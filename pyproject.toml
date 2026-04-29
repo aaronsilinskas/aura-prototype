@@ -1,0 +1,51 @@
+[project]
+name = "aura-prototype"
+version = "0.1.0"
+description = "Aura Game Engine core features protoype"
+readme = "README.md"
+authors = [
+    { name = "Aaron Silinskas", email = "aaron@mindwidgets.com" }
+]
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "import-linter>=2.3",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.15.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["effects", "engine", "magic", "rules"]
+pythonpath = ["."]
+addopts = "-p no:debugging"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (unused imports, undefined names)
+    "I",   # isort (import ordering)
+    "N",   # pep8-naming conventions
+    "UP",  # pyupgrade (modernise syntax)
+    "B",   # flake8-bugbear (likely bugs and design issues)
+    "C4",  # flake8-comprehensions (cleaner list/dict/set expressions)
+    "SIM", # flake8-simplify (redundant code patterns)
+    "RUF", # ruff-native rules
+]
+ignore = [
+    "N817",   # VG is an established abbreviation for ValueGenerator throughout the codebase
+    "RUF002", # mathematical symbols (×, –) in docstrings are intentional
+    "RUF003", # mathematical symbols (×, –) in comments are intentional
+    "SIM105", # try/except/pass is clearer than contextlib.suppress for CircuitPython compat blocks
+]
+
+[tool.importlinter]
+root_packages = ["effects", "engine", "magic", "rules"]
+source_roots = ["."]
