@@ -5,7 +5,25 @@ A monorepo to prototype Aura Game Engine core features.
 
 # Implementation Notes
 
-## Terms
+*New General Flow*
+
+- Input \ network activity -> data objects -> wrapped in events like InputEvent
+- events go into GameEngine for processing, which runs GameRules 
+- GameRules alter game state and can call an effect shim to make effects
+- These effects will be wired to also trigger sound and vibrations inside the effect shim
+  - A new effect event design will be needed to standardize named events from effects
+- RGB strips, sound, and vibration modules will consume the updated effect to render RGB strips, play sounds if defined, or play vibrations.
+
+- use EffectManager.start/end_effect(slot/area, name, options, merge=true/false)
+  - need to know published options (could just be documented, not programmatic and updated with version updates - all effects should have a default for no options)
+  - slot/area/focus would be "player", "directional", etc
+  - merge would be whether existing effects running in a slot/area/focus will be replaced
+- make a single object that takes all parameters into a GameRule
+  - engine (to load packs)
+  - state (game state)
+  - effect manager (trigger effects)
+
+## Terms (Old - need an update)
 Game Thing - the main game loop, holds game state, processes events with rules, then sends
   to listeners.
   Owns: Player, Team, Game State, Game Manager (scanning for games, joining/rejoining, creating)
