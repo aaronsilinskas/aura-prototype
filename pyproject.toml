@@ -25,6 +25,7 @@ addopts = "-p no:debugging"
 
 [tool.ruff]
 line-length = 100
+exclude = ["scratch"]
 
 [tool.ruff.lint]
 select = [
