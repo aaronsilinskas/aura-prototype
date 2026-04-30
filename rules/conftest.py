@@ -1,6 +1,6 @@
 import pytest
 
-from engine.engine import GameEngine, GameRule, Version
+from engine.engine import GameEngine, GameRule, GameState, Version
 from engine.events import Event
 from engine.timer import Timer
 
@@ -18,7 +18,7 @@ class _EventCaptureRule(GameRule):
         super().__init__("test.capture_rule", Version(1, 0))
         self.captured_events = []
 
-    def handle_event(self, engine: GameEngine, event: Event, timer: Timer) -> None:
+    def handle_event(self, event: Event, state: GameState) -> None:
         self.captured_events.append(event)
 
 

@@ -1,6 +1,7 @@
 import time
 
-from engine.engine import GameEngine
+from engine.engine import GameEngine, GameRule, GameState
+from engine.events import Event
 from engine.input import ButtonData, InputEvents, MovementData
 from engine.timer import Timer
 from rules.debug_pack.event_logger import EventLoggerRule
@@ -25,6 +26,91 @@ test_movement_data = MovementData(x_accel=0.0, y_accel=9.8, z_accel=0.0)
 input_event = InputEvents.ButtonAndMovement(test_button_data, test_movement_data)
 
 
+try:
+    from typing import Final
+except ImportError:
+    pass  # Not available on CircuitPython
+
+
+class ScopeValue:
+    """A typed scope value. Use constants from Scope — do not construct directly."""
+
+    __slots__ = ("_value",)
+
+    def __init__(self, value: str) -> None:
+        self._value = value
+
+    def __repr__(self) -> str:
+        return self._value
+
+
+class Scope:
+    """Routing constants that tell drivers where to display or play an effect.
+
+    Use PERSONAL or DIRECTIONAL for single-player feedback.
+    Use Scope.Global.* constants for shared, multi-player display areas.
+    """
+
+    class Global:
+        """Effect is visible/audible to all players. Use zone constants to route to sub-areas."""
+        ALL: "Final" = ScopeValue("global.all")       # entire global area, no differentiation
+        MAIN: "Final" = ScopeValue("global.main")     # primary effect area (e.g. active spell)
+        BUFF: "Final" = ScopeValue("global.buff")      # positive status effects
+        DEBUFF: "Final" = ScopeValue("global.debuff")  # negative status effects
+
+    PERSONAL: "Final" = ScopeValue("personal")         # only the local player's device
+    DIRECTIONAL: "Final" = ScopeValue("directional")   # the direction the player is pointing
+
+
+class EffectManager:
+
+    def set_effect(self, name: str, scope: ScopeValue, options: "dict | None" = None) -> None:
+        """Replace any running effect(s) in scope and start this one."""
+        pass
+
+    def add_effect(self, name: str, scope: ScopeValue, options: "dict | None" = None) -> None:
+        """Layer this effect on top of any running effects in scope.
+
+        If nothing is running in scope, behaves like set_effect.
+        The driver determines how layered effects are composited (e.g. splitting an LED strip).
+        """
+        pass
+
+    def push_effect(self, name: str, scope: ScopeValue, options: "dict | None" = None) -> None:
+        """Pause running effects in scope and start this one on top of the stack.
+
+        Call pop_effect to remove this effect and resume what was running before.
+        """
+        pass
+
+    def pop_effect(self, scope: ScopeValue) -> None:
+        """Remove the top effect from the stack in scope and resume the previous one."""
+        pass
+
+    def stop_effect(self, scope: ScopeValue) -> None:
+        """Stop all running effects in scope, including any layered effects."""
+        pass
+
+effect_manager_hack = EffectManager() # Temporary global instance for testing until we have a better way to pass it to rules
+
+class MakeEffectRule(GameRule):
+    def handle_event(self, event: Event, state: GameState) -> None:
+        if isinstance(event, InputEvents.ButtonAndMovement):
+            # Process the button and movement data to determine the effect to trigger
+            button_data = event.buttons
+                        
+            # Example logic to determine effect based on input
+            if button_data.states["A"] == ButtonData.PRESSED:
+                effect_manager_hack.set_effect("color.flash", Scope.Global.ALL, {"duration": 3})
+                
+
+# - TODO: EventManager and standard naming for effects and options with defaults
+# - TODO: Use ANSI effect renderer to see visuals without hardware
+# - TODO: Single container object to pass all params to rules (engine, state, effect manager, etc)
+# - TODO: EffectManager.start/end_effect(slot/area/focus, name, options, merge=true/false)
+# = TODO: Set target focus for effect (e.g. player, directional, global) with merge/replace
+# Trigger visual, sound, and vibration effect that runs on update
+# - TODO: New standardized effect event name design for sound/vibration triggers
 
 timer = Timer()
 
@@ -39,34 +125,3 @@ for _ in range(10):
     
     time.sleep(0.1)
     
-# Examples
-# Note: try to focus on minimal memory usage for events.
-# - Radio request to join game received:
-# Test Rule Pack
-# - Player pushes A or B button, generates a configured game event like "indicate color" or
-#   "cast spell"
-# - Additional rules to test SFX, IR, RGB, etc drivers.
-# Red Rover Game Rule Pack
-# - Player moves IMU when green or loses
-# - Player stops moving IMU when red or loses
-# - Player gets points for correct movement
-# - Player loses game after too many incorrect movements
-# - Start flashing when indicator will change soon
-# - Speed of change increases with each correct movement.
-# - Advanced mode -> direction matters, not just movement.
-# Fishing Game Rule Pack
-# - Player casts fishing line with button A or B
-# - Player gets bite with flashing light and SFX
-# - Player reels in with button, letting go if flashes red
-# - Add IMU to reeling for more fun
-# - Player catches fish, gets points, and can cast again
-# - Player loses fish, gets no points, and can cast again
-# Lobby Rule Pack
-# - Player selects a rule pack and starts a game
-# - Player joins a game, receives list of Rule Packs and versions, verifies that they have them,
-#   then sends join request with player name and list of Rule Packs and versions.
-# - Player device restart and rejoin game attempt.
-# Free For All Rule Pack
-# - Player creates new team (may not be allowed in some games)
-# - Player casts spell over IR
-# - Spell Hit IR packet received

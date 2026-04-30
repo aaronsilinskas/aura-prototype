@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from engine.engine import GameEngine, GameRule, Version
+from engine.engine import GameRule, GameState, Version
 from engine.events import Event
 from engine.input import ButtonData, InputEvents
-from engine.timer import Timer
 
 _VERSION: Version = Version(1, 0)
 
@@ -26,21 +25,21 @@ class ButtonEventsRule(GameRule):
         self._up = button_up
         self._released = button_released
 
-    def handle_event(self, engine: GameEngine, event: Event, timer: Timer) -> None:
+    def handle_event(self, event: Event, state: GameState) -> None:
         if not isinstance(event, InputEvents.ButtonAndMovement):
             return
-        for button_name, state in event.buttons.states.items():
-            if state == ButtonData.PRESSED:
+        for button_name, button_state in event.buttons.states.items():
+            if button_state == ButtonData.PRESSED:
                 state_map = self._pressed
-            elif state == ButtonData.DOWN:
+            elif button_state == ButtonData.DOWN:
                 state_map = self._down
-            elif state == ButtonData.UP:
+            elif button_state == ButtonData.UP:
                 state_map = self._up
-            elif state == ButtonData.RELEASED:
+            elif button_state == ButtonData.RELEASED:
                 state_map = self._released
             else:
                 state_map = None
             if state_map is not None:
                 button_event = state_map.get(button_name)
                 if button_event is not None:
-                    engine.queue_event(button_event)
+                    state.engine.queue_event(button_event)

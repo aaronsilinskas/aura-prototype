@@ -19,9 +19,17 @@ class GameRule:
         self.name = name
         self.version = version
 
-    def handle_event(self, engine: GameEngine, event: Event, timer: Timer) -> None:
+    def handle_event(self, event: Event, state: GameState) -> None:
         # Process the event with game rules, update game state, and generate new events as needed
         pass
+
+
+class GameState:
+    __slots__ = ("engine", "timer")
+
+    def __init__(self, engine: GameEngine, timer: Timer) -> None:
+        self.engine = engine
+        self.timer = timer
 
 
 class GameEngine:
@@ -32,10 +40,11 @@ class GameEngine:
         self._queue: list[Event] = []
 
     def update(self, timer: Timer) -> None:
+        state = GameState(self, timer)
         while self._queue:
             event = self._queue.pop(0)
             for rule in self._rules:
-                rule.handle_event(self, event, timer)
+                rule.handle_event(event, state)
 
     def queue_event(self, event: Event) -> None:
         self._queue.append(event)

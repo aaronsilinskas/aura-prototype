@@ -5,9 +5,8 @@ try:
 except ImportError:
     pass
 
-from engine.engine import GameEngine, GameRule, Version
+from engine.engine import GameRule, GameState, Version
 from engine.events import Event
-from engine.timer import Timer
 
 _VERSION: Version = Version(1, 0)
 
@@ -21,10 +20,10 @@ class EventLoggerRule(GameRule):
         super().__init__("debug.event_logger", _VERSION)
         self._output = output
 
-    def handle_event(self, engine: GameEngine, event: Event, timer: Timer) -> None:
+    def handle_event(self, event: Event, state: GameState) -> None:
         parts = []
         for cls in type(event).__mro__:
             for slot in getattr(cls, "__slots__", ()):
                 if slot not in ("group", "name"):
                     parts.append(f"{slot}={getattr(event, slot)}")
-        self._output(f"[debug] t={timer.total:.3f} {str(event).upper()} {', '.join(parts)}")
+        self._output(f"[debug] t={state.timer.total:.3f} {str(event).upper()} {', '.join(parts)}")
