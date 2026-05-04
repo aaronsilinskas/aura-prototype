@@ -4,20 +4,22 @@ from effects.palette import Palette
 from effects.render import EffectRenderer, RendererConfig
 from engine.timer import Timer
 
-# TODO - manager will need to populate RendererConfig
-# -- pixel_count and resolution will need to come from each driver, but re-use renderer if those
-#   match
-# -- listeners will need a hook to audio/vibration drivers to trigger
-# TODO - need some kind of standard registry hook or file that will provide all available effects
-
 
 class EffectBuilder:
-    def __call__(self, name: str, config: RendererConfig, options: dict) -> EffectRenderer:
+    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
         """Build an EffectRenderer for the named effect.
 
         Args:
-            name: The registered effect name (e.g. "color.flash").
-            options: Configuration values for the effect's steps and shapes.
+            name: The registered effect name (e.g. ``"color.flash"``).
+            config: Runtime configuration for the render pass. ``config.level``
+                carries the universal intensity in ``[1, 10]``; ``config.options``
+                carries any effect-specific parameters (e.g. duration, color).
+                ``config.pixel_count`` and ``config.resolution`` describe the
+                output hardware.
+
+        Returns:
+            A configured ``EffectRenderer`` ready to be paired with an
+            ``EffectState`` and advanced each frame.
         """
         raise NotImplementedError
 
@@ -30,8 +32,18 @@ class EffectManager:
         self._effects: dict[str, list[tuple[EffectRenderer, EffectState]]] = {}
         self._timer: EffectTimer = EffectTimer()
 
-    def _build_effect(self, name: str, level: int, options: dict) -> "tuple[EffectRenderer, EffectState]":
+    def _build_effect(
+        self, name: str, level: int, options: dict
+    ) -> "tuple[EffectRenderer, EffectState]":
         """Construct an EffectRenderer paired with a fresh EffectState."""
+
+        # TODO - construct a RendererConfig to pass to the builder:
+        # -- pixel_count and resolution will need to come from each driver, but re-use renderer if
+        #   those match
+        # -- level comes from set/add_effect
+        # -- options comes from set/add_effect
+        # -- listeners will need a hook to audio/vibration drivers to trigger
+
         # TODO implement registry to build effect renderer(s) for drivers
         return EffectRenderer(Effect(name), Palette()), EffectState()
 
@@ -73,7 +85,7 @@ class EffectManager:
 
     def __repr__(self) -> str:
         parts = []
-        for key, effects in self._effects.items():  # TODO: expose effect name to fix r._effect.name
-            names = ", ".join(r._effect.name for r, _ in effects)
+        for key, effects in self._effects.items():
+            names = ", ".join(r.name for r, _ in effects)
             parts.append(f"{key}: [{names}]")
         return "\n".join(parts) if parts else "(no active effects)"

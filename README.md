@@ -12,11 +12,11 @@ A monorepo to prototype Aura Game Engine core features.
 - Add Scene which takes rules, effects, and palettes so far
 - SceneManager will layer on top of (overlay or hide) or replace Scenes. Rules can change Scenes
 
-- Event = an event that will be processed by the game
-- Message = from another device (IR, radio, BLE, Wifi). Has sender, receivers optional. Device IDs should be managed outside of game engine
-
-- SoundManager and VibrationManager
-- Sound can use file name to determine play once, loop, random select. Eg lightning_strike.wav (once), water_start_loop.wav, earth_shift_1/2/3.wav (random select)
+- Need Visual/Audio/VibrationDrivers registered with EffectManager
+  - VisualDrivers will have pixel count and resolution parameters for RendererConfig
+  - AudioDriver will scale min/max volume by level
+  - VibrationDriver will probably need to dynamically scale min/max strength by level
+- Audio can use file name to determine play once, loop, random select. Eg lightning_strike.wav (once), water_start_loop.wav, earth_shift_1/2/3.wav (random select)
 - Vibration could have text files with sequences 
 
 *New General Flow*
@@ -36,6 +36,10 @@ A monorepo to prototype Aura Game Engine core features.
   - engine (to load packs)
   - state (game state)
   - effect manager (trigger effects)
+
+- Event = an event that will be processed by the game
+- Message = from another device (IR, radio, BLE, Wifi). Has sender, receivers optional. Device IDs should be managed outside of game engine
+
 
 ## Terms (Old - need an update)
 Game Thing - the main game loop, holds game state, processes events with rules, then sends

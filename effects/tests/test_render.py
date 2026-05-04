@@ -108,6 +108,14 @@ def test_all_registered_listeners_are_notified_in_registration_order() -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_renderer_exposes_effect_name() -> None:
+    renderer = EffectRenderer(
+        Effect("my_effect"), PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
+    )
+
+    assert renderer.name == "my_effect"
+
+
 def test_renderer_maps_effect_value_through_palette_to_produce_packed_color() -> None:
     # Effect always returns 1.0; black→red palette maps 1.0 to full red.
     effect = Effect("test", lambda _: 1.0)

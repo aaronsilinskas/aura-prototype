@@ -55,6 +55,11 @@ class EffectRenderer:
         self._effect = effect
         self._palette = palette
 
+    @property
+    def name(self) -> str:
+        """The name of the underlying effect."""
+        return self._effect.name
+
     def update(self, state: EffectState, timer: EffectTimer) -> None:
         """Advance effect step state for the current frame."""
         self._effect.update(state, timer)
