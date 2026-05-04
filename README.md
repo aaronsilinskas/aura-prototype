@@ -15,6 +15,7 @@ A monorepo to prototype Aura Game Engine core features.
 - Event = an event that will be processed by the game
 - Message = from another device (IR, radio, BLE, Wifi). Has sender, receivers optional. Device IDs should be managed outside of game engine
 
+- SoundManager and VibrationManager
 - Sound can use file name to determine play once, loop, random select. Eg lightning_strike.wav (once), water_start_loop.wav, earth_shift_1/2/3.wav (random select)
 - Vibration could have text files with sequences 
 
