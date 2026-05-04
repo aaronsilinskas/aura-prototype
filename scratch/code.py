@@ -46,13 +46,13 @@ class EffectManager:
         """
         return EffectRenderer(Effect(name), Palette()), EffectState()
 
-    def set_effect(self, name: str, scope: ScopeValue, options: "dict | None" = None) -> None:
+    def set_effect(self, scope: ScopeValue, name: str, options: "dict | None" = None) -> None:
         """Replace any running effect(s) in scope and start this one."""
         pair = self._build_effect(name, options)
         for key in scope.keys:
             self._effects[key] = [pair]
 
-    def add_effect(self, name: str, scope: ScopeValue, options: "dict | None" = None) -> None:
+    def add_effect(self, scope: ScopeValue, name: str, options: "dict | None" = None) -> None:
         """Layer this effect alongside any running effects in scope.
 
         If nothing is running in scope, behaves like set_effect.
@@ -99,10 +99,9 @@ class MakeEffectRule(GameRule):
                         
             # Example logic to determine effect based on input
             if button_data.states["A"] == ButtonData.PRESSED:
-                effect_manager_hack.set_effect("color.flash", Scope.Global.ALL, {"duration": 3})
+                effect_manager_hack.set_effect(Scope.Global.ALL, "color.flash", {"duration": 3, "times": 2})
                 
 
-# - TODO: EventManager and standard naming for effects and options with defaults
 # - TODO: Use ANSI effect renderer to see visuals without hardware
 # - TODO: Single container object to pass all params to rules (engine, state, effect manager, etc)
 # - TODO: EffectManager.start/end_effect(slot/area/focus, name, options, merge=true/false)

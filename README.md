@@ -5,6 +5,19 @@ A monorepo to prototype Aura Game Engine core features.
 
 # Implementation Notes
 
+*New New*
+- Scene will specify rules, effects, palettes, etc
+- Scenes can nest - pause could run as a parent to suspend child rules temporarily
+- Finish effect manager registry, which will be populated by Scene
+- Add Scene which takes rules, effects, and palettes so far
+- SceneManager will layer on top of (overlay or hide) or replace Scenes. Rules can change Scenes
+
+- Event = an event that will be processed by the game
+- Message = from another device (IR, radio, BLE, Wifi). Has sender, receivers optional. Device IDs should be managed outside of game engine
+
+- Sound can use file name to determine play once, loop, random select. Eg lightning_strike.wav (once), water_start_loop.wav, earth_shift_1/2/3.wav (random select)
+- Vibration could have text files with sequences 
+
 *New General Flow*
 
 - Input \ network activity -> data objects -> wrapped in events like InputEvent
