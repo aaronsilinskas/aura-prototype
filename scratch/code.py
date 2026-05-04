@@ -38,7 +38,7 @@ class MakeEffectRule(GameRule):
                         
             # Example logic to determine effect based on input
             if button_data.states["A"] == ButtonData.PRESSED:
-                effect_manager_hack.set_effect(Scope.Global.ALL, "color.flash", {"duration": 3, "times": 2})
+                effect_manager_hack.set_effect(Scope.Global.ALL, "color.flash", 5, {"color": "red", "duration": 3, "times": 2})
                 
 
 # - TODO: Use ANSI effect renderer to see visuals without hardware

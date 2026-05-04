@@ -18,18 +18,20 @@ class RendererConfig:
     name when significant events occur during rendering.
     """
 
-    __slots__ = ["level", "listeners", "pixel_count", "resolution"]
+    __slots__ = ["level", "listeners", "options", "pixel_count", "resolution"]
 
     def __init__(
         self,
         level: int,
         pixel_count: int,
         resolution: int,
+        options: dict | None = None,
         listeners: list[EffectListenerFunc] | None = None,
     ):
         self.level = min(max(1, level), 10)
         self.pixel_count = max(1, pixel_count)
         self.resolution = max(1, resolution)
+        self.options = options if options is not None else {}
         self.listeners = listeners if listeners is not None else []
 
     def notify_listeners(self, event_name: str) -> None:

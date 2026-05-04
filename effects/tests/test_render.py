@@ -1,5 +1,3 @@
-from effects.tests.helpers import CountUpdates, make_timer
-
 from effects.effect import Effect, EffectState
 from effects.palette import Palette, PaletteLUT256
 from effects.render import (
@@ -8,6 +6,7 @@ from effects.render import (
     EffectRenderer,
     RendererConfig,
 )
+from effects.tests.helpers import CountUpdates, make_timer
 
 # ---------------------------------------------------------------------------
 # RendererConfig — level clamping
@@ -30,6 +29,19 @@ def test_config_stores_level_within_valid_range_unchanged() -> None:
     config = RendererConfig(level=5, pixel_count=10, resolution=10)
 
     assert config.level == 5
+
+
+def test_config_stores_options_dict() -> None:
+    opts = {"color": "red"}
+    config = RendererConfig(level=5, pixel_count=10, resolution=10, options=opts)
+
+    assert config.options == opts
+
+
+def test_config_options_defaults_to_empty_dict() -> None:
+    config = RendererConfig(level=5, pixel_count=10, resolution=10)
+
+    assert config.options == {}
 
 
 # ---------------------------------------------------------------------------

@@ -4,8 +4,6 @@ from effects.palette import Palette
 from effects.render import EffectRenderer, RendererConfig
 from engine.timer import Timer
 
-# TODO - level is really a specific option for spells, not a general option. Pull out to options dict?
-# - need options dict for more general effects like flashes, etc
 # TODO - manager will need to populate RendererConfig
 # -- pixel_count and resolution will need to come from each driver, but re-use renderer if those
 #   match
@@ -32,24 +30,24 @@ class EffectManager:
         self._effects: dict[str, list[tuple[EffectRenderer, EffectState]]] = {}
         self._timer: EffectTimer = EffectTimer()
 
-    def _build_effect(self, name: str, options: dict) -> "tuple[EffectRenderer, EffectState]":
+    def _build_effect(self, name: str, level: int, options: dict) -> "tuple[EffectRenderer, EffectState]":
         """Construct an EffectRenderer paired with a fresh EffectState."""
         # TODO implement registry to build effect renderer(s) for drivers
         return EffectRenderer(Effect(name), Palette()), EffectState()
 
-    def set_effect(self, scope: ScopeValue, name: str, options: dict) -> None:
+    def set_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None:
         """Replace any running effect(s) in scope and start this one."""
-        pair = self._build_effect(name, options)
+        pair = self._build_effect(name, level, options)
         for key in scope.keys:
             self._effects[key] = [pair]
 
-    def add_effect(self, scope: ScopeValue, name: str, options: dict) -> None:
+    def add_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None:
         """Layer this effect alongside any running effects in scope.
 
         If nothing is running in scope, behaves like set_effect.
         The driver determines how layered effects are composited (e.g. splitting an LED strip).
         """
-        pair = self._build_effect(name, options)
+        pair = self._build_effect(name, level, options)
         for key in scope.keys:
             if key in self._effects:
                 self._effects[key].append(pair)
