@@ -8,6 +8,7 @@ Run:
     uv run python examples/element_levels.py
     uv run python examples/element_levels.py fire          # one element
     uv run python examples/element_levels.py fire 7        # one element at one level
+    uv run python examples/element_levels.py fire 3 8      # levels 3 through 8
 """
 
 import sys
@@ -22,7 +23,7 @@ PIXEL_COUNT = 32
 RESOLUTION = PIXEL_COUNT * 3
 FPS = 24
 WARMUP_SECONDS = 1.5  # advance silently so animations reach a representative state
-SHOW_SECONDS = 2.0  # how long to display each level
+SHOW_SECONDS = 5.0  # how long to display each level
 
 SAMPLE_LEVELS = [1, 4, 7, 10]
 
@@ -73,8 +74,12 @@ def show_element(name: str, levels: list[int]) -> None:
 def main() -> None:
     element_arg = sys.argv[1] if len(sys.argv) > 1 else None
     level_arg = int(sys.argv[2]) if len(sys.argv) > 2 else None
+    end_level_arg = int(sys.argv[3]) if len(sys.argv) > 3 else None
 
-    if element_arg and level_arg:
+    if element_arg and level_arg and end_level_arg:
+        elements = [element_arg]
+        levels = list(range(level_arg, end_level_arg + 1))
+    elif element_arg and level_arg:
         elements = [element_arg]
         levels = [level_arg]
     elif element_arg:

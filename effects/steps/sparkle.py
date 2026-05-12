@@ -25,7 +25,7 @@ class SparkleStep(EffectStep):
     ):
         self.sparkle_count = max(0, int(VG.resolve(sparkle_count)))
         # TODO remove buffer_count and related logic once adjust_value has access to pixel_count
-        self.buffer_count = max(1, self.sparkle_count * 2)
+        self.buffer_count = max(1, 10, self.sparkle_count * 2)
         self.spawn_delay_rate = spawn_delay_rate
         self.fade_in_rate = VG.resolve(fade_in_rate)
         self.fade_out_rate = VG.resolve(fade_out_rate)
