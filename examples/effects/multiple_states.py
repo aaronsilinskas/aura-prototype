@@ -13,10 +13,11 @@ Run:
 
 import sys
 import time
+from collections.abc import Iterable
 
 from effects.effect import Effect, EffectState, EffectTimer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer
+from effects.render import EffectRenderer, PixelBuffer
 from effects.steps.flame import flame
 
 PIXEL_COUNT = 24
@@ -36,7 +37,7 @@ fire_palette = bytes([
 # fmt: on
 
 
-def ansi_strip(colors: list[int]) -> str:
+def ansi_strip(colors: Iterable[int]) -> str:
     parts = []
     for color in colors:
         r = (color >> 16) & 0xFF
@@ -78,8 +79,9 @@ def main() -> None:
             sys.stdout.write(f"\033[{NUM_STRIPS}A")
             for i, state in enumerate(states):
                 renderer.update(state, timer)
-                colors = [renderer.render(state, j / PIXEL_COUNT) for j in range(PIXEL_COUNT)]
-                sys.stdout.write(f"\rStrip {i + 1}: {ansi_strip(colors)}\n")
+                output = PixelBuffer(PIXEL_COUNT)
+                renderer.render(state, output)
+                sys.stdout.write(f"\rStrip {i + 1}: {ansi_strip(output)}\n")
             sys.stdout.flush()
 
             time.sleep(elapsed)

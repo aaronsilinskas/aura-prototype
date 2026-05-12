@@ -46,7 +46,7 @@ import neopixel
 from effects.effect import EffectState, EffectTimer
 from effects.elements.registry import build_element_renderer, list_element_names
 from effects.performance import PerformanceTracker
-from effects.render import RendererConfig
+from effects.render import PixelBuffer, RendererConfig
 
 NUM_LEDS = 12
 PIXELS_PIN = board.D5
@@ -107,10 +107,10 @@ while True:
     perf.add_update_time()
 
     perf.start_render_time()
+    output = PixelBuffer(NUM_LEDS)
+    current_renderer.render(state, output)
     for led_index in range(NUM_LEDS):
-        position = led_index / NUM_LEDS
-        color = current_renderer.render(state, position)
-        pixels[led_index] = color
+        pixels[led_index] = output[led_index]
     perf.add_render_time()
 
     pixels.show()

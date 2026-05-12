@@ -15,10 +15,11 @@ Run:
 
 import sys
 import time
+from collections.abc import Iterable
 
 from effects.effect import Effect, EffectState, EffectTimer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer
+from effects.render import EffectRenderer, PixelBuffer
 from effects.shape import Shape
 from effects.steps.drift_noise import drift_noise
 from effects.steps.position import rotate
@@ -40,7 +41,7 @@ COSMIC_PALETTE = bytes([
 # fmt: on
 
 
-def ansi_strip(colors: list[int]) -> str:
+def ansi_strip(colors: Iterable[int]) -> str:
     """Render a list of packed RGB colors as ANSI true-color terminal blocks."""
     parts = []
     for color in colors:
@@ -81,7 +82,7 @@ def main() -> None:
     # --- Renderer ---------------------------------------------------
     # EffectRenderer ties an Effect to a Palette.
     # Call update() once per frame to advance step state.
-    # Call render(state, position) per pixel to get a packed 0xRRGGBB color.
+    # Call render(state, output) with a PixelBuffer to fill all pixel colors.
     palette = PaletteLUT256(COSMIC_PALETTE)
     renderer = EffectRenderer(effect, palette)
 
@@ -98,8 +99,9 @@ def main() -> None:
             timer.update(elapsed)
             renderer.update(state, timer)
 
-            colors = [renderer.render(state, i / PIXEL_COUNT) for i in range(PIXEL_COUNT)]
-            sys.stdout.write(f"\r{ansi_strip(colors)}")
+            output = PixelBuffer(PIXEL_COUNT)
+            renderer.render(state, output)
+            sys.stdout.write(f"\r{ansi_strip(output)}")
             sys.stdout.flush()
             time.sleep(elapsed)
     except KeyboardInterrupt:

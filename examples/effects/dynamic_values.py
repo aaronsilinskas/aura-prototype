@@ -22,10 +22,11 @@ Run:
 
 import sys
 import time
+from collections.abc import Iterable
 
 from effects.effect import Effect, EffectState, EffectTimer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer
+from effects.render import EffectRenderer, PixelBuffer
 from effects.steps.flame import flame
 from effects.value import ValueGenerator as VG
 
@@ -45,7 +46,7 @@ fire_palette = bytes([
 # fmt: on
 
 
-def ansi_strip(colors: list[int]) -> str:
+def ansi_strip(colors: Iterable[int]) -> str:
     parts = []
     for color in colors:
         r = (color >> 16) & 0xFF
@@ -112,15 +113,12 @@ def main() -> None:
             random_renderer.update(random_state_a, timer)
             random_renderer.update(random_state_b, timer)
 
-            fixed_colors = [
-                fixed_renderer.render(fixed_state, i / PIXEL_COUNT) for i in range(PIXEL_COUNT)
-            ]
-            colors_a = [
-                random_renderer.render(random_state_a, i / PIXEL_COUNT) for i in range(PIXEL_COUNT)
-            ]
-            colors_b = [
-                random_renderer.render(random_state_b, i / PIXEL_COUNT) for i in range(PIXEL_COUNT)
-            ]
+            fixed_colors = PixelBuffer(PIXEL_COUNT)
+            fixed_renderer.render(fixed_state, fixed_colors)
+            colors_a = PixelBuffer(PIXEL_COUNT)
+            random_renderer.render(random_state_a, colors_a)
+            colors_b = PixelBuffer(PIXEL_COUNT)
+            random_renderer.render(random_state_b, colors_b)
 
             sys.stdout.write("\033[3A")
             sys.stdout.write(f"\rFixed:    {ansi_strip(fixed_colors)}\n")

@@ -32,10 +32,11 @@ Run:
 import math
 import sys
 import time
+from collections.abc import Iterable
 
 from effects.effect import Effect, EffectState, EffectStep, EffectTimer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer
+from effects.render import EffectRenderer, PixelBuffer
 from effects.shape import Shape
 from effects.steps.position import rotate
 
@@ -82,7 +83,7 @@ class PulseStep(EffectStep):
         return value * multiplier
 
 
-def ansi_strip(colors: list[int]) -> str:
+def ansi_strip(colors: Iterable[int]) -> str:
     parts = []
     for color in colors:
         r = (color >> 16) & 0xFF
@@ -124,12 +125,10 @@ def main() -> None:
             steady_renderer.update(steady_state, timer)
             pulse_renderer.update(pulse_state, timer)
 
-            steady_colors = [
-                steady_renderer.render(steady_state, i / PIXEL_COUNT) for i in range(PIXEL_COUNT)
-            ]
-            pulse_colors = [
-                pulse_renderer.render(pulse_state, i / PIXEL_COUNT) for i in range(PIXEL_COUNT)
-            ]
+            steady_colors = PixelBuffer(PIXEL_COUNT)
+            steady_renderer.render(steady_state, steady_colors)
+            pulse_colors = PixelBuffer(PIXEL_COUNT)
+            pulse_renderer.render(pulse_state, pulse_colors)
 
             sys.stdout.write("\033[2A")
             sys.stdout.write(f"\rSteady:  {ansi_strip(steady_colors)}\n")

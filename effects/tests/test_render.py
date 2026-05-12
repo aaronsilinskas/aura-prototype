@@ -4,6 +4,7 @@ from effects.render import (
     AdditiveMergeRenderer,
     AverageMergeRenderer,
     EffectRenderer,
+    PixelBuffer,
     RendererConfig,
 )
 from effects.tests.helpers import CountUpdates, make_timer
@@ -104,6 +105,46 @@ def test_all_registered_listeners_are_notified_in_registration_order() -> None:
 
 
 # ---------------------------------------------------------------------------
+# PixelBuffer
+# ---------------------------------------------------------------------------
+
+
+def test_pixel_buffer_count_matches_size_at_construction() -> None:
+    buf = PixelBuffer(5)
+
+    assert buf.count == 5
+
+
+def test_pixel_buffer_initializes_all_pixels_to_zero() -> None:
+    buf = PixelBuffer(4)
+
+    assert list(buf) == [0, 0, 0, 0]
+
+
+def test_pixel_buffer_set_pixel_stores_color_at_given_index() -> None:
+    buf = PixelBuffer(3)
+
+    buf.set_pixel(1, 0xFF0000)
+
+    assert buf[1] == 0xFF0000
+
+
+def test_pixel_buffer_len_returns_pixel_count() -> None:
+    buf = PixelBuffer(7)
+
+    assert len(buf) == 7
+
+
+def test_pixel_buffer_iterates_pixels_in_index_order() -> None:
+    buf = PixelBuffer(3)
+    buf.set_pixel(0, 0xFF0000)
+    buf.set_pixel(1, 0x00FF00)
+    buf.set_pixel(2, 0x0000FF)
+
+    assert list(buf) == [0xFF0000, 0x00FF00, 0x0000FF]
+
+
+# ---------------------------------------------------------------------------
 # EffectRenderer — render pipeline
 # ---------------------------------------------------------------------------
 
@@ -123,9 +164,10 @@ def test_renderer_maps_effect_value_through_palette_to_produce_packed_color() ->
     state = EffectState()
     renderer = EffectRenderer(effect, palette)
 
-    color = renderer.render(state, 0.5)
+    output = PixelBuffer(1)
+    renderer.render(state, output)
 
-    assert color == Palette.pack_rgb(255, 0, 0)
+    assert output[0] == Palette.pack_rgb(255, 0, 0)
 
 
 def test_renderer_returns_black_when_effect_value_is_zero() -> None:
@@ -134,9 +176,10 @@ def test_renderer_returns_black_when_effect_value_is_zero() -> None:
     state = EffectState()
     renderer = EffectRenderer(effect, palette)
 
-    color = renderer.render(state, 0.0)
+    output = PixelBuffer(1)
+    renderer.render(state, output)
 
-    assert color == Palette.pack_rgb(0, 0, 0)
+    assert output[0] == Palette.pack_rgb(0, 0, 0)
 
 
 def test_renderer_update_propagates_to_effect_step() -> None:
@@ -152,6 +195,33 @@ def test_renderer_update_propagates_to_effect_step() -> None:
     assert counter.count == 2
 
 
+def test_renderer_fills_all_pixels_in_output() -> None:
+    effect = Effect("test", lambda _: 1.0)
+    palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
+    state = EffectState()
+    renderer = EffectRenderer(effect, palette)
+
+    output = PixelBuffer(3)
+    renderer.render(state, output)
+
+    assert list(output) == [Palette.pack_rgb(255, 0, 0)] * 3
+
+
+def test_renderer_samples_each_pixel_at_its_normalized_position() -> None:
+    # Effect returns 0.0 for position < 0.5, 1.0 otherwise.
+    # pixel[0] → position 0/2 = 0.0 → black; pixel[1] → position 1/2 = 0.5 → red.
+    effect = Effect("test", lambda pos: 1.0 if pos >= 0.5 else 0.0)
+    palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
+    state = EffectState()
+    renderer = EffectRenderer(effect, palette)
+
+    output = PixelBuffer(2)
+    renderer.render(state, output)
+
+    assert output[0] == Palette.pack_rgb(0, 0, 0)
+    assert output[1] == Palette.pack_rgb(255, 0, 0)
+
+
 # ---------------------------------------------------------------------------
 # AverageMergeRenderer
 # ---------------------------------------------------------------------------
@@ -164,7 +234,12 @@ def test_average_merge_render_with_single_renderer_produces_same_color() -> None
     single = EffectRenderer(effect, palette)
     merged = AverageMergeRenderer([EffectRenderer(effect, palette)])
 
-    assert merged.render(state, 0.5) == single.render(state, 0.5)
+    out_merged = PixelBuffer(1)
+    out_single = PixelBuffer(1)
+    merged.render(state, out_merged)
+    single.render(state, out_single)
+
+    assert out_merged[0] == out_single[0]
 
 
 def test_average_merge_render_averages_rgb_channels_across_renderers() -> None:
@@ -181,9 +256,10 @@ def test_average_merge_render_averages_rgb_channels_across_renderers() -> None:
         ]
     )
 
-    color = renderer.render(state, 0.0)
+    output = PixelBuffer(1)
+    renderer.render(state, output)
 
-    assert color == Palette.pack_rgb(127, 0, 127)
+    assert output[0] == Palette.pack_rgb(127, 0, 127)
 
 
 def test_average_merge_update_propagates_to_all_child_renderers() -> None:
@@ -206,6 +282,30 @@ def test_average_merge_update_propagates_to_all_child_renderers() -> None:
     assert counter_b.count == 1
 
 
+def test_average_merge_renders_each_pixel_independently() -> None:
+    # Effect A: full red at position >= 0.5, black otherwise.
+    # Effect B: always full blue.
+    # pixel[0] (pos=0.0): A=black, B=blue  → average = (0, 0, 127)
+    # pixel[1] (pos=0.5): A=red,   B=blue  → average = (127, 0, 127)
+    effect_a = Effect("a", lambda pos: 1.0 if pos >= 0.5 else 0.0)
+    effect_b = Effect("b", lambda _: 1.0)
+    red_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
+    blue_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 0, 0, 255]))
+    state = EffectState()
+    renderer = AverageMergeRenderer(
+        [
+            EffectRenderer(effect_a, red_palette),
+            EffectRenderer(effect_b, blue_palette),
+        ]
+    )
+
+    output = PixelBuffer(2)
+    renderer.render(state, output)
+
+    assert output[0] == Palette.pack_rgb(0, 0, 127)
+    assert output[1] == Palette.pack_rgb(127, 0, 127)
+
+
 # ---------------------------------------------------------------------------
 # AdditiveMergeRenderer
 # ---------------------------------------------------------------------------
@@ -223,9 +323,10 @@ def test_additive_merge_render_sums_rgb_channels_from_each_renderer() -> None:
         ]
     )
 
-    color = renderer.render(state, 0.0)
+    output = PixelBuffer(1)
+    renderer.render(state, output)
 
-    assert color == Palette.pack_rgb(128, 0, 0)
+    assert output[0] == Palette.pack_rgb(128, 0, 0)
 
 
 def test_additive_merge_render_clamps_summed_channel_to_255_on_overflow() -> None:
@@ -240,9 +341,10 @@ def test_additive_merge_render_clamps_summed_channel_to_255_on_overflow() -> Non
         ]
     )
 
-    color = renderer.render(state, 0.0)
+    output = PixelBuffer(1)
+    renderer.render(state, output)
 
-    assert color == Palette.pack_rgb(0, 255, 0)
+    assert output[0] == Palette.pack_rgb(0, 255, 0)
 
 
 def test_additive_merge_update_propagates_to_all_child_renderers() -> None:
@@ -263,3 +365,27 @@ def test_additive_merge_update_propagates_to_all_child_renderers() -> None:
 
     assert counter_a.count == 1
     assert counter_b.count == 1
+
+
+def test_additive_merge_renders_each_pixel_independently() -> None:
+    # Effect A: full red at position >= 0.5, black otherwise.
+    # Effect B: always dim blue (0, 0, 64).
+    # pixel[0] (pos=0.0): A=black,    B=dim_blue → sum = (0, 0, 64)
+    # pixel[1] (pos=0.5): A=full_red, B=dim_blue → sum = (255, 0, 64)
+    effect_a = Effect("a", lambda pos: 1.0 if pos >= 0.5 else 0.0)
+    effect_b = Effect("b", lambda _: 1.0)
+    red_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
+    dim_blue_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 0, 0, 64]))
+    state = EffectState()
+    renderer = AdditiveMergeRenderer(
+        [
+            EffectRenderer(effect_a, red_palette),
+            EffectRenderer(effect_b, dim_blue_palette),
+        ]
+    )
+
+    output = PixelBuffer(2)
+    renderer.render(state, output)
+
+    assert output[0] == Palette.pack_rgb(0, 0, 64)
+    assert output[1] == Palette.pack_rgb(255, 0, 64)

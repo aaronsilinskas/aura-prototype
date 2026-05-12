@@ -12,10 +12,11 @@ Run:
 
 import sys
 import time
+from collections.abc import Iterable
 
 from effects.effect import EffectState, EffectTimer
 from effects.elements.registry import ELEMENT_BUILDERS, build_element_renderer
-from effects.render import RendererConfig
+from effects.render import PixelBuffer, RendererConfig
 
 PIXEL_COUNT = 32
 RESOLUTION = PIXEL_COUNT * 3
@@ -26,7 +27,7 @@ SHOW_SECONDS = 2.0  # how long to display each level
 SAMPLE_LEVELS = [1, 4, 7, 10]
 
 
-def ansi_strip(colors: list[int]) -> str:
+def ansi_strip(colors: Iterable[int]) -> str:
     """Render a list of packed RGB colors as ANSI true-color terminal blocks."""
     parts = []
     for color in colors:
@@ -54,8 +55,9 @@ def show_element_level(name: str, level: int) -> None:
         renderer.update(state, timer)
 
         if frame >= warmup_frames:
-            colors = [renderer.render(state, i / PIXEL_COUNT) for i in range(PIXEL_COUNT)]
-            sys.stdout.write(f"\r{label}{ansi_strip(colors)}")
+            output = PixelBuffer(PIXEL_COUNT)
+            renderer.render(state, output)
+            sys.stdout.write(f"\r{label}{ansi_strip(output)}")
             sys.stdout.flush()
             time.sleep(elapsed)
 

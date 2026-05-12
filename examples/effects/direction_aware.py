@@ -23,10 +23,11 @@ Run:
 
 import sys
 import time
+from collections.abc import Iterable
 
 from effects.effect import Effect, EffectState, EffectTimer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer
+from effects.render import EffectRenderer, PixelBuffer
 from effects.shape import Shape
 from effects.steps.duration import duration
 from effects.steps.position import accelerate, face_forward
@@ -45,7 +46,7 @@ COMET_PALETTE = bytes([
 # fmt: on
 
 
-def ansi_strip(colors: list[int]) -> str:
+def ansi_strip(colors: Iterable[int]) -> str:
     parts = []
     for color in colors:
         r = (color >> 16) & 0xFF
@@ -113,12 +114,10 @@ def main() -> None:
             plain_renderer.update(plain_state, timer)
             aware_renderer.update(aware_state, timer)
 
-            plain_colors = [
-                plain_renderer.render(plain_state, i / PIXEL_COUNT) for i in range(PIXEL_COUNT)
-            ]
-            aware_colors = [
-                aware_renderer.render(aware_state, i / PIXEL_COUNT) for i in range(PIXEL_COUNT)
-            ]
+            plain_colors = PixelBuffer(PIXEL_COUNT)
+            plain_renderer.render(plain_state, plain_colors)
+            aware_colors = PixelBuffer(PIXEL_COUNT)
+            aware_renderer.render(aware_state, aware_colors)
 
             sys.stdout.write("\033[2A")
             sys.stdout.write(f"\rWithout face_forward: {ansi_strip(plain_colors)}\n")

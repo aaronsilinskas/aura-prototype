@@ -40,6 +40,46 @@ class RendererConfig:
             listener(event_name)
 
 
+class RendererOutput:
+    def set_pixel(self, position: int, color: int) -> None:
+        """Set the pixel at ``position`` to the given packed RGB color."""
+        raise NotImplementedError
+
+    @property
+    def count(self) -> int:
+        """Return the total number of pixels in this output."""
+        raise NotImplementedError
+
+    def __len__(self) -> int:
+        return self.count
+
+
+class PixelBuffer(RendererOutput):
+    """In-memory pixel buffer backed by a list.
+
+    Use wherever a concrete :class:`RendererOutput` is needed — in tests,
+    examples, or any context where rendered colors are collected before
+    being written to hardware.
+    """
+
+    def __init__(self, count: int):
+        self._pixels = [0] * count
+        self._count = count
+
+    def set_pixel(self, position: int, color: int) -> None:
+        self._pixels[position] = color
+
+    @property
+    def count(self) -> int:
+        return self._count
+
+    def __getitem__(self, index: int) -> int:
+        return self._pixels[index]
+
+    def __iter__(self):
+        return iter(self._pixels)
+
+
 class EffectRenderer:
     """Drives an effect through time and produces pixel colors for each position.
 
@@ -64,11 +104,13 @@ class EffectRenderer:
         """Advance effect step state for the current frame."""
         self._effect.update(state, timer)
 
-    def render(self, state: EffectState, position: float) -> int:
-        """Return a packed RGB color for ``position`` based on the current effect state."""
-        value = self._effect.value(state, position)
-        color = self._palette.lookup(value)
-        return color
+    def render(self, state: EffectState, output: RendererOutput) -> None:
+        """Write a packed RGB color for each pixel in ``output``."""
+        count = output.count
+        for i in range(count):
+            value = self._effect.value(state, i / count)
+            color = self._palette.lookup(value)
+            output.set_pixel(i, color)
 
 
 class AverageMergeRenderer(EffectRenderer):
@@ -81,24 +123,26 @@ class AverageMergeRenderer(EffectRenderer):
         for renderer in self._renderers:
             renderer.update(state, timer)
 
-    def render(self, state: EffectState, position: float) -> int:
-        r_total = 0
-        g_total = 0
-        b_total = 0
-        for renderer in self._renderers:
-            color = renderer.render(state, position)
-            r = (color >> 16) & 255
-            g = (color >> 8) & 255
-            b = color & 255
-            r_total += r
-            g_total += g
-            b_total += b
+    def render(self, state: EffectState, output: RendererOutput) -> None:
+        pixel_count = output.count
+        buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
+        for renderer, buf in zip(self._renderers, buffers):
+            renderer.render(state, buf)
 
-        count = len(self._renderers)
-        r = min(255, r_total // count)
-        g = min(255, g_total // count)
-        b = min(255, b_total // count)
-        return (r << 16) | (g << 8) | b
+        n = len(self._renderers)
+        for i in range(pixel_count):
+            r_total = 0
+            g_total = 0
+            b_total = 0
+            for buf in buffers:
+                color = buf[i]
+                r_total += (color >> 16) & 255
+                g_total += (color >> 8) & 255
+                b_total += color & 255
+            r = min(255, r_total // n)
+            g = min(255, g_total // n)
+            b = min(255, b_total // n)
+            output.set_pixel(i, (r << 16) | (g << 8) | b)
 
 
 class AdditiveMergeRenderer(EffectRenderer):
@@ -111,20 +155,22 @@ class AdditiveMergeRenderer(EffectRenderer):
         for renderer in self._renderers:
             renderer.update(state, timer)
 
-    def render(self, state: EffectState, position: float) -> int:
-        r_total = 0
-        g_total = 0
-        b_total = 0
-        for renderer in self._renderers:
-            color = renderer.render(state, position)
-            r = (color >> 16) & 255
-            g = (color >> 8) & 255
-            b = color & 255
-            r_total += r
-            g_total += g
-            b_total += b
+    def render(self, state: EffectState, output: RendererOutput) -> None:
+        pixel_count = output.count
+        buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
+        for renderer, buf in zip(self._renderers, buffers):
+            renderer.render(state, buf)
 
-        r = min(255, r_total)
-        g = min(255, g_total)
-        b = min(255, b_total)
-        return (r << 16) | (g << 8) | b
+        for i in range(pixel_count):
+            r_total = 0
+            g_total = 0
+            b_total = 0
+            for buf in buffers:
+                color = buf[i]
+                r_total += (color >> 16) & 255
+                g_total += (color >> 8) & 255
+                b_total += color & 255
+            r = min(255, r_total)
+            g = min(255, g_total)
+            b = min(255, b_total)
+            output.set_pixel(i, (r << 16) | (g << 8) | b)

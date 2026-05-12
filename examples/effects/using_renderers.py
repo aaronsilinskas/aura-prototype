@@ -25,12 +25,13 @@ Run:
 
 import sys
 import time
+from collections.abc import Iterable
 
 from effects.effect import EffectState, EffectTimer
 from effects.elements.earth import build_earth_renderer
 from effects.elements.fire import build_fire_renderer
 from effects.elements.lightning import build_lightning_renderer
-from effects.render import AdditiveMergeRenderer, AverageMergeRenderer, RendererConfig
+from effects.render import AdditiveMergeRenderer, AverageMergeRenderer, PixelBuffer, RendererConfig
 
 PIXEL_COUNT = 28
 RESOLUTION = PIXEL_COUNT * 3
@@ -39,7 +40,7 @@ LEVEL = 6
 PART1_SECONDS = 12.0
 
 
-def ansi_strip(colors: list[int]) -> str:
+def ansi_strip(colors: Iterable[int]) -> str:
     """Render a list of packed RGB colors as ANSI true-color terminal blocks."""
     parts = []
     for color in colors:
@@ -50,8 +51,10 @@ def ansi_strip(colors: list[int]) -> str:
     return "".join(parts)
 
 
-def render_strip(renderer, state: EffectState) -> list[int]:
-    return [renderer.render(state, i / PIXEL_COUNT) for i in range(PIXEL_COUNT)]
+def render_strip(renderer, state: EffectState) -> PixelBuffer:
+    output = PixelBuffer(PIXEL_COUNT)
+    renderer.render(state, output)
+    return output
 
 
 def part1_merge_comparison() -> None:

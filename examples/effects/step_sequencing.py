@@ -30,10 +30,11 @@ Run:
 
 import sys
 import time
+from collections.abc import Iterable
 
 from effects.effect import Effect, EffectState, EffectTimer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer
+from effects.render import EffectRenderer, PixelBuffer
 from effects.shape import Shape
 from effects.steps.control import call, hide
 from effects.steps.duration import duration
@@ -55,7 +56,7 @@ STRIKE_PALETTE = bytes([
 # fmt: on
 
 
-def ansi_strip(colors: list[int]) -> str:
+def ansi_strip(colors: Iterable[int]) -> str:
     """Render a list of packed RGB colors as ANSI true-color terminal blocks."""
     parts = []
     for color in colors:
@@ -110,10 +111,11 @@ def main() -> None:
             timer.update(elapsed)
             renderer.update(state, timer)
 
-            colors = [renderer.render(state, i / PIXEL_COUNT) for i in range(PIXEL_COUNT)]
+            output = PixelBuffer(PIXEL_COUNT)
+            renderer.render(state, output)
             sys.stdout.write("\033[2A")
             sys.stdout.write(f"\rStrikes: {strike_count:<4}  elapsed: {timer.total:6.1f}s\n")
-            sys.stdout.write(f"\r{ansi_strip(colors)}\n")
+            sys.stdout.write(f"\r{ansi_strip(output)}\n")
             sys.stdout.flush()
             time.sleep(elapsed)
     except KeyboardInterrupt:
