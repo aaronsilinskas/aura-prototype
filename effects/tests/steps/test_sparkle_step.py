@@ -1,8 +1,8 @@
 import pytest
-from effects.tests.helpers import make_timer
 
 from effects.effect import Effect, EffectState
 from effects.steps.sparkle import sparkle
+from effects.tests.helpers import make_timer
 
 
 def test_sparkle_with_zero_count_does_not_change_output_value() -> None:
@@ -17,9 +17,7 @@ def test_sparkle_with_zero_count_does_not_change_output_value() -> None:
 
 def test_sparkle_output_does_not_decrease_below_input_value() -> None:
     # Sparkles add non-negative intensity; output can only increase.
-    effect = Effect("test", lambda _: 0.4).add_steps(
-        [sparkle(sparkle_count=4, pixel_count=16)]
-    )
+    effect = Effect("test", lambda _: 0.4).add_steps([sparkle(sparkle_count=4, pixel_count=16)])
     state = EffectState()
 
     effect.update(state, make_timer(0.1))
@@ -122,7 +120,5 @@ def test_sparkle_collision_retry_gives_each_sparkle_a_distinct_position() -> Non
     effect.update(state, make_timer(0.0))  # idle → fade_in
     effect.update(state, make_timer(1.0))  # fade_in raises intensity to 1.0
 
-    lit_count = sum(
-        1 for i in range(buffer_count) if effect.value(state, i / buffer_count) > 0.0
-    )
+    lit_count = sum(1 for i in range(buffer_count) if effect.value(state, i / buffer_count) > 0.0)
     assert lit_count == sparkle_count

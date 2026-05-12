@@ -15,49 +15,43 @@ from effects.tests.helpers import CountUpdates, make_timer
 
 
 def test_config_clamps_level_below_one_to_one() -> None:
-    config = RendererConfig(level=0, pixel_count=10, resolution=10)
+    config = RendererConfig(level=0, resolution=10)
 
     assert config.level == 1
 
 
 def test_config_clamps_level_above_ten_to_ten() -> None:
-    config = RendererConfig(level=11, pixel_count=10, resolution=10)
+    config = RendererConfig(level=11, resolution=10)
 
     assert config.level == 10
 
 
 def test_config_stores_level_within_valid_range_unchanged() -> None:
-    config = RendererConfig(level=5, pixel_count=10, resolution=10)
+    config = RendererConfig(level=5, resolution=10)
 
     assert config.level == 5
 
 
 def test_config_stores_options_dict() -> None:
     opts = {"color": "red"}
-    config = RendererConfig(level=5, pixel_count=10, resolution=10, options=opts)
+    config = RendererConfig(level=5, resolution=10, options=opts)
 
     assert config.options == opts
 
 
 def test_config_options_defaults_to_empty_dict() -> None:
-    config = RendererConfig(level=5, pixel_count=10, resolution=10)
+    config = RendererConfig(level=5, resolution=10)
 
     assert config.options == {}
 
 
 # ---------------------------------------------------------------------------
-# RendererConfig — pixel_count and resolution clamping
+# RendererConfig — resolution clamping
 # ---------------------------------------------------------------------------
 
 
-def test_config_clamps_pixel_count_below_one_to_one() -> None:
-    config = RendererConfig(level=5, pixel_count=0, resolution=10)
-
-    assert config.pixel_count == 1
-
-
 def test_config_clamps_resolution_below_one_to_one() -> None:
-    config = RendererConfig(level=5, pixel_count=10, resolution=0)
+    config = RendererConfig(level=5, resolution=0)
 
     assert config.resolution == 1
 
@@ -68,7 +62,7 @@ def test_config_clamps_resolution_below_one_to_one() -> None:
 
 
 def test_notify_listeners_is_silent_when_no_listeners_are_registered() -> None:
-    config = RendererConfig(level=5, pixel_count=10, resolution=10)
+    config = RendererConfig(level=5, resolution=10)
 
     config.notify_listeners("frame_start")  # must not raise
 
@@ -77,7 +71,6 @@ def test_registered_listener_receives_event_on_notify() -> None:
     received: list[str] = []
     config = RendererConfig(
         level=5,
-        pixel_count=10,
         resolution=10,
         listeners=[received.append],
     )
@@ -91,7 +84,6 @@ def test_all_registered_listeners_are_notified_in_registration_order() -> None:
     received: list[str] = []
     config = RendererConfig(
         level=5,
-        pixel_count=10,
         resolution=10,
         listeners=[
             lambda e: received.append(f"a:{e}"),

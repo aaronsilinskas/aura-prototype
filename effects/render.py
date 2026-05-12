@@ -13,23 +13,21 @@ EffectListenerFunc: TypeAlias = "Callable[[str], None]"
 class RendererConfig:
     """Runtime configuration shared across a render pass.
 
-    Holds the user-facing settings (level, pixel count, resolution) that
-    drive how an effect is sampled and scaled. Listeners are notified by
-    name when significant events occur during rendering.
+    Holds the user-facing settings (level and resolution) that drive how an
+    effect is sampled and scaled. Listeners are notified by name when
+    significant events occur during rendering.
     """
 
-    __slots__ = ["level", "listeners", "options", "pixel_count", "resolution"]
+    __slots__ = ["level", "listeners", "options", "resolution"]
 
     def __init__(
         self,
         level: int,
-        pixel_count: int,
         resolution: int,
         options: dict | None = None,
         listeners: list[EffectListenerFunc] | None = None,
     ):
         self.level = min(max(1, level), 10)
-        self.pixel_count = max(1, pixel_count)
         self.resolution = max(1, resolution)
         self.options = options if options is not None else {}
         self.listeners = listeners if listeners is not None else []

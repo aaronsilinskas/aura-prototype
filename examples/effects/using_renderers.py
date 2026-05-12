@@ -59,20 +59,24 @@ def render_strip(renderer, state: EffectState) -> PixelBuffer:
 
 def part1_merge_comparison() -> None:
     """Show fire, fire+earth averaged, and fire+earth additive side by side."""
-    config = RendererConfig(level=LEVEL, pixel_count=PIXEL_COUNT, resolution=RESOLUTION)
+    config = RendererConfig(level=LEVEL, resolution=RESOLUTION)
 
     # Build three independent renderer sets.
     # Each merge renderer owns its own child EffectRenderer instances — do not
     # share renderer objects across merge groups, as they share no state.
     fire_sole = build_fire_renderer(config)
-    avg_renderer = AverageMergeRenderer([
-        build_fire_renderer(config),
-        build_earth_renderer(config),
-    ])
-    add_renderer = AdditiveMergeRenderer([
-        build_fire_renderer(config),
-        build_earth_renderer(config),
-    ])
+    avg_renderer = AverageMergeRenderer(
+        [
+            build_fire_renderer(config),
+            build_earth_renderer(config),
+        ]
+    )
+    add_renderer = AdditiveMergeRenderer(
+        [
+            build_fire_renderer(config),
+            build_earth_renderer(config),
+        ]
+    )
 
     # Each renderer needs its own EffectState.
     # State holds the mutable per-frame data (flame buffers, offsets, etc.)

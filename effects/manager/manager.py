@@ -4,6 +4,11 @@ from effects.palette import Palette
 from effects.render import EffectRenderer, RendererConfig
 from engine.timer import Timer
 
+# TODO: Need output interfaces that register resolution
+# - for each resolution key, have a list of outputs
+# - one state machine for each key?
+# TODO: sparkle step still uses pixel_count internally — needs manual update
+
 
 class EffectBuilder:
     def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
@@ -14,8 +19,7 @@ class EffectBuilder:
             config: Runtime configuration for the render pass. ``config.level``
                 carries the universal intensity in ``[1, 10]``; ``config.options``
                 carries any effect-specific parameters (e.g. duration, color).
-                ``config.pixel_count`` and ``config.resolution`` describe the
-                output hardware.
+                ``config.resolution`` describes the output hardware.
 
         Returns:
             A configured ``EffectRenderer`` ready to be paired with an
@@ -25,12 +29,13 @@ class EffectBuilder:
 
 
 class EffectManager:
-    __slots__ = ("_effects", "_timer")
+    __slots__ = ("_effects", "_seen", "_timer")
 
     def __init__(self) -> None:
         # scope key -> list of active (EffectRenderer, EffectState) pairs
         self._effects: dict[str, list[tuple[EffectRenderer, EffectState]]] = {}
         self._timer: EffectTimer = EffectTimer()
+        self._seen: set[int] = set()
 
     def _build_effect(
         self, name: str, level: int, options: dict
@@ -38,7 +43,7 @@ class EffectManager:
         """Construct an EffectRenderer paired with a fresh EffectState."""
 
         # TODO - construct a RendererConfig to pass to the builder:
-        # -- pixel_count and resolution will need to come from each driver, but re-use renderer if
+        # -- resolution will need to come from each driver, but re-use renderer if
         #   those match
         # -- level comes from set/add_effect
         # -- options comes from set/add_effect
@@ -68,6 +73,9 @@ class EffectManager:
 
     def stop_effect(self, scope: ScopeValue) -> None:
         """Stop all running effects in scope."""
+        # TODO - this is a bit brute-force; we could track individual effects and only stop those
+        #   that match the scope, but that would add complexity to the data structure and
+        #   bookkeeping. For now, we can just stop all effects in any scope that matches.
         for key in scope.keys:
             if key in self._effects:
                 del self._effects[key]
@@ -75,7 +83,8 @@ class EffectManager:
     def update(self, timer: Timer) -> None:
         """Tick all active effects in each scope."""
         self._timer.update(timer.elapsed)
-        seen: set[int] = set()
+        seen = self._seen
+        seen.clear()
         for effects in self._effects.values():
             for renderer, state in effects:
                 renderer_id = id(renderer)

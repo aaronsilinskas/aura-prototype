@@ -22,10 +22,10 @@ class SparkleStep(EffectStep):
         spawn_delay_rate: DynamicValue,
         fade_in_rate: DynamicValue,
         fade_out_rate: DynamicValue,
-        pixel_count: int,
     ):
         self.sparkle_count = max(0, int(VG.resolve(sparkle_count)))
-        self.buffer_count = max(1, max(pixel_count, self.sparkle_count * 2))
+        # TODO remove buffer_count and related logic once adjust_value has access to pixel_count
+        self.buffer_count = max(1, self.sparkle_count * 2)
         self.spawn_delay_rate = spawn_delay_rate
         self.fade_in_rate = VG.resolve(fade_in_rate)
         self.fade_out_rate = VG.resolve(fade_out_rate)
@@ -122,7 +122,6 @@ def sparkle(
     spawn_delay_rate: DynamicValue = 2.5,
     fade_in_rate: DynamicValue = 1.0,
     fade_out_rate: DynamicValue = 1.0,
-    pixel_count: int = 16,
 ) -> EffectStep:
     """Return a step that overlays fading sparkles onto the effect output."""
     return SparkleStep(
@@ -130,5 +129,4 @@ def sparkle(
         spawn_delay_rate=spawn_delay_rate,
         fade_in_rate=fade_in_rate,
         fade_out_rate=fade_out_rate,
-        pixel_count=pixel_count,
     )

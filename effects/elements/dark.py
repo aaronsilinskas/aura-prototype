@@ -31,12 +31,9 @@ def build_dark_renderer(config: RendererConfig) -> EffectRenderer:
                 spawn_delay_rate=VG.random(spawn_delay_min, spawn_delay_max),
                 fade_in_rate=VG.random(0.5, 1),
                 fade_out_rate=VG.random(1.0, 2.0),
-                pixel_count=config.pixel_count,
             ),
         ]
     )
-    dark_sparkle_renderer = EffectRenderer(
-        dark_sparkle_effect, PaletteLUT256(dark_sparkle_palette)
-    )
+    dark_sparkle_renderer = EffectRenderer(dark_sparkle_effect, PaletteLUT256(dark_sparkle_palette))
 
     return dark_sparkle_renderer

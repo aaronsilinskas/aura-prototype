@@ -40,7 +40,7 @@ def ansi_strip(colors: Iterable[int]) -> str:
 
 def show_element_level(name: str, level: int) -> None:
     """Animate one element at one level for SHOW_SECONDS, after a silent warmup."""
-    config = RendererConfig(level=level, pixel_count=PIXEL_COUNT, resolution=RESOLUTION)
+    config = RendererConfig(level=level, resolution=RESOLUTION)
     state = EffectState()
     renderer = build_element_renderer(name, config)
 

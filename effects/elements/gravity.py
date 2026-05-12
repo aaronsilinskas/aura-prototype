@@ -43,9 +43,7 @@ def build_gravity_renderer(config: RendererConfig) -> EffectRenderer:
             ),
         ]
     )
-    gravity_nebula_renderer = EffectRenderer(
-        gravity_nebula_effect, PaletteLUT256(gravity_palette)
-    )
+    gravity_nebula_renderer = EffectRenderer(gravity_nebula_effect, PaletteLUT256(gravity_palette))
 
     gravity_stars_effect = Effect("gravity_stars").add_steps(
         [
@@ -54,12 +52,9 @@ def build_gravity_renderer(config: RendererConfig) -> EffectRenderer:
                 spawn_delay_rate=VG.random(spawn_delay_min, spawn_delay_max),
                 fade_in_rate=star_fade_in_rate,
                 fade_out_rate=star_fade_out_rate,
-                pixel_count=config.pixel_count,
             ),
         ]
     )
-    gravity_stars_renderer = EffectRenderer(
-        gravity_stars_effect, PaletteLUT256(grayscale_palette)
-    )
+    gravity_stars_renderer = EffectRenderer(gravity_stars_effect, PaletteLUT256(grayscale_palette))
 
     return AdditiveMergeRenderer([gravity_nebula_renderer, gravity_stars_renderer])
