@@ -43,7 +43,9 @@ class MultiplyValue(EffectStep):
         # adjust_value on ALL steps regardless of which step is active.
         return True
 
-    def adjust_value(self, state: EffectState, position: float, value: float) -> float:
+    def adjust_value(
+        self, state: EffectState, position: float, pixel_count: int, value: float
+    ) -> float:
         return value * self._factor
 
 

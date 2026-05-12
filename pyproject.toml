@@ -42,6 +42,7 @@ select = [
     "RUF", # ruff-native rules
 ]
 ignore = [
+    "B905",   # zip() without strict= — not available on CircuitPython
     "N817",   # VG is an established abbreviation for ValueGenerator throughout the codebase
     "RUF002", # mathematical symbols (×, –) in docstrings are intentional
     "RUF003", # mathematical symbols (×, –) in comments are intentional

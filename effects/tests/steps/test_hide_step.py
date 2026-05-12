@@ -1,8 +1,8 @@
 import pytest
-from effects.tests.helpers import RecordAndHold, make_timer
 
 from effects.effect import Effect, EffectState
 from effects.steps.control import hide
+from effects.tests.helpers import RecordAndHold, make_timer
 
 
 def test_hide_suppresses_output_while_duration_is_active() -> None:
@@ -10,7 +10,7 @@ def test_hide_suppresses_output_while_duration_is_active() -> None:
     state = EffectState()
 
     effect.update(state, make_timer(0.1))
-    value = effect.value(state, 0.0)
+    value = effect.value(state, 0.0, 1)
 
     assert value == pytest.approx(0.0)
 
@@ -20,7 +20,7 @@ def test_hide_restores_output_after_duration_expires() -> None:
     state = EffectState()
 
     effect.update(state, make_timer(1.0))  # far exceeds duration
-    value = effect.value(state, 0.0)
+    value = effect.value(state, 0.0, 1)
 
     assert value == pytest.approx(0.8)
 

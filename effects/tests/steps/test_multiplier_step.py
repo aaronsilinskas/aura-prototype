@@ -11,7 +11,7 @@ def test_multiplier_applies_start_value_at_beginning_of_duration() -> None:
     timer = EffectTimer(duration=1.0)
 
     effect.update(state, timer)
-    value = effect.value(state, 0.0)
+    value = effect.value(state, 0.0, 1)
 
     assert value == pytest.approx(0.25)
 
@@ -24,7 +24,7 @@ def test_multiplier_interpolates_toward_end_value_as_duration_progresses() -> No
     timer.update(0.5)
 
     effect.update(state, timer)
-    value = effect.value(state, 0.0)
+    value = effect.value(state, 0.0, 1)
 
     assert value == pytest.approx(0.5)
 
@@ -39,7 +39,7 @@ def test_multiplier_is_at_end_value_just_before_duration_completes() -> None:
     timer.update(0.9999)
 
     effect.update(state, timer)
-    value = effect.value(state, 0.0)
+    value = effect.value(state, 0.0, 1)
 
     assert value == pytest.approx(0.75, rel=1e-3)
 
@@ -55,6 +55,6 @@ def test_multiplier_passes_value_through_unchanged_after_duration_completes() ->
     timer.update(1.0)
 
     effect.update(state, timer)
-    value = effect.value(state, 0.0)
+    value = effect.value(state, 0.0, 1)
 
     assert value == pytest.approx(0.7)

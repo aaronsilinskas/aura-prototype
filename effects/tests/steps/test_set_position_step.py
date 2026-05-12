@@ -1,8 +1,8 @@
 import pytest
-from effects.tests.helpers import make_timer
 
 from effects.effect import Effect, EffectState
 from effects.steps.position import set_position
+from effects.tests.helpers import make_timer
 
 
 def test_set_position_shifts_sampling_position_by_fixed_amount() -> None:
@@ -11,7 +11,7 @@ def test_set_position_shifts_sampling_position_by_fixed_amount() -> None:
     state = EffectState()
 
     effect.update(state, make_timer(0.1))
-    value = effect.value(state, 0.5)
+    value = effect.value(state, 0.5, 1)
 
     assert value == pytest.approx(0.7)
 
@@ -21,6 +21,6 @@ def test_set_position_wraps_position_when_offset_exceeds_one() -> None:
     state = EffectState()
 
     effect.update(state, make_timer(0.1))
-    value = effect.value(state, 0.8)
+    value = effect.value(state, 0.8, 1)
 
     assert value == pytest.approx(0.1)

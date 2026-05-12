@@ -44,7 +44,9 @@ class DriftNoiseStep(EffectStep):
 
         return True
 
-    def adjust_value(self, state: EffectState, position: float, value: float) -> float:
+    def adjust_value(
+        self, state: EffectState, position: float, pixel_count: int, value: float
+    ) -> float:
         data = state.get_step_data(self, DriftNoiseStep._Data)
         if data is None:
             return value

@@ -156,7 +156,9 @@ class EffectStep:
         """Transform sampling position before the effect shape is evaluated."""
         return position
 
-    def adjust_value(self, state: EffectState, position: float, value: float) -> float:
+    def adjust_value(
+        self, state: EffectState, position: float, pixel_count: int, value: float
+    ) -> float:
         """Transform sampled value after shape evaluation and prior step transforms."""
         return value
 
@@ -203,8 +205,11 @@ class Effect:
         if next_step_index != step_index:
             state.set_step_index(self, next_step_index)
 
-    def value(self, state: EffectState, position: float) -> float:
+    def value(self, state: EffectState, position: float, pixel_count: int) -> float:
         """Sample the effect at ``position`` after all step transforms.
+
+        ``pixel_count`` is the total number of pixels in the current output
+        buffer.
 
         Order: ``adjust_position`` (all steps) → shape → ``adjust_value`` (all steps).
         Output is clamped to ``[0.0, 1.0]``.
@@ -215,7 +220,7 @@ class Effect:
 
         shape_value = self._shape(position)
         for step in steps:
-            shape_value = step.adjust_value(state, position, shape_value)
+            shape_value = step.adjust_value(state, position, pixel_count, shape_value)
 
         return max(0.0, min(1.0, shape_value))
 

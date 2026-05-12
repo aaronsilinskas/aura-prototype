@@ -1,4 +1,6 @@
 import pytest
+
+from effects.effect import Effect, EffectState, EffectStep, EffectTimer
 from effects.tests.helpers import (
     AlwaysAdvance,
     MultiplyValue,
@@ -7,8 +9,6 @@ from effects.tests.helpers import (
     RecordAndHold,
     make_timer,
 )
-
-from effects.effect import Effect, EffectState, EffectStep, EffectTimer
 
 # ---------------------------------------------------------------------------
 # Effect construction
@@ -32,7 +32,7 @@ def test_effect_with_no_steps_samples_shape_directly() -> None:
     effect = Effect("test", lambda _: 0.75)
     state = EffectState()
 
-    value = effect.value(state, 0.0)
+    value = effect.value(state, 0.0, 1)
 
     assert value == 0.75
 
@@ -43,7 +43,7 @@ def test_effect_applies_position_offset_before_sampling_shape() -> None:
     state = EffectState()
     effect.update(state, make_timer(0.016))
 
-    value = effect.value(state, 0.5)
+    value = effect.value(state, 0.5, 1)
 
     # Position 0.5 + 0.25 offset = 0.75 wrapped into [0,1], shape returns it directly.
     assert value == pytest.approx(0.75)
@@ -52,13 +52,11 @@ def test_effect_applies_position_offset_before_sampling_shape() -> None:
 def test_effect_applies_value_transforms_in_step_order() -> None:
     # Two multiplier steps: first halves (×0.5), then doubles (×2.0).
     # Net result should be the original shape value (×1.0).
-    effect = Effect("test", lambda _: 0.6).add_steps(
-        [MultiplyValue(0.5), MultiplyValue(2.0)]
-    )
+    effect = Effect("test", lambda _: 0.6).add_steps([MultiplyValue(0.5), MultiplyValue(2.0)])
     state = EffectState()
     effect.update(state, make_timer(0.016))
 
-    value = effect.value(state, 0.0)
+    value = effect.value(state, 0.0, 1)
 
     assert value == pytest.approx(0.6)
 
@@ -68,7 +66,7 @@ def test_effect_clamps_output_above_one_when_step_amplifies_value() -> None:
     state = EffectState()
     effect.update(state, make_timer(0.016))
 
-    value = effect.value(state, 0.0)
+    value = effect.value(state, 0.0, 1)
 
     assert value == 1.0
 
@@ -78,7 +76,7 @@ def test_effect_clamps_output_below_zero_when_step_inverts_value() -> None:
     state = EffectState()
     effect.update(state, make_timer(0.016))
 
-    value = effect.value(state, 0.0)
+    value = effect.value(state, 0.0, 1)
 
     assert value == 0.0
 

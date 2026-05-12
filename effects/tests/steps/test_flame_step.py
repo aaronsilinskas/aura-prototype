@@ -1,8 +1,8 @@
 import pytest
-from effects.tests.helpers import make_timer
 
 from effects.effect import Effect, EffectState
 from effects.steps.flame import flame
+from effects.tests.helpers import make_timer
 
 
 def test_flame_output_is_always_at_least_as_large_as_input_value() -> None:
@@ -13,7 +13,7 @@ def test_flame_output_is_always_at_least_as_large_as_input_value() -> None:
     effect.update(state, make_timer(0.1))
 
     for pos in [0.0, 0.25, 0.5, 0.75]:
-        assert effect.value(state, pos) >= 0.3
+        assert effect.value(state, pos, 1) >= 0.3
 
 
 def test_flame_output_saturates_at_one_under_heavy_heating() -> None:
@@ -25,7 +25,7 @@ def test_flame_output_saturates_at_one_under_heavy_heating() -> None:
 
     effect.update(state, make_timer(1.0))
 
-    max_value = max(effect.value(state, i / 16) for i in range(16))
+    max_value = max(effect.value(state, i / 16, 16) for i in range(16))
     assert max_value == pytest.approx(1.0)
 
 
@@ -36,7 +36,7 @@ def test_flame_with_no_sparks_produces_no_heat() -> None:
     effect.update(state, make_timer(0.1))
 
     for pos in [0.0, 0.25, 0.5, 0.75]:
-        assert effect.value(state, pos) == pytest.approx(0.4)
+        assert effect.value(state, pos, 1) == pytest.approx(0.4)
 
 
 def test_flame_sparks_respawn_to_keep_heat_active_over_multiple_cycles() -> None:
@@ -53,7 +53,7 @@ def test_flame_sparks_respawn_to_keep_heat_active_over_multiple_cycles() -> None
     for _ in range(15):
         effect.update(state, make_timer(0.1))
 
-    max_value = max(effect.value(state, i / 8) for i in range(8))
+    max_value = max(effect.value(state, i / 8, 8) for i in range(8))
     assert max_value > 0.0
 
 
@@ -68,5 +68,5 @@ def test_flame_with_spread_heats_neighboring_cells_around_spark() -> None:
 
     effect.update(state, make_timer(1.0))
 
-    hot_positions = sum(1 for i in range(8) if effect.value(state, i / 8) > 0.0)
+    hot_positions = sum(1 for i in range(8) if effect.value(state, i / 8, 8) > 0.0)
     assert hot_positions > 1

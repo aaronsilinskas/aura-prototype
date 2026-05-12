@@ -1,5 +1,5 @@
 try:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
     from typing import TypeAlias
 except ImportError:
     pass
@@ -26,7 +26,7 @@ class RendererConfig:
         resolution: int,
         options: dict | None = None,
         listeners: list[EffectListenerFunc] | None = None,
-    ):
+    ) -> None:
         self.level = min(max(1, level), 10)
         self.resolution = max(1, resolution)
         self.options = options if options is not None else {}
@@ -60,7 +60,7 @@ class PixelBuffer(RendererOutput):
     being written to hardware.
     """
 
-    def __init__(self, count: int):
+    def __init__(self, count: int) -> None:
         self._pixels = [0] * count
         self._count = count
 
@@ -74,7 +74,7 @@ class PixelBuffer(RendererOutput):
     def __getitem__(self, index: int) -> int:
         return self._pixels[index]
 
-    def __iter__(self):
+    def __iter__(self) -> "Iterator[int]":
         return iter(self._pixels)
 
 
@@ -89,7 +89,7 @@ class EffectRenderer:
     - Call ``render`` per pixel to get a packed RGB int for a given position.
     """
 
-    def __init__(self, effect: Effect, palette: Palette):
+    def __init__(self, effect: Effect, palette: Palette) -> None:
         self._effect = effect
         self._palette = palette
 
@@ -106,7 +106,7 @@ class EffectRenderer:
         """Write a packed RGB color for each pixel in ``output``."""
         count = output.count
         for i in range(count):
-            value = self._effect.value(state, i / count)
+            value = self._effect.value(state, i / count, count)
             color = self._palette.lookup(value)
             output.set_pixel(i, color)
 
@@ -114,8 +114,9 @@ class EffectRenderer:
 class AverageMergeRenderer(EffectRenderer):
     """Combines multiple renderers by averaging their RGB channels per pixel."""
 
-    def __init__(self, renderers: list[EffectRenderer]):
+    def __init__(self, renderers: list[EffectRenderer]) -> None:
         self._renderers = renderers
+        self._buffers: list[PixelBuffer] = []
 
     def update(self, state: EffectState, timer: EffectTimer) -> None:
         for renderer in self._renderers:
@@ -123,8 +124,9 @@ class AverageMergeRenderer(EffectRenderer):
 
     def render(self, state: EffectState, output: RendererOutput) -> None:
         pixel_count = output.count
-        buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
-        for renderer, buf in zip(self._renderers, buffers):
+        if not self._buffers:
+            self._buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
+        for renderer, buf in zip(self._renderers, self._buffers):
             renderer.render(state, buf)
 
         n = len(self._renderers)
@@ -132,7 +134,7 @@ class AverageMergeRenderer(EffectRenderer):
             r_total = 0
             g_total = 0
             b_total = 0
-            for buf in buffers:
+            for buf in self._buffers:
                 color = buf[i]
                 r_total += (color >> 16) & 255
                 g_total += (color >> 8) & 255
@@ -146,8 +148,9 @@ class AverageMergeRenderer(EffectRenderer):
 class AdditiveMergeRenderer(EffectRenderer):
     """Combines multiple renderers by summing their RGB channels per pixel, clamped to ``255``."""
 
-    def __init__(self, renderers: list[EffectRenderer]):
+    def __init__(self, renderers: list[EffectRenderer]) -> None:
         self._renderers = renderers
+        self._buffers: list[PixelBuffer] = []
 
     def update(self, state: EffectState, timer: EffectTimer) -> None:
         for renderer in self._renderers:
@@ -155,15 +158,16 @@ class AdditiveMergeRenderer(EffectRenderer):
 
     def render(self, state: EffectState, output: RendererOutput) -> None:
         pixel_count = output.count
-        buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
-        for renderer, buf in zip(self._renderers, buffers):
+        if not self._buffers:
+            self._buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
+        for renderer, buf in zip(self._renderers, self._buffers):
             renderer.render(state, buf)
 
         for i in range(pixel_count):
             r_total = 0
             g_total = 0
             b_total = 0
-            for buf in buffers:
+            for buf in self._buffers:
                 color = buf[i]
                 r_total += (color >> 16) & 255
                 g_total += (color >> 8) & 255

@@ -105,7 +105,9 @@ class FlameStep(EffectStep):
 
         return True
 
-    def adjust_value(self, state: EffectState, position: float, value: float) -> float:
+    def adjust_value(
+        self, state: EffectState, position: float, pixel_count: int, value: float
+    ) -> float:
         data = state.get_step_data(self, FlameStep._Data)
         if data is not None:
             flame_offset = position * self.flame_count

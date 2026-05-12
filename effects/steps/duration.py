@@ -45,9 +45,7 @@ class DurationStep(EffectStep):
         data.timer.update(timer.elapsed)
 
         # run the child steps sequentially and advance the active step as needed
-        data.step_index = run_step_updates(
-            self.steps, data.step_index, state, data.timer
-        )
+        data.step_index = run_step_updates(self.steps, data.step_index, state, data.timer)
 
         if data.timer.progress >= 1.0:
             if self.persist_steps:
@@ -69,11 +67,13 @@ class DurationStep(EffectStep):
 
         return position
 
-    def adjust_value(self, state: EffectState, position: float, value: float) -> float:
+    def adjust_value(
+        self, state: EffectState, position: float, pixel_count: int, value: float
+    ) -> float:
         data = state.get_step_data(self, DurationStep._Data)
         if data is not None:
             for step in self.steps:
-                value = step.adjust_value(state, position, value)
+                value = step.adjust_value(state, position, pixel_count, value)
 
         return value
 

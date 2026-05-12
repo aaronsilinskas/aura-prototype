@@ -28,7 +28,9 @@ class HideStep(EffectStep):
 
         return False
 
-    def adjust_value(self, state: EffectState, position: float, value: float) -> float:
+    def adjust_value(
+        self, state: EffectState, position: float, pixel_count: int, value: float
+    ) -> float:
         if state.get_step_data(self, EffectTimer) is not None:
             return 0.0
 
