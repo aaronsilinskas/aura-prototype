@@ -6,6 +6,12 @@ class MultiplierStep(EffectStep):
     """Scales the output value from a start to an end multiplier over the step's timer duration.
 
     Useful for fading an effect in or out, or modulating intensity over time.
+
+    Once the timer reaches completion (``progress >= 1.0``) the step clears its
+    state, so ``adjust_value`` returns the raw shape value unmodified — equivalent
+    to a multiplier of ``1.0`` regardless of what ``end`` was. If you need the
+    end multiplier to persist after the duration, use a ``DurationStep`` or follow
+    this step with a ``MultiplierStep(end, end)`` with no timer.
     """
 
     def __init__(self, start: DynamicValue, end: DynamicValue):

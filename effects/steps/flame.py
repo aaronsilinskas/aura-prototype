@@ -26,6 +26,9 @@ class FlameStep(EffectStep):
         self.heat_rate = VG.resolve(heat_rate)
         self.extra_cool_rate = VG.resolve(extra_cool_rate)
         self.spread = min(max(spread, 0.0), 1.0)
+        # NOTE: integer truncation means that spread has no effect unless
+        # flame_count is large enough: half_flame_spread collapses to 0 when
+        # int(spread * flame_count) < 2. E.g. spread=0.1 requires flame_count > 19.
         self.half_flame_spread = int(self.spread * self.flame_count) // 2
 
         # calculate minimum cool rate to ensure flames will cool down enough between sparks
@@ -82,6 +85,9 @@ class FlameStep(EffectStep):
                     if offset == 0:
                         flame_buffer[spark_index] += spark_heat
                     else:
+                        # Weight is 1.0 for the immediately adjacent cell and
+                        # decreases linearly to 1/half_flame_spread at the
+                        # outermost cell in the spread radius.
                         flame_buffer[(spark_index + offset) % flame_count] += (
                             spark_heat * (1 + half_flame_spread - abs(offset)) / half_flame_spread
                         )

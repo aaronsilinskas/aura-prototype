@@ -99,7 +99,10 @@ class EffectState:
         self._shared_data.pop(key, None)
 
     def __str__(self):
-        return f"EffectState(step_indices={self._step_indices}, step_data={self._step_data})"
+        return (
+            f"EffectState(step_indices={self._step_indices}, "
+            f"step_data={self._step_data}, shared_data={self._shared_data})"
+        )
 
 
 class EffectTimer:
@@ -123,7 +126,7 @@ class EffectTimer:
         """Advance timer by one frame delta and return whether duration is complete."""
         self.elapsed = elapsed
         self.total += elapsed
-        if self.duration is not None:
+        if self.duration is not None and self.duration > 0:
             self.progress = min(1.0, self.total / self.duration)
 
         return self.progress >= 1.0
@@ -193,7 +196,7 @@ class Effect:
         self._steps.extend(steps)
         return self
 
-    def update(self, state: EffectState, timer: EffectTimer):
+    def update(self, state: EffectState, timer: EffectTimer) -> None:
         """Advance the active step and update step state for the current frame."""
         step_index = state.get_step_index(self)
         next_step_index = run_step_updates(self._steps, step_index, state, timer)

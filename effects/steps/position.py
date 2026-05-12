@@ -5,7 +5,14 @@ from effects.value import DynamicValue, Range, ValueGenerator
 
 
 class SetPositionStep(EffectStep):
-    """Offsets the sampling position by a fixed or dynamic amount each frame."""
+    """Applies a fixed offset to the sampling position.
+
+    The ``DynamicValue`` is resolved each time this step is activated (i.e.
+    each time it is the active step and ``update`` is called). In a
+    single-step sequence that means every frame; in a multi-step sequence the
+    value is resolved once on activation and the stored offset persists for all
+    subsequent frames, even as later steps become active.
+    """
 
     def __init__(self, position: DynamicValue):
         self.position = position

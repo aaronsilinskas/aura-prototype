@@ -112,9 +112,12 @@ class Shape:
     def checkers(value: float, count: int, width: float) -> EffectShapeFunc:
         """Return a repeating checker pattern of ``count`` segments across ``[0.0, 1.0]``.
 
-        Each checker has a flat region at ``value`` followed by a short fade to
-        ``0.0`` controlled by ``width`` (fraction of segment, clamped to
-        ``[0.0, 1.0]``).
+        Each segment contains a flat region at ``value``, a linear fade to
+        ``0.0``, and a dark region. ``width`` is the size of both the flat and
+        fade regions as a fraction of the total strip (``[0.0, 1.0]``), not of
+        the individual segment. For a dark region to exist between checkers,
+        ``width`` must be less than ``0.5 / count``; values at or above that
+        threshold cause the flat region to fill the entire segment.
         """
         clamped_width = max(0.0, min(1.0, width))
         if count <= 0 or clamped_width <= 0.0:
