@@ -38,37 +38,21 @@ class RendererConfig:
             listener(event_name)
 
 
-class RendererOutput:
-    def set_pixel(self, position: int, color: int) -> None:
-        """Set the pixel at ``position`` to the given packed RGB color."""
-        raise NotImplementedError
-
-    @property
-    def count(self) -> int:
-        """Return the total number of pixels in this output."""
-        raise NotImplementedError
-
-    def __len__(self) -> int:
-        return self.count
-
-
-class PixelBuffer(RendererOutput):
+class PixelBuffer:
     """In-memory pixel buffer backed by a list.
 
-    Use wherever a concrete :class:`RendererOutput` is needed — in tests,
-    examples, or any context where rendered colors are collected before
-    being written to hardware.
+    Used in tests, examples, or any context where rendered colors are
+    collected before being written to hardware.
     """
 
     def __init__(self, count: int) -> None:
         self._pixels = [0] * count
         self._count = count
 
-    def set_pixel(self, position: int, color: int) -> None:
+    def __setitem__(self, position: int, color: int) -> None:
         self._pixels[position] = color
 
-    @property
-    def count(self) -> int:
+    def __len__(self) -> int:
         return self._count
 
     def __getitem__(self, index: int) -> int:
@@ -102,13 +86,13 @@ class EffectRenderer:
         """Advance effect step state for the current frame."""
         self._effect.update(state, timer)
 
-    def render(self, state: EffectState, output: RendererOutput) -> None:
+    def render(self, state: EffectState, output: PixelBuffer) -> None:
         """Write a packed RGB color for each pixel in ``output``."""
-        count = output.count
+        count = len(output)
         for i in range(count):
             value = self._effect.value(state, i / count, count)
             color = self._palette.lookup(value)
-            output.set_pixel(i, color)
+            output[i] = color
 
 
 class AverageMergeRenderer(EffectRenderer):
@@ -122,8 +106,8 @@ class AverageMergeRenderer(EffectRenderer):
         for renderer in self._renderers:
             renderer.update(state, timer)
 
-    def render(self, state: EffectState, output: RendererOutput) -> None:
-        pixel_count = output.count
+    def render(self, state: EffectState, output: PixelBuffer) -> None:
+        pixel_count = len(output)
         if not self._buffers:
             self._buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
         for renderer, buf in zip(self._renderers, self._buffers):
@@ -142,7 +126,7 @@ class AverageMergeRenderer(EffectRenderer):
             r = min(255, r_total // n)
             g = min(255, g_total // n)
             b = min(255, b_total // n)
-            output.set_pixel(i, (r << 16) | (g << 8) | b)
+            output[i] = (r << 16) | (g << 8) | b
 
 
 class AdditiveMergeRenderer(EffectRenderer):
@@ -156,8 +140,8 @@ class AdditiveMergeRenderer(EffectRenderer):
         for renderer in self._renderers:
             renderer.update(state, timer)
 
-    def render(self, state: EffectState, output: RendererOutput) -> None:
-        pixel_count = output.count
+    def render(self, state: EffectState, output: PixelBuffer) -> None:
+        pixel_count = len(output)
         if not self._buffers:
             self._buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
         for renderer, buf in zip(self._renderers, self._buffers):
@@ -175,4 +159,4 @@ class AdditiveMergeRenderer(EffectRenderer):
             r = min(255, r_total)
             g = min(255, g_total)
             b = min(255, b_total)
-            output.set_pixel(i, (r << 16) | (g << 8) | b)
+            output[i] = (r << 16) | (g << 8) | b

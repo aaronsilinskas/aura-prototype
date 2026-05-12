@@ -104,7 +104,7 @@ def test_all_registered_listeners_are_notified_in_registration_order() -> None:
 def test_pixel_buffer_count_matches_size_at_construction() -> None:
     buf = PixelBuffer(5)
 
-    assert buf.count == 5
+    assert len(buf) == 5
 
 
 def test_pixel_buffer_initializes_all_pixels_to_zero() -> None:
@@ -113,10 +113,10 @@ def test_pixel_buffer_initializes_all_pixels_to_zero() -> None:
     assert list(buf) == [0, 0, 0, 0]
 
 
-def test_pixel_buffer_set_pixel_stores_color_at_given_index() -> None:
+def test_pixel_buffer_setitem_stores_color_at_given_index() -> None:
     buf = PixelBuffer(3)
 
-    buf.set_pixel(1, 0xFF0000)
+    buf[1] = 0xFF0000
 
     assert buf[1] == 0xFF0000
 
@@ -129,9 +129,9 @@ def test_pixel_buffer_len_returns_pixel_count() -> None:
 
 def test_pixel_buffer_iterates_pixels_in_index_order() -> None:
     buf = PixelBuffer(3)
-    buf.set_pixel(0, 0xFF0000)
-    buf.set_pixel(1, 0x00FF00)
-    buf.set_pixel(2, 0x0000FF)
+    buf[0] = 0xFF0000
+    buf[1] = 0x00FF00
+    buf[2] = 0x0000FF
 
     assert list(buf) == [0xFF0000, 0x00FF00, 0x0000FF]
 
