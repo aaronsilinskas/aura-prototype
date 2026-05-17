@@ -1,6 +1,5 @@
-from effects.effect import Effect, EffectState, EffectTimer
+from effects.effect import EffectState, EffectTimer
 from effects.manager.scope import ScopeValue
-from effects.palette import Palette
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
 from engine.timer import Timer
 
@@ -73,22 +72,15 @@ class EffectManager:
     ) -> "tuple[EffectRenderer, EffectState]":
         """Construct an EffectRenderer paired with a fresh EffectState."""
 
-        # Listeners will need a hook to audio/vibration drivers to trigger
         def scoped_listener(event_name):
-            # Event handling -> look up in-scoped EffectOutput and call handle_event(event_name)
             return self._notify_listeners(event_name, scope)
 
-        # resolution = (
-        #     16  # TODO - look up max resolution required from effect outputs that match the scope
-        # )
-
-        # config = RendererConfig(
-        #     level=level, resolution=resolution, options=options, listeners=[scoped_listener]
-        # )
-
-        # TODO look up the effect builder in a registry, give it config, and return the result
-
-        return EffectRenderer(Effect(name), Palette()), EffectState()
+        resolution = 16
+        config = RendererConfig(
+            level=level, resolution=resolution, options=options, listeners=[scoped_listener]
+        )
+        renderer = self._builder(name, config)
+        return renderer, EffectState()
 
     def set_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None:
         """Replace any running effect(s) in scope and start this one."""
