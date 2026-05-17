@@ -266,3 +266,80 @@ def test_add_effect_on_empty_scope_delivers_one_frame() -> None:
     manager.update(_make_timer())
 
     assert len(output.update_pixels_calls[0]) == 1
+
+
+# ---------------------------------------------------------------------------
+# stop_effect — slice 5
+# ---------------------------------------------------------------------------
+
+
+def test_stop_effect_causes_go_dark_on_next_update() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.update(_make_timer())
+    manager.stop_effect(Scope.PERSONAL)
+    manager.update(_make_timer())
+
+    assert output.update_pixels_calls[1] == []
+
+
+def test_stop_effect_clears_stacked_effects() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.stop_effect(Scope.PERSONAL)
+    manager.update(_make_timer())
+
+    assert output.update_pixels_calls[0] == []
+
+
+def test_stop_effect_does_not_affect_other_scopes() -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+    )
+
+    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.set_effect(Scope.DIRECTIONAL, "ice", 5, {})
+    manager.stop_effect(Scope.PERSONAL)
+    manager.update(_make_timer())
+
+    assert output_directional.update_pixels_calls == [[output_directional.created_buffers[0]]]
+
+
+# ---------------------------------------------------------------------------
+# shared renderer dedup — slice 7
+# ---------------------------------------------------------------------------
+
+
+def test_shared_renderer_advanced_once_per_frame_for_composite_scope() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.ALL])
+    builder = _SpyEffectBuilder()
+    manager = EffectManager(builder=builder, outputs=[output])
+
+    manager.set_effect(Scope.ALL, "fire", 5, {})
+    manager.update(_make_timer())
+
+    assert builder.created[0].update_count == 1
+
+
+def test_each_output_receives_own_buffer_for_composite_scope() -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+    )
+
+    manager.set_effect(Scope.ALL, "fire", 5, {})
+    manager.update(_make_timer())
+
+    assert len(output_personal.update_pixels_calls[0]) == 1
+    assert len(output_directional.update_pixels_calls[0]) == 1
+    personal_buf = output_personal.update_pixels_calls[0][0]
+    directional_buf = output_directional.update_pixels_calls[0][0]
+    assert personal_buf is not directional_buf
