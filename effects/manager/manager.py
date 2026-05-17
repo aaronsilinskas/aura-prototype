@@ -6,10 +6,26 @@ from engine.timer import Timer
 
 
 class EffectOutput:
-    """Interface for sending rendered pixels and events to hardware outputs."""
+    """Interface for sending rendered pixels and events to hardware outputs.
 
-    def update_pixels(self, frame: PixelBuffer) -> None:
-        """Send a rendered frame (list of packed RGB colors) to the output hardware."""
+    Concrete subclasses must set in their __init__:
+      - min_resolution: int  — minimum pixel count needed by this output.
+      - scopes: list         — list of ScopeValue this output serves.
+    """
+
+    min_resolution: int
+    scopes: "list[ScopeValue]"
+
+    def create_buffer(self) -> PixelBuffer:
+        """Create a PixelBuffer sized to this output's hardware pixel count."""
+        raise NotImplementedError
+
+    def update_pixels(self, frames: list) -> None:
+        """Receive rendered frames (list of PixelBuffer) for this output.
+
+        Called every update tick. Receives an empty list when no effects are active
+        (signal to go dark).
+        """
         pass
 
     def handle_event(self, event_name: str) -> None:
