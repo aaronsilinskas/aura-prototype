@@ -192,3 +192,37 @@ def test_effect_event_does_not_reach_out_of_scope_output() -> None:
     manager.update(_make_timer())
 
     assert output_b.handle_event_calls == []
+
+
+# ---------------------------------------------------------------------------
+# resolution — slice 9
+# ---------------------------------------------------------------------------
+
+
+class _CapturingEffectBuilder(EffectBuilder):
+    def __init__(self) -> None:
+        self.last_config: RendererConfig | None = None
+
+    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+        self.last_config = config
+        return EffectRenderer(Effect(name), PaletteLUT256(b""))
+
+
+def test_resolution_equals_max_min_resolution_of_matching_outputs() -> None:
+    output_a = SpyEffectOutput(min_resolution=32, scopes=[Scope.PERSONAL])
+    output_b = SpyEffectOutput(min_resolution=64, scopes=[Scope.PERSONAL])
+    builder = _CapturingEffectBuilder()
+    manager = EffectManager(builder=builder, outputs=[output_a, output_b])
+
+    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+
+    assert builder.last_config.resolution == 64
+
+
+def test_resolution_falls_back_to_16_when_no_outputs_match() -> None:
+    builder = _CapturingEffectBuilder()
+    manager = EffectManager(builder=builder, outputs=[])
+
+    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+
+    assert builder.last_config.resolution == 16
