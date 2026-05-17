@@ -62,10 +62,12 @@ class EffectManager:
 
     def _notify_listeners(self, event_name: str, scope: ScopeValue) -> None:
         """Notify listeners registered for the given scope."""
-        pass
-        # for key in scope.keys:
-        #    pass
-        # TODO - look up outputs in scope and notify them of the event
+        scope_keys = set(scope.keys)
+        for output in self._outputs:
+            for s in output.scopes:
+                if any(k in scope_keys for k in s.keys):
+                    output.handle_event(event_name)
+                    break
 
     def _build_effect(
         self, scope: ScopeValue, name: str, level: int, options: dict
@@ -75,7 +77,14 @@ class EffectManager:
         def scoped_listener(event_name):
             return self._notify_listeners(event_name, scope)
 
+        scope_keys = set(scope.keys)
         resolution = 16
+        for output in self._outputs:
+            for s in output.scopes:
+                if any(k in scope_keys for k in s.keys):
+                    if output.min_resolution > resolution:
+                        resolution = output.min_resolution
+                    break
         config = RendererConfig(
             level=level, resolution=resolution, options=options, listeners=[scoped_listener]
         )
