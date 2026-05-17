@@ -1,5 +1,4 @@
 from effects.effect import Effect
-from effects.level import level_lerp
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, RendererConfig
 from effects.steps.duration import duration
@@ -25,8 +24,8 @@ def build_ice_renderer(config: RendererConfig) -> EffectRenderer:
     level = config.level
     resolution = config.resolution
 
-    flow_speed = level_lerp(level, 0.02, 0.05)
-    spread = level_lerp(level, 0.75, 0.45)
+    flow_speed = config.level_lerp(0.02, 0.05)
+    spread = config.level_lerp(0.75, 0.45)
 
     ice_effect = Effect("ice").add_steps(
         [

@@ -1,5 +1,4 @@
 from effects.effect import Effect
-from effects.level import level_lerp
 from effects.palette import PaletteLUT256
 from effects.render import AdditiveMergeRenderer, EffectRenderer, RendererConfig
 from effects.shape import Shape
@@ -26,21 +25,15 @@ def build_time_renderer(config: RendererConfig) -> EffectRenderer:
     """
     level = config.level
 
-    drift_speed = level_lerp(level, 0.02, 0.065)
-    ticker_rotate_speed = level_lerp(level, 0.1, 0.28)
+    drift_speed = config.level_lerp(0.02, 0.065)
+    ticker_rotate_speed = config.level_lerp(0.1, 0.28)
 
-    time_sand_effect = Effect("time_sand").add_steps(
-        [drift_noise(drift_speed=drift_speed)]
-    )
-    time_sand_renderer = EffectRenderer(
-        time_sand_effect, PaletteLUT256(time_sand_palette)
-    )
+    time_sand_effect = Effect("time_sand").add_steps([drift_noise(drift_speed=drift_speed)])
+    time_sand_renderer = EffectRenderer(time_sand_effect, PaletteLUT256(time_sand_palette))
 
     time_ticker_effect = Effect(
         "time_ticker", Shape.checkers(value=0.25, count=level, width=0.05)
     ).add_steps([rotate(ticker_rotate_speed)])
-    time_ticker_renderer = EffectRenderer(
-        time_ticker_effect, PaletteLUT256(grayscale_palette)
-    )
+    time_ticker_renderer = EffectRenderer(time_ticker_effect, PaletteLUT256(grayscale_palette))
 
     return AdditiveMergeRenderer([time_sand_renderer, time_ticker_renderer])

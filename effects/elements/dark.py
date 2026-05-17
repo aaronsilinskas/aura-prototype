@@ -1,5 +1,4 @@
 from effects.effect import Effect
-from effects.level import level_lerp
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, RendererConfig
 from effects.steps.sparkle import sparkle
@@ -21,8 +20,8 @@ def build_dark_renderer(config: RendererConfig) -> EffectRenderer:
     """
     level = config.level
 
-    spawn_delay_min = level_lerp(level, 0.5, 1.0)
-    spawn_delay_max = level_lerp(level, 3.0, 5.0)
+    spawn_delay_min = config.level_lerp(0.5, 1.0)
+    spawn_delay_max = config.level_lerp(3.0, 5.0)
 
     dark_sparkle_effect = Effect("dark_sparkles").add_steps(
         [

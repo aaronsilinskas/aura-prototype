@@ -1,5 +1,4 @@
 from effects.effect import Effect
-from effects.level import level_lerp
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, RendererConfig
 from effects.steps.duration import duration
@@ -25,8 +24,8 @@ def build_water_renderer(config: RendererConfig) -> EffectRenderer:
     level = config.level
     resolution = config.resolution
 
-    flow_speed = level_lerp(level, 0.05, 0.14)
-    heat_rate = level_lerp(level, 0.2, 0.29)
+    flow_speed = config.level_lerp(0.05, 0.14)
+    heat_rate = config.level_lerp(0.2, 0.29)
 
     water_effect = Effect("water").add_steps(
         [

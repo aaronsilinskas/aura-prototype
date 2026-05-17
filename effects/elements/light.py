@@ -1,5 +1,4 @@
 from effects.effect import Effect
-from effects.level import level_lerp
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, RendererConfig
 from effects.steps.flame import flame
@@ -19,8 +18,8 @@ def build_light_renderer(config: RendererConfig) -> EffectRenderer:
     """
     level = config.level
 
-    heat_rate = level_lerp(level, 0.5, 0.75)
-    extra_cool_rate = level_lerp(level, 0.1, 0.3)
+    heat_rate = config.level_lerp(0.5, 0.75)
+    extra_cool_rate = config.level_lerp(0.1, 0.3)
 
     light_effect = Effect("light").add_steps(
         [

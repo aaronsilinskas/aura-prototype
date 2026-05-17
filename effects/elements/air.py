@@ -1,5 +1,4 @@
 from effects.effect import Effect
-from effects.level import level_lerp
 from effects.palette import PaletteLUT256
 from effects.render import AdditiveMergeRenderer, EffectRenderer, RendererConfig
 from effects.shape import Shape
@@ -35,19 +34,17 @@ def build_air_renderer(config: RendererConfig) -> EffectRenderer:
     level = config.level
 
     accelerate_end = VG.random(0.75, 1.2)
-    breeze_duration_end = VG.random(2.0, level_lerp(level, 2.5, 5.0))
+    breeze_duration_end = VG.random(2.0, config.level_lerp(2.5, 5.0))
     breeze_count = 1 + level // 5
-    multiplier_end = level_lerp(level, 0.0, 0.5) + 0.50 / breeze_count
-    hide_duration = VG.random(0.5, 3.0 - level_lerp(level, 0.0, 2.0))
+    multiplier_end = config.level_lerp(0.0, 0.5) + 0.50 / breeze_count
+    hide_duration = VG.random(0.5, 3.0 - config.level_lerp(0.0, 2.0))
     palette = PaletteLUT256(air_palette)
 
     renderers: list[EffectRenderer] = []
     for _ in range(breeze_count):
         air_effect = Effect(
             "air",
-            Shape.padded(
-                0.3 - level_lerp(level, 0.0, 0.3), Shape.reverse(Shape.gradient())
-            ),
+            Shape.padded(0.3 - config.level_lerp(0.0, 0.3), Shape.reverse(Shape.gradient())),
         ).add_steps(
             [
                 set_position(position=VG.random()),

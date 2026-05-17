@@ -1,5 +1,4 @@
 from effects.effect import Effect
-from effects.level import level_lerp
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, RendererConfig
 from effects.steps.flame import flame
@@ -21,7 +20,7 @@ def build_earth_renderer(config: RendererConfig) -> EffectRenderer:
     """
     level = config.level
     resolution = config.resolution
-    spread = level_lerp(level, 0.7, 0.4)
+    spread = config.level_lerp(0.7, 0.4)
 
     earth_effect = Effect("earth").add_steps(
         [

@@ -1,5 +1,4 @@
 from effects.effect import Effect
-from effects.level import level_lerp, level_lerp_int
 from effects.palette import PaletteLUT256
 from effects.render import AdditiveMergeRenderer, EffectRenderer, RendererConfig
 from effects.steps.drift_noise import drift_noise
@@ -25,14 +24,14 @@ def build_gravity_renderer(config: RendererConfig) -> EffectRenderer:
     """
     level = config.level
 
-    nebula_resolution = max(config.resolution, level_lerp_int(level, 18, 36))
-    nebula_drift_speed = level_lerp(level, 0.02, 0.038)
-    nebula_amplitude = level_lerp(level, 0.22, 0.4)
+    nebula_resolution = max(config.resolution, config.level_lerp_int(18, 36))
+    nebula_drift_speed = config.level_lerp(0.02, 0.038)
+    nebula_amplitude = config.level_lerp(0.22, 0.4)
 
-    spawn_delay_min = level_lerp(level, 0.5, 1.0)
-    spawn_delay_max = level_lerp(level, 3.0, 5.0)
-    star_fade_in_rate = level_lerp(level, 1.0, 2.0)
-    star_fade_out_rate = level_lerp(level, 2.0, 4.0)
+    spawn_delay_min = config.level_lerp(0.5, 1.0)
+    spawn_delay_max = config.level_lerp(3.0, 5.0)
+    star_fade_in_rate = config.level_lerp(1.0, 2.0)
+    star_fade_out_rate = config.level_lerp(2.0, 4.0)
 
     gravity_nebula_effect = Effect("gravity_nebula").add_steps(
         [

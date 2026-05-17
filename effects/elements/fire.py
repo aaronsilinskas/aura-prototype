@@ -1,5 +1,4 @@
 from effects.effect import Effect
-from effects.level import level_lerp
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, RendererConfig
 from effects.steps.flame import flame
@@ -21,17 +20,12 @@ def build_fire_renderer(config: RendererConfig) -> EffectRenderer:
     Level: more sparks and faster heat produce a taller, brighter, and more
     turbulent flame.
     """
-    level = config.level
-    resolution = config.resolution
-
-    heat_rate = level_lerp(level, 1.22, 1.4)
-
     fire_effect = Effect("fire").add_steps(
         [
             flame(
-                spark_count=level,
-                resolution=resolution,
-                heat_rate=heat_rate,
+                spark_count=config.level,
+                resolution=config.resolution,
+                heat_rate=config.level_lerp(1.22, 1.4),
                 extra_cool_rate=0.1,
                 spread=0.3,
             )

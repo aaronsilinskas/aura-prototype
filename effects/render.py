@@ -5,6 +5,8 @@ except ImportError:
     pass
 
 from effects.effect import Effect, EffectState, EffectTimer
+from effects.level import level_lerp as _level_lerp
+from effects.level import level_lerp_int as _level_lerp_int
 from effects.palette import Palette
 
 EffectListenerFunc: TypeAlias = "Callable[[str], None]"
@@ -36,6 +38,15 @@ class RendererConfig:
         """Invoke all registered listeners with ``event_name``."""
         for listener in self.listeners:
             listener(event_name)
+
+    def level_lerp(self, minimum: float, maximum: float) -> float:
+        """Interpolate between ``minimum`` and ``maximum`` based on the current level."""
+        return _level_lerp(self.level, minimum, maximum)
+
+    def level_lerp_int(self, minimum: int, maximum: int) -> int:
+        """Interpolate between ``minimum`` and ``maximum`` based on the current level,
+        rounded to the nearest int."""
+        return _level_lerp_int(self.level, minimum, maximum)
 
 
 class PixelBuffer:
@@ -100,7 +111,6 @@ class AverageMergeRenderer(EffectRenderer):
 
     def __init__(self, renderers: list[EffectRenderer]) -> None:
         self._renderers = renderers
-        self._buffers: list[PixelBuffer] = []
 
     def update(self, state: EffectState, timer: EffectTimer) -> None:
         for renderer in self._renderers:
@@ -108,9 +118,8 @@ class AverageMergeRenderer(EffectRenderer):
 
     def render(self, state: EffectState, output: PixelBuffer) -> None:
         pixel_count = len(output)
-        if not self._buffers:
-            self._buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
-        for renderer, buf in zip(self._renderers, self._buffers):
+        buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
+        for renderer, buf in zip(self._renderers, buffers):
             renderer.render(state, buf)
 
         n = len(self._renderers)
@@ -118,7 +127,7 @@ class AverageMergeRenderer(EffectRenderer):
             r_total = 0
             g_total = 0
             b_total = 0
-            for buf in self._buffers:
+            for buf in buffers:
                 color = buf[i]
                 r_total += (color >> 16) & 255
                 g_total += (color >> 8) & 255
@@ -134,7 +143,6 @@ class AdditiveMergeRenderer(EffectRenderer):
 
     def __init__(self, renderers: list[EffectRenderer]) -> None:
         self._renderers = renderers
-        self._buffers: list[PixelBuffer] = []
 
     def update(self, state: EffectState, timer: EffectTimer) -> None:
         for renderer in self._renderers:
@@ -142,16 +150,15 @@ class AdditiveMergeRenderer(EffectRenderer):
 
     def render(self, state: EffectState, output: PixelBuffer) -> None:
         pixel_count = len(output)
-        if not self._buffers:
-            self._buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
-        for renderer, buf in zip(self._renderers, self._buffers):
+        buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
+        for renderer, buf in zip(self._renderers, buffers):
             renderer.render(state, buf)
 
         for i in range(pixel_count):
             r_total = 0
             g_total = 0
             b_total = 0
-            for buf in self._buffers:
+            for buf in buffers:
                 color = buf[i]
                 r_total += (color >> 16) & 255
                 g_total += (color >> 8) & 255
