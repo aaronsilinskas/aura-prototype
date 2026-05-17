@@ -82,3 +82,20 @@ def test_set_effect_nonmatching_output_receives_go_dark() -> None:
     manager.update(_make_timer())
 
     assert output_b.update_pixels_calls == [[]]
+
+
+# ---------------------------------------------------------------------------
+# out-of-scope go-dark — slice 6
+# ---------------------------------------------------------------------------
+
+
+def test_out_of_scope_output_receives_go_dark_each_frame() -> None:
+    output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output_a, output_b])
+
+    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.update(_make_timer())
+    manager.update(_make_timer())
+
+    assert output_b.update_pixels_calls == [[], []]
