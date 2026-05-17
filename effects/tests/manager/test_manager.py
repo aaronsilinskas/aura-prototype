@@ -56,3 +56,29 @@ def test_update_called_twice_notifies_output_each_tick() -> None:
     manager.update(_make_timer())
 
     assert len(output.update_pixels_calls) == 2
+
+
+# ---------------------------------------------------------------------------
+# set_effect + update — slice 2
+# ---------------------------------------------------------------------------
+
+
+def test_set_effect_delivers_one_frame_to_matching_output() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.update(_make_timer())
+
+    assert output.update_pixels_calls == [[output.created_buffers[0]]]
+
+
+def test_set_effect_nonmatching_output_receives_go_dark() -> None:
+    output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output_a, output_b])
+
+    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.update(_make_timer())
+
+    assert output_b.update_pixels_calls == [[]]
