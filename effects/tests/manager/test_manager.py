@@ -1,5 +1,9 @@
-from effects.manager.manager import EffectManager
+from effects.effect import Effect
+from effects.manager.manager import EffectBuilder, EffectManager
 from effects.manager.scope import Scope
+from effects.palette import PaletteLUT256
+from effects.render import EffectRenderer, RendererConfig
+from effects.steps.control import call
 from effects.tests.manager.helpers import SpyEffectOutput, StubEffectBuilder
 from engine.timer import Timer
 
@@ -149,3 +153,42 @@ def test_out_of_scope_output_receives_go_dark_each_frame() -> None:
     manager.update(_make_timer())
 
     assert output_b.update_pixels_calls == [[], []]
+
+
+# ---------------------------------------------------------------------------
+# effect events — slice 8
+# ---------------------------------------------------------------------------
+
+
+class _EventFiringEffectBuilder(EffectBuilder):
+    def __init__(self, event_name: str) -> None:
+        self._event_name = event_name
+
+    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+        event_name = self._event_name
+        step = call(lambda state, timer: config.notify_listeners(event_name))
+        effect = Effect(name).add_steps([step])
+        return EffectRenderer(effect, PaletteLUT256(b""))
+
+
+def test_effect_event_reaches_matching_scope_output() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=_EventFiringEffectBuilder("lightning_strike"), outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "shock", 5, {})
+    manager.update(_make_timer())
+
+    assert output.handle_event_calls == ["lightning_strike"]
+
+
+def test_effect_event_does_not_reach_out_of_scope_output() -> None:
+    output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        builder=_EventFiringEffectBuilder("lightning_strike"), outputs=[output_a, output_b]
+    )
+
+    manager.set_effect(Scope.PERSONAL, "shock", 5, {})
+    manager.update(_make_timer())
+
+    assert output_b.handle_event_calls == []
