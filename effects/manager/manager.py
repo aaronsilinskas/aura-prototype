@@ -1,13 +1,20 @@
 from effects.effect import Effect, EffectState, EffectTimer
 from effects.manager.scope import ScopeValue
 from effects.palette import Palette
-from effects.render import EffectRenderer, RendererConfig
+from effects.render import EffectRenderer, PixelBuffer, RendererConfig
 from engine.timer import Timer
 
-# TODO: Need output interfaces that register resolution
-# - for each resolution key, have a list of outputs
-# - one state machine for each key?
-# TODO: sparkle step still uses pixel_count internally — needs manual update
+
+class EffectOutput:
+    """Interface for sending rendered pixels and events to hardware outputs."""
+
+    def update_pixels(self, frame: PixelBuffer) -> None:
+        """Send a rendered frame (list of packed RGB colors) to the output hardware."""
+        pass
+
+    def handle_event(self, event_name: str) -> None:
+        """Handle an event triggered by an effect renderer."""
+        pass
 
 
 class EffectBuilder:
@@ -32,29 +39,42 @@ class EffectManager:
     __slots__ = ("_effects", "_seen", "_timer")
 
     def __init__(self) -> None:
-        # scope key -> list of active (EffectRenderer, EffectState) pairs
         self._effects: dict[str, list[tuple[EffectRenderer, EffectState]]] = {}
         self._timer: EffectTimer = EffectTimer()
         self._seen: set[int] = set()
 
+    def _notify_listeners(self, event_name: str, scope: ScopeValue) -> None:
+        """Notify listeners registered for the given scope."""
+        pass
+        # for key in scope.keys:
+        #    pass
+        # TODO - look up outputs in scope and notify them of the event
+
     def _build_effect(
-        self, name: str, level: int, options: dict
+        self, scope: ScopeValue, name: str, level: int, options: dict
     ) -> "tuple[EffectRenderer, EffectState]":
         """Construct an EffectRenderer paired with a fresh EffectState."""
 
-        # TODO - construct a RendererConfig to pass to the builder:
-        # -- resolution will need to come from each driver, but re-use renderer if
-        #   those match
-        # -- level comes from set/add_effect
-        # -- options comes from set/add_effect
-        # -- listeners will need a hook to audio/vibration drivers to trigger
+        # Listeners will need a hook to audio/vibration drivers to trigger
+        def scoped_listener(event_name):
+            # Event handling -> look up in-scoped EffectOutput and call handle_event(event_name)
+            return self._notify_listeners(event_name, scope)
 
-        # TODO implement registry to build effect renderer(s) for drivers
+        # resolution = (
+        #     16  # TODO - look up max resolution required from effect outputs that match the scope
+        # )
+
+        # config = RendererConfig(
+        #     level=level, resolution=resolution, options=options, listeners=[scoped_listener]
+        # )
+
+        # TODO look up the effect builder in a registry, give it config, and return the result
+
         return EffectRenderer(Effect(name), Palette()), EffectState()
 
     def set_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None:
         """Replace any running effect(s) in scope and start this one."""
-        pair = self._build_effect(name, level, options)
+        pair = self._build_effect(scope, name, level, options)
         for key in scope.keys:
             self._effects[key] = [pair]
 
@@ -64,7 +84,7 @@ class EffectManager:
         If nothing is running in scope, behaves like set_effect.
         The driver determines how layered effects are composited (e.g. splitting an LED strip).
         """
-        pair = self._build_effect(name, level, options)
+        pair = self._build_effect(scope, name, level, options)
         for key in scope.keys:
             if key in self._effects:
                 self._effects[key].append(pair)
@@ -80,6 +100,17 @@ class EffectManager:
             if key in self._effects:
                 del self._effects[key]
 
+    def register_output(
+        self, output: EffectOutput, min_resolution: int, scopes: list[ScopeValue]
+    ) -> None:
+        """Register an output to receive rendered frames for effects in matching scopes."""
+
+        # TODO - just store the params and brute force lookups. Optimize later with dicts!!!!
+
+        # TODO - this will need to trigger some kind of reconciliation to start sending frames for
+        #   any existing effects that match the new output's scope
+        pass
+
     def update(self, timer: Timer) -> None:
         """Tick all active effects in each scope."""
         self._timer.update(timer.elapsed)
@@ -91,6 +122,8 @@ class EffectManager:
                 if renderer_id not in seen:
                     seen.add(renderer_id)
                     renderer.update(state, self._timer)
+
+        # TODO: render to buffers and send to outputs
 
     def __repr__(self) -> str:
         parts = []
