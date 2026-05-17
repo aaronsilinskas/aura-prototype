@@ -192,3 +192,43 @@ def test_effect_event_does_not_reach_out_of_scope_output() -> None:
     manager.update(_make_timer())
 
     assert output_b.handle_event_calls == []
+
+
+# ---------------------------------------------------------------------------
+# add_effect — slice 4
+# ---------------------------------------------------------------------------
+
+
+def test_add_effect_after_set_effect_delivers_two_frames() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.update(_make_timer())
+
+    assert len(output.update_pixels_calls[0]) == 2
+
+
+def test_add_effect_both_renderers_advanced_on_each_update() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    builder = _SpyEffectBuilder()
+    manager = EffectManager(builder=builder, outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.update(_make_timer())
+    manager.update(_make_timer())
+
+    assert builder.created[0].update_count == 2
+    assert builder.created[1].update_count == 2
+
+
+def test_add_effect_on_empty_scope_delivers_one_frame() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.update(_make_timer())
+
+    assert len(output.update_pixels_calls[0]) == 1
