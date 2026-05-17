@@ -343,3 +343,19 @@ def test_each_output_receives_own_buffer_for_composite_scope() -> None:
     personal_buf = output_personal.update_pixels_calls[0][0]
     directional_buf = output_directional.update_pixels_calls[0][0]
     assert personal_buf is not directional_buf
+
+
+def test_stop_effect_all_sends_go_dark_to_every_output() -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+    )
+
+    manager.set_effect(Scope.ALL, "fire", 5, {})
+    manager.update(_make_timer())
+    manager.stop_effect(Scope.ALL)
+    manager.update(_make_timer())
+
+    assert output_personal.update_pixels_calls[1] == []
+    assert output_directional.update_pixels_calls[1] == []

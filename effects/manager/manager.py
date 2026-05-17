@@ -112,9 +112,6 @@ class EffectManager:
 
     def stop_effect(self, scope: ScopeValue) -> None:
         """Stop all running effects in scope."""
-        # TODO - this is a bit brute-force; we could track individual effects and only stop those
-        #   that match the scope, but that would add complexity to the data structure and
-        #   bookkeeping. For now, we can just stop all effects in any scope that matches.
         for key in scope.keys:
             if key in self._effects:
                 del self._effects[key]
