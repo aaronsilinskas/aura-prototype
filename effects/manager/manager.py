@@ -6,10 +6,26 @@ from engine.timer import Timer
 
 
 class EffectOutput:
-    """Interface for sending rendered pixels and events to hardware outputs."""
+    """Interface for sending rendered pixels and events to hardware outputs.
 
-    def update_pixels(self, frame: PixelBuffer) -> None:
-        """Send a rendered frame (list of packed RGB colors) to the output hardware."""
+    Concrete subclasses must set in their __init__:
+      - min_resolution: int  — minimum pixel count needed by this output.
+      - scopes: list         — list of ScopeValue this output serves.
+    """
+
+    min_resolution: int
+    scopes: "list[ScopeValue]"
+
+    def create_buffer(self) -> PixelBuffer:
+        """Create a PixelBuffer sized to this output's hardware pixel count."""
+        raise NotImplementedError
+
+    def update_pixels(self, frames: list) -> None:
+        """Receive rendered frames (list of PixelBuffer) for this output.
+
+        Called every update tick. Receives an empty list when no effects are active
+        (signal to go dark).
+        """
         pass
 
     def handle_event(self, event_name: str) -> None:
@@ -36,9 +52,11 @@ class EffectBuilder:
 
 
 class EffectManager:
-    __slots__ = ("_effects", "_seen", "_timer")
+    __slots__ = ("_builder", "_effects", "_outputs", "_seen", "_timer")
 
-    def __init__(self) -> None:
+    def __init__(self, builder: EffectBuilder, outputs: list[EffectOutput]) -> None:
+        self._builder: EffectBuilder = builder
+        self._outputs: list[EffectOutput] = outputs
         self._effects: dict[str, list[tuple[EffectRenderer, EffectState]]] = {}
         self._timer: EffectTimer = EffectTimer()
         self._seen: set[int] = set()
@@ -100,21 +118,12 @@ class EffectManager:
             if key in self._effects:
                 del self._effects[key]
 
-    def register_output(
-        self, output: EffectOutput, min_resolution: int, scopes: list[ScopeValue]
-    ) -> None:
-        """Register an output to receive rendered frames for effects in matching scopes."""
-
-        # TODO - just store the params and brute force lookups. Optimize later with dicts!!!!
-
-        # TODO - this will need to trigger some kind of reconciliation to start sending frames for
-        #   any existing effects that match the new output's scope
-        pass
-
     def update(self, timer: Timer) -> None:
-        """Tick all active effects in each scope."""
+        """Tick all active effects and deliver frames to every registered output."""
         self._timer.update(timer.elapsed)
         seen = self._seen
+
+        # Pass 1: advance each unique renderer exactly once.
         seen.clear()
         for effects in self._effects.values():
             for renderer, state in effects:
@@ -123,7 +132,22 @@ class EffectManager:
                     seen.add(renderer_id)
                     renderer.update(state, self._timer)
 
-        # TODO: render to buffers and send to outputs
+        # Pass 2: render and deliver to each output.
+        # Outputs whose scopes have no active effects receive [] (go-dark signal).
+        for output in self._outputs:
+            seen.clear()
+            frames = []
+            for scope in output.scopes:
+                for key in scope.keys:
+                    if key in self._effects:
+                        for renderer, state in self._effects[key]:
+                            renderer_id = id(renderer)
+                            if renderer_id not in seen:
+                                seen.add(renderer_id)
+                                buf = output.create_buffer()
+                                renderer.render(state, buf)
+                                frames.append(buf)
+            output.update_pixels(frames)
 
     def __repr__(self) -> str:
         parts = []
