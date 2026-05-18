@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from effects.manager.manager import EffectManager
+from effects.manager.manager import EffectControls
 from engine.events import Event
 from engine.timer import Timer
 
@@ -28,7 +28,7 @@ class GameRule:
 class GameState:
     __slots__ = ("effect_manager", "engine", "timer")
 
-    def __init__(self, engine: GameEngine, timer: Timer, effect_manager: EffectManager) -> None:
+    def __init__(self, engine: GameEngine, timer: Timer, effect_manager: EffectControls) -> None:
         self.engine = engine
         self.timer = timer
         self.effect_manager = effect_manager
@@ -37,7 +37,7 @@ class GameState:
 class GameEngine:
     __slots__ = ("_effect_manager", "_queue", "_rules")
 
-    def __init__(self, effect_manager: EffectManager) -> None:
+    def __init__(self, effect_manager: EffectControls) -> None:
         self._effect_manager = effect_manager
         self._rules: list[GameRule] = []
         self._queue: list[Event] = []
