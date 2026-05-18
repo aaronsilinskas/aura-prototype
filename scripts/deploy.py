@@ -13,6 +13,7 @@ Usage
 """
 
 import argparse
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -51,11 +52,15 @@ def _sync_file(
     label: str,
     copied: "list[Path]",
     skipped: "list[Path]",
+    dry_run: bool = False,
 ) -> None:
     """Copy src to dest unless it should be skipped."""
     if _should_skip(dest):
         skipped.append(dest)
         print(f"SKIP  {label} (up to date)")
+    elif dry_run:
+        copied.append(dest)
+        print(f"[DRY RUN] COPY  {label}")
     else:
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dest)
@@ -67,6 +72,7 @@ def deploy(
     example_file: "Path | None",
     mount: Path,
     source_root: "Path | None" = None,
+    dry_run: bool = False,
 ) -> int:
     """Deploy to mount. Returns 0 on success, 1 on error.
 
@@ -75,22 +81,32 @@ def deploy(
             Pass ``None`` to sync modules only without touching ``code.py``.
         mount: Path to the mounted CIRCUITPY volume.
         source_root: Root of the source tree. Defaults to ``Path.cwd()``.
+        dry_run: When True, skip mount validation and print what would be copied
+            without writing any files.
     """
     if source_root is None:
         source_root = Path.cwd()
 
-    if not mount.is_dir():
-        print(
-            f"Error: mount path '{mount}' does not exist or is not a directory.",
-            file=sys.stderr,
-        )
-        return 1
+    if not dry_run:
+        if not mount.is_dir():
+            print(
+                f"Error: mount path '{mount}' does not exist or is not a directory.",
+                file=sys.stderr,
+            )
+            return 1
+
+        if not os.access(mount, os.W_OK):
+            print(
+                "Error: CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first.",
+                file=sys.stderr,
+            )
+            return 1
 
     copied: list[Path] = []
     skipped: list[Path] = []
 
     if example_file is not None:
-        _sync_file(example_file, mount / "code.py", "code.py", copied, skipped)
+        _sync_file(example_file, mount / "code.py", "code.py", copied, skipped, dry_run)
 
     for module in MODULE_DIRS:
         src_dir = source_root / module
@@ -104,7 +120,7 @@ def deploy(
             if _is_excluded(rel):
                 continue
             label = f"{module}/{rel}"
-            _sync_file(src_file, dest_dir / rel, label, copied, skipped)
+            _sync_file(src_file, dest_dir / rel, label, copied, skipped, dry_run)
 
     print(f"Done. {len(copied)} copied, {len(skipped)} skipped.")
     return 0
@@ -127,8 +143,14 @@ def main() -> None:
         default=Path(_DEFAULT_MOUNT),
         help=f"Path to the mounted CIRCUITPY volume (default: {_DEFAULT_MOUNT}).",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Print what would be copied without writing any files. Skips mount validation.",
+    )
     args = parser.parse_args()
-    sys.exit(deploy(args.example_file, args.mount))
+    sys.exit(deploy(args.example_file, args.mount, dry_run=args.dry_run))
 
 
 if __name__ == "__main__":
