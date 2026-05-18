@@ -6,7 +6,7 @@ import tty
 
 from effects.elements.registry import build_element_renderer
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
-from engine.engine import GameEngine, GameRule, GameState
+from engine.engine import GameEngine, GameRule, GameState, Version
 from engine.events import Event
 from engine.input import ButtonData, InputEvents, MovementData
 from engine.effects.manager import EffectBuilder, EffectManager, EffectOutput
@@ -67,29 +67,28 @@ class AnsiEffectOutput(EffectOutput):
 personal_output = AnsiEffectOutput(scopes=[Scope.PERSONAL])
 effect_manager = EffectManager(builder=ElementEffectBuilder(), outputs=[personal_output])
 
-game_engine = GameEngine()
+game_engine = GameEngine(effect_controls=effect_manager)
 
 
 class MakeEffectRule(GameRule):
-    def __init__(self, manager: EffectManager) -> None:
-        self._manager = manager
+    def __init__(self):
+        super().__init__("make_effect", Version(1, 0))
 
     def handle_event(self, event: Event, state: GameState) -> None:
         if isinstance(event, InputEvents.ButtonAndMovement):
             button_data = event.buttons
             if button_data.states["A"] == ButtonData.PRESSED:
-                self._manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+                state.effect_controls.add_effect(Scope.PERSONAL, "fire", 5, {})
             elif button_data.states["B"] == ButtonData.PRESSED:
-                self._manager.add_effect(Scope.PERSONAL, "water", 5, {})
+                state.effect_controls.add_effect(Scope.PERSONAL, "water", 5, {})
             elif button_data.states["C"] == ButtonData.PRESSED:
-                self._manager.add_effect(Scope.PERSONAL, "lightning", 5, {})
+                state.effect_controls.add_effect(Scope.PERSONAL, "lightning", 5, {})
             elif button_data.states["D"] == ButtonData.PRESSED:
-                self._manager.stop_effect(Scope.ALL)
+                state.effect_controls.stop_effect(Scope.ALL)
 
 
-game_engine.add_rules(MakeEffectRule(effect_manager))
+game_engine.add_rules(MakeEffectRule())
 
-# - TODO: Single container object to pass all params to rules (engine, state, effect manager, etc)
 # - TODO: New standardized effect event name design for sound/vibration triggers
 
 _default_movement = MovementData(x_accel=0.0, y_accel=9.8, z_accel=0.0)
