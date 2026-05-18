@@ -32,7 +32,7 @@ import time
 
 import board
 import busio
-from adafruit_is31fl3741.adafruit_rgbmatrix import IS31FL3741_RGBMatrix13x9
+from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
 from effects.elements.registry import build_element_renderer
 from effects.manager.manager import EffectBuilder, EffectManager, EffectOutput
@@ -60,7 +60,8 @@ _MATRIX_ROWS: "Final" = 9
 # ---------------------------------------------------------------------------
 
 i2c = busio.I2C(board.SCL, board.SDA)
-is31 = IS31FL3741_RGBMatrix13x9(i2c)
+time.sleep(3)  # Wait for RGB panel to initialize.
+is31 = Adafruit_RGBMatrixQT(i2c)
 is31.global_current = 0x0A  # limit LED current for safe testing; raise for full brightness
 is31.enable = True
 
@@ -96,12 +97,12 @@ class IS31FL3741EffectOutput(EffectOutput):
         for f in range(row_count):
             buf = frames[f]
             for p in range(_MATRIX_COLS):
-                is31[p, f] = buf[p]  # buf[p] is a packed 24-bit RGB int
+                is31.pixel(p, f, buf[p])  # pixel(x, y, packed_24bit_color)
 
         # Clear unused rows to black
         for f in range(row_count, _MATRIX_ROWS):
             for p in range(_MATRIX_COLS):
-                is31[p, f] = 0
+                is31.pixel(p, f, 0)
 
         is31.show()
 
