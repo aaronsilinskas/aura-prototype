@@ -167,7 +167,7 @@ effect_manager = EffectManager(
 
 # Hardcode a lightning effect to test AudioEffectOutput (fires "lightning_strike" events).
 # Button input to layer / clear effects is added in Issue #34.
-effect_manager.set_effect(Scope.PERSONAL, "lightning", 5, {})
+effect_manager.set_effect(Scope.PERSONAL, "lightning", 1, {})
 
 # ---------------------------------------------------------------------------
 # Main loop
