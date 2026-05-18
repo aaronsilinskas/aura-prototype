@@ -22,6 +22,9 @@ class ElementEffectBuilder(EffectBuilder):
 MAX_FRAMES = 4  # fixed display block height; add_effect can layer up to this many effects
 
 
+BLOCK_HEIGHT = MAX_FRAMES + 1  # frame lines + 1 event status line
+
+
 class AnsiEffectOutput(EffectOutput):
     PIXEL_COUNT = 36
 
@@ -29,9 +32,15 @@ class AnsiEffectOutput(EffectOutput):
         self.min_resolution = self.PIXEL_COUNT
         self.scopes = scopes
         self._initialized = False
+        self._last_event: str = ""
+        self._event_count: int = 0
 
     def create_buffer(self) -> PixelBuffer:
         return PixelBuffer(self.PIXEL_COUNT)
+
+    def handle_event(self, event_name: str) -> None:
+        self._last_event = event_name
+        self._event_count += 1
 
     def update_pixels(self, frames: list) -> None:
         empty_line = "\r" + "  " * self.PIXEL_COUNT
@@ -44,12 +53,12 @@ class AnsiEffectOutput(EffectOutput):
                 b = color & 0xFF
                 parts.append(f"\033[48;2;{r};{g};{b}m  \033[0m")
             lines.append("\r" + "".join(parts))
-        # Always pad to a fixed height so the block never grows or shrinks
         while len(lines) < MAX_FRAMES:
             lines.append(empty_line)
-        # On first call establish the block; thereafter move back to the top
+        event_line = f"\r[audio #{self._event_count}] {self._last_event}\033[K" if self._last_event else "\r\033[K"
+        lines.append(event_line)d
         if self._initialized:
-            print(f"\033[{MAX_FRAMES}A", end="")
+            print(f"\033[{BLOCK_HEIGHT}A", end="")
         else:
             self._initialized = True
         print("\r\n".join(lines), end="", flush=True)
