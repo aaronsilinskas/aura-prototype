@@ -177,20 +177,17 @@ class AudioEffectOutput(EffectOutput):
 
 
 class ButtonEffectRule(GameRule):
-    def __init__(self, manager):
-        self._manager = manager
-
     def handle_event(self, event, state):
         if isinstance(event, InputEvents.ButtonAndMovement):
             button_data = event.buttons
             if button_data.states["A"] == ButtonData.PRESSED:
-                self._manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+                state.effect_controls.add_effect(Scope.PERSONAL, "fire", 5, {})
             elif button_data.states["B"] == ButtonData.PRESSED:
-                self._manager.add_effect(Scope.PERSONAL, "water", 5, {})
+                state.effect_controls.add_effect(Scope.PERSONAL, "water", 5, {})
             elif button_data.states["C"] == ButtonData.PRESSED:
-                self._manager.add_effect(Scope.PERSONAL, "lightning", 5, {})
+                state.effect_controls.add_effect(Scope.PERSONAL, "lightning", 5, {})
             elif button_data.states["D"] == ButtonData.PRESSED:
-                self._manager.stop_effect(Scope.ALL)
+                state.effect_controls.stop_effect(Scope.ALL)
 
 
 effect_output = IS31FL3741EffectOutput()
@@ -200,8 +197,8 @@ effect_manager = EffectManager(
     outputs=[effect_output, audio_output],
 )
 
-game_engine = GameEngine()
-game_engine.add_rules(ButtonEffectRule(effect_manager))
+game_engine = GameEngine(effect_controls=effect_manager)
+game_engine.add_rules(ButtonEffectRule())
 
 # Button state tracking for edge detection (pull-up: True = not pressed)
 _buttons = [_button_a, _button_b, _button_c, _button_d]
