@@ -1,7 +1,7 @@
-from effects.manager.manager import EffectManager
-from effects.tests.manager.helpers import StubEffectBuilder
 from engine.engine import GameEngine, GameRule, GameState, Version
 from engine.events import Event, EventGroup
+from engine.manager.manager import EffectManager
+from engine.tests.manager.helpers import StubEffectBuilder
 from engine.timer import Timer
 
 _GROUP = EventGroup("test")

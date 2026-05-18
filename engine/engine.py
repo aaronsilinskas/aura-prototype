@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from effects.manager.manager import EffectControls
 from engine.events import Event
+from engine.manager.manager import EffectControls
 from engine.timer import Timer
 
 

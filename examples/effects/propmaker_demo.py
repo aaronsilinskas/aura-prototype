@@ -39,11 +39,11 @@ import digitalio
 from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
 from effects.elements.registry import build_element_renderer
-from effects.manager.manager import EffectBuilder, EffectManager, EffectOutput
-from effects.manager.scope import Scope
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
 from engine.engine import GameEngine, GameRule
 from engine.input import ButtonData, InputEvents, MovementData
+from engine.manager.manager import EffectBuilder, EffectManager, EffectOutput
+from engine.manager.scope import Scope
 from engine.timer import Timer
 
 try:
