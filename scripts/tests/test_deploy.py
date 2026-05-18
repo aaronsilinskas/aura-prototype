@@ -196,3 +196,43 @@ def test_existing_destination_file_is_not_overwritten(tmp_path: Path) -> None:
     deploy(None, mount, source_root=source)
 
     assert dest.read_text() == "# device copy"
+
+
+# ---------------------------------------------------------------------------
+# Dry run (#42)
+# ---------------------------------------------------------------------------
+
+
+def test_dry_run_skips_mount_existence_check(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+
+    result = deploy(None, tmp_path / "nonexistent", source_root=source, dry_run=True)
+
+    assert result == 0
+
+
+def test_dry_run_writes_no_files(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source, dry_run=True)
+
+    assert list(mount.rglob("*")) == []
+
+
+def test_dry_run_output_shows_dry_run_prefix_for_copies(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source, dry_run=True)
+
+    captured = capsys.readouterr()
+    assert "[DRY RUN] COPY" in captured.out
