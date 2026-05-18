@@ -30,8 +30,12 @@ Configuration
 
 import time
 
+import audiobusio
+import audiocore
+import audiomixer
 import board
 import busio
+import digitalio
 from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
 from effects.elements.registry import build_element_renderer
@@ -49,9 +53,6 @@ except ImportError:
 # Constants
 # ---------------------------------------------------------------------------
 
-TARGET_FPS: "Final" = 20
-_TICK_SECONDS: "Final" = 1.0 / TARGET_FPS
-
 _MATRIX_COLS: "Final" = 13
 _MATRIX_ROWS: "Final" = 9
 
@@ -60,11 +61,19 @@ _MATRIX_ROWS: "Final" = 9
 # ---------------------------------------------------------------------------
 
 i2c = busio.I2C(board.SCL, board.SDA)
-time.sleep(3)  # Wait for RGB panel to initialize.
-is31 = Adafruit_RGBMatrixQT(i2c)
+while True:
+    try:
+        is31 = Adafruit_RGBMatrixQT(i2c)
+        break
+    except Exception:
+        time.sleep(1)
 is31.set_led_scaling(0x33)  # Brightness 0 -> 0xFF
 is31.global_current = 0xFF  # limit LED current for safe testing; raise for full brightness
 is31.enable = True
+
+# Turn on power for audio amp
+power = digitalio.DigitalInOut(board.EXTERNAL_POWER)
+power.switch_to_output(value=True)
 
 # ---------------------------------------------------------------------------
 # Effect system
@@ -108,15 +117,57 @@ class IS31FL3741EffectOutput(EffectOutput):
         is31.show()
 
 
+class AudioEffectOutput(EffectOutput):
+    """EffectOutput that plays WAV files via the PropMaker's built-in I2S amp.
+
+    On each effect event, opens ``sounds/<event_name>.wav`` and plays it
+    non-blocking via ``audiobusio.I2SOut``.  If the file does not exist the
+    event is silently ignored.  Only one sound plays at a time; a new event
+    stops any in-progress playback before starting the new file.
+    """
+
+    def __init__(self) -> None:
+        self.min_resolution = 1
+        self.scopes = [Scope.PERSONAL]
+        self._audio = audiobusio.I2SOut(board.I2S_BIT_CLOCK, board.I2S_WORD_SELECT, board.I2S_DATA)
+        self._mixer = audiomixer.Mixer(
+            voice_count=1,
+            sample_rate=22050,
+            channel_count=1,
+            bits_per_sample=16,
+            samples_signed=True,
+        )
+        self._mixer.voice[0].level = 0.05
+        self._audio.play(self._mixer)
+        self._wav_file = None
+
+    def create_buffer(self) -> PixelBuffer:
+        return PixelBuffer(1)
+
+    def update_pixels(self, frames: list) -> None:
+        pass
+
+    def handle_event(self, event_name: str) -> None:
+        if self._mixer.playing:
+            return
+        path = "sounds/" + event_name + ".wav"
+        f = open(path, "rb")  # noqa: SIM115
+        if self._wav_file is not None:
+            self._wav_file.close()
+        self._wav_file = f
+        self._mixer.play(audiocore.WaveFile(self._wav_file))
+
+
 effect_output = IS31FL3741EffectOutput()
+audio_output = AudioEffectOutput()
 effect_manager = EffectManager(
     builder=ElementEffectBuilder(),
-    outputs=[effect_output],
+    outputs=[effect_output, audio_output],
 )
 
-# Hardcode a fire effect for Phase 1 (Issue #33).
+# Hardcode a lightning effect to test AudioEffectOutput (fires "lightning_strike" events).
 # Button input to layer / clear effects is added in Issue #34.
-effect_manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+effect_manager.set_effect(Scope.PERSONAL, "lightning", 1, {})
 
 # ---------------------------------------------------------------------------
 # Main loop
@@ -126,4 +177,3 @@ timer = Timer()
 while True:
     timer.update()
     effect_manager.update(timer)
-    time.sleep(_TICK_SECONDS)
