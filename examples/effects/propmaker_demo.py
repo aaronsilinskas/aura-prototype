@@ -56,10 +56,10 @@ except ImportError:
 _MATRIX_COLS: "Final" = 13
 _MATRIX_ROWS: "Final" = 9
 
-BUTTON_A_PIN = board.GP9
-BUTTON_B_PIN = board.GP10
-BUTTON_C_PIN = board.GP11
-BUTTON_D_PIN = board.GP12
+BUTTON_A_PIN = board.D9
+BUTTON_B_PIN = board.D10
+BUTTON_C_PIN = board.D11
+BUTTON_D_PIN = board.D12
 
 # ---------------------------------------------------------------------------
 # Hardware setup
@@ -152,7 +152,7 @@ class AudioEffectOutput(EffectOutput):
             bits_per_sample=16,
             samples_signed=True,
         )
-        self._mixer.voice[0].level = 0.05
+        self._mixer.voice[0].level = 0.01
         self._audio.play(self._mixer)
         self._wav_file = None
 
