@@ -1,5 +1,3 @@
-from typing import Protocol
-
 from effects.effect import EffectState, EffectTimer
 from effects.manager.scope import ScopeValue
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
@@ -52,21 +50,24 @@ class EffectBuilder:
         raise NotImplementedError
 
 
-class EffectControls(Protocol):
+class EffectControls:
     """Read-only effect-control interface exposed to game rules via GameState.
 
     Provides effect start/stop operations only. The update() tick is
     intentionally excluded so rules cannot advance the effect loop.
     """
 
-    def set_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None: ...
+    def set_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None:
+        raise NotImplementedError
 
-    def add_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None: ...
+    def add_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None:
+        raise NotImplementedError
 
-    def stop_effect(self, scope: ScopeValue) -> None: ...
+    def stop_effect(self, scope: ScopeValue) -> None:
+        raise NotImplementedError
 
 
-class EffectManager:
+class EffectManager(EffectControls):
     __slots__ = ("_builder", "_effects", "_outputs", "_seen", "_timer")
 
     def __init__(self, builder: EffectBuilder, outputs: list[EffectOutput]) -> None:
