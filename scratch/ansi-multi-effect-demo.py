@@ -56,7 +56,7 @@ class AnsiEffectOutput(EffectOutput):
         while len(lines) < MAX_FRAMES:
             lines.append(empty_line)
         event_line = f"\r[audio #{self._event_count}] {self._last_event}\033[K" if self._last_event else "\r\033[K"
-        lines.append(event_line)d
+        lines.append(event_line)
         if self._initialized:
             print(f"\033[{BLOCK_HEIGHT}A", end="")
         else:
