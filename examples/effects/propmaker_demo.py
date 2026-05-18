@@ -30,6 +30,8 @@ Configuration
 
 import time
 
+import audiobusio
+import audiocore
 import board
 import busio
 from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
@@ -108,10 +110,46 @@ class IS31FL3741EffectOutput(EffectOutput):
         is31.show()
 
 
+class AudioEffectOutput(EffectOutput):
+    """EffectOutput that plays WAV files via the PropMaker's built-in I2S amp.
+
+    On each effect event, opens ``sounds/<event_name>.wav`` and plays it
+    non-blocking via ``audiobusio.I2SOut``.  If the file does not exist the
+    event is silently ignored.  Only one sound plays at a time; a new event
+    stops any in-progress playback before starting the new file.
+    """
+
+    def __init__(self) -> None:
+        self.min_resolution = 1
+        self.scopes = [Scope.PERSONAL]
+        self._audio = audiobusio.I2SOut(board.I2S_BIT_CLOCK, board.I2S_WORD_SELECT, board.I2S_DATA)
+        self._wav_file = None
+
+    def create_buffer(self) -> PixelBuffer:
+        return PixelBuffer(1)
+
+    def update_pixels(self, frames: list) -> None:
+        pass
+
+    def handle_event(self, event_name: str) -> None:
+        path = "sounds/" + event_name + ".wav"
+        try:
+            f = open(path, "rb")  # noqa: SIM115
+        except OSError:
+            return
+        if self._audio.playing:
+            self._audio.stop()
+        if self._wav_file is not None:
+            self._wav_file.close()
+        self._wav_file = f
+        self._audio.play(audiocore.WaveFile(self._wav_file))
+
+
 effect_output = IS31FL3741EffectOutput()
+audio_output = AudioEffectOutput()
 effect_manager = EffectManager(
     builder=ElementEffectBuilder(),
-    outputs=[effect_output],
+    outputs=[effect_output, audio_output],
 )
 
 # Hardcode a fire effect for Phase 1 (Issue #33).
