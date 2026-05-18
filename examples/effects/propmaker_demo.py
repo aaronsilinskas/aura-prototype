@@ -174,6 +174,14 @@ effect_manager.set_effect(Scope.PERSONAL, "lightning", 1, {})
 # ---------------------------------------------------------------------------
 
 timer = Timer()
+_fps_frame_count = 0
+_fps_window_start = time.monotonic()
 while True:
     timer.update()
     effect_manager.update(timer)
+    _fps_frame_count += 1
+    _fps_now = time.monotonic()
+    if _fps_now - _fps_window_start >= 1.0:
+        print("FPS:", _fps_frame_count)
+        _fps_frame_count = 0
+        _fps_window_start = _fps_now
