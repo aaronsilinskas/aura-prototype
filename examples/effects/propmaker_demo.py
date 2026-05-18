@@ -62,7 +62,8 @@ _MATRIX_ROWS: "Final" = 9
 i2c = busio.I2C(board.SCL, board.SDA)
 time.sleep(3)  # Wait for RGB panel to initialize.
 is31 = Adafruit_RGBMatrixQT(i2c)
-is31.global_current = 0x0A  # limit LED current for safe testing; raise for full brightness
+is31.set_led_scaling(0x33)  # Brightness 0 -> 0xFF
+is31.global_current = 0xFF  # limit LED current for safe testing; raise for full brightness
 is31.enable = True
 
 # ---------------------------------------------------------------------------
