@@ -19,28 +19,40 @@ class ElementEffectBuilder(EffectBuilder):
         return build_element_renderer(name, config)
 
 
+MAX_FRAMES = 4  # fixed display block height; add_effect can layer up to this many effects
+
+
 class AnsiEffectOutput(EffectOutput):
     PIXEL_COUNT = 36
 
     def __init__(self, scopes: list) -> None:
         self.min_resolution = self.PIXEL_COUNT
         self.scopes = scopes
+        self._initialized = False
 
     def create_buffer(self) -> PixelBuffer:
         return PixelBuffer(self.PIXEL_COUNT)
 
     def update_pixels(self, frames: list) -> None:
-        if not frames:
-            print("\r" + "  " * self.PIXEL_COUNT, end="", flush=True)
-            return
-        buf = frames[0]
-        parts = []
-        for color in buf:
-            r = (color >> 16) & 0xFF
-            g = (color >> 8) & 0xFF
-            b = color & 0xFF
-            parts.append(f"\033[48;2;{r};{g};{b}m  \033[0m")
-        print("\r" + "".join(parts), end="", flush=True)
+        empty_line = "\r" + "  " * self.PIXEL_COUNT
+        lines = []
+        for buf in frames[:MAX_FRAMES]:
+            parts = []
+            for color in buf:
+                r = (color >> 16) & 0xFF
+                g = (color >> 8) & 0xFF
+                b = color & 0xFF
+                parts.append(f"\033[48;2;{r};{g};{b}m  \033[0m")
+            lines.append("\r" + "".join(parts))
+        # Always pad to a fixed height so the block never grows or shrinks
+        while len(lines) < MAX_FRAMES:
+            lines.append(empty_line)
+        # On first call establish the block; thereafter move back to the top
+        if self._initialized:
+            print(f"\033[{MAX_FRAMES}A", end="")
+        else:
+            self._initialized = True
+        print("\r\n".join(lines), end="", flush=True)
 
 
 personal_output = AnsiEffectOutput(scopes=[Scope.PERSONAL])
@@ -57,9 +69,13 @@ class MakeEffectRule(GameRule):
         if isinstance(event, InputEvents.ButtonAndMovement):
             button_data = event.buttons
             if button_data.states["A"] == ButtonData.PRESSED:
-                self._manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+                self._manager.add_effect(Scope.PERSONAL, "fire", 5, {})
             elif button_data.states["B"] == ButtonData.PRESSED:
-                self._manager.set_effect(Scope.PERSONAL, "water", 5, {})
+                self._manager.add_effect(Scope.PERSONAL, "water", 5, {})
+            elif button_data.states["C"] == ButtonData.PRESSED:
+                self._manager.add_effect(Scope.PERSONAL, "lightning", 5, {})
+            elif button_data.states["D"] == ButtonData.PRESSED:
+                self._manager.stop_effect(Scope.ALL)
 
 
 game_engine.add_rules(MakeEffectRule(effect_manager))
@@ -72,11 +88,15 @@ _default_movement = MovementData(x_accel=0.0, y_accel=9.8, z_accel=0.0)
 
 def _make_event(key: str | None) -> InputEvents.ButtonAndMovement:
     if key in ("a", "A"):
-        states = {"A": ButtonData.PRESSED, "B": ButtonData.UP}
+        states = {"A": ButtonData.PRESSED, "B": ButtonData.UP, "C": ButtonData.UP, "D": ButtonData.UP}
     elif key in ("b", "B"):
-        states = {"A": ButtonData.UP, "B": ButtonData.PRESSED}
+        states = {"A": ButtonData.UP, "B": ButtonData.PRESSED, "C": ButtonData.UP, "D": ButtonData.UP}
+    elif key in ("c", "C"):
+        states = {"A": ButtonData.UP, "B": ButtonData.UP, "C": ButtonData.PRESSED, "D": ButtonData.UP}
+    elif key in ("d", "D"):
+        states = {"A": ButtonData.UP, "B": ButtonData.UP, "C": ButtonData.UP, "D": ButtonData.PRESSED}
     else:
-        states = {"A": ButtonData.UP, "B": ButtonData.UP}
+        states = {"A": ButtonData.UP, "B": ButtonData.UP, "C": ButtonData.UP, "D": ButtonData.UP}
     return InputEvents.ButtonAndMovement(ButtonData(states=states), _default_movement)
 
 
@@ -85,7 +105,7 @@ def main() -> None:
     old_settings = termios.tcgetattr(fd)
     try:
         tty.setraw(fd)
-        print("Press 'a' (fire), 'b' (water), 'q' to quit.\r")
+        print("Press 'a' (fire), 'b' (water), 'c' (lightning), 'd' (stop all), 'q' to quit.\r")
         timer = Timer()
         while True:
             timer.update()
