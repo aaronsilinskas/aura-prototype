@@ -25,7 +25,7 @@ Installation
 
 Configuration
 -------------
-- TARGET_FPS: animation update rate (default 20)
+- Buttons A–D on GP9–GP12 (pull-up) layer effects or clear all.
 """
 
 import time
@@ -56,6 +56,11 @@ except ImportError:
 _MATRIX_COLS: "Final" = 13
 _MATRIX_ROWS: "Final" = 9
 
+BUTTON_A_PIN = board.D9
+BUTTON_B_PIN = board.D10
+BUTTON_C_PIN = board.D11
+BUTTON_D_PIN = board.D12
+
 # ---------------------------------------------------------------------------
 # Hardware setup
 # ---------------------------------------------------------------------------
@@ -74,6 +79,16 @@ is31.enable = True
 # Turn on power for audio amp
 power = digitalio.DigitalInOut(board.EXTERNAL_POWER)
 power.switch_to_output(value=True)
+
+# Button inputs with pull-up resistors (value=False when pressed)
+_button_a = digitalio.DigitalInOut(BUTTON_A_PIN)
+_button_a.switch_to_input(pull=digitalio.Pull.UP)
+_button_b = digitalio.DigitalInOut(BUTTON_B_PIN)
+_button_b.switch_to_input(pull=digitalio.Pull.UP)
+_button_c = digitalio.DigitalInOut(BUTTON_C_PIN)
+_button_c.switch_to_input(pull=digitalio.Pull.UP)
+_button_d = digitalio.DigitalInOut(BUTTON_D_PIN)
+_button_d.switch_to_input(pull=digitalio.Pull.UP)
 
 # ---------------------------------------------------------------------------
 # Effect system
@@ -137,7 +152,7 @@ class AudioEffectOutput(EffectOutput):
             bits_per_sample=16,
             samples_signed=True,
         )
-        self._mixer.voice[0].level = 0.05
+        self._mixer.voice[0].level = 0.01
         self._audio.play(self._mixer)
         self._wav_file = None
 
@@ -165,9 +180,9 @@ effect_manager = EffectManager(
     outputs=[effect_output, audio_output],
 )
 
-# Hardcode a lightning effect to test AudioEffectOutput (fires "lightning_strike" events).
-# Button input to layer / clear effects is added in Issue #34.
-effect_manager.set_effect(Scope.PERSONAL, "lightning", 1, {})
+# Button state tracking for edge detection (pull-up: True = not pressed)
+_buttons = [_button_a, _button_b, _button_c, _button_d]
+_button_prev = [True, True, True, True]
 
 # ---------------------------------------------------------------------------
 # Main loop
@@ -179,6 +194,20 @@ _fps_window_start = time.monotonic()
 while True:
     timer.update()
     effect_manager.update(timer)
+
+    for _i, _btn in enumerate(_buttons):
+        _current = _btn.value
+        if not _current and _button_prev[_i]:  # falling edge: just pressed
+            if _i == 0:
+                effect_manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+            elif _i == 1:
+                effect_manager.add_effect(Scope.PERSONAL, "water", 5, {})
+            elif _i == 2:
+                effect_manager.add_effect(Scope.PERSONAL, "lightning", 5, {})
+            elif _i == 3:
+                effect_manager.stop_effect(Scope.ALL)
+        _button_prev[_i] = _current
+
     _fps_frame_count += 1
     _fps_now = time.monotonic()
     if _fps_now - _fps_window_start >= 1.0:
