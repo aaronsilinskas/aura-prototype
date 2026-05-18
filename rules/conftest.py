@@ -1,9 +1,9 @@
 import pytest
 
+from engine.effects.manager import EffectManager
 from engine.engine import GameEngine, GameRule, GameState, Version
 from engine.events import Event
-from engine.manager.manager import EffectManager
-from engine.tests.manager.helpers import StubEffectBuilder
+from engine.tests.effects.helpers import StubEffectBuilder
 from engine.timer import Timer
 
 

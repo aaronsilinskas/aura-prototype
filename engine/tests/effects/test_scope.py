@@ -1,4 +1,4 @@
-from engine.manager.scope import Scope, ScopeValue
+from engine.effects.scope import Scope, ScopeValue
 
 # ---------------------------------------------------------------------------
 # ScopeValue — leaf scopes

@@ -5,12 +5,12 @@ import time
 import tty
 
 from effects.elements.registry import build_element_renderer
-from effects.manager.manager import EffectBuilder, EffectManager, EffectOutput
-from effects.manager.scope import Scope
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
 from engine.engine import GameEngine, GameRule, GameState
 from engine.events import Event
 from engine.input import ButtonData, InputEvents, MovementData
+from engine.effects.manager import EffectBuilder, EffectManager, EffectOutput
+from engine.effects.scope import Scope
 from engine.timer import Timer
 
 

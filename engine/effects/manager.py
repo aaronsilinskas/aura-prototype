@@ -1,6 +1,6 @@
 from effects.effect import EffectState, EffectTimer
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
-from engine.manager.scope import ScopeValue
+from engine.effects.scope import ScopeValue
 from engine.timer import Timer
 
 
