@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from scripts.deploy import deploy
@@ -196,6 +197,67 @@ def test_existing_destination_file_is_not_overwritten(tmp_path: Path) -> None:
     deploy(None, mount, source_root=source)
 
     assert dest.read_text() == "# device copy"
+
+
+# ---------------------------------------------------------------------------
+# Skip logic — FAT32 mtime tolerance (#40)
+# ---------------------------------------------------------------------------
+
+_BASE_TIME = 1_000_000.0
+
+
+def test_file_within_fat32_tolerance_is_skipped(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "effects").mkdir()
+    src = source / "effects" / "render.py"
+    dest = mount / "effects" / "render.py"
+    dest.write_text("# device copy")
+    os.utime(src, (_BASE_TIME, _BASE_TIME))
+    os.utime(dest, (_BASE_TIME - 1, _BASE_TIME - 1))  # 1 s behind — within tolerance
+
+    deploy(None, mount, source_root=source)
+
+    assert dest.read_text() == "# device copy"
+
+
+def test_file_at_fat32_boundary_is_skipped(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "effects").mkdir()
+    src = source / "effects" / "render.py"
+    dest = mount / "effects" / "render.py"
+    dest.write_text("# device copy")
+    os.utime(src, (_BASE_TIME, _BASE_TIME))
+    os.utime(dest, (_BASE_TIME - 2, _BASE_TIME - 2))  # exactly 2 s — still within tolerance
+
+    deploy(None, mount, source_root=source)
+
+    assert dest.read_text() == "# device copy"
+
+
+def test_stale_destination_file_is_overwritten(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "effects").mkdir()
+    src = source / "effects" / "render.py"
+    dest = mount / "effects" / "render.py"
+    dest.write_text("# stale device copy")
+    os.utime(src, (_BASE_TIME, _BASE_TIME))
+    os.utime(dest, (_BASE_TIME - 3, _BASE_TIME - 3))  # 3 s behind — outside tolerance
+
+    deploy(None, mount, source_root=source)
+
+    assert dest.read_text() == "# render"
 
 
 # ---------------------------------------------------------------------------

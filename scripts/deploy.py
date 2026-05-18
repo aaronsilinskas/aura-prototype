@@ -37,13 +37,18 @@ def _is_excluded(rel: Path) -> bool:
     return rel.suffix in _EXCLUDE_SUFFIXES
 
 
-def _should_skip(dest: Path) -> bool:
+def _should_skip(src: Path, dest: Path) -> bool:
     """Return True if the destination file is already up to date.
 
-    Slice 1: skip whenever the destination already exists.
-    Slice 2 will refine this with FAT32-aware mtime comparison.
+    A destination is considered fresh when its mtime is within 2 seconds of the
+    source mtime. The 2-second tolerance accounts for FAT32's mtime truncation:
+    ``shutil.copy2`` preserves the source mtime, but FAT32 rounds it down to the
+    nearest even second, so a strict ``>=`` check would always re-copy on the
+    next run.
     """
-    return dest.exists()
+    if not dest.exists():
+        return False
+    return dest.stat().st_mtime >= src.stat().st_mtime - 2
 
 
 def _sync_file(
@@ -55,7 +60,7 @@ def _sync_file(
     dry_run: bool = False,
 ) -> None:
     """Copy src to dest unless it should be skipped."""
-    if _should_skip(dest):
+    if _should_skip(src, dest):
         skipped.append(dest)
         print(f"SKIP  {label} (up to date)")
     elif dry_run:
@@ -101,13 +106,6 @@ def deploy(
                 file=sys.stderr,
             )
             return 1
-
-    if not os.access(mount, os.W_OK):
-        print(
-            "Error: CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first.",
-            file=sys.stderr,
-        )
-        return 1
 
     copied: list[Path] = []
     skipped: list[Path] = []
