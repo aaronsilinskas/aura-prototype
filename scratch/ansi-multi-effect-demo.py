@@ -6,7 +6,7 @@ import tty
 
 from effects.elements.registry import build_element_renderer
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
-from engine.engine import GameEngine, GameRule, GameState
+from engine.engine import GameEngine, GameRule, GameState, Version
 from engine.events import Event
 from engine.input import ButtonData, InputEvents, MovementData
 from engine.effects.manager import EffectBuilder, EffectManager, EffectOutput
@@ -71,6 +71,9 @@ game_engine = GameEngine(effect_controls=effect_manager)
 
 
 class MakeEffectRule(GameRule):
+    def __init__(self):
+        super().__init__("make_effect", Version(1, 0))
+
     def handle_event(self, event: Event, state: GameState) -> None:
         if isinstance(event, InputEvents.ButtonAndMovement):
             button_data = event.buttons

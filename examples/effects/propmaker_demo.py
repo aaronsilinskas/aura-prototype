@@ -42,7 +42,7 @@ from effects.elements.registry import build_element_renderer
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
 from engine.effects.manager import EffectBuilder, EffectManager, EffectOutput
 from engine.effects.scope import Scope
-from engine.engine import GameEngine, GameRule
+from engine.engine import GameEngine, GameRule, Version
 from engine.input import ButtonData, InputEvents, MovementData
 from engine.timer import Timer
 
@@ -177,6 +177,9 @@ class AudioEffectOutput(EffectOutput):
 
 
 class ButtonEffectRule(GameRule):
+    def __init__(self):
+        super().__init__("button_effects", Version(1, 0))
+
     def handle_event(self, event, state):
         if isinstance(event, InputEvents.ButtonAndMovement):
             button_data = event.buttons
