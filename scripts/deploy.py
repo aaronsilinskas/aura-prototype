@@ -13,6 +13,7 @@ Usage
 """
 
 import argparse
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -82,6 +83,13 @@ def deploy(
     if not mount.is_dir():
         print(
             f"Error: mount path '{mount}' does not exist or is not a directory.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not os.access(mount, os.W_OK):
+        print(
+            "Error: CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first.",
             file=sys.stderr,
         )
         return 1

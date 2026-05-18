@@ -42,6 +42,44 @@ def test_file_instead_of_directory_as_mount_exits_with_nonzero_code(tmp_path: Pa
     assert result != 0
 
 
+def test_read_only_mount_exits_with_nonzero_code(tmp_path: Path) -> None:
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    mount.chmod(0o555)
+    try:
+        result = deploy(None, mount)
+        assert result != 0
+    finally:
+        mount.chmod(0o755)
+
+
+def test_read_only_mount_prints_error_message(tmp_path: Path, capsys) -> None:
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    mount.chmod(0o555)
+    try:
+        deploy(None, mount)
+        captured = capsys.readouterr()
+        assert "read-only" in captured.err
+        assert "Ctrl+C" in captured.err
+    finally:
+        mount.chmod(0o755)
+
+
+def test_read_only_mount_copies_nothing(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    mount.chmod(0o555)
+    try:
+        deploy(None, mount, source_root=source)
+        assert not list(mount.rglob("*"))
+    finally:
+        mount.chmod(0o755)
+
+
 # ---------------------------------------------------------------------------
 # Example file deploy
 # ---------------------------------------------------------------------------
