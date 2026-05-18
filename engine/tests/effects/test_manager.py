@@ -1,10 +1,10 @@
 from effects.effect import Effect
-from effects.manager.manager import EffectBuilder, EffectManager
-from effects.manager.scope import Scope
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, RendererConfig
 from effects.steps.control import call
-from effects.tests.manager.helpers import SpyEffectOutput, StubEffectBuilder
+from engine.effects.manager import EffectBuilder, EffectManager
+from engine.effects.scope import Scope
+from engine.tests.effects.helpers import SpyEffectOutput, StubEffectBuilder
 from engine.timer import Timer
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from engine.effects.manager import EffectControls
 from engine.events import Event
 from engine.timer import Timer
 
@@ -25,22 +26,24 @@ class GameRule:
 
 
 class GameState:
-    __slots__ = ("engine", "timer")
+    __slots__ = ("effect_controls", "engine", "timer")
 
-    def __init__(self, engine: GameEngine, timer: Timer) -> None:
+    def __init__(self, engine: GameEngine, timer: Timer, effect_controls: EffectControls) -> None:
         self.engine = engine
         self.timer = timer
+        self.effect_controls = effect_controls
 
 
 class GameEngine:
-    __slots__ = ("_queue", "_rules")
+    __slots__ = ("_effect_controls", "_queue", "_rules")
 
-    def __init__(self) -> None:
+    def __init__(self, effect_controls: EffectControls) -> None:
+        self._effect_controls = effect_controls
         self._rules: list[GameRule] = []
         self._queue: list[Event] = []
 
     def update(self, timer: Timer) -> None:
-        state = GameState(self, timer)
+        state = GameState(self, timer, self._effect_controls)
         while self._queue:
             event = self._queue.pop(0)
             for rule in self._rules:
