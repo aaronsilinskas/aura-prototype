@@ -1,5 +1,7 @@
 import pytest
 
+from effects.manager.manager import EffectManager
+from effects.tests.manager.helpers import StubEffectBuilder
 from engine.engine import GameEngine, GameRule, GameState, Version
 from engine.events import Event
 from engine.timer import Timer
@@ -25,7 +27,7 @@ class _EventCaptureRule(GameRule):
 class EngineFixture:
     def __init__(self):
         self.timer = Timer()
-        self.game_engine = GameEngine()
+        self.game_engine = GameEngine(EffectManager(builder=StubEffectBuilder(), outputs=[]))
         self._event_capture_rule = _EventCaptureRule()
         self.game_engine.add_rules(self._event_capture_rule)
 
