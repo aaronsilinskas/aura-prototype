@@ -42,6 +42,8 @@ from effects.elements.registry import build_element_renderer
 from effects.manager.manager import EffectBuilder, EffectManager, EffectOutput
 from effects.manager.scope import Scope
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
+from engine.engine import GameEngine, GameRule
+from engine.input import ButtonData, InputEvents, MovementData
 from engine.timer import Timer
 
 try:
@@ -55,6 +57,7 @@ except ImportError:
 
 _MATRIX_COLS: "Final" = 13
 _MATRIX_ROWS: "Final" = 9
+_BUTTON_NAMES = ("A", "B", "C", "D")
 
 BUTTON_A_PIN = board.D9
 BUTTON_B_PIN = board.D10
@@ -173,12 +176,32 @@ class AudioEffectOutput(EffectOutput):
         self._mixer.play(audiocore.WaveFile(self._wav_file))
 
 
+class ButtonEffectRule(GameRule):
+    def __init__(self, manager):
+        self._manager = manager
+
+    def handle_event(self, event, state):
+        if isinstance(event, InputEvents.ButtonAndMovement):
+            button_data = event.buttons
+            if button_data.states["A"] == ButtonData.PRESSED:
+                self._manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+            elif button_data.states["B"] == ButtonData.PRESSED:
+                self._manager.add_effect(Scope.PERSONAL, "water", 5, {})
+            elif button_data.states["C"] == ButtonData.PRESSED:
+                self._manager.add_effect(Scope.PERSONAL, "lightning", 5, {})
+            elif button_data.states["D"] == ButtonData.PRESSED:
+                self._manager.stop_effect(Scope.ALL)
+
+
 effect_output = IS31FL3741EffectOutput()
 audio_output = AudioEffectOutput()
 effect_manager = EffectManager(
     builder=ElementEffectBuilder(),
     outputs=[effect_output, audio_output],
 )
+
+game_engine = GameEngine()
+game_engine.add_rules(ButtonEffectRule(effect_manager))
 
 # Button state tracking for edge detection (pull-up: True = not pressed)
 _buttons = [_button_a, _button_b, _button_c, _button_d]
@@ -198,15 +221,13 @@ while True:
     for _i, _btn in enumerate(_buttons):
         _current = _btn.value
         if not _current and _button_prev[_i]:  # falling edge: just pressed
-            if _i == 0:
-                effect_manager.add_effect(Scope.PERSONAL, "fire", 5, {})
-            elif _i == 1:
-                effect_manager.add_effect(Scope.PERSONAL, "water", 5, {})
-            elif _i == 2:
-                effect_manager.add_effect(Scope.PERSONAL, "lightning", 5, {})
-            elif _i == 3:
-                effect_manager.stop_effect(Scope.ALL)
+            _states = dict.fromkeys(_BUTTON_NAMES, ButtonData.UP)
+            _states[_BUTTON_NAMES[_i]] = ButtonData.PRESSED
+            game_engine.queue_event(
+                InputEvents.ButtonAndMovement(ButtonData(_states), MovementData())
+            )
         _button_prev[_i] = _current
+    game_engine.update(timer)
 
     _fps_frame_count += 1
     _fps_now = time.monotonic()
