@@ -69,15 +69,17 @@ class EffectControls:
 
 class EffectManager(EffectControls):
     class _EffectEntry:
-        __slots__ = ("keys", "renderer", "state")
+        __slots__ = ("keys", "output_buffers", "renderer", "state")
 
         def __init__(
             self,
-            keys: "tuple[str, ...]",
-            renderer: "EffectRenderer",
-            state: "EffectState",
+            keys: tuple[str, ...],
+            output_buffers: list,
+            renderer: EffectRenderer,
+            state: EffectState,
         ) -> None:
             self.keys: tuple[str, ...] = keys
+            self.output_buffers: list = output_buffers
             self.renderer: EffectRenderer = renderer
             self.state: EffectState = state
 
@@ -115,17 +117,28 @@ class EffectManager(EffectControls):
 
         scope_keys = set(scope.keys)
         resolution = 16
-        for output in self._outputs:
-            for s in output.scopes:
-                if any(k in scope_keys for k in s.keys):
-                    if output.min_resolution > resolution:
-                        resolution = output.min_resolution
-                    break
+        output_buffers = []
+        for i, output in enumerate(self._outputs):
+            if any(k in self._output_key_sets[i] for k in scope_keys):
+                if output.min_resolution > resolution:
+                    resolution = output.min_resolution
+                output_buffers.append(output.create_buffer())
+            else:
+                output_buffers.append(None)
         config = RendererConfig(
             level=level, resolution=resolution, options=options, listeners=[scoped_listener]
         )
         renderer = self._builder(name, config)
-        return EffectManager._EffectEntry(scope.keys, renderer, EffectState())
+        return EffectManager._EffectEntry(scope.keys, output_buffers, renderer, EffectState())
+
+    def _update_output_buffers(self, entry: "_EffectEntry") -> None:
+        """Null out pre-allocated buffers for outputs no longer matched by entry.keys."""
+        key_set = set(entry.keys)
+        for i in range(len(self._outputs)):
+            if entry.output_buffers[i] is not None and not any(
+                k in self._output_key_sets[i] for k in key_set
+            ):
+                entry.output_buffers[i] = None
 
     def set_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None:
         """Replace any running effect(s) in scope and start this one."""
@@ -135,6 +148,7 @@ class EffectManager(EffectControls):
             remaining = tuple(k for k in entry.keys if k not in scope_key_set)
             if remaining:
                 entry.keys = remaining
+                self._update_output_buffers(entry)
                 new_effects.append(entry)
         self._effects = new_effects
         self._effects.append(self._build_effect(scope, name, level, options))
@@ -155,6 +169,7 @@ class EffectManager(EffectControls):
             remaining = tuple(k for k in entry.keys if k not in scope_key_set)
             if remaining:
                 entry.keys = remaining
+                self._update_output_buffers(entry)
                 new_effects.append(entry)
         self._effects = new_effects
 
@@ -166,21 +181,15 @@ class EffectManager(EffectControls):
         for entry in self._effects:
             entry.renderer.update(entry.state, self._timer)
 
-        # Pass 2: render and deliver to each output.
+        # Pass 2: render and deliver to each output using pre-allocated buffers.
         # Outputs whose scopes have no active effects receive [] (go-dark signal).
         for i in range(len(self._outputs)):
             output = self._outputs[i]
-            output_key_set = self._output_key_sets[i]
             frames = self._frames[i]
             frames.clear()
             for entry in self._effects:
-                matched = False
-                for k in entry.keys:
-                    if k in output_key_set:
-                        matched = True
-                        break
-                if matched:
-                    buf = output.create_buffer()
+                buf = entry.output_buffers[i]
+                if buf is not None:
                     entry.renderer.render(entry.state, buf)
                     frames.append(buf)
             output.update_pixels(frames)

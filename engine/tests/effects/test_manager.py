@@ -122,7 +122,7 @@ def test_set_effect_twice_replaces_effect() -> None:
     manager.set_effect(Scope.PERSONAL, "ice", 5, {})
     manager.update(_make_timer())
 
-    assert output.update_pixels_calls == [[output.created_buffers[0]]]
+    assert output.update_pixels_calls == [[output.created_buffers[1]]]
 
 
 def test_set_effect_twice_first_renderer_not_advanced() -> None:
