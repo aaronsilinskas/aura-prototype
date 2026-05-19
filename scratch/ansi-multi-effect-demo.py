@@ -89,8 +89,6 @@ class MakeEffectRule(GameRule):
 
 game_engine.add_rules(MakeEffectRule())
 
-# - TODO: New standardized effect event name design for sound/vibration triggers
-
 _default_movement = MovementData(x_accel=0.0, y_accel=9.8, z_accel=0.0)
 
 
