@@ -30,6 +30,7 @@ Configuration
 
 import time
 
+import adafruit_is31fl3741
 import audiobusio
 import audiocore
 import audiomixer
@@ -52,6 +53,19 @@ except ImportError:
     pass
 
 # ---------------------------------------------------------------------------
+# Utilities
+# ---------------------------------------------------------------------------
+
+
+def time_it(fn, *args, **kwargs):
+    start = time.monotonic()
+    result = fn(*args, **kwargs)
+    elapsed = time.monotonic() - start
+    print(fn.__name__, "took", elapsed, "s")
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
@@ -71,7 +85,7 @@ BUTTON_D_PIN = board.D12
 i2c = busio.I2C(board.SCL, board.SDA)
 while True:
     try:
-        is31 = Adafruit_RGBMatrixQT(i2c)
+        is31 = Adafruit_RGBMatrixQT(i2c, allocate=adafruit_is31fl3741.MUST_BUFFER)
         break
     except Exception:
         time.sleep(1)
@@ -217,6 +231,7 @@ _fps_window_start = time.monotonic()
 while True:
     timer.update()
     effect_manager.update(timer)
+    # time_it(effect_manager.update, timer)
 
     for _i, _btn in enumerate(_buttons):
         _current = _btn.value
@@ -227,7 +242,9 @@ while True:
                 InputEvents.ButtonAndMovement(ButtonData(_states), MovementData())
             )
         _button_prev[_i] = _current
+
     game_engine.update(timer)
+    # time_it(game_engine.update, timer)
 
     _fps_frame_count += 1
     _fps_now = time.monotonic()
