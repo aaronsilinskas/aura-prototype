@@ -68,14 +68,32 @@ class EffectControls:
 
 
 class EffectManager(EffectControls):
-    __slots__ = ("_builder", "_effects", "_outputs", "_seen", "_timer")
+    class _EffectEntry:
+        __slots__ = ("keys", "renderer", "state")
+
+        def __init__(
+            self,
+            keys: "tuple[str, ...]",
+            renderer: "EffectRenderer",
+            state: "EffectState",
+        ) -> None:
+            self.keys: tuple[str, ...] = keys
+            self.renderer: EffectRenderer = renderer
+            self.state: EffectState = state
+
+        def __repr__(self) -> str:
+            return f"_EffectEntry(keys={self.keys!r})"
+
+    __slots__ = ("_builder", "_effects", "_output_key_sets", "_outputs", "_timer")
 
     def __init__(self, builder: EffectBuilder, outputs: list[EffectOutput]) -> None:
         self._builder: EffectBuilder = builder
         self._outputs: list[EffectOutput] = outputs
-        self._effects: dict[str, list[tuple[EffectRenderer, EffectState]]] = {}
+        self._effects: list = []
         self._timer: EffectTimer = EffectTimer()
-        self._seen: set[int] = set()
+        self._output_key_sets: list = [
+            frozenset(k for s in o.scopes for k in s.keys) for o in outputs
+        ]
 
     def _notify_listeners(self, event_name: str, scope: ScopeValue) -> None:
         """Notify listeners registered for the given scope."""
@@ -88,7 +106,7 @@ class EffectManager(EffectControls):
 
     def _build_effect(
         self, scope: ScopeValue, name: str, level: int, options: dict
-    ) -> "tuple[EffectRenderer, EffectState]":
+    ) -> "EffectManager._EffectEntry":
         """Construct an EffectRenderer paired with a fresh EffectState."""
 
         def scoped_listener(event_name):
@@ -106,13 +124,19 @@ class EffectManager(EffectControls):
             level=level, resolution=resolution, options=options, listeners=[scoped_listener]
         )
         renderer = self._builder(name, config)
-        return renderer, EffectState()
+        return EffectManager._EffectEntry(scope.keys, renderer, EffectState())
 
     def set_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None:
         """Replace any running effect(s) in scope and start this one."""
-        pair = self._build_effect(scope, name, level, options)
-        for key in scope.keys:
-            self._effects[key] = [pair]
+        scope_key_set = set(scope.keys)
+        new_effects = []
+        for entry in self._effects:
+            remaining = tuple(k for k in entry.keys if k not in scope_key_set)
+            if remaining:
+                entry.keys = remaining
+                new_effects.append(entry)
+        self._effects = new_effects
+        self._effects.append(self._build_effect(scope, name, level, options))
 
     def add_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None:
         """Layer this effect alongside any running effects in scope.
@@ -120,53 +144,45 @@ class EffectManager(EffectControls):
         If nothing is running in scope, behaves like set_effect.
         The driver determines how layered effects are composited (e.g. splitting an LED strip).
         """
-        pair = self._build_effect(scope, name, level, options)
-        for key in scope.keys:
-            if key in self._effects:
-                self._effects[key].append(pair)
-            else:
-                self._effects[key] = [pair]
+        self._effects.append(self._build_effect(scope, name, level, options))
 
     def stop_effect(self, scope: ScopeValue) -> None:
         """Stop all running effects in scope."""
-        for key in scope.keys:
-            if key in self._effects:
-                del self._effects[key]
+        scope_key_set = set(scope.keys)
+        new_effects = []
+        for entry in self._effects:
+            remaining = tuple(k for k in entry.keys if k not in scope_key_set)
+            if remaining:
+                entry.keys = remaining
+                new_effects.append(entry)
+        self._effects = new_effects
 
     def update(self, timer: Timer) -> None:
         """Tick all active effects and deliver frames to every registered output."""
         self._timer.update(timer.elapsed)
-        seen = self._seen
 
-        # Pass 1: advance each unique renderer exactly once.
-        seen.clear()
-        for effects in self._effects.values():
-            for renderer, state in effects:
-                renderer_id = id(renderer)
-                if renderer_id not in seen:
-                    seen.add(renderer_id)
-                    renderer.update(state, self._timer)
+        # Pass 1: advance each renderer once.
+        for entry in self._effects:
+            entry.renderer.update(entry.state, self._timer)
 
         # Pass 2: render and deliver to each output.
         # Outputs whose scopes have no active effects receive [] (go-dark signal).
-        for output in self._outputs:
-            seen.clear()
+        for i, output in enumerate(self._outputs):
+            output_key_set = self._output_key_sets[i]
             frames = []
-            for scope in output.scopes:
-                for key in scope.keys:
-                    if key in self._effects:
-                        for renderer, state in self._effects[key]:
-                            renderer_id = id(renderer)
-                            if renderer_id not in seen:
-                                seen.add(renderer_id)
-                                buf = output.create_buffer()
-                                renderer.render(state, buf)
-                                frames.append(buf)
+            for entry in self._effects:
+                matched = False
+                for k in entry.keys:
+                    if k in output_key_set:
+                        matched = True
+                        break
+                if matched:
+                    buf = output.create_buffer()
+                    entry.renderer.render(entry.state, buf)
+                    frames.append(buf)
             output.update_pixels(frames)
 
     def __repr__(self) -> str:
-        parts = []
-        for key, effects in self._effects.items():
-            names = ", ".join(r.name for r, _ in effects)
-            parts.append(f"{key}: [{names}]")
-        return "\n".join(parts) if parts else "(no active effects)"
+        if not self._effects:
+            return "(no active effects)"
+        return "\n".join(repr(entry) for entry in self._effects)
