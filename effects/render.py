@@ -111,6 +111,7 @@ class AverageMergeRenderer(EffectRenderer):
 
     def __init__(self, renderers: list[EffectRenderer]) -> None:
         self._renderers = renderers
+        self._buffers: list[PixelBuffer] | None = None
 
     def update(self, state: EffectState, timer: EffectTimer) -> None:
         for renderer in self._renderers:
@@ -118,17 +119,19 @@ class AverageMergeRenderer(EffectRenderer):
 
     def render(self, state: EffectState, output: PixelBuffer) -> None:
         pixel_count = len(output)
-        buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
-        for renderer, buf in zip(self._renderers, buffers):
-            renderer.render(state, buf)
+        renderer_count = len(self._renderers)
+        if self._buffers is None or len(self._buffers[0]) != pixel_count:
+            self._buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
+        for i in range(renderer_count):
+            self._renderers[i].render(state, self._buffers[i])
 
         n = len(self._renderers)
         for i in range(pixel_count):
             r_total = 0
             g_total = 0
             b_total = 0
-            for buf in buffers:
-                color = buf[i]
+            for j in range(n):
+                color = self._buffers[j][i]
                 r_total += (color >> 16) & 255
                 g_total += (color >> 8) & 255
                 b_total += color & 255
@@ -143,6 +146,7 @@ class AdditiveMergeRenderer(EffectRenderer):
 
     def __init__(self, renderers: list[EffectRenderer]) -> None:
         self._renderers = renderers
+        self._buffers: list[PixelBuffer] | None = None
 
     def update(self, state: EffectState, timer: EffectTimer) -> None:
         for renderer in self._renderers:
@@ -150,16 +154,18 @@ class AdditiveMergeRenderer(EffectRenderer):
 
     def render(self, state: EffectState, output: PixelBuffer) -> None:
         pixel_count = len(output)
-        buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
-        for renderer, buf in zip(self._renderers, buffers):
-            renderer.render(state, buf)
+        renderer_count = len(self._renderers)
+        if self._buffers is None or len(self._buffers[0]) != pixel_count:
+            self._buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
+        for i in range(renderer_count):
+            self._renderers[i].render(state, self._buffers[i])
 
         for i in range(pixel_count):
             r_total = 0
             g_total = 0
             b_total = 0
-            for buf in buffers:
-                color = buf[i]
+            for j in range(renderer_count):
+                color = self._buffers[j][i]
                 r_total += (color >> 16) & 255
                 g_total += (color >> 8) & 255
                 b_total += color & 255
