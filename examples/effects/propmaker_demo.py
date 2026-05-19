@@ -57,11 +57,11 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 
-def time_it(fn, *args, **kwargs):
+def time_it(tag, fn, *args, **kwargs):
     start = time.monotonic()
     result = fn(*args, **kwargs)
     elapsed = time.monotonic() - start
-    print(fn.__name__, "took", elapsed, "s")
+    print(tag, fn.__name__, "took", elapsed, "s")
     return result
 
 
@@ -211,7 +211,7 @@ effect_output = IS31FL3741EffectOutput()
 audio_output = AudioEffectOutput()
 effect_manager = EffectManager(
     builder=ElementEffectBuilder(),
-    outputs=[effect_output, audio_output],
+    outputs=[effect_output],  # , audio_output],
 )
 
 game_engine = GameEngine(effect_controls=effect_manager)
@@ -231,7 +231,7 @@ _fps_window_start = time.monotonic()
 while True:
     timer.update()
     effect_manager.update(timer)
-    # time_it(effect_manager.update, timer)
+    # time_it("effect_manager", effect_manager.update, timer)
 
     for _i, _btn in enumerate(_buttons):
         _current = _btn.value
@@ -244,7 +244,7 @@ while True:
         _button_prev[_i] = _current
 
     game_engine.update(timer)
-    # time_it(game_engine.update, timer)
+    # time_it("game_engine", game_engine.update, timer)
 
     _fps_frame_count += 1
     _fps_now = time.monotonic()
