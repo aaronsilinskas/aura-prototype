@@ -84,7 +84,7 @@ class EffectManager(EffectControls):
         def __repr__(self) -> str:
             return f"_EffectEntry(keys={self.keys!r})"
 
-    __slots__ = ("_builder", "_effects", "_output_key_sets", "_outputs", "_timer")
+    __slots__ = ("_builder", "_effects", "_frames", "_output_key_sets", "_outputs", "_timer")
 
     def __init__(self, builder: EffectBuilder, outputs: list[EffectOutput]) -> None:
         self._builder: EffectBuilder = builder
@@ -94,6 +94,7 @@ class EffectManager(EffectControls):
         self._output_key_sets: list = [
             frozenset(k for s in o.scopes for k in s.keys) for o in outputs
         ]
+        self._frames: list = [[] for _ in outputs]
 
     def _notify_listeners(self, event_name: str, scope: ScopeValue) -> None:
         """Notify listeners registered for the given scope."""
@@ -167,9 +168,11 @@ class EffectManager(EffectControls):
 
         # Pass 2: render and deliver to each output.
         # Outputs whose scopes have no active effects receive [] (go-dark signal).
-        for i, output in enumerate(self._outputs):
+        for i in range(len(self._outputs)):
+            output = self._outputs[i]
             output_key_set = self._output_key_sets[i]
-            frames = []
+            frames = self._frames[i]
+            frames.clear()
             for entry in self._effects:
                 matched = False
                 for k in entry.keys:
