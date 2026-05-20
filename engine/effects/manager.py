@@ -50,6 +50,22 @@ class EffectBuilder:
         raise NotImplementedError
 
 
+class EffectReceipt:
+    """Opaque handle returned when an effect is started.
+
+    Uniquely identifies a single running effect instance. Pass to
+    ``stop_effect_by_receipt`` (issue #64) to stop exactly that instance.
+    """
+
+    __slots__ = ("id",)
+
+    def __init__(self, id: int) -> None:
+        self.id: int = id
+
+    def __repr__(self) -> str:
+        return f"EffectReceipt(id={self.id})"
+
+
 class EffectControls:
     """Read-only effect-control interface exposed to game rules via GameState.
 
@@ -59,12 +75,12 @@ class EffectControls:
 
     def set_effect(
         self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
-    ) -> None:
+    ) -> "EffectReceipt":
         raise NotImplementedError
 
     def add_effect(
         self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
-    ) -> None:
+    ) -> "EffectReceipt":
         raise NotImplementedError
 
     def stop_effect(self, scope: ScopeValue) -> None:
@@ -73,29 +89,45 @@ class EffectControls:
 
 class EffectManager(EffectControls):
     class _EffectEntry:
-        __slots__ = ("keys", "output_buffers", "renderer", "state")
+        __slots__ = ("keys", "name", "output_buffers", "receipt", "renderer", "state")
 
         def __init__(
             self,
             keys: tuple[str, ...],
+            name: str,
+            receipt: "EffectReceipt",
             output_buffers: list[PixelBuffer | None],
             renderer: EffectRenderer,
             state: EffectState,
         ) -> None:
             self.keys: tuple[str, ...] = keys
+            self.name: str = name
+            self.receipt: EffectReceipt = receipt
             self.output_buffers: list[PixelBuffer | None] = output_buffers
             self.renderer: EffectRenderer = renderer
             self.state: EffectState = state
 
         def __repr__(self) -> str:
-            return f"_EffectEntry(keys={self.keys!r})"
+            return (
+                f"_EffectEntry(name={self.name!r}, receipt_id={self.receipt.id},"
+                f" keys={self.keys!r})"
+            )
 
-    __slots__ = ("_builder", "_effects", "_frames", "_output_key_sets", "_outputs", "_timer")
+    __slots__ = (
+        "_builder",
+        "_effects",
+        "_frames",
+        "_next_id",
+        "_output_key_sets",
+        "_outputs",
+        "_timer",
+    )
 
     def __init__(self, builder: EffectBuilder, outputs: list[EffectOutput]) -> None:
         self._builder: EffectBuilder = builder
         self._outputs: list[EffectOutput] = outputs
         self._effects: list[EffectManager._EffectEntry] = []
+        self._next_id: int = 1
         self._timer: EffectTimer = EffectTimer()
         self._output_key_sets: list[frozenset[str]] = [
             frozenset(k for s in o.scopes for k in s.keys) for o in outputs
@@ -133,7 +165,19 @@ class EffectManager(EffectControls):
             level=level, resolution=resolution, options=options, listeners=[scoped_listener]
         )
         renderer = self._builder(name, config)
-        return EffectManager._EffectEntry(scope.keys, output_buffers, renderer, EffectState())
+        receipt = EffectReceipt(self._next_id)
+        self._next_id += 1
+        return EffectManager._EffectEntry(
+            scope.keys, name, receipt, output_buffers, renderer, EffectState()
+        )
+
+    def _append_new_effect(
+        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
+    ) -> EffectReceipt:
+        """Build, append, and return the receipt for a new effect entry."""
+        entry = self._build_effect(scope, name, level, options)
+        self._effects.append(entry)
+        return entry.receipt
 
     def _update_output_buffers(self, entry: "_EffectEntry") -> None:
         """Null out pre-allocated buffers for outputs no longer matched by entry.keys."""
@@ -146,7 +190,7 @@ class EffectManager(EffectControls):
 
     def set_effect(
         self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
-    ) -> None:
+    ) -> EffectReceipt:
         """Replace any running effect(s) in scope and start this one."""
         scope_key_set = set(scope.keys)
         new_effects = []
@@ -157,17 +201,17 @@ class EffectManager(EffectControls):
                 self._update_output_buffers(entry)
                 new_effects.append(entry)
         self._effects = new_effects
-        self._effects.append(self._build_effect(scope, name, level, options))
+        return self._append_new_effect(scope, name, level, options)
 
     def add_effect(
         self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
-    ) -> None:
+    ) -> EffectReceipt:
         """Layer this effect alongside any running effects in scope.
 
         If nothing is running in scope, behaves like set_effect.
         The driver determines how layered effects are composited (e.g. splitting an LED strip).
         """
-        self._effects.append(self._build_effect(scope, name, level, options))
+        return self._append_new_effect(scope, name, level, options)
 
     def stop_effect(self, scope: ScopeValue) -> None:
         """Stop all running effects in scope."""
