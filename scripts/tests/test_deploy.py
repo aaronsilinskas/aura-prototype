@@ -15,9 +15,13 @@ def make_source_tree(root: Path) -> None:
     (root / "effects" / "__pycache__").mkdir()
     (root / "effects" / "__pycache__" / "render.cpython-312.pyc").write_text("")
     (root / "effects" / "render.mpy").write_text("")
+    (root / "effects" / "tests").mkdir()
+    (root / "effects" / "tests" / "__init__.py").write_text("")
 
     (root / "engine").mkdir()
     (root / "engine" / "timer.py").write_text("# timer")
+    (root / "engine" / "tests" / "effects").mkdir(parents=True)
+    (root / "engine" / "tests" / "effects" / "helpers.py").write_text("")
 
     (root / "magic").mkdir()
     (root / "magic" / "aura.py").write_text("# aura")
@@ -177,6 +181,30 @@ def test_mpy_files_are_not_copied_to_mount(tmp_path: Path) -> None:
     deploy(None, mount, source_root=source)
 
     assert not list((mount / "effects").rglob("*.mpy"))
+
+
+def test_tests_directory_files_are_not_copied_to_mount(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source)
+
+    assert not (mount / "effects" / "tests" / "__init__.py").exists()
+
+
+def test_nested_tests_directory_files_are_not_copied_to_mount(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source)
+
+    assert not (mount / "engine" / "tests" / "effects" / "helpers.py").exists()
 
 
 # ---------------------------------------------------------------------------
