@@ -430,3 +430,37 @@ def test_add_effect_does_not_narrow_existing_entry_keys() -> None:
 
     assert len(output_personal.update_pixels_calls[0]) == 2
     assert len(output_directional.update_pixels_calls[0]) == 1
+
+
+# ---------------------------------------------------------------------------
+# EffectReceipt generation (#63)
+# ---------------------------------------------------------------------------
+
+
+def test_add_effect_returns_a_receipt() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+
+    assert receipt is not None
+
+
+def test_two_add_effect_calls_return_different_receipts() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    receipt_a = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    receipt_b = manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+
+    assert receipt_a is not receipt_b
+    assert receipt_a.id != receipt_b.id
+
+
+def test_set_effect_returns_a_receipt() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    receipt = manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+
+    assert receipt is not None
