@@ -28,6 +28,7 @@ def make_source_tree(root: Path) -> None:
 
     (root / "rules").mkdir()
     (root / "rules" / "__init__.py").write_text("")
+    (root / "rules" / "conftest.py").write_text("")
 
 
 # ---------------------------------------------------------------------------
@@ -207,6 +208,18 @@ def test_nested_tests_directory_files_are_not_copied_to_mount(tmp_path: Path) ->
     assert not (mount / "engine" / "tests" / "effects" / "helpers.py").exists()
 
 
+def test_conftest_py_is_not_copied_to_mount(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source)
+
+    assert not (mount / "rules" / "conftest.py").exists()
+
+
 # ---------------------------------------------------------------------------
 # Skip logic (existing destination = up to date for slice 1)
 # ---------------------------------------------------------------------------
@@ -354,10 +367,28 @@ def test_live_py_file_is_not_deleted_from_mount(tmp_path: Path) -> None:
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
+    (mount / "effects").mkdir()
+    existing = mount / "effects" / "render.py"
+    existing.write_text("# device copy")
 
     deploy(None, mount, source_root=source)
 
-    assert (mount / "effects" / "render.py").exists()
+    assert existing.exists()
+
+
+def test_stale_non_py_file_on_mount_is_not_pruned(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "effects").mkdir()
+    stale_mpy = mount / "effects" / "old_module.mpy"
+    stale_mpy.write_text("")
+
+    deploy(None, mount, source_root=source)
+
+    assert stale_mpy.exists()
 
 
 def test_code_py_is_never_deleted_from_mount(tmp_path: Path) -> None:

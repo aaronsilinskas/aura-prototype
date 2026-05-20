@@ -25,6 +25,7 @@ except ImportError:
 
 MODULE_DIRS: "Final" = ["effects", "engine", "magic", "rules"]
 _EXCLUDE_DIRS: "Final" = {"__pycache__", "tests"}
+_EXCLUDE_NAMES: "Final" = {"conftest.py"}
 _EXCLUDE_SUFFIXES: "Final" = {".pyc", ".mpy"}
 _DEFAULT_MOUNT: "Final" = "/Volumes/CIRCUITPY"
 
@@ -34,6 +35,8 @@ def _is_excluded(rel: Path) -> bool:
     for part in rel.parts:
         if part in _EXCLUDE_DIRS:
             return True
+    if rel.name in _EXCLUDE_NAMES:
+        return True
     return rel.suffix in _EXCLUDE_SUFFIXES
 
 
