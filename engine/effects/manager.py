@@ -86,6 +86,9 @@ class EffectControls:
     def stop_effect(self, scope: ScopeValue) -> None:
         raise NotImplementedError
 
+    def stop_effect_by_receipt(self, receipt: "EffectReceipt") -> None:
+        raise NotImplementedError
+
 
 class EffectManager(EffectControls):
     class _EffectEntry:
@@ -212,6 +215,10 @@ class EffectManager(EffectControls):
         The driver determines how layered effects are composited (e.g. splitting an LED strip).
         """
         return self._append_new_effect(scope, name, level, options)
+
+    def stop_effect_by_receipt(self, receipt: EffectReceipt) -> None:
+        """Stop the single effect identified by receipt; silent no-op if not found."""
+        self._effects = [e for e in self._effects if e.receipt is not receipt]
 
     def stop_effect(self, scope: ScopeValue) -> None:
         """Stop all running effects in scope."""

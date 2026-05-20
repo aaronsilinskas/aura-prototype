@@ -464,3 +464,43 @@ def test_set_effect_returns_a_receipt() -> None:
     receipt = manager.set_effect(Scope.PERSONAL, "fire", 5, {})
 
     assert receipt is not None
+
+
+# ---------------------------------------------------------------------------
+# stop_effect_by_receipt (#64)
+# ---------------------------------------------------------------------------
+
+
+def test_stop_effect_by_receipt_stops_the_matching_effect() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.stop_effect_by_receipt(receipt)
+    manager.update(_make_timer())
+
+    assert output.update_pixels_calls[0] == []
+
+
+def test_stop_effect_by_receipt_leaves_other_effects_running() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    receipt_a = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.stop_effect_by_receipt(receipt_a)
+    manager.update(_make_timer())
+
+    assert len(output.update_pixels_calls[0]) == 1
+
+
+def test_stop_effect_by_receipt_with_stale_receipt_is_silent_noop() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.stop_effect_by_receipt(receipt)
+    manager.stop_effect_by_receipt(receipt)  # second call — stale receipt
+    manager.update(_make_timer())
+
+    assert output.update_pixels_calls[0] == []
