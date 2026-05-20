@@ -2,10 +2,10 @@
 
 ## What this project is
 
-`aura-prototype` is the Python/CircuitPython animation and game-logic engine for the **Aura** live-action game platform. Aura is a physical magic game played with custom props (wands, targets, tokens) powered by micropython-compatible microcontrollers.
+`aura-prototype` is the Python/CircuitPython/MicroPython animation and game-logic engine for the **Aura** live-action game platform. Aura is a physical magic game played with custom props (wands, targets, tokens) powered by microcontrollers.
 
 This repo implements:
-- A composable LED animation engine (the `effects/` package) that runs on both CPython and CircuitPython
+- A composable LED animation engine (`effects/`) that runs on both CPython and CircuitPython
 - Game rules for a magic system built around ten elements (Fire, Water, Earth, Ice, Air, Lightning, Light, Dark, Time, Gravity)
 - An event-driven game engine (`engine/`)
 - Spell and aura logic (`magic/`)
@@ -22,28 +22,31 @@ Full game and hardware design lives in `~/dev/aura/aura-docs/` (an Obsidian vaul
 ```
 effects/          Animation engine (CircuitPython-safe)
   effect.py       Effect, EffectState, EffectStep, SharedStateKey, EffectTimer
-  render.py       RendererConfig, PixelBuffer, EffectRenderer, merge renderers
+  render.py       RendererConfig, PixelBuffer, EffectRenderer, AverageMergeRenderer, AdditiveMergeRenderer
   palette.py      Palette, PaletteLUT256 (pre-computed, immutable)
-  shape.py        Shape — maps sample positions to pixel indices
-  level.py        level_lerp / level_lerp_int — intensity scaling helpers
-  value.py        Dynamic value types (constants, noise, ranges, etc.)
-  steps/          EffectStep implementations (flame, sparkle, drift_noise, …)
-  elements/       One builder function per element + registry.py
-  manager/        EffectManager, EffectOutput, EffectBuilder, Scope, ScopeValue
+  shape.py        Shape (factory), EffectShapeFunc
+  level.py        clamp_level, level_progress, level_lerp, level_lerp_int
+  value.py        DynamicValue, Range, ValueGenerator, lerp
+  performance.py  PerformanceTracker
+  steps/          EffectStep implementations (flame, sparkle, drift_noise, duration, control, …)
+  elements/       One builder function per element + registry.py, ElementBuilder
 
-magic/            Spell and aura game logic
-  aura.py         Aura, Spell, SpellLevelScaler
-  caster.py       Caster, CastType (line / cone / aoe)
-  values.py       MinMaxValue, ValueWithModifiers
+engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
+  engine.py       GameEngine, GameRule, GameState, Version
+  events.py       Event, EventGroup
+  timer.py        Timer
+  effects/
+    manager.py    EffectManager, EffectControls, EffectOutput, EffectBuilder, EffectReceipt
+    scope.py      Scope, ScopeValue
+
+magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
+  aura.py         Aura, Spell, Spells, SpellTags, SpellLevelScaler, AuraEvent (+ subclasses), EventListener
+  caster.py       Caster, CastType (LINE / CONE / AREA_OF_EFFECT)
+  values.py       MinMaxValue, ValueWithModifiers, ValueModifier, ValueModifiers, Duration, Counter
   spell/          Individual spell implementations (elemental/, combo/)
 
-engine/           Event-driven game loop
-  engine.py       GameEngine, GameRule, GameState
-  events.py       Event
-  timer.py        Timer, EffectTimer
-
-rules/            Game-specific rule packs (loaded at runtime)
-scratch/          Throwaway experiments — ignore
+rules/            Game-specific rule packs (loaded at runtime, CircuitPython/MicroPython-safe)
+scripts/          Deploy and maintenance scripts
 ```
 
 ---
@@ -54,17 +57,34 @@ scratch/          Throwaway experiments — ignore
 |------|----------|------|
 | `Effect` | `effects/effect.py` | Immutable chain of `EffectStep` instances; stateless |
 | `EffectState` | `effects/effect.py` | All mutable per-animation state; one per running effect |
-| `EffectTimer` | `effects/effect.py` | Elapsed time; passed into each step update |
+| `EffectTimer` | `effects/effect.py` | Duration + elapsed tracking; passed to each step |
+| `EffectStep` | `effects/effect.py` | Base step; implements `update`, `adjust_position`, `adjust_value` |
+| `SharedStateKey` | `effects/effect.py` | Marker base class for cross-step shared state keys |
 | `RendererConfig` | `effects/render.py` | Level [1–10], resolution, options, listeners for one render pass |
-| `PixelBuffer` | `effects/render.py` | In-memory list of packed RGB values; maps 1:1 with LED strip |
-| `EffectRenderer` | `effects/render.py` | Pairs an `Effect` + `Palette`; samples the effect into a `PixelBuffer` |
-| `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → RGB; LUT variant is pre-computed and fast |
-| `EffectManager` | `effects/manager/manager.py` | Lifecycle manager; routes effects to `EffectOutput` instances by scope |
-| `EffectOutput` | `effects/manager/manager.py` | Interface: `update_pixels(buffer)` + `handle_event(name)` |
-| `EffectBuilder` | `effects/manager/manager.py` | Callable `(name, config) → EffectRenderer`; one per "effect pack" |
-| `ScopeValue` / `Scope` | `effects/manager/scope.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN/BUFF/DEBUFF`, `ALL` |
-| `Aura` | `magic/aura.py` | A player/object's magic pool + list of active `Spell` instances |
-| `GameEngine` | `engine/engine.py` | Event queue + list of `GameRule` instances; driven by a single `update(timer)` tick |
+| `PixelBuffer` | `effects/render.py` | List-backed in-memory pixel buffer of packed RGB values |
+| `EffectRenderer` | `effects/render.py` | Pairs `Effect` + `Palette`; renders frames into a `PixelBuffer` |
+| `AverageMergeRenderer` | `effects/render.py` | Combines multiple renderers by averaging RGB channels |
+| `AdditiveMergeRenderer` | `effects/render.py` | Combines multiple renderers by additive blending (clamped) |
+| `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
+| `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
+| `EffectControls` | `engine/effects/manager.py` | Abstract interface: `set_effect`, `add_effect`, `stop_effect` |
+| `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls`; routes effects to outputs by scope |
+| `EffectOutput` | `engine/effects/manager.py` | Abstract hardware output: `create_buffer`, `update_pixels`, `handle_event` |
+| `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → EffectRenderer`; one per effect pack |
+| `EffectReceipt` | `engine/effects/manager.py` | Opaque handle for a running effect instance; used to stop by receipt |
+| `ScopeValue` / `Scope` | `engine/effects/scope.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN/BUFF/DEBUFF`, `ALL` |
+| `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update(timer)` tick |
+| `GameState` | `engine/engine.py` | Passed to each rule: holds `engine`, `timer`, `effect_controls` |
+| `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
+| `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
+| `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
+| `Aura` | `magic/aura.py` | A player/object's magic pool + active `Spells` collection |
+| `Spell` | `magic/aura.py` | Base class for spells; `update` returns `True` to self-remove |
+| `Spells` | `magic/aura.py` | Collection with lookup by name, tag, or class |
+| `AuraEvent` | `magic/aura.py` | Base event routed through active spells; can be canceled |
+| `MinMaxValue` | `magic/values.py` | Clamped float with dynamic max (via `ValueWithModifiers`) |
+| `ValueWithModifiers` | `magic/values.py` | Base value + temporary multiplier stack |
+| `Duration` | `magic/values.py` | Expiry tracker: `update(elapsed) → bool` |
 
 ---
 
@@ -73,30 +93,34 @@ scratch/          Throwaway experiments — ignore
 | Term | Meaning |
 |------|---------|
 | **Level** | Effect intensity, integer 1–10. 1 = weakest, 10 = strongest. Passed to `RendererConfig.level`. |
-| **Resolution** | Pixel count of the target LED strip. Drives sample density and buffer size. |
+| **Resolution** | Drives sample density and buffer size, it is not the pixel count of a strip. |
 | **Element** | One of ten named magical elements (Fire, Water, Earth, Ice, Air, Lightning, Light, Dark, Time, Gravity). Each has a buff and a debuff spell. |
-| **Effect pack** | An `EffectBuilder` that owns a named set of effects. `ElementRegistryBuilder` is one pack; games compose multiple packs at startup. |
-| **Scope** | Routing key that maps effects to outputs. `PERSONAL` targets the caster; `ALL` targets every registered output. |
-| **Aura** | A player or object's current magic state: magic pool + list of active spells. |
+| **Effect pack** | An `EffectBuilder` that owns a named set of effects. `ElementBuilder` (from `registry.py`) is one pack; games compose multiple packs at startup. |
+| **Scope** | Routing key that maps effects to outputs. `PERSONAL` targets the caster's device; `ALL` targets every registered output. |
+| **Receipt** | An `EffectReceipt` returned by `set_effect` / `add_effect`; used to stop a specific running effect instance. |
+| **Aura** | A player or object's current magic state: magic pool + active spell list. |
 | **Spell power** | Amount of magic at cast time. 1 unit ≈ ambient magic gathered over 1 second in 1 m³. |
+| **DynamicValue** | `float | Callable[[], float]` — a value that may be constant or computed each sample. |
+| **EffectShapeFunc** | `Callable[[float], float]` — maps a normalized position [0,1] to an output value. |
 
 ---
 
-## Coding constraints (CircuitPython compatibility)
+## Coding constraints (CircuitPython and MicroPython compatibility)
 
-All code in `effects/` must run on both CPython and CircuitPython. CircuitPython limitations:
+All code in `effects/`, `engine/`, `magic/`, and `rules/` must run on CPython, CircuitPython 10.x, and MicroPython. Constraints:
 
 - **No `dataclasses`** — use `__init__` + `__slots__` instead
-- **No generics** — no `T = TypeVar(...)` or `list[T]` at runtime
-- **Wrap all `typing` imports** in `try/except ImportError`
-- **No per-frame allocation in hot paths** — animation loops must not allocate lists, dicts, or objects on every frame; pre-allocate in `__init__` or use stack-local vars that the GC can reclaim cheaply
-- **`PaletteLUT256` is pre-computed** — never call `PaletteLUT256(palette)` inside a render loop
-- **Line limit: 100 characters** — enforced by `ruff` in the pre-commit hook
+- **`list[X]` / `dict[K, V]` subscripts are fine** at runtime in CP 10.x
+- **`typing.Protocol` is NOT available** — use plain base classes with `raise NotImplementedError`; subclass explicitly for type-checker compatibility
+- **Wrap other `typing` imports** in `try/except ImportError` (coverage varies)
+- **No per-frame allocation in hot paths** — animation loops must not allocate lists, dicts, or objects on every frame; pre-allocate in `__init__` or use stack-local vars
+- **`PaletteLUT256` is pre-computed** — never construct inside a render loop
+- **Line limit: 100 characters** — enforced by `ruff` pre-commit hook (also `ruff format`)
 
-`magic/` and `engine/` are CPython-only and do not carry the CircuitPython constraint.
+`scripts/` is CPython-only and does not carry these constraints.
 
 ---
 
 ## Tests
 
-469 tests under `effects/tests/`, `engine/tests/`, and `magic/tests/`. Run with `pytest`. All must pass before commit. Pre-commit hooks run `ruff` (lint) and `ruff format`.
+549 tests under `effects/tests/`, `engine/tests/`, `magic/tests/`, `rules/`, and `scripts/tests/`. Run with `python -m pytest`. All must pass before commit. Pre-commit hooks run `python -m ruff` (lint) and `ruff format`.
