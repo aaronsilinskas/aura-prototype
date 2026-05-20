@@ -89,6 +89,8 @@ class Spell:
 
 
 class SpellTags:
+    """String constants for categorising spells by role."""
+
     SHIELD = "SHIELD"
     BUFF = "BUFF"
     DEBUFF = "DEBUFF"

@@ -1,4 +1,6 @@
 class ElementTags:
+    """String constants for the elemental affinities a spell can carry."""
+
     FIRE = "element.fire"
     WATER = "element.water"
     EARTH = "element.earth"
