@@ -179,7 +179,7 @@ class AudioEffectOutput(EffectOutput):
     def update_pixels(self, frames: list) -> None:
         pass
 
-    def handle_event(self, event_name: str, receipt) -> None:
+    def handle_event(self, event_name: str, scope, receipt) -> None:
         if self._mixer.playing:
             return
         path = "sounds/" + event_name + ".wav"

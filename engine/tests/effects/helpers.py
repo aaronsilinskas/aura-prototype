@@ -14,8 +14,8 @@ class SpyEffectOutput(EffectOutput):
         self.created_buffers: list = []
         self.handle_event_calls: list = []
 
-    def handle_event(self, event_name: str, receipt: EffectReceipt) -> None:
-        self.handle_event_calls.append((event_name, receipt))
+    def handle_event(self, event_name: str, scope: object, receipt: EffectReceipt) -> None:
+        self.handle_event_calls.append((event_name, scope, receipt))
 
     def create_buffer(self) -> PixelBuffer:
         buf = PixelBuffer(self.min_resolution)

@@ -179,8 +179,8 @@ def test_effect_event_reaches_matching_scope_output() -> None:
     manager.update(_make_timer())
 
     assert output.handle_event_calls == [
-        ("shock.start", receipt),
-        ("lightning_strike", receipt),
+        ("shock.start", Scope.PERSONAL, receipt),
+        ("lightning_strike", Scope.PERSONAL, receipt),
     ]
 
 
@@ -504,7 +504,7 @@ def test_add_effect_fires_start_event_to_matching_output() -> None:
 
     receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
 
-    assert output.handle_event_calls == [("fire.start", receipt)]
+    assert output.handle_event_calls == [("fire.start", Scope.PERSONAL, receipt)]
 
 
 def test_add_effect_start_event_not_delivered_to_out_of_scope_output() -> None:
@@ -526,7 +526,7 @@ def test_add_effect_does_not_fire_stop_for_existing_effects() -> None:
 
     ice_receipt = manager.add_effect(Scope.PERSONAL, "ice", 5, {})
 
-    assert output.handle_event_calls == [("ice.start", ice_receipt)]
+    assert output.handle_event_calls == [("ice.start", Scope.PERSONAL, ice_receipt)]
 
 
 def test_add_effect_fires_start_event_unconditionally_for_duplicate_name() -> None:
@@ -536,7 +536,10 @@ def test_add_effect_fires_start_event_unconditionally_for_duplicate_name() -> No
     receipt_a = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
     receipt_b = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
 
-    assert output.handle_event_calls == [("fire.start", receipt_a), ("fire.start", receipt_b)]
+    assert output.handle_event_calls == [
+        ("fire.start", Scope.PERSONAL, receipt_a),
+        ("fire.start", Scope.PERSONAL, receipt_b),
+    ]
 
 
 def test_stop_effect_fires_stop_event_to_matching_output() -> None:
@@ -548,7 +551,7 @@ def test_stop_effect_fires_stop_event_to_matching_output() -> None:
 
     manager.stop_effect(Scope.PERSONAL)
 
-    assert output.handle_event_calls == [("fire.stop", receipt)]
+    assert output.handle_event_calls == [("fire.stop", Scope.PERSONAL, receipt)]
 
 
 def test_stop_effect_fires_stop_for_each_effect_in_scope() -> None:
@@ -562,8 +565,8 @@ def test_stop_effect_fires_stop_for_each_effect_in_scope() -> None:
     manager.stop_effect(Scope.PERSONAL)
 
     assert output.handle_event_calls == [
-        ("fire.stop", fire_receipt),
-        ("ice.stop", ice_receipt),
+        ("fire.stop", Scope.PERSONAL, fire_receipt),
+        ("ice.stop", Scope.PERSONAL, ice_receipt),
     ]
 
 
@@ -577,8 +580,8 @@ def test_set_effect_fires_stop_then_start_when_replacing_effect() -> None:
     ice_receipt = manager.set_effect(Scope.PERSONAL, "ice", 5, {})
 
     assert output.handle_event_calls == [
-        ("fire.stop", fire_receipt),
-        ("ice.start", ice_receipt),
+        ("fire.stop", Scope.PERSONAL, fire_receipt),
+        ("ice.start", Scope.PERSONAL, ice_receipt),
     ]
 
 
@@ -596,8 +599,8 @@ def test_set_effect_fires_stop_only_to_outputs_in_call_time_scope() -> None:
     ice_receipt = manager.set_effect(Scope.PERSONAL, "ice", 5, {})
 
     assert output_personal.handle_event_calls == [
-        ("fire.stop", fire_receipt),
-        ("ice.start", ice_receipt),
+        ("fire.stop", Scope.ALL, fire_receipt),
+        ("ice.start", Scope.PERSONAL, ice_receipt),
     ]
     assert output_directional.handle_event_calls == []
 
@@ -615,8 +618,8 @@ def test_stop_effect_with_broader_scope_fires_stop_to_all_matching_outputs() -> 
 
     manager.stop_effect(Scope.ALL)
 
-    assert output_personal.handle_event_calls == [("fire.stop", fire_receipt)]
-    assert output_directional.handle_event_calls == [("fire.stop", fire_receipt)]
+    assert output_personal.handle_event_calls == [("fire.stop", Scope.PERSONAL, fire_receipt)]
+    assert output_directional.handle_event_calls == [("fire.stop", Scope.PERSONAL, fire_receipt)]
 
 
 def test_stop_effect_by_receipt_fires_stop_event() -> None:
@@ -628,7 +631,7 @@ def test_stop_effect_by_receipt_fires_stop_event() -> None:
 
     manager.stop_effect_by_receipt(receipt)
 
-    assert output.handle_event_calls == [("fire.stop", receipt)]
+    assert output.handle_event_calls == [("fire.stop", Scope.PERSONAL, receipt)]
 
 
 def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect() -> None:
@@ -648,4 +651,40 @@ def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect()
     manager.stop_effect_by_receipt(fire_receipt)
 
     assert output_personal.handle_event_calls == []
-    assert output_directional.handle_event_calls == [("fire.stop", fire_receipt)]
+    assert output_directional.handle_event_calls == [("fire.stop", Scope.ALL, fire_receipt)]
+
+
+# ---------------------------------------------------------------------------
+# scope forwarding — issue #75
+# ---------------------------------------------------------------------------
+
+
+def test_handle_event_receives_personal_scope_for_personal_effect() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+
+    assert output.handle_event_calls == [("fire.start", Scope.PERSONAL, receipt)]
+
+
+def test_handle_event_receives_directional_scope_for_directional_effect() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    receipt = manager.add_effect(Scope.DIRECTIONAL, "ice", 5, {})
+
+    assert output.handle_event_calls == [("ice.start", Scope.DIRECTIONAL, receipt)]
+
+
+def test_handle_event_receives_composite_scope_not_decomposed_leaf() -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+    )
+
+    receipt = manager.add_effect(Scope.ALL, "fire", 5, {})
+
+    assert output_personal.handle_event_calls == [("fire.start", Scope.ALL, receipt)]
+    assert output_directional.handle_event_calls == [("fire.start", Scope.ALL, receipt)]
