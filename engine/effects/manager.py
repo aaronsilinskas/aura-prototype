@@ -19,7 +19,7 @@ class EffectOutput:
         """Create a PixelBuffer sized to this output's hardware pixel count."""
         raise NotImplementedError
 
-    def update_pixels(self, frames: list) -> None:
+    def update_pixels(self, frames: list[PixelBuffer]) -> None:
         """Receive rendered frames (list of PixelBuffer) for this output.
 
         Called every update tick. Receives an empty list when no effects are active
@@ -57,10 +57,14 @@ class EffectControls:
     intentionally excluded so rules cannot advance the effect loop.
     """
 
-    def set_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None:
+    def set_effect(
+        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
+    ) -> None:
         raise NotImplementedError
 
-    def add_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None:
+    def add_effect(
+        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
+    ) -> None:
         raise NotImplementedError
 
     def stop_effect(self, scope: ScopeValue) -> None:
@@ -74,12 +78,12 @@ class EffectManager(EffectControls):
         def __init__(
             self,
             keys: tuple[str, ...],
-            output_buffers: list,
+            output_buffers: list[PixelBuffer | None],
             renderer: EffectRenderer,
             state: EffectState,
         ) -> None:
             self.keys: tuple[str, ...] = keys
-            self.output_buffers: list = output_buffers
+            self.output_buffers: list[PixelBuffer | None] = output_buffers
             self.renderer: EffectRenderer = renderer
             self.state: EffectState = state
 
@@ -91,12 +95,12 @@ class EffectManager(EffectControls):
     def __init__(self, builder: EffectBuilder, outputs: list[EffectOutput]) -> None:
         self._builder: EffectBuilder = builder
         self._outputs: list[EffectOutput] = outputs
-        self._effects: list = []
+        self._effects: list[EffectManager._EffectEntry] = []
         self._timer: EffectTimer = EffectTimer()
-        self._output_key_sets: list = [
+        self._output_key_sets: list[frozenset[str]] = [
             frozenset(k for s in o.scopes for k in s.keys) for o in outputs
         ]
-        self._frames: list = [[] for _ in outputs]
+        self._frames: list[list[PixelBuffer]] = [[] for _ in outputs]
 
     def _notify_listeners(self, event_name: str, scope: ScopeValue) -> None:
         """Notify listeners registered for the given scope."""
@@ -108,12 +112,12 @@ class EffectManager(EffectControls):
                     break
 
     def _build_effect(
-        self, scope: ScopeValue, name: str, level: int, options: dict
+        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
     ) -> "EffectManager._EffectEntry":
         """Construct an EffectRenderer paired with a fresh EffectState."""
 
-        def scoped_listener(event_name):
-            return self._notify_listeners(event_name, scope)
+        def scoped_listener(event_name: str) -> None:
+            self._notify_listeners(event_name, scope)
 
         scope_keys = set(scope.keys)
         resolution = 16
@@ -140,7 +144,9 @@ class EffectManager(EffectControls):
             ):
                 entry.output_buffers[i] = None
 
-    def set_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None:
+    def set_effect(
+        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
+    ) -> None:
         """Replace any running effect(s) in scope and start this one."""
         scope_key_set = set(scope.keys)
         new_effects = []
@@ -153,7 +159,9 @@ class EffectManager(EffectControls):
         self._effects = new_effects
         self._effects.append(self._build_effect(scope, name, level, options))
 
-    def add_effect(self, scope: ScopeValue, name: str, level: int, options: dict) -> None:
+    def add_effect(
+        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
+    ) -> None:
         """Layer this effect alongside any running effects in scope.
 
         If nothing is running in scope, behaves like set_effect.
