@@ -24,7 +24,7 @@ except ImportError:
     pass
 
 MODULE_DIRS: "Final" = ["effects", "engine", "magic", "rules"]
-_EXCLUDE_DIRS: "Final" = {"__pycache__"}
+_EXCLUDE_DIRS: "Final" = {"__pycache__", "tests"}
 _EXCLUDE_SUFFIXES: "Final" = {".pyc", ".mpy"}
 _DEFAULT_MOUNT: "Final" = "/Volumes/CIRCUITPY"
 
