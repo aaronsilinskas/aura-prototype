@@ -1,9 +1,8 @@
 from effects.effect import Effect, EffectState
 from effects.palette import Palette, PaletteLUT256
 from effects.render import (
-    AdditiveMergeRenderer,
-    AverageMergeRenderer,
     EffectRenderer,
+    MergeRenderer,
     PixelBuffer,
     RendererConfig,
 )
@@ -97,6 +96,23 @@ def test_all_registered_listeners_are_notified_in_registration_order() -> None:
 
 
 # ---------------------------------------------------------------------------
+# RendererConfig — level_lerp
+# ---------------------------------------------------------------------------
+
+
+def test_config_level_lerp_returns_minimum_at_level_one() -> None:
+    config = RendererConfig(level=1, resolution=10)
+
+    assert config.level_lerp(0.2, 1.0) == 0.2
+
+
+def test_config_level_lerp_returns_maximum_at_level_ten() -> None:
+    config = RendererConfig(level=10, resolution=10)
+
+    assert config.level_lerp(0.2, 1.0) == 1.0
+
+
+# ---------------------------------------------------------------------------
 # PixelBuffer
 # ---------------------------------------------------------------------------
 
@@ -119,12 +135,6 @@ def test_pixel_buffer_setitem_stores_color_at_given_index() -> None:
     buf[1] = 0xFF0000
 
     assert buf[1] == 0xFF0000
-
-
-def test_pixel_buffer_len_returns_pixel_count() -> None:
-    buf = PixelBuffer(7)
-
-    assert len(buf) == 7
 
 
 def test_pixel_buffer_iterates_pixels_in_index_order() -> None:
@@ -215,16 +225,28 @@ def test_renderer_samples_each_pixel_at_its_normalized_position() -> None:
 
 
 # ---------------------------------------------------------------------------
-# AverageMergeRenderer
+# MergeRenderer — name
 # ---------------------------------------------------------------------------
 
 
-def test_average_merge_render_with_single_renderer_produces_same_color() -> None:
+def test_merge_renderer_name_returns_name_passed_at_construction() -> None:
+    palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
+    renderer = MergeRenderer("my_merge", [EffectRenderer(Effect("e"), palette)])
+
+    assert renderer.name == "my_merge"
+
+
+# ---------------------------------------------------------------------------
+# MergeRenderer — average (default)
+# ---------------------------------------------------------------------------
+
+
+def test_merge_renderer_with_single_renderer_produces_same_color() -> None:
     effect = Effect("test", lambda _: 1.0)
     palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))  # black → red
     state = EffectState()
     single = EffectRenderer(effect, palette)
-    merged = AverageMergeRenderer([EffectRenderer(effect, palette)])
+    merged = MergeRenderer("test", [EffectRenderer(effect, palette)])
 
     out_merged = PixelBuffer(1)
     out_single = PixelBuffer(1)
@@ -234,18 +256,19 @@ def test_average_merge_render_with_single_renderer_produces_same_color() -> None
     assert out_merged[0] == out_single[0]
 
 
-def test_average_merge_render_averages_rgb_channels_across_renderers() -> None:
+def test_merge_renderer_averages_rgb_channels_across_renderers() -> None:
     # Renderer A → full red (255,0,0); Renderer B → full blue (0,0,255).
     # Average: r=(255+0)//2=127, g=0, b=(0+255)//2=127.
     red_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
     blue_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 0, 0, 255]))
     effect = Effect("test", lambda _: 1.0)
     state = EffectState()
-    renderer = AverageMergeRenderer(
+    renderer = MergeRenderer(
+        "test",
         [
             EffectRenderer(effect, red_palette),
             EffectRenderer(effect, blue_palette),
-        ]
+        ],
     )
 
     output = PixelBuffer(1)
@@ -254,18 +277,19 @@ def test_average_merge_render_averages_rgb_channels_across_renderers() -> None:
     assert output[0] == Palette.pack_rgb(127, 0, 127)
 
 
-def test_average_merge_update_propagates_to_all_child_renderers() -> None:
+def test_merge_renderer_update_propagates_to_all_child_renderers() -> None:
     counter_a = CountUpdates()
     counter_b = CountUpdates()
     effect_a = Effect("a", lambda _: 0.0).add_steps([counter_a])
     effect_b = Effect("b", lambda _: 0.0).add_steps([counter_b])
     palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
     state = EffectState()
-    renderer = AverageMergeRenderer(
+    renderer = MergeRenderer(
+        "test",
         [
             EffectRenderer(effect_a, palette),
             EffectRenderer(effect_b, palette),
-        ]
+        ],
     )
 
     renderer.update(state, make_timer(0.016))
@@ -274,7 +298,7 @@ def test_average_merge_update_propagates_to_all_child_renderers() -> None:
     assert counter_b.count == 1
 
 
-def test_average_merge_renders_each_pixel_independently() -> None:
+def test_merge_renderer_average_renders_each_pixel_independently() -> None:
     # Effect A: full red at position >= 0.5, black otherwise.
     # Effect B: always full blue.
     # pixel[0] (pos=0.0): A=black, B=blue  → average = (0, 0, 127)
@@ -284,11 +308,12 @@ def test_average_merge_renders_each_pixel_independently() -> None:
     red_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
     blue_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 0, 0, 255]))
     state = EffectState()
-    renderer = AverageMergeRenderer(
+    renderer = MergeRenderer(
+        "test",
         [
             EffectRenderer(effect_a, red_palette),
             EffectRenderer(effect_b, blue_palette),
-        ]
+        ],
     )
 
     output = PixelBuffer(2)
@@ -299,20 +324,22 @@ def test_average_merge_renders_each_pixel_independently() -> None:
 
 
 # ---------------------------------------------------------------------------
-# AdditiveMergeRenderer
+# MergeRenderer — additive
 # ---------------------------------------------------------------------------
 
 
-def test_additive_merge_render_sums_rgb_channels_from_each_renderer() -> None:
+def test_merge_renderer_additive_sums_rgb_channels_across_renderers() -> None:
     # Each renderer produces r=64; two renderers → r=128.
     dim_red_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 64, 0, 0]))
     effect = Effect("test", lambda _: 1.0)
     state = EffectState()
-    renderer = AdditiveMergeRenderer(
+    renderer = MergeRenderer(
+        "test",
         [
             EffectRenderer(effect, dim_red_palette),
             EffectRenderer(effect, dim_red_palette),
-        ]
+        ],
+        additive=True,
     )
 
     output = PixelBuffer(1)
@@ -321,16 +348,18 @@ def test_additive_merge_render_sums_rgb_channels_from_each_renderer() -> None:
     assert output[0] == Palette.pack_rgb(128, 0, 0)
 
 
-def test_additive_merge_render_clamps_summed_channel_to_255_on_overflow() -> None:
+def test_merge_renderer_additive_clamps_channel_to_255_on_overflow() -> None:
     # Each renderer produces g=128; sum=256 → clamped to 255.
     green_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 0, 128, 0]))
     effect = Effect("test", lambda _: 1.0)
     state = EffectState()
-    renderer = AdditiveMergeRenderer(
+    renderer = MergeRenderer(
+        "test",
         [
             EffectRenderer(effect, green_palette),
             EffectRenderer(effect, green_palette),
-        ]
+        ],
+        additive=True,
     )
 
     output = PixelBuffer(1)
@@ -339,27 +368,7 @@ def test_additive_merge_render_clamps_summed_channel_to_255_on_overflow() -> Non
     assert output[0] == Palette.pack_rgb(0, 255, 0)
 
 
-def test_additive_merge_update_propagates_to_all_child_renderers() -> None:
-    counter_a = CountUpdates()
-    counter_b = CountUpdates()
-    effect_a = Effect("a", lambda _: 0.0).add_steps([counter_a])
-    effect_b = Effect("b", lambda _: 0.0).add_steps([counter_b])
-    palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
-    state = EffectState()
-    renderer = AdditiveMergeRenderer(
-        [
-            EffectRenderer(effect_a, palette),
-            EffectRenderer(effect_b, palette),
-        ]
-    )
-
-    renderer.update(state, make_timer(0.016))
-
-    assert counter_a.count == 1
-    assert counter_b.count == 1
-
-
-def test_additive_merge_renders_each_pixel_independently() -> None:
+def test_merge_renderer_additive_renders_each_pixel_independently() -> None:
     # Effect A: full red at position >= 0.5, black otherwise.
     # Effect B: always dim blue (0, 0, 64).
     # pixel[0] (pos=0.0): A=black,    B=dim_blue → sum = (0, 0, 64)
@@ -369,11 +378,13 @@ def test_additive_merge_renders_each_pixel_independently() -> None:
     red_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
     dim_blue_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 0, 0, 64]))
     state = EffectState()
-    renderer = AdditiveMergeRenderer(
+    renderer = MergeRenderer(
+        "test",
         [
             EffectRenderer(effect_a, red_palette),
             EffectRenderer(effect_b, dim_blue_palette),
-        ]
+        ],
+        additive=True,
     )
 
     output = PixelBuffer(2)

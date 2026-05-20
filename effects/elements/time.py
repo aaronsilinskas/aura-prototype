@@ -1,6 +1,6 @@
 from effects.effect import Effect
 from effects.palette import PaletteLUT256
-from effects.render import AdditiveMergeRenderer, EffectRenderer, RendererConfig
+from effects.render import EffectRenderer, MergeRenderer, RendererConfig
 from effects.shape import Shape
 from effects.steps.drift_noise import drift_noise
 from effects.steps.position import rotate
@@ -36,4 +36,4 @@ def build_time_renderer(config: RendererConfig) -> EffectRenderer:
     ).add_steps([rotate(ticker_rotate_speed)])
     time_ticker_renderer = EffectRenderer(time_ticker_effect, PaletteLUT256(grayscale_palette))
 
-    return AdditiveMergeRenderer([time_sand_renderer, time_ticker_renderer])
+    return MergeRenderer("time", [time_sand_renderer, time_ticker_renderer], additive=True)

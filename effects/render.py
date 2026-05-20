@@ -106,47 +106,30 @@ class EffectRenderer:
             output[i] = color
 
 
-class AverageMergeRenderer(EffectRenderer):
-    """Combines multiple renderers by averaging their RGB channels per pixel."""
+class MergeRenderer(EffectRenderer):
+    """Combines multiple renderers into one by blending their RGB channels per pixel.
 
-    def __init__(self, renderers: list[EffectRenderer]) -> None:
+    With ``additive=False`` (default) channels are averaged across all child renderers.
+    With ``additive=True`` channels are summed and clamped to 255.
+    """
+
+    __slots__ = ["_additive", "_buffers", "_name", "_renderers"]
+
+    def __init__(
+        self,
+        name: str,
+        renderers: list[EffectRenderer],
+        additive: bool = False,
+    ) -> None:
+        self._name = name
         self._renderers = renderers
+        self._additive = additive
         self._buffers: list[PixelBuffer] | None = None
 
-    def update(self, state: EffectState, timer: EffectTimer) -> None:
-        for renderer in self._renderers:
-            renderer.update(state, timer)
-
-    def render(self, state: EffectState, output: PixelBuffer) -> None:
-        pixel_count = len(output)
-        renderer_count = len(self._renderers)
-        if self._buffers is None or len(self._buffers[0]) != pixel_count:
-            self._buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
-        for i in range(renderer_count):
-            self._renderers[i].render(state, self._buffers[i])
-
-        n = len(self._renderers)
-        for i in range(pixel_count):
-            r_total = 0
-            g_total = 0
-            b_total = 0
-            for j in range(n):
-                color = self._buffers[j][i]
-                r_total += (color >> 16) & 255
-                g_total += (color >> 8) & 255
-                b_total += color & 255
-            r = min(255, r_total // n)
-            g = min(255, g_total // n)
-            b = min(255, b_total // n)
-            output[i] = (r << 16) | (g << 8) | b
-
-
-class AdditiveMergeRenderer(EffectRenderer):
-    """Combines multiple renderers by summing their RGB channels per pixel, clamped to ``255``."""
-
-    def __init__(self, renderers: list[EffectRenderer]) -> None:
-        self._renderers = renderers
-        self._buffers: list[PixelBuffer] | None = None
+    @property
+    def name(self) -> str:
+        """The name of this merged renderer."""
+        return self._name
 
     def update(self, state: EffectState, timer: EffectTimer) -> None:
         for renderer in self._renderers:
@@ -169,7 +152,12 @@ class AdditiveMergeRenderer(EffectRenderer):
                 r_total += (color >> 16) & 255
                 g_total += (color >> 8) & 255
                 b_total += color & 255
-            r = min(255, r_total)
-            g = min(255, g_total)
-            b = min(255, b_total)
+            if self._additive:
+                r = min(255, r_total)
+                g = min(255, g_total)
+                b = min(255, b_total)
+            else:
+                r = min(255, r_total // renderer_count)
+                g = min(255, g_total // renderer_count)
+                b = min(255, b_total // renderer_count)
             output[i] = (r << 16) | (g << 8) | b

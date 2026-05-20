@@ -1,6 +1,6 @@
 from effects.effect import Effect
 from effects.palette import PaletteLUT256
-from effects.render import AdditiveMergeRenderer, EffectRenderer, RendererConfig
+from effects.render import EffectRenderer, MergeRenderer, RendererConfig
 from effects.shape import Shape
 from effects.steps.control import hide
 from effects.steps.duration import duration
@@ -73,4 +73,4 @@ def build_air_renderer(config: RendererConfig) -> EffectRenderer:
     if breeze_count == 1:
         return renderers[0]
 
-    return AdditiveMergeRenderer(renderers)
+    return MergeRenderer("air", renderers, additive=True)

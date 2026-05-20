@@ -22,7 +22,7 @@ Full game and hardware design lives in `~/dev/aura/aura-docs/` (an Obsidian vaul
 ```
 effects/          Animation engine (CircuitPython-safe)
   effect.py       Effect, EffectState, EffectStep, SharedStateKey, EffectTimer
-  render.py       RendererConfig, PixelBuffer, EffectRenderer, AverageMergeRenderer, AdditiveMergeRenderer
+  render.py       RendererConfig, PixelBuffer, EffectRenderer, MergeRenderer
   palette.py      Palette, PaletteLUT256 (pre-computed, immutable)
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
@@ -63,8 +63,7 @@ scripts/          Deploy and maintenance scripts
 | `RendererConfig` | `effects/render.py` | Level [1–10], resolution, options, listeners for one render pass |
 | `PixelBuffer` | `effects/render.py` | List-backed in-memory pixel buffer of packed RGB values |
 | `EffectRenderer` | `effects/render.py` | Pairs `Effect` + `Palette`; renders frames into a `PixelBuffer` |
-| `AverageMergeRenderer` | `effects/render.py` | Combines multiple renderers by averaging RGB channels |
-| `AdditiveMergeRenderer` | `effects/render.py` | Combines multiple renderers by additive blending (clamped) |
+| `MergeRenderer` | `effects/render.py` | Combines multiple renderers; average (default) or additive blend |
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
 | `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
 | `EffectControls` | `engine/effects/manager.py` | Abstract interface: `set_effect`, `add_effect`, `stop_effect` |

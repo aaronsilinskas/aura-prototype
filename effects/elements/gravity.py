@@ -1,6 +1,6 @@
 from effects.effect import Effect
 from effects.palette import PaletteLUT256
-from effects.render import AdditiveMergeRenderer, EffectRenderer, RendererConfig
+from effects.render import EffectRenderer, MergeRenderer, RendererConfig
 from effects.steps.drift_noise import drift_noise
 from effects.steps.sparkle import sparkle
 from effects.value import ValueGenerator as VG
@@ -56,4 +56,6 @@ def build_gravity_renderer(config: RendererConfig) -> EffectRenderer:
     )
     gravity_stars_renderer = EffectRenderer(gravity_stars_effect, PaletteLUT256(grayscale_palette))
 
-    return AdditiveMergeRenderer([gravity_nebula_renderer, gravity_stars_renderer])
+    return MergeRenderer(
+        "gravity", [gravity_nebula_renderer, gravity_stars_renderer], additive=True
+    )

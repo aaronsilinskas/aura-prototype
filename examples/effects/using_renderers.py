@@ -4,8 +4,8 @@ Part 1 — Merge renderers (runs for 12 seconds):
   Displays three animations simultaneously so you can compare blend modes:
 
     Fire alone      — single EffectRenderer
-    Average merge   — AverageMergeRenderer(fire, earth): averages RGB channels
-    Additive merge  — AdditiveMergeRenderer(fire, earth): sums RGB channels, clamped
+    Average merge   — MergeRenderer(fire, earth): averages RGB channels
+    Additive merge  — MergeRenderer(fire, earth, additive=True): sums RGB channels, clamped
 
   Average merge is well-suited for mixing subtler layers: the combined brightness
   is the mean of both effects, so neither dominates the other.
@@ -31,7 +31,7 @@ from effects.effect import EffectState, EffectTimer
 from effects.elements.earth import build_earth_renderer
 from effects.elements.fire import build_fire_renderer
 from effects.elements.lightning import build_lightning_renderer
-from effects.render import AdditiveMergeRenderer, AverageMergeRenderer, PixelBuffer, RendererConfig
+from effects.render import MergeRenderer, PixelBuffer, RendererConfig
 
 PIXEL_COUNT = 28
 RESOLUTION = PIXEL_COUNT * 3
@@ -65,17 +65,20 @@ def part1_merge_comparison() -> None:
     # Each merge renderer owns its own child EffectRenderer instances — do not
     # share renderer objects across merge groups, as they share no state.
     fire_sole = build_fire_renderer(config)
-    avg_renderer = AverageMergeRenderer(
+    avg_renderer = MergeRenderer(
+        "fire_earth_average",
         [
             build_fire_renderer(config),
             build_earth_renderer(config),
-        ]
+        ],
     )
-    add_renderer = AdditiveMergeRenderer(
+    add_renderer = MergeRenderer(
+        "fire_earth_additive",
         [
             build_fire_renderer(config),
             build_earth_renderer(config),
-        ]
+        ],
+        additive=True,
     )
 
     # Each renderer needs its own EffectState.

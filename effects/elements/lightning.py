@@ -1,6 +1,6 @@
 from effects.effect import Effect
 from effects.palette import PaletteLUT256
-from effects.render import AdditiveMergeRenderer, EffectRenderer, RendererConfig
+from effects.render import EffectRenderer, MergeRenderer, RendererConfig
 from effects.shape import Shape
 from effects.steps.control import call, hide
 from effects.steps.duration import duration
@@ -52,4 +52,4 @@ def build_lightning_renderer(config: RendererConfig) -> EffectRenderer:
     if branch_count == 1:
         return renderers[0]
 
-    return AdditiveMergeRenderer(renderers)
+    return MergeRenderer("lightning", renderers, additive=True)
