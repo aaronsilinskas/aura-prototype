@@ -122,7 +122,7 @@ def test_set_effect_twice_replaces_effect() -> None:
     manager.set_effect(Scope.PERSONAL, "ice", 5, {})
     manager.update(_make_timer())
 
-    assert output.update_pixels_calls == [[output.created_buffers[0]]]
+    assert output.update_pixels_calls == [[output.created_buffers[1]]]
 
 
 def test_set_effect_twice_first_renderer_not_advanced() -> None:
@@ -359,3 +359,74 @@ def test_stop_effect_all_sends_go_dark_to_every_output() -> None:
 
     assert output_personal.update_pixels_calls[1] == []
     assert output_directional.update_pixels_calls[1] == []
+
+
+# ---------------------------------------------------------------------------
+# scope subtraction — flat list refactor (#61)
+# ---------------------------------------------------------------------------
+
+
+def test_set_effect_replaces_partial_scope_while_preserving_remaining_keys() -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    output_global = SpyEffectOutput(min_resolution=10, scopes=[Scope.Global.MAIN])
+    manager = EffectManager(
+        builder=StubEffectBuilder(),
+        outputs=[output_personal, output_directional, output_global],
+    )
+
+    manager.add_effect(Scope.ALL, "fire", 5, {})
+    manager.set_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.update(_make_timer())
+
+    assert len(output_personal.update_pixels_calls[0]) == 1
+    assert len(output_directional.update_pixels_calls[0]) == 1
+    assert len(output_global.update_pixels_calls[0]) == 1
+
+
+def test_stop_effect_on_partial_scope_continues_rendering_on_remaining_scope() -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        builder=StubEffectBuilder(),
+        outputs=[output_personal, output_directional],
+    )
+
+    manager.add_effect(Scope.ALL, "fire", 5, {})
+    manager.stop_effect(Scope.PERSONAL)
+    manager.update(_make_timer())
+
+    assert output_personal.update_pixels_calls[0] == []
+    assert len(output_directional.update_pixels_calls[0]) == 1
+
+
+def test_stop_effect_fully_removes_entry_when_scope_fully_overlaps_entry_keys() -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        builder=StubEffectBuilder(),
+        outputs=[output_personal, output_directional],
+    )
+
+    manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.stop_effect(Scope.ALL)
+    manager.update(_make_timer())
+
+    assert output_personal.update_pixels_calls[0] == []
+    assert output_directional.update_pixels_calls[0] == []
+
+
+def test_add_effect_does_not_narrow_existing_entry_keys() -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        builder=StubEffectBuilder(),
+        outputs=[output_personal, output_directional],
+    )
+
+    manager.add_effect(Scope.ALL, "fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.update(_make_timer())
+
+    assert len(output_personal.update_pixels_calls[0]) == 2
+    assert len(output_directional.update_pixels_calls[0]) == 1

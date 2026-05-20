@@ -23,7 +23,7 @@ class SpyEffectOutput(EffectOutput):
         return buf
 
     def update_pixels(self, frames: list) -> None:
-        self.update_pixels_calls.append(frames)
+        self.update_pixels_calls.append(list(frames))
 
 
 class StubEffectBuilder(EffectBuilder):
