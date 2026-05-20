@@ -1,5 +1,5 @@
 from magic.aura import Aura, AuraEvent, DamageEvent, Spell, SpellTags
-from magic.caster import CastType, Caster
+from magic.caster import Caster, CastType
 from magic.spell.elemental.elements import ElementTags
 from magic.spell.elemental.freeze import FreezeSpell
 from magic.values import Counter, Duration
@@ -60,6 +60,4 @@ class IceShieldSpell(Spell):
         )  # Cast type can be arbitrary here
 
     def _update_level(self, level: int) -> None:
-        self.reduction = Spell.LEVEL_SCALER.scale_percentage(
-            self._base_reduction, level
-        )
+        self.reduction = Spell.LEVEL_SCALER.scale_percentage(self._base_reduction, level)

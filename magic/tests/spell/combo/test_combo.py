@@ -1,4 +1,5 @@
 import pytest
+
 from magic.aura import AddSpellEvent, Aura, RemoveSpellEvent
 from magic.spell.combo.combo import SpellCombination, SpellCombinations
 from magic.spell.elemental.ignite import IgniteSpell

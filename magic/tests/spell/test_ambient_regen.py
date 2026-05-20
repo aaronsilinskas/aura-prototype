@@ -1,5 +1,7 @@
-import pytest
 import random
+
+import pytest
+
 from magic.aura import Spell
 from magic.spell.ambient_magic_regen import AmbientMagicRegenSpell
 from magic.tests.helpers import AuraFixture

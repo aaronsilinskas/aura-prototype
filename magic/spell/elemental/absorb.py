@@ -1,4 +1,4 @@
-from magic.aura import AddSpellEvent, Aura, AuraEvent, DamageEvent, Spell, SpellTags
+from magic.aura import AddSpellEvent, Aura, AuraEvent, Spell, SpellTags
 from magic.spell.elemental.elements import ElementTags
 from magic.values import Duration
 
@@ -6,7 +6,7 @@ from magic.values import Duration
 class AbsorbSpell(Spell):
     """A spell that absorbs debuff spells, and expires after a duration. The number of
     debuff spells it can absorb increases with level.
-    
+
     Level scaling: Increases the number of debuff spells that can be absorbed.
     """
 

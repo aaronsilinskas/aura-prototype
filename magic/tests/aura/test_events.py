@@ -1,15 +1,13 @@
-from unittest.mock import Mock
 import pytest
-from pytest_mock import MockerFixture
+
 from magic.aura import (
+    AddSpellEvent,
     Aura,
     AuraEvent,
+    CastEvent,
     DamageEvent,
     HealEvent,
-    CastEvent,
-    AddSpellEvent,
     RemoveSpellEvent,
-    EventListener,
     Spell,
 )
 from magic.tests.helpers import AuraFixture, MockEventListener

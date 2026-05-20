@@ -1,6 +1,8 @@
 from unittest.mock import Mock
+
 import pytest
 from pytest_mock import MockerFixture
+
 from magic.values import ValueModifier, ValueWithModifiers
 
 
@@ -29,7 +31,7 @@ def test_initialization_with_base_value():
 
 def test_initialization_with_callback(mock_callback):
     """Test that initialization with a callback doesn't trigger it."""
-    val = ValueWithModifiers(base_value=10.0, value_changed=mock_callback)
+    ValueWithModifiers(base_value=10.0, value_changed=mock_callback)
 
     mock_callback.assert_not_called()
 

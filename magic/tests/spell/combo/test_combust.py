@@ -1,4 +1,5 @@
 import pytest
+
 from magic.spell.combo.combo import SpellCombinations
 from magic.spell.combo.combust import CombustCombination
 from magic.spell.elemental.ignite import IgniteSpell

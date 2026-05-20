@@ -1,7 +1,8 @@
 import pytest
+
+from magic.spell.elemental.ignite import IgniteSpell
 from magic.spell.elemental.pause import PauseSpell
 from magic.spell.elemental.unpause import UnpauseSpell
-from magic.spell.elemental.ignite import IgniteSpell
 from magic.tests.helpers import AuraFixture
 
 

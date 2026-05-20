@@ -1,5 +1,7 @@
-import pytest
 import random
+
+import pytest
+
 from magic.aura import Spell
 from magic.spell.elemental.regen import RegenSpell
 from magic.tests.helpers import AuraFixture
@@ -41,9 +43,7 @@ def test_regen_full_regeneration(regen_fixture: RegenFixture) -> None:
 def test_regen_partial_regeneration(regen_fixture: RegenFixture) -> None:
     aura = regen_fixture.aura
     partial_duration = regen_fixture.regen_duration / 2
-    partial_regen = (
-        regen_fixture.total_regen * partial_duration / regen_fixture.regen_duration
-    )
+    partial_regen = regen_fixture.total_regen * partial_duration / regen_fixture.regen_duration
 
     # Start with low magic
     aura.magic.value = 0.0
@@ -82,9 +82,7 @@ def test_regen_damage_during_spell_active(regen_fixture: RegenFixture) -> None:
     half_of_duration = regen_fixture.regen_duration / 2
     damage_amount = regen_fixture.total_regen  # Damage equal to total regen
     regen_after_damage = regen_fixture.total_regen / 2  # Regen for half of duration
-    expected_magic_after_regen = (
-        aura.magic.max.value - damage_amount + regen_after_damage
-    )
+    expected_magic_after_regen = aura.magic.max.value - damage_amount + regen_after_damage
 
     aura.add_spell(regen_fixture.regen_spell)
     # Simulate time passing for half the duration on max magic

@@ -1,3 +1,3 @@
-from .aura import Spell, Aura
+from .aura import Aura, Spell
 
-__all__ = ["Spell", "Aura"]
+__all__ = ["Aura", "Spell"]

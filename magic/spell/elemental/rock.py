@@ -4,7 +4,7 @@ from magic.spell.elemental.elements import ElementTags
 
 class RockSpell(Spell):
     """Instantly damages the target for a specified amount.
-    
+
     Level scaling: Increases the damage amount.
     """
 

@@ -5,7 +5,7 @@ from magic.values import Duration
 
 class RegenSpell(Spell):
     """A spell that provides magic regeneration over time.
-    
+
     Level scaling: Increases the regeneration rate per second.
     """
 

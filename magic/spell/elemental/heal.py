@@ -4,7 +4,7 @@ from magic.spell.elemental.elements import ElementTags
 
 class HealSpell(Spell):
     """Instantly heals the target for a specified amount.
-    
+
     Level scaling: Increases the healing amount.
     """
 

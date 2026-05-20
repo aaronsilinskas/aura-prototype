@@ -4,9 +4,10 @@ from magic.values import Duration
 
 
 class ShadowSpell(Spell):
-    """A spell that temporarily turns the selected spell visual indicators black until the duration expires.
+    """A spell that temporarily turns the selected spell visual indicators black
+    until the duration expires.
     Visual effects must listen for this spell and implement the effect.
-    
+
     Level scaling: Increases the duration.
     """
 
@@ -19,6 +20,4 @@ class ShadowSpell(Spell):
         return self.duration.update(elapsed_time)
 
     def _update_level(self, level: int) -> None:
-        self.duration.length = Spell.LEVEL_SCALER.scale_value(
-            self._base_duration, level
-        )
+        self.duration.length = Spell.LEVEL_SCALER.scale_value(self._base_duration, level)

@@ -5,7 +5,7 @@ from magic.values import Duration
 
 class IgniteSpell(Spell):
     """Damage over time spell that deals damage per second for a duration.
-    
+
     Level scaling: Increases the damage per second.
     """
 
@@ -22,6 +22,4 @@ class IgniteSpell(Spell):
         return self.duration.update(elapsed_time)
 
     def _update_level(self, level: int) -> None:
-        self.damage_per_second = Spell.LEVEL_SCALER.scale_value(
-            self._base_damage_per_second, level
-        )
+        self.damage_per_second = Spell.LEVEL_SCALER.scale_value(self._base_damage_per_second, level)

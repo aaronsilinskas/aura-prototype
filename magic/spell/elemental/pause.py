@@ -12,7 +12,7 @@ class PauseSpell(Spell):
     - Cancels all spell casts
     - Multiplies cast delay by the pause duration
     - Does not affect damage, healing, or spell hits
-    
+
     Level scaling: Increases the pause duration.
     """
 

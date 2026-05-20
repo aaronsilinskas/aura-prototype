@@ -1,4 +1,5 @@
 import pytest
+
 from magic.aura import DamageEvent, HealEvent, Spell
 from magic.spell.elemental.charge import ChargeSpell
 from magic.tests.helpers import AuraFixture

@@ -1,6 +1,7 @@
 import random
 
 import pytest
+
 from magic.aura import Aura, Spell
 from magic.tests.helpers import AuraFixture
 
@@ -11,8 +12,6 @@ def fixture() -> AuraFixture:
 
 
 def test_spell_name_normalization(fixture: AuraFixture) -> None:
-    aura = fixture.aura
-
     class SuperGiantSpell(Spell):
         pass
 

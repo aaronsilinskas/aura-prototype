@@ -1,4 +1,5 @@
 import pytest
+
 from magic.aura import SpellTags
 from magic.spell.elemental.elements import ElementTags
 from magic.spell.elemental.warmth import WarmthSpell

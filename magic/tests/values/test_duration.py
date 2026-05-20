@@ -1,4 +1,5 @@
 import pytest
+
 from magic.values import Duration
 
 
@@ -143,7 +144,7 @@ def test_length_setter_can_cause_expiration():
 def test_length_setter_negative_remaining():
     duration = Duration(length=10.0)
     duration.update(8.0)
-    
+
     # Set length to less than elapsed
     duration.length = 5.0
     assert duration.remaining == 0.0  # Should not be negative

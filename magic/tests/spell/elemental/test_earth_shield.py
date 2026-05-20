@@ -1,5 +1,7 @@
 import random
+
 import pytest
+
 from magic.aura import Spell
 from magic.spell.elemental.earth_shield import EarthShieldSpell
 from magic.spell.elemental.slice import SliceSpell
@@ -53,9 +55,9 @@ def test_earth_shield_expiry_by_hits(shield_fixture: EarthShieldFixture) -> None
     # Final update to process removals because earth spell is processed before damage spell
     aura.update(0.1)
 
-    assert (
-        shield_fixture.shield_spell not in aura.spells
-    ), "Earth Shield should expire after max_hits"
+    assert shield_fixture.shield_spell not in aura.spells, (
+        "Earth Shield should expire after max_hits"
+    )
 
 
 def test_earth_shield_removed_after_expiry(
@@ -68,9 +70,9 @@ def test_earth_shield_removed_after_expiry(
     # Ellapse time past duration to expire shield
     aura.update(shield_fixture.duration + 1)
 
-    assert (
-        shield_fixture.shield_spell not in aura.spells
-    ), "Earth Shield should expire after duration"
+    assert shield_fixture.shield_spell not in aura.spells, (
+        "Earth Shield should expire after duration"
+    )
 
 
 def test_earth_shield_level(shield_fixture: EarthShieldFixture) -> None:

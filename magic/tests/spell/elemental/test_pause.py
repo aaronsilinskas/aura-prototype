@@ -1,8 +1,9 @@
 import pytest
+
+from magic.aura import CastEvent, Spell
+from magic.spell.elemental.ignite import IgniteSpell
 from magic.spell.elemental.pause import PauseSpell
 from magic.spell.elemental.slice import SliceSpell
-from magic.spell.elemental.ignite import IgniteSpell
-from magic.aura import CastEvent, Spell
 from magic.tests.helpers import AuraFixture, MockEventListener
 
 
@@ -78,7 +79,6 @@ def test_pause_spell_does_not_expire_before_duration(pause_fixture: PauseFixture
 
 def test_pause_level(pause_fixture: PauseFixture):
     """Test that PauseSpell level updates duration."""
-    aura = pause_fixture.aura
     level = 2
     original_duration = pause_fixture.pause_duration
     pause_spell = PauseSpell(duration=original_duration)

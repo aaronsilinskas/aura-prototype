@@ -1,5 +1,5 @@
 try:
-    from typing import Callable
+    from collections.abc import Callable
 except ImportError:
     pass
 
@@ -108,7 +108,8 @@ class ValueModifier:
 
 
 class ValueModifiers:
-    """Manages a collection of ValueModifiers and notifies an optional callback when the list changes."""
+    """Manages a collection of ValueModifiers and notifies an optional callback
+    when the list changes."""
 
     def __init__(self, modifiers_changed: Callable | None = None) -> None:
         """Initializes the manager with a callback for list changes.
@@ -149,7 +150,8 @@ class ValueModifiers:
             self._notify_modifiers_changed()
 
     def update(self, elapsed_time: float) -> None:
-        """Updates all modifiers, removing expired ones and triggering the callback if changes occurred.
+        """Updates all modifiers, removing expired ones and triggering the callback
+        if changes occurred.
 
         Args:
             elapsed_time: The time passed since the last update.
@@ -193,9 +195,7 @@ class ValueModifiers:
 class ValueWithModifiers:
     """A value that can be modified by a set of multipliers."""
 
-    def __init__(
-        self, base_value: float = 0.0, value_changed: Callable | None = None
-    ) -> None:
+    def __init__(self, base_value: float = 0.0, value_changed: Callable | None = None) -> None:
         """Initializes the value with modifiers.
 
         Args:

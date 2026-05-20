@@ -1,6 +1,7 @@
 import random
 
 import pytest
+
 from magic.aura import DamageEvent, HealEvent, Spell, SpellTags
 from magic.spell.elemental.earth_shield import EarthShieldSpell
 from magic.spell.elemental.vulnerable import VulnerableSpell

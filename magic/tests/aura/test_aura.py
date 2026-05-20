@@ -1,7 +1,8 @@
 import pytest
+
 from magic.aura import Aura, AuraEvent, DamageEvent, HealEvent, Spell, SpellTags
-from magic.values import ValueModifier
 from magic.tests.helpers import AuraFixture
+from magic.values import ValueModifier
 
 
 @pytest.fixture

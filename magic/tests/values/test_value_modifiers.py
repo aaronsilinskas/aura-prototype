@@ -1,6 +1,8 @@
 from unittest.mock import Mock
+
 import pytest
 from pytest_mock import MockerFixture
+
 from magic.values import ValueModifier, ValueModifiers
 
 

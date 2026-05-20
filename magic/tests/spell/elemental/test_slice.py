@@ -1,4 +1,5 @@
 import pytest
+
 from magic.aura import Spell
 from magic.spell.elemental.slice import SliceSpell
 from magic.tests.helpers import AuraFixture

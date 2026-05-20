@@ -6,7 +6,7 @@ from magic.values import Duration
 class VulnerableSpell(Spell):
     """Removes any existing or new shields while this spell is active.
     If no shields are removed, increases damage taken for a duration.
-    
+
     Level scaling: Increases the damage multiplier.
     """
 
@@ -32,7 +32,5 @@ class VulnerableSpell(Spell):
             event.amount *= self.damage_multiplier
 
     def _update_level(self, level: int) -> None:
-        self.damage_multiplier = Spell.LEVEL_SCALER.scale_value(
-            self._base_damage_multiplier, level
-        )
+        self.damage_multiplier = Spell.LEVEL_SCALER.scale_value(self._base_damage_multiplier, level)
         self.damage_multiplier = max(1.0, self.damage_multiplier)

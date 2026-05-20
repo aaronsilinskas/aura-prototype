@@ -1,5 +1,5 @@
 try:
-    from typing import Type, TypeVar
+    from typing import TypeVar
 
     T = TypeVar("T")
 except ImportError:
@@ -17,8 +17,10 @@ class SpellLevelScaler:
         """Initializes the coefficients for this level scaler.
 
         Args:
-            value_coefficient (float, optional): The coefficient for scaling values. Defaults to 0.25.
-            percentage_coefficient (float, optional): The coefficient for scaling percentages. Defaults to 0.05.
+            value_coefficient (float, optional): The coefficient for scaling values.
+                Defaults to 0.25.
+            percentage_coefficient (float, optional): The coefficient for scaling percentages.
+                Defaults to 0.05.
         """
         self._value_coefficient = max(value_coefficient, 0)
         self._percentage_coefficient = max(percentage_coefficient, 0)
@@ -174,13 +176,11 @@ class Spells:
         """Finds spells that have all of the specified tags."""
         if not tags:
             return []
-        return [
-            spell for spell in self._spells if all(tag in spell.tags for tag in tags)
-        ]
+        return [spell for spell in self._spells if all(tag in spell.tags for tag in tags)]
 
-    def get_by_class(self, cls: "Type[T]") -> "list[T]":
+    def get_by_class(self, cls: "type[T]") -> "list[T]":
         """Finds spells by their class type."""
-        matching = list()
+        matching = []
         for spell in self._spells:
             if isinstance(spell, cls):
                 matching.append(spell)
@@ -302,6 +302,8 @@ class Aura:
     @property
     def event_listeners(self) -> list[EventListener]:
         """Returns the list of event listeners.
-        These listeners will be notified on events after the event is processed by active spells and the Aura.
+
+        These listeners will be notified on events after the event is processed
+        by active spells and the Aura.
         """
         return self._event_listeners

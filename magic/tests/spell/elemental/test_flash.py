@@ -1,4 +1,5 @@
 import pytest
+
 from magic.aura import Spell
 from magic.spell.elemental.flash import FlashSpell
 from magic.tests.helpers import AuraFixture

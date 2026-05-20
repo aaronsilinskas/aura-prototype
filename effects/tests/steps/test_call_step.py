@@ -1,7 +1,6 @@
-from effects.tests.helpers import RecordAndHold, make_timer
-
 from effects.effect import Effect, EffectState, EffectTimer
 from effects.steps.control import call
+from effects.tests.helpers import RecordAndHold, make_timer
 
 
 def test_call_invokes_callback_when_step_is_activated() -> None:

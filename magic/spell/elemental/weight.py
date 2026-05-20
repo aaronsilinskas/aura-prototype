@@ -1,8 +1,8 @@
 import math
+
 from magic.aura import Aura, AuraEvent, DamageEvent, Spell, SpellTags
 from magic.spell.elemental.elements import ElementTags
 from magic.values import Duration
-
 
 GRAVITY: float = 9.81  # m/s²
 
@@ -34,7 +34,7 @@ class AccelerationEvent(AuraEvent):
 
 class WeightSpell(Spell):
     """Deals damage over time when acceleration above a threshold is detected.
-    
+
     Level scaling: Increases the damage per second.
     """
 
@@ -61,6 +61,4 @@ class WeightSpell(Spell):
             self.movement_detected = event.accel_magnitude > self.acceleration_threshold
 
     def _update_level(self, level: int) -> None:
-        self.damage_per_second = Spell.LEVEL_SCALER.scale_value(
-            self._base_damage_per_second, level
-        )
+        self.damage_per_second = Spell.LEVEL_SCALER.scale_value(self._base_damage_per_second, level)

@@ -1,7 +1,7 @@
 import pytest
+
 from magic.aura import Spell, SpellTags
 from magic.spell.elemental.absorb import AbsorbSpell
-from magic.spell.elemental.elements import ElementTags
 from magic.tests.helpers import AuraFixture, NoopSpell
 
 

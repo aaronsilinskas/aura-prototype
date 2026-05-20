@@ -1,4 +1,5 @@
 import pytest
+
 from magic.spell.combo.combo import SpellCombinations
 from magic.spell.combo.invigorate import InvigorateCombination
 from magic.spell.elemental.regen import RegenSpell
@@ -14,9 +15,7 @@ class InvigorateFixture(AuraFixture):
         self.original_max_magic = self.aura.magic.max.value
         self.max_magic_multiplier = 1.5
         self.duration = 10.0
-        self.invigorate_combo = InvigorateCombination(
-            self.max_magic_multiplier, self.duration
-        )
+        self.invigorate_combo = InvigorateCombination(self.max_magic_multiplier, self.duration)
         self.combos.add(self.invigorate_combo)
         self.regen_duration = 5.0
 
@@ -36,9 +35,7 @@ def test_invigorate_triggers_with_three_regen_spells(fixture: InvigorateFixture)
     aura.add_spell(RegenSpell(regen_rate=8.0, duration=fixture.regen_duration))
 
     # Max magic should be increased by the multiplier
-    assert aura.magic.max.value == pytest.approx(
-        original_max_magic * fixture.max_magic_multiplier
-    )
+    assert aura.magic.max.value == pytest.approx(original_max_magic * fixture.max_magic_multiplier)
 
 
 def test_invigorate_does_not_trigger_with_two_regen_spells(fixture: InvigorateFixture):
@@ -91,9 +88,7 @@ def test_invigorate_modifier_expires_after_regen_and_duration(
     aura.add_spell(regen3)
 
     # Max magic should be increased
-    assert aura.magic.max.value == pytest.approx(
-        original_max_magic * fixture.max_magic_multiplier
-    )
+    assert aura.magic.max.value == pytest.approx(original_max_magic * fixture.max_magic_multiplier)
 
     # Simulate time passing to remove all regen spells (they have 2s duration)
     aura.update(regen_duration + 1.0)
@@ -102,9 +97,7 @@ def test_invigorate_modifier_expires_after_regen_and_duration(
     assert len(aura.spells.get_by_class(RegenSpell)) == 0
 
     # Max magic should still be increased (modifier has 10s duration)
-    assert aura.magic.max.value == pytest.approx(
-        original_max_magic * fixture.max_magic_multiplier
-    )
+    assert aura.magic.max.value == pytest.approx(original_max_magic * fixture.max_magic_multiplier)
 
     # Simulate time passing beyond the modifier duration
     aura.update(fixture.duration)
@@ -125,33 +118,25 @@ def test_invigorate_refreshes_when_regen_spells_return_to_three(
     aura.add_spell(RegenSpell(regen_rate=8.0, duration=5))
 
     # Max magic should be increased
-    assert aura.magic.max.value == pytest.approx(
-        original_max_magic * fixture.max_magic_multiplier
-    )
+    assert aura.magic.max.value == pytest.approx(original_max_magic * fixture.max_magic_multiplier)
 
     aura.update(4)  # Let first regen expire leaving 2 active
 
     # Max magic should still be increased but duration has 7 seconds left
-    assert aura.magic.max.value == pytest.approx(
-        original_max_magic * fixture.max_magic_multiplier
-    )
+    assert aura.magic.max.value == pytest.approx(original_max_magic * fixture.max_magic_multiplier)
 
     # Increase to 3 regen spells again
     aura.add_spell(RegenSpell(regen_rate=12.0, duration=5))
     aura.update(8)  # Let time pass beyond original modifier duration
 
     # Max magic should still be increased
-    assert aura.magic.max.value == pytest.approx(
-        original_max_magic * fixture.max_magic_multiplier
-    )
+    assert aura.magic.max.value == pytest.approx(original_max_magic * fixture.max_magic_multiplier)
 
 
 def test_invigorate_check_returns_true_when_triggered(fixture: InvigorateFixture):
     """Test that check returns True when the combination is first applied."""
     # Create a separate invigorate combo that isn't registered with event listeners
-    standalone_combo = InvigorateCombination(
-        fixture.max_magic_multiplier, fixture.duration
-    )
+    standalone_combo = InvigorateCombination(fixture.max_magic_multiplier, fixture.duration)
     aura = fixture.aura
 
     aura.add_spell(RegenSpell(regen_rate=5.0, duration=fixture.regen_duration))
@@ -168,9 +153,7 @@ def test_invigorate_check_returns_false_when_already_applied(
 ):
     """Test that check returns False when the modifier is already applied."""
     # Create a separate invigorate combo that isn't registered with event listeners
-    standalone_combo = InvigorateCombination(
-        fixture.max_magic_multiplier, fixture.duration
-    )
+    standalone_combo = InvigorateCombination(fixture.max_magic_multiplier, fixture.duration)
     aura = fixture.aura
 
     aura.add_spell(RegenSpell(regen_rate=5.0, duration=fixture.regen_duration))
@@ -190,9 +173,7 @@ def test_invigorate_check_returns_false_with_insufficient_regen_spells(
 ):
     """Test that check returns False when there are fewer than 3 Regen spells."""
     # Create a separate invigorate combo that isn't registered with event listeners
-    standalone_combo = InvigorateCombination(
-        fixture.max_magic_multiplier, fixture.duration
-    )
+    standalone_combo = InvigorateCombination(fixture.max_magic_multiplier, fixture.duration)
     aura = fixture.aura
 
     aura.add_spell(RegenSpell(regen_rate=5.0, duration=fixture.regen_duration))

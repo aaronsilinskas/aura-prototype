@@ -5,7 +5,7 @@ from magic.values import Duration, ValueModifier
 
 class FreezeSpell(Spell):
     """Increases the delay between spell casts for a duration.
-    
+
     Level scaling: Increases the cast delay multiplier.
     """
 
@@ -14,9 +14,7 @@ class FreezeSpell(Spell):
         self.duration = Duration(duration)
         self._base_cast_delay_modifier = max(cast_delay_modifier, 1.0)
         self.cast_delay_modifier = self._base_cast_delay_modifier
-        self._modifier = ValueModifier(
-            self.cast_delay_modifier, duration=self.duration.length
-        )
+        self._modifier = ValueModifier(self.cast_delay_modifier, duration=self.duration.length)
 
     def start(self, aura: Aura) -> None:
         aura.cast_delay.modifiers.add(self._modifier)

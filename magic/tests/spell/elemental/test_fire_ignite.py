@@ -1,5 +1,7 @@
-import pytest
 import random
+
+import pytest
+
 from magic.aura import Spell
 from magic.spell.elemental.ignite import IgniteSpell
 from magic.tests.helpers import AuraFixture
@@ -30,9 +32,7 @@ def test_fire_ignite_full_damage(ignite_fixture: IgniteFixture) -> None:
     # Simulate time passing beyond duration
     aura.update(ignite_fixture.ignite_duration + 5)
 
-    assert aura.magic.value == pytest.approx(
-        aura.magic.max.value - ignite_fixture.total_damage
-    )
+    assert aura.magic.value == pytest.approx(aura.magic.max.value - ignite_fixture.total_damage)
     # Spell should be removed after duration
     assert ignite_fixture.ignite_spell not in aura.spells
 
@@ -40,9 +40,7 @@ def test_fire_ignite_full_damage(ignite_fixture: IgniteFixture) -> None:
 def test_fire_ignite_partial_damage(ignite_fixture: IgniteFixture) -> None:
     aura = ignite_fixture.aura
     partial_duration = ignite_fixture.ignite_duration / 2
-    partial_damage = (
-        ignite_fixture.total_damage * partial_duration / ignite_fixture.ignite_duration
-    )
+    partial_damage = ignite_fixture.total_damage * partial_duration / ignite_fixture.ignite_duration
 
     aura.add_spell(ignite_fixture.ignite_spell)
     # Simulate part of the ignite duration passing

@@ -5,7 +5,7 @@ from magic.values import Duration
 
 class ChargeSpell(Spell):
     """Increase the effectiveness of healing spells for a duration.
-    
+
     Level scaling: Increases the healing multiplier.
     """
 
