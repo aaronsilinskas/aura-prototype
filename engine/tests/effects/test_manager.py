@@ -176,10 +176,12 @@ def test_effect_event_reaches_matching_scope_output() -> None:
     manager = EffectManager(builder=_EventFiringEffectBuilder("lightning_strike"), outputs=[output])
 
     receipt = manager.set_effect(Scope.PERSONAL, "shock", 5, {})
-    output.handle_event_calls.clear()  # ignore lifecycle start event
     manager.update(_make_timer())
 
-    assert output.handle_event_calls == [("lightning_strike", receipt)]
+    assert output.handle_event_calls == [
+        ("shock.start", receipt),
+        ("lightning_strike", receipt),
+    ]
 
 
 def test_effect_event_does_not_reach_out_of_scope_output() -> None:
@@ -220,7 +222,7 @@ def test_resolution_equals_max_min_resolution_of_matching_outputs() -> None:
     assert builder.last_config.resolution == 64
 
 
-def test_resolution_falls_back_to_16_when_no_outputs_match() -> None:
+def test_resolution_falls_back_to_default_when_no_outputs_match() -> None:
     builder = _CapturingEffectBuilder()
     manager = EffectManager(builder=builder, outputs=[])
 
@@ -369,7 +371,7 @@ def test_stop_effect_all_sends_go_dark_to_every_output() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_set_effect_replaces_partial_scope_while_preserving_remaining_keys() -> None:
+def test_set_effect_on_partial_scope_leaves_other_scope_effects_running() -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     output_global = SpyEffectOutput(min_resolution=10, scopes=[Scope.Global.MAIN])
@@ -403,7 +405,7 @@ def test_stop_effect_on_partial_scope_continues_rendering_on_remaining_scope() -
     assert len(output_directional.update_pixels_calls[0]) == 1
 
 
-def test_stop_effect_fully_removes_entry_when_scope_fully_overlaps_entry_keys() -> None:
+def test_stop_effect_with_broader_scope_removes_narrower_effect_completely() -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
@@ -419,7 +421,7 @@ def test_stop_effect_fully_removes_entry_when_scope_fully_overlaps_entry_keys() 
     assert output_directional.update_pixels_calls[0] == []
 
 
-def test_add_effect_does_not_narrow_existing_entry_keys() -> None:
+def test_add_effect_does_not_stop_effects_already_running_in_scope() -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
@@ -440,15 +442,6 @@ def test_add_effect_does_not_narrow_existing_entry_keys() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_add_effect_returns_a_receipt() -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
-
-    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
-
-    assert receipt is not None
-
-
 def test_two_add_effect_calls_return_different_receipts() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
@@ -458,15 +451,6 @@ def test_two_add_effect_calls_return_different_receipts() -> None:
 
     assert receipt_a is not receipt_b
     assert receipt_a.id != receipt_b.id
-
-
-def test_set_effect_returns_a_receipt() -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
-
-    receipt = manager.set_effect(Scope.PERSONAL, "fire", 5, {})
-
-    assert receipt is not None
 
 
 # ---------------------------------------------------------------------------
@@ -647,7 +631,7 @@ def test_stop_effect_by_receipt_fires_stop_event() -> None:
     assert output.handle_event_calls == [("fire.stop", receipt)]
 
 
-def test_stop_effect_by_receipt_routes_stop_by_current_entry_keys() -> None:
+def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect() -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
