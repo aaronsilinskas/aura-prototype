@@ -10,7 +10,6 @@ class CastType:
 
 
 class Caster:
-
     def cast_spell(self, spell: Spell, cast_type: str) -> None:
         """Casts a spell."""
         raise NotImplementedError("cast_spell must be implemented by subclasses.")

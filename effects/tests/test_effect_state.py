@@ -92,9 +92,7 @@ def test_step_data_is_unaffected_by_shared_data_writes() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_step_data_set_by_one_step_is_not_visible_to_a_different_step_instance() -> (
-    None
-):
+def test_step_data_set_by_one_step_is_not_visible_to_a_different_step_instance() -> None:
     step_a = EffectStep.__new__(EffectStep)
     step_b = EffectStep.__new__(EffectStep)
     state = EffectState()

@@ -25,6 +25,7 @@ except ImportError:
 
 MODULE_DIRS: "Final" = ["effects", "engine", "magic", "rules"]
 _EXCLUDE_DIRS: "Final" = {"__pycache__", "tests"}
+_EXCLUDE_NAMES: "Final" = {"conftest.py"}
 _EXCLUDE_SUFFIXES: "Final" = {".pyc", ".mpy"}
 _DEFAULT_MOUNT: "Final" = "/Volumes/CIRCUITPY"
 
@@ -34,7 +35,27 @@ def _is_excluded(rel: Path) -> bool:
     for part in rel.parts:
         if part in _EXCLUDE_DIRS:
             return True
+    if rel.name in _EXCLUDE_NAMES:
+        return True
     return rel.suffix in _EXCLUDE_SUFFIXES
+
+
+def _collect_stale_files(src_dir: Path, dest_dir: Path) -> list[Path]:
+    """Return .py files in dest_dir that have no counterpart in src_dir.
+
+    Returns an empty list if dest_dir does not exist.
+    Excluded paths (e.g. tests/, __pycache__/) are not considered stale.
+    """
+    if not dest_dir.is_dir():
+        return []
+    stale = []
+    for dest_file in sorted(dest_dir.rglob("*.py")):
+        rel = dest_file.relative_to(dest_dir)
+        if _is_excluded(rel):
+            continue
+        if not (src_dir / rel).exists():
+            stale.append(dest_file)
+    return stale
 
 
 def _should_skip(src: Path, dest: Path) -> bool:
@@ -109,25 +130,48 @@ def deploy(
 
     copied: list[Path] = []
     skipped: list[Path] = []
+    pruned: list[Path] = []
 
     if example_file is not None:
         _sync_file(example_file, mount / "code.py", "code.py", copied, skipped, dry_run)
 
     for module in MODULE_DIRS:
         src_dir = source_root / module
-        if not src_dir.is_dir():
-            continue
         dest_dir = mount / module
-        for src_file in sorted(src_dir.rglob("*")):
-            if src_file.is_dir():
-                continue
-            rel = src_file.relative_to(src_dir)
-            if _is_excluded(rel):
-                continue
-            label = f"{module}/{rel}"
-            _sync_file(src_file, dest_dir / rel, label, copied, skipped, dry_run)
 
-    print(f"Done. {len(copied)} copied, {len(skipped)} skipped.")
+        if src_dir.is_dir():
+            for src_file in sorted(src_dir.rglob("*")):
+                if src_file.is_dir():
+                    continue
+                rel = src_file.relative_to(src_dir)
+                if _is_excluded(rel):
+                    continue
+                label = f"{module}/{rel}"
+                _sync_file(src_file, dest_dir / rel, label, copied, skipped, dry_run)
+
+        for stale_file in _collect_stale_files(src_dir, dest_dir):
+            label = f"{module}/{stale_file.relative_to(dest_dir)}"
+            if dry_run:
+                pruned.append(stale_file)
+                print(f"[DRY RUN] PRUNE  {label}")
+            else:
+                stale_file.unlink()
+                pruned.append(stale_file)
+                print(f"PRUNE  {label}")
+
+        if not dry_run and dest_dir.is_dir():
+            for d in sorted(dest_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+                if d.is_dir():
+                    try:
+                        d.rmdir()
+                    except OSError:
+                        pass
+            try:
+                dest_dir.rmdir()
+            except OSError:
+                pass
+
+    print(f"Done. {len(copied)} copied, {len(skipped)} skipped, {len(pruned)} pruned.")
     return 0
 
 

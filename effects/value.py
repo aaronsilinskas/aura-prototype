@@ -40,6 +40,7 @@ class ValueGenerator:
     A ``DynamicValue`` is either a plain ``float`` or a zero-argument callable
     returning a ``float``. Use ``resolve`` to evaluate either form uniformly.
     """
+
     @staticmethod
     def resolve(value: DynamicValue) -> float:
         """Return ``value`` directly, or call it if callable."""

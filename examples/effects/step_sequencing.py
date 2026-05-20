@@ -80,21 +80,20 @@ def main() -> None:
     # padded() adds dead-zones so the glow hovers in the center of the strip.
     shape = Shape.padded(0.25, Shape.centered_gradient())
 
-    effect = Effect("spell_strike", shape).add_steps([
-        # Phase 1: blank output for a random 0.5–2.0s pause.
-        hide(duration=VG.random(0.5, 2.0)),
-
-        # Phase 2: trigger the strike callback with no visual delay.
-        call(on_strike),
-
-        # Phase 3: flash from dark to full brightness over 0.15 seconds.
-        # multiplier() interpolates from start to end using timer.progress,
-        # so it must be wrapped in a duration() that supplies timed progress.
-        duration(0.15, steps=[multiplier(0.0, 1.0)]),
-
-        # Phase 4: fade back to dark over 0.6 seconds.
-        duration(0.60, steps=[multiplier(1.0, 0.0)]),
-    ])
+    effect = Effect("spell_strike", shape).add_steps(
+        [
+            # Phase 1: blank output for a random 0.5–2.0s pause.
+            hide(duration=VG.random(0.5, 2.0)),
+            # Phase 2: trigger the strike callback with no visual delay.
+            call(on_strike),
+            # Phase 3: flash from dark to full brightness over 0.15 seconds.
+            # multiplier() interpolates from start to end using timer.progress,
+            # so it must be wrapped in a duration() that supplies timed progress.
+            duration(0.15, steps=[multiplier(0.0, 1.0)]),
+            # Phase 4: fade back to dark over 0.6 seconds.
+            duration(0.60, steps=[multiplier(1.0, 0.0)]),
+        ]
+    )
 
     renderer = EffectRenderer(effect, PaletteLUT256(STRIKE_PALETTE))
     state = EffectState()

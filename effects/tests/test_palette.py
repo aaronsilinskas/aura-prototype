@@ -96,9 +96,7 @@ def test_lut_raises_when_stops_length_is_not_a_multiple_of_four() -> None:
         PaletteLUT256(bytes([0, 255, 0]))
 
 
-def test_lut_auto_anchors_start_with_black_when_first_stop_is_not_at_index_zero() -> (
-    None
-):
+def test_lut_auto_anchors_start_with_black_when_first_stop_is_not_at_index_zero() -> None:
     # Stops begin at index 128 (red); index 0 should be auto-filled with black.
     palette = PaletteLUT256(bytes([128, 255, 0, 0, 255, 0, 255, 0]))
 
