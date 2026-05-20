@@ -71,10 +71,10 @@ def test_set_effect_delivers_one_frame_to_matching_output() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
 
-    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    receipt = manager.set_effect(Scope.PERSONAL, "fire", 5, {})
     manager.update(_make_timer())
 
-    assert output.update_pixels_calls == [[output.created_buffers[0]]]
+    assert output.update_pixels_calls == [[(output.created_buffers[0], receipt)]]
 
 
 def test_set_effect_nonmatching_output_receives_go_dark() -> None:
@@ -119,10 +119,10 @@ def test_set_effect_twice_replaces_effect() -> None:
     manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "fire", 5, {})
-    manager.set_effect(Scope.PERSONAL, "ice", 5, {})
+    receipt_ice = manager.set_effect(Scope.PERSONAL, "ice", 5, {})
     manager.update(_make_timer())
 
-    assert output.update_pixels_calls == [[output.created_buffers[1]]]
+    assert output.update_pixels_calls == [[(output.created_buffers[1], receipt_ice)]]
 
 
 def test_set_effect_twice_first_renderer_not_advanced() -> None:
@@ -175,10 +175,13 @@ def test_effect_event_reaches_matching_scope_output() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = EffectManager(builder=_EventFiringEffectBuilder("lightning_strike"), outputs=[output])
 
-    manager.set_effect(Scope.PERSONAL, "shock", 5, {})
+    receipt = manager.set_effect(Scope.PERSONAL, "shock", 5, {})
     manager.update(_make_timer())
 
-    assert output.handle_event_calls == ["lightning_strike"]
+    assert output.handle_event_calls == [
+        ("shock.start", receipt),
+        ("lightning_strike", receipt),
+    ]
 
 
 def test_effect_event_does_not_reach_out_of_scope_output() -> None:
@@ -219,7 +222,7 @@ def test_resolution_equals_max_min_resolution_of_matching_outputs() -> None:
     assert builder.last_config.resolution == 64
 
 
-def test_resolution_falls_back_to_16_when_no_outputs_match() -> None:
+def test_resolution_falls_back_to_default_when_no_outputs_match() -> None:
     builder = _CapturingEffectBuilder()
     manager = EffectManager(builder=builder, outputs=[])
 
@@ -305,11 +308,13 @@ def test_stop_effect_does_not_affect_other_scopes() -> None:
     )
 
     manager.set_effect(Scope.PERSONAL, "fire", 5, {})
-    manager.set_effect(Scope.DIRECTIONAL, "ice", 5, {})
+    receipt_ice = manager.set_effect(Scope.DIRECTIONAL, "ice", 5, {})
     manager.stop_effect(Scope.PERSONAL)
     manager.update(_make_timer())
 
-    assert output_directional.update_pixels_calls == [[output_directional.created_buffers[0]]]
+    assert output_directional.update_pixels_calls == [
+        [(output_directional.created_buffers[0], receipt_ice)]
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -340,8 +345,8 @@ def test_each_output_receives_own_buffer_for_composite_scope() -> None:
 
     assert len(output_personal.update_pixels_calls[0]) == 1
     assert len(output_directional.update_pixels_calls[0]) == 1
-    personal_buf = output_personal.update_pixels_calls[0][0]
-    directional_buf = output_directional.update_pixels_calls[0][0]
+    personal_buf, _ = output_personal.update_pixels_calls[0][0]
+    directional_buf, _ = output_directional.update_pixels_calls[0][0]
     assert personal_buf is not directional_buf
 
 
@@ -366,7 +371,7 @@ def test_stop_effect_all_sends_go_dark_to_every_output() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_set_effect_replaces_partial_scope_while_preserving_remaining_keys() -> None:
+def test_set_effect_on_partial_scope_leaves_other_scope_effects_running() -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     output_global = SpyEffectOutput(min_resolution=10, scopes=[Scope.Global.MAIN])
@@ -400,7 +405,7 @@ def test_stop_effect_on_partial_scope_continues_rendering_on_remaining_scope() -
     assert len(output_directional.update_pixels_calls[0]) == 1
 
 
-def test_stop_effect_fully_removes_entry_when_scope_fully_overlaps_entry_keys() -> None:
+def test_stop_effect_with_broader_scope_removes_narrower_effect_completely() -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
@@ -416,7 +421,7 @@ def test_stop_effect_fully_removes_entry_when_scope_fully_overlaps_entry_keys() 
     assert output_directional.update_pixels_calls[0] == []
 
 
-def test_add_effect_does_not_narrow_existing_entry_keys() -> None:
+def test_add_effect_does_not_stop_effects_already_running_in_scope() -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
@@ -437,15 +442,6 @@ def test_add_effect_does_not_narrow_existing_entry_keys() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_add_effect_returns_a_receipt() -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
-
-    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
-
-    assert receipt is not None
-
-
 def test_two_add_effect_calls_return_different_receipts() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
@@ -455,15 +451,6 @@ def test_two_add_effect_calls_return_different_receipts() -> None:
 
     assert receipt_a is not receipt_b
     assert receipt_a.id != receipt_b.id
-
-
-def test_set_effect_returns_a_receipt() -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
-
-    receipt = manager.set_effect(Scope.PERSONAL, "fire", 5, {})
-
-    assert receipt is not None
 
 
 # ---------------------------------------------------------------------------
@@ -504,3 +491,161 @@ def test_stop_effect_by_receipt_with_stale_receipt_is_silent_noop() -> None:
     manager.update(_make_timer())
 
     assert output.update_pixels_calls[0] == []
+
+
+# ---------------------------------------------------------------------------
+# lifecycle events — start/stop (#58)
+# ---------------------------------------------------------------------------
+
+
+def test_add_effect_fires_start_event_to_matching_output() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+
+    assert output.handle_event_calls == [("fire.start", receipt)]
+
+
+def test_add_effect_start_event_not_delivered_to_out_of_scope_output() -> None:
+    output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output_a, output_b])
+
+    manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+
+    assert output_b.handle_event_calls == []
+
+
+def test_add_effect_does_not_fire_stop_for_existing_effects() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    output.handle_event_calls.clear()
+
+    ice_receipt = manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+
+    assert output.handle_event_calls == [("ice.start", ice_receipt)]
+
+
+def test_add_effect_fires_start_event_unconditionally_for_duplicate_name() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    receipt_a = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    receipt_b = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+
+    assert output.handle_event_calls == [("fire.start", receipt_a), ("fire.start", receipt_b)]
+
+
+def test_stop_effect_fires_stop_event_to_matching_output() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    output.handle_event_calls.clear()
+
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert output.handle_event_calls == [("fire.stop", receipt)]
+
+
+def test_stop_effect_fires_stop_for_each_effect_in_scope() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    fire_receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    ice_receipt = manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    output.handle_event_calls.clear()
+
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert output.handle_event_calls == [
+        ("fire.stop", fire_receipt),
+        ("ice.stop", ice_receipt),
+    ]
+
+
+def test_set_effect_fires_stop_then_start_when_replacing_effect() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    fire_receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    output.handle_event_calls.clear()
+
+    ice_receipt = manager.set_effect(Scope.PERSONAL, "ice", 5, {})
+
+    assert output.handle_event_calls == [
+        ("fire.stop", fire_receipt),
+        ("ice.start", ice_receipt),
+    ]
+
+
+def test_set_effect_fires_stop_only_to_outputs_in_call_time_scope() -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+    )
+
+    fire_receipt = manager.add_effect(Scope.ALL, "fire", 5, {})
+    output_personal.handle_event_calls.clear()
+    output_directional.handle_event_calls.clear()
+
+    ice_receipt = manager.set_effect(Scope.PERSONAL, "ice", 5, {})
+
+    assert output_personal.handle_event_calls == [
+        ("fire.stop", fire_receipt),
+        ("ice.start", ice_receipt),
+    ]
+    assert output_directional.handle_event_calls == []
+
+
+def test_stop_effect_with_broader_scope_fires_stop_to_all_matching_outputs() -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+    )
+
+    fire_receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    output_personal.handle_event_calls.clear()
+    output_directional.handle_event_calls.clear()
+
+    manager.stop_effect(Scope.ALL)
+
+    assert output_personal.handle_event_calls == [("fire.stop", fire_receipt)]
+    assert output_directional.handle_event_calls == [("fire.stop", fire_receipt)]
+
+
+def test_stop_effect_by_receipt_fires_stop_event() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+
+    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    output.handle_event_calls.clear()
+
+    manager.stop_effect_by_receipt(receipt)
+
+    assert output.handle_event_calls == [("fire.stop", receipt)]
+
+
+def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect() -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+    )
+
+    fire_receipt = manager.add_effect(Scope.ALL, "fire", 5, {})
+    # set_effect(PERSONAL) narrows fire to DIRECTIONAL and fires fire.stop to PERSONAL
+    manager.set_effect(Scope.PERSONAL, "ice", 5, {})
+    output_personal.handle_event_calls.clear()
+    output_directional.handle_event_calls.clear()
+
+    # fire is now only on DIRECTIONAL — stop_effect_by_receipt should only notify DIRECTIONAL
+    manager.stop_effect_by_receipt(fire_receipt)
+
+    assert output_personal.handle_event_calls == []
+    assert output_directional.handle_event_calls == [("fire.stop", fire_receipt)]

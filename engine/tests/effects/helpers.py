@@ -1,7 +1,7 @@
 from effects.effect import Effect
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
-from engine.effects.manager import EffectBuilder, EffectOutput
+from engine.effects.manager import EffectBuilder, EffectOutput, EffectReceipt
 
 
 class SpyEffectOutput(EffectOutput):
@@ -14,15 +14,15 @@ class SpyEffectOutput(EffectOutput):
         self.created_buffers: list = []
         self.handle_event_calls: list = []
 
-    def handle_event(self, event_name: str) -> None:
-        self.handle_event_calls.append(event_name)
+    def handle_event(self, event_name: str, receipt: EffectReceipt) -> None:
+        self.handle_event_calls.append((event_name, receipt))
 
     def create_buffer(self) -> PixelBuffer:
         buf = PixelBuffer(self.min_resolution)
         self.created_buffers.append(buf)
         return buf
 
-    def update_pixels(self, frames: list) -> None:
+    def update_pixels(self, frames: list[tuple[PixelBuffer, EffectReceipt]]) -> None:
         self.update_pixels_calls.append(list(frames))
 
 

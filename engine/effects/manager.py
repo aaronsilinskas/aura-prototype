@@ -3,6 +3,8 @@ from effects.render import EffectRenderer, PixelBuffer, RendererConfig
 from engine.effects.scope import ScopeValue
 from engine.timer import Timer
 
+_DEFAULT_RESOLUTION = 16
+
 
 class EffectOutput:
     """Interface for sending rendered pixels and events to hardware outputs.
@@ -13,21 +15,21 @@ class EffectOutput:
     """
 
     min_resolution: int
-    scopes: "list[ScopeValue]"
+    scopes: list[ScopeValue]
 
     def create_buffer(self) -> PixelBuffer:
         """Create a PixelBuffer sized to this output's hardware pixel count."""
         raise NotImplementedError
 
-    def update_pixels(self, frames: list[PixelBuffer]) -> None:
-        """Receive rendered frames (list of PixelBuffer) for this output.
+    def update_pixels(self, frames: "list[tuple[PixelBuffer, EffectReceipt]]") -> None:
+        """Receive rendered frames for this output.
 
-        Called every update tick. Receives an empty list when no effects are active
-        (signal to go dark).
+        Called every update tick. Each element is a (PixelBuffer, EffectReceipt) tuple.
+        Receives an empty list when no effects are active (signal to go dark).
         """
         pass
 
-    def handle_event(self, event_name: str) -> None:
+    def handle_event(self, event_name: str, receipt: "EffectReceipt") -> None:
         """Handle an event triggered by an effect renderer."""
         pass
 
@@ -59,8 +61,8 @@ class EffectReceipt:
 
     __slots__ = ("id",)
 
-    def __init__(self, id: int) -> None:
-        self.id: int = id
+    def __init__(self, effect_id: int) -> None:
+        self.id: int = effect_id
 
     def __repr__(self) -> str:
         return f"EffectReceipt(id={self.id})"
@@ -76,17 +78,21 @@ class EffectControls:
     def set_effect(
         self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
     ) -> "EffectReceipt":
+        """Stop any effect(s) currently running in scope, then start name."""
         raise NotImplementedError
 
     def add_effect(
         self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
     ) -> "EffectReceipt":
+        """Start name in scope without stopping existing effects."""
         raise NotImplementedError
 
     def stop_effect(self, scope: ScopeValue) -> None:
+        """Stop all effects whose keys overlap scope."""
         raise NotImplementedError
 
     def stop_effect_by_receipt(self, receipt: "EffectReceipt") -> None:
+        """Stop exactly the effect identified by receipt."""
         raise NotImplementedError
 
 
@@ -135,30 +141,37 @@ class EffectManager(EffectControls):
         self._output_key_sets: list[frozenset[str]] = [
             frozenset(k for s in o.scopes for k in s.keys) for o in outputs
         ]
-        self._frames: list[list[PixelBuffer]] = [[] for _ in outputs]
+        self._frames: list[list[tuple[PixelBuffer, EffectReceipt]]] = [[] for _ in outputs]
 
-    def _notify_listeners(self, event_name: str, scope: ScopeValue) -> None:
+    def _notify_listeners(
+        self, event_name: str, scope_keys: set[str], receipt: "EffectReceipt"
+    ) -> None:
         """Notify listeners registered for the given scope."""
-        scope_keys = set(scope.keys)
         for output in self._outputs:
             for s in output.scopes:
                 if any(k in scope_keys for k in s.keys):
-                    output.handle_event(event_name)
+                    output.handle_event(event_name, receipt)
                     break
 
     def _build_effect(
-        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
+        self,
+        scope: ScopeValue,
+        scope_key_set: set[str],
+        name: str,
+        level: int,
+        options: dict[str, object],
     ) -> "EffectManager._EffectEntry":
         """Construct an EffectRenderer paired with a fresh EffectState."""
+        receipt = EffectReceipt(self._next_id)
+        self._next_id += 1
 
         def scoped_listener(event_name: str) -> None:
-            self._notify_listeners(event_name, scope)
+            self._notify_listeners(event_name, scope_key_set, receipt)
 
-        scope_keys = set(scope.keys)
-        resolution = 16
+        resolution = _DEFAULT_RESOLUTION
         output_buffers = []
         for i, output in enumerate(self._outputs):
-            if any(k in self._output_key_sets[i] for k in scope_keys):
+            if any(k in self._output_key_sets[i] for k in scope_key_set):
                 if output.min_resolution > resolution:
                     resolution = output.min_resolution
                 output_buffers.append(output.create_buffer())
@@ -168,17 +181,20 @@ class EffectManager(EffectControls):
             level=level, resolution=resolution, options=options, listeners=[scoped_listener]
         )
         renderer = self._builder(name, config)
-        receipt = EffectReceipt(self._next_id)
-        self._next_id += 1
         return EffectManager._EffectEntry(
             scope.keys, name, receipt, output_buffers, renderer, EffectState()
         )
 
     def _append_new_effect(
-        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
+        self,
+        scope: ScopeValue,
+        scope_key_set: set[str],
+        name: str,
+        level: int,
+        options: dict[str, object],
     ) -> EffectReceipt:
         """Build, append, and return the receipt for a new effect entry."""
-        entry = self._build_effect(scope, name, level, options)
+        entry = self._build_effect(scope, scope_key_set, name, level, options)
         self._effects.append(entry)
         return entry.receipt
 
@@ -191,20 +207,28 @@ class EffectManager(EffectControls):
             ):
                 entry.output_buffers[i] = None
 
-    def set_effect(
-        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
-    ) -> EffectReceipt:
-        """Replace any running effect(s) in scope and start this one."""
-        scope_key_set = set(scope.keys)
+    def _remove_effects_in_scope(self, scope_key_set: set[str]) -> None:
+        """Remove or narrow entries that overlap scope_key_set, firing stop events."""
         new_effects = []
         for entry in self._effects:
             remaining = tuple(k for k in entry.keys if k not in scope_key_set)
+            if len(remaining) < len(entry.keys):
+                self._notify_listeners(f"{entry.name}.stop", scope_key_set, entry.receipt)
             if remaining:
                 entry.keys = remaining
                 self._update_output_buffers(entry)
                 new_effects.append(entry)
         self._effects = new_effects
-        return self._append_new_effect(scope, name, level, options)
+
+    def set_effect(
+        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
+    ) -> EffectReceipt:
+        """Replace any running effect(s) in scope and start this one."""
+        scope_key_set = set(scope.keys)
+        self._remove_effects_in_scope(scope_key_set)
+        receipt = self._append_new_effect(scope, scope_key_set, name, level, options)
+        self._notify_listeners(f"{name}.start", scope_key_set, receipt)
+        return receipt
 
     def add_effect(
         self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
@@ -214,23 +238,24 @@ class EffectManager(EffectControls):
         If nothing is running in scope, behaves like set_effect.
         The driver determines how layered effects are composited (e.g. splitting an LED strip).
         """
-        return self._append_new_effect(scope, name, level, options)
+        scope_key_set = set(scope.keys)
+        receipt = self._append_new_effect(scope, scope_key_set, name, level, options)
+        self._notify_listeners(f"{name}.start", scope_key_set, receipt)
+        return receipt
 
     def stop_effect_by_receipt(self, receipt: EffectReceipt) -> None:
         """Stop the single effect identified by receipt; silent no-op if not found."""
-        self._effects = [e for e in self._effects if e.receipt is not receipt]
+        new_effects = []
+        for entry in self._effects:
+            if entry.receipt is receipt:
+                self._notify_listeners(f"{entry.name}.stop", set(entry.keys), entry.receipt)
+            else:
+                new_effects.append(entry)
+        self._effects = new_effects
 
     def stop_effect(self, scope: ScopeValue) -> None:
         """Stop all running effects in scope."""
-        scope_key_set = set(scope.keys)
-        new_effects = []
-        for entry in self._effects:
-            remaining = tuple(k for k in entry.keys if k not in scope_key_set)
-            if remaining:
-                entry.keys = remaining
-                self._update_output_buffers(entry)
-                new_effects.append(entry)
-        self._effects = new_effects
+        self._remove_effects_in_scope(set(scope.keys))
 
     def update(self, timer: Timer) -> None:
         """Tick all active effects and deliver frames to every registered output."""
@@ -250,7 +275,7 @@ class EffectManager(EffectControls):
                 buf = entry.output_buffers[i]
                 if buf is not None:
                     entry.renderer.render(entry.state, buf)
-                    frames.append(buf)
+                    frames.append((buf, entry.receipt))
             output.update_pixels(frames)
 
     def __repr__(self) -> str:
