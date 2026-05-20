@@ -14,15 +14,26 @@ class Version:
 
 
 class GameRule:
-    __slots__ = ("name", "version")
+    __slots__ = ("_event_handlers", "name", "version")
 
     def __init__(self, name: str, version: Version) -> None:
         self.name = name
         self.version = version
+        self._event_handlers: dict = {}
+
+    def on(self, event_type: type, handler) -> None:
+        """Register a handler for a specific event type.
+
+        The handler is called as ``handler(event, state)`` when an event of
+        exactly ``event_type`` is dispatched to this rule.  Registering a
+        second handler for the same type replaces the first.
+        """
+        self._event_handlers[event_type] = handler
 
     def handle_event(self, event: Event, state: GameState) -> None:
-        # Process the event with game rules, update game state, and generate new events as needed
-        pass
+        handler = self._event_handlers.get(type(event))
+        if handler is not None:
+            handler(event, state)
 
 
 class GameState:
