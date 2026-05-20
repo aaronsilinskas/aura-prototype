@@ -326,3 +326,196 @@ def test_dry_run_output_shows_dry_run_prefix_for_copies(tmp_path: Path, capsys) 
 
     captured = capsys.readouterr()
     assert "[DRY RUN] COPY" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# Pruning stale files (#72)
+# ---------------------------------------------------------------------------
+
+
+def test_stale_py_file_is_deleted_from_mount(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "effects").mkdir()
+    stale = mount / "effects" / "old_module.py"
+    stale.write_text("# stale")
+
+    deploy(None, mount, source_root=source)
+
+    assert not stale.exists()
+
+
+def test_live_py_file_is_not_deleted_from_mount(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source)
+
+    assert (mount / "effects" / "render.py").exists()
+
+
+def test_code_py_is_never_deleted_from_mount(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    code_py = mount / "code.py"
+    code_py.write_text("# running example")
+
+    deploy(None, mount, source_root=source)
+
+    assert code_py.exists()
+
+
+def test_files_outside_module_dirs_are_not_deleted(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    lib = mount / "lib"
+    lib.mkdir()
+    lib_file = lib / "neopixel.py"
+    lib_file.write_text("# neopixel")
+    settings = mount / "settings.toml"
+    settings.write_text("[wifi]")
+
+    deploy(None, mount, source_root=source)
+
+    assert lib_file.exists()
+    assert settings.exists()
+
+
+def test_excluded_path_files_on_mount_are_not_pruned(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "effects" / "tests").mkdir(parents=True)
+    legacy_test = mount / "effects" / "tests" / "old_test.py"
+    legacy_test.write_text("# legacy test")
+
+    deploy(None, mount, source_root=source)
+
+    assert legacy_test.exists()
+
+
+def test_empty_subdirectory_is_removed_after_pruning(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "effects" / "steps").mkdir(parents=True)
+    stale = mount / "effects" / "steps" / "old_step.py"
+    stale.write_text("# stale step")
+
+    deploy(None, mount, source_root=source)
+
+    assert not stale.exists()
+    assert not (mount / "effects" / "steps").exists()
+
+
+def test_module_root_removed_when_fully_pruned(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    # Only create source dirs that don't include 'effects'
+    (source / "engine").mkdir()
+    (source / "engine" / "timer.py").write_text("# timer")
+    (source / "magic").mkdir()
+    (source / "magic" / "aura.py").write_text("# aura")
+    (source / "rules").mkdir()
+    (source / "rules" / "__init__.py").write_text("")
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "effects").mkdir()
+    stale = mount / "effects" / "render.py"
+    stale.write_text("# stale render")
+
+    deploy(None, mount, source_root=source)
+
+    assert not stale.exists()
+    assert not (mount / "effects").exists()
+
+
+def test_non_empty_directory_is_not_removed(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "effects" / "steps").mkdir(parents=True)
+    stale = mount / "effects" / "steps" / "old_step.py"
+    stale.write_text("# stale")
+
+    deploy(None, mount, source_root=source)
+
+    # effects/ still has live files (render.py was synced), so it must remain
+    assert (mount / "effects").exists()
+
+
+def test_first_time_deploy_with_no_module_dirs_on_mount(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    # mount has no module dirs at all
+
+    result = deploy(None, mount, source_root=source)
+
+    assert result == 0
+
+
+def test_dry_run_does_not_delete_stale_files(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "effects").mkdir()
+    stale = mount / "effects" / "old_module.py"
+    stale.write_text("# stale")
+
+    deploy(None, mount, source_root=source, dry_run=True)
+
+    assert stale.exists()
+
+
+def test_dry_run_prune_output_shows_dry_run_prefix(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "effects").mkdir()
+    (mount / "effects" / "old_module.py").write_text("# stale")
+
+    deploy(None, mount, source_root=source, dry_run=True)
+
+    captured = capsys.readouterr()
+    assert "[DRY RUN] PRUNE" in captured.out
+
+
+def test_summary_includes_pruned_count(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "effects").mkdir()
+    (mount / "effects" / "old_a.py").write_text("# stale")
+    (mount / "effects" / "old_b.py").write_text("# stale")
+
+    deploy(None, mount, source_root=source)
+
+    captured = capsys.readouterr()
+    assert "2 pruned" in captured.out

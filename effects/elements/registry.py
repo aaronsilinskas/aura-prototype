@@ -46,10 +46,7 @@ def get_element_builder(element_name: str) -> ElementBuilder:
         return builder
 
     raise ValueError(
-        "Unknown element '"
-        + element_name
-        + "'. Available: "
-        + ", ".join(ELEMENT_BUILDERS.keys())
+        "Unknown element '" + element_name + "'. Available: " + ", ".join(ELEMENT_BUILDERS.keys())
     )
 
 

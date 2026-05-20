@@ -49,9 +49,7 @@ class VelocitySharedData:
 
     @staticmethod
     def get(state: EffectState) -> VelocitySharedData:
-        data = state.get_shared_data(
-            VelocitySharedData._VELOCITY_SHARED_KEY, VelocitySharedData
-        )
+        data = state.get_shared_data(VelocitySharedData._VELOCITY_SHARED_KEY, VelocitySharedData)
         if data is None:
             data = VelocitySharedData()
             state.set_shared_data(VelocitySharedData._VELOCITY_SHARED_KEY, data)
