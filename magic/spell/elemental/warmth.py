@@ -20,5 +20,5 @@ class WarmthSpell(Spell):
 
         return True  # Remove immediately after application
 
-    def _update_level(self, level: int) -> None:
+    def on_level_changed(self, level: int) -> None:
         pass  # No scaling for instant removal spell

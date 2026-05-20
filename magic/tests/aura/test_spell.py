@@ -39,6 +39,9 @@ class LifecycleTrackingSpell(Spell):
         super().stop(aura)
         self.stopped = True
 
+    def on_level_changed(self, level: int) -> None:
+        pass
+
 
 def test_add_spell_calls_start(fixture: AuraFixture) -> None:
     aura = fixture.aura

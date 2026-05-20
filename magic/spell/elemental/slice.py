@@ -18,5 +18,5 @@ class SliceSpell(Spell):
 
         return True  # Remove after one application
 
-    def _update_level(self, level: int) -> None:
+    def on_level_changed(self, level: int) -> None:
         self.damage = Spell.LEVEL_SCALER.scale_value(self._base_damage, level)

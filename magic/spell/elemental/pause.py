@@ -81,6 +81,6 @@ class PauseSpell(Spell):
             # Cancel all non-pause spell casts while paused
             event.is_canceled = True
 
-    def _update_level(self, level: int) -> None:
+    def on_level_changed(self, level: int) -> None:
         new_length = Spell.LEVEL_SCALER.scale_value(self._base_duration, level)
         self.duration.length = new_length

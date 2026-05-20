@@ -59,5 +59,5 @@ class IceShieldSpell(Spell):
             self._freeze_spell, cast_type=CastType.AREA_OF_EFFECT
         )  # Cast type can be arbitrary here
 
-    def _update_level(self, level: int) -> None:
+    def on_level_changed(self, level: int) -> None:
         self.reduction = Spell.LEVEL_SCALER.scale_percentage(self._base_reduction, level)

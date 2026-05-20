@@ -21,5 +21,5 @@ class IgniteSpell(Spell):
 
         return self.duration.update(elapsed_time)
 
-    def _update_level(self, level: int) -> None:
+    def on_level_changed(self, level: int) -> None:
         self.damage_per_second = Spell.LEVEL_SCALER.scale_value(self._base_damage_per_second, level)

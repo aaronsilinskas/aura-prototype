@@ -68,7 +68,7 @@ class Spell:
         """Modify an incoming event if needed, will only be called for active spells."""
         pass
 
-    def _update_level(self, level: int) -> None:
+    def on_level_changed(self, level: int) -> None:
         """Called when the spell's level is changed, allowing for adjustments based on level."""
         raise NotImplementedError()
 
@@ -85,7 +85,7 @@ class Spell:
     def level(self, value: int) -> None:
         """Sets the level of the spell, affecting its potency."""
         self._level = max(1, value)
-        self._update_level(self._level)
+        self.on_level_changed(self._level)
 
 
 class SpellTags:

@@ -27,7 +27,7 @@ class HasteSpell(Spell):
     def stop(self, aura: Aura) -> None:
         aura.cast_delay.modifiers.remove(self._modifier)
 
-    def _update_level(self, level: int) -> None:
+    def on_level_changed(self, level: int) -> None:
         self.cast_delay_percentage = Spell.LEVEL_SCALER.scale_value(
             self._base_cast_delay_percentage, level
         )

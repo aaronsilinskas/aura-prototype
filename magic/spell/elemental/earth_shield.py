@@ -30,5 +30,5 @@ class EarthShieldSpell(Spell):
             event.amount *= 1 - self.reduction
             self.hits.increment()
 
-    def _update_level(self, level: int) -> None:
+    def on_level_changed(self, level: int) -> None:
         self.reduction = Spell.LEVEL_SCALER.scale_percentage(self._base_reduction, level)

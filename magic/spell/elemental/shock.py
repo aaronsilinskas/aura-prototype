@@ -22,7 +22,7 @@ class ShockSpell(Spell):
         if isinstance(event, HealEvent):
             event.amount *= 1 - self.heal_reduction_percentage
 
-    def _update_level(self, level: int) -> None:
+    def on_level_changed(self, level: int) -> None:
         self.heal_reduction_percentage = Spell.LEVEL_SCALER.scale_value(
             self._base_heal_reduction_percentage, level
         )

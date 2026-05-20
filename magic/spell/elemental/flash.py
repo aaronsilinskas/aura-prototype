@@ -18,5 +18,5 @@ class FlashSpell(Spell):
     def update(self, aura: Aura, elapsed_time: float) -> bool:
         return self.duration.update(elapsed_time)
 
-    def _update_level(self, level: int) -> None:
+    def on_level_changed(self, level: int) -> None:
         self.duration.length = Spell.LEVEL_SCALER.scale_value(self._base_duration, level)

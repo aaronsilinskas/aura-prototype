@@ -21,7 +21,7 @@ class AbsorbSpell(Spell):
 
         return self.duration.update(elapsed_time)
 
-    def _update_level(self, level: int) -> None:
+    def on_level_changed(self, level: int) -> None:
         self._absorb_count = round(Spell.LEVEL_SCALER.scale_value(1, level))
 
     def modify_event(self, aura: Aura, event: AuraEvent) -> None:

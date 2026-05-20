@@ -23,7 +23,7 @@ class NoopSpell(Spell):
     def update(self, aura, elapsed_time: float) -> bool:
         return False
 
-    def _update_level(self, level: int) -> None:
+    def on_level_changed(self, level: int) -> None:
         pass
 
 
