@@ -62,11 +62,14 @@ class RotateStep(EffectStep):
 
     Accumulates a position offset each frame based on ``rotations_per_second``
     and writes velocity data to ``VelocitySharedData`` so that downstream steps
-    like ``AccelerateStep`` and ``FaceForwardStep`` can read the current speed.
+    like ``AccelerateStep`` can read the current speed.  Pass
+    ``face_forward=True`` to mirror the sampling position when moving in
+    reverse, keeping the effect head pointed in the direction of travel.
     """
 
-    def __init__(self, rotations_per_second: DynamicValue):
+    def __init__(self, rotations_per_second: DynamicValue, face_forward: bool = False):
         self.rotations_per_second = rotations_per_second
+        self.face_forward = face_forward
 
     def update(self, state: EffectState, timer: EffectTimer) -> bool:
         offset = state.get_step_data(self, float)
@@ -86,19 +89,24 @@ class RotateStep(EffectStep):
         return True
 
     def adjust_position(self, state: EffectState, position: float) -> float:
-        return position + (state.get_step_data(self, float) or 0.0)
+        position = position + (state.get_step_data(self, float) or 0.0)
+        if self.face_forward and VelocitySharedData.get(state).rotations_per_second < 0:
+            position = 1.0 - position
+        return position
 
 
-def rotate(rotations_per_second: DynamicValue) -> EffectStep:
+def rotate(rotations_per_second: DynamicValue, face_forward: bool = False) -> EffectStep:
     """Return a step that rotates the sampling position at ``rotations_per_second``."""
-    return RotateStep(rotations_per_second)
+    return RotateStep(rotations_per_second, face_forward)
 
 
 class AccelerateStep(EffectStep):
     """Interpolates rotational speed from a start to an end value over the step's timer duration.
 
     Reads ``VelocitySharedData`` to seed the initial speed when ``start`` is
-    ``None``, allowing a smooth hand-off from a preceding ``RotateStep`` or ``AccelerateStep``.
+    ``None``, allowing a smooth hand-off from a preceding ``RotateStep`` or
+    ``AccelerateStep``.  Pass ``face_forward=True`` to mirror the sampling
+    position when moving in reverse.
     """
 
     def __init__(
@@ -106,10 +114,12 @@ class AccelerateStep(EffectStep):
         start: DynamicValue | None = None,
         end: DynamicValue = 1.0,
         direction: DynamicValue | None = None,
+        face_forward: bool = False,
     ):
         self.start = start
         self.end = end
         self.direction = direction
+        self.face_forward = face_forward
 
     def update(self, state: EffectState, timer: EffectTimer) -> bool:
         speed_range = state.get_step_data(self, Range)
@@ -144,36 +154,17 @@ class AccelerateStep(EffectStep):
 
     def adjust_position(self, state: EffectState, position: float) -> float:
         velocity_data = VelocitySharedData.get(state)
-        return (position + velocity_data.offset) % 1.0
+        position = (position + velocity_data.offset) % 1.0
+        if self.face_forward and velocity_data.rotations_per_second < 0:
+            position = 1.0 - position
+        return position
 
 
 def accelerate(
     start: DynamicValue | None = None,
     end: DynamicValue = 1.0,
     direction: DynamicValue | None = None,
+    face_forward: bool = False,
 ) -> EffectStep:
     """Return a step that ramps rotational speed from ``start`` to ``end``."""
-    return AccelerateStep(start, end, direction)
-
-
-class FaceForwardStep(EffectStep):
-    """Flips the sampling direction so the effect always faces the direction of motion.
-
-    Reads ``VelocitySharedData`` — when ``rotations_per_second`` is negative,
-    the position is mirrored so the effect head leads rather than trails.
-    """
-
-    def update(self, state: EffectState, timer: EffectTimer) -> bool:
-        return True
-
-    def adjust_position(self, state: EffectState, position: float) -> float:
-        velocity_data = VelocitySharedData.get(state)
-        if velocity_data.rotations_per_second < 0:
-            position = 1.0 - position
-
-        return position
-
-
-def face_forward() -> EffectStep:
-    """Return a step that mirrors the sampling direction when moving in reverse."""
-    return FaceForwardStep()
+    return AccelerateStep(start, end, direction, face_forward)

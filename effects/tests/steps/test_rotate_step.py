@@ -38,3 +38,28 @@ def test_rotate_wraps_accumulated_offset_within_unit_range() -> None:
 
     # offset = 1.7 % 1.0 = 0.7
     assert value == pytest.approx(0.7)
+
+
+# rotate — face_forward
+
+
+def test_rotate_face_forward_does_not_flip_position_when_moving_forward() -> None:
+    effect = Effect("test", lambda pos: pos % 1.0).add_steps([rotate(1.0, face_forward=True)])
+    state = EffectState()
+
+    effect.update(state, make_timer(0.3))
+    value = effect.value(state, 0.2, 1)
+
+    # offset = 1.0 * 0.3 = 0.3; rps > 0 so no flip: (0.2 + 0.3) % 1.0 = 0.5
+    assert value == pytest.approx(0.5)
+
+
+def test_rotate_face_forward_mirrors_position_when_moving_in_reverse() -> None:
+    effect = Effect("test", lambda pos: pos % 1.0).add_steps([rotate(-1.0, face_forward=True)])
+    state = EffectState()
+
+    effect.update(state, make_timer(0.4))
+    value = effect.value(state, 0.1, 1)
+
+    # offset = (-1.0 * 0.4) % 1.0 = 0.6; adjusted = 0.1 + 0.6 = 0.7; mirrored: 1.0 - 0.7 = 0.3
+    assert value == pytest.approx(0.3)

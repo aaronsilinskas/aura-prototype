@@ -1,4 +1,4 @@
-"""Demonstrate accelerate() and face_forward() for direction-aware animation.
+"""Demonstrate accelerate() with face_forward=True for direction-aware animation.
 
 Two strips run the same checker shape with a velocity that ramps from forward
 (+0.5 rps) to reverse (−0.5 rps) and back in a repeating cycle:
@@ -7,7 +7,7 @@ Two strips run the same checker shape with a velocity that ramps from forward
     edge switches sides when direction reverses. The pattern looks like it
     bounces off walls.
 
-  With face_forward — FaceForwardStep mirrors the sampling position whenever
+  With face_forward=True — the sampling position is mirrored whenever
     velocity is negative, so the bright leading edge always faces the direction
     of travel. The checkers appear to accelerate, decelerate, reverse, and
     accelerate again with a consistent "front."
@@ -30,7 +30,7 @@ from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, PixelBuffer
 from effects.shape import Shape
 from effects.steps.duration import duration
-from effects.steps.position import accelerate, face_forward
+from effects.steps.position import accelerate
 
 PIXEL_COUNT = 36
 FPS = 60
@@ -69,7 +69,7 @@ def build_effect(with_face_forward: bool) -> Effect:
             3.0,
             persist_steps=False,
             steps=[
-                accelerate(start=0.5, end=-0.5),
+                accelerate(start=0.5, end=-0.5, face_forward=with_face_forward),
             ],
         ),
         # Phase B: ramp back from −0.5 rps up to +0.5 rps over 3 seconds.
@@ -77,17 +77,10 @@ def build_effect(with_face_forward: bool) -> Effect:
             3.0,
             persist_steps=False,
             steps=[
-                accelerate(start=-0.5, end=0.5),
+                accelerate(start=-0.5, end=0.5, face_forward=with_face_forward),
             ],
         ),
     ]
-
-    if with_face_forward:
-        # face_forward() must come after the velocity-writing step (accelerate)
-        # so VelocitySharedData has been updated before the position mirror runs.
-        # It is added outside duration() so it applies every frame regardless
-        # of which phase is active.
-        steps.append(face_forward())
 
     return Effect("direction_aware", shape).add_steps(steps)
 

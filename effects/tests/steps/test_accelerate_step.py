@@ -65,3 +65,38 @@ def test_accelerate_seeds_start_speed_from_existing_velocity_when_not_set() -> N
     value = effect.value(state, 0.0, 1)
 
     assert value == pytest.approx(0.5)
+
+
+# accelerate — face_forward
+
+
+def test_accelerate_face_forward_does_not_flip_position_when_moving_forward() -> None:
+    effect = Effect("test", lambda pos: pos % 1.0).add_steps(
+        [accelerate(start=0.0, end=1.0, face_forward=True)]
+    )
+    state = EffectState()
+    timer = EffectTimer(duration=1.0)
+    timer.update(0.5)
+
+    effect.update(state, timer)
+    value = effect.value(state, 0.1, 1)
+
+    # speed = lerp(0, 1, 0.5) = 0.5; offset = 0.5 * 0.5 = 0.25
+    # rps = 0.5 > 0, no flip: (0.1 + 0.25) % 1.0 = 0.35
+    assert value == pytest.approx(0.35)
+
+
+def test_accelerate_face_forward_mirrors_position_when_moving_in_reverse() -> None:
+    effect = Effect("test", lambda pos: pos % 1.0).add_steps(
+        [accelerate(start=0.0, end=-1.0, face_forward=True)]
+    )
+    state = EffectState()
+    timer = EffectTimer(duration=1.0)
+    timer.update(0.5)
+
+    effect.update(state, timer)
+    value = effect.value(state, 0.1, 1)
+
+    # speed = lerp(0, -1, 0.5) = -0.5; offset = (-0.5 * 0.5) % 1.0 = 0.75
+    # rps = -0.5 < 0, mirrored: (0.1 + 0.75) % 1.0 = 0.85 -> 1.0 - 0.85 = 0.15
+    assert value == pytest.approx(0.15)
