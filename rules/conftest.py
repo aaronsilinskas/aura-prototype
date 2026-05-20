@@ -7,6 +7,8 @@ from engine.timer import Timer
 
 
 class CapturingLogger:
+    """Callable logger that accumulates messages for assertion in tests."""
+
     def __init__(self) -> None:
         self.logs = []
 
@@ -15,6 +17,8 @@ class CapturingLogger:
 
 
 class _EventCaptureRule(GameRule):
+    """Test-only rule that records every event it receives for later inspection."""
+
     def __init__(self):
         super().__init__("test.capture_rule", Version(1, 0))
         self.captured_events = []
@@ -24,6 +28,8 @@ class _EventCaptureRule(GameRule):
 
 
 class EngineFixture:
+    """Pre-wired engine + timer for rule integration tests."""
+
     def __init__(self):
         self.timer = Timer()
         self.game_engine = GameEngine(EffectControls())
