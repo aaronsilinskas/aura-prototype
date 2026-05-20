@@ -1,4 +1,6 @@
 class EventGroup:
+    """Namespace identifier for a family of related events."""
+
     __slots__ = ["name"]
 
     def __init__(self, name: str) -> None:
@@ -9,6 +11,12 @@ class EventGroup:
 
 
 class Event:
+    """Base class for all engine events.
+
+    Subclasses add payload slots. The ``group`` and ``name`` fields together
+    uniquely identify the event type for logging and debugging.
+    """
+
     __slots__ = ["group", "name"]
 
     def __init__(

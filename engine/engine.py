@@ -6,6 +6,8 @@ from engine.timer import Timer
 
 
 class Version:
+    """Major and minor version identifier for a game rule."""
+
     __slots__ = ("major", "minor")
 
     def __init__(self, major: int, minor: int) -> None:
@@ -14,6 +16,15 @@ class Version:
 
 
 class GameRule:
+    """Base class for gameplay rules that react to engine events.
+
+    Register per-event-type handlers in ``__init__`` using ``self.on()``.
+    The engine calls ``handle_event`` each tick for every queued event;
+    the dispatch table routes to the correct handler by exact event type.
+
+    Subclasses must set ``name`` and ``version`` via ``super().__init__``.
+    """
+
     __slots__ = ("_event_handlers", "name", "version")
 
     def __init__(self, name: str, version: Version) -> None:
@@ -37,6 +48,13 @@ class GameRule:
 
 
 class GameState:
+    """Per-tick context passed to every rule handler.
+
+    Provides access to the engine, the current frame timer, and the
+    effect controls interface for starting and stopping effects.
+    Created fresh each ``update`` tick; do not store references across ticks.
+    """
+
     __slots__ = ("effect_controls", "engine", "timer")
 
     def __init__(self, engine: GameEngine, timer: Timer, effect_controls: EffectControls) -> None:
@@ -46,6 +64,14 @@ class GameState:
 
 
 class GameEngine:
+    """Drives the game loop by dispatching queued events to registered rules.
+
+    Update model:
+      - Call ``update(timer)`` once per frame.
+      - All queued events are dispatched to all rules in registration order.
+      - Rules may queue additional events during dispatch.
+    """
+
     __slots__ = ("_effect_controls", "_queue", "_rules")
 
     def __init__(self, effect_controls: EffectControls) -> None:

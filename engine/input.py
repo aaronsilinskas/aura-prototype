@@ -7,6 +7,13 @@ except ImportError:
 
 
 class ButtonData:
+    """Snapshot of button states at a point in time.
+
+    ``states`` maps button name to one of the class constants:
+    ``UP``, ``DOWN``, ``PRESSED`` (transitioned down this frame), or
+    ``RELEASED`` (transitioned up this frame).
+    """
+
     __slots__ = ("states",)
 
     UP: "Final" = 0
@@ -29,6 +36,13 @@ class ButtonData:
 
 
 class MovementData:
+    """Snapshot of accelerometer readings at a point in time. Unit of measure is meters per second
+    squared (m/s^2).
+
+    Axes follow the device's local coordinate system. Use the
+    ``NO_MOVEMENT`` sentinel when movement data is unavailable.
+    """
+
     __slots__ = ("x_accel", "y_accel", "z_accel")
 
     def __init__(self, x_accel: float = 0.0, y_accel: float = 0.0, z_accel: float = 0.0) -> None:
@@ -44,9 +58,17 @@ NO_MOVEMENT: "Final" = MovementData()
 
 
 class InputEvents:
+    """Namespace for input-layer event types."""
+
     GROUP: "Final" = EventGroup("in")
 
     class ButtonAndMovement(Event):
+        """Event carrying a button state snapshot and optional movement data.
+
+        Fired each input poll cycle. ``movement`` defaults to ``NO_MOVEMENT``
+        when the device has no accelerometer or motion is not being tracked.
+        """
+
         __slots__ = ("buttons", "movement")
 
         def __init__(self, buttons: ButtonData, movement: MovementData = NO_MOVEMENT) -> None:

@@ -35,6 +35,13 @@ class EffectOutput:
 
 
 class EffectBuilder:
+    """Factory interface for constructing ``EffectRenderer`` instances by name.
+
+    Concrete implementations look up the named effect and return a renderer
+    configured for the given ``RendererConfig``. Raise ``KeyError`` or
+    ``ValueError`` for unregistered names.
+    """
+
     def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
         """Build an EffectRenderer for the named effect.
 
@@ -97,6 +104,17 @@ class EffectControls:
 
 
 class EffectManager(EffectControls):
+    """Manages running effects and routesrendered frames to registered outputs each tick.
+
+    Update model:
+      - Call ``update(timer)`` once per frame. Each unique renderer is
+        advanced exactly once; outputs receive their frames in a second pass.
+      - Outputs always receive a call, with an empty list when no effects
+        are active (go-dark signal).
+    State ownership:
+      - Output buffers are created once per effect via ``EffectOutput.create_buffer``.
+    """
+
     class _EffectEntry:
         __slots__ = ("keys", "name", "output_buffers", "receipt", "renderer", "scope", "state")
 
