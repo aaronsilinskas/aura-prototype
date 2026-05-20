@@ -19,6 +19,8 @@ class MultiplierStep(EffectStep):
         self.end = end
 
     class _Data:
+        """Per-state storage for MultiplierStep: the interpolation range and current multiplier."""
+
         __slots__ = ("multiplier", "range")
 
         def __init__(self, start: float, end: float):

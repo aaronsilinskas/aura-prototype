@@ -29,6 +29,8 @@ class DurationStep(EffectStep):
         self.steps = list(steps)
 
     class _Data:
+        """Per-state storage for DurationStep: owns the child timer and active step index."""
+
         __slots__ = ("step_index", "timer")
 
         def __init__(self, duration: float):

@@ -24,6 +24,8 @@ class DriftNoiseStep(EffectStep):
         self.amplitude = VG.resolve(amplitude)
 
     class _Data:
+        """Per-state storage for DriftNoiseStep: noise buffer and current scroll offset."""
+
         __slots__ = ("noise", "offset")
 
         def __init__(self, buffer_count: int):

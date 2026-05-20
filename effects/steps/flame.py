@@ -42,6 +42,8 @@ class FlameStep(EffectStep):
         self._spread_range = range(-self.half_flame_spread, self.half_flame_spread + 1)
 
     class _Data:
+        """Per-state storage for FlameStep: spark positions and the heat decay buffer."""
+
         __slots__ = ("flame_buffer", "remove_count", "spark_buffer", "sparks_to_remove")
 
         def __init__(self, spark_count: int, flame_count: int):

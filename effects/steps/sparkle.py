@@ -33,6 +33,8 @@ class SparkleStep(EffectStep):
         self._sparkle_range = range(self.sparkle_count)
 
     class _Data:
+        """Per-state storage for SparkleStep: per-slot position, intensity, phase, and delay."""
+
         __slots__ = ("intensity", "phase", "slot_pos", "spawn_delay")
 
         def __init__(self, sparkle_count: int):
