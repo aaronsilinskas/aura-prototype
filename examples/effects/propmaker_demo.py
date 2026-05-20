@@ -137,7 +137,7 @@ class IS31FL3741EffectOutput(EffectOutput):
 
         # Write active frames to their matrix rows
         for f in range(row_count):
-            buf = frames[f]
+            buf, _ = frames[f]
             for p in range(_MATRIX_COLS):
                 is31.pixel(p, f, buf[p])  # pixel(x, y, packed_24bit_color)
 
@@ -179,11 +179,14 @@ class AudioEffectOutput(EffectOutput):
     def update_pixels(self, frames: list) -> None:
         pass
 
-    def handle_event(self, event_name: str) -> None:
+    def handle_event(self, event_name: str, receipt) -> None:
         if self._mixer.playing:
             return
         path = "sounds/" + event_name + ".wav"
-        f = open(path, "rb")  # noqa: SIM115
+        try:
+            f = open(path, "rb")  # noqa: SIM115
+        except OSError:
+            return
         if self._wav_file is not None:
             self._wav_file.close()
         self._wav_file = f
@@ -202,7 +205,7 @@ class ButtonEffectRule(GameRule):
             elif button_data.states["B"] == ButtonData.PRESSED:
                 state.effect_controls.add_effect(Scope.PERSONAL, "water", 5, {})
             elif button_data.states["C"] == ButtonData.PRESSED:
-                state.effect_controls.add_effect(Scope.PERSONAL, "lightning", 5, {})
+                state.effect_controls.add_effect(Scope.PERSONAL, "lightning", 2, {})
             elif button_data.states["D"] == ButtonData.PRESSED:
                 state.effect_controls.stop_effect(Scope.ALL)
 
@@ -211,7 +214,7 @@ effect_output = IS31FL3741EffectOutput()
 audio_output = AudioEffectOutput()
 effect_manager = EffectManager(
     builder=ElementEffectBuilder(),
-    outputs=[effect_output],  # , audio_output],
+    outputs=[effect_output, audio_output],
 )
 
 game_engine = GameEngine(effect_controls=effect_manager)

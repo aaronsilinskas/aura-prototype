@@ -6,11 +6,11 @@ import tty
 
 from effects.elements.registry import build_element_renderer
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
+from engine.effects.manager import EffectBuilder, EffectManager, EffectOutput
+from engine.effects.scope import Scope
 from engine.engine import GameEngine, GameRule, GameState, Version
 from engine.events import Event
 from engine.input import ButtonData, InputEvents, MovementData
-from engine.effects.manager import EffectBuilder, EffectManager, EffectOutput
-from engine.effects.scope import Scope
 from engine.timer import Timer
 
 
@@ -38,14 +38,14 @@ class AnsiEffectOutput(EffectOutput):
     def create_buffer(self) -> PixelBuffer:
         return PixelBuffer(self.PIXEL_COUNT)
 
-    def handle_event(self, event_name: str) -> None:
+    def handle_event(self, event_name: str, receipt) -> None:
         self._last_event = event_name
         self._event_count += 1
 
     def update_pixels(self, frames: list) -> None:
         empty_line = "\r" + "  " * self.PIXEL_COUNT
         lines = []
-        for buf in frames[:MAX_FRAMES]:
+        for buf, _ in frames[:MAX_FRAMES]:
             parts = []
             for color in buf:
                 r = (color >> 16) & 0xFF
@@ -55,7 +55,11 @@ class AnsiEffectOutput(EffectOutput):
             lines.append("\r" + "".join(parts))
         while len(lines) < MAX_FRAMES:
             lines.append(empty_line)
-        event_line = f"\r[audio #{self._event_count}] {self._last_event}\033[K" if self._last_event else "\r\033[K"
+        event_line = (
+            f"\r[audio #{self._event_count}] {self._last_event}\033[K"
+            if self._last_event
+            else "\r\033[K"
+        )
         lines.append(event_line)
         if self._initialized:
             print(f"\033[{BLOCK_HEIGHT}A", end="")
@@ -94,13 +98,33 @@ _default_movement = MovementData(x_accel=0.0, y_accel=9.8, z_accel=0.0)
 
 def _make_event(key: str | None) -> InputEvents.ButtonAndMovement:
     if key in ("a", "A"):
-        states = {"A": ButtonData.PRESSED, "B": ButtonData.UP, "C": ButtonData.UP, "D": ButtonData.UP}
+        states = {
+            "A": ButtonData.PRESSED,
+            "B": ButtonData.UP,
+            "C": ButtonData.UP,
+            "D": ButtonData.UP,
+        }
     elif key in ("b", "B"):
-        states = {"A": ButtonData.UP, "B": ButtonData.PRESSED, "C": ButtonData.UP, "D": ButtonData.UP}
+        states = {
+            "A": ButtonData.UP,
+            "B": ButtonData.PRESSED,
+            "C": ButtonData.UP,
+            "D": ButtonData.UP,
+        }
     elif key in ("c", "C"):
-        states = {"A": ButtonData.UP, "B": ButtonData.UP, "C": ButtonData.PRESSED, "D": ButtonData.UP}
+        states = {
+            "A": ButtonData.UP,
+            "B": ButtonData.UP,
+            "C": ButtonData.PRESSED,
+            "D": ButtonData.UP,
+        }
     elif key in ("d", "D"):
-        states = {"A": ButtonData.UP, "B": ButtonData.UP, "C": ButtonData.UP, "D": ButtonData.PRESSED}
+        states = {
+            "A": ButtonData.UP,
+            "B": ButtonData.UP,
+            "C": ButtonData.UP,
+            "D": ButtonData.PRESSED,
+        }
     else:
         states = {"A": ButtonData.UP, "B": ButtonData.UP, "C": ButtonData.UP, "D": ButtonData.UP}
     return InputEvents.ButtonAndMovement(ButtonData(states=states), _default_movement)
@@ -130,5 +154,3 @@ def main() -> None:
 
 
 main()
-
-
