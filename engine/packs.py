@@ -147,7 +147,7 @@ class PackRegistry:
             return self._cache[cache_key]  # type: ignore[return-value]
 
         full_module = meta.module_prefix + "." + item_name
-        module = __import__(full_module, fromlist=[""])
+        module = __import__(full_module, None, None, [""])
         value = self._extractor(module)
         self._cache[cache_key] = value
         return value  # type: ignore[return-value]
