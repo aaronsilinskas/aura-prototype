@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from engine.effects.manager import EffectControls
 from engine.events import Event
 from engine.timer import Timer
@@ -30,9 +32,9 @@ class GameRule:
     def __init__(self, name: str, version: Version) -> None:
         self.name = name
         self.version = version
-        self._event_handlers: dict = {}
+        self._event_handlers: dict[type, Callable[[Event, GameState], None]] = {}
 
-    def on(self, event_type: type, handler) -> None:
+    def on(self, event_type: type, handler: Callable[[Event, GameState], None]) -> None:
         """Register a handler for a specific event type.
 
         The handler is called as ``handler(event, state)`` when an event of
@@ -66,12 +68,12 @@ class GameState:
     def __init__(
         self,
         effect_controls: EffectControls,
-        queue: list,
-        data: dict | None = None,
+        queue: list[Event],
+        data: dict[str, object] | None = None,
     ) -> None:
         self.effect_controls = effect_controls
         self._queue = queue
-        self.data: dict = data if data is not None else {}
+        self.data: dict[str, object] = data if data is not None else {}
         self._elapsed: float = 0.0
         self._total: float = 0.0
 
@@ -116,7 +118,7 @@ class GameEngine:
         self,
         effect_controls: EffectControls,
         timer: Timer | None = None,
-        initial_data: dict | None = None,
+        initial_data: dict[str, object] | None = None,
     ) -> None:
         self._effect_controls = effect_controls
         self._timer = timer if timer is not None else Timer()
