@@ -53,3 +53,10 @@ def build_lightning_renderer(config: RendererConfig) -> EffectRenderer:
         return renderers[0]
 
     return MergeRenderer("lightning", renderers, additive=True)
+
+
+def _build(name: str, config: RendererConfig) -> EffectRenderer:
+    return build_lightning_renderer(config)
+
+
+BUILD = _build

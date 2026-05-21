@@ -35,3 +35,10 @@ def build_earth_renderer(config: RendererConfig) -> EffectRenderer:
     )
 
     return EffectRenderer(earth_effect, PaletteLUT256(earth_palette))
+
+
+def _build(name: str, config: RendererConfig) -> EffectRenderer:
+    return build_earth_renderer(config)
+
+
+BUILD = _build

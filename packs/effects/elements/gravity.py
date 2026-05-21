@@ -59,3 +59,10 @@ def build_gravity_renderer(config: RendererConfig) -> EffectRenderer:
     return MergeRenderer(
         "gravity", [gravity_nebula_renderer, gravity_stars_renderer], additive=True
     )
+
+
+def _build(name: str, config: RendererConfig) -> EffectRenderer:
+    return build_gravity_renderer(config)
+
+
+BUILD = _build

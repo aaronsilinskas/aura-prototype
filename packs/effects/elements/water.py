@@ -47,3 +47,10 @@ def build_water_renderer(config: RendererConfig) -> EffectRenderer:
     )
 
     return EffectRenderer(water_effect, PaletteLUT256(water_palette))
+
+
+def _build(name: str, config: RendererConfig) -> EffectRenderer:
+    return build_water_renderer(config)
+
+
+BUILD = _build

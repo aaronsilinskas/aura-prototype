@@ -47,3 +47,10 @@ def build_ice_renderer(config: RendererConfig) -> EffectRenderer:
     )
 
     return EffectRenderer(ice_effect, PaletteLUT256(ice_palette))
+
+
+def _build(name: str, config: RendererConfig) -> EffectRenderer:
+    return build_ice_renderer(config)
+
+
+BUILD = _build

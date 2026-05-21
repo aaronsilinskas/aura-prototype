@@ -36,3 +36,10 @@ def build_dark_renderer(config: RendererConfig) -> EffectRenderer:
     dark_sparkle_renderer = EffectRenderer(dark_sparkle_effect, PaletteLUT256(dark_sparkle_palette))
 
     return dark_sparkle_renderer
+
+
+def _build(name: str, config: RendererConfig) -> EffectRenderer:
+    return build_dark_renderer(config)
+
+
+BUILD = _build

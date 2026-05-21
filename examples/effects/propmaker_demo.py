@@ -39,12 +39,12 @@ import busio
 import digitalio
 from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
-from packs.effects.elements.registry import build_element_renderer
-from effects.render import EffectRenderer, PixelBuffer, RendererConfig
-from engine.effects.manager import EffectBuilder, EffectManager, EffectOutput
+from effects.render import PixelBuffer
+from engine.effects.manager import EffectManager, EffectOutput
 from engine.effects.scope import Scope
 from engine.engine import GameEngine, GameRule, Version
 from engine.input import ButtonData, InputEvents, MovementData
+from engine.packs import PackRegistry
 from engine.timer import Timer
 
 try:
@@ -111,10 +111,8 @@ _button_d.switch_to_input(pull=digitalio.Pull.UP)
 # Effect system
 # ---------------------------------------------------------------------------
 
-
-class ElementEffectBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
-        return build_element_renderer(name, config)
+_registry = PackRegistry(extractor=lambda m: m.BUILD)
+_registry.scan_dir("packs/effects", "packs.effects")
 
 
 class IS31FL3741EffectOutput(EffectOutput):
@@ -213,7 +211,7 @@ class ButtonEffectRule(GameRule):
 effect_output = IS31FL3741EffectOutput()
 audio_output = AudioEffectOutput()
 effect_manager = EffectManager(
-    builder=ElementEffectBuilder(),
+    registry=_registry,
     outputs=[effect_output, audio_output],
 )
 
