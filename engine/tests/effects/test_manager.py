@@ -1,11 +1,67 @@
-from effects.effect import Effect
-from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer, RendererConfig
-from effects.steps.control import call
-from engine.effects.manager import EffectBuilder, EffectManager
+import sys
+
+import pytest
+
+from engine.effects.manager import EffectManager
 from engine.effects.scope import Scope
-from engine.tests.effects.helpers import SpyEffectOutput, StubEffectBuilder
+from engine.packs import PackRegistry
+from engine.tests.effects.helpers import SpyEffectOutput
 from engine.timer import Timer
+
+# ---------------------------------------------------------------------------
+# Fixtures and helpers
+# ---------------------------------------------------------------------------
+
+_MODULE_PREFIX = "tp"
+
+
+@pytest.fixture()
+def pack_env(tmp_path):
+    """Yield a packs-root directory and manage ``sys.path`` / ``sys.modules``."""
+    packs_root = tmp_path / _MODULE_PREFIX
+    packs_root.mkdir()
+    sys.path.insert(0, str(tmp_path))
+    known = set(sys.modules)
+    yield packs_root
+    for key in list(sys.modules):
+        if key not in known:
+            del sys.modules[key]
+    sys.path.remove(str(tmp_path))
+
+
+def _make_pack(root, name: str, items: dict[str, str]) -> None:
+    """Create a pack directory with *items* as ``{item_name: module_content}``."""
+    pack_dir = root / name
+    pack_dir.mkdir(exist_ok=True)
+    (pack_dir / "version.txt").write_text("1.0\n")
+    for item, content in items.items():
+        (pack_dir / f"{item}.py").write_text(content)
+
+
+def _stub_item() -> str:
+    return (
+        "from engine.tests.effects.helpers import StubEffectBuilder\n"
+        "BUILD = StubEffectBuilder()\n"
+    )
+
+
+def _spy_item() -> str:
+    return (
+        "from engine.tests.effects.helpers import SpyEffectBuilder\n"
+        "BUILD = SpyEffectBuilder()\n"
+    )
+
+
+def _make_stub_registry(pack_env) -> PackRegistry:
+    """Return a scanned PackRegistry with a 'stub' pack providing common test effects."""
+    _make_pack(
+        pack_env,
+        "stub",
+        {"fire": _stub_item(), "ice": _stub_item(), "shock": _stub_item()},
+    )
+    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    return registry
 
 
 def _make_timer() -> Timer:
@@ -17,14 +73,14 @@ def _make_timer() -> Timer:
 # ---------------------------------------------------------------------------
 
 
-def test_effect_manager_accepts_builder_and_outputs() -> None:
+def test_effect_manager_accepts_registry_and_outputs() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
 
-    EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    EffectManager(registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[output])
 
 
 def test_effect_manager_accepts_empty_outputs_list() -> None:
-    EffectManager(builder=StubEffectBuilder(), outputs=[])
+    EffectManager(registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[])
 
 
 # ---------------------------------------------------------------------------
@@ -34,7 +90,9 @@ def test_effect_manager_accepts_empty_outputs_list() -> None:
 
 def test_update_with_no_effects_sends_go_dark_to_output() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(
+        registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[output]
+    )
 
     manager.update(_make_timer())
 
@@ -44,7 +102,9 @@ def test_update_with_no_effects_sends_go_dark_to_output() -> None:
 def test_update_with_no_effects_sends_go_dark_to_all_outputs() -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output_a, output_b])
+    manager = EffectManager(
+        registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[output_a, output_b]
+    )
 
     manager.update(_make_timer())
 
@@ -54,7 +114,9 @@ def test_update_with_no_effects_sends_go_dark_to_all_outputs() -> None:
 
 def test_update_called_twice_notifies_output_each_tick() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(
+        registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[output]
+    )
 
     manager.update(_make_timer())
     manager.update(_make_timer())
@@ -67,22 +129,24 @@ def test_update_called_twice_notifies_output_each_tick() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_set_effect_delivers_one_frame_to_matching_output() -> None:
+def test_set_effect_delivers_one_frame_to_matching_output(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    receipt = manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.update(_make_timer())
 
     assert output.update_pixels_calls == [[(output.created_buffers[0], receipt)]]
 
 
-def test_set_effect_nonmatching_output_receives_go_dark() -> None:
+def test_set_effect_nonmatching_output_receives_go_dark(pack_env) -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output_a, output_b])
+    manager = EffectManager(
+        registry=_make_stub_registry(pack_env), outputs=[output_a, output_b]
+    )
 
-    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.update(_make_timer())
 
     assert output_b.update_pixels_calls == [[]]
@@ -93,48 +157,34 @@ def test_set_effect_nonmatching_output_receives_go_dark() -> None:
 # ---------------------------------------------------------------------------
 
 
-class _SpyRenderer:
-    def __init__(self) -> None:
-        self.update_count = 0
-
-    def update(self, state, timer) -> None:
-        self.update_count += 1
-
-    def render(self, state, buf) -> None:
-        pass
-
-
-class _SpyEffectBuilder:
-    def __init__(self) -> None:
-        self.created: list = []
-
-    def __call__(self, name: str, config) -> _SpyRenderer:
-        renderer = _SpyRenderer()
-        self.created.append(renderer)
-        return renderer
-
-
-def test_set_effect_twice_replaces_effect() -> None:
+def test_set_effect_twice_replaces_effect(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
-    receipt_ice = manager.set_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    receipt_ice = manager.set_effect(Scope.PERSONAL, "stub.ice", 5, {})
     manager.update(_make_timer())
 
     assert output.update_pixels_calls == [[(output.created_buffers[1], receipt_ice)]]
 
 
-def test_set_effect_twice_first_renderer_not_advanced() -> None:
+def test_set_effect_twice_first_renderer_not_advanced(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    builder = _SpyEffectBuilder()
-    manager = EffectManager(builder=builder, outputs=[output])
+    _make_pack(
+        pack_env,
+        "spy",
+        {"fire": _spy_item(), "ice": _spy_item()},
+    )
+    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    manager = EffectManager(registry=registry, outputs=[output])
 
-    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
-    manager.set_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.set_effect(Scope.PERSONAL, "spy.fire", 5, {})
+    manager.set_effect(Scope.PERSONAL, "spy.ice", 5, {})
+    fire_builder = registry.get("spy", "fire")
     manager.update(_make_timer())
 
-    renderer_a = builder.created[0]
+    renderer_a = fire_builder.created[0]
     assert renderer_a.update_count == 0
 
 
@@ -143,12 +193,14 @@ def test_set_effect_twice_first_renderer_not_advanced() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_out_of_scope_output_receives_go_dark_each_frame() -> None:
+def test_out_of_scope_output_receives_go_dark_each_frame(pack_env) -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output_a, output_b])
+    manager = EffectManager(
+        registry=_make_stub_registry(pack_env), outputs=[output_a, output_b]
+    )
 
-    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.update(_make_timer())
     manager.update(_make_timer())
 
@@ -160,22 +212,23 @@ def test_out_of_scope_output_receives_go_dark_each_frame() -> None:
 # ---------------------------------------------------------------------------
 
 
-class _EventFiringEffectBuilder(EffectBuilder):
-    def __init__(self, event_name: str) -> None:
-        self._event_name = event_name
-
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
-        event_name = self._event_name
-        step = call(lambda state, timer: config.notify_listeners(event_name))
-        effect = Effect(name).add_steps([step])
-        return EffectRenderer(effect, PaletteLUT256(b""))
-
-
-def test_effect_event_reaches_matching_scope_output() -> None:
+def test_effect_event_reaches_matching_scope_output(pack_env) -> None:
+    _make_pack(
+        pack_env,
+        "events",
+        {
+            "shock": (
+                "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
+                "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
+            )
+        },
+    )
+    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=_EventFiringEffectBuilder("lightning_strike"), outputs=[output])
+    manager = EffectManager(registry=registry, outputs=[output])
 
-    receipt = manager.set_effect(Scope.PERSONAL, "shock", 5, {})
+    receipt = manager.set_effect(Scope.PERSONAL, "events.shock", 5, {})
     manager.update(_make_timer())
 
     assert output.handle_event_calls == [
@@ -184,14 +237,24 @@ def test_effect_event_reaches_matching_scope_output() -> None:
     ]
 
 
-def test_effect_event_does_not_reach_out_of_scope_output() -> None:
+def test_effect_event_does_not_reach_out_of_scope_output(pack_env) -> None:
+    _make_pack(
+        pack_env,
+        "events",
+        {
+            "shock": (
+                "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
+                "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
+            )
+        },
+    )
+    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = EffectManager(
-        builder=_EventFiringEffectBuilder("lightning_strike"), outputs=[output_a, output_b]
-    )
+    manager = EffectManager(registry=registry, outputs=[output_a, output_b])
 
-    manager.set_effect(Scope.PERSONAL, "shock", 5, {})
+    manager.set_effect(Scope.PERSONAL, "events.shock", 5, {})
     manager.update(_make_timer())
 
     assert output_b.handle_event_calls == []
@@ -202,32 +265,35 @@ def test_effect_event_does_not_reach_out_of_scope_output() -> None:
 # ---------------------------------------------------------------------------
 
 
-class _CapturingEffectBuilder(EffectBuilder):
-    def __init__(self) -> None:
-        self.last_config: RendererConfig | None = None
-
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
-        self.last_config = config
-        return EffectRenderer(Effect(name), PaletteLUT256(b""))
-
-
-def test_resolution_equals_max_min_resolution_of_matching_outputs() -> None:
+def test_resolution_equals_max_min_resolution_of_matching_outputs(pack_env) -> None:
+    _make_pack(pack_env, "capture", {"fire": (
+        "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
+        "BUILD = CapturingEffectBuilder()\n"
+    )})
+    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     output_a = SpyEffectOutput(min_resolution=32, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=64, scopes=[Scope.PERSONAL])
-    builder = _CapturingEffectBuilder()
-    manager = EffectManager(builder=builder, outputs=[output_a, output_b])
+    manager = EffectManager(registry=registry, outputs=[output_a, output_b])
 
-    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.set_effect(Scope.PERSONAL, "capture.fire", 5, {})
 
+    builder = registry.get("capture", "fire")
     assert builder.last_config.resolution == 64
 
 
-def test_resolution_falls_back_to_default_when_no_outputs_match() -> None:
-    builder = _CapturingEffectBuilder()
-    manager = EffectManager(builder=builder, outputs=[])
+def test_resolution_falls_back_to_default_when_no_outputs_match(pack_env) -> None:
+    _make_pack(pack_env, "capture", {"fire": (
+        "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
+        "BUILD = CapturingEffectBuilder()\n"
+    )})
+    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    manager = EffectManager(registry=registry, outputs=[])
 
-    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.set_effect(Scope.PERSONAL, "capture.fire", 5, {})
 
+    builder = registry.get("capture", "fire")
     assert builder.last_config.resolution == 16
 
 
@@ -236,36 +302,44 @@ def test_resolution_falls_back_to_default_when_no_outputs_match() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_add_effect_after_set_effect_delivers_two_frames() -> None:
+def test_add_effect_after_set_effect_delivers_two_frames(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
-    manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
     manager.update(_make_timer())
 
     assert len(output.update_pixels_calls[0]) == 2
 
 
-def test_add_effect_both_renderers_advanced_on_each_update() -> None:
+def test_add_effect_both_renderers_advanced_on_each_update(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    builder = _SpyEffectBuilder()
-    manager = EffectManager(builder=builder, outputs=[output])
+    _make_pack(
+        pack_env,
+        "spy",
+        {"fire": _spy_item(), "ice": _spy_item()},
+    )
+    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    manager = EffectManager(registry=registry, outputs=[output])
 
-    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
-    manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.set_effect(Scope.PERSONAL, "spy.fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "spy.ice", 5, {})
+    fire_builder = registry.get("spy", "fire")
+    ice_builder = registry.get("spy", "ice")
     manager.update(_make_timer())
     manager.update(_make_timer())
 
-    assert builder.created[0].update_count == 2
-    assert builder.created[1].update_count == 2
+    assert fire_builder.created[0].update_count == 2
+    assert ice_builder.created[0].update_count == 2
 
 
-def test_add_effect_on_empty_scope_delivers_one_frame() -> None:
+def test_add_effect_on_empty_scope_delivers_one_frame(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.update(_make_timer())
 
     assert len(output.update_pixels_calls[0]) == 1
@@ -276,11 +350,11 @@ def test_add_effect_on_empty_scope_delivers_one_frame() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_stop_effect_causes_go_dark_on_next_update() -> None:
+def test_stop_effect_causes_go_dark_on_next_update(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.update(_make_timer())
     manager.stop_effect(Scope.PERSONAL)
     manager.update(_make_timer())
@@ -288,27 +362,28 @@ def test_stop_effect_causes_go_dark_on_next_update() -> None:
     assert output.update_pixels_calls[1] == []
 
 
-def test_stop_effect_clears_stacked_effects() -> None:
+def test_stop_effect_clears_stacked_effects(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
-    manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
     manager.stop_effect(Scope.PERSONAL)
     manager.update(_make_timer())
 
     assert output.update_pixels_calls[0] == []
 
 
-def test_stop_effect_does_not_affect_other_scopes() -> None:
+def test_stop_effect_does_not_affect_other_scopes(pack_env) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
-        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_personal, output_directional],
     )
 
-    manager.set_effect(Scope.PERSONAL, "fire", 5, {})
-    receipt_ice = manager.set_effect(Scope.DIRECTIONAL, "ice", 5, {})
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    receipt_ice = manager.set_effect(Scope.DIRECTIONAL, "stub.ice", 5, {})
     manager.stop_effect(Scope.PERSONAL)
     manager.update(_make_timer())
 
@@ -322,25 +397,29 @@ def test_stop_effect_does_not_affect_other_scopes() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_shared_renderer_advanced_once_per_frame_for_composite_scope() -> None:
+def test_shared_renderer_advanced_once_per_frame_for_composite_scope(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.ALL])
-    builder = _SpyEffectBuilder()
-    manager = EffectManager(builder=builder, outputs=[output])
+    _make_pack(pack_env, "spy", {"fire": _spy_item()})
+    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    manager = EffectManager(registry=registry, outputs=[output])
 
-    manager.set_effect(Scope.ALL, "fire", 5, {})
+    manager.set_effect(Scope.ALL, "spy.fire", 5, {})
+    fire_builder = registry.get("spy", "fire")
     manager.update(_make_timer())
 
-    assert builder.created[0].update_count == 1
+    assert fire_builder.created[0].update_count == 1
 
 
-def test_each_output_receives_own_buffer_for_composite_scope() -> None:
+def test_each_output_receives_own_buffer_for_composite_scope(pack_env) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
-        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_personal, output_directional],
     )
 
-    manager.set_effect(Scope.ALL, "fire", 5, {})
+    manager.set_effect(Scope.ALL, "stub.fire", 5, {})
     manager.update(_make_timer())
 
     assert len(output_personal.update_pixels_calls[0]) == 1
@@ -350,14 +429,15 @@ def test_each_output_receives_own_buffer_for_composite_scope() -> None:
     assert personal_buf is not directional_buf
 
 
-def test_stop_effect_all_sends_go_dark_to_every_output() -> None:
+def test_stop_effect_all_sends_go_dark_to_every_output(pack_env) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
-        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_personal, output_directional],
     )
 
-    manager.set_effect(Scope.ALL, "fire", 5, {})
+    manager.set_effect(Scope.ALL, "stub.fire", 5, {})
     manager.update(_make_timer())
     manager.stop_effect(Scope.ALL)
     manager.update(_make_timer())
@@ -371,17 +451,17 @@ def test_stop_effect_all_sends_go_dark_to_every_output() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_set_effect_on_partial_scope_leaves_other_scope_effects_running() -> None:
+def test_set_effect_on_partial_scope_leaves_other_scope_effects_running(pack_env) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     output_global = SpyEffectOutput(min_resolution=10, scopes=[Scope.Global.MAIN])
     manager = EffectManager(
-        builder=StubEffectBuilder(),
+        registry=_make_stub_registry(pack_env),
         outputs=[output_personal, output_directional, output_global],
     )
 
-    manager.add_effect(Scope.ALL, "fire", 5, {})
-    manager.set_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.add_effect(Scope.ALL, "stub.fire", 5, {})
+    manager.set_effect(Scope.PERSONAL, "stub.ice", 5, {})
     manager.update(_make_timer())
 
     assert len(output_personal.update_pixels_calls[0]) == 1
@@ -389,15 +469,15 @@ def test_set_effect_on_partial_scope_leaves_other_scope_effects_running() -> Non
     assert len(output_global.update_pixels_calls[0]) == 1
 
 
-def test_stop_effect_on_partial_scope_continues_rendering_on_remaining_scope() -> None:
+def test_stop_effect_on_partial_scope_continues_rendering_on_remaining_scope(pack_env) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
-        builder=StubEffectBuilder(),
+        registry=_make_stub_registry(pack_env),
         outputs=[output_personal, output_directional],
     )
 
-    manager.add_effect(Scope.ALL, "fire", 5, {})
+    manager.add_effect(Scope.ALL, "stub.fire", 5, {})
     manager.stop_effect(Scope.PERSONAL)
     manager.update(_make_timer())
 
@@ -405,15 +485,15 @@ def test_stop_effect_on_partial_scope_continues_rendering_on_remaining_scope() -
     assert len(output_directional.update_pixels_calls[0]) == 1
 
 
-def test_stop_effect_with_broader_scope_removes_narrower_effect_completely() -> None:
+def test_stop_effect_with_broader_scope_removes_narrower_effect_completely(pack_env) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
-        builder=StubEffectBuilder(),
+        registry=_make_stub_registry(pack_env),
         outputs=[output_personal, output_directional],
     )
 
-    manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.stop_effect(Scope.ALL)
     manager.update(_make_timer())
 
@@ -421,16 +501,16 @@ def test_stop_effect_with_broader_scope_removes_narrower_effect_completely() -> 
     assert output_directional.update_pixels_calls[0] == []
 
 
-def test_add_effect_does_not_stop_effects_already_running_in_scope() -> None:
+def test_add_effect_does_not_stop_effects_already_running_in_scope(pack_env) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
-        builder=StubEffectBuilder(),
+        registry=_make_stub_registry(pack_env),
         outputs=[output_personal, output_directional],
     )
 
-    manager.add_effect(Scope.ALL, "fire", 5, {})
-    manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.add_effect(Scope.ALL, "stub.fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
     manager.update(_make_timer())
 
     assert len(output_personal.update_pixels_calls[0]) == 2
@@ -442,12 +522,12 @@ def test_add_effect_does_not_stop_effects_already_running_in_scope() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_two_add_effect_calls_return_different_receipts() -> None:
+def test_two_add_effect_calls_return_different_receipts(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    receipt_a = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
-    receipt_b = manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    receipt_a = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    receipt_b = manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
 
     assert receipt_a is not receipt_b
     assert receipt_a.id != receipt_b.id
@@ -458,34 +538,34 @@ def test_two_add_effect_calls_return_different_receipts() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_stop_effect_by_receipt_stops_the_matching_effect() -> None:
+def test_stop_effect_by_receipt_stops_the_matching_effect(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.stop_effect_by_receipt(receipt)
     manager.update(_make_timer())
 
     assert output.update_pixels_calls[0] == []
 
 
-def test_stop_effect_by_receipt_leaves_other_effects_running() -> None:
+def test_stop_effect_by_receipt_leaves_other_effects_running(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    receipt_a = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
-    manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    receipt_a = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
     manager.stop_effect_by_receipt(receipt_a)
     manager.update(_make_timer())
 
     assert len(output.update_pixels_calls[0]) == 1
 
 
-def test_stop_effect_by_receipt_with_stale_receipt_is_silent_noop() -> None:
+def test_stop_effect_by_receipt_with_stale_receipt_is_silent_noop(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.stop_effect_by_receipt(receipt)
     manager.stop_effect_by_receipt(receipt)  # second call — stale receipt
     manager.update(_make_timer())
@@ -498,43 +578,45 @@ def test_stop_effect_by_receipt_with_stale_receipt_is_silent_noop() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_add_effect_fires_start_event_to_matching_output() -> None:
+def test_add_effect_fires_start_event_to_matching_output(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
 
     assert output.handle_event_calls == [("fire.start", Scope.PERSONAL, receipt)]
 
 
-def test_add_effect_start_event_not_delivered_to_out_of_scope_output() -> None:
+def test_add_effect_start_event_not_delivered_to_out_of_scope_output(pack_env) -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output_a, output_b])
+    manager = EffectManager(
+        registry=_make_stub_registry(pack_env), outputs=[output_a, output_b]
+    )
 
-    manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
 
     assert output_b.handle_event_calls == []
 
 
-def test_add_effect_does_not_fire_stop_for_existing_effects() -> None:
+def test_add_effect_does_not_fire_stop_for_existing_effects(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
     output.handle_event_calls.clear()
 
-    ice_receipt = manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    ice_receipt = manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
 
     assert output.handle_event_calls == [("ice.start", Scope.PERSONAL, ice_receipt)]
 
 
-def test_add_effect_fires_start_event_unconditionally_for_duplicate_name() -> None:
+def test_add_effect_fires_start_event_unconditionally_for_duplicate_name(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    receipt_a = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
-    receipt_b = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    receipt_a = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    receipt_b = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
 
     assert output.handle_event_calls == [
         ("fire.start", Scope.PERSONAL, receipt_a),
@@ -542,11 +624,11 @@ def test_add_effect_fires_start_event_unconditionally_for_duplicate_name() -> No
     ]
 
 
-def test_stop_effect_fires_stop_event_to_matching_output() -> None:
+def test_stop_effect_fires_stop_event_to_matching_output(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
     output.handle_event_calls.clear()
 
     manager.stop_effect(Scope.PERSONAL)
@@ -554,12 +636,12 @@ def test_stop_effect_fires_stop_event_to_matching_output() -> None:
     assert output.handle_event_calls == [("fire.stop", Scope.PERSONAL, receipt)]
 
 
-def test_stop_effect_fires_stop_for_each_effect_in_scope() -> None:
+def test_stop_effect_fires_stop_for_each_effect_in_scope(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    fire_receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
-    ice_receipt = manager.add_effect(Scope.PERSONAL, "ice", 5, {})
+    fire_receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    ice_receipt = manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
     output.handle_event_calls.clear()
 
     manager.stop_effect(Scope.PERSONAL)
@@ -570,14 +652,14 @@ def test_stop_effect_fires_stop_for_each_effect_in_scope() -> None:
     ]
 
 
-def test_set_effect_fires_stop_then_start_when_replacing_effect() -> None:
+def test_set_effect_fires_stop_then_start_when_replacing_effect(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    fire_receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    fire_receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
     output.handle_event_calls.clear()
 
-    ice_receipt = manager.set_effect(Scope.PERSONAL, "ice", 5, {})
+    ice_receipt = manager.set_effect(Scope.PERSONAL, "stub.ice", 5, {})
 
     assert output.handle_event_calls == [
         ("fire.stop", Scope.PERSONAL, fire_receipt),
@@ -585,18 +667,19 @@ def test_set_effect_fires_stop_then_start_when_replacing_effect() -> None:
     ]
 
 
-def test_set_effect_fires_stop_only_to_outputs_in_call_time_scope() -> None:
+def test_set_effect_fires_stop_only_to_outputs_in_call_time_scope(pack_env) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
-        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_personal, output_directional],
     )
 
-    fire_receipt = manager.add_effect(Scope.ALL, "fire", 5, {})
+    fire_receipt = manager.add_effect(Scope.ALL, "stub.fire", 5, {})
     output_personal.handle_event_calls.clear()
     output_directional.handle_event_calls.clear()
 
-    ice_receipt = manager.set_effect(Scope.PERSONAL, "ice", 5, {})
+    ice_receipt = manager.set_effect(Scope.PERSONAL, "stub.ice", 5, {})
 
     assert output_personal.handle_event_calls == [
         ("fire.stop", Scope.ALL, fire_receipt),
@@ -605,14 +688,15 @@ def test_set_effect_fires_stop_only_to_outputs_in_call_time_scope() -> None:
     assert output_directional.handle_event_calls == []
 
 
-def test_stop_effect_with_broader_scope_fires_stop_to_all_matching_outputs() -> None:
+def test_stop_effect_with_broader_scope_fires_stop_to_all_matching_outputs(pack_env) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
-        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_personal, output_directional],
     )
 
-    fire_receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    fire_receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
     output_personal.handle_event_calls.clear()
     output_directional.handle_event_calls.clear()
 
@@ -622,11 +706,11 @@ def test_stop_effect_with_broader_scope_fires_stop_to_all_matching_outputs() -> 
     assert output_directional.handle_event_calls == [("fire.stop", Scope.PERSONAL, fire_receipt)]
 
 
-def test_stop_effect_by_receipt_fires_stop_event() -> None:
+def test_stop_effect_by_receipt_fires_stop_event(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
     output.handle_event_calls.clear()
 
     manager.stop_effect_by_receipt(receipt)
@@ -634,16 +718,17 @@ def test_stop_effect_by_receipt_fires_stop_event() -> None:
     assert output.handle_event_calls == [("fire.stop", Scope.PERSONAL, receipt)]
 
 
-def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect() -> None:
+def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect(pack_env) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
-        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_personal, output_directional],
     )
 
-    fire_receipt = manager.add_effect(Scope.ALL, "fire", 5, {})
+    fire_receipt = manager.add_effect(Scope.ALL, "stub.fire", 5, {})
     # set_effect(PERSONAL) narrows fire to DIRECTIONAL and fires fire.stop to PERSONAL
-    manager.set_effect(Scope.PERSONAL, "ice", 5, {})
+    manager.set_effect(Scope.PERSONAL, "stub.ice", 5, {})
     output_personal.handle_event_calls.clear()
     output_directional.handle_event_calls.clear()
 
@@ -659,32 +744,66 @@ def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect()
 # ---------------------------------------------------------------------------
 
 
-def test_handle_event_receives_personal_scope_for_personal_effect() -> None:
+def test_handle_event_receives_personal_scope_for_personal_effect(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    receipt = manager.add_effect(Scope.PERSONAL, "fire", 5, {})
+    receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
 
     assert output.handle_event_calls == [("fire.start", Scope.PERSONAL, receipt)]
 
 
-def test_handle_event_receives_directional_scope_for_directional_effect() -> None:
+def test_handle_event_receives_directional_scope_for_directional_effect(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = EffectManager(builder=StubEffectBuilder(), outputs=[output])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
-    receipt = manager.add_effect(Scope.DIRECTIONAL, "ice", 5, {})
+    receipt = manager.add_effect(Scope.DIRECTIONAL, "stub.ice", 5, {})
 
     assert output.handle_event_calls == [("ice.start", Scope.DIRECTIONAL, receipt)]
 
 
-def test_handle_event_receives_composite_scope_not_decomposed_leaf() -> None:
+def test_handle_event_receives_composite_scope_not_decomposed_leaf(pack_env) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
-        builder=StubEffectBuilder(), outputs=[output_personal, output_directional]
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_personal, output_directional],
     )
 
-    receipt = manager.add_effect(Scope.ALL, "fire", 5, {})
+    receipt = manager.add_effect(Scope.ALL, "stub.fire", 5, {})
 
     assert output_personal.handle_event_calls == [("fire.start", Scope.ALL, receipt)]
     assert output_directional.handle_event_calls == [("fire.start", Scope.ALL, receipt)]
+
+
+# ---------------------------------------------------------------------------
+# Error cases — malformed effect names
+# ---------------------------------------------------------------------------
+
+
+def test_missing_pack_prefix_raises_value_error() -> None:
+    manager = EffectManager(
+        registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[]
+    )
+
+    with pytest.raises(ValueError, match="missing pack prefix"):
+        manager.set_effect(Scope.PERSONAL, "fire", 5, {})
+
+
+def test_unknown_pack_raises_value_error(pack_env) -> None:
+    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    manager = EffectManager(registry=registry, outputs=[])
+
+    with pytest.raises(ValueError, match="Unknown effect pack 'spells'"):
+        manager.set_effect(Scope.PERSONAL, "spells.fireball", 5, {})
+
+
+def test_unknown_effect_in_known_pack_raises_value_error(pack_env) -> None:
+    _make_pack(pack_env, "elements", {"fire": _stub_item()})
+    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    manager = EffectManager(registry=registry, outputs=[])
+
+    with pytest.raises(ValueError, match="Unknown effect 'flash' in pack 'elements'"):
+        manager.set_effect(Scope.PERSONAL, "elements.flash", 5, {})

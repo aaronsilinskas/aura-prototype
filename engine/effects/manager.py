@@ -1,6 +1,7 @@
 from effects.effect import EffectState, EffectTimer
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
 from engine.effects.scope import ScopeValue
+from engine.packs import PackRegistry
 from engine.timer import Timer
 
 _DEFAULT_RESOLUTION = 16
@@ -143,17 +144,17 @@ class EffectManager(EffectControls):
             )
 
     __slots__ = (
-        "_builder",
         "_effects",
         "_frames",
         "_next_id",
         "_output_key_sets",
         "_outputs",
+        "_registry",
         "_timer",
     )
 
-    def __init__(self, builder: EffectBuilder, outputs: list[EffectOutput]) -> None:
-        self._builder: EffectBuilder = builder
+    def __init__(self, registry: PackRegistry, outputs: list[EffectOutput]) -> None:
+        self._registry: PackRegistry = registry
         self._outputs: list[EffectOutput] = outputs
         self._effects: list[EffectManager._EffectEntry] = []
         self._next_id: int = 1
@@ -181,7 +182,29 @@ class EffectManager(EffectControls):
         level: int,
         options: dict[str, object],
     ) -> "EffectManager._EffectEntry":
-        """Construct an EffectRenderer paired with a fresh EffectState."""
+        """Construct an EffectRenderer paired with a fresh EffectState.
+
+        *name* must be in ``"pack.effect"`` format.  The pack portion is used to
+        look up the registered pack in the ``PackRegistry``; the bare effect name
+        is passed to that pack's builder.
+        """
+        if "." not in name:
+            raise ValueError(
+                f"Effect name '{name}' missing pack prefix (expected 'pack.effect')"
+            )
+        pack_name, effect_name = name.split(".", 1)
+        try:
+            builder = self._registry.get(pack_name, effect_name)
+        except ValueError as exc:
+            msg = str(exc)
+            if msg.startswith("Unknown pack '"):
+                raise ValueError(f"Unknown effect pack '{pack_name}'") from exc
+            if msg.startswith("Unknown item '"):
+                raise ValueError(
+                    f"Unknown effect '{effect_name}' in pack '{pack_name}'"
+                ) from exc
+            raise
+
         receipt = EffectReceipt(self._next_id)
         self._next_id += 1
 
@@ -200,9 +223,9 @@ class EffectManager(EffectControls):
         config = RendererConfig(
             level=level, resolution=resolution, options=options, listeners=[scoped_listener]
         )
-        renderer = self._builder(name, config)
+        renderer = builder(effect_name, config)
         return EffectManager._EffectEntry(
-            scope.keys, name, receipt, output_buffers, renderer, scope, EffectState()
+            scope.keys, effect_name, receipt, output_buffers, renderer, scope, EffectState()
         )
 
     def _append_new_effect(
@@ -249,7 +272,8 @@ class EffectManager(EffectControls):
         scope_key_set = set(scope.keys)
         self._remove_effects_in_scope(scope_key_set)
         receipt = self._append_new_effect(scope, scope_key_set, name, level, options)
-        self._notify_listeners(f"{name}.start", scope_key_set, scope, receipt)
+        effect_name = name.split(".", 1)[1]
+        self._notify_listeners(f"{effect_name}.start", scope_key_set, scope, receipt)
         return receipt
 
     def add_effect(
@@ -262,7 +286,8 @@ class EffectManager(EffectControls):
         """
         scope_key_set = set(scope.keys)
         receipt = self._append_new_effect(scope, scope_key_set, name, level, options)
-        self._notify_listeners(f"{name}.start", scope_key_set, scope, receipt)
+        effect_name = name.split(".", 1)[1]
+        self._notify_listeners(f"{effect_name}.start", scope_key_set, scope, receipt)
         return receipt
 
     def stop_effect_by_receipt(self, receipt: EffectReceipt) -> None:
