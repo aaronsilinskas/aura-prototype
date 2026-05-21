@@ -65,8 +65,16 @@ def test_scan_dir_discovers_subdirectory_with_version_txt(pack_env) -> None:
 
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    # The pack is accessible — no ValueError means it was discovered.
     assert registry.get("mypack", "item_a") == 1
+
+
+def test_scan_dir_on_empty_directory_registers_no_packs(pack_env) -> None:
+    registry = _make_registry()
+
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    with pytest.raises(ValueError, match="Unknown pack"):
+        registry.get("anything", "item")
 
 
 def test_scan_dir_ignores_subdirectory_without_version_txt(pack_env) -> None:
@@ -85,8 +93,9 @@ def test_scan_dir_ignores_plain_files_at_top_level(pack_env) -> None:
     _make_pack(pack_env, "mypack", "1.0", {"item_a": "VALUE = 1"})
     registry = _make_registry()
 
-    # Should not raise — plain files are skipped silently.
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    assert registry.get("mypack", "item_a") == 1
 
 
 def test_scan_dir_records_multiple_packs_from_same_directory(pack_env) -> None:
@@ -121,10 +130,8 @@ def test_scan_dir_called_twice_with_same_path_is_a_no_op(pack_env) -> None:
     registry = _make_registry()
 
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
-    # Second call must not raise and must not create a duplicate.
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    # Still exactly one pack.
     assert registry.get("mypack", "item_a") == 1
 
 
@@ -205,6 +212,17 @@ def test_get_excludes_init_py_from_valid_item_names(pack_env) -> None:
     with pytest.raises(ValueError, match="Unknown item"):
         registry.get("mypack", "__init__")
 
+
+def test_get_returns_value_from_sibling_of_init_py(pack_env) -> None:
+    pack_dir = pack_env / "mypack"
+    pack_dir.mkdir()
+    (pack_dir / "version.txt").write_text("1.0\n")
+    (pack_dir / "__init__.py").write_text("")
+    (pack_dir / "item_a.py").write_text("VALUE = 7")
+
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
     assert registry.get("mypack", "item_a") == 7
 
 
@@ -266,7 +284,6 @@ def test_check_version_passes_when_installed_equals_required(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    # Should not raise.
     registry.check_version("mypack", required_major=1, required_minor=2)
 
 

@@ -148,9 +148,8 @@ class PackRegistry:
             )
 
         cache_key = (pack_name, item_name)
-        cached = self._cache.get(cache_key)
-        if cached is not None:
-            return cached  # type: ignore[return-value]
+        if cache_key in self._cache:
+            return self._cache[cache_key]  # type: ignore[return-value]
 
         full_module = meta.module_prefix + "." + item_name
         module = __import__(full_module, fromlist=[""])
