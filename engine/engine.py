@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from engine.effects.manager import EffectControls
 from engine.events import Event
 from engine.timer import Timer
@@ -30,9 +32,9 @@ class GameRule:
     def __init__(self, name: str, version: Version) -> None:
         self.name = name
         self.version = version
-        self._event_handlers: dict = {}
+        self._event_handlers: dict[type, Callable[[Event, GameState], None]] = {}
 
-    def on(self, event_type: type, handler) -> None:
+    def on(self, event_type: type, handler: Callable[[Event, GameState], None]) -> None:
         """Register a handler for a specific event type.
 
         The handler is called as ``handler(event, state)`` when an event of
@@ -48,21 +50,30 @@ class GameRule:
 
 
 class GameState:
-    """Per-tick context passed to every rule handler.
+    """Persistent game context owned by ``GameEngine``.
 
-    Provides access to the engine, time information, and the effect controls
-    interface for starting and stopping effects.
-    Created fresh each ``update`` tick; do not store references across ticks.
+    Passed by reference to every rule handler on every tick.  Rule-written
+    data in ``state.data`` survives across ticks automatically.
+
+    Provides access to time information, the effect controls interface for
+    starting and stopping effects, and ``queue_event`` so rules can enqueue
+    events without holding a ``GameEngine`` reference.
 
     Time values are read-only; use ``state.elapsed`` and ``state.total`` to
     read per-tick and cumulative time.
     """
 
-    __slots__ = ("_elapsed", "_total", "effect_controls", "engine")
+    __slots__ = ("_elapsed", "_total", "_queue", "data", "effect_controls")
 
-    def __init__(self, engine: GameEngine, effect_controls: EffectControls) -> None:
-        self.engine = engine
+    def __init__(
+        self,
+        effect_controls: EffectControls,
+        queue: list[Event],
+        data: dict[str, object] | None = None,
+    ) -> None:
         self.effect_controls = effect_controls
+        self._queue = queue
+        self.data: dict[str, object] = data if data is not None else {}
         self._elapsed: float = 0.0
         self._total: float = 0.0
 
@@ -75,6 +86,10 @@ class GameState:
     def total(self) -> float:
         """Cumulative seconds elapsed since the engine started."""
         return self._total
+
+    def queue_event(self, event: Event) -> None:
+        """Enqueue an event for processing on the current or next update."""
+        self._queue.append(event)
 
     def _update_time(self, elapsed: float, total: float) -> None:
         """Refresh time values from the engine's timer. Called only by GameEngine."""
@@ -92,24 +107,37 @@ class GameEngine:
 
     An optional ``timer`` argument may be injected at construction time for
     test-time clock control; production code uses the default ``Timer()``.
+
+    An optional ``initial_data`` dict seeds ``state.data`` with starting
+    values; the dict is used directly (no copy).
     """
 
-    __slots__ = ("_effect_controls", "_queue", "_rules", "_timer")
+    __slots__ = ("_effect_controls", "_queue", "_rules", "_state", "_timer")
 
-    def __init__(self, effect_controls: EffectControls, timer: Timer | None = None) -> None:
+    def __init__(
+        self,
+        effect_controls: EffectControls,
+        timer: Timer | None = None,
+        initial_data: dict[str, object] | None = None,
+    ) -> None:
         self._effect_controls = effect_controls
         self._timer = timer if timer is not None else Timer()
         self._rules: list[GameRule] = []
         self._queue: list[Event] = []
+        self._state = GameState(self._effect_controls, self._queue, initial_data)
+
+    @property
+    def state(self) -> GameState:
+        """The persistent ``GameState`` shared across all ticks."""
+        return self._state
 
     def update(self) -> None:
         self._timer.update()
-        state = GameState(self, self._effect_controls)
-        state._update_time(self._timer.elapsed, self._timer.total)
+        self._state._update_time(self._timer.elapsed, self._timer.total)
         while self._queue:
             event = self._queue.pop(0)
             for rule in self._rules:
-                rule.handle_event(event, state)
+                rule.handle_event(event, self._state)
 
     def queue_event(self, event: Event) -> None:
         self._queue.append(event)
