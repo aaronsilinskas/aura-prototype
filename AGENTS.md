@@ -8,7 +8,7 @@
 
 1. `to-prd` — create PRD as a local document only (no GH issue yet).
 2. `grill-with-docs` — challenge the PRD; amend the GH issue with decisions reached. **Do NOT create ADRs** — the design is still evolving and ADRs are premature.
-3. Grill again until no open questions remain.
+3. Keep looping on grilling until no open questions remain.
 4. Move the PRD to a GH issue, delete the local file.
 5. `to-issues` — split PRD into independently-grabbable implementation issues.
 6. `as-work-on-issue` — implement issues in dependency order. After each PR merges, switch back to `main`.
