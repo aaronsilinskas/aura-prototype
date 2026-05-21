@@ -12,6 +12,31 @@ try:
 except ImportError:
     pass
 
+try:
+    from os.path import isdir as _isdir
+    from os.path import isfile as _isfile
+    from os.path import join as _path_join
+    from os.path import normpath as _normpath
+except (ImportError, AttributeError):
+    # CircuitPython / MicroPython: os.path is not available; use os.stat instead.
+    def _normpath(p):  # type: ignore[misc]
+        return p
+
+    def _path_join(a, b):  # type: ignore[misc]
+        return a.rstrip("/") + "/" + b
+
+    def _isdir(p):  # type: ignore[misc]
+        try:
+            return bool(os.stat(p)[0] & 0x4000)
+        except OSError:
+            return False
+
+    def _isfile(p):  # type: ignore[misc]
+        try:
+            return bool(os.stat(p)[0] & 0x8000)
+        except OSError:
+            return False
+
 
 class _PackEntry:
     """Metadata for a single discovered pack. Internal use only."""
@@ -73,15 +98,15 @@ class PackRegistry:
         *path* is a no-op.  Discovering a pack name that was already registered
         from a **different** source path raises ``ValueError``.
         """
-        norm_path = os.path.normpath(path)
+        norm_path = _normpath(path)
         if norm_path in self._scanned_dirs:
             return
         self._scanned_dirs.add(norm_path)
 
         for entry in os.listdir(norm_path):
-            pack_dir = os.path.join(norm_path, entry)
-            version_file = os.path.join(pack_dir, "version.txt")
-            if not os.path.isdir(pack_dir) or not os.path.isfile(version_file):
+            pack_dir = _path_join(norm_path, entry)
+            version_file = _path_join(pack_dir, "version.txt")
+            if not _isdir(pack_dir) or not _isfile(version_file):
                 continue
 
             pack_name = entry
@@ -151,9 +176,7 @@ class PackRegistry:
         self._cache[cache_key] = value
         return value  # type: ignore[return-value]
 
-    def check_version(
-        self, pack_name: str, required_major: int, required_minor: int
-    ) -> None:
+    def check_version(self, pack_name: str, required_major: int, required_minor: int) -> None:
         """Verify that the installed pack version satisfies the minimum required.
 
         Compatibility rules (MAJOR.MINOR semantics):
