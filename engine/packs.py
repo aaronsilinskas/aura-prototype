@@ -2,6 +2,7 @@
 
 import os
 
+import engine._path as _path
 from engine.version import Version
 
 try:
@@ -73,15 +74,15 @@ class PackRegistry:
         *path* is a no-op.  Discovering a pack name that was already registered
         from a **different** source path raises ``ValueError``.
         """
-        norm_path = os.path.normpath(path)
+        norm_path = _path.normpath(path)
         if norm_path in self._scanned_dirs:
             return
         self._scanned_dirs.add(norm_path)
 
         for entry in os.listdir(norm_path):
-            pack_dir = os.path.join(norm_path, entry)
-            version_file = os.path.join(pack_dir, "version.txt")
-            if not os.path.isdir(pack_dir) or not os.path.isfile(version_file):
+            pack_dir = _path.join(norm_path, entry)
+            version_file = _path.join(pack_dir, "version.txt")
+            if not _path.isdir(pack_dir) or not _path.isfile(version_file):
                 continue
 
             pack_name = entry
@@ -146,14 +147,12 @@ class PackRegistry:
             return self._cache[cache_key]  # type: ignore[return-value]
 
         full_module = meta.module_prefix + "." + item_name
-        module = __import__(full_module, fromlist=[""])
+        module = __import__(full_module, None, None, [""])
         value = self._extractor(module)
         self._cache[cache_key] = value
         return value  # type: ignore[return-value]
 
-    def check_version(
-        self, pack_name: str, required_major: int, required_minor: int
-    ) -> None:
+    def check_version(self, pack_name: str, required_major: int, required_minor: int) -> None:
         """Verify that the installed pack version satisfies the minimum required.
 
         Compatibility rules (MAJOR.MINOR semantics):

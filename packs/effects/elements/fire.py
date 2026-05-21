@@ -33,3 +33,10 @@ def build_fire_renderer(config: RendererConfig) -> EffectRenderer:
     )
 
     return EffectRenderer(fire_effect, PaletteLUT256(fire_palette))
+
+
+def _build(name: str, config: RendererConfig) -> EffectRenderer:
+    return build_fire_renderer(config)
+
+
+BUILD = _build

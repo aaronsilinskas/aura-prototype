@@ -1,22 +1,24 @@
+import os
 import select
 import sys
 import termios
 import time
 import tty
 
-from packs.effects.elements.registry import build_element_renderer
-from effects.render import EffectRenderer, PixelBuffer, RendererConfig
-from engine.effects.manager import EffectBuilder, EffectManager, EffectOutput
+from effects.render import PixelBuffer
+from engine.effects.manager import EffectManager, EffectOutput
 from engine.effects.scope import Scope
 from engine.engine import GameEngine, GameRule, GameState, Version
 from engine.events import Event
 from engine.input import ButtonData, InputEvents, MovementData
+from engine.packs import PackRegistry
 from engine.timer import Timer
 
-
-class ElementEffectBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
-        return build_element_renderer(name, config)
+_packs_dir = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "packs", "effects")
+)
+_registry = PackRegistry(extractor=lambda m: m.BUILD)
+_registry.scan_dir(_packs_dir, "packs.effects")
 
 
 MAX_FRAMES = 4  # fixed display block height; add_effect can layer up to this many effects
@@ -69,7 +71,7 @@ class AnsiEffectOutput(EffectOutput):
 
 
 personal_output = AnsiEffectOutput(scopes=[Scope.PERSONAL])
-effect_manager = EffectManager(builder=ElementEffectBuilder(), outputs=[personal_output])
+effect_manager = EffectManager(registry=_registry, outputs=[personal_output])
 
 game_engine = GameEngine(effect_controls=effect_manager)
 
@@ -82,11 +84,11 @@ class MakeEffectRule(GameRule):
         if isinstance(event, InputEvents.ButtonAndMovement):
             button_data = event.buttons
             if button_data.states["A"] == ButtonData.PRESSED:
-                state.effect_controls.add_effect(Scope.PERSONAL, "fire", 5, {})
+                state.effect_controls.add_effect(Scope.PERSONAL, "elements.fire", 5, {})
             elif button_data.states["B"] == ButtonData.PRESSED:
-                state.effect_controls.add_effect(Scope.PERSONAL, "water", 5, {})
+                state.effect_controls.add_effect(Scope.PERSONAL, "elements.water", 5, {})
             elif button_data.states["C"] == ButtonData.PRESSED:
-                state.effect_controls.add_effect(Scope.PERSONAL, "lightning", 5, {})
+                state.effect_controls.add_effect(Scope.PERSONAL, "elements.lightning", 5, {})
             elif button_data.states["D"] == ButtonData.PRESSED:
                 state.effect_controls.stop_effect(Scope.ALL)
 

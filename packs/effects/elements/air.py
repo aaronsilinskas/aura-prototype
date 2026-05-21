@@ -74,3 +74,10 @@ def build_air_renderer(config: RendererConfig) -> EffectRenderer:
         return renderers[0]
 
     return MergeRenderer("air", renderers, additive=True)
+
+
+def _build(name: str, config: RendererConfig) -> EffectRenderer:
+    return build_air_renderer(config)
+
+
+BUILD = _build

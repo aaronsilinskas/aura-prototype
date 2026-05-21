@@ -37,3 +37,10 @@ def build_time_renderer(config: RendererConfig) -> EffectRenderer:
     time_ticker_renderer = EffectRenderer(time_ticker_effect, PaletteLUT256(grayscale_palette))
 
     return MergeRenderer("time", [time_sand_renderer, time_ticker_renderer], additive=True)
+
+
+def _build(name: str, config: RendererConfig) -> EffectRenderer:
+    return build_time_renderer(config)
+
+
+BUILD = _build

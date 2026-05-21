@@ -34,3 +34,10 @@ def build_light_renderer(config: RendererConfig) -> EffectRenderer:
     )
 
     return EffectRenderer(light_effect, PaletteLUT256(light_palette))
+
+
+def _build(name: str, config: RendererConfig) -> EffectRenderer:
+    return build_light_renderer(config)
+
+
+BUILD = _build
