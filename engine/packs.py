@@ -1,7 +1,5 @@
 """PackRegistry — auto-discovers named packs from a directory and lazily loads items."""
 
-from __future__ import annotations
-
 import os
 
 try:
@@ -13,27 +11,71 @@ except ImportError:
     pass
 
 
-def _parse_version(version_str: str) -> tuple[int, int]:
-    """Parse a ``'MAJOR.MINOR'`` string into an ``(major, minor)`` int tuple."""
-    parts = version_str.strip().split(".")
-    return int(parts[0]), int(parts[1])
+class Version:
+    """Parsed MAJOR.MINOR version with compatibility checking. Internal use only."""
+
+    __slots__ = ("major", "minor")
+
+    def __init__(self, major: int, minor: int) -> None:
+        self.major = major
+        self.minor = minor
+
+    @staticmethod
+    def parse(version_str: str) -> "Version":
+        """Parse a ``'MAJOR.MINOR'`` string into a :class:`Version`."""
+        parts = version_str.strip().split(".")
+        return Version(int(parts[0]), int(parts[1]))
+
+    def check_compatible(
+        self, pack_name: str, required_major: int, required_minor: int
+    ) -> None:
+        """Raise ``ValueError`` if this version does not satisfy the minimum required.
+
+        * Same major and ``self.minor >= required_minor`` → compatible (no-op).
+        * Same major and ``self.minor < required_minor`` →
+          ``ValueError`` containing "upgrade the pack".
+        * Different major → ``ValueError`` containing "incompatible".
+        """
+        version_display = str(self.major) + "." + str(self.minor)
+        required_display = str(required_major) + "." + str(required_minor)
+        if self.major != required_major:
+            raise ValueError(
+                "Pack '"
+                + pack_name
+                + "' version "
+                + version_display
+                + " is incompatible with required "
+                + required_display
+            )
+        if self.minor < required_minor:
+            raise ValueError(
+                "Pack '"
+                + pack_name
+                + "' version "
+                + version_display
+                + " is too old; upgrade the pack to at least "
+                + required_display
+            )
+
+    def __str__(self) -> str:
+        return str(self.major) + "." + str(self.minor)
 
 
 class _PackEntry:
     """Metadata for a single discovered pack. Internal use only."""
 
-    __slots__ = ("item_names", "module_prefix", "name", "source_path", "version_str")
+    __slots__ = ("item_names", "module_prefix", "name", "source_path", "version")
 
     def __init__(
         self,
         name: str,
-        version_str: str,
+        version: Version,
         module_prefix: str,
         item_names: set[str],
         source_path: str,
     ) -> None:
         self.name = name
-        self.version_str = version_str
+        self.version = version
         self.module_prefix = module_prefix
         self.item_names = item_names
         self.source_path = source_path
@@ -61,7 +103,7 @@ class PackRegistry:
 
     __slots__ = ("_cache", "_extractor", "_packs", "_scanned_dirs")
 
-    def __init__(self, extractor: Callable[[object], T]) -> None:
+    def __init__(self, extractor: "Callable[[object], T]") -> None:
         self._extractor = extractor
         self._packs: dict[str, _PackEntry] = {}
         self._cache: dict[tuple[str, str], object] = {}
@@ -117,13 +159,13 @@ class PackRegistry:
             full_prefix = module_prefix + "." + pack_name
             self._packs[pack_name] = _PackEntry(
                 name=pack_name,
-                version_str=version_str,
+                version=Version.parse(version_str),
                 module_prefix=full_prefix,
                 item_names=item_names,
                 source_path=norm_path,
             )
 
-    def get(self, pack_name: str, item_name: str) -> T:
+    def get(self, pack_name: str, item_name: str) -> "T":
         """Return the extracted value for *item_name* from *pack_name*.
 
         The item is imported on first access and the result is cached.
@@ -177,28 +219,4 @@ class PackRegistry:
         if meta is None:
             raise ValueError("Unknown pack '" + pack_name + "'")
 
-        installed_major, installed_minor = _parse_version(meta.version_str)
-
-        if installed_major != required_major:
-            raise ValueError(
-                "Pack '"
-                + pack_name
-                + "' version "
-                + meta.version_str
-                + " is incompatible with required "
-                + str(required_major)
-                + "."
-                + str(required_minor)
-            )
-
-        if installed_minor < required_minor:
-            raise ValueError(
-                "Pack '"
-                + pack_name
-                + "' version "
-                + meta.version_str
-                + " is too old; upgrade the pack to at least "
-                + str(required_major)
-                + "."
-                + str(required_minor)
-            )
+        meta.version.check_compatible(pack_name, required_major, required_minor)
