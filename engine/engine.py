@@ -5,16 +5,9 @@ from collections.abc import Callable
 from engine.effects.manager import EffectControls
 from engine.events import Event
 from engine.timer import Timer
+from engine.version import Version
 
-
-class Version:
-    """Major and minor version identifier for a game rule."""
-
-    __slots__ = ("major", "minor")
-
-    def __init__(self, major: int, minor: int) -> None:
-        self.major = major
-        self.minor = minor
+__all__ = ["GameEngine", "GameRule", "GameState", "Version"]
 
 
 class GameRule:
@@ -63,7 +56,7 @@ class GameState:
     read per-tick and cumulative time.
     """
 
-    __slots__ = ("_elapsed", "_total", "_queue", "data", "effect_controls")
+    __slots__ = ("_elapsed", "_queue", "_total", "data", "effect_controls")
 
     def __init__(
         self,

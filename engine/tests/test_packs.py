@@ -1,0 +1,362 @@
+"""Tests for engine.packs.PackRegistry.
+
+All tests use a real temporary filesystem (tmp_path) to exercise the actual
+``os.listdir`` + ``__import__`` code path.
+"""
+
+from __future__ import annotations
+
+import sys
+
+import pytest
+
+from engine.packs import PackRegistry
+
+# ---------------------------------------------------------------------------
+# Helpers / fixtures
+# ---------------------------------------------------------------------------
+
+
+MODULE_PREFIX = "tp"
+
+
+@pytest.fixture()
+def pack_env(tmp_path):
+    """Yield a ``tp/`` subdirectory of tmp_path as the packs root.
+
+    ``tmp_path`` is inserted into ``sys.path`` so that module names of the
+    form ``tp.<pack>.<item>`` resolve to the real files created by tests.
+    All imported modules added during the test are removed on teardown.
+    """
+    packs_root = tmp_path / MODULE_PREFIX
+    packs_root.mkdir()
+    sys.path.insert(0, str(tmp_path))
+    known_modules = set(sys.modules)
+    yield packs_root
+    # Remove any modules that were imported during the test.
+    for key in list(sys.modules):
+        if key not in known_modules:
+            del sys.modules[key]
+    sys.path.remove(str(tmp_path))
+
+
+def _make_pack(root, pack_name: str, version: str, items: dict[str, str]) -> None:
+    """Create a pack directory under *root* with the given version and item files."""
+    pack_dir = root / pack_name
+    pack_dir.mkdir(parents=True, exist_ok=True)
+    (pack_dir / "version.txt").write_text(version + "\n")
+    for item_name, content in items.items():
+        (pack_dir / (item_name + ".py")).write_text(content)
+
+
+def _make_registry(attr: str = "VALUE") -> PackRegistry:
+    """Return a PackRegistry whose extractor reads the named module attribute."""
+    return PackRegistry(extractor=lambda module: getattr(module, attr))
+
+
+# ---------------------------------------------------------------------------
+# scan_dir — discovery
+# ---------------------------------------------------------------------------
+
+
+def test_scan_dir_discovers_subdirectory_with_version_txt(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.0", {"item_a": "VALUE = 1"})
+    registry = _make_registry()
+
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    assert registry.get("mypack", "item_a") == 1
+
+
+def test_scan_dir_on_empty_directory_registers_no_packs(pack_env) -> None:
+    registry = _make_registry()
+
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    with pytest.raises(ValueError, match="Unknown pack"):
+        registry.get("anything", "item")
+
+
+def test_scan_dir_ignores_subdirectory_without_version_txt(pack_env) -> None:
+    (pack_env / "notapack").mkdir()
+    (pack_env / "notapack" / "item_a.py").write_text("VALUE = 99")
+    registry = _make_registry()
+
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    with pytest.raises(ValueError, match="Unknown pack"):
+        registry.get("notapack", "item_a")
+
+
+def test_scan_dir_ignores_plain_files_at_top_level(pack_env) -> None:
+    (pack_env / "readme.txt").write_text("hello")
+    _make_pack(pack_env, "mypack", "1.0", {"item_a": "VALUE = 1"})
+    registry = _make_registry()
+
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    assert registry.get("mypack", "item_a") == 1
+
+
+def test_scan_dir_records_multiple_packs_from_same_directory(pack_env) -> None:
+    _make_pack(pack_env, "pack_a", "1.0", {"x": "VALUE = 10"})
+    _make_pack(pack_env, "pack_b", "2.0", {"y": "VALUE = 20"})
+    registry = _make_registry()
+
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    assert registry.get("pack_a", "x") == 10
+    assert registry.get("pack_b", "y") == 20
+
+
+def test_scan_dir_no_modules_imported_during_scan(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.0", {"item_a": "VALUE = 1"})
+    registry = _make_registry()
+    known_before = set(sys.modules)
+
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    new_modules = set(sys.modules) - known_before
+    assert new_modules == set(), f"Unexpected imports during scan: {new_modules}"
+
+
+# ---------------------------------------------------------------------------
+# scan_dir — idempotency
+# ---------------------------------------------------------------------------
+
+
+def test_scan_dir_called_twice_with_same_path_is_a_no_op(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.0", {"item_a": "VALUE = 1"})
+    registry = _make_registry()
+
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    assert registry.get("mypack", "item_a") == 1
+
+
+def test_scan_dir_second_call_does_not_pick_up_packs_added_after_first_scan(
+    pack_env,
+) -> None:
+    _make_pack(pack_env, "pack_a", "1.0", {"x": "VALUE = 1"})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    # Add a new pack after the first scan.
+    _make_pack(pack_env, "pack_b", "1.0", {"y": "VALUE = 2"})
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)  # no-op
+
+    with pytest.raises(ValueError, match="Unknown pack"):
+        registry.get("pack_b", "y")
+
+
+# ---------------------------------------------------------------------------
+# scan_dir — name collision from different source
+# ---------------------------------------------------------------------------
+
+
+def test_scan_dir_raises_when_same_pack_name_comes_from_different_directory(
+    pack_env,
+) -> None:
+    src_a = pack_env / "src_a"
+    src_b = pack_env / "src_b"
+    src_a.mkdir()
+    src_b.mkdir()
+    _make_pack(src_a, "mypack", "1.0", {"x": "VALUE = 1"})
+    _make_pack(src_b, "mypack", "2.0", {"x": "VALUE = 2"})
+
+    registry = _make_registry()
+    registry.scan_dir(str(src_a), "tp.a")
+
+    with pytest.raises(ValueError):
+        registry.scan_dir(str(src_b), "tp.b")
+
+
+# ---------------------------------------------------------------------------
+# get — item lookup validation
+# ---------------------------------------------------------------------------
+
+
+def test_get_raises_for_unknown_pack(pack_env) -> None:
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    with pytest.raises(ValueError, match="Unknown pack"):
+        registry.get("nonexistent", "item_a")
+
+
+def test_get_raises_for_unknown_item_name_before_any_import(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.0", {"item_a": "VALUE = 1"})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+    known_before = set(sys.modules)
+
+    with pytest.raises(ValueError, match="Unknown item"):
+        registry.get("mypack", "ghost_item")
+
+    # No new modules should have been imported.
+    new_modules = set(sys.modules) - known_before
+    assert new_modules == set(), f"Unexpected imports: {new_modules}"
+
+
+def test_get_excludes_init_py_from_valid_item_names(pack_env) -> None:
+    pack_dir = pack_env / "mypack"
+    pack_dir.mkdir()
+    (pack_dir / "version.txt").write_text("1.0\n")
+    (pack_dir / "__init__.py").write_text("")
+    (pack_dir / "item_a.py").write_text("VALUE = 7")
+
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    with pytest.raises(ValueError, match="Unknown item"):
+        registry.get("mypack", "__init__")
+
+
+def test_get_returns_value_from_sibling_of_init_py(pack_env) -> None:
+    pack_dir = pack_env / "mypack"
+    pack_dir.mkdir()
+    (pack_dir / "version.txt").write_text("1.0\n")
+    (pack_dir / "__init__.py").write_text("")
+    (pack_dir / "item_a.py").write_text("VALUE = 7")
+
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    assert registry.get("mypack", "item_a") == 7
+
+
+# ---------------------------------------------------------------------------
+# get — lazy import + caching
+# ---------------------------------------------------------------------------
+
+
+def test_get_imports_module_and_extracts_value_on_first_call(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.0", {"fire": "VALUE = 42"})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    result = registry.get("mypack", "fire")
+
+    assert result == 42
+
+
+def test_get_returns_cached_value_on_subsequent_calls(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.0", {"fire": "VALUE = 42"})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    first = registry.get("mypack", "fire")
+    second = registry.get("mypack", "fire")
+
+    assert first is second
+
+
+def test_get_only_imports_module_once(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.0", {"fire": "VALUE = 42"})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    registry.get("mypack", "fire")
+    modules_after_first = set(sys.modules)
+    registry.get("mypack", "fire")
+
+    assert set(sys.modules) == modules_after_first
+
+
+def test_get_uses_extractor_to_pull_value_from_module(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.0", {"item_a": "GREETING = 'hello'"})
+    registry = PackRegistry(extractor=lambda module: module.GREETING)
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    result = registry.get("mypack", "item_a")
+
+    assert result == "hello"
+
+
+# ---------------------------------------------------------------------------
+# check_version — compatible
+# ---------------------------------------------------------------------------
+
+
+def test_check_version_passes_when_installed_equals_required(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.2", {})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    registry.check_version("mypack", required_major=1, required_minor=2)
+
+
+def test_check_version_passes_when_installed_minor_is_greater(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.5", {})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    registry.check_version("mypack", required_major=1, required_minor=2)
+
+
+# ---------------------------------------------------------------------------
+# check_version — minor too old
+# ---------------------------------------------------------------------------
+
+
+def test_check_version_raises_upgrade_message_when_installed_minor_is_less(
+    pack_env,
+) -> None:
+    _make_pack(pack_env, "mypack", "1.1", {})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    with pytest.raises(ValueError, match="upgrade the pack"):
+        registry.check_version("mypack", required_major=1, required_minor=2)
+
+
+# ---------------------------------------------------------------------------
+# check_version — different major
+# ---------------------------------------------------------------------------
+
+
+def test_check_version_raises_incompatible_when_major_differs_higher(
+    pack_env,
+) -> None:
+    _make_pack(pack_env, "mypack", "2.0", {})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    with pytest.raises(ValueError, match="incompatible"):
+        registry.check_version("mypack", required_major=1, required_minor=0)
+
+
+def test_check_version_raises_incompatible_when_major_differs_lower(
+    pack_env,
+) -> None:
+    _make_pack(pack_env, "mypack", "1.0", {})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    with pytest.raises(ValueError, match="incompatible"):
+        registry.check_version("mypack", required_major=2, required_minor=0)
+
+
+def test_check_version_raises_for_unknown_pack(pack_env) -> None:
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    with pytest.raises(ValueError, match="Unknown pack"):
+        registry.check_version("ghost", required_major=1, required_minor=0)
+
+
+# ---------------------------------------------------------------------------
+# PackRegistry uses __slots__
+# ---------------------------------------------------------------------------
+
+
+def test_pack_registry_uses_slots() -> None:
+    assert hasattr(PackRegistry, "__slots__")
+
+
+def test_pack_registry_does_not_allow_arbitrary_attributes() -> None:
+    registry = _make_registry()
+
+    with pytest.raises(AttributeError):
+        registry.unexpected_attr = "oops"  # type: ignore[attr-defined]
