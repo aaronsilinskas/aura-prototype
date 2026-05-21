@@ -1,7 +1,7 @@
 from engine.events import Event, EventGroup
 from engine.input import ButtonData, InputEvents
-from rules.conftest import EngineFixture
-from rules.debug_pack.button_events import ButtonEventsRule
+from packs.rules.conftest import EngineFixture
+from packs.rules.debug_pack.button_events import ButtonEventsRule
 
 _GROUP = EventGroup("test")
 

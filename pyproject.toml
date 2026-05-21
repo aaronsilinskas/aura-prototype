@@ -20,7 +20,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["effects", "engine", "magic", "rules", "scripts"]
+testpaths = ["effects", "engine", "magic", "packs", "scripts"]
 pythonpath = ["."]
 addopts = "-p no:debugging"
 
@@ -50,5 +50,5 @@ ignore = [
 ]
 
 [tool.importlinter]
-root_packages = ["effects", "engine", "magic", "rules"]
+root_packages = ["effects", "engine", "magic", "packs"]
 source_roots = ["."]

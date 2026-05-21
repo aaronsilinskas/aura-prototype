@@ -27,3 +27,6 @@ class EventLoggerRule(GameRule):
                 if slot not in ("group", "name"):
                     parts.append(f"{slot}={getattr(event, slot)}")
         self._output(f"[debug] t={state.total:.3f} {str(event).upper()} {', '.join(parts)}")
+
+
+rule = EventLoggerRule()

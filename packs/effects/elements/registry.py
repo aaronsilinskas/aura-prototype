@@ -6,16 +6,16 @@ try:
 except ImportError:
     pass
 
-from effects.elements.air import build_air_renderer
-from effects.elements.dark import build_dark_renderer
-from effects.elements.earth import build_earth_renderer
-from effects.elements.fire import build_fire_renderer
-from effects.elements.gravity import build_gravity_renderer
-from effects.elements.ice import build_ice_renderer
-from effects.elements.light import build_light_renderer
-from effects.elements.lightning import build_lightning_renderer
-from effects.elements.time import build_time_renderer
-from effects.elements.water import build_water_renderer
+from packs.effects.elements.air import build_air_renderer
+from packs.effects.elements.dark import build_dark_renderer
+from packs.effects.elements.earth import build_earth_renderer
+from packs.effects.elements.fire import build_fire_renderer
+from packs.effects.elements.gravity import build_gravity_renderer
+from packs.effects.elements.ice import build_ice_renderer
+from packs.effects.elements.light import build_light_renderer
+from packs.effects.elements.lightning import build_lightning_renderer
+from packs.effects.elements.time import build_time_renderer
+from packs.effects.elements.water import build_water_renderer
 from effects.render import EffectRenderer, RendererConfig
 
 ElementBuilder: TypeAlias = "Callable[[RendererConfig], EffectRenderer]"
