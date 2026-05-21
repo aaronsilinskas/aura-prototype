@@ -1,6 +1,7 @@
 from effects.effect import Effect
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
+from effects.steps.control import call
 from engine.effects.manager import EffectBuilder, EffectOutput, EffectReceipt
 
 
@@ -31,3 +32,52 @@ class StubEffectBuilder(EffectBuilder):
 
     def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
         return EffectRenderer(Effect(name), PaletteLUT256(b""))
+
+
+class SpyRenderer:
+    """Minimal renderer that counts how many times ``update`` was called."""
+
+    def __init__(self) -> None:
+        self.update_count: int = 0
+
+    def update(self, state: object, timer: object) -> None:
+        self.update_count += 1
+
+    def render(self, state: object, buf: object) -> None:
+        pass
+
+
+class SpyEffectBuilder(EffectBuilder):
+    """Builder that records each renderer it creates, for update-count assertions."""
+
+    def __init__(self) -> None:
+        self.created: list[SpyRenderer] = []
+
+    def __call__(self, name: str, config: RendererConfig) -> SpyRenderer:
+        renderer = SpyRenderer()
+        self.created.append(renderer)
+        return renderer
+
+
+class CapturingEffectBuilder(EffectBuilder):
+    """Builder that captures the last ``RendererConfig`` it received."""
+
+    def __init__(self) -> None:
+        self.last_config: RendererConfig | None = None
+
+    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+        self.last_config = config
+        return EffectRenderer(Effect(name), PaletteLUT256(b""))
+
+
+class EventFiringEffectBuilder(EffectBuilder):
+    """Builder that creates a renderer which fires a named event on each update."""
+
+    def __init__(self, event_name: str) -> None:
+        self._event_name = event_name
+
+    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+        event_name = self._event_name
+        step = call(lambda state, timer: config.notify_listeners(event_name))
+        effect = Effect(name).add_steps([step])
+        return EffectRenderer(effect, PaletteLUT256(b""))
