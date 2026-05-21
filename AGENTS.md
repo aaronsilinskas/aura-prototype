@@ -7,7 +7,7 @@
 ### PRD workflow
 
 1. `to-prd` — create PRD as a GH issue.
-2. `grill-me` — challenge the PRD; amend the GH issue with decisions reached.
+2. `grill-with-docs` — challenge the PRD; amend the GH issue with decisions reached.
 3. Grill again until no open questions remain.
 4. `to-issues` — split PRD into independently-grabbable implementation issues.
 5. `as-work-on-issue` — implement issues in dependency order. After each PR merges, switch back to `main`.
