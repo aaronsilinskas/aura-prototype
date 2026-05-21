@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+try:
+    from collections.abc import Callable
+except ImportError:
+    pass  # No typing support on CircuitPython yet
 
 from engine.effects.manager import EffectControls
 from engine.events import Event
