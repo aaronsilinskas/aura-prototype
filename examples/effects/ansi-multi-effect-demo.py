@@ -4,7 +4,7 @@ import termios
 import time
 import tty
 
-from effects.elements.registry import build_element_renderer
+from packs.effects.elements.registry import build_element_renderer
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
 from engine.effects.manager import EffectBuilder, EffectManager, EffectOutput
 from engine.effects.scope import Scope

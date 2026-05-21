@@ -16,7 +16,7 @@ import time
 from collections.abc import Iterable
 
 from effects.effect import EffectState, EffectTimer
-from effects.elements.registry import ELEMENT_BUILDERS, build_element_renderer
+from packs.effects.elements.registry import ELEMENT_BUILDERS, build_element_renderer
 from effects.render import PixelBuffer, RendererConfig
 
 PIXEL_COUNT = 32

@@ -1,6 +1,6 @@
 from engine.input import ButtonData, InputEvents, MovementData
-from rules.conftest import CapturingLogger, EngineFixture
-from rules.debug_pack.event_logger import EventLoggerRule
+from packs.rules.conftest import CapturingLogger, EngineFixture
+from packs.rules.debug_pack.event_logger import EventLoggerRule
 
 _BUTTON_DATA = ButtonData(
     states={
