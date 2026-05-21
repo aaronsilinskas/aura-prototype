@@ -28,8 +28,7 @@ def _make_effect_controls() -> EffectControls:
 
 def _make_state() -> GameState:
     controls = _make_effect_controls()
-    engine = GameEngine(effect_controls=controls)
-    return GameState(engine, controls)
+    return GameState(controls, [])
 
 
 class _CapturingRule(GameRule):
@@ -177,3 +176,128 @@ def test_game_engine_uses_injected_timer_to_control_state_time() -> None:
 
     assert rule.seen_elapsed[0] == pytest.approx(0.1)
     assert rule.seen_total[0] == pytest.approx(5.0)
+
+
+# ---------------------------------------------------------------------------
+# GameState.data — persistent data dict
+# ---------------------------------------------------------------------------
+
+
+def test_game_state_data_defaults_to_empty_dict() -> None:
+    state = _make_state()
+
+    assert state.data == {}
+
+
+def test_game_state_constructed_standalone_with_initial_data() -> None:
+    controls = _make_effect_controls()
+    data = {"key": "val"}
+    state = GameState(controls, [], data)
+
+    assert state.data["key"] == "val"
+
+
+def test_game_state_holds_no_reference_to_engine() -> None:
+    state = _make_state()
+
+    assert not hasattr(state, "engine")
+
+
+# ---------------------------------------------------------------------------
+# GameEngine.state — persistent state property
+# ---------------------------------------------------------------------------
+
+
+def test_game_engine_state_property_returns_same_object_across_updates() -> None:
+    engine = GameEngine(effect_controls=_make_effect_controls())
+    engine.queue_event(Event(_GROUP, "tick"))
+
+    state_before = engine.state
+    engine.update()
+    state_after = engine.state
+
+    assert state_before is state_after
+
+
+def test_game_engine_data_written_in_one_tick_survives_to_next_tick() -> None:
+    class _WriterRule(GameRule):
+        def __init__(self) -> None:
+            super().__init__("test.writer", Version(1, 0))
+
+        def handle_event(self, event: Event, state: GameState) -> None:
+            state.data["counter"] = state.data.get("counter", 0) + 1
+
+    engine = GameEngine(effect_controls=_make_effect_controls())
+    rule = _WriterRule()
+    engine.add_rules(rule)
+
+    engine.queue_event(Event(_GROUP, "tick"))
+    engine.update()
+    engine.queue_event(Event(_GROUP, "tick"))
+    engine.update()
+
+    assert engine.state.data["counter"] == 2
+
+
+def test_game_engine_data_written_by_one_rule_readable_by_another_same_tick() -> None:
+    class _WriteRule(GameRule):
+        def __init__(self) -> None:
+            super().__init__("test.write", Version(1, 0))
+
+        def handle_event(self, event: Event, state: GameState) -> None:
+            state.data["shared"] = 42
+
+    class _ReadRule(GameRule):
+        def __init__(self) -> None:
+            super().__init__("test.read", Version(1, 0))
+            self.read_value = None
+
+        def handle_event(self, event: Event, state: GameState) -> None:
+            self.read_value = state.data.get("shared")
+
+    engine = GameEngine(effect_controls=_make_effect_controls())
+    write_rule = _WriteRule()
+    read_rule = _ReadRule()
+    engine.add_rules(write_rule, read_rule)
+    engine.queue_event(Event(_GROUP, "tick"))
+
+    engine.update()
+
+    assert read_rule.read_value == 42
+
+
+def test_game_engine_initial_data_seeds_state_data_before_update() -> None:
+    engine = GameEngine(
+        effect_controls=_make_effect_controls(),
+        initial_data={"score": 0},
+    )
+
+    assert engine.state.data["score"] == 0
+
+
+# ---------------------------------------------------------------------------
+# GameState.queue_event — enqueue via state
+# ---------------------------------------------------------------------------
+
+
+def test_game_state_queue_event_enqueues_event_processed_by_engine() -> None:
+    captured: list[Event] = []
+
+    class _QueueRule(GameRule):
+        def __init__(self) -> None:
+            super().__init__("test.queue", Version(1, 0))
+
+        def handle_event(self, event: Event, state: GameState) -> None:
+            if event.name == "trigger":
+                state.queue_event(Event(_GROUP, "queued"))
+            elif event.name == "queued":
+                captured.append(event)
+
+    engine = GameEngine(effect_controls=_make_effect_controls())
+    engine.add_rules(_QueueRule())
+    engine.queue_event(Event(_GROUP, "trigger"))
+
+    engine.update()
+
+    assert len(captured) == 1
+    assert captured[0].name == "queued"

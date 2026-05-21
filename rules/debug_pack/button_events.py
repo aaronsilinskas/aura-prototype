@@ -41,4 +41,4 @@ class ButtonEventsRule(GameRule):
             if state_map is not None:
                 button_event = state_map.get(button_name)
                 if button_event is not None:
-                    state.engine.queue_event(button_event)
+                    state.queue_event(button_event)
