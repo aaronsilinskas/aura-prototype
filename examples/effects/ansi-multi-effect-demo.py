@@ -145,7 +145,7 @@ def main() -> None:
                 if key == "q":
                     break
             game_engine.queue_event(_make_event(key))
-            game_engine.update(timer)
+            game_engine.update()
             effect_manager.update(timer)
             time.sleep(0.033)  # ~30 fps
     finally:

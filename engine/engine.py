@@ -50,37 +50,62 @@ class GameRule:
 class GameState:
     """Per-tick context passed to every rule handler.
 
-    Provides access to the engine, the current frame timer, and the
-    effect controls interface for starting and stopping effects.
+    Provides access to the engine, time information, and the effect controls
+    interface for starting and stopping effects.
     Created fresh each ``update`` tick; do not store references across ticks.
+
+    Time values are read-only; use ``state.elapsed`` and ``state.total`` to
+    read per-tick and cumulative time.
     """
 
-    __slots__ = ("effect_controls", "engine", "timer")
+    __slots__ = ("_elapsed", "_total", "effect_controls", "engine")
 
-    def __init__(self, engine: GameEngine, timer: Timer, effect_controls: EffectControls) -> None:
+    def __init__(self, engine: GameEngine, effect_controls: EffectControls) -> None:
         self.engine = engine
-        self.timer = timer
         self.effect_controls = effect_controls
+        self._elapsed: float = 0.0
+        self._total: float = 0.0
+
+    @property
+    def elapsed(self) -> float:
+        """Seconds elapsed during the most recent tick."""
+        return self._elapsed
+
+    @property
+    def total(self) -> float:
+        """Cumulative seconds elapsed since the engine started."""
+        return self._total
+
+    def _update_time(self, elapsed: float, total: float) -> None:
+        """Refresh time values from the engine's timer. Called only by GameEngine."""
+        self._elapsed = elapsed
+        self._total = total
 
 
 class GameEngine:
     """Drives the game loop by dispatching queued events to registered rules.
 
     Update model:
-      - Call ``update(timer)`` once per frame.
+      - Call ``update()`` once per frame.
       - All queued events are dispatched to all rules in registration order.
       - Rules may queue additional events during dispatch.
+
+    An optional ``timer`` argument may be injected at construction time for
+    test-time clock control; production code uses the default ``Timer()``.
     """
 
-    __slots__ = ("_effect_controls", "_queue", "_rules")
+    __slots__ = ("_effect_controls", "_queue", "_rules", "_timer")
 
-    def __init__(self, effect_controls: EffectControls) -> None:
+    def __init__(self, effect_controls: EffectControls, timer: Timer | None = None) -> None:
         self._effect_controls = effect_controls
+        self._timer = timer if timer is not None else Timer()
         self._rules: list[GameRule] = []
         self._queue: list[Event] = []
 
-    def update(self, timer: Timer) -> None:
-        state = GameState(self, timer, self._effect_controls)
+    def update(self) -> None:
+        self._timer.update()
+        state = GameState(self, self._effect_controls)
+        state._update_time(self._timer.elapsed, self._timer.total)
         while self._queue:
             event = self._queue.pop(0)
             for rule in self._rules:
