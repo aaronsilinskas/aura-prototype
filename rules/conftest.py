@@ -3,7 +3,6 @@ import pytest
 from engine.effects.manager import EffectControls
 from engine.engine import GameEngine, GameRule, GameState, Version
 from engine.events import Event
-from engine.timer import Timer
 
 
 class CapturingLogger:
@@ -28,17 +27,15 @@ class _EventCaptureRule(GameRule):
 
 
 class EngineFixture:
-    """Pre-wired engine + timer for rule integration tests."""
+    """Pre-wired engine for rule integration tests."""
 
     def __init__(self):
-        self.timer = Timer()
         self.game_engine = GameEngine(EffectControls())
         self._event_capture_rule = _EventCaptureRule()
         self.game_engine.add_rules(self._event_capture_rule)
 
     def update_engine(self):
-        self.timer.update()
-        self.game_engine.update(self.timer)
+        self.game_engine.update()
 
     @property
     def captured_events(self):

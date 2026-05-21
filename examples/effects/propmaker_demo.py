@@ -246,7 +246,7 @@ while True:
             )
         _button_prev[_i] = _current
 
-    game_engine.update(timer)
+    game_engine.update()
     # time_it("game_engine", game_engine.update, timer)
 
     _fps_frame_count += 1
