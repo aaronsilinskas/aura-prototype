@@ -7,6 +7,7 @@ except ImportError:
 
 from engine.effects.manager import EffectControls
 from engine.events import Event
+from engine.scene import SceneControls
 from engine.timer import Timer
 from engine.version import Version
 
@@ -61,14 +62,16 @@ class GameState:
     read per-tick and cumulative time.
     """
 
-    __slots__ = ("_elapsed", "_queue", "_total", "data", "effect_controls")
+    __slots__ = ("_elapsed", "_queue", "_total", "data", "effect_controls", "scene_controls")
 
     def __init__(
         self,
         effect_controls: EffectControls,
+        scene_controls: SceneControls,
         data: dict[str, object] | None = None,
     ) -> None:
         self.effect_controls = effect_controls
+        self.scene_controls = scene_controls
         self._queue: list[Event] = []
         self.data: dict[str, object] = data if data is not None else {}
         self._elapsed: float = 0.0
@@ -109,8 +112,8 @@ class GameEngine:
     An optional ``timer`` argument may be injected at construction time for
     test-time clock control; production code uses the default ``Timer()``.
 
-    Use ``create_state(initial_data)`` to create a ``GameState`` pre-wired
-    with this engine's effect controls.
+    Use ``create_state(scene_controls, initial_data)`` to create a ``GameState``
+    pre-wired with this engine's effect controls and the given scene controls.
     """
 
     __slots__ = ("_effect_controls", "_rules", "_timer")
@@ -124,15 +127,28 @@ class GameEngine:
         self._timer = timer if timer is not None else Timer()
         self._rules: list[GameRule] = []
 
-    def create_state(self, initial_data: dict[str, object] | None = None) -> "GameState":
-        """Create a ``GameState`` pre-wired with this engine's effect controls.
+    def set_rules(self, rules: list[GameRule]) -> None:
+        """Replace the current rule list in full.
+
+        Used by ``SceneManager`` on scene transitions to swap in a new scene's
+        rules.  For incremental registration use ``add_rules()`` instead.
+        """
+        self._rules = list(rules)
+
+    def create_state(
+        self,
+        scene_controls: SceneControls,
+        initial_data: dict[str, object] | None = None,
+    ) -> GameState:
+        """Create a ``GameState`` pre-wired with this engine's effect controls
+        and the given ``scene_controls``.
 
         The optional ``initial_data`` dict seeds ``state.data`` with starting
         values; the dict is used directly (no copy).
         """
-        return GameState(self._effect_controls, initial_data)
+        return GameState(self._effect_controls, scene_controls, initial_data)
 
-    def update(self, state: "GameState") -> None:
+    def update(self, state: GameState) -> None:
         """Advance the timer, update state time, and dispatch all queued events."""
         self._timer.update()
         state._update_time(self._timer.elapsed, self._timer.total)

@@ -3,6 +3,7 @@ import pytest
 from engine.effects.manager import EffectControls
 from engine.engine import GameEngine, GameRule, GameState, Version
 from engine.events import Event
+from engine.scene import SceneControls
 
 
 class CapturingLogger:
@@ -31,7 +32,7 @@ class EngineFixture:
 
     def __init__(self):
         self.game_engine = GameEngine(EffectControls())
-        self.state = self.game_engine.create_state()
+        self.state = self.game_engine.create_state(SceneControls())
         self._event_capture_rule = _EventCaptureRule()
         self.game_engine.add_rules(self._event_capture_rule)
 
