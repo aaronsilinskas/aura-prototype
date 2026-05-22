@@ -138,10 +138,12 @@ class SceneManager(SceneControls):
     # ------------------------------------------------------------------
 
     def load(self, name: str) -> None:
-        """Record a load transition for *name*; raises immediately if unknown."""
+        """Record a load transition for *name*; raises immediately if unknown or packs invalid."""
         if name not in self._scenes:
             raise ValueError("Unknown scene '" + name + "'")
-        self._pending = ("load", name)
+        scene = self._scenes[name]()
+        self._validate_packs(scene)
+        self._pending = ("load", scene)
 
     def overlay(self, name: str) -> None:
         """Record an overlay transition for *name*; raises immediately if invalid."""
@@ -149,7 +151,9 @@ class SceneManager(SceneControls):
             raise ValueError("Unknown scene '" + name + "'")
         if not self._stack:
             raise ValueError("Cannot overlay: no active scene on stack")
-        self._pending = ("overlay", name)
+        scene = self._scenes[name]()
+        self._validate_packs(scene)
+        self._pending = ("overlay", scene)
 
     def pop(self) -> None:
         """Record a pop transition; raises immediately if stack has ≤ 1 entry."""
@@ -175,12 +179,12 @@ class SceneManager(SceneControls):
             self._engine.update(self._stack[-1][1])
 
         if self._pending is not None:
-            kind, name = self._pending
+            kind, arg = self._pending
             self._pending = None
             if kind == "load":
-                self._do_load(name)
+                self._do_load(arg)
             elif kind == "overlay":
-                self._do_overlay(name)
+                self._do_overlay(arg)
             else:
                 self._do_pop()
 
@@ -203,10 +207,8 @@ class SceneManager(SceneControls):
                 combined.append(self._rule_registry.get(pack_name, item_name))
         return combined
 
-    def _do_load(self, name: str) -> None:
+    def _do_load(self, scene: Scene) -> None:
         """Execute a load transition: unload all, create fresh state, fire on_load."""
-        scene = self._scenes[name]()
-        self._validate_packs(scene)  # raises on mismatch; stack untouched
         combined_rules = self._resolve_rules(scene)
 
         # Fire on_unload top-down and clear each state's queue
@@ -224,10 +226,8 @@ class SceneManager(SceneControls):
         if scene.on_load is not None:
             scene.on_load(state.effect_controls)
 
-    def _do_overlay(self, name: str) -> None:
+    def _do_overlay(self, scene: Scene) -> None:
         """Execute an overlay transition: suspend top, push new scene."""
-        scene = self._scenes[name]()
-        self._validate_packs(scene)  # raises on mismatch; stack untouched
         combined_rules = self._resolve_rules(scene)
 
         # Suspend current top

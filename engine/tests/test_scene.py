@@ -288,10 +288,8 @@ def test_load_validates_effect_pack_version_before_any_lifecycle_callback(pack_e
             on_load=lambda ec: on_load_called.append(True),
         ),
     )
-    manager.load("main")
-
     with pytest.raises(ValueError):
-        manager.update()
+        manager.load("main")
 
     assert on_load_called == [], "on_load must not fire when pack validation fails"
 
@@ -309,9 +307,8 @@ def test_load_leaves_stack_untouched_when_pack_version_is_incompatible(pack_env)
 
     # Attempt to load a scene with incompatible effect pack
     manager.register("bad", _scene_factory(effect_packs=[("fx", "99.0")]))
-    manager.load("bad")
     with pytest.raises(ValueError):
-        manager.update()
+        manager.load("bad")
 
     # Manager should still be usable; loading initial again works
     manager.load("initial")
@@ -343,10 +340,8 @@ def test_load_validates_rule_pack_version_before_any_lifecycle_callback(pack_env
             on_load=lambda ec: on_load_called.append(True),
         ),
     )
-    manager.load("main")
-
     with pytest.raises(ValueError):
-        manager.update()
+        manager.load("main")
 
     assert on_load_called == []
 
@@ -368,10 +363,8 @@ def test_overlay_validates_packs_before_suspending_active_scene(pack_env) -> Non
     manager.update()
 
     manager.register("overlay_scene", _scene_factory(effect_packs=[("fx", "99.0")]))
-    manager.overlay("overlay_scene")
-
     with pytest.raises(ValueError):
-        manager.update()
+        manager.overlay("overlay_scene")
 
     assert on_suspend_called == [], "on_suspend must not fire when overlay pack validation fails"
 
