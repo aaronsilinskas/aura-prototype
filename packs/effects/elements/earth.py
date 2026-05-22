@@ -2,6 +2,7 @@ from effects.effect import Effect
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, RendererConfig
 from effects.steps.flame import flame
+from engine.effects.manager import EffectBuilder
 
 # fmt: off
 earth_palette = bytes([0, 96, 48, 8,
@@ -12,33 +13,30 @@ earth_palette = bytes([0, 96, 48, 8,
 # fmt: on
 
 
-def build_earth_renderer(config: RendererConfig) -> EffectRenderer:
-    """A slow, broad smolder in golds with sprouts of earthy greens.
+class EarthBuilder(EffectBuilder):
+    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+        """A slow, broad smolder in golds with sprouts of earthy greens.
 
-    Level: more heat sparks with a narrower spread, concentrating the smolder
-    into a tighter, more active column.
-    """
-    level = config.level
-    resolution = config.resolution
-    spread = config.level_lerp(0.7, 0.4)
+        Level: more heat sparks with a narrower spread, concentrating the smolder
+        into a tighter, more active column.
+        """
+        level = config.level
+        resolution = config.resolution
+        spread = config.level_lerp(0.7, 0.4)
 
-    earth_effect = Effect("earth").add_steps(
-        [
-            flame(
-                spark_count=level,
-                heat_rate=0.2,
-                extra_cool_rate=0.0,
-                resolution=resolution,
-                spread=spread,
-            ),
-        ]
-    )
+        earth_effect = Effect("earth").add_steps(
+            [
+                flame(
+                    spark_count=level,
+                    heat_rate=0.2,
+                    extra_cool_rate=0.0,
+                    resolution=resolution,
+                    spread=spread,
+                ),
+            ]
+        )
 
-    return EffectRenderer(earth_effect, PaletteLUT256(earth_palette))
-
-
-def _build(name: str, config: RendererConfig) -> EffectRenderer:
-    return build_earth_renderer(config)
+        return EffectRenderer(earth_effect, PaletteLUT256(earth_palette))
 
 
-BUILD = _build
+BUILD = EarthBuilder()

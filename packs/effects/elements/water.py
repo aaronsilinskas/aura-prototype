@@ -5,6 +5,7 @@ from effects.steps.duration import duration
 from effects.steps.flame import flame
 from effects.steps.position import accelerate
 from effects.value import ValueGenerator as VG
+from engine.effects.manager import EffectBuilder
 
 # fmt: off
 water_palette = bytes([0, 0, 0, 64,
@@ -14,43 +15,40 @@ water_palette = bytes([0, 0, 0, 64,
 # fmt: on
 
 
-def build_water_renderer(config: RendererConfig) -> EffectRenderer:
-    """A flowing deep-blue-to-cyan flame that drifts along the strip and
-    occasionally reverses direction, like light rippling under moving water.
+class WaterBuilder(EffectBuilder):
+    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+        """A flowing deep-blue-to-cyan flame that drifts along the strip and
+        occasionally reverses direction, like light rippling under moving water.
 
-    Level: the current accelerates and the flame grows more turbulent,
-    producing faster, stronger ripples.
-    """
-    level = config.level
-    resolution = config.resolution
+        Level: the current accelerates and the flame grows more turbulent,
+        producing faster, stronger ripples.
+        """
+        level = config.level
+        resolution = config.resolution
 
-    flow_speed = config.level_lerp(0.05, 0.14)
-    heat_rate = config.level_lerp(0.2, 0.29)
+        flow_speed = config.level_lerp(0.05, 0.14)
+        heat_rate = config.level_lerp(0.2, 0.29)
 
-    water_effect = Effect("water").add_steps(
-        [
-            duration(
-                duration=VG.random(3.0, 5.0),
-                persist_steps=True,
-                steps=[
-                    accelerate(end=flow_speed, direction=VG.random_choice([-1, 1])),
-                    flame(
-                        spark_count=level,
-                        heat_rate=heat_rate,
-                        extra_cool_rate=0.0,
-                        resolution=resolution,
-                        spread=0.2,
-                    ),
-                ],
-            ),
-        ]
-    )
+        water_effect = Effect("water").add_steps(
+            [
+                duration(
+                    duration=VG.random(3.0, 5.0),
+                    persist_steps=True,
+                    steps=[
+                        accelerate(end=flow_speed, direction=VG.random_choice([-1, 1])),
+                        flame(
+                            spark_count=level,
+                            heat_rate=heat_rate,
+                            extra_cool_rate=0.0,
+                            resolution=resolution,
+                            spread=0.2,
+                        ),
+                    ],
+                ),
+            ]
+        )
 
-    return EffectRenderer(water_effect, PaletteLUT256(water_palette))
-
-
-def _build(name: str, config: RendererConfig) -> EffectRenderer:
-    return build_water_renderer(config)
+        return EffectRenderer(water_effect, PaletteLUT256(water_palette))
 
 
-BUILD = _build
+BUILD = WaterBuilder()

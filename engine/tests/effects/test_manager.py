@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from engine.effects.manager import EffectManager
+from engine.effects.manager import EffectBuilder, EffectManager
 from engine.packs import PackRegistry
 from engine.state import Scope
 from engine.tests.effects.helpers import SpyEffectOutput
@@ -55,7 +55,7 @@ def _make_stub_registry(pack_env) -> PackRegistry:
         "stub",
         {"fire": _stub_item(), "ice": _stub_item(), "shock": _stub_item()},
     )
-    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     return registry
 
@@ -72,11 +72,11 @@ def _make_timer() -> Timer:
 def test_effect_manager_accepts_registry_and_outputs() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
 
-    EffectManager(registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[output])
+    EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
 
 
 def test_effect_manager_accepts_empty_outputs_list() -> None:
-    EffectManager(registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[])
+    EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[])
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ def test_effect_manager_accepts_empty_outputs_list() -> None:
 
 def test_update_with_no_effects_sends_go_dark_to_output() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[output])
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
 
     manager.update(_make_timer())
 
@@ -96,9 +96,7 @@ def test_update_with_no_effects_sends_go_dark_to_output() -> None:
 def test_update_with_no_effects_sends_go_dark_to_all_outputs() -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = EffectManager(
-        registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[output_a, output_b]
-    )
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output_a, output_b])
 
     manager.update(_make_timer())
 
@@ -108,7 +106,7 @@ def test_update_with_no_effects_sends_go_dark_to_all_outputs() -> None:
 
 def test_update_called_twice_notifies_output_each_tick() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[output])
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
 
     manager.update(_make_timer())
     manager.update(_make_timer())
@@ -165,13 +163,13 @@ def test_set_effect_twice_first_renderer_not_advanced(pack_env) -> None:
         "spy",
         {"fire": _spy_item(), "ice": _spy_item()},
     )
-    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     manager = EffectManager(registry=registry, outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "spy.fire", 5, {})
     manager.set_effect(Scope.PERSONAL, "spy.ice", 5, {})
-    fire_builder = registry.get("spy", "fire")
+    fire_builder = registry.get("spy", "fire", EffectBuilder)
     manager.update(_make_timer())
 
     renderer_a = fire_builder.created[0]
@@ -211,7 +209,7 @@ def test_effect_event_reaches_matching_scope_output(pack_env) -> None:
             )
         },
     )
-    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = EffectManager(registry=registry, outputs=[output])
@@ -236,7 +234,7 @@ def test_effect_event_does_not_reach_out_of_scope_output(pack_env) -> None:
             )
         },
     )
-    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
@@ -264,7 +262,7 @@ def test_resolution_equals_max_min_resolution_of_matching_outputs(pack_env) -> N
             )
         },
     )
-    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     output_a = SpyEffectOutput(min_resolution=32, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=64, scopes=[Scope.PERSONAL])
@@ -272,7 +270,7 @@ def test_resolution_equals_max_min_resolution_of_matching_outputs(pack_env) -> N
 
     manager.set_effect(Scope.PERSONAL, "capture.fire", 5, {})
 
-    builder = registry.get("capture", "fire")
+    builder = registry.get("capture", "fire", EffectBuilder)
     assert builder.last_config.resolution == 64
 
 
@@ -287,13 +285,13 @@ def test_resolution_falls_back_to_default_when_no_outputs_match(pack_env) -> Non
             )
         },
     )
-    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     manager = EffectManager(registry=registry, outputs=[])
 
     manager.set_effect(Scope.PERSONAL, "capture.fire", 5, {})
 
-    builder = registry.get("capture", "fire")
+    builder = registry.get("capture", "fire", EffectBuilder)
     assert builder.last_config.resolution == 16
 
 
@@ -320,14 +318,14 @@ def test_add_effect_both_renderers_advanced_on_each_update(pack_env) -> None:
         "spy",
         {"fire": _spy_item(), "ice": _spy_item()},
     )
-    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     manager = EffectManager(registry=registry, outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "spy.fire", 5, {})
     manager.add_effect(Scope.PERSONAL, "spy.ice", 5, {})
-    fire_builder = registry.get("spy", "fire")
-    ice_builder = registry.get("spy", "ice")
+    fire_builder = registry.get("spy", "fire", EffectBuilder)
+    ice_builder = registry.get("spy", "ice", EffectBuilder)
     manager.update(_make_timer())
     manager.update(_make_timer())
 
@@ -400,12 +398,12 @@ def test_stop_effect_does_not_affect_other_scopes(pack_env) -> None:
 def test_shared_renderer_advanced_once_per_frame_for_composite_scope(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.ALL])
     _make_pack(pack_env, "spy", {"fire": _spy_item()})
-    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     manager = EffectManager(registry=registry, outputs=[output])
 
     manager.set_effect(Scope.ALL, "spy.fire", 5, {})
-    fire_builder = registry.get("spy", "fire")
+    fire_builder = registry.get("spy", "fire", EffectBuilder)
     manager.update(_make_timer())
 
     assert fire_builder.created[0].update_count == 1
@@ -780,14 +778,14 @@ def test_handle_event_receives_composite_scope_not_decomposed_leaf(pack_env) -> 
 
 
 def test_missing_pack_prefix_raises_value_error() -> None:
-    manager = EffectManager(registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[])
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[])
 
     with pytest.raises(ValueError, match="missing pack prefix"):
         manager.set_effect(Scope.PERSONAL, "fire", 5, {})
 
 
 def test_unknown_pack_raises_value_error(pack_env) -> None:
-    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     manager = EffectManager(registry=registry, outputs=[])
 
@@ -797,7 +795,7 @@ def test_unknown_pack_raises_value_error(pack_env) -> None:
 
 def test_unknown_effect_in_known_pack_raises_value_error(pack_env) -> None:
     _make_pack(pack_env, "elements", {"fire": _stub_item()})
-    registry = PackRegistry(extractor=lambda m: m.BUILD)
+    registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     manager = EffectManager(registry=registry, outputs=[])
 

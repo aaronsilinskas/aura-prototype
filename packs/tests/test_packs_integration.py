@@ -21,38 +21,40 @@ def _packs_path(*parts: str) -> str:
 # --- Effects registry ---
 
 
-def test_fire_module_is_accessible_via_effects_registry() -> None:
-    registry = PackRegistry(extractor=lambda module: module)
+def test_fire_pack_exposes_valid_effect_builder() -> None:
+    from engine.effects.manager import EffectBuilder
+
+    registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(_packs_path("effects"), "packs.effects")
 
-    module = registry.get("elements", "fire")
+    builder = registry.get("elements", "fire", EffectBuilder)
 
-    assert hasattr(module, "build_fire_renderer")
+    assert isinstance(builder, EffectBuilder)
 
 
 # --- Rules registry ---
 
 
 def test_button_events_rule_is_a_game_rule() -> None:
-    registry = PackRegistry(extractor=lambda module: module.RULE)
+    registry = PackRegistry(item_attr="RULE")
     registry.scan_dir(_packs_path("rules"), "packs.rules")
 
-    rule = registry.get("debug", "button_events")
+    rule = registry.get("debug", "button_events", GameRule)
 
     assert isinstance(rule, GameRule)
 
 
 def test_event_logger_rule_is_a_game_rule() -> None:
-    registry = PackRegistry(extractor=lambda module: module.RULE)
+    registry = PackRegistry(item_attr="RULE")
     registry.scan_dir(_packs_path("rules"), "packs.rules")
 
-    rule = registry.get("debug", "event_logger")
+    rule = registry.get("debug", "event_logger", GameRule)
 
     assert isinstance(rule, GameRule)
 
 
 def test_debug_exposes_all_expected_rule_modules() -> None:
-    rule_registry = PackRegistry(extractor=lambda m: m.RULE)
+    rule_registry = PackRegistry(item_attr="RULE")
     rule_registry.scan_dir(_packs_path("rules"), "packs.rules")
 
     items = rule_registry.items("debug")
@@ -66,9 +68,9 @@ def test_debug_exposes_all_expected_rule_modules() -> None:
 
 @pytest.fixture
 def loaded_debug_engine():
-    rule_registry = PackRegistry(extractor=lambda m: m.RULE)
+    rule_registry = PackRegistry(item_attr="RULE")
     rule_registry.scan_dir(_packs_path("rules"), "packs.rules")
-    effect_registry = PackRegistry(extractor=lambda m: m.BUILD)
+    effect_registry = PackRegistry(item_attr="BUILD")
     engine = GameEngine(EffectControls())
     manager = SceneManager(engine, effect_registry, rule_registry)
     manager.register(
@@ -112,9 +114,9 @@ def test_scene_manager_load_activates_all_rules_from_pack(
 
 
 def test_scene_manager_load_raises_for_incompatible_pack_version() -> None:
-    rule_registry = PackRegistry(extractor=lambda m: m.RULE)
+    rule_registry = PackRegistry(item_attr="RULE")
     rule_registry.scan_dir(_packs_path("rules"), "packs.rules")
-    effect_registry = PackRegistry(extractor=lambda m: m.BUILD)
+    effect_registry = PackRegistry(item_attr="BUILD")
     engine = GameEngine(EffectControls())
     manager = SceneManager(engine, effect_registry, rule_registry)
     manager.register(

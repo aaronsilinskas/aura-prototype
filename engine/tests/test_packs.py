@@ -51,8 +51,8 @@ def _make_pack(root, pack_name: str, version: str, items: dict[str, str]) -> Non
 
 
 def _make_registry(attr: str = "VALUE") -> PackRegistry:
-    """Return a PackRegistry whose extractor reads the named module attribute."""
-    return PackRegistry(extractor=lambda module: getattr(module, attr))
+    """Return a PackRegistry that reads the named module attribute."""
+    return PackRegistry(item_attr=attr)
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ def test_scan_dir_discovers_subdirectory_with_version_txt(pack_env) -> None:
 
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    assert registry.get("mypack", "item_a") == 1
+    assert registry.get("mypack", "item_a", int) == 1
 
 
 def test_scan_dir_on_empty_directory_registers_no_packs(pack_env) -> None:
@@ -75,7 +75,7 @@ def test_scan_dir_on_empty_directory_registers_no_packs(pack_env) -> None:
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
     with pytest.raises(ValueError, match="Unknown pack"):
-        registry.get("anything", "item")
+        registry.get("anything", "item", object)
 
 
 def test_scan_dir_ignores_subdirectory_without_version_txt(pack_env) -> None:
@@ -86,7 +86,7 @@ def test_scan_dir_ignores_subdirectory_without_version_txt(pack_env) -> None:
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
     with pytest.raises(ValueError, match="Unknown pack"):
-        registry.get("notapack", "item_a")
+        registry.get("notapack", "item_a", object)
 
 
 def test_scan_dir_ignores_plain_files_at_top_level(pack_env) -> None:
@@ -96,7 +96,7 @@ def test_scan_dir_ignores_plain_files_at_top_level(pack_env) -> None:
 
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    assert registry.get("mypack", "item_a") == 1
+    assert registry.get("mypack", "item_a", int) == 1
 
 
 def test_scan_dir_records_multiple_packs_from_same_directory(pack_env) -> None:
@@ -106,8 +106,8 @@ def test_scan_dir_records_multiple_packs_from_same_directory(pack_env) -> None:
 
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    assert registry.get("pack_a", "x") == 10
-    assert registry.get("pack_b", "y") == 20
+    assert registry.get("pack_a", "x", int) == 10
+    assert registry.get("pack_b", "y", int) == 20
 
 
 def test_scan_dir_no_modules_imported_during_scan(pack_env) -> None:
@@ -133,7 +133,7 @@ def test_scan_dir_called_twice_with_same_path_is_a_no_op(pack_env) -> None:
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    assert registry.get("mypack", "item_a") == 1
+    assert registry.get("mypack", "item_a", int) == 1
 
 
 def test_scan_dir_second_call_does_not_pick_up_packs_added_after_first_scan(
@@ -148,7 +148,7 @@ def test_scan_dir_second_call_does_not_pick_up_packs_added_after_first_scan(
     registry.scan_dir(str(pack_env), MODULE_PREFIX)  # no-op
 
     with pytest.raises(ValueError, match="Unknown pack"):
-        registry.get("pack_b", "y")
+        registry.get("pack_b", "y", object)
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ def test_get_raises_for_unknown_pack(pack_env) -> None:
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
     with pytest.raises(ValueError, match="Unknown pack"):
-        registry.get("nonexistent", "item_a")
+        registry.get("nonexistent", "item_a", object)
 
 
 def test_get_raises_for_unknown_item_name_before_any_import(pack_env) -> None:
@@ -193,7 +193,7 @@ def test_get_raises_for_unknown_item_name_before_any_import(pack_env) -> None:
     known_before = set(sys.modules)
 
     with pytest.raises(ValueError, match="Unknown item"):
-        registry.get("mypack", "ghost_item")
+        registry.get("mypack", "ghost_item", object)
 
     # No new modules should have been imported.
     new_modules = set(sys.modules) - known_before
@@ -211,7 +211,7 @@ def test_get_excludes_init_py_from_valid_item_names(pack_env) -> None:
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
     with pytest.raises(ValueError, match="Unknown item"):
-        registry.get("mypack", "__init__")
+        registry.get("mypack", "__init__", object)
 
 
 def test_get_returns_value_from_sibling_of_init_py(pack_env) -> None:
@@ -224,7 +224,7 @@ def test_get_returns_value_from_sibling_of_init_py(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    assert registry.get("mypack", "item_a") == 7
+    assert registry.get("mypack", "item_a", int) == 7
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +237,7 @@ def test_get_imports_module_and_extracts_value_on_first_call(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    result = registry.get("mypack", "fire")
+    result = registry.get("mypack", "fire", int)
 
     assert result == 42
 
@@ -247,8 +247,8 @@ def test_get_returns_cached_value_on_subsequent_calls(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    first = registry.get("mypack", "fire")
-    second = registry.get("mypack", "fire")
+    first = registry.get("mypack", "fire", int)
+    second = registry.get("mypack", "fire", int)
 
     assert first is second
 
@@ -258,21 +258,44 @@ def test_get_only_imports_module_once(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    registry.get("mypack", "fire")
+    registry.get("mypack", "fire", int)
     modules_after_first = set(sys.modules)
-    registry.get("mypack", "fire")
+    registry.get("mypack", "fire", int)
 
     assert set(sys.modules) == modules_after_first
 
 
-def test_get_uses_extractor_to_pull_value_from_module(pack_env) -> None:
+def test_get_returns_named_attribute_value_from_pack_module(pack_env) -> None:
     _make_pack(pack_env, "mypack", "1.0", {"item_a": "GREETING = 'hello'"})
-    registry = PackRegistry(extractor=lambda module: module.GREETING)
+    registry = PackRegistry(item_attr="GREETING")
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    result = registry.get("mypack", "item_a")
+    result = registry.get("mypack", "item_a", str)
 
     assert result == "hello"
+
+
+# ---------------------------------------------------------------------------
+# get — missing attribute / wrong type
+# ---------------------------------------------------------------------------
+
+
+def test_get_raises_value_error_when_attribute_is_missing_from_module(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.0", {"item_a": "WRONG_NAME = 99"})
+    registry = PackRegistry(item_attr="VALUE")
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    with pytest.raises(ValueError, match="has no attribute 'VALUE'"):
+        registry.get("mypack", "item_a", object)
+
+
+def test_get_raises_value_error_when_attribute_has_wrong_type(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.0", {"item_a": "VALUE = 'not_an_int'"})
+    registry = PackRegistry(item_attr="VALUE")
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    with pytest.raises(ValueError, match="is not an instance of int"):
+        registry.get("mypack", "item_a", int)
 
 
 # ---------------------------------------------------------------------------
