@@ -5,6 +5,15 @@ try:
 except ImportError:
     pass  # Not available on CircuitPython/MicroPython; annotations are quoted below
 
+try:
+    from typing import TYPE_CHECKING
+except ImportError:
+    TYPE_CHECKING = False  # type: ignore[assignment]
+
+if TYPE_CHECKING:
+    from engine.engine import GameEngine, GameRule, GameState
+    from engine.packs import PackRegistry
+
 from engine.version import Version
 
 
@@ -64,10 +73,10 @@ class Scene:
 
     def __init__(
         self,
-        rules: list,
-        effect_packs: list,
-        rule_packs: list,
-        initial_data: dict | None = None,
+        rules: "list[GameRule]",
+        effect_packs: "list[tuple[str, str]]",
+        rule_packs: "list[tuple[str, str]]",
+        initial_data: "dict[str, object] | None" = None,
         on_load: "Callable | None" = None,
         on_unload: "Callable | None" = None,
         on_suspend: "Callable | None" = None,
@@ -116,16 +125,16 @@ class SceneManager(SceneControls):
 
     def __init__(
         self,
-        engine: object,
-        effect_registry: object,
-        rule_registry: object,
+        engine: "GameEngine",
+        effect_registry: "PackRegistry",
+        rule_registry: "PackRegistry",
     ) -> None:
         self._engine = engine
         self._effect_registry = effect_registry
         self._rule_registry = rule_registry
-        self._scenes: dict = {}
-        self._stack: list = []
-        self._pending = None  # tuple (kind, name) or None
+        self._scenes: dict[str, Callable] = {}
+        self._stack: list[tuple[Scene, GameState, list[GameRule]]] = []
+        self._pending: tuple | None = None  # (kind, scene_or_none)
 
     def register(self, name: str, factory: "Callable") -> None:
         """Register *factory* — a zero-arg callable returning a ``Scene`` — for *name*."""
@@ -197,7 +206,7 @@ class SceneManager(SceneControls):
         for pack_name, min_version in scene.rule_packs:
             self._rule_registry.check_version(pack_name, Version.parse(min_version))
 
-    def _resolve_rules(self, scene: Scene) -> list:
+    def _resolve_rules(self, scene: Scene) -> "list[GameRule]":
         """Return combined rules: *scene.rules* followed by all rule-pack items."""
         combined = list(scene.rules)
         for pack_name, _ in scene.rule_packs:
