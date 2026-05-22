@@ -3,45 +3,10 @@ __all__ = ["Scene", "SceneControls", "SceneManager"]
 try:
     from collections.abc import Callable
 except ImportError:
-    pass  # Not available on CircuitPython/MicroPython; annotations are quoted below
+    pass  # Not available on CircuitPython/MicroPython
 
-try:
-    from typing import TYPE_CHECKING
-except ImportError:
-    TYPE_CHECKING = False  # type: ignore[assignment]
-
-if TYPE_CHECKING:
-    from engine.engine import GameEngine, GameRule, GameState
-    from engine.packs import PackRegistry
-
-from engine.version import Version
-
-
-class SceneControls:
-    """Abstract interface for scene transitions called from within game rules.
-
-    All methods raise ``NotImplementedError`` by default.  ``SceneManager``
-    injects itself as the live implementation; standalone callers (e.g. rule
-    unit tests) pass the base ``SceneControls()`` instance, which raises on
-    any call.
-
-    Transitions are deferred to end-of-tick — the transition is applied after
-    ``engine.update(state)`` returns, not immediately inside the rule.
-    """
-
-    __slots__ = ()
-
-    def load(self, name: str) -> None:
-        """Replace the entire scene stack with the named scene."""
-        raise NotImplementedError
-
-    def overlay(self, name: str) -> None:
-        """Push the named scene on top, suspending the current scene."""
-        raise NotImplementedError
-
-    def pop(self) -> None:
-        """Unload the top scene and restore the scene below it."""
-        raise NotImplementedError
+from engine.engine import GameEngine, GameRule, GameState, SceneControls, Version
+from engine.packs import PackRegistry
 
 
 class Scene:
@@ -73,14 +38,14 @@ class Scene:
 
     def __init__(
         self,
-        rules: "list[GameRule]",
-        effect_packs: "list[tuple[str, str]]",
-        rule_packs: "list[tuple[str, str]]",
-        initial_data: "dict[str, object] | None" = None,
-        on_load: "Callable | None" = None,
-        on_unload: "Callable | None" = None,
-        on_suspend: "Callable | None" = None,
-        on_resume: "Callable | None" = None,
+        rules: list[GameRule],
+        effect_packs: list[tuple[str, str]],
+        rule_packs: list[tuple[str, str]],
+        initial_data: dict[str, object] | None = None,
+        on_load: Callable | None = None,
+        on_unload: Callable | None = None,
+        on_suspend: Callable | None = None,
+        on_resume: Callable | None = None,
     ) -> None:
         self.rules = rules
         self.effect_packs = effect_packs
@@ -125,9 +90,9 @@ class SceneManager(SceneControls):
 
     def __init__(
         self,
-        engine: "GameEngine",
-        effect_registry: "PackRegistry",
-        rule_registry: "PackRegistry",
+        engine: GameEngine,
+        effect_registry: PackRegistry,
+        rule_registry: PackRegistry,
     ) -> None:
         self._engine = engine
         self._effect_registry = effect_registry
@@ -136,7 +101,7 @@ class SceneManager(SceneControls):
         self._stack: list[tuple[Scene, GameState, list[GameRule]]] = []
         self._pending: tuple | None = None  # (kind, scene_or_none)
 
-    def register(self, name: str, factory: "Callable") -> None:
+    def register(self, name: str, factory: Callable) -> None:
         """Register *factory* — a zero-arg callable returning a ``Scene`` — for *name*."""
         self._scenes[name] = factory
 
@@ -206,7 +171,7 @@ class SceneManager(SceneControls):
         for pack_name, min_version in scene.rule_packs:
             self._rule_registry.check_version(pack_name, Version.parse(min_version))
 
-    def _resolve_rules(self, scene: Scene) -> "list[GameRule]":
+    def _resolve_rules(self, scene: Scene) -> list[GameRule]:
         """Return combined rules: *scene.rules* followed by all rule-pack items."""
         combined = list(scene.rules)
         for pack_name, _ in scene.rule_packs:
