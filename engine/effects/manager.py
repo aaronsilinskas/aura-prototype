@@ -1,7 +1,7 @@
 from effects.effect import EffectState, EffectTimer
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
-from engine.effects.scope import ScopeValue
 from engine.packs import PackRegistry
+from engine.state import EffectControls, EffectReceipt, ScopeValue
 from engine.timer import Timer
 
 _DEFAULT_RESOLUTION = 16
@@ -22,7 +22,7 @@ class EffectOutput:
         """Create a PixelBuffer sized to this output's hardware pixel count."""
         raise NotImplementedError
 
-    def update_pixels(self, frames: "list[tuple[PixelBuffer, EffectReceipt]]") -> None:
+    def update_pixels(self, frames: list[tuple[PixelBuffer, EffectReceipt]]) -> None:
         """Receive rendered frames for this output.
 
         Called every update tick. Each element is a (PixelBuffer, EffectReceipt) tuple.
@@ -30,7 +30,7 @@ class EffectOutput:
         """
         pass
 
-    def handle_event(self, event_name: str, scope: "ScopeValue", receipt: "EffectReceipt") -> None:
+    def handle_event(self, event_name: str, scope: ScopeValue, receipt: EffectReceipt) -> None:
         """Handle an event triggered by an effect renderer."""
         pass
 
@@ -60,50 +60,6 @@ class EffectBuilder:
         raise NotImplementedError
 
 
-class EffectReceipt:
-    """Opaque handle returned when an effect is started.
-
-    Uniquely identifies a single running effect instance. Pass to
-    ``stop_effect_by_receipt`` (issue #64) to stop exactly that instance.
-    """
-
-    __slots__ = ("id",)
-
-    def __init__(self, effect_id: int) -> None:
-        self.id: int = effect_id
-
-    def __repr__(self) -> str:
-        return f"EffectReceipt(id={self.id})"
-
-
-class EffectControls:
-    """Read-only effect-control interface exposed to game rules via GameState.
-
-    Provides effect start/stop operations only. The update() tick is
-    intentionally excluded so rules cannot advance the effect loop.
-    """
-
-    def set_effect(
-        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
-    ) -> "EffectReceipt":
-        """Stop any effect(s) currently running in scope, then start name."""
-        raise NotImplementedError
-
-    def add_effect(
-        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
-    ) -> "EffectReceipt":
-        """Start name in scope without stopping existing effects."""
-        raise NotImplementedError
-
-    def stop_effect(self, scope: ScopeValue) -> None:
-        """Stop all effects whose keys overlap scope."""
-        raise NotImplementedError
-
-    def stop_effect_by_receipt(self, receipt: "EffectReceipt") -> None:
-        """Stop exactly the effect identified by receipt."""
-        raise NotImplementedError
-
-
 class EffectManager(EffectControls):
     """Manages running effects and routesrendered frames to registered outputs each tick.
 
@@ -123,7 +79,7 @@ class EffectManager(EffectControls):
             self,
             keys: tuple[str, ...],
             name: str,
-            receipt: "EffectReceipt",
+            receipt: EffectReceipt,
             output_buffers: list[PixelBuffer | None],
             renderer: EffectRenderer,
             scope: ScopeValue,
@@ -165,7 +121,7 @@ class EffectManager(EffectControls):
         self._frames: list[list[tuple[PixelBuffer, EffectReceipt]]] = [[] for _ in outputs]
 
     def _notify_listeners(
-        self, event_name: str, scope_keys: set[str], scope: ScopeValue, receipt: "EffectReceipt"
+        self, event_name: str, scope_keys: set[str], scope: ScopeValue, receipt: EffectReceipt
     ) -> None:
         """Notify listeners registered for the given scope."""
         for output in self._outputs:
@@ -189,9 +145,7 @@ class EffectManager(EffectControls):
         is passed to that pack's builder.
         """
         if "." not in name:
-            raise ValueError(
-                f"Effect name '{name}' missing pack prefix (expected 'pack.effect')"
-            )
+            raise ValueError(f"Effect name '{name}' missing pack prefix (expected 'pack.effect')")
         pack_name, effect_name = name.split(".", 1)
         try:
             builder = self._registry.get(pack_name, effect_name)
@@ -200,9 +154,7 @@ class EffectManager(EffectControls):
             if msg.startswith("Unknown pack '"):
                 raise ValueError(f"Unknown effect pack '{pack_name}'") from exc
             if msg.startswith("Unknown item '"):
-                raise ValueError(
-                    f"Unknown effect '{effect_name}' in pack '{pack_name}'"
-                ) from exc
+                raise ValueError(f"Unknown effect '{effect_name}' in pack '{pack_name}'") from exc
             raise
 
         receipt = EffectReceipt(self._next_id)

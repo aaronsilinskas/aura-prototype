@@ -5,8 +5,9 @@ try:
 except ImportError:
     pass
 
-from engine.engine import GameRule, GameState, Version
+from engine.engine import GameRule, Version
 from engine.events import Event
+from engine.state import GameState
 
 _VERSION: Version = Version(1, 0)
 

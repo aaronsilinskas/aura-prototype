@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from engine.engine import GameRule, GameState, Version
+from engine.engine import GameRule, Version
 from engine.events import Event
 from engine.input import ButtonData, InputEvents
+from engine.state import GameState
 
 _VERSION: Version = Version(1, 0)
 

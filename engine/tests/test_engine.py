@@ -1,9 +1,8 @@
 import pytest
 
-from engine.effects.manager import EffectControls
-from engine.engine import GameEngine, GameRule, GameState, Version
+from engine.engine import GameEngine, GameRule, Version
 from engine.events import Event, EventGroup
-from engine.scene import SceneControls
+from engine.state import EffectControls, GameState, SceneControls
 from engine.timer import Timer
 
 _GROUP = EventGroup("test")

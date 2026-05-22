@@ -2,7 +2,8 @@ from effects.effect import Effect
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
 from effects.steps.control import call
-from engine.effects.manager import EffectBuilder, EffectOutput, EffectReceipt
+from engine.effects.manager import EffectBuilder, EffectOutput
+from engine.state import EffectReceipt
 
 
 class SpyEffectOutput(EffectOutput):

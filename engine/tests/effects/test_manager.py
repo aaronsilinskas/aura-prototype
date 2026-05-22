@@ -3,8 +3,8 @@ import sys
 import pytest
 
 from engine.effects.manager import EffectManager
-from engine.effects.scope import Scope
 from engine.packs import PackRegistry
+from engine.state import Scope
 from engine.tests.effects.helpers import SpyEffectOutput
 from engine.timer import Timer
 
@@ -40,16 +40,12 @@ def _make_pack(root, name: str, items: dict[str, str]) -> None:
 
 def _stub_item() -> str:
     return (
-        "from engine.tests.effects.helpers import StubEffectBuilder\n"
-        "BUILD = StubEffectBuilder()\n"
+        "from engine.tests.effects.helpers import StubEffectBuilder\nBUILD = StubEffectBuilder()\n"
     )
 
 
 def _spy_item() -> str:
-    return (
-        "from engine.tests.effects.helpers import SpyEffectBuilder\n"
-        "BUILD = SpyEffectBuilder()\n"
-    )
+    return "from engine.tests.effects.helpers import SpyEffectBuilder\nBUILD = SpyEffectBuilder()\n"
 
 
 def _make_stub_registry(pack_env) -> PackRegistry:
@@ -90,9 +86,7 @@ def test_effect_manager_accepts_empty_outputs_list() -> None:
 
 def test_update_with_no_effects_sends_go_dark_to_output() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(
-        registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[output]
-    )
+    manager = EffectManager(registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[output])
 
     manager.update(_make_timer())
 
@@ -114,9 +108,7 @@ def test_update_with_no_effects_sends_go_dark_to_all_outputs() -> None:
 
 def test_update_called_twice_notifies_output_each_tick() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = EffectManager(
-        registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[output]
-    )
+    manager = EffectManager(registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[output])
 
     manager.update(_make_timer())
     manager.update(_make_timer())
@@ -142,9 +134,7 @@ def test_set_effect_delivers_one_frame_to_matching_output(pack_env) -> None:
 def test_set_effect_nonmatching_output_receives_go_dark(pack_env) -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = EffectManager(
-        registry=_make_stub_registry(pack_env), outputs=[output_a, output_b]
-    )
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output_a, output_b])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.update(_make_timer())
@@ -196,9 +186,7 @@ def test_set_effect_twice_first_renderer_not_advanced(pack_env) -> None:
 def test_out_of_scope_output_receives_go_dark_each_frame(pack_env) -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = EffectManager(
-        registry=_make_stub_registry(pack_env), outputs=[output_a, output_b]
-    )
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output_a, output_b])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.update(_make_timer())
@@ -266,10 +254,16 @@ def test_effect_event_does_not_reach_out_of_scope_output(pack_env) -> None:
 
 
 def test_resolution_equals_max_min_resolution_of_matching_outputs(pack_env) -> None:
-    _make_pack(pack_env, "capture", {"fire": (
-        "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
-        "BUILD = CapturingEffectBuilder()\n"
-    )})
+    _make_pack(
+        pack_env,
+        "capture",
+        {
+            "fire": (
+                "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
+                "BUILD = CapturingEffectBuilder()\n"
+            )
+        },
+    )
     registry = PackRegistry(extractor=lambda m: m.BUILD)
     registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     output_a = SpyEffectOutput(min_resolution=32, scopes=[Scope.PERSONAL])
@@ -283,10 +277,16 @@ def test_resolution_equals_max_min_resolution_of_matching_outputs(pack_env) -> N
 
 
 def test_resolution_falls_back_to_default_when_no_outputs_match(pack_env) -> None:
-    _make_pack(pack_env, "capture", {"fire": (
-        "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
-        "BUILD = CapturingEffectBuilder()\n"
-    )})
+    _make_pack(
+        pack_env,
+        "capture",
+        {
+            "fire": (
+                "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
+                "BUILD = CapturingEffectBuilder()\n"
+            )
+        },
+    )
     registry = PackRegistry(extractor=lambda m: m.BUILD)
     registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     manager = EffectManager(registry=registry, outputs=[])
@@ -590,9 +590,7 @@ def test_add_effect_fires_start_event_to_matching_output(pack_env) -> None:
 def test_add_effect_start_event_not_delivered_to_out_of_scope_output(pack_env) -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = EffectManager(
-        registry=_make_stub_registry(pack_env), outputs=[output_a, output_b]
-    )
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output_a, output_b])
 
     manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
 
@@ -782,9 +780,7 @@ def test_handle_event_receives_composite_scope_not_decomposed_leaf(pack_env) -> 
 
 
 def test_missing_pack_prefix_raises_value_error() -> None:
-    manager = EffectManager(
-        registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[]
-    )
+    manager = EffectManager(registry=PackRegistry(extractor=lambda m: m.BUILD), outputs=[])
 
     with pytest.raises(ValueError, match="missing pack prefix"):
         manager.set_effect(Scope.PERSONAL, "fire", 5, {})
