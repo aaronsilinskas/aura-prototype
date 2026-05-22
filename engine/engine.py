@@ -46,10 +46,12 @@ class GameRule:
 
 
 class GameState:
-    """Persistent game context owned by ``GameEngine``.
+    """Portable game context passed to every rule handler on every tick.
 
-    Passed by reference to every rule handler on every tick.  Rule-written
-    data in ``state.data`` survives across ticks automatically.
+    Create via ``GameEngine.create_state()`` for production use, or directly
+    for rule unit tests.  Rule-written data in ``state.data`` survives across
+    ticks when the same ``GameState`` instance is passed to each
+    ``engine.update(state)`` call.
 
     Provides access to time information, the effect controls interface for
     starting and stopping effects, and ``queue_event`` so rules can enqueue
@@ -64,11 +66,10 @@ class GameState:
     def __init__(
         self,
         effect_controls: EffectControls,
-        queue: list[Event],
         data: dict[str, object] | None = None,
     ) -> None:
         self.effect_controls = effect_controls
-        self._queue = queue
+        self._queue: list[Event] = []
         self.data: dict[str, object] = data if data is not None else {}
         self._elapsed: float = 0.0
         self._total: float = 0.0
@@ -87,6 +88,10 @@ class GameState:
         """Enqueue an event for processing on the current or next update."""
         self._queue.append(event)
 
+    def clear_queue(self) -> None:
+        """Discard all pending events without processing them."""
+        self._queue = []
+
     def _update_time(self, elapsed: float, total: float) -> None:
         """Refresh time values from the engine's timer. Called only by GameEngine."""
         self._elapsed = elapsed
@@ -97,46 +102,44 @@ class GameEngine:
     """Drives the game loop by dispatching queued events to registered rules.
 
     Update model:
-      - Call ``update()`` once per frame.
+      - Call ``update(state)`` once per frame, passing the active ``GameState``.
       - All queued events are dispatched to all rules in registration order.
       - Rules may queue additional events during dispatch.
 
     An optional ``timer`` argument may be injected at construction time for
     test-time clock control; production code uses the default ``Timer()``.
 
-    An optional ``initial_data`` dict seeds ``state.data`` with starting
-    values; the dict is used directly (no copy).
+    Use ``create_state(initial_data)`` to create a ``GameState`` pre-wired
+    with this engine's effect controls.
     """
 
-    __slots__ = ("_effect_controls", "_queue", "_rules", "_state", "_timer")
+    __slots__ = ("_effect_controls", "_rules", "_timer")
 
     def __init__(
         self,
         effect_controls: EffectControls,
         timer: Timer | None = None,
-        initial_data: dict[str, object] | None = None,
     ) -> None:
         self._effect_controls = effect_controls
         self._timer = timer if timer is not None else Timer()
         self._rules: list[GameRule] = []
-        self._queue: list[Event] = []
-        self._state = GameState(self._effect_controls, self._queue, initial_data)
 
-    @property
-    def state(self) -> GameState:
-        """The persistent ``GameState`` shared across all ticks."""
-        return self._state
+    def create_state(self, initial_data: dict[str, object] | None = None) -> "GameState":
+        """Create a ``GameState`` pre-wired with this engine's effect controls.
 
-    def update(self) -> None:
+        The optional ``initial_data`` dict seeds ``state.data`` with starting
+        values; the dict is used directly (no copy).
+        """
+        return GameState(self._effect_controls, initial_data)
+
+    def update(self, state: "GameState") -> None:
+        """Advance the timer, update state time, and dispatch all queued events."""
         self._timer.update()
-        self._state._update_time(self._timer.elapsed, self._timer.total)
-        while self._queue:
-            event = self._queue.pop(0)
+        state._update_time(self._timer.elapsed, self._timer.total)
+        while state._queue:
+            event = state._queue.pop(0)
             for rule in self._rules:
-                rule.handle_event(event, self._state)
-
-    def queue_event(self, event: Event) -> None:
-        self._queue.append(event)
+                rule.handle_event(event, state)
 
     def add_rules(self, *rules: GameRule) -> None:
         self._rules.extend(rules)

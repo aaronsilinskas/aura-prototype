@@ -14,7 +14,7 @@ def test_button_pressed_state_triggers_mapped_event(fixture: EngineFixture):
     triggered = Event(_GROUP, "pressed")
     fixture.game_engine.add_rules(ButtonEventsRule(button_pressed={"A": triggered}))
 
-    fixture.game_engine.queue_event(_make_input({"A": ButtonData.PRESSED}))
+    fixture.state.queue_event(_make_input({"A": ButtonData.PRESSED}))
     fixture.update_engine()
 
     assert triggered in fixture.captured_events
@@ -24,7 +24,7 @@ def test_button_down_state_triggers_mapped_event(fixture: EngineFixture):
     triggered = Event(_GROUP, "down")
     fixture.game_engine.add_rules(ButtonEventsRule(button_down={"A": triggered}))
 
-    fixture.game_engine.queue_event(_make_input({"A": ButtonData.DOWN}))
+    fixture.state.queue_event(_make_input({"A": ButtonData.DOWN}))
     fixture.update_engine()
 
     assert triggered in fixture.captured_events
@@ -34,7 +34,7 @@ def test_button_up_state_triggers_mapped_event(fixture: EngineFixture):
     triggered = Event(_GROUP, "up")
     fixture.game_engine.add_rules(ButtonEventsRule(button_up={"A": triggered}))
 
-    fixture.game_engine.queue_event(_make_input({"A": ButtonData.UP}))
+    fixture.state.queue_event(_make_input({"A": ButtonData.UP}))
     fixture.update_engine()
 
     assert triggered in fixture.captured_events
@@ -44,7 +44,7 @@ def test_button_released_state_triggers_mapped_event(fixture: EngineFixture):
     triggered = Event(_GROUP, "released")
     fixture.game_engine.add_rules(ButtonEventsRule(button_released={"A": triggered}))
 
-    fixture.game_engine.queue_event(_make_input({"A": ButtonData.RELEASED}))
+    fixture.state.queue_event(_make_input({"A": ButtonData.RELEASED}))
     fixture.update_engine()
 
     assert triggered in fixture.captured_events
@@ -54,7 +54,7 @@ def test_button_state_does_not_trigger_event_for_different_state(fixture: Engine
     should_not_trigger = Event(_GROUP, "should_not_trigger")
     fixture.game_engine.add_rules(ButtonEventsRule(button_pressed={"A": should_not_trigger}))
 
-    fixture.game_engine.queue_event(_make_input({"A": ButtonData.DOWN}))
+    fixture.state.queue_event(_make_input({"A": ButtonData.DOWN}))
     fixture.update_engine()
 
     assert should_not_trigger not in fixture.captured_events
@@ -65,7 +65,7 @@ def test_multiple_pressed_buttons_each_trigger_their_mapped_event(fixture: Engin
     event_2 = Event(_GROUP, "P2_pressed")
     fixture.game_engine.add_rules(ButtonEventsRule(button_pressed={"P1": event_1, "P2": event_2}))
 
-    fixture.game_engine.queue_event(
+    fixture.state.queue_event(
         _make_input({"P1": ButtonData.PRESSED, "P2": ButtonData.PRESSED})
     )
     fixture.update_engine()
@@ -78,7 +78,7 @@ def test_unmapped_button_does_not_trigger_any_event(fixture: EngineFixture):
     triggered = Event(_GROUP, "triggered")
     fixture.game_engine.add_rules(ButtonEventsRule(button_pressed={"A": triggered}))
 
-    fixture.game_engine.queue_event(_make_input({"B": ButtonData.PRESSED}))
+    fixture.state.queue_event(_make_input({"B": ButtonData.PRESSED}))
     fixture.update_engine()
 
     assert triggered not in fixture.captured_events

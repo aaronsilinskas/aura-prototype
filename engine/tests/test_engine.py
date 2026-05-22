@@ -28,7 +28,7 @@ def _make_effect_controls() -> EffectControls:
 
 def _make_state() -> GameState:
     controls = _make_effect_controls()
-    return GameState(controls, [])
+    return GameState(controls)
 
 
 class _CapturingRule(GameRule):
@@ -49,10 +49,11 @@ def test_rule_receives_the_effect_controls_passed_to_the_engine() -> None:
     controls = _make_effect_controls()
     rule = _CapturingRule()
     engine = GameEngine(effect_controls=controls)
+    state = engine.create_state()
     engine.add_rules(rule)
-    engine.queue_event(Event(_GROUP, "test"))
+    state.queue_event(Event(_GROUP, "test"))
 
-    engine.update()
+    engine.update(state)
 
     assert rule.captured_controls[0] is controls
 
@@ -155,11 +156,12 @@ def test_time_properties_reflect_values_injected_via_update_time() -> None:
 def test_rules_see_elapsed_and_total_time_from_the_engines_timer() -> None:
     timer = _ControlledTimer(elapsed=0.032, total=2.0)
     engine = GameEngine(effect_controls=_make_effect_controls(), timer=timer)
+    state = engine.create_state()
     rule = _TimeCaptureRule()
     engine.add_rules(rule)
-    engine.queue_event(Event(_GROUP, "tick"))
+    state.queue_event(Event(_GROUP, "tick"))
 
-    engine.update()
+    engine.update(state)
 
     assert rule.seen_elapsed == [pytest.approx(0.032)]
     assert rule.seen_total == [pytest.approx(2.0)]
@@ -179,7 +181,7 @@ def test_state_data_is_empty_when_no_initial_data_is_provided() -> None:
 def test_state_can_be_constructed_standalone_with_preset_data_for_rule_unit_testing() -> None:
     controls = _make_effect_controls()
 
-    state = GameState(controls, [], {"key": "val"})
+    state = GameState(controls, {"key": "val"})
 
     assert state.data["key"] == "val"
 
@@ -191,18 +193,46 @@ def test_rules_cannot_access_game_engine_through_state() -> None:
 
 
 # ---------------------------------------------------------------------------
-# GameEngine.state — persistent state across ticks
+# GameEngine.create_state — factory wires effect_controls
 # ---------------------------------------------------------------------------
 
 
-def test_engine_state_is_the_same_object_before_and_after_update() -> None:
+def test_create_state_returns_a_game_state() -> None:
     engine = GameEngine(effect_controls=_make_effect_controls())
-    state_before = engine.state
-    engine.queue_event(Event(_GROUP, "tick"))
 
-    engine.update()
+    state = engine.create_state()
 
-    assert engine.state is state_before
+    assert isinstance(state, GameState)
+
+
+def test_create_state_wires_engine_effect_controls() -> None:
+    controls = _make_effect_controls()
+    engine = GameEngine(effect_controls=controls)
+
+    state = engine.create_state()
+
+    assert state.effect_controls is controls
+
+
+def test_create_state_seeds_data_from_initial_data() -> None:
+    engine = GameEngine(effect_controls=_make_effect_controls())
+
+    state = engine.create_state(initial_data={"score": 0})
+
+    assert state.data["score"] == 0
+
+
+def test_create_state_returns_empty_data_when_no_initial_data_provided() -> None:
+    engine = GameEngine(effect_controls=_make_effect_controls())
+
+    state = engine.create_state()
+
+    assert state.data == {}
+
+
+# ---------------------------------------------------------------------------
+# GameEngine.update(state) — stateless tick
+# ---------------------------------------------------------------------------
 
 
 def test_data_written_in_one_tick_is_readable_in_a_later_tick() -> None:
@@ -214,14 +244,15 @@ def test_data_written_in_one_tick_is_readable_in_a_later_tick() -> None:
             state.data["n"] = state.data.get("n", 0) + 1
 
     engine = GameEngine(effect_controls=_make_effect_controls())
+    state = engine.create_state()
     engine.add_rules(_CounterRule())
 
-    engine.queue_event(Event(_GROUP, "tick"))
-    engine.update()
-    engine.queue_event(Event(_GROUP, "tick"))
-    engine.update()
+    state.queue_event(Event(_GROUP, "tick"))
+    engine.update(state)
+    state.queue_event(Event(_GROUP, "tick"))
+    engine.update(state)
 
-    assert engine.state.data["n"] == 2
+    assert state.data["n"] == 2
 
 
 def test_data_written_by_an_earlier_rule_is_visible_to_a_later_rule_in_the_same_tick() -> None:
@@ -241,22 +272,39 @@ def test_data_written_by_an_earlier_rule_is_visible_to_a_later_rule_in_the_same_
             self.value = state.data.get("shared")
 
     engine = GameEngine(effect_controls=_make_effect_controls())
+    state = engine.create_state()
     reader = _ReaderRule()
     engine.add_rules(_WriterRule(), reader)
-    engine.queue_event(Event(_GROUP, "tick"))
+    state.queue_event(Event(_GROUP, "tick"))
 
-    engine.update()
+    engine.update(state)
 
     assert reader.value == 42
 
 
-def test_initial_data_is_available_on_state_before_any_update() -> None:
-    engine = GameEngine(
-        effect_controls=_make_effect_controls(),
-        initial_data={"score": 0},
-    )
+def test_different_state_objects_are_independent() -> None:
+    class _CounterRule(GameRule):
+        def __init__(self) -> None:
+            super().__init__("test.counter", Version(1, 0))
 
-    assert engine.state.data["score"] == 0
+        def handle_event(self, event: Event, state: GameState) -> None:
+            state.data["n"] = state.data.get("n", 0) + 1
+
+    engine = GameEngine(effect_controls=_make_effect_controls())
+    state_a = engine.create_state()
+    state_b = engine.create_state()
+    engine.add_rules(_CounterRule())
+
+    state_a.queue_event(Event(_GROUP, "tick"))
+    engine.update(state_a)
+    state_a.queue_event(Event(_GROUP, "tick"))
+    engine.update(state_a)
+
+    state_b.queue_event(Event(_GROUP, "tick"))
+    engine.update(state_b)
+
+    assert state_a.data["n"] == 2
+    assert state_b.data["n"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -278,30 +326,46 @@ def test_event_queued_from_state_inside_a_rule_is_dispatched_in_the_same_update(
                 captured.append(event)
 
     engine = GameEngine(effect_controls=_make_effect_controls())
+    state = engine.create_state()
     engine.add_rules(_RelayRule())
-    engine.queue_event(Event(_GROUP, "trigger"))
+    state.queue_event(Event(_GROUP, "trigger"))
 
-    engine.update()
+    engine.update(state)
 
     assert captured[0].name == "relayed"
 
 
-def test_state_queue_event_and_engine_queue_event_share_the_same_queue() -> None:
+# ---------------------------------------------------------------------------
+# GameState.clear_queue — discard pending events
+# ---------------------------------------------------------------------------
+
+
+def test_clear_queue_removes_all_pending_events() -> None:
+    state = _make_state()
+    state.queue_event(Event(_GROUP, "a"))
+    state.queue_event(Event(_GROUP, "b"))
+
+    state.clear_queue()
+
+    assert state._queue == []
+
+
+def test_clear_queue_prevents_events_from_being_dispatched() -> None:
     captured: list[Event] = []
 
-    class _CaptureAllRule(GameRule):
+    class _CaptureRule(GameRule):
         def __init__(self) -> None:
-            super().__init__("test.capture_all", Version(1, 0))
+            super().__init__("test.capture", Version(1, 0))
 
         def handle_event(self, event: Event, state: GameState) -> None:
             captured.append(event)
 
     engine = GameEngine(effect_controls=_make_effect_controls())
-    engine.add_rules(_CaptureAllRule())
-    engine.queue_event(Event(_GROUP, "via-engine"))
-    engine.state.queue_event(Event(_GROUP, "via-state"))
+    state = engine.create_state()
+    engine.add_rules(_CaptureRule())
+    state.queue_event(Event(_GROUP, "should-not-fire"))
+    state.clear_queue()
 
-    engine.update()
+    engine.update(state)
 
-    names = {e.name for e in captured}
-    assert names == {"via-engine", "via-state"}
+    assert captured == []

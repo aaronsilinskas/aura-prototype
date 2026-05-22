@@ -31,11 +31,12 @@ class EngineFixture:
 
     def __init__(self):
         self.game_engine = GameEngine(EffectControls())
+        self.state = self.game_engine.create_state()
         self._event_capture_rule = _EventCaptureRule()
         self.game_engine.add_rules(self._event_capture_rule)
 
     def update_engine(self):
-        self.game_engine.update()
+        self.game_engine.update(self.state)
 
     @property
     def captured_events(self):

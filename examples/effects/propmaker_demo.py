@@ -217,6 +217,7 @@ effect_manager = EffectManager(
 
 game_engine = GameEngine(effect_controls=effect_manager)
 game_engine.add_rules(ButtonEffectRule())
+game_state = game_engine.create_state()
 
 # Button state tracking for edge detection (pull-up: True = not pressed)
 _buttons = [_button_a, _button_b, _button_c, _button_d]
@@ -239,12 +240,12 @@ while True:
         if not _current and _button_prev[_i]:  # falling edge: just pressed
             _states = dict.fromkeys(_BUTTON_NAMES, ButtonData.UP)
             _states[_BUTTON_NAMES[_i]] = ButtonData.PRESSED
-            game_engine.queue_event(
+            game_state.queue_event(
                 InputEvents.ButtonAndMovement(ButtonData(_states), MovementData())
             )
         _button_prev[_i] = _current
 
-    game_engine.update()
+    game_engine.update(game_state)
     # time_it("game_engine", game_engine.update, timer)
 
     _fps_frame_count += 1

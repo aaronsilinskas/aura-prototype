@@ -58,8 +58,8 @@ Items marked `[#86]` or `[#85]` are planned but not yet implemented.
 (InputEvent | NetworkEvent)
         │
         ▼
-   GameEngine             holds event queue + list[GameRule]
-        │  engine.update(timer)
+   GameEngine             holds rule list; stateless — caller owns GameState
+        │  engine.update(state)
         ▼
    GameRule.handle_event(event, state)
         │  rules read/write state.data, queue new events,
@@ -101,7 +101,7 @@ A **Scene** is a declarative bundle:
 `SceneManager` owns a scene stack. `load(name)` replaces the stack; `overlay(name)` pushes
 on top (suspending the current scene); `pop()` restores the previous scene. Transitions are
 deferred to end-of-tick — rules call `state.scene_controls.load/overlay/pop()` during a tick
-and the transition is applied after `engine.update()` returns.
+and the transition is applied after `engine.update(state)` returns.
 
 ---
 
@@ -109,7 +109,7 @@ and the transition is applied after `engine.update()` returns.
 
 | Type | Module | Role |
 |------|--------|------|
-| `GameEngine` | `engine/engine.py` | Event queue + rule list; driven by `update(timer)` |
+| `GameEngine` | `engine/engine.py` | Rule list; driven by `update(state)`; `create_state()` factory |
 | `GameRule` | `engine/engine.py` | Abstract stateless event handler |
 | `GameState` | `engine/engine.py` | Per-tick context passed to every rule: `data`, `effect_controls`, `scene_controls`, `timer` |
 | `PackRegistry` | `engine/packs.py` | Multi-pack discovery, version checks, lazy item import |

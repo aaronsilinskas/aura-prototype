@@ -16,7 +16,7 @@ _MOVEMENT_DATA = MovementData(x_accel=0.0, y_accel=9.8, z_accel=0.0)
 def _capture_log_entry(fixture: EngineFixture) -> str:
     logger = CapturingLogger()
     fixture.game_engine.add_rules(EventLoggerRule(output=logger))
-    fixture.game_engine.queue_event(InputEvents.ButtonAndMovement(_BUTTON_DATA, _MOVEMENT_DATA))
+    fixture.state.queue_event(InputEvents.ButtonAndMovement(_BUTTON_DATA, _MOVEMENT_DATA))
     fixture.update_engine()
     return logger.logs[0]
 
@@ -25,7 +25,7 @@ def test_queued_event_produces_exactly_one_log_entry(fixture: EngineFixture):
     logger = CapturingLogger()
     fixture.game_engine.add_rules(EventLoggerRule(output=logger))
 
-    fixture.game_engine.queue_event(InputEvents.ButtonAndMovement(_BUTTON_DATA))
+    fixture.state.queue_event(InputEvents.ButtonAndMovement(_BUTTON_DATA))
     fixture.update_engine()
 
     assert len(logger.logs) == 1
