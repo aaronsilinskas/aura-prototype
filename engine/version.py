@@ -29,9 +29,7 @@ class Version:
         parts = version_str.strip().split(".")
         return Version(int(parts[0]), int(parts[1]))
 
-    def check_compatible(
-        self, name: str, required_major: int, required_minor: int
-    ) -> None:
+    def check_compatible(self, name: str, required_major: int, required_minor: int) -> None:
         """Raise ``ValueError`` if this version does not satisfy the minimum required.
 
         * Same major and ``self.minor >= required_minor`` → compatible (no-op).

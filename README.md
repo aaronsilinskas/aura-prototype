@@ -35,7 +35,7 @@ packs/            First-party game content packs  [#86]
   effects/
     elements/     Element effect builders (Fire, Water, Earth, …)  ← from effects/elements/
   rules/
-    debug_pack/   Debug rule pack (button events, event logger)  ← from rules/debug_pack/
+    debug/        Debug rule pack (button events, event logger)  ← from rules/debug/
 
 magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
   aura.py         Aura, Spell, Spells, SpellTags, AuraEvent, EventListener

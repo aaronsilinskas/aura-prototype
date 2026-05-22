@@ -6,6 +6,7 @@ try:
 except ImportError:
     pass
 
+from effects.render import EffectRenderer, RendererConfig
 from packs.effects.elements.air import build_air_renderer
 from packs.effects.elements.dark import build_dark_renderer
 from packs.effects.elements.earth import build_earth_renderer
@@ -16,7 +17,6 @@ from packs.effects.elements.light import build_light_renderer
 from packs.effects.elements.lightning import build_lightning_renderer
 from packs.effects.elements.time import build_time_renderer
 from packs.effects.elements.water import build_water_renderer
-from effects.render import EffectRenderer, RendererConfig
 
 ElementBuilder: TypeAlias = "Callable[[RendererConfig], EffectRenderer]"
 

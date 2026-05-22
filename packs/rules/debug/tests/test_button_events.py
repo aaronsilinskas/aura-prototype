@@ -1,7 +1,7 @@
 from engine.events import Event, EventGroup
 from engine.input import ButtonData, InputEvents
 from packs.rules.conftest import EngineFixture
-from packs.rules.debug_pack.button_events import ButtonEventsRule
+from packs.rules.debug.button_events import ButtonEventsRule
 
 _GROUP = EventGroup("test")
 
@@ -65,9 +65,7 @@ def test_multiple_pressed_buttons_each_trigger_their_mapped_event(fixture: Engin
     event_2 = Event(_GROUP, "P2_pressed")
     fixture.game_engine.add_rules(ButtonEventsRule(button_pressed={"P1": event_1, "P2": event_2}))
 
-    fixture.state.queue_event(
-        _make_input({"P1": ButtonData.PRESSED, "P2": ButtonData.PRESSED})
-    )
+    fixture.state.queue_event(_make_input({"P1": ButtonData.PRESSED, "P2": ButtonData.PRESSED}))
     fixture.update_engine()
 
     assert event_1 in fixture.captured_events

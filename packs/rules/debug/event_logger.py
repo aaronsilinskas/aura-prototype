@@ -30,4 +30,4 @@ class EventLoggerRule(GameRule):
         self._output(f"[debug] t={state.total:.3f} {str(event).upper()} {', '.join(parts)}")
 
 
-rule = EventLoggerRule()
+RULE = EventLoggerRule()

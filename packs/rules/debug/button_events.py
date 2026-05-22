@@ -45,4 +45,4 @@ class ButtonEventsRule(GameRule):
                     state.queue_event(button_event)
 
 
-rule = ButtonEventsRule()
+RULE = ButtonEventsRule()

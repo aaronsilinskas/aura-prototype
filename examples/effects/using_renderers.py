@@ -28,10 +28,10 @@ import time
 from collections.abc import Iterable
 
 from effects.effect import EffectState, EffectTimer
+from effects.render import MergeRenderer, PixelBuffer, RendererConfig
 from packs.effects.elements.earth import build_earth_renderer
 from packs.effects.elements.fire import build_fire_renderer
 from packs.effects.elements.lightning import build_lightning_renderer
-from effects.render import MergeRenderer, PixelBuffer, RendererConfig
 
 PIXEL_COUNT = 28
 RESOLUTION = PIXEL_COUNT * 3
