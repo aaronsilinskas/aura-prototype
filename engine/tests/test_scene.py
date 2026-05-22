@@ -118,19 +118,24 @@ def test_scene_controls_pop_raises_not_implemented_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_scene_stores_rules_in_slots() -> None:
+def test_scene_rules_accessible_after_construction() -> None:
     rules = [_rule()]
     scene = Scene(rules=rules, effect_packs=[], rule_packs=[])
 
     assert scene.rules is rules
 
 
-def test_scene_stores_effect_packs_and_rule_packs() -> None:
+def test_scene_effect_packs_accessible_after_construction() -> None:
     effect_packs = [("fx", "1.0")]
-    rule_packs = [("rules", "2.0")]
-    scene = Scene(rules=[], effect_packs=effect_packs, rule_packs=rule_packs)
+    scene = Scene(rules=[], effect_packs=effect_packs, rule_packs=[])
 
     assert scene.effect_packs is effect_packs
+
+
+def test_scene_rule_packs_accessible_after_construction() -> None:
+    rule_packs = [("rules", "2.0")]
+    scene = Scene(rules=[], effect_packs=[], rule_packs=rule_packs)
+
     assert scene.rule_packs is rule_packs
 
 
@@ -140,7 +145,7 @@ def test_scene_initial_data_defaults_to_none() -> None:
     assert scene.initial_data is None
 
 
-def test_scene_stores_initial_data_when_provided() -> None:
+def test_scene_initial_data_accessible_when_provided() -> None:
     data = {"score": 0}
     scene = Scene(rules=[], effect_packs=[], rule_packs=[], initial_data=data)
 
@@ -156,7 +161,7 @@ def test_scene_lifecycle_callbacks_default_to_none() -> None:
     assert scene.on_resume is None
 
 
-def test_scene_stores_lifecycle_callbacks_when_provided() -> None:
+def test_scene_lifecycle_callbacks_accessible_when_provided() -> None:
     def cb(ec: object) -> None:
         pass
 
@@ -176,7 +181,7 @@ def test_scene_stores_lifecycle_callbacks_when_provided() -> None:
     assert scene.on_resume is cb
 
 
-def test_scene_rejects_arbitrary_runtime_attributes_due_to_slots() -> None:
+def test_scene_rejects_unknown_attributes() -> None:
     scene = Scene(rules=[], effect_packs=[], rule_packs=[])
 
     with pytest.raises(AttributeError):
@@ -188,7 +193,7 @@ def test_scene_rejects_arbitrary_runtime_attributes_due_to_slots() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_scene_manager_is_a_subclass_of_scene_controls() -> None:
+def test_scene_manager_satisfies_scene_controls_interface() -> None:
     engine = _make_engine()
     effect_registry = PackRegistry(extractor=lambda m: m.BUILD)
     rule_registry = PackRegistry(extractor=lambda m: m.RULE)
@@ -198,7 +203,7 @@ def test_scene_manager_is_a_subclass_of_scene_controls() -> None:
     assert isinstance(manager, SceneControls)
 
 
-def test_register_stores_factory_for_later_use() -> None:
+def test_load_succeeds_after_register() -> None:
     engine = _make_engine()
     effect_registry = PackRegistry(extractor=lambda m: m.BUILD)
     rule_registry = PackRegistry(extractor=lambda m: m.RULE)
@@ -208,6 +213,21 @@ def test_register_stores_factory_for_later_use() -> None:
     manager.register("main", factory)
     manager.load("main")
     manager.update()  # should not raise
+
+
+def test_register_overwrites_existing_factory_silently() -> None:
+    engine = _make_engine()
+    manager = SceneManager(
+        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
+    )
+    loaded = []
+
+    manager.register("main", _scene_factory(on_load=lambda ec: loaded.append("first")))
+    manager.register("main", _scene_factory(on_load=lambda ec: loaded.append("second")))
+    manager.load("main")
+    manager.update()
+
+    assert loaded == ["second"]
 
 
 # ---------------------------------------------------------------------------
@@ -419,7 +439,7 @@ class _TrackingEngine(GameEngine):
         super().update(state)
 
 
-def test_update_applies_deferred_load_after_engine_update() -> None:
+def test_on_load_fires_after_engine_update_in_same_tick() -> None:
     engine = _TrackingEngine(EffectControls())
     manager = SceneManager(
         engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
@@ -462,6 +482,36 @@ def test_last_pending_transition_wins_within_one_tick() -> None:
     assert loaded == ["b"], "last load() call in tick should win"
 
 
+def test_overlay_wins_when_load_and_overlay_both_called_in_same_tick() -> None:
+    engine = _make_engine()
+    manager = SceneManager(
+        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
+    )
+    unloaded = []
+    suspended = []
+    manager.register(
+        "base",
+        _scene_factory(
+            on_unload=lambda ec: unloaded.append("base"),
+            on_suspend=lambda ec: suspended.append("base"),
+        ),
+    )
+    manager.register("new", _scene_factory())
+    manager.register("overlay_scene", _scene_factory())
+
+    manager.load("base")
+    manager.update()
+
+    # In the same tick: load first, then overlay — overlay (last call) wins.
+    # overlay suspends base rather than unloading it; load would have unloaded it.
+    manager.load("new")
+    manager.overlay("overlay_scene")
+    manager.update()
+
+    assert suspended == ["base"], "overlay() called last must win — base is suspended not unloaded"
+    assert unloaded == [], "load() called first must be superseded"
+
+
 # ---------------------------------------------------------------------------
 # SceneManager — load() lifecycle
 # ---------------------------------------------------------------------------
@@ -493,7 +543,7 @@ def test_load_seeds_active_state_data_from_scene_initial_data() -> None:
     assert engine._last_state.data == {"level": 5}
 
 
-def test_load_fires_on_load_callback_with_effect_controls() -> None:
+def test_on_load_callback_receives_effect_controls() -> None:
     engine = _make_engine()
     manager = SceneManager(
         engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
@@ -505,6 +555,59 @@ def test_load_fires_on_load_callback_with_effect_controls() -> None:
 
     assert len(received_ec) == 1
     assert isinstance(received_ec[0], EffectControls)
+
+
+def test_on_unload_callback_receives_effect_controls() -> None:
+    engine = _make_engine()
+    manager = SceneManager(
+        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
+    )
+    received = []
+    manager.register("main", _scene_factory(on_unload=lambda ec: received.append(ec)))
+    manager.register("next", _scene_factory())
+    manager.load("main")
+    manager.update()
+    manager.load("next")
+    manager.update()
+
+    assert len(received) == 1
+    assert isinstance(received[0], EffectControls)
+
+
+def test_on_suspend_callback_receives_effect_controls() -> None:
+    engine = _make_engine()
+    manager = SceneManager(
+        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
+    )
+    received = []
+    manager.register("main", _scene_factory(on_suspend=lambda ec: received.append(ec)))
+    manager.register("overlay_scene", _scene_factory())
+    manager.load("main")
+    manager.update()
+    manager.overlay("overlay_scene")
+    manager.update()
+
+    assert len(received) == 1
+    assert isinstance(received[0], EffectControls)
+
+
+def test_on_resume_callback_receives_effect_controls() -> None:
+    engine = _make_engine()
+    manager = SceneManager(
+        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
+    )
+    received = []
+    manager.register("main", _scene_factory(on_resume=lambda ec: received.append(ec)))
+    manager.register("overlay_scene", _scene_factory())
+    manager.load("main")
+    manager.update()
+    manager.overlay("overlay_scene")
+    manager.update()
+    manager.pop()
+    manager.update()
+
+    assert len(received) == 1
+    assert isinstance(received[0], EffectControls)
 
 
 def test_load_does_not_require_on_load_callback() -> None:
@@ -621,7 +724,47 @@ def test_load_dispatches_events_to_scene_rules_on_following_ticks(pack_env) -> N
 
     assert "scene" in fired, "scene rule must receive events after load"
     assert "pack" in fired, "pack rule must receive events after load"
-    assert fired.index("scene") < fired.index("pack"), "scene rules fire before pack rules"
+
+
+def test_scene_rules_fire_before_pack_rules(pack_env) -> None:
+    _make_rule_pack(
+        pack_env,
+        "rules",
+        "1.0",
+        {
+            "rule_a": (
+                "from engine.engine import GameRule\n"
+                "from engine.version import Version\n"
+                "RULE = GameRule('pack.rule_a', Version(1, 0))\n"
+            )
+        },
+    )
+    effect_registry, rule_registry = _make_registries(str(pack_env))
+    engine = _TrackingEngine(EffectControls())
+    manager = SceneManager(engine, effect_registry, rule_registry)
+
+    fired: list = []
+
+    class _SceneRule(GameRule):
+        def __init__(self) -> None:
+            super().__init__("scene.rule", Version(1, 0))
+
+        def handle_event(self, e: Event, state: GameState) -> None:
+            fired.append("scene")
+
+    pack_rule = rule_registry.get("rules", "rule_a")
+    pack_rule.on(Event, lambda e, s: fired.append("pack"))
+
+    scene_r = _SceneRule()
+    manager.register("main", _scene_factory(rules=[scene_r], rule_packs=[("rules", "1.0")]))
+    manager.load("main")
+    manager.update()
+    manager.update()
+
+    engine._last_state.queue_event(Event(_GROUP, "verify"))
+    manager.update()
+
+    assert fired.index("scene") < fired.index("pack")
 
 
 # ---------------------------------------------------------------------------
@@ -691,7 +834,7 @@ def test_overlay_clears_suspended_base_state_queue_before_pushing() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_pop_fires_on_unload_for_top_and_on_resume_for_restored() -> None:
+def test_pop_fires_lifecycle_callbacks_in_correct_order() -> None:
     engine = _make_engine()
     manager = SceneManager(
         engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
@@ -802,12 +945,40 @@ def test_pop_clears_restored_state_queue_so_suspended_events_do_not_replay() -> 
     )
 
 
+def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
+    engine = _make_engine()
+    manager = SceneManager(
+        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
+    )
+    resumed = []
+    manager.register("base", _scene_factory(on_resume=lambda ec: resumed.append("base")))
+    manager.register("mid", _scene_factory(on_resume=lambda ec: resumed.append("mid")))
+    manager.register("top", _scene_factory())
+
+    manager.load("base")
+    manager.update()
+    manager.overlay("mid")
+    manager.update()
+    manager.overlay("top")
+    manager.update()
+
+    manager.pop()
+    manager.update()
+
+    assert resumed == ["mid"], "pop from 3-layer stack must resume the scene directly below"
+
+    manager.pop()
+    manager.update()
+
+    assert resumed == ["mid", "base"]
+
+
 # ---------------------------------------------------------------------------
 # SceneManager — rule pack integration
 # ---------------------------------------------------------------------------
 
 
-def test_load_appends_all_rule_pack_items_after_scene_rules(pack_env) -> None:
+def test_rule_pack_items_all_receive_events_after_load(pack_env) -> None:
     rule_content = (
         "from engine.engine import GameRule\n"
         "from engine.version import Version\n"
@@ -852,9 +1023,6 @@ def test_load_appends_all_rule_pack_items_after_scene_rules(pack_env) -> None:
     assert "scene" in fired_by, "scene rule must fire"
     assert "pack_a" in fired_by, "pack rule_a must fire"
     assert "pack_b" in fired_by, "pack rule_b must fire"
-    # Scene rule fires before both pack rules
-    assert fired_by.index("scene") < fired_by.index("pack_a")
-    assert fired_by.index("scene") < fired_by.index("pack_b")
 
 
 def test_rule_pack_items_loaded_in_alphabetical_order(pack_env) -> None:
@@ -882,80 +1050,11 @@ def test_rule_pack_items_loaded_in_alphabetical_order(pack_env) -> None:
 
 
 # ---------------------------------------------------------------------------
-# SceneManager — queue isolation (clear_queue called at correct times)
-# ---------------------------------------------------------------------------
-
-
-def test_clear_queue_called_during_load_prevents_stale_events_from_processing() -> None:
-    engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
-
-    stale_events_processed = []
-
-    class _SentinelRule(GameRule):
-        def __init__(self):
-            super().__init__("sentinel", Version(1, 0))
-
-        def handle_event(self, e, state):
-            stale_events_processed.append(e)
-
-    sentinel = _SentinelRule()
-    manager.register("first", _scene_factory(rules=[sentinel]))
-    manager.register("second", _scene_factory())
-
-    manager.load("first")
-    manager.update()
-
-    # Queue a stale event on the active state; it should not survive load()
-    # We need the state reference; get it via on_load of another load
-    state_holder = []
-    manager.register(
-        "capture",
-        _scene_factory(
-            rules=[sentinel],
-            on_load=lambda ec: None,
-        ),
-    )
-
-    # Reset, re-register to track
-    class _StateCaptureRule(GameRule):
-        def __init__(self, holder):
-            super().__init__("sc", Version(1, 0))
-            self._holder = holder
-
-        def handle_event(self, e, state):
-            self._holder.append(state)
-
-    state_holder = []
-    sc_rule = _StateCaptureRule(state_holder)
-    manager.register("with_state_capture", _scene_factory(rules=[sc_rule]))
-    manager.load("with_state_capture")
-    manager.update()
-
-    # Tick to capture state via sc_rule dispatching
-    if not state_holder:
-        # Queue an event directly via a workaround
-        # We can't easily access the state directly, so test indirectly:
-        # load a new scene; if stale events from the old state processed in new,
-        # that would be a bug. The clear_queue removes them.
-        pass
-
-    manager.load("second")
-    manager.update()
-
-    # If clear_queue works, stale events from "with_state_capture" won't process
-    # in "second"'s rules. No assertion needed beyond no crash.
-    manager.update()
-
-
-# ---------------------------------------------------------------------------
 # SceneManager — GC eligibility after full unload
 # ---------------------------------------------------------------------------
 
 
-def test_scene_is_gc_eligible_after_full_unload() -> None:
+def test_unloaded_scene_is_not_retained_by_manager() -> None:
     import gc
     import weakref
 
