@@ -51,7 +51,7 @@ class PackRegistry:
 
     Version check::
 
-        registry.check_version("elements", required_major=1, required_minor=2)
+        registry.check_version("elements", Version(1, 2))
     """
 
     __slots__ = ("_cache", "_extractor", "_packs", "_scanned_dirs")
@@ -152,7 +152,18 @@ class PackRegistry:
         self._cache[cache_key] = value
         return value  # type: ignore[return-value]
 
-    def check_version(self, pack_name: str, required_major: int, required_minor: int) -> None:
+    def items(self, pack_name: str) -> "list[str]":
+        """Return item names for *pack_name* in alphabetical order.
+
+        Raises:
+            ValueError: if *pack_name* is unknown.
+        """
+        meta = self._packs.get(pack_name)
+        if meta is None:
+            raise ValueError("Unknown pack '" + pack_name + "'")
+        return sorted(meta.item_names)
+
+    def check_version(self, pack_name: str, required: Version) -> None:
         """Verify that the installed pack version satisfies the minimum required.
 
         Compatibility rules (MAJOR.MINOR semantics):
@@ -170,4 +181,4 @@ class PackRegistry:
         if meta is None:
             raise ValueError("Unknown pack '" + pack_name + "'")
 
-        meta.version.check_compatible(pack_name, required_major, required_minor)
+        meta.version.check_compatible(pack_name, required.major, required.minor)

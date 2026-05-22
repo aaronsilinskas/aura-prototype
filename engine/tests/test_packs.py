@@ -11,6 +11,7 @@ import sys
 import pytest
 
 from engine.packs import PackRegistry
+from engine.version import Version
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -284,7 +285,7 @@ def test_check_version_passes_when_installed_equals_required(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    registry.check_version("mypack", required_major=1, required_minor=2)
+    registry.check_version("mypack", Version(1, 2))
 
 
 def test_check_version_passes_when_installed_minor_is_greater(pack_env) -> None:
@@ -292,7 +293,7 @@ def test_check_version_passes_when_installed_minor_is_greater(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    registry.check_version("mypack", required_major=1, required_minor=2)
+    registry.check_version("mypack", Version(1, 2))
 
 
 # ---------------------------------------------------------------------------
@@ -308,7 +309,7 @@ def test_check_version_raises_upgrade_message_when_installed_minor_is_less(
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
     with pytest.raises(ValueError, match="upgrade the pack"):
-        registry.check_version("mypack", required_major=1, required_minor=2)
+        registry.check_version("mypack", Version(1, 2))
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +325,7 @@ def test_check_version_raises_incompatible_when_major_differs_higher(
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
     with pytest.raises(ValueError, match="incompatible"):
-        registry.check_version("mypack", required_major=1, required_minor=0)
+        registry.check_version("mypack", Version(1, 0))
 
 
 def test_check_version_raises_incompatible_when_major_differs_lower(
@@ -335,7 +336,7 @@ def test_check_version_raises_incompatible_when_major_differs_lower(
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
     with pytest.raises(ValueError, match="incompatible"):
-        registry.check_version("mypack", required_major=2, required_minor=0)
+        registry.check_version("mypack", Version(2, 0))
 
 
 def test_check_version_raises_for_unknown_pack(pack_env) -> None:
@@ -343,7 +344,7 @@ def test_check_version_raises_for_unknown_pack(pack_env) -> None:
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
     with pytest.raises(ValueError, match="Unknown pack"):
-        registry.check_version("ghost", required_major=1, required_minor=0)
+        registry.check_version("ghost", Version(1, 0))
 
 
 # ---------------------------------------------------------------------------
@@ -360,3 +361,45 @@ def test_pack_registry_does_not_allow_arbitrary_attributes() -> None:
 
     with pytest.raises(AttributeError):
         registry.unexpected_attr = "oops"  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
+# items — item name listing
+# ---------------------------------------------------------------------------
+
+
+def test_items_returns_sorted_item_names(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.0", {"zebra": "VALUE = 1", "alpha": "VALUE = 2", "mango": "VALUE = 3"})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    assert registry.items("mypack") == ["alpha", "mango", "zebra"]
+
+
+def test_items_returns_empty_list_for_pack_with_no_items(pack_env) -> None:
+    _make_pack(pack_env, "mypack", "1.0", {})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    assert registry.items("mypack") == []
+
+
+def test_items_excludes_init_py(pack_env) -> None:
+    pack_dir = pack_env / "mypack"
+    pack_dir.mkdir()
+    (pack_dir / "version.txt").write_text("1.0\n")
+    (pack_dir / "__init__.py").write_text("")
+    (pack_dir / "item_a.py").write_text("VALUE = 1")
+
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    assert registry.items("mypack") == ["item_a"]
+
+
+def test_items_raises_for_unknown_pack(pack_env) -> None:
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    with pytest.raises(ValueError, match="Unknown pack"):
+        registry.items("nonexistent")
