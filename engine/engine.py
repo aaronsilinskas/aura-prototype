@@ -139,7 +139,7 @@ class GameEngine:
         self,
         scene_controls: SceneControls,
         initial_data: dict[str, object] | None = None,
-    ) -> "GameState":
+    ) -> GameState:
         """Create a ``GameState`` pre-wired with this engine's effect controls
         and the given ``scene_controls``.
 
@@ -148,7 +148,7 @@ class GameEngine:
         """
         return GameState(self._effect_controls, scene_controls, initial_data)
 
-    def update(self, state: "GameState") -> None:
+    def update(self, state: GameState) -> None:
         """Advance the timer, update state time, and dispatch all queued events."""
         self._timer.update()
         state._update_time(self._timer.elapsed, self._timer.total)

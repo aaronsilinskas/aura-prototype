@@ -1,10 +1,10 @@
+import pytest
+
 from engine.effects.manager import EffectControls
 from engine.engine import GameEngine, GameRule, GameState, Version
 from engine.events import Event, EventGroup
 from engine.scene import SceneControls
 from engine.timer import Timer
-
-import pytest
 
 _GROUP = EventGroup("test")
 
@@ -135,24 +135,26 @@ class _ControlledTimer(Timer):
         pass  # values remain whatever was set at construction / by the test
 
 
-def test_elapsed_cannot_be_written_by_a_rule() -> None:
+def test_elapsed_is_read_only() -> None:
     state = _make_state()
 
     with pytest.raises(AttributeError):
         state.elapsed = 1.0  # type: ignore[misc]
 
 
-def test_total_cannot_be_written_by_a_rule() -> None:
+def test_total_is_read_only() -> None:
     state = _make_state()
 
     with pytest.raises(AttributeError):
         state.total = 1.0  # type: ignore[misc]
 
 
-def test_time_properties_reflect_values_injected_via_update_time() -> None:
-    state = _make_state()
+def test_state_elapsed_and_total_reflect_timer_values_after_engine_update() -> None:
+    timer = _ControlledTimer(elapsed=0.016, total=1.5)
+    engine = GameEngine(effect_controls=_make_effect_controls(), timer=timer)
+    state = engine.create_state(_make_scene_controls())
 
-    state._update_time(0.016, 1.5)
+    engine.update(state)
 
     assert state.elapsed == pytest.approx(0.016)
     assert state.total == pytest.approx(1.5)
@@ -200,14 +202,6 @@ def test_rules_cannot_access_game_engine_through_state() -> None:
 # ---------------------------------------------------------------------------
 # GameEngine.create_state — factory wires effect_controls and scene_controls
 # ---------------------------------------------------------------------------
-
-
-def test_create_state_returns_a_game_state() -> None:
-    engine = GameEngine(effect_controls=_make_effect_controls())
-
-    state = engine.create_state(_make_scene_controls())
-
-    assert isinstance(state, GameState)
 
 
 def test_create_state_wires_engine_effect_controls() -> None:
@@ -352,16 +346,6 @@ def test_event_queued_from_state_inside_a_rule_is_dispatched_in_the_same_update(
 # ---------------------------------------------------------------------------
 # GameState.clear_queue — discard pending events
 # ---------------------------------------------------------------------------
-
-
-def test_clear_queue_removes_all_pending_events() -> None:
-    state = _make_state()
-    state.queue_event(Event(_GROUP, "a"))
-    state.queue_event(Event(_GROUP, "b"))
-
-    state.clear_queue()
-
-    assert state._queue == []
 
 
 def test_clear_queue_prevents_events_from_being_dispatched() -> None:
