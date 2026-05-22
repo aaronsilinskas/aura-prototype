@@ -4,10 +4,12 @@
 - **Triage labels** — See `docs/agents/triage-labels.md`.
 - **Domain docs** — `docs/agents/domain.md` (module layout, key types, vocabulary, constraints). Extended design in Obsidian vault at `~/dev/aura/aura-docs/`.
 
+**When a workflow step names a skill, load its `SKILL.md` with `read_file` and follow it precisely before proceeding.**
+
 ### PRD workflow
 
 1. `to-prd` — create PRD as a local document only (no GH issue yet).
-2. `grill-with-docs` — challenge the PRD; amend the GH issue with decisions reached. **Do NOT create ADRs** — the design is still evolving and ADRs are premature.
+2. `grill-with-docs` — challenge the PRD against `CONTEXT.md`; update the local PRD and `CONTEXT.md` inline as decisions crystallise. **Do NOT create ADRs** — the design is still evolving and ADRs are premature.
 3. Keep looping on grilling until no open questions remain.
 4. Move the PRD to a GH issue, delete the local file.
 5. `to-issues` — split PRD into independently-grabbable implementation issues.
