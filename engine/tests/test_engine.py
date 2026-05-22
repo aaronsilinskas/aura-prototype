@@ -1,6 +1,7 @@
 from engine.effects.manager import EffectControls
 from engine.engine import GameEngine, GameRule, GameState, Version
 from engine.events import Event, EventGroup
+from engine.scene import SceneControls
 from engine.timer import Timer
 
 import pytest
@@ -26,9 +27,13 @@ def _make_effect_controls() -> EffectControls:
     return EffectControls()
 
 
+def _make_scene_controls() -> SceneControls:
+    return SceneControls()
+
+
 def _make_state() -> GameState:
     controls = _make_effect_controls()
-    return GameState(controls)
+    return GameState(controls, _make_scene_controls())
 
 
 class _CapturingRule(GameRule):
@@ -49,7 +54,7 @@ def test_rule_receives_the_effect_controls_passed_to_the_engine() -> None:
     controls = _make_effect_controls()
     rule = _CapturingRule()
     engine = GameEngine(effect_controls=controls)
-    state = engine.create_state()
+    state = engine.create_state(_make_scene_controls())
     engine.add_rules(rule)
     state.queue_event(Event(_GROUP, "test"))
 
@@ -156,7 +161,7 @@ def test_time_properties_reflect_values_injected_via_update_time() -> None:
 def test_rules_see_elapsed_and_total_time_from_the_engines_timer() -> None:
     timer = _ControlledTimer(elapsed=0.032, total=2.0)
     engine = GameEngine(effect_controls=_make_effect_controls(), timer=timer)
-    state = engine.create_state()
+    state = engine.create_state(_make_scene_controls())
     rule = _TimeCaptureRule()
     engine.add_rules(rule)
     state.queue_event(Event(_GROUP, "tick"))
@@ -181,7 +186,7 @@ def test_state_data_is_empty_when_no_initial_data_is_provided() -> None:
 def test_state_can_be_constructed_standalone_with_preset_data_for_rule_unit_testing() -> None:
     controls = _make_effect_controls()
 
-    state = GameState(controls, {"key": "val"})
+    state = GameState(controls, _make_scene_controls(), {"key": "val"})
 
     assert state.data["key"] == "val"
 
@@ -193,14 +198,14 @@ def test_rules_cannot_access_game_engine_through_state() -> None:
 
 
 # ---------------------------------------------------------------------------
-# GameEngine.create_state — factory wires effect_controls
+# GameEngine.create_state — factory wires effect_controls and scene_controls
 # ---------------------------------------------------------------------------
 
 
 def test_create_state_returns_a_game_state() -> None:
     engine = GameEngine(effect_controls=_make_effect_controls())
 
-    state = engine.create_state()
+    state = engine.create_state(_make_scene_controls())
 
     assert isinstance(state, GameState)
 
@@ -209,15 +214,24 @@ def test_create_state_wires_engine_effect_controls() -> None:
     controls = _make_effect_controls()
     engine = GameEngine(effect_controls=controls)
 
-    state = engine.create_state()
+    state = engine.create_state(_make_scene_controls())
 
     assert state.effect_controls is controls
+
+
+def test_create_state_wires_scene_controls() -> None:
+    engine = GameEngine(effect_controls=_make_effect_controls())
+    scene_controls = _make_scene_controls()
+
+    state = engine.create_state(scene_controls)
+
+    assert state.scene_controls is scene_controls
 
 
 def test_create_state_seeds_data_from_initial_data() -> None:
     engine = GameEngine(effect_controls=_make_effect_controls())
 
-    state = engine.create_state(initial_data={"score": 0})
+    state = engine.create_state(_make_scene_controls(), initial_data={"score": 0})
 
     assert state.data["score"] == 0
 
@@ -225,7 +239,7 @@ def test_create_state_seeds_data_from_initial_data() -> None:
 def test_create_state_returns_empty_data_when_no_initial_data_provided() -> None:
     engine = GameEngine(effect_controls=_make_effect_controls())
 
-    state = engine.create_state()
+    state = engine.create_state(_make_scene_controls())
 
     assert state.data == {}
 
@@ -244,7 +258,7 @@ def test_data_written_in_one_tick_is_readable_in_a_later_tick() -> None:
             state.data["n"] = state.data.get("n", 0) + 1
 
     engine = GameEngine(effect_controls=_make_effect_controls())
-    state = engine.create_state()
+    state = engine.create_state(_make_scene_controls())
     engine.add_rules(_CounterRule())
 
     state.queue_event(Event(_GROUP, "tick"))
@@ -272,7 +286,7 @@ def test_data_written_by_an_earlier_rule_is_visible_to_a_later_rule_in_the_same_
             self.value = state.data.get("shared")
 
     engine = GameEngine(effect_controls=_make_effect_controls())
-    state = engine.create_state()
+    state = engine.create_state(_make_scene_controls())
     reader = _ReaderRule()
     engine.add_rules(_WriterRule(), reader)
     state.queue_event(Event(_GROUP, "tick"))
@@ -291,8 +305,8 @@ def test_different_state_objects_are_independent() -> None:
             state.data["n"] = state.data.get("n", 0) + 1
 
     engine = GameEngine(effect_controls=_make_effect_controls())
-    state_a = engine.create_state()
-    state_b = engine.create_state()
+    state_a = engine.create_state(_make_scene_controls())
+    state_b = engine.create_state(_make_scene_controls())
     engine.add_rules(_CounterRule())
 
     state_a.queue_event(Event(_GROUP, "tick"))
@@ -326,7 +340,7 @@ def test_event_queued_from_state_inside_a_rule_is_dispatched_in_the_same_update(
                 captured.append(event)
 
     engine = GameEngine(effect_controls=_make_effect_controls())
-    state = engine.create_state()
+    state = engine.create_state(_make_scene_controls())
     engine.add_rules(_RelayRule())
     state.queue_event(Event(_GROUP, "trigger"))
 
@@ -361,7 +375,7 @@ def test_clear_queue_prevents_events_from_being_dispatched() -> None:
             captured.append(event)
 
     engine = GameEngine(effect_controls=_make_effect_controls())
-    state = engine.create_state()
+    state = engine.create_state(_make_scene_controls())
     engine.add_rules(_CaptureRule())
     state.queue_event(Event(_GROUP, "should-not-fire"))
     state.clear_queue()
@@ -369,3 +383,114 @@ def test_clear_queue_prevents_events_from_being_dispatched() -> None:
     engine.update(state)
 
     assert captured == []
+
+
+# ---------------------------------------------------------------------------
+# GameState.scene_controls — scene transition interface
+# ---------------------------------------------------------------------------
+
+
+def test_state_exposes_scene_controls_passed_at_construction() -> None:
+    scene_controls = _make_scene_controls()
+
+    state = GameState(_make_effect_controls(), scene_controls)
+
+    assert state.scene_controls is scene_controls
+
+
+def test_scene_controls_default_raises_not_implemented_on_load() -> None:
+    sc = SceneControls()
+
+    with pytest.raises(NotImplementedError):
+        sc.load("some-scene")
+
+
+def test_scene_controls_default_raises_not_implemented_on_overlay() -> None:
+    sc = SceneControls()
+
+    with pytest.raises(NotImplementedError):
+        sc.overlay("some-scene")
+
+
+def test_scene_controls_default_raises_not_implemented_on_pop() -> None:
+    sc = SceneControls()
+
+    with pytest.raises(NotImplementedError):
+        sc.pop()
+
+
+# ---------------------------------------------------------------------------
+# GameEngine.set_rules — full rule list replacement
+# ---------------------------------------------------------------------------
+
+
+def test_set_rules_replaces_existing_rules() -> None:
+    old_captured: list[Event] = []
+    new_captured: list[Event] = []
+
+    class _OldRule(GameRule):
+        def __init__(self) -> None:
+            super().__init__("test.old", Version(1, 0))
+
+        def handle_event(self, event: Event, state: GameState) -> None:
+            old_captured.append(event)
+
+    class _NewRule(GameRule):
+        def __init__(self) -> None:
+            super().__init__("test.new", Version(1, 0))
+
+        def handle_event(self, event: Event, state: GameState) -> None:
+            new_captured.append(event)
+
+    engine = GameEngine(effect_controls=_make_effect_controls())
+    engine.add_rules(_OldRule())
+    engine.set_rules([_NewRule()])
+
+    state = engine.create_state(_make_scene_controls())
+    state.queue_event(Event(_GROUP, "tick"))
+    engine.update(state)
+
+    assert old_captured == []
+    assert len(new_captured) == 1
+
+
+def test_set_rules_with_empty_list_clears_all_rules() -> None:
+    captured: list[Event] = []
+
+    class _CaptureRule(GameRule):
+        def __init__(self) -> None:
+            super().__init__("test.capture", Version(1, 0))
+
+        def handle_event(self, event: Event, state: GameState) -> None:
+            captured.append(event)
+
+    engine = GameEngine(effect_controls=_make_effect_controls())
+    engine.add_rules(_CaptureRule())
+    engine.set_rules([])
+
+    state = engine.create_state(_make_scene_controls())
+    state.queue_event(Event(_GROUP, "tick"))
+    engine.update(state)
+
+    assert captured == []
+
+
+def test_add_rules_appends_after_set_rules() -> None:
+    captured: list[Event] = []
+
+    class _CaptureRule(GameRule):
+        def __init__(self) -> None:
+            super().__init__("test.capture", Version(1, 0))
+
+        def handle_event(self, event: Event, state: GameState) -> None:
+            captured.append(event)
+
+    engine = GameEngine(effect_controls=_make_effect_controls())
+    engine.set_rules([])
+    engine.add_rules(_CaptureRule())
+
+    state = engine.create_state(_make_scene_controls())
+    state.queue_event(Event(_GROUP, "tick"))
+    engine.update(state)
+
+    assert len(captured) == 1
