@@ -3,7 +3,7 @@ __all__ = ["Scene", "SceneControls", "SceneManager"]
 try:
     from collections.abc import Callable
 except ImportError:
-    Callable = object  # type: ignore[assignment,misc]  # CircuitPython/MicroPython fallback
+    pass  # Not available on CircuitPython/MicroPython; annotations are quoted below
 
 from engine.version import Version
 
@@ -68,10 +68,10 @@ class Scene:
         effect_packs: list,
         rule_packs: list,
         initial_data: dict | None = None,
-        on_load: Callable | None = None,
-        on_unload: Callable | None = None,
-        on_suspend: Callable | None = None,
-        on_resume: Callable | None = None,
+        on_load: "Callable | None" = None,
+        on_unload: "Callable | None" = None,
+        on_suspend: "Callable | None" = None,
+        on_resume: "Callable | None" = None,
     ) -> None:
         self.rules = rules
         self.effect_packs = effect_packs
@@ -127,7 +127,7 @@ class SceneManager(SceneControls):
         self._stack: list = []
         self._pending = None  # tuple (kind, name) or None
 
-    def register(self, name: str, factory: Callable) -> None:
+    def register(self, name: str, factory: "Callable") -> None:
         """Register *factory* — a zero-arg callable returning a ``Scene`` — for *name*."""
         self._scenes[name] = factory
 
