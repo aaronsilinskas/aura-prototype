@@ -16,8 +16,8 @@ import time
 from collections.abc import Iterable
 
 from effects.effect import EffectState, EffectTimer
-from packs.effects.elements.registry import ELEMENT_BUILDERS, build_element_renderer
 from effects.render import PixelBuffer, RendererConfig
+from packs.effects.elements.registry import ELEMENT_BUILDERS, build_element_renderer
 
 PIXEL_COUNT = 32
 RESOLUTION = PIXEL_COUNT * 3

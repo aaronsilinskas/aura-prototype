@@ -369,7 +369,12 @@ def test_pack_registry_does_not_allow_arbitrary_attributes() -> None:
 
 
 def test_items_returns_sorted_item_names(pack_env) -> None:
-    _make_pack(pack_env, "mypack", "1.0", {"zebra": "VALUE = 1", "alpha": "VALUE = 2", "mango": "VALUE = 3"})
+    _make_pack(
+        pack_env,
+        "mypack",
+        "1.0",
+        {"zebra": "VALUE = 1", "alpha": "VALUE = 2", "mango": "VALUE = 3"},
+    )
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 

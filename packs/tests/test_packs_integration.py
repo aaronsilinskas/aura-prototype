@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 
+import pytest
+
 from engine.engine import GameEngine, GameRule
 from engine.packs import PackRegistry
 from engine.scene import Scene, SceneManager
@@ -16,89 +18,109 @@ def _packs_path(*parts: str) -> str:
     return os.path.join(_PACKS_ROOT, *parts)
 
 
-def test_scan_effects_discovers_elements_pack() -> None:
+# --- Effects registry ---
+
+
+def test_fire_module_is_accessible_via_effects_registry() -> None:
     registry = PackRegistry(extractor=lambda module: module)
     registry.scan_dir(_packs_path("effects"), "packs.effects")
-    # Verify the elements pack was discovered by attempting to access a known item
+
     module = registry.get("elements", "fire")
+
     assert hasattr(module, "build_fire_renderer")
 
 
-def test_scan_rules_discovers_debug_pack() -> None:
+# --- Rules registry ---
+
+
+def test_button_events_rule_is_a_game_rule() -> None:
     registry = PackRegistry(extractor=lambda module: module.RULE)
     registry.scan_dir(_packs_path("rules"), "packs.rules")
-    rule = registry.get("debug_pack", "button_events")
+
+    rule = registry.get("debug", "button_events")
 
     assert isinstance(rule, GameRule)
 
 
-def test_scan_rules_debug_pack_event_logger_exports_rule() -> None:
+def test_event_logger_rule_is_a_game_rule() -> None:
     registry = PackRegistry(extractor=lambda module: module.RULE)
     registry.scan_dir(_packs_path("rules"), "packs.rules")
-    rule = registry.get("debug_pack", "event_logger")
+
+    rule = registry.get("debug", "event_logger")
 
     assert isinstance(rule, GameRule)
 
 
-def test_debug_pack_items_discovered_via_registry_items() -> None:
+def test_debug_exposes_all_expected_rule_modules() -> None:
     rule_registry = PackRegistry(extractor=lambda m: m.RULE)
     rule_registry.scan_dir(_packs_path("rules"), "packs.rules")
 
-    items = rule_registry.items("debug_pack")
+    items = rule_registry.items("debug")
 
     assert "button_events" in items
     assert "event_logger" in items
 
 
-def test_scene_manager_load_with_debug_pack_wires_button_events_rule() -> None:
+# --- SceneManager integration ---
+
+
+@pytest.fixture
+def loaded_debug_engine():
     rule_registry = PackRegistry(extractor=lambda m: m.RULE)
     rule_registry.scan_dir(_packs_path("rules"), "packs.rules")
     effect_registry = PackRegistry(extractor=lambda m: m.BUILD)
     engine = GameEngine(EffectControls())
     manager = SceneManager(engine, effect_registry, rule_registry)
-
     manager.register(
         "test_scene",
-        lambda: Scene(rules=[], effect_packs=[], rule_packs=[("debug_pack", "1.0")]),
+        lambda: Scene(rules=[], effect_packs=[], rule_packs=[("debug", "1.0")]),
     )
     manager.load("test_scene")
-    manager.update()  # applies the deferred load transition
+    manager.update()
+    return engine, rule_registry
+
+
+def test_scene_manager_load_wires_button_events_rule_from_pack(
+    loaded_debug_engine,
+) -> None:
+    engine, _ = loaded_debug_engine
 
     rule_names = {r.name for r in engine._rules}
+
     assert "debug.button_event" in rule_names
 
 
-def test_scene_manager_load_with_debug_pack_wires_event_logger_rule() -> None:
-    rule_registry = PackRegistry(extractor=lambda m: m.RULE)
-    rule_registry.scan_dir(_packs_path("rules"), "packs.rules")
-    effect_registry = PackRegistry(extractor=lambda m: m.BUILD)
-    engine = GameEngine(EffectControls())
-    manager = SceneManager(engine, effect_registry, rule_registry)
-
-    manager.register(
-        "test_scene",
-        lambda: Scene(rules=[], effect_packs=[], rule_packs=[("debug_pack", "1.0")]),
-    )
-    manager.load("test_scene")
-    manager.update()  # applies the deferred load transition
+def test_scene_manager_load_wires_event_logger_rule_from_pack(
+    loaded_debug_engine,
+) -> None:
+    engine, _ = loaded_debug_engine
 
     rule_names = {r.name for r in engine._rules}
+
     assert "debug.event_logger" in rule_names
 
 
-def test_scene_manager_load_with_debug_pack_wires_all_rules_in_combined_rules() -> None:
+def test_scene_manager_load_activates_all_rules_from_pack(
+    loaded_debug_engine,
+) -> None:
+    engine, rule_registry = loaded_debug_engine
+
+    expected_count = len(rule_registry.items("debug"))
+
+    assert all(isinstance(r, GameRule) for r in engine._rules)
+    assert len(engine._rules) == expected_count
+
+
+def test_scene_manager_load_raises_for_incompatible_pack_version() -> None:
     rule_registry = PackRegistry(extractor=lambda m: m.RULE)
     rule_registry.scan_dir(_packs_path("rules"), "packs.rules")
     effect_registry = PackRegistry(extractor=lambda m: m.BUILD)
     engine = GameEngine(EffectControls())
     manager = SceneManager(engine, effect_registry, rule_registry)
-
     manager.register(
         "test_scene",
-        lambda: Scene(rules=[], effect_packs=[], rule_packs=[("debug_pack", "1.0")]),
+        lambda: Scene(rules=[], effect_packs=[], rule_packs=[("debug", "99.0")]),
     )
-    manager.load("test_scene")
-    manager.update()  # applies the deferred load transition
 
-    assert all(isinstance(r, GameRule) for r in engine._rules)
-    assert len(engine._rules) == 2
+    with pytest.raises(ValueError):
+        manager.load("test_scene")
