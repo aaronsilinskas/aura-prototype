@@ -6,7 +6,6 @@ import engine._path as _path
 from engine.version import Version
 
 try:
-    from collections.abc import Callable
     from typing import TypeVar
 
     T = TypeVar("T")
@@ -39,7 +38,7 @@ class PackRegistry:
 
     Construction::
 
-        registry = PackRegistry(extractor=lambda module: module.BUILD)
+        registry = PackRegistry(item_attr="BUILD")
 
     Scanning::
 
@@ -47,17 +46,17 @@ class PackRegistry:
 
     Item access::
 
-        builder = registry.get("elements", "fire")
+        builder = registry.get("elements", "fire", EffectBuilder)
 
     Version check::
 
         registry.check_version("elements", Version(1, 2))
     """
 
-    __slots__ = ("_cache", "_extractor", "_packs", "_scanned_dirs")
+    __slots__ = ("_cache", "_item_attr", "_packs", "_scanned_dirs")
 
-    def __init__(self, extractor: "Callable[[object], T]") -> None:
-        self._extractor = extractor
+    def __init__(self, item_attr: str) -> None:
+        self._item_attr = item_attr
         self._packs: dict[str, _PackEntry] = {}
         self._cache: dict[tuple[str, str], object] = {}
         self._scanned_dirs: set[str] = set()
@@ -118,15 +117,20 @@ class PackRegistry:
                 source_path=norm_path,
             )
 
-    def get(self, pack_name: str, item_name: str) -> "T":
-        """Return the extracted value for *item_name* from *pack_name*.
+    def get(self, pack_name: str, item_name: str, expected_class: "type[T]") -> "T":
+        """Return the *item_attr* attribute of *item_name* from *pack_name*.
 
-        The item is imported on first access and the result is cached.
+        The item is imported on first access and the result is cached.  On
+        first load the value is verified with ``isinstance(value,
+        expected_class)``; cache hits skip the check.
 
         Raises:
             ValueError: if *pack_name* is unknown.
             ValueError: if *item_name* is not in the recorded set for the pack
                 (raised before any import attempt).
+            ValueError: if the module has no attribute named *item_attr*.
+            ValueError: if the attribute value is not an instance of
+                *expected_class*.
         """
         meta = self._packs.get(pack_name)
         if meta is None:
@@ -148,7 +152,29 @@ class PackRegistry:
 
         full_module = meta.module_prefix + "." + item_name
         module = __import__(full_module, None, None, [""])
-        value = self._extractor(module)
+        try:
+            value = getattr(module, self._item_attr)
+        except AttributeError:
+            raise ValueError(
+                "Pack '"
+                + pack_name
+                + "' item '"
+                + item_name
+                + "' has no attribute '"
+                + self._item_attr
+                + "'"
+            ) from None
+        if not isinstance(value, expected_class):
+            raise ValueError(
+                "Pack '"
+                + pack_name
+                + "' item '"
+                + item_name
+                + "' attribute '"
+                + self._item_attr
+                + "' is not an instance of "
+                + expected_class.__name__
+            )
         self._cache[cache_key] = value
         return value  # type: ignore[return-value]
 

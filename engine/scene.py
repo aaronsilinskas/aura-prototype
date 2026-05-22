@@ -179,7 +179,7 @@ class SceneManager(SceneControls):
         combined = list(scene.rules)
         for pack_name, _ in scene.rule_packs:
             for item_name in self._rule_registry.items(pack_name):
-                combined.append(self._rule_registry.get(pack_name, item_name))
+                combined.append(self._rule_registry.get(pack_name, item_name, GameRule))
         return combined
 
     def _do_load(self, scene: Scene) -> None:

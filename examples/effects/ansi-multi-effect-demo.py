@@ -17,7 +17,7 @@ from engine.timer import Timer
 _packs_dir = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "packs", "effects")
 )
-_registry = PackRegistry(extractor=lambda m: m.BUILD)
+_registry = PackRegistry(item_attr="BUILD")
 _registry.scan_dir(_packs_dir, "packs.effects")
 
 

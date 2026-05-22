@@ -111,7 +111,7 @@ _button_d.switch_to_input(pull=digitalio.Pull.UP)
 # Effect system
 # ---------------------------------------------------------------------------
 
-_registry = PackRegistry(extractor=lambda m: m.BUILD)
+_registry = PackRegistry(item_attr="BUILD")
 _registry.scan_dir("packs/effects", "packs.effects")
 
 

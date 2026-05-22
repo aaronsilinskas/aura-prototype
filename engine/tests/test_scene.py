@@ -54,8 +54,8 @@ def _make_effect_pack(root, pack_name: str, version: str) -> None:
 
 def _make_registries(pack_env_path: str):
     """Return (effect_registry, rule_registry) scanned from *pack_env_path*."""
-    effect_registry = PackRegistry(extractor=lambda module: module.BUILD)
-    rule_registry = PackRegistry(extractor=lambda module: module.RULE)
+    effect_registry = PackRegistry(item_attr="BUILD")
+    rule_registry = PackRegistry(item_attr="RULE")
     effect_registry.scan_dir(pack_env_path, MODULE_PREFIX)
     rule_registry.scan_dir(pack_env_path, MODULE_PREFIX)
     return effect_registry, rule_registry
@@ -195,8 +195,8 @@ def test_scene_rejects_unknown_attributes() -> None:
 
 def test_scene_manager_satisfies_scene_controls_interface() -> None:
     engine = _make_engine()
-    effect_registry = PackRegistry(extractor=lambda m: m.BUILD)
-    rule_registry = PackRegistry(extractor=lambda m: m.RULE)
+    effect_registry = PackRegistry(item_attr="BUILD")
+    rule_registry = PackRegistry(item_attr="RULE")
 
     manager = SceneManager(engine, effect_registry, rule_registry)
 
@@ -205,8 +205,8 @@ def test_scene_manager_satisfies_scene_controls_interface() -> None:
 
 def test_load_succeeds_after_register() -> None:
     engine = _make_engine()
-    effect_registry = PackRegistry(extractor=lambda m: m.BUILD)
-    rule_registry = PackRegistry(extractor=lambda m: m.RULE)
+    effect_registry = PackRegistry(item_attr="BUILD")
+    rule_registry = PackRegistry(item_attr="RULE")
     manager = SceneManager(engine, effect_registry, rule_registry)
     factory = _scene_factory()
 
@@ -217,9 +217,7 @@ def test_load_succeeds_after_register() -> None:
 
 def test_register_overwrites_existing_factory_silently() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     loaded = []
 
     manager.register("main", _scene_factory(on_load=lambda ec: loaded.append("first")))
@@ -237,9 +235,7 @@ def test_register_overwrites_existing_factory_silently() -> None:
 
 def test_load_raises_immediately_for_unregistered_scene_name() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
 
     with pytest.raises(ValueError, match="Unknown scene"):
         manager.load("nonexistent")
@@ -247,9 +243,7 @@ def test_load_raises_immediately_for_unregistered_scene_name() -> None:
 
 def test_overlay_raises_immediately_for_unregistered_scene_name() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
 
     with pytest.raises(ValueError, match="Unknown scene"):
         manager.overlay("nonexistent")
@@ -257,9 +251,7 @@ def test_overlay_raises_immediately_for_unregistered_scene_name() -> None:
 
 def test_overlay_raises_immediately_when_stack_is_empty() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     manager.register("overlay_scene", _scene_factory())
 
     with pytest.raises(ValueError):
@@ -268,9 +260,7 @@ def test_overlay_raises_immediately_when_stack_is_empty() -> None:
 
 def test_pop_raises_immediately_with_zero_entries_on_stack() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
 
     with pytest.raises(ValueError):
         manager.pop()
@@ -278,9 +268,7 @@ def test_pop_raises_immediately_with_zero_entries_on_stack() -> None:
 
 def test_pop_raises_immediately_with_exactly_one_entry_on_stack() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     manager.register("main", _scene_factory())
     manager.load("main")
     manager.update()  # apply the load
@@ -396,9 +384,7 @@ def test_overlay_validates_packs_before_suspending_active_scene(pack_env) -> Non
 
 def test_update_skips_engine_update_when_stack_is_empty() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
 
     # No exception should be raised; engine.update would fail without a state
     manager.update()
@@ -406,9 +392,7 @@ def test_update_skips_engine_update_when_stack_is_empty() -> None:
 
 def test_update_calls_engine_update_with_active_state_on_each_tick() -> None:
     engine = _TrackingEngine(EffectControls())
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     manager.register("main", _scene_factory())
     manager.load("main")
     manager.update()  # stack empty at start of tick; engine.update skipped; load fires
@@ -441,9 +425,7 @@ class _TrackingEngine(GameEngine):
 
 def test_on_load_fires_after_engine_update_in_same_tick() -> None:
     engine = _TrackingEngine(EffectControls())
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     on_load_called = []
 
     manager.register("main", _scene_factory(on_load=lambda ec: on_load_called.append("on_load")))
@@ -466,9 +448,7 @@ def test_on_load_fires_after_engine_update_in_same_tick() -> None:
 
 def test_last_pending_transition_wins_within_one_tick() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     loaded = []
 
     manager.register("scene_a", _scene_factory(on_load=lambda ec: loaded.append("a")))
@@ -484,9 +464,7 @@ def test_last_pending_transition_wins_within_one_tick() -> None:
 
 def test_overlay_wins_when_load_and_overlay_both_called_in_same_tick() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     unloaded = []
     suspended = []
     manager.register(
@@ -519,9 +497,7 @@ def test_overlay_wins_when_load_and_overlay_both_called_in_same_tick() -> None:
 
 def test_load_passes_scene_manager_as_scene_controls_in_active_state() -> None:
     engine = _TrackingEngine(EffectControls())
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     manager.register("main", _scene_factory())
     manager.load("main")
     manager.update()  # load fires; state created
@@ -532,9 +508,7 @@ def test_load_passes_scene_manager_as_scene_controls_in_active_state() -> None:
 
 def test_load_seeds_active_state_data_from_scene_initial_data() -> None:
     engine = _TrackingEngine(EffectControls())
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     manager.register("main", _scene_factory(initial_data={"level": 5}))
     manager.load("main")
     manager.update()  # load fires; state created with initial_data
@@ -545,9 +519,7 @@ def test_load_seeds_active_state_data_from_scene_initial_data() -> None:
 
 def test_on_load_callback_receives_effect_controls() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     received_ec = []
     manager.register("main", _scene_factory(on_load=lambda ec: received_ec.append(ec)))
     manager.load("main")
@@ -559,9 +531,7 @@ def test_on_load_callback_receives_effect_controls() -> None:
 
 def test_on_unload_callback_receives_effect_controls() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     received = []
     manager.register("main", _scene_factory(on_unload=lambda ec: received.append(ec)))
     manager.register("next", _scene_factory())
@@ -576,9 +546,7 @@ def test_on_unload_callback_receives_effect_controls() -> None:
 
 def test_on_suspend_callback_receives_effect_controls() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     received = []
     manager.register("main", _scene_factory(on_suspend=lambda ec: received.append(ec)))
     manager.register("overlay_scene", _scene_factory())
@@ -593,9 +561,7 @@ def test_on_suspend_callback_receives_effect_controls() -> None:
 
 def test_on_resume_callback_receives_effect_controls() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     received = []
     manager.register("main", _scene_factory(on_resume=lambda ec: received.append(ec)))
     manager.register("overlay_scene", _scene_factory())
@@ -612,9 +578,7 @@ def test_on_resume_callback_receives_effect_controls() -> None:
 
 def test_load_does_not_require_on_load_callback() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     manager.register("main", _scene_factory())  # on_load=None
     manager.load("main")
     manager.update()  # must not raise
@@ -622,9 +586,7 @@ def test_load_does_not_require_on_load_callback() -> None:
 
 def test_load_fires_on_unload_top_down_on_all_stack_entries() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     unload_order = []
 
     manager.register("base", _scene_factory(on_unload=lambda ec: unload_order.append("base")))
@@ -646,9 +608,7 @@ def test_load_fires_on_unload_top_down_on_all_stack_entries() -> None:
 
 def test_load_clears_suspended_state_queues_so_stale_events_do_not_outlive_the_stack() -> None:
     engine = _TrackingEngine(EffectControls())
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     base_events = []
 
     class _BaseRule(GameRule):
@@ -710,7 +670,7 @@ def test_load_dispatches_events_to_scene_rules_on_following_ticks(pack_env) -> N
         def handle_event(self, e: Event, state: GameState) -> None:
             fired.append("scene")
 
-    pack_rule = rule_registry.get("rules", "rule_a")
+    pack_rule = rule_registry.get("rules", "rule_a", GameRule)
     pack_rule.on(Event, lambda e, s: fired.append("pack"))
 
     scene_r = _SceneRule()
@@ -752,7 +712,7 @@ def test_scene_rules_fire_before_pack_rules(pack_env) -> None:
         def handle_event(self, e: Event, state: GameState) -> None:
             fired.append("scene")
 
-    pack_rule = rule_registry.get("rules", "rule_a")
+    pack_rule = rule_registry.get("rules", "rule_a", GameRule)
     pack_rule.on(Event, lambda e, s: fired.append("pack"))
 
     scene_r = _SceneRule()
@@ -774,9 +734,7 @@ def test_scene_rules_fire_before_pack_rules(pack_env) -> None:
 
 def test_overlay_suspends_active_scene_and_pushes_without_clearing_stack() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     suspended = []
     manager.register("base", _scene_factory(on_suspend=lambda ec: suspended.append("base")))
     manager.register("overlay_scene", _scene_factory())
@@ -792,9 +750,7 @@ def test_overlay_suspends_active_scene_and_pushes_without_clearing_stack() -> No
 
 def test_overlay_clears_suspended_base_state_queue_before_pushing() -> None:
     engine = _TrackingEngine(EffectControls())
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     base_events = []
 
     class _BaseRule(GameRule):
@@ -836,9 +792,7 @@ def test_overlay_clears_suspended_base_state_queue_before_pushing() -> None:
 
 def test_pop_fires_lifecycle_callbacks_in_correct_order() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     lifecycle = []
 
     manager.register("base", _scene_factory(on_resume=lambda ec: lifecycle.append("base_resume")))
@@ -884,7 +838,7 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_env
             base_events.append(e.name)
 
     base_rule = _BaseRule()
-    pack_rule = rule_registry.get("rules", "rule_a")
+    pack_rule = rule_registry.get("rules", "rule_a", GameRule)
     pack_events: list = []
     pack_rule.on(Event, lambda e, s: pack_events.append(e.name))
 
@@ -909,9 +863,7 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_env
 
 def test_pop_clears_restored_state_queue_so_suspended_events_do_not_replay() -> None:
     engine = _TrackingEngine(EffectControls())
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     base_events: list = []
 
     class _BaseRule(GameRule):
@@ -947,9 +899,7 @@ def test_pop_clears_restored_state_queue_so_suspended_events_do_not_replay() -> 
 
 def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
     resumed = []
     manager.register("base", _scene_factory(on_resume=lambda ec: resumed.append("base")))
     manager.register("mid", _scene_factory(on_resume=lambda ec: resumed.append("mid")))
@@ -1006,8 +956,8 @@ def test_rule_pack_items_all_receive_events_after_load(pack_env) -> None:
         def handle_event(self, e: Event, state: GameState) -> None:
             fired_by.append("scene")
 
-    pack_rule_a = rule_registry.get("rules", "rule_a")
-    pack_rule_b = rule_registry.get("rules", "rule_b")
+    pack_rule_a = rule_registry.get("rules", "rule_a", GameRule)
+    pack_rule_b = rule_registry.get("rules", "rule_b", GameRule)
     pack_rule_a.on(Event, lambda e, s: fired_by.append("pack_a"))
     pack_rule_b.on(Event, lambda e, s: fired_by.append("pack_b"))
 
@@ -1059,9 +1009,7 @@ def test_unloaded_scene_is_not_retained_by_manager() -> None:
     import weakref
 
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
 
     created_scene = None
 
@@ -1091,9 +1039,7 @@ def test_suspended_scene_remains_on_stack_after_overlay() -> None:
     import weakref
 
     engine = _make_engine()
-    manager = SceneManager(
-        engine, PackRegistry(extractor=lambda m: m.BUILD), PackRegistry(extractor=lambda m: m.RULE)
-    )
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
 
     created_scene = None
 

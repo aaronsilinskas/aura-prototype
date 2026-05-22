@@ -148,13 +148,21 @@ class EffectManager(EffectControls):
             raise ValueError(f"Effect name '{name}' missing pack prefix (expected 'pack.effect')")
         pack_name, effect_name = name.split(".", 1)
         try:
-            builder = self._registry.get(pack_name, effect_name)
+            builder = self._registry.get(pack_name, effect_name, EffectBuilder)
         except ValueError as exc:
             msg = str(exc)
             if msg.startswith("Unknown pack '"):
                 raise ValueError(f"Unknown effect pack '{pack_name}'") from exc
             if msg.startswith("Unknown item '"):
                 raise ValueError(f"Unknown effect '{effect_name}' in pack '{pack_name}'") from exc
+            if "is not an instance of" in msg:
+                raise ValueError(
+                    f"Effect '{effect_name}' in pack '{pack_name}' has an invalid BUILD attribute"
+                ) from exc
+            if msg.startswith("Pack '"):
+                raise ValueError(
+                    f"Effect pack '{pack_name}' item '{effect_name}' is missing a BUILD attribute"
+                ) from exc
             raise
 
         receipt = EffectReceipt(self._next_id)

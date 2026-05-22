@@ -4,6 +4,7 @@ from effects.render import EffectRenderer, MergeRenderer, RendererConfig
 from effects.shape import Shape
 from effects.steps.drift_noise import drift_noise
 from effects.steps.position import rotate
+from engine.effects.manager import EffectBuilder
 
 # fmt: off
 grayscale_palette = bytes([0, 0, 0, 0,
@@ -16,31 +17,28 @@ time_sand_palette = bytes([0, 0, 0, 0,
 # fmt: on
 
 
-def build_time_renderer(config: RendererConfig) -> EffectRenderer:
-    """A drifting amber-brown noise evoking shifting sand, overlaid with
-    rotating gray tick marks like a timer.
+class TimeBuilder(EffectBuilder):
+    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+        """A drifting amber-brown noise evoking shifting sand, overlaid with
+        rotating gray tick marks like a timer.
 
-    Level: sand drifts faster and the tick marks multiply; everything spins
-    more quickly.
-    """
-    level = config.level
+        Level: sand drifts faster and the tick marks multiply; everything spins
+        more quickly.
+        """
+        level = config.level
 
-    drift_speed = config.level_lerp(0.02, 0.065)
-    ticker_rotate_speed = config.level_lerp(0.1, 0.28)
+        drift_speed = config.level_lerp(0.02, 0.065)
+        ticker_rotate_speed = config.level_lerp(0.1, 0.28)
 
-    time_sand_effect = Effect("time_sand").add_steps([drift_noise(drift_speed=drift_speed)])
-    time_sand_renderer = EffectRenderer(time_sand_effect, PaletteLUT256(time_sand_palette))
+        time_sand_effect = Effect("time_sand").add_steps([drift_noise(drift_speed=drift_speed)])
+        time_sand_renderer = EffectRenderer(time_sand_effect, PaletteLUT256(time_sand_palette))
 
-    time_ticker_effect = Effect(
-        "time_ticker", Shape.checkers(value=0.25, count=level, width=0.05)
-    ).add_steps([rotate(ticker_rotate_speed)])
-    time_ticker_renderer = EffectRenderer(time_ticker_effect, PaletteLUT256(grayscale_palette))
+        time_ticker_effect = Effect(
+            "time_ticker", Shape.checkers(value=0.25, count=level, width=0.05)
+        ).add_steps([rotate(ticker_rotate_speed)])
+        time_ticker_renderer = EffectRenderer(time_ticker_effect, PaletteLUT256(grayscale_palette))
 
-    return MergeRenderer("time", [time_sand_renderer, time_ticker_renderer], additive=True)
-
-
-def _build(name: str, config: RendererConfig) -> EffectRenderer:
-    return build_time_renderer(config)
+        return MergeRenderer("time", [time_sand_renderer, time_ticker_renderer], additive=True)
 
 
-BUILD = _build
+BUILD = TimeBuilder()

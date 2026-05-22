@@ -4,6 +4,7 @@ from effects.render import EffectRenderer, MergeRenderer, RendererConfig
 from effects.steps.drift_noise import drift_noise
 from effects.steps.sparkle import sparkle
 from effects.value import ValueGenerator as VG
+from engine.effects.manager import EffectBuilder
 
 # fmt: off
 grayscale_palette = bytes([0, 0, 0, 0,
@@ -15,54 +16,55 @@ gravity_palette = bytes([0, 0, 0, 0,
 # fmt: on
 
 
-def build_gravity_renderer(config: RendererConfig) -> EffectRenderer:
-    """A slowly drifting deep-space nebula in indigo and navy, scattered
-    with white stars that softly twinkle in and out.
+class GravityBuilder(EffectBuilder):
+    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+        """A slowly drifting deep-space nebula in indigo and navy, scattered
+        with white stars that softly twinkle in and out.
 
-    Level: more stars that flash more crisply, the nebula drifts faster, and
-    its contrast deepens.
-    """
-    level = config.level
+        Level: more stars that flash more crisply, the nebula drifts faster, and
+        its contrast deepens.
+        """
+        level = config.level
 
-    nebula_resolution = max(config.resolution, config.level_lerp_int(18, 36))
-    nebula_drift_speed = config.level_lerp(0.02, 0.038)
-    nebula_amplitude = config.level_lerp(0.22, 0.4)
+        nebula_resolution = max(config.resolution, config.level_lerp_int(18, 36))
+        nebula_drift_speed = config.level_lerp(0.02, 0.038)
+        nebula_amplitude = config.level_lerp(0.22, 0.4)
 
-    spawn_delay_min = config.level_lerp(0.5, 1.0)
-    spawn_delay_max = config.level_lerp(3.0, 5.0)
-    star_fade_in_rate = config.level_lerp(1.0, 2.0)
-    star_fade_out_rate = config.level_lerp(2.0, 4.0)
+        spawn_delay_min = config.level_lerp(0.5, 1.0)
+        spawn_delay_max = config.level_lerp(3.0, 5.0)
+        star_fade_in_rate = config.level_lerp(1.0, 2.0)
+        star_fade_out_rate = config.level_lerp(2.0, 4.0)
 
-    gravity_nebula_effect = Effect("gravity_nebula").add_steps(
-        [
-            drift_noise(
-                resolution=nebula_resolution,
-                drift_speed=nebula_drift_speed,
-                amplitude=nebula_amplitude,
-            ),
-        ]
-    )
-    gravity_nebula_renderer = EffectRenderer(gravity_nebula_effect, PaletteLUT256(gravity_palette))
+        gravity_nebula_effect = Effect("gravity_nebula").add_steps(
+            [
+                drift_noise(
+                    resolution=nebula_resolution,
+                    drift_speed=nebula_drift_speed,
+                    amplitude=nebula_amplitude,
+                ),
+            ]
+        )
+        gravity_nebula_renderer = EffectRenderer(
+            gravity_nebula_effect, PaletteLUT256(gravity_palette)
+        )
 
-    gravity_stars_effect = Effect("gravity_stars").add_steps(
-        [
-            sparkle(
-                sparkle_count=level,
-                spawn_delay_rate=VG.random(spawn_delay_min, spawn_delay_max),
-                fade_in_rate=star_fade_in_rate,
-                fade_out_rate=star_fade_out_rate,
-            ),
-        ]
-    )
-    gravity_stars_renderer = EffectRenderer(gravity_stars_effect, PaletteLUT256(grayscale_palette))
+        gravity_stars_effect = Effect("gravity_stars").add_steps(
+            [
+                sparkle(
+                    sparkle_count=level,
+                    spawn_delay_rate=VG.random(spawn_delay_min, spawn_delay_max),
+                    fade_in_rate=star_fade_in_rate,
+                    fade_out_rate=star_fade_out_rate,
+                ),
+            ]
+        )
+        gravity_stars_renderer = EffectRenderer(
+            gravity_stars_effect, PaletteLUT256(grayscale_palette)
+        )
 
-    return MergeRenderer(
-        "gravity", [gravity_nebula_renderer, gravity_stars_renderer], additive=True
-    )
-
-
-def _build(name: str, config: RendererConfig) -> EffectRenderer:
-    return build_gravity_renderer(config)
+        return MergeRenderer(
+            "gravity", [gravity_nebula_renderer, gravity_stars_renderer], additive=True
+        )
 
 
-BUILD = _build
+BUILD = GravityBuilder()
