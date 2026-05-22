@@ -1,11 +1,9 @@
-from __future__ import annotations
-
 __all__ = ["Scene", "SceneControls", "SceneManager"]
 
 try:
     from collections.abc import Callable
 except ImportError:
-    pass  # No typing support on CircuitPython yet
+    Callable = object  # type: ignore[assignment,misc]  # CircuitPython/MicroPython fallback
 
 from engine.version import Version
 
