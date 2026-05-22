@@ -41,10 +41,10 @@ from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
 from effects.render import PixelBuffer
 from engine.effects.manager import EffectManager, EffectOutput
-from engine.effects.scope import Scope
 from engine.engine import GameEngine, GameRule, Version
 from engine.input import ButtonData, InputEvents, MovementData
 from engine.packs import PackRegistry
+from engine.state import SceneControls, Scope
 from engine.timer import Timer
 
 try:
@@ -217,7 +217,7 @@ effect_manager = EffectManager(
 
 game_engine = GameEngine(effect_controls=effect_manager)
 game_engine.add_rules(ButtonEffectRule())
-game_state = game_engine.create_state()
+game_state = game_engine.create_state(SceneControls())
 
 # Button state tracking for edge detection (pull-up: True = not pressed)
 _buttons = [_button_a, _button_b, _button_c, _button_d]

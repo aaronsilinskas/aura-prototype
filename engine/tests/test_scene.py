@@ -6,11 +6,11 @@ import sys
 
 import pytest
 
-from engine.effects.manager import EffectControls
-from engine.engine import GameEngine, GameRule, GameState
+from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
 from engine.packs import PackRegistry
-from engine.scene import Scene, SceneControls, SceneManager
+from engine.scene import Scene, SceneManager
+from engine.state import EffectControls, GameState, SceneControls
 from engine.version import Version
 
 # ---------------------------------------------------------------------------

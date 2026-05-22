@@ -7,11 +7,11 @@ import tty
 
 from effects.render import PixelBuffer
 from engine.effects.manager import EffectManager, EffectOutput
-from engine.effects.scope import Scope
-from engine.engine import GameEngine, GameRule, GameState, Version
+from engine.engine import GameEngine, GameRule, Version
 from engine.events import Event
 from engine.input import ButtonData, InputEvents, MovementData
 from engine.packs import PackRegistry
+from engine.state import GameState, SceneControls, Scope
 from engine.timer import Timer
 
 _packs_dir = os.path.normpath(
@@ -74,7 +74,7 @@ personal_output = AnsiEffectOutput(scopes=[Scope.PERSONAL])
 effect_manager = EffectManager(registry=_registry, outputs=[personal_output])
 
 game_engine = GameEngine(effect_controls=effect_manager)
-game_state = game_engine.create_state()
+game_state = game_engine.create_state(SceneControls())
 
 
 class MakeEffectRule(GameRule):

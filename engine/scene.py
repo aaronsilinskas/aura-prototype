@@ -1,12 +1,15 @@
-__all__ = ["Scene", "SceneControls", "SceneManager"]
+from __future__ import annotations
+
+__all__ = ["Scene", "SceneManager"]
 
 try:
     from collections.abc import Callable
 except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
-from engine.engine import GameEngine, GameRule, GameState, SceneControls, Version
+from engine.engine import GameEngine, GameRule, Version
 from engine.packs import PackRegistry
+from engine.state import EffectControls, GameState, SceneControls
 
 
 class Scene:
@@ -42,10 +45,10 @@ class Scene:
         effect_packs: list[tuple[str, str]],
         rule_packs: list[tuple[str, str]],
         initial_data: dict[str, object] | None = None,
-        on_load: Callable | None = None,
-        on_unload: Callable | None = None,
-        on_suspend: Callable | None = None,
-        on_resume: Callable | None = None,
+        on_load: Callable[[EffectControls], None] | None = None,
+        on_unload: Callable[[EffectControls], None] | None = None,
+        on_suspend: Callable[[EffectControls], None] | None = None,
+        on_resume: Callable[[EffectControls], None] | None = None,
     ) -> None:
         self.rules = rules
         self.effect_packs = effect_packs
@@ -97,11 +100,11 @@ class SceneManager(SceneControls):
         self._engine = engine
         self._effect_registry = effect_registry
         self._rule_registry = rule_registry
-        self._scenes: dict[str, Callable] = {}
+        self._scenes: dict[str, Callable[[], Scene]] = {}
         self._stack: list[tuple[Scene, GameState, list[GameRule]]] = []
-        self._pending: tuple | None = None  # (kind, scene_or_none)
+        self._pending: tuple[str, Scene | None] | None = None  # (kind, scene_or_none)
 
-    def register(self, name: str, factory: Callable) -> None:
+    def register(self, name: str, factory: Callable[[], Scene]) -> None:
         """Register *factory* — a zero-arg callable returning a ``Scene`` — for *name*."""
         self._scenes[name] = factory
 

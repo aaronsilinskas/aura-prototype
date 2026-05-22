@@ -5,39 +5,12 @@ try:
 except ImportError:
     pass  # No typing support on CircuitPython yet
 
-from engine.effects.manager import EffectControls
 from engine.events import Event
+from engine.state import EffectControls, GameState, SceneControls
 from engine.timer import Timer
 from engine.version import Version
 
-__all__ = ["GameEngine", "GameRule", "GameState", "SceneControls", "Version"]
-
-
-class SceneControls:
-    """Abstract interface for scene transitions called from within game rules.
-
-    All methods raise ``NotImplementedError`` by default.  ``SceneManager``
-    injects itself as the live implementation; standalone callers (e.g. rule
-    unit tests) pass the base ``SceneControls()`` instance, which raises on
-    any call.
-
-    Transitions are deferred to end-of-tick — the transition is applied after
-    ``engine.update(state)`` returns, not immediately inside the rule.
-    """
-
-    __slots__ = ()
-
-    def load(self, name: str) -> None:
-        """Replace the entire scene stack with the named scene."""
-        raise NotImplementedError
-
-    def overlay(self, name: str) -> None:
-        """Push the named scene on top, suspending the current scene."""
-        raise NotImplementedError
-
-    def pop(self) -> None:
-        """Unload the top scene and restore the scene below it."""
-        raise NotImplementedError
+__all__ = ["GameEngine", "GameRule", "Version"]
 
 
 class GameRule:
@@ -70,61 +43,6 @@ class GameRule:
         handler = self._event_handlers.get(type(event))
         if handler is not None:
             handler(event, state)
-
-
-class GameState:
-    """Portable game context passed to every rule handler on every tick.
-
-    Create via ``GameEngine.create_state()`` for production use, or directly
-    for rule unit tests.  Rule-written data in ``state.data`` survives across
-    ticks when the same ``GameState`` instance is passed to each
-    ``engine.update(state)`` call.
-
-    Provides access to time information, the effect controls interface for
-    starting and stopping effects, and ``queue_event`` so rules can enqueue
-    events without holding a ``GameEngine`` reference.
-
-    Time values are read-only; use ``state.elapsed`` and ``state.total`` to
-    read per-tick and cumulative time.
-    """
-
-    __slots__ = ("_elapsed", "_queue", "_total", "data", "effect_controls", "scene_controls")
-
-    def __init__(
-        self,
-        effect_controls: EffectControls,
-        scene_controls: SceneControls,
-        data: dict[str, object] | None = None,
-    ) -> None:
-        self.effect_controls = effect_controls
-        self.scene_controls = scene_controls
-        self._queue: list[Event] = []
-        self.data: dict[str, object] = data if data is not None else {}
-        self._elapsed: float = 0.0
-        self._total: float = 0.0
-
-    @property
-    def elapsed(self) -> float:
-        """Seconds elapsed during the most recent tick."""
-        return self._elapsed
-
-    @property
-    def total(self) -> float:
-        """Cumulative seconds elapsed since the engine started."""
-        return self._total
-
-    def queue_event(self, event: Event) -> None:
-        """Enqueue an event for processing on the current or next update."""
-        self._queue.append(event)
-
-    def clear_queue(self) -> None:
-        """Discard all pending events without processing them."""
-        self._queue = []
-
-    def _update_time(self, elapsed: float, total: float) -> None:
-        """Refresh time values from the engine's timer. Called only by GameEngine."""
-        self._elapsed = elapsed
-        self._total = total
 
 
 class GameEngine:
