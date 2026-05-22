@@ -74,6 +74,7 @@ personal_output = AnsiEffectOutput(scopes=[Scope.PERSONAL])
 effect_manager = EffectManager(registry=_registry, outputs=[personal_output])
 
 game_engine = GameEngine(effect_controls=effect_manager)
+game_state = game_engine.create_state()
 
 
 class MakeEffectRule(GameRule):
@@ -146,8 +147,8 @@ def main() -> None:
                 key = sys.stdin.read(1)
                 if key == "q":
                     break
-            game_engine.queue_event(_make_event(key))
-            game_engine.update()
+            game_state.queue_event(_make_event(key))
+            game_engine.update(game_state)
             effect_manager.update(timer)
             time.sleep(0.033)  # ~30 fps
     finally:
