@@ -32,6 +32,17 @@ def test_fire_pack_exposes_valid_effect_builder() -> None:
     assert isinstance(builder, EffectBuilder)
 
 
+def test_solid_pack_exposes_valid_effect_builder() -> None:
+    from engine.effects.manager import EffectBuilder
+
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(_packs_path("effects"), "packs.effects")
+
+    builder = registry.get("basic", "solid", EffectBuilder)
+
+    assert isinstance(builder, EffectBuilder)
+
+
 # --- Rules registry ---
 
 
