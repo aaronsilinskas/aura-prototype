@@ -32,6 +32,112 @@ def test_fire_pack_exposes_valid_effect_builder() -> None:
     assert isinstance(builder, EffectBuilder)
 
 
+def test_solid_pack_exposes_valid_effect_builder() -> None:
+    from engine.effects.manager import EffectBuilder
+
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(_packs_path("effects"), "packs.effects")
+
+    builder = registry.get("basic", "solid", EffectBuilder)
+
+    assert isinstance(builder, EffectBuilder)
+
+
+def test_solid_level_1_white_renders_dimmed_pixels() -> None:
+    from effects.render import PixelBuffer, RendererConfig
+    from engine.effects.manager import EffectBuilder
+
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(_packs_path("effects"), "packs.effects")
+    builder = registry.get("basic", "solid", EffectBuilder)
+    config = RendererConfig(level=1, resolution=16, options={"color": 0xFFFFFF})
+    renderer = builder("basic.solid", config)
+    output = PixelBuffer(4)
+
+    renderer.render(None, output)  # type: ignore[arg-type]
+
+    assert all(output[i] == 0x191919 for i in range(4))
+
+
+def test_solid_level_10_white_renders_full_brightness() -> None:
+    from effects.render import PixelBuffer, RendererConfig
+    from engine.effects.manager import EffectBuilder
+
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(_packs_path("effects"), "packs.effects")
+    builder = registry.get("basic", "solid", EffectBuilder)
+    config = RendererConfig(level=10, resolution=16, options={"color": 0xFFFFFF})
+    renderer = builder("basic.solid", config)
+    output = PixelBuffer(4)
+
+    renderer.render(None, output)  # type: ignore[arg-type]
+
+    assert all(output[i] == 0xFFFFFF for i in range(4))
+
+
+def test_solid_level_5_red_renders_half_brightness() -> None:
+    from effects.render import PixelBuffer, RendererConfig
+    from engine.effects.manager import EffectBuilder
+
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(_packs_path("effects"), "packs.effects")
+    builder = registry.get("basic", "solid", EffectBuilder)
+    config = RendererConfig(level=5, resolution=16, options={"color": 0xFF0000})
+    renderer = builder("basic.solid", config)
+    output = PixelBuffer(4)
+
+    renderer.render(None, output)  # type: ignore[arg-type]
+
+    assert all(output[i] == 0x7F0000 for i in range(4))
+
+
+def test_solid_defaults_to_white_when_no_options() -> None:
+    from effects.render import PixelBuffer, RendererConfig
+    from engine.effects.manager import EffectBuilder
+
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(_packs_path("effects"), "packs.effects")
+    builder = registry.get("basic", "solid", EffectBuilder)
+    config = RendererConfig(level=10, resolution=16)
+    renderer = builder("basic.solid", config)
+    output = PixelBuffer(4)
+
+    renderer.render(None, output)  # type: ignore[arg-type]
+
+    assert all(output[i] == 0xFFFFFF for i in range(4))
+
+
+def test_solid_double_render_is_pixel_identical() -> None:
+    from effects.render import PixelBuffer, RendererConfig
+    from engine.effects.manager import EffectBuilder
+
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(_packs_path("effects"), "packs.effects")
+    builder = registry.get("basic", "solid", EffectBuilder)
+    config = RendererConfig(level=7, resolution=16, options={"color": 0x00FF80})
+    renderer = builder("basic.solid", config)
+    output1 = PixelBuffer(8)
+    output2 = PixelBuffer(8)
+
+    renderer.render(None, output1)  # type: ignore[arg-type]
+    renderer.render(None, output2)  # type: ignore[arg-type]
+
+    assert all(output1[i] == output2[i] for i in range(8))
+
+
+def test_solid_renderer_name_is_basic_solid() -> None:
+    from effects.render import RendererConfig
+    from engine.effects.manager import EffectBuilder
+
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(_packs_path("effects"), "packs.effects")
+    builder = registry.get("basic", "solid", EffectBuilder)
+    config = RendererConfig(level=5, resolution=16)
+    renderer = builder("basic.solid", config)
+
+    assert renderer.name == "basic.solid"
+
+
 # --- Rules registry ---
 
 
