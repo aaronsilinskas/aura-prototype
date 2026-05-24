@@ -16,13 +16,13 @@ HW_TEST_PAYLOAD: Final = b"hw_test"
 FLASH_DURATION: Final = 0.5
 
 # RGB mode idle effect table: (scope, name, options)
-_RGB_IDLE: Final = [
+_RGB_IDLE: Final = (
     (Scope.PERSONAL, "elements.water", {}),
     (Scope.DIRECTIONAL, "elements.fire", {}),
     (Scope.Global.MAIN, "elements.lightning", {}),
     (Scope.Global.BUFF, "elements.earth", {}),
     (Scope.Global.DEBUFF, "elements.ice", {}),
-]
+)
 
 
 def _enter_rgb(state: GameState) -> None:
@@ -50,8 +50,8 @@ def _enter_radio(state: GameState) -> None:
     ec.set_effect(Scope.ALL, "basic.solid", 3, {"color": 0xFFFFFF})
 
 
-_MODE_ENTRY: Final = [_enter_rgb, _enter_imu, _enter_ir, _enter_radio]
-_NUM_MODES = 4
+_MODE_ENTRY: Final = (_enter_rgb, _enter_imu, _enter_ir, _enter_radio)
+_NUM_MODES: Final = 4
 
 
 class HwTestModeRule(GameRule):
@@ -127,3 +127,6 @@ class HwTestModeRule(GameRule):
             state.effect_controls.set_effect(
                 Scope.Global.ALL, "basic.solid", 3, {"color": 0xFFFFFF}
             )
+
+
+RULE = HwTestModeRule()

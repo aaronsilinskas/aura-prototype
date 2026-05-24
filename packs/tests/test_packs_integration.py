@@ -74,6 +74,44 @@ def test_debug_exposes_all_expected_rule_modules() -> None:
     assert "event_logger" in items
 
 
+def test_hw_test_mode_rule_is_a_game_rule() -> None:
+    registry = PackRegistry(item_attr="RULE")
+    registry.scan_dir(_packs_path("rules"), "packs.rules")
+
+    rule = registry.get("hw_test", "mode_rule", GameRule)
+
+    assert isinstance(rule, GameRule)
+
+
+def test_hw_test_motion_rule_is_a_game_rule() -> None:
+    registry = PackRegistry(item_attr="RULE")
+    registry.scan_dir(_packs_path("rules"), "packs.rules")
+
+    rule = registry.get("hw_test", "motion_rule", GameRule)
+
+    assert isinstance(rule, GameRule)
+
+
+def test_hw_test_network_rule_is_a_game_rule() -> None:
+    registry = PackRegistry(item_attr="RULE")
+    registry.scan_dir(_packs_path("rules"), "packs.rules")
+
+    rule = registry.get("hw_test", "network_rule", GameRule)
+
+    assert isinstance(rule, GameRule)
+
+
+def test_hw_test_exposes_all_expected_rule_modules() -> None:
+    registry = PackRegistry(item_attr="RULE")
+    registry.scan_dir(_packs_path("rules"), "packs.rules")
+
+    items = registry.items("hw_test")
+
+    assert "mode_rule" in items
+    assert "motion_rule" in items
+    assert "network_rule" in items
+
+
 # --- SceneManager integration ---
 
 

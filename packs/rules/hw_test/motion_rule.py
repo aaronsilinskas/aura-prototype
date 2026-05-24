@@ -19,3 +19,6 @@ class HwTestMotionRule(GameRule):
 
     def __init__(self) -> None:
         super().__init__("hw_test.motion", _VERSION)
+
+
+RULE = HwTestMotionRule()

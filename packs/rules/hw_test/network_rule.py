@@ -17,3 +17,6 @@ class HwTestNetworkRule(GameRule):
 
     def __init__(self) -> None:
         super().__init__("hw_test.network", _VERSION)
+
+
+RULE = HwTestNetworkRule()
