@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-__all__ = ["EffectControls", "EffectReceipt", "GameState", "SceneControls", "Scope", "ScopeValue"]
+__all__ = [
+    "EffectControls",
+    "EffectReceipt",
+    "GameState",
+    "NetworkControls",
+    "SceneControls",
+    "Scope",
+    "ScopeValue",
+]
 
 try:
     from typing import Final
@@ -97,6 +105,27 @@ class SceneControls:
         raise NotImplementedError
 
 
+class NetworkControls:
+    """Abstract interface for network transmit operations called from within game rules.
+
+    All methods raise ``NotImplementedError`` by default.  ``HardwareNetworkControls``
+    in ``engine/network.py`` provides the live hardware-backed implementation.
+
+    Transmits are always broadcast — no recipient parameter; player identity is
+    encoded in the payload if needed.
+    """
+
+    __slots__ = ()
+
+    def send_ir(self, data: bytes) -> None:
+        """Transmit an IR packet."""
+        raise NotImplementedError
+
+    def send_radio(self, data: bytes) -> None:
+        """Transmit a radio packet."""
+        raise NotImplementedError
+
+
 class EffectReceipt:
     """Opaque handle returned when an effect is started.
 
@@ -157,16 +186,28 @@ class GameState:
     read per-tick and cumulative time.
     """
 
-    __slots__ = ("_elapsed", "_queue", "_total", "data", "effect_controls", "scene_controls")
+    __slots__ = (
+        "_elapsed",
+        "_queue",
+        "_total",
+        "data",
+        "effect_controls",
+        "network_controls",
+        "scene_controls",
+    )
 
     def __init__(
         self,
         effect_controls: EffectControls,
         scene_controls: SceneControls,
+        network_controls: NetworkControls | None = None,
         data: dict[str, object] | None = None,
     ) -> None:
         self.effect_controls = effect_controls
         self.scene_controls = scene_controls
+        self.network_controls = (
+            network_controls if network_controls is not None else NetworkControls()
+        )
         self._queue: list[Event] = []
         self.data: dict[str, object] = data if data is not None else {}
         self._elapsed: float = 0.0

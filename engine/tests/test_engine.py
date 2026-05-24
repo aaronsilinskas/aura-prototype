@@ -187,7 +187,7 @@ def test_state_data_is_empty_when_no_initial_data_is_provided() -> None:
 def test_state_can_be_constructed_standalone_with_preset_data_for_rule_unit_testing() -> None:
     controls = _make_effect_controls()
 
-    state = GameState(controls, _make_scene_controls(), {"key": "val"})
+    state = GameState(controls, _make_scene_controls(), data={"key": "val"})
 
     assert state.data["key"] == "val"
 

@@ -6,7 +6,7 @@ except ImportError:
     pass  # No typing support on CircuitPython yet
 
 from engine.events import Event
-from engine.state import EffectControls, GameState, SceneControls
+from engine.state import EffectControls, GameState, NetworkControls, SceneControls
 from engine.timer import Timer
 from engine.version import Version
 
@@ -60,14 +60,18 @@ class GameEngine:
     pre-wired with this engine's effect controls and the given scene controls.
     """
 
-    __slots__ = ("_effect_controls", "_rules", "_timer")
+    __slots__ = ("_effect_controls", "_network_controls", "_rules", "_timer")
 
     def __init__(
         self,
         effect_controls: EffectControls,
         timer: Timer | None = None,
+        network_controls: NetworkControls | None = None,
     ) -> None:
         self._effect_controls = effect_controls
+        self._network_controls = (
+            network_controls if network_controls is not None else NetworkControls()
+        )
         self._timer = timer if timer is not None else Timer()
         self._rules: list[GameRule] = []
 
@@ -90,7 +94,9 @@ class GameEngine:
         The optional ``initial_data`` dict seeds ``state.data`` with starting
         values; the dict is used directly (no copy).
         """
-        return GameState(self._effect_controls, scene_controls, initial_data)
+        return GameState(
+            self._effect_controls, scene_controls, self._network_controls, initial_data
+        )
 
     def update(self, state: GameState) -> None:
         """Advance the timer, update state time, and dispatch all queued events."""
