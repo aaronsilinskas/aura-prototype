@@ -20,7 +20,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["effects", "engine", "magic", "packs", "scripts"]
+testpaths = ["effects", "engine", "magic", "packs", "scenes", "scripts"]
 pythonpath = ["."]
 addopts = "-p no:debugging"
 
