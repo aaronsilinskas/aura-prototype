@@ -7,6 +7,11 @@ try:
 except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
+try:
+    from typing import Literal
+except ImportError:
+    pass  # Not available on CircuitPython/MicroPython
+
 from engine.engine import GameEngine, GameRule, Version
 from engine.packs import PackRegistry
 from engine.state import EffectControls, GameState, SceneControls
@@ -36,12 +41,10 @@ class Scene:
         "on_suspend",
         "on_unload",
         "rule_packs",
-        "rules",
     )
 
     def __init__(
         self,
-        rules: list[GameRule],
         effect_packs: list[tuple[str, str]],
         rule_packs: list[tuple[str, str]],
         initial_data: dict[str, object] | None = None,
@@ -50,7 +53,6 @@ class Scene:
         on_suspend: Callable[[EffectControls], None] | None = None,
         on_resume: Callable[[EffectControls], None] | None = None,
     ) -> None:
-        self.rules = rules
         self.effect_packs = effect_packs
         self.rule_packs = rule_packs
         self.initial_data = initial_data
@@ -102,7 +104,12 @@ class SceneManager(SceneControls):
         self._rule_registry = rule_registry
         self._scenes: dict[str, Callable[[], Scene]] = {}
         self._stack: list[tuple[Scene, GameState, list[GameRule]]] = []
-        self._pending: tuple[str, Scene | None] | None = None  # (kind, scene_or_none)
+        self._pending: (
+            tuple[Literal["load"], Scene]
+            | tuple[Literal["overlay"], Scene]
+            | tuple[Literal["pop"]]
+            | None
+        ) = None
 
     def register(self, name: str, factory: Callable[[], Scene]) -> None:
         """Register *factory* — a zero-arg callable returning a ``Scene`` — for *name*."""
@@ -137,7 +144,7 @@ class SceneManager(SceneControls):
             raise ValueError(
                 "Cannot pop: stack has " + str(n) + " entr" + ("y" if n == 1 else "ies")
             )
-        self._pending = ("pop", None)
+        self._pending = ("pop",)
 
     # ------------------------------------------------------------------
     # Main loop driver
@@ -154,12 +161,12 @@ class SceneManager(SceneControls):
             self._engine.update(self._stack[-1][1])
 
         if self._pending is not None:
-            kind, arg = self._pending
+            pending = self._pending
             self._pending = None
-            if kind == "load":
-                self._do_load(arg)
-            elif kind == "overlay":
-                self._do_overlay(arg)
+            if pending[0] == "load":
+                self._do_load(pending[1])
+            elif pending[0] == "overlay":
+                self._do_overlay(pending[1])
             else:
                 self._do_pop()
 
@@ -175,8 +182,8 @@ class SceneManager(SceneControls):
             self._rule_registry.check_version(pack_name, Version.parse(min_version))
 
     def _resolve_rules(self, scene: Scene) -> list[GameRule]:
-        """Return combined rules: *scene.rules* followed by all rule-pack items."""
-        combined = list(scene.rules)
+        """Return combined rules from all rule-pack items."""
+        combined = []
         for pack_name, _ in scene.rule_packs:
             for item_name in self._rule_registry.items(pack_name):
                 combined.append(self._rule_registry.get(pack_name, item_name, GameRule))

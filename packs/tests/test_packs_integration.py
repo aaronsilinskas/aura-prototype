@@ -124,7 +124,7 @@ def loaded_debug_engine():
     manager = SceneManager(engine, effect_registry, rule_registry)
     manager.register(
         "test_scene",
-        lambda: Scene(rules=[], effect_packs=[], rule_packs=[("debug", "1.0")]),
+        lambda: Scene(effect_packs=[], rule_packs=[("debug", "1.0")]),
     )
     manager.load("test_scene")
     manager.update()
@@ -170,7 +170,7 @@ def test_scene_manager_load_raises_for_incompatible_pack_version() -> None:
     manager = SceneManager(engine, effect_registry, rule_registry)
     manager.register(
         "test_scene",
-        lambda: Scene(rules=[], effect_packs=[], rule_packs=[("debug", "99.0")]),
+        lambda: Scene(effect_packs=[], rule_packs=[("debug", "99.0")]),
     )
 
     with pytest.raises(ValueError):

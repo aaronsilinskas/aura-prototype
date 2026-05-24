@@ -8,7 +8,7 @@ import pytest
 
 from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
-from engine.packs import PackRegistry
+from engine.packs import PackRegistry, _PackEntry
 from engine.scene import Scene, SceneManager
 from engine.state import EffectControls, GameState, SceneControls
 from engine.version import Version
@@ -55,7 +55,7 @@ def _make_effect_pack(root, pack_name: str, version: str) -> None:
 def _make_registries(pack_env_path: str):
     """Return (effect_registry, rule_registry) scanned from *pack_env_path*."""
     effect_registry = PackRegistry(item_attr="BUILD")
-    rule_registry = PackRegistry(item_attr="RULE")
+    rule_registry = _TestPackRegistry(item_attr="RULE")
     effect_registry.scan_dir(pack_env_path, MODULE_PREFIX)
     rule_registry.scan_dir(pack_env_path, MODULE_PREFIX)
     return effect_registry, rule_registry
@@ -65,12 +65,30 @@ def _make_engine() -> GameEngine:
     return GameEngine(effect_controls=EffectControls())
 
 
+class _TestPackRegistry(PackRegistry):
+    """PackRegistry subclass that supports registering pre-built instances for testing."""
+
+    def register_instance(
+        self, pack_name: str, item_name: str, instance: object, version: str = "1.0"
+    ) -> None:
+        if pack_name not in self._packs:
+            self._packs[pack_name] = _PackEntry(
+                name=pack_name,
+                version=Version.parse(version),
+                module_prefix="",
+                item_names={item_name},
+                source_path="",
+            )
+        else:
+            self._packs[pack_name].item_names.add(item_name)
+        self._cache[(pack_name, item_name)] = instance
+
+
 def _scene_factory(**kwargs):
     """Return a zero-arg factory producing a Scene from keyword overrides."""
 
     def factory():
         return Scene(
-            rules=kwargs.get("rules", []),
             effect_packs=kwargs.get("effect_packs", []),
             rule_packs=kwargs.get("rule_packs", []),
             initial_data=kwargs.get("initial_data"),
@@ -118,42 +136,35 @@ def test_scene_controls_pop_raises_not_implemented_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_scene_rules_accessible_after_construction() -> None:
-    rules = [_rule()]
-    scene = Scene(rules=rules, effect_packs=[], rule_packs=[])
-
-    assert scene.rules is rules
-
-
 def test_scene_effect_packs_accessible_after_construction() -> None:
     effect_packs = [("fx", "1.0")]
-    scene = Scene(rules=[], effect_packs=effect_packs, rule_packs=[])
+    scene = Scene(effect_packs=effect_packs, rule_packs=[])
 
     assert scene.effect_packs is effect_packs
 
 
 def test_scene_rule_packs_accessible_after_construction() -> None:
     rule_packs = [("rules", "2.0")]
-    scene = Scene(rules=[], effect_packs=[], rule_packs=rule_packs)
+    scene = Scene(effect_packs=[], rule_packs=rule_packs)
 
     assert scene.rule_packs is rule_packs
 
 
 def test_scene_initial_data_defaults_to_none() -> None:
-    scene = Scene(rules=[], effect_packs=[], rule_packs=[])
+    scene = Scene(effect_packs=[], rule_packs=[])
 
     assert scene.initial_data is None
 
 
 def test_scene_initial_data_accessible_when_provided() -> None:
     data = {"score": 0}
-    scene = Scene(rules=[], effect_packs=[], rule_packs=[], initial_data=data)
+    scene = Scene(effect_packs=[], rule_packs=[], initial_data=data)
 
     assert scene.initial_data is data
 
 
 def test_scene_lifecycle_callbacks_default_to_none() -> None:
-    scene = Scene(rules=[], effect_packs=[], rule_packs=[])
+    scene = Scene(effect_packs=[], rule_packs=[])
 
     assert scene.on_load is None
     assert scene.on_unload is None
@@ -166,7 +177,6 @@ def test_scene_lifecycle_callbacks_accessible_when_provided() -> None:
         pass
 
     scene = Scene(
-        rules=[],
         effect_packs=[],
         rule_packs=[],
         on_load=cb,
@@ -182,7 +192,7 @@ def test_scene_lifecycle_callbacks_accessible_when_provided() -> None:
 
 
 def test_scene_rejects_unknown_attributes() -> None:
-    scene = Scene(rules=[], effect_packs=[], rule_packs=[])
+    scene = Scene(effect_packs=[], rule_packs=[])
 
     with pytest.raises(AttributeError):
         scene.runtime_state = "mutable"  # type: ignore[attr-defined]
@@ -415,8 +425,8 @@ class _TrackingEngine(GameEngine):
         self._update_calls: list = []
 
     @property
-    def _last_state(self) -> GameState | None:
-        return self._update_calls[-1] if self._update_calls else None
+    def _last_state(self) -> GameState:
+        return self._update_calls[-1]
 
     def update(self, state: GameState) -> None:
         self._update_calls.append(state)
@@ -608,18 +618,20 @@ def test_load_fires_on_unload_top_down_on_all_stack_entries() -> None:
 
 def test_load_clears_suspended_state_queues_so_stale_events_do_not_outlive_the_stack() -> None:
     engine = _TrackingEngine(EffectControls())
-    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
+    rule_registry = _TestPackRegistry(item_attr="RULE")
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), rule_registry)
     base_events = []
 
     class _BaseRule(GameRule):
         def __init__(self) -> None:
             super().__init__("base", Version(1, 0))
 
-        def handle_event(self, e: Event, state: GameState) -> None:
-            base_events.append(e.name)
+        def handle_event(self, event: Event, state: GameState) -> None:
+            base_events.append(event.name)
 
     base_rule = _BaseRule()
-    manager.register("base", _scene_factory(rules=[base_rule]))
+    rule_registry.register_instance("stubs", "base_rule", base_rule)
+    manager.register("base", _scene_factory(rule_packs=[("stubs", "1.0")]))
     manager.register("overlay_scene", _scene_factory())
     manager.register("new", _scene_factory())
 
@@ -667,14 +679,15 @@ def test_load_dispatches_events_to_scene_rules_on_following_ticks(pack_env) -> N
         def __init__(self) -> None:
             super().__init__("scene.rule", Version(1, 0))
 
-        def handle_event(self, e: Event, state: GameState) -> None:
+        def handle_event(self, event: Event, state: GameState) -> None:
             fired.append("scene")
 
     pack_rule = rule_registry.get("rules", "rule_a", GameRule)
     pack_rule.on(Event, lambda e, s: fired.append("pack"))
 
     scene_r = _SceneRule()
-    manager.register("main", _scene_factory(rules=[scene_r], rule_packs=[("rules", "1.0")]))
+    rule_registry.register_instance("stubs", "scene_rule", scene_r)
+    manager.register("main", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")]))
     manager.load("main")
     manager.update()  # load fires; state created
     manager.update()  # engine.update(active_state)
@@ -709,14 +722,15 @@ def test_scene_rules_fire_before_pack_rules(pack_env) -> None:
         def __init__(self) -> None:
             super().__init__("scene.rule", Version(1, 0))
 
-        def handle_event(self, e: Event, state: GameState) -> None:
+        def handle_event(self, event: Event, state: GameState) -> None:
             fired.append("scene")
 
     pack_rule = rule_registry.get("rules", "rule_a", GameRule)
     pack_rule.on(Event, lambda e, s: fired.append("pack"))
 
     scene_r = _SceneRule()
-    manager.register("main", _scene_factory(rules=[scene_r], rule_packs=[("rules", "1.0")]))
+    rule_registry.register_instance("stubs", "scene_rule", scene_r)
+    manager.register("main", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")]))
     manager.load("main")
     manager.update()
     manager.update()
@@ -750,18 +764,20 @@ def test_overlay_suspends_active_scene_and_pushes_without_clearing_stack() -> No
 
 def test_overlay_clears_suspended_base_state_queue_before_pushing() -> None:
     engine = _TrackingEngine(EffectControls())
-    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
+    rule_registry = _TestPackRegistry(item_attr="RULE")
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), rule_registry)
     base_events = []
 
     class _BaseRule(GameRule):
         def __init__(self) -> None:
             super().__init__("base", Version(1, 0))
 
-        def handle_event(self, e: Event, state: GameState) -> None:
-            base_events.append(e.name)
+        def handle_event(self, event: Event, state: GameState) -> None:
+            base_events.append(event.name)
 
     base_rule = _BaseRule()
-    manager.register("base", _scene_factory(rules=[base_rule]))
+    rule_registry.register_instance("stubs", "base_rule", base_rule)
+    manager.register("base", _scene_factory(rule_packs=[("stubs", "1.0")]))
     manager.register("overlay_scene", _scene_factory())
 
     manager.load("base")
@@ -834,15 +850,16 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_env
         def __init__(self) -> None:
             super().__init__("base.rule", Version(1, 0))
 
-        def handle_event(self, e: Event, state: GameState) -> None:
-            base_events.append(e.name)
+        def handle_event(self, event: Event, state: GameState) -> None:
+            base_events.append(event.name)
 
     base_rule = _BaseRule()
+    rule_registry.register_instance("stubs", "base_rule", base_rule)
     pack_rule = rule_registry.get("rules", "rule_a", GameRule)
     pack_events: list = []
     pack_rule.on(Event, lambda e, s: pack_events.append(e.name))
 
-    manager.register("base", _scene_factory(rules=[base_rule], rule_packs=[("rules", "1.0")]))
+    manager.register("base", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")]))
     manager.register("overlay_scene", _scene_factory())
 
     manager.load("base")
@@ -863,18 +880,20 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_env
 
 def test_pop_clears_restored_state_queue_so_suspended_events_do_not_replay() -> None:
     engine = _TrackingEngine(EffectControls())
-    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"))
+    rule_registry = _TestPackRegistry(item_attr="RULE")
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), rule_registry)
     base_events: list = []
 
     class _BaseRule(GameRule):
         def __init__(self) -> None:
             super().__init__("base", Version(1, 0))
 
-        def handle_event(self, e: Event, state: GameState) -> None:
-            base_events.append(e.name)
+        def handle_event(self, event: Event, state: GameState) -> None:
+            base_events.append(event.name)
 
     base_rule = _BaseRule()
-    manager.register("base", _scene_factory(rules=[base_rule]))
+    rule_registry.register_instance("stubs", "base_rule", base_rule)
+    manager.register("base", _scene_factory(rule_packs=[("stubs", "1.0")]))
     manager.register("overlay_scene", _scene_factory())
 
     manager.load("base")
@@ -953,7 +972,7 @@ def test_rule_pack_items_all_receive_events_after_load(pack_env) -> None:
         def __init__(self) -> None:
             super().__init__("scene.rule", Version(1, 0))
 
-        def handle_event(self, e: Event, state: GameState) -> None:
+        def handle_event(self, event: Event, state: GameState) -> None:
             fired_by.append("scene")
 
     pack_rule_a = rule_registry.get("rules", "rule_a", GameRule)
@@ -962,7 +981,8 @@ def test_rule_pack_items_all_receive_events_after_load(pack_env) -> None:
     pack_rule_b.on(Event, lambda e, s: fired_by.append("pack_b"))
 
     scene_r = _SceneRule()
-    manager.register("main", _scene_factory(rules=[scene_r], rule_packs=[("rules", "1.0")]))
+    rule_registry.register_instance("stubs", "scene_rule", scene_r)
+    manager.register("main", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")]))
     manager.load("main")
     manager.update()  # load fires
     manager.update()  # engine.update(active_state)
@@ -1015,7 +1035,7 @@ def test_unloaded_scene_is_not_retained_by_manager() -> None:
 
     def factory():
         nonlocal created_scene
-        created_scene = Scene(rules=[], effect_packs=[], rule_packs=[])
+        created_scene = Scene(effect_packs=[], rule_packs=[])
         return created_scene
 
     manager.register("main", factory)
@@ -1045,7 +1065,7 @@ def test_suspended_scene_remains_on_stack_after_overlay() -> None:
 
     def factory():
         nonlocal created_scene
-        created_scene = Scene(rules=[], effect_packs=[], rule_packs=[])
+        created_scene = Scene(effect_packs=[], rule_packs=[])
         return created_scene
 
     manager.register("base", factory)

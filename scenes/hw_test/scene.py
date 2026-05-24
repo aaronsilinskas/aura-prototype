@@ -11,7 +11,6 @@ def _on_unload(ec: EffectControls) -> None:
 def factory() -> Scene:
     """Create and return a fresh hw_test Scene instance."""
     return Scene(
-        rules=[],
         effect_packs=[("elements", "1.0"), ("basic", "1.0")],
         rule_packs=[("hw_test", "1.0"), ("debug", "1.0")],
         initial_data={"initial_mode": 0},
