@@ -37,7 +37,7 @@ class AnsiEffectOutput(EffectOutput):
         self._last_event: str = ""
         self._event_count: int = 0
 
-    def create_buffer(self) -> PixelBuffer:
+    def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(self.PIXEL_COUNT)
 
     def handle_event(self, event_name: str, scope, receipt) -> None:

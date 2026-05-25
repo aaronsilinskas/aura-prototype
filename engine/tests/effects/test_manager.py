@@ -876,3 +876,75 @@ def test_update_calls_show_pixels_after_update_pixels_each_tick() -> None:
     manager.update(_make_timer())
 
     assert call_order == ["update_pixels", "show_pixels"]
+
+
+# ---------------------------------------------------------------------------
+# per-key create_buffer — issue #137
+# ---------------------------------------------------------------------------
+
+
+def test_create_buffer_called_with_scope_key_on_effect_start(pack_env) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
+
+    assert output.create_buffer_key_calls == ["personal"]
+
+
+def test_create_buffer_called_once_per_matching_key_for_composite_scope(pack_env) -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_personal, output_directional],
+    )
+
+    manager.set_effect(Scope.ALL, "stub.fire", 5, {})
+
+    assert output_personal.create_buffer_key_calls == ["personal"]
+    assert output_directional.create_buffer_key_calls == ["directional"]
+
+
+def test_create_buffer_not_called_for_out_of_scope_output(pack_env) -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_personal, output_directional],
+    )
+
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
+
+    assert output_directional.create_buffer_key_calls == []
+
+
+def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_env) -> None:
+    """Renderer-generated events after scope narrowing must reach only remaining-scope outputs."""
+    _make_pack(
+        pack_env,
+        "evt",
+        {
+            "shock": (
+                "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
+                "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
+            )
+        },
+    )
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(registry=registry, outputs=[output_personal, output_directional])
+
+    manager.add_effect(Scope.ALL, "evt.shock", 5, {})
+    manager.stop_effect(Scope.PERSONAL)  # narrows shock: personal key removed
+    output_personal.handle_event_calls.clear()
+    output_directional.handle_event_calls.clear()
+
+    manager.update(_make_timer())
+
+    # shock renderer fires "lightning_strike"; scoped_listener reads live entry.keys
+    # → personal output must NOT receive it after narrowing
+    assert not any(c[0] == "lightning_strike" for c in output_personal.handle_event_calls)
+    assert any(c[0] == "lightning_strike" for c in output_directional.handle_event_calls)

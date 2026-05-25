@@ -14,6 +14,7 @@ class SpyEffectOutput(EffectOutput):
         self.scopes = scopes
         self.update_pixels_calls: list = []
         self.created_buffers: list = []
+        self.create_buffer_key_calls: list = []
         self.handle_event_calls: list = []
         self.show_pixels_calls: list = []
 
@@ -22,9 +23,10 @@ class SpyEffectOutput(EffectOutput):
     ) -> None:
         self.handle_event_calls.append((event_name, scope_keys, receipt))
 
-    def create_buffer(self) -> PixelBuffer:
+    def create_buffer(self, scope_key: str) -> PixelBuffer:
         buf = PixelBuffer(self.min_resolution)
         self.created_buffers.append(buf)
+        self.create_buffer_key_calls.append(scope_key)
         return buf
 
     def update_pixels(self, frames: list[tuple[PixelBuffer, EffectReceipt]]) -> None:

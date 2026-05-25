@@ -136,7 +136,7 @@ class IS31FL3741EffectOutput(EffectOutput):
         self.min_resolution = _MATRIX_COLS
         self.scopes = [Scope.ALL]
 
-    def create_buffer(self) -> PixelBuffer:
+    def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(_MATRIX_COLS)
 
     def update_pixels(self, frames: list) -> None:
