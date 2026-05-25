@@ -15,6 +15,13 @@ try:
 except ImportError:
     pass  # Not available on CircuitPython
 
+try:
+    from typing import TypeVar
+
+    T = TypeVar("T")
+except ImportError:
+    pass  # Not available on CircuitPython
+
 from engine.events import Event
 
 
@@ -174,7 +181,7 @@ class GameState:
     """Portable game context passed to every rule handler on every tick.
 
     Create via ``GameEngine.create_state()`` for production use, or directly
-    for rule unit tests.  Rule-written data in ``state.data`` survives across
+    for rule unit tests.  Data stored via ``state.set()`` survives across
     ticks when the same ``GameState`` instance is passed to each
     ``engine.update(state)`` call.
 
@@ -187,10 +194,10 @@ class GameState:
     """
 
     __slots__ = (
+        "_data",
         "_elapsed",
         "_queue",
         "_total",
-        "data",
         "effect_controls",
         "network_controls",
         "scene_controls",
@@ -209,7 +216,7 @@ class GameState:
             network_controls if network_controls is not None else NetworkControls()
         )
         self._queue: list[Event] = []
-        self.data: dict[str, object] = data if data is not None else {}
+        self._data: dict[str, object] = data if data is not None else {}
         self._elapsed: float = 0.0
         self._total: float = 0.0
 
@@ -222,6 +229,45 @@ class GameState:
     def total(self) -> float:
         """Cumulative seconds elapsed since the engine started."""
         return self._total
+
+    def get(self, key: str, default: T) -> T:
+        """Return the stored value for *key*, or *default* if absent."""
+        if key in self._data:
+            return self._data[key]  # type: ignore[return-value]
+        return default
+
+    def set(self, key: str, value: object) -> None:
+        """Store *value* under *key*."""
+        self._data[key] = value
+
+    def pop(self, key: str, type_: type[T]) -> T:
+        """Remove and return the value at *key*, validating its type first.
+
+        Raises:
+            KeyError: if *key* is absent.
+            ValueError: if the stored value is not an instance of *type_*;
+                the key is **not** removed in this case.
+        """
+        if key not in self._data:
+            raise KeyError(key)
+        value = self._data[key]
+        if not isinstance(value, type_):
+            raise ValueError(
+                "Key '"
+                + key
+                + "' value is not an instance of "
+                + type_.__name__
+            )
+        del self._data[key]
+        return value  # type: ignore[return-value]
+
+    def delete(self, key: str) -> None:
+        """Remove *key* from state; no-op if absent."""
+        self._data.pop(key, None)
+
+    def has(self, key: str) -> bool:
+        """Return ``True`` if *key* is present in state."""
+        return key in self._data
 
     def queue_event(self, event: Event) -> None:
         """Enqueue an event for processing on the current or next update."""

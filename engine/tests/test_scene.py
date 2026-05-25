@@ -524,7 +524,7 @@ def test_load_seeds_active_state_data_from_scene_initial_data() -> None:
     manager.update()  # load fires; state created with initial_data
     manager.update()  # engine.update(active_state); _last_state is now set
 
-    assert engine._last_state.data == {"level": 5}
+    assert engine._last_state.get("level", None) == 5
 
 
 def test_on_load_callback_receives_effect_controls() -> None:
