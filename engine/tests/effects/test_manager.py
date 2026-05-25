@@ -2,10 +2,10 @@ import sys
 
 import pytest
 
-from engine.effects.manager import EffectBuilder, EffectManager
+from engine.effects.manager import EffectManager
 from engine.packs import PackRegistry
 from engine.state import Scope
-from engine.tests.effects.helpers import SpyEffectOutput
+from engine.tests.effects.helpers import CapturingEffectBuilder, SpyEffectBuilder, SpyEffectOutput
 from engine.timer import Timer
 
 # ---------------------------------------------------------------------------
@@ -169,7 +169,7 @@ def test_set_effect_twice_first_renderer_not_advanced(pack_env) -> None:
 
     manager.set_effect(Scope.PERSONAL, "spy.fire", 5, {})
     manager.set_effect(Scope.PERSONAL, "spy.ice", 5, {})
-    fire_builder = registry.get("spy", "fire", EffectBuilder)
+    fire_builder = registry.get("spy", "fire", SpyEffectBuilder)
     manager.update(_make_timer())
 
     renderer_a = fire_builder.created[0]
@@ -270,7 +270,7 @@ def test_resolution_equals_max_min_resolution_of_matching_outputs(pack_env) -> N
 
     manager.set_effect(Scope.PERSONAL, "capture.fire", 5, {})
 
-    builder = registry.get("capture", "fire", EffectBuilder)
+    builder = registry.get("capture", "fire", CapturingEffectBuilder)
     assert builder.last_config.resolution == 64
 
 
@@ -291,7 +291,7 @@ def test_resolution_falls_back_to_default_when_no_outputs_match(pack_env) -> Non
 
     manager.set_effect(Scope.PERSONAL, "capture.fire", 5, {})
 
-    builder = registry.get("capture", "fire", EffectBuilder)
+    builder = registry.get("capture", "fire", CapturingEffectBuilder)
     assert builder.last_config.resolution == 16
 
 
@@ -324,8 +324,8 @@ def test_add_effect_both_renderers_advanced_on_each_update(pack_env) -> None:
 
     manager.set_effect(Scope.PERSONAL, "spy.fire", 5, {})
     manager.add_effect(Scope.PERSONAL, "spy.ice", 5, {})
-    fire_builder = registry.get("spy", "fire", EffectBuilder)
-    ice_builder = registry.get("spy", "ice", EffectBuilder)
+    fire_builder = registry.get("spy", "fire", SpyEffectBuilder)
+    ice_builder = registry.get("spy", "ice", SpyEffectBuilder)
     manager.update(_make_timer())
     manager.update(_make_timer())
 
@@ -403,7 +403,7 @@ def test_shared_renderer_advanced_once_per_frame_for_composite_scope(pack_env) -
     manager = EffectManager(registry=registry, outputs=[output])
 
     manager.set_effect(Scope.ALL, "spy.fire", 5, {})
-    fire_builder = registry.get("spy", "fire", EffectBuilder)
+    fire_builder = registry.get("spy", "fire", SpyEffectBuilder)
     manager.update(_make_timer())
 
     assert fire_builder.created[0].update_count == 1
