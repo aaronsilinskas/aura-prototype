@@ -15,6 +15,7 @@ class SpyEffectOutput(EffectOutput):
         self.update_pixels_calls: list = []
         self.created_buffers: list = []
         self.handle_event_calls: list = []
+        self.show_pixels_calls: list = []
 
     def handle_event(self, event_name: str, scope: object, receipt: EffectReceipt) -> None:
         self.handle_event_calls.append((event_name, scope, receipt))
@@ -26,6 +27,9 @@ class SpyEffectOutput(EffectOutput):
 
     def update_pixels(self, frames: list[tuple[PixelBuffer, EffectReceipt]]) -> None:
         self.update_pixels_calls.append(list(frames))
+
+    def show_pixels(self) -> None:
+        self.show_pixels_calls.append(True)
 
 
 class StubEffectBuilder(EffectBuilder):

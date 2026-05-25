@@ -67,7 +67,10 @@ class AnsiEffectOutput(EffectOutput):
             print(f"\033[{BLOCK_HEIGHT}A", end="")
         else:
             self._initialized = True
-        print("\r\n".join(lines), end="", flush=True)
+        print("\r\n".join(lines), end="")
+
+    def show_pixels(self) -> None:
+        sys.stdout.flush()
 
 
 personal_output = AnsiEffectOutput(scopes=[Scope.PERSONAL])

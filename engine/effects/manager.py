@@ -30,6 +30,16 @@ class EffectOutput:
         """
         pass
 
+    def show_pixels(self) -> None:
+        """Commit staged pixel data to hardware or other sinks.
+
+        Called unconditionally once per tick, after ``update_pixels`` for this
+        output. Concrete pixel outputs override this to flush their hardware
+        buffer (e.g. ``strip.show()`` for NeoPixels). Audio and event outputs
+        may leave this as a no-op.
+        """
+        pass
+
     def handle_event(self, event_name: str, scope: ScopeValue, receipt: EffectReceipt) -> None:
         """Handle an event triggered by an effect renderer."""
         pass
@@ -286,6 +296,7 @@ class EffectManager(EffectControls):
                     entry.renderer.render(entry.state, buf)
                     frames.append((buf, entry.receipt))
             output.update_pixels(frames)
+            output.show_pixels()
 
     def __repr__(self) -> str:
         if not self._effects:
