@@ -91,8 +91,9 @@ class GameEngine:
         """Create a ``GameState`` pre-wired with this engine's effect controls
         and the given ``scene_controls``.
 
-        The optional ``initial_data`` dict seeds ``state.data`` with starting
-        values; the dict is used directly (no copy).
+        The optional ``initial_data`` dict seeds the state's internal store with
+        starting values accessible via the typed accessor API; the dict is used
+        directly (no copy).
         """
         return GameState(
             self._effect_controls, scene_controls, self._network_controls, initial_data
