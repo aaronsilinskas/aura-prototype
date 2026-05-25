@@ -40,7 +40,9 @@ class EffectOutput:
         """
         pass
 
-    def handle_event(self, event_name: str, scope: ScopeValue, receipt: EffectReceipt) -> None:
+    def handle_event(
+        self, event_name: str, scope_keys: frozenset[str], receipt: EffectReceipt
+    ) -> None:
         """Handle an event triggered by an effect renderer."""
         pass
 
@@ -83,7 +85,7 @@ class EffectManager(EffectControls):
     """
 
     class _EffectEntry:
-        __slots__ = ("keys", "name", "output_buffers", "receipt", "renderer", "scope", "state")
+        __slots__ = ("keys", "name", "output_buffers", "receipt", "renderer", "state")
 
         def __init__(
             self,
@@ -92,7 +94,6 @@ class EffectManager(EffectControls):
             receipt: EffectReceipt,
             output_buffers: list[PixelBuffer | None],
             renderer: EffectRenderer,
-            scope: ScopeValue,
             state: EffectState,
         ) -> None:
             self.keys: tuple[str, ...] = keys
@@ -100,7 +101,6 @@ class EffectManager(EffectControls):
             self.receipt: EffectReceipt = receipt
             self.output_buffers: list[PixelBuffer | None] = output_buffers
             self.renderer: EffectRenderer = renderer
-            self.scope: ScopeValue = scope
             self.state: EffectState = state
 
         def __repr__(self) -> str:
@@ -131,14 +131,13 @@ class EffectManager(EffectControls):
         self._frames: list[list[tuple[PixelBuffer, EffectReceipt]]] = [[] for _ in outputs]
 
     def _notify_listeners(
-        self, event_name: str, scope_keys: set[str], scope: ScopeValue, receipt: EffectReceipt
+        self, event_name: str, event_keys: set[str], receipt: EffectReceipt
     ) -> None:
-        """Notify listeners registered for the given scope."""
-        for output in self._outputs:
-            for s in output.scopes:
-                if any(k in scope_keys for k in s.keys):
-                    output.handle_event(event_name, scope, receipt)
-                    break
+        """Notify outputs whose registered key sets intersect event_keys."""
+        for i in range(len(self._outputs)):
+            matching = event_keys & self._output_key_sets[i]
+            if matching:
+                self._outputs[i].handle_event(event_name, frozenset(matching), receipt)
 
     def _build_effect(
         self,
@@ -179,7 +178,7 @@ class EffectManager(EffectControls):
         self._next_id += 1
 
         def scoped_listener(event_name: str) -> None:
-            self._notify_listeners(event_name, scope_key_set, scope, receipt)
+            self._notify_listeners(event_name, scope_key_set, receipt)
 
         resolution = _DEFAULT_RESOLUTION
         output_buffers = []
@@ -195,7 +194,7 @@ class EffectManager(EffectControls):
         )
         renderer = builder(effect_name, config)
         return EffectManager._EffectEntry(
-            scope.keys, effect_name, receipt, output_buffers, renderer, scope, EffectState()
+            scope.keys, effect_name, receipt, output_buffers, renderer, EffectState()
         )
 
     def _append_new_effect(
@@ -226,9 +225,7 @@ class EffectManager(EffectControls):
         for entry in self._effects:
             remaining = tuple(k for k in entry.keys if k not in scope_key_set)
             if len(remaining) < len(entry.keys):
-                self._notify_listeners(
-                    f"{entry.name}.stop", scope_key_set, entry.scope, entry.receipt
-                )
+                self._notify_listeners(f"{entry.name}.stop", scope_key_set, entry.receipt)
             if remaining:
                 entry.keys = remaining
                 self._update_output_buffers(entry)
@@ -243,7 +240,7 @@ class EffectManager(EffectControls):
         self._remove_effects_in_scope(scope_key_set)
         receipt = self._append_new_effect(scope, scope_key_set, name, level, options)
         effect_name = name.split(".", 1)[1]
-        self._notify_listeners(f"{effect_name}.start", scope_key_set, scope, receipt)
+        self._notify_listeners(f"{effect_name}.start", scope_key_set, receipt)
         return receipt
 
     def add_effect(
@@ -257,7 +254,7 @@ class EffectManager(EffectControls):
         scope_key_set = set(scope.keys)
         receipt = self._append_new_effect(scope, scope_key_set, name, level, options)
         effect_name = name.split(".", 1)[1]
-        self._notify_listeners(f"{effect_name}.start", scope_key_set, scope, receipt)
+        self._notify_listeners(f"{effect_name}.start", scope_key_set, receipt)
         return receipt
 
     def stop_effect_by_receipt(self, receipt: EffectReceipt) -> None:
@@ -265,9 +262,7 @@ class EffectManager(EffectControls):
         new_effects = []
         for entry in self._effects:
             if entry.receipt is receipt:
-                self._notify_listeners(
-                    f"{entry.name}.stop", set(entry.keys), entry.scope, entry.receipt
-                )
+                self._notify_listeners(f"{entry.name}.stop", set(entry.keys), entry.receipt)
             else:
                 new_effects.append(entry)
         self._effects = new_effects
