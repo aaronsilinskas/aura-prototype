@@ -2,6 +2,9 @@ from __future__ import annotations
 
 try:
     from collections.abc import Callable
+    from typing import TypeVar
+
+    T = TypeVar("T")
 except ImportError:
     pass  # No typing support on CircuitPython yet
 
@@ -28,9 +31,9 @@ class GameRule:
     def __init__(self, name: str, version: Version) -> None:
         self.name = name
         self.version = version
-        self._event_handlers: dict[type, Callable[[Event, GameState], None]] = {}
+        self._event_handlers: dict[type, Callable[..., None]] = {}
 
-    def on(self, event_type: type, handler: Callable[[Event, GameState], None]) -> None:
+    def on(self, event_type: type[T], handler: Callable[[T, GameState], None]) -> None:
         """Register a handler for a specific event type.
 
         The handler is called as ``handler(event, state)`` when an event of
