@@ -127,7 +127,7 @@ class IS31FL3741EffectOutput(EffectOutput):
         self.min_resolution = _MATRIX_COLS
         self.scopes = [Scope.PERSONAL]
 
-    def create_buffer(self) -> PixelBuffer:
+    def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(_MATRIX_COLS)
 
     def update_pixels(self, frames: list) -> None:
@@ -172,7 +172,7 @@ class AudioEffectOutput(EffectOutput):
         self._audio.play(self._mixer)
         self._wav_file = None
 
-    def create_buffer(self) -> PixelBuffer:
+    def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(1)
 
     def update_pixels(self, frames: list) -> None:

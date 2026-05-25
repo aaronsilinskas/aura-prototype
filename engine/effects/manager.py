@@ -18,8 +18,8 @@ class EffectOutput:
     min_resolution: int
     scopes: list[ScopeValue]
 
-    def create_buffer(self) -> PixelBuffer:
-        """Create a PixelBuffer sized to this output's hardware pixel count."""
+    def create_buffer(self, scope_key: str) -> PixelBuffer:
+        """Create a PixelBuffer sized for the given scope key's hardware region."""
         raise NotImplementedError
 
     def update_pixels(self, frames: list[tuple[PixelBuffer, EffectReceipt]]) -> None:
@@ -92,15 +92,15 @@ class EffectManager(EffectControls):
             keys: tuple[str, ...],
             name: str,
             receipt: EffectReceipt,
-            output_buffers: list[PixelBuffer | None],
-            renderer: EffectRenderer,
+            output_buffers: list[dict[str, PixelBuffer] | None],
+            renderer: EffectRenderer | None,
             state: EffectState,
         ) -> None:
             self.keys: tuple[str, ...] = keys
             self.name: str = name
             self.receipt: EffectReceipt = receipt
-            self.output_buffers: list[PixelBuffer | None] = output_buffers
-            self.renderer: EffectRenderer = renderer
+            self.output_buffers: list[dict[str, PixelBuffer] | None] = output_buffers
+            self.renderer: EffectRenderer | None = renderer
             self.state: EffectState = state
 
         def __repr__(self) -> str:
@@ -177,25 +177,29 @@ class EffectManager(EffectControls):
         receipt = EffectReceipt(self._next_id)
         self._next_id += 1
 
-        def scoped_listener(event_name: str) -> None:
-            self._notify_listeners(event_name, scope_key_set, receipt)
-
         resolution = _DEFAULT_RESOLUTION
         output_buffers = []
         for i, output in enumerate(self._outputs):
-            if any(k in self._output_key_sets[i] for k in scope_key_set):
+            matching_keys = scope_key_set & self._output_key_sets[i]
+            if matching_keys:
                 if output.min_resolution > resolution:
                     resolution = output.min_resolution
-                output_buffers.append(output.create_buffer())
+                output_buffers.append({k: output.create_buffer(k) for k in matching_keys})
             else:
                 output_buffers.append(None)
+
+        entry = EffectManager._EffectEntry(
+            scope.keys, effect_name, receipt, output_buffers, None, EffectState()
+        )
+
+        def scoped_listener(event_name: str) -> None:
+            self._notify_listeners(event_name, set(entry.keys), receipt)
+
         config = RendererConfig(
             level=level, resolution=resolution, options=options, listeners=[scoped_listener]
         )
-        renderer = builder(effect_name, config)
-        return EffectManager._EffectEntry(
-            scope.keys, effect_name, receipt, output_buffers, renderer, EffectState()
-        )
+        entry.renderer = builder(effect_name, config)
+        return entry
 
     def _append_new_effect(
         self,
@@ -211,12 +215,16 @@ class EffectManager(EffectControls):
         return entry.receipt
 
     def _update_output_buffers(self, entry: "_EffectEntry") -> None:
-        """Null out pre-allocated buffers for outputs no longer matched by entry.keys."""
+        """Remove keys no longer in entry.keys from per-output buffer dicts."""
         key_set = set(entry.keys)
         for i in range(len(self._outputs)):
-            if entry.output_buffers[i] is not None and not any(
-                k in self._output_key_sets[i] for k in key_set
-            ):
+            buf_dict = entry.output_buffers[i]
+            if buf_dict is None:
+                continue
+            for k in list(buf_dict):
+                if k not in key_set:
+                    del buf_dict[k]
+            if not buf_dict:
                 entry.output_buffers[i] = None
 
     def _remove_effects_in_scope(self, scope_key_set: set[str]) -> None:
@@ -286,10 +294,11 @@ class EffectManager(EffectControls):
             frames = self._frames[i]
             frames.clear()
             for entry in self._effects:
-                buf = entry.output_buffers[i]
-                if buf is not None:
-                    entry.renderer.render(entry.state, buf)
-                    frames.append((buf, entry.receipt))
+                buf_dict = entry.output_buffers[i]
+                if buf_dict is not None:
+                    for buf in buf_dict.values():
+                        entry.renderer.render(entry.state, buf)
+                        frames.append((buf, entry.receipt))
             output.update_pixels(frames)
             output.show_pixels()
 
