@@ -139,7 +139,7 @@ class IS31FL3741EffectOutput(EffectOutput):
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(_MATRIX_COLS)
 
-    def update_pixels(self, frames: list) -> None:
+    def update_pixels(self, scope_key: str, frames: list) -> None:
         row_count = min(len(frames), _MATRIX_ROWS)
 
         for f in range(row_count):

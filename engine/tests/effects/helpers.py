@@ -29,8 +29,10 @@ class SpyEffectOutput(EffectOutput):
         self.create_buffer_key_calls.append(scope_key)
         return buf
 
-    def update_pixels(self, frames: list[tuple[PixelBuffer, EffectReceipt]]) -> None:
-        self.update_pixels_calls.append(list(frames))
+    def update_pixels(
+        self, scope_key: str, frames: list[tuple[PixelBuffer, EffectReceipt]]
+    ) -> None:
+        self.update_pixels_calls.append((scope_key, list(frames)))
 
     def show_pixels(self) -> None:
         self.show_pixels_calls.append(True)
