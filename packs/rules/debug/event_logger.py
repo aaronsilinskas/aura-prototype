@@ -23,10 +23,12 @@ class EventLoggerRule(GameRule):
 
     def handle_event(self, event: Event, state: GameState) -> None:
         parts = []
-        for cls in type(event).__mro__:
+        cls = type(event)
+        while cls is not object:
             for slot in getattr(cls, "__slots__", ()):
                 if slot not in ("group", "name"):
                     parts.append(f"{slot}={getattr(event, slot)}")
+            cls = cls.__bases__[0] if cls.__bases__ else object
         self._output(f"[debug] t={state.total:.3f} {str(event).upper()} {', '.join(parts)}")
 
 

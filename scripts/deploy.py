@@ -23,7 +23,7 @@ try:
 except ImportError:
     pass
 
-MODULE_DIRS: "Final" = ["effects", "engine", "magic", "packs", "rules"]
+MODULE_DIRS: "Final" = ["effects", "engine", "magic", "packs", "rules", "scenes"]
 _EXCLUDE_DIRS: "Final" = {"__pycache__", "tests"}
 _EXCLUDE_NAMES: "Final" = {"conftest.py"}
 _EXCLUDE_SUFFIXES: "Final" = {".pyc", ".mpy"}
