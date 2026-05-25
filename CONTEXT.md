@@ -23,6 +23,21 @@ Abstract base class (raises `NotImplementedError`) with three methods: `load(nam
 ### SceneManager
 Owns the scene stack and drives scene transitions. Wraps `GameEngine`; its `update()` calls `engine.update(state)` with the active scene's state, then applies any pending transition. Implements `SceneControls`. `load(name)` clears the entire stack top-down (active scene `on_unload` first), then loads the named scene with a fresh `GameState`. `overlay(name)` suspends the active scene (rules swapped out) and loads a new scene on top. `pop()` unloads the top scene, swaps the engine's rules via `set_rules()`, and resumes passing the restored `GameState` from the stack triple to `engine.update(state)`. `pop()` and `overlay()` raise `ValueError` immediately if the stack has fewer entries than required.
 
+### Scope
+Identifies what a game effect targets — which outputs and players should display or respond to it. Leaf scopes: `PERSONAL` (local player's device only), `DIRECTIONAL` (the direction indicator), `Global.MAIN` (primary shared effect area), `Global.BUFF` (positive status area), `Global.DEBUFF` (negative status area). Composite scopes: `Global.ALL` (all three global zones), `Scope.ALL` (every scope). `ScopeValue` is the Python type name — an implementation artifact caused by CircuitPython's lack of enum support. Use "scope" in domain language.
+_Avoid_: ScopeValue (as a domain term)
+
+### EffectOutput
+A hardware or software output registered with the effect system. Serves one or more scopes and receives rendered frames each tick. Translates pixel and event data into hardware calls (e.g. writing to an LED matrix or playing audio).
+_Avoid_: output (ambiguous in multi-output contexts)
+
+### Resolution
+The mathematical detail level at which an effect generates its animation data. Independent of pixel count — an effect can be generated at resolution 20 and rendered into a 10-pixel buffer, which may look noticeably better than generating at resolution 10. Each `EffectOutput` declares a `min_resolution` — the minimum detail level it requires. The effect engine uses the highest `min_resolution` across all outputs an effect targets when constructing the renderer. Pixel count (the number of LEDs written per tick) is a separate hardware concern controlled by the size of the buffer the output allocates.
+_Avoid_: conflating resolution with pixel count
+
+### EffectReceipt
+A handle returned when an effect is started. Used to stop that specific running effect by reference. Invalidated when the effect ends.
+
 ### Idle effect
-A low-level, looping effect running on a scope when no active game logic requires a specific response. Used to keep outputs visually active during standby or between triggered events. Replaced (via `set_effect`) when an active effect is started; restored when the active effect ends.
+A low-level, looping effect running on a scope when no active game logic requires a specific response. Used to keep outputs visually active during standby or between triggered events. Replaced (via `set_effect`) when an active effect is started; restored when the active effect ends. Idle effects are optional — scopes may have no effect running at all.
 _Avoid_: ambient effect, background effect

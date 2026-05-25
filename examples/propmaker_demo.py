@@ -144,6 +144,7 @@ class IS31FL3741EffectOutput(EffectOutput):
             for p in range(_MATRIX_COLS):
                 is31.pixel(p, f, 0)
 
+    def show_pixels(self) -> None:
         is31.show()
 
 

@@ -801,3 +801,70 @@ def test_unknown_effect_in_known_pack_raises_value_error(pack_env) -> None:
 
     with pytest.raises(ValueError, match="Unknown effect 'flash' in pack 'elements'"):
         manager.set_effect(Scope.PERSONAL, "elements.flash", 5, {})
+
+
+# ---------------------------------------------------------------------------
+# show_pixels — issue #135
+# ---------------------------------------------------------------------------
+
+
+def test_update_calls_show_pixels_when_no_effects_are_active() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+
+    manager.update(_make_timer())
+
+    assert len(output.show_pixels_calls) == 1
+
+
+def test_update_calls_show_pixels_once_per_tick() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+
+    manager.update(_make_timer())
+    manager.update(_make_timer())
+    manager.update(_make_timer())
+
+    assert len(output.show_pixels_calls) == 3
+
+
+def test_update_calls_show_pixels_on_all_outputs_each_tick() -> None:
+    output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output_a, output_b])
+
+    manager.update(_make_timer())
+
+    assert len(output_a.show_pixels_calls) == 1
+    assert len(output_b.show_pixels_calls) == 1
+
+
+def test_update_calls_show_pixels_even_when_effects_are_active(pack_env) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    manager.update(_make_timer())
+
+    assert len(output.show_pixels_calls) == 1
+
+
+def test_update_calls_show_pixels_after_update_pixels_each_tick() -> None:
+    """show_pixels must be called after update_pixels on the same output."""
+    call_order: list[str] = []
+
+    class OrderTrackingOutput(SpyEffectOutput):
+        def update_pixels(self, frames: list) -> None:
+            super().update_pixels(frames)
+            call_order.append("update_pixels")
+
+        def show_pixels(self) -> None:
+            super().show_pixels()
+            call_order.append("show_pixels")
+
+    output = OrderTrackingOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+
+    manager.update(_make_timer())
+
+    assert call_order == ["update_pixels", "show_pixels"]
