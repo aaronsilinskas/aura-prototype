@@ -67,7 +67,7 @@ def test_first_tick_sets_hw_mode_from_initial_mode(spy):
     engine.update(state)
 
     assert state.get("hw_mode", None) == 0
-    assert not state.has("initial_mode")
+    assert "initial_mode" not in state
 
 
 def test_first_tick_starts_rgb_idle_effects(spy):
@@ -177,10 +177,10 @@ def test_button_b_clears_flash_keys_on_mode_change(spy):
     _press_button(state, "B")
     engine.update(state)
 
-    assert not state.has("ir_flash_receipt")
-    assert not state.has("ir_flash_start")
-    assert not state.has("radio_flash_receipt")
-    assert not state.has("radio_flash_start")
+    assert "ir_flash_receipt" not in state
+    assert "ir_flash_start" not in state
+    assert "radio_flash_receipt" not in state
+    assert "radio_flash_start" not in state
 
 
 # ---------------------------------------------------------------------------
@@ -314,8 +314,8 @@ def test_ir_flash_expires_and_restarts_directional_idle(spy):
     engine.update(state)
 
     assert receipt in spy.stop_effect_by_receipt_calls
-    assert not state.has("ir_flash_receipt")
-    assert not state.has("ir_flash_start")
+    assert "ir_flash_receipt" not in state
+    assert "ir_flash_start" not in state
     # Restarts DIRECTIONAL at level 3
     directional_calls = [c for c in spy.set_effect_calls if c[2] == 3]
     assert len(directional_calls) >= 1
@@ -338,8 +338,8 @@ def test_radio_flash_expires_and_restarts_global_all_idle(spy):
     engine.update(state)
 
     assert receipt in spy.stop_effect_by_receipt_calls
-    assert not state.has("radio_flash_receipt")
-    assert not state.has("radio_flash_start")
+    assert "radio_flash_receipt" not in state
+    assert "radio_flash_start" not in state
     level_3_calls = [c for c in spy.set_effect_calls if c[2] == 3]
     assert len(level_3_calls) >= 1
 
@@ -360,4 +360,4 @@ def test_ir_flash_does_not_expire_before_duration(spy):
     engine.update(state)
 
     assert receipt not in spy.stop_effect_by_receipt_calls
-    assert state.has("ir_flash_receipt")
+    assert "ir_flash_receipt" in state

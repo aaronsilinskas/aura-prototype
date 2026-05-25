@@ -203,7 +203,7 @@ def test_pop_removes_and_returns_value() -> None:
     result = state.pop("n", int)
 
     assert result == 7
-    assert not state.has("n")
+    assert "n" not in state
 
 
 def test_pop_raises_key_error_when_key_is_absent() -> None:
@@ -219,14 +219,14 @@ def test_pop_raises_value_error_on_type_mismatch_and_does_not_remove_key() -> No
     with pytest.raises(ValueError):
         state.pop("v", int)
 
-    assert state.has("v")
+    assert "v" in state
 
 
 def test_delete_removes_a_present_key() -> None:
     state = GameState(_make_effect_controls(), _make_scene_controls(), data={"k": 1})
     state.delete("k")
 
-    assert not state.has("k")
+    assert "k" not in state
 
 
 def test_delete_is_a_noop_when_key_is_absent() -> None:
@@ -238,13 +238,13 @@ def test_delete_is_a_noop_when_key_is_absent() -> None:
 def test_has_returns_true_when_key_is_present() -> None:
     state = GameState(_make_effect_controls(), _make_scene_controls(), data={"p": True})
 
-    assert state.has("p") is True
+    assert "p" in state
 
 
 def test_has_returns_false_when_key_is_absent() -> None:
     state = _make_state()
 
-    assert state.has("absent") is False
+    assert "absent" not in state
 
 
 def test_state_can_be_constructed_standalone_with_preset_data_for_rule_unit_testing() -> None:
@@ -297,7 +297,7 @@ def test_create_state_returns_empty_data_when_no_initial_data_provided() -> None
 
     state = engine.create_state(_make_scene_controls())
 
-    assert not state.has("score")
+    assert "score" not in state
 
 
 # ---------------------------------------------------------------------------

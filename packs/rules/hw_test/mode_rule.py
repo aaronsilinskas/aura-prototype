@@ -65,7 +65,7 @@ class HwTestModeRule(GameRule):
 
     def _handle(self, event: InputEvents.ButtonAndMovement, state: GameState) -> None:
         # First-tick init: initialise mode from initial_mode
-        if not state.has("hw_mode"):
+        if "hw_mode" not in state:
             mode = state.pop("initial_mode", int)
             state.set("hw_mode", mode)
             _MODE_ENTRY[mode](state)
@@ -107,7 +107,7 @@ class HwTestModeRule(GameRule):
 
     def _check_flash_expiry(self, state: GameState) -> None:
         if (
-            state.has("ir_flash_start")
+            "ir_flash_start" in state
             and state.total - state.get("ir_flash_start", 0.0) > FLASH_DURATION
         ):
             receipt = state.pop("ir_flash_receipt", EffectReceipt)
@@ -118,7 +118,7 @@ class HwTestModeRule(GameRule):
             )
 
         if (
-            state.has("radio_flash_start")
+            "radio_flash_start" in state
             and state.total - state.get("radio_flash_start", 0.0) > FLASH_DURATION
         ):
             receipt = state.pop("radio_flash_receipt", EffectReceipt)

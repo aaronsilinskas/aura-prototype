@@ -269,6 +269,10 @@ class GameState:
         """Return ``True`` if *key* is present in state."""
         return key in self._data
 
+    def __contains__(self, key: object) -> bool:
+        """Support ``"key" in state`` membership tests."""
+        return key in self._data
+
     def queue_event(self, event: Event) -> None:
         """Enqueue an event for processing on the current or next update."""
         self._queue.append(event)
