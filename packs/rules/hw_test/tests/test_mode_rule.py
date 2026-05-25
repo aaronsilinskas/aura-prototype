@@ -66,8 +66,8 @@ def test_first_tick_sets_hw_mode_from_initial_mode(spy):
     state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
     engine.update(state)
 
-    assert state.data["hw_mode"] == 0
-    assert "initial_mode" not in state.data
+    assert state.get("hw_mode", None) == 0
+    assert "initial_mode" not in state
 
 
 def test_first_tick_starts_rgb_idle_effects(spy):
@@ -89,7 +89,7 @@ def test_first_tick_sets_rgb_level_in_state_data(spy):
     state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
     engine.update(state)
 
-    assert state.data["rgb_level"] == 1
+    assert state.get("rgb_level", None) == 1
 
 
 def test_first_tick_imu_mode_starts_solid_effects(spy):
@@ -97,7 +97,7 @@ def test_first_tick_imu_mode_starts_solid_effects(spy):
     state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
     engine.update(state)
 
-    assert state.data["hw_mode"] == 1
+    assert state.get("hw_mode", None) == 1
     names_and_options = [(call[1], call[3]) for call in spy.set_effect_calls]
     assert ("basic.solid", {"color": 0xFF0000}) in names_and_options
     assert ("basic.solid", {"color": 0x00FF00}) in names_and_options
@@ -109,7 +109,7 @@ def test_first_tick_ir_mode_starts_white_solid_effects(spy):
     state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
     engine.update(state)
 
-    assert state.data["hw_mode"] == 2
+    assert state.get("hw_mode", None) == 2
     assert all(call[1] == "basic.solid" for call in spy.set_effect_calls)
     assert all(call[3] == {"color": 0xFFFFFF} for call in spy.set_effect_calls)
 
@@ -119,7 +119,7 @@ def test_first_tick_radio_mode_starts_white_solid_effects(spy):
     state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
     engine.update(state)
 
-    assert state.data["hw_mode"] == 3
+    assert state.get("hw_mode", None) == 3
     assert all(call[1] == "basic.solid" for call in spy.set_effect_calls)
     assert all(call[3] == {"color": 0xFFFFFF} for call in spy.set_effect_calls)
 
@@ -139,7 +139,7 @@ def test_button_b_advances_mode_from_rgb_to_imu(spy):
     _press_button(state, "B")
     engine.update(state)
 
-    assert state.data["hw_mode"] == 1
+    assert state.get("hw_mode", None) == 1
 
 
 def test_button_b_cycles_mode_through_0_1_2_3_and_back_to_0(spy):
@@ -150,7 +150,7 @@ def test_button_b_cycles_mode_through_0_1_2_3_and_back_to_0(spy):
     for expected_mode in [1, 2, 3, 0]:
         _press_button(state, "B")
         engine.update(state)
-        assert state.data["hw_mode"] == expected_mode
+        assert state.get("hw_mode", None) == expected_mode
 
 
 def test_button_b_stops_all_effects_before_starting_new_mode(spy):
@@ -169,18 +169,18 @@ def test_button_b_clears_flash_keys_on_mode_change(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2})
     state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
     engine.update(state)
-    state.data["ir_flash_receipt"] = object()
-    state.data["ir_flash_start"] = 1.0
-    state.data["radio_flash_receipt"] = object()
-    state.data["radio_flash_start"] = 1.0
+    state.set("ir_flash_receipt", object())
+    state.set("ir_flash_start", 1.0)
+    state.set("radio_flash_receipt", object())
+    state.set("radio_flash_start", 1.0)
 
     _press_button(state, "B")
     engine.update(state)
 
-    assert "ir_flash_receipt" not in state.data
-    assert "ir_flash_start" not in state.data
-    assert "radio_flash_receipt" not in state.data
-    assert "radio_flash_start" not in state.data
+    assert "ir_flash_receipt" not in state
+    assert "ir_flash_start" not in state
+    assert "radio_flash_receipt" not in state
+    assert "radio_flash_start" not in state
 
 
 # ---------------------------------------------------------------------------
@@ -197,20 +197,20 @@ def test_button_a_in_rgb_mode_increments_level(spy):
     _press_button(state, "A")
     engine.update(state)
 
-    assert state.data["rgb_level"] == 2
+    assert state.get("rgb_level", None) == 2
 
 
 def test_button_a_in_rgb_mode_wraps_level_from_10_to_1(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
     state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
     engine.update(state)
-    state.data["rgb_level"] = 10
+    state.set("rgb_level", 10)
     spy.set_effect_calls.clear()
 
     _press_button(state, "A")
     engine.update(state)
 
-    assert state.data["rgb_level"] == 1
+    assert state.get("rgb_level", None) == 1
 
 
 def test_button_a_in_rgb_mode_calls_set_effect_on_all_five_scopes(spy):
@@ -303,8 +303,8 @@ def test_ir_flash_expires_and_restarts_directional_idle(spy):
     engine.update(state)
 
     receipt = EffectReceipt(42)
-    state.data["ir_flash_receipt"] = receipt
-    state.data["ir_flash_start"] = 0.0
+    state.set("ir_flash_receipt", receipt)
+    state.set("ir_flash_start", 0.0)
     # Advance timer total beyond FLASH_DURATION
     timer.total = FLASH_DURATION + 0.01
     spy.set_effect_calls.clear()
@@ -314,8 +314,8 @@ def test_ir_flash_expires_and_restarts_directional_idle(spy):
     engine.update(state)
 
     assert receipt in spy.stop_effect_by_receipt_calls
-    assert "ir_flash_receipt" not in state.data
-    assert "ir_flash_start" not in state.data
+    assert "ir_flash_receipt" not in state
+    assert "ir_flash_start" not in state
     # Restarts DIRECTIONAL at level 3
     directional_calls = [c for c in spy.set_effect_calls if c[2] == 3]
     assert len(directional_calls) >= 1
@@ -328,8 +328,8 @@ def test_radio_flash_expires_and_restarts_global_all_idle(spy):
     engine.update(state)
 
     receipt = EffectReceipt(99)
-    state.data["radio_flash_receipt"] = receipt
-    state.data["radio_flash_start"] = 0.0
+    state.set("radio_flash_receipt", receipt)
+    state.set("radio_flash_start", 0.0)
     timer.total = FLASH_DURATION + 0.01
     spy.set_effect_calls.clear()
     spy.stop_effect_by_receipt_calls.clear()
@@ -338,8 +338,8 @@ def test_radio_flash_expires_and_restarts_global_all_idle(spy):
     engine.update(state)
 
     assert receipt in spy.stop_effect_by_receipt_calls
-    assert "radio_flash_receipt" not in state.data
-    assert "radio_flash_start" not in state.data
+    assert "radio_flash_receipt" not in state
+    assert "radio_flash_start" not in state
     level_3_calls = [c for c in spy.set_effect_calls if c[2] == 3]
     assert len(level_3_calls) >= 1
 
@@ -351,8 +351,8 @@ def test_ir_flash_does_not_expire_before_duration(spy):
     engine.update(state)
 
     receipt = EffectReceipt(7)
-    state.data["ir_flash_receipt"] = receipt
-    state.data["ir_flash_start"] = 0.0
+    state.set("ir_flash_receipt", receipt)
+    state.set("ir_flash_start", 0.0)
     timer.total = FLASH_DURATION - 0.01
     spy.stop_effect_by_receipt_calls.clear()
 
@@ -360,4 +360,4 @@ def test_ir_flash_does_not_expire_before_duration(spy):
     engine.update(state)
 
     assert receipt not in spy.stop_effect_by_receipt_calls
-    assert "ir_flash_receipt" in state.data
+    assert "ir_flash_receipt" in state

@@ -8,7 +8,7 @@ except ImportError:
 from engine.engine import GameRule, Version
 from engine.input import ButtonData, InputEvents
 from engine.network import NetworkEvents
-from engine.state import GameState, Scope
+from engine.state import EffectReceipt, GameState, Scope
 
 _VERSION: Final = Version(1, 0)
 
@@ -28,7 +28,7 @@ _RGB_IDLE: Final = (
 def _enter_rgb(state: GameState) -> None:
     ec = state.effect_controls
     level = 1
-    state.data["rgb_level"] = level
+    state.set("rgb_level", level)
     for scope, name, options in _RGB_IDLE:
         ec.set_effect(scope, name, level, options)
 
@@ -65,9 +65,9 @@ class HwTestModeRule(GameRule):
 
     def _handle(self, event: InputEvents.ButtonAndMovement, state: GameState) -> None:
         # First-tick init: initialise mode from initial_mode
-        if "hw_mode" not in state.data:
-            mode = state.data.pop("initial_mode")
-            state.data["hw_mode"] = mode
+        if "hw_mode" not in state:
+            mode = state.pop("initial_mode", int)
+            state.set("hw_mode", mode)
             _MODE_ENTRY[mode](state)
 
         self._check_flash_expiry(state)
@@ -81,20 +81,20 @@ class HwTestModeRule(GameRule):
     def _advance_mode(self, state: GameState) -> None:
         state.effect_controls.stop_effect(Scope.ALL)
         # Clear all flash keys
-        state.data.pop("ir_flash_receipt", None)
-        state.data.pop("ir_flash_start", None)
-        state.data.pop("radio_flash_receipt", None)
-        state.data.pop("radio_flash_start", None)
+        state.delete("ir_flash_receipt")
+        state.delete("ir_flash_start")
+        state.delete("radio_flash_receipt")
+        state.delete("radio_flash_start")
 
-        new_mode = (state.data["hw_mode"] + 1) % _NUM_MODES
-        state.data["hw_mode"] = new_mode
+        new_mode = (state.get("hw_mode", 0) + 1) % _NUM_MODES
+        state.set("hw_mode", new_mode)
         _MODE_ENTRY[new_mode](state)
 
     def _handle_button_a(self, state: GameState) -> None:
-        mode = state.data["hw_mode"]
+        mode = state.get("hw_mode", 0)
         if mode == 0:
-            new_level = (state.data["rgb_level"] % 10) + 1
-            state.data["rgb_level"] = new_level
+            new_level = (state.get("rgb_level", 1) % 10) + 1
+            state.set("rgb_level", new_level)
             ec = state.effect_controls
             for scope, name, options in _RGB_IDLE:
                 ec.set_effect(scope, name, new_level, options)
@@ -107,22 +107,22 @@ class HwTestModeRule(GameRule):
 
     def _check_flash_expiry(self, state: GameState) -> None:
         if (
-            "ir_flash_start" in state.data
-            and state.total - state.data["ir_flash_start"] > FLASH_DURATION
+            "ir_flash_start" in state
+            and state.total - state.get("ir_flash_start", 0.0) > FLASH_DURATION
         ):
-            receipt = state.data.pop("ir_flash_receipt")
-            state.data.pop("ir_flash_start")
+            receipt = state.pop("ir_flash_receipt", EffectReceipt)
+            state.delete("ir_flash_start")
             state.effect_controls.stop_effect_by_receipt(receipt)
             state.effect_controls.set_effect(
                 Scope.DIRECTIONAL, "basic.solid", 3, {"color": 0xFFFFFF}
             )
 
         if (
-            "radio_flash_start" in state.data
-            and state.total - state.data["radio_flash_start"] > FLASH_DURATION
+            "radio_flash_start" in state
+            and state.total - state.get("radio_flash_start", 0.0) > FLASH_DURATION
         ):
-            receipt = state.data.pop("radio_flash_receipt")
-            state.data.pop("radio_flash_start")
+            receipt = state.pop("radio_flash_receipt", EffectReceipt)
+            state.delete("radio_flash_start")
             state.effect_controls.stop_effect_by_receipt(receipt)
             state.effect_controls.set_effect(
                 Scope.Global.ALL, "basic.solid", 3, {"color": 0xFFFFFF}

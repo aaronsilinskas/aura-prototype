@@ -174,14 +174,77 @@ def test_rules_see_elapsed_and_total_time_from_the_engines_timer() -> None:
 
 
 # ---------------------------------------------------------------------------
-# GameState.data — persistent data dict
+# GameState — typed accessor API (get, set, pop, delete, has)
 # ---------------------------------------------------------------------------
 
 
-def test_state_data_is_empty_when_no_initial_data_is_provided() -> None:
+def test_get_returns_value_when_key_is_present() -> None:
+    state = GameState(_make_effect_controls(), _make_scene_controls(), data={"x": 42})
+
+    assert state.get("x", 0) == 42
+
+
+def test_get_returns_default_when_key_is_absent() -> None:
     state = _make_state()
 
-    assert state.data == {}
+    assert state.get("missing", 99) == 99
+
+
+def test_set_then_get_returns_stored_value() -> None:
+    state = _make_state()
+    state.set("y", "hello")
+
+    assert state.get("y", "") == "hello"
+
+
+def test_pop_removes_and_returns_value() -> None:
+    state = GameState(_make_effect_controls(), _make_scene_controls(), data={"n": 7})
+
+    result = state.pop("n", int)
+
+    assert result == 7
+    assert "n" not in state
+
+
+def test_pop_raises_key_error_when_key_is_absent() -> None:
+    state = _make_state()
+
+    with pytest.raises(KeyError):
+        state.pop("absent", int)
+
+
+def test_pop_raises_value_error_on_type_mismatch_and_does_not_remove_key() -> None:
+    state = GameState(_make_effect_controls(), _make_scene_controls(), data={"v": "text"})
+
+    with pytest.raises(ValueError):
+        state.pop("v", int)
+
+    assert "v" in state
+
+
+def test_delete_removes_a_present_key() -> None:
+    state = GameState(_make_effect_controls(), _make_scene_controls(), data={"k": 1})
+    state.delete("k")
+
+    assert "k" not in state
+
+
+def test_delete_is_a_noop_when_key_is_absent() -> None:
+    state = _make_state()
+
+    state.delete("nonexistent")  # must not raise
+
+
+def test_has_returns_true_when_key_is_present() -> None:
+    state = GameState(_make_effect_controls(), _make_scene_controls(), data={"p": True})
+
+    assert "p" in state
+
+
+def test_has_returns_false_when_key_is_absent() -> None:
+    state = _make_state()
+
+    assert "absent" not in state
 
 
 def test_state_can_be_constructed_standalone_with_preset_data_for_rule_unit_testing() -> None:
@@ -189,7 +252,7 @@ def test_state_can_be_constructed_standalone_with_preset_data_for_rule_unit_test
 
     state = GameState(controls, _make_scene_controls(), data={"key": "val"})
 
-    assert state.data["key"] == "val"
+    assert state.get("key", "") == "val"
 
 
 def test_rules_cannot_access_game_engine_through_state() -> None:
@@ -226,7 +289,7 @@ def test_create_state_seeds_data_from_initial_data() -> None:
 
     state = engine.create_state(_make_scene_controls(), initial_data={"score": 0})
 
-    assert state.data["score"] == 0
+    assert state.get("score", None) == 0
 
 
 def test_create_state_returns_empty_data_when_no_initial_data_provided() -> None:
@@ -234,7 +297,7 @@ def test_create_state_returns_empty_data_when_no_initial_data_provided() -> None
 
     state = engine.create_state(_make_scene_controls())
 
-    assert state.data == {}
+    assert "score" not in state
 
 
 # ---------------------------------------------------------------------------
@@ -248,7 +311,7 @@ def test_data_written_in_one_tick_is_readable_in_a_later_tick() -> None:
             super().__init__("test.counter", Version(1, 0))
 
         def handle_event(self, event: Event, state: GameState) -> None:
-            state.data["n"] = state.data.get("n", 0) + 1
+            state.set("n", state.get("n", 0) + 1)
 
     engine = GameEngine(effect_controls=_make_effect_controls())
     state = engine.create_state(_make_scene_controls())
@@ -259,7 +322,7 @@ def test_data_written_in_one_tick_is_readable_in_a_later_tick() -> None:
     state.queue_event(Event(_GROUP, "tick"))
     engine.update(state)
 
-    assert state.data["n"] == 2
+    assert state.get("n", None) == 2
 
 
 def test_data_written_by_an_earlier_rule_is_visible_to_a_later_rule_in_the_same_tick() -> None:
@@ -268,7 +331,7 @@ def test_data_written_by_an_earlier_rule_is_visible_to_a_later_rule_in_the_same_
             super().__init__("test.writer", Version(1, 0))
 
         def handle_event(self, event: Event, state: GameState) -> None:
-            state.data["shared"] = 42
+            state.set("shared", 42)
 
     class _ReaderRule(GameRule):
         def __init__(self) -> None:
@@ -276,7 +339,7 @@ def test_data_written_by_an_earlier_rule_is_visible_to_a_later_rule_in_the_same_
             self.value = None
 
         def handle_event(self, event: Event, state: GameState) -> None:
-            self.value = state.data.get("shared")
+            self.value = state.get("shared", None)
 
     engine = GameEngine(effect_controls=_make_effect_controls())
     state = engine.create_state(_make_scene_controls())
@@ -295,7 +358,7 @@ def test_different_state_objects_are_independent() -> None:
             super().__init__("test.counter", Version(1, 0))
 
         def handle_event(self, event: Event, state: GameState) -> None:
-            state.data["n"] = state.data.get("n", 0) + 1
+            state.set("n", state.get("n", 0) + 1)
 
     engine = GameEngine(effect_controls=_make_effect_controls())
     state_a = engine.create_state(_make_scene_controls())
@@ -310,8 +373,8 @@ def test_different_state_objects_are_independent() -> None:
     state_b.queue_event(Event(_GROUP, "tick"))
     engine.update(state_b)
 
-    assert state_a.data["n"] == 2
-    assert state_b.data["n"] == 1
+    assert state_a.get("n", None) == 2
+    assert state_b.get("n", None) == 1
 
 
 # ---------------------------------------------------------------------------
