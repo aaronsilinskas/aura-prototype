@@ -44,6 +44,15 @@ class EffectOutput:
         """
         pass
 
+    def clear_pixels(self, scope_key: str) -> None:
+        """Signal that the given scope key should go dark.
+
+        Called when the last effect covering this key stops. Hardware outputs
+        can override this to explicitly clear their buffer (e.g. write zeros to
+        LEDs). Default is a no-op.
+        """
+        pass
+
     def handle_event(
         self, event_name: str, scope_keys: frozenset[str], receipt: EffectReceipt
     ) -> None:
@@ -229,17 +238,50 @@ class EffectManager(EffectControls):
             if not buf_dict:
                 entry.output_buffers[i] = None
 
+    def _stop_entries(
+        self,
+        stopped: "list[tuple[EffectManager._EffectEntry, set[str]]]",
+        remaining: "list[EffectManager._EffectEntry]",
+    ) -> None:
+        """Fire stop events and clear_pixels for entries that have stopped or been narrowed.
+
+        Args:
+            stopped: List of ``(entry, removed_keys)`` pairs. ``removed_keys`` is the set
+                of scope keys being removed from each entry (used for event routing).
+            remaining: The effects that will remain active after this stop operation,
+                with their keys already narrowed to the post-stop state.
+        """
+        for entry, removed_keys in stopped:
+            self._notify_listeners(f"{entry.name}.stop", removed_keys, entry.receipt)
+
+        remaining_key_set: set[str] = set()
+        for r in remaining:
+            remaining_key_set.update(r.keys)
+
+        checked: set[str] = set()
+        for _, removed_keys in stopped:
+            for key in removed_keys:
+                if key in checked:
+                    continue
+                checked.add(key)
+                if key not in remaining_key_set:
+                    for i in range(len(self._outputs)):
+                        if key in self._output_key_sets[i]:
+                            self._outputs[i].clear_pixels(key)
+
     def _remove_effects_in_scope(self, scope_key_set: set[str]) -> None:
         """Remove or narrow entries that overlap scope_key_set, firing stop events."""
-        new_effects = []
+        stopped: list[tuple[EffectManager._EffectEntry, set[str]]] = []
+        new_effects: list[EffectManager._EffectEntry] = []
         for entry in self._effects:
             remaining = tuple(k for k in entry.keys if k not in scope_key_set)
             if len(remaining) < len(entry.keys):
-                self._notify_listeners(f"{entry.name}.stop", scope_key_set, entry.receipt)
+                stopped.append((entry, scope_key_set))
             if remaining:
                 entry.keys = remaining
                 self._update_output_buffers(entry)
                 new_effects.append(entry)
+        self._stop_entries(stopped, new_effects)
         self._effects = new_effects
 
     def set_effect(
@@ -269,12 +311,14 @@ class EffectManager(EffectControls):
 
     def stop_effect_by_receipt(self, receipt: EffectReceipt) -> None:
         """Stop the single effect identified by receipt; silent no-op if not found."""
-        new_effects = []
+        stopped: list[tuple[EffectManager._EffectEntry, set[str]]] = []
+        new_effects: list[EffectManager._EffectEntry] = []
         for entry in self._effects:
             if entry.receipt is receipt:
-                self._notify_listeners(f"{entry.name}.stop", set(entry.keys), entry.receipt)
+                stopped.append((entry, set(entry.keys)))
             else:
                 new_effects.append(entry)
+        self._stop_entries(stopped, new_effects)
         self._effects = new_effects
 
     def stop_effect(self, scope: ScopeValue) -> None:

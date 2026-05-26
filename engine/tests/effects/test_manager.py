@@ -868,6 +868,78 @@ def test_update_calls_show_pixels_on_all_outputs_each_tick() -> None:
     assert len(output_b.show_pixels_calls) == 1
 
 
+# ---------------------------------------------------------------------------
+# clear_pixels — issue #139
+# ---------------------------------------------------------------------------
+
+
+def test_stop_effect_calls_clear_pixels_when_last_effect_stops(pack_env) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert output.clear_pixels_calls == ["personal"]
+
+
+def test_stop_effect_by_receipt_calls_clear_pixels_when_last_effect_stops(pack_env) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    manager.stop_effect_by_receipt(receipt)
+
+    assert output.clear_pixels_calls == ["personal"]
+
+
+def test_stop_effect_by_receipt_does_not_call_clear_pixels_when_layered_effect_remains(
+    pack_env,
+) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    fire_receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
+    manager.stop_effect_by_receipt(fire_receipt)
+
+    assert output.clear_pixels_calls == []
+
+
+def test_clear_pixels_fires_for_narrowed_key_with_no_remaining_coverage(pack_env) -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_personal, output_directional],
+    )
+
+    manager.add_effect(Scope.ALL, "stub.fire", 5, {})
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert output_personal.clear_pixels_calls == ["personal"]
+    assert output_directional.clear_pixels_calls == []
+
+
+def test_clear_pixels_not_fired_for_key_still_covered_after_narrowing(pack_env) -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_personal, output_directional],
+    )
+
+    manager.add_effect(Scope.ALL, "stub.fire", 5, {})
+    manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
+    manager.stop_effect(Scope.PERSONAL)
+
+    # fire still covers directional; ice and fire(personal) both stopped
+    # personal is now covered by nothing → clear
+    # directional still covered by fire → no clear
+    assert output_personal.clear_pixels_calls == ["personal"]
+    assert output_directional.clear_pixels_calls == []
+
+
 def test_update_calls_show_pixels_even_when_effects_are_active(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])

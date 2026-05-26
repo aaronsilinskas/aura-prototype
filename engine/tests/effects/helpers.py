@@ -17,6 +17,7 @@ class SpyEffectOutput(EffectOutput):
         self.create_buffer_key_calls: list = []
         self.handle_event_calls: list = []
         self.show_pixels_calls: list = []
+        self.clear_pixels_calls: list = []
 
     def handle_event(
         self, event_name: str, scope_keys: frozenset[str], receipt: EffectReceipt
@@ -36,6 +37,9 @@ class SpyEffectOutput(EffectOutput):
 
     def show_pixels(self) -> None:
         self.show_pixels_calls.append(True)
+
+    def clear_pixels(self, scope_key: str) -> None:
+        self.clear_pixels_calls.append(scope_key)
 
 
 class StubEffectBuilder(EffectBuilder):
