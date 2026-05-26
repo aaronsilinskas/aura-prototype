@@ -23,14 +23,14 @@ class EffectOutput:
         raise NotImplementedError
 
     def update_pixels(
-        self, scope_key: str, frames: list[tuple[PixelBuffer, EffectReceipt]]
+        self, scope_key: str, buffers: list[PixelBuffer], receipts: list[EffectReceipt]
     ) -> None:
         """Receive rendered frames for this output for a single scope key.
 
-        Called once per registered scope key per tick. ``frames`` is a list of
-        ``(PixelBuffer, EffectReceipt)`` tuples ordered by effect start time
-        (oldest first). Receives an empty list when no effects are active for
-        that key (go-dark signal).
+        Called once per registered scope key per tick. ``buffers`` and
+        ``receipts`` are parallel lists ordered by effect start time (oldest
+        first). Both are empty when no effects are active for that key
+        (go-dark signal).
         """
         pass
 
@@ -124,7 +124,8 @@ class EffectManager(EffectControls):
 
     __slots__ = (
         "_effects",
-        "_key_frames",
+        "_frame_bufs",
+        "_frame_receipts",
         "_next_id",
         "_output_key_sets",
         "_outputs",
@@ -143,7 +144,10 @@ class EffectManager(EffectControls):
         ]
         # Pre-allocated per-output frame accumulators — cleared and reused each tick
         # to avoid dict/list allocation in the hot path.
-        self._key_frames: list[dict[str, list[tuple[PixelBuffer, EffectReceipt]]]] = [
+        self._frame_bufs: list[dict[str, list[PixelBuffer]]] = [
+            {k: [] for k in key_set} for key_set in self._output_key_sets
+        ]
+        self._frame_receipts: list[dict[str, list[EffectReceipt]]] = [
             {k: [] for k in key_set} for key_set in self._output_key_sets
         ]
 
@@ -340,22 +344,25 @@ class EffectManager(EffectControls):
             entry.renderer.update(entry.state, self._timer)
 
         # Pass 2: render and deliver per-key frames to each output.
-        # Every registered key receives a call; empty list signals go-dark.
-        # key_frames lists are pre-allocated in __init__ and cleared here to avoid
-        # per-frame dict/list allocation. Note: (buf, receipt) tuples still allocate
-        # per rendered key — eliminating them requires an update_pixels API change.
+        # Every registered key receives a call; empty lists signal go-dark.
+        # _frame_bufs and _frame_receipts are pre-allocated in __init__ and cleared
+        # here — no new objects in steady state after warmup.
         for i, output in enumerate(self._outputs):
-            key_frames = self._key_frames[i]
-            for frame_list in key_frames.values():
-                frame_list.clear()
+            frame_bufs = self._frame_bufs[i]
+            frame_receipts = self._frame_receipts[i]
+            for buf_list in frame_bufs.values():
+                buf_list.clear()
+            for receipt_list in frame_receipts.values():
+                receipt_list.clear()
             for entry in self._effects:
                 buf_dict = entry.output_buffers[i]
                 if buf_dict is not None:
                     for k, buf in buf_dict.items():
                         entry.renderer.render(entry.state, buf)
-                        key_frames[k].append((buf, entry.receipt))
-            for key, frames in key_frames.items():
-                output.update_pixels(key, frames)
+                        frame_bufs[k].append(buf)
+                        frame_receipts[k].append(entry.receipt)
+            for key in frame_bufs:
+                output.update_pixels(key, frame_bufs[key], frame_receipts[key])
             output.show_pixels()
 
     def __repr__(self) -> str:
