@@ -23,7 +23,16 @@ try:
 except ImportError:
     pass
 
-MODULE_DIRS: "Final" = ["effects", "engine", "magic", "packs", "rules", "scenes"]
+MODULE_DIRS: "Final" = [
+    "effects",
+    "engine",
+    "hardware/circuitpython",
+    "hardware/shared",
+    "magic",
+    "packs",
+    "rules",
+    "scenes",
+]
 _EXCLUDE_DIRS: "Final" = {"__pycache__", "tests"}
 _EXCLUDE_NAMES: "Final" = {"conftest.py"}
 _EXCLUDE_SUFFIXES: "Final" = {".pyc", ".mpy"}
@@ -70,6 +79,29 @@ def _should_skip(src: Path, dest: Path) -> bool:
     if not dest.exists():
         return False
     return dest.stat().st_mtime >= src.stat().st_mtime - 2
+
+
+def _copy_intermediate_inits(
+    module: str,
+    source_root: Path,
+    mount: Path,
+    copied: "list[Path]",
+    skipped: "list[Path]",
+    dry_run: bool,
+) -> None:
+    """Copy ``__init__.py`` for each intermediate package in a sub-package path.
+
+    For a module path like ``hardware/shared``, copies
+    ``<source_root>/hardware/__init__.py`` to ``<mount>/hardware/__init__.py``
+    so Python can import from the sub-package on the device.
+    """
+    parts = Path(module).parts
+    for i in range(len(parts) - 1):
+        pkg_path = Path(*parts[: i + 1])
+        src_init = source_root / pkg_path / "__init__.py"
+        if src_init.exists():
+            label = str(pkg_path / "__init__.py")
+            _sync_file(src_init, mount / pkg_path / "__init__.py", label, copied, skipped, dry_run)
 
 
 def _sync_file(
@@ -140,6 +172,8 @@ def deploy(
         dest_dir = mount / module
 
         if src_dir.is_dir():
+            if "/" in module:
+                _copy_intermediate_inits(module, source_root, mount, copied, skipped, dry_run)
             for src_file in sorted(src_dir.rglob("*")):
                 if src_file.is_dir():
                     continue
