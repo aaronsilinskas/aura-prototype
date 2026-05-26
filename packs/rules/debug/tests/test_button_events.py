@@ -6,8 +6,8 @@ from packs.rules.debug.button_events import ButtonEventsRule
 _GROUP = EventGroup("test")
 
 
-def _make_input(states: dict[str, int]) -> InputEvents.ButtonAndMovement:
-    return InputEvents.ButtonAndMovement(ButtonData(states=states))
+def _make_input(states: dict[str, int]) -> InputEvents.ButtonAndAcceleration:
+    return InputEvents.ButtonAndAcceleration(ButtonData(states=states))
 
 
 def test_button_pressed_state_triggers_mapped_event(fixture: EngineFixture):

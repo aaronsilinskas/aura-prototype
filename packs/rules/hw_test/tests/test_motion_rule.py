@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from engine.engine import GameEngine
-from engine.input import ButtonData, InputEvents, MovementData
+from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.state import GameState, SceneControls, Scope
 from packs.rules.hw_test.motion_rule import (
     ACCEL_MAX,
@@ -37,8 +37,8 @@ def _make_state(spy: SpyEffectControls, hw_mode: int) -> tuple[GameState, GameEn
     return state, engine
 
 
-def _fire(state: GameState, engine: GameEngine, movement: MovementData) -> None:
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={}), movement))
+def _fire(state: GameState, engine: GameEngine, acceleration: AccelerationData | None) -> None:
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={}), acceleration))
     engine.update(state)
 
 
@@ -49,19 +49,25 @@ def _fire(state: GameState, engine: GameEngine, movement: MovementData) -> None:
 
 def test_motion_rule_is_noop_when_hw_mode_is_0(spy):
     state, engine = _make_state(spy, hw_mode=0)
-    _fire(state, engine, MovementData(x_accel=ACCEL_MAX, y_accel=ACCEL_MAX, z_accel=ACCEL_MAX))
+    _fire(state, engine, AccelerationData(x=ACCEL_MAX, y=ACCEL_MAX, z=ACCEL_MAX))
     assert spy.set_effect_calls == []
 
 
 def test_motion_rule_is_noop_when_hw_mode_is_2(spy):
     state, engine = _make_state(spy, hw_mode=2)
-    _fire(state, engine, MovementData(x_accel=ACCEL_MAX))
+    _fire(state, engine, AccelerationData(x=ACCEL_MAX))
     assert spy.set_effect_calls == []
 
 
 def test_motion_rule_is_noop_when_hw_mode_is_3(spy):
     state, engine = _make_state(spy, hw_mode=3)
-    _fire(state, engine, MovementData(z_accel=ACCEL_MAX))
+    _fire(state, engine, AccelerationData(z=ACCEL_MAX))
+    assert spy.set_effect_calls == []
+
+
+def test_motion_rule_is_noop_when_acceleration_is_none(spy):
+    state, engine = _make_state(spy, hw_mode=1)
+    _fire(state, engine, None)
     assert spy.set_effect_calls == []
 
 
@@ -72,7 +78,7 @@ def test_motion_rule_is_noop_when_hw_mode_is_3(spy):
 
 def test_x_axis_max_positive_sets_level_10_red_on_personal(spy):
     state, engine = _make_state(spy, hw_mode=1)
-    _fire(state, engine, MovementData(x_accel=ACCEL_MAX))
+    _fire(state, engine, AccelerationData(x=ACCEL_MAX))
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
     assert len(x_calls) == 1
@@ -85,7 +91,7 @@ def test_x_axis_max_positive_sets_level_10_red_on_personal(spy):
 
 def test_x_axis_max_negative_sets_level_10_cyan_on_personal(spy):
     state, engine = _make_state(spy, hw_mode=1)
-    _fire(state, engine, MovementData(x_accel=-ACCEL_MAX))
+    _fire(state, engine, AccelerationData(x=-ACCEL_MAX))
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
     assert len(x_calls) == 1
@@ -102,7 +108,7 @@ def test_x_axis_max_negative_sets_level_10_cyan_on_personal(spy):
 
 def test_y_axis_max_positive_sets_level_10_green_on_directional(spy):
     state, engine = _make_state(spy, hw_mode=1)
-    _fire(state, engine, MovementData(y_accel=ACCEL_MAX))
+    _fire(state, engine, AccelerationData(y=ACCEL_MAX))
 
     y_calls = [c for c in spy.set_effect_calls if c[0] == Scope.DIRECTIONAL]
     assert len(y_calls) == 1
@@ -115,7 +121,7 @@ def test_y_axis_max_positive_sets_level_10_green_on_directional(spy):
 
 def test_y_axis_max_negative_sets_level_10_magenta_on_directional(spy):
     state, engine = _make_state(spy, hw_mode=1)
-    _fire(state, engine, MovementData(y_accel=-ACCEL_MAX))
+    _fire(state, engine, AccelerationData(y=-ACCEL_MAX))
 
     y_calls = [c for c in spy.set_effect_calls if c[0] == Scope.DIRECTIONAL]
     assert len(y_calls) == 1
@@ -132,7 +138,7 @@ def test_y_axis_max_negative_sets_level_10_magenta_on_directional(spy):
 
 def test_z_axis_max_positive_sets_level_10_blue_on_global_all(spy):
     state, engine = _make_state(spy, hw_mode=1)
-    _fire(state, engine, MovementData(z_accel=ACCEL_MAX))
+    _fire(state, engine, AccelerationData(z=ACCEL_MAX))
 
     z_calls = [c for c in spy.set_effect_calls if c[0] == Scope.Global.ALL]
     assert len(z_calls) == 1
@@ -145,7 +151,7 @@ def test_z_axis_max_positive_sets_level_10_blue_on_global_all(spy):
 
 def test_z_axis_max_negative_sets_level_10_yellow_on_global_all(spy):
     state, engine = _make_state(spy, hw_mode=1)
-    _fire(state, engine, MovementData(z_accel=-ACCEL_MAX))
+    _fire(state, engine, AccelerationData(z=-ACCEL_MAX))
 
     z_calls = [c for c in spy.set_effect_calls if c[0] == Scope.Global.ALL]
     assert len(z_calls) == 1
@@ -162,7 +168,7 @@ def test_z_axis_max_negative_sets_level_10_yellow_on_global_all(spy):
 
 def test_zero_acceleration_on_all_axes_sets_level_1(spy):
     state, engine = _make_state(spy, hw_mode=1)
-    _fire(state, engine, MovementData(x_accel=0.0, y_accel=0.0, z_accel=0.0))
+    _fire(state, engine, AccelerationData(x=0.0, y=0.0, z=0.0))
 
     assert len(spy.set_effect_calls) == 3
     levels = [c[2] for c in spy.set_effect_calls]
@@ -176,7 +182,7 @@ def test_zero_acceleration_on_all_axes_sets_level_1(spy):
 
 def test_half_max_x_accel_produces_level_5(spy):
     state, engine = _make_state(spy, hw_mode=1)
-    _fire(state, engine, MovementData(x_accel=ACCEL_MAX / 2))
+    _fire(state, engine, AccelerationData(x=ACCEL_MAX / 2))
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
     assert x_calls[0][2] == 5
@@ -184,7 +190,7 @@ def test_half_max_x_accel_produces_level_5(spy):
 
 def test_all_three_axes_fire_on_each_tick(spy):
     state, engine = _make_state(spy, hw_mode=1)
-    _fire(state, engine, MovementData(x_accel=ACCEL_MAX, y_accel=ACCEL_MAX, z_accel=ACCEL_MAX))
+    _fire(state, engine, AccelerationData(x=ACCEL_MAX, y=ACCEL_MAX, z=ACCEL_MAX))
 
     scopes = [c[0] for c in spy.set_effect_calls]
     assert Scope.PERSONAL in scopes

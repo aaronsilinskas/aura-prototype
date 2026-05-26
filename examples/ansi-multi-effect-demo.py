@@ -9,7 +9,7 @@ from effects.render import PixelBuffer
 from engine.effects.manager import EffectManager, EffectOutput
 from engine.engine import GameEngine, GameRule, Version
 from engine.events import Event
-from engine.input import ButtonData, InputEvents, MovementData
+from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.packs import PackRegistry
 from engine.state import GameState, SceneControls, Scope
 from engine.timer import Timer
@@ -85,7 +85,7 @@ class MakeEffectRule(GameRule):
         super().__init__("make_effect", Version(1, 0))
 
     def handle_event(self, event: Event, state: GameState) -> None:
-        if isinstance(event, InputEvents.ButtonAndMovement):
+        if isinstance(event, InputEvents.ButtonAndAcceleration):
             button_data = event.buttons
             if button_data.states["A"] == ButtonData.PRESSED:
                 state.effect_controls.add_effect(Scope.PERSONAL, "elements.fire", 5, {})
@@ -99,10 +99,10 @@ class MakeEffectRule(GameRule):
 
 game_engine.add_rules(MakeEffectRule())
 
-_default_movement = MovementData(x_accel=0.0, y_accel=9.8, z_accel=0.0)
+_default_acceleration = AccelerationData(x=0.0, y=9.8, z=0.0)
 
 
-def _make_event(key: str | None) -> InputEvents.ButtonAndMovement:
+def _make_event(key: str | None) -> InputEvents.ButtonAndAcceleration:
     if key in ("a", "A"):
         states = {
             "A": ButtonData.PRESSED,
@@ -133,7 +133,7 @@ def _make_event(key: str | None) -> InputEvents.ButtonAndMovement:
         }
     else:
         states = {"A": ButtonData.UP, "B": ButtonData.UP, "C": ButtonData.UP, "D": ButtonData.UP}
-    return InputEvents.ButtonAndMovement(ButtonData(states=states), _default_movement)
+    return InputEvents.ButtonAndAcceleration(ButtonData(states=states), _default_acceleration)
 
 
 def main() -> None:

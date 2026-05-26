@@ -61,9 +61,9 @@ class HwTestModeRule(GameRule):
 
     def __init__(self) -> None:
         super().__init__("hw_test.mode", _VERSION)
-        self.on(InputEvents.ButtonAndMovement, self._handle)
+        self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
-    def _handle(self, event: InputEvents.ButtonAndMovement, state: GameState) -> None:
+    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
         # First-tick init: initialise mode from initial_mode
         if "hw_mode" not in state:
             mode = state.pop("initial_mode", int)
