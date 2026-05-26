@@ -69,14 +69,9 @@ def _make_timer() -> Timer:
 # ---------------------------------------------------------------------------
 
 
-def test_effect_manager_accepts_registry_and_outputs() -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-
-    EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
-
-
-def test_effect_manager_accepts_empty_outputs_list() -> None:
-    EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[])
+def test_manager_with_no_outputs_updates_without_error() -> None:
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[])
+    manager.update(_make_timer())
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +99,7 @@ def test_update_with_no_effects_sends_go_dark_to_all_outputs() -> None:
     assert output_b.update_pixels_calls == [("directional", [])]
 
 
-def test_update_called_twice_notifies_output_each_tick() -> None:
+def test_update_delivers_frames_to_output_on_every_tick() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
 
@@ -343,6 +338,19 @@ def test_add_effect_on_empty_scope_delivers_one_frame(pack_env) -> None:
     assert len(output.update_pixels_calls[0][1]) == 1
 
 
+def test_frames_for_stacked_effects_are_ordered_oldest_first(pack_env) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    receipt_fire = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    receipt_ice = manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
+    manager.update(_make_timer())
+
+    _, frames = output.update_pixels_calls[0]
+    assert frames[0][1] is receipt_fire
+    assert frames[1][1] is receipt_ice
+
+
 # ---------------------------------------------------------------------------
 # stop_effect — slice 5
 # ---------------------------------------------------------------------------
@@ -409,7 +417,7 @@ def test_shared_renderer_advanced_once_per_frame_for_composite_scope(pack_env) -
     assert fire_builder.created[0].update_count == 1
 
 
-def test_each_output_receives_own_buffer_for_composite_scope(pack_env) -> None:
+def test_each_output_receives_one_frame_for_composite_scope(pack_env) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
@@ -422,6 +430,19 @@ def test_each_output_receives_own_buffer_for_composite_scope(pack_env) -> None:
 
     assert len(output_personal.update_pixels_calls[0][1]) == 1
     assert len(output_directional.update_pixels_calls[0][1]) == 1
+
+
+def test_each_output_gets_distinct_buffer_for_composite_scope(pack_env) -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_personal, output_directional],
+    )
+
+    manager.set_effect(Scope.ALL, "stub.fire", 5, {})
+    manager.update(_make_timer())
+
     personal_buf, _ = output_personal.update_pixels_calls[0][1][0]
     directional_buf, _ = output_directional.update_pixels_calls[0][1][0]
     assert personal_buf is not directional_buf
@@ -858,7 +879,6 @@ def test_update_calls_show_pixels_even_when_effects_are_active(pack_env) -> None
 
 
 def test_update_calls_show_pixels_after_update_pixels_each_tick() -> None:
-    """show_pixels must be called after update_pixels on the same output."""
     call_order: list[str] = []
 
     class OrderTrackingOutput(SpyEffectOutput):
@@ -948,3 +968,20 @@ def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_env) -> None:
     # → personal output must NOT receive it after narrowing
     assert not any(c[0] == "lightning_strike" for c in output_personal.handle_event_calls)
     assert any(c[0] == "lightning_strike" for c in output_directional.handle_event_calls)
+
+
+# ---------------------------------------------------------------------------
+# per-key update_pixels — issue #138
+# ---------------------------------------------------------------------------
+
+
+def test_update_pixels_called_once_per_registered_key_for_multi_key_output(pack_env) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL, Scope.DIRECTIONAL])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    manager.set_effect(Scope.ALL, "stub.fire", 5, {})
+    manager.update(_make_timer())
+
+    called_keys = [key for key, _ in output.update_pixels_calls]
+    assert set(called_keys) == {"personal", "directional"}
+    assert len(called_keys) == 2  # exactly one call per key, no duplicates
