@@ -96,24 +96,24 @@ _registry.scan_dir("packs/effects", "packs.effects")
 class ButtonEffectRule(GameRule):
     def __init__(self):
         super().__init__("button_effects", Version(1, 0))
+        self.on(InputEvents.ButtonAndMovement, self._on_buttons)
 
-    def handle_event(self, event, state):
-        if isinstance(event, InputEvents.ButtonAndMovement):
-            button_data = event.buttons
-            if button_data.states["A"] == ButtonData.PRESSED:
-                page = (state.get("demo_page", 0) + 1) % 2
-                level = state.get("demo_level", 1)
-                state.set("demo_page", page)
-                for scope, name in _ELEMENT_PAGES[page]:
-                    state.effect_controls.set_effect(scope, name, level, {})
-            elif button_data.states["B"] == ButtonData.PRESSED:
-                page = state.get("demo_page", 0)
-                level = state.get("demo_level", 1) + 1
-                if level > 10:
-                    level = 1
-                state.set("demo_level", level)
-                for scope, name in _ELEMENT_PAGES[page]:
-                    state.effect_controls.set_effect(scope, name, level, {})
+    def _on_buttons(self, event, state):
+        button_data = event.buttons
+        if button_data.states["A"] == ButtonData.PRESSED:
+            page = (state.get("demo_page", 0) + 1) % 2
+            level = state.get("demo_level", 1)
+            state.set("demo_page", page)
+            for scope, name in _ELEMENT_PAGES[page]:
+                state.effect_controls.set_effect(scope, name, level, {})
+        elif button_data.states["B"] == ButtonData.PRESSED:
+            page = state.get("demo_page", 0)
+            level = state.get("demo_level", 1) + 1
+            if level > 10:
+                level = 1
+            state.set("demo_level", level)
+            for scope, name in _ELEMENT_PAGES[page]:
+                state.effect_controls.set_effect(scope, name, level, {})
 
 
 effect_output = IS31FL3741EffectOutput(_matrix)
