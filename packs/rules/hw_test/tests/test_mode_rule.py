@@ -40,7 +40,7 @@ def spy() -> SpyEffectControls:
 
 def _press_button(state: GameState, button: str) -> None:
     state.queue_event(
-        InputEvents.ButtonAndMovement(ButtonData(states={button: ButtonData.PRESSED}))
+        InputEvents.ButtonAndAcceleration(ButtonData(states={button: ButtonData.PRESSED}))
     )
 
 
@@ -63,7 +63,7 @@ def _make_state_with_rule(
 
 def test_first_tick_sets_hw_mode_from_initial_mode(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     assert state.get("hw_mode", None) == 0
@@ -72,7 +72,7 @@ def test_first_tick_sets_hw_mode_from_initial_mode(spy):
 
 def test_first_tick_starts_rgb_idle_effects(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     # Expect 5 set_effect calls for RGB mode entry
@@ -86,7 +86,7 @@ def test_first_tick_starts_rgb_idle_effects(spy):
 
 def test_first_tick_sets_rgb_level_in_state_data(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     assert state.get("rgb_level", None) == 1
@@ -94,7 +94,7 @@ def test_first_tick_sets_rgb_level_in_state_data(spy):
 
 def test_first_tick_imu_mode_starts_solid_effects(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 1})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     assert state.get("hw_mode", None) == 1
@@ -106,7 +106,7 @@ def test_first_tick_imu_mode_starts_solid_effects(spy):
 
 def test_first_tick_ir_mode_starts_white_solid_effects(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     assert state.get("hw_mode", None) == 2
@@ -116,7 +116,7 @@ def test_first_tick_ir_mode_starts_white_solid_effects(spy):
 
 def test_first_tick_radio_mode_starts_white_solid_effects(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 3})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     assert state.get("hw_mode", None) == 3
@@ -132,7 +132,7 @@ def test_first_tick_radio_mode_starts_white_solid_effects(spy):
 def test_button_b_advances_mode_from_rgb_to_imu(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
     # First tick initialises mode
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
 
@@ -144,7 +144,7 @@ def test_button_b_advances_mode_from_rgb_to_imu(spy):
 
 def test_button_b_cycles_mode_through_0_1_2_3_and_back_to_0(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     for expected_mode in [1, 2, 3, 0]:
@@ -155,7 +155,7 @@ def test_button_b_cycles_mode_through_0_1_2_3_and_back_to_0(spy):
 
 def test_button_b_stops_all_effects_before_starting_new_mode(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.stop_effect_calls.clear()
 
@@ -167,7 +167,7 @@ def test_button_b_stops_all_effects_before_starting_new_mode(spy):
 
 def test_button_b_clears_flash_keys_on_mode_change(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     state.set("ir_flash_receipt", object())
     state.set("ir_flash_start", 1.0)
@@ -190,7 +190,7 @@ def test_button_b_clears_flash_keys_on_mode_change(spy):
 
 def test_button_a_in_rgb_mode_increments_level(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
 
@@ -202,7 +202,7 @@ def test_button_a_in_rgb_mode_increments_level(spy):
 
 def test_button_a_in_rgb_mode_wraps_level_from_10_to_1(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     state.set("rgb_level", 10)
     spy.set_effect_calls.clear()
@@ -215,7 +215,7 @@ def test_button_a_in_rgb_mode_wraps_level_from_10_to_1(spy):
 
 def test_button_a_in_rgb_mode_calls_set_effect_on_all_five_scopes(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
 
@@ -230,7 +230,7 @@ def test_button_a_in_rgb_mode_calls_set_effect_on_all_five_scopes(spy):
 
 def test_button_a_in_imu_mode_is_noop(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 1})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
     spy.stop_effect_calls.clear()
@@ -244,7 +244,7 @@ def test_button_a_in_imu_mode_is_noop(spy):
 
 def test_button_a_in_ir_mode_queues_ir_received_event(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     captured_events = []
@@ -268,7 +268,7 @@ def test_button_a_in_ir_mode_queues_ir_received_event(spy):
 
 def test_button_a_in_radio_mode_queues_radio_received_event(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 3})
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     captured_events = []
@@ -299,7 +299,7 @@ def test_button_a_in_radio_mode_queues_radio_received_event(spy):
 def test_ir_flash_expires_and_restarts_directional_idle(spy):
     timer = _StubTimer()
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2}, timer=timer)
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     receipt = EffectReceipt(42)
@@ -310,7 +310,7 @@ def test_ir_flash_expires_and_restarts_directional_idle(spy):
     spy.set_effect_calls.clear()
     spy.stop_effect_by_receipt_calls.clear()
 
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     assert receipt in spy.stop_effect_by_receipt_calls
@@ -324,7 +324,7 @@ def test_ir_flash_expires_and_restarts_directional_idle(spy):
 def test_radio_flash_expires_and_restarts_global_all_idle(spy):
     timer = _StubTimer()
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 3}, timer=timer)
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     receipt = EffectReceipt(99)
@@ -334,7 +334,7 @@ def test_radio_flash_expires_and_restarts_global_all_idle(spy):
     spy.set_effect_calls.clear()
     spy.stop_effect_by_receipt_calls.clear()
 
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     assert receipt in spy.stop_effect_by_receipt_calls
@@ -347,7 +347,7 @@ def test_radio_flash_expires_and_restarts_global_all_idle(spy):
 def test_ir_flash_does_not_expire_before_duration(spy):
     timer = _StubTimer()
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2}, timer=timer)
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     receipt = EffectReceipt(7)
@@ -356,7 +356,7 @@ def test_ir_flash_does_not_expire_before_duration(spy):
     timer.total = FLASH_DURATION - 0.01
     spy.stop_effect_by_receipt_calls.clear()
 
-    state.queue_event(InputEvents.ButtonAndMovement(ButtonData(states={})))
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     assert receipt not in spy.stop_effect_by_receipt_calls

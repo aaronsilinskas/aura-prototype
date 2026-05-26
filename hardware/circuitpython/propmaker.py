@@ -12,7 +12,7 @@ Typical usage::
     matrix = propmaker.setup_matrix_is31fl3741(i2c)
     buttons = propmaker.setup_buttons(board.D9, board.D10, board.D11, board.D12)
     propmaker.setup_external_power()
-    imu = propmaker.setup_imu(i2c)  # None if IMU absent
+    accelerometer = propmaker.setup_accelerometer(i2c)  # None if absent
 """
 
 import time
@@ -65,11 +65,22 @@ def setup_external_power():
     power.switch_to_output(value=True)
 
 
-def setup_imu(i2c):
-    """Return a configured LIS3DH IMU on *i2c*, or ``None`` if absent."""
+def setup_accelerometer(i2c):
+    """Return a configured LIS3DH accelerometer on *i2c*, or ``None`` if absent.
+
+    Prints a distinct warning depending on the failure mode:
+    - ``"accelerometer library not installed"`` when ``adafruit_lis3dh`` cannot
+      be imported.
+    - ``"accelerometer not found on I2C bus"`` when the library is present but
+      the sensor cannot be reached.
+    """
     try:
         import adafruit_lis3dh
-
+    except ImportError:
+        print("accelerometer library not installed")
+        return None
+    try:
         return adafruit_lis3dh.LIS3DH_I2C(i2c)
     except Exception:
+        print("accelerometer not found on I2C bus")
         return None

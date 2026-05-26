@@ -35,26 +35,24 @@ class ButtonData:
         return f"ButtonData({parts})"
 
 
-class MovementData:
+class AccelerationData:
     """Snapshot of accelerometer readings at a point in time. Unit of measure is meters per second
     squared (m/s^2).
 
-    Axes follow the device's local coordinate system. Use the
-    ``NO_MOVEMENT`` sentinel when movement data is unavailable.
+    Axes follow the device's local coordinate system. When no accelerometer is
+    present or a read fails, use ``None`` rather than an ``AccelerationData``
+    instance — ``None`` signals "no sensor data", not "device at rest".
     """
 
-    __slots__ = ("x_accel", "y_accel", "z_accel")
+    __slots__ = ("x", "y", "z")
 
-    def __init__(self, x_accel: float = 0.0, y_accel: float = 0.0, z_accel: float = 0.0) -> None:
-        self.x_accel = x_accel
-        self.y_accel = y_accel
-        self.z_accel = z_accel
+    def __init__(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> None:
+        self.x = x
+        self.y = y
+        self.z = z
 
     def __str__(self) -> str:
-        return f"MovementData(x={self.x_accel}, y={self.y_accel}, z={self.z_accel})"
-
-
-NO_MOVEMENT: "Final" = MovementData()
+        return f"AccelerationData(x={self.x}, y={self.y}, z={self.z})"
 
 
 class InputEvents:
@@ -62,16 +60,18 @@ class InputEvents:
 
     GROUP: "Final" = EventGroup("in")
 
-    class ButtonAndMovement(Event):
-        """Event carrying a button state snapshot and optional movement data.
+    class ButtonAndAcceleration(Event):
+        """Event carrying a button state snapshot and optional acceleration data.
 
-        Fired each input poll cycle. ``movement`` defaults to ``NO_MOVEMENT``
-        when the device has no accelerometer or motion is not being tracked.
+        Fired each input poll cycle. ``acceleration`` is ``None`` when the
+        device has no accelerometer or when a transient read failure occurs.
         """
 
-        __slots__ = ("buttons", "movement")
+        __slots__ = ("acceleration", "buttons")
 
-        def __init__(self, buttons: ButtonData, movement: MovementData = NO_MOVEMENT) -> None:
-            super().__init__(InputEvents.GROUP, "button_and_movement")
+        def __init__(
+            self, buttons: ButtonData, acceleration: "AccelerationData | None" = None
+        ) -> None:
+            super().__init__(InputEvents.GROUP, "button_and_acceleration")
             self.buttons = buttons
-            self.movement = movement
+            self.acceleration = acceleration

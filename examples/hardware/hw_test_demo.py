@@ -1,16 +1,17 @@
 """Hardware verification demo — hw_test scene on RP2040 PropMaker + IS31FL3741.
 
 Loads the ``hw_test`` scene via ``SceneManager`` so every hardware subsystem
-(LEDs, buttons, IMU, IR transceiver, radio) can be exercised through the same
-scene logic used in production.  The ``debug`` rules pack logs every dispatched
-event to the serial console, giving a text trace alongside the visual output.
+(LEDs, buttons, accelerometer, IR transceiver, radio) can be exercised through
+the same scene logic used in production.  The ``debug`` rules pack logs every
+dispatched event to the serial console, giving a text trace alongside the visual
+output.
 
 Hardware
 --------
 - Adafruit RP2040 PropMaker Feather
 - Adafruit IS31FL3741 13×9 RGB LED Matrix Breakout (I2C on default SDA/SCL)
 - Two buttons (pull-up) on BUTTON_A_PIN / BUTTON_B_PIN (default: D9 / D10)
-- LIS3DH or compatible I2C accelerometer on default SDA/SCL
+- LIS3DH I2C accelerometer on default SDA/SCL (shared bus with IS31FL3741)
 - IR transceiver wired to HardwareNetworkControls
 - Radio module wired to HardwareNetworkControls
 
@@ -21,7 +22,7 @@ Installation
 
 2. Copy required libraries to CIRCUITPY/lib/:
      adafruit_is31fl3741/
-     adafruit_lis3dh.mpy   (or substitute your IMU library)
+     adafruit_lis3dh.mpy
 
 3. Run the deploy script to copy all source files and set code.py:
      python scripts/deploy.py examples/hardware/hw_test_demo.py
@@ -33,7 +34,7 @@ Mode 0 — RGB idle
     Five element effects (water, fire, lightning, earth, ice) fill each scope.
     Press A to step the brightness level from 1 → 10 → 1.
 
-Mode 1 — IMU
+Mode 1 — Accelerometer
     Accelerometer axes map to scopes: X → PERSONAL (red/cyan),
     Y → DIRECTIONAL (green/magenta), Z → Global.ALL (blue/yellow).
     Tilt the device to change colours and intensity.
@@ -54,7 +55,7 @@ import board
 import hardware.circuitpython.propmaker as propmaker
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
-from engine.input import ButtonData, InputEvents, MovementData
+from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.network import HardwareNetworkControls
 from engine.packs import PackRegistry
 from engine.scene import SceneManager
@@ -80,7 +81,7 @@ BUTTON_B_PIN: "Final" = board.D10
 _i2c = propmaker.setup_i2c()
 _matrix = propmaker.setup_matrix_is31fl3741(_i2c)
 _button_a, _button_b = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
-_imu = propmaker.setup_imu(_i2c)
+_accelerometer = propmaker.setup_accelerometer(_i2c)
 
 # ---------------------------------------------------------------------------
 # Effect system
@@ -149,22 +150,23 @@ while True:
     _button_prev_a = _cur_a
     _button_prev_b = _cur_b
 
-    # --- Read IMU ---
-    if _imu is not None:
+    # --- Read accelerometer ---
+    if _accelerometer is not None:
         try:
-            _ax, _ay, _az = _imu.acceleration
+            _ax, _ay, _az = _accelerometer.acceleration
+            _acceleration = AccelerationData(_ax, _ay, _az)
         except Exception:
-            _ax, _ay, _az = 0.0, 0.0, 0.0
+            _acceleration = None
     else:
-        _ax, _ay, _az = 0.0, 0.0, 0.0
+        _acceleration = None
 
     # --- Queue combined input event ---
     if _manager._stack:
         _active_state = _manager._stack[-1][1]
         _active_state.queue_event(
-            InputEvents.ButtonAndMovement(
+            InputEvents.ButtonAndAcceleration(
                 ButtonData(_btn_states),
-                MovementData(_ax, _ay, _az),
+                _acceleration,
             )
         )
 

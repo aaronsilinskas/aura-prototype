@@ -25,9 +25,11 @@ class ButtonEventsRule(GameRule):
         self._down = button_down
         self._up = button_up
         self._released = button_released
-        self.on(InputEvents.ButtonAndMovement, self._handle_button_input)
+        self.on(InputEvents.ButtonAndAcceleration, self._handle_button_input)
 
-    def _handle_button_input(self, event: InputEvents.ButtonAndMovement, state: GameState) -> None:
+    def _handle_button_input(
+        self, event: InputEvents.ButtonAndAcceleration, state: GameState
+    ) -> None:
         for button_name, button_state in event.buttons.states.items():
             if button_state == ButtonData.PRESSED:
                 state_map = self._pressed

@@ -34,7 +34,7 @@ import board
 import hardware.circuitpython.propmaker as propmaker
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine, GameRule, Version
-from engine.input import ButtonData, InputEvents, MovementData
+from engine.input import ButtonData, InputEvents
 from engine.packs import PackRegistry
 from engine.state import SceneControls, Scope
 from engine.timer import Timer
@@ -96,7 +96,7 @@ _registry.scan_dir("packs/effects", "packs.effects")
 class ButtonEffectRule(GameRule):
     def __init__(self):
         super().__init__("button_effects", Version(1, 0))
-        self.on(InputEvents.ButtonAndMovement, self._on_buttons)
+        self.on(InputEvents.ButtonAndAcceleration, self._on_buttons)
 
     def _on_buttons(self, event, state):
         button_data = event.buttons
@@ -150,9 +150,7 @@ while True:
         if not _current and _button_prev[_i]:  # falling edge: just pressed
             _states = dict.fromkeys(_BUTTON_NAMES, ButtonData.UP)
             _states[_BUTTON_NAMES[_i]] = ButtonData.PRESSED
-            game_state.queue_event(
-                InputEvents.ButtonAndMovement(ButtonData(_states), MovementData())
-            )
+            game_state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(_states)))
         _button_prev[_i] = _current
 
     game_engine.update(game_state)
