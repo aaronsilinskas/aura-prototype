@@ -44,10 +44,10 @@ class AnsiEffectOutput(EffectOutput):
         self._last_event = event_name
         self._event_count += 1
 
-    def update_pixels(self, scope_key: str, frames: list) -> None:
+    def update_pixels(self, scope_key: str, buffers: list, receipts: list) -> None:
         empty_line = "\r" + "  " * self.PIXEL_COUNT
         lines = []
-        for buf, _ in frames[:MAX_FRAMES]:
+        for buf in buffers[:MAX_FRAMES]:
             parts = []
             for color in buf:
                 r = (color >> 16) & 0xFF

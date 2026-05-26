@@ -954,8 +954,8 @@ def test_update_calls_show_pixels_after_update_pixels_each_tick() -> None:
     call_order: list[str] = []
 
     class OrderTrackingOutput(SpyEffectOutput):
-        def update_pixels(self, scope_key: str, frames: list) -> None:
-            super().update_pixels(scope_key, frames)
+        def update_pixels(self, scope_key: str, buffers: list, receipts: list) -> None:
+            super().update_pixels(scope_key, buffers, receipts)
             call_order.append("update_pixels")
 
         def show_pixels(self) -> None:
