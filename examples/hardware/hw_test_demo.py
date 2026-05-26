@@ -24,7 +24,7 @@ Installation
      adafruit_lis3dh.mpy   (or substitute your IMU library)
 
 3. Run the deploy script to copy all source files and set code.py:
-     python scripts/deploy.py examples/hw_test_demo.py
+     python scripts/deploy.py examples/hardware/hw_test_demo.py
    The board reboots and starts running automatically.
 
 Modes (press Button B to cycle)
@@ -49,20 +49,16 @@ Mode 3 — Radio receive
     returns to the idle solid white.  Console shows ``net.radio_received``.
 """
 
-import adafruit_is31fl3741
 import board
-import busio
-import digitalio
-from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
-from effects.render import PixelBuffer
-from engine.effects.manager import EffectManager, EffectOutput
+import hardware.circuitpython.propmaker as propmaker
+from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.input import ButtonData, InputEvents, MovementData
 from engine.network import HardwareNetworkControls
 from engine.packs import PackRegistry
 from engine.scene import SceneManager
-from engine.state import Scope
+from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from scenes.hw_test.scene import factory as hw_test_factory
 
 try:
@@ -74,86 +70,21 @@ except ImportError:
 # Configuration — adjust to match your wiring
 # ---------------------------------------------------------------------------
 
-_MATRIX_COLS: "Final" = 13
-_MATRIX_ROWS: "Final" = 9
-
 BUTTON_A_PIN: "Final" = board.D9
 BUTTON_B_PIN: "Final" = board.D10
 
 # ---------------------------------------------------------------------------
-# Hardware setup — IS31FL3741 LED matrix
+# Hardware setup
 # ---------------------------------------------------------------------------
 
-i2c = busio.I2C(board.SCL, board.SDA)
-while True:
-    try:
-        is31 = Adafruit_RGBMatrixQT(i2c, allocate=adafruit_is31fl3741.MUST_BUFFER)
-        break
-    except Exception:
-        pass  # retry until matrix responds
-is31.set_led_scaling(0x33)  # Brightness 0 → 0xFF
-is31.global_current = 0xFF  # limit LED current for safe testing; raise for full brightness
-is31.enable = True
-
-# ---------------------------------------------------------------------------
-# Hardware setup — buttons (pull-up: value=False when pressed)
-# ---------------------------------------------------------------------------
-
-_button_a = digitalio.DigitalInOut(BUTTON_A_PIN)
-_button_a.switch_to_input(pull=digitalio.Pull.UP)
-_button_b = digitalio.DigitalInOut(BUTTON_B_PIN)
-_button_b.switch_to_input(pull=digitalio.Pull.UP)
-
-_button_prev_a = True
-_button_prev_b = True
-
-# ---------------------------------------------------------------------------
-# Hardware setup — IMU (optional, shares I2C bus with matrix)
-# ---------------------------------------------------------------------------
-
-_imu = None
-try:
-    import adafruit_lis3dh
-
-    _imu = adafruit_lis3dh.LIS3DH_I2C(i2c)
-except Exception:
-    pass  # IMU absent; movement stays at zero
+_i2c = propmaker.setup_i2c()
+_matrix = propmaker.setup_matrix_is31fl3741(_i2c)
+_button_a, _button_b = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
+_imu = propmaker.setup_imu(_i2c)
 
 # ---------------------------------------------------------------------------
 # Effect system
 # ---------------------------------------------------------------------------
-
-
-class IS31FL3741EffectOutput(EffectOutput):
-    """EffectOutput that drives the IS31FL3741 13×9 RGB LED matrix.
-
-    Mapping: frame ``f`` → matrix row ``f``; pixel ``p`` → matrix column ``p``.
-    Unused rows are cleared to black each tick. ``is31.show()`` is called once
-    after all rows are written.
-    """
-
-    def __init__(self) -> None:
-        self.min_resolution = _MATRIX_COLS
-        self.scopes = [Scope.ALL]
-
-    def create_buffer(self, scope_key: str) -> PixelBuffer:
-        return PixelBuffer(_MATRIX_COLS)
-
-    def update_pixels(self, scope_key: str, buffers: list, receipts: list) -> None:
-        row_count = min(len(buffers), _MATRIX_ROWS)
-
-        for f in range(row_count):
-            buf = buffers[f]
-            for p in range(_MATRIX_COLS):
-                is31.pixel(p, f, buf[p])
-
-        for f in range(row_count, _MATRIX_ROWS):
-            for p in range(_MATRIX_COLS):
-                is31.pixel(p, f, 0)
-
-    def show_pixels(self) -> None:
-        is31.show()
-
 
 _effect_registry = PackRegistry(item_attr="BUILD")
 _effect_registry.scan_dir("packs/effects", "packs.effects")
@@ -163,7 +94,7 @@ _rule_registry.scan_dir("packs/rules", "packs.rules")
 
 _effect_manager = EffectManager(
     registry=_effect_registry,
-    outputs=[IS31FL3741EffectOutput()],
+    outputs=[IS31FL3741EffectOutput(_matrix)],
 )
 
 # ---------------------------------------------------------------------------
@@ -179,6 +110,13 @@ _manager = SceneManager(_engine, _effect_registry, _rule_registry)
 _manager.register("hw_test", hw_test_factory)
 _manager.load("hw_test")
 _manager.update()  # applies the load transition; hw_test scene is now active
+
+# ---------------------------------------------------------------------------
+# Button state tracking
+# ---------------------------------------------------------------------------
+
+_button_prev_a = True
+_button_prev_b = True
 
 # ---------------------------------------------------------------------------
 # Main loop
