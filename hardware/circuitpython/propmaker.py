@@ -11,7 +11,7 @@ Typical usage::
     i2c = propmaker.setup_i2c()
     matrix = propmaker.setup_matrix_is31fl3741(i2c)
     buttons = propmaker.setup_buttons(board.D9, board.D10, board.D11, board.D12)
-    propmaker.setup_amp()
+    propmaker.setup_external_power()
     imu = propmaker.setup_imu(i2c)  # None if IMU absent
 """
 
@@ -58,8 +58,9 @@ def setup_buttons(*pins):
     return buttons
 
 
-def setup_amp():
-    """Enable the PropMaker's on-board audio amplifier power rail."""
+def setup_external_power():
+    """Enable the PropMaker's EXTERNAL_POWER rail (powers NeoPixels, audio amp, and other
+    peripherals)."""
     power = digitalio.DigitalInOut(board.EXTERNAL_POWER)
     power.switch_to_output(value=True)
 
