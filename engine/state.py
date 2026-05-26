@@ -252,12 +252,7 @@ class GameState:
             raise KeyError(key)
         value = self._data[key]
         if not isinstance(value, type_):
-            raise ValueError(
-                "Key '"
-                + key
-                + "' value is not an instance of "
-                + type_.__name__
-            )
+            raise ValueError("Key '" + key + "' value is not an instance of " + type_.__name__)
         del self._data[key]
         return value  # type: ignore[return-value]
 
