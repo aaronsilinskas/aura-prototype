@@ -2,10 +2,10 @@ import sys
 
 import pytest
 
-from engine.effects.manager import EffectBuilder, EffectManager
+from engine.effects.manager import EffectManager
 from engine.packs import PackRegistry
 from engine.state import Scope
-from engine.tests.effects.helpers import SpyEffectOutput
+from engine.tests.effects.helpers import CapturingEffectBuilder, SpyEffectBuilder, SpyEffectOutput
 from engine.timer import Timer
 
 # ---------------------------------------------------------------------------
@@ -69,14 +69,9 @@ def _make_timer() -> Timer:
 # ---------------------------------------------------------------------------
 
 
-def test_effect_manager_accepts_registry_and_outputs() -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-
-    EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
-
-
-def test_effect_manager_accepts_empty_outputs_list() -> None:
-    EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[])
+def test_manager_with_no_outputs_updates_without_error() -> None:
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[])
+    manager.update(_make_timer())
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +85,7 @@ def test_update_with_no_effects_sends_go_dark_to_output() -> None:
 
     manager.update(_make_timer())
 
-    assert output.update_pixels_calls == [[]]
+    assert output.update_pixels_calls == [("personal", [])]
 
 
 def test_update_with_no_effects_sends_go_dark_to_all_outputs() -> None:
@@ -100,11 +95,11 @@ def test_update_with_no_effects_sends_go_dark_to_all_outputs() -> None:
 
     manager.update(_make_timer())
 
-    assert output_a.update_pixels_calls == [[]]
-    assert output_b.update_pixels_calls == [[]]
+    assert output_a.update_pixels_calls == [("personal", [])]
+    assert output_b.update_pixels_calls == [("directional", [])]
 
 
-def test_update_called_twice_notifies_output_each_tick() -> None:
+def test_update_delivers_frames_to_output_on_every_tick() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
 
@@ -126,7 +121,7 @@ def test_set_effect_delivers_one_frame_to_matching_output(pack_env) -> None:
     receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.update(_make_timer())
 
-    assert output.update_pixels_calls == [[(output.created_buffers[0], receipt)]]
+    assert output.update_pixels_calls == [("personal", [(output.created_buffers[0], receipt)])]
 
 
 def test_set_effect_nonmatching_output_receives_go_dark(pack_env) -> None:
@@ -137,7 +132,7 @@ def test_set_effect_nonmatching_output_receives_go_dark(pack_env) -> None:
     manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.update(_make_timer())
 
-    assert output_b.update_pixels_calls == [[]]
+    assert output_b.update_pixels_calls == [("directional", [])]
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +148,7 @@ def test_set_effect_twice_replaces_effect(pack_env) -> None:
     receipt_ice = manager.set_effect(Scope.PERSONAL, "stub.ice", 5, {})
     manager.update(_make_timer())
 
-    assert output.update_pixels_calls == [[(output.created_buffers[1], receipt_ice)]]
+    assert output.update_pixels_calls == [("personal", [(output.created_buffers[1], receipt_ice)])]
 
 
 def test_set_effect_twice_first_renderer_not_advanced(pack_env) -> None:
@@ -169,7 +164,7 @@ def test_set_effect_twice_first_renderer_not_advanced(pack_env) -> None:
 
     manager.set_effect(Scope.PERSONAL, "spy.fire", 5, {})
     manager.set_effect(Scope.PERSONAL, "spy.ice", 5, {})
-    fire_builder = registry.get("spy", "fire", EffectBuilder)
+    fire_builder = registry.get("spy", "fire", SpyEffectBuilder)
     manager.update(_make_timer())
 
     renderer_a = fire_builder.created[0]
@@ -190,7 +185,7 @@ def test_out_of_scope_output_receives_go_dark_each_frame(pack_env) -> None:
     manager.update(_make_timer())
     manager.update(_make_timer())
 
-    assert output_b.update_pixels_calls == [[], []]
+    assert output_b.update_pixels_calls == [("directional", []), ("directional", [])]
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +265,7 @@ def test_resolution_equals_max_min_resolution_of_matching_outputs(pack_env) -> N
 
     manager.set_effect(Scope.PERSONAL, "capture.fire", 5, {})
 
-    builder = registry.get("capture", "fire", EffectBuilder)
+    builder = registry.get("capture", "fire", CapturingEffectBuilder)
     assert builder.last_config.resolution == 64
 
 
@@ -291,7 +286,7 @@ def test_resolution_falls_back_to_default_when_no_outputs_match(pack_env) -> Non
 
     manager.set_effect(Scope.PERSONAL, "capture.fire", 5, {})
 
-    builder = registry.get("capture", "fire", EffectBuilder)
+    builder = registry.get("capture", "fire", CapturingEffectBuilder)
     assert builder.last_config.resolution == 16
 
 
@@ -308,7 +303,7 @@ def test_add_effect_after_set_effect_delivers_two_frames(pack_env) -> None:
     manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
     manager.update(_make_timer())
 
-    assert len(output.update_pixels_calls[0]) == 2
+    assert len(output.update_pixels_calls[0][1]) == 2
 
 
 def test_add_effect_both_renderers_advanced_on_each_update(pack_env) -> None:
@@ -324,8 +319,8 @@ def test_add_effect_both_renderers_advanced_on_each_update(pack_env) -> None:
 
     manager.set_effect(Scope.PERSONAL, "spy.fire", 5, {})
     manager.add_effect(Scope.PERSONAL, "spy.ice", 5, {})
-    fire_builder = registry.get("spy", "fire", EffectBuilder)
-    ice_builder = registry.get("spy", "ice", EffectBuilder)
+    fire_builder = registry.get("spy", "fire", SpyEffectBuilder)
+    ice_builder = registry.get("spy", "ice", SpyEffectBuilder)
     manager.update(_make_timer())
     manager.update(_make_timer())
 
@@ -340,7 +335,20 @@ def test_add_effect_on_empty_scope_delivers_one_frame(pack_env) -> None:
     manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.update(_make_timer())
 
-    assert len(output.update_pixels_calls[0]) == 1
+    assert len(output.update_pixels_calls[0][1]) == 1
+
+
+def test_frames_for_stacked_effects_are_ordered_oldest_first(pack_env) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    receipt_fire = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    receipt_ice = manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
+    manager.update(_make_timer())
+
+    _, frames = output.update_pixels_calls[0]
+    assert frames[0][1] is receipt_fire
+    assert frames[1][1] is receipt_ice
 
 
 # ---------------------------------------------------------------------------
@@ -357,7 +365,7 @@ def test_stop_effect_causes_go_dark_on_next_update(pack_env) -> None:
     manager.stop_effect(Scope.PERSONAL)
     manager.update(_make_timer())
 
-    assert output.update_pixels_calls[1] == []
+    assert output.update_pixels_calls[1][1] == []
 
 
 def test_stop_effect_clears_stacked_effects(pack_env) -> None:
@@ -369,7 +377,7 @@ def test_stop_effect_clears_stacked_effects(pack_env) -> None:
     manager.stop_effect(Scope.PERSONAL)
     manager.update(_make_timer())
 
-    assert output.update_pixels_calls[0] == []
+    assert output.update_pixels_calls[0][1] == []
 
 
 def test_stop_effect_does_not_affect_other_scopes(pack_env) -> None:
@@ -386,7 +394,7 @@ def test_stop_effect_does_not_affect_other_scopes(pack_env) -> None:
     manager.update(_make_timer())
 
     assert output_directional.update_pixels_calls == [
-        [(output_directional.created_buffers[0], receipt_ice)]
+        ("directional", [(output_directional.created_buffers[0], receipt_ice)])
     ]
 
 
@@ -403,13 +411,13 @@ def test_shared_renderer_advanced_once_per_frame_for_composite_scope(pack_env) -
     manager = EffectManager(registry=registry, outputs=[output])
 
     manager.set_effect(Scope.ALL, "spy.fire", 5, {})
-    fire_builder = registry.get("spy", "fire", EffectBuilder)
+    fire_builder = registry.get("spy", "fire", SpyEffectBuilder)
     manager.update(_make_timer())
 
     assert fire_builder.created[0].update_count == 1
 
 
-def test_each_output_receives_own_buffer_for_composite_scope(pack_env) -> None:
+def test_each_output_receives_one_frame_for_composite_scope(pack_env) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(
@@ -420,10 +428,23 @@ def test_each_output_receives_own_buffer_for_composite_scope(pack_env) -> None:
     manager.set_effect(Scope.ALL, "stub.fire", 5, {})
     manager.update(_make_timer())
 
-    assert len(output_personal.update_pixels_calls[0]) == 1
-    assert len(output_directional.update_pixels_calls[0]) == 1
-    personal_buf, _ = output_personal.update_pixels_calls[0][0]
-    directional_buf, _ = output_directional.update_pixels_calls[0][0]
+    assert len(output_personal.update_pixels_calls[0][1]) == 1
+    assert len(output_directional.update_pixels_calls[0][1]) == 1
+
+
+def test_each_output_gets_distinct_buffer_for_composite_scope(pack_env) -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_personal, output_directional],
+    )
+
+    manager.set_effect(Scope.ALL, "stub.fire", 5, {})
+    manager.update(_make_timer())
+
+    personal_buf, _ = output_personal.update_pixels_calls[0][1][0]
+    directional_buf, _ = output_directional.update_pixels_calls[0][1][0]
     assert personal_buf is not directional_buf
 
 
@@ -440,8 +461,8 @@ def test_stop_effect_all_sends_go_dark_to_every_output(pack_env) -> None:
     manager.stop_effect(Scope.ALL)
     manager.update(_make_timer())
 
-    assert output_personal.update_pixels_calls[1] == []
-    assert output_directional.update_pixels_calls[1] == []
+    assert output_personal.update_pixels_calls[1][1] == []
+    assert output_directional.update_pixels_calls[1][1] == []
 
 
 # ---------------------------------------------------------------------------
@@ -462,9 +483,9 @@ def test_set_effect_on_partial_scope_leaves_other_scope_effects_running(pack_env
     manager.set_effect(Scope.PERSONAL, "stub.ice", 5, {})
     manager.update(_make_timer())
 
-    assert len(output_personal.update_pixels_calls[0]) == 1
-    assert len(output_directional.update_pixels_calls[0]) == 1
-    assert len(output_global.update_pixels_calls[0]) == 1
+    assert len(output_personal.update_pixels_calls[0][1]) == 1
+    assert len(output_directional.update_pixels_calls[0][1]) == 1
+    assert len(output_global.update_pixels_calls[0][1]) == 1
 
 
 def test_stop_effect_on_partial_scope_continues_rendering_on_remaining_scope(pack_env) -> None:
@@ -479,8 +500,8 @@ def test_stop_effect_on_partial_scope_continues_rendering_on_remaining_scope(pac
     manager.stop_effect(Scope.PERSONAL)
     manager.update(_make_timer())
 
-    assert output_personal.update_pixels_calls[0] == []
-    assert len(output_directional.update_pixels_calls[0]) == 1
+    assert output_personal.update_pixels_calls[0][1] == []
+    assert len(output_directional.update_pixels_calls[0][1]) == 1
 
 
 def test_stop_effect_with_broader_scope_removes_narrower_effect_completely(pack_env) -> None:
@@ -495,8 +516,8 @@ def test_stop_effect_with_broader_scope_removes_narrower_effect_completely(pack_
     manager.stop_effect(Scope.ALL)
     manager.update(_make_timer())
 
-    assert output_personal.update_pixels_calls[0] == []
-    assert output_directional.update_pixels_calls[0] == []
+    assert output_personal.update_pixels_calls[0][1] == []
+    assert output_directional.update_pixels_calls[0][1] == []
 
 
 def test_add_effect_does_not_stop_effects_already_running_in_scope(pack_env) -> None:
@@ -511,8 +532,8 @@ def test_add_effect_does_not_stop_effects_already_running_in_scope(pack_env) -> 
     manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
     manager.update(_make_timer())
 
-    assert len(output_personal.update_pixels_calls[0]) == 2
-    assert len(output_directional.update_pixels_calls[0]) == 1
+    assert len(output_personal.update_pixels_calls[0][1]) == 2
+    assert len(output_directional.update_pixels_calls[0][1]) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -544,7 +565,7 @@ def test_stop_effect_by_receipt_stops_the_matching_effect(pack_env) -> None:
     manager.stop_effect_by_receipt(receipt)
     manager.update(_make_timer())
 
-    assert output.update_pixels_calls[0] == []
+    assert output.update_pixels_calls[0][1] == []
 
 
 def test_stop_effect_by_receipt_leaves_other_effects_running(pack_env) -> None:
@@ -556,7 +577,7 @@ def test_stop_effect_by_receipt_leaves_other_effects_running(pack_env) -> None:
     manager.stop_effect_by_receipt(receipt_a)
     manager.update(_make_timer())
 
-    assert len(output.update_pixels_calls[0]) == 1
+    assert len(output.update_pixels_calls[0][1]) == 1
 
 
 def test_stop_effect_by_receipt_with_stale_receipt_is_silent_noop(pack_env) -> None:
@@ -568,7 +589,7 @@ def test_stop_effect_by_receipt_with_stale_receipt_is_silent_noop(pack_env) -> N
     manager.stop_effect_by_receipt(receipt)  # second call — stale receipt
     manager.update(_make_timer())
 
-    assert output.update_pixels_calls[0] == []
+    assert output.update_pixels_calls[0][1] == []
 
 
 # ---------------------------------------------------------------------------
@@ -742,7 +763,7 @@ def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect(p
 
 
 # ---------------------------------------------------------------------------
-# scope forwarding — issue #75
+# scope forwarding
 # ---------------------------------------------------------------------------
 
 
@@ -812,7 +833,7 @@ def test_unknown_effect_in_known_pack_raises_value_error(pack_env) -> None:
 
 
 # ---------------------------------------------------------------------------
-# show_pixels — issue #135
+# show_pixels
 # ---------------------------------------------------------------------------
 
 
@@ -858,12 +879,11 @@ def test_update_calls_show_pixels_even_when_effects_are_active(pack_env) -> None
 
 
 def test_update_calls_show_pixels_after_update_pixels_each_tick() -> None:
-    """show_pixels must be called after update_pixels on the same output."""
     call_order: list[str] = []
 
     class OrderTrackingOutput(SpyEffectOutput):
-        def update_pixels(self, frames: list) -> None:
-            super().update_pixels(frames)
+        def update_pixels(self, scope_key: str, frames: list) -> None:
+            super().update_pixels(scope_key, frames)
             call_order.append("update_pixels")
 
         def show_pixels(self) -> None:
@@ -879,7 +899,7 @@ def test_update_calls_show_pixels_after_update_pixels_each_tick() -> None:
 
 
 # ---------------------------------------------------------------------------
-# per-key create_buffer — issue #137
+# per-key create_buffer
 # ---------------------------------------------------------------------------
 
 
@@ -948,3 +968,20 @@ def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_env) -> None:
     # → personal output must NOT receive it after narrowing
     assert not any(c[0] == "lightning_strike" for c in output_personal.handle_event_calls)
     assert any(c[0] == "lightning_strike" for c in output_directional.handle_event_calls)
+
+
+# ---------------------------------------------------------------------------
+# per-key update_pixels
+# ---------------------------------------------------------------------------
+
+
+def test_update_pixels_called_once_per_registered_key_for_multi_key_output(pack_env) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL, Scope.DIRECTIONAL])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    manager.set_effect(Scope.ALL, "stub.fire", 5, {})
+    manager.update(_make_timer())
+
+    called_keys = [key for key, _ in output.update_pixels_calls]
+    assert set(called_keys) == {"personal", "directional"}
+    assert len(called_keys) == 2  # exactly one call per key, no duplicates

@@ -22,11 +22,15 @@ class EffectOutput:
         """Create a PixelBuffer sized for the given scope key's hardware region."""
         raise NotImplementedError
 
-    def update_pixels(self, frames: list[tuple[PixelBuffer, EffectReceipt]]) -> None:
-        """Receive rendered frames for this output.
+    def update_pixels(
+        self, scope_key: str, frames: list[tuple[PixelBuffer, EffectReceipt]]
+    ) -> None:
+        """Receive rendered frames for this output for a single scope key.
 
-        Called every update tick. Each element is a (PixelBuffer, EffectReceipt) tuple.
-        Receives an empty list when no effects are active (signal to go dark).
+        Called once per registered scope key per tick. ``frames`` is a list of
+        ``(PixelBuffer, EffectReceipt)`` tuples ordered by effect start time
+        (oldest first). Receives an empty list when no effects are active for
+        that key (go-dark signal).
         """
         pass
 
@@ -111,7 +115,6 @@ class EffectManager(EffectControls):
 
     __slots__ = (
         "_effects",
-        "_frames",
         "_next_id",
         "_output_key_sets",
         "_outputs",
@@ -128,7 +131,6 @@ class EffectManager(EffectControls):
         self._output_key_sets: list[frozenset[str]] = [
             frozenset(k for s in o.scopes for k in s.keys) for o in outputs
         ]
-        self._frames: list[list[tuple[PixelBuffer, EffectReceipt]]] = [[] for _ in outputs]
 
     def _notify_listeners(
         self, event_name: str, event_keys: set[str], receipt: EffectReceipt
@@ -287,19 +289,20 @@ class EffectManager(EffectControls):
         for entry in self._effects:
             entry.renderer.update(entry.state, self._timer)
 
-        # Pass 2: render and deliver to each output using pre-allocated buffers.
-        # Outputs whose scopes have no active effects receive [] (go-dark signal).
-        for i in range(len(self._outputs)):
-            output = self._outputs[i]
-            frames = self._frames[i]
-            frames.clear()
+        # Pass 2: render and deliver per-key frames to each output.
+        # Every registered key receives a call; empty list signals go-dark.
+        for i, output in enumerate(self._outputs):
+            key_frames: dict[str, list[tuple[PixelBuffer, EffectReceipt]]] = {
+                k: [] for k in self._output_key_sets[i]
+            }
             for entry in self._effects:
                 buf_dict = entry.output_buffers[i]
                 if buf_dict is not None:
-                    for buf in buf_dict.values():
+                    for k, buf in buf_dict.items():
                         entry.renderer.render(entry.state, buf)
-                        frames.append((buf, entry.receipt))
-            output.update_pixels(frames)
+                        key_frames[k].append((buf, entry.receipt))
+            for key, frames in key_frames.items():
+                output.update_pixels(key, frames)
             output.show_pixels()
 
     def __repr__(self) -> str:

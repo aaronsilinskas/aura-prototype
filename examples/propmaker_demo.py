@@ -130,7 +130,7 @@ class IS31FL3741EffectOutput(EffectOutput):
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(_MATRIX_COLS)
 
-    def update_pixels(self, frames: list) -> None:
+    def update_pixels(self, scope_key: str, frames: list) -> None:
         row_count = min(len(frames), _MATRIX_ROWS)
 
         # Write active frames to their matrix rows
@@ -175,7 +175,7 @@ class AudioEffectOutput(EffectOutput):
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(1)
 
-    def update_pixels(self, frames: list) -> None:
+    def update_pixels(self, scope_key: str, frames: list) -> None:
         pass
 
     def handle_event(self, event_name: str, scope, receipt) -> None:
