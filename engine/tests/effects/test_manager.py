@@ -763,7 +763,7 @@ def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect(p
 
 
 # ---------------------------------------------------------------------------
-# scope forwarding — issue #75
+# scope forwarding
 # ---------------------------------------------------------------------------
 
 
@@ -833,7 +833,7 @@ def test_unknown_effect_in_known_pack_raises_value_error(pack_env) -> None:
 
 
 # ---------------------------------------------------------------------------
-# show_pixels — issue #135
+# show_pixels
 # ---------------------------------------------------------------------------
 
 
@@ -899,7 +899,7 @@ def test_update_calls_show_pixels_after_update_pixels_each_tick() -> None:
 
 
 # ---------------------------------------------------------------------------
-# per-key create_buffer — issue #137
+# per-key create_buffer
 # ---------------------------------------------------------------------------
 
 
@@ -971,7 +971,7 @@ def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_env) -> None:
 
 
 # ---------------------------------------------------------------------------
-# per-key update_pixels — issue #138
+# per-key update_pixels
 # ---------------------------------------------------------------------------
 
 
