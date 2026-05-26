@@ -1,14 +1,16 @@
 """CircuitPython hardware demo — RP2040 PropMaker + IS31FL3741 13×9 LED matrix.
 
-Two buttons (A and B) trigger elemental effects on the LED matrix.
+Two element pages cycle across all five scopes on the LED matrix.
+- Button A: advance to the next element page
+- Button B: increase effect level (1–10, wraps to 1)
 FPS is printed to serial each second.
 
 Hardware
 --------
 - Adafruit RP2040 PropMaker Feather
 - Adafruit IS31FL3741 13×9 RGB LED Matrix Breakout (I2C on default SDA/SCL)
-- Button A on GP9 (pull-up) — triggers fire effect
-- Button B on GP10 (pull-up) — triggers water effect
+- Button A on GP9 (pull-up) — page forward
+- Button B on GP10 (pull-up) — level up
 
 Installation
 ------------
@@ -61,6 +63,29 @@ _matrix = propmaker.setup_matrix_is31fl3741(_i2c)
 _button_a, _button_b = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
 
 # ---------------------------------------------------------------------------
+# Element pages
+# ---------------------------------------------------------------------------
+
+# Two pages, each mapping five scopes to element names in order:
+# BUFF, DEBUFF, MAIN, DIRECTIONAL, PERSONAL
+_ELEMENT_PAGES = (
+    (
+        (Scope.Global.BUFF, "elements.air"),
+        (Scope.Global.DEBUFF, "elements.dark"),
+        (Scope.Global.MAIN, "elements.earth"),
+        (Scope.DIRECTIONAL, "elements.fire"),
+        (Scope.PERSONAL, "elements.gravity"),
+    ),
+    (
+        (Scope.Global.BUFF, "elements.ice"),
+        (Scope.Global.DEBUFF, "elements.light"),
+        (Scope.Global.MAIN, "elements.lightning"),
+        (Scope.DIRECTIONAL, "elements.time"),
+        (Scope.PERSONAL, "elements.water"),
+    ),
+)
+
+# ---------------------------------------------------------------------------
 # Effect system
 # ---------------------------------------------------------------------------
 
@@ -71,14 +96,24 @@ _registry.scan_dir("packs/effects", "packs.effects")
 class ButtonEffectRule(GameRule):
     def __init__(self):
         super().__init__("button_effects", Version(1, 0))
+        self.on(InputEvents.ButtonAndMovement, self._on_buttons)
 
-    def handle_event(self, event, state):
-        if isinstance(event, InputEvents.ButtonAndMovement):
-            button_data = event.buttons
-            if button_data.states["A"] == ButtonData.PRESSED:
-                state.effect_controls.set_effect(Scope.PERSONAL, "elements.fire", 5, {})
-            elif button_data.states["B"] == ButtonData.PRESSED:
-                state.effect_controls.set_effect(Scope.PERSONAL, "elements.water", 5, {})
+    def _on_buttons(self, event, state):
+        button_data = event.buttons
+        if button_data.states["A"] == ButtonData.PRESSED:
+            page = (state.get("demo_page", 0) + 1) % 2
+            level = state.get("demo_level", 1)
+            state.set("demo_page", page)
+            for scope, name in _ELEMENT_PAGES[page]:
+                state.effect_controls.set_effect(scope, name, level, {})
+        elif button_data.states["B"] == ButtonData.PRESSED:
+            page = state.get("demo_page", 0)
+            level = state.get("demo_level", 1) + 1
+            if level > 10:
+                level = 1
+            state.set("demo_level", level)
+            for scope, name in _ELEMENT_PAGES[page]:
+                state.effect_controls.set_effect(scope, name, level, {})
 
 
 effect_output = IS31FL3741EffectOutput(_matrix)
@@ -90,6 +125,10 @@ effect_manager = EffectManager(
 game_engine = GameEngine(effect_controls=effect_manager)
 game_engine.add_rules(ButtonEffectRule())
 game_state = game_engine.create_state(SceneControls())
+
+# Display page 0 at level 1 before entering the main loop
+for _scope, _name in _ELEMENT_PAGES[0]:
+    effect_manager.set_effect(_scope, _name, 1, {})
 
 # Button state tracking for edge detection (pull-up: True = not pressed)
 _buttons = [_button_a, _button_b]
