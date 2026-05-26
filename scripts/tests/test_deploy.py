@@ -30,6 +30,12 @@ def make_source_tree(root: Path) -> None:
     (root / "rules" / "__init__.py").write_text("")
     (root / "rules" / "conftest.py").write_text("")
 
+    (root / "hardware").mkdir()
+    (root / "hardware" / "__init__.py").write_text("")
+    (root / "hardware" / "shared").mkdir()
+    (root / "hardware" / "shared" / "__init__.py").write_text("")
+    (root / "hardware" / "shared" / "matrix_output.py").write_text("# matrix_output")
+
 
 # ---------------------------------------------------------------------------
 # Mount validation
@@ -139,6 +145,20 @@ def test_module_directories_are_synced_to_mount(tmp_path: Path) -> None:
     assert (mount / "engine" / "timer.py").exists()
     assert (mount / "magic" / "aura.py").exists()
     assert (mount / "rules" / "__init__.py").exists()
+
+
+def test_hardware_subdirectory_modules_are_deployed(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source)
+
+    assert (mount / "hardware" / "__init__.py").exists()
+    assert (mount / "hardware" / "shared" / "__init__.py").exists()
+    assert (mount / "hardware" / "shared" / "matrix_output.py").exists()
 
 
 # ---------------------------------------------------------------------------
