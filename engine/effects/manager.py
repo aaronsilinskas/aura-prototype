@@ -162,7 +162,6 @@ class EffectManager(EffectControls):
 
     def _build_effect(
         self,
-        scope: ScopeValue,
         scope_key_set: set[str],
         name: str,
         level: int,
@@ -210,7 +209,7 @@ class EffectManager(EffectControls):
                 output_buffers.append(None)
 
         entry = EffectManager._EffectEntry(
-            scope.keys, effect_name, receipt, output_buffers, None, EffectState()
+            tuple(scope_key_set), effect_name, receipt, output_buffers, None, EffectState()
         )
 
         def scoped_listener(event_name: str) -> None:
@@ -231,7 +230,7 @@ class EffectManager(EffectControls):
         options: dict[str, object],
     ) -> EffectReceipt:
         """Build, append, and return the receipt for a new effect entry."""
-        entry = self._build_effect(scope, scope_key_set, name, level, options)
+        entry = self._build_effect(scope_key_set, name, level, options)
         self._effects.append(entry)
         return entry.receipt
 
