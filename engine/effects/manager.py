@@ -86,7 +86,7 @@ class EffectBuilder:
 
 
 class EffectManager(EffectControls):
-    """Manages running effects and routesrendered frames to registered outputs each tick.
+    """Manages running effects and routes rendered frames to registered outputs each tick.
 
     Update model:
       - Call ``update(timer)`` once per frame. Each unique renderer is
@@ -124,6 +124,7 @@ class EffectManager(EffectControls):
 
     __slots__ = (
         "_effects",
+        "_key_frames",
         "_next_id",
         "_output_key_sets",
         "_outputs",
@@ -139,6 +140,11 @@ class EffectManager(EffectControls):
         self._timer: EffectTimer = EffectTimer()
         self._output_key_sets: list[frozenset[str]] = [
             frozenset(k for s in o.scopes for k in s.keys) for o in outputs
+        ]
+        # Pre-allocated per-output frame accumulators — cleared and reused each tick
+        # to avoid dict/list allocation in the hot path.
+        self._key_frames: list[dict[str, list[tuple[PixelBuffer, EffectReceipt]]]] = [
+            {k: [] for k in key_set} for key_set in self._output_key_sets
         ]
 
     def _notify_listeners(
@@ -335,10 +341,13 @@ class EffectManager(EffectControls):
 
         # Pass 2: render and deliver per-key frames to each output.
         # Every registered key receives a call; empty list signals go-dark.
+        # key_frames lists are pre-allocated in __init__ and cleared here to avoid
+        # per-frame dict/list allocation. Note: (buf, receipt) tuples still allocate
+        # per rendered key — eliminating them requires an update_pixels API change.
         for i, output in enumerate(self._outputs):
-            key_frames: dict[str, list[tuple[PixelBuffer, EffectReceipt]]] = {
-                k: [] for k in self._output_key_sets[i]
-            }
+            key_frames = self._key_frames[i]
+            for frame_list in key_frames.values():
+                frame_list.clear()
             for entry in self._effects:
                 buf_dict = entry.output_buffers[i]
                 if buf_dict is not None:
