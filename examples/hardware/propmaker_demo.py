@@ -1,13 +1,14 @@
 """CircuitPython hardware demo — RP2040 PropMaker + IS31FL3741 13×9 LED matrix.
 
-A fire effect is hardcoded at startup and rendered across the LED matrix.
-Subsequent issues add button input (#34), audio output (#35), and FPS
-reporting (#36).
+Two buttons (A and B) trigger elemental effects on the LED matrix.
+FPS is printed to serial each second.
 
 Hardware
 --------
 - Adafruit RP2040 PropMaker Feather
 - Adafruit IS31FL3741 13×9 RGB LED Matrix Breakout (I2C on default SDA/SCL)
+- Button A on GP9 (pull-up) — triggers fire effect
+- Button B on GP10 (pull-up) — triggers water effect
 
 Installation
 ------------
@@ -22,10 +23,6 @@ Installation
 
 4. Copy this file to /CIRCUITPY/code.py.
    The board reboots and starts running automatically.
-
-Configuration
--------------
-- Buttons A–D on GP9–GP12 (pull-up) layer effects or clear all.
 """
 
 import time
@@ -39,7 +36,6 @@ from engine.input import ButtonData, InputEvents, MovementData
 from engine.packs import PackRegistry
 from engine.state import SceneControls, Scope
 from engine.timer import Timer
-from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 
 try:
@@ -51,12 +47,10 @@ except ImportError:
 # Constants
 # ---------------------------------------------------------------------------
 
-_BUTTON_NAMES = ("A", "B", "C", "D")
+_BUTTON_NAMES = ("A", "B")
 
 BUTTON_A_PIN: "Final" = board.D9
 BUTTON_B_PIN: "Final" = board.D10
-BUTTON_C_PIN: "Final" = board.D11
-BUTTON_D_PIN: "Final" = board.D12
 
 # ---------------------------------------------------------------------------
 # Hardware setup
@@ -64,10 +58,7 @@ BUTTON_D_PIN: "Final" = board.D12
 
 _i2c = propmaker.setup_i2c()
 _matrix = propmaker.setup_matrix_is31fl3741(_i2c)
-_button_a, _button_b, _button_c, _button_d = propmaker.setup_buttons(
-    BUTTON_A_PIN, BUTTON_B_PIN, BUTTON_C_PIN, BUTTON_D_PIN
-)
-propmaker.setup_external_power()
+_button_a, _button_b = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
 
 # ---------------------------------------------------------------------------
 # Effect system
@@ -85,20 +76,15 @@ class ButtonEffectRule(GameRule):
         if isinstance(event, InputEvents.ButtonAndMovement):
             button_data = event.buttons
             if button_data.states["A"] == ButtonData.PRESSED:
-                state.effect_controls.add_effect(Scope.PERSONAL, "elements.fire", 5, {})
+                state.effect_controls.set_effect(Scope.PERSONAL, "elements.fire", 5, {})
             elif button_data.states["B"] == ButtonData.PRESSED:
-                state.effect_controls.add_effect(Scope.PERSONAL, "elements.water", 5, {})
-            elif button_data.states["C"] == ButtonData.PRESSED:
-                state.effect_controls.add_effect(Scope.PERSONAL, "elements.lightning", 2, {})
-            elif button_data.states["D"] == ButtonData.PRESSED:
-                state.effect_controls.stop_effect(Scope.ALL)
+                state.effect_controls.set_effect(Scope.PERSONAL, "elements.water", 5, {})
 
 
 effect_output = IS31FL3741EffectOutput(_matrix)
-audio_output = AudioEffectOutput()
 effect_manager = EffectManager(
     registry=_registry,
-    outputs=[effect_output, audio_output],
+    outputs=[effect_output],
 )
 
 game_engine = GameEngine(effect_controls=effect_manager)
@@ -106,8 +92,8 @@ game_engine.add_rules(ButtonEffectRule())
 game_state = game_engine.create_state(SceneControls())
 
 # Button state tracking for edge detection (pull-up: True = not pressed)
-_buttons = [_button_a, _button_b, _button_c, _button_d]
-_button_prev = [True, True, True, True]
+_buttons = [_button_a, _button_b]
+_button_prev = [True, True]
 
 # ---------------------------------------------------------------------------
 # Main loop
