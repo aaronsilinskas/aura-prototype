@@ -1,4 +1,4 @@
-"""CircuitPython showcase — all element effects cycling through intensity levels.
+"""CircuitPython element performance demo — all element effects cycling through intensity levels.
 
 Each element is displayed at levels 1, 4, 7, and 10 in sequence, spending
 DISPLAY_SECONDS on each before advancing to the next level, then the next
@@ -25,7 +25,7 @@ Installation
    so it lives at /CIRCUITPY/effects/.
 
 4. Copy this file to the root of the CIRCUITPY drive as code.py:
-     cp examples/circuitpython_showcase.py /Volumes/CIRCUITPY/code.py
+     cp examples/hardware/element_perf_demo.py /Volumes/CIRCUITPY/code.py
 
 5. The board will reboot and start running automatically.
 
