@@ -26,7 +26,7 @@ except ImportError:
 from engine.engine import GameRule, Version
 from engine.input import ButtonData, InputEvents
 from engine.state import GameState, Scope
-from packs.rules.rlgl.motion_detector import (
+from packs.rules.rlgl.helpers.motion_detector import (
     GREEN_MIN_MOTION_THRESHOLD,
     RED_MAX_MOTION_THRESHOLD,
     motion_magnitude,
