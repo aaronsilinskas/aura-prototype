@@ -149,14 +149,20 @@ def test_first_tick_enters_ready_phase(spy):
     assert state.get("rlgl_phase", None) == PHASE_READY
 
 
-def test_first_tick_applies_water_effect_on_all(spy):
+def test_ready_shows_water_effect_on_all_scopes(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
     water_calls = [c for c in spy.set_effect_calls if c[1] == "elements.water"]
     assert len(water_calls) == 1
-    scope, _name, level, _opts = water_calls[0]
-    assert scope is Scope.ALL
-    assert level == 3
+    assert water_calls[0][0] is Scope.ALL
+
+
+def test_ready_shows_water_effect_at_level_3(spy):
+    state, engine, timer = _make_state(spy)
+    _tick(state, engine, timer, total=0.0)
+    water_calls = [c for c in spy.set_effect_calls if c[1] == "elements.water"]
+    assert len(water_calls) == 1
+    assert water_calls[0][2] == 3
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +206,7 @@ def test_button_b_from_ready_enters_red_warning(spy):
     assert state.get("rlgl_phase", None) == PHASE_RED_WARNING
 
 
-def test_button_press_from_ready_applies_yellow_solid_effect_on_all(spy):
+def test_button_press_from_ready_shows_yellow_warning_on_all_scopes(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
     spy.set_effect_calls.clear()
@@ -209,8 +215,18 @@ def test_button_press_from_ready_applies_yellow_solid_effect_on_all(spy):
 
     yellow_calls = [c for c in spy.set_effect_calls if c[3].get("color") == 0xFFFF00]
     assert len(yellow_calls) == 1
-    assert yellow_calls[0][1] == "basic.solid"
     assert yellow_calls[0][0] is Scope.ALL
+
+
+def test_button_press_from_ready_uses_solid_effect_for_warning(spy):
+    state, engine, timer = _make_state(spy)
+    _tick(state, engine, timer, total=0.0)
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, button_a=True, total=0.0)
+
+    solid_calls = [c for c in spy.set_effect_calls if c[1] == "basic.solid"]
+    assert len(solid_calls) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -278,7 +294,6 @@ def test_red_timer_expiry_transitions_to_green_warning(spy):
 
 
 def test_red_timer_expiry_takes_priority_over_motion(spy):
-    """When timer expires simultaneously with motion above threshold, timer wins."""
     state, engine, timer = _setup_red_phase(spy, grace=1.0, initial_data={"rlgl_red_duration": 3.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
 
@@ -357,7 +372,6 @@ def test_green_motion_below_threshold_for_less_than_still_timeout_does_not_trigg
     )
     phase_start = state.get("rlgl_phase_start", 0.0)
 
-    # Motion detected at 1.2 s resets the still timer; only 0.3 s of stillness after
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 1.2)
     _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 1.5)
 
@@ -370,9 +384,7 @@ def test_green_motion_above_threshold_resets_still_timer_so_brief_pause_is_forgi
     )
     phase_start = state.get("rlgl_phase_start", 0.0)
 
-    # Motion detected at 1.5 s resets the still timer
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 1.5)
-    # Only 0.4 s of stillness since last motion — under the timeout
     _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 1.9)
 
     assert state.get("rlgl_phase", None) == PHASE_GREEN
@@ -384,7 +396,6 @@ def test_green_sustained_stillness_for_still_timeout_triggers_game_over(spy):
     )
     phase_start = state.get("rlgl_phase_start", 0.0)
 
-    # 2.0 s of stillness since phase start (last_motion seeded at phase_start)
     _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 2.0)
 
     assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
@@ -409,7 +420,6 @@ def test_green_timer_expiry_transitions_to_red_warning(spy):
 
 
 def test_green_timer_expiry_takes_priority_over_motion(spy):
-    """When timer expires simultaneously with motion below threshold, timer wins."""
     state, engine, timer = _setup_green_phase(
         spy, grace=1.0, initial_data={"rlgl_green_duration": 3.0}
     )
@@ -425,7 +435,7 @@ def test_green_timer_expiry_takes_priority_over_motion(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_game_over_applies_fire_level_10_effect_on_all(spy):
+def test_game_over_shows_fire_effect_on_all_scopes(spy):
     state, engine, timer = _setup_red_phase(spy, grace=1.0)
     phase_start = state.get("rlgl_phase_start", 0.0)
     spy.set_effect_calls.clear()
@@ -434,9 +444,19 @@ def test_game_over_applies_fire_level_10_effect_on_all(spy):
 
     fire_calls = [c for c in spy.set_effect_calls if c[1] == "elements.fire"]
     assert len(fire_calls) == 1
-    scope, _name, level, _opts = fire_calls[0]
-    assert scope is Scope.ALL
-    assert level == 10
+    assert fire_calls[0][0] is Scope.ALL
+
+
+def test_game_over_shows_fire_effect_at_level_10(spy):
+    state, engine, timer = _setup_red_phase(spy, grace=1.0)
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)
+
+    fire_calls = [c for c in spy.set_effect_calls if c[1] == "elements.fire"]
+    assert len(fire_calls) == 1
+    assert fire_calls[0][2] == 10
 
 
 def test_game_over_transitions_to_ready_after_game_over_duration(spy):
@@ -452,13 +472,12 @@ def test_game_over_transitions_to_ready_after_game_over_duration(spy):
     assert state.get("rlgl_phase", None) == PHASE_READY
 
 
-def test_ready_effect_restored_after_game_over(spy):
+def test_game_over_expiry_restores_water_effect_on_all_scopes(spy):
     state, engine, timer = _setup_red_phase(
         spy, grace=1.0, initial_data={"rlgl_game_over_duration": 2.0}
     )
     phase_start = state.get("rlgl_phase_start", 0.0)
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)
-
     go_start = state.get("rlgl_phase_start", 0.0)
     spy.set_effect_calls.clear()
 
@@ -467,4 +486,19 @@ def test_ready_effect_restored_after_game_over(spy):
     water_calls = [c for c in spy.set_effect_calls if c[1] == "elements.water"]
     assert len(water_calls) == 1
     assert water_calls[0][0] is Scope.ALL
+
+
+def test_game_over_expiry_restores_water_effect_at_level_3(spy):
+    state, engine, timer = _setup_red_phase(
+        spy, grace=1.0, initial_data={"rlgl_game_over_duration": 2.0}
+    )
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)
+    go_start = state.get("rlgl_phase_start", 0.0)
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, total=go_start + 2.0)
+
+    water_calls = [c for c in spy.set_effect_calls if c[1] == "elements.water"]
+    assert len(water_calls) == 1
     assert water_calls[0][2] == 3
