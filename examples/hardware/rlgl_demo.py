@@ -152,3 +152,6 @@ while True:
 
     # --- Advance game rules ---
     _manager.update()
+
+    # --- Advance effect rendering ---
+    _effect_manager.update(_engine._timer)
