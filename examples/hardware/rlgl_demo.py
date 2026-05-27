@@ -87,10 +87,10 @@ _engine = GameEngine(
     effect_controls=_effect_manager,
 )
 
-_manager = SceneManager(_engine, _effect_registry, _rule_registry)
-_manager.register("rlgl", rlgl_factory)
-_manager.load("rlgl")
-_manager.update()  # applies the load transition; rlgl scene is now active
+_scene_manager = SceneManager(_engine, _effect_registry, _rule_registry)
+_scene_manager.register("rlgl", rlgl_factory)
+_scene_manager.load("rlgl")
+_scene_manager.update()  # applies the load transition; rlgl scene is now active
 
 # ---------------------------------------------------------------------------
 # Button state tracking
@@ -141,8 +141,8 @@ while True:
         _acceleration = None
 
     # --- Queue combined input event ---
-    if _manager._stack:
-        _active_state = _manager._stack[-1][1]
+    if _scene_manager._stack:
+        _active_state = _scene_manager._stack[-1][1]
         _active_state.queue_event(
             InputEvents.ButtonAndAcceleration(
                 ButtonData(_btn_states),
@@ -151,7 +151,7 @@ while True:
         )
 
     # --- Advance game rules ---
-    _manager.update()
+    _scene_manager.update()
 
     # --- Advance effect rendering ---
     _effect_manager.update(_engine._timer)
