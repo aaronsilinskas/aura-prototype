@@ -70,7 +70,7 @@ _DEFAULT_RED_DURATION: Final = 5.0
 _DEFAULT_GREEN_DURATION: Final = 5.0
 _DEFAULT_GRACE_DURATION: Final = 1.0
 _DEFAULT_GAME_OVER_DURATION: Final = 3.0
-_DEFAULT_GREEN_STILL_TIMEOUT: Final = 1.0
+_DEFAULT_GREEN_STILL_TIMEOUT: Final = 1.5
 
 # ---------------------------------------------------------------------------
 # Phase entry helpers
