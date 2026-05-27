@@ -137,6 +137,13 @@ class SceneManager(SceneControls):
         self._validate_packs(scene)
         self._pending = ("overlay", scene)
 
+    @property
+    def active_state(self) -> GameState | None:
+        """The ``GameState`` for the top-most active scene, or ``None`` if the stack is empty."""
+        if not self._stack:
+            return None
+        return self._stack[-1][1]
+
     def pop(self) -> None:
         """Record a pop transition; raises immediately if stack has ≤ 1 entry."""
         n = len(self._stack)

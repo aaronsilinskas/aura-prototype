@@ -16,6 +16,10 @@
 6. `as-work-on-issue` — implement issues in dependency order. After each PR merges, switch back to `main`.
 7. When all child issues are closed, verify acceptance criteria are met and close the PRD issue.
 
+### Code conventions
+
+- **No internal state access** — demo scripts and tests must not read private attributes (names starting with `_`) on engine or manager objects. Use only the public API. If the public API is insufficient, expand it rather than reaching in. The one exception is test helpers that are explicitly testing internal behaviour (e.g. asserting a private field after calling a public method), and even then the access should be isolated to a dedicated helper.
+
 ### Issue implementation workflow
 
 Follow: https://raw.githubusercontent.com/aaronsilinskas/ai-skills/main/as-work-on-issue/SKILL.md

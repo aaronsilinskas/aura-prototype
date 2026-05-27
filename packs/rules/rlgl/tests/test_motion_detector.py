@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from engine.input import AccelerationData
-from packs.rules.rlgl.motion_detector import (
+from packs.rules.rlgl.helpers.motion_detector import (
     GREEN_MIN_MOTION_THRESHOLD,
     RED_MAX_MOTION_THRESHOLD,
     motion_magnitude,

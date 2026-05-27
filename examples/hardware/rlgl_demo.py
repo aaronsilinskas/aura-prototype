@@ -1,10 +1,8 @@
-"""Hardware verification demo — hw_test scene on RP2040 PropMaker + IS31FL3741.
+"""Red Light Green Light mini-game — RP2040 PropMaker Feather + IS31FL3741.
 
-Loads the ``hw_test`` scene via ``SceneManager`` so every hardware subsystem
-(LEDs, buttons, accelerometer, IR transceiver, radio) can be exercised through
-the same scene logic used in production.  The ``debug`` rules pack logs every
-dispatched event to the serial console, giving a text trace alongside the visual
-output.
+Runs the RLGL mini-game scene on a PropMaker Feather with an IS31FL3741 LED
+matrix.  The accelerometer detects player motion so the game can catch cheaters
+moving on a red light.
 
 Hardware
 --------
@@ -12,8 +10,6 @@ Hardware
 - Adafruit IS31FL3741 13×9 RGB LED Matrix Breakout (I2C on default SDA/SCL)
 - Two buttons (pull-up) on BUTTON_A_PIN / BUTTON_B_PIN (default: D9 / D10)
 - LIS3DH I2C accelerometer on default SDA/SCL (shared bus with IS31FL3741)
-- IR transceiver wired to HardwareNetworkControls
-- Radio module wired to HardwareNetworkControls
 
 Installation
 ------------
@@ -25,29 +21,15 @@ Installation
      adafruit_lis3dh.mpy
 
 3. Run the deploy script to copy all source files and set code.py:
-     python scripts/deploy.py examples/hardware/hw_test_demo.py
+     python scripts/deploy.py examples/hardware/rlgl_demo.py
    The board reboots and starts running automatically.
 
-Modes (press Button B to cycle)
---------------------------------
-Mode 0 — RGB idle
-    Five element effects (water, fire, lightning, earth, ice) fill each scope.
-    Press A to step the brightness level from 1 → 10 → 1.
-
-Mode 1 — Accelerometer
-    Accelerometer axes map to scopes: X → PERSONAL (red/cyan),
-    Y → DIRECTIONAL (green/magenta), Z → Global.ALL (blue/yellow).
-    Tilt the device to change colours and intensity.
-
-Mode 2 — IR receive
-    Press A to simulate sending an IR packet (queues IRReceived internally).
-    On a real receive, DIRECTIONAL flashes white at level 9 for 0.5 s, then
-    returns to the idle solid white.  Console shows ``net.ir_received``.
-
-Mode 3 — Radio receive
-    Press A to simulate sending a radio packet (queues RadioReceived internally).
-    On a real receive, Global.ALL flashes white at level 9 for 0.5 s, then
-    returns to the idle solid white.  Console shows ``net.radio_received``.
+How to play
+-----------
+- Press A or B to start the game.
+- Green light: keep moving — detected via accelerometer.
+- Red light: freeze completely — any detected motion is penalised.
+- The LED matrix shows the current game state (green / red / result).
 """
 
 import board
@@ -56,11 +38,10 @@ import hardware.circuitpython.propmaker as propmaker
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
-from engine.network import HardwareNetworkControls
 from engine.packs import PackRegistry
 from engine.scene import SceneManager
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
-from scenes.hw_test.scene import factory as hw_test_factory
+from scenes.rlgl.scene import factory as rlgl_factory
 
 try:
     from typing import Final
@@ -104,13 +85,12 @@ _effect_manager = EffectManager(
 
 _engine = GameEngine(
     effect_controls=_effect_manager,
-    network_controls=HardwareNetworkControls(),
 )
 
-_manager = SceneManager(_engine, _effect_registry, _rule_registry)
-_manager.register("hw_test", hw_test_factory)
-_manager.load("hw_test")
-_manager.update()  # applies the load transition; hw_test scene is now active
+_scene_manager = SceneManager(_engine, _effect_registry, _rule_registry)
+_scene_manager.register("rlgl", rlgl_factory)
+_scene_manager.load("rlgl")
+_scene_manager.update()  # applies the load transition; rlgl scene is now active
 
 # ---------------------------------------------------------------------------
 # Button state tracking
@@ -161,8 +141,8 @@ while True:
         _acceleration = None
 
     # --- Queue combined input event ---
-    if _manager.active_state is not None:
-        _manager.active_state.queue_event(
+    if _scene_manager.active_state is not None:
+        _scene_manager.active_state.queue_event(
             InputEvents.ButtonAndAcceleration(
                 ButtonData(_btn_states),
                 _acceleration,
@@ -170,7 +150,7 @@ while True:
         )
 
     # --- Advance game rules ---
-    _manager.update()
+    _scene_manager.update()
 
     # --- Advance effect rendering ---
     _effect_manager.update(_engine._timer)
