@@ -58,6 +58,8 @@ _KEY_RED_DURATION: Final = "rlgl_red_duration"
 _KEY_GREEN_DURATION: Final = "rlgl_green_duration"
 _KEY_GRACE_DURATION: Final = "rlgl_grace_duration"
 _KEY_GAME_OVER_DURATION: Final = "rlgl_game_over_duration"
+_KEY_GREEN_STILL_TIMEOUT: Final = "rlgl_green_still_timeout"
+_KEY_LAST_MOTION_TIME: Final = "rlgl_last_motion_time"
 
 # ---------------------------------------------------------------------------
 # Default durations (seconds)
@@ -68,6 +70,7 @@ _DEFAULT_RED_DURATION: Final = 5.0
 _DEFAULT_GREEN_DURATION: Final = 5.0
 _DEFAULT_GRACE_DURATION: Final = 1.0
 _DEFAULT_GAME_OVER_DURATION: Final = 3.0
+_DEFAULT_GREEN_STILL_TIMEOUT: Final = 1.0
 
 # ---------------------------------------------------------------------------
 # Phase entry helpers
@@ -101,6 +104,7 @@ def _enter_green_warning(state: GameState) -> None:
 def _enter_green(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_GREEN)
     state.set(_KEY_PHASE_START, state.total)
+    state.set(_KEY_LAST_MOTION_TIME, state.total)
     state.effect_controls.set_effect(Scope.ALL, "basic.solid", 10, {"color": 0x00FF00})
 
 
@@ -201,12 +205,15 @@ class RlglGameRule(GameRule):
             _enter_red_warning(state)
             return
 
-        if (
-            event.acceleration is not None
-            and elapsed >= grace_duration
-            and motion_magnitude(event.acceleration) < GREEN_MIN_MOTION_THRESHOLD
-        ):
-            _enter_game_over(state)
+        if event.acceleration is not None and elapsed >= grace_duration:
+            mag = motion_magnitude(event.acceleration)
+            if mag >= GREEN_MIN_MOTION_THRESHOLD:
+                state.set(_KEY_LAST_MOTION_TIME, state.total)
+            else:
+                still_timeout = state.get(_KEY_GREEN_STILL_TIMEOUT, _DEFAULT_GREEN_STILL_TIMEOUT)
+                last_motion = state.get(_KEY_LAST_MOTION_TIME, state.total)
+                if state.total - last_motion >= still_timeout:
+                    _enter_game_over(state)
 
     def _check_game_over(self, state: GameState, elapsed: float) -> None:
         duration = state.get(_KEY_GAME_OVER_DURATION, _DEFAULT_GAME_OVER_DURATION)

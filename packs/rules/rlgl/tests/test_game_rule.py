@@ -351,10 +351,40 @@ def test_green_motion_below_threshold_within_grace_does_not_trigger_game_over(sp
     assert state.get("rlgl_phase", None) == PHASE_GREEN
 
 
-def test_green_motion_below_threshold_after_grace_triggers_game_over(spy):
-    state, engine, timer = _setup_green_phase(spy, grace=1.0)
+def test_green_motion_below_threshold_for_less_than_still_timeout_does_not_trigger_game_over(spy):
+    state, engine, timer = _setup_green_phase(
+        spy, grace=1.0, initial_data={"rlgl_green_still_timeout": 1.0}
+    )
     phase_start = state.get("rlgl_phase_start", 0.0)
 
+    # Motion detected at 1.2 s resets the still timer; only 0.3 s of stillness after
+    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 1.2)
+    _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 1.5)
+
+    assert state.get("rlgl_phase", None) == PHASE_GREEN
+
+
+def test_green_motion_above_threshold_resets_still_timer_so_brief_pause_is_forgiven(spy):
+    state, engine, timer = _setup_green_phase(
+        spy, grace=1.0, initial_data={"rlgl_green_still_timeout": 1.0}
+    )
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    # Motion detected at 1.5 s resets the still timer
+    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 1.5)
+    # Only 0.4 s of stillness since last motion — under the timeout
+    _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 1.9)
+
+    assert state.get("rlgl_phase", None) == PHASE_GREEN
+
+
+def test_green_sustained_stillness_for_still_timeout_triggers_game_over(spy):
+    state, engine, timer = _setup_green_phase(
+        spy, grace=1.0, initial_data={"rlgl_green_still_timeout": 1.0}
+    )
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    # 2.0 s of stillness since phase start (last_motion seeded at phase_start)
     _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 2.0)
 
     assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
