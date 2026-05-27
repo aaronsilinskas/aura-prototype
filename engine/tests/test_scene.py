@@ -239,6 +239,58 @@ def test_register_overwrites_existing_factory_silently() -> None:
 
 
 # ---------------------------------------------------------------------------
+# SceneManager — active_state
+# ---------------------------------------------------------------------------
+
+
+def test_active_state_is_none_before_any_scene_is_loaded() -> None:
+    manager = SceneManager(
+        _make_engine(), PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE")
+    )
+
+    assert manager.active_state is None
+
+
+def test_active_state_returns_game_state_after_scene_loads() -> None:
+    manager = SceneManager(
+        _make_engine(), PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE")
+    )
+    manager.register("main", _scene_factory())
+    manager.load("main")
+    manager.update()
+
+    assert isinstance(manager.active_state, GameState)
+
+
+def test_active_state_is_none_while_load_is_pending_but_not_yet_applied() -> None:
+    manager = SceneManager(
+        _make_engine(), PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE")
+    )
+    manager.register("main", _scene_factory())
+    manager.load("main")
+
+    # Transition is recorded but update() has not been called yet
+    assert manager.active_state is None
+
+
+def test_active_state_changes_after_load_replaces_scene() -> None:
+    manager = SceneManager(
+        _make_engine(), PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE")
+    )
+    manager.register("first", _scene_factory())
+    manager.register("second", _scene_factory())
+
+    manager.load("first")
+    manager.update()
+    first_state = manager.active_state
+
+    manager.load("second")
+    manager.update()
+
+    assert manager.active_state is not first_state
+
+
+# ---------------------------------------------------------------------------
 # SceneManager — immediate validation (ValueError raised before any state change)
 # ---------------------------------------------------------------------------
 
