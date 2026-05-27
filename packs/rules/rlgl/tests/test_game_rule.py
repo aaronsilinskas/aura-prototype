@@ -200,17 +200,17 @@ def test_button_b_from_ready_enters_red_warning(spy):
     assert state.get("rlgl_phase", None) == PHASE_RED_WARNING
 
 
-def test_button_press_from_ready_applies_red_solid_effect_on_all(spy):
+def test_button_press_from_ready_applies_yellow_solid_effect_on_all(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
     spy.set_effect_calls.clear()
 
     _tick(state, engine, timer, button_a=True, total=0.0)
 
-    red_calls = [c for c in spy.set_effect_calls if c[3].get("color") == 0xFF0000]
-    assert len(red_calls) == 1
-    assert red_calls[0][1] == "basic.solid"
-    assert red_calls[0][0] is Scope.ALL
+    yellow_calls = [c for c in spy.set_effect_calls if c[3].get("color") == 0xFFFF00]
+    assert len(yellow_calls) == 1
+    assert yellow_calls[0][1] == "basic.solid"
+    assert yellow_calls[0][0] is Scope.ALL
 
 
 # ---------------------------------------------------------------------------

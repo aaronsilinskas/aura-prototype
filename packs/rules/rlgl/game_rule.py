@@ -83,7 +83,7 @@ def _enter_ready(state: GameState) -> None:
 def _enter_red_warning(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_RED_WARNING)
     state.set(_KEY_PHASE_START, state.total)
-    state.effect_controls.set_effect(Scope.ALL, "basic.solid", 10, {"color": 0xFF0000})
+    state.effect_controls.set_effect(Scope.ALL, "basic.solid", 10, {"color": 0xFFFF00})
 
 
 def _enter_red(state: GameState) -> None:
@@ -95,7 +95,7 @@ def _enter_red(state: GameState) -> None:
 def _enter_green_warning(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_GREEN_WARNING)
     state.set(_KEY_PHASE_START, state.total)
-    state.effect_controls.set_effect(Scope.ALL, "basic.solid", 10, {"color": 0x00FF00})
+    state.effect_controls.set_effect(Scope.ALL, "basic.solid", 10, {"color": 0xFFFF00})
 
 
 def _enter_green(state: GameState) -> None:
