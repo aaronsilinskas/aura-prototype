@@ -213,20 +213,37 @@ def test_button_press_from_ready_shows_yellow_warning_on_all_scopes(spy):
 
     _tick(state, engine, timer, button_a=True, total=0.0)
 
-    yellow_calls = [c for c in spy.set_effect_calls if c[3].get("color") == 0xFFFF00]
+    yellow_calls = [c for c in spy.set_effect_calls if c[3].get("end_color") == 0xFFFF00]
     assert len(yellow_calls) == 1
     assert yellow_calls[0][0] is Scope.ALL
 
 
-def test_button_press_from_ready_uses_solid_effect_for_warning(spy):
+def test_button_press_from_ready_uses_pulse_effect_for_warning(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
     spy.set_effect_calls.clear()
 
     _tick(state, engine, timer, button_a=True, total=0.0)
 
-    solid_calls = [c for c in spy.set_effect_calls if c[1] == "basic.solid"]
-    assert len(solid_calls) == 1
+    pulse_calls = [c for c in spy.set_effect_calls if c[1] == "basic.pulse"]
+    assert len(pulse_calls) == 1
+
+
+def test_red_warning_pulse_uses_one_second_breathe_cycle(spy):
+    state, engine, timer = _make_state(spy)
+    _tick(state, engine, timer, total=0.0)
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, button_a=True, total=0.0)
+
+    pulse_calls = [c for c in spy.set_effect_calls if c[1] == "basic.pulse"]
+    assert len(pulse_calls) == 1
+    opts = pulse_calls[0][3]
+    assert opts["start_color"] == 0x000000
+    assert opts["brighten_duration"] == 0.3
+    assert opts["on_duration"] == 0.4
+    assert opts["darken_duration"] == 0.3
+    assert opts["off_duration"] == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -250,6 +267,20 @@ def test_red_warning_transitions_to_red_after_warning_duration(spy):
 
     _tick(state, engine, timer, total=2.0)
     assert state.get("rlgl_phase", None) == PHASE_RED
+
+
+def test_red_phase_transition_uses_solid_with_red_color(spy):
+    state, engine, timer = _make_state(spy, initial_data={"rlgl_warning_duration": 0.0})
+    _tick(state, engine, timer, total=0.0)
+    _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, total=0.0)  # RED_WARNING → RED (duration=0)
+
+    solid_calls = [c for c in spy.set_effect_calls if c[1] == "basic.solid"]
+    assert len(solid_calls) == 1
+    assert solid_calls[0][0] is Scope.ALL
+    assert solid_calls[0][3]["color"] == 0xFF0000
 
 
 # ---------------------------------------------------------------------------
@@ -350,6 +381,41 @@ def test_green_warning_transitions_to_green_after_warning_duration(spy):
 
     _tick(state, engine, timer, total=4.0)  # elapsed=2.0 → GREEN
     assert state.get("rlgl_phase", None) == PHASE_GREEN
+
+
+def test_green_warning_transition_uses_pulse_with_yellow_end_color(spy):
+    state, engine, timer = _make_state(
+        spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
+    )
+    _tick(state, engine, timer, total=0.0)
+    _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
+    _tick(state, engine, timer, total=0.0)  # → RED
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
+
+    pulse_calls = [c for c in spy.set_effect_calls if c[1] == "basic.pulse"]
+    assert len(pulse_calls) == 1
+    assert pulse_calls[0][0] is Scope.ALL
+    assert pulse_calls[0][3]["end_color"] == 0xFFFF00
+
+
+def test_green_phase_transition_uses_solid_with_green_color(spy):
+    state, engine, timer = _make_state(
+        spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
+    )
+    _tick(state, engine, timer, total=0.0)
+    _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
+    _tick(state, engine, timer, total=0.0)  # → RED
+    _tick(state, engine, timer, total=0.0)  # → GREEN_WARNING
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, total=0.0)  # GREEN_WARNING → GREEN
+
+    solid_calls = [c for c in spy.set_effect_calls if c[1] == "basic.solid"]
+    assert len(solid_calls) == 1
+    assert solid_calls[0][0] is Scope.ALL
+    assert solid_calls[0][3]["color"] == 0x00FF00
 
 
 # ---------------------------------------------------------------------------

@@ -83,10 +83,21 @@ def _enter_ready(state: GameState) -> None:
     state.effect_controls.set_effect(Scope.ALL, "elements.water", 3, {})
 
 
+_PULSE_OPTS_BASE = {
+    "start_color": 0x000000,
+    "brighten_duration": 0.3,
+    "on_duration": 0.4,
+    "darken_duration": 0.3,
+    "off_duration": 0.0,
+}
+
+
 def _enter_red_warning(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_RED_WARNING)
     state.set(_KEY_PHASE_START, state.total)
-    state.effect_controls.set_effect(Scope.ALL, "basic.solid", 10, {"color": 0xFFFF00})
+    opts = dict(_PULSE_OPTS_BASE)
+    opts["end_color"] = 0xFFFF00
+    state.effect_controls.set_effect(Scope.ALL, "basic.pulse", 10, opts)
 
 
 def _enter_red(state: GameState) -> None:
@@ -98,7 +109,9 @@ def _enter_red(state: GameState) -> None:
 def _enter_green_warning(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_GREEN_WARNING)
     state.set(_KEY_PHASE_START, state.total)
-    state.effect_controls.set_effect(Scope.ALL, "basic.solid", 10, {"color": 0xFFFF00})
+    opts = dict(_PULSE_OPTS_BASE)
+    opts["end_color"] = 0xFFFF00
+    state.effect_controls.set_effect(Scope.ALL, "basic.pulse", 10, opts)
 
 
 def _enter_green(state: GameState) -> None:

@@ -10,7 +10,7 @@ def _on_unload(ec: EffectControls) -> None:
 
 def factory() -> Scene:
     return Scene(
-        effect_packs=[("elements", "1.0"), ("basic", "1.0")],
+        effect_packs=[("elements", "1.0"), ("basic", "1.1")],
         rule_packs=[("rlgl", "1.0")],
         on_unload=_on_unload,
     )

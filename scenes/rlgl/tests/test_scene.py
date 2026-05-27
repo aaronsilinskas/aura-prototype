@@ -18,7 +18,7 @@ def test_factory_includes_effect_packs():
 
     scene = factory()
     assert ("elements", "1.0") in scene.effect_packs
-    assert ("basic", "1.0") in scene.effect_packs
+    assert ("basic", "1.1") in scene.effect_packs
 
 
 def test_factory_includes_rlgl_rule_pack():
