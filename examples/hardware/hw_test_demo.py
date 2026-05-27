@@ -161,9 +161,8 @@ while True:
         _acceleration = None
 
     # --- Queue combined input event ---
-    if _manager._stack:
-        _active_state = _manager._stack[-1][1]
-        _active_state.queue_event(
+    if _manager.active_state is not None:
+        _manager.active_state.queue_event(
             InputEvents.ButtonAndAcceleration(
                 ButtonData(_btn_states),
                 _acceleration,
