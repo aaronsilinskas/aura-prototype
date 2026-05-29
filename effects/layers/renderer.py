@@ -4,7 +4,7 @@ from effects.render import EffectRenderer, EffectTimer, PixelBuffer
 
 
 class LayerRenderer(EffectRenderer):
-    """Composes any simulation layer and a Palette into a renderer.
+    """Composes any effect layer and a Palette into a renderer.
 
     ``layer`` is any object exposing ``update(elapsed: float)`` and
     ``sample(position: float, pixel_count: int) -> float`` — for example

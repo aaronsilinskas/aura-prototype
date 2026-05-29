@@ -1,5 +1,5 @@
 class Layer:
-    """Base interface for simulation layers.
+    """Base interface for effect layers.
 
     All concrete subclasses must implement ``update`` and ``sample``.
 
