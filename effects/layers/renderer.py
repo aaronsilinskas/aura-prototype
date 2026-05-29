@@ -1,6 +1,6 @@
 from effects.layers.layer import Layer
 from effects.palette import Palette
-from effects.render import EffectRenderer, PixelBuffer
+from effects.render import EffectRenderer, EffectTimer, PixelBuffer
 
 
 class LayerRenderer(EffectRenderer):
@@ -22,7 +22,7 @@ class LayerRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, timer) -> None:
+    def update(self, timer: EffectTimer) -> None:
         self._layer.update(timer.elapsed)
 
     def render(self, output: PixelBuffer) -> None:

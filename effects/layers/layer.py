@@ -1,5 +1,5 @@
 class Layer:
-    """Base interface for simulation layers and independent agents.
+    """Base interface for simulation layers.
 
     All concrete subclasses must implement ``update`` and ``sample``.
 
