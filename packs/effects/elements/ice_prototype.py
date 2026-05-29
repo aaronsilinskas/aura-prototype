@@ -4,6 +4,7 @@ from engine.effects.manager import EffectBuilder
 from packs.effects.elements.helpers.flame_layer import FlameLayer
 from packs.effects.elements.helpers.renderer import LayerRenderer
 from packs.effects.elements.helpers.scroll import ScrollOffset
+from packs.effects.elements.helpers.scroll_layer import ScrollLayer
 
 # fmt: off
 _ice_palette = bytes([0, 0, 64, 8,
@@ -23,14 +24,16 @@ class IcePrototypeBuilder(EffectBuilder):
         """
         return LayerRenderer(
             name="elements.ice_prototype",
-            layer=FlameLayer(
-                spark_count=config.level,
-                resolution=config.resolution,
-                heat_rate=0.15,
-                extra_cool_rate=0.0,
-                spread=config.level_lerp(0.75, 0.45),
+            layer=ScrollLayer(
+                FlameLayer(
+                    spark_count=config.level,
+                    resolution=config.resolution,
+                    heat_rate=0.15,
+                    extra_cool_rate=0.0,
+                    spread=config.level_lerp(0.75, 0.45),
+                ),
+                ScrollOffset(speed=config.level_lerp(0.02, 0.05)),
             ),
-            scroll=ScrollOffset(speed=config.level_lerp(0.02, 0.05)),
             palette=PaletteLUT256(_ice_palette),
         )
 

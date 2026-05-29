@@ -4,6 +4,7 @@ from engine.effects.manager import EffectBuilder
 from packs.effects.elements.helpers.flame_layer import FlameLayer
 from packs.effects.elements.helpers.renderer import LayerRenderer
 from packs.effects.elements.helpers.scroll import PhaseScroll
+from packs.effects.elements.helpers.scroll_layer import ScrollLayer
 
 # fmt: off
 _water_palette = bytes([0, 0, 0, 64,
@@ -23,17 +24,19 @@ class WaterPrototypeBuilder(EffectBuilder):
         """
         return LayerRenderer(
             name="elements.water_prototype",
-            layer=FlameLayer(
-                spark_count=config.level,
-                resolution=config.resolution,
-                heat_rate=config.level_lerp(0.2, 0.29),
-                extra_cool_rate=0.0,
-                spread=0.2,
-            ),
-            scroll=PhaseScroll(
-                speed=config.level_lerp(0.05, 0.14),
-                min_phase=3.0,
-                max_phase=5.0,
+            layer=ScrollLayer(
+                FlameLayer(
+                    spark_count=config.level,
+                    resolution=config.resolution,
+                    heat_rate=config.level_lerp(0.2, 0.29),
+                    extra_cool_rate=0.0,
+                    spread=0.2,
+                ),
+                PhaseScroll(
+                    speed=config.level_lerp(0.05, 0.14),
+                    min_phase=3.0,
+                    max_phase=5.0,
+                ),
             ),
             palette=PaletteLUT256(_water_palette),
         )

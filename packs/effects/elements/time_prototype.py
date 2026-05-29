@@ -5,6 +5,7 @@ from engine.effects.manager import EffectBuilder
 from packs.effects.elements.helpers.add_colors_renderer import AddColorsRenderer
 from packs.effects.elements.helpers.drift_noise_layer import DriftNoiseLayer
 from packs.effects.elements.helpers.scroll import ScrollOffset
+from packs.effects.elements.helpers.scroll_layer import ScrollLayer
 from packs.effects.elements.helpers.shape_layer import ShapeLayer
 
 # fmt: off
@@ -35,8 +36,8 @@ class TimePrototypeBuilder(EffectBuilder):
             drift_speed=drift_speed,
             amplitude=0.2,
         )
-        ticker = ShapeLayer(
-            Shape.checkers(value=0.25, count=level, width=0.05),
+        ticker = ScrollLayer(
+            ShapeLayer(Shape.checkers(value=0.25, count=level, width=0.05)),
             ScrollOffset(speed=ticker_rotate_speed),
         )
         return AddColorsRenderer(
