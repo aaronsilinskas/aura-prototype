@@ -13,34 +13,22 @@ EffectListenerFunc: TypeAlias = "Callable[[str], None]"
 class EffectTimer:
     """Tracks frame timing for effect renderers.
 
-    ``elapsed`` is the last frame delta, ``total`` is cumulative elapsed time,
-    and ``progress`` is normalized to ``[0.0, 1.0]`` when a finite duration is
-    set. When ``duration`` is ``None``, ``progress`` stays ``0.0`` and
-    ``update`` always returns ``False``.
+    ``elapsed`` is the last frame delta; ``total`` is cumulative elapsed time.
     """
 
-    __slots__ = ("duration", "elapsed", "progress", "total")
+    __slots__ = ("elapsed", "total")
 
-    def __init__(self, duration: float | None = None):
+    def __init__(self) -> None:
         self.elapsed: float = 0.0
         self.total: float = 0.0
-        self.duration: float | None = duration
-        self.progress: float = 0.0
 
-    def update(self, elapsed: float) -> bool:
-        """Advance timer by one frame delta and return whether duration is complete."""
+    def update(self, elapsed: float) -> None:
+        """Advance timer by one frame delta."""
         self.elapsed = elapsed
         self.total += elapsed
-        if self.duration is not None and self.duration > 0:
-            self.progress = min(1.0, self.total / self.duration)
-
-        return self.progress >= 1.0
 
     def __str__(self) -> str:
-        return (
-            f"EffectTimer(elapsed={self.elapsed}, total={self.total}, "
-            f"duration={self.duration}, progress={self.progress})"
-        )
+        return f"EffectTimer(elapsed={self.elapsed}, total={self.total})"
 
 
 class RendererConfig:

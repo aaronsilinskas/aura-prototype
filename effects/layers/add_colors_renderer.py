@@ -13,9 +13,6 @@ class AddColorsRenderer(EffectRenderer):
     Layers are rendered in order: the first writes directly to ``output``; each
     subsequent layer renders to a lazily-allocated temp buffer and is blended
     additively (per-channel sum, clamped to 255).
-
-    The ``state`` argument on ``update`` and ``render`` is accepted for
-    signature compatibility with ``EffectRenderer`` but is never read.
     """
 
     __slots__ = ["_layers", "_name", "_temp"]
@@ -30,13 +27,11 @@ class AddColorsRenderer(EffectRenderer):
         return self._name
 
     def update(self, timer) -> None:
-        """Advance all layer buffers. ``state`` is ignored."""
         elapsed = timer.elapsed
         for buf, _ in self._layers:
             buf.update(elapsed)
 
     def render(self, output: PixelBuffer) -> None:
-        """Write additively blended layers to ``output``. ``state`` is ignored."""
         count = len(output)
         inv_count = 1.0 / count
         layers = self._layers

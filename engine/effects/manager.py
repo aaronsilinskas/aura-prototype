@@ -78,8 +78,7 @@ class EffectBuilder:
                 ``config.resolution`` describes the output hardware.
 
         Returns:
-            A configured ``EffectRenderer`` ready to be paired with an
-            ``EffectState`` and advanced each frame.
+            A configured ``EffectRenderer`` ready to be advanced each frame.
         """
         raise NotImplementedError
 
@@ -164,7 +163,7 @@ class EffectManager(EffectControls):
         level: int,
         options: dict[str, object],
     ) -> "EffectManager._EffectEntry":
-        """Construct an EffectRenderer paired with a fresh EffectState.
+        """Construct an EffectRenderer for the named effect.
 
         *name* must be in ``"pack.effect"`` format.  The pack portion is used to
         look up the registered pack in the ``PackRegistry``; the bare effect name

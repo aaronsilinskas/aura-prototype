@@ -1,6 +1,6 @@
 import pytest
 
-from effects.value import Range, ValueGenerator, lerp
+from effects.value import ValueGenerator, lerp
 
 # ---------------------------------------------------------------------------
 # lerp
@@ -27,42 +27,6 @@ def test_lerp_works_with_negative_range() -> None:
     assert lerp(-10.0, 10.0, 0.25) == pytest.approx(-5.0)
     assert lerp(-10.0, 10.0, 0.5) == pytest.approx(0.0)
     assert lerp(-10.0, 10.0, 0.75) == pytest.approx(5.0)
-
-
-# ---------------------------------------------------------------------------
-# Range
-# ---------------------------------------------------------------------------
-
-
-def test_range_lerp_returns_start_at_zero_progress() -> None:
-    r = Range(5.0, 15.0)
-
-    assert r.lerp(0.0) == pytest.approx(5.0)
-
-
-def test_range_lerp_returns_end_at_full_progress() -> None:
-    r = Range(5.0, 15.0)
-
-    assert r.lerp(1.0) == pytest.approx(15.0)
-
-
-def test_range_lerp_clamps_to_end_when_progress_exceeds_one() -> None:
-    r = Range(0.0, 1.0)
-
-    assert r.lerp(1.5) == pytest.approx(1.0)
-    assert r.lerp(100.0) == pytest.approx(1.0)
-
-
-def test_range_lerp_interpolates_proportionally_at_midpoint() -> None:
-    r = Range(0.0, 100.0)
-
-    assert r.lerp(0.5) == pytest.approx(50.0)
-
-
-def test_range_lerp_works_with_reversed_start_and_end() -> None:
-    r = Range(1.0, 0.0)
-
-    assert r.lerp(0.5) == pytest.approx(0.5)
 
 
 # ---------------------------------------------------------------------------

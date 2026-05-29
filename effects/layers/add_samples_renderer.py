@@ -8,9 +8,6 @@ class AddSamplesRenderer(EffectRenderer):
 
     Per-pixel: sums ``agent.sample(pos, count)`` across all agents, clamps the
     total to ``1.0``, then maps through a single shared palette.
-
-    The ``state`` argument on ``update`` and ``render`` is accepted for
-    signature compatibility with ``EffectRenderer`` but is never read.
     """
 
     __slots__ = ["_agents", "_name", "_palette"]
@@ -25,13 +22,11 @@ class AddSamplesRenderer(EffectRenderer):
         return self._name
 
     def update(self, timer) -> None:
-        """Advance all agents. ``state`` is ignored."""
         elapsed = timer.elapsed
         for agent in self._agents:
             agent.update(elapsed)
 
     def render(self, output: PixelBuffer) -> None:
-        """Write additively blended agent colors to ``output``. ``state`` is ignored."""
         count = len(output)
         inv_count = 1.0 / count
         palette = self._palette

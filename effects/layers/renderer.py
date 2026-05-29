@@ -9,9 +9,6 @@ class LayerRenderer(EffectRenderer):
     ``layer`` is any object exposing ``update(elapsed: float)`` and
     ``sample(position: float, pixel_count: int) -> float`` — for example
     ``FlameLayer``, ``DriftNoiseLayer``, ``SparkleLayer``, or ``ScrollLayer``.
-
-    The ``state`` argument on ``update`` and ``render`` is accepted for
-    signature compatibility with ``EffectRenderer`` but is never read.
     """
 
     __slots__ = ["_layer", "_name", "_palette"]
@@ -26,11 +23,9 @@ class LayerRenderer(EffectRenderer):
         return self._name
 
     def update(self, timer) -> None:
-        """Advance the layer. ``state`` is ignored."""
         self._layer.update(timer.elapsed)
 
     def render(self, output: PixelBuffer) -> None:
-        """Write palette-mapped layer colors to ``output``. ``state`` is ignored."""
         count = len(output)
         inv_count = 1.0 / count
         layer = self._layer
