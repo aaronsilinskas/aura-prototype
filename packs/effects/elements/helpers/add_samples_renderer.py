@@ -33,14 +33,14 @@ class AddSamplesRenderer(EffectRenderer):
     def render(self, state, output: PixelBuffer) -> None:
         """Write additively blended agent colors to ``output``. ``state`` is ignored."""
         count = len(output)
+        inv_count = 1.0 / count
         palette = self._palette
         agents = self._agents
-        agent_count = len(agents)
         for i in range(count):
-            pos = i / count
+            pos = i * inv_count
             total = 0.0
-            for j in range(agent_count):
-                total += agents[j].sample(pos, count)
+            for agent in agents:
+                total += agent.sample(pos, count)
             if total > 1.0:
                 total = 1.0
             output[i] = palette.lookup(total)

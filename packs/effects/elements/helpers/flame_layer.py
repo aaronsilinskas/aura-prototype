@@ -19,12 +19,12 @@ class FlameLayer(Layer):
         "_cool_rate",
         "_flame_buffer",
         "_flame_count",
-        "_half_flame_spread",
         "_heat_rate",
         "_spark_buffer",
         "_spark_count",
         "_sparks_to_remove",
-        "_spread_range",
+        "_spread_offsets",
+        "_spread_weights",
     ]
 
     def __init__(
@@ -39,15 +39,27 @@ class FlameLayer(Layer):
         self._flame_count = max(resolution, spark_count * 2)
         self._heat_rate = heat_rate
         spread = min(max(spread, 0.0), 1.0)
-        self._half_flame_spread = int(spread * self._flame_count) // 2
-        self._spread_range = range(-self._half_flame_spread, self._half_flame_spread + 1)
+        half_flame_spread = int(spread * self._flame_count) // 2
 
         heat_per_spark = heat_rate
-        if self._half_flame_spread > 0:
-            heat_per_spark += heat_rate * (self._half_flame_spread + 2)
+        if half_flame_spread > 0:
+            heat_per_spark += heat_rate * (half_flame_spread + 2)
         total_spark_heat = heat_per_spark * spark_count
         cooling_buffer_size = self._flame_count - spark_count
         self._cool_rate = total_spark_heat / cooling_buffer_size + extra_cool_rate
+
+        # Pre-compute non-zero spread offsets and their weights once; avoids
+        # per-frame division and abs() calls inside the spark update loop.
+        if half_flame_spread > 0:
+            inv_hfs = 1.0 / half_flame_spread
+            offsets = [o for o in range(-half_flame_spread, half_flame_spread + 1) if o != 0]
+            self._spread_offsets: list[int] = offsets
+            self._spread_weights: list[float] = [
+                (1 + half_flame_spread - abs(o)) * inv_hfs for o in offsets
+            ]
+        else:
+            self._spread_offsets = []
+            self._spread_weights = []
 
         self._flame_buffer = [0.0] * self._flame_count
         self._spark_buffer: set[int] = set()
@@ -60,7 +72,9 @@ class FlameLayer(Layer):
         flame_buffer = self._flame_buffer
         spark_buffer = self._spark_buffer
         flame_count = self._flame_count
-        half_flame_spread = self._half_flame_spread
+        spread_offsets = self._spread_offsets
+        spread_weights = self._spread_weights
+        n_spread = len(spread_offsets)
 
         cool_delta = self._cool_rate * elapsed
         for i in range(flame_count):
@@ -74,13 +88,11 @@ class FlameLayer(Layer):
 
         for spark_index in spark_buffer:
             if flame_buffer[spark_index] < 1.0:
-                for offset in self._spread_range:
-                    if offset == 0:
-                        flame_buffer[spark_index] += spark_heat
-                    else:
-                        flame_buffer[(spark_index + offset) % flame_count] += (
-                            spark_heat * (1 + half_flame_spread - abs(offset)) / half_flame_spread
-                        )
+                flame_buffer[spark_index] += spark_heat
+                for k in range(n_spread):
+                    flame_buffer[(spark_index + spread_offsets[k]) % flame_count] += (
+                        spark_heat * spread_weights[k]
+                    )
             else:
                 sparks_to_remove[remove_count] = spark_index
                 remove_count += 1

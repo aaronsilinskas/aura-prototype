@@ -38,12 +38,13 @@ class AddColorsRenderer(EffectRenderer):
     def render(self, state, output: PixelBuffer) -> None:
         """Write additively blended layers to ``output``. ``state`` is ignored."""
         count = len(output)
+        inv_count = 1.0 / count
         layers = self._layers
 
         # First layer renders directly into output
         buf0, pal0 = layers[0]
         for i in range(count):
-            v = buf0.sample(i / count, count)
+            v = buf0.sample(i * inv_count, count)
             if v > 1.0:
                 v = 1.0
             output[i] = pal0.lookup(v)
@@ -59,7 +60,7 @@ class AddColorsRenderer(EffectRenderer):
         for k in range(1, len(layers)):
             buf, pal = layers[k]
             for i in range(count):
-                v = buf.sample(i / count, count)
+                v = buf.sample(i * inv_count, count)
                 if v > 1.0:
                     v = 1.0
                 temp[i] = pal.lookup(v)

@@ -32,7 +32,8 @@ class LayerRenderer(EffectRenderer):
     def render(self, state, output: PixelBuffer) -> None:
         """Write palette-mapped layer colors to ``output``. ``state`` is ignored."""
         count = len(output)
+        inv_count = 1.0 / count
         layer = self._layer
         palette = self._palette
         for i in range(count):
-            output[i] = palette.lookup(layer.sample(i / count, count))
+            output[i] = palette.lookup(layer.sample(i * inv_count, count))
