@@ -1,7 +1,7 @@
 import random
 
+from effects.layer import Layer
 from effects.value import lerp
-from packs.effects.elements.helpers.layer import Layer
 
 
 class FlameLayer(Layer):

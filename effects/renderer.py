@@ -1,6 +1,6 @@
+from effects.layer import Layer
 from effects.palette import Palette
 from effects.render import EffectRenderer, PixelBuffer
-from packs.effects.elements.helpers.layer import Layer
 
 
 class LayerRenderer(EffectRenderer):

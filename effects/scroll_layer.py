@@ -1,5 +1,5 @@
-from packs.effects.elements.helpers.layer import Layer
-from packs.effects.elements.helpers.scroll import Scroll
+from effects.layer import Layer
+from effects.scroll import Scroll
 
 
 class ScrollLayer(Layer):

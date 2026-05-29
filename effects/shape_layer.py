@@ -1,5 +1,5 @@
+from effects.layer import Layer
 from effects.shape import EffectShapeFunc
-from packs.effects.elements.helpers.layer import Layer
 
 
 class ShapeLayer(Layer):

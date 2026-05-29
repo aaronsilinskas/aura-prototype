@@ -1,16 +1,16 @@
-from effects.effect import Effect
+from effects.flame_layer import FlameLayer
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, RendererConfig
-from effects.steps.flame import flame
+from effects.renderer import LayerRenderer
 from engine.effects.manager import EffectBuilder
 
 # fmt: off
-light_palette = bytes([0, 32, 32, 32,
-                       255, 255, 255, 255])
+_light_palette = bytes([0, 32, 32, 32,
+                        255, 255, 255, 255])
 # fmt: on
 
 
-class LightBuilder(EffectBuilder):
+class LightPrototypeBuilder(EffectBuilder):
     def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
         """Tight, rapid white flickers — a bright noisy pulse concentrated in a
         narrow band, like an overdriven flash.
@@ -18,24 +18,17 @@ class LightBuilder(EffectBuilder):
         Level: hotter sparks that also cool faster — brighter peaks with quicker
         turnover and more rapid flickering.
         """
-        level = config.level
-
-        heat_rate = config.level_lerp(0.5, 0.75)
-        extra_cool_rate = config.level_lerp(0.1, 0.3)
-
-        light_effect = Effect("light").add_steps(
-            [
-                flame(
-                    spark_count=level,
-                    heat_rate=heat_rate,
-                    extra_cool_rate=extra_cool_rate,
-                    resolution=config.resolution,
-                    spread=0.1,
-                )
-            ]
+        return LayerRenderer(
+            name=name,
+            layer=FlameLayer(
+                spark_count=config.level,
+                resolution=config.resolution,
+                heat_rate=config.level_lerp(0.5, 0.75),
+                extra_cool_rate=config.level_lerp(0.1, 0.3),
+                spread=0.1,
+            ),
+            palette=PaletteLUT256(_light_palette),
         )
 
-        return EffectRenderer(light_effect, PaletteLUT256(light_palette))
 
-
-BUILD = LightBuilder()
+BUILD = LightPrototypeBuilder()

@@ -1,8 +1,8 @@
 import random
 
+from effects.layer import Layer
 from effects.value import DynamicValue, lerp
 from effects.value import ValueGenerator as VG
-from packs.effects.elements.helpers.layer import Layer
 
 
 class DriftNoiseLayer(Layer):

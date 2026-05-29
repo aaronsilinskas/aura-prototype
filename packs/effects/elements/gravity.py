@@ -1,28 +1,27 @@
-from effects.effect import Effect
+from effects.add_colors_renderer import AddColorsRenderer
+from effects.drift_noise_layer import DriftNoiseLayer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer, MergeRenderer, RendererConfig
-from effects.steps.drift_noise import drift_noise
-from effects.steps.sparkle import sparkle
+from effects.render import EffectRenderer, RendererConfig
+from effects.sparkle_layer import SparkleLayer
 from effects.value import ValueGenerator as VG
 from engine.effects.manager import EffectBuilder
 
 # fmt: off
-grayscale_palette = bytes([0, 0, 0, 0,
-                           255, 255, 255, 255])
-gravity_palette = bytes([0, 0, 0, 0,
-                         128, 28, 18, 64,
-                         192, 25, 50, 100,
-                         228, 128, 75, 25])
+_GRAYSCALE_PALETTE = bytes([  0,   0,   0,   0,
+                             255, 255, 255, 255])
+_GRAVITY_PALETTE = bytes([  0,   0,   0,   0,
+                           128,  28,  18,  64,
+                           192,  25,  50, 100,
+                           228, 128,  75,  25])
 # fmt: on
 
 
-class GravityBuilder(EffectBuilder):
+class GravityPrototypeBuilder(EffectBuilder):
     def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
-        """A slowly drifting deep-space nebula in indigo and navy, scattered
-        with white stars that softly twinkle in and out.
+        """A drift-noise nebula prototype with additive star sparkles.
 
-        Level: more stars that flash more crisply, the nebula drifts faster, and
-        its contrast deepens.
+        Bypasses Effect/EffectStep/EffectState machinery entirely — all
+        simulation state lives directly on the renderer.
         """
         level = config.level
 
@@ -35,36 +34,24 @@ class GravityBuilder(EffectBuilder):
         star_fade_in_rate = config.level_lerp(1.0, 2.0)
         star_fade_out_rate = config.level_lerp(2.0, 4.0)
 
-        gravity_nebula_effect = Effect("gravity_nebula").add_steps(
+        nebula = DriftNoiseLayer(
+            resolution=nebula_resolution,
+            drift_speed=nebula_drift_speed,
+            amplitude=nebula_amplitude,
+        )
+        sparkles = SparkleLayer(
+            sparkle_count=level,
+            spawn_delay_rate=VG.random(spawn_delay_min, spawn_delay_max),
+            fade_in_rate=star_fade_in_rate,
+            fade_out_rate=star_fade_out_rate,
+        )
+        return AddColorsRenderer(
+            name,
             [
-                drift_noise(
-                    resolution=nebula_resolution,
-                    drift_speed=nebula_drift_speed,
-                    amplitude=nebula_amplitude,
-                ),
-            ]
-        )
-        gravity_nebula_renderer = EffectRenderer(
-            gravity_nebula_effect, PaletteLUT256(gravity_palette)
-        )
-
-        gravity_stars_effect = Effect("gravity_stars").add_steps(
-            [
-                sparkle(
-                    sparkle_count=level,
-                    spawn_delay_rate=VG.random(spawn_delay_min, spawn_delay_max),
-                    fade_in_rate=star_fade_in_rate,
-                    fade_out_rate=star_fade_out_rate,
-                ),
-            ]
-        )
-        gravity_stars_renderer = EffectRenderer(
-            gravity_stars_effect, PaletteLUT256(grayscale_palette)
-        )
-
-        return MergeRenderer(
-            "gravity", [gravity_nebula_renderer, gravity_stars_renderer], additive=True
+                (nebula, PaletteLUT256(_GRAVITY_PALETTE)),
+                (sparkles, PaletteLUT256(_GRAYSCALE_PALETTE)),
+            ],
         )
 
 
-BUILD = GravityBuilder()
+BUILD = GravityPrototypeBuilder()
