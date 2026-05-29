@@ -77,11 +77,25 @@ _ELEMENT_PAGES = (
         (Scope.PERSONAL, "elements.gravity"),
     ),
     (
+        (Scope.Global.BUFF, "elements.air_prototype"),
+        (Scope.Global.DEBUFF, "elements.dark_prototype"),
+        (Scope.Global.MAIN, "elements.earth_prototype"),
+        (Scope.DIRECTIONAL, "elements.fire_prototype"),
+        (Scope.PERSONAL, "elements.gravity_prototype"),
+    ),
+    (
         (Scope.Global.BUFF, "elements.ice"),
         (Scope.Global.DEBUFF, "elements.light"),
         (Scope.Global.MAIN, "elements.lightning"),
         (Scope.DIRECTIONAL, "elements.time"),
         (Scope.PERSONAL, "elements.water"),
+    ),
+    (
+        (Scope.Global.BUFF, "elements.ice_prototype"),
+        (Scope.Global.DEBUFF, "elements.light_prototype"),
+        (Scope.Global.MAIN, "elements.lightning_prototype"),
+        (Scope.DIRECTIONAL, "elements.time_prototype"),
+        (Scope.PERSONAL, "elements.water_prototype"),
     ),
 )
 
