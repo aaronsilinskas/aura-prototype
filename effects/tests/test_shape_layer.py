@@ -1,4 +1,4 @@
-from effects.shape_layer import ShapeLayer
+from effects.layers.shape_layer import ShapeLayer
 
 # ---------------------------------------------------------------------------
 # ShapeLayer — delegates to shape function

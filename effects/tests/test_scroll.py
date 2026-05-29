@@ -1,4 +1,4 @@
-from effects.scroll import PhaseScroll, ScrollOffset
+from effects.layers.scroll import PhaseScroll, ScrollOffset
 
 # ---------------------------------------------------------------------------
 # ScrollOffset — position shift

@@ -1,5 +1,5 @@
-from effects.layer import Layer
-from effects.scroll import Scroll
+from effects.layers.layer import Layer
+from effects.layers.scroll import Scroll
 
 
 class ScrollLayer(Layer):

@@ -1,7 +1,7 @@
 import random
 
-from effects.add_samples_renderer import AddSamplesRenderer
-from effects.layer import Layer
+from effects.layers.add_samples_renderer import AddSamplesRenderer
+from effects.layers.layer import Layer
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, RendererConfig
 from effects.shape import Shape

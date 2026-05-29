@@ -1,6 +1,6 @@
+from effects.layers.renderer import LayerRenderer
 from effects.palette import PaletteLUT256
 from effects.render import PixelBuffer
-from effects.renderer import LayerRenderer
 from effects.tests.helpers import make_timer
 
 _BLACK_TO_WHITE = bytes([0, 0, 0, 0, 255, 255, 255, 255])

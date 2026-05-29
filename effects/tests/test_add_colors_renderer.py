@@ -1,4 +1,4 @@
-from effects.add_colors_renderer import AddColorsRenderer
+from effects.layers.add_colors_renderer import AddColorsRenderer
 from effects.palette import Palette, PaletteLUT256
 from effects.render import PixelBuffer
 from effects.tests.helpers import make_timer

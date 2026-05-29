@@ -1,6 +1,6 @@
 import pytest
 
-from effects.layer import Layer
+from effects.layers.layer import Layer
 
 # ---------------------------------------------------------------------------
 # Layer — abstract interface

@@ -1,5 +1,5 @@
-from effects.scroll import ScrollOffset
-from effects.scroll_layer import ScrollLayer
+from effects.layers.scroll import ScrollOffset
+from effects.layers.scroll_layer import ScrollLayer
 
 
 class _PositionLayer:

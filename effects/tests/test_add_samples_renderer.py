@@ -1,4 +1,4 @@
-from effects.add_samples_renderer import AddSamplesRenderer
+from effects.layers.add_samples_renderer import AddSamplesRenderer
 from effects.palette import PaletteLUT256
 from effects.render import PixelBuffer
 from effects.tests.helpers import make_timer

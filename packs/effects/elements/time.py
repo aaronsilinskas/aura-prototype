@@ -1,11 +1,11 @@
-from effects.add_colors_renderer import AddColorsRenderer
-from effects.drift_noise_layer import DriftNoiseLayer
+from effects.layers.add_colors_renderer import AddColorsRenderer
+from effects.layers.drift_noise_layer import DriftNoiseLayer
+from effects.layers.scroll import ScrollOffset
+from effects.layers.scroll_layer import ScrollLayer
+from effects.layers.shape_layer import ShapeLayer
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, RendererConfig
-from effects.scroll import ScrollOffset
-from effects.scroll_layer import ScrollLayer
 from effects.shape import Shape
-from effects.shape_layer import ShapeLayer
 from engine.effects.manager import EffectBuilder
 
 # fmt: off

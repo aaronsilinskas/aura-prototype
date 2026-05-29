@@ -1,4 +1,4 @@
-from effects.flame_layer import FlameLayer
+from effects.layers.flame_layer import FlameLayer
 
 # ---------------------------------------------------------------------------
 # FlameLayer — sample range

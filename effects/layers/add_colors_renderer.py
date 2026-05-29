@@ -1,4 +1,4 @@
-from effects.layer import Layer
+from effects.layers.layer import Layer
 from effects.palette import Palette
 from effects.render import EffectRenderer, PixelBuffer
 

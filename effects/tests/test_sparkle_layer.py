@@ -1,4 +1,4 @@
-from effects.sparkle_layer import SparkleLayer
+from effects.layers.sparkle_layer import SparkleLayer
 
 # ---------------------------------------------------------------------------
 # SparkleLayer — sample range

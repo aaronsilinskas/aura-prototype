@@ -1,4 +1,4 @@
-from effects.drift_noise_layer import DriftNoiseLayer
+from effects.layers.drift_noise_layer import DriftNoiseLayer
 
 # ---------------------------------------------------------------------------
 # DriftNoiseLayer — sample range

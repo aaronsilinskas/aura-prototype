@@ -5,7 +5,7 @@ try:
 except ImportError:
     pass
 
-from effects.layer import Layer
+from effects.layers.layer import Layer
 from effects.value import DynamicValue
 from effects.value import ValueGenerator as VG
 

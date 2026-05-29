@@ -1,6 +1,6 @@
 import random
 
-from effects.layer import Layer
+from effects.layers.layer import Layer
 from effects.value import lerp
 
 

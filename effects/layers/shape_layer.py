@@ -1,4 +1,4 @@
-from effects.layer import Layer
+from effects.layers.layer import Layer
 from effects.shape import EffectShapeFunc
 
 

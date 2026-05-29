@@ -1,9 +1,9 @@
-from effects.flame_layer import FlameLayer
+from effects.layers.flame_layer import FlameLayer
+from effects.layers.renderer import LayerRenderer
+from effects.layers.scroll import PhaseScroll
+from effects.layers.scroll_layer import ScrollLayer
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, RendererConfig
-from effects.renderer import LayerRenderer
-from effects.scroll import PhaseScroll
-from effects.scroll_layer import ScrollLayer
 from engine.effects.manager import EffectBuilder
 
 # fmt: off
