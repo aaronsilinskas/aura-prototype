@@ -21,7 +21,7 @@ Full game and hardware design lives in `~/dev/aura/aura-docs/` (an Obsidian vaul
 
 ```
 effects/          Animation engine (CircuitPython-safe)
-  render.py       RendererConfig, PixelBuffer, EffectRenderer, EffectTimer
+  render.py       RendererConfig, PixelBuffer, EffectRenderer
   palette.py      Palette, PaletteLUT256 (pre-computed, immutable)
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
@@ -54,10 +54,9 @@ scripts/          Deploy and maintenance scripts
 
 | Type | Lives in | Role |
 |------|----------|------|
-| `EffectTimer` | `effects/render.py` | Duration + elapsed tracking; passed to each renderer's `update` |
 | `RendererConfig` | `effects/render.py` | Level [1–10], resolution, options, listeners for one render pass |
 | `PixelBuffer` | `effects/render.py` | List-backed in-memory pixel buffer of packed RGB values |
-| `EffectRenderer` | `effects/render.py` | Base class for all renderers; subclasses implement `name`, `update(timer)`, `render(output)` |
+| `EffectRenderer` | `effects/render.py` | Base class for all renderers; subclasses implement `name`, `update(elapsed)`, `render(output)` |
 | `Layer` | `effects/layers/layer.py` | Base layer: `update(elapsed)` + `sample(position, pixel_count) -> float` |
 | `Scroll` | `effects/layers/scroll.py` | Scroll base: `update(elapsed)` + `apply(position) -> float` |
 | `LayerRenderer` | `effects/layers/renderer.py` | Single-layer `EffectRenderer` |

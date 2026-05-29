@@ -12,7 +12,7 @@ microcontrollers. Full game and hardware design lives in `~/dev/aura/aura-docs/`
 
 ```
 effects/          LED animation engine (CircuitPython-safe)
-  render.py       RendererConfig, PixelBuffer, EffectRenderer, EffectTimer
+  render.py       RendererConfig, PixelBuffer, EffectRenderer
   palette.py      Palette, PaletteLUT256
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
@@ -121,9 +121,8 @@ and the transition is applied after `engine.update(state)` returns.
 | `EffectReceipt` | `engine/effects/manager.py` | Opaque handle for a running effect; used to stop by receipt |
 | `Scope` / `ScopeValue` | `engine/effects/scope.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `Global.*`, `ALL` |
 | `RendererConfig` | `effects/render.py` | Level [1–10], resolution, options for one render pass |
-| `EffectTimer` | `effects/render.py` | Duration + elapsed tracking; passed to each renderer's `update` |
 | `PixelBuffer` | `effects/render.py` | In-memory packed-RGB pixel buffer |
-| `EffectRenderer` | `effects/render.py` | Base class; subclasses implement `name`, `update(timer)`, `render(output)` |
+| `EffectRenderer` | `effects/render.py` | Base class; subclasses implement `name`, `update(elapsed)`, `render(output)` |
 | `Layer` | `effects/layers/layer.py` | Simulation layer: `update(elapsed)` + `sample(position, pixel_count) -> float` |
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB |
 | `Aura` | `magic/aura.py` | Player magic pool + active spell list |

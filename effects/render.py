@@ -10,27 +10,6 @@ from effects.level import level_lerp_int as _level_lerp_int
 EffectListenerFunc: TypeAlias = "Callable[[str], None]"
 
 
-class EffectTimer:
-    """Tracks frame timing for effect renderers.
-
-    ``elapsed`` is the last frame delta; ``total`` is cumulative elapsed time.
-    """
-
-    __slots__ = ("elapsed", "total")
-
-    def __init__(self) -> None:
-        self.elapsed: float = 0.0
-        self.total: float = 0.0
-
-    def update(self, elapsed: float) -> None:
-        """Advance timer by one frame delta."""
-        self.elapsed = elapsed
-        self.total += elapsed
-
-    def __str__(self) -> str:
-        return f"EffectTimer(elapsed={self.elapsed}, total={self.total})"
-
-
 class RendererConfig:
     """Runtime configuration shared across a render pass.
 
@@ -103,7 +82,7 @@ class EffectRenderer:
         """The name of this renderer."""
         raise NotImplementedError
 
-    def update(self, timer: EffectTimer) -> None:
+    def update(self, elapsed: float) -> None:
         """Advance renderer state for the current frame."""
         raise NotImplementedError
 

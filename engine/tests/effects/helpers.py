@@ -47,7 +47,7 @@ class _NamedRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, timer: object) -> None:
+    def update(self, elapsed: float) -> None:
         pass
 
     def render(self, output: object) -> None:
@@ -67,7 +67,7 @@ class SpyRenderer:
     def __init__(self) -> None:
         self.update_count: int = 0
 
-    def update(self, timer: object) -> None:
+    def update(self, elapsed: float) -> None:
         self.update_count += 1
 
     def render(self, buf: object) -> None:
@@ -111,7 +111,7 @@ class EventFiringEffectBuilder(EffectBuilder):
             def name(self) -> str:  # type: ignore[override]
                 return name
 
-            def update(self, timer: object) -> None:
+            def update(self, elapsed: float) -> None:
                 config.notify_listeners(event_name)
 
             def render(self, output: object) -> None:

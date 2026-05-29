@@ -21,8 +21,7 @@ class AddSamplesRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, timer) -> None:
-        elapsed = timer.elapsed
+    def update(self, elapsed: float) -> None:
         for layer in self._layers:
             layer.update(elapsed)
 

@@ -1,4 +1,4 @@
-from effects.render import EffectRenderer, EffectTimer, PixelBuffer, RendererConfig
+from effects.render import EffectRenderer, PixelBuffer, RendererConfig
 from engine.packs import PackRegistry
 from engine.state import EffectControls, EffectReceipt, ScopeValue
 from engine.timer import Timer
@@ -126,7 +126,6 @@ class EffectManager(EffectControls):
         "_output_key_sets",
         "_outputs",
         "_registry",
-        "_timer",
     )
 
     def __init__(self, registry: PackRegistry, outputs: list[EffectOutput]) -> None:
@@ -134,7 +133,6 @@ class EffectManager(EffectControls):
         self._outputs: list[EffectOutput] = outputs
         self._effects: list[EffectManager._EffectEntry] = []
         self._next_id: int = 1
-        self._timer: EffectTimer = EffectTimer()
         self._output_key_sets: list[frozenset[str]] = [
             frozenset(k for s in o.scopes for k in s.keys) for o in outputs
         ]
@@ -332,11 +330,11 @@ class EffectManager(EffectControls):
 
     def update(self, timer: Timer) -> None:
         """Tick all active effects and deliver frames to every registered output."""
-        self._timer.update(timer.elapsed)
+        elapsed = timer.elapsed
 
         # Pass 1: advance each renderer once.
         for entry in self._effects:
-            entry.renderer.update(self._timer)
+            entry.renderer.update(elapsed)
 
         # Pass 2: render and deliver per-key frames to each output.
         # Every registered key receives a call; empty lists signal go-dark.

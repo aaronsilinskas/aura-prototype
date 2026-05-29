@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from effects.render import EffectTimer, PixelBuffer, RendererConfig
+from effects.render import PixelBuffer, RendererConfig
 
 
 def _config(level: int = 10, options: dict | None = None) -> RendererConfig:
@@ -18,9 +18,7 @@ def _build(level: int = 10, options: dict | None = None):
 
 
 def _advance(renderer, seconds: float) -> None:
-    timer = EffectTimer()
-    timer.update(seconds)
-    renderer.update(timer)
+    renderer.update(seconds)
 
 
 def _render(renderer, pixel_count: int = 4) -> list:

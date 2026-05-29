@@ -19,7 +19,7 @@ class SolidRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, timer) -> None:
+    def update(self, elapsed: float) -> None:
         pass
 
     def render(self, output: PixelBuffer) -> None:

@@ -1,4 +1,4 @@
-from effects.render import EffectRenderer, EffectTimer, PixelBuffer, RendererConfig
+from effects.render import EffectRenderer, PixelBuffer, RendererConfig
 
 # ---------------------------------------------------------------------------
 # Stub renderers used by EffectRenderer tests
@@ -16,7 +16,7 @@ class _ConstantRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, timer: object) -> None:
+    def update(self, elapsed: float) -> None:
         pass
 
     def render(self, output: PixelBuffer) -> None:
@@ -36,7 +36,7 @@ class _SplitRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, timer: object) -> None:
+    def update(self, elapsed: float) -> None:
         pass
 
     def render(self, output: PixelBuffer) -> None:
@@ -56,7 +56,7 @@ class _CountingRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, timer: object) -> None:
+    def update(self, elapsed: float) -> None:
         self.count += 1
 
     def render(self, output: PixelBuffer) -> None:
@@ -219,7 +219,7 @@ def test_base_renderer_update_raises_not_implemented() -> None:
 
     renderer = EffectRenderer()
     with pytest.raises(NotImplementedError):
-        renderer.update(EffectTimer())
+        renderer.update(0.016)
 
 
 def test_base_renderer_render_raises_not_implemented() -> None:

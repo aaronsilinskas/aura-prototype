@@ -67,8 +67,8 @@ class PulseRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, timer) -> None:
-        self._elapsed += timer.elapsed
+    def update(self, elapsed: float) -> None:
+        self._elapsed += elapsed
         self._elapsed %= self._cycle_total
         elapsed = self._elapsed
         if elapsed < self._b_on:

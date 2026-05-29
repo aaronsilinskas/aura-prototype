@@ -1,15 +1,10 @@
 from effects.layers.layer import Layer
 from effects.palette import Palette
-from effects.render import EffectRenderer, EffectTimer, PixelBuffer
+from effects.render import EffectRenderer, PixelBuffer
 
 
 class LayerRenderer(EffectRenderer):
-    """Composes any effect layer and a Palette into a renderer.
-
-    ``layer`` is any object exposing ``update(elapsed: float)`` and
-    ``sample(position: float, pixel_count: int) -> float`` — for example
-    ``FlameLayer``, ``DriftNoiseLayer``, ``SparkleLayer``, or ``ScrollLayer``.
-    """
+    """Composes an effect layer and a Palette into a renderer."""
 
     __slots__ = ["_layer", "_name", "_palette"]
 
@@ -22,8 +17,8 @@ class LayerRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, timer: EffectTimer) -> None:
-        self._layer.update(timer.elapsed)
+    def update(self, elapsed: float) -> None:
+        self._layer.update(elapsed)
 
     def render(self, output: PixelBuffer) -> None:
         count = len(output)
