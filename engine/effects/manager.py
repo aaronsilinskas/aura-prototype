@@ -1,4 +1,3 @@
-from effects.effect import EffectState, EffectTimer
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
 from engine.packs import PackRegistry
 from engine.state import EffectControls, EffectReceipt, ScopeValue
@@ -79,8 +78,7 @@ class EffectBuilder:
                 ``config.resolution`` describes the output hardware.
 
         Returns:
-            A configured ``EffectRenderer`` ready to be paired with an
-            ``EffectState`` and advanced each frame.
+            A configured ``EffectRenderer`` ready to be advanced each frame.
         """
         raise NotImplementedError
 
@@ -98,7 +96,7 @@ class EffectManager(EffectControls):
     """
 
     class _EffectEntry:
-        __slots__ = ("keys", "name", "output_buffers", "receipt", "renderer", "state")
+        __slots__ = ("keys", "name", "output_buffers", "receipt", "renderer")
 
         def __init__(
             self,
@@ -107,14 +105,12 @@ class EffectManager(EffectControls):
             receipt: EffectReceipt,
             output_buffers: list[dict[str, PixelBuffer] | None],
             renderer: EffectRenderer | None,
-            state: EffectState,
         ) -> None:
             self.keys: tuple[str, ...] = keys
             self.name: str = name
             self.receipt: EffectReceipt = receipt
             self.output_buffers: list[dict[str, PixelBuffer] | None] = output_buffers
             self.renderer: EffectRenderer | None = renderer
-            self.state: EffectState = state
 
         def __repr__(self) -> str:
             return (
@@ -130,7 +126,6 @@ class EffectManager(EffectControls):
         "_output_key_sets",
         "_outputs",
         "_registry",
-        "_timer",
     )
 
     def __init__(self, registry: PackRegistry, outputs: list[EffectOutput]) -> None:
@@ -138,7 +133,6 @@ class EffectManager(EffectControls):
         self._outputs: list[EffectOutput] = outputs
         self._effects: list[EffectManager._EffectEntry] = []
         self._next_id: int = 1
-        self._timer: EffectTimer = EffectTimer()
         self._output_key_sets: list[frozenset[str]] = [
             frozenset(k for s in o.scopes for k in s.keys) for o in outputs
         ]
@@ -167,7 +161,7 @@ class EffectManager(EffectControls):
         level: int,
         options: dict[str, object],
     ) -> "EffectManager._EffectEntry":
-        """Construct an EffectRenderer paired with a fresh EffectState.
+        """Construct an EffectRenderer for the named effect.
 
         *name* must be in ``"pack.effect"`` format.  The pack portion is used to
         look up the registered pack in the ``PackRegistry``; the bare effect name
@@ -209,7 +203,7 @@ class EffectManager(EffectControls):
                 output_buffers.append(None)
 
         entry = EffectManager._EffectEntry(
-            tuple(scope_key_set), effect_name, receipt, output_buffers, None, EffectState()
+            tuple(scope_key_set), effect_name, receipt, output_buffers, None
         )
 
         def scoped_listener(event_name: str) -> None:
@@ -336,11 +330,11 @@ class EffectManager(EffectControls):
 
     def update(self, timer: Timer) -> None:
         """Tick all active effects and deliver frames to every registered output."""
-        self._timer.update(timer.elapsed)
+        elapsed = timer.elapsed
 
         # Pass 1: advance each renderer once.
         for entry in self._effects:
-            entry.renderer.update(entry.state, self._timer)
+            entry.renderer.update(elapsed)
 
         # Pass 2: render and deliver per-key frames to each output.
         # Every registered key receives a call; empty lists signal go-dark.
@@ -357,7 +351,7 @@ class EffectManager(EffectControls):
                 buf_dict = entry.output_buffers[i]
                 if buf_dict is not None:
                     for k, buf in buf_dict.items():
-                        entry.renderer.render(entry.state, buf)
+                        entry.renderer.render(buf)
                         frame_bufs[k].append(buf)
                         frame_receipts[k].append(entry.receipt)
             for key in frame_bufs:

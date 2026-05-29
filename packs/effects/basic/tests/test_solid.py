@@ -16,7 +16,7 @@ def _render(level: int, pixel_count: int = 4, color: int | None = None):
     config = _config(level, color)
     renderer = BUILD("basic.solid", config)
     buf = PixelBuffer(pixel_count)
-    renderer.render(None, buf)
+    renderer.render(buf)
     return list(buf)
 
 
@@ -66,7 +66,7 @@ def test_solid_no_color_option_defaults_to_white() -> None:
     config = RendererConfig(level=10, resolution=16)
     renderer = BUILD("basic.solid", config)
     buf = PixelBuffer(4)
-    renderer.render(None, buf)
+    renderer.render(buf)
     assert all(p == 0xFFFFFF for p in buf)
 
 

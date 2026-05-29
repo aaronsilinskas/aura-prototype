@@ -15,8 +15,7 @@ class Shape:
     """Defines the visual form of an effect — the brightness distribution across a strip.
 
     Choosing a shape determines what an effect looks like: a full gradient, a
-    centered glow, a pulse, a checkerboard, and so on. Shapes are combined with
-    steps to build complete effects.
+    centered glow, a pulse, a checkerboard, and so on.
 
     Contracts:
     - Each method returns an ``EffectShapeFunc``: ``(float) -> float``.

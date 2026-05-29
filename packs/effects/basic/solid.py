@@ -19,10 +19,10 @@ class SolidRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, state, timer) -> None:
+    def update(self, elapsed: float) -> None:
         pass
 
-    def render(self, state, output: PixelBuffer) -> None:
+    def render(self, output: PixelBuffer) -> None:
         for i in range(len(output)):
             output[i] = self._color
 

@@ -12,30 +12,33 @@ microcontrollers. Full game and hardware design lives in `~/dev/aura/aura-docs/`
 
 ```
 effects/          LED animation engine (CircuitPython-safe)
-  effect.py       Effect, EffectState, EffectStep, EffectTimer, SharedStateKey
-  render.py       RendererConfig, PixelBuffer, EffectRenderer, MergeRenderer
+  render.py       RendererConfig, PixelBuffer, EffectRenderer
   palette.py      Palette, PaletteLUT256
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
-  value.py        DynamicValue, Range, ValueGenerator, lerp
+  value.py        DynamicValue, ValueGenerator, lerp
   performance.py  PerformanceTracker
-  steps/          EffectStep implementations (flame, sparkle, drift_noise, …)
+  layers/         Layer, Scroll, LayerRenderer, AddColorsRenderer, AddSamplesRenderer,
+                  ScrollLayer, FlameLayer, DriftNoiseLayer, SparkleLayer, ShapeLayer
 
 engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   engine.py       GameEngine, GameRule, GameState
   events.py       Event, EventGroup
   timer.py        Timer
-  packs.py        PackRegistry — multi-pack discovery and lazy loading  [#86]
-  scene.py        Scene, SceneControls, SceneManager  [#85]
+  packs.py        PackRegistry — multi-pack discovery and lazy loading
+  scene.py        Scene, SceneControls, SceneManager
   effects/
     manager.py    EffectManager, EffectControls, EffectOutput, EffectReceipt
     scope.py      Scope, ScopeValue
 
-packs/            First-party game content packs  [#86]
+packs/            First-party game content packs
   effects/
-    elements/     Element effect builders (Fire, Water, Earth, …)  ← from effects/elements/
+    basic/        Basic effect builders (solid, pulse)
+    elements/     Element effect builders (Fire, Water, Earth, …)
   rules/
-    debug/        Debug rule pack (button events, event logger)  ← from rules/debug/
+    debug/        Debug rule pack (button events, event logger)
+    hw_test/      Hardware test rule pack
+    rlgl/         Red Light Green Light rule pack
 
 magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
   aura.py         Aura, Spell, Spells, SpellTags, AuraEvent, EventListener
@@ -45,8 +48,6 @@ magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
 
 scripts/          Deploy and maintenance scripts
 ```
-
-Items marked `[#86]` or `[#85]` are planned but not yet implemented.
 
 ---
 
@@ -105,54 +106,6 @@ and the transition is applied after `engine.update(state)` returns.
 
 ---
 
-## Key Types
+## Key Types, Domain Vocabulary, and Constraints
 
-| Type | Module | Role |
-|------|--------|------|
-| `GameEngine` | `engine/engine.py` | Rule list; driven by `update(state)`; `create_state()` factory |
-| `GameRule` | `engine/engine.py` | Abstract stateless event handler |
-| `GameState` | `engine/engine.py` | Per-tick context passed to every rule: `data`, `effect_controls`, `scene_controls`, `timer` |
-| `PackRegistry` | `engine/packs.py` | Multi-pack discovery, version checks, lazy item import |
-| `Scene` | `engine/scene.py` | Declarative game context bundle |
-| `SceneManager` | `engine/scene.py` | Scene stack; `load`, `overlay`, `pop`; owns two `PackRegistry` instances |
-| `SceneControls` | `engine/scene.py` | Abstract interface for scene transitions from within rules |
-| `EffectControls` | `engine/effects/manager.py` | Abstract interface: `set_effect`, `add_effect`, `stop_effect` |
-| `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls`; routes `"pack.effect"` names to outputs by scope |
-| `EffectOutput` | `engine/effects/manager.py` | Abstract hardware output: `create_buffer`, `update_pixels`, `handle_event` |
-| `EffectReceipt` | `engine/effects/manager.py` | Opaque handle for a running effect; used to stop by receipt |
-| `Scope` / `ScopeValue` | `engine/effects/scope.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `Global.*`, `ALL` |
-| `Effect` | `effects/effect.py` | Immutable step chain; stateless |
-| `EffectState` | `effects/effect.py` | All mutable per-animation state |
-| `RendererConfig` | `effects/render.py` | Level [1–10], resolution, options for one render pass |
-| `PixelBuffer` | `effects/render.py` | In-memory packed-RGB pixel buffer |
-| `EffectRenderer` | `effects/render.py` | Pairs `Effect` + `Palette`; renders frames |
-| `MergeRenderer` | `effects/render.py` | Combines multiple renderers (average or additive) |
-| `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB |
-| `Aura` | `magic/aura.py` | Player magic pool + active spell list |
-| `Spell` | `magic/aura.py` | Base spell; `update` returns `True` to self-remove |
-
----
-
-## Domain Vocabulary
-
-| Term | Meaning |
-|------|---------|
-| **Level** | Effect intensity, integer 1–10. Passed to `RendererConfig.level`. |
-| **Resolution** | Sample density and buffer size — not the physical pixel count. |
-| **Element** | One of ten magic elements: Fire, Water, Earth, Ice, Air, Lightning, Light, Dark, Time, Gravity. |
-| **Effect pack** | A directory of `EffectBuilder` modules discovered by `PackRegistry`. Named `"pack.effect"` at call sites. |
-| **Rule pack** | A directory of `GameRule` modules discovered by `PackRegistry`. Each file exports `rule = <GameRule instance>`. |
-| **Scope** | Routing key that maps effects to outputs. `PERSONAL` targets the caster; `ALL` targets every output. |
-| **Receipt** | An `EffectReceipt` returned by `set_effect`/`add_effect`; used to stop a specific running effect. |
-| **Scene** | Declarative bundle of rules + pack references + optional lifecycle callbacks. |
-| **Aura** | A player or object's current magic state: magic pool + active spells. |
-
----
-
-## Constraints
-
-- **`__slots__` required** on all engine and effects types — no `__dict__` on CircuitPython.
-- **No `dataclasses` or `typing.Protocol`** — not available on CircuitPython.
-- **100-character line limit** enforced by `ruff`.
-- **No heap allocation in hot paths** — avoid list/dict creation inside `update()` loops.
-- Pack item import uses `__import__` directly (no `importlib`) for CircuitPython compatibility.
+See [`docs/agents/domain.md`](docs/agents/domain.md).

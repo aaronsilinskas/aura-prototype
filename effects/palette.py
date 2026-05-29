@@ -30,7 +30,7 @@ class PaletteLUT256(Palette):
 
     __slots__ = ("colors",)
 
-    def __init__(self, color_stops: bytes):
+    def __init__(self, color_stops: bytes) -> None:
         self.colors: list[int] = PaletteLUT256._build_lookup(color_stops)
 
     @staticmethod
@@ -81,6 +81,11 @@ class PaletteLUT256(Palette):
         return lookup_palette
 
     def lookup(self, value: float) -> int:
+        """Return the packed RGB color for ``value`` in ``[0.0, 1.0]``.
+
+        Values at or below ``0.0`` map to the first color stop; values at or
+        above ``1.0`` map to the last.
+        """
         if value <= 0.0:
             return self.colors[0]
         if value >= 1.0:

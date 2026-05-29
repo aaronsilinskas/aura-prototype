@@ -18,22 +18,6 @@ def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
 
 
-class Range:
-    """Interpolates a float between ``start`` and ``end`` by a normalized progress value."""
-
-    __slots__ = ("end", "start")
-
-    def __init__(self, start: float, end: float):
-        self.start = start
-        self.end = end
-
-    def lerp(self, progress: float) -> float:
-        """Return the value at ``progress`` in ``[0.0, 1.0]``, clamped at ``end``."""
-        if progress >= 1.0:
-            return self.end
-        return lerp(self.start, self.end, progress)
-
-
 class ValueGenerator:
     """Factory for ``DynamicValue`` callables that produce float values on demand.
 

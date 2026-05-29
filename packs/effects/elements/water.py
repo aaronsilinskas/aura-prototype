@@ -1,21 +1,20 @@
-from effects.effect import Effect
+from effects.layers.flame_layer import FlameLayer
+from effects.layers.renderer import LayerRenderer
+from effects.layers.scroll import PhaseScroll
+from effects.layers.scroll_layer import ScrollLayer
 from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, RendererConfig
-from effects.steps.duration import duration
-from effects.steps.flame import flame
-from effects.steps.position import accelerate
-from effects.value import ValueGenerator as VG
 from engine.effects.manager import EffectBuilder
 
 # fmt: off
-water_palette = bytes([0, 0, 0, 64,
-                       128, 0, 0, 255,
-                       224, 0, 128, 255,
-                       255, 0, 255, 255])
+_water_palette = bytes([0, 0, 0, 64,
+                        128, 0, 0, 255,
+                        224, 0, 128, 255,
+                        255, 0, 255, 255])
 # fmt: on
 
 
-class WaterBuilder(EffectBuilder):
+class WaterPrototypeBuilder(EffectBuilder):
     def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
         """A flowing deep-blue-to-cyan flame that drifts along the strip and
         occasionally reverses direction, like light rippling under moving water.
@@ -23,32 +22,24 @@ class WaterBuilder(EffectBuilder):
         Level: the current accelerates and the flame grows more turbulent,
         producing faster, stronger ripples.
         """
-        level = config.level
-        resolution = config.resolution
-
-        flow_speed = config.level_lerp(0.05, 0.14)
-        heat_rate = config.level_lerp(0.2, 0.29)
-
-        water_effect = Effect("water").add_steps(
-            [
-                duration(
-                    duration=VG.random(3.0, 5.0),
-                    persist_steps=True,
-                    steps=[
-                        accelerate(end=flow_speed, direction=VG.random_choice([-1, 1])),
-                        flame(
-                            spark_count=level,
-                            heat_rate=heat_rate,
-                            extra_cool_rate=0.0,
-                            resolution=resolution,
-                            spread=0.2,
-                        ),
-                    ],
+        return LayerRenderer(
+            name=name,
+            layer=ScrollLayer(
+                FlameLayer(
+                    spark_count=config.level,
+                    resolution=config.resolution,
+                    heat_rate=config.level_lerp(0.2, 0.29),
+                    extra_cool_rate=0.0,
+                    spread=0.2,
                 ),
-            ]
+                PhaseScroll(
+                    speed=config.level_lerp(0.05, 0.14),
+                    min_phase=3.0,
+                    max_phase=5.0,
+                ),
+            ),
+            palette=PaletteLUT256(_water_palette),
         )
 
-        return EffectRenderer(water_effect, PaletteLUT256(water_palette))
 
-
-BUILD = WaterBuilder()
+BUILD = WaterPrototypeBuilder()
