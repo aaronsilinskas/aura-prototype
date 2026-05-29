@@ -4,7 +4,16 @@ from effects.render import EffectRenderer, PixelBuffer
 
 
 class LayerRenderer(EffectRenderer):
-    """Composes an effect layer and a Palette into a renderer."""
+    """Maps a single Layer's sample values to colors via a Palette.
+
+    Per pixel, samples the layer at the normalised position and maps the result
+    through the palette to produce a packed RGB color.
+
+    Update model:
+      - ``update(elapsed)`` forwards elapsed time to the inner layer.
+    Rendering model:
+      - ``render(output)`` writes one palette-mapped color per pixel.
+    """
 
     __slots__ = ["_layer", "_name", "_palette"]
 
@@ -18,9 +27,11 @@ class LayerRenderer(EffectRenderer):
         return self._name
 
     def update(self, elapsed: float) -> None:
+        """Advance the inner layer by ``elapsed`` seconds."""
         self._layer.update(elapsed)
 
     def render(self, output: PixelBuffer) -> None:
+        """Sample the layer at each pixel position and write palette-mapped colors to ``output``."""
         count = len(output)
         inv_count = 1.0 / count
         layer = self._layer

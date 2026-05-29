@@ -1,7 +1,6 @@
 from effects.layers.add_samples_renderer import AddSamplesRenderer
 from effects.palette import PaletteLUT256
 from effects.render import PixelBuffer
-from effects.tests.helpers import make_timer
 
 _BLACK_TO_WHITE = bytes([0, 0, 0, 0, 255, 255, 255, 255])
 
@@ -81,7 +80,7 @@ def test_add_samples_renderer_update_advances_all_layers() -> None:
     layer_b = _ConstantLayer(0.3)
     renderer = AddSamplesRenderer("test", [layer_a, layer_b], PaletteLUT256(_BLACK_TO_WHITE))
 
-    renderer.update(make_timer(0.1))
+    renderer.update(0.1)
 
     assert layer_a.update_count == 1
     assert layer_b.update_count == 1

@@ -1,7 +1,6 @@
 from effects.layers.add_colors_renderer import AddColorsRenderer
 from effects.palette import Palette, PaletteLUT256
 from effects.render import PixelBuffer
-from effects.tests.helpers import make_timer
 
 _BLACK_TO_WHITE = bytes([0, 0, 0, 0, 255, 255, 255, 255])
 
@@ -103,7 +102,7 @@ def test_add_colors_renderer_update_advances_all_layers() -> None:
     palette = PaletteLUT256(_BLACK_TO_WHITE)
     renderer = AddColorsRenderer("test", [(layer_a, palette), (layer_b, palette)])
 
-    renderer.update(make_timer(0.1))
+    renderer.update(0.1)
 
     assert layer_a.update_count == 1
     assert layer_b.update_count == 1

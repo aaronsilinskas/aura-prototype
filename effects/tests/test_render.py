@@ -1,67 +1,6 @@
+import pytest
+
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
-
-# ---------------------------------------------------------------------------
-# Stub renderers used by EffectRenderer tests
-# ---------------------------------------------------------------------------
-
-
-class _ConstantRenderer(EffectRenderer):
-    """Fills every pixel with a constant packed RGB color."""
-
-    def __init__(self, name: str, color: int) -> None:
-        self._name = name
-        self._color = color
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    def update(self, elapsed: float) -> None:
-        pass
-
-    def render(self, output: PixelBuffer) -> None:
-        for i in range(len(output)):
-            output[i] = self._color
-
-
-class _SplitRenderer(EffectRenderer):
-    """Returns color_low for positions < 0.5 and color_high otherwise."""
-
-    def __init__(self, name: str, color_low: int, color_high: int) -> None:
-        self._name = name
-        self._color_low = color_low
-        self._color_high = color_high
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    def update(self, elapsed: float) -> None:
-        pass
-
-    def render(self, output: PixelBuffer) -> None:
-        count = len(output)
-        for i in range(count):
-            output[i] = self._color_high if (i / count) >= 0.5 else self._color_low
-
-
-class _CountingRenderer(EffectRenderer):
-    """Counts how many times update() is called."""
-
-    def __init__(self, name: str) -> None:
-        self._name = name
-        self.count: int = 0
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    def update(self, elapsed: float) -> None:
-        self.count += 1
-
-    def render(self, output: PixelBuffer) -> None:
-        pass
-
 
 # ---------------------------------------------------------------------------
 # RendererConfig — level clamping
@@ -86,7 +25,7 @@ def test_config_stores_level_within_valid_range_unchanged() -> None:
     assert config.level == 5
 
 
-def test_config_stores_options_dict() -> None:
+def test_config_preserves_options_dict_passed_at_construction() -> None:
     opts = {"color": "red"}
     config = RendererConfig(level=5, resolution=10, options=opts)
 
@@ -207,24 +146,18 @@ def test_pixel_buffer_iterates_pixels_in_index_order() -> None:
 
 
 def test_base_renderer_name_raises_not_implemented() -> None:
-    import pytest
-
     renderer = EffectRenderer()
     with pytest.raises(NotImplementedError):
         _ = renderer.name
 
 
 def test_base_renderer_update_raises_not_implemented() -> None:
-    import pytest
-
     renderer = EffectRenderer()
     with pytest.raises(NotImplementedError):
         renderer.update(0.016)
 
 
 def test_base_renderer_render_raises_not_implemented() -> None:
-    import pytest
-
     renderer = EffectRenderer()
     with pytest.raises(NotImplementedError):
         renderer.render(PixelBuffer(1))

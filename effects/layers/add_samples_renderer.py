@@ -22,10 +22,12 @@ class AddSamplesRenderer(EffectRenderer):
         return self._name
 
     def update(self, elapsed: float) -> None:
+        """Advance all layers by ``elapsed`` seconds."""
         for layer in self._layers:
             layer.update(elapsed)
 
     def render(self, output: PixelBuffer) -> None:
+        """Sum layer samples per pixel, clamp to ``1.0``, and write palette-mapped colors."""
         count = len(output)
         inv_count = 1.0 / count
         palette = self._palette

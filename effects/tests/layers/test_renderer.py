@@ -1,7 +1,6 @@
 from effects.layers.renderer import LayerRenderer
 from effects.palette import PaletteLUT256
 from effects.render import PixelBuffer
-from effects.tests.helpers import make_timer
 
 _BLACK_TO_WHITE = bytes([0, 0, 0, 0, 255, 255, 255, 255])
 
@@ -27,7 +26,7 @@ class _ConstantLayer:
 # ---------------------------------------------------------------------------
 
 
-def test_layer_renderer_fills_output_with_palette_mapped_layer_values() -> None:
+def test_layer_renderer_maps_layer_sample_through_palette_for_each_pixel() -> None:
     palette = PaletteLUT256(_BLACK_TO_WHITE)
     layer = _ConstantLayer(0.5)
     renderer = LayerRenderer("test", layer, palette)
@@ -40,7 +39,7 @@ def test_layer_renderer_fills_output_with_palette_mapped_layer_values() -> None:
         assert output[i] == expected
 
 
-def test_layer_renderer_fills_all_pixels_with_correct_values() -> None:
+def test_layer_renderer_passes_normalized_position_per_pixel_to_layer() -> None:
     # gradient layer: sample(pos, count) = pos
     class _GradientLayer:
         def update(self, elapsed: float) -> None:
@@ -66,11 +65,11 @@ def test_layer_renderer_fills_all_pixels_with_correct_values() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_layer_renderer_update_advances_layer_with_timer_elapsed() -> None:
+def test_layer_renderer_update_passes_elapsed_to_layer() -> None:
     layer = _ConstantLayer(0.5)
     renderer = LayerRenderer("test", layer, PaletteLUT256(_BLACK_TO_WHITE))
 
-    renderer.update(make_timer(0.25))
+    renderer.update(0.25)
 
     assert layer.update_count == 1
     assert abs(layer.last_elapsed - 0.25) < 1e-9

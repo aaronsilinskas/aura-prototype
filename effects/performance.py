@@ -11,7 +11,7 @@ class PerformanceTracker:
     the end. Aggregated stats are printed at ``log_interval`` second intervals.
     """
 
-    def __init__(self, log_interval: float = 5.0):
+    def __init__(self, log_interval: float = 5.0) -> None:
         now = time.monotonic()
         self.log_interval = log_interval
         self.frame_count = 0
@@ -28,23 +28,27 @@ class PerformanceTracker:
         self._render_started_at = 0.0
 
     def start_frame(self) -> None:
+        """Record the heap allocation baseline for this frame."""
         self._memory_before = gc.mem_alloc()
 
     def start_update_time(self) -> None:
+        """Record the start of the update phase."""
         self._update_started_at = time.monotonic()
 
     def add_update_time(self) -> None:
+        """Accumulate elapsed time since the last ``start_update_time`` call."""
         self.update_time_total += time.monotonic() - self._update_started_at
 
     def start_render_time(self) -> None:
+        """Record the start of the render phase."""
         self._render_started_at = time.monotonic()
 
     def add_render_time(self) -> None:
+        """Accumulate elapsed time since the last ``start_render_time`` call."""
         self.render_time_total += time.monotonic() - self._render_started_at
 
     def complete_frame(self, current_time: float) -> None:
-        """Record memory allocation for this frame and print stats
-        if the log interval has elapsed."""
+        """Record memory allocation for this frame; log stats if the interval has elapsed."""
         memory_after = gc.mem_alloc()
         available_memory = gc.mem_free()
 

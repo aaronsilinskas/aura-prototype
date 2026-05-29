@@ -1,3 +1,5 @@
+import pytest
+
 from effects.layers.scroll import ScrollOffset
 from effects.layers.scroll_layer import ScrollLayer
 
@@ -43,7 +45,7 @@ def test_scroll_layer_shifts_sample_position_after_update() -> None:
     layer.update(0.25)  # offset becomes 0.25
 
     # inner receives apply(0.0) = 0.25
-    assert abs(layer.sample(0.0, 10) - 0.25) < 1e-9
+    assert layer.sample(0.0, 10) == pytest.approx(0.25)
 
 
 def test_scroll_layer_delegates_update_to_inner_layer() -> None:

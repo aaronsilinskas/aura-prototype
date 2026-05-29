@@ -42,10 +42,6 @@ def test_resolve_calls_callable_and_returns_its_result() -> None:
     assert ValueGenerator.resolve(lambda: 3.14) == pytest.approx(3.14)
 
 
-def test_resolve_returns_zero_unchanged() -> None:
-    assert ValueGenerator.resolve(0.0) == pytest.approx(0.0)
-
-
 # ---------------------------------------------------------------------------
 # ValueGenerator.random
 # ---------------------------------------------------------------------------

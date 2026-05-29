@@ -2,12 +2,6 @@ class Layer:
     """Base interface for effect layers.
 
     All concrete subclasses must implement ``update`` and ``sample``.
-
-    This class uses ``raise NotImplementedError`` rather than ``abc.ABC`` /
-    ``@abstractmethod`` for CircuitPython compatibility.
-
-    ``__slots__ = []`` allows subclasses to define their own ``__slots__``
-    without accidentally adding a ``__dict__``.
     """
 
     __slots__ = []

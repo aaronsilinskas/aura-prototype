@@ -13,9 +13,14 @@ EffectListenerFunc: TypeAlias = "Callable[[str], None]"
 class RendererConfig:
     """Runtime configuration shared across a render pass.
 
-    Holds the user-facing settings (level and resolution) that drive how an
-    effect is sampled and scaled. Listeners are notified by name when
-    significant events occur during rendering.
+    Passed to effect builders at construction. Controls output intensity via
+    ``level`` and the number of sample positions via ``resolution``.
+    Registered listeners are called by name when significant rendering events
+    occur.
+
+    Constraints:
+      - ``level`` is clamped to ``[1, 10]`` at construction.
+      - ``resolution`` is clamped to a minimum of ``1`` at construction.
     """
 
     __slots__ = ["level", "listeners", "options", "resolution"]
@@ -74,7 +79,12 @@ class PixelBuffer:
 class EffectRenderer:
     """Base class for effect renderers.
 
-    Subclasses must implement ``name``, ``update``, and ``render``.
+    Update model:
+      - Call ``update(elapsed)`` once per frame before ``render``.
+    Rendering model:
+      - Call ``render(output)`` once per frame to write packed RGB colors.
+    Subclass contract:
+      - Subclasses must implement ``name``, ``update``, and ``render``.
     """
 
     @property
@@ -86,6 +96,6 @@ class EffectRenderer:
         """Advance renderer state for the current frame."""
         raise NotImplementedError
 
-    def render(self, output: "PixelBuffer") -> None:
+    def render(self, output: PixelBuffer) -> None:
         """Write a packed RGB color for each pixel in ``output``."""
         raise NotImplementedError
