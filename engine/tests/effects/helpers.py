@@ -1,7 +1,4 @@
-from effects.effect import Effect
-from effects.palette import PaletteLUT256
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
-from effects.steps.control import call
 from engine.effects.manager import EffectBuilder, EffectOutput
 from engine.state import EffectReceipt
 
@@ -40,11 +37,28 @@ class SpyEffectOutput(EffectOutput):
         self.clear_pixels_calls.append(scope_key)
 
 
+class _NamedRenderer(EffectRenderer):
+    """Minimal EffectRenderer stub that stores a name and does nothing."""
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def update(self, timer: object) -> None:
+        pass
+
+    def render(self, output: object) -> None:
+        pass
+
+
 class StubEffectBuilder(EffectBuilder):
     """Returns a minimal EffectRenderer for any effect name."""
 
     def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
-        return EffectRenderer(Effect(name), PaletteLUT256(b""))
+        return _NamedRenderer(name)
 
 
 class SpyRenderer:
@@ -53,10 +67,10 @@ class SpyRenderer:
     def __init__(self) -> None:
         self.update_count: int = 0
 
-    def update(self, state: object, timer: object) -> None:
+    def update(self, timer: object) -> None:
         self.update_count += 1
 
-    def render(self, state: object, buf: object) -> None:
+    def render(self, buf: object) -> None:
         pass
 
 
@@ -80,7 +94,7 @@ class CapturingEffectBuilder(EffectBuilder):
 
     def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
         self.last_config = config
-        return EffectRenderer(Effect(name), PaletteLUT256(b""))
+        return _NamedRenderer(name)
 
 
 class EventFiringEffectBuilder(EffectBuilder):
@@ -91,6 +105,16 @@ class EventFiringEffectBuilder(EffectBuilder):
 
     def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
         event_name = self._event_name
-        step = call(lambda state, timer: config.notify_listeners(event_name))
-        effect = Effect(name).add_steps([step])
-        return EffectRenderer(effect, PaletteLUT256(b""))
+
+        class _EventRenderer(EffectRenderer):
+            @property
+            def name(self) -> str:  # type: ignore[override]
+                return name
+
+            def update(self, timer: object) -> None:
+                config.notify_listeners(event_name)
+
+            def render(self, output: object) -> None:
+                pass
+
+        return _EventRenderer()

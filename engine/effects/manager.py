@@ -1,5 +1,4 @@
-from effects.effect import EffectState, EffectTimer
-from effects.render import EffectRenderer, PixelBuffer, RendererConfig
+from effects.render import EffectRenderer, EffectTimer, PixelBuffer, RendererConfig
 from engine.packs import PackRegistry
 from engine.state import EffectControls, EffectReceipt, ScopeValue
 from engine.timer import Timer
@@ -98,7 +97,7 @@ class EffectManager(EffectControls):
     """
 
     class _EffectEntry:
-        __slots__ = ("keys", "name", "output_buffers", "receipt", "renderer", "state")
+        __slots__ = ("keys", "name", "output_buffers", "receipt", "renderer")
 
         def __init__(
             self,
@@ -107,14 +106,12 @@ class EffectManager(EffectControls):
             receipt: EffectReceipt,
             output_buffers: list[dict[str, PixelBuffer] | None],
             renderer: EffectRenderer | None,
-            state: EffectState,
         ) -> None:
             self.keys: tuple[str, ...] = keys
             self.name: str = name
             self.receipt: EffectReceipt = receipt
             self.output_buffers: list[dict[str, PixelBuffer] | None] = output_buffers
             self.renderer: EffectRenderer | None = renderer
-            self.state: EffectState = state
 
         def __repr__(self) -> str:
             return (
@@ -209,7 +206,7 @@ class EffectManager(EffectControls):
                 output_buffers.append(None)
 
         entry = EffectManager._EffectEntry(
-            tuple(scope_key_set), effect_name, receipt, output_buffers, None, EffectState()
+            tuple(scope_key_set), effect_name, receipt, output_buffers, None
         )
 
         def scoped_listener(event_name: str) -> None:
@@ -340,7 +337,7 @@ class EffectManager(EffectControls):
 
         # Pass 1: advance each renderer once.
         for entry in self._effects:
-            entry.renderer.update(entry.state, self._timer)
+            entry.renderer.update(self._timer)
 
         # Pass 2: render and deliver per-key frames to each output.
         # Every registered key receives a call; empty lists signal go-dark.
@@ -357,7 +354,7 @@ class EffectManager(EffectControls):
                 buf_dict = entry.output_buffers[i]
                 if buf_dict is not None:
                     for k, buf in buf_dict.items():
-                        entry.renderer.render(entry.state, buf)
+                        entry.renderer.render(buf)
                         frame_bufs[k].append(buf)
                         frame_receipts[k].append(entry.receipt)
             for key in frame_bufs:

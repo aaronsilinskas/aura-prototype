@@ -2,13 +2,13 @@
 
 ## Glossary
 
-### Prototype Renderer
-An `EffectRenderer` implementation that drives all visual simulation state directly, bypassing the `Effect`/`EffectStep`/`EffectState` pipeline. Prototype renderers are the intended production replacement for the step-based element effects — they are production-quality code being proven out before the old API is retired, not throwaway sketches. Each prototype is paired with a `*PrototypeBuilder` registered under the `elements.*_prototype` namespace so it can coexist with the step-based effect during the migration period. Cutover happens all-at-once across all ten elements once two gates are met: (1) a designer approves each element's look at all levels via side-by-side comparison on hardware (not strict parity — prototypes may intentionally improve on the old effect), and (2) performance benchmarks confirm a meaningful frame-time improvement (current estimate: 20–30% reduction). At cutover, each `*_prototype.py` is renamed to replace the corresponding step-based file and re-registered under the original `elements.*` name, and all helpers are promoted to the `effects` module — both happen in a single atomic PR. No changes to scenes or any other caller are required. The full cutover (helpers promotion, tests, rename, deletion) is tracked as #191 and must close before the cutover PR merges.
-_Avoid_: "visual reference only", "throwaway prototype" (these are permanent)
+### EffectRenderer
+A base class in `effects/render.py` that subclasses override to drive all visual simulation state directly. Subclasses implement `name`, `update(timer)`, and `render(output)`. All ten element effects live in `packs/effects/elements/` and extend `EffectRenderer` using the layer helpers in `effects/layers/`. Registered under the `elements.*` namespace via `ElementBuilder`.
+_Avoid_: "step-based effect", "prototype renderer" (the cutover is complete — all renderers use this direct approach)
 
-### Layer (prototype helper)
-The base class for all simulation layers used by prototype renderers. Lives in `packs/effects/elements/helpers/` for now — intentionally scoped to the `elements` pack during the prototype phase. Moves to the top-level `effects` module as part of the cutover tracked in #191.
-_Avoid_: importing from `packs.effects.elements.helpers` outside the `elements` pack (use the `effects` module path once promoted)
+### Layer
+A composable simulation unit used by element `EffectRenderer` subclasses. The base class in `effects/layers/layer.py` defines `update(elapsed)` and `sample(position, pixel_count) -> float`. Concrete implementations: `ScrollLayer`, `FlameLayer`, `DriftNoiseLayer`, `SparkleLayer`, `ShapeLayer`. Layer-based renderers (`LayerRenderer`, `AddColorsRenderer`, `AddSamplesRenderer`) composite layers into pixel output.
+_Avoid_: importing layer helpers from anywhere other than `effects.layers`
 
 ### GameRule
 An event handler registered with `GameEngine`. **Stateless** — a rule instance must not accumulate mutable game data as instance attributes. All data that changes over the life of a game (scores, durations, counters, health, inventory) must be stored and retrieved via the `GameState` accessor methods (`get`, `set`, `pop`, `delete`, `has`). Construction-time configuration injected via `__init__` (event maps, callbacks) is the only permitted use of instance attributes.

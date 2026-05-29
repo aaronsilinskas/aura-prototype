@@ -4,12 +4,43 @@ try:
 except ImportError:
     pass
 
-from effects.effect import Effect, EffectState, EffectTimer
 from effects.level import level_lerp as _level_lerp
 from effects.level import level_lerp_int as _level_lerp_int
-from effects.palette import Palette
 
 EffectListenerFunc: TypeAlias = "Callable[[str], None]"
+
+
+class EffectTimer:
+    """Tracks frame timing for effect renderers.
+
+    ``elapsed`` is the last frame delta, ``total`` is cumulative elapsed time,
+    and ``progress`` is normalized to ``[0.0, 1.0]`` when a finite duration is
+    set. When ``duration`` is ``None``, ``progress`` stays ``0.0`` and
+    ``update`` always returns ``False``.
+    """
+
+    __slots__ = ("duration", "elapsed", "progress", "total")
+
+    def __init__(self, duration: float | None = None):
+        self.elapsed: float = 0.0
+        self.total: float = 0.0
+        self.duration: float | None = duration
+        self.progress: float = 0.0
+
+    def update(self, elapsed: float) -> bool:
+        """Advance timer by one frame delta and return whether duration is complete."""
+        self.elapsed = elapsed
+        self.total += elapsed
+        if self.duration is not None and self.duration > 0:
+            self.progress = min(1.0, self.total / self.duration)
+
+        return self.progress >= 1.0
+
+    def __str__(self) -> str:
+        return (
+            f"EffectTimer(elapsed={self.elapsed}, total={self.total}, "
+            f"duration={self.duration}, progress={self.progress})"
+        )
 
 
 class RendererConfig:
@@ -74,90 +105,20 @@ class PixelBuffer:
 
 
 class EffectRenderer:
-    """Drives an effect through time and produces pixel colors for each position.
+    """Base class for effect renderers.
 
-    This is the main object you advance each frame and sample per pixel to
-    get the final colors for an LED strip.
-
-    Contracts:
-    - Call ``update`` once per frame to advance step state.
-    - Call ``render`` per pixel to get a packed RGB int for a given position.
+    Subclasses must implement ``name``, ``update``, and ``render``.
     """
-
-    def __init__(self, effect: Effect, palette: Palette) -> None:
-        self._effect = effect
-        self._palette = palette
 
     @property
     def name(self) -> str:
-        """The name of the underlying effect."""
-        return self._effect.name
+        """The name of this renderer."""
+        raise NotImplementedError
 
-    def update(self, state: EffectState, timer: EffectTimer) -> None:
-        """Advance effect step state for the current frame."""
-        self._effect.update(state, timer)
+    def update(self, timer: EffectTimer) -> None:
+        """Advance renderer state for the current frame."""
+        raise NotImplementedError
 
-    def render(self, state: EffectState, output: PixelBuffer) -> None:
+    def render(self, output: "PixelBuffer") -> None:
         """Write a packed RGB color for each pixel in ``output``."""
-        count = len(output)
-        for i in range(count):
-            value = self._effect.value(state, i / count, count)
-            color = self._palette.lookup(value)
-            output[i] = color
-
-
-class MergeRenderer(EffectRenderer):
-    """Combines multiple renderers into one by blending their RGB channels per pixel.
-
-    With ``additive=False`` (default) channels are averaged across all child renderers.
-    With ``additive=True`` channels are summed and clamped to 255.
-    """
-
-    __slots__ = ["_additive", "_buffers", "_name", "_renderers"]
-
-    def __init__(
-        self,
-        name: str,
-        renderers: list[EffectRenderer],
-        additive: bool = False,
-    ) -> None:
-        self._name = name
-        self._renderers = renderers
-        self._additive = additive
-        self._buffers: list[PixelBuffer] | None = None
-
-    @property
-    def name(self) -> str:
-        """The name of this merged renderer."""
-        return self._name
-
-    def update(self, state: EffectState, timer: EffectTimer) -> None:
-        for renderer in self._renderers:
-            renderer.update(state, timer)
-
-    def render(self, state: EffectState, output: PixelBuffer) -> None:
-        pixel_count = len(output)
-        renderer_count = len(self._renderers)
-        if self._buffers is None or len(self._buffers[0]) != pixel_count:
-            self._buffers = [PixelBuffer(pixel_count) for _ in self._renderers]
-        for i in range(renderer_count):
-            self._renderers[i].render(state, self._buffers[i])
-
-        for i in range(pixel_count):
-            r_total = 0
-            g_total = 0
-            b_total = 0
-            for j in range(renderer_count):
-                color = self._buffers[j][i]
-                r_total += (color >> 16) & 255
-                g_total += (color >> 8) & 255
-                b_total += color & 255
-            if self._additive:
-                r = min(255, r_total)
-                g = min(255, g_total)
-                b = min(255, b_total)
-            else:
-                r = min(255, r_total // renderer_count)
-                g = min(255, g_total // renderer_count)
-                b = min(255, b_total // renderer_count)
-            output[i] = (r << 16) | (g << 8) | b
+        raise NotImplementedError

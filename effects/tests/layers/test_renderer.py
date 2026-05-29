@@ -33,7 +33,7 @@ def test_layer_renderer_fills_output_with_palette_mapped_layer_values() -> None:
     renderer = LayerRenderer("test", layer, palette)
 
     output = PixelBuffer(5)
-    renderer.render(None, output)
+    renderer.render(output)
 
     expected = palette.lookup(0.5)
     for i in range(5):
@@ -54,7 +54,7 @@ def test_layer_renderer_fills_all_pixels_with_correct_values() -> None:
 
     count = 4
     output = PixelBuffer(count)
-    renderer.render(None, output)
+    renderer.render(output)
 
     for i in range(count):
         pos = i / count
@@ -70,7 +70,7 @@ def test_layer_renderer_update_advances_layer_with_timer_elapsed() -> None:
     layer = _ConstantLayer(0.5)
     renderer = LayerRenderer("test", layer, PaletteLUT256(_BLACK_TO_WHITE))
 
-    renderer.update(None, make_timer(0.25))
+    renderer.update(make_timer(0.25))
 
     assert layer.update_count == 1
     assert abs(layer.last_elapsed - 0.25) < 1e-9

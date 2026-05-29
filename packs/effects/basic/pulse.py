@@ -67,7 +67,7 @@ class PulseRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, state, timer) -> None:
+    def update(self, timer) -> None:
         self._elapsed += timer.elapsed
         self._elapsed %= self._cycle_total
         elapsed = self._elapsed
@@ -89,7 +89,7 @@ class PulseRenderer(EffectRenderer):
         else:
             self._current_color = (self._start_r << 16) | (self._start_g << 8) | self._start_b
 
-    def render(self, state, output: PixelBuffer) -> None:
+    def render(self, output: PixelBuffer) -> None:
         color = self._current_color
         for i in range(len(output)):
             output[i] = color

@@ -29,7 +29,7 @@ def test_add_colors_renderer_with_one_layer_matches_layer_renderer_output() -> N
     renderer = AddColorsRenderer("test", [(layer, palette)])
 
     output = PixelBuffer(4)
-    renderer.render(None, output)
+    renderer.render(output)
 
     expected = palette.lookup(0.5)
     for i in range(4):
@@ -50,8 +50,8 @@ def test_add_colors_renderer_two_layers_are_brighter_than_one() -> None:
 
     out_two = PixelBuffer(4)
     out_one = PixelBuffer(4)
-    renderer_two.render(None, out_two)
-    renderer_one.render(None, out_one)
+    renderer_two.render(out_two)
+    renderer_one.render(out_one)
 
     # Additive blend: each channel is brighter (or equal at max 255)
     assert out_two[0] > out_one[0], "additive result not brighter than single layer"
@@ -67,7 +67,7 @@ def test_add_colors_renderer_blends_channels_additively_without_overflow() -> No
     )
 
     output = PixelBuffer(1)
-    renderer.render(None, output)
+    renderer.render(output)
 
     r = (output[0] >> 16) & 255
     g = (output[0] >> 8) & 255
@@ -87,7 +87,7 @@ def test_add_colors_renderer_clamps_channels_at_255() -> None:
     )
 
     output = PixelBuffer(1)
-    renderer.render(None, output)
+    renderer.render(output)
 
     assert output[0] == Palette.pack_rgb(255, 255, 255)
 
@@ -103,7 +103,7 @@ def test_add_colors_renderer_update_advances_all_layers() -> None:
     palette = PaletteLUT256(_BLACK_TO_WHITE)
     renderer = AddColorsRenderer("test", [(layer_a, palette), (layer_b, palette)])
 
-    renderer.update(None, make_timer(0.1))
+    renderer.update(make_timer(0.1))
 
     assert layer_a.update_count == 1
     assert layer_b.update_count == 1

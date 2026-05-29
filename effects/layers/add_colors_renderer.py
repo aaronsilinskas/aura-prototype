@@ -29,13 +29,13 @@ class AddColorsRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, state, timer) -> None:
+    def update(self, timer) -> None:
         """Advance all layer buffers. ``state`` is ignored."""
         elapsed = timer.elapsed
         for buf, _ in self._layers:
             buf.update(elapsed)
 
-    def render(self, state, output: PixelBuffer) -> None:
+    def render(self, output: PixelBuffer) -> None:
         """Write additively blended layers to ``output``. ``state`` is ignored."""
         count = len(output)
         inv_count = 1.0 / count

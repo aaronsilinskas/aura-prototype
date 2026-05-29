@@ -21,14 +21,13 @@ Full game and hardware design lives in `~/dev/aura/aura-docs/` (an Obsidian vaul
 
 ```
 effects/          Animation engine (CircuitPython-safe)
-  effect.py       Effect, EffectState, EffectStep, SharedStateKey, EffectTimer
-  render.py       RendererConfig, PixelBuffer, EffectRenderer, MergeRenderer
+  render.py       RendererConfig, PixelBuffer, EffectRenderer, EffectTimer
   palette.py      Palette, PaletteLUT256 (pre-computed, immutable)
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
   value.py        DynamicValue, Range, ValueGenerator, lerp
   performance.py  PerformanceTracker
-  steps/          EffectStep implementations (flame, sparkle, drift_noise, duration, control, …)
+  layers/         Layer base class + scroll, flame, drift_noise, sparkle, shape, and renderer compositors
   elements/       One builder function per element + registry.py, ElementBuilder
 
 engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
@@ -55,15 +54,15 @@ scripts/          Deploy and maintenance scripts
 
 | Type | Lives in | Role |
 |------|----------|------|
-| `Effect` | `effects/effect.py` | Immutable chain of `EffectStep` instances; stateless |
-| `EffectState` | `effects/effect.py` | All mutable per-animation state; one per running effect |
-| `EffectTimer` | `effects/effect.py` | Duration + elapsed tracking; passed to each step |
-| `EffectStep` | `effects/effect.py` | Base step; implements `update`, `adjust_position`, `adjust_value` |
-| `SharedStateKey` | `effects/effect.py` | Marker base class for cross-step shared state keys |
+| `EffectTimer` | `effects/render.py` | Duration + elapsed tracking; passed to each renderer's `update` |
 | `RendererConfig` | `effects/render.py` | Level [1–10], resolution, options, listeners for one render pass |
 | `PixelBuffer` | `effects/render.py` | List-backed in-memory pixel buffer of packed RGB values |
-| `EffectRenderer` | `effects/render.py` | Pairs `Effect` + `Palette`; renders frames into a `PixelBuffer` |
-| `MergeRenderer` | `effects/render.py` | Combines multiple renderers; average (default) or additive blend |
+| `EffectRenderer` | `effects/render.py` | Base class for all renderers; subclasses implement `name`, `update(timer)`, `render(output)` |
+| `Layer` | `effects/layers/layer.py` | Base layer: `update(elapsed)` + `sample(position, pixel_count) -> float` |
+| `Scroll` | `effects/layers/scroll.py` | Scroll base: `update(elapsed)` + `apply(position) -> float` |
+| `LayerRenderer` | `effects/layers/renderer.py` | Single-layer `EffectRenderer` |
+| `AddColorsRenderer` | `effects/layers/add_colors_renderer.py` | Composites layers by summing packed RGB colors |
+| `AddSamplesRenderer` | `effects/layers/add_samples_renderer.py` | Composites layers by summing float samples then sampling a palette |
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
 | `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
 | `EffectControls` | `engine/effects/manager.py` | Abstract interface: `set_effect`, `add_effect`, `stop_effect` |
@@ -122,4 +121,4 @@ All code in `effects/`, `engine/`, `magic/`, and `rules/` must run on CPython, C
 
 ## Tests
 
-549 tests under `effects/tests/`, `engine/tests/`, `magic/tests/`, `rules/`, and `scripts/tests/`. Run with `python -m pytest`. All must pass before commit. Pre-commit hooks run `python -m ruff` (lint) and `ruff format`.
+760 tests under `effects/tests/`, `engine/tests/`, `magic/tests/`, `rules/`, and `scripts/tests/`. Run with `python -m pytest`. All must pass before commit. Pre-commit hooks run `python -m ruff` (lint) and `ruff format`.

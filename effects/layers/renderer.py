@@ -25,11 +25,11 @@ class LayerRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, state, timer) -> None:
+    def update(self, timer) -> None:
         """Advance the layer. ``state`` is ignored."""
         self._layer.update(timer.elapsed)
 
-    def render(self, state, output: PixelBuffer) -> None:
+    def render(self, output: PixelBuffer) -> None:
         """Write palette-mapped layer colors to ``output``. ``state`` is ignored."""
         count = len(output)
         inv_count = 1.0 / count

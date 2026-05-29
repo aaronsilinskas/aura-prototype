@@ -12,14 +12,13 @@ microcontrollers. Full game and hardware design lives in `~/dev/aura/aura-docs/`
 
 ```
 effects/          LED animation engine (CircuitPython-safe)
-  effect.py       Effect, EffectState, EffectStep, EffectTimer, SharedStateKey
-  render.py       RendererConfig, PixelBuffer, EffectRenderer, MergeRenderer
+  render.py       RendererConfig, PixelBuffer, EffectRenderer, EffectTimer
   palette.py      Palette, PaletteLUT256
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
   value.py        DynamicValue, Range, ValueGenerator, lerp
   performance.py  PerformanceTracker
-  steps/          EffectStep implementations (flame, sparkle, drift_noise, …)
+  layers/         Layer, Scroll, ScrollLayer, FlameLayer, DriftNoiseLayer, SparkleLayer, ShapeLayer, renderers
 
 engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   engine.py       GameEngine, GameRule, GameState
@@ -121,12 +120,11 @@ and the transition is applied after `engine.update(state)` returns.
 | `EffectOutput` | `engine/effects/manager.py` | Abstract hardware output: `create_buffer`, `update_pixels`, `handle_event` |
 | `EffectReceipt` | `engine/effects/manager.py` | Opaque handle for a running effect; used to stop by receipt |
 | `Scope` / `ScopeValue` | `engine/effects/scope.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `Global.*`, `ALL` |
-| `Effect` | `effects/effect.py` | Immutable step chain; stateless |
-| `EffectState` | `effects/effect.py` | All mutable per-animation state |
 | `RendererConfig` | `effects/render.py` | Level [1–10], resolution, options for one render pass |
+| `EffectTimer` | `effects/render.py` | Duration + elapsed tracking; passed to each renderer's `update` |
 | `PixelBuffer` | `effects/render.py` | In-memory packed-RGB pixel buffer |
-| `EffectRenderer` | `effects/render.py` | Pairs `Effect` + `Palette`; renders frames |
-| `MergeRenderer` | `effects/render.py` | Combines multiple renderers (average or additive) |
+| `EffectRenderer` | `effects/render.py` | Base class; subclasses implement `name`, `update(timer)`, `render(output)` |
+| `Layer` | `effects/layers/layer.py` | Simulation layer: `update(elapsed)` + `sample(position, pixel_count) -> float` |
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB |
 | `Aura` | `magic/aura.py` | Player magic pool + active spell list |
 | `Spell` | `magic/aura.py` | Base spell; `update` returns `True` to self-remove |

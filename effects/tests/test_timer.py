@@ -1,6 +1,6 @@
 import pytest
 
-from effects.effect import EffectTimer
+from effects.render import EffectTimer
 
 # ---------------------------------------------------------------------------
 # Elapsed tracking

@@ -24,13 +24,13 @@ class AddSamplesRenderer(EffectRenderer):
     def name(self) -> str:
         return self._name
 
-    def update(self, state, timer) -> None:
+    def update(self, timer) -> None:
         """Advance all agents. ``state`` is ignored."""
         elapsed = timer.elapsed
         for agent in self._agents:
             agent.update(elapsed)
 
-    def render(self, state, output: PixelBuffer) -> None:
+    def render(self, output: PixelBuffer) -> None:
         """Write additively blended agent colors to ``output``. ``state`` is ignored."""
         count = len(output)
         inv_count = 1.0 / count
