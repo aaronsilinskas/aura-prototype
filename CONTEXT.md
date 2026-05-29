@@ -2,6 +2,14 @@
 
 ## Glossary
 
+### Prototype Renderer
+An `EffectRenderer` implementation that drives all visual simulation state directly, bypassing the `Effect`/`EffectStep`/`EffectState` pipeline. Prototype renderers are the intended production replacement for the step-based element effects — they are production-quality code being proven out before the old API is retired, not throwaway sketches. Each prototype is paired with a `*PrototypeBuilder` registered under the `elements.*_prototype` namespace so it can coexist with the step-based effect during the migration period. Cutover happens all-at-once across all ten elements once two gates are met: (1) a designer approves each element's look at all levels via side-by-side comparison on hardware (not strict parity — prototypes may intentionally improve on the old effect), and (2) performance benchmarks confirm a meaningful frame-time improvement (current estimate: 20–30% reduction). At cutover, each `*_prototype.py` is renamed to replace the corresponding step-based file and re-registered under the original `elements.*` name, and all helpers are promoted to the `effects` module — both happen in a single atomic PR. No changes to scenes or any other caller are required. The full cutover (helpers promotion, tests, rename, deletion) is tracked as #191 and must close before the cutover PR merges.
+_Avoid_: "visual reference only", "throwaway prototype" (these are permanent)
+
+### Layer (prototype helper)
+The base class for all simulation layers used by prototype renderers. Lives in `packs/effects/elements/helpers/` for now — intentionally scoped to the `elements` pack during the prototype phase. Moves to the top-level `effects` module as part of the cutover tracked in #191.
+_Avoid_: importing from `packs.effects.elements.helpers` outside the `elements` pack (use the `effects` module path once promoted)
+
 ### GameRule
 An event handler registered with `GameEngine`. **Stateless** — a rule instance must not accumulate mutable game data as instance attributes. All data that changes over the life of a game (scores, durations, counters, health, inventory) must be stored and retrieved via the `GameState` accessor methods (`get`, `set`, `pop`, `delete`, `has`). Construction-time configuration injected via `__init__` (event maps, callbacks) is the only permitted use of instance attributes.
 
@@ -41,6 +49,10 @@ A handle returned when an effect is started. Used to stop that specific running 
 ### Idle effect
 A low-level, looping effect running on a scope when no active game logic requires a specific response. Used to keep outputs visually active during standby or between triggered events. Replaced (via `set_effect`) when an active effect is started; restored when the active effect ends. Idle effects are optional — scopes may have no effect running at all.
 _Avoid_: ambient effect, background effect
+
+### AudioEffectOutput
+A hardware-only (`EffectOutput`) implementation that drives CircuitPython `audiomixer.Mixer` and `audiobusio.I2SOut`. Uses `voice_count=2`: voice 0 for looping background tracks, voice 1 for one-shot sound effects. Registered with `EffectManager` on `Scope.PERSONAL`. Rules trigger audio by calling `add_effect(Scope.PERSONAL, "audio.loop" | "audio.once", 1, {"file": "<name>"})` via `EffectControls`; `AudioEffectOutput.handle_event` receives the routed `"audio:loop:<name>"` / `"audio:once:<name>"` event and starts playback. Loop lifetime is tracked via `EffectReceipt` stored in `GameState` and stopped via `stop_effect_by_receipt`.
+_Avoid_: `AudioControls`, `AudioManager`, `AudioReceipt` (superseded by effects-based approach)
 
 ### Accelerometer
 A hardware sensor (e.g. LIS3DH) that provides 3-axis acceleration readings (x, y, z) in m/s². Optional peripheral — absent when the hardware is not present. The engine treats it as an input source: readings are sampled each tick and packaged into `AccelerationData` carried by input events.
