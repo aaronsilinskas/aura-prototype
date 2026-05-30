@@ -32,14 +32,14 @@ class AudioEffectOutput(EffectOutput):
         self._audio = audiobusio.I2SOut(board.I2S_BIT_CLOCK, board.I2S_WORD_SELECT, board.I2S_DATA)
         self._mixer = audiomixer.Mixer(
             voice_count=2,
-            sample_rate=22050,
+            sample_rate=11025,
             channel_count=1,
             bits_per_sample=16,
             samples_signed=True,
         )
         # TODO: adjust volume by effect level instead of hardcoding here
-        self._mixer.voice[0].level = 0.1
-        self._mixer.voice[1].level = 0.1
+        self._mixer.voice[0].level = 0.2
+        self._mixer.voice[1].level = 0.2
 
         self._audio.play(self._mixer)
         self._loop_file = None
