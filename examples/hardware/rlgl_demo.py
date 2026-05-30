@@ -60,6 +60,7 @@ BUTTON_B_PIN: "Final" = board.D10
 # Hardware setup
 # ---------------------------------------------------------------------------
 
+propmaker.setup_external_power()
 _i2c = propmaker.setup_i2c()
 _matrix = propmaker.setup_matrix_is31fl3741(_i2c)
 _button_a, _button_b = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
