@@ -6,7 +6,7 @@ _STUB_RECEIPT_ID = 0
 
 
 class SpyEffectControls(EffectControls):
-    """Test spy that records set_effect, stop_effect, and stop_effect_by_receipt calls.
+    """Test spy that records set_effect, stop_effect, and add_effect calls.
 
     ``add_effect`` stubs with a dummy ``EffectReceipt``.
     """
@@ -14,7 +14,6 @@ class SpyEffectControls(EffectControls):
     def __init__(self) -> None:
         self.set_effect_calls: list[tuple[ScopeValue, str, int, dict]] = []
         self.stop_effect_calls: list[ScopeValue] = []
-        self.stop_effect_by_receipt_calls: list[EffectReceipt] = []
         self.add_effect_calls: list[tuple[ScopeValue, str, int, dict]] = []
 
     def set_effect(
@@ -31,6 +30,3 @@ class SpyEffectControls(EffectControls):
 
     def stop_effect(self, scope: ScopeValue) -> None:
         self.stop_effect_calls.append(scope)
-
-    def stop_effect_by_receipt(self, receipt: EffectReceipt) -> None:
-        self.stop_effect_by_receipt_calls.append(receipt)

@@ -136,14 +136,23 @@ class NetworkControls:
 class EffectReceipt:
     """Opaque handle returned when an effect is started.
 
-    Uniquely identifies a single running effect instance. Pass to
-    ``stop_effect_by_receipt`` to stop exactly that instance.
+    Uniquely identifies a single running effect instance. Call ``stop()`` to
+    request that the effect be stopped on the next tick.
     """
 
-    __slots__ = ("id",)
+    __slots__ = ("id", "_stopped")
 
     def __init__(self, effect_id: int) -> None:
         self.id: int = effect_id
+        self._stopped: bool = False
+
+    def stop(self) -> None:
+        """Request that this effect be stopped on the next tick (idempotent)."""
+        self._stopped = True
+
+    def is_stopped(self) -> bool:
+        """Return ``True`` if ``stop()`` has been called on this receipt."""
+        return self._stopped
 
     def __repr__(self) -> str:
         return f"EffectReceipt(id={self.id})"
@@ -170,10 +179,6 @@ class EffectControls:
 
     def stop_effect(self, scope: ScopeValue) -> None:
         """Stop all effects whose keys overlap scope."""
-        raise NotImplementedError
-
-    def stop_effect_by_receipt(self, receipt: EffectReceipt) -> None:
-        """Stop exactly the effect identified by receipt."""
         raise NotImplementedError
 
 
