@@ -152,7 +152,7 @@ def test_set_effect_twice_replaces_effect(pack_env) -> None:
     assert output.update_pixels_calls == [("personal", [(output.created_buffers[1], receipt_ice)])]
 
 
-def test_set_effect_twice_first_renderer_not_advanced(pack_env) -> None:
+def test_set_effect_twice_first_effect_not_advanced(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     _make_pack(
         pack_env,
@@ -168,8 +168,8 @@ def test_set_effect_twice_first_renderer_not_advanced(pack_env) -> None:
     fire_builder = registry.get("spy", "fire", SpyEffectBuilder)
     manager.update(_make_timer())
 
-    renderer_a = fire_builder.created[0]
-    assert renderer_a.update_count == 0
+    effect_a = fire_builder.created[0]
+    assert effect_a.update_count == 0
 
 
 # ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ def test_add_effect_after_set_effect_delivers_two_frames(pack_env) -> None:
     assert len(output.update_pixels_calls[0][1]) == 2
 
 
-def test_add_effect_both_renderers_advanced_on_each_update(pack_env) -> None:
+def test_add_effect_both_effects_advanced_on_each_update(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     _make_pack(
         pack_env,
@@ -400,11 +400,11 @@ def test_stop_effect_does_not_affect_other_scopes(pack_env) -> None:
 
 
 # ---------------------------------------------------------------------------
-# shared renderer dedup — slice 7
+# shared effect dedup — slice 7
 # ---------------------------------------------------------------------------
 
 
-def test_shared_renderer_advanced_once_per_frame_for_composite_scope(pack_env) -> None:
+def test_shared_effect_advanced_once_per_frame_for_composite_scope(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.ALL])
     _make_pack(pack_env, "spy", {"fire": _spy_item()})
     registry = PackRegistry(item_attr="BUILD")
@@ -1031,7 +1031,7 @@ def test_create_buffer_not_called_for_out_of_scope_output(pack_env) -> None:
 
 
 def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_env) -> None:
-    """Renderer-generated events after scope narrowing must reach only remaining-scope outputs."""
+    """Effect-triggered events after scope narrowing must reach only remaining-scope outputs."""
     _make_pack(
         pack_env,
         "evt",
@@ -1055,7 +1055,7 @@ def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_env) -> None:
 
     manager.update(_make_timer())
 
-    # shock renderer fires "lightning_strike"; scoped_listener reads live entry.keys
+    # shock effect fires "lightning_strike"; scoped_listener reads live entry.keys
     # → personal output must NOT receive it after narrowing
     assert not any(
         c[0] == EffectEvent("evt", "shock", "lightning_strike")
@@ -1153,7 +1153,7 @@ def test_pixel_output_alongside_non_pixel_output_both_get_flush(pack_env) -> Non
 # ---------------------------------------------------------------------------
 
 
-def test_renderer_with_renders_pixels_false_skips_buffer_allocation(pack_env) -> None:
+def test_effect_with_renders_pixels_false_skips_buffer_allocation(pack_env) -> None:
     _make_pack(
         pack_env,
         "nopix",
@@ -1184,7 +1184,7 @@ def test_renderer_with_renders_pixels_false_skips_buffer_allocation(pack_env) ->
     assert output.create_buffer_key_calls == []
 
 
-def test_renderer_with_renders_pixels_false_skips_update_pixels_but_calls_flush(pack_env) -> None:
+def test_effect_with_renders_pixels_false_skips_update_pixels_but_calls_flush(pack_env) -> None:
     _make_pack(
         pack_env,
         "nopix",
