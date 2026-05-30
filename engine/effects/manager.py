@@ -1,4 +1,5 @@
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
+from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.state import EffectControls, EffectReceipt, ScopeValue
 from engine.timer import Timer
@@ -53,9 +54,14 @@ class EffectOutput:
         pass
 
     def handle_event(
-        self, event_name: str, scope_keys: frozenset[str], receipt: EffectReceipt
+        self, event: "EffectEvent | str", scope_keys: frozenset[str], receipt: EffectReceipt
     ) -> None:
-        """Handle an event triggered by an effect renderer."""
+        """Handle an event triggered by an effect lifecycle or renderer.
+
+        Lifecycle events (start/stop) deliver an ``EffectEvent`` instance.
+        Renderer-triggered signals (via ``RendererConfig.notify_listeners``) deliver
+        a freeform string.
+        """
         pass
 
 
@@ -146,13 +152,13 @@ class EffectManager(EffectControls):
         ]
 
     def _notify_listeners(
-        self, event_name: str, event_keys: set[str], receipt: EffectReceipt
+        self, event: "EffectEvent | str", event_keys: set[str], receipt: EffectReceipt
     ) -> None:
         """Notify outputs whose registered key sets intersect event_keys."""
         for i in range(len(self._outputs)):
             matching = event_keys & self._output_key_sets[i]
             if matching:
-                self._outputs[i].handle_event(event_name, frozenset(matching), receipt)
+                self._outputs[i].handle_event(event, frozenset(matching), receipt)
 
     def _build_effect(
         self,
@@ -203,7 +209,7 @@ class EffectManager(EffectControls):
                 output_buffers.append(None)
 
         entry = EffectManager._EffectEntry(
-            tuple(scope_key_set), effect_name, receipt, output_buffers, None
+            tuple(scope_key_set), name, receipt, output_buffers, None
         )
 
         def scoped_listener(event_name: str) -> None:
@@ -255,7 +261,8 @@ class EffectManager(EffectControls):
                 with their keys already narrowed to the post-stop state.
         """
         for entry, removed_keys in stopped:
-            self._notify_listeners(f"{entry.name}.stop", removed_keys, entry.receipt)
+            pack_name, effect_name = entry.name.split(".", 1)
+            self._notify_listeners(EffectEvent(pack_name, effect_name, "stop"), removed_keys, entry.receipt)
 
         remaining_key_set: set[str] = set()
         for r in remaining:
@@ -294,8 +301,8 @@ class EffectManager(EffectControls):
         scope_key_set = set(scope.keys)
         self._remove_effects_in_scope(scope_key_set)
         receipt = self._append_new_effect(scope, scope_key_set, name, level, options)
-        effect_name = name.split(".", 1)[1]
-        self._notify_listeners(f"{effect_name}.start", scope_key_set, receipt)
+        pack_name, effect_name = name.split(".", 1)
+        self._notify_listeners(EffectEvent(pack_name, effect_name, "start"), scope_key_set, receipt)
         return receipt
 
     def add_effect(
@@ -308,8 +315,8 @@ class EffectManager(EffectControls):
         """
         scope_key_set = set(scope.keys)
         receipt = self._append_new_effect(scope, scope_key_set, name, level, options)
-        effect_name = name.split(".", 1)[1]
-        self._notify_listeners(f"{effect_name}.start", scope_key_set, receipt)
+        pack_name, effect_name = name.split(".", 1)
+        self._notify_listeners(EffectEvent(pack_name, effect_name, "start"), scope_key_set, receipt)
         return receipt
 
     def stop_effect_by_receipt(self, receipt: EffectReceipt) -> None:

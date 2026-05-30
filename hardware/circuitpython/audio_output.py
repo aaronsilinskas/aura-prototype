@@ -38,9 +38,10 @@ class AudioEffectOutput(EffectOutput):
     def update_pixels(self, scope_key: str, buffers: list, receipts: list) -> None:
         pass
 
-    def handle_event(self, event_name: str, scope_keys, receipt) -> None:
+    def handle_event(self, event, scope_keys, receipt) -> None:
         if self._mixer.playing:
             return
+        event_name = event if isinstance(event, str) else f"{event.name}.{event.verb}"
         path = "sounds/" + event_name + ".wav"
         try:
             f = open(path, "rb")  # noqa: SIM115

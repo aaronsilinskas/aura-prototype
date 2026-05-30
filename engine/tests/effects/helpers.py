@@ -1,5 +1,6 @@
 from effects.render import EffectRenderer, PixelBuffer, RendererConfig
 from engine.effects.manager import EffectBuilder, EffectOutput
+from engine.events import EffectEvent
 from engine.state import EffectReceipt
 
 
@@ -17,9 +18,9 @@ class SpyEffectOutput(EffectOutput):
         self.clear_pixels_calls: list = []
 
     def handle_event(
-        self, event_name: str, scope_keys: frozenset[str], receipt: EffectReceipt
+        self, event: "EffectEvent | str", scope_keys: frozenset[str], receipt: EffectReceipt
     ) -> None:
-        self.handle_event_calls.append((event_name, scope_keys, receipt))
+        self.handle_event_calls.append((event, scope_keys, receipt))
 
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         buf = PixelBuffer(self.min_resolution)
