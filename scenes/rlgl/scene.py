@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from engine.packs import PackRegistry
 from engine.scene import Scene
 from engine.state import EffectControls, Scope
 
@@ -15,13 +14,3 @@ def factory() -> Scene:
         rule_packs=[("rlgl", "1.0")],
         on_unload=_on_unload,
     )
-
-
-def create_audio_output(registry: PackRegistry):
-    """Instantiate the AudioEffectOutput for the RLGL scene (hardware-only).
-
-    Import is deferred so this module remains importable on CPython.
-    """
-    from hardware.circuitpython.audio_output import AudioEffectOutput
-
-    return AudioEffectOutput(registry)
