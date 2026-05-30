@@ -6,7 +6,8 @@ from engine.state import EffectReceipt
 class SpyEffectOutput(EffectOutput):
     """Test spy that captures every ``update_pixels`` call for assertion."""
 
-    def __init__(self, min_resolution: int, scopes: list) -> None:
+    def __init__(self, min_resolution: int, scopes: list, receives_pixels: bool = True) -> None:
+        super().__init__(receives_pixels=receives_pixels)
         self.min_resolution = min_resolution
         self.scopes = scopes
         self.update_pixels_calls: list = []

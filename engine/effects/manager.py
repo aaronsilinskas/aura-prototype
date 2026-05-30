@@ -17,13 +17,19 @@ class EffectOutput:
     min_resolution: int
     scopes: list[ScopeValue]
 
-    receives_pixels: bool = True
-    """Whether this output expects pixel data.
+    def __init__(self, receives_pixels: bool = True) -> None:
+        self._receives_pixels = receives_pixels
 
-    Non-pixel outputs (e.g. audio, event-only) set this to ``False`` to skip
-    ``create_buffer`` calls, ``update_pixels`` calls, and frame buffer
-    allocation.  ``flush`` is still called unconditionally every tick.
-    """
+    @property
+    def receives_pixels(self) -> bool:
+        """Whether this output expects pixel data.
+
+        Non-pixel outputs (e.g. audio, event-only) pass ``receives_pixels=False``
+        to ``super().__init__()`` to skip ``create_buffer`` calls, ``update_pixels``
+        calls, and frame buffer allocation.  ``flush`` is still called
+        unconditionally every tick.
+        """
+        return getattr(self, "_receives_pixels", True)
 
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         """Create a PixelBuffer sized for the given scope key's hardware region."""

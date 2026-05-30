@@ -87,12 +87,17 @@ class EffectRenderer:
       - Subclasses must implement ``name``, ``update``, and ``render``.
     """
 
-    renders_pixels: bool = True
-    """Whether this renderer produces pixel output.
+    def __init__(self, renders_pixels: bool = True) -> None:
+        self._renders_pixels = renders_pixels
 
-    Non-pixel renderers (e.g. audio or event-only) set this to ``False`` to
-    skip pixel buffer allocation for all outputs.
-    """
+    @property
+    def renders_pixels(self) -> bool:
+        """Whether this renderer produces pixel output.
+
+        Non-pixel renderers (e.g. audio or event-only) pass ``renders_pixels=False``
+        to ``super().__init__()`` to skip pixel buffer allocation for all outputs.
+        """
+        return getattr(self, "_renders_pixels", True)
 
     @property
     def name(self) -> str:

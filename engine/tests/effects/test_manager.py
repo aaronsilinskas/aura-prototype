@@ -1065,8 +1065,7 @@ def test_update_pixels_called_once_per_registered_key_for_multi_key_output(pack_
 
 
 def test_output_with_receives_pixels_false_gets_no_create_buffer(pack_env) -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    output.receives_pixels = False
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL], receives_pixels=False)
     manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
@@ -1075,8 +1074,7 @@ def test_output_with_receives_pixels_false_gets_no_create_buffer(pack_env) -> No
 
 
 def test_output_with_receives_pixels_false_gets_no_update_pixels(pack_env) -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    output.receives_pixels = False
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL], receives_pixels=False)
     manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
@@ -1086,8 +1084,7 @@ def test_output_with_receives_pixels_false_gets_no_update_pixels(pack_env) -> No
 
 
 def test_output_with_receives_pixels_false_still_gets_flush(pack_env) -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    output.receives_pixels = False
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL], receives_pixels=False)
     manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
@@ -1097,8 +1094,7 @@ def test_output_with_receives_pixels_false_still_gets_flush(pack_env) -> None:
 
 
 def test_output_with_receives_pixels_false_flush_called_even_with_no_effects() -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    output.receives_pixels = False
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL], receives_pixels=False)
     manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
 
     manager.update(_make_timer())
@@ -1109,8 +1105,7 @@ def test_output_with_receives_pixels_false_flush_called_even_with_no_effects() -
 
 def test_pixel_output_alongside_non_pixel_output_both_get_flush(pack_env) -> None:
     pixel_output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    non_pixel_output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    non_pixel_output.receives_pixels = False
+    non_pixel_output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL], receives_pixels=False)
     manager = EffectManager(
         registry=_make_stub_registry(pack_env),
         outputs=[pixel_output, non_pixel_output],
