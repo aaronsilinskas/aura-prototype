@@ -28,7 +28,7 @@ class IS31FL3741EffectOutput(MatrixEffectOutput):
 
     def __init__(self, matrix) -> None:
         super().__init__(_MATRIX_COLS, _SCOPE_ROWS)
-        self.scopes = [Scope.ALL]
+        self.scopes = [Scope.NON_AMBIENT]
         self._matrix = matrix
 
     def _write_row(self, row: int, pixels) -> None:
