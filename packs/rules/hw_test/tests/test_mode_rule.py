@@ -308,12 +308,11 @@ def test_ir_flash_expires_and_restarts_directional_idle(spy):
     # Advance timer total beyond FLASH_DURATION
     timer.total = FLASH_DURATION + 0.01
     spy.set_effect_calls.clear()
-    spy.stop_effect_by_receipt_calls.clear()
 
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
-    assert receipt in spy.stop_effect_by_receipt_calls
+    assert receipt.is_stopped()
     assert "ir_flash_receipt" not in state
     assert "ir_flash_start" not in state
     # Restarts DIRECTIONAL at level 3
@@ -332,12 +331,11 @@ def test_radio_flash_expires_and_restarts_global_all_idle(spy):
     state.set("radio_flash_start", 0.0)
     timer.total = FLASH_DURATION + 0.01
     spy.set_effect_calls.clear()
-    spy.stop_effect_by_receipt_calls.clear()
 
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
-    assert receipt in spy.stop_effect_by_receipt_calls
+    assert receipt.is_stopped()
     assert "radio_flash_receipt" not in state
     assert "radio_flash_start" not in state
     level_3_calls = [c for c in spy.set_effect_calls if c[2] == 3]
@@ -354,10 +352,9 @@ def test_ir_flash_does_not_expire_before_duration(spy):
     state.set("ir_flash_receipt", receipt)
     state.set("ir_flash_start", 0.0)
     timer.total = FLASH_DURATION - 0.01
-    spy.stop_effect_by_receipt_calls.clear()
 
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
-    assert receipt not in spy.stop_effect_by_receipt_calls
+    assert not receipt.is_stopped()
     assert "ir_flash_receipt" in state

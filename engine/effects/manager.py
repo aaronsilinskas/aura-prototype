@@ -18,6 +18,20 @@ class EffectOutput:
     min_resolution: int
     scopes: list[ScopeValue]
 
+    def __init__(self, receives_pixels: bool = True) -> None:
+        self._receives_pixels = receives_pixels
+
+    @property
+    def receives_pixels(self) -> bool:
+        """Whether this output expects pixel data.
+
+        Non-pixel outputs (e.g. audio, event-only) pass ``receives_pixels=False``
+        to ``super().__init__()`` to skip ``create_buffer`` calls, ``update_pixels``
+        calls, and frame buffer allocation.  ``flush`` is still called
+        unconditionally every tick.
+        """
+        return getattr(self, "_receives_pixels", True)
+
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         """Create a PixelBuffer sized for the given scope key's hardware region."""
         raise NotImplementedError
@@ -34,7 +48,7 @@ class EffectOutput:
         """
         pass
 
-    def show_pixels(self) -> None:
+    def flush(self) -> None:
         """Commit staged pixel data to hardware or other sinks.
 
         Called unconditionally once per tick, after ``update_pixels`` for this
@@ -144,11 +158,14 @@ class EffectManager(EffectControls):
         ]
         # Pre-allocated per-output frame accumulators — cleared and reused each tick
         # to avoid dict/list allocation in the hot path.
-        self._frame_bufs: list[dict[str, list[PixelBuffer]]] = [
-            {k: [] for k in key_set} for key_set in self._output_key_sets
+        # Non-pixel outputs (receives_pixels=False) use None as a placeholder.
+        self._frame_bufs: list[dict[str, list[PixelBuffer]] | None] = [
+            {k: [] for k in key_set} if o.receives_pixels else None
+            for o, key_set in zip(outputs, self._output_key_sets)
         ]
-        self._frame_receipts: list[dict[str, list[EffectReceipt]]] = [
-            {k: [] for k in key_set} for key_set in self._output_key_sets
+        self._frame_receipts: list[dict[str, list[EffectReceipt]] | None] = [
+            {k: [] for k in key_set} if o.receives_pixels else None
+            for o, key_set in zip(outputs, self._output_key_sets)
         ]
 
     def _notify_listeners(
@@ -198,18 +215,17 @@ class EffectManager(EffectControls):
         self._next_id += 1
 
         resolution = _DEFAULT_RESOLUTION
-        output_buffers = []
         for i, output in enumerate(self._outputs):
             matching_keys = scope_key_set & self._output_key_sets[i]
-            if matching_keys:
-                if output.min_resolution > resolution:
-                    resolution = output.min_resolution
-                output_buffers.append({k: output.create_buffer(k) for k in matching_keys})
-            else:
-                output_buffers.append(None)
+            if matching_keys and output.min_resolution > resolution:
+                resolution = output.min_resolution
 
         entry = EffectManager._EffectEntry(
+<<<<<<< HEAD
             tuple(scope_key_set), name, receipt, output_buffers, None
+=======
+            tuple(scope_key_set), effect_name, receipt, [], None
+>>>>>>> origin/main
         )
 
         def scoped_listener(event_name: str) -> None:
@@ -219,6 +235,17 @@ class EffectManager(EffectControls):
             level=level, resolution=resolution, options=options, listeners=[scoped_listener]
         )
         entry.renderer = builder(effect_name, config)
+
+        if entry.renderer.renders_pixels:
+            for i, output in enumerate(self._outputs):
+                matching_keys = scope_key_set & self._output_key_sets[i]
+                if matching_keys and output.receives_pixels:
+                    entry.output_buffers.append({k: output.create_buffer(k) for k in matching_keys})
+                else:
+                    entry.output_buffers.append(None)
+        else:
+            entry.output_buffers = [None] * len(self._outputs)
+
         return entry
 
     def _append_new_effect(
@@ -319,24 +346,27 @@ class EffectManager(EffectControls):
         self._notify_listeners(EffectEvent(pack_name, effect_name, "start"), scope_key_set, receipt)
         return receipt
 
-    def stop_effect_by_receipt(self, receipt: EffectReceipt) -> None:
-        """Stop the single effect identified by receipt; silent no-op if not found."""
-        stopped: list[tuple[EffectManager._EffectEntry, set[str]]] = []
-        new_effects: list[EffectManager._EffectEntry] = []
-        for entry in self._effects:
-            if entry.receipt is receipt:
-                stopped.append((entry, set(entry.keys)))
-            else:
-                new_effects.append(entry)
-        self._stop_entries(stopped, new_effects)
-        self._effects = new_effects
-
     def stop_effect(self, scope: ScopeValue) -> None:
         """Stop all running effects in scope."""
         self._remove_effects_in_scope(set(scope.keys))
 
     def update(self, timer: Timer) -> None:
         """Tick all active effects and deliver frames to every registered output."""
+        # Deferred-stop: remove any effects whose receipt was marked stopped since
+        # the last tick.  This runs before Pass 1 so that stop events and
+        # clear_pixels fire before the new frame is rendered, and so that calling
+        # receipt.stop() from within output.flush() during Pass 2 is safe.
+        stopped: list[tuple[EffectManager._EffectEntry, set[str]]] = []
+        new_effects: list[EffectManager._EffectEntry] = []
+        for entry in self._effects:
+            if entry.receipt.is_stopped():
+                stopped.append((entry, set(entry.keys)))
+            else:
+                new_effects.append(entry)
+        if stopped:
+            self._stop_entries(stopped, new_effects)
+            self._effects = new_effects
+
         elapsed = timer.elapsed
 
         # Pass 1: advance each renderer once.
@@ -347,23 +377,26 @@ class EffectManager(EffectControls):
         # Every registered key receives a call; empty lists signal go-dark.
         # _frame_bufs and _frame_receipts are pre-allocated in __init__ and cleared
         # here — no new objects in steady state after warmup.
+        # Non-pixel outputs (receives_pixels=False) skip update_pixels entirely;
+        # flush() is always called unconditionally.
         for i, output in enumerate(self._outputs):
-            frame_bufs = self._frame_bufs[i]
-            frame_receipts = self._frame_receipts[i]
-            for buf_list in frame_bufs.values():
-                buf_list.clear()
-            for receipt_list in frame_receipts.values():
-                receipt_list.clear()
-            for entry in self._effects:
-                buf_dict = entry.output_buffers[i]
-                if buf_dict is not None:
-                    for k, buf in buf_dict.items():
-                        entry.renderer.render(buf)
-                        frame_bufs[k].append(buf)
-                        frame_receipts[k].append(entry.receipt)
-            for key in frame_bufs:
-                output.update_pixels(key, frame_bufs[key], frame_receipts[key])
-            output.show_pixels()
+            if output.receives_pixels:
+                frame_bufs = self._frame_bufs[i]
+                frame_receipts = self._frame_receipts[i]
+                for buf_list in frame_bufs.values():
+                    buf_list.clear()
+                for receipt_list in frame_receipts.values():
+                    receipt_list.clear()
+                for entry in self._effects:
+                    buf_dict = entry.output_buffers[i]
+                    if buf_dict is not None:
+                        for k, buf in buf_dict.items():
+                            entry.renderer.render(buf)
+                            frame_bufs[k].append(buf)
+                            frame_receipts[k].append(entry.receipt)
+                for key in frame_bufs:
+                    output.update_pixels(key, frame_bufs[key], frame_receipts[key])
+            output.flush()
 
     def __repr__(self) -> str:
         if not self._effects:
