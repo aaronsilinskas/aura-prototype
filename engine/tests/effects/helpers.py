@@ -13,7 +13,7 @@ class SpyEffectOutput(EffectOutput):
         self.created_buffers: list = []
         self.create_buffer_key_calls: list = []
         self.handle_event_calls: list = []
-        self.show_pixels_calls: list = []
+        self.flush_calls: list = []
         self.clear_pixels_calls: list = []
 
     def handle_event(
@@ -30,8 +30,8 @@ class SpyEffectOutput(EffectOutput):
     def update_pixels(self, scope_key: str, buffers: list, receipts: list) -> None:
         self.update_pixels_calls.append((scope_key, list(zip(buffers, receipts))))
 
-    def show_pixels(self) -> None:
-        self.show_pixels_calls.append(True)
+    def flush(self) -> None:
+        self.flush_calls.append(True)
 
     def clear_pixels(self, scope_key: str) -> None:
         self.clear_pixels_calls.append(scope_key)
@@ -63,6 +63,8 @@ class StubEffectBuilder(EffectBuilder):
 
 class SpyRenderer:
     """Minimal renderer that counts how many times ``update`` was called."""
+
+    renders_pixels: bool = True
 
     def __init__(self) -> None:
         self.update_count: int = 0

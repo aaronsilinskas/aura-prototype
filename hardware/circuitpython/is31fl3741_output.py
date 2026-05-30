@@ -18,7 +18,7 @@ class IS31FL3741EffectOutput(MatrixEffectOutput):
     Subclasses ``MatrixEffectOutput``; all scope-to-row-band routing lives in
     the base class.  This subclass provides only the last-mile hardware calls:
     ``_write_row`` writes pixels via ``self._matrix.pixel(col, row, color)``
-    and ``show_pixels`` calls ``self._matrix.show()``.
+    and ``flush`` calls ``self._matrix.show()``.
 
     Args:
         matrix: A configured IS31FL3741 driver instance (e.g.
@@ -35,5 +35,5 @@ class IS31FL3741EffectOutput(MatrixEffectOutput):
         for col in range(self._cols):
             self._matrix.pixel(col, row, pixels[col])
 
-    def show_pixels(self) -> None:
+    def flush(self) -> None:
         self._matrix.show()

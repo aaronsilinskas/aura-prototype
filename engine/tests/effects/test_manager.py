@@ -833,20 +833,20 @@ def test_unknown_effect_in_known_pack_raises_value_error(pack_env) -> None:
 
 
 # ---------------------------------------------------------------------------
-# show_pixels
+# flush
 # ---------------------------------------------------------------------------
 
 
-def test_update_calls_show_pixels_when_no_effects_are_active() -> None:
+def test_update_calls_flush_when_no_effects_are_active() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
 
     manager.update(_make_timer())
 
-    assert len(output.show_pixels_calls) == 1
+    assert len(output.flush_calls) == 1
 
 
-def test_update_calls_show_pixels_once_per_tick() -> None:
+def test_update_calls_flush_once_per_tick() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
 
@@ -854,18 +854,18 @@ def test_update_calls_show_pixels_once_per_tick() -> None:
     manager.update(_make_timer())
     manager.update(_make_timer())
 
-    assert len(output.show_pixels_calls) == 3
+    assert len(output.flush_calls) == 3
 
 
-def test_update_calls_show_pixels_on_all_outputs_each_tick() -> None:
+def test_update_calls_flush_on_all_outputs_each_tick() -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output_a, output_b])
 
     manager.update(_make_timer())
 
-    assert len(output_a.show_pixels_calls) == 1
-    assert len(output_b.show_pixels_calls) == 1
+    assert len(output_a.flush_calls) == 1
+    assert len(output_b.flush_calls) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -940,17 +940,17 @@ def test_clear_pixels_not_fired_for_key_still_covered_after_narrowing(pack_env) 
     assert output_directional.clear_pixels_calls == []
 
 
-def test_update_calls_show_pixels_even_when_effects_are_active(pack_env) -> None:
+def test_update_calls_flush_even_when_effects_are_active(pack_env) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.update(_make_timer())
 
-    assert len(output.show_pixels_calls) == 1
+    assert len(output.flush_calls) == 1
 
 
-def test_update_calls_show_pixels_after_update_pixels_each_tick() -> None:
+def test_update_calls_flush_after_update_pixels_each_tick() -> None:
     call_order: list[str] = []
 
     class OrderTrackingOutput(SpyEffectOutput):
@@ -958,16 +958,16 @@ def test_update_calls_show_pixels_after_update_pixels_each_tick() -> None:
             super().update_pixels(scope_key, buffers, receipts)
             call_order.append("update_pixels")
 
-        def show_pixels(self) -> None:
-            super().show_pixels()
-            call_order.append("show_pixels")
+        def flush(self) -> None:
+            super().flush()
+            call_order.append("flush")
 
     output = OrderTrackingOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
 
     manager.update(_make_timer())
 
-    assert call_order == ["update_pixels", "show_pixels"]
+    assert call_order == ["update_pixels", "flush"]
 
 
 # ---------------------------------------------------------------------------
@@ -1057,3 +1057,139 @@ def test_update_pixels_called_once_per_registered_key_for_multi_key_output(pack_
     called_keys = [key for key, _ in output.update_pixels_calls]
     assert set(called_keys) == {"personal", "directional"}
     assert len(called_keys) == 2  # exactly one call per key, no duplicates
+
+
+# ---------------------------------------------------------------------------
+# receives_pixels — issue #191
+# ---------------------------------------------------------------------------
+
+
+def test_output_with_receives_pixels_false_gets_no_create_buffer(pack_env) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output.receives_pixels = False
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
+
+    assert output.create_buffer_key_calls == []
+
+
+def test_output_with_receives_pixels_false_gets_no_update_pixels(pack_env) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output.receives_pixels = False
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    manager.update(_make_timer())
+
+    assert output.update_pixels_calls == []
+
+
+def test_output_with_receives_pixels_false_still_gets_flush(pack_env) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output.receives_pixels = False
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    manager.update(_make_timer())
+
+    assert len(output.flush_calls) == 1
+
+
+def test_output_with_receives_pixels_false_flush_called_even_with_no_effects() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output.receives_pixels = False
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+
+    manager.update(_make_timer())
+
+    assert len(output.flush_calls) == 1
+    assert output.update_pixels_calls == []
+
+
+def test_pixel_output_alongside_non_pixel_output_both_get_flush(pack_env) -> None:
+    pixel_output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    non_pixel_output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    non_pixel_output.receives_pixels = False
+    manager = EffectManager(
+        registry=_make_stub_registry(pack_env),
+        outputs=[pixel_output, non_pixel_output],
+    )
+
+    manager.set_effect(Scope.PERSONAL, "stub.fire", 5, {})
+    manager.update(_make_timer())
+
+    assert len(pixel_output.flush_calls) == 1
+    assert len(non_pixel_output.flush_calls) == 1
+    assert len(pixel_output.update_pixels_calls) == 1
+    assert non_pixel_output.update_pixels_calls == []
+    assert non_pixel_output.create_buffer_key_calls == []
+
+
+# ---------------------------------------------------------------------------
+# renders_pixels — issue #191
+# ---------------------------------------------------------------------------
+
+
+def test_renderer_with_renders_pixels_false_skips_buffer_allocation(pack_env) -> None:
+    _make_pack(
+        pack_env,
+        "nopix",
+        {
+            "event": (
+                "from effects.render import EffectRenderer, PixelBuffer, RendererConfig\n"
+                "from engine.effects.manager import EffectBuilder\n"
+                "class _NoPixRenderer(EffectRenderer):\n"
+                "    renders_pixels = False\n"
+                "    @property\n"
+                "    def name(self): return 'event'\n"
+                "    def update(self, elapsed): pass\n"
+                "    def render(self, output): pass\n"
+                "class _Builder(EffectBuilder):\n"
+                "    def __call__(self, name, config): return _NoPixRenderer()\n"
+                "BUILD = _Builder()\n"
+            )
+        },
+    )
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=registry, outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "nopix.event", 5, {})
+
+    assert output.create_buffer_key_calls == []
+
+
+def test_renderer_with_renders_pixels_false_skips_update_pixels_but_calls_flush(pack_env) -> None:
+    _make_pack(
+        pack_env,
+        "nopix",
+        {
+            "event": (
+                "from effects.render import EffectRenderer, PixelBuffer, RendererConfig\n"
+                "from engine.effects.manager import EffectBuilder\n"
+                "class _NoPixRenderer(EffectRenderer):\n"
+                "    renders_pixels = False\n"
+                "    @property\n"
+                "    def name(self): return 'event'\n"
+                "    def update(self, elapsed): pass\n"
+                "    def render(self, output): pass\n"
+                "class _Builder(EffectBuilder):\n"
+                "    def __call__(self, name, config): return _NoPixRenderer()\n"
+                "BUILD = _Builder()\n"
+            )
+        },
+    )
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=registry, outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "nopix.event", 5, {})
+    manager.update(_make_timer())
+
+    assert output.update_pixels_calls == [("personal", [])]
+    assert len(output.flush_calls) == 1
