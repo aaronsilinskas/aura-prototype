@@ -1,1 +1,1 @@
-"""Element renderer builders."""
+"""Element effect builders."""

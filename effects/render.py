@@ -10,7 +10,7 @@ from effects.level import level_lerp_int as _level_lerp_int
 EffectListenerFunc: TypeAlias = "Callable[[str], None]"
 
 
-class RendererConfig:
+class EffectConfig:
     """Runtime configuration shared across a render pass.
 
     Passed to effect builders at construction. Controls output intensity via
@@ -76,8 +76,8 @@ class PixelBuffer:
         return iter(self._pixels)
 
 
-class EffectRenderer:
-    """Base class for effect renderers.
+class Effect:
+    """Base class for effects.
 
     Update model:
       - Call ``update(elapsed)`` once per frame before ``render``.
@@ -92,20 +92,20 @@ class EffectRenderer:
 
     @property
     def renders_pixels(self) -> bool:
-        """Whether this renderer produces pixel output.
+        """Whether this effect produces pixel output.
 
-        Non-pixel renderers (e.g. audio or event-only) pass ``renders_pixels=False``
+        Non-pixel effects (e.g. audio or event-only) pass ``renders_pixels=False``
         to ``super().__init__()`` to skip pixel buffer allocation for all outputs.
         """
         return getattr(self, "_renders_pixels", True)
 
     @property
     def name(self) -> str:
-        """The name of this renderer."""
+        """The name of this effect."""
         raise NotImplementedError
 
     def update(self, elapsed: float) -> None:
-        """Advance renderer state for the current frame."""
+        """Advance effect state for the current frame."""
         raise NotImplementedError
 
     def render(self, output: PixelBuffer) -> None:

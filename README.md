@@ -12,7 +12,7 @@ microcontrollers. Full game and hardware design lives in `~/dev/aura/aura-docs/`
 
 ```
 effects/          LED animation engine (CircuitPython-safe)
-  render.py       RendererConfig, PixelBuffer, EffectRenderer
+  render.py       EffectConfig, PixelBuffer, Effect
   palette.py      Palette, PaletteLUT256
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
@@ -82,7 +82,7 @@ A **pack** is a directory containing a `version.txt` and one `.py` file per
 item. `PackRegistry` discovers packs via `scan_dir(path, module_prefix)` and
 imports items lazily on first use.
 
-- **Effect pack** — each `.py` file exports `builder`: a `(config) → EffectRenderer` callable.
+- **Effect pack** — each `.py` file exports `builder`: a `(config) → Effect` callable.
   Effect names use `"pack.effect"` format (e.g. `"elements.fire"`).
 - **Rule pack** — each `.py` file exports `rule`: a `GameRule` instance.
 

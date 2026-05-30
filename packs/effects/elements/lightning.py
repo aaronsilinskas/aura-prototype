@@ -3,7 +3,7 @@ import random
 from effects.layers.add_samples_renderer import AddSamplesRenderer
 from effects.layers.layer import Layer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer, RendererConfig
+from effects.render import Effect, EffectConfig
 from effects.shape import Shape
 from engine.effects.manager import EffectBuilder
 
@@ -79,8 +79,8 @@ class _LightningBolt(Layer):
         return self._shape((position + self._bolt_offset) % 1.0) * brightness
 
 
-class LightningPrototypeBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+class LightningBuilder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
         """Blinding orange flashes at random positions, prototype version.
 
         runs its own IDLE/STRIKE FSM directly on the effect.
@@ -102,4 +102,4 @@ class LightningPrototypeBuilder(EffectBuilder):
         return AddSamplesRenderer(name, bolts, PaletteLUT256(_LIGHTNING_PALETTE))
 
 
-BUILD = LightningPrototypeBuilder()
+BUILD = LightningBuilder()

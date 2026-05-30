@@ -1,4 +1,4 @@
-from effects.render import EffectRenderer, PixelBuffer, RendererConfig
+from effects.render import Effect, EffectConfig, PixelBuffer
 from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.state import EffectControls, EffectReceipt, ScopeValue
@@ -70,24 +70,24 @@ class EffectOutput:
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], receipt: EffectReceipt
     ) -> None:
-        """Handle an event triggered by an effect lifecycle or renderer.
+        """Handle an event triggered by an effect lifecycle or effect-triggered signal.
 
-        Lifecycle events (start/stop) and renderer-triggered signals all deliver
+        Lifecycle events (start/stop) and effect-triggered signals all deliver
         an ``EffectEvent`` instance.
         """
         pass
 
 
 class EffectBuilder:
-    """Factory interface for constructing ``EffectRenderer`` instances by name.
+    """Factory interface for constructing ``Effect`` instances by name.
 
-    Concrete implementations look up the named effect and return a renderer
-    configured for the given ``RendererConfig``. Raise ``KeyError`` or
+    Concrete implementations look up the named effect and return an effect
+    configured for the given ``EffectConfig``. Raise ``KeyError`` or
     ``ValueError`` for unregistered names.
     """
 
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
-        """Build an EffectRenderer for the named effect.
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        """Build an Effect for the named effect.
 
         Args:
             name: The registered effect name (e.g. ``"color.flash"``).
@@ -97,7 +97,7 @@ class EffectBuilder:
                 ``config.resolution`` describes the output hardware.
 
         Returns:
-            A configured ``EffectRenderer`` ready to be advanced each frame.
+            A configured ``Effect`` ready to be advanced each frame.
         """
         raise NotImplementedError
 
@@ -106,7 +106,7 @@ class EffectManager(EffectControls):
     """Manages running effects and routes rendered frames to registered outputs each tick.
 
     Update model:
-      - Call ``update(timer)`` once per frame. Each unique renderer is
+      - Call ``update(timer)`` once per frame. Each unique effect is
         advanced exactly once; outputs receive their frames in a second pass.
       - Outputs always receive a call, with an empty list when no effects
         are active (go-dark signal).
@@ -115,7 +115,7 @@ class EffectManager(EffectControls):
     """
 
     class _EffectEntry:
-        __slots__ = ("keys", "name", "output_buffers", "receipt", "renderer")
+        __slots__ = ("effect", "keys", "name", "output_buffers", "receipt")
 
         def __init__(
             self,
@@ -123,13 +123,13 @@ class EffectManager(EffectControls):
             name: str,
             receipt: EffectReceipt,
             output_buffers: list[dict[str, PixelBuffer] | None],
-            renderer: EffectRenderer | None,
+            effect: Effect | None,
         ) -> None:
             self.keys: tuple[str, ...] = keys
             self.name: str = name
             self.receipt: EffectReceipt = receipt
             self.output_buffers: list[dict[str, PixelBuffer] | None] = output_buffers
-            self.renderer: EffectRenderer | None = renderer
+            self.effect: Effect | None = effect
 
         def __repr__(self) -> str:
             return (
@@ -183,7 +183,7 @@ class EffectManager(EffectControls):
         level: int,
         options: dict[str, object],
     ) -> "EffectManager._EffectEntry":
-        """Construct an EffectRenderer for the named effect.
+        """Construct an Effect for the named effect.
 
         *name* must be in ``"pack.effect"`` format.  The pack portion is used to
         look up the registered pack in the ``PackRegistry``; the bare effect name
@@ -219,19 +219,19 @@ class EffectManager(EffectControls):
             if matching_keys and output.min_resolution > resolution:
                 resolution = output.min_resolution
 
-        entry = EffectManager._EffectEntry(
-            tuple(scope_key_set), name, receipt, [], None
-        )
+        entry = EffectManager._EffectEntry(tuple(scope_key_set), name, receipt, [], None)
 
         def scoped_listener(event_name: str) -> None:
-            self._notify_listeners(EffectEvent(pack_name, effect_name, event_name), set(entry.keys), receipt)
+            self._notify_listeners(
+                EffectEvent(pack_name, effect_name, event_name), set(entry.keys), receipt
+            )
 
-        config = RendererConfig(
+        config = EffectConfig(
             level=level, resolution=resolution, options=options, listeners=[scoped_listener]
         )
-        entry.renderer = builder(effect_name, config)
+        entry.effect = builder(effect_name, config)
 
-        if entry.renderer.renders_pixels:
+        if entry.effect.renders_pixels:
             for i, output in enumerate(self._outputs):
                 matching_keys = scope_key_set & self._output_key_sets[i]
                 if matching_keys and output.receives_pixels:
@@ -284,7 +284,9 @@ class EffectManager(EffectControls):
         """
         for entry, removed_keys in stopped:
             pack_name, effect_name = entry.name.split(".", 1)
-            self._notify_listeners(EffectEvent(pack_name, effect_name, "stop"), removed_keys, entry.receipt)
+            self._notify_listeners(
+                EffectEvent(pack_name, effect_name, "stop"), removed_keys, entry.receipt
+            )
 
         remaining_key_set: set[str] = set()
         for r in remaining:
@@ -364,9 +366,9 @@ class EffectManager(EffectControls):
 
         elapsed = timer.elapsed
 
-        # Pass 1: advance each renderer once.
+        # Pass 1: advance each effect once.
         for entry in self._effects:
-            entry.renderer.update(elapsed)
+            entry.effect.update(elapsed)
 
         # Pass 2: render and deliver per-key frames to each output.
         # Every registered key receives a call; empty lists signal go-dark.
@@ -386,7 +388,7 @@ class EffectManager(EffectControls):
                     buf_dict = entry.output_buffers[i]
                     if buf_dict is not None:
                         for k, buf in buf_dict.items():
-                            entry.renderer.render(buf)
+                            entry.effect.render(buf)
                             frame_bufs[k].append(buf)
                             frame_receipts[k].append(entry.receipt)
                 for key in frame_bufs:

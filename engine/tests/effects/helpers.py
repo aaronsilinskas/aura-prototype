@@ -1,4 +1,4 @@
-from effects.render import EffectRenderer, PixelBuffer, RendererConfig
+from effects.render import Effect, EffectConfig, PixelBuffer
 from engine.effects.manager import EffectBuilder, EffectOutput
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
@@ -39,8 +39,8 @@ class SpyEffectOutput(EffectOutput):
         self.clear_pixels_calls.append(scope_key)
 
 
-class _NamedRenderer(EffectRenderer):
-    """Minimal EffectRenderer stub that stores a name and does nothing."""
+class _NamedEffect(Effect):
+    """Minimal Effect stub that stores a name and does nothing."""
 
     def __init__(self, name: str) -> None:
         self._name = name
@@ -57,14 +57,14 @@ class _NamedRenderer(EffectRenderer):
 
 
 class StubEffectBuilder(EffectBuilder):
-    """Returns a minimal EffectRenderer for any effect name."""
+    """Returns a minimal Effect for any effect name."""
 
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
-        return _NamedRenderer(name)
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        return _NamedEffect(name)
 
 
-class SpyRenderer:
-    """Minimal renderer that counts how many times ``update`` was called."""
+class SpyEffect:
+    """Minimal effect that counts how many times ``update`` was called."""
 
     renders_pixels: bool = True
 
@@ -79,38 +79,38 @@ class SpyRenderer:
 
 
 class SpyEffectBuilder(EffectBuilder):
-    """Builder that records each renderer it creates, for update-count assertions."""
+    """Builder that records each effect it creates, for update-count assertions."""
 
     def __init__(self) -> None:
-        self.created: list[SpyRenderer] = []
+        self.created: list[SpyEffect] = []
 
-    def __call__(self, name: str, config: RendererConfig) -> SpyRenderer:
-        renderer = SpyRenderer()
-        self.created.append(renderer)
-        return renderer
+    def __call__(self, name: str, config: EffectConfig) -> SpyEffect:
+        effect = SpyEffect()
+        self.created.append(effect)
+        return effect
 
 
 class CapturingEffectBuilder(EffectBuilder):
-    """Builder that captures the last ``RendererConfig`` it received."""
+    """Builder that captures the last ``EffectConfig`` it received."""
 
     def __init__(self) -> None:
-        self.last_config: RendererConfig | None = None
+        self.last_config: EffectConfig | None = None
 
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
         self.last_config = config
-        return _NamedRenderer(name)
+        return _NamedEffect(name)
 
 
 class EventFiringEffectBuilder(EffectBuilder):
-    """Builder that creates a renderer which fires a named event on each update."""
+    """Builder that creates an effect which fires a named event on each update."""
 
     def __init__(self, event_name: str) -> None:
         self._event_name = event_name
 
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
         event_name = self._event_name
 
-        class _EventRenderer(EffectRenderer):
+        class _EventEffect(Effect):
             @property
             def name(self) -> str:  # type: ignore[override]
                 return name
@@ -121,4 +121,4 @@ class EventFiringEffectBuilder(EffectBuilder):
             def render(self, output: object) -> None:
                 pass
 
-        return _EventRenderer()
+        return _EventEffect()

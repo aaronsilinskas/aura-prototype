@@ -3,7 +3,7 @@ from effects.layers.renderer import LayerRenderer
 from effects.layers.scroll import ScrollOffset
 from effects.layers.scroll_layer import ScrollLayer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer, RendererConfig
+from effects.render import Effect, EffectConfig
 from engine.effects.manager import EffectBuilder
 
 # fmt: off
@@ -14,8 +14,8 @@ _ice_palette = bytes([0, 0, 64, 8,
 # fmt: on
 
 
-class IcePrototypeBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+class IceBuilder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
         """A slow, cold flame that flows and gently scrolls — dark teal at the base
         blooming into bright cyan and white.
 
@@ -38,4 +38,4 @@ class IcePrototypeBuilder(EffectBuilder):
         )
 
 
-BUILD = IcePrototypeBuilder()
+BUILD = IceBuilder()

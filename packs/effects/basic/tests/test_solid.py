@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
-from effects.render import PixelBuffer, RendererConfig
+from effects.render import EffectConfig, PixelBuffer
 
 
-def _config(level: int, color: int | None = None) -> RendererConfig:
+def _config(level: int, color: int | None = None) -> EffectConfig:
     options = {"color": color} if color is not None else {}
-    return RendererConfig(level=level, resolution=16, options=options)
+    return EffectConfig(level=level, resolution=16, options=options)
 
 
 def _render(level: int, pixel_count: int = 4, color: int | None = None):
     from packs.effects.basic.solid import BUILD
 
     config = _config(level, color)
-    renderer = BUILD("basic.solid", config)
+    effect = BUILD("basic.solid", config)
     buf = PixelBuffer(pixel_count)
-    renderer.render(buf)
+    effect.render(buf)
     return list(buf)
 
 
@@ -30,11 +30,11 @@ def test_solid_build_returns_effect_builder_instance() -> None:
     assert isinstance(BUILD, EffectBuilder)
 
 
-def test_solid_renderer_name_is_basic_solid() -> None:
+def test_solid_effect_name_is_basic_solid() -> None:
     from packs.effects.basic.solid import BUILD
 
-    renderer = BUILD("basic.solid", _config(5))
-    assert renderer.name == "basic.solid"
+    effect = BUILD("basic.solid", _config(5))
+    assert effect.name == "basic.solid"
 
 
 # --- Color scaling ---
@@ -63,10 +63,10 @@ def test_solid_level_5_red_scales_red_channel_only() -> None:
 def test_solid_no_color_option_defaults_to_white() -> None:
     from packs.effects.basic.solid import BUILD
 
-    config = RendererConfig(level=10, resolution=16)
-    renderer = BUILD("basic.solid", config)
+    config = EffectConfig(level=10, resolution=16)
+    effect = BUILD("basic.solid", config)
     buf = PixelBuffer(4)
-    renderer.render(buf)
+    effect.render(buf)
     assert all(p == 0xFFFFFF for p in buf)
 
 

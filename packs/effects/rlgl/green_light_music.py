@@ -1,9 +1,9 @@
-from effects.render import EffectRenderer, PixelBuffer, RendererConfig
+from effects.render import Effect, EffectConfig, PixelBuffer
 from engine.effects.manager import EffectBuilder
 
 
-class GreenLightMusicRenderer(EffectRenderer):
-    """Audio-only renderer for green light background music.
+class GreenLightMusic(Effect):
+    """Audio-only effect for green light background music.
 
     Plays via AudioEffectOutput on the AMBIENT scope (voice 0, looping).
     ``renders_pixels = False`` — no pixel buffer is allocated.
@@ -24,8 +24,8 @@ class GreenLightMusicRenderer(EffectRenderer):
 
 
 class GreenLightMusicBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> GreenLightMusicRenderer:
-        return GreenLightMusicRenderer()
+    def __call__(self, name: str, config: EffectConfig) -> GreenLightMusic:
+        return GreenLightMusic()
 
 
 BUILD = GreenLightMusicBuilder()

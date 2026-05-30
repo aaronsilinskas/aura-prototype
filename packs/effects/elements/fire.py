@@ -1,7 +1,7 @@
 from effects.layers.flame_layer import FlameLayer
 from effects.layers.renderer import LayerRenderer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer, RendererConfig
+from effects.render import Effect, EffectConfig
 from engine.effects.manager import EffectBuilder
 
 # fmt: off
@@ -14,8 +14,8 @@ _fire_palette = bytes([0, 32, 0, 0,
 # fmt: on
 
 
-class FirePrototypeBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+class FireBuilder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
         """Classic flickering flame in deep red, orange, and golden yellow —
         turbulent with bright peaks and dark, smoldering roots.
 
@@ -35,4 +35,4 @@ class FirePrototypeBuilder(EffectBuilder):
         )
 
 
-BUILD = FirePrototypeBuilder()
+BUILD = FireBuilder()

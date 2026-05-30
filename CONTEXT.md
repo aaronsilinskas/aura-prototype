@@ -2,12 +2,12 @@
 
 ## Glossary
 
-### EffectRenderer
-A base class in `effects/render.py` that subclasses override to drive all visual simulation state directly. Subclasses implement `name`, `update(timer)`, and `render(output)`. All ten element effects live in `packs/effects/elements/` and extend `EffectRenderer` using the layer helpers in `effects/layers/`. Registered under the `elements.*` namespace via `ElementBuilder`. Class attribute `renders_pixels: bool = True` — audio-only and vibration-only renderers set this to `False`; `EffectManager` skips pixel buffer allocation and `render()` calls for such renderers.
-_Avoid_: "step-based effect", "prototype renderer" (the cutover is complete — all renderers use this direct approach)
+### Effect
+A base class in `effects/render.py` that subclasses override to drive all visual simulation state directly. Subclasses implement `name`, `update(timer)`, and `render(output)`. All ten element effects live in `packs/effects/elements/` and extend `Effect` using the layer helpers in `effects/layers/`. Registered under the `elements.*` namespace via `ElementBuilder`. Class attribute `renders_pixels: bool = True` — audio-only and vibration-only effects set this to `False`; `EffectManager` skips pixel buffer allocation and `render()` calls for such effects.
+_Avoid_: "step-based effect", "prototype renderer" (the cutover is complete — all effects use this direct approach); "EffectRenderer" (old name — renamed)
 
 ### Layer
-A composable simulation unit used by `Effect` implementations that composite pixel animations. The base class in `effects/layers/layer.py` defines `update(elapsed)` and `sample(position, pixel_count) -> float`. Concrete implementations: `ScrollLayer`, `FlameLayer`, `DriftNoiseLayer`, `SparkleLayer`, `ShapeLayer`. Layer-based renderers (`LayerRenderer`, `AddColorsRenderer`, `AddSamplesRenderer`) composite layers into pixel output.
+A composable simulation unit used by `Effect` implementations that composite pixel animations. The base class in `effects/layers/layer.py` defines `update(elapsed)` and `sample(position, pixel_count) -> float`. Concrete implementations: `ScrollLayer`, `FlameLayer`, `DriftNoiseLayer`, `SparkleLayer`, `ShapeLayer`. Layer-based effects (`LayerRenderer`, `AddColorsRenderer`, `AddSamplesRenderer`) composite layers into pixel output.
 _Avoid_: importing layer helpers from anywhere other than `effects.layers`
 
 ### GameRule
@@ -40,11 +40,11 @@ A hardware or software output registered with the effect system. Serves one or m
 _Avoid_: output (ambiguous in multi-output contexts)
 
 ### EffectEvent
-A structured effect lifecycle payload constructed by `EffectManager` when an effect starts or stops. Lives in `engine/events.py` alongside `Event` (game-rule events) — parallel concept, different subsystem. Holds three fields: `pack` (the pack name, e.g. `"rlgl"`), `name` (the bare effect name, e.g. `"red_light_music"`), and `verb` (`"start"` or `"stop"`). `EffectManager` constructs it directly for lifecycle events and passes it to `_notify_listeners`. `EffectOutput.handle_event` receives an `EffectEvent` — outputs never parse raw strings. Renderer-triggered signals (via `RendererConfig.notify_listeners`) are a separate path and do not produce `EffectEvent` objects.
+A structured effect lifecycle payload constructed by `EffectManager` when an effect starts or stops. Lives in `engine/events.py` alongside `Event` (game-rule events) — parallel concept, different subsystem. Holds three fields: `pack` (the pack name, e.g. `"rlgl"`), `name` (the bare effect name, e.g. `"red_light_music"`), and `verb` (`"start"` or `"stop"`). `EffectManager` constructs it directly for lifecycle events and passes it to `_notify_listeners`. `EffectOutput.handle_event` receives an `EffectEvent` — outputs never parse raw strings. Effect-triggered signals (via `EffectConfig.notify_listeners`) are a separate path and do not produce `EffectEvent` objects.
 _Avoid_: passing raw event name strings to `handle_event`; confusing with `Event` (game-rule events)
 
 ### Resolution
-The mathematical detail level at which an effect generates its animation data. Independent of pixel count — an effect can be generated at resolution 20 and rendered into a 10-pixel buffer, which may look noticeably better than generating at resolution 10. Each `EffectOutput` declares a `min_resolution` — the minimum detail level it requires. The effect engine uses the highest `min_resolution` across all outputs an effect targets when constructing the renderer. Pixel count (the number of LEDs written per tick) is a separate hardware concern controlled by the size of the buffer the output allocates.
+The mathematical detail level at which an effect generates its animation data. Independent of pixel count — an effect can be generated at resolution 20 and rendered into a 10-pixel buffer, which may look noticeably better than generating at resolution 10. Each `EffectOutput` declares a `min_resolution` — the minimum detail level it requires. The effect engine uses the highest `min_resolution` across all outputs an effect targets when constructing the effect. Pixel count (the number of LEDs written per tick) is a separate hardware concern controlled by the size of the buffer the output allocates.
 _Avoid_: conflating resolution with pixel count
 
 ### EffectReceipt

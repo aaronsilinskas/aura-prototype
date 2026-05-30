@@ -4,7 +4,7 @@ from effects.layers.scroll import ScrollOffset
 from effects.layers.scroll_layer import ScrollLayer
 from effects.layers.shape_layer import ShapeLayer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer, RendererConfig
+from effects.render import Effect, EffectConfig
 from effects.shape import Shape
 from engine.effects.manager import EffectBuilder
 
@@ -19,8 +19,8 @@ _TIME_SAND_PALETTE = bytes([  0,   0,   0,   0,
 # fmt: on
 
 
-class TimePrototypeBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+class TimeBuilder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
         """A drifting amber-brown sand prototype overlaid with rotating gray tickers.
 
         simulation state lives directly on the effect.
@@ -48,4 +48,4 @@ class TimePrototypeBuilder(EffectBuilder):
         )
 
 
-BUILD = TimePrototypeBuilder()
+BUILD = TimeBuilder()

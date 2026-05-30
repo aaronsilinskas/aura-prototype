@@ -1,7 +1,7 @@
 from effects.layers.renderer import LayerRenderer
 from effects.layers.sparkle_layer import SparkleLayer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer, RendererConfig
+from effects.render import Effect, EffectConfig
 from effects.value import ValueGenerator as VG
 from engine.effects.manager import EffectBuilder
 
@@ -12,8 +12,8 @@ _dark_palette = bytes([0, 0, 0, 0,
 # fmt: on
 
 
-class DarkPrototypeBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+class DarkBuilder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
         """Sparse deep-red sparks that flicker and fade against black, like dying
         embers glowing in the dark.
 
@@ -36,4 +36,4 @@ class DarkPrototypeBuilder(EffectBuilder):
         )
 
 
-BUILD = DarkPrototypeBuilder()
+BUILD = DarkBuilder()

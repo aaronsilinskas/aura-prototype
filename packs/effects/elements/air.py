@@ -3,7 +3,7 @@ import random
 from effects.layers.add_samples_renderer import AddSamplesRenderer
 from effects.layers.layer import Layer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer, RendererConfig
+from effects.render import Effect, EffectConfig
 from effects.shape import Shape
 from effects.value import lerp
 from engine.effects.manager import EffectBuilder
@@ -142,8 +142,8 @@ class _AirBreeze(Layer):
         return self._shape(pos) * self._multiplier
 
 
-class AirPrototypeBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+class AirBuilder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
         """Sweeping green-white breezes prototype.
 
         Each breeze runs its own IDLE/SWEEP/FADE FSM directly on the effect.
@@ -177,4 +177,4 @@ class AirPrototypeBuilder(EffectBuilder):
         return AddSamplesRenderer(name, breezes, PaletteLUT256(_AIR_PALETTE))
 
 
-BUILD = AirPrototypeBuilder()
+BUILD = AirBuilder()
