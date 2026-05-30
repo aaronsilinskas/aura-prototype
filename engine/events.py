@@ -38,7 +38,7 @@ class EffectEvent:
     renderer-triggered signals (via ``RendererConfig.notify_listeners``).
     """
 
-    __slots__ = ["pack", "name", "verb"]
+    __slots__ = ["name", "pack", "verb"]
 
     def __init__(self, pack: str, name: str, verb: str) -> None:
         self.pack: str = pack

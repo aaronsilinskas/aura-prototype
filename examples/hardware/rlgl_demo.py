@@ -41,6 +41,7 @@ from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.packs import PackRegistry
 from engine.scene import SceneManager
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
+from scenes.rlgl.scene import create_audio_output
 from scenes.rlgl.scene import factory as rlgl_factory
 
 try:
@@ -76,7 +77,7 @@ _rule_registry.scan_dir("packs/rules", "packs.rules")
 
 _effect_manager = EffectManager(
     registry=_effect_registry,
-    outputs=[IS31FL3741EffectOutput(_matrix)],
+    outputs=[IS31FL3741EffectOutput(_matrix), create_audio_output(_effect_registry)],
 )
 
 # ---------------------------------------------------------------------------

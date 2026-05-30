@@ -6,7 +6,7 @@ import pytest
 
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
-from engine.state import GameState, SceneControls, Scope
+from engine.state import EffectReceipt, GameState, SceneControls, Scope
 from packs.rules.hw_test.tests.helpers import SpyEffectControls
 from packs.rules.rlgl.game_rule import (
     PHASE_GAME_OVER,
@@ -154,7 +154,7 @@ def test_ready_shows_water_effect_on_all_scopes(spy):
     _tick(state, engine, timer, total=0.0)
     water_calls = [c for c in spy.set_effect_calls if c[1] == "elements.water"]
     assert len(water_calls) == 1
-    assert water_calls[0][0] is Scope.ALL
+    assert water_calls[0][0] is Scope.NON_AMBIENT
 
 
 def test_ready_shows_water_effect_at_level_3(spy):
@@ -215,7 +215,7 @@ def test_button_press_from_ready_shows_yellow_warning_on_all_scopes(spy):
 
     yellow_calls = [c for c in spy.set_effect_calls if c[3].get("end_color") == 0xFFFF00]
     assert len(yellow_calls) == 1
-    assert yellow_calls[0][0] is Scope.ALL
+    assert yellow_calls[0][0] is Scope.NON_AMBIENT
 
 
 def test_button_press_from_ready_uses_pulse_effect_for_warning(spy):
@@ -279,7 +279,7 @@ def test_red_phase_transition_uses_solid_with_red_color(spy):
 
     solid_calls = [c for c in spy.set_effect_calls if c[1] == "basic.solid"]
     assert len(solid_calls) == 1
-    assert solid_calls[0][0] is Scope.ALL
+    assert solid_calls[0][0] is Scope.NON_AMBIENT
     assert solid_calls[0][3]["color"] == 0xFF0000
 
 
@@ -396,7 +396,7 @@ def test_green_warning_transition_uses_pulse_with_yellow_end_color(spy):
 
     pulse_calls = [c for c in spy.set_effect_calls if c[1] == "basic.pulse"]
     assert len(pulse_calls) == 1
-    assert pulse_calls[0][0] is Scope.ALL
+    assert pulse_calls[0][0] is Scope.NON_AMBIENT
     assert pulse_calls[0][3]["end_color"] == 0xFFFF00
 
 
@@ -414,7 +414,7 @@ def test_green_phase_transition_uses_solid_with_green_color(spy):
 
     solid_calls = [c for c in spy.set_effect_calls if c[1] == "basic.solid"]
     assert len(solid_calls) == 1
-    assert solid_calls[0][0] is Scope.ALL
+    assert solid_calls[0][0] is Scope.NON_AMBIENT
     assert solid_calls[0][3]["color"] == 0x00FF00
 
 
@@ -510,7 +510,7 @@ def test_game_over_shows_fire_effect_on_all_scopes(spy):
 
     fire_calls = [c for c in spy.set_effect_calls if c[1] == "elements.fire"]
     assert len(fire_calls) == 1
-    assert fire_calls[0][0] is Scope.ALL
+    assert fire_calls[0][0] is Scope.NON_AMBIENT
 
 
 def test_game_over_shows_fire_effect_at_level_10(spy):
@@ -551,7 +551,7 @@ def test_game_over_expiry_restores_water_effect_on_all_scopes(spy):
 
     water_calls = [c for c in spy.set_effect_calls if c[1] == "elements.water"]
     assert len(water_calls) == 1
-    assert water_calls[0][0] is Scope.ALL
+    assert water_calls[0][0] is Scope.NON_AMBIENT
 
 
 def test_game_over_expiry_restores_water_effect_at_level_3(spy):
@@ -568,3 +568,151 @@ def test_game_over_expiry_restores_water_effect_at_level_3(spy):
     water_calls = [c for c in spy.set_effect_calls if c[1] == "elements.water"]
     assert len(water_calls) == 1
     assert water_calls[0][2] == 3
+
+
+# ---------------------------------------------------------------------------
+# Audio — Red Warning phase
+# ---------------------------------------------------------------------------
+
+
+def test_red_warning_plays_warning_sting_on_personal(spy):
+    state, engine, timer = _make_state(spy)
+    _tick(state, engine, timer, total=0.0)
+    spy.add_effect_calls.clear()
+
+    _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
+
+    sting_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.warning_sting"]
+    assert len(sting_calls) == 1
+    assert sting_calls[0][0] is Scope.PERSONAL
+
+
+def test_red_warning_starts_ambient_music_on_ambient_scope(spy):
+    state, engine, timer = _make_state(spy)
+    _tick(state, engine, timer, total=0.0)
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
+
+    music_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.red_light_music"]
+    assert len(music_calls) == 1
+    assert music_calls[0][0] is Scope.AMBIENT
+
+
+def test_red_warning_stores_ambient_receipt_in_game_state(spy):
+    state, engine, timer = _make_state(spy)
+    _tick(state, engine, timer, total=0.0)
+
+    _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
+
+    assert state.has("rlgl_ambient_receipt")
+
+
+# ---------------------------------------------------------------------------
+# Audio — Green Warning phase
+# ---------------------------------------------------------------------------
+
+
+def test_green_warning_plays_warning_sting_on_personal(spy):
+    state, engine, timer = _make_state(
+        spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
+    )
+    _tick(state, engine, timer, total=0.0)
+    _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
+    _tick(state, engine, timer, total=0.0)  # → RED
+    spy.add_effect_calls.clear()
+
+    _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
+
+    sting_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.warning_sting"]
+    assert len(sting_calls) == 1
+    assert sting_calls[0][0] is Scope.PERSONAL
+
+
+def test_green_warning_starts_ambient_music_on_ambient_scope(spy):
+    state, engine, timer = _make_state(
+        spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
+    )
+    _tick(state, engine, timer, total=0.0)
+    _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
+    _tick(state, engine, timer, total=0.0)  # → RED
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
+
+    music_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.green_light_music"]
+    assert len(music_calls) == 1
+    assert music_calls[0][0] is Scope.AMBIENT
+
+
+def test_green_warning_stores_ambient_receipt_in_game_state(spy):
+    state, engine, timer = _make_state(
+        spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
+    )
+    _tick(state, engine, timer, total=0.0)
+    _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
+    _tick(state, engine, timer, total=0.0)  # → RED
+    _tick(state, engine, timer, total=0.0)  # → GREEN_WARNING
+
+    assert state.has("rlgl_ambient_receipt")
+
+
+# ---------------------------------------------------------------------------
+# Audio — Game Over phase
+# ---------------------------------------------------------------------------
+
+
+def test_game_over_plays_game_over_sting_on_personal(spy):
+    state, engine, timer = _setup_red_phase(spy, grace=1.0)
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    spy.add_effect_calls.clear()
+
+    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)  # → GAME_OVER
+
+    sting_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.game_over_sting"]
+    assert len(sting_calls) == 1
+    assert sting_calls[0][0] is Scope.PERSONAL
+
+
+def test_game_over_stops_ambient_receipt(spy):
+    state, engine, timer = _setup_red_phase(spy, grace=1.0)
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    ambient_receipt = state.get("rlgl_ambient_receipt", None)
+    assert ambient_receipt is not None
+
+    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)  # → GAME_OVER
+
+    assert ambient_receipt.is_stopped()
+
+
+def test_game_over_removes_ambient_receipt_from_game_state(spy):
+    state, engine, timer = _setup_red_phase(spy, grace=1.0)
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)  # → GAME_OVER
+
+    assert not state.has("rlgl_ambient_receipt")
+
+
+# ---------------------------------------------------------------------------
+# Audio — Ready phase stops held ambient receipt
+# ---------------------------------------------------------------------------
+
+
+def test_ready_stops_ambient_receipt_if_held(spy):
+    stub_receipt = EffectReceipt(99)
+    state, engine, timer = _make_state(spy, initial_data={"rlgl_ambient_receipt": stub_receipt})
+
+    _tick(state, engine, timer, total=0.0)  # init → READY (ambient receipt held)
+
+    assert stub_receipt.is_stopped()
+    assert not state.has("rlgl_ambient_receipt")
+
+
+def test_ready_does_not_crash_when_no_ambient_receipt_held(spy):
+    state, engine, timer = _make_state(spy)
+
+    _tick(state, engine, timer, total=0.0)  # init → READY (no ambient receipt)
+
+    assert state.get("rlgl_phase", None) == PHASE_READY
