@@ -146,8 +146,7 @@ class AirPrototypeBuilder(EffectBuilder):
     def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
         """Sweeping green-white breezes prototype.
 
-        Bypasses Effect/EffectStep/EffectState machinery entirely — each breeze
-        runs its own IDLE/SWEEP/FADE FSM directly on the renderer.
+        Each breeze runs its own IDLE/SWEEP/FADE FSM directly on the effect.
         """
         level = config.level
 

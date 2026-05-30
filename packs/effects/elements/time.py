@@ -23,8 +23,7 @@ class TimePrototypeBuilder(EffectBuilder):
     def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
         """A drifting amber-brown sand prototype overlaid with rotating gray tickers.
 
-        Bypasses Effect/EffectStep/EffectState machinery entirely — all
-        simulation state lives directly on the renderer.
+        simulation state lives directly on the effect.
         """
         level = config.level
 

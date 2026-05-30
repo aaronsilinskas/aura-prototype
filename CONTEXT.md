@@ -7,7 +7,7 @@ A base class in `effects/render.py` that subclasses override to drive all visual
 _Avoid_: "step-based effect", "prototype renderer" (the cutover is complete — all renderers use this direct approach)
 
 ### Layer
-A composable simulation unit used by element `EffectRenderer` subclasses. The base class in `effects/layers/layer.py` defines `update(elapsed)` and `sample(position, pixel_count) -> float`. Concrete implementations: `ScrollLayer`, `FlameLayer`, `DriftNoiseLayer`, `SparkleLayer`, `ShapeLayer`. Layer-based renderers (`LayerRenderer`, `AddColorsRenderer`, `AddSamplesRenderer`) composite layers into pixel output.
+A composable simulation unit used by `Effect` implementations that composite pixel animations. The base class in `effects/layers/layer.py` defines `update(elapsed)` and `sample(position, pixel_count) -> float`. Concrete implementations: `ScrollLayer`, `FlameLayer`, `DriftNoiseLayer`, `SparkleLayer`, `ShapeLayer`. Layer-based renderers (`LayerRenderer`, `AddColorsRenderer`, `AddSamplesRenderer`) composite layers into pixel output.
 _Avoid_: importing layer helpers from anywhere other than `effects.layers`
 
 ### GameRule

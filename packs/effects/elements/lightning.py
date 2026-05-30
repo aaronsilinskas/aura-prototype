@@ -83,8 +83,7 @@ class LightningPrototypeBuilder(EffectBuilder):
     def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
         """Blinding orange flashes at random positions, prototype version.
 
-        Bypasses Effect/EffectStep/EffectState machinery entirely — each bolt
-        runs its own IDLE/STRIKE FSM directly on the renderer.
+        runs its own IDLE/STRIKE FSM directly on the effect.
         """
         level = config.level
 

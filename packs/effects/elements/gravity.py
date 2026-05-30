@@ -20,8 +20,7 @@ class GravityPrototypeBuilder(EffectBuilder):
     def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
         """A drift-noise nebula prototype with additive star sparkles.
 
-        Bypasses Effect/EffectStep/EffectState machinery entirely — all
-        simulation state lives directly on the renderer.
+        simulation state lives directly on the effect.
         """
         level = config.level
 
