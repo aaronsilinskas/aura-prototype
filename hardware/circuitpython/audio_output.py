@@ -60,6 +60,8 @@ class AudioEffectOutput(EffectOutput):
                 self._mixer.voice[0].stop()
                 if self._loop_file is not None:
                     self._loop_file.close()
+                if self._loop_receipt is not None:
+                    self._loop_receipt.stop()
                 self._loop_file = f
                 self._loop_receipt = receipt
                 self._mixer.voice[0].play(audiocore.WaveFile(self._loop_file), loop=True)
@@ -68,6 +70,8 @@ class AudioEffectOutput(EffectOutput):
                 self._mixer.voice[1].stop()
                 if self._once_file is not None:
                     self._once_file.close()
+                if self._once_receipt is not None:
+                    self._once_receipt.stop()
                 self._once_file = f
                 self._once_receipt = receipt
                 self._mixer.voice[1].play(audiocore.WaveFile(self._once_file))
