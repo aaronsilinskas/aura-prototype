@@ -69,7 +69,7 @@ class AnsiEffectOutput(EffectOutput):
             self._initialized = True
         print("\r\n".join(lines), end="")
 
-    def show_pixels(self) -> None:
+    def flush(self) -> None:
         sys.stdout.flush()
 
 
