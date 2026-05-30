@@ -105,6 +105,7 @@ def test_scope_all_expands_to_every_registered_output() -> None:
         "global.main",
         "global.buff",
         "global.debuff",
+        "ambient",
     }
 
 
@@ -116,3 +117,34 @@ def test_scope_all_contains_no_duplicate_keys() -> None:
 
 def test_global_all_keys_are_subset_of_scope_all_keys() -> None:
     assert set(Scope.Global.ALL.keys).issubset(set(Scope.ALL.keys))
+
+
+# ---------------------------------------------------------------------------
+# Scope constants — AMBIENT and NON_AMBIENT
+# ---------------------------------------------------------------------------
+
+
+def test_ambient_scope_routes_to_ambient_key() -> None:
+    assert Scope.AMBIENT.keys == ("ambient",)
+
+
+def test_ambient_scope_is_a_leaf() -> None:
+    assert Scope.AMBIENT.members == [Scope.AMBIENT]
+
+
+def test_non_ambient_expands_to_personal_directional_and_global() -> None:
+    assert set(Scope.NON_AMBIENT.keys) == {
+        "personal",
+        "directional",
+        "global.main",
+        "global.buff",
+        "global.debuff",
+    }
+
+
+def test_non_ambient_does_not_include_ambient_key() -> None:
+    assert "ambient" not in Scope.NON_AMBIENT.keys
+
+
+def test_scope_all_includes_ambient() -> None:
+    assert "ambient" in Scope.ALL.keys

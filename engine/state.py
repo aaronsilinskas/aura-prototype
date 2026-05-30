@@ -59,7 +59,9 @@ class Scope:
     Usage:
       - ``PERSONAL`` — local player's device only.
       - ``DIRECTIONAL`` — the direction indicator the player is pointing.
+      - ``AMBIENT`` — long-running background effects.
       - ``Global.*`` — shared outputs targeting all players.
+      - ``NON_AMBIENT`` — every non-ambient scope (PERSONAL, DIRECTIONAL, Global.ALL).
       - ``ALL`` — every output; use when the scope should be universal
         (e.g. clearing all active effects).
     """
@@ -80,9 +82,13 @@ class Scope:
 
     PERSONAL: Final = ScopeValue("personal")  # only the local player's device
     DIRECTIONAL: Final = ScopeValue("directional")  # the direction the player is pointing
+    AMBIENT: Final = ScopeValue("ambient")  # long-running background effects
+    NON_AMBIENT: Final = ScopeValue(
+        "non_ambient", [PERSONAL, DIRECTIONAL, Global.ALL]
+    )  # all non-ambient scopes
     ALL: Final = ScopeValue(
-        "all", [PERSONAL, DIRECTIONAL, Global.ALL]
-    )  # every scope, including all global zones
+        "all", [PERSONAL, DIRECTIONAL, Global.ALL, AMBIENT]
+    )  # every scope, including all global zones and ambient
 
 
 class SceneControls:

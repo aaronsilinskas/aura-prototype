@@ -29,3 +29,29 @@ class Event:
 
     def __str__(self) -> str:
         return f"{self.group.name}:{self.name}"
+
+
+class EffectEvent:
+    """Structured event payload for effect lifecycle and renderer signals.
+
+    Constructed by ``EffectManager`` for lifecycle events (start/stop) and for
+    renderer-triggered signals (via ``RendererConfig.notify_listeners``).
+    """
+
+    __slots__ = ["pack", "name", "verb"]
+
+    def __init__(self, pack: str, name: str, verb: str) -> None:
+        self.pack: str = pack
+        self.name: str = name
+        self.verb: str = verb
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, EffectEvent):
+            return NotImplemented
+        return self.pack == other.pack and self.name == other.name and self.verb == other.verb
+
+    def __hash__(self) -> int:
+        return hash((self.pack, self.name, self.verb))
+
+    def __repr__(self) -> str:
+        return f"EffectEvent({self.pack!r}, {self.name!r}, {self.verb!r})"
