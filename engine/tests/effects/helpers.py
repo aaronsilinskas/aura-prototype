@@ -19,7 +19,7 @@ class SpyEffectOutput(EffectOutput):
         self.clear_pixels_calls: list = []
 
     def handle_event(
-        self, event: "EffectEvent | str", scope_keys: frozenset[str], receipt: EffectReceipt
+        self, event: EffectEvent, scope_keys: frozenset[str], receipt: EffectReceipt
     ) -> None:
         self.handle_event_calls.append((event, scope_keys, receipt))
 

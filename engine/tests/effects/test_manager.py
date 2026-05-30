@@ -215,7 +215,7 @@ def test_effect_event_reaches_matching_scope_output(pack_env) -> None:
 
     assert output.handle_event_calls == [
         (EffectEvent("events", "shock", "start"), frozenset({"personal"}), receipt),
-        ("lightning_strike", frozenset({"personal"}), receipt),
+        (EffectEvent("events", "shock", "lightning_strike"), frozenset({"personal"}), receipt),
     ]
 
 
@@ -1043,8 +1043,8 @@ def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_env) -> None:
 
     # shock renderer fires "lightning_strike"; scoped_listener reads live entry.keys
     # → personal output must NOT receive it after narrowing
-    assert not any(c[0] == "lightning_strike" for c in output_personal.handle_event_calls)
-    assert any(c[0] == "lightning_strike" for c in output_directional.handle_event_calls)
+    assert not any(c[0] == EffectEvent("evt", "shock", "lightning_strike") for c in output_personal.handle_event_calls)
+    assert any(c[0] == EffectEvent("evt", "shock", "lightning_strike") for c in output_directional.handle_event_calls)
 
 
 # ---------------------------------------------------------------------------

@@ -68,13 +68,12 @@ class EffectOutput:
         pass
 
     def handle_event(
-        self, event: "EffectEvent | str", scope_keys: frozenset[str], receipt: EffectReceipt
+        self, event: EffectEvent, scope_keys: frozenset[str], receipt: EffectReceipt
     ) -> None:
         """Handle an event triggered by an effect lifecycle or renderer.
 
-        Lifecycle events (start/stop) deliver an ``EffectEvent`` instance.
-        Renderer-triggered signals (via ``RendererConfig.notify_listeners``) deliver
-        a freeform string.
+        Lifecycle events (start/stop) and renderer-triggered signals all deliver
+        an ``EffectEvent`` instance.
         """
         pass
 
@@ -169,7 +168,7 @@ class EffectManager(EffectControls):
         ]
 
     def _notify_listeners(
-        self, event: "EffectEvent | str", event_keys: set[str], receipt: EffectReceipt
+        self, event: EffectEvent, event_keys: set[str], receipt: EffectReceipt
     ) -> None:
         """Notify outputs whose registered key sets intersect event_keys."""
         for i in range(len(self._outputs)):
@@ -221,15 +220,11 @@ class EffectManager(EffectControls):
                 resolution = output.min_resolution
 
         entry = EffectManager._EffectEntry(
-<<<<<<< HEAD
-            tuple(scope_key_set), name, receipt, output_buffers, None
-=======
-            tuple(scope_key_set), effect_name, receipt, [], None
->>>>>>> origin/main
+            tuple(scope_key_set), name, receipt, [], None
         )
 
         def scoped_listener(event_name: str) -> None:
-            self._notify_listeners(event_name, set(entry.keys), receipt)
+            self._notify_listeners(EffectEvent(pack_name, effect_name, event_name), set(entry.keys), receipt)
 
         config = RendererConfig(
             level=level, resolution=resolution, options=options, listeners=[scoped_listener]

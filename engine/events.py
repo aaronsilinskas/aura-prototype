@@ -32,11 +32,10 @@ class Event:
 
 
 class EffectEvent:
-    """Structured lifecycle payload for effect start/stop events.
+    """Structured event payload for effect lifecycle and renderer signals.
 
-    Constructed by ``EffectManager`` for lifecycle events only.
-    Renderer-triggered signals (via ``RendererConfig.notify_listeners``) are
-    delivered as freeform strings and do not produce ``EffectEvent`` objects.
+    Constructed by ``EffectManager`` for lifecycle events (start/stop) and for
+    renderer-triggered signals (via ``RendererConfig.notify_listeners``).
     """
 
     __slots__ = ["pack", "name", "verb"]
