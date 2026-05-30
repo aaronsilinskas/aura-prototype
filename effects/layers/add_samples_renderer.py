@@ -1,9 +1,9 @@
 from effects.layers.layer import Layer
 from effects.palette import Palette
-from effects.render import EffectRenderer, PixelBuffer
+from effects.render import Effect, PixelBuffer
 
 
-class AddSamplesRenderer(EffectRenderer):
+class AddSamplesRenderer(Effect):
     """Blends multiple layers by summing their sample values and applying a single palette.
 
     Per-pixel: sums ``layer.sample(pos, count)`` across all layers, clamps the

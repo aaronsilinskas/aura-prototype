@@ -1,9 +1,9 @@
 from effects.layers.layer import Layer
 from effects.palette import Palette
-from effects.render import EffectRenderer, PixelBuffer
+from effects.render import Effect, PixelBuffer
 
 
-class LayerRenderer(EffectRenderer):
+class LayerRenderer(Effect):
     """Maps a single Layer's sample values to colors via a Palette.
 
     Per pixel, samples the layer at the normalised position and maps the result

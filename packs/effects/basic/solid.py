@@ -1,8 +1,8 @@
-from effects.render import EffectRenderer, PixelBuffer, RendererConfig
+from effects.render import Effect, EffectConfig, PixelBuffer
 from engine.effects.manager import EffectBuilder
 
 
-class SolidRenderer(EffectRenderer):
+class Solid(Effect):
     """Renders every pixel at a fixed pre-scaled packed RGB color.
 
     Stateless: ``update`` is a no-op, so calling ``set_effect`` every tick
@@ -28,20 +28,20 @@ class SolidRenderer(EffectRenderer):
 
 
 class SolidBuilder(EffectBuilder):
-    """Builds a :class:`SolidRenderer` from a ``RendererConfig``.
+    """Builds a :class:`Solid` from an ``EffectConfig``.
 
     Reads ``config.options.get("color", 0xFFFFFF)`` for the base color and
     scales each RGB channel by ``config.level / 10.0`` using integer truncation.
     """
 
-    def __call__(self, name: str, config: RendererConfig) -> SolidRenderer:
+    def __call__(self, name: str, config: EffectConfig) -> Solid:
         base_color = config.options.get("color", 0xFFFFFF)
         brightness = config.level / 10.0
         r = int(((base_color >> 16) & 0xFF) * brightness)
         g = int(((base_color >> 8) & 0xFF) * brightness)
         b = int((base_color & 0xFF) * brightness)
         color = (r << 16) | (g << 8) | b
-        return SolidRenderer(color)
+        return Solid(color)
 
 
 BUILD = SolidBuilder()

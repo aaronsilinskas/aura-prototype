@@ -1,68 +1,68 @@
 import pytest
 
-from effects.render import EffectRenderer, PixelBuffer, RendererConfig
+from effects.render import Effect, EffectConfig, PixelBuffer
 
 # ---------------------------------------------------------------------------
-# RendererConfig — level clamping
+# EffectConfig — level clamping
 # ---------------------------------------------------------------------------
 
 
 def test_config_clamps_level_below_one_to_one() -> None:
-    config = RendererConfig(level=0, resolution=10)
+    config = EffectConfig(level=0, resolution=10)
 
     assert config.level == 1
 
 
 def test_config_clamps_level_above_ten_to_ten() -> None:
-    config = RendererConfig(level=11, resolution=10)
+    config = EffectConfig(level=11, resolution=10)
 
     assert config.level == 10
 
 
 def test_config_stores_level_within_valid_range_unchanged() -> None:
-    config = RendererConfig(level=5, resolution=10)
+    config = EffectConfig(level=5, resolution=10)
 
     assert config.level == 5
 
 
 def test_config_preserves_options_dict_passed_at_construction() -> None:
     opts = {"color": "red"}
-    config = RendererConfig(level=5, resolution=10, options=opts)
+    config = EffectConfig(level=5, resolution=10, options=opts)
 
     assert config.options == opts
 
 
 def test_config_options_defaults_to_empty_dict() -> None:
-    config = RendererConfig(level=5, resolution=10)
+    config = EffectConfig(level=5, resolution=10)
 
     assert config.options == {}
 
 
 # ---------------------------------------------------------------------------
-# RendererConfig — resolution clamping
+# EffectConfig — resolution clamping
 # ---------------------------------------------------------------------------
 
 
 def test_config_clamps_resolution_below_one_to_one() -> None:
-    config = RendererConfig(level=5, resolution=0)
+    config = EffectConfig(level=5, resolution=0)
 
     assert config.resolution == 1
 
 
 # ---------------------------------------------------------------------------
-# RendererConfig — listeners
+# EffectConfig — listeners
 # ---------------------------------------------------------------------------
 
 
 def test_notify_listeners_is_silent_when_no_listeners_are_registered() -> None:
-    config = RendererConfig(level=5, resolution=10)
+    config = EffectConfig(level=5, resolution=10)
 
     config.notify_listeners("frame_start")  # must not raise
 
 
 def test_registered_listener_receives_event_on_notify() -> None:
     received: list[str] = []
-    config = RendererConfig(
+    config = EffectConfig(
         level=5,
         resolution=10,
         listeners=[received.append],
@@ -75,7 +75,7 @@ def test_registered_listener_receives_event_on_notify() -> None:
 
 def test_all_registered_listeners_are_notified_in_registration_order() -> None:
     received: list[str] = []
-    config = RendererConfig(
+    config = EffectConfig(
         level=5,
         resolution=10,
         listeners=[
@@ -90,18 +90,18 @@ def test_all_registered_listeners_are_notified_in_registration_order() -> None:
 
 
 # ---------------------------------------------------------------------------
-# RendererConfig — level_lerp
+# EffectConfig — level_lerp
 # ---------------------------------------------------------------------------
 
 
 def test_config_level_lerp_returns_minimum_at_level_one() -> None:
-    config = RendererConfig(level=1, resolution=10)
+    config = EffectConfig(level=1, resolution=10)
 
     assert config.level_lerp(0.2, 1.0) == 0.2
 
 
 def test_config_level_lerp_returns_maximum_at_level_ten() -> None:
-    config = RendererConfig(level=10, resolution=10)
+    config = EffectConfig(level=10, resolution=10)
 
     assert config.level_lerp(0.2, 1.0) == 1.0
 
@@ -141,23 +141,23 @@ def test_pixel_buffer_iterates_pixels_in_index_order() -> None:
 
 
 # ---------------------------------------------------------------------------
-# EffectRenderer — base class protocol
+# Effect — base class protocol
 # ---------------------------------------------------------------------------
 
 
 def test_base_renderer_name_raises_not_implemented() -> None:
-    renderer = EffectRenderer()
+    renderer = Effect()
     with pytest.raises(NotImplementedError):
         _ = renderer.name
 
 
 def test_base_renderer_update_raises_not_implemented() -> None:
-    renderer = EffectRenderer()
+    renderer = Effect()
     with pytest.raises(NotImplementedError):
         renderer.update(0.016)
 
 
 def test_base_renderer_render_raises_not_implemented() -> None:
-    renderer = EffectRenderer()
+    renderer = Effect()
     with pytest.raises(NotImplementedError):
         renderer.render(PixelBuffer(1))

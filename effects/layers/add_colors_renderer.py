@@ -1,9 +1,9 @@
 from effects.layers.layer import Layer
 from effects.palette import Palette
-from effects.render import EffectRenderer, PixelBuffer
+from effects.render import Effect, PixelBuffer
 
 
-class AddColorsRenderer(EffectRenderer):
+class AddColorsRenderer(Effect):
     """Composes multiple (buffer, palette) layers by additively blending their colors.
 
     Each layer is a ``(buffer, palette)`` pair. Per-pixel: each layer maps its

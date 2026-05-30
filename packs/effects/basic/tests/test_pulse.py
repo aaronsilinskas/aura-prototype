@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from effects.render import PixelBuffer, RendererConfig
+from effects.render import EffectConfig, PixelBuffer
 
 
-def _config(level: int = 10, options: dict | None = None) -> RendererConfig:
-    return RendererConfig(level=level, resolution=16, options=options or {})
+def _config(level: int = 10, options: dict | None = None) -> EffectConfig:
+    return EffectConfig(level=level, resolution=16, options=options or {})
 
 
 def _build(level: int = 10, options: dict | None = None):
@@ -129,7 +129,7 @@ def test_pulse_level_scaling_applied_to_end_color() -> None:
 def test_pulse_default_end_color_appears_at_on_phase() -> None:
     from packs.effects.basic.pulse import BUILD
 
-    renderer = BUILD("basic.pulse", RendererConfig(level=10, resolution=16))
+    renderer = BUILD("basic.pulse", EffectConfig(level=10, resolution=16))
     renderer.update(0.75)  # past brighten(0.5) + into on(0.5)
     pixels = _render(renderer)
     assert all(p == 0xFFFFFF for p in pixels)

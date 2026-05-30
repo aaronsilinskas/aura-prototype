@@ -21,7 +21,7 @@ Full game and hardware design lives in `~/dev/aura/aura-docs/` (an Obsidian vaul
 
 ```
 effects/          Animation engine (CircuitPython-safe)
-  render.py       RendererConfig, PixelBuffer, EffectRenderer
+  render.py       EffectConfig, PixelBuffer, Effect
   palette.py      Palette, PaletteLUT256 (pre-computed, immutable)
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
@@ -35,7 +35,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   events.py       Event, EventGroup
   timer.py        Timer
   effects/
-    manager.py    EffectManager, EffectControls, EffectOutput, EffectBuilder, EffectReceipt
+    manager.py    EffectManager, EffectControls, EffectOutput, EffectBuilder, EffectConfig, EffectReceipt
     scope.py      Scope, ScopeValue
 
 magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
@@ -54,12 +54,12 @@ scripts/          Deploy and maintenance scripts
 
 | Type | Lives in | Role |
 |------|----------|------|
-| `RendererConfig` | `effects/render.py` | Level [1–10], resolution, options, listeners for one render pass |
+| `EffectConfig` | `effects/render.py` | Level [1–10], resolution, options, listeners for one render pass |
 | `PixelBuffer` | `effects/render.py` | List-backed in-memory pixel buffer of packed RGB values |
-| `EffectRenderer` | `effects/render.py` | Base class for all renderers; subclasses implement `name`, `update(elapsed)`, `render(output)` |
+| `Effect` | `effects/render.py` | Base class for all effects; subclasses implement `name`, `update(elapsed)`, `render(output)` |
 | `Layer` | `effects/layers/layer.py` | Base layer: `update(elapsed)` + `sample(position, pixel_count) -> float` |
 | `Scroll` | `effects/layers/scroll.py` | Scroll base: `update(elapsed)` + `apply(position) -> float` |
-| `LayerRenderer` | `effects/layers/renderer.py` | Single-layer `EffectRenderer` |
+| `LayerRenderer` | `effects/layers/renderer.py` | Single-layer `Effect` |
 | `AddColorsRenderer` | `effects/layers/add_colors_renderer.py` | Composites layers by summing packed RGB colors |
 | `AddSamplesRenderer` | `effects/layers/add_samples_renderer.py` | Composites layers by summing float samples then sampling a palette |
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
@@ -67,7 +67,7 @@ scripts/          Deploy and maintenance scripts
 | `EffectControls` | `engine/effects/manager.py` | Abstract interface: `set_effect`, `add_effect`, `stop_effect` |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/manager.py` | Abstract hardware output: `create_buffer`, `update_pixels`, `handle_event` |
-| `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → EffectRenderer`; one per effect pack |
+| `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → Effect`; one per effect pack |
 | `EffectReceipt` | `engine/effects/manager.py` | Opaque handle for a running effect instance; used to stop by receipt |
 | `ScopeValue` / `Scope` | `engine/effects/scope.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN/BUFF/DEBUFF`, `ALL` |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update(timer)` tick |
@@ -89,7 +89,7 @@ scripts/          Deploy and maintenance scripts
 
 | Term | Meaning |
 |------|---------|
-| **Level** | Effect intensity, integer 1–10. 1 = weakest, 10 = strongest. Passed to `RendererConfig.level`. |
+| **Level** | Effect intensity, integer 1–10. 1 = weakest, 10 = strongest. Passed to `EffectConfig.level`. |
 | **Resolution** | Drives sample density and buffer size, it is not the pixel count of a strip. |
 | **Element** | One of ten named magical elements (Fire, Water, Earth, Ice, Air, Lightning, Light, Dark, Time, Gravity). Each has a buff and a debuff spell. |
 | **Effect pack** | An `EffectBuilder` that owns a named set of effects. `ElementBuilder` (from `registry.py`) is one pack; games compose multiple packs at startup. |

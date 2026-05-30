@@ -1,1 +1,1 @@
-"""RLGL audio effect renderers."""
+"""RLGL audio effects."""

@@ -604,7 +604,9 @@ def test_add_effect_fires_start_event_to_matching_output(pack_env) -> None:
 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
 
-    assert output.handle_event_calls == [(EffectEvent("stub", "fire", "start"), frozenset({"personal"}), receipt)]
+    assert output.handle_event_calls == [
+        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), receipt)
+    ]
 
 
 def test_add_effect_start_event_not_delivered_to_out_of_scope_output(pack_env) -> None:
@@ -626,7 +628,9 @@ def test_add_effect_does_not_fire_stop_for_existing_effects(pack_env) -> None:
 
     ice_receipt = manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
 
-    assert output.handle_event_calls == [(EffectEvent("stub", "ice", "start"), frozenset({"personal"}), ice_receipt)]
+    assert output.handle_event_calls == [
+        (EffectEvent("stub", "ice", "start"), frozenset({"personal"}), ice_receipt)
+    ]
 
 
 def test_add_effect_fires_start_event_unconditionally_for_duplicate_name(pack_env) -> None:
@@ -651,7 +655,9 @@ def test_stop_effect_fires_stop_event_to_matching_output(pack_env) -> None:
 
     manager.stop_effect(Scope.PERSONAL)
 
-    assert output.handle_event_calls == [(EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), receipt)]
+    assert output.handle_event_calls == [
+        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), receipt)
+    ]
 
 
 def test_stop_effect_fires_stop_for_each_effect_in_scope(pack_env) -> None:
@@ -738,7 +744,9 @@ def test_stop_effect_by_receipt_fires_stop_event(pack_env) -> None:
     receipt.stop()
     manager.update(_make_timer())
 
-    assert output.handle_event_calls == [(EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), receipt)]
+    assert output.handle_event_calls == [
+        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), receipt)
+    ]
 
 
 def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect(pack_env) -> None:
@@ -776,7 +784,9 @@ def test_handle_event_receives_personal_scope_for_personal_effect(pack_env) -> N
 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
 
-    assert output.handle_event_calls == [(EffectEvent("stub", "fire", "start"), frozenset({"personal"}), receipt)]
+    assert output.handle_event_calls == [
+        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), receipt)
+    ]
 
 
 def test_handle_event_receives_directional_scope_for_directional_effect(pack_env) -> None:
@@ -785,7 +795,9 @@ def test_handle_event_receives_directional_scope_for_directional_effect(pack_env
 
     receipt = manager.add_effect(Scope.DIRECTIONAL, "stub.ice", 5, {})
 
-    assert output.handle_event_calls == [(EffectEvent("stub", "ice", "start"), frozenset({"directional"}), receipt)]
+    assert output.handle_event_calls == [
+        (EffectEvent("stub", "ice", "start"), frozenset({"directional"}), receipt)
+    ]
 
 
 def test_handle_event_receives_composite_scope_not_decomposed_leaf(pack_env) -> None:
@@ -798,7 +810,9 @@ def test_handle_event_receives_composite_scope_not_decomposed_leaf(pack_env) -> 
 
     receipt = manager.add_effect(Scope.ALL, "stub.fire", 5, {})
 
-    assert output_personal.handle_event_calls == [(EffectEvent("stub", "fire", "start"), frozenset({"personal"}), receipt)]
+    assert output_personal.handle_event_calls == [
+        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), receipt)
+    ]
     assert output_directional.handle_event_calls == [
         (EffectEvent("stub", "fire", "start"), frozenset({"directional"}), receipt)
     ]
@@ -1043,8 +1057,14 @@ def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_env) -> None:
 
     # shock renderer fires "lightning_strike"; scoped_listener reads live entry.keys
     # → personal output must NOT receive it after narrowing
-    assert not any(c[0] == EffectEvent("evt", "shock", "lightning_strike") for c in output_personal.handle_event_calls)
-    assert any(c[0] == EffectEvent("evt", "shock", "lightning_strike") for c in output_directional.handle_event_calls)
+    assert not any(
+        c[0] == EffectEvent("evt", "shock", "lightning_strike")
+        for c in output_personal.handle_event_calls
+    )
+    assert any(
+        c[0] == EffectEvent("evt", "shock", "lightning_strike")
+        for c in output_directional.handle_event_calls
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1110,7 +1130,9 @@ def test_output_with_receives_pixels_false_flush_called_even_with_no_effects() -
 
 def test_pixel_output_alongside_non_pixel_output_both_get_flush(pack_env) -> None:
     pixel_output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    non_pixel_output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL], receives_pixels=False)
+    non_pixel_output = SpyEffectOutput(
+        min_resolution=10, scopes=[Scope.PERSONAL], receives_pixels=False
+    )
     manager = EffectManager(
         registry=_make_stub_registry(pack_env),
         outputs=[pixel_output, non_pixel_output],
@@ -1137,9 +1159,9 @@ def test_renderer_with_renders_pixels_false_skips_buffer_allocation(pack_env) ->
         "nopix",
         {
             "event": (
-                "from effects.render import EffectRenderer, PixelBuffer, RendererConfig\n"
+                "from effects.render import Effect, PixelBuffer, EffectConfig\n"
                 "from engine.effects.manager import EffectBuilder\n"
-                "class _NoPixRenderer(EffectRenderer):\n"
+                "class _NoPixRenderer(Effect):\n"
                 "    renders_pixels = False\n"
                 "    @property\n"
                 "    def name(self): return 'event'\n"
@@ -1168,9 +1190,9 @@ def test_renderer_with_renders_pixels_false_skips_update_pixels_but_calls_flush(
         "nopix",
         {
             "event": (
-                "from effects.render import EffectRenderer, PixelBuffer, RendererConfig\n"
+                "from effects.render import Effect, PixelBuffer, EffectConfig\n"
                 "from engine.effects.manager import EffectBuilder\n"
-                "class _NoPixRenderer(EffectRenderer):\n"
+                "class _NoPixRenderer(Effect):\n"
                 "    renders_pixels = False\n"
                 "    @property\n"
                 "    def name(self): return 'event'\n"

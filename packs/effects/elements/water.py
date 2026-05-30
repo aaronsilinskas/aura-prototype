@@ -3,7 +3,7 @@ from effects.layers.renderer import LayerRenderer
 from effects.layers.scroll import PhaseScroll
 from effects.layers.scroll_layer import ScrollLayer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer, RendererConfig
+from effects.render import Effect, EffectConfig
 from engine.effects.manager import EffectBuilder
 
 # fmt: off
@@ -14,8 +14,8 @@ _water_palette = bytes([0, 0, 0, 64,
 # fmt: on
 
 
-class WaterPrototypeBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+class WaterBuilder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
         """A flowing deep-blue-to-cyan flame that drifts along the strip and
         occasionally reverses direction, like light rippling under moving water.
 
@@ -42,4 +42,4 @@ class WaterPrototypeBuilder(EffectBuilder):
         )
 
 
-BUILD = WaterPrototypeBuilder()
+BUILD = WaterBuilder()

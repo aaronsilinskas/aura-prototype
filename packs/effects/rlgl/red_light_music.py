@@ -1,9 +1,9 @@
-from effects.render import EffectRenderer, PixelBuffer, RendererConfig
+from effects.render import Effect, EffectConfig, PixelBuffer
 from engine.effects.manager import EffectBuilder
 
 
-class RedLightMusicRenderer(EffectRenderer):
-    """Audio-only renderer for red light background music.
+class RedLightMusic(Effect):
+    """Audio-only effect for red light background music.
 
     Plays via AudioEffectOutput on the AMBIENT scope (voice 0, looping).
     ``renders_pixels = False`` — no pixel buffer is allocated.
@@ -24,8 +24,8 @@ class RedLightMusicRenderer(EffectRenderer):
 
 
 class RedLightMusicBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> RedLightMusicRenderer:
-        return RedLightMusicRenderer()
+    def __call__(self, name: str, config: EffectConfig) -> RedLightMusic:
+        return RedLightMusic()
 
 
 BUILD = RedLightMusicBuilder()

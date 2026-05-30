@@ -1,7 +1,7 @@
 from effects.layers.flame_layer import FlameLayer
 from effects.layers.renderer import LayerRenderer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer, RendererConfig
+from effects.render import Effect, EffectConfig
 from engine.effects.manager import EffectBuilder
 
 # fmt: off
@@ -10,8 +10,8 @@ _light_palette = bytes([0, 32, 32, 32,
 # fmt: on
 
 
-class LightPrototypeBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+class LightBuilder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
         """Tight, rapid white flickers — a bright noisy pulse concentrated in a
         narrow band, like an overdriven flash.
 
@@ -31,4 +31,4 @@ class LightPrototypeBuilder(EffectBuilder):
         )
 
 
-BUILD = LightPrototypeBuilder()
+BUILD = LightBuilder()

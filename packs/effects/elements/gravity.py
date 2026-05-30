@@ -2,7 +2,7 @@ from effects.layers.add_colors_renderer import AddColorsRenderer
 from effects.layers.drift_noise_layer import DriftNoiseLayer
 from effects.layers.sparkle_layer import SparkleLayer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer, RendererConfig
+from effects.render import Effect, EffectConfig
 from effects.value import ValueGenerator as VG
 from engine.effects.manager import EffectBuilder
 
@@ -16,8 +16,8 @@ _GRAVITY_PALETTE = bytes([  0,   0,   0,   0,
 # fmt: on
 
 
-class GravityPrototypeBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+class GravityBuilder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
         """A drift-noise nebula prototype with additive star sparkles.
 
         simulation state lives directly on the effect.
@@ -53,4 +53,4 @@ class GravityPrototypeBuilder(EffectBuilder):
         )
 
 
-BUILD = GravityPrototypeBuilder()
+BUILD = GravityBuilder()

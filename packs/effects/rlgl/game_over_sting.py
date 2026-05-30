@@ -1,9 +1,9 @@
-from effects.render import EffectRenderer, PixelBuffer, RendererConfig
+from effects.render import Effect, EffectConfig, PixelBuffer
 from engine.effects.manager import EffectBuilder
 
 
-class GameOverStingRenderer(EffectRenderer):
-    """Audio-only renderer for the game over sting sound effect.
+class GameOverSting(Effect):
+    """Audio-only effect for the game over sting sound effect.
 
     Plays via AudioEffectOutput on the PERSONAL scope (voice 1, one-shot).
     ``renders_pixels = False`` — no pixel buffer is allocated.
@@ -24,8 +24,8 @@ class GameOverStingRenderer(EffectRenderer):
 
 
 class GameOverStingBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> GameOverStingRenderer:
-        return GameOverStingRenderer()
+    def __call__(self, name: str, config: EffectConfig) -> GameOverSting:
+        return GameOverSting()
 
 
 BUILD = GameOverStingBuilder()

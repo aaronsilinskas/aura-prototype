@@ -1,7 +1,7 @@
 from effects.layers.flame_layer import FlameLayer
 from effects.layers.renderer import LayerRenderer
 from effects.palette import PaletteLUT256
-from effects.render import EffectRenderer, RendererConfig
+from effects.render import Effect, EffectConfig
 from engine.effects.manager import EffectBuilder
 
 # fmt: off
@@ -13,8 +13,8 @@ _earth_palette = bytes([0, 96, 48, 8,
 # fmt: on
 
 
-class EarthPrototypeBuilder(EffectBuilder):
-    def __call__(self, name: str, config: RendererConfig) -> EffectRenderer:
+class EarthBuilder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
         """A slow, broad smolder in golds with sprouts of earthy greens.
 
         Level: more heat sparks with a narrower spread, concentrating the smolder
@@ -33,4 +33,4 @@ class EarthPrototypeBuilder(EffectBuilder):
         )
 
 
-BUILD = EarthPrototypeBuilder()
+BUILD = EarthBuilder()
