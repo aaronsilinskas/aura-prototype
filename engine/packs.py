@@ -189,6 +189,19 @@ class PackRegistry:
             raise ValueError("Unknown pack '" + pack_name + "'")
         return sorted(meta.item_names)
 
+    def sound_path(self, pack_name: str, effect_name: str) -> "str | None":
+        """Return the WAV file path for *effect_name* in *pack_name*.
+
+        Returns ``<pack_source_path>/sounds/<effect_name>.wav`` if the pack is
+        registered, or ``None`` if the pack is unknown.
+        """
+        meta = self._packs.get(pack_name)
+        if meta is None:
+            return None
+        pack_dir = _path.join(meta.source_path, pack_name)
+        sounds_dir = _path.join(pack_dir, "sounds")
+        return _path.join(sounds_dir, effect_name + ".wav")
+
     def check_version(self, pack_name: str, required: Version) -> None:
         """Verify that the installed pack version satisfies the minimum required.
 

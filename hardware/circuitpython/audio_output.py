@@ -3,51 +3,104 @@ import audiocore
 import audiomixer
 import board
 
-from effects.render import PixelBuffer
 from engine.effects.manager import EffectOutput
-from engine.state import Scope
+from engine.events import EffectEvent
+from engine.packs import PackRegistry
+from engine.state import EffectReceipt, Scope
 
 
 class AudioEffectOutput(EffectOutput):
     """EffectOutput that plays WAV files via the PropMaker's built-in I2S amp.
 
-    On each effect event, opens ``sounds/<event_name>.wav`` and plays it
-    non-blocking via ``audiobusio.I2SOut``.  If the file does not exist the
-    event is silently ignored.  Only one sound plays at a time; a new event
-    stops any in-progress playback before starting the new file.
+    Registered on all scopes with ``receives_pixels = False`` — receives
+    ``handle_event`` calls for every effect on every scope without incurring
+    pixel buffer allocation.
+
+    Uses a 2-voice ``audiomixer.Mixer``:
+      - Voice 0 — ambient loop (``loop=True``); started when ``"ambient"`` is in
+        ``scope_keys``.  Stopped when the matching receipt stops.
+      - Voice 1 — one-shot; started for all other scopes.  Replaced immediately
+        if a new one-shot starts.  Stopped automatically in ``flush()`` once
+        playback ends naturally, or early if the receipt is stopped externally.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, registry: PackRegistry) -> None:
+        super().__init__(receives_pixels=False)
         self.min_resolution = 1
-        self.scopes = [Scope.PERSONAL]
+        self.scopes = [Scope.ALL]
+        self._registry = registry
         self._audio = audiobusio.I2SOut(board.I2S_BIT_CLOCK, board.I2S_WORD_SELECT, board.I2S_DATA)
         self._mixer = audiomixer.Mixer(
-            voice_count=1,
+            voice_count=2,
             sample_rate=22050,
             channel_count=1,
             bits_per_sample=16,
             samples_signed=True,
         )
-        self._mixer.voice[0].level = 0.01
         self._audio.play(self._mixer)
-        self._wav_file = None
+        self._loop_file = None
+        self._once_file = None
+        self._loop_receipt: EffectReceipt | None = None
+        self._once_receipt: EffectReceipt | None = None
 
-    def create_buffer(self, scope_key: str) -> PixelBuffer:
-        return PixelBuffer(1)
+    def handle_event(
+        self, event: EffectEvent, scope_keys: frozenset[str], receipt: EffectReceipt
+    ) -> None:
+        if event.verb == "start":
+            path = self._registry.sound_path(event.pack, event.name)
+            if path is None:
+                return
+            try:
+                f = open(path, "rb")  # noqa: SIM115
+            except OSError:
+                return
 
-    def update_pixels(self, scope_key: str, buffers: list, receipts: list) -> None:
-        pass
+            if "ambient" in scope_keys:
+                # Voice 0 — looping ambient track
+                self._mixer.voice[0].stop()
+                if self._loop_file is not None:
+                    self._loop_file.close()
+                self._loop_file = f
+                self._loop_receipt = receipt
+                self._mixer.voice[0].play(audiocore.WaveFile(self._loop_file), loop=True)
+            else:
+                # Voice 1 — one-shot; replaces any current one-shot
+                self._mixer.voice[1].stop()
+                if self._once_file is not None:
+                    self._once_file.close()
+                self._once_file = f
+                self._once_receipt = receipt
+                self._mixer.voice[1].play(audiocore.WaveFile(self._once_file))
 
-    def handle_event(self, event, scope_keys, receipt) -> None:
-        if self._mixer.playing:
-            return
-        event_name = event if isinstance(event, str) else f"{event.name}.{event.verb}"
-        path = "sounds/" + event_name + ".wav"
-        try:
-            f = open(path, "rb")  # noqa: SIM115
-        except OSError:
-            return
-        if self._wav_file is not None:
-            self._wav_file.close()
-        self._wav_file = f
-        self._mixer.play(audiocore.WaveFile(self._wav_file))
+        elif event.verb == "stop":
+            if receipt is self._loop_receipt:
+                self._mixer.voice[0].stop()
+                if self._loop_file is not None:
+                    self._loop_file.close()
+                    self._loop_file = None
+                self._loop_receipt = None
+
+    def flush(self) -> None:
+        # Auto-stop one-shot when playback ends naturally
+        if self._once_receipt is not None and not self._mixer.voice[1].playing:
+            self._once_receipt.stop()
+            if self._once_file is not None:
+                self._once_file.close()
+                self._once_file = None
+            self._once_receipt = None
+
+        # Stop voice 1 early if a rule stopped the receipt externally
+        if self._once_receipt is not None and self._once_receipt.is_stopped():
+            self._mixer.voice[1].stop()
+            if self._once_file is not None:
+                self._once_file.close()
+                self._once_file = None
+            self._once_receipt = None
+
+        # Stop voice 0 if a rule stopped the loop receipt directly
+        if self._loop_receipt is not None and self._loop_receipt.is_stopped():
+            self._mixer.voice[0].stop()
+            if self._loop_file is not None:
+                self._loop_file.close()
+                self._loop_file = None
+            self._loop_receipt = None

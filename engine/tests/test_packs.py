@@ -431,3 +431,40 @@ def test_items_raises_for_unknown_pack(pack_env) -> None:
 
     with pytest.raises(ValueError, match="Unknown pack"):
         registry.items("nonexistent")
+
+
+# ---------------------------------------------------------------------------
+# sound_path — WAV file path resolution
+# ---------------------------------------------------------------------------
+
+
+def test_sound_path_returns_wav_path_for_registered_pack(pack_env) -> None:
+    _make_pack(pack_env, "rlgl", "1.0", {})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    result = registry.sound_path("rlgl", "red_light_music")
+
+    expected = str(pack_env / "rlgl") + "/sounds/red_light_music.wav"
+    assert result == expected
+
+
+def test_sound_path_returns_none_for_unknown_pack(pack_env) -> None:
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    result = registry.sound_path("nonexistent", "some_sound")
+
+    assert result is None
+
+
+def test_sound_path_uses_pack_source_path(pack_env) -> None:
+    src = pack_env / "custom_src"
+    src.mkdir()
+    _make_pack(src, "mygame", "1.0", {})
+    registry = _make_registry()
+    registry.scan_dir(str(src), MODULE_PREFIX)
+
+    result = registry.sound_path("mygame", "alert")
+
+    assert result == str(src / "mygame") + "/sounds/alert.wav"
