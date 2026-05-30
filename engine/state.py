@@ -146,7 +146,7 @@ class EffectReceipt:
     request that the effect be stopped on the next tick.
     """
 
-    __slots__ = ("id", "_stopped")
+    __slots__ = ("_stopped", "id")
 
     def __init__(self, effect_id: int) -> None:
         self.id: int = effect_id

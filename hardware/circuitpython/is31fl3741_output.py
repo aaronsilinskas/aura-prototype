@@ -8,7 +8,8 @@ _SCOPE_ROWS = {
     "global.debuff": range(1, 2),
     "global.main": range(2, 5),
     "personal": range(5, 7),
-    "directional": range(7, 9),
+    "directional": range(7, 8),
+    "ambient": range(8, 9),
 }
 
 

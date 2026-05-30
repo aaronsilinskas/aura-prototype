@@ -25,7 +25,7 @@ except ImportError:
 
 from engine.engine import GameRule, Version
 from engine.input import ButtonData, InputEvents
-from engine.state import GameState, Scope
+from engine.state import EffectReceipt, GameState, Scope
 from packs.rules.rlgl.helpers.motion_detector import (
     GREEN_MIN_MOTION_THRESHOLD,
     RED_MAX_MOTION_THRESHOLD,
@@ -60,6 +60,7 @@ _KEY_GRACE_DURATION: Final = "rlgl_grace_duration"
 _KEY_GAME_OVER_DURATION: Final = "rlgl_game_over_duration"
 _KEY_GREEN_STILL_TIMEOUT: Final = "rlgl_green_still_timeout"
 _KEY_LAST_MOTION_TIME: Final = "rlgl_last_motion_time"
+_KEY_AMBIENT_RECEIPT: Final = "rlgl_ambient_receipt"
 
 # ---------------------------------------------------------------------------
 # Default durations (seconds)
@@ -80,7 +81,9 @@ _DEFAULT_GREEN_STILL_TIMEOUT: Final = 1.5
 def _enter_ready(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_READY)
     state.set(_KEY_PHASE_START, state.total)
-    state.effect_controls.set_effect(Scope.ALL, "elements.water", 3, {})
+    if state.has(_KEY_AMBIENT_RECEIPT):
+        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
+    state.effect_controls.set_effect(Scope.NON_AMBIENT, "elements.water", 3, {})
 
 
 _PULSE_OPTS_BASE = {
@@ -97,13 +100,16 @@ def _enter_red_warning(state: GameState) -> None:
     state.set(_KEY_PHASE_START, state.total)
     opts = dict(_PULSE_OPTS_BASE)
     opts["end_color"] = 0xFFFF00
-    state.effect_controls.set_effect(Scope.ALL, "basic.pulse", 10, opts)
+    state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.pulse", 10, opts)
+    state.effect_controls.add_effect(Scope.PERSONAL, "rlgl.warning_sting", 10, {})
+    receipt = state.effect_controls.set_effect(Scope.AMBIENT, "rlgl.red_light_music", 10, {})
+    state.set(_KEY_AMBIENT_RECEIPT, receipt)
 
 
 def _enter_red(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_RED)
     state.set(_KEY_PHASE_START, state.total)
-    state.effect_controls.set_effect(Scope.ALL, "basic.solid", 10, {"color": 0xFF0000})
+    state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.solid", 10, {"color": 0xFF0000})
 
 
 def _enter_green_warning(state: GameState) -> None:
@@ -111,20 +117,26 @@ def _enter_green_warning(state: GameState) -> None:
     state.set(_KEY_PHASE_START, state.total)
     opts = dict(_PULSE_OPTS_BASE)
     opts["end_color"] = 0xFFFF00
-    state.effect_controls.set_effect(Scope.ALL, "basic.pulse", 10, opts)
+    state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.pulse", 10, opts)
+    state.effect_controls.add_effect(Scope.PERSONAL, "rlgl.warning_sting", 10, {})
+    receipt = state.effect_controls.set_effect(Scope.AMBIENT, "rlgl.green_light_music", 10, {})
+    state.set(_KEY_AMBIENT_RECEIPT, receipt)
 
 
 def _enter_green(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_GREEN)
     state.set(_KEY_PHASE_START, state.total)
     state.set(_KEY_LAST_MOTION_TIME, state.total)
-    state.effect_controls.set_effect(Scope.ALL, "basic.solid", 10, {"color": 0x00FF00})
+    state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.solid", 10, {"color": 0x00FF00})
 
 
 def _enter_game_over(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_GAME_OVER)
     state.set(_KEY_PHASE_START, state.total)
-    state.effect_controls.set_effect(Scope.ALL, "elements.fire", 10, {})
+    if state.has(_KEY_AMBIENT_RECEIPT):
+        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
+    state.effect_controls.set_effect(Scope.NON_AMBIENT, "elements.fire", 10, {})
+    state.effect_controls.add_effect(Scope.PERSONAL, "rlgl.game_over_sting", 10, {})
 
 
 # ---------------------------------------------------------------------------

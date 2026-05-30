@@ -21,6 +21,13 @@ def test_factory_includes_effect_packs():
     assert ("basic", "1.1") in scene.effect_packs
 
 
+def test_factory_includes_rlgl_effect_pack():
+    from scenes.rlgl.scene import factory
+
+    scene = factory()
+    assert ("rlgl", "1.0") in scene.effect_packs
+
+
 def test_factory_includes_rlgl_rule_pack():
     from scenes.rlgl.scene import factory
 

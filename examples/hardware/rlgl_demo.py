@@ -40,6 +40,7 @@ from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.packs import PackRegistry
 from engine.scene import SceneManager
+from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from scenes.rlgl.scene import factory as rlgl_factory
 
@@ -59,6 +60,7 @@ BUTTON_B_PIN: "Final" = board.D10
 # Hardware setup
 # ---------------------------------------------------------------------------
 
+propmaker.setup_external_power()
 _i2c = propmaker.setup_i2c()
 _matrix = propmaker.setup_matrix_is31fl3741(_i2c)
 _button_a, _button_b = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
@@ -76,7 +78,7 @@ _rule_registry.scan_dir("packs/rules", "packs.rules")
 
 _effect_manager = EffectManager(
     registry=_effect_registry,
-    outputs=[IS31FL3741EffectOutput(_matrix)],
+    outputs=[IS31FL3741EffectOutput(_matrix), AudioEffectOutput(_effect_registry)],
 )
 
 # ---------------------------------------------------------------------------

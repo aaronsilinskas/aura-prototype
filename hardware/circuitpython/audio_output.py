@@ -37,6 +37,10 @@ class AudioEffectOutput(EffectOutput):
             bits_per_sample=16,
             samples_signed=True,
         )
+        # TODO: adjust volume by effect level instead of hardcoding here
+        self._mixer.voice[0].level = 0.1
+        self._mixer.voice[1].level = 0.1
+
         self._audio.play(self._mixer)
         self._loop_file = None
         self._once_file = None
