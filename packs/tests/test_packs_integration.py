@@ -54,7 +54,7 @@ def test_rlgl_pack_exposes_valid_effect_builders() -> None:
         assert isinstance(builder, EffectBuilder)
 
 
-def test_rlgl_renderers_have_renders_pixels_false() -> None:
+def test_rlgl_effects_have_renders_pixels_false() -> None:
     from effects.render import EffectConfig
     from engine.effects.manager import EffectBuilder
 
@@ -64,8 +64,8 @@ def test_rlgl_renderers_have_renders_pixels_false() -> None:
     for effect_name in ("red_light_music", "green_light_music", "warning_sting", "game_over_sting"):
         builder = registry.get("rlgl", effect_name, EffectBuilder)
         config = EffectConfig(level=5, resolution=16, options={})
-        renderer = builder(effect_name, config)
-        assert not renderer.renders_pixels
+        effect = builder(effect_name, config)
+        assert not effect.renders_pixels
 
 
 def test_rlgl_sound_path_returns_wav_path() -> None:
