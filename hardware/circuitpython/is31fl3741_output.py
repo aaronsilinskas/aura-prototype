@@ -8,7 +8,8 @@ _SCOPE_ROWS = {
     "global.debuff": range(1, 2),
     "global.main": range(2, 5),
     "personal": range(5, 7),
-    "directional": range(7, 9),
+    "directional": range(7, 8),
+    "ambient": range(8, 9),
 }
 
 
@@ -28,7 +29,7 @@ class IS31FL3741EffectOutput(MatrixEffectOutput):
 
     def __init__(self, matrix) -> None:
         super().__init__(_MATRIX_COLS, _SCOPE_ROWS)
-        self.scopes = [Scope.NON_AMBIENT]
+        self.scopes = [Scope.ALL]
         self._matrix = matrix
 
     def _write_row(self, row: int, pixels) -> None:
