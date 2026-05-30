@@ -312,24 +312,27 @@ class EffectManager(EffectControls):
         self._notify_listeners(f"{effect_name}.start", scope_key_set, receipt)
         return receipt
 
-    def stop_effect_by_receipt(self, receipt: EffectReceipt) -> None:
-        """Stop the single effect identified by receipt; silent no-op if not found."""
-        stopped: list[tuple[EffectManager._EffectEntry, set[str]]] = []
-        new_effects: list[EffectManager._EffectEntry] = []
-        for entry in self._effects:
-            if entry.receipt is receipt:
-                stopped.append((entry, set(entry.keys)))
-            else:
-                new_effects.append(entry)
-        self._stop_entries(stopped, new_effects)
-        self._effects = new_effects
-
     def stop_effect(self, scope: ScopeValue) -> None:
         """Stop all running effects in scope."""
         self._remove_effects_in_scope(set(scope.keys))
 
     def update(self, timer: Timer) -> None:
         """Tick all active effects and deliver frames to every registered output."""
+        # Deferred-stop: remove any effects whose receipt was marked stopped since
+        # the last tick.  This runs before Pass 1 so that stop events and
+        # clear_pixels fire before the new frame is rendered, and so that calling
+        # receipt.stop() from within output.flush() during Pass 2 is safe.
+        stopped: list[tuple[EffectManager._EffectEntry, set[str]]] = []
+        new_effects: list[EffectManager._EffectEntry] = []
+        for entry in self._effects:
+            if entry.receipt.is_stopped():
+                stopped.append((entry, set(entry.keys)))
+            else:
+                new_effects.append(entry)
+        if stopped:
+            self._stop_entries(stopped, new_effects)
+            self._effects = new_effects
+
         elapsed = timer.elapsed
 
         # Pass 1: advance each renderer once.

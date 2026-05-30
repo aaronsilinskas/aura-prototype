@@ -112,7 +112,7 @@ class HwTestModeRule(GameRule):
         ):
             receipt = state.pop("ir_flash_receipt", EffectReceipt)
             state.delete("ir_flash_start")
-            state.effect_controls.stop_effect_by_receipt(receipt)
+            receipt.stop()
             state.effect_controls.set_effect(
                 Scope.DIRECTIONAL, "basic.solid", 3, {"color": 0xFFFFFF}
             )
@@ -123,7 +123,7 @@ class HwTestModeRule(GameRule):
         ):
             receipt = state.pop("radio_flash_receipt", EffectReceipt)
             state.delete("radio_flash_start")
-            state.effect_controls.stop_effect_by_receipt(receipt)
+            receipt.stop()
             state.effect_controls.set_effect(
                 Scope.Global.ALL, "basic.solid", 3, {"color": 0xFFFFFF}
             )

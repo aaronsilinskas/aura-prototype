@@ -553,7 +553,7 @@ def test_two_add_effect_calls_return_different_receipts(pack_env) -> None:
 
 
 # ---------------------------------------------------------------------------
-# stop_effect_by_receipt (#64)
+# receipt.stop() + deferred-stop (#64)
 # ---------------------------------------------------------------------------
 
 
@@ -562,7 +562,7 @@ def test_stop_effect_by_receipt_stops_the_matching_effect(pack_env) -> None:
     manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
-    manager.stop_effect_by_receipt(receipt)
+    receipt.stop()
     manager.update(_make_timer())
 
     assert output.update_pixels_calls[0][1] == []
@@ -574,7 +574,7 @@ def test_stop_effect_by_receipt_leaves_other_effects_running(pack_env) -> None:
 
     receipt_a = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
-    manager.stop_effect_by_receipt(receipt_a)
+    receipt_a.stop()
     manager.update(_make_timer())
 
     assert len(output.update_pixels_calls[0][1]) == 1
@@ -585,8 +585,8 @@ def test_stop_effect_by_receipt_with_stale_receipt_is_silent_noop(pack_env) -> N
     manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
-    manager.stop_effect_by_receipt(receipt)
-    manager.stop_effect_by_receipt(receipt)  # second call — stale receipt
+    receipt.stop()
+    receipt.stop()  # second call — idempotent
     manager.update(_make_timer())
 
     assert output.update_pixels_calls[0][1] == []
@@ -734,7 +734,8 @@ def test_stop_effect_by_receipt_fires_stop_event(pack_env) -> None:
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
     output.handle_event_calls.clear()
 
-    manager.stop_effect_by_receipt(receipt)
+    receipt.stop()
+    manager.update(_make_timer())
 
     assert output.handle_event_calls == [("fire.stop", frozenset({"personal"}), receipt)]
 
@@ -753,8 +754,9 @@ def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect(p
     output_personal.handle_event_calls.clear()
     output_directional.handle_event_calls.clear()
 
-    # fire is now only on DIRECTIONAL — stop_effect_by_receipt should only notify DIRECTIONAL
-    manager.stop_effect_by_receipt(fire_receipt)
+    # fire is now only on DIRECTIONAL — receipt.stop() should only notify DIRECTIONAL
+    fire_receipt.stop()
+    manager.update(_make_timer())
 
     assert output_personal.handle_event_calls == []
     assert output_directional.handle_event_calls == [
@@ -888,7 +890,8 @@ def test_stop_effect_by_receipt_calls_clear_pixels_when_last_effect_stops(pack_e
     manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
-    manager.stop_effect_by_receipt(receipt)
+    receipt.stop()
+    manager.update(_make_timer())
 
     assert output.clear_pixels_calls == ["personal"]
 
@@ -901,7 +904,8 @@ def test_stop_effect_by_receipt_does_not_call_clear_pixels_when_layered_effect_r
 
     fire_receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", 5, {})
     manager.add_effect(Scope.PERSONAL, "stub.ice", 5, {})
-    manager.stop_effect_by_receipt(fire_receipt)
+    fire_receipt.stop()
+    manager.update(_make_timer())
 
     assert output.clear_pixels_calls == []
 
