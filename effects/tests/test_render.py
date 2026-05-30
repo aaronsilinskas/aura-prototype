@@ -145,19 +145,19 @@ def test_pixel_buffer_iterates_pixels_in_index_order() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_base_renderer_name_raises_not_implemented() -> None:
-    renderer = Effect()
+def test_base_effect_name_raises_not_implemented() -> None:
+    effect = Effect()
     with pytest.raises(NotImplementedError):
-        _ = renderer.name
+        _ = effect.name
 
 
-def test_base_renderer_update_raises_not_implemented() -> None:
-    renderer = Effect()
+def test_base_effect_update_raises_not_implemented() -> None:
+    effect = Effect()
     with pytest.raises(NotImplementedError):
-        renderer.update(0.016)
+        effect.update(0.016)
 
 
-def test_base_renderer_render_raises_not_implemented() -> None:
-    renderer = Effect()
+def test_base_effect_render_raises_not_implemented() -> None:
+    effect = Effect()
     with pytest.raises(NotImplementedError):
-        renderer.render(PixelBuffer(1))
+        effect.render(PixelBuffer(1))
