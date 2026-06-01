@@ -32,12 +32,14 @@ How to play
 - The LED matrix shows the current game state (green / red / result).
 """
 
+import time as _time
+
 import board
 
 import hardware.circuitpython.propmaker as propmaker
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
-from engine.input import AccelerationData, ButtonData, InputEvents
+from engine.input import AccelerationData, InputEvents
 from engine.packs import PackRegistry
 from engine.scene import SceneManager
 from hardware.circuitpython.audio_output import AudioEffectOutput
@@ -63,7 +65,7 @@ BUTTON_B_PIN: "Final" = board.D10
 propmaker.setup_external_power()
 _i2c = propmaker.setup_i2c()
 _matrix = propmaker.setup_matrix_is31fl3741(_i2c)
-_button_a, _button_b = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
+_buttons = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
 _accelerometer = propmaker.setup_accelerometer(_i2c)
 
 # ---------------------------------------------------------------------------
@@ -95,42 +97,18 @@ _scene_manager.load("rlgl")
 _scene_manager.update()  # applies the load transition; rlgl scene is now active
 
 # ---------------------------------------------------------------------------
-# Button state tracking
-# ---------------------------------------------------------------------------
-
-_button_prev_a = True
-_button_prev_b = True
-
-# ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
 
+_last_tick = _time.monotonic()
+
 while True:
-    # --- Read button state (edge detection: falling edge = PRESSED) ---
-    _cur_a = _button_a.value
-    _cur_b = _button_b.value
+    _now = _time.monotonic()
+    elapsed = _now - _last_tick
+    _last_tick = _now
 
-    _btn_states = {}
-    if not _cur_a and _button_prev_a:
-        _btn_states["A"] = ButtonData.PRESSED
-    elif _cur_a and not _button_prev_a:
-        _btn_states["A"] = ButtonData.RELEASED
-    elif not _cur_a:
-        _btn_states["A"] = ButtonData.DOWN
-    else:
-        _btn_states["A"] = ButtonData.UP
-
-    if not _cur_b and _button_prev_b:
-        _btn_states["B"] = ButtonData.PRESSED
-    elif _cur_b and not _button_prev_b:
-        _btn_states["B"] = ButtonData.RELEASED
-    elif not _cur_b:
-        _btn_states["B"] = ButtonData.DOWN
-    else:
-        _btn_states["B"] = ButtonData.UP
-
-    _button_prev_a = _cur_a
-    _button_prev_b = _cur_b
+    # --- Read button state ---
+    _button_data = _buttons.update(elapsed)
 
     # --- Read accelerometer ---
     if _accelerometer is not None:
@@ -146,7 +124,7 @@ while True:
     if _scene_manager.active_state is not None:
         _scene_manager.active_state.queue_event(
             InputEvents.ButtonAndAcceleration(
-                ButtonData(_btn_states),
+                _button_data,
                 _acceleration,
             )
         )
