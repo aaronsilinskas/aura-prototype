@@ -218,27 +218,28 @@ def test_button_press_from_ready_shows_yellow_warning_on_all_scopes(spy):
     assert yellow_calls[0][0] is Scope.NON_AMBIENT
 
 
-def test_button_press_from_ready_uses_pulse_effect_for_warning(spy):
+def test_button_press_from_ready_uses_warning_sting_effect_for_warning(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
     spy.set_effect_calls.clear()
 
     _tick(state, engine, timer, button_a=True, total=0.0)
 
-    pulse_calls = [c for c in spy.set_effect_calls if c[1] == "basic.pulse"]
-    assert len(pulse_calls) == 1
+    sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
+    assert len(sting_calls) == 1
+    assert sting_calls[0][0] is Scope.NON_AMBIENT
 
 
-def test_red_warning_pulse_uses_one_second_breathe_cycle(spy):
+def test_red_warning_sting_uses_one_second_breathe_cycle(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
     spy.set_effect_calls.clear()
 
     _tick(state, engine, timer, button_a=True, total=0.0)
 
-    pulse_calls = [c for c in spy.set_effect_calls if c[1] == "basic.pulse"]
-    assert len(pulse_calls) == 1
-    opts = pulse_calls[0][3]
+    sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
+    assert len(sting_calls) == 1
+    opts = sting_calls[0][3]
     assert opts["start_color"] == 0x000000
     assert opts["brighten_duration"] == 0.3
     assert opts["on_duration"] == 0.4
@@ -383,7 +384,7 @@ def test_green_warning_transitions_to_green_after_warning_duration(spy):
     assert state.get("rlgl_phase", None) == PHASE_GREEN
 
 
-def test_green_warning_transition_uses_pulse_with_yellow_end_color(spy):
+def test_green_warning_transition_uses_warning_sting_with_yellow_end_color(spy):
     state, engine, timer = _make_state(
         spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
     )
@@ -394,10 +395,10 @@ def test_green_warning_transition_uses_pulse_with_yellow_end_color(spy):
 
     _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
 
-    pulse_calls = [c for c in spy.set_effect_calls if c[1] == "basic.pulse"]
-    assert len(pulse_calls) == 1
-    assert pulse_calls[0][0] is Scope.NON_AMBIENT
-    assert pulse_calls[0][3]["end_color"] == 0xFFFF00
+    sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
+    assert len(sting_calls) == 1
+    assert sting_calls[0][0] is Scope.NON_AMBIENT
+    assert sting_calls[0][3]["end_color"] == 0xFFFF00
 
 
 def test_green_phase_transition_uses_solid_with_green_color(spy):
@@ -575,16 +576,27 @@ def test_game_over_expiry_restores_water_effect_at_level_3(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_red_warning_plays_warning_sting_on_personal(spy):
+def test_red_warning_sets_warning_sting_on_non_ambient(spy):
+    state, engine, timer = _make_state(spy)
+    _tick(state, engine, timer, total=0.0)
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
+
+    sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
+    assert len(sting_calls) == 1
+    assert sting_calls[0][0] is Scope.NON_AMBIENT
+
+
+def test_red_warning_does_not_add_effect_for_warning_sting(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
     spy.add_effect_calls.clear()
 
     _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
 
-    sting_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.warning_sting"]
-    assert len(sting_calls) == 1
-    assert sting_calls[0][0] is Scope.PERSONAL
+    sting_add_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.warning_sting"]
+    assert len(sting_add_calls) == 0
 
 
 def test_red_warning_starts_ambient_music_on_ambient_scope(spy):
@@ -613,7 +625,23 @@ def test_red_warning_stores_ambient_receipt_in_game_state(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_green_warning_plays_warning_sting_on_personal(spy):
+def test_green_warning_sets_warning_sting_on_non_ambient(spy):
+    state, engine, timer = _make_state(
+        spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
+    )
+    _tick(state, engine, timer, total=0.0)
+    _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
+    _tick(state, engine, timer, total=0.0)  # → RED
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
+
+    sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
+    assert len(sting_calls) == 1
+    assert sting_calls[0][0] is Scope.NON_AMBIENT
+
+
+def test_green_warning_does_not_add_effect_for_warning_sting(spy):
     state, engine, timer = _make_state(
         spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
     )
@@ -624,9 +652,8 @@ def test_green_warning_plays_warning_sting_on_personal(spy):
 
     _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
 
-    sting_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.warning_sting"]
-    assert len(sting_calls) == 1
-    assert sting_calls[0][0] is Scope.PERSONAL
+    sting_add_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.warning_sting"]
+    assert len(sting_add_calls) == 0
 
 
 def test_green_warning_starts_ambient_music_on_ambient_scope(spy):

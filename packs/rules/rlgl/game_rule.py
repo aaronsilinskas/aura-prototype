@@ -100,8 +100,7 @@ def _enter_red_warning(state: GameState) -> None:
     state.set(_KEY_PHASE_START, state.total)
     opts = dict(_PULSE_OPTS_BASE)
     opts["end_color"] = 0xFFFF00
-    state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.pulse", 10, opts)
-    state.effect_controls.add_effect(Scope.PERSONAL, "rlgl.warning_sting", 10, {})
+    state.effect_controls.set_effect(Scope.NON_AMBIENT, "rlgl.warning_sting", 10, opts)
     receipt = state.effect_controls.set_effect(Scope.AMBIENT, "rlgl.red_light_music", 10, {})
     state.set(_KEY_AMBIENT_RECEIPT, receipt)
 
@@ -117,8 +116,7 @@ def _enter_green_warning(state: GameState) -> None:
     state.set(_KEY_PHASE_START, state.total)
     opts = dict(_PULSE_OPTS_BASE)
     opts["end_color"] = 0xFFFF00
-    state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.pulse", 10, opts)
-    state.effect_controls.add_effect(Scope.PERSONAL, "rlgl.warning_sting", 10, {})
+    state.effect_controls.set_effect(Scope.NON_AMBIENT, "rlgl.warning_sting", 10, opts)
     receipt = state.effect_controls.set_effect(Scope.AMBIENT, "rlgl.green_light_music", 10, {})
     state.set(_KEY_AMBIENT_RECEIPT, receipt)
 
