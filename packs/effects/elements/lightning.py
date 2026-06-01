@@ -3,7 +3,7 @@ import random
 from effects.layers.layer import Layer
 from effects.palette import Palette, PaletteLUT256
 from effects.render import Effect, EffectConfig, PixelBuffer
-from effects.shape import Shape
+from effects.shape import EffectShapeFunc, Shape
 from engine.effects.manager import EffectBuilder
 
 # fmt: off
@@ -37,7 +37,7 @@ class _LightningBolt(Layer):
 
     def __init__(
         self,
-        shape,
+        shape: EffectShapeFunc,
         hide_max: float,
         strike_duration_min: float,
         strike_duration_max: float,
