@@ -47,6 +47,7 @@ class AudioEffectOutput(EffectOutput):
         self._once_wave = None  # held to prevent GC collecting it during playback
         self._loop_receipt: EffectReceipt | None = None
         self._once_receipt: EffectReceipt | None = None
+        self._once_verb: str | None = None
 
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], receipt: EffectReceipt
@@ -71,22 +72,25 @@ class AudioEffectOutput(EffectOutput):
         self._mixer.voice[1].stop()
         if self._once_file is not None:
             self._once_file.close()
-        if self._once_receipt is not None:
+        if self._once_receipt is not None and self._once_verb == "start":
             self._once_receipt.stop()
         self._once_file = f
         self._once_receipt = receipt
+        self._once_verb = event.verb
         self._once_wave = audiocore.WaveFile(self._once_file)
         self._mixer.voice[1].play(self._once_wave)
 
     def flush(self) -> None:
         # Auto-stop one-shot when playback ends naturally
         if self._once_receipt is not None and not self._mixer.voice[1].playing:
-            self._once_receipt.stop()
+            if self._once_verb == "start":
+                self._once_receipt.stop()
             if self._once_file is not None:
                 self._once_file.close()
                 self._once_file = None
             self._once_wave = None
             self._once_receipt = None
+            self._once_verb = None
 
         # Stop voice 1 early if a rule stopped the receipt externally
         if self._once_receipt is not None and self._once_receipt.is_stopped():
@@ -96,6 +100,7 @@ class AudioEffectOutput(EffectOutput):
                 self._once_file = None
             self._once_wave = None
             self._once_receipt = None
+            self._once_verb = None
 
         # Stop voice 0 if a rule stopped the loop receipt directly
         if self._loop_receipt is not None and self._loop_receipt.is_stopped():
