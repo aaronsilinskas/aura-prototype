@@ -10,6 +10,7 @@ import sys
 
 import pytest
 
+from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.version import Version
 
@@ -439,8 +440,6 @@ def test_items_raises_for_unknown_pack(pack_env) -> None:
 
 
 def test_sound_path_returns_wav_path_for_registered_pack(pack_env) -> None:
-    from engine.events import EffectEvent
-
     _make_pack(pack_env, "rlgl", "1.0", {})
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
@@ -453,8 +452,6 @@ def test_sound_path_returns_wav_path_for_registered_pack(pack_env) -> None:
 
 
 def test_sound_path_returns_none_for_unknown_pack(pack_env) -> None:
-    from engine.events import EffectEvent
-
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
@@ -465,8 +462,6 @@ def test_sound_path_returns_none_for_unknown_pack(pack_env) -> None:
 
 
 def test_sound_path_uses_pack_source_path(pack_env) -> None:
-    from engine.events import EffectEvent
-
     src = pack_env / "custom_src"
     src.mkdir()
     _make_pack(src, "mygame", "1.0", {})
