@@ -3,6 +3,7 @@
 import os
 
 import engine._path as _path
+from engine.events import EffectEvent
 from engine.version import Version
 
 try:
@@ -189,7 +190,7 @@ class PackRegistry:
             raise ValueError("Unknown pack '" + pack_name + "'")
         return sorted(meta.item_names)
 
-    def sound_path(self, event: object) -> "str | None":
+    def sound_path(self, event: EffectEvent) -> "str | None":
         """Return the WAV file path for *event*.
 
         The lookup key is ``{event.name}_{event.verb}.wav`` inside the
@@ -198,9 +199,9 @@ class PackRegistry:
         Returns the resolved path string if the pack is registered, or
         ``None`` if the pack is unknown.
         """
-        pack_name = event.pack  # type: ignore[attr-defined]
-        name = event.name  # type: ignore[attr-defined]
-        verb = event.verb  # type: ignore[attr-defined]
+        pack_name = event.pack
+        name = event.name
+        verb = event.verb
         meta = self._packs.get(pack_name)
         if meta is None:
             return None
