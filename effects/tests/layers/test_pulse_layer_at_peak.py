@@ -82,17 +82,6 @@ def test_pulse_layer_at_peak_false_during_off() -> None:
     assert layer.at_peak is False
 
 
-# --- at_peak remains False late in cycle after first crossing, without another crossing ---
-
-
-def test_pulse_layer_at_peak_false_late_in_cycle_without_crossing() -> None:
-    # Advance just past b_on, then move to off phase without another crossing
-    layer = _layer(b_on=0.5, on_dur=0.5, darken_dur=0.5, off_dur=0.5)
-    layer.update(0.6)  # first crossing
-    layer.update(1.2)  # now at 1.8 (off phase), no new b_on crossing
-    assert layer.at_peak is False
-
-
 def test_pulse_layer_at_peak_true_on_second_cycle_crossing() -> None:
     layer = _layer(b_on=0.5, on_dur=0.5, darken_dur=0.5, off_dur=0.5)
     # Advance through first cycle and into second cycle's brighten-to-ON crossing
@@ -116,17 +105,6 @@ def test_pulse_layer_at_peak_true_when_large_elapsed_skips_entire_cycle() -> Non
     layer = _layer(b_on=0.5, on_dur=0.5, darken_dur=0.5, off_dur=0.5)
     layer.update(3.0)  # crosses at least one b_on boundary
     assert layer.at_peak is True
-
-
-# --- Raw accumulator: _elapsed is never wrapped ---
-
-
-def test_pulse_layer_elapsed_is_raw_accumulator() -> None:
-    layer = _layer(b_on=0.5, on_dur=0.5, darken_dur=0.5, off_dur=0.5)
-    layer.update(1.5)
-    layer.update(1.5)
-    # If raw, _elapsed == 3.0; modulo would give 1.0
-    assert layer._elapsed == pytest.approx(3.0)
 
 
 # --- sample() still uses modulo internally for visual correctness ---

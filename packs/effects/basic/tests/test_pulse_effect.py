@@ -79,7 +79,7 @@ def test_pulse_effect_no_listener_call_during_off() -> None:
 # --- PulseEffect with no listeners fires without error ---
 
 
-def test_pulse_effect_no_listeners_no_error_at_peak() -> None:
+def test_pulse_effect_peak_with_no_listeners_is_silent() -> None:
     effect = _build()  # no listeners
     effect.update(0.6)  # crosses b_on
     # Should not raise

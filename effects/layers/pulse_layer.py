@@ -21,7 +21,15 @@ class PulseLayer(Layer):
         ``position`` and ``pixel_count`` are ignored.
     """
 
-    __slots__ = ("_b_darken", "_b_off", "_b_on", "_cycle_total", "_elapsed", "at_peak")
+    __slots__ = (
+        "_b_darken",
+        "_b_off",
+        "_b_on",
+        "_brightness",
+        "_cycle_total",
+        "_elapsed",
+        "at_peak",
+    )
 
     def __init__(
         self,
@@ -35,6 +43,7 @@ class PulseLayer(Layer):
         self._b_off = b_off
         self._cycle_total = cycle_total
         self._elapsed = 0.0
+        self._brightness = 0.0
         self.at_peak = False
 
     def update(self, elapsed: float) -> None:
@@ -46,14 +55,18 @@ class PulseLayer(Layer):
         self.at_peak = floor((self._elapsed - b_on) / cycle_total) > floor(
             (prev - b_on) / cycle_total
         )
+        e = self._elapsed % cycle_total
+        b_darken = self._b_darken
+        b_off = self._b_off
+        if e < b_on:
+            self._brightness = e / b_on
+        elif e < b_darken:
+            self._brightness = 1.0
+        elif e < b_off:
+            self._brightness = 1.0 - (e - b_darken) / (b_off - b_darken)
+        else:
+            self._brightness = 0.0
 
     def sample(self, position: float, pixel_count: int) -> float:
         """Return current brightness in ``[0.0, 1.0]``; position is ignored."""
-        elapsed = self._elapsed % self._cycle_total
-        if elapsed < self._b_on:
-            return elapsed / self._b_on
-        if elapsed < self._b_darken:
-            return 1.0
-        if elapsed < self._b_off:
-            return 1.0 - (elapsed - self._b_darken) / (self._b_off - self._b_darken)
-        return 0.0
+        return self._brightness
