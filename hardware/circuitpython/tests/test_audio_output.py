@@ -110,11 +110,12 @@ def test_verb_event_replaces_current_voice1_oneshot(tmp_path) -> None:
 
     output = _make_output(registry)
 
-    # Simulate an already-playing one-shot
+    # Simulate an already-playing one-shot from a prior "start" event
     old_receipt = _make_receipt()
     old_file = MagicMock()
     output._once_file = old_file
     output._once_receipt = old_receipt
+    output._once_verb = "start"
 
     event = EffectEvent("mygame", "shield", "boom")
     receipt = _make_receipt()
@@ -123,6 +124,35 @@ def test_verb_event_replaces_current_voice1_oneshot(tmp_path) -> None:
     output._mixer.voice[1].stop.assert_called()
     old_file.close.assert_called()
     old_receipt.stop.assert_called()
+
+
+def test_peak_event_replacing_current_oneshot_does_not_stop_pixel_effect_receipt(
+    tmp_path,
+) -> None:
+    """Replacing a 'peak' one-shot does NOT stop the pixel effect's receipt."""
+    wav = tmp_path / "pulse_peak.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = MagicMock()
+    registry.sound_path.return_value = str(wav)
+
+    output = _make_output(registry)
+
+    # Simulate an already-playing one-shot from a prior "peak" event
+    old_receipt = _make_receipt()
+    old_file = MagicMock()
+    output._once_file = old_file
+    output._once_receipt = old_receipt
+    output._once_verb = "peak"
+
+    event = EffectEvent("mygame", "pulse", "peak")
+    receipt = _make_receipt()
+    output.handle_event(event, frozenset({"personal"}), receipt)
+
+    output._mixer.voice[1].stop.assert_called()
+    old_file.close.assert_called()
+    # Receipt must NOT be stopped — it belongs to the still-running pixel effect
+    old_receipt.stop.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -229,11 +259,33 @@ def test_flush_stops_oneshot_receipt_when_voice1_finishes_naturally() -> None:
     once_file = MagicMock()
     output._once_receipt = receipt
     output._once_file = once_file
+    output._once_verb = "start"  # lifecycle: stopping receipt is correct
     output._mixer.voice[1].playing = False
 
     output.flush()
 
     receipt.stop.assert_called_once()
+    once_file.close.assert_called_once()
+    assert output._once_receipt is None
+    assert output._once_file is None
+    assert output._once_wave is None
+
+
+def test_flush_does_not_stop_pixel_effect_receipt_when_peak_sound_finishes() -> None:
+    """flush: voice 1 finishes a 'peak' sound → pixel effect receipt is NOT stopped."""
+    registry = MagicMock()
+    output = _make_output(registry)
+
+    receipt = _make_receipt()
+    once_file = MagicMock()
+    output._once_receipt = receipt
+    output._once_file = once_file
+    output._once_verb = "peak"  # side-effect sound: must not kill the pixel effect
+    output._mixer.voice[1].playing = False
+
+    output.flush()
+
+    receipt.stop.assert_not_called()
     once_file.close.assert_called_once()
     assert output._once_receipt is None
     assert output._once_file is None

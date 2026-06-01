@@ -66,7 +66,7 @@ _KEY_AMBIENT_RECEIPT: Final = "rlgl_ambient_receipt"
 # Default durations (seconds)
 # ---------------------------------------------------------------------------
 
-_DEFAULT_WARNING_DURATION: Final = 2.0
+_DEFAULT_WARNING_DURATION: Final = 3.0
 _DEFAULT_RED_DURATION: Final = 5.0
 _DEFAULT_GREEN_DURATION: Final = 5.0
 _DEFAULT_GRACE_DURATION: Final = 1.0
