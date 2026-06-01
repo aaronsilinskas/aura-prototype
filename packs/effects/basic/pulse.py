@@ -1,12 +1,12 @@
 from effects.layers.pulse_layer import PulseLayer
-from effects.layers.renderer import LayerRenderer
 from effects.palette import PaletteLUT256
 from effects.render import EffectConfig
 from engine.effects.manager import EffectBuilder
+from packs.effects.basic.pulse_effect import PulseEffect
 
 
 class PulseBuilder(EffectBuilder):
-    """Builds a :class:`LayerRenderer` wrapping a :class:`PulseLayer` from a ``EffectConfig``.
+    """Builds a :class:`PulseEffect` wrapping a :class:`PulseLayer` from a ``EffectConfig``.
 
     Reads ``start_color`` (default ``0x000000``), ``end_color`` (default
     ``0xFFFFFF``), ``brighten_duration``, ``on_duration``, ``darken_duration``,
@@ -18,7 +18,7 @@ class PulseBuilder(EffectBuilder):
     to zero.
     """
 
-    def __call__(self, name: str, config: EffectConfig) -> LayerRenderer:
+    def __call__(self, name: str, config: EffectConfig) -> PulseEffect:
         opts = config.options
         start_color_raw = opts.get("start_color", 0x000000)
         end_color_raw = opts.get("end_color", 0xFFFFFF)
@@ -47,7 +47,7 @@ class PulseBuilder(EffectBuilder):
         b_off = brighten_duration + on_duration + darken_duration
         layer = PulseLayer(b_on, b_darken, b_off, cycle_total)
 
-        return LayerRenderer(name, layer, palette)
+        return PulseEffect(name, layer, palette, config)
 
 
 BUILD = PulseBuilder()
