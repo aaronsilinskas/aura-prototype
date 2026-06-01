@@ -23,6 +23,8 @@ import busio
 import digitalio
 from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
+from hardware.shared.debounced_buttons import DebouncedButtons
+
 
 def setup_i2c():
     """Return an I2C bus on the board's default SDA/SCL pins."""
@@ -49,13 +51,17 @@ def setup_matrix_is31fl3741(i2c):
 
 
 def setup_buttons(*pins):
-    """Return a list of ``DigitalInOut`` inputs, one per pin, with pull-up resistors."""
-    buttons = []
-    for pin in pins:
+    """Return a ``DebouncedButtons`` instance for the given pins with pull-up resistors.
+
+    Button labels are assigned alphabetically by position ("A", "B", …).
+    """
+    labels = [chr(ord("A") + i) for i in range(len(pins))]
+    pairs = []
+    for label, pin in zip(labels, pins):
         btn = digitalio.DigitalInOut(pin)
         btn.switch_to_input(pull=digitalio.Pull.UP)
-        buttons.append(btn)
-    return buttons
+        pairs.append((label, lambda p=btn: p.value))
+    return DebouncedButtons(pairs)
 
 
 def setup_external_power():

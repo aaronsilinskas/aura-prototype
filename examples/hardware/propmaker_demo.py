@@ -49,8 +49,6 @@ except ImportError:
 # Constants
 # ---------------------------------------------------------------------------
 
-_BUTTON_NAMES = ("A", "B")
-
 BUTTON_A_PIN: "Final" = board.D9
 BUTTON_B_PIN: "Final" = board.D10
 
@@ -60,7 +58,7 @@ BUTTON_B_PIN: "Final" = board.D10
 
 _i2c = propmaker.setup_i2c()
 _matrix = propmaker.setup_matrix_is31fl3741(_i2c)
-_button_a, _button_b = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
+_buttons = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
 
 # ---------------------------------------------------------------------------
 # Element pages
@@ -130,10 +128,6 @@ game_state = game_engine.create_state(SceneControls())
 for _scope, _name in _ELEMENT_PAGES[0]:
     effect_manager.set_effect(_scope, _name, 1, {})
 
-# Button state tracking for edge detection (pull-up: True = not pressed)
-_buttons = [_button_a, _button_b]
-_button_prev = [True, True]
-
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
@@ -145,13 +139,8 @@ while True:
     timer.update()
     effect_manager.update(timer)
 
-    for _i, _btn in enumerate(_buttons):
-        _current = _btn.value
-        if not _current and _button_prev[_i]:  # falling edge: just pressed
-            _states = dict.fromkeys(_BUTTON_NAMES, ButtonData.UP)
-            _states[_BUTTON_NAMES[_i]] = ButtonData.PRESSED
-            game_state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(_states)))
-        _button_prev[_i] = _current
+    _button_data = _buttons.update(timer.elapsed)
+    game_state.queue_event(InputEvents.ButtonAndAcceleration(_button_data))
 
     game_engine.update(game_state)
 
