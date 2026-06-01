@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from effects.layers.add_samples_renderer import AddSamplesRenderer
 from effects.palette import PaletteLUT256
 from effects.render import EffectConfig, PixelBuffer
 from effects.shape import Shape
@@ -49,7 +50,7 @@ def test_lightning_bolt_at_strike_true_on_idle_to_strike_transition() -> None:
     assert bolt.at_strike is True
 
 
-def test_lightning_bolt_at_strike_false_when_no_elapsed_on_new_bolt() -> None:
+def test_lightning_bolt_at_strike_false_before_idle_threshold_is_crossed() -> None:
     bolt = _make_bolt()
 
     bolt.update(0.0)
@@ -59,8 +60,7 @@ def test_lightning_bolt_at_strike_false_when_no_elapsed_on_new_bolt() -> None:
 
 def test_lightning_bolt_at_strike_false_during_strike_phase() -> None:
     bolt = _make_bolt()
-    bolt.update(10.0)
-    assert bolt.at_strike is True  # confirm we're on transition tick
+    bolt.update(10.0)  # advance to STRIKE phase
 
     bolt.update(0.0)
 
@@ -77,13 +77,8 @@ def test_lightning_bolt_at_strike_false_on_strike_to_idle_transition() -> None:
 
 
 # ---------------------------------------------------------------------------
-# LightningBuilder — returns LightningEffect
+# LightningBuilder — name is passed through to the effect
 # ---------------------------------------------------------------------------
-
-
-def test_lightning_builder_produces_a_lightning_effect() -> None:
-    effect = LightningBuilder()("elements.lightning", _config())
-    assert isinstance(effect, LightningEffect)
 
 
 def test_lightning_effect_name_matches_builder_argument() -> None:
@@ -144,8 +139,6 @@ def test_lightning_effect_emits_single_strike_event_even_when_multiple_bolts_tra
 
 
 def test_lightning_effect_pixel_output_matches_add_samples_renderer() -> None:
-    from effects.layers.add_samples_renderer import AddSamplesRenderer
-
     shape = Shape.padded(0.25, Shape.centered_gradient())
     palette = PaletteLUT256(_LIGHTNING_PALETTE)
 
@@ -170,7 +163,7 @@ def test_lightning_effect_pixel_output_matches_add_samples_renderer() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_lightning_effect_no_listeners_registered_does_not_crash() -> None:
+def test_lightning_effect_fires_strike_event_with_no_listeners_silently() -> None:
     config = _config(listeners=[])
 
     shape = Shape.padded(0.25, Shape.centered_gradient())
@@ -179,3 +172,20 @@ def test_lightning_effect_no_listeners_registered_does_not_crash() -> None:
     effect = LightningEffect("test", [bolt], palette, config)
 
     effect.update(10.0)  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# LightningEffect — pixel output is zero during idle phase
+# ---------------------------------------------------------------------------
+
+
+def test_lightning_effect_pixel_output_is_zero_during_idle_phase() -> None:
+    shape = Shape.padded(0.25, Shape.centered_gradient())
+    bolt = _LightningBolt(shape, 1.5, 0.5, 1.25)
+    palette = PaletteLUT256(_LIGHTNING_PALETTE)
+    effect = LightningEffect("test", [bolt], palette, _config())
+
+    out = PixelBuffer(16)
+    effect.render(out)
+
+    assert all(px == 0 for px in out)
