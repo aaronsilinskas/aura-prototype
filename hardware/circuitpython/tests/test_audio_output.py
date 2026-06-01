@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
+from hardware.circuitpython.audio_output import AudioEffectOutput
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -18,7 +19,7 @@ def _make_receipt() -> MagicMock:
     return r
 
 
-def _make_output(registry: MagicMock) -> AudioEffectOutput:  # noqa: F821
+def _make_output(registry: MagicMock) -> AudioEffectOutput:
     """Build an AudioEffectOutput with all hardware deps patched out."""
     import audiobusio  # type: ignore[import]
     import audiocore  # type: ignore[import]
