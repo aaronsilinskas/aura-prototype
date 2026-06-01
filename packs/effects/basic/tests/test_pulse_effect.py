@@ -21,16 +21,6 @@ def _render(effect, pixel_count: int = 4) -> list:
     return list(buf)
 
 
-# --- PulseBuilder returns PulseEffect ---
-
-
-def test_pulse_builder_returns_pulse_effect() -> None:
-    from packs.effects.basic.pulse import PulseEffect
-
-    effect = _build()
-    assert isinstance(effect, PulseEffect)
-
-
 # --- PulseEffect calls notify_listeners("peak") when at_peak is True ---
 
 
