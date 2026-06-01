@@ -69,10 +69,13 @@ def test_rlgl_effects_have_renders_pixels_false() -> None:
 
 
 def test_rlgl_sound_path_returns_wav_path() -> None:
+    from engine.events import EffectEvent
+
     registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(_packs_path("effects"), "packs.effects")
 
-    path = registry.sound_path("rlgl", "red_light_music")
+    event = EffectEvent("rlgl", "red_light", "music")
+    path = registry.sound_path(event)
 
     assert path is not None
     assert path.endswith("/sounds/red_light_music.wav")

@@ -1,4 +1,5 @@
 """Stub out CircuitPython-only hardware modules so CPython can import audio_output."""
+
 import sys
 import types
 
