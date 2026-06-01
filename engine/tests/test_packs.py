@@ -10,6 +10,7 @@ import sys
 
 import pytest
 
+from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.version import Version
 
@@ -443,7 +444,8 @@ def test_sound_path_returns_wav_path_for_registered_pack(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    result = registry.sound_path("rlgl", "red_light_music")
+    event = EffectEvent("rlgl", "red_light", "music")
+    result = registry.sound_path(event)
 
     expected = str(pack_env / "rlgl") + "/sounds/red_light_music.wav"
     assert result == expected
@@ -453,7 +455,8 @@ def test_sound_path_returns_none_for_unknown_pack(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    result = registry.sound_path("nonexistent", "some_sound")
+    event = EffectEvent("nonexistent", "some", "sound")
+    result = registry.sound_path(event)
 
     assert result is None
 
@@ -465,6 +468,7 @@ def test_sound_path_uses_pack_source_path(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(src), MODULE_PREFIX)
 
-    result = registry.sound_path("mygame", "alert")
+    event = EffectEvent("mygame", "shield", "alert")
+    result = registry.sound_path(event)
 
-    assert result == str(src / "mygame") + "/sounds/alert.wav"
+    assert result == str(src / "mygame") + "/sounds/shield_alert.wav"

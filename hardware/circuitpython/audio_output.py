@@ -44,49 +44,39 @@ class AudioEffectOutput(EffectOutput):
         self._audio.play(self._mixer)
         self._loop_file = None
         self._once_file = None
+        self._once_wave = None  # held to prevent GC collecting it during playback
         self._loop_receipt: EffectReceipt | None = None
         self._once_receipt: EffectReceipt | None = None
 
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], receipt: EffectReceipt
     ) -> None:
-        if event.verb == "start":
-            path = self._registry.sound_path(event.pack, event.name)
-            if path is None:
-                return
-            try:
-                f = open(path, "rb")  # noqa: SIM115
-            except OSError:
-                return
+        # All verbs: stop the loop on 'stop'
+        if event.verb == "stop" and receipt is self._loop_receipt:
+            self._mixer.voice[0].stop()
+            if self._loop_file is not None:
+                self._loop_file.close()
+                self._loop_file = None
+            self._loop_receipt = None
 
-            if "ambient" in scope_keys:
-                # Voice 0 — looping ambient track
-                self._mixer.voice[0].stop()
-                if self._loop_file is not None:
-                    self._loop_file.close()
-                if self._loop_receipt is not None:
-                    self._loop_receipt.stop()
-                self._loop_file = f
-                self._loop_receipt = receipt
-                self._mixer.voice[0].play(audiocore.WaveFile(self._loop_file), loop=True)
-            else:
-                # Voice 1 — one-shot; replaces any current one-shot
-                self._mixer.voice[1].stop()
-                if self._once_file is not None:
-                    self._once_file.close()
-                if self._once_receipt is not None:
-                    self._once_receipt.stop()
-                self._once_file = f
-                self._once_receipt = receipt
-                self._mixer.voice[1].play(audiocore.WaveFile(self._once_file))
+        # All verbs: unified one-shot sound lookup on voice 1
+        path = self._registry.sound_path(event)
+        if path is None:
+            return
+        try:
+            f = open(path, "rb")  # noqa: SIM115
+        except OSError:
+            return
 
-        elif event.verb == "stop":
-            if receipt is self._loop_receipt:
-                self._mixer.voice[0].stop()
-                if self._loop_file is not None:
-                    self._loop_file.close()
-                    self._loop_file = None
-                self._loop_receipt = None
+        self._mixer.voice[1].stop()
+        if self._once_file is not None:
+            self._once_file.close()
+        if self._once_receipt is not None:
+            self._once_receipt.stop()
+        self._once_file = f
+        self._once_receipt = receipt
+        self._once_wave = audiocore.WaveFile(self._once_file)
+        self._mixer.voice[1].play(self._once_wave)
 
     def flush(self) -> None:
         # Auto-stop one-shot when playback ends naturally
@@ -95,6 +85,7 @@ class AudioEffectOutput(EffectOutput):
             if self._once_file is not None:
                 self._once_file.close()
                 self._once_file = None
+            self._once_wave = None
             self._once_receipt = None
 
         # Stop voice 1 early if a rule stopped the receipt externally
@@ -103,6 +94,7 @@ class AudioEffectOutput(EffectOutput):
             if self._once_file is not None:
                 self._once_file.close()
                 self._once_file = None
+            self._once_wave = None
             self._once_receipt = None
 
         # Stop voice 0 if a rule stopped the loop receipt directly

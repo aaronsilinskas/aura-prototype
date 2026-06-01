@@ -6,7 +6,10 @@ import os
 
 import pytest
 
+from effects.render import EffectConfig
+from engine.effects.manager import EffectBuilder
 from engine.engine import GameEngine, GameRule
+from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.scene import Scene, SceneManager
 from engine.state import EffectControls
@@ -22,8 +25,6 @@ def _packs_path(*parts: str) -> str:
 
 
 def test_fire_pack_exposes_valid_effect_builder() -> None:
-    from engine.effects.manager import EffectBuilder
-
     registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(_packs_path("effects"), "packs.effects")
 
@@ -33,8 +34,6 @@ def test_fire_pack_exposes_valid_effect_builder() -> None:
 
 
 def test_solid_pack_exposes_valid_effect_builder() -> None:
-    from engine.effects.manager import EffectBuilder
-
     registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(_packs_path("effects"), "packs.effects")
 
@@ -44,8 +43,6 @@ def test_solid_pack_exposes_valid_effect_builder() -> None:
 
 
 def test_rlgl_pack_exposes_valid_effect_builders() -> None:
-    from engine.effects.manager import EffectBuilder
-
     registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(_packs_path("effects"), "packs.effects")
 
@@ -55,9 +52,6 @@ def test_rlgl_pack_exposes_valid_effect_builders() -> None:
 
 
 def test_rlgl_effects_have_renders_pixels_false() -> None:
-    from effects.render import EffectConfig
-    from engine.effects.manager import EffectBuilder
-
     registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(_packs_path("effects"), "packs.effects")
 
@@ -72,7 +66,8 @@ def test_rlgl_sound_path_returns_wav_path() -> None:
     registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(_packs_path("effects"), "packs.effects")
 
-    path = registry.sound_path("rlgl", "red_light_music")
+    event = EffectEvent("rlgl", "red_light", "music")
+    path = registry.sound_path(event)
 
     assert path is not None
     assert path.endswith("/sounds/red_light_music.wav")
