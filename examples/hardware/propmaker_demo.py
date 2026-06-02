@@ -33,7 +33,7 @@ import board
 
 import hardware.circuitpython.propmaker as propmaker
 from engine.effects.manager import EffectManager
-from engine.engine import GameEngine, GameRule, Version
+from engine.engine import GameEngine, GameRule
 from engine.input import ButtonData, InputEvents
 from engine.packs import PackRegistry
 from engine.state import SceneControls, Scope
@@ -93,7 +93,6 @@ _registry.scan_dir("packs/effects", "packs.effects")
 
 class ButtonEffectRule(GameRule):
     def __init__(self):
-        super().__init__("button_effects", Version(1, 0))
         self.on(InputEvents.ButtonAndAcceleration, self._on_buttons)
 
     def _on_buttons(self, event, state):

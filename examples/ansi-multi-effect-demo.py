@@ -7,7 +7,7 @@ import tty
 
 from effects.render import PixelBuffer
 from engine.effects.manager import EffectManager, EffectOutput
-from engine.engine import GameEngine, GameRule, Version
+from engine.engine import GameEngine, GameRule
 from engine.events import Event
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.packs import PackRegistry
@@ -81,9 +81,6 @@ game_state = game_engine.create_state(SceneControls())
 
 
 class MakeEffectRule(GameRule):
-    def __init__(self):
-        super().__init__("make_effect", Version(1, 0))
-
     def handle_event(self, event: Event, state: GameState) -> None:
         if isinstance(event, InputEvents.ButtonAndAcceleration):
             button_data = event.buttons

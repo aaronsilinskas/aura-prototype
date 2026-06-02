@@ -5,20 +5,15 @@ try:
 except ImportError:
     pass
 
-from engine.engine import GameRule, Version
+from engine.engine import GameRule
 from engine.events import Event
 from engine.state import GameState
-
-_VERSION: Version = Version(1, 0)
 
 
 class EventLoggerRule(GameRule):
     """Logs every received event along with all its attributes."""
 
-    __slots__ = ("_output",)
-
     def __init__(self, output: Callable[[str], None] = lambda s: print(s)) -> None:
-        super().__init__("debug.event_logger", _VERSION)
         self._output = output
 
     def handle_event(self, event: Event, state: GameState) -> None:

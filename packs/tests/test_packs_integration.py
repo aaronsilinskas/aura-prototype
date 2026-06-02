@@ -13,6 +13,8 @@ from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.scene import Scene, SceneManager
 from engine.state import EffectControls
+from packs.rules.debug.button_events import ButtonEventsRule
+from packs.rules.debug.event_logger import EventLoggerRule
 
 _PACKS_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -176,9 +178,7 @@ def test_scene_manager_load_wires_button_events_rule_from_pack(
 ) -> None:
     engine, _ = loaded_debug_engine
 
-    rule_names = {r.name for r in engine._rules}
-
-    assert "debug.button_event" in rule_names
+    assert any(isinstance(r, ButtonEventsRule) for r in engine.rules)
 
 
 def test_scene_manager_load_wires_event_logger_rule_from_pack(
@@ -186,9 +186,7 @@ def test_scene_manager_load_wires_event_logger_rule_from_pack(
 ) -> None:
     engine, _ = loaded_debug_engine
 
-    rule_names = {r.name for r in engine._rules}
-
-    assert "debug.event_logger" in rule_names
+    assert any(isinstance(r, EventLoggerRule) for r in engine.rules)
 
 
 def test_scene_manager_load_activates_all_rules_from_pack(
@@ -198,8 +196,8 @@ def test_scene_manager_load_activates_all_rules_from_pack(
 
     expected_count = len(rule_registry.items("debug"))
 
-    assert all(isinstance(r, GameRule) for r in engine._rules)
-    assert len(engine._rules) == expected_count
+    assert all(isinstance(r, GameRule) for r in engine.rules)
+    assert len(engine.rules) == expected_count
 
 
 def test_scene_manager_load_raises_for_incompatible_pack_version() -> None:

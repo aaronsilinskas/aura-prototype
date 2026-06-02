@@ -1,15 +1,8 @@
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
-from engine.engine import GameRule, Version
+from engine.engine import GameRule
 from engine.network import NetworkEvents
 from engine.state import GameState, Scope
-
-_VERSION: Final = Version(1, 0)
 
 
 class HwTestNetworkRule(GameRule):
@@ -21,10 +14,7 @@ class HwTestNetworkRule(GameRule):
     Radio receive (mode 3): flashes ``Scope.Global.ALL`` at level 9 similarly.
     """
 
-    __slots__ = ()
-
     def __init__(self) -> None:
-        super().__init__("hw_test.network", _VERSION)
         self.on(NetworkEvents.IRReceived, self._handle_ir)
         self.on(NetworkEvents.RadioReceived, self._handle_radio)
 

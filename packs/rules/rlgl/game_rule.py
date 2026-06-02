@@ -23,7 +23,7 @@ try:
 except ImportError:
     pass
 
-from engine.engine import GameRule, Version
+from engine.engine import GameRule
 from engine.input import ButtonData, InputEvents
 from engine.state import EffectReceipt, GameState, Scope
 from packs.rules.rlgl.helpers.motion_detector import (
@@ -31,8 +31,6 @@ from packs.rules.rlgl.helpers.motion_detector import (
     RED_MAX_MOTION_THRESHOLD,
     motion_magnitude,
 )
-
-_VERSION: Final = Version(1, 0)
 
 # ---------------------------------------------------------------------------
 # Phase constants
@@ -147,10 +145,7 @@ class RlglGameRule(GameRule):
     itself is stateless beyond the registered event handler.
     """
 
-    __slots__ = ()
-
     def __init__(self) -> None:
-        super().__init__("rlgl.game", _VERSION)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:

@@ -8,7 +8,6 @@ from engine.engine import GameEngine, GameRule
 from engine.input import ButtonData, InputEvents
 from engine.network import NetworkEvents
 from engine.state import EffectReceipt, GameState, SceneControls, Scope
-from engine.version import Version
 from packs.rules.hw_test.mode_rule import (
     FLASH_DURATION,
     HW_TEST_PAYLOAD,
@@ -250,9 +249,6 @@ def test_button_a_in_ir_mode_queues_ir_received_event(spy):
     captured_events = []
 
     class _Capture(GameRule):
-        def __init__(self):
-            super().__init__("test.capture", Version(1, 0))
-
         def handle_event(self, event, s):
             captured_events.append(event)
 
@@ -274,9 +270,6 @@ def test_button_a_in_radio_mode_queues_radio_received_event(spy):
     captured_events = []
 
     class _Capture(GameRule):
-        def __init__(self):
-            super().__init__("test.capture", Version(1, 0))
-
         def handle_event(self, event, s):
             captured_events.append(event)
 
