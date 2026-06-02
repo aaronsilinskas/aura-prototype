@@ -161,18 +161,19 @@ class AirBuilder(EffectBuilder):
 
         shape = Shape.padded(padding, Shape.reverse(Shape.gradient()))
 
-        breezes = [
-            _AirBreeze(
-                shape,
-                multiplier_end,
-                hide_dur_min,
-                hide_dur_max,
-                sweep_dur_min,
-                sweep_dur_max,
-                initial_delay=random.uniform(0.0, hide_dur_max),
+        breezes = list[Layer]()
+        for _ in range(breeze_count):
+            breezes.append(
+                _AirBreeze(
+                    shape,
+                    multiplier_end,
+                    hide_dur_min,
+                    hide_dur_max,
+                    sweep_dur_min,
+                    sweep_dur_max,
+                    initial_delay=random.uniform(0.0, hide_dur_max),
+                )
             )
-            for _ in range(breeze_count)
-        ]
 
         return AddSamplesRenderer(name, breezes, PaletteLUT256(_AIR_PALETTE))
 
