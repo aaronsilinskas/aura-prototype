@@ -396,7 +396,7 @@ def test_live_py_file_is_not_deleted_from_mount(tmp_path: Path) -> None:
     assert existing.exists()
 
 
-def test_stale_non_py_file_on_mount_is_not_pruned(tmp_path: Path) -> None:
+def test_stale_excluded_suffix_file_on_mount_is_not_pruned(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
@@ -409,6 +409,23 @@ def test_stale_non_py_file_on_mount_is_not_pruned(tmp_path: Path) -> None:
     deploy(None, mount, source_root=source)
 
     assert stale_mpy.exists()
+
+
+def test_stale_wav_file_is_deleted_from_mount(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    (source / "effects" / "sounds").mkdir()
+    (source / "effects" / "sounds" / "active.wav").write_bytes(b"")
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "effects" / "sounds").mkdir(parents=True)
+    stale_wav = mount / "effects" / "sounds" / "old_sound.wav"
+    stale_wav.write_bytes(b"")
+
+    deploy(None, mount, source_root=source)
+
+    assert not stale_wav.exists()
 
 
 def test_code_py_is_never_deleted_from_mount(tmp_path: Path) -> None:

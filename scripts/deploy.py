@@ -50,7 +50,7 @@ def _is_excluded(rel: Path) -> bool:
 
 
 def _collect_stale_files(src_dir: Path, dest_dir: Path) -> list[Path]:
-    """Return .py files in dest_dir that have no counterpart in src_dir.
+    """Return files in dest_dir that have no counterpart in src_dir.
 
     Returns an empty list if dest_dir does not exist.
     Excluded paths (e.g. tests/, __pycache__/) are not considered stale.
@@ -58,7 +58,9 @@ def _collect_stale_files(src_dir: Path, dest_dir: Path) -> list[Path]:
     if not dest_dir.is_dir():
         return []
     stale = []
-    for dest_file in sorted(dest_dir.rglob("*.py")):
+    for dest_file in sorted(dest_dir.rglob("*")):
+        if dest_file.is_dir():
+            continue
         rel = dest_file.relative_to(dest_dir)
         if _is_excluded(rel):
             continue
