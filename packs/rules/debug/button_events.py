@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-from engine.engine import GameRule, Version
+from engine.engine import GameRule
 from engine.events import Event
 from engine.input import ButtonData, InputEvents
 from engine.state import GameState
 
-_VERSION: Version = Version(1, 0)
-
 
 class ButtonEventsRule(GameRule):
     """Triggers events based on per-button state combinations."""
-
-    __slots__ = ("_down", "_pressed", "_released", "_up")
 
     def __init__(
         self,
@@ -20,7 +16,6 @@ class ButtonEventsRule(GameRule):
         button_up: dict[str, Event] | None = None,
         button_released: dict[str, Event] | None = None,
     ) -> None:
-        super().__init__("debug.button_event", _VERSION)
         self._pressed = button_pressed
         self._down = button_down
         self._up = button_up

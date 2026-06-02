@@ -1,6 +1,6 @@
 import pytest
 
-from engine.engine import GameEngine, GameRule, Version
+from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
 from engine.state import EffectControls, GameState, SceneControls
 from engine.timer import Timer
@@ -37,7 +37,6 @@ def _make_state() -> GameState:
 
 class _CapturingRule(GameRule):
     def __init__(self) -> None:
-        super().__init__("test.capturing_rule", Version(1, 0))
         self.captured_controls: list = []
 
     def handle_event(self, event: Event, state: GameState) -> None:
@@ -69,7 +68,7 @@ def test_rule_receives_the_effect_controls_passed_to_the_engine() -> None:
 
 def test_registered_handler_fires_when_matching_event_is_dispatched() -> None:
     captured = []
-    rule = GameRule("test", Version(1, 0))
+    rule = GameRule()
     rule.on(_AEvent, lambda e, s: captured.append(e))
 
     event = _AEvent()
@@ -80,7 +79,7 @@ def test_registered_handler_fires_when_matching_event_is_dispatched() -> None:
 
 def test_unregistered_event_type_is_silently_ignored() -> None:
     captured = []
-    rule = GameRule("test", Version(1, 0))
+    rule = GameRule()
     rule.on(_AEvent, lambda e, s: captured.append(e))
 
     rule.handle_event(_BEvent(), _make_state())
@@ -91,7 +90,7 @@ def test_unregistered_event_type_is_silently_ignored() -> None:
 def test_each_event_type_routes_to_its_own_registered_handler() -> None:
     a_captured = []
     b_captured = []
-    rule = GameRule("test", Version(1, 0))
+    rule = GameRule()
     rule.on(_AEvent, lambda e, s: a_captured.append(e))
     rule.on(_BEvent, lambda e, s: b_captured.append(e))
 
@@ -113,7 +112,6 @@ class _TimeCaptureRule(GameRule):
     """Records elapsed and total seen during handle_event."""
 
     def __init__(self) -> None:
-        super().__init__("test.time_capture", Version(1, 0))
         self.seen_elapsed: list[float] = []
         self.seen_total: list[float] = []
 
@@ -307,9 +305,6 @@ def test_create_state_returns_empty_data_when_no_initial_data_provided() -> None
 
 def test_data_written_in_one_tick_is_readable_in_a_later_tick() -> None:
     class _CounterRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("test.counter", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             state.set("n", state.get("n", 0) + 1)
 
@@ -327,15 +322,11 @@ def test_data_written_in_one_tick_is_readable_in_a_later_tick() -> None:
 
 def test_data_written_by_an_earlier_rule_is_visible_to_a_later_rule_in_the_same_tick() -> None:
     class _WriterRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("test.writer", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             state.set("shared", 42)
 
     class _ReaderRule(GameRule):
         def __init__(self) -> None:
-            super().__init__("test.reader", Version(1, 0))
             self.value = None
 
         def handle_event(self, event: Event, state: GameState) -> None:
@@ -354,9 +345,6 @@ def test_data_written_by_an_earlier_rule_is_visible_to_a_later_rule_in_the_same_
 
 def test_different_state_objects_are_independent() -> None:
     class _CounterRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("test.counter", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             state.set("n", state.get("n", 0) + 1)
 
@@ -386,9 +374,6 @@ def test_event_queued_from_state_inside_a_rule_is_dispatched_in_the_same_update(
     captured: list[Event] = []
 
     class _RelayRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("test.relay", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             if event.name == "trigger":
                 state.queue_event(Event(_GROUP, "relayed"))
@@ -414,9 +399,6 @@ def test_clear_queue_prevents_events_from_being_dispatched() -> None:
     captured: list[Event] = []
 
     class _CaptureRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("test.capture", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             captured.append(event)
 
@@ -475,16 +457,10 @@ def test_set_rules_replaces_existing_rules() -> None:
     new_captured: list[Event] = []
 
     class _OldRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("test.old", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             old_captured.append(event)
 
     class _NewRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("test.new", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             new_captured.append(event)
 
@@ -504,9 +480,6 @@ def test_set_rules_with_empty_list_clears_all_rules() -> None:
     captured: list[Event] = []
 
     class _CaptureRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("test.capture", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             captured.append(event)
 
@@ -525,9 +498,6 @@ def test_add_rules_appends_after_set_rules() -> None:
     captured: list[Event] = []
 
     class _CaptureRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("test.capture", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             captured.append(event)
 

@@ -5,11 +5,9 @@ try:
 except ImportError:
     pass
 
-from engine.engine import GameRule, Version
+from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState, Scope
-
-_VERSION: Final = Version(1, 0)
 
 ACCEL_MAX: Final = 9.8
 
@@ -30,10 +28,7 @@ _AXIS_MAP: Final = (
 class HwTestMotionRule(GameRule):
     """Maps accelerometer axes to effect levels and colours per scope."""
 
-    __slots__ = ()
-
     def __init__(self) -> None:
-        super().__init__("hw_test.motion", _VERSION)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:

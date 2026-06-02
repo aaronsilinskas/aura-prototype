@@ -1,6 +1,6 @@
 import pytest
 
-from engine.engine import GameEngine, GameRule, Version
+from engine.engine import GameEngine, GameRule
 from engine.events import Event
 from engine.state import EffectControls, GameState, SceneControls
 
@@ -19,7 +19,6 @@ class _EventCaptureRule(GameRule):
     """Test-only rule that records every event it receives for later inspection."""
 
     def __init__(self):
-        super().__init__("test.capture_rule", Version(1, 0))
         self.captured_events = []
 
     def handle_event(self, event: Event, state: GameState) -> None:

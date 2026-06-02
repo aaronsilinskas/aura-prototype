@@ -19,19 +19,11 @@ __all__ = ["GameEngine", "GameRule", "Version"]
 class GameRule:
     """Base class for gameplay rules that react to engine events.
 
-    Register per-event-type handlers in ``__init__`` using ``self.on()``.
-    The engine calls ``handle_event`` each tick for every queued event;
-    the dispatch table routes to the correct handler by exact event type.
-
-    Subclasses must set ``name`` and ``version`` via ``super().__init__``.
+    Register per-event-type handlers by calling ``self.on()`` in a subclass
+    ``__init__`` (no ``super().__init__()`` required).  The engine calls
+    ``handle_event`` each tick for every queued event; the dispatch table
+    routes to the correct handler by exact event type.
     """
-
-    __slots__ = ("_event_handlers", "name", "version")
-
-    def __init__(self, name: str, version: Version) -> None:
-        self.name = name
-        self.version = version
-        self._event_handlers: dict[type, Callable[..., None]] = {}
 
     def on(self, event_type: type[T], handler: Callable[[T, GameState], None]) -> None:
         """Register a handler for a specific event type.
@@ -40,12 +32,16 @@ class GameRule:
         exactly ``event_type`` is dispatched to this rule.  Registering a
         second handler for the same type replaces the first.
         """
+        if not hasattr(self, "_event_handlers"):
+            self._event_handlers: dict[type, Callable[..., None]] = {}
         self._event_handlers[event_type] = handler
 
     def handle_event(self, event: Event, state: GameState) -> None:
-        handler = self._event_handlers.get(type(event))
-        if handler is not None:
-            handler(event, state)
+        handlers = getattr(self, "_event_handlers", None)
+        if handlers is not None:
+            handler = handlers.get(type(event))
+            if handler is not None:
+                handler(event, state)
 
 
 class GameEngine:
@@ -113,3 +109,8 @@ class GameEngine:
 
     def add_rules(self, *rules: GameRule) -> None:
         self._rules.extend(rules)
+
+    @property
+    def rules(self) -> list[GameRule]:
+        """Return a snapshot of the currently registered rules."""
+        return list(self._rules)

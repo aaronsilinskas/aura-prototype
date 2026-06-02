@@ -5,12 +5,10 @@ try:
 except ImportError:
     pass
 
-from engine.engine import GameRule, Version
+from engine.engine import GameRule
 from engine.input import ButtonData, InputEvents
 from engine.network import NetworkEvents
 from engine.state import EffectReceipt, GameState, Scope
-
-_VERSION: Final = Version(1, 0)
 
 HW_TEST_PAYLOAD: Final = b"hw_test"
 FLASH_DURATION: Final = 0.5
@@ -57,10 +55,7 @@ _NUM_MODES: Final = 4
 class HwTestModeRule(GameRule):
     """Drives hw_test mode transitions and Button A/B behaviour."""
 
-    __slots__ = ()
-
     def __init__(self) -> None:
-        super().__init__("hw_test.mode", _VERSION)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:

@@ -102,7 +102,7 @@ def _scene_factory(**kwargs):
 
 
 def _rule(name: str = "test.rule") -> GameRule:
-    return GameRule(name, Version(1, 0))
+    return GameRule()
 
 
 # ---------------------------------------------------------------------------
@@ -393,8 +393,7 @@ def test_load_validates_rule_pack_version_before_any_lifecycle_callback(pack_env
         {
             "rule_a": (
                 "from engine.engine import GameRule\n"
-                "from engine.version import Version\n"
-                "RULE = GameRule('test', Version(1, 0))\n"
+                "RULE = GameRule()\n"
             )
         },
     )
@@ -675,9 +674,6 @@ def test_load_clears_suspended_state_queues_so_stale_events_do_not_outlive_the_s
     base_events = []
 
     class _BaseRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("base", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             base_events.append(event.name)
 
@@ -716,8 +712,7 @@ def test_load_dispatches_events_to_scene_rules_on_following_ticks(pack_env) -> N
         {
             "rule_a": (
                 "from engine.engine import GameRule\n"
-                "from engine.version import Version\n"
-                "RULE = GameRule('pack.rule_a', Version(1, 0))\n"
+                "RULE = GameRule()\n"
             )
         },
     )
@@ -728,9 +723,6 @@ def test_load_dispatches_events_to_scene_rules_on_following_ticks(pack_env) -> N
     fired: list = []
 
     class _SceneRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("scene.rule", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             fired.append("scene")
 
@@ -759,8 +751,7 @@ def test_scene_rules_fire_before_pack_rules(pack_env) -> None:
         {
             "rule_a": (
                 "from engine.engine import GameRule\n"
-                "from engine.version import Version\n"
-                "RULE = GameRule('pack.rule_a', Version(1, 0))\n"
+                "RULE = GameRule()\n"
             )
         },
     )
@@ -771,9 +762,6 @@ def test_scene_rules_fire_before_pack_rules(pack_env) -> None:
     fired: list = []
 
     class _SceneRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("scene.rule", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             fired.append("scene")
 
@@ -821,9 +809,6 @@ def test_overlay_clears_suspended_base_state_queue_before_pushing() -> None:
     base_events = []
 
     class _BaseRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("base", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             base_events.append(event.name)
 
@@ -887,8 +872,7 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_env
         {
             "rule_a": (
                 "from engine.engine import GameRule\n"
-                "from engine.version import Version\n"
-                "RULE = GameRule('pack.rule_a', Version(1, 0))\n"
+                "RULE = GameRule()\n"
             )
         },
     )
@@ -899,9 +883,6 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_env
     base_events: list = []
 
     class _BaseRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("base.rule", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             base_events.append(event.name)
 
@@ -937,9 +918,6 @@ def test_pop_clears_restored_state_queue_so_suspended_events_do_not_replay() -> 
     base_events: list = []
 
     class _BaseRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("base", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             base_events.append(event.name)
 
@@ -1002,16 +980,15 @@ def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
 def test_rule_pack_items_all_receive_events_after_load(pack_env) -> None:
     rule_content = (
         "from engine.engine import GameRule\n"
-        "from engine.version import Version\n"
-        "RULE = GameRule('pack.{name}', Version(1, 0))\n"
+        "RULE = GameRule()\n"
     )
     _make_rule_pack(
         pack_env,
         "rules",
         "1.0",
         {
-            "rule_a": rule_content.format(name="rule_a"),
-            "rule_b": rule_content.format(name="rule_b"),
+            "rule_a": rule_content,
+            "rule_b": rule_content,
         },
     )
     effect_registry, rule_registry = _make_registries(str(pack_env))
@@ -1021,9 +998,6 @@ def test_rule_pack_items_all_receive_events_after_load(pack_env) -> None:
     fired_by: list = []
 
     class _SceneRule(GameRule):
-        def __init__(self) -> None:
-            super().__init__("scene.rule", Version(1, 0))
-
         def handle_event(self, event: Event, state: GameState) -> None:
             fired_by.append("scene")
 
@@ -1050,18 +1024,17 @@ def test_rule_pack_items_all_receive_events_after_load(pack_env) -> None:
 def test_rule_pack_items_loaded_in_alphabetical_order(pack_env) -> None:
     rule_template = (
         "from engine.engine import GameRule\n"
-        "from engine.version import Version\n"
         "import engine.scene as _s\n"
-        "RULE = GameRule('{name}', Version(1, 0))\n"
+        "RULE = GameRule()\n"
     )
     _make_rule_pack(
         pack_env,
         "rules",
         "1.0",
         {
-            "z_rule": rule_template.format(name="z_rule"),
-            "a_rule": rule_template.format(name="a_rule"),
-            "m_rule": rule_template.format(name="m_rule"),
+            "z_rule": rule_template,
+            "a_rule": rule_template,
+            "m_rule": rule_template,
         },
     )
     _effect_registry, rule_registry = _make_registries(str(pack_env))
