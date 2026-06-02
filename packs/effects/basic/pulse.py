@@ -2,7 +2,7 @@ from effects.layers.pulse_layer import PulseLayer
 from effects.palette import PaletteLUT256
 from effects.render import EffectConfig
 from engine.effects.manager import EffectBuilder
-from packs.effects.basic.pulse_effect import PulseEffect
+from packs.effects.basic.helpers.pulse_effect import PulseEffect
 
 
 class PulseBuilder(EffectBuilder):
