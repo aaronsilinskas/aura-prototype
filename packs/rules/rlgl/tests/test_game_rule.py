@@ -6,7 +6,7 @@ import pytest
 
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
-from engine.state import EffectReceipt, GameState, SceneControls, Scope
+from engine.state import GameState, SceneControls, Scope
 from packs.rules.hw_test.tests.helpers import SpyEffectControls
 from packs.rules.rlgl.game_rule import (
     PHASE_GAME_OVER,
@@ -149,20 +149,20 @@ def test_first_tick_enters_ready_phase(spy):
     assert state.get("rlgl_phase", None) == PHASE_READY
 
 
-def test_ready_shows_water_effect_on_all_scopes(spy):
+def test_ready_shows_ready_effect_on_all_scopes(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
-    water_calls = [c for c in spy.set_effect_calls if c[1] == "elements.water"]
-    assert len(water_calls) == 1
-    assert water_calls[0][0] is Scope.NON_AMBIENT
+    ready_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.ready"]
+    assert len(ready_calls) == 1
+    assert ready_calls[0][0] is Scope.ALL
 
 
-def test_ready_shows_water_effect_at_level_3(spy):
+def test_ready_shows_ready_effect_at_level_3(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
-    water_calls = [c for c in spy.set_effect_calls if c[1] == "elements.water"]
-    assert len(water_calls) == 1
-    assert water_calls[0][2] == 3
+    ready_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.ready"]
+    assert len(ready_calls) == 1
+    assert ready_calls[0][2] == 3
 
 
 # ---------------------------------------------------------------------------
@@ -539,7 +539,7 @@ def test_game_over_transitions_to_ready_after_game_over_duration(spy):
     assert state.get("rlgl_phase", None) == PHASE_READY
 
 
-def test_game_over_expiry_restores_water_effect_on_all_scopes(spy):
+def test_game_over_expiry_restores_ready_effect_on_all_scopes(spy):
     state, engine, timer = _setup_red_phase(
         spy, grace=1.0, initial_data={"rlgl_game_over_duration": 2.0}
     )
@@ -550,12 +550,12 @@ def test_game_over_expiry_restores_water_effect_on_all_scopes(spy):
 
     _tick(state, engine, timer, total=go_start + 2.0)
 
-    water_calls = [c for c in spy.set_effect_calls if c[1] == "elements.water"]
-    assert len(water_calls) == 1
-    assert water_calls[0][0] is Scope.NON_AMBIENT
+    ready_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.ready"]
+    assert len(ready_calls) == 1
+    assert ready_calls[0][0] is Scope.ALL
 
 
-def test_game_over_expiry_restores_water_effect_at_level_3(spy):
+def test_game_over_expiry_restores_ready_effect_at_level_3(spy):
     state, engine, timer = _setup_red_phase(
         spy, grace=1.0, initial_data={"rlgl_game_over_duration": 2.0}
     )
@@ -566,9 +566,9 @@ def test_game_over_expiry_restores_water_effect_at_level_3(spy):
 
     _tick(state, engine, timer, total=go_start + 2.0)
 
-    water_calls = [c for c in spy.set_effect_calls if c[1] == "elements.water"]
-    assert len(water_calls) == 1
-    assert water_calls[0][2] == 3
+    ready_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.ready"]
+    assert len(ready_calls) == 1
+    assert ready_calls[0][2] == 3
 
 
 # ---------------------------------------------------------------------------
@@ -723,18 +723,8 @@ def test_game_over_removes_ambient_receipt_from_game_state(spy):
 
 
 # ---------------------------------------------------------------------------
-# Audio — Ready phase stops held ambient receipt
+# Audio — Ready phase
 # ---------------------------------------------------------------------------
-
-
-def test_ready_stops_ambient_receipt_if_held(spy):
-    stub_receipt = EffectReceipt(99)
-    state, engine, timer = _make_state(spy, initial_data={"rlgl_ambient_receipt": stub_receipt})
-
-    _tick(state, engine, timer, total=0.0)  # init → READY (ambient receipt held)
-
-    assert stub_receipt.is_stopped()
-    assert not state.has("rlgl_ambient_receipt")
 
 
 def test_ready_does_not_crash_when_no_ambient_receipt_held(spy):

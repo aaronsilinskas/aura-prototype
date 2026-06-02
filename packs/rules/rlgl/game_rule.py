@@ -81,9 +81,7 @@ _DEFAULT_GREEN_STILL_TIMEOUT: Final = 1.5
 def _enter_ready(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_READY)
     state.set(_KEY_PHASE_START, state.total)
-    if state.has(_KEY_AMBIENT_RECEIPT):
-        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
-    state.effect_controls.set_effect(Scope.NON_AMBIENT, "elements.water", 3, {})
+    state.effect_controls.set_effect(Scope.ALL, "rlgl.ready", 3, {})
 
 
 _PULSE_OPTS_BASE = {
