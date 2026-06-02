@@ -112,6 +112,26 @@ def test_example_file_is_deployed_as_code_py(tmp_path: Path) -> None:
     assert (mount / "code.py").read_text() == "# demo"
 
 
+def test_example_file_is_always_deployed_even_when_up_to_date(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    example = source / "new_demo.py"
+    example.write_text("# new demo")
+    # Simulate an older example already deployed as code.py with the same mtime
+    existing = mount / "code.py"
+    existing.write_text("# old demo")
+    import os
+
+    os.utime(existing, (example.stat().st_mtime, example.stat().st_mtime))
+
+    deploy(example, mount, source_root=source)
+
+    assert existing.read_text() == "# new demo"
+
+
 def test_no_example_file_leaves_code_py_untouched(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -192,7 +212,7 @@ def test_pyc_files_are_not_copied_to_mount(tmp_path: Path) -> None:
     assert not list((mount / "effects").rglob("*.pyc"))
 
 
-def test_mpy_files_are_not_copied_to_mount(tmp_path: Path) -> None:
+def test_mpy_files_are_copied_to_mount(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
@@ -201,7 +221,20 @@ def test_mpy_files_are_not_copied_to_mount(tmp_path: Path) -> None:
 
     deploy(None, mount, source_root=source)
 
-    assert not list((mount / "effects").rglob("*.mpy"))
+    assert (mount / "effects" / "render.mpy").exists()
+
+
+def test_ds_store_files_are_not_copied_to_mount(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    (source / "effects" / ".DS_Store").write_bytes(b"")
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source)
+
+    assert not (mount / "effects" / ".DS_Store").exists()
 
 
 def test_tests_directory_files_are_not_copied_to_mount(tmp_path: Path) -> None:
@@ -403,12 +436,12 @@ def test_stale_excluded_suffix_file_on_mount_is_not_pruned(tmp_path: Path) -> No
     mount = tmp_path / "mount"
     mount.mkdir()
     (mount / "effects").mkdir()
-    stale_mpy = mount / "effects" / "old_module.mpy"
-    stale_mpy.write_text("")
+    stale_pyc = mount / "effects" / "old_module.pyc"
+    stale_pyc.write_text("")
 
     deploy(None, mount, source_root=source)
 
-    assert stale_mpy.exists()
+    assert stale_pyc.exists()
 
 
 def test_stale_wav_file_is_deleted_from_mount(tmp_path: Path) -> None:

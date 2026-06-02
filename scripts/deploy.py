@@ -23,7 +23,7 @@ try:
 except ImportError:
     pass
 
-MODULE_DIRS: "Final" = [
+MODULE_DIRS: Final = [
     "effects",
     "engine",
     "hardware/circuitpython",
@@ -33,10 +33,10 @@ MODULE_DIRS: "Final" = [
     "rules",
     "scenes",
 ]
-_EXCLUDE_DIRS: "Final" = {"__pycache__", "tests"}
-_EXCLUDE_NAMES: "Final" = {"conftest.py"}
-_EXCLUDE_SUFFIXES: "Final" = {".pyc", ".mpy"}
-_DEFAULT_MOUNT: "Final" = "/Volumes/CIRCUITPY"
+_EXCLUDE_DIRS: Final = {"__pycache__", "tests"}
+_EXCLUDE_NAMES: Final = {"conftest.py"}
+_INCLUDE_SUFFIXES: Final = {".py", ".mpy", ".txt", ".json", ".wav"}
+_DEFAULT_MOUNT: Final = "/Volumes/CIRCUITPY"
 
 
 def _is_excluded(rel: Path) -> bool:
@@ -46,7 +46,7 @@ def _is_excluded(rel: Path) -> bool:
             return True
     if rel.name in _EXCLUDE_NAMES:
         return True
-    return rel.suffix in _EXCLUDE_SUFFIXES
+    return rel.suffix not in _INCLUDE_SUFFIXES
 
 
 def _collect_stale_files(src_dir: Path, dest_dir: Path) -> list[Path]:
@@ -113,9 +113,10 @@ def _sync_file(
     copied: "list[Path]",
     skipped: "list[Path]",
     dry_run: bool = False,
+    force: bool = False,
 ) -> None:
     """Copy src to dest unless it should be skipped."""
-    if _should_skip(src, dest):
+    if not force and _should_skip(src, dest):
         skipped.append(dest)
         print(f"SKIP  {label} (up to date)")
     elif dry_run:
@@ -167,7 +168,7 @@ def deploy(
     pruned: list[Path] = []
 
     if example_file is not None:
-        _sync_file(example_file, mount / "code.py", "code.py", copied, skipped, dry_run)
+        _sync_file(example_file, mount / "code.py", "code.py", copied, skipped, dry_run, force=True)
 
     for module in MODULE_DIRS:
         src_dir = source_root / module
