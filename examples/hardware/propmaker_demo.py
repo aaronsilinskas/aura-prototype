@@ -102,7 +102,7 @@ class ButtonEffectRule(GameRule):
             level = state.get("demo_level", 1)
             state.set("demo_page", page)
             for scope, name in _ELEMENT_PAGES[page]:
-                state.effect_controls.set_effect(scope, name, level, {})
+                state.effect_controls.set_effect(scope, name, {"level": level})
         elif button_data.states["B"] == ButtonData.PRESSED:
             page = state.get("demo_page", 0)
             level = state.get("demo_level", 1) + 1
@@ -110,7 +110,7 @@ class ButtonEffectRule(GameRule):
                 level = 1
             state.set("demo_level", level)
             for scope, name in _ELEMENT_PAGES[page]:
-                state.effect_controls.set_effect(scope, name, level, {})
+                state.effect_controls.set_effect(scope, name, {"level": level})
 
 
 effect_output = IS31FL3741EffectOutput(_matrix)
@@ -125,7 +125,7 @@ game_state = game_engine.create_state(SceneControls())
 
 # Display page 0 at level 1 before entering the main loop
 for _scope, _name in _ELEMENT_PAGES[0]:
-    effect_manager.set_effect(_scope, _name, 1, {})
+    effect_manager.set_effect(_scope, _name, {"level": 1})
 
 # ---------------------------------------------------------------------------
 # Main loop
