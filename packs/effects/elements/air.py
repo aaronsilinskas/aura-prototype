@@ -3,7 +3,7 @@ import random
 from effects.effect import Effect, EffectConfig
 from effects.layers.add_samples_renderer import AddSamplesRenderer
 from effects.layers.layer import Layer
-from effects.level import level_lerp
+from effects.level import clamp_level, level_lerp
 from effects.palette import PaletteLUT256
 from effects.shape import Shape
 from effects.value import lerp
@@ -149,7 +149,7 @@ class AirBuilder(EffectBuilder):
 
         Each breeze runs its own IDLE/SWEEP/FADE FSM directly on the effect.
         """
-        level = config.options.get("level", 10)
+        level = clamp_level(int(config.options.get("level", 1)))
 
         breeze_count = 1 + level // 5
         padding = 0.3 - level_lerp(level, 0.0, 0.3)

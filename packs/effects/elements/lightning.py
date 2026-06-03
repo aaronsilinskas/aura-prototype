@@ -2,6 +2,7 @@ import random
 
 from effects.effect import Effect, EffectConfig, PixelBuffer
 from effects.layers.layer import Layer
+from effects.level import clamp_level
 from effects.palette import Palette, PaletteLUT256
 from effects.shape import EffectShapeFunc, Shape
 from engine.effects.manager import EffectBuilder
@@ -138,7 +139,7 @@ class LightningBuilder(EffectBuilder):
 
         runs its own IDLE/STRIKE FSM directly on the effect.
         """
-        level = config.options.get("level", 10)
+        level = clamp_level(int(config.options.get("level", 1)))
 
         hide_max = 1.5 - (1 - 1 / level)
         strike_duration_max = 1.25 - (1 - 1 / level)
