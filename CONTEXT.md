@@ -6,6 +6,10 @@
 A base class in `effects/effect.py` that subclasses override to drive all visual simulation state directly. Subclasses implement `name`, `update(timer)`, and `render(output)`. All ten element effects live in `packs/effects/elements/` and extend `Effect` using the layer helpers in `effects/layers/`. Registered under the `elements.*` namespace via `ElementBuilder`. Class attribute `renders_pixels: bool = True` — audio-only and vibration-only effects set this to `False`; `EffectManager` skips pixel buffer allocation and `render()` calls for such effects.
 _Avoid_: "step-based effect", "prototype renderer" (the cutover is complete — all effects use this direct approach); "EffectRenderer" (old name — renamed)
 
+### EffectConfig
+Runtime configuration passed to effect builders at construction. Three fields: `resolution` (sample detail — the mathematical density at which the effect generates animation data, independent of pixel count), `options` (effect-specific parameters as a plain dict, e.g. `{"level": 5}`), and `listeners` (notification callbacks invoked by name when significant rendering events occur). `resolution` is clamped to a minimum of `1` at construction.
+_Avoid_: reading `config.level` (slot removed — use `clamp_level(int(config.options.get("level", 1)))` in element builders); calling `config.level_lerp()` / `config.level_lerp_int()` (removed — call `level_lerp` / `level_lerp_int` from `effects.level` directly)
+
 ### Layer
 A composable simulation unit used by `Effect` implementations that composite pixel animations. The base class in `effects/layers/layer.py` defines `update(elapsed)` and `sample(position, pixel_count) -> float`. Concrete implementations: `ScrollLayer`, `FlameLayer`, `DriftNoiseLayer`, `SparkleLayer`, `ShapeLayer`. Layer-based effects (`LayerRenderer`, `AddColorsRenderer`, `AddSamplesRenderer`) composite layers into pixel output.
 _Avoid_: importing layer helpers from anywhere other than `effects.layers`

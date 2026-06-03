@@ -73,8 +73,8 @@ def logging_listener(event_name: str) -> None:
 
 def create_effect(element: str, level: int):
     config = EffectConfig(
-        level=level,
         resolution=NUM_LEDS * 3,
+        options={"level": level},
         listeners=[logging_listener],
     )
     builder = _registry.get("elements", element, EffectBuilder)

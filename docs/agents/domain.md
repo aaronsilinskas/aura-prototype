@@ -54,7 +54,7 @@ scripts/          Deploy and maintenance scripts
 
 | Type | Lives in | Role |
 |------|----------|------|
-| `EffectConfig` | `effects/effect.py` | Level [1–10], resolution, options, listeners for one render pass |
+| `EffectConfig` | `effects/effect.py` | Resolution, options, and listeners for one render pass |
 | `PixelBuffer` | `effects/effect.py` | List-backed in-memory pixel buffer of packed RGB values |
 | `Effect` | `effects/effect.py` | Base class for all effects; subclasses implement `name`, `update(elapsed)`, `render(output)` |
 | `Layer` | `effects/layers/layer.py` | Base layer: `update(elapsed)` + `sample(position, pixel_count) -> float` |
@@ -89,7 +89,7 @@ scripts/          Deploy and maintenance scripts
 
 | Term | Meaning |
 |------|---------|
-| **Level** | Effect intensity, integer 1–10. 1 = weakest, 10 = strongest. Passed to `EffectConfig.level`. |
+| **Level** | Effect intensity, integer 1–10. 1 = weakest, 10 = strongest. Passed via `options={"level": N}` when calling `set_effect` / `add_effect`. |
 | **Resolution** | Drives sample density and buffer size, it is not the pixel count of a strip. |
 | **Element** | One of ten named magical elements (Fire, Water, Earth, Ice, Air, Lightning, Light, Dark, Time, Gravity). Each has a buff and a debuff spell. |
 | **Effect pack** | An `EffectBuilder` that owns a named set of effects. `ElementBuilder` (from `registry.py`) is one pack; games compose multiple packs at startup. |
