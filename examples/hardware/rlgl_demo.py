@@ -37,6 +37,7 @@ import time as _time
 import board
 
 import hardware.circuitpython.propmaker as propmaker
+from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.input import AccelerationData, InputEvents
@@ -78,9 +79,16 @@ _effect_registry.scan_dir("packs/effects", "packs.effects")
 _rule_registry = PackRegistry(item_attr="RULE")
 _rule_registry.scan_dir("packs/rules", "packs.rules")
 
+_audio_registry = AudioRegistry()
+_audio_registry.register("ready_start", "sounds/ready_start.wav")
+_audio_registry.register("warning_sting_peak", "sounds/warning_sting_peak.wav")
+_audio_registry.register("red_light_music_start", "sounds/red_light_music_start.wav")
+_audio_registry.register("green_light_music_start", "sounds/green_light_music_start.wav")
+_audio_registry.register("game_over_sting_start", "sounds/game_over_sting_start.wav")
+
 _effect_manager = EffectManager(
     registry=_effect_registry,
-    outputs=[IS31FL3741EffectOutput(_matrix), AudioEffectOutput(_effect_registry)],
+    outputs=[IS31FL3741EffectOutput(_matrix), AudioEffectOutput(_audio_registry)],
 )
 
 # ---------------------------------------------------------------------------

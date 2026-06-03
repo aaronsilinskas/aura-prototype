@@ -4,9 +4,9 @@ import audiomixer
 import board
 
 from effects.effect import Effect
+from engine.audio import AudioRegistry
 from engine.effects.manager import EffectOutput
 from engine.events import EffectEvent
-from engine.packs import PackRegistry
 from engine.state import EffectReceipt, Scope
 
 
@@ -18,18 +18,22 @@ class AudioEffectOutput(EffectOutput):
     pixel buffer allocation.
 
     Uses a 2-voice ``audiomixer.Mixer``:
-      - Voice 0 — ambient loop (``loop=True``); started when ``"ambient"`` is in
-        ``scope_keys``.  Stopped when the matching receipt stops.
-      - Voice 1 — one-shot; started for all other scopes.  Replaced immediately
-        if a new one-shot starts.  Stopped automatically in ``flush()`` once
-        playback ends naturally, or early if the receipt is stopped externally.
+      - Voice 0 — ambient loop (``loop=True``); started when
+        ``effect.audio.clips[verb].loop`` is ``True``.  Stopped when the
+        matching receipt stops (detected in ``flush()``).
+      - Voice 1 — one-shot; started when ``loop`` is ``False``.  Replaced
+        immediately if a new one-shot starts.  Stopped automatically in
+        ``flush()`` once playback ends naturally, or early if the receipt is
+        stopped externally.
+
+    Teardown of both voices is driven entirely by ``flush()`` receipt guards.
     """
 
-    def __init__(self, registry: PackRegistry) -> None:
+    def __init__(self, audio_registry: AudioRegistry) -> None:
         super().__init__(receives_pixels=False)
         self.min_resolution = 1
         self.scopes = [Scope.ALL]
-        self._registry = registry
+        self._audio_registry = audio_registry
         self._audio = audiobusio.I2SOut(board.I2S_BIT_CLOCK, board.I2S_WORD_SELECT, board.I2S_DATA)
         self._mixer = audiomixer.Mixer(
             voice_count=2,
@@ -44,6 +48,7 @@ class AudioEffectOutput(EffectOutput):
 
         self._audio.play(self._mixer)
         self._loop_file = None
+        self._loop_wave = None  # held to prevent GC collecting it during playback
         self._once_file = None
         self._once_wave = None  # held to prevent GC collecting it during playback
         self._loop_receipt: EffectReceipt | None = None
@@ -53,16 +58,13 @@ class AudioEffectOutput(EffectOutput):
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
     ) -> None:
-        # All verbs: stop the loop on 'stop'
-        if event.verb == "stop" and receipt is self._loop_receipt:
-            self._mixer.voice[0].stop()
-            if self._loop_file is not None:
-                self._loop_file.close()
-                self._loop_file = None
-            self._loop_receipt = None
+        if effect.audio is None:
+            return
+        config = effect.audio.clips.get(event.verb)
+        if config is None:
+            return
 
-        # All verbs: unified one-shot sound lookup on voice 1
-        path = self._registry.sound_path(event)
+        path = self._audio_registry.path(config.name)
         if path is None:
             return
         try:
@@ -70,16 +72,25 @@ class AudioEffectOutput(EffectOutput):
         except OSError:
             return
 
-        self._mixer.voice[1].stop()
-        if self._once_file is not None:
-            self._once_file.close()
-        if self._once_receipt is not None and self._once_verb == "start":
-            self._once_receipt.stop()
-        self._once_file = f
-        self._once_receipt = receipt
-        self._once_verb = event.verb
-        self._once_wave = audiocore.WaveFile(self._once_file)
-        self._mixer.voice[1].play(self._once_wave)
+        if config.loop:
+            self._mixer.voice[0].stop()
+            if self._loop_file is not None:
+                self._loop_file.close()
+            self._loop_wave = audiocore.WaveFile(f)
+            self._loop_file = f
+            self._loop_receipt = receipt
+            self._mixer.voice[0].play(self._loop_wave, loop=True)
+        else:
+            self._mixer.voice[1].stop()
+            if self._once_file is not None:
+                self._once_file.close()
+            if self._once_receipt is not None and self._once_verb == "start":
+                self._once_receipt.stop()
+            self._once_file = f
+            self._once_receipt = receipt
+            self._once_verb = event.verb
+            self._once_wave = audiocore.WaveFile(self._once_file)
+            self._mixer.voice[1].play(self._once_wave)
 
     def flush(self) -> None:
         # Auto-stop one-shot when playback ends naturally
@@ -109,4 +120,5 @@ class AudioEffectOutput(EffectOutput):
             if self._loop_file is not None:
                 self._loop_file.close()
                 self._loop_file = None
+            self._loop_wave = None
             self._loop_receipt = None
