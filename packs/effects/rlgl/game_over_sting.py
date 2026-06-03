@@ -1,31 +1,10 @@
-from effects.effect import Effect, EffectConfig, PixelBuffer
+from effects.effect import Effect, EffectConfig
 from engine.effects.manager import EffectBuilder
 
 
-class GameOverSting(Effect):
-    """Audio-only effect for the game over sting sound effect.
-
-    Plays via AudioEffectOutput on the PERSONAL scope (voice 1, one-shot).
-    ``renders_pixels = False`` — no pixel buffer is allocated.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(renders_pixels=False)
-
-    @property
-    def name(self) -> str:
-        return "rlgl.game_over_sting"
-
-    def update(self, elapsed: float) -> None:
-        pass
-
-    def render(self, output: PixelBuffer) -> None:
-        pass
-
-
 class GameOverStingBuilder(EffectBuilder):
-    def __call__(self, name: str, config: EffectConfig) -> GameOverSting:
-        return GameOverSting()
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        return Effect(name=name)
 
 
 BUILD = GameOverStingBuilder()

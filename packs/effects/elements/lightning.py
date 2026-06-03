@@ -1,6 +1,6 @@
 import random
 
-from effects.effect import Effect, EffectConfig, PixelBuffer
+from effects.effect import Effect, EffectConfig, EffectPixels, PixelBuffer
 from effects.layers.layer import Layer
 from effects.level import clamp_level
 from effects.palette import Palette, PaletteLUT256
@@ -84,26 +84,20 @@ class _LightningBolt(Layer):
         return self._shape((position + self._bolt_offset) % 1.0) * brightness
 
 
-class LightningEffect(Effect):
+class LightningEffect(EffectPixels):
     """Renders multiple lightning bolts and fires a 'strike' event on IDLE→STRIKE transitions."""
 
-    __slots__ = ["_bolts", "_config", "_name", "_palette"]
+    __slots__ = ["_bolts", "_config", "_palette"]
 
     def __init__(
         self,
-        name: str,
         bolts: list[_LightningBolt],
         palette: Palette,
         config: EffectConfig,
     ) -> None:
-        self._name = name
         self._bolts = bolts
         self._palette = palette
         self._config = config
-
-    @property
-    def name(self) -> str:
-        return self._name
 
     def update(self, elapsed: float) -> None:
         """Advance all bolts; call notify_listeners('strike') if any bolt just struck."""
@@ -153,7 +147,10 @@ class LightningBuilder(EffectBuilder):
             for _ in range(branch_count)
         ]
 
-        return LightningEffect(name, bolts, PaletteLUT256(_LIGHTNING_PALETTE), config)
+        return Effect(
+            name=name,
+            pixels=LightningEffect(bolts, PaletteLUT256(_LIGHTNING_PALETTE), config),
+        )
 
 
 BUILD = LightningBuilder()

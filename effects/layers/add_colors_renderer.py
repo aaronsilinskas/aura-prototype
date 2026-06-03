@@ -1,9 +1,9 @@
-from effects.effect import Effect, PixelBuffer
+from effects.effect import EffectPixels, PixelBuffer
 from effects.layers.layer import Layer
 from effects.palette import Palette
 
 
-class AddColorsRenderer(Effect):
+class AddColorsRenderer(EffectPixels):
     """Composes multiple (buffer, palette) layers by additively blending their colors.
 
     Each layer is a ``(buffer, palette)`` pair. Per-pixel: each layer maps its
@@ -14,15 +14,10 @@ class AddColorsRenderer(Effect):
     subsequent layer samples its color directly and blends additively per pixel.
     """
 
-    __slots__ = ["_layers", "_name"]
+    __slots__ = ["_layers"]
 
-    def __init__(self, name: str, layers: list[tuple[Layer, Palette]]) -> None:
-        self._name = name
+    def __init__(self, layers: list[tuple[Layer, Palette]]) -> None:
         self._layers = layers
-
-    @property
-    def name(self) -> str:
-        return self._name
 
     def update(self, elapsed: float) -> None:
         """Advance all layers by ``elapsed`` seconds."""

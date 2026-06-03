@@ -176,7 +176,7 @@ class AirBuilder(EffectBuilder):
                 )
             )
 
-        return AddSamplesRenderer(name, breezes, PaletteLUT256(_AIR_PALETTE))
+        return Effect(name=name, pixels=AddSamplesRenderer(breezes, PaletteLUT256(_AIR_PALETTE)))
 
 
 BUILD = AirBuilder()

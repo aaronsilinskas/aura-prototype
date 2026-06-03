@@ -24,19 +24,21 @@ class IceBuilder(EffectBuilder):
         more active column.
         """
         level = clamp_level(int(config.options.get("level", 1)))
-        return LayerRenderer(
+        return Effect(
             name=name,
-            layer=ScrollLayer(
-                FlameLayer(
-                    spark_count=level,
-                    resolution=config.resolution,
-                    heat_rate=0.15,
-                    extra_cool_rate=0.0,
-                    spread=level_lerp(level, 0.75, 0.45),
+            pixels=LayerRenderer(
+                layer=ScrollLayer(
+                    FlameLayer(
+                        spark_count=level,
+                        resolution=config.resolution,
+                        heat_rate=0.15,
+                        extra_cool_rate=0.0,
+                        spread=level_lerp(level, 0.75, 0.45),
+                    ),
+                    ScrollOffset(speed=level_lerp(level, 0.02, 0.05)),
                 ),
-                ScrollOffset(speed=level_lerp(level, 0.02, 0.05)),
+                palette=PaletteLUT256(_ice_palette),
             ),
-            palette=PaletteLUT256(_ice_palette),
         )
 
 

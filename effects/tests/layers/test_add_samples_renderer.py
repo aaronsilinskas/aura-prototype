@@ -24,7 +24,7 @@ class _ConstantLayer:
 
 def test_add_samples_renderer_single_layer_maps_sample_through_palette() -> None:
     palette = PaletteLUT256(_BLACK_TO_WHITE)
-    renderer = AddSamplesRenderer("test", [_ConstantLayer(0.5)], palette)
+    renderer = AddSamplesRenderer([_ConstantLayer(0.5)], palette)
 
     output = PixelBuffer(4)
     renderer.render(output)
@@ -37,7 +37,7 @@ def test_add_samples_renderer_single_layer_maps_sample_through_palette() -> None
 def test_add_samples_renderer_sums_layer_samples_before_palette_lookup() -> None:
     palette = PaletteLUT256(_BLACK_TO_WHITE)
     # two layers at 0.3 each → sum = 0.6
-    renderer = AddSamplesRenderer("test", [_ConstantLayer(0.3), _ConstantLayer(0.3)], palette)
+    renderer = AddSamplesRenderer([_ConstantLayer(0.3), _ConstantLayer(0.3)], palette)
 
     output = PixelBuffer(1)
     renderer.render(output)
@@ -48,7 +48,7 @@ def test_add_samples_renderer_sums_layer_samples_before_palette_lookup() -> None
 def test_add_samples_renderer_clamps_sum_to_one_before_palette_lookup() -> None:
     palette = PaletteLUT256(_BLACK_TO_WHITE)
     # two layers at 0.8 each → sum = 1.6, clamped to 1.0
-    renderer = AddSamplesRenderer("test", [_ConstantLayer(0.8), _ConstantLayer(0.8)], palette)
+    renderer = AddSamplesRenderer([_ConstantLayer(0.8), _ConstantLayer(0.8)], palette)
 
     output = PixelBuffer(1)
     renderer.render(output)
@@ -59,8 +59,8 @@ def test_add_samples_renderer_clamps_sum_to_one_before_palette_lookup() -> None:
 
 def test_add_samples_renderer_two_layers_produce_brighter_output_than_one() -> None:
     palette = PaletteLUT256(_BLACK_TO_WHITE)
-    renderer_two = AddSamplesRenderer("two", [_ConstantLayer(0.3), _ConstantLayer(0.3)], palette)
-    renderer_one = AddSamplesRenderer("one", [_ConstantLayer(0.3)], palette)
+    renderer_two = AddSamplesRenderer([_ConstantLayer(0.3), _ConstantLayer(0.3)], palette)
+    renderer_one = AddSamplesRenderer([_ConstantLayer(0.3)], palette)
 
     out_two = PixelBuffer(4)
     out_one = PixelBuffer(4)
@@ -78,7 +78,7 @@ def test_add_samples_renderer_two_layers_produce_brighter_output_than_one() -> N
 def test_add_samples_renderer_update_advances_all_layers() -> None:
     layer_a = _ConstantLayer(0.3)
     layer_b = _ConstantLayer(0.3)
-    renderer = AddSamplesRenderer("test", [layer_a, layer_b], PaletteLUT256(_BLACK_TO_WHITE))
+    renderer = AddSamplesRenderer([layer_a, layer_b], PaletteLUT256(_BLACK_TO_WHITE))
 
     renderer.update(0.1)
 
@@ -86,14 +86,4 @@ def test_add_samples_renderer_update_advances_all_layers() -> None:
     assert layer_b.update_count == 1
 
 
-# ---------------------------------------------------------------------------
-# AddSamplesRenderer — name property
-# ---------------------------------------------------------------------------
-
-
-def test_add_samples_renderer_name_returns_name_passed_at_construction() -> None:
-    renderer = AddSamplesRenderer(
-        "elements.air", [_ConstantLayer(0.0)], PaletteLUT256(_BLACK_TO_WHITE)
-    )
-
-    assert renderer.name == "elements.air"
+# (name is now on Effect, not on AddSamplesRenderer)

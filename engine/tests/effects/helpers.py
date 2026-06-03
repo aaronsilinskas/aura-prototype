@@ -1,4 +1,4 @@
-from effects.effect import Effect, EffectConfig, PixelBuffer
+from effects.effect import Effect, EffectConfig, EffectPixels, PixelBuffer
 from engine.effects.manager import EffectBuilder, EffectOutput
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
@@ -39,15 +39,8 @@ class SpyEffectOutput(EffectOutput):
         self.clear_pixels_calls.append(scope_key)
 
 
-class _NamedEffect(Effect):
-    """Minimal Effect stub that stores a name and does nothing."""
-
-    def __init__(self, name: str) -> None:
-        self._name = name
-
-    @property
-    def name(self) -> str:
-        return self._name
+class _StubPixels(EffectPixels):
+    """A no-op pixel compositor for testing."""
 
     def update(self, elapsed: float) -> None:
         pass
@@ -57,16 +50,14 @@ class _NamedEffect(Effect):
 
 
 class StubEffectBuilder(EffectBuilder):
-    """Returns a minimal Effect for any effect name."""
+    """Returns a minimal Effect with pixels for any effect name."""
 
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        return _NamedEffect(name)
+        return Effect(name=name, pixels=_StubPixels())
 
 
-class SpyEffect:
-    """Minimal effect that counts how many times ``update`` was called."""
-
-    renders_pixels: bool = True
+class SpyEffect(EffectPixels):
+    """Minimal EffectPixels that counts how many times ``update`` was called."""
 
     def __init__(self) -> None:
         self.update_count: int = 0
@@ -79,15 +70,15 @@ class SpyEffect:
 
 
 class SpyEffectBuilder(EffectBuilder):
-    """Builder that records each effect it creates, for update-count assertions."""
+    """Builder that records each SpyEffect it creates, for update-count assertions."""
 
     def __init__(self) -> None:
         self.created: list[SpyEffect] = []
 
-    def __call__(self, name: str, config: EffectConfig) -> SpyEffect:
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
         effect = SpyEffect()
         self.created.append(effect)
-        return effect
+        return Effect(name=name, pixels=effect)
 
 
 class CapturingEffectBuilder(EffectBuilder):
@@ -98,7 +89,7 @@ class CapturingEffectBuilder(EffectBuilder):
 
     def __call__(self, name: str, config: EffectConfig) -> Effect:
         self.last_config = config
-        return _NamedEffect(name)
+        return Effect(name=name, pixels=_StubPixels())
 
 
 class EventFiringEffectBuilder(EffectBuilder):
@@ -110,15 +101,11 @@ class EventFiringEffectBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
         event_name = self._event_name
 
-        class _EventEffect(Effect):
-            @property
-            def name(self) -> str:  # type: ignore[override]
-                return name
-
+        class _EventPixels(EffectPixels):
             def update(self, elapsed: float) -> None:
                 config.notify_listeners(event_name)
 
             def render(self, output: object) -> None:
                 pass
 
-        return _EventEffect()
+        return Effect(name=name, pixels=_EventPixels())

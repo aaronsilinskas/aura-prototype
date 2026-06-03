@@ -29,7 +29,7 @@ class _ConstantLayer:
 def test_layer_renderer_maps_layer_sample_through_palette_for_each_pixel() -> None:
     palette = PaletteLUT256(_BLACK_TO_WHITE)
     layer = _ConstantLayer(0.5)
-    renderer = LayerRenderer("test", layer, palette)
+    renderer = LayerRenderer(layer, palette)
 
     output = PixelBuffer(5)
     renderer.render(output)
@@ -49,7 +49,7 @@ def test_layer_renderer_passes_normalized_position_per_pixel_to_layer() -> None:
             return position
 
     palette = PaletteLUT256(_BLACK_TO_WHITE)
-    renderer = LayerRenderer("test", _GradientLayer(), palette)
+    renderer = LayerRenderer(_GradientLayer(), palette)
 
     count = 4
     output = PixelBuffer(count)
@@ -67,7 +67,7 @@ def test_layer_renderer_passes_normalized_position_per_pixel_to_layer() -> None:
 
 def test_layer_renderer_update_passes_elapsed_to_layer() -> None:
     layer = _ConstantLayer(0.5)
-    renderer = LayerRenderer("test", layer, PaletteLUT256(_BLACK_TO_WHITE))
+    renderer = LayerRenderer(layer, PaletteLUT256(_BLACK_TO_WHITE))
 
     renderer.update(0.25)
 
@@ -75,12 +75,4 @@ def test_layer_renderer_update_passes_elapsed_to_layer() -> None:
     assert abs(layer.last_elapsed - 0.25) < 1e-9
 
 
-# ---------------------------------------------------------------------------
-# LayerRenderer — name property
-# ---------------------------------------------------------------------------
-
-
-def test_layer_renderer_name_returns_name_passed_at_construction() -> None:
-    renderer = LayerRenderer("elements.fire", _ConstantLayer(0.0), PaletteLUT256(_BLACK_TO_WHITE))
-
-    assert renderer.name == "elements.fire"
+# (name is now on Effect, not on LayerRenderer)

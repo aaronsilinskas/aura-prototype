@@ -227,7 +227,7 @@ class EffectManager(EffectControls):
         config = EffectConfig(resolution=resolution, options=options, listeners=[scoped_listener])
         entry.effect = builder(effect_name, config)
 
-        if entry.effect.renders_pixels:
+        if entry.effect.pixels is not None:
             for i, output in enumerate(self._outputs):
                 matching_keys = scope_key_set & self._output_key_sets[i]
                 if matching_keys and output.receives_pixels:
@@ -359,7 +359,8 @@ class EffectManager(EffectControls):
 
         # Pass 1: advance each effect once.
         for entry in self._effects:
-            entry.effect.update(elapsed)
+            if entry.effect.pixels is not None:
+                entry.effect.pixels.update(elapsed)
 
         # Pass 2: render and deliver per-key frames to each output.
         # Every registered key receives a call; empty lists signal go-dark.
@@ -379,7 +380,7 @@ class EffectManager(EffectControls):
                     buf_dict = entry.output_buffers[i]
                     if buf_dict is not None:
                         for k, buf in buf_dict.items():
-                            entry.effect.render(buf)
+                            entry.effect.pixels.render(buf)
                             frame_bufs[k].append(buf)
                             frame_receipts[k].append(entry.receipt)
                 for key in frame_bufs:

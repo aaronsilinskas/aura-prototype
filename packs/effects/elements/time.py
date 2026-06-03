@@ -40,12 +40,14 @@ class TimeBuilder(EffectBuilder):
             ShapeLayer(Shape.checkers(value=0.25, count=level, width=0.05)),
             ScrollOffset(speed=ticker_rotate_speed),
         )
-        return AddColorsRenderer(
-            name,
-            [
-                (sand, PaletteLUT256(_TIME_SAND_PALETTE)),
-                (ticker, PaletteLUT256(_GRAYSCALE_PALETTE)),
-            ],
+        return Effect(
+            name=name,
+            pixels=AddColorsRenderer(
+                [
+                    (sand, PaletteLUT256(_TIME_SAND_PALETTE)),
+                    (ticker, PaletteLUT256(_GRAYSCALE_PALETTE)),
+                ],
+            ),
         )
 
 

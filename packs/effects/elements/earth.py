@@ -22,16 +22,18 @@ class EarthBuilder(EffectBuilder):
         into a tighter, more active column.
         """
         level = clamp_level(int(config.options.get("level", 1)))
-        return LayerRenderer(
+        return Effect(
             name=name,
-            layer=FlameLayer(
-                spark_count=level,
-                resolution=config.resolution,
-                heat_rate=0.2,
-                extra_cool_rate=0.0,
-                spread=level_lerp(level, 0.7, 0.4),
+            pixels=LayerRenderer(
+                layer=FlameLayer(
+                    spark_count=level,
+                    resolution=config.resolution,
+                    heat_rate=0.2,
+                    extra_cool_rate=0.0,
+                    spread=level_lerp(level, 0.7, 0.4),
+                ),
+                palette=PaletteLUT256(_earth_palette),
             ),
-            palette=PaletteLUT256(_earth_palette),
         )
 
 
