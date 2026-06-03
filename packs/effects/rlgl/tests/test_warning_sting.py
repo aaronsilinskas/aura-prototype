@@ -13,7 +13,7 @@ from effects.effect import EffectConfig
 
 
 def _config() -> EffectConfig:
-    return EffectConfig(level=10, resolution=16, options={}, listeners=[])
+    return EffectConfig(resolution=16, options={}, listeners=[])
 
 
 def test_warning_sting_build_preserves_effect_name() -> None:

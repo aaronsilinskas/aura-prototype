@@ -6,8 +6,10 @@ from effects.effect import EffectConfig, PixelBuffer
 
 
 def _config(level: int, color: int | None = None) -> EffectConfig:
-    options = {"color": color} if color is not None else {}
-    return EffectConfig(level=level, resolution=16, options=options)
+    options: dict = {"level": level}
+    if color is not None:
+        options["color"] = color
+    return EffectConfig(resolution=16, options=options)
 
 
 def _render(level: int, pixel_count: int = 4, color: int | None = None):
@@ -63,7 +65,7 @@ def test_solid_level_5_red_scales_red_channel_only() -> None:
 def test_solid_no_color_option_defaults_to_white() -> None:
     from packs.effects.basic.solid import BUILD
 
-    config = EffectConfig(level=10, resolution=16)
+    config = EffectConfig(resolution=16)
     effect = BUILD("basic.solid", config)
     buf = PixelBuffer(4)
     effect.render(buf)

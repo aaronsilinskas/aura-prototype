@@ -19,7 +19,7 @@ from packs.effects.elements.lightning import (
 
 
 def _config(level: int = 5, listeners=None) -> EffectConfig:
-    return EffectConfig(level=level, resolution=16, listeners=listeners or [])
+    return EffectConfig(resolution=16, options={"level": level}, listeners=listeners or [])
 
 
 def _make_bolt() -> _LightningBolt:

@@ -82,9 +82,8 @@ def test_x_axis_max_positive_sets_level_10_red_on_personal(spy):
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
     assert len(x_calls) == 1
-    _, name, level, options = x_calls[0]
+    _, name, options = x_calls[0]
     assert name == "basic.solid"
-    assert level == 10
     assert options == {"color": X_POS_COLOR}
     assert X_POS_COLOR == 0xFF0000
 
@@ -95,8 +94,7 @@ def test_x_axis_max_negative_sets_level_10_cyan_on_personal(spy):
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
     assert len(x_calls) == 1
-    _, _name, level, options = x_calls[0]
-    assert level == 10
+    _, _name, options = x_calls[0]
     assert options == {"color": X_NEG_COLOR}
     assert X_NEG_COLOR == 0x00FFFF
 
@@ -112,9 +110,8 @@ def test_y_axis_max_positive_sets_level_10_green_on_directional(spy):
 
     y_calls = [c for c in spy.set_effect_calls if c[0] == Scope.DIRECTIONAL]
     assert len(y_calls) == 1
-    _, name, level, options = y_calls[0]
+    _, name, options = y_calls[0]
     assert name == "basic.solid"
-    assert level == 10
     assert options == {"color": Y_POS_COLOR}
     assert Y_POS_COLOR == 0x00FF00
 
@@ -125,8 +122,7 @@ def test_y_axis_max_negative_sets_level_10_magenta_on_directional(spy):
 
     y_calls = [c for c in spy.set_effect_calls if c[0] == Scope.DIRECTIONAL]
     assert len(y_calls) == 1
-    _, _name, level, options = y_calls[0]
-    assert level == 10
+    _, _name, options = y_calls[0]
     assert options == {"color": Y_NEG_COLOR}
     assert Y_NEG_COLOR == 0xFF00FF
 
@@ -142,9 +138,8 @@ def test_z_axis_max_positive_sets_level_10_blue_on_global_all(spy):
 
     z_calls = [c for c in spy.set_effect_calls if c[0] == Scope.Global.ALL]
     assert len(z_calls) == 1
-    _, name, level, options = z_calls[0]
+    _, name, options = z_calls[0]
     assert name == "basic.solid"
-    assert level == 10
     assert options == {"color": Z_POS_COLOR}
     assert Z_POS_COLOR == 0x0000FF
 
@@ -155,8 +150,7 @@ def test_z_axis_max_negative_sets_level_10_yellow_on_global_all(spy):
 
     z_calls = [c for c in spy.set_effect_calls if c[0] == Scope.Global.ALL]
     assert len(z_calls) == 1
-    _, _name, level, options = z_calls[0]
-    assert level == 10
+    _, _name, options = z_calls[0]
     assert options == {"color": Z_NEG_COLOR}
     assert Z_NEG_COLOR == 0xFFFF00
 
@@ -166,26 +160,11 @@ def test_z_axis_max_negative_sets_level_10_yellow_on_global_all(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_zero_acceleration_on_all_axes_sets_level_1(spy):
+def test_zero_acceleration_on_all_axes_fires_three_effects(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(x=0.0, y=0.0, z=0.0))
 
     assert len(spy.set_effect_calls) == 3
-    levels = [c[2] for c in spy.set_effect_calls]
-    assert all(lv == 1 for lv in levels)
-
-
-# ---------------------------------------------------------------------------
-# Level formula — intermediate values
-# ---------------------------------------------------------------------------
-
-
-def test_half_max_x_accel_produces_level_5(spy):
-    state, engine = _make_state(spy, hw_mode=1)
-    _fire(state, engine, AccelerationData(x=ACCEL_MAX / 2))
-
-    x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
-    assert x_calls[0][2] == 5
 
 
 def test_all_three_axes_fire_on_each_tick(spy):

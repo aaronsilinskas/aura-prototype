@@ -171,15 +171,11 @@ class EffectControls:
     intentionally excluded so rules cannot advance the effect loop.
     """
 
-    def set_effect(
-        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
-    ) -> EffectReceipt:
+    def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
         """Stop any effect(s) currently running in scope, then start name."""
         raise NotImplementedError
 
-    def add_effect(
-        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
-    ) -> EffectReceipt:
+    def add_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
         """Start name in scope without stopping existing effects."""
         raise NotImplementedError
 

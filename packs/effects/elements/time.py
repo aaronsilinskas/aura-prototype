@@ -4,6 +4,7 @@ from effects.layers.drift_noise_layer import DriftNoiseLayer
 from effects.layers.scroll import ScrollOffset
 from effects.layers.scroll_layer import ScrollLayer
 from effects.layers.shape_layer import ShapeLayer
+from effects.level import level_lerp
 from effects.palette import PaletteLUT256
 from effects.shape import Shape
 from engine.effects.manager import EffectBuilder
@@ -25,10 +26,10 @@ class TimeBuilder(EffectBuilder):
 
         simulation state lives directly on the effect.
         """
-        level = config.level
+        level = config.options.get("level", 10)
 
-        drift_speed = config.level_lerp(0.02, 0.065)
-        ticker_rotate_speed = config.level_lerp(0.1, 0.28)
+        drift_speed = level_lerp(level, 0.02, 0.065)
+        ticker_rotate_speed = level_lerp(level, 0.1, 0.28)
 
         sand = DriftNoiseLayer(
             resolution=24,

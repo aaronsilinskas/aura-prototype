@@ -4,35 +4,28 @@ try:
 except ImportError:
     pass
 
-from effects.level import level_lerp as _level_lerp
-from effects.level import level_lerp_int as _level_lerp_int
-
 EffectListenerFunc: TypeAlias = "Callable[[str], None]"
 
 
 class EffectConfig:
     """Runtime configuration shared across a render pass.
 
-    Passed to effect builders at construction. Controls output intensity via
-    ``level`` and the number of sample positions via ``resolution``.
-    Registered listeners are called by name when significant rendering events
-    occur.
+    Passed to effect builders at construction. Controls the number of sample
+    positions via ``resolution``. Registered listeners are called by name when
+    significant rendering events occur.
 
     Constraints:
-      - ``level`` is clamped to ``[1, 10]`` at construction.
       - ``resolution`` is clamped to a minimum of ``1`` at construction.
     """
 
-    __slots__ = ["level", "listeners", "options", "resolution"]
+    __slots__ = ["listeners", "options", "resolution"]
 
     def __init__(
         self,
-        level: int,
         resolution: int,
         options: dict | None = None,
         listeners: list[EffectListenerFunc] | None = None,
     ) -> None:
-        self.level = min(max(1, level), 10)
         self.resolution = max(1, resolution)
         self.options = options if options is not None else {}
         self.listeners = listeners if listeners is not None else []
@@ -41,15 +34,6 @@ class EffectConfig:
         """Invoke all registered listeners with ``event_name``."""
         for listener in self.listeners:
             listener(event_name)
-
-    def level_lerp(self, minimum: float, maximum: float) -> float:
-        """Interpolate between ``minimum`` and ``maximum`` based on the current level."""
-        return _level_lerp(self.level, minimum, maximum)
-
-    def level_lerp_int(self, minimum: int, maximum: int) -> int:
-        """Interpolate between ``minimum`` and ``maximum`` based on the current level,
-        rounded to the nearest int."""
-        return _level_lerp_int(self.level, minimum, maximum)
 
 
 class PixelBuffer:

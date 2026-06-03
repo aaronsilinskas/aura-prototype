@@ -76,10 +76,9 @@ def test_ir_received_calls_set_effect_on_directional_at_level_9(spy):
     state, engine = _make_state(spy, hw_mode=2)
     _fire_ir(state, engine)
     assert len(spy.set_effect_calls) == 1
-    scope, name, level, options = spy.set_effect_calls[0]
+    scope, name, options = spy.set_effect_calls[0]
     assert scope is Scope.DIRECTIONAL
     assert name == "basic.solid"
-    assert level == 9
     assert options == {"color": 0xFFFFFF}
 
 
@@ -133,10 +132,9 @@ def test_radio_received_calls_set_effect_on_global_all_at_level_9(spy):
     state, engine = _make_state(spy, hw_mode=3)
     _fire_radio(state, engine)
     assert len(spy.set_effect_calls) == 1
-    scope, name, level, options = spy.set_effect_calls[0]
+    scope, name, options = spy.set_effect_calls[0]
     assert scope is Scope.Global.ALL
     assert name == "basic.solid"
-    assert level == 9
     assert options == {"color": 0xFFFFFF}
 
 

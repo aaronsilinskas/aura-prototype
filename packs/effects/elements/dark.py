@@ -1,6 +1,7 @@
 from effects.effect import Effect, EffectConfig
 from effects.layers.renderer import LayerRenderer
 from effects.layers.sparkle_layer import SparkleLayer
+from effects.level import level_lerp
 from effects.palette import PaletteLUT256
 from effects.value import ValueGenerator as VG
 from engine.effects.manager import EffectBuilder
@@ -20,9 +21,9 @@ class DarkBuilder(EffectBuilder):
         Level: more sparks can glow simultaneously, though each spawns more slowly
         — the field grows denser rather than quickening.
         """
-        level = config.level
-        spawn_delay_min = config.level_lerp(0.5, 1.0)
-        spawn_delay_max = config.level_lerp(3.0, 5.0)
+        level = config.options.get("level", 10)
+        spawn_delay_min = level_lerp(level, 0.5, 1.0)
+        spawn_delay_max = level_lerp(level, 3.0, 5.0)
 
         return LayerRenderer(
             name,

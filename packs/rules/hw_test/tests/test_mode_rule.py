@@ -97,7 +97,7 @@ def test_first_tick_imu_mode_starts_solid_effects(spy):
     engine.update(state)
 
     assert state.get("hw_mode", None) == 1
-    names_and_options = [(call[1], call[3]) for call in spy.set_effect_calls]
+    names_and_options = [(call[1], call[2]) for call in spy.set_effect_calls]
     assert ("basic.solid", {"color": 0xFF0000}) in names_and_options
     assert ("basic.solid", {"color": 0x00FF00}) in names_and_options
     assert ("basic.solid", {"color": 0x0000FF}) in names_and_options
@@ -110,7 +110,7 @@ def test_first_tick_ir_mode_starts_white_solid_effects(spy):
 
     assert state.get("hw_mode", None) == 2
     assert all(call[1] == "basic.solid" for call in spy.set_effect_calls)
-    assert all(call[3] == {"color": 0xFFFFFF} for call in spy.set_effect_calls)
+    assert all(call[2] == {"color": 0xFFFFFF} for call in spy.set_effect_calls)
 
 
 def test_first_tick_radio_mode_starts_white_solid_effects(spy):
@@ -120,7 +120,7 @@ def test_first_tick_radio_mode_starts_white_solid_effects(spy):
 
     assert state.get("hw_mode", None) == 3
     assert all(call[1] == "basic.solid" for call in spy.set_effect_calls)
-    assert all(call[3] == {"color": 0xFFFFFF} for call in spy.set_effect_calls)
+    assert all(call[2] == {"color": 0xFFFFFF} for call in spy.set_effect_calls)
 
 
 # ---------------------------------------------------------------------------
@@ -223,8 +223,6 @@ def test_button_a_in_rgb_mode_calls_set_effect_on_all_five_scopes(spy):
 
     # 5 set_effect calls — one per scope
     assert len(spy.set_effect_calls) == 5
-    levels = {call[2] for call in spy.set_effect_calls}
-    assert levels == {2}
 
 
 def test_button_a_in_imu_mode_is_noop(spy):
@@ -308,8 +306,8 @@ def test_ir_flash_expires_and_restarts_directional_idle(spy):
     assert receipt.is_stopped()
     assert "ir_flash_receipt" not in state
     assert "ir_flash_start" not in state
-    # Restarts DIRECTIONAL at level 3
-    directional_calls = [c for c in spy.set_effect_calls if c[2] == 3]
+    # Restarts DIRECTIONAL — at least one call for scope DIRECTIONAL
+    directional_calls = [c for c in spy.set_effect_calls if c[0] == Scope.DIRECTIONAL]
     assert len(directional_calls) >= 1
 
 
@@ -331,8 +329,8 @@ def test_radio_flash_expires_and_restarts_global_all_idle(spy):
     assert receipt.is_stopped()
     assert "radio_flash_receipt" not in state
     assert "radio_flash_start" not in state
-    level_3_calls = [c for c in spy.set_effect_calls if c[2] == 3]
-    assert len(level_3_calls) >= 1
+    all_calls = [c for c in spy.set_effect_calls if c[0] in (Scope.Global.ALL, Scope.ALL)]
+    assert len(all_calls) >= 1
 
 
 def test_ir_flash_does_not_expire_before_duration(spy):

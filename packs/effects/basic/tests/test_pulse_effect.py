@@ -6,7 +6,7 @@ from effects.effect import EffectConfig, PixelBuffer
 
 
 def _config(options: dict | None = None, listeners: list | None = None) -> EffectConfig:
-    return EffectConfig(level=10, resolution=16, options=options or {}, listeners=listeners or [])
+    return EffectConfig(resolution=16, options=options or {}, listeners=listeners or [])
 
 
 def _build(options: dict | None = None, listeners: list | None = None):
