@@ -84,7 +84,7 @@ def test_x_axis_max_positive_sets_level_10_red_on_personal(spy):
     assert len(x_calls) == 1
     _, name, options = x_calls[0]
     assert name == "basic.solid"
-    assert options == {"color": X_POS_COLOR}
+    assert options == {"color": X_POS_COLOR, "brightness": 1.0}
     assert X_POS_COLOR == 0xFF0000
 
 
@@ -95,7 +95,7 @@ def test_x_axis_max_negative_sets_level_10_cyan_on_personal(spy):
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
     assert len(x_calls) == 1
     _, _name, options = x_calls[0]
-    assert options == {"color": X_NEG_COLOR}
+    assert options == {"color": X_NEG_COLOR, "brightness": 1.0}
     assert X_NEG_COLOR == 0x00FFFF
 
 
@@ -112,7 +112,7 @@ def test_y_axis_max_positive_sets_level_10_green_on_directional(spy):
     assert len(y_calls) == 1
     _, name, options = y_calls[0]
     assert name == "basic.solid"
-    assert options == {"color": Y_POS_COLOR}
+    assert options == {"color": Y_POS_COLOR, "brightness": 1.0}
     assert Y_POS_COLOR == 0x00FF00
 
 
@@ -123,7 +123,7 @@ def test_y_axis_max_negative_sets_level_10_magenta_on_directional(spy):
     y_calls = [c for c in spy.set_effect_calls if c[0] == Scope.DIRECTIONAL]
     assert len(y_calls) == 1
     _, _name, options = y_calls[0]
-    assert options == {"color": Y_NEG_COLOR}
+    assert options == {"color": Y_NEG_COLOR, "brightness": 1.0}
     assert Y_NEG_COLOR == 0xFF00FF
 
 
@@ -140,7 +140,7 @@ def test_z_axis_max_positive_sets_level_10_blue_on_global_all(spy):
     assert len(z_calls) == 1
     _, name, options = z_calls[0]
     assert name == "basic.solid"
-    assert options == {"color": Z_POS_COLOR}
+    assert options == {"color": Z_POS_COLOR, "brightness": 1.0}
     assert Z_POS_COLOR == 0x0000FF
 
 
@@ -151,7 +151,7 @@ def test_z_axis_max_negative_sets_level_10_yellow_on_global_all(spy):
     z_calls = [c for c in spy.set_effect_calls if c[0] == Scope.Global.ALL]
     assert len(z_calls) == 1
     _, _name, options = z_calls[0]
-    assert options == {"color": Z_NEG_COLOR}
+    assert options == {"color": Z_NEG_COLOR, "brightness": 1.0}
     assert Z_NEG_COLOR == 0xFFFF00
 
 
