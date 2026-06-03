@@ -37,7 +37,7 @@ class DebouncedButtons:
     def __init__(
         self,
         buttons: "list[tuple[str, Callable[[], bool]]]",
-        interval: float = 0.1,
+        interval: float = 0.05,
     ) -> None:
         self._interval = interval
         self._predicates = buttons
