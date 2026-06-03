@@ -24,16 +24,18 @@ class FireBuilder(EffectBuilder):
         turbulent flame.
         """
         level = clamp_level(int(config.options.get("level", 1)))
-        return LayerRenderer(
+        return Effect(
             name=name,
-            layer=FlameLayer(
-                spark_count=level,
-                resolution=config.resolution,
-                heat_rate=level_lerp(level, 1.22, 1.4),
-                extra_cool_rate=0.1,
-                spread=0.3,
+            pixels=LayerRenderer(
+                layer=FlameLayer(
+                    spark_count=level,
+                    resolution=config.resolution,
+                    heat_rate=level_lerp(level, 1.22, 1.4),
+                    extra_cool_rate=0.1,
+                    spread=0.3,
+                ),
+                palette=PaletteLUT256(_fire_palette),
             ),
-            palette=PaletteLUT256(_fire_palette),
         )
 
 

@@ -25,15 +25,17 @@ class DarkBuilder(EffectBuilder):
         spawn_delay_min = level_lerp(level, 0.5, 1.0)
         spawn_delay_max = level_lerp(level, 3.0, 5.0)
 
-        return LayerRenderer(
-            name,
-            SparkleLayer(
-                sparkle_count=level,
-                spawn_delay_rate=VG.random(spawn_delay_min, spawn_delay_max),
-                fade_in_rate=VG.resolve(VG.random(0.5, 1.0)),
-                fade_out_rate=VG.resolve(VG.random(1.0, 2.0)),
+        return Effect(
+            name=name,
+            pixels=LayerRenderer(
+                SparkleLayer(
+                    sparkle_count=level,
+                    spawn_delay_rate=VG.random(spawn_delay_min, spawn_delay_max),
+                    fade_in_rate=VG.resolve(VG.random(0.5, 1.0)),
+                    fade_out_rate=VG.resolve(VG.random(1.0, 2.0)),
+                ),
+                PaletteLUT256(_dark_palette),
             ),
-            PaletteLUT256(_dark_palette),
         )
 
 

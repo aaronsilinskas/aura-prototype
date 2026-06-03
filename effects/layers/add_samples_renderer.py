@@ -1,25 +1,20 @@
-from effects.effect import Effect, PixelBuffer
+from effects.effect import EffectPixels, PixelBuffer
 from effects.layers.layer import Layer
 from effects.palette import Palette
 
 
-class AddSamplesRenderer(Effect):
+class AddSamplesRenderer(EffectPixels):
     """Blends multiple layers by summing their sample values and applying a single palette.
 
     Per-pixel: sums ``layer.sample(pos, count)`` across all layers, clamps the
     total to ``1.0``, then maps through a single shared palette.
     """
 
-    __slots__ = ["_layers", "_name", "_palette"]
+    __slots__ = ["_layers", "_palette"]
 
-    def __init__(self, name: str, layers: list[Layer], palette: Palette) -> None:
-        self._name = name
+    def __init__(self, layers: list[Layer], palette: Palette) -> None:
         self._layers = layers
         self._palette = palette
-
-    @property
-    def name(self) -> str:
-        return self._name
 
     def update(self, elapsed: float) -> None:
         """Advance all layers by ``elapsed`` seconds."""

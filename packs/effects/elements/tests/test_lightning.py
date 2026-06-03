@@ -97,7 +97,7 @@ def test_lightning_effect_calls_notify_listeners_when_bolt_strikes() -> None:
     shape = Shape.padded(0.25, Shape.centered_gradient())
     bolt = _LightningBolt(shape, 1.5, 0.5, 1.25)
     palette = PaletteLUT256(_LIGHTNING_PALETTE)
-    effect = LightningEffect("test", [bolt], palette, config)
+    effect = LightningEffect([bolt], palette, config)
 
     effect.update(10.0)  # well past hide_max of 1.5 — triggers IDLE → STRIKE
 
@@ -111,7 +111,7 @@ def test_lightning_effect_no_notify_when_no_bolt_strikes() -> None:
     shape = Shape.padded(0.25, Shape.centered_gradient())
     bolt = _LightningBolt(shape, 1.5, 0.5, 1.25)
     palette = PaletteLUT256(_LIGHTNING_PALETTE)
-    effect = LightningEffect("test", [bolt], palette, config)
+    effect = LightningEffect([bolt], palette, config)
 
     effect.update(0.0)  # below idle threshold — bolt stays IDLE
 
@@ -125,7 +125,7 @@ def test_lightning_effect_emits_single_strike_event_even_when_multiple_bolts_tra
     shape = Shape.padded(0.25, Shape.centered_gradient())
     bolts = [_LightningBolt(shape, 1.5, 0.5, 1.25) for _ in range(3)]
     palette = PaletteLUT256(_LIGHTNING_PALETTE)
-    effect = LightningEffect("test", bolts, palette, config)
+    effect = LightningEffect(bolts, palette, config)
 
     effect.update(10.0)  # well past hide_max of 1.5 — all bolts transition to STRIKE
 
@@ -141,7 +141,7 @@ def test_lightning_effect_pixel_output_is_nonzero_during_strike_phase() -> None:
     shape = Shape.padded(0.25, Shape.centered_gradient())
     bolt = _LightningBolt(shape, 1.5, 0.5, 1.25)
     palette = PaletteLUT256(_LIGHTNING_PALETTE)
-    effect = LightningEffect("test", [bolt], palette, _config())
+    effect = LightningEffect([bolt], palette, _config())
 
     bolt.update(10.0)  # well past hide_max of 1.5 — advances to STRIKE phase
 
@@ -162,7 +162,7 @@ def test_lightning_effect_update_does_not_raise_when_no_listeners_registered() -
     shape = Shape.padded(0.25, Shape.centered_gradient())
     bolt = _LightningBolt(shape, 1.5, 0.5, 1.25)
     palette = PaletteLUT256(_LIGHTNING_PALETTE)
-    effect = LightningEffect("test", [bolt], palette, config)
+    effect = LightningEffect([bolt], palette, config)
 
     effect.update(10.0)  # well past hide_max of 1.5 — triggers strike; should not raise
 
@@ -176,7 +176,7 @@ def test_lightning_effect_pixel_output_is_zero_during_idle_phase() -> None:
     shape = Shape.padded(0.25, Shape.centered_gradient())
     bolt = _LightningBolt(shape, 1.5, 0.5, 1.25)
     palette = PaletteLUT256(_LIGHTNING_PALETTE)
-    effect = LightningEffect("test", [bolt], palette, _config())
+    effect = LightningEffect([bolt], palette, _config())
 
     out = PixelBuffer(16)
     effect.render(out)  # bolt has not been updated — still in IDLE phase

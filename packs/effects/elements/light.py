@@ -20,16 +20,18 @@ class LightBuilder(EffectBuilder):
         turnover and more rapid flickering.
         """
         level = clamp_level(int(config.options.get("level", 1)))
-        return LayerRenderer(
+        return Effect(
             name=name,
-            layer=FlameLayer(
-                spark_count=level,
-                resolution=config.resolution,
-                heat_rate=level_lerp(level, 0.5, 0.75),
-                extra_cool_rate=level_lerp(level, 0.1, 0.3),
-                spread=0.1,
+            pixels=LayerRenderer(
+                layer=FlameLayer(
+                    spark_count=level,
+                    resolution=config.resolution,
+                    heat_rate=level_lerp(level, 0.5, 0.75),
+                    extra_cool_rate=level_lerp(level, 0.1, 0.3),
+                    spread=0.1,
+                ),
+                palette=PaletteLUT256(_light_palette),
             ),
-            palette=PaletteLUT256(_light_palette),
         )
 
 

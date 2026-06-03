@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 try:
     from collections.abc import Callable, Iterator
     from typing import TypeAlias
@@ -5,6 +7,66 @@ except ImportError:
     pass
 
 EffectListenerFunc: TypeAlias = "Callable[[str], None]"
+
+
+class EffectPixels:
+    """Abstract base class for pixel simulation and rendering.
+
+    Owns the per-frame ``update``/``render`` contract that was previously on
+    ``Effect``. Concrete subclasses: ``LayerRenderer``, ``AddColorsRenderer``,
+    ``AddSamplesRenderer``, ``Solid``, ``PulseEffect``, ``LightningEffect``.
+    ``EffectManager`` calls these methods directly on ``effect.pixels``; the
+    ``Effect`` shell is not involved.
+    """
+
+    def update(self, elapsed: float) -> None:
+        """Advance pixel state for the current frame."""
+        raise NotImplementedError
+
+    def render(self, output: PixelBuffer) -> None:
+        """Write a packed RGB color for each pixel in ``output``."""
+        raise NotImplementedError
+
+
+class AudioPlaybackConfig:
+    """Declares how a single audio clip should play.
+
+    Fields:
+      - ``name``: the clip name looked up in ``AudioRegistry``.
+      - ``loop``: ``True`` → voice 0, looping background; ``False`` → voice 1, one-shot.
+    """
+
+    __slots__ = ["loop", "name"]
+
+    def __init__(self, name: str, loop: bool) -> None:
+        self.name = name
+        self.loop = loop
+
+
+class EffectAudio:
+    """Capability object declaring the audio behaviour of an effect.
+
+    ``clips`` maps event verbs to ``AudioPlaybackConfig`` instances.
+    Set on ``Effect.audio``; if ``None``, the effect produces no audio.
+    """
+
+    __slots__ = ["clips"]
+
+    def __init__(self, clips: dict) -> None:
+        self.clips = clips
+
+
+class EffectVibration:
+    """Placeholder capability object for future vibration hardware support.
+
+    ``patterns`` maps event verbs to opaque vibration config objects.
+    Set on ``Effect.vibration``; no hardware output implements it yet.
+    """
+
+    __slots__ = ["patterns"]
+
+    def __init__(self, patterns: dict) -> None:
+        self.patterns = patterns
 
 
 class EffectConfig:
@@ -56,42 +118,31 @@ class PixelBuffer:
     def __getitem__(self, index: int) -> int:
         return self._pixels[index]
 
-    def __iter__(self) -> "Iterator[int]":
+    def __iter__(self) -> Iterator[int]:
         return iter(self._pixels)
 
 
 class Effect:
-    """Base class for effects.
+    """A descriptor declaring what capabilities an effect has.
 
-    Update model:
-      - Call ``update(elapsed)`` once per frame before ``render``.
-    Rendering model:
-      - Call ``render(output)`` once per frame to write packed RGB colors.
-    Subclass contract:
-      - Subclasses must implement ``name``, ``update``, and ``render``.
+    Constructor: ``Effect(name, pixels=None, audio=None, vibration=None)``.
+    ``EffectManager`` inspects each capability field each tick:
+      - ``pixels is None`` → no pixel buffer allocated, no render pass.
+      - ``audio``/``vibration`` are passed to outputs via ``handle_event``.
+    Builders return plain ``Effect`` instances — subclassing is only appropriate
+    when there is genuine logic to add.
     """
 
-    def __init__(self, renders_pixels: bool = True) -> None:
-        self._renders_pixels = renders_pixels
+    __slots__ = ["audio", "name", "pixels", "vibration"]
 
-    @property
-    def renders_pixels(self) -> bool:
-        """Whether this effect produces pixel output.
-
-        Non-pixel effects (e.g. audio or event-only) pass ``renders_pixels=False``
-        to ``super().__init__()`` to skip pixel buffer allocation for all outputs.
-        """
-        return getattr(self, "_renders_pixels", True)
-
-    @property
-    def name(self) -> str:
-        """The name of this effect."""
-        raise NotImplementedError
-
-    def update(self, elapsed: float) -> None:
-        """Advance effect state for the current frame."""
-        raise NotImplementedError
-
-    def render(self, output: PixelBuffer) -> None:
-        """Write a packed RGB color for each pixel in ``output``."""
-        raise NotImplementedError
+    def __init__(
+        self,
+        name: str,
+        pixels: EffectPixels | None = None,
+        audio: EffectAudio | None = None,
+        vibration: EffectVibration | None = None,
+    ) -> None:
+        self.name = name
+        self.pixels = pixels
+        self.audio = audio
+        self.vibration = vibration

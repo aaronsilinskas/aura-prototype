@@ -53,7 +53,7 @@ def test_rlgl_pack_exposes_valid_effect_builders() -> None:
         assert isinstance(builder, EffectBuilder)
 
 
-def test_rlgl_effects_have_renders_pixels_false() -> None:
+def test_rlgl_audio_only_effects_have_no_pixels() -> None:
     registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(_packs_path("effects"), "packs.effects")
 
@@ -61,17 +61,17 @@ def test_rlgl_effects_have_renders_pixels_false() -> None:
         builder = registry.get("rlgl", effect_name, EffectBuilder)
         config = EffectConfig(resolution=16, options={})
         effect = builder(effect_name, config)
-        assert not effect.renders_pixels
+        assert effect.pixels is None
 
 
-def test_warning_sting_effect_renders_pixels_true() -> None:
+def test_warning_sting_effect_has_pixels() -> None:
     registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(_packs_path("effects"), "packs.effects")
 
     builder = registry.get("rlgl", "warning_sting", EffectBuilder)
     config = EffectConfig(resolution=16, options={})
     effect = builder("warning_sting", config)
-    assert effect.renders_pixels
+    assert effect.pixels is not None
 
 
 def test_rlgl_sound_path_returns_wav_path() -> None:

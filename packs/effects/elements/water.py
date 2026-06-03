@@ -24,23 +24,25 @@ class WaterBuilder(EffectBuilder):
         producing faster, stronger ripples.
         """
         level = clamp_level(int(config.options.get("level", 1)))
-        return LayerRenderer(
+        return Effect(
             name=name,
-            layer=ScrollLayer(
-                FlameLayer(
-                    spark_count=level,
-                    resolution=config.resolution,
-                    heat_rate=level_lerp(level, 0.2, 0.29),
-                    extra_cool_rate=0.0,
-                    spread=0.2,
+            pixels=LayerRenderer(
+                layer=ScrollLayer(
+                    FlameLayer(
+                        spark_count=level,
+                        resolution=config.resolution,
+                        heat_rate=level_lerp(level, 0.2, 0.29),
+                        extra_cool_rate=0.0,
+                        spread=0.2,
+                    ),
+                    PhaseScroll(
+                        speed=level_lerp(level, 0.05, 0.14),
+                        min_phase=3.0,
+                        max_phase=5.0,
+                    ),
                 ),
-                PhaseScroll(
-                    speed=level_lerp(level, 0.05, 0.14),
-                    min_phase=3.0,
-                    max_phase=5.0,
-                ),
+                palette=PaletteLUT256(_water_palette),
             ),
-            palette=PaletteLUT256(_water_palette),
         )
 
 

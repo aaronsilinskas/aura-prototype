@@ -1159,16 +1159,10 @@ def test_effect_with_renders_pixels_false_skips_buffer_allocation(pack_env) -> N
         "nopix",
         {
             "event": (
-                "from effects.effect import Effect, PixelBuffer, EffectConfig\n"
+                "from effects.effect import Effect, EffectConfig\n"
                 "from engine.effects.manager import EffectBuilder\n"
-                "class _NoPixRenderer(Effect):\n"
-                "    renders_pixels = False\n"
-                "    @property\n"
-                "    def name(self): return 'event'\n"
-                "    def update(self, elapsed): pass\n"
-                "    def render(self, output): pass\n"
                 "class _Builder(EffectBuilder):\n"
-                "    def __call__(self, name, config): return _NoPixRenderer()\n"
+                "    def __call__(self, name, config): return Effect(name=name)\n"
                 "BUILD = _Builder()\n"
             )
         },
@@ -1190,16 +1184,10 @@ def test_effect_with_renders_pixels_false_skips_update_pixels_but_calls_flush(pa
         "nopix",
         {
             "event": (
-                "from effects.effect import Effect, PixelBuffer, EffectConfig\n"
+                "from effects.effect import Effect, EffectConfig\n"
                 "from engine.effects.manager import EffectBuilder\n"
-                "class _NoPixRenderer(Effect):\n"
-                "    renders_pixels = False\n"
-                "    @property\n"
-                "    def name(self): return 'event'\n"
-                "    def update(self, elapsed): pass\n"
-                "    def render(self, output): pass\n"
                 "class _Builder(EffectBuilder):\n"
-                "    def __call__(self, name, config): return _NoPixRenderer()\n"
+                "    def __call__(self, name, config): return Effect(name=name)\n"
                 "BUILD = _Builder()\n"
             )
         },

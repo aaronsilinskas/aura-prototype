@@ -45,12 +45,14 @@ class GravityBuilder(EffectBuilder):
             fade_in_rate=star_fade_in_rate,
             fade_out_rate=star_fade_out_rate,
         )
-        return AddColorsRenderer(
-            name,
-            [
-                (nebula, PaletteLUT256(_GRAVITY_PALETTE)),
-                (sparkles, PaletteLUT256(_GRAYSCALE_PALETTE)),
-            ],
+        return Effect(
+            name=name,
+            pixels=AddColorsRenderer(
+                [
+                    (nebula, PaletteLUT256(_GRAVITY_PALETTE)),
+                    (sparkles, PaletteLUT256(_GRAYSCALE_PALETTE)),
+                ],
+            ),
         )
 
 

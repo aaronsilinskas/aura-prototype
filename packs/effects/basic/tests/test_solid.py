@@ -20,11 +20,8 @@ def _render(pixel_count: int = 4, color: int | None = None, brightness: float | 
     config = _config(color, brightness)
     effect = BUILD("basic.solid", config)
     buf = PixelBuffer(pixel_count)
-    effect.render(buf)
+    effect.pixels.render(buf)
     return list(buf)
-
-
-# --- SolidBuilder ---
 
 
 def test_solid_build_returns_effect_builder_instance() -> None:
@@ -83,7 +80,7 @@ def test_solid_no_color_option_defaults_to_white() -> None:
     config = EffectConfig(resolution=16)
     effect = BUILD("basic.solid", config)
     buf = PixelBuffer(4)
-    effect.render(buf)
+    effect.pixels.render(buf)
     assert all(p == 0xFFFFFF for p in buf)
 
 

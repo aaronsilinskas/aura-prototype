@@ -88,7 +88,7 @@ def test_first_tick_rgb_idle_effects_have_level_1_in_options(spy):
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
-    for scope, name, options in spy.set_effect_calls:
+    for _scope, name, options in spy.set_effect_calls:
         assert options.get("level") == 1, f"{name} expected level=1, got options={options}"
 
 
@@ -244,7 +244,9 @@ def test_button_a_in_rgb_mode_passes_new_level_to_element_effects(spy):
     engine.update(state)
 
     for _scope, _name, options in spy.set_effect_calls:
-        assert options.get("level") == 2, f"expected level=2 after first A press, got options={options}"
+        assert options.get("level") == 2, (
+            f"expected level=2 after first A press, got options={options}"
+        )
 
 
 def test_button_a_in_rgb_mode_wraps_level_passes_level_1_to_effects(spy):

@@ -25,7 +25,7 @@ class _ConstantLayer:
 def test_add_colors_renderer_with_one_layer_matches_layer_renderer_output() -> None:
     palette = PaletteLUT256(_BLACK_TO_WHITE)
     layer = _ConstantLayer(0.5)
-    renderer = AddColorsRenderer("test", [(layer, palette)])
+    renderer = AddColorsRenderer([(layer, palette)])
 
     output = PixelBuffer(4)
     renderer.render(output)
@@ -43,9 +43,9 @@ def test_add_colors_renderer_with_one_layer_matches_layer_renderer_output() -> N
 def test_add_colors_renderer_two_layers_are_brighter_than_one() -> None:
     palette = PaletteLUT256(_BLACK_TO_WHITE)
     renderer_two = AddColorsRenderer(
-        "two", [(_ConstantLayer(0.5), palette), (_ConstantLayer(0.5), palette)]
+        [(_ConstantLayer(0.5), palette), (_ConstantLayer(0.5), palette)]
     )
-    renderer_one = AddColorsRenderer("one", [(_ConstantLayer(0.5), palette)])
+    renderer_one = AddColorsRenderer([(_ConstantLayer(0.5), palette)])
 
     out_two = PixelBuffer(4)
     out_one = PixelBuffer(4)
@@ -61,7 +61,6 @@ def test_add_colors_renderer_blends_channels_additively_without_overflow() -> No
     # Two layers both at 1.0 → result should be (200, 100, 50)
     dim_red_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 100, 50, 25]))
     renderer = AddColorsRenderer(
-        "test",
         [(_ConstantLayer(1.0), dim_red_palette), (_ConstantLayer(1.0), dim_red_palette)],
     )
 
@@ -81,7 +80,6 @@ def test_add_colors_renderer_clamps_channels_at_255() -> None:
     # clamped to (255,255,255)
     bright_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 200, 200, 200]))
     renderer = AddColorsRenderer(
-        "test",
         [(_ConstantLayer(1.0), bright_palette), (_ConstantLayer(1.0), bright_palette)],
     )
 
@@ -100,7 +98,7 @@ def test_add_colors_renderer_update_advances_all_layers() -> None:
     layer_a = _ConstantLayer(0.5)
     layer_b = _ConstantLayer(0.3)
     palette = PaletteLUT256(_BLACK_TO_WHITE)
-    renderer = AddColorsRenderer("test", [(layer_a, palette), (layer_b, palette)])
+    renderer = AddColorsRenderer([(layer_a, palette), (layer_b, palette)])
 
     renderer.update(0.1)
 
