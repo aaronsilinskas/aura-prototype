@@ -3,6 +3,7 @@ import audiocore
 import audiomixer
 import board
 
+from effects.effect import Effect
 from engine.effects.manager import EffectOutput
 from engine.events import EffectEvent
 from engine.packs import PackRegistry
@@ -50,7 +51,7 @@ class AudioEffectOutput(EffectOutput):
         self._once_verb: str | None = None
 
     def handle_event(
-        self, event: EffectEvent, scope_keys: frozenset[str], receipt: EffectReceipt
+        self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
     ) -> None:
         # All verbs: stop the loop on 'stop'
         if event.verb == "stop" and receipt is self._loop_receipt:

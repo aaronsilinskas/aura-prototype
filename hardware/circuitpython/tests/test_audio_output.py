@@ -56,7 +56,7 @@ def test_verb_event_plays_named_wav_on_voice_1(tmp_path) -> None:
     event = EffectEvent("mygame", "shield", "alert")
     receipt = _make_receipt()
 
-    output.handle_event(event, frozenset({"personal"}), receipt)
+    output.handle_event(event, frozenset({"personal"}), MagicMock(), receipt)
 
     registry.sound_path.assert_called_once_with(event)
     output._mixer.voice[1].stop.assert_called_once()
@@ -75,7 +75,7 @@ def test_start_verb_plays_oneshot_on_voice_1(tmp_path) -> None:
     event = EffectEvent("mygame", "sting", "start")
     receipt = _make_receipt()
 
-    output.handle_event(event, frozenset({"personal"}), receipt)
+    output.handle_event(event, frozenset({"personal"}), MagicMock(), receipt)
 
     registry.sound_path.assert_called_once_with(event)
     output._mixer.voice[1].play.assert_called()
@@ -94,7 +94,7 @@ def test_start_verb_with_ambient_scope_plays_oneshot_not_loop(tmp_path) -> None:
     event = EffectEvent("mygame", "music", "start")
     receipt = _make_receipt()
 
-    output.handle_event(event, frozenset({"ambient"}), receipt)
+    output.handle_event(event, frozenset({"ambient"}), MagicMock(), receipt)
 
     output._mixer.voice[1].play.assert_called()
     output._mixer.voice[0].play.assert_not_called()
@@ -119,7 +119,7 @@ def test_verb_event_replaces_current_voice1_oneshot(tmp_path) -> None:
 
     event = EffectEvent("mygame", "shield", "boom")
     receipt = _make_receipt()
-    output.handle_event(event, frozenset({"personal"}), receipt)
+    output.handle_event(event, frozenset({"personal"}), MagicMock(), receipt)
 
     output._mixer.voice[1].stop.assert_called()
     old_file.close.assert_called()
@@ -147,7 +147,7 @@ def test_peak_event_replacing_current_oneshot_does_not_stop_pixel_effect_receipt
 
     event = EffectEvent("mygame", "pulse", "peak")
     receipt = _make_receipt()
-    output.handle_event(event, frozenset({"personal"}), receipt)
+    output.handle_event(event, frozenset({"personal"}), MagicMock(), receipt)
 
     output._mixer.voice[1].stop.assert_called()
     old_file.close.assert_called()
@@ -170,7 +170,7 @@ def test_verb_event_silently_ignored_when_no_sound_path() -> None:
     receipt = _make_receipt()
 
     # Should not raise
-    output.handle_event(event, frozenset({"personal"}), receipt)
+    output.handle_event(event, frozenset({"personal"}), MagicMock(), receipt)
 
     output._mixer.voice[1].stop.assert_not_called()
     output._mixer.voice[1].play.assert_not_called()
@@ -186,7 +186,7 @@ def test_verb_event_silently_ignored_on_oserror(tmp_path) -> None:
     receipt = _make_receipt()
 
     # Should not raise even though the file does not exist
-    output.handle_event(event, frozenset({"personal"}), receipt)
+    output.handle_event(event, frozenset({"personal"}), MagicMock(), receipt)
 
     output._mixer.voice[1].play.assert_not_called()
 
@@ -201,7 +201,7 @@ def test_stop_verb_silently_ignored_when_no_sound_path() -> None:
     output._loop_receipt = loop_receipt
 
     event = EffectEvent("mygame", "music", "stop")
-    output.handle_event(event, frozenset({"ambient"}), loop_receipt)
+    output.handle_event(event, frozenset({"ambient"}), MagicMock(), loop_receipt)
 
     output._mixer.voice[0].stop.assert_called()
     output._mixer.voice[1].play.assert_not_called()
@@ -223,7 +223,7 @@ def test_stop_verb_stops_voice_0_loop() -> None:
     output._loop_receipt = loop_receipt
 
     event = EffectEvent("mygame", "music", "stop")
-    output.handle_event(event, frozenset({"ambient"}), loop_receipt)
+    output.handle_event(event, frozenset({"ambient"}), MagicMock(), loop_receipt)
 
     output._mixer.voice[0].stop.assert_called()
 
@@ -240,7 +240,7 @@ def test_stop_verb_does_not_stop_voice_0_for_unrelated_receipt() -> None:
 
     event = EffectEvent("mygame", "music", "stop")
     other_receipt = _make_receipt()
-    output.handle_event(event, frozenset({"ambient"}), other_receipt)
+    output.handle_event(event, frozenset({"ambient"}), MagicMock(), other_receipt)
 
     output._mixer.voice[0].stop.assert_not_called()
 
