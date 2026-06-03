@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from effects.render import EffectConfig
+from effects.effect import EffectConfig
 from engine.effects.manager import EffectBuilder
 from engine.engine import GameEngine, GameRule
 from engine.events import EffectEvent

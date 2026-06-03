@@ -5,7 +5,7 @@ import termios
 import time
 import tty
 
-from effects.render import PixelBuffer
+from effects.effect import PixelBuffer
 from engine.effects.manager import EffectManager, EffectOutput
 from engine.engine import GameEngine, GameRule
 from engine.events import Event

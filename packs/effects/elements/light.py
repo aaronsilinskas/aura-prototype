@@ -1,7 +1,7 @@
+from effects.effect import Effect, EffectConfig
 from effects.layers.flame_layer import FlameLayer
 from effects.layers.renderer import LayerRenderer
 from effects.palette import PaletteLUT256
-from effects.render import Effect, EffectConfig
 from engine.effects.manager import EffectBuilder
 
 # fmt: off

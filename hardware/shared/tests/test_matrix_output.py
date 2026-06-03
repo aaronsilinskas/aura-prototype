@@ -1,6 +1,6 @@
 import pytest
 
-from effects.render import PixelBuffer
+from effects.effect import PixelBuffer
 from hardware.shared.matrix_output import MatrixEffectOutput
 
 # ---------------------------------------------------------------------------

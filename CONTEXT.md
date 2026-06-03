@@ -3,7 +3,7 @@
 ## Glossary
 
 ### Effect
-A base class in `effects/render.py` that subclasses override to drive all visual simulation state directly. Subclasses implement `name`, `update(timer)`, and `render(output)`. All ten element effects live in `packs/effects/elements/` and extend `Effect` using the layer helpers in `effects/layers/`. Registered under the `elements.*` namespace via `ElementBuilder`. Class attribute `renders_pixels: bool = True` — audio-only and vibration-only effects set this to `False`; `EffectManager` skips pixel buffer allocation and `render()` calls for such effects.
+A base class in `effects/effect.py` that subclasses override to drive all visual simulation state directly. Subclasses implement `name`, `update(timer)`, and `render(output)`. All ten element effects live in `packs/effects/elements/` and extend `Effect` using the layer helpers in `effects/layers/`. Registered under the `elements.*` namespace via `ElementBuilder`. Class attribute `renders_pixels: bool = True` — audio-only and vibration-only effects set this to `False`; `EffectManager` skips pixel buffer allocation and `render()` calls for such effects.
 _Avoid_: "step-based effect", "prototype renderer" (the cutover is complete — all effects use this direct approach); "EffectRenderer" (old name — renamed)
 
 ### Layer

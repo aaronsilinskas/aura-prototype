@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from effects.render import EffectConfig, PixelBuffer
+from effects.effect import EffectConfig, PixelBuffer
 
 
 def _config(options: dict | None = None, listeners: list | None = None) -> EffectConfig:

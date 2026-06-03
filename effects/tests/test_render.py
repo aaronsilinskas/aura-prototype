@@ -1,6 +1,6 @@
 import pytest
 
-from effects.render import Effect, EffectConfig, PixelBuffer
+from effects.effect import Effect, EffectConfig, PixelBuffer
 
 # ---------------------------------------------------------------------------
 # EffectConfig — level clamping

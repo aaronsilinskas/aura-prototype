@@ -1,4 +1,4 @@
-from effects.render import PixelBuffer
+from effects.effect import PixelBuffer
 from engine.effects.manager import EffectOutput
 
 

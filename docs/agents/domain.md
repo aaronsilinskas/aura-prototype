@@ -54,9 +54,9 @@ scripts/          Deploy and maintenance scripts
 
 | Type | Lives in | Role |
 |------|----------|------|
-| `EffectConfig` | `effects/render.py` | Level [1–10], resolution, options, listeners for one render pass |
-| `PixelBuffer` | `effects/render.py` | List-backed in-memory pixel buffer of packed RGB values |
-| `Effect` | `effects/render.py` | Base class for all effects; subclasses implement `name`, `update(elapsed)`, `render(output)` |
+| `EffectConfig` | `effects/effect.py` | Level [1–10], resolution, options, listeners for one render pass |
+| `PixelBuffer` | `effects/effect.py` | List-backed in-memory pixel buffer of packed RGB values |
+| `Effect` | `effects/effect.py` | Base class for all effects; subclasses implement `name`, `update(elapsed)`, `render(output)` |
 | `Layer` | `effects/layers/layer.py` | Base layer: `update(elapsed)` + `sample(position, pixel_count) -> float` |
 | `Scroll` | `effects/layers/scroll.py` | Scroll base: `update(elapsed)` + `apply(position) -> float` |
 | `LayerRenderer` | `effects/layers/renderer.py` | Single-layer `Effect` |

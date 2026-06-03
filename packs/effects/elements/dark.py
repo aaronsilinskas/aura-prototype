@@ -1,7 +1,7 @@
+from effects.effect import Effect, EffectConfig
 from effects.layers.renderer import LayerRenderer
 from effects.layers.sparkle_layer import SparkleLayer
 from effects.palette import PaletteLUT256
-from effects.render import Effect, EffectConfig
 from effects.value import ValueGenerator as VG
 from engine.effects.manager import EffectBuilder
 

@@ -1,9 +1,9 @@
 import random
 
+from effects.effect import Effect, EffectConfig
 from effects.layers.add_samples_renderer import AddSamplesRenderer
 from effects.layers.layer import Layer
 from effects.palette import PaletteLUT256
-from effects.render import Effect, EffectConfig
 from effects.shape import Shape
 from effects.value import lerp
 from engine.effects.manager import EffectBuilder

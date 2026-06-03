@@ -42,11 +42,10 @@ import time
 
 import board
 import neopixel
-from effects.effect import EffectState, EffectTimer
 from packs.effects.elements.registry import build_element_renderer, list_element_names
 
+from effects.effect import EffectConfig, EffectState, EffectTimer, PixelBuffer
 from effects.performance import PerformanceTracker
-from effects.render import EffectConfig, PixelBuffer
 
 NUM_LEDS = 12
 PIXELS_PIN = board.D5

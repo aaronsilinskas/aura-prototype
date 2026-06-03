@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from effects.effect import EffectConfig, PixelBuffer
 from effects.layers.add_samples_renderer import AddSamplesRenderer
 from effects.palette import PaletteLUT256
-from effects.render import EffectConfig, PixelBuffer
 from effects.shape import Shape
 from packs.effects.elements.lightning import (
     _LIGHTNING_PALETTE,

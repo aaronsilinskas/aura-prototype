@@ -1,6 +1,6 @@
+from effects.effect import Effect, EffectConfig, PixelBuffer
 from effects.layers.pulse_layer import PulseLayer
 from effects.palette import Palette
-from effects.render import Effect, EffectConfig, PixelBuffer
 
 
 class PulseEffect(Effect):

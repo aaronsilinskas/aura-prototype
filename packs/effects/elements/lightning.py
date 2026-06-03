@@ -1,8 +1,8 @@
 import random
 
+from effects.effect import Effect, EffectConfig, PixelBuffer
 from effects.layers.layer import Layer
 from effects.palette import Palette, PaletteLUT256
-from effects.render import Effect, EffectConfig, PixelBuffer
 from effects.shape import EffectShapeFunc, Shape
 from engine.effects.manager import EffectBuilder
 

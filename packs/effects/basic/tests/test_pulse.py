@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from effects.render import EffectConfig, PixelBuffer
+from effects.effect import EffectConfig, PixelBuffer
 
 
 def _config(level: int = 10, options: dict | None = None) -> EffectConfig:

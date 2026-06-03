@@ -1,4 +1,4 @@
-from effects.render import Effect, EffectConfig, PixelBuffer
+from effects.effect import Effect, EffectConfig, PixelBuffer
 from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.state import EffectControls, EffectReceipt, ScopeValue

@@ -9,7 +9,7 @@ sound path lookup.
 
 from __future__ import annotations
 
-from effects.render import EffectConfig
+from effects.effect import EffectConfig
 
 
 def _config() -> EffectConfig:

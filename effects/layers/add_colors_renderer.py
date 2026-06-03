@@ -1,6 +1,6 @@
+from effects.effect import Effect, PixelBuffer
 from effects.layers.layer import Layer
 from effects.palette import Palette
-from effects.render import Effect, PixelBuffer
 
 
 class AddColorsRenderer(Effect):
