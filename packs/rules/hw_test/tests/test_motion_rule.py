@@ -7,16 +7,7 @@ import pytest
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.state import GameState, SceneControls, Scope
-from packs.rules.hw_test.motion_rule import (
-    ACCEL_MAX,
-    X_NEG_COLOR,
-    X_POS_COLOR,
-    Y_NEG_COLOR,
-    Y_POS_COLOR,
-    Z_NEG_COLOR,
-    Z_POS_COLOR,
-    HwTestMotionRule,
-)
+from packs.rules.hw_test.motion_rule import ACCEL_MAX, HwTestMotionRule
 from packs.rules.hw_test.tests.helpers import SpyEffectControls
 
 # ---------------------------------------------------------------------------
@@ -82,10 +73,8 @@ def test_x_axis_max_positive_sets_brightness_1_0_red_on_personal(spy):
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
     assert len(x_calls) == 1
-    _, name, options = x_calls[0]
-    assert name == "basic.solid"
-    assert options == {"color": X_POS_COLOR, "brightness": 1.0}
-    assert X_POS_COLOR == 0xFF0000
+    _, _name, options = x_calls[0]
+    assert options == {"color": 0xFF0000, "brightness": 1.0}
 
 
 def test_x_axis_max_negative_sets_brightness_1_0_cyan_on_personal(spy):
@@ -95,8 +84,7 @@ def test_x_axis_max_negative_sets_brightness_1_0_cyan_on_personal(spy):
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
     assert len(x_calls) == 1
     _, _name, options = x_calls[0]
-    assert options == {"color": X_NEG_COLOR, "brightness": 1.0}
-    assert X_NEG_COLOR == 0x00FFFF
+    assert options == {"color": 0x00FFFF, "brightness": 1.0}
 
 
 # ---------------------------------------------------------------------------
@@ -110,10 +98,8 @@ def test_y_axis_max_positive_sets_brightness_1_0_green_on_directional(spy):
 
     y_calls = [c for c in spy.set_effect_calls if c[0] == Scope.DIRECTIONAL]
     assert len(y_calls) == 1
-    _, name, options = y_calls[0]
-    assert name == "basic.solid"
-    assert options == {"color": Y_POS_COLOR, "brightness": 1.0}
-    assert Y_POS_COLOR == 0x00FF00
+    _, _name, options = y_calls[0]
+    assert options == {"color": 0x00FF00, "brightness": 1.0}
 
 
 def test_y_axis_max_negative_sets_brightness_1_0_magenta_on_directional(spy):
@@ -123,8 +109,7 @@ def test_y_axis_max_negative_sets_brightness_1_0_magenta_on_directional(spy):
     y_calls = [c for c in spy.set_effect_calls if c[0] == Scope.DIRECTIONAL]
     assert len(y_calls) == 1
     _, _name, options = y_calls[0]
-    assert options == {"color": Y_NEG_COLOR, "brightness": 1.0}
-    assert Y_NEG_COLOR == 0xFF00FF
+    assert options == {"color": 0xFF00FF, "brightness": 1.0}
 
 
 # ---------------------------------------------------------------------------
@@ -138,10 +123,8 @@ def test_z_axis_max_positive_sets_brightness_1_0_blue_on_global_all(spy):
 
     z_calls = [c for c in spy.set_effect_calls if c[0] == Scope.Global.ALL]
     assert len(z_calls) == 1
-    _, name, options = z_calls[0]
-    assert name == "basic.solid"
-    assert options == {"color": Z_POS_COLOR, "brightness": 1.0}
-    assert Z_POS_COLOR == 0x0000FF
+    _, _name, options = z_calls[0]
+    assert options == {"color": 0x0000FF, "brightness": 1.0}
 
 
 def test_z_axis_max_negative_sets_brightness_1_0_yellow_on_global_all(spy):
@@ -151,8 +134,41 @@ def test_z_axis_max_negative_sets_brightness_1_0_yellow_on_global_all(spy):
     z_calls = [c for c in spy.set_effect_calls if c[0] == Scope.Global.ALL]
     assert len(z_calls) == 1
     _, _name, options = z_calls[0]
-    assert options == {"color": Z_NEG_COLOR, "brightness": 1.0}
-    assert Z_NEG_COLOR == 0xFFFF00
+    assert options == {"color": 0xFFFF00, "brightness": 1.0}
+
+
+# ---------------------------------------------------------------------------
+# Effect name
+# ---------------------------------------------------------------------------
+
+
+def test_motion_rule_uses_basic_solid_effect_for_all_axes(spy):
+    state, engine = _make_state(spy, hw_mode=1)
+    _fire(state, engine, AccelerationData(x=ACCEL_MAX, y=ACCEL_MAX, z=ACCEL_MAX))
+
+    names = [c[1] for c in spy.set_effect_calls]
+    assert all(n == "basic.solid" for n in names)
+
+
+# ---------------------------------------------------------------------------
+# Brightness scales with acceleration magnitude
+# ---------------------------------------------------------------------------
+
+
+def test_x_axis_half_max_acceleration_sets_brightness_0_5(spy):
+    state, engine = _make_state(spy, hw_mode=1)
+    _fire(state, engine, AccelerationData(x=ACCEL_MAX / 2))
+
+    x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
+    assert x_calls[0][2]["brightness"] == pytest.approx(0.5)
+
+
+def test_brightness_clamps_to_1_0_when_acceleration_exceeds_max(spy):
+    state, engine = _make_state(spy, hw_mode=1)
+    _fire(state, engine, AccelerationData(x=ACCEL_MAX * 2))
+
+    x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
+    assert x_calls[0][2]["brightness"] == pytest.approx(1.0)
 
 
 # ---------------------------------------------------------------------------

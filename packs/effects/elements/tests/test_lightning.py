@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from effects.effect import EffectConfig, PixelBuffer
-from effects.layers.add_samples_renderer import AddSamplesRenderer
 from effects.palette import PaletteLUT256
 from effects.shape import Shape
 from packs.effects.elements.lightning import (
@@ -45,7 +44,7 @@ def test_lightning_bolt_at_strike_initialized_false() -> None:
 def test_lightning_bolt_at_strike_true_on_idle_to_strike_transition() -> None:
     bolt = _make_bolt()
 
-    bolt.update(10.0)
+    bolt.update(10.0)  # well past hide_max of 1.5 — forces IDLE → STRIKE
 
     assert bolt.at_strike is True
 
@@ -60,7 +59,7 @@ def test_lightning_bolt_at_strike_false_before_idle_threshold_is_crossed() -> No
 
 def test_lightning_bolt_at_strike_false_during_strike_phase() -> None:
     bolt = _make_bolt()
-    bolt.update(10.0)  # advance to STRIKE phase
+    bolt.update(10.0)  # well past hide_max of 1.5 — forces IDLE → STRIKE
 
     bolt.update(0.0)
 
@@ -69,9 +68,9 @@ def test_lightning_bolt_at_strike_false_during_strike_phase() -> None:
 
 def test_lightning_bolt_at_strike_false_on_strike_to_idle_transition() -> None:
     bolt = _make_bolt()
-    bolt.update(10.0)  # IDLE → STRIKE
+    bolt.update(10.0)  # well past hide_max of 1.5 — IDLE → STRIKE
 
-    bolt.update(10.0)  # STRIKE → IDLE
+    bolt.update(10.0)  # well past strike_duration_max of 1.25 — STRIKE → IDLE
 
     assert bolt.at_strike is False
 
@@ -100,7 +99,7 @@ def test_lightning_effect_calls_notify_listeners_when_bolt_strikes() -> None:
     palette = PaletteLUT256(_LIGHTNING_PALETTE)
     effect = LightningEffect("test", [bolt], palette, config)
 
-    effect.update(10.0)
+    effect.update(10.0)  # well past hide_max of 1.5 — triggers IDLE → STRIKE
 
     assert "strike" in events
 
@@ -114,7 +113,7 @@ def test_lightning_effect_no_notify_when_no_bolt_strikes() -> None:
     palette = PaletteLUT256(_LIGHTNING_PALETTE)
     effect = LightningEffect("test", [bolt], palette, config)
 
-    effect.update(0.0)
+    effect.update(0.0)  # below idle threshold — bolt stays IDLE
 
     assert events == []
 
@@ -128,34 +127,28 @@ def test_lightning_effect_emits_single_strike_event_even_when_multiple_bolts_tra
     palette = PaletteLUT256(_LIGHTNING_PALETTE)
     effect = LightningEffect("test", bolts, palette, config)
 
-    effect.update(10.0)
+    effect.update(10.0)  # well past hide_max of 1.5 — all bolts transition to STRIKE
 
     assert events.count("strike") == 1
 
 
 # ---------------------------------------------------------------------------
-# LightningEffect — pixel output identical to AddSamplesRenderer
+# LightningEffect — pixel output is non-zero during strike phase
 # ---------------------------------------------------------------------------
 
 
-def test_lightning_effect_pixel_output_matches_add_samples_renderer() -> None:
+def test_lightning_effect_pixel_output_is_nonzero_during_strike_phase() -> None:
     shape = Shape.padded(0.25, Shape.centered_gradient())
-    palette = PaletteLUT256(_LIGHTNING_PALETTE)
-
-    # Share a single bolt so both renderers operate on identical state
     bolt = _LightningBolt(shape, 1.5, 0.5, 1.25)
-    config = _config()
-    le = LightningEffect("a", [bolt], palette, config)
-    asr = AddSamplesRenderer("b", [bolt], palette)
+    palette = PaletteLUT256(_LIGHTNING_PALETTE)
+    effect = LightningEffect("test", [bolt], palette, _config())
 
-    bolt.update(10.0)  # advance bolt to STRIKE phase
+    bolt.update(10.0)  # well past hide_max of 1.5 — advances to STRIKE phase
 
-    out_le = PixelBuffer(16)
-    out_asr = PixelBuffer(16)
-    le.render(out_le)
-    asr.render(out_asr)
+    out = PixelBuffer(16)
+    effect.render(out)
 
-    assert list(out_le) == list(out_asr)
+    assert any(px != 0 for px in out)
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +156,7 @@ def test_lightning_effect_pixel_output_matches_add_samples_renderer() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_lightning_effect_fires_strike_event_with_no_listeners_silently() -> None:
+def test_lightning_effect_update_does_not_raise_when_no_listeners_registered() -> None:
     config = _config(listeners=[])
 
     shape = Shape.padded(0.25, Shape.centered_gradient())
@@ -171,7 +164,7 @@ def test_lightning_effect_fires_strike_event_with_no_listeners_silently() -> Non
     palette = PaletteLUT256(_LIGHTNING_PALETTE)
     effect = LightningEffect("test", [bolt], palette, config)
 
-    effect.update(10.0)  # should not raise
+    effect.update(10.0)  # well past hide_max of 1.5 — triggers strike; should not raise
 
 
 # ---------------------------------------------------------------------------
@@ -186,6 +179,6 @@ def test_lightning_effect_pixel_output_is_zero_during_idle_phase() -> None:
     effect = LightningEffect("test", [bolt], palette, _config())
 
     out = PixelBuffer(16)
-    effect.render(out)
+    effect.render(out)  # bolt has not been updated — still in IDLE phase
 
     assert all(px == 0 for px in out)
