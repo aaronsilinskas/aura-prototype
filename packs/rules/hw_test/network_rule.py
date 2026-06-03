@@ -22,7 +22,7 @@ class HwTestNetworkRule(GameRule):
         if state.get("hw_mode", None) != 2:
             return
         receipt = state.effect_controls.set_effect(
-            Scope.DIRECTIONAL, "basic.solid", 9, {"color": 0xFFFFFF}
+            Scope.DIRECTIONAL, "basic.solid", {"color": 0xFFFFFF}
         )
         state.set("ir_flash_receipt", receipt)
         state.set("ir_flash_start", state.total)
@@ -31,7 +31,7 @@ class HwTestNetworkRule(GameRule):
         if state.get("hw_mode", None) != 3:
             return
         receipt = state.effect_controls.set_effect(
-            Scope.Global.ALL, "basic.solid", 9, {"color": 0xFFFFFF}
+            Scope.Global.ALL, "basic.solid", {"color": 0xFFFFFF}
         )
         state.set("radio_flash_receipt", receipt)
         state.set("radio_flash_start", state.total)

@@ -33,7 +33,7 @@ class PulseBuilder(EffectBuilder):
         if cycle_total == 0.0:
             raise ValueError("At least one pulse phase duration must be non-zero")
 
-        brightness = config.level / 10.0
+        brightness = config.options.get("level", 10) / 10.0
         sr = int(((start_color_raw >> 16) & 0xFF) * brightness)
         sg = int(((start_color_raw >> 8) & 0xFF) * brightness)
         sb = int((start_color_raw & 0xFF) * brightness)

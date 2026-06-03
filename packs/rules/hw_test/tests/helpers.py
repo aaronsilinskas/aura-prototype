@@ -12,20 +12,16 @@ class SpyEffectControls(EffectControls):
     """
 
     def __init__(self) -> None:
-        self.set_effect_calls: list[tuple[ScopeValue, str, int, dict]] = []
+        self.set_effect_calls: list[tuple[ScopeValue, str, dict]] = []
         self.stop_effect_calls: list[ScopeValue] = []
-        self.add_effect_calls: list[tuple[ScopeValue, str, int, dict]] = []
+        self.add_effect_calls: list[tuple[ScopeValue, str, dict]] = []
 
-    def set_effect(
-        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
-    ) -> EffectReceipt:
-        self.set_effect_calls.append((scope, name, level, options))
+    def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
+        self.set_effect_calls.append((scope, name, options))
         return EffectReceipt(_STUB_RECEIPT_ID)
 
-    def add_effect(
-        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
-    ) -> EffectReceipt:
-        self.add_effect_calls.append((scope, name, level, options))
+    def add_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
+        self.add_effect_calls.append((scope, name, options))
         return EffectReceipt(_STUB_RECEIPT_ID)
 
     def stop_effect(self, scope: ScopeValue) -> None:

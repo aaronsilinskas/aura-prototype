@@ -1,6 +1,7 @@
 from effects.effect import Effect, EffectConfig
 from effects.layers.flame_layer import FlameLayer
 from effects.layers.renderer import LayerRenderer
+from effects.level import level_lerp
 from effects.palette import PaletteLUT256
 from engine.effects.manager import EffectBuilder
 
@@ -20,14 +21,15 @@ class EarthBuilder(EffectBuilder):
         Level: more heat sparks with a narrower spread, concentrating the smolder
         into a tighter, more active column.
         """
+        level = config.options.get("level", 10)
         return LayerRenderer(
             name=name,
             layer=FlameLayer(
-                spark_count=config.level,
+                spark_count=config.options.get("level", 10),
                 resolution=config.resolution,
                 heat_rate=0.2,
                 extra_cool_rate=0.0,
-                spread=config.level_lerp(0.7, 0.4),
+                spread=level_lerp(level, 0.7, 0.4),
             ),
             palette=PaletteLUT256(_earth_palette),
         )

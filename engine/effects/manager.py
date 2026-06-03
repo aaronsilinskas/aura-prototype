@@ -91,8 +91,7 @@ class EffectBuilder:
 
         Args:
             name: The registered effect name (e.g. ``"color.flash"``).
-            config: Runtime configuration for the render pass. ``config.level``
-                carries the universal intensity in ``[1, 10]``; ``config.options``
+            config: Runtime configuration for the render pass. ``config.options``
                 carries any effect-specific parameters (e.g. duration, color).
                 ``config.resolution`` describes the output hardware.
 
@@ -180,7 +179,6 @@ class EffectManager(EffectControls):
         self,
         scope_key_set: set[str],
         name: str,
-        level: int,
         options: dict[str, object],
     ) -> "EffectManager._EffectEntry":
         """Construct an Effect for the named effect.
@@ -226,9 +224,7 @@ class EffectManager(EffectControls):
                 EffectEvent(pack_name, effect_name, event_name), set(entry.keys), receipt
             )
 
-        config = EffectConfig(
-            level=level, resolution=resolution, options=options, listeners=[scoped_listener]
-        )
+        config = EffectConfig(resolution=resolution, options=options, listeners=[scoped_listener])
         entry.effect = builder(effect_name, config)
 
         if entry.effect.renders_pixels:
@@ -248,11 +244,10 @@ class EffectManager(EffectControls):
         scope: ScopeValue,
         scope_key_set: set[str],
         name: str,
-        level: int,
         options: dict[str, object],
     ) -> EffectReceipt:
         """Build, append, and return the receipt for a new effect entry."""
-        entry = self._build_effect(scope_key_set, name, level, options)
+        entry = self._build_effect(scope_key_set, name, options)
         self._effects.append(entry)
         return entry.receipt
 
@@ -318,27 +313,23 @@ class EffectManager(EffectControls):
         self._stop_entries(stopped, new_effects)
         self._effects = new_effects
 
-    def set_effect(
-        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
-    ) -> EffectReceipt:
+    def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
         """Replace any running effect(s) in scope and start this one."""
         scope_key_set = set(scope.keys)
         self._remove_effects_in_scope(scope_key_set)
-        receipt = self._append_new_effect(scope, scope_key_set, name, level, options)
+        receipt = self._append_new_effect(scope, scope_key_set, name, options)
         pack_name, effect_name = name.split(".", 1)
         self._notify_listeners(EffectEvent(pack_name, effect_name, "start"), scope_key_set, receipt)
         return receipt
 
-    def add_effect(
-        self, scope: ScopeValue, name: str, level: int, options: dict[str, object]
-    ) -> EffectReceipt:
+    def add_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
         """Layer this effect alongside any running effects in scope.
 
         If nothing is running in scope, behaves like set_effect.
         The driver determines how layered effects are composited (e.g. splitting an LED strip).
         """
         scope_key_set = set(scope.keys)
-        receipt = self._append_new_effect(scope, scope_key_set, name, level, options)
+        receipt = self._append_new_effect(scope, scope_key_set, name, options)
         pack_name, effect_name = name.split(".", 1)
         self._notify_listeners(EffectEvent(pack_name, effect_name, "start"), scope_key_set, receipt)
         return receipt

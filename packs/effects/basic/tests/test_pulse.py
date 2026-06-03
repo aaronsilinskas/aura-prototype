@@ -8,7 +8,9 @@ from effects.effect import EffectConfig, PixelBuffer
 
 
 def _config(level: int = 10, options: dict | None = None) -> EffectConfig:
-    return EffectConfig(level=level, resolution=16, options=options or {})
+    opts = dict(options) if options else {}
+    opts.setdefault("level", level)
+    return EffectConfig(resolution=16, options=opts)
 
 
 def _build(level: int = 10, options: dict | None = None):
@@ -129,7 +131,7 @@ def test_pulse_level_scaling_applied_to_end_color() -> None:
 def test_pulse_default_end_color_appears_at_on_phase() -> None:
     from packs.effects.basic.pulse import BUILD
 
-    effect = BUILD("basic.pulse", EffectConfig(level=10, resolution=16))
+    effect = BUILD("basic.pulse", EffectConfig(resolution=16))
     effect.update(0.75)  # past brighten(0.5) + into on(0.5)
     pixels = _render(effect)
     assert all(p == 0xFFFFFF for p in pixels)

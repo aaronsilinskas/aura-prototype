@@ -25,27 +25,26 @@ _RGB_IDLE: Final = (
 
 def _enter_rgb(state: GameState) -> None:
     ec = state.effect_controls
-    level = 1
-    state.set("rgb_level", level)
+    state.set("rgb_level", 1)
     for scope, name, options in _RGB_IDLE:
-        ec.set_effect(scope, name, level, options)
+        ec.set_effect(scope, name, options)
 
 
 def _enter_imu(state: GameState) -> None:
     ec = state.effect_controls
-    ec.set_effect(Scope.PERSONAL, "basic.solid", 1, {"color": 0xFF0000})
-    ec.set_effect(Scope.DIRECTIONAL, "basic.solid", 1, {"color": 0x00FF00})
-    ec.set_effect(Scope.Global.ALL, "basic.solid", 1, {"color": 0x0000FF})
+    ec.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0xFF0000})
+    ec.set_effect(Scope.DIRECTIONAL, "basic.solid", {"color": 0x00FF00})
+    ec.set_effect(Scope.Global.ALL, "basic.solid", {"color": 0x0000FF})
 
 
 def _enter_ir(state: GameState) -> None:
     ec = state.effect_controls
-    ec.set_effect(Scope.ALL, "basic.solid", 3, {"color": 0xFFFFFF})
+    ec.set_effect(Scope.ALL, "basic.solid", {"color": 0xFFFFFF})
 
 
 def _enter_radio(state: GameState) -> None:
     ec = state.effect_controls
-    ec.set_effect(Scope.ALL, "basic.solid", 3, {"color": 0xFFFFFF})
+    ec.set_effect(Scope.ALL, "basic.solid", {"color": 0xFFFFFF})
 
 
 _MODE_ENTRY: Final = (_enter_rgb, _enter_imu, _enter_ir, _enter_radio)
@@ -92,7 +91,7 @@ class HwTestModeRule(GameRule):
             state.set("rgb_level", new_level)
             ec = state.effect_controls
             for scope, name, options in _RGB_IDLE:
-                ec.set_effect(scope, name, new_level, options)
+                ec.set_effect(scope, name, options)
         elif mode == 1:
             pass  # IMU mode: no-op
         elif mode == 2:
@@ -108,9 +107,7 @@ class HwTestModeRule(GameRule):
             receipt = state.pop("ir_flash_receipt", EffectReceipt)
             state.delete("ir_flash_start")
             receipt.stop()
-            state.effect_controls.set_effect(
-                Scope.DIRECTIONAL, "basic.solid", 3, {"color": 0xFFFFFF}
-            )
+            state.effect_controls.set_effect(Scope.DIRECTIONAL, "basic.solid", {"color": 0xFFFFFF})
 
         if (
             "radio_flash_start" in state
@@ -119,9 +116,7 @@ class HwTestModeRule(GameRule):
             receipt = state.pop("radio_flash_receipt", EffectReceipt)
             state.delete("radio_flash_start")
             receipt.stop()
-            state.effect_controls.set_effect(
-                Scope.Global.ALL, "basic.solid", 3, {"color": 0xFFFFFF}
-            )
+            state.effect_controls.set_effect(Scope.Global.ALL, "basic.solid", {"color": 0xFFFFFF})
 
 
 RULE = HwTestModeRule()

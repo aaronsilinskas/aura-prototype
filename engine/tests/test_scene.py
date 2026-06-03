@@ -390,12 +390,7 @@ def test_load_validates_rule_pack_version_before_any_lifecycle_callback(pack_env
         pack_env,
         "rules",
         "1.0",
-        {
-            "rule_a": (
-                "from engine.engine import GameRule\n"
-                "RULE = GameRule()\n"
-            )
-        },
+        {"rule_a": ("from engine.engine import GameRule\nRULE = GameRule()\n")},
     )
     effect_registry, rule_registry = _make_registries(str(pack_env))
     engine = _make_engine()
@@ -709,12 +704,7 @@ def test_load_dispatches_events_to_scene_rules_on_following_ticks(pack_env) -> N
         pack_env,
         "rules",
         "1.0",
-        {
-            "rule_a": (
-                "from engine.engine import GameRule\n"
-                "RULE = GameRule()\n"
-            )
-        },
+        {"rule_a": ("from engine.engine import GameRule\nRULE = GameRule()\n")},
     )
     effect_registry, rule_registry = _make_registries(str(pack_env))
     engine = _TrackingEngine(EffectControls())
@@ -748,12 +738,7 @@ def test_scene_rules_fire_before_pack_rules(pack_env) -> None:
         pack_env,
         "rules",
         "1.0",
-        {
-            "rule_a": (
-                "from engine.engine import GameRule\n"
-                "RULE = GameRule()\n"
-            )
-        },
+        {"rule_a": ("from engine.engine import GameRule\nRULE = GameRule()\n")},
     )
     effect_registry, rule_registry = _make_registries(str(pack_env))
     engine = _TrackingEngine(EffectControls())
@@ -869,12 +854,7 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_env
         pack_env,
         "rules",
         "1.0",
-        {
-            "rule_a": (
-                "from engine.engine import GameRule\n"
-                "RULE = GameRule()\n"
-            )
-        },
+        {"rule_a": ("from engine.engine import GameRule\nRULE = GameRule()\n")},
     )
     effect_registry, rule_registry = _make_registries(str(pack_env))
     engine = _TrackingEngine(EffectControls())
@@ -978,10 +958,7 @@ def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
 
 
 def test_rule_pack_items_all_receive_events_after_load(pack_env) -> None:
-    rule_content = (
-        "from engine.engine import GameRule\n"
-        "RULE = GameRule()\n"
-    )
+    rule_content = "from engine.engine import GameRule\nRULE = GameRule()\n"
     _make_rule_pack(
         pack_env,
         "rules",
@@ -1023,9 +1000,7 @@ def test_rule_pack_items_all_receive_events_after_load(pack_env) -> None:
 
 def test_rule_pack_items_loaded_in_alphabetical_order(pack_env) -> None:
     rule_template = (
-        "from engine.engine import GameRule\n"
-        "import engine.scene as _s\n"
-        "RULE = GameRule()\n"
+        "from engine.engine import GameRule\nimport engine.scene as _s\nRULE = GameRule()\n"
     )
     _make_rule_pack(
         pack_env,

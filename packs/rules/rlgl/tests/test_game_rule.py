@@ -157,12 +157,11 @@ def test_ready_shows_ready_effect_on_all_scopes(spy):
     assert ready_calls[0][0] is Scope.ALL
 
 
-def test_ready_shows_ready_effect_at_level_3(spy):
+def test_ready_shows_ready_effect(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
     ready_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.ready"]
     assert len(ready_calls) == 1
-    assert ready_calls[0][2] == 3
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +212,7 @@ def test_button_press_from_ready_shows_yellow_warning_on_all_scopes(spy):
 
     _tick(state, engine, timer, button_a=True, total=0.0)
 
-    yellow_calls = [c for c in spy.set_effect_calls if c[3].get("end_color") == 0xFFFF00]
+    yellow_calls = [c for c in spy.set_effect_calls if c[2].get("end_color") == 0xFFFF00]
     assert len(yellow_calls) == 1
     assert yellow_calls[0][0] is Scope.NON_AMBIENT
 
@@ -239,7 +238,7 @@ def test_red_warning_sting_uses_one_second_breathe_cycle(spy):
 
     sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
     assert len(sting_calls) == 1
-    opts = sting_calls[0][3]
+    opts = sting_calls[0][2]
     assert opts["start_color"] == 0x000000
     assert opts["brighten_duration"] == 0.3
     assert opts["on_duration"] == 0.4
@@ -281,7 +280,7 @@ def test_red_phase_transition_uses_solid_with_red_color(spy):
     solid_calls = [c for c in spy.set_effect_calls if c[1] == "basic.solid"]
     assert len(solid_calls) == 1
     assert solid_calls[0][0] is Scope.NON_AMBIENT
-    assert solid_calls[0][3]["color"] == 0xFF0000
+    assert solid_calls[0][2]["color"] == 0xFF0000
 
 
 # ---------------------------------------------------------------------------
@@ -398,7 +397,7 @@ def test_green_warning_transition_uses_warning_sting_with_yellow_end_color(spy):
     sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
     assert len(sting_calls) == 1
     assert sting_calls[0][0] is Scope.NON_AMBIENT
-    assert sting_calls[0][3]["end_color"] == 0xFFFF00
+    assert sting_calls[0][2]["end_color"] == 0xFFFF00
 
 
 def test_green_phase_transition_uses_solid_with_green_color(spy):
@@ -416,7 +415,7 @@ def test_green_phase_transition_uses_solid_with_green_color(spy):
     solid_calls = [c for c in spy.set_effect_calls if c[1] == "basic.solid"]
     assert len(solid_calls) == 1
     assert solid_calls[0][0] is Scope.NON_AMBIENT
-    assert solid_calls[0][3]["color"] == 0x00FF00
+    assert solid_calls[0][2]["color"] == 0x00FF00
 
 
 # ---------------------------------------------------------------------------
@@ -514,7 +513,7 @@ def test_game_over_shows_fire_effect_on_all_scopes(spy):
     assert fire_calls[0][0] is Scope.NON_AMBIENT
 
 
-def test_game_over_shows_fire_effect_at_level_10(spy):
+def test_game_over_shows_fire_effect(spy):
     state, engine, timer = _setup_red_phase(spy, grace=1.0)
     phase_start = state.get("rlgl_phase_start", 0.0)
     spy.set_effect_calls.clear()
@@ -523,7 +522,6 @@ def test_game_over_shows_fire_effect_at_level_10(spy):
 
     fire_calls = [c for c in spy.set_effect_calls if c[1] == "elements.fire"]
     assert len(fire_calls) == 1
-    assert fire_calls[0][2] == 10
 
 
 def test_game_over_transitions_to_ready_after_game_over_duration(spy):
@@ -555,7 +553,7 @@ def test_game_over_expiry_restores_ready_effect_on_all_scopes(spy):
     assert ready_calls[0][0] is Scope.ALL
 
 
-def test_game_over_expiry_restores_ready_effect_at_level_3(spy):
+def test_game_over_expiry_restores_ready_effect(spy):
     state, engine, timer = _setup_red_phase(
         spy, grace=1.0, initial_data={"rlgl_game_over_duration": 2.0}
     )
@@ -568,7 +566,6 @@ def test_game_over_expiry_restores_ready_effect_at_level_3(spy):
 
     ready_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.ready"]
     assert len(ready_calls) == 1
-    assert ready_calls[0][2] == 3
 
 
 # ---------------------------------------------------------------------------

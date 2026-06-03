@@ -1,6 +1,7 @@
 from effects.effect import Effect, EffectConfig
 from effects.layers.flame_layer import FlameLayer
 from effects.layers.renderer import LayerRenderer
+from effects.level import level_lerp
 from effects.palette import PaletteLUT256
 from engine.effects.manager import EffectBuilder
 
@@ -22,12 +23,13 @@ class FireBuilder(EffectBuilder):
         Level: more sparks and faster heat produce a taller, brighter, and more
         turbulent flame.
         """
+        level = config.options.get("level", 10)
         return LayerRenderer(
             name=name,
             layer=FlameLayer(
-                spark_count=config.level,
+                spark_count=config.options.get("level", 10),
                 resolution=config.resolution,
-                heat_rate=config.level_lerp(1.22, 1.4),
+                heat_rate=level_lerp(level, 1.22, 1.4),
                 extra_cool_rate=0.1,
                 spread=0.3,
             ),

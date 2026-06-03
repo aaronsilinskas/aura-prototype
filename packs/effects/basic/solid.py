@@ -36,7 +36,8 @@ class SolidBuilder(EffectBuilder):
 
     def __call__(self, name: str, config: EffectConfig) -> Solid:
         base_color = config.options.get("color", 0xFFFFFF)
-        brightness = config.level / 10.0
+        level = config.options.get("level", 10)
+        brightness = level / 10.0
         r = int(((base_color >> 16) & 0xFF) * brightness)
         g = int(((base_color >> 8) & 0xFF) * brightness)
         b = int((base_color & 0xFF) * brightness)
