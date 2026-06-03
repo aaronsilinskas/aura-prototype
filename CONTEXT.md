@@ -65,7 +65,8 @@ The mathematical detail level at which an effect generates its animation data. I
 _Avoid_: conflating resolution with pixel count
 
 ### EffectReceipt
-A handle returned when an effect is started. `stop()` marks the receipt as stopped — `EffectManager` removes the effect at the top of the next tick. `is_stopped() -> bool` lets any holder test whether the effect has ended. Deferred cleanup is reentrance-safe.
+A handle returned when an effect is started. `stop()` marks the receipt as stopped — `EffectManager` removes the effect at the top of the next tick. `is_stopped() -> bool` lets any holder test whether the effect has ended. Deferred cleanup is reentrance-safe. Carries two mutable output-control floats: `brightness` (visual scaling, 0.0–1.0) and `loudness` (audio scaling, 0.0–1.0), both defaulting to 1.0. `brightness` is initialized from `options["brightness"]` when the effect is started; `loudness` always starts at 1.0. Rules set these directly on a running receipt to vary intensity without restarting the effect. Each `EffectOutput` reads them independently — an output that ignores them renders at full intensity.
+_Avoid_: using `options["brightness"]` as a runtime control mechanism (it only initializes the receipt; change `receipt.brightness` at runtime instead); setting `brightness` or `loudness` outside [0.0, 1.0] (clamping is the caller's responsibility)
 
 ### Idle effect
 A low-level, looping effect running on a scope when no active game logic requires a specific response. Used to keep outputs visually active during standby or between triggered events. Replaced (via `set_effect`) when an active effect is started; restored when the active effect ends. Idle effects are optional — scopes may have no effect running at all.
