@@ -72,7 +72,7 @@ def test_ir_received_is_noop_when_hw_mode_is_3(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_ir_received_calls_set_effect_on_directional_at_level_9(spy):
+def test_ir_received_calls_set_effect_on_directional_with_white_solid(spy):
     state, engine = _make_state(spy, hw_mode=2)
     _fire_ir(state, engine)
     assert len(spy.set_effect_calls) == 1
@@ -128,7 +128,7 @@ def test_radio_received_is_noop_when_hw_mode_is_2(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_radio_received_calls_set_effect_on_global_all_at_level_9(spy):
+def test_radio_received_calls_set_effect_on_global_all_with_white_solid(spy):
     state, engine = _make_state(spy, hw_mode=3)
     _fire_radio(state, engine)
     assert len(spy.set_effect_calls) == 1

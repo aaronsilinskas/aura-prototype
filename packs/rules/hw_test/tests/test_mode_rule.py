@@ -83,6 +83,15 @@ def test_first_tick_starts_rgb_idle_effects(spy):
     assert "elements.ice" in names
 
 
+def test_first_tick_rgb_idle_effects_have_level_1_in_options(spy):
+    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+
+    for scope, name, options in spy.set_effect_calls:
+        assert options.get("level") == 1, f"{name} expected level=1, got options={options}"
+
+
 def test_first_tick_sets_rgb_level_in_state_data(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
@@ -223,6 +232,33 @@ def test_button_a_in_rgb_mode_calls_set_effect_on_all_five_scopes(spy):
 
     # 5 set_effect calls — one per scope
     assert len(spy.set_effect_calls) == 5
+
+
+def test_button_a_in_rgb_mode_passes_new_level_to_element_effects(spy):
+    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+    spy.set_effect_calls.clear()
+
+    _press_button(state, "A")
+    engine.update(state)
+
+    for _scope, _name, options in spy.set_effect_calls:
+        assert options.get("level") == 2, f"expected level=2 after first A press, got options={options}"
+
+
+def test_button_a_in_rgb_mode_wraps_level_passes_level_1_to_effects(spy):
+    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+    state.set("rgb_level", 10)
+    spy.set_effect_calls.clear()
+
+    _press_button(state, "A")
+    engine.update(state)
+
+    for _scope, _name, options in spy.set_effect_calls:
+        assert options.get("level") == 1, f"expected level=1 after wrap, got options={options}"
 
 
 def test_button_a_in_imu_mode_is_noop(spy):

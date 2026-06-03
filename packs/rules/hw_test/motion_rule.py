@@ -26,7 +26,7 @@ _AXIS_MAP: Final = (
 
 
 class HwTestMotionRule(GameRule):
-    """Maps accelerometer axes to effect levels and colours per scope."""
+    """Maps accelerometer axes to brightness and colours per scope."""
 
     def __init__(self) -> None:
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
