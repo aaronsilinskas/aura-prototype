@@ -8,10 +8,10 @@ from engine.state import GameState, Scope
 class HwTestNetworkRule(GameRule):
     """Fires a timed flash effect on IR and radio receive events.
 
-    IR receive (mode 2): flashes ``Scope.DIRECTIONAL`` at level 9 and records
+    IR receive (mode 2): flashes ``Scope.DIRECTIONAL`` with a white solid and records
     the receipt/timestamp so ``HwTestModeRule`` can expire the flash.
 
-    Radio receive (mode 3): flashes ``Scope.Global.ALL`` at level 9 similarly.
+    Radio receive (mode 3): flashes ``Scope.Global.ALL`` with a white solid similarly.
     """
 
     def __init__(self) -> None:

@@ -13,21 +13,21 @@ from engine.state import EffectReceipt, GameState, Scope
 HW_TEST_PAYLOAD: Final = b"hw_test"
 FLASH_DURATION: Final = 0.5
 
-# RGB mode idle effect table: (scope, name, options)
+# RGB mode idle effect table: (scope, name)
 _RGB_IDLE: Final = (
-    (Scope.PERSONAL, "elements.water", {}),
-    (Scope.DIRECTIONAL, "elements.fire", {}),
-    (Scope.Global.MAIN, "elements.lightning", {}),
-    (Scope.Global.BUFF, "elements.earth", {}),
-    (Scope.Global.DEBUFF, "elements.ice", {}),
+    (Scope.PERSONAL, "elements.water"),
+    (Scope.DIRECTIONAL, "elements.fire"),
+    (Scope.Global.MAIN, "elements.lightning"),
+    (Scope.Global.BUFF, "elements.earth"),
+    (Scope.Global.DEBUFF, "elements.ice"),
 )
 
 
 def _enter_rgb(state: GameState) -> None:
     ec = state.effect_controls
     state.set("rgb_level", 1)
-    for scope, name, options in _RGB_IDLE:
-        ec.set_effect(scope, name, options)
+    for scope, name in _RGB_IDLE:
+        ec.set_effect(scope, name, {"level": 1})
 
 
 def _enter_imu(state: GameState) -> None:
@@ -90,8 +90,8 @@ class HwTestModeRule(GameRule):
             new_level = (state.get("rgb_level", 1) % 10) + 1
             state.set("rgb_level", new_level)
             ec = state.effect_controls
-            for scope, name, options in _RGB_IDLE:
-                ec.set_effect(scope, name, options)
+            for scope, name in _RGB_IDLE:
+                ec.set_effect(scope, name, {"level": new_level})
         elif mode == 1:
             pass  # IMU mode: no-op
         elif mode == 2:

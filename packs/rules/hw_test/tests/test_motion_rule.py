@@ -76,7 +76,7 @@ def test_motion_rule_is_noop_when_acceleration_is_none(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_x_axis_max_positive_sets_level_10_red_on_personal(spy):
+def test_x_axis_max_positive_sets_brightness_1_0_red_on_personal(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX))
 
@@ -88,7 +88,7 @@ def test_x_axis_max_positive_sets_level_10_red_on_personal(spy):
     assert X_POS_COLOR == 0xFF0000
 
 
-def test_x_axis_max_negative_sets_level_10_cyan_on_personal(spy):
+def test_x_axis_max_negative_sets_brightness_1_0_cyan_on_personal(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(x=-ACCEL_MAX))
 
@@ -104,7 +104,7 @@ def test_x_axis_max_negative_sets_level_10_cyan_on_personal(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_y_axis_max_positive_sets_level_10_green_on_directional(spy):
+def test_y_axis_max_positive_sets_brightness_1_0_green_on_directional(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(y=ACCEL_MAX))
 
@@ -116,7 +116,7 @@ def test_y_axis_max_positive_sets_level_10_green_on_directional(spy):
     assert Y_POS_COLOR == 0x00FF00
 
 
-def test_y_axis_max_negative_sets_level_10_magenta_on_directional(spy):
+def test_y_axis_max_negative_sets_brightness_1_0_magenta_on_directional(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(y=-ACCEL_MAX))
 
@@ -132,7 +132,7 @@ def test_y_axis_max_negative_sets_level_10_magenta_on_directional(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_z_axis_max_positive_sets_level_10_blue_on_global_all(spy):
+def test_z_axis_max_positive_sets_brightness_1_0_blue_on_global_all(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(z=ACCEL_MAX))
 
@@ -144,7 +144,7 @@ def test_z_axis_max_positive_sets_level_10_blue_on_global_all(spy):
     assert Z_POS_COLOR == 0x0000FF
 
 
-def test_z_axis_max_negative_sets_level_10_yellow_on_global_all(spy):
+def test_z_axis_max_negative_sets_brightness_1_0_yellow_on_global_all(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(z=-ACCEL_MAX))
 
@@ -156,7 +156,7 @@ def test_z_axis_max_negative_sets_level_10_yellow_on_global_all(spy):
 
 
 # ---------------------------------------------------------------------------
-# Zero acceleration — level clamps to 1
+# Zero acceleration — brightness clamps to 0.0
 # ---------------------------------------------------------------------------
 
 
