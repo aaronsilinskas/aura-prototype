@@ -1,9 +1,20 @@
-"""RLGL ready effect.
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig
+from engine.effects.manager import EffectBuilder
+from packs.effects.elements.water import WaterBuilder
 
-Reuses :mod:`packs.effects.elements.water` directly.  The sound file
-``water_peak.wav`` is resolved from the effect's *name* by
-:class:`~engine.packs.PackRegistry`, not from the Python class name, so no
-distinct effect class is required.
-"""
+_water = WaterBuilder()
 
-from packs.effects.elements.water import BUILD  # noqa: F401
+
+class _Builder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        base = _water(name, config)
+        return Effect(
+            name=base.name,
+            pixels=base.pixels,
+            audio=EffectAudio(
+                clips={"start": AudioPlaybackConfig(name=name + "_start", loop=False)}
+            ),
+        )
+
+
+BUILD = _Builder()
