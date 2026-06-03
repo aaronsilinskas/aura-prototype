@@ -43,7 +43,8 @@ class HwTestMotionRule(GameRule):
         for field, scope, pos_color, neg_color in _AXIS_MAP:
             accel = getattr(acceleration, field)
             color = pos_color if accel >= 0 else neg_color
-            ec.set_effect(scope, "basic.solid", {"color": color})
+            brightness = min(1.0, abs(accel) / ACCEL_MAX)
+            ec.set_effect(scope, "basic.solid", {"color": color, "brightness": brightness})
 
 
 RULE = HwTestMotionRule()
