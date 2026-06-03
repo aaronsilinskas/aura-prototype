@@ -31,13 +31,13 @@ class SolidBuilder(EffectBuilder):
     """Builds a :class:`Solid` from an ``EffectConfig``.
 
     Reads ``config.options.get("color", 0xFFFFFF)`` for the base color and
-    scales each RGB channel by ``config.level / 10.0`` using integer truncation.
+    scales each RGB channel by ``brightness`` (float, ``[0.0, 1.0]``, default
+    ``1.0``). Values outside ``[0.0, 1.0]`` are clamped silently.
     """
 
     def __call__(self, name: str, config: EffectConfig) -> Solid:
         base_color = config.options.get("color", 0xFFFFFF)
-        level = config.options.get("level", 10)
-        brightness = level / 10.0
+        brightness = max(0.0, min(1.0, float(config.options.get("brightness", 1.0))))
         r = int(((base_color >> 16) & 0xFF) * brightness)
         g = int(((base_color >> 8) & 0xFF) * brightness)
         b = int((base_color & 0xFF) * brightness)

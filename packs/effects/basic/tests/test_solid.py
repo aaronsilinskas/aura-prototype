@@ -5,17 +5,19 @@ from __future__ import annotations
 from effects.effect import EffectConfig, PixelBuffer
 
 
-def _config(level: int, color: int | None = None) -> EffectConfig:
-    options: dict = {"level": level}
+def _config(color: int | None = None, brightness: float | None = None) -> EffectConfig:
+    options: dict = {}
     if color is not None:
         options["color"] = color
+    if brightness is not None:
+        options["brightness"] = brightness
     return EffectConfig(resolution=16, options=options)
 
 
-def _render(level: int, pixel_count: int = 4, color: int | None = None):
+def _render(pixel_count: int = 4, color: int | None = None, brightness: float | None = None):
     from packs.effects.basic.solid import BUILD
 
-    config = _config(level, color)
+    config = _config(color, brightness)
     effect = BUILD("basic.solid", config)
     buf = PixelBuffer(pixel_count)
     effect.render(buf)
@@ -35,28 +37,41 @@ def test_solid_build_returns_effect_builder_instance() -> None:
 def test_solid_effect_name_is_basic_solid() -> None:
     from packs.effects.basic.solid import BUILD
 
-    effect = BUILD("basic.solid", _config(5))
+    effect = BUILD("basic.solid", _config())
     assert effect.name == "basic.solid"
 
 
-# --- Color scaling ---
+# --- Brightness scaling ---
 
 
-def test_solid_level_1_white_produces_dim_pixels() -> None:
-    # Each channel: int(255 * 0.1) = 25 = 0x19
-    pixels = _render(level=1, color=0xFFFFFF)
-    assert all(p == 0x191919 for p in pixels)
-
-
-def test_solid_level_10_white_produces_full_brightness_pixels() -> None:
-    pixels = _render(level=10, color=0xFFFFFF)
+def test_solid_brightness_default_is_full() -> None:
+    pixels = _render(color=0xFFFFFF)
     assert all(p == 0xFFFFFF for p in pixels)
 
 
-def test_solid_level_5_red_scales_red_channel_only() -> None:
-    # Red channel: int(255 * 0.5) = 127 = 0x7F; green/blue stay 0
-    pixels = _render(level=5, color=0xFF0000)
-    assert all(p == 0x7F0000 for p in pixels)
+def test_solid_brightness_0_5_halves_each_channel() -> None:
+    # int(255 * 0.5) = 127 = 0x7F
+    pixels = _render(color=0xFFFFFF, brightness=0.5)
+    assert all(p == 0x7F7F7F for p in pixels)
+
+
+def test_solid_brightness_0_0_produces_black() -> None:
+    pixels = _render(color=0xFFFFFF, brightness=0.0)
+    assert all(p == 0x000000 for p in pixels)
+
+
+def test_solid_brightness_1_5_clamps_to_full() -> None:
+    # out-of-range clamp: 1.5 → 1.0, same as brightness=1.0
+    pixels_clamped = _render(color=0xFFFFFF, brightness=1.5)
+    pixels_full = _render(color=0xFFFFFF, brightness=1.0)
+    assert pixels_clamped == pixels_full
+
+
+def test_solid_brightness_negative_0_2_clamps_to_black() -> None:
+    # out-of-range clamp: -0.2 → 0.0, same as brightness=0.0
+    pixels_clamped = _render(color=0xFFFFFF, brightness=-0.2)
+    pixels_zero = _render(color=0xFFFFFF, brightness=0.0)
+    assert pixels_clamped == pixels_zero
 
 
 # --- Defaults ---
@@ -76,6 +91,6 @@ def test_solid_no_color_option_defaults_to_white() -> None:
 
 
 def test_solid_render_is_deterministic() -> None:
-    first = _render(level=7, color=0x00FF88)
-    second = _render(level=7, color=0x00FF88)
+    first = _render(color=0x00FF88, brightness=0.7)
+    second = _render(color=0x00FF88, brightness=0.7)
     assert first == second

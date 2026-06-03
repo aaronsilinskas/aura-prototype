@@ -7,16 +7,15 @@ import pytest
 from effects.effect import EffectConfig, PixelBuffer
 
 
-def _config(level: int = 10, options: dict | None = None) -> EffectConfig:
+def _config(options: dict | None = None) -> EffectConfig:
     opts = dict(options) if options else {}
-    opts.setdefault("level", level)
     return EffectConfig(resolution=16, options=opts)
 
 
-def _build(level: int = 10, options: dict | None = None):
+def _build(options: dict | None = None):
     from packs.effects.basic.pulse import BUILD
 
-    return BUILD("basic.pulse", _config(level, options))
+    return BUILD("basic.pulse", _config(options))
 
 
 def _render(effect, pixel_count: int = 4) -> list:
@@ -88,41 +87,78 @@ def test_pulse_after_full_cycle_pixels_return_to_start_color() -> None:
     assert all(p == 0x112233 for p in pixels)
 
 
-# --- Level scaling ---
+# --- Brightness scaling ---
 
 
-def test_pulse_level_scaling_applied_to_start_color() -> None:
-    # start=0xFFFFFF, level=1: int(255 * 0.1) = 25 = 0x19
-    effect = _build(
-        level=1,
-        options={
-            "start_color": 0xFFFFFF,
-            "end_color": 0x000000,
-            "brighten_duration": 0.0,
-            "on_duration": 0.0,
-            "darken_duration": 0.0,
-            "off_duration": 1.0,
-        },
-    )
-    effect.update(0.5)  # mid-OFF phase
-    pixels = _render(effect)
-    assert all(p == 0x191919 for p in pixels)
-
-
-def test_pulse_level_scaling_applied_to_end_color() -> None:
-    # end=0xFFFFFF, level=1: int(255 * 0.1) = 25 = 0x19
-    effect = _build(
-        level=1,
-        options={
-            "start_color": 0x000000,
-            "end_color": 0xFFFFFF,
-            "brighten_duration": 0.0,
-            "on_duration": 1.0,
-        },
-    )
+def test_pulse_default_brightness_is_full() -> None:
+    # default brightness=1.0: end=0xFFFFFF unchanged
+    effect = _build(options={
+        "start_color": 0x000000,
+        "end_color": 0xFFFFFF,
+        "brighten_duration": 0.0,
+        "on_duration": 1.0,
+    })
     effect.update(0.5)  # mid-ON phase
     pixels = _render(effect)
-    assert all(p == 0x191919 for p in pixels)
+    assert all(p == 0xFFFFFF for p in pixels)
+
+
+def test_pulse_brightness_0_5_halves_end_color_channels() -> None:
+    # end=0xFFFFFF, brightness=0.5: int(255 * 0.5) = 127 = 0x7F
+    effect = _build(options={
+        "start_color": 0x000000,
+        "end_color": 0xFFFFFF,
+        "brighten_duration": 0.0,
+        "on_duration": 1.0,
+        "brightness": 0.5,
+    })
+    effect.update(0.5)  # mid-ON phase
+    pixels = _render(effect)
+    assert all(p == 0x7F7F7F for p in pixels)
+
+
+def test_pulse_brightness_0_0_produces_black() -> None:
+    # brightness=0.0: all channels → 0
+    effect = _build(options={
+        "start_color": 0xFFFFFF,
+        "end_color": 0xFFFFFF,
+        "brighten_duration": 0.0,
+        "on_duration": 1.0,
+        "brightness": 0.0,
+    })
+    effect.update(0.5)  # mid-ON phase
+    pixels = _render(effect)
+    assert all(p == 0x000000 for p in pixels)
+
+
+def test_pulse_brightness_1_5_clamps_to_full() -> None:
+    # out-of-range: 1.5 → 1.0, same result as brightness=1.0
+    opts_base = {
+        "start_color": 0x000000,
+        "end_color": 0xFFFFFF,
+        "brighten_duration": 0.0,
+        "on_duration": 1.0,
+    }
+    effect_clamped = _build(options={**opts_base, "brightness": 1.5})
+    effect_full = _build(options={**opts_base, "brightness": 1.0})
+    effect_clamped.update(0.5)
+    effect_full.update(0.5)
+    assert _render(effect_clamped) == _render(effect_full)
+
+
+def test_pulse_brightness_negative_0_2_clamps_to_zero() -> None:
+    # out-of-range: -0.2 → 0.0, same result as brightness=0.0
+    opts_base = {
+        "start_color": 0x000000,
+        "end_color": 0xFFFFFF,
+        "brighten_duration": 0.0,
+        "on_duration": 1.0,
+    }
+    effect_clamped = _build(options={**opts_base, "brightness": -0.2})
+    effect_zero = _build(options={**opts_base, "brightness": 0.0})
+    effect_clamped.update(0.5)
+    effect_zero.update(0.5)
+    assert _render(effect_clamped) == _render(effect_zero)
 
 
 # --- Default options ---
