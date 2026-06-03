@@ -2,7 +2,7 @@ from effects.effect import Effect, EffectConfig
 from effects.layers.add_colors_renderer import AddColorsRenderer
 from effects.layers.drift_noise_layer import DriftNoiseLayer
 from effects.layers.sparkle_layer import SparkleLayer
-from effects.level import level_lerp, level_lerp_int
+from effects.level import clamp_level, level_lerp, level_lerp_int
 from effects.palette import PaletteLUT256
 from effects.value import ValueGenerator as VG
 from engine.effects.manager import EffectBuilder
@@ -23,7 +23,7 @@ class GravityBuilder(EffectBuilder):
 
         simulation state lives directly on the effect.
         """
-        level = config.options.get("level", 10)
+        level = clamp_level(int(config.options.get("level", 1)))
 
         nebula_resolution = max(config.resolution, level_lerp_int(level, 18, 36))
         nebula_drift_speed = level_lerp(level, 0.02, 0.038)
