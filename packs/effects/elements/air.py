@@ -161,7 +161,7 @@ class AirBuilder(EffectBuilder):
 
         shape = Shape.padded(padding, Shape.reverse(Shape.gradient()))
 
-        breezes = list[Layer]()
+        breezes: list[Layer] = []
         for _ in range(breeze_count):
             breezes.append(
                 _AirBreeze(

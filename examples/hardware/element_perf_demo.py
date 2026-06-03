@@ -42,10 +42,11 @@ import time
 
 import board
 import neopixel
-from packs.effects.elements.registry import build_element_renderer, list_element_names
 
-from effects.effect import EffectConfig, EffectState, EffectTimer, PixelBuffer
+from effects.effect import EffectConfig, PixelBuffer
 from effects.performance import PerformanceTracker
+from engine.effects.manager import EffectBuilder
+from engine.packs import PackRegistry
 
 NUM_LEDS = 12
 PIXELS_PIN = board.D5
@@ -60,9 +61,10 @@ pixels = neopixel.NeoPixel(pin=PIXELS_PIN, n=NUM_LEDS, brightness=0.5, auto_writ
 SAMPLE_LEVELS = [1, 4, 7, 10]
 DISPLAY_SECONDS = 10.0
 
+_registry = PackRegistry(item_attr="BUILD")
+_registry.scan_dir("packs/effects", "packs.effects")
+
 last_update = time.monotonic()
-timer = EffectTimer()
-state = EffectState()
 
 
 def logging_listener(event_name: str) -> None:
@@ -75,10 +77,11 @@ def create_effect(element: str, level: int):
         resolution=NUM_LEDS * 3,
         listeners=[logging_listener],
     )
-    return build_element_renderer(element, config)
+    builder = _registry.get("elements", element, EffectBuilder)
+    return builder("elements." + element, config)
 
 
-element_names = list_element_names()
+element_names = _registry.items("elements")
 element_index = 0
 level_index = 0
 current_element = element_names[element_index]
@@ -96,17 +99,15 @@ while True:
     elapsed_time = current_time - last_update
     last_update = current_time
 
-    timer.update(elapsed_time)
-
     perf.start_frame()
 
     perf.start_update_time()
-    current_effect.update(state, timer)
+    current_effect.update(elapsed_time)
     perf.add_update_time()
 
     perf.start_render_time()
     output = PixelBuffer(NUM_LEDS)
-    current_effect.render(state, output)
+    current_effect.render(output)
     for led_index in range(NUM_LEDS):
         pixels[led_index] = output[led_index]
     perf.add_render_time()
@@ -123,7 +124,6 @@ while True:
             current_element = element_names[element_index]
         current_level = SAMPLE_LEVELS[level_index]
         print(f"Element: {current_element}, Level: {current_level}")
-        state = EffectState()  # NOTE: Be absolutely sure to clear state!
         current_effect = create_effect(current_element, current_level)
         gc.collect()
         next_change_time = current_time + DISPLAY_SECONDS
