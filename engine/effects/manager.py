@@ -68,7 +68,7 @@ class EffectOutput:
         pass
 
     def handle_event(
-        self, event: EffectEvent, scope_keys: frozenset[str], receipt: EffectReceipt
+        self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
     ) -> None:
         """Handle an event triggered by an effect lifecycle or effect-triggered signal.
 
@@ -167,13 +167,17 @@ class EffectManager(EffectControls):
         ]
 
     def _notify_listeners(
-        self, event: EffectEvent, event_keys: set[str], receipt: EffectReceipt
+        self,
+        event: EffectEvent,
+        event_keys: set[str],
+        effect: Effect | None,
+        receipt: EffectReceipt,
     ) -> None:
         """Notify outputs whose registered key sets intersect event_keys."""
         for i in range(len(self._outputs)):
             matching = event_keys & self._output_key_sets[i]
             if matching:
-                self._outputs[i].handle_event(event, frozenset(matching), receipt)
+                self._outputs[i].handle_event(event, frozenset(matching), effect, receipt)
 
     def _build_effect(
         self,
@@ -221,7 +225,10 @@ class EffectManager(EffectControls):
 
         def scoped_listener(event_name: str) -> None:
             self._notify_listeners(
-                EffectEvent(pack_name, effect_name, event_name), set(entry.keys), receipt
+                EffectEvent(pack_name, effect_name, event_name),
+                set(entry.keys),
+                entry.effect,
+                receipt,
             )
 
         config = EffectConfig(resolution=resolution, options=options, listeners=[scoped_listener])
@@ -245,11 +252,11 @@ class EffectManager(EffectControls):
         scope_key_set: set[str],
         name: str,
         options: dict[str, object],
-    ) -> EffectReceipt:
-        """Build, append, and return the receipt for a new effect entry."""
+    ) -> "EffectManager._EffectEntry":
+        """Build, append, and return the new effect entry."""
         entry = self._build_effect(scope_key_set, name, options)
         self._effects.append(entry)
-        return entry.receipt
+        return entry
 
     def _update_output_buffers(self, entry: "_EffectEntry") -> None:
         """Remove keys no longer in entry.keys from per-output buffer dicts."""
@@ -280,7 +287,10 @@ class EffectManager(EffectControls):
         for entry, removed_keys in stopped:
             pack_name, effect_name = entry.name.split(".", 1)
             self._notify_listeners(
-                EffectEvent(pack_name, effect_name, "stop"), removed_keys, entry.receipt
+                EffectEvent(pack_name, effect_name, "stop"),
+                removed_keys,
+                entry.effect,
+                entry.receipt,
             )
 
         remaining_key_set: set[str] = set()
@@ -317,10 +327,12 @@ class EffectManager(EffectControls):
         """Replace any running effect(s) in scope and start this one."""
         scope_key_set = set(scope.keys)
         self._remove_effects_in_scope(scope_key_set)
-        receipt = self._append_new_effect(scope, scope_key_set, name, options)
+        entry = self._append_new_effect(scope, scope_key_set, name, options)
         pack_name, effect_name = name.split(".", 1)
-        self._notify_listeners(EffectEvent(pack_name, effect_name, "start"), scope_key_set, receipt)
-        return receipt
+        self._notify_listeners(
+            EffectEvent(pack_name, effect_name, "start"), scope_key_set, entry.effect, entry.receipt
+        )
+        return entry.receipt
 
     def add_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
         """Layer this effect alongside any running effects in scope.
@@ -329,10 +341,12 @@ class EffectManager(EffectControls):
         The driver determines how layered effects are composited (e.g. splitting an LED strip).
         """
         scope_key_set = set(scope.keys)
-        receipt = self._append_new_effect(scope, scope_key_set, name, options)
+        entry = self._append_new_effect(scope, scope_key_set, name, options)
         pack_name, effect_name = name.split(".", 1)
-        self._notify_listeners(EffectEvent(pack_name, effect_name, "start"), scope_key_set, receipt)
-        return receipt
+        self._notify_listeners(
+            EffectEvent(pack_name, effect_name, "start"), scope_key_set, entry.effect, entry.receipt
+        )
+        return entry.receipt
 
     def stop_effect(self, scope: ScopeValue) -> None:
         """Stop all running effects in scope."""

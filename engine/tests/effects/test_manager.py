@@ -1,4 +1,5 @@
 import sys
+from unittest.mock import ANY
 
 import pytest
 
@@ -214,8 +215,8 @@ def test_effect_event_reaches_matching_scope_output(pack_env) -> None:
     manager.update(_make_timer())
 
     assert output.handle_event_calls == [
-        (EffectEvent("events", "shock", "start"), frozenset({"personal"}), receipt),
-        (EffectEvent("events", "shock", "lightning_strike"), frozenset({"personal"}), receipt),
+        (EffectEvent("events", "shock", "start"), frozenset({"personal"}), ANY, receipt),
+        (EffectEvent("events", "shock", "lightning_strike"), frozenset({"personal"}), ANY, receipt),
     ]
 
 
@@ -605,7 +606,7 @@ def test_add_effect_fires_start_event_to_matching_output(pack_env) -> None:
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), receipt)
+        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), ANY, receipt)
     ]
 
 
@@ -629,7 +630,7 @@ def test_add_effect_does_not_fire_stop_for_existing_effects(pack_env) -> None:
     ice_receipt = manager.add_effect(Scope.PERSONAL, "stub.ice", {})
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "ice", "start"), frozenset({"personal"}), ice_receipt)
+        (EffectEvent("stub", "ice", "start"), frozenset({"personal"}), ANY, ice_receipt)
     ]
 
 
@@ -641,8 +642,8 @@ def test_add_effect_fires_start_event_unconditionally_for_duplicate_name(pack_en
     receipt_b = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), receipt_a),
-        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), receipt_b),
+        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), ANY, receipt_a),
+        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), ANY, receipt_b),
     ]
 
 
@@ -656,7 +657,7 @@ def test_stop_effect_fires_stop_event_to_matching_output(pack_env) -> None:
     manager.stop_effect(Scope.PERSONAL)
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), receipt)
+        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, receipt)
     ]
 
 
@@ -671,8 +672,8 @@ def test_stop_effect_fires_stop_for_each_effect_in_scope(pack_env) -> None:
     manager.stop_effect(Scope.PERSONAL)
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), fire_receipt),
-        (EffectEvent("stub", "ice", "stop"), frozenset({"personal"}), ice_receipt),
+        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, fire_receipt),
+        (EffectEvent("stub", "ice", "stop"), frozenset({"personal"}), ANY, ice_receipt),
     ]
 
 
@@ -686,8 +687,8 @@ def test_set_effect_fires_stop_then_start_when_replacing_effect(pack_env) -> Non
     ice_receipt = manager.set_effect(Scope.PERSONAL, "stub.ice", {})
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), fire_receipt),
-        (EffectEvent("stub", "ice", "start"), frozenset({"personal"}), ice_receipt),
+        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, fire_receipt),
+        (EffectEvent("stub", "ice", "start"), frozenset({"personal"}), ANY, ice_receipt),
     ]
 
 
@@ -706,8 +707,8 @@ def test_set_effect_fires_stop_only_to_outputs_in_call_time_scope(pack_env) -> N
     ice_receipt = manager.set_effect(Scope.PERSONAL, "stub.ice", {})
 
     assert output_personal.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), fire_receipt),
-        (EffectEvent("stub", "ice", "start"), frozenset({"personal"}), ice_receipt),
+        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, fire_receipt),
+        (EffectEvent("stub", "ice", "start"), frozenset({"personal"}), ANY, ice_receipt),
     ]
     assert output_directional.handle_event_calls == []
 
@@ -727,10 +728,10 @@ def test_stop_effect_with_broader_scope_fires_stop_to_all_matching_outputs(pack_
     manager.stop_effect(Scope.ALL)
 
     assert output_personal.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), fire_receipt)
+        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, fire_receipt)
     ]
     assert output_directional.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"directional"}), fire_receipt)
+        (EffectEvent("stub", "fire", "stop"), frozenset({"directional"}), ANY, fire_receipt)
     ]
 
 
@@ -745,7 +746,7 @@ def test_stop_effect_by_receipt_fires_stop_event(pack_env) -> None:
     manager.update(_make_timer())
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), receipt)
+        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, receipt)
     ]
 
 
@@ -769,7 +770,7 @@ def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect(p
 
     assert output_personal.handle_event_calls == []
     assert output_directional.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"directional"}), fire_receipt)
+        (EffectEvent("stub", "fire", "stop"), frozenset({"directional"}), ANY, fire_receipt)
     ]
 
 
@@ -785,7 +786,7 @@ def test_handle_event_receives_personal_scope_for_personal_effect(pack_env) -> N
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), receipt)
+        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), ANY, receipt)
     ]
 
 
@@ -796,7 +797,7 @@ def test_handle_event_receives_directional_scope_for_directional_effect(pack_env
     receipt = manager.add_effect(Scope.DIRECTIONAL, "stub.ice", {})
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "ice", "start"), frozenset({"directional"}), receipt)
+        (EffectEvent("stub", "ice", "start"), frozenset({"directional"}), ANY, receipt)
     ]
 
 
@@ -811,10 +812,10 @@ def test_handle_event_receives_composite_scope_not_decomposed_leaf(pack_env) -> 
     receipt = manager.add_effect(Scope.ALL, "stub.fire", {})
 
     assert output_personal.handle_event_calls == [
-        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), receipt)
+        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), ANY, receipt)
     ]
     assert output_directional.handle_event_calls == [
-        (EffectEvent("stub", "fire", "start"), frozenset({"directional"}), receipt)
+        (EffectEvent("stub", "fire", "start"), frozenset({"directional"}), ANY, receipt)
     ]
 
 
