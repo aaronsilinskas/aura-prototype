@@ -10,9 +10,10 @@ class PulseBuilder(EffectBuilder):
 
     Reads ``start_color`` (default ``0x000000``), ``end_color`` (default
     ``0xFFFFFF``), ``brighten_duration``, ``on_duration``, ``darken_duration``,
-    and ``off_duration`` (all default ``0.5`` seconds) from options. Level
-    brightness scaling is applied to both colors at build time using the same
-    per-channel ``int(channel * level / 10.0)`` truncation as ``basic.solid``.
+    and ``off_duration`` (all default ``0.5`` seconds) from options. Brightness
+    scaling is applied to both colors at build time via the ``brightness``
+    option (float, ``[0.0, 1.0]``, default ``1.0``); values outside the range
+    are clamped silently.
 
     Raises ``ValueError`` if any duration is negative or if all durations sum
     to zero.
@@ -33,7 +34,7 @@ class PulseBuilder(EffectBuilder):
         if cycle_total == 0.0:
             raise ValueError("At least one pulse phase duration must be non-zero")
 
-        brightness = config.options.get("level", 10) / 10.0
+        brightness = max(0.0, min(1.0, float(config.options.get("brightness", 1.0))))
         sr = int(((start_color_raw >> 16) & 0xFF) * brightness)
         sg = int(((start_color_raw >> 8) & 0xFF) * brightness)
         sb = int((start_color_raw & 0xFF) * brightness)
