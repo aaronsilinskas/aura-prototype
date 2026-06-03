@@ -29,7 +29,7 @@ class AudioEffectOutput(EffectOutput):
     Teardown of both voices is driven entirely by ``flush()`` receipt guards.
     """
 
-    def __init__(self, audio_registry: AudioRegistry) -> None:
+    def __init__(self, audio_registry: AudioRegistry, max_volume: float = 0.1) -> None:
         super().__init__(receives_pixels=False)
         self.min_resolution = 1
         self.scopes = [Scope.ALL]
@@ -42,9 +42,8 @@ class AudioEffectOutput(EffectOutput):
             bits_per_sample=16,
             samples_signed=True,
         )
-        # TODO: adjust volume by effect level instead of hardcoding here
-        self._mixer.voice[0].level = 0.2
-        self._mixer.voice[1].level = 0.2
+        self._mixer.voice[0].level = max_volume
+        self._mixer.voice[1].level = max_volume
 
         self._audio.play(self._mixer)
         self._loop_file = None
