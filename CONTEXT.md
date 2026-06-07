@@ -83,8 +83,8 @@ A registry that maps clip names to WAV file paths. Populated explicitly via `reg
 _Avoid_: using `PackRegistry.sound_path` for new audio effects (deprecated — migrate to `AudioRegistry`)
 
 ### AudioEffectOutput
-A CircuitPython `EffectOutput` driving audio via I2S. Two voices: voice 0 for looping backgrounds, voice 1 for one-shot clips. Teardown for both voices is driven entirely by `flush()` receipt guards. Audio completion never stops an effect receipt.
-_Avoid_: `PackRegistry.sound_path` for new effects; stopping playback in `handle_event` on `"stop"`
+A CircuitPython `EffectOutput` driving audio via I2S. Drives a flat voice pool of configurable size (`num_voices`, required at construction). Any voice can play any clip type — loops and one-shots share the pool. Voice selection finds the first idle slot; if none is available, an eviction policy applies: a new loop evicts the oldest playing loop (or, if none, the oldest one-shot); a new one-shot evicts the oldest playing one-shot (or is silently dropped if all voices hold loops). "Oldest" is determined by a per-slot monotonic claim counter. On eviction or natural one-shot finish, if the affected effect was audio-only (`pixels is None and vibration is None`), its receipt is stopped; otherwise receipt lifecycle remains in the hands of rules.
+_Avoid_: `PackRegistry.sound_path` for new effects; stopping playback in `handle_event` on `"stop"`; assuming a fixed voice count or role-assigned slots
 
 ### Drv2605EffectOutput
 A CircuitPython `EffectOutput` driving a DRV2605L haptic motor. Registered on all scopes with `receives_pixels = False`. Translates `VibrationConfig` constants to DRV2605L waveforms via an internal mapping; clears remaining slots before each play. A new event always interrupts the current sequence. `flush()` cuts the sequence short if the active receipt is externally stopped. Constructed via `setup_drv2605(i2c)` in `propmaker.py`.
