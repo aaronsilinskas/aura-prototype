@@ -8,6 +8,7 @@ from effects.effect import (
     EffectPixels,
     EffectVibration,
     PixelBuffer,
+    VibrationConfig,
 )
 
 # ---------------------------------------------------------------------------
@@ -219,3 +220,109 @@ def test_effect_vibration_stores_patterns_dict() -> None:
     vibration = EffectVibration(patterns={"strike": object()})
 
     assert "strike" in vibration.patterns
+
+
+# ---------------------------------------------------------------------------
+# VibrationConfig — sequence field
+# ---------------------------------------------------------------------------
+
+
+def test_vibration_config_stores_sequence_passed_at_construction() -> None:
+    cfg = VibrationConfig(sequence=[VibrationConfig.STRONG_CLICK])
+
+    assert cfg.sequence == [VibrationConfig.STRONG_CLICK]
+
+
+def test_vibration_config_sequence_may_contain_multiple_steps() -> None:
+    cfg = VibrationConfig(
+        sequence=[
+            VibrationConfig.STRONG_CLICK,
+            VibrationConfig.PAUSE_250,
+            VibrationConfig.SOFT_BUMP,
+        ]
+    )
+
+    assert len(cfg.sequence) == 3
+
+
+# ---------------------------------------------------------------------------
+# VibrationConfig — effect constants exist
+# ---------------------------------------------------------------------------
+
+
+def test_vibration_config_strong_click_constant_is_defined() -> None:
+    assert isinstance(VibrationConfig.STRONG_CLICK, int)
+
+
+def test_vibration_config_sharp_click_constant_is_defined() -> None:
+    assert isinstance(VibrationConfig.SHARP_CLICK, int)
+
+
+def test_vibration_config_soft_bump_constant_is_defined() -> None:
+    assert isinstance(VibrationConfig.SOFT_BUMP, int)
+
+
+def test_vibration_config_double_click_constant_is_defined() -> None:
+    assert isinstance(VibrationConfig.DOUBLE_CLICK, int)
+
+
+def test_vibration_config_triple_click_constant_is_defined() -> None:
+    assert isinstance(VibrationConfig.TRIPLE_CLICK, int)
+
+
+def test_vibration_config_strong_buzz_constant_is_defined() -> None:
+    assert isinstance(VibrationConfig.STRONG_BUZZ, int)
+
+
+# ---------------------------------------------------------------------------
+# VibrationConfig — pause constants exist
+# ---------------------------------------------------------------------------
+
+
+def test_vibration_config_pause_250_constant_is_defined() -> None:
+    assert isinstance(VibrationConfig.PAUSE_250, int)
+
+
+def test_vibration_config_pause_500_constant_is_defined() -> None:
+    assert isinstance(VibrationConfig.PAUSE_500, int)
+
+
+def test_vibration_config_pause_1000_constant_is_defined() -> None:
+    assert isinstance(VibrationConfig.PAUSE_1000, int)
+
+
+# ---------------------------------------------------------------------------
+# VibrationConfig — constants do not overlap with DRV2605L hardware IDs
+# ---------------------------------------------------------------------------
+
+_DRV2605L_HARDWARE_IDS = {1, 4, 7, 10, 12, 14}
+_ALL_VIBRATION_CONSTANTS = [
+    VibrationConfig.STRONG_CLICK,
+    VibrationConfig.SHARP_CLICK,
+    VibrationConfig.SOFT_BUMP,
+    VibrationConfig.DOUBLE_CLICK,
+    VibrationConfig.TRIPLE_CLICK,
+    VibrationConfig.STRONG_BUZZ,
+    VibrationConfig.PAUSE_250,
+    VibrationConfig.PAUSE_500,
+    VibrationConfig.PAUSE_1000,
+]
+
+
+def test_no_vibration_constant_overlaps_with_drv2605l_hardware_waveform_ids() -> None:
+    for constant in _ALL_VIBRATION_CONSTANTS:
+        assert constant not in _DRV2605L_HARDWARE_IDS, (
+            f"VibrationConfig constant {constant} collides with a DRV2605L hardware waveform ID"
+        )
+
+
+# ---------------------------------------------------------------------------
+# EffectVibration — typed patterns dict
+# ---------------------------------------------------------------------------
+
+
+def test_effect_vibration_accepts_vibration_config_as_pattern_value() -> None:
+    cfg = VibrationConfig(sequence=[VibrationConfig.STRONG_CLICK])
+    vibration = EffectVibration(patterns={"cast": cfg})
+
+    assert vibration.patterns["cast"] is cfg
