@@ -23,9 +23,26 @@ class MatrixEffectOutput(EffectOutput):
     def update_pixels(self, scope_key: str, buffers: list, receipts: list) -> None:
         """Render each buffer into the scope's row band via ``_write_row``."""
         row_band = self._scope_rows[scope_key]
+        receipt = receipts[-1] if receipts else None
+        brightness = receipt.brightness if receipt is not None else 1.0
         for row in row_band:
-            pixels = buffers[-1] if buffers else self._zero_buffer
+            if not buffers:
+                self._write_row(row, self._zero_buffer)
+                continue
+            pixels = buffers[-1]
+            if brightness != 1.0:
+                pixels = self._scale_pixels(pixels, brightness)
             self._write_row(row, pixels)
+
+    def _scale_pixels(self, pixels: PixelBuffer, brightness: float) -> PixelBuffer:
+        scaled = PixelBuffer(self._cols)
+        for i in range(self._cols):
+            c = pixels[i]
+            r = int(((c >> 16) & 0xFF) * brightness)
+            g = int(((c >> 8) & 0xFF) * brightness)
+            b = int((c & 0xFF) * brightness)
+            scaled[i] = (r << 16) | (g << 8) | b
+        return scaled
 
     def clear_pixels(self, scope_key: str) -> None:
         """Zero all rows in the scope's row band using the pre-allocated zero buffer."""
