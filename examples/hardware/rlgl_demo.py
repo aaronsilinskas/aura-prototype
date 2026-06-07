@@ -80,10 +80,10 @@ _rule_registry = PackRegistry(item_attr="RULE")
 _rule_registry.scan_dir("packs/rules", "packs.rules")
 
 _audio_registry = AudioRegistry()
-_audio_registry.register("ready_start", "sounds/ready.wav")
+_audio_registry.register("ready_start", "sounds/red_light_green_light.wav")
 _audio_registry.register("warning_sting_peak", "sounds/blip.wav")
 _audio_registry.register("red_light_music_start", "sounds/jaws_dundun.wav")
-_audio_registry.register("green_light_music_start", "sounds/green_light_music_start.wav")
+_audio_registry.register("green_light_music_start", "sounds/move.wav")
 _audio_registry.register("game_over_sting_start", "sounds/game_over.wav")
 
 _effect_manager = EffectManager(

@@ -94,27 +94,29 @@ _PULSE_OPTS_BASE = {
 def _enter_red_warning(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_RED_WARNING)
     state.set(_KEY_PHASE_START, state.total)
+    if state.has(_KEY_AMBIENT_RECEIPT):
+        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
     opts = dict(_PULSE_OPTS_BASE)
     opts["end_color"] = 0xFFFF00
     state.effect_controls.set_effect(Scope.NON_AMBIENT, "rlgl.warning_sting", opts)
-    receipt = state.effect_controls.set_effect(Scope.AMBIENT, "rlgl.red_light_music", {})
-    state.set(_KEY_AMBIENT_RECEIPT, receipt)
 
 
 def _enter_red(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_RED)
     state.set(_KEY_PHASE_START, state.total)
     state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.solid", {"color": 0xFF0000})
+    receipt = state.effect_controls.set_effect(Scope.AMBIENT, "rlgl.red_light_music", {})
+    state.set(_KEY_AMBIENT_RECEIPT, receipt)
 
 
 def _enter_green_warning(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_GREEN_WARNING)
     state.set(_KEY_PHASE_START, state.total)
+    if state.has(_KEY_AMBIENT_RECEIPT):
+        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
     opts = dict(_PULSE_OPTS_BASE)
     opts["end_color"] = 0xFFFF00
     state.effect_controls.set_effect(Scope.NON_AMBIENT, "rlgl.warning_sting", opts)
-    receipt = state.effect_controls.set_effect(Scope.AMBIENT, "rlgl.green_light_music", {})
-    state.set(_KEY_AMBIENT_RECEIPT, receipt)
 
 
 def _enter_green(state: GameState) -> None:
@@ -122,6 +124,8 @@ def _enter_green(state: GameState) -> None:
     state.set(_KEY_PHASE_START, state.total)
     state.set(_KEY_LAST_MOTION_TIME, state.total)
     state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.solid", {"color": 0x00FF00})
+    receipt = state.effect_controls.set_effect(Scope.AMBIENT, "rlgl.green_light_music", {})
+    state.set(_KEY_AMBIENT_RECEIPT, receipt)
 
 
 def _enter_game_over(state: GameState) -> None:
