@@ -29,11 +29,12 @@ class AudioEffectOutput(EffectOutput):
     Teardown of both voices is driven entirely by ``flush()`` receipt guards.
     """
 
-    def __init__(self, audio_registry: AudioRegistry, max_volume: float = 0.1) -> None:
+    def __init__(self, audio_registry: AudioRegistry, max_volume: float) -> None:
         super().__init__(receives_pixels=False)
         self.min_resolution = 1
         self.scopes = [Scope.ALL]
         self._audio_registry = audio_registry
+        self._max_volume = max_volume
         self._audio = audiobusio.I2SOut(board.I2S_BIT_CLOCK, board.I2S_WORD_SELECT, board.I2S_DATA)
         self._mixer = audiomixer.Mixer(
             voice_count=2,
@@ -42,8 +43,6 @@ class AudioEffectOutput(EffectOutput):
             bits_per_sample=16,
             samples_signed=True,
         )
-        self._mixer.voice[0].level = max_volume
-        self._mixer.voice[1].level = max_volume
 
         self._audio.play(self._mixer)
         self._loop_file = None
@@ -53,6 +52,8 @@ class AudioEffectOutput(EffectOutput):
         self._loop_receipt: EffectReceipt | None = None
         self._once_receipt: EffectReceipt | None = None
         self._once_verb: str | None = None
+        self._loop_loudness: float = 1.0
+        self._once_loudness: float = 1.0
 
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
@@ -78,6 +79,8 @@ class AudioEffectOutput(EffectOutput):
             self._loop_wave = audiocore.WaveFile(f)
             self._loop_file = f
             self._loop_receipt = receipt
+            self._loop_loudness = receipt.loudness
+            self._mixer.voice[0].level = self._max_volume * receipt.loudness
             self._mixer.voice[0].play(self._loop_wave, loop=True)
         else:
             self._mixer.voice[1].stop()
@@ -88,6 +91,8 @@ class AudioEffectOutput(EffectOutput):
             self._once_file = f
             self._once_receipt = receipt
             self._once_verb = event.verb
+            self._once_loudness = receipt.loudness
+            self._mixer.voice[1].level = self._max_volume * receipt.loudness
             self._once_wave = audiocore.WaveFile(self._once_file)
             self._mixer.voice[1].play(self._once_wave)
 
@@ -102,6 +107,7 @@ class AudioEffectOutput(EffectOutput):
             self._once_wave = None
             self._once_receipt = None
             self._once_verb = None
+            self._once_loudness = 1.0
 
         # Stop voice 1 early if a rule stopped the receipt externally
         if self._once_receipt is not None and self._once_receipt.is_stopped():
@@ -112,6 +118,12 @@ class AudioEffectOutput(EffectOutput):
             self._once_wave = None
             self._once_receipt = None
             self._once_verb = None
+            self._once_loudness = 1.0
+        elif self._once_receipt is not None:
+            loudness = self._once_receipt.loudness
+            if loudness != self._once_loudness:
+                self._mixer.voice[1].level = self._max_volume * loudness
+                self._once_loudness = loudness
 
         # Stop voice 0 if a rule stopped the loop receipt directly
         if self._loop_receipt is not None and self._loop_receipt.is_stopped():
@@ -121,3 +133,9 @@ class AudioEffectOutput(EffectOutput):
                 self._loop_file = None
             self._loop_wave = None
             self._loop_receipt = None
+            self._loop_loudness = 1.0
+        elif self._loop_receipt is not None:
+            loudness = self._loop_receipt.loudness
+            if loudness != self._loop_loudness:
+                self._mixer.voice[0].level = self._max_volume * loudness
+                self._loop_loudness = loudness

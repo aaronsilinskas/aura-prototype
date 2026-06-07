@@ -15,13 +15,14 @@ from hardware.circuitpython.audio_output import AudioEffectOutput
 # ---------------------------------------------------------------------------
 
 
-def _make_receipt() -> MagicMock:
+def _make_receipt(loudness: float = 1.0) -> MagicMock:
     r = MagicMock(spec=EffectReceipt)
     r.is_stopped.return_value = False
+    r.loudness = loudness
     return r
 
 
-def _make_output(audio_registry: AudioRegistry) -> AudioEffectOutput:
+def _make_output(audio_registry: AudioRegistry, max_volume: float = 0.2) -> AudioEffectOutput:
     """Build an AudioEffectOutput with all hardware deps patched out."""
     import audiobusio  # type: ignore[import]
     import audiocore  # type: ignore[import]
@@ -37,7 +38,7 @@ def _make_output(audio_registry: AudioRegistry) -> AudioEffectOutput:
 
     from hardware.circuitpython.audio_output import AudioEffectOutput
 
-    return AudioEffectOutput(audio_registry=audio_registry)
+    return AudioEffectOutput(audio_registry=audio_registry, max_volume=max_volume)
 
 
 def _effect_oneshot(verb: str, clip_name: str) -> Effect:
@@ -344,3 +345,157 @@ def test_flush_does_nothing_when_voice1_still_playing() -> None:
 
     output._mixer.voice[1].stop.assert_not_called()
     receipt.stop.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# max_volume — required constructor parameter
+# ---------------------------------------------------------------------------
+
+
+def test_audio_effect_output_requires_max_volume() -> None:
+    """AudioEffectOutput must be constructed with max_volume — no default."""
+    import audiobusio  # type: ignore[import]
+    import audiomixer  # type: ignore[import]
+
+    audiobusio.I2SOut = MagicMock(return_value=MagicMock())
+    mock_mixer = MagicMock()
+    mock_mixer.voice = [MagicMock(), MagicMock()]
+    audiomixer.Mixer = MagicMock(return_value=mock_mixer)
+
+    import pytest
+
+    from hardware.circuitpython.audio_output import AudioEffectOutput
+
+    with pytest.raises(TypeError):
+        AudioEffectOutput(audio_registry=AudioRegistry())
+
+
+# ---------------------------------------------------------------------------
+# loudness — voice level set at playback start
+# ---------------------------------------------------------------------------
+
+
+def test_loop_clip_sets_voice0_level_from_receipt_loudness(tmp_path) -> None:
+    """loop=True: voice 0 level = max_volume * receipt.loudness when playback starts."""
+    wav = tmp_path / "music.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("music", str(wav))
+
+    output = _make_output(registry, max_volume=0.4)
+    effect = _effect_loop("start", "music")
+    receipt = _make_receipt(loudness=0.5)
+
+    output.handle_event(
+        EffectEvent("pack", "effect", "start"), frozenset({"ambient"}), effect, receipt
+    )
+
+    output._mixer.voice[0].level = 0.4 * 0.5
+    assert output._loop_loudness == 0.5
+
+
+def test_oneshot_clip_sets_voice1_level_from_receipt_loudness(tmp_path) -> None:
+    """loop=False: voice 1 level = max_volume * receipt.loudness when playback starts."""
+    wav = tmp_path / "sting.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("sting", str(wav))
+
+    output = _make_output(registry, max_volume=0.4)
+    effect = _effect_oneshot("start", "sting")
+    receipt = _make_receipt(loudness=0.5)
+
+    output.handle_event(
+        EffectEvent("pack", "effect", "start"), frozenset({"personal"}), effect, receipt
+    )
+
+    output._mixer.voice[1].level = 0.4 * 0.5
+    assert output._once_loudness == 0.5
+
+
+# ---------------------------------------------------------------------------
+# loudness — flush() polling
+# ---------------------------------------------------------------------------
+
+
+def test_flush_updates_voice1_level_when_once_loudness_changes() -> None:
+    """flush: receipt.loudness changed since last tick → voice 1 level reapplied."""
+    registry = AudioRegistry()
+    output = _make_output(registry, max_volume=0.4)
+
+    receipt = _make_receipt(loudness=0.5)
+    receipt.is_stopped.return_value = False
+    output._once_receipt = receipt
+    output._once_loudness = 1.0
+    output._mixer.voice[1].playing = True
+
+    output.flush()
+
+    output._mixer.voice[1].level = 0.4 * 0.5
+    assert output._once_loudness == 0.5
+
+
+def test_flush_does_not_reapply_voice1_level_when_loudness_unchanged() -> None:
+    """flush: receipt.loudness unchanged → voice 1 level assignment not called."""
+    registry = AudioRegistry()
+    output = _make_output(registry, max_volume=0.4)
+
+    receipt = _make_receipt(loudness=0.75)
+    receipt.is_stopped.return_value = False
+    output._once_receipt = receipt
+    output._once_loudness = 0.75
+    output._mixer.voice[1].playing = True
+
+    output.flush()
+
+    output._mixer.voice[1].level = MagicMock()
+    output._mixer.voice[1].level.assert_not_called()
+
+
+def test_flush_updates_voice0_level_when_loop_loudness_changes() -> None:
+    """flush: loop receipt.loudness changed → voice 0 level reapplied."""
+    registry = AudioRegistry()
+    output = _make_output(registry, max_volume=0.4)
+
+    receipt = _make_receipt(loudness=0.25)
+    receipt.is_stopped.return_value = False
+    output._loop_receipt = receipt
+    output._loop_loudness = 1.0
+
+    output.flush()
+
+    output._mixer.voice[0].level = 0.4 * 0.25
+    assert output._loop_loudness == 0.25
+
+
+def test_flush_resets_once_loudness_to_one_when_receipt_cleared() -> None:
+    """flush: once receipt cleared → _once_loudness resets to 1.0."""
+    registry = AudioRegistry()
+    output = _make_output(registry, max_volume=0.2)
+
+    receipt = _make_receipt(loudness=0.3)
+    receipt.is_stopped.return_value = True
+    output._once_receipt = receipt
+    output._once_loudness = 0.3
+    output._mixer.voice[1].playing = True
+
+    output.flush()
+
+    assert output._once_loudness == 1.0
+
+
+def test_flush_resets_loop_loudness_to_one_when_receipt_cleared() -> None:
+    """flush: loop receipt cleared → _loop_loudness resets to 1.0."""
+    registry = AudioRegistry()
+    output = _make_output(registry, max_volume=0.2)
+
+    receipt = _make_receipt(loudness=0.3)
+    receipt.is_stopped.return_value = True
+    output._loop_receipt = receipt
+    output._loop_loudness = 0.3
+
+    output.flush()
+
+    assert output._loop_loudness == 1.0
