@@ -1,4 +1,4 @@
-from engine.state import Scope, ScopeValue
+from engine.state import EffectReceipt, Scope, ScopeValue
 
 # ---------------------------------------------------------------------------
 # ScopeValue — leaf scopes
@@ -148,3 +148,40 @@ def test_non_ambient_does_not_include_ambient_key() -> None:
 
 def test_scope_all_includes_ambient() -> None:
     assert "ambient" in Scope.ALL.keys
+
+
+# ---------------------------------------------------------------------------
+# EffectReceipt — brightness and loudness slots
+# ---------------------------------------------------------------------------
+
+
+def test_effect_receipt_brightness_defaults_to_one() -> None:
+    receipt = EffectReceipt(1)
+
+    assert receipt.brightness == 1.0
+
+
+def test_effect_receipt_loudness_defaults_to_one() -> None:
+    receipt = EffectReceipt(1)
+
+    assert receipt.loudness == 1.0
+
+
+def test_effect_receipt_brightness_is_writable() -> None:
+    receipt = EffectReceipt(1)
+    receipt.brightness = 0.5
+
+    assert receipt.brightness == 0.5
+
+
+def test_effect_receipt_loudness_is_writable() -> None:
+    receipt = EffectReceipt(1)
+    receipt.loudness = 0.25
+
+    assert receipt.loudness == 0.25
+
+
+def test_effect_receipt_constructor_accepts_only_effect_id() -> None:
+    receipt = EffectReceipt(42)
+
+    assert receipt.id == 42

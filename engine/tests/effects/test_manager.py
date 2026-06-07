@@ -1204,3 +1204,48 @@ def test_effect_with_renders_pixels_false_skips_update_pixels_but_calls_flush(pa
 
     assert output.update_pixels_calls == [("personal", [])]
     assert len(output.flush_calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# EffectReceipt — brightness and loudness from options (#249)
+# ---------------------------------------------------------------------------
+
+
+def test_set_effect_receipt_brightness_defaults_to_one(pack_env) -> None:
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[])
+
+    receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+
+    assert receipt.brightness == 1.0
+
+
+def test_set_effect_receipt_loudness_defaults_to_one(pack_env) -> None:
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[])
+
+    receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+
+    assert receipt.loudness == 1.0
+
+
+def test_set_effect_transfers_brightness_from_options(pack_env) -> None:
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[])
+
+    receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {"brightness": 0.5})
+
+    assert receipt.brightness == 0.5
+
+
+def test_set_effect_transfers_loudness_from_options(pack_env) -> None:
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[])
+
+    receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {"loudness": 0.25})
+
+    assert receipt.loudness == 0.25
+
+
+def test_add_effect_transfers_brightness_from_options(pack_env) -> None:
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[])
+
+    receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {"brightness": 0.75})
+
+    assert receipt.brightness == 0.75

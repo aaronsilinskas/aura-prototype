@@ -214,6 +214,8 @@ class EffectManager(EffectControls):
 
         receipt = EffectReceipt(self._next_id)
         self._next_id += 1
+        receipt.brightness = float(options.get("brightness", 1.0))
+        receipt.loudness = float(options.get("loudness", 1.0))
 
         resolution = _DEFAULT_RESOLUTION
         for i, output in enumerate(self._outputs):
