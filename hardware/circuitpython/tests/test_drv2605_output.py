@@ -93,7 +93,7 @@ def test_known_verb_writes_effect_to_motor_sequence() -> None:
 
 
 def test_pause_constant_writes_pause_object_to_correct_slot() -> None:
-    """PAUSE_250 constant is translated to Pause(250) in motor.sequence."""
+    """PAUSE_250 constant is translated to Pause(0.25) in motor.sequence."""
     output, motor = _make_output()
     effect = _effect_with_sequence("strike", [VibrationConfig.PAUSE_250])
     receipt = _make_receipt()
@@ -102,11 +102,11 @@ def test_pause_constant_writes_pause_object_to_correct_slot() -> None:
         EffectEvent("rlgl", "haptic", "strike"), frozenset({"all"}), effect, receipt
     )
 
-    assert motor.sequence[0] == adafruit_drv2605.Pause(250)
+    assert motor.sequence[0] == adafruit_drv2605.Pause(0.25)
 
 
 def test_all_pause_constants_write_correct_durations() -> None:
-    """PAUSE_500 and PAUSE_1000 map to Pause(500) and Pause(1000) respectively."""
+    """PAUSE_500 and PAUSE_1000 map to Pause(0.5) and Pause(1.0) respectively."""
     output, motor = _make_output()
     effect = _effect_with_sequence(
         "strike", [VibrationConfig.PAUSE_500, VibrationConfig.PAUSE_1000]
@@ -117,8 +117,8 @@ def test_all_pause_constants_write_correct_durations() -> None:
         EffectEvent("rlgl", "haptic", "strike"), frozenset({"all"}), effect, receipt
     )
 
-    assert motor.sequence[0] == adafruit_drv2605.Pause(500)
-    assert motor.sequence[1] == adafruit_drv2605.Pause(1000)
+    assert motor.sequence[0] == adafruit_drv2605.Pause(0.5)
+    assert motor.sequence[1] == adafruit_drv2605.Pause(1.0)
 
 
 def test_known_verb_calls_motor_play() -> None:

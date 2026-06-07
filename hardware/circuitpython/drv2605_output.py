@@ -22,9 +22,9 @@ _DRV2605L_EFFECT_MAP: Final = {
     VibrationConfig.DOUBLE_CLICK: adafruit_drv2605.Effect(10),
     VibrationConfig.TRIPLE_CLICK: adafruit_drv2605.Effect(12),
     VibrationConfig.STRONG_BUZZ: adafruit_drv2605.Effect(14),
-    VibrationConfig.PAUSE_250: adafruit_drv2605.Pause(250),
-    VibrationConfig.PAUSE_500: adafruit_drv2605.Pause(500),
-    VibrationConfig.PAUSE_1000: adafruit_drv2605.Pause(1000),
+    VibrationConfig.PAUSE_250: adafruit_drv2605.Pause(0.25),
+    VibrationConfig.PAUSE_500: adafruit_drv2605.Pause(0.5),
+    VibrationConfig.PAUSE_1000: adafruit_drv2605.Pause(1.0),
 }
 
 _MAX_SEQUENCE_LEN: Final = 8
