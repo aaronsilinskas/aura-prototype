@@ -24,15 +24,25 @@ class AudioEffectOutput(EffectOutput):
     a new one-shot evicts the oldest one-shot (if all voices are loops, the
     clip is silently dropped).
 
+    When an effect has no pixel or vibration outputs (``audio_only``), stopping
+    its audio is equivalent to the effect being over.  ``AudioEffectOutput``
+    stops the receipt in two cases so rules and ``EffectManager`` are notified:
+      - Eviction: the evicted receipt is stopped if ``audio_only`` was True.
+      - Natural one-shot finish: the receipt is stopped after the slot is freed
+        if ``audio_only`` was True.
+    Externally-stopped receipts are already stopped by rules — no second stop.
+
     ``flush()`` iterates all N slots each tick:
-      1. Natural one-shot finish (``not voice[i].playing``) — frees the slot
-         without stopping the receipt.
-      2. Externally-stopped receipt — stops the voice and frees the slot.
+      1. Natural one-shot finish (``not voice[i].playing``) — frees the slot;
+         stops the receipt when ``audio_only`` is True.
+      2. Externally-stopped receipt — stops the voice and frees the slot
+         (receipt already stopped by rules, not stopped again here).
       3. Loudness change — updates the voice level.
     """
 
     __slots__ = (
         "_audio",
+        "_audio_only",
         "_audio_registry",
         "_claim_counter",
         "_claim_seq",
@@ -72,6 +82,10 @@ class AudioEffectOutput(EffectOutput):
         self._wave_objs: list[object | None] = [None] * num_voices
         self._loudness: list[float] = [1.0] * num_voices
         self._is_loop: list[bool] = [False] * num_voices
+        # True when the effect has no pixels and no vibration.  In that case
+        # stopping audio is the same as the effect being over, so
+        # AudioEffectOutput stops the receipt on eviction or natural finish.
+        self._audio_only: list[bool] = [False] * num_voices
         # Monotonic counter incremented each time a slot is claimed.
         # _claim_seq[i] records the counter value when slot i was last claimed.
         self._claim_counter: int = 0
@@ -109,12 +123,18 @@ class AudioEffectOutput(EffectOutput):
                 f.close()
                 return
             # Evict: stop voice, close file, clear slot.
-            # Receipt is intentionally left alive — its lifecycle is managed by rules.
+            # For audio-only effects, stopping audio means the effect is over —
+            # stop the receipt so rules and EffectManager are notified promptly.
+            # For effects with pixels/vibration, receipt lifecycle is managed by rules.
+            evicted_receipt = self._receipts[slot]
+            evicted_audio_only = self._audio_only[slot]
             self._mixer.voice[slot].stop()
             if self._wave_files[slot] is not None:
                 self._wave_files[slot].close()
                 self._wave_files[slot] = None
             self._wave_objs[slot] = None
+            if evicted_audio_only and evicted_receipt is not None:
+                evicted_receipt.stop()
         else:
             # Idle slot: stop any lingering voice state and close any stale file.
             self._mixer.voice[slot].stop()
@@ -127,6 +147,7 @@ class AudioEffectOutput(EffectOutput):
         self._receipts[slot] = receipt
         self._loudness[slot] = receipt.loudness
         self._is_loop[slot] = config.loop
+        self._audio_only[slot] = effect.pixels is None and effect.vibration is None
         self._claim_seq[slot] = self._claim_counter
         self._mixer.voice[slot].level = self._max_volume * receipt.loudness
         self._mixer.voice[slot].play(self._wave_objs[slot], loop=config.loop)
@@ -178,6 +199,8 @@ class AudioEffectOutput(EffectOutput):
 
             # 1. Natural one-shot finish — clear before stopped check
             if not self._is_loop[i] and not self._mixer.voice[i].playing:
+                finished_receipt = self._receipts[i]
+                audio_only = self._audio_only[i]
                 if self._wave_files[i] is not None:
                     self._wave_files[i].close()
                     self._wave_files[i] = None
@@ -185,6 +208,9 @@ class AudioEffectOutput(EffectOutput):
                 self._receipts[i] = None
                 self._loudness[i] = 1.0
                 self._is_loop[i] = False
+                self._audio_only[i] = False
+                if audio_only and finished_receipt is not None:
+                    finished_receipt.stop()
                 continue
 
             # 2. Externally-stopped receipt
@@ -197,6 +223,7 @@ class AudioEffectOutput(EffectOutput):
                 self._receipts[i] = None
                 self._loudness[i] = 1.0
                 self._is_loop[i] = False
+                self._audio_only[i] = False
                 continue
 
             # 3. Loudness update

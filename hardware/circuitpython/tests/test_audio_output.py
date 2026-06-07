@@ -46,16 +46,29 @@ def _make_output(
     )
 
 
+def _make_pixels() -> object:
+    """Return a minimal EffectPixels stub sufficient to mark an effect as non-audio-only."""
+    from unittest.mock import MagicMock
+
+    from effects.effect import EffectPixels
+
+    return MagicMock(spec=EffectPixels)
+
+
 def _effect_oneshot(verb: str, clip_name: str) -> Effect:
+    """One-shot effect with pixels (non-audio-only): receipt lifecycle is managed by rules."""
     return Effect(
         name="test",
+        pixels=_make_pixels(),
         audio=EffectAudio(clips={verb: AudioPlaybackConfig(name=clip_name, loop=False)}),
     )
 
 
 def _effect_loop(verb: str, clip_name: str) -> Effect:
+    """Loop effect with pixels (non-audio-only): receipt lifecycle is managed by rules."""
     return Effect(
         name="test",
+        pixels=_make_pixels(),
         audio=EffectAudio(clips={verb: AudioPlaybackConfig(name=clip_name, loop=True)}),
     )
 
@@ -802,3 +815,184 @@ def test_evicted_receipt_is_not_stopped(tmp_path) -> None:
     )
 
     old_receipts[0].stop.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# audio_only — eviction stops receipt when effect has no pixels or vibration
+# ---------------------------------------------------------------------------
+
+
+def _effect_audio_only_oneshot(verb: str, clip_name: str) -> Effect:
+    """One-shot with audio only (no pixels, no vibration)."""
+    return Effect(
+        name="audio_only",
+        audio=EffectAudio(clips={verb: AudioPlaybackConfig(name=clip_name, loop=False)}),
+    )
+
+
+def _effect_with_pixels_oneshot(verb: str, clip_name: str) -> Effect:
+    """One-shot with audio and pixels (not audio-only)."""
+    from effects.effect import EffectPixels
+
+    return Effect(
+        name="with_pixels",
+        pixels=MagicMock(spec=EffectPixels),
+        audio=EffectAudio(clips={verb: AudioPlaybackConfig(name=clip_name, loop=False)}),
+    )
+
+
+def _fill_pool_audio_only(
+    output: AudioEffectOutput,
+    wav: Path,
+    registry: AudioRegistry,
+    num_voices: int,
+) -> list[MagicMock]:
+    """Fill pool with audio-only one-shots; returns receipts in slot order (0 = oldest)."""
+    receipts = []
+    for i in range(num_voices):
+        clip_name = f"_ao_{i}"
+        registry.register(clip_name, str(wav))
+        effect = _effect_audio_only_oneshot("start", clip_name)
+        receipt = _make_receipt()
+        output.handle_event(
+            EffectEvent("rlgl", "fill", "start"), frozenset({"personal"}), effect, receipt
+        )
+        receipts.append(receipt)
+    return receipts
+
+
+def test_eviction_of_audio_only_slot_stops_evicted_receipt(tmp_path) -> None:
+    """Evicting an audio-only slot calls stop() on the evicted receipt."""
+    wav = tmp_path / "clip.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("new_clip", str(wav))
+
+    output = _make_output(registry, num_voices=2)
+    old_receipts = _fill_pool_audio_only(output, wav, registry, 2)
+
+    effect = _effect_audio_only_oneshot("start", "new_clip")
+    new_receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "clip", "start"), frozenset({"personal"}), effect, new_receipt
+    )
+
+    old_receipts[0].stop.assert_called_once()
+
+
+def test_eviction_of_non_audio_only_slot_does_not_stop_evicted_receipt(tmp_path) -> None:
+    """Evicting a slot whose effect has pixels does NOT stop the evicted receipt."""
+    wav = tmp_path / "clip.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("new_clip", str(wav))
+    registry.register("clip_0", str(wav))
+    registry.register("clip_1", str(wav))
+
+    output = _make_output(registry, num_voices=2)
+
+    r0 = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "clip", "start"),
+        frozenset({"personal"}),
+        _effect_with_pixels_oneshot("start", "clip_0"),
+        r0,
+    )
+    r1 = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "clip", "start"),
+        frozenset({"personal"}),
+        _effect_with_pixels_oneshot("start", "clip_1"),
+        r1,
+    )
+
+    effect = _effect_audio_only_oneshot("start", "new_clip")
+    new_receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "clip", "start"), frozenset({"personal"}), effect, new_receipt
+    )
+
+    r0.stop.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# audio_only — natural one-shot finish stops receipt when audio-only
+# ---------------------------------------------------------------------------
+
+
+def test_flush_stops_receipt_on_natural_finish_when_audio_only(tmp_path) -> None:
+    """flush: audio-only one-shot finishes naturally → slot freed AND receipt stopped."""
+    wav = tmp_path / "sting.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("sting", str(wav))
+
+    output = _make_output(registry)
+    receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "sting", "start"),
+        frozenset({"personal"}),
+        _effect_audio_only_oneshot("start", "sting"),
+        receipt,
+    )
+
+    output._mixer.voice[0].playing = False
+    output.flush()
+
+    receipt.stop.assert_called_once()
+    assert output._receipts[0] is None
+
+
+def test_flush_does_not_stop_receipt_on_natural_finish_when_not_audio_only(tmp_path) -> None:
+    """flush: one-shot with pixels finishes naturally → slot freed, receipt NOT stopped."""
+    wav = tmp_path / "sting.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("sting", str(wav))
+
+    output = _make_output(registry)
+    receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "sting", "start"),
+        frozenset({"personal"}),
+        _effect_with_pixels_oneshot("start", "sting"),
+        receipt,
+    )
+
+    output._mixer.voice[0].playing = False
+    output.flush()
+
+    receipt.stop.assert_not_called()
+    assert output._receipts[0] is None
+
+
+def test_flush_does_not_stop_receipt_on_externally_stopped_audio_only(tmp_path) -> None:
+    """flush: externally-stopped audio-only receipt → voice stopped, receipt not stopped again."""
+    wav = tmp_path / "clip.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("clip", str(wav))
+
+    output = _make_output(registry)
+    receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "clip", "start"),
+        frozenset({"personal"}),
+        _effect_audio_only_oneshot("start", "clip"),
+        receipt,
+    )
+
+    receipt.is_stopped.return_value = True
+    output._mixer.voice[0].playing = True
+    output._mixer.voice[0].reset_mock()
+    output.flush()
+
+    # Voice is stopped, slot freed, but receipt.stop() is not called by flush
+    output._mixer.voice[0].stop.assert_called_once()
+    receipt.stop.assert_not_called()
+    assert output._receipts[0] is None
