@@ -52,7 +52,7 @@ class EffectAudio:
 
     __slots__ = ["clips"]
 
-    def __init__(self, clips: dict) -> None:
+    def __init__(self, clips: dict[str, AudioPlaybackConfig]) -> None:
         self.clips = clips
 
 
@@ -65,7 +65,7 @@ class EffectVibration:
 
     __slots__ = ["patterns"]
 
-    def __init__(self, patterns: dict) -> None:
+    def __init__(self, patterns: dict[str, object]) -> None:
         self.patterns = patterns
 
 
@@ -85,7 +85,7 @@ class EffectConfig:
     def __init__(
         self,
         resolution: int,
-        options: dict | None = None,
+        options: dict[str, object] | None = None,
         listeners: list[EffectListenerFunc] | None = None,
     ) -> None:
         self.resolution = max(1, resolution)

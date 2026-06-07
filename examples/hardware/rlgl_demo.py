@@ -88,7 +88,7 @@ _audio_registry.register("game_over_sting_start", "sounds/game_over_sting_start.
 
 _effect_manager = EffectManager(
     registry=_effect_registry,
-    outputs=[IS31FL3741EffectOutput(_matrix), AudioEffectOutput(_audio_registry)],
+    outputs=[IS31FL3741EffectOutput(_matrix), AudioEffectOutput(_audio_registry, 0.2)],
 )
 
 # ---------------------------------------------------------------------------
