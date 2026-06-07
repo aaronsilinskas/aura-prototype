@@ -32,6 +32,7 @@ MODULE_DIRS: Final = [
     "packs",
     "rules",
     "scenes",
+    "sounds",
 ]
 _EXCLUDE_DIRS: Final = {"__pycache__", "tests"}
 _EXCLUDE_NAMES: Final = {"conftest.py"}
