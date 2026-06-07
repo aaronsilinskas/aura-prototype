@@ -249,8 +249,8 @@ def test_replacing_peak_oneshot_does_not_stop_pixel_effect_receipt(tmp_path) -> 
 # ---------------------------------------------------------------------------
 
 
-def test_flush_stops_oneshot_receipt_when_voice1_finishes_naturally() -> None:
-    """flush: voice 1 finishes playing → receipt is stopped and file is closed."""
+def test_flush_cleans_up_oneshot_state_when_voice1_finishes_naturally() -> None:
+    """flush: voice 1 finishes playing → audio state is cleaned up, receipt is NOT stopped."""
     registry = AudioRegistry()
     output = _make_output(registry)
 
@@ -259,27 +259,6 @@ def test_flush_stops_oneshot_receipt_when_voice1_finishes_naturally() -> None:
     output._once_receipt = receipt
     output._once_file = once_file
     output._once_verb = "start"
-    output._mixer.voice[1].playing = False
-
-    output.flush()
-
-    receipt.stop.assert_called_once()
-    once_file.close.assert_called_once()
-    assert output._once_receipt is None
-    assert output._once_file is None
-    assert output._once_wave is None
-
-
-def test_flush_does_not_stop_pixel_effect_receipt_when_peak_sound_finishes() -> None:
-    """flush: voice 1 finishes a 'peak' sound → pixel effect receipt is NOT stopped."""
-    registry = AudioRegistry()
-    output = _make_output(registry)
-
-    receipt = _make_receipt()
-    once_file = MagicMock()
-    output._once_receipt = receipt
-    output._once_file = once_file
-    output._once_verb = "peak"
     output._mixer.voice[1].playing = False
 
     output.flush()

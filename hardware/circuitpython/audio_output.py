@@ -97,10 +97,8 @@ class AudioEffectOutput(EffectOutput):
             self._mixer.voice[1].play(self._once_wave)
 
     def flush(self) -> None:
-        # Auto-stop one-shot when playback ends naturally
+        # Clean up one-shot state when playback ends naturally
         if self._once_receipt is not None and not self._mixer.voice[1].playing:
-            if self._once_verb == "start":
-                self._once_receipt.stop()
             if self._once_file is not None:
                 self._once_file.close()
                 self._once_file = None
