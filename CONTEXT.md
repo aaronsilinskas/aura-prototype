@@ -18,7 +18,13 @@ _Avoid_: including `"stop"` as a clips key (the stop lifecycle verb does not tri
 A value object in `effects/effect.py` declaring how a single audio clip should play. Fields: `name: str` (the clip name looked up in `AudioRegistry`) and `loop: bool` (`True` → voice 0, looping background; `False` → voice 1, one-shot). Additional playback fields (volume, fade, etc.) are deferred.
 
 ### EffectVibration
-A placeholder capability object in `effects/effect.py` for future vibration hardware support. Holds `patterns: dict[str, object]` — a map from event verb to an opaque vibration config (type unspecified). Set on `Effect.vibration`; no hardware output implements it yet.
+A capability object in `effects/effect.py` that declares the vibration behaviour of an effect. Holds `patterns: dict[str, VibrationConfig]` — a map from event verb to a playback config. Set on `Effect.vibration`; if `None`, the effect produces no vibration. `Drv2605EffectOutput` reads `effect.vibration.patterns.get(event.verb)` in `handle_event` to decide whether and how to vibrate.
+_Avoid_: using raw DRV2605L waveform IDs as pattern values (hardware IDs belong in `Drv2605EffectOutput`'s internal mapping, not in the effect descriptor)
+
+### VibrationConfig
+A value object in `effects/effect.py` declaring how a vibration sequence should play. Holds `sequence: list[int]` — an ordered list of abstract constants defined as class-level attributes on `VibrationConfig`. Effect constants: `STRONG_CLICK`, `SHARP_CLICK`, `SOFT_BUMP`, `DOUBLE_CLICK`, `TRIPLE_CLICK`, `STRONG_BUZZ`. Pause constants: `PAUSE_250`, `PAUSE_500`, `PAUSE_1000` (0.25s, 0.5s, 1.0s). Hardware outputs translate these constants to device-specific types via an internal mapping; the effect layer never references hardware IDs or pause encodings directly. The DRV2605L supports up to 8 slots per sequence; the hardware output enforces any device limit.
+_Avoid_: using raw DRV2605L waveform IDs in a `VibrationConfig` sequence (the named constants are deliberately offset from hardware IDs so any unmapped value raises at the output layer)
+
 
 ### EffectConfig
 Runtime configuration passed to effect builders at construction. Three fields: `resolution` (sample detail, independent of pixel count — clamped to minimum `1`), `options` (effect-specific parameters as a plain dict, e.g. `{"level": 5}`), and `listeners` (notification callbacks invoked by name when significant rendering events occur).
@@ -75,6 +81,10 @@ _Avoid_: ambient effect, background effect (as synonyms for idle effect — `Sco
 ### AudioRegistry
 A standalone registry in `engine/audio.py` that maps clip names (plain strings) to WAV file paths. Given to `AudioEffectOutput` at construction. Populated explicitly via `register(name, path)` calls — no naming-convention magic. `PackRegistry` may provide a helper to bulk-register a pack's `sounds/` directory, but `AudioRegistry` itself has no dependency on `PackRegistry`. The lookup key comes from `AudioPlaybackConfig.name` inside an `EffectAudio` clip map.
 _Avoid_: using `PackRegistry.sound_path` for new audio effects (deprecated — migrate to `AudioRegistry`)
+
+### Drv2605EffectOutput
+A CircuitPython `EffectOutput` in `hardware/circuitpython/drv2605_output.py` that drives a DRV2605L haptic motor. Registered on all scopes with `receives_pixels = False`. In `handle_event`, looks up `effect.vibration.patterns.get(event.verb)` to get a `VibrationConfig`, translates each constant in `config.sequence` to a DRV2605L `Effect` or `Pause` via an internal mapping, clears remaining slots, then calls `motor.play()`. A new event always interrupts the current sequence. `flush()` calls `motor.stop()` and clears the active receipt if it has been externally stopped. Constructed via `setup_drv2605(i2c)` in `propmaker.py`; returns `None` gracefully if the library is absent or the device is not found.
+_Avoid_: constructing with a `None` motor (the caller guards on the result of `setup_drv2605`); subclassing for different haptic controllers (extract a shared base only when a second controller is needed); reading `receipt.loudness` (the DRV2605L has no volume control — intensity is baked into the waveform)
 
 ### AudioEffectOutput
 A CircuitPython `EffectOutput` that drives `audiomixer.Mixer` via I2S. Registered on all scopes with `receives_pixels = False`. In `handle_event`, looks up `effect.audio.clips.get(event.verb)` to get an `AudioPlaybackConfig`, resolves the WAV path via `AudioRegistry`, and plays on voice 0 (`loop=True`) or voice 1 (`loop=False`). The `"stop"` verb does **not** halt audio — teardown for both voices is driven by `flush()` receipt guards. Audio completion never stops an effect receipt — receipt lifecycle is controlled entirely by rules or external stops. Rules trigger audio via `add_effect`/`set_effect` — they do not pass filenames.
