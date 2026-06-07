@@ -19,7 +19,10 @@ class AudioEffectOutput(EffectOutput):
 
     Uses a flat pool of ``num_voices`` mixer voices.  Voice selection in
     ``handle_event`` iterates slots 0 to N-1 and claims the first whose
-    receipt is ``None``.  If no idle slot exists the clip is silently dropped.
+    receipt is ``None``.  If no idle slot exists the eviction policy runs:
+    a new loop evicts the oldest loop (fallback: oldest slot overall);
+    a new one-shot evicts the oldest one-shot (if all voices are loops, the
+    clip is silently dropped).
 
     ``flush()`` iterates all N slots each tick:
       1. Natural one-shot finish (``not voice[i].playing``) — frees the slot
@@ -31,6 +34,8 @@ class AudioEffectOutput(EffectOutput):
     __slots__ = (
         "_audio",
         "_audio_registry",
+        "_claim_counter",
+        "_claim_seq",
         "_is_loop",
         "_loudness",
         "_max_volume",
@@ -67,6 +72,10 @@ class AudioEffectOutput(EffectOutput):
         self._wave_objs: list[object | None] = [None] * num_voices
         self._loudness: list[float] = [1.0] * num_voices
         self._is_loop: list[bool] = [False] * num_voices
+        # Monotonic counter incremented each time a slot is claimed.
+        # _claim_seq[i] records the counter value when slot i was last claimed.
+        self._claim_counter: int = 0
+        self._claim_seq: list[int] = [0] * num_voices
 
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
@@ -93,21 +102,74 @@ class AudioEffectOutput(EffectOutput):
                 break
 
         if slot == -1:
-            # No idle slot — drop silently
-            f.close()
-            return
+            # No idle slot — apply eviction policy
+            slot = self._evict_slot(config.loop)
+            if slot == -1:
+                # No evictable slot — drop silently
+                f.close()
+                return
+            # Evict: stop voice, close file, clear slot.
+            # Receipt is intentionally left alive — its lifecycle is managed by rules.
+            self._mixer.voice[slot].stop()
+            if self._wave_files[slot] is not None:
+                self._wave_files[slot].close()
+                self._wave_files[slot] = None
+            self._wave_objs[slot] = None
+        else:
+            # Idle slot: stop any lingering voice state and close any stale file.
+            self._mixer.voice[slot].stop()
+            if self._wave_files[slot] is not None:
+                self._wave_files[slot].close()
 
-        self._mixer.voice[slot].stop()
-        if self._wave_files[slot] is not None:
-            self._wave_files[slot].close()
-
+        self._claim_counter += 1
         self._wave_objs[slot] = audiocore.WaveFile(f)
         self._wave_files[slot] = f
         self._receipts[slot] = receipt
         self._loudness[slot] = receipt.loudness
         self._is_loop[slot] = config.loop
+        self._claim_seq[slot] = self._claim_counter
         self._mixer.voice[slot].level = self._max_volume * receipt.loudness
         self._mixer.voice[slot].play(self._wave_objs[slot], loop=config.loop)
+
+    def _evict_slot(self, is_loop: bool) -> int:
+        """Return the slot index to evict for a new clip, or -1 if no eviction is possible.
+
+        Eviction rules:
+        - New loop: prefer oldest loop (lowest claim_seq where is_loop=True).
+          Fallback to oldest slot overall if no loops exist.
+        - New one-shot: prefer oldest one-shot (lowest claim_seq where is_loop=False).
+          Drop silently (return -1) if all voices hold loops.
+        """
+        preferred_slot = -1
+        preferred_seq = -1
+        fallback_slot = -1
+        fallback_seq = -1
+
+        for i in range(self._num_voices):
+            if self._receipts[i] is None:
+                continue
+            seq = self._claim_seq[i]
+            slot_is_loop = self._is_loop[i]
+
+            if is_loop:
+                # Prefer oldest loop; fallback to oldest overall
+                if slot_is_loop and (preferred_slot == -1 or seq < preferred_seq):
+                    preferred_slot = i
+                    preferred_seq = seq
+                if fallback_slot == -1 or seq < fallback_seq:
+                    fallback_slot = i
+                    fallback_seq = seq
+            else:
+                # Prefer oldest one-shot; no fallback (drop if all loops)
+                if not slot_is_loop and (preferred_slot == -1 or seq < preferred_seq):
+                    preferred_slot = i
+                    preferred_seq = seq
+
+        if preferred_slot != -1:
+            return preferred_slot
+        if is_loop and fallback_slot != -1:
+            return fallback_slot
+        return -1
 
     def flush(self) -> None:
         for i in range(self._num_voices):

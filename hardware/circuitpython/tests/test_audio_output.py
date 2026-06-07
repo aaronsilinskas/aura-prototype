@@ -161,8 +161,8 @@ def test_second_clip_claims_next_idle_slot(tmp_path) -> None:
     output._mixer.voice[1].play.assert_called()
 
 
-def test_clip_silently_dropped_when_all_voices_occupied(tmp_path) -> None:
-    """With all voices occupied, a new clip is silently dropped — no play, no crash."""
+def test_oneshot_evicts_oldest_oneshot_when_all_voices_occupied(tmp_path) -> None:
+    """With all voices occupied by one-shots, a new one-shot evicts the oldest slot."""
     wav = tmp_path / "clip.wav"
     wav.write_bytes(b"RIFF")
 
@@ -171,9 +171,15 @@ def test_clip_silently_dropped_when_all_voices_occupied(tmp_path) -> None:
 
     output = _make_output(registry, num_voices=2)
 
-    # Occupy all slots
-    output._receipts[0] = _make_receipt()
-    output._receipts[1] = _make_receipt()
+    # Occupy all slots with one-shots; slot 0 is oldest
+    r0 = _make_receipt()
+    r1 = _make_receipt()
+    output._receipts[0] = r0
+    output._is_loop[0] = False
+    output._claim_seq[0] = 1
+    output._receipts[1] = r1
+    output._is_loop[1] = False
+    output._claim_seq[1] = 2
 
     effect = _effect_oneshot("start", "new_clip")
     receipt = _make_receipt()
@@ -181,8 +187,9 @@ def test_clip_silently_dropped_when_all_voices_occupied(tmp_path) -> None:
         EffectEvent("rlgl", "clip", "start"), frozenset({"personal"}), effect, receipt
     )
 
-    output._mixer.voice[0].play.assert_not_called()
-    output._mixer.voice[1].play.assert_not_called()
+    # Slot 0 (oldest one-shot) is evicted and replayed
+    output._mixer.voice[0].play.assert_called()
+    assert output._receipts[0] is receipt
 
 
 # ---------------------------------------------------------------------------
@@ -444,3 +451,298 @@ def test_clip_sets_voice_level_from_receipt_loudness(tmp_path) -> None:
 
     assert output._mixer.voice[0].level == pytest.approx(0.4 * 0.5)
     assert output._loudness[0] == 0.5
+
+
+# ---------------------------------------------------------------------------
+# Eviction — full pool, claim_seq-based selection
+# ---------------------------------------------------------------------------
+
+
+def _fill_pool_with_oneshots(output: AudioEffectOutput, num_voices: int) -> list[MagicMock]:
+    """Fill all slots with one-shot receipts in order (slot 0 = oldest).
+
+    Sets _claim_counter to num_voices so the next eviction produces a higher seq.
+    """
+    receipts = []
+    for i in range(num_voices):
+        r = _make_receipt()
+        output._receipts[i] = r
+        output._wave_files[i] = MagicMock()
+        output._wave_objs[i] = MagicMock()
+        output._is_loop[i] = False
+        output._claim_seq[i] = i + 1  # slot 0 is oldest (seq=1), slot N-1 is newest (seq=N)
+        receipts.append(r)
+    output._claim_counter = num_voices  # next claim will be num_voices + 1
+    return receipts
+
+
+def _fill_pool_with_loops(output: AudioEffectOutput, num_voices: int) -> list[MagicMock]:
+    """Fill all slots with loop receipts in order (slot 0 = oldest).
+
+    Sets _claim_counter to num_voices so the next eviction produces a higher seq.
+    """
+    receipts = []
+    for i in range(num_voices):
+        r = _make_receipt()
+        output._receipts[i] = r
+        output._wave_files[i] = MagicMock()
+        output._wave_objs[i] = MagicMock()
+        output._is_loop[i] = True
+        output._claim_seq[i] = i + 1  # slot 0 is oldest (seq=1), slot N-1 is newest (seq=N)
+        receipts.append(r)
+    output._claim_counter = num_voices  # next claim will be num_voices + 1
+    return receipts
+
+
+def test_new_oneshot_evicts_oldest_oneshot_when_all_oneshots(tmp_path) -> None:
+    """All N voices hold one-shots: new one-shot evicts slot with lowest claim_seq."""
+    wav = tmp_path / "clip.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("new_clip", str(wav))
+
+    output = _make_output(registry, num_voices=2)
+    old_receipts = _fill_pool_with_oneshots(output, 2)
+
+    effect = _effect_oneshot("start", "new_clip")
+    new_receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "clip", "start"), frozenset({"personal"}), effect, new_receipt
+    )
+
+    # Slot 0 was oldest (claim_seq=0), should be evicted and replayed
+    output._mixer.voice[0].stop.assert_called()
+    output._mixer.voice[0].play.assert_called()
+    assert output._receipts[0] is new_receipt
+    # Evicted receipt is NOT stopped
+    old_receipts[0].stop.assert_not_called()
+
+
+def test_new_loop_evicts_oldest_loop_when_all_loops(tmp_path) -> None:
+    """All N voices hold loops: new loop evicts slot with lowest claim_seq."""
+    wav = tmp_path / "music.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("new_music", str(wav))
+
+    output = _make_output(registry, num_voices=2)
+    old_receipts = _fill_pool_with_loops(output, 2)
+
+    effect = _effect_loop("start", "new_music")
+    new_receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "music", "start"), frozenset({"ambient"}), effect, new_receipt
+    )
+
+    # Slot 0 was oldest loop (claim_seq=0), should be evicted
+    output._mixer.voice[0].stop.assert_called()
+    output._mixer.voice[0].play.assert_called()
+    assert output._receipts[0] is new_receipt
+    old_receipts[0].stop.assert_not_called()
+
+
+def test_new_loop_evicts_oldest_loop_not_oneshot_in_mixed_pool(tmp_path) -> None:
+    """Mixed pool: new loop evicts oldest loop, not a one-shot."""
+    wav = tmp_path / "music.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("new_music", str(wav))
+
+    output = _make_output(registry, num_voices=2)
+
+    # Slot 0 = older one-shot (claim_seq=0), slot 1 = newer loop (claim_seq=1)
+    r0 = _make_receipt()
+    output._receipts[0] = r0
+    output._wave_files[0] = MagicMock()
+    output._wave_objs[0] = MagicMock()
+    output._is_loop[0] = False
+    output._claim_seq[0] = 0
+
+    r1 = _make_receipt()
+    output._receipts[1] = r1
+    output._wave_files[1] = MagicMock()
+    output._wave_objs[1] = MagicMock()
+    output._is_loop[1] = True
+    output._claim_seq[1] = 1
+
+    effect = _effect_loop("start", "new_music")
+    new_receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "music", "start"), frozenset({"ambient"}), effect, new_receipt
+    )
+
+    # Slot 1 is the only loop — must be evicted
+    output._mixer.voice[1].stop.assert_called()
+    output._mixer.voice[1].play.assert_called()
+    assert output._receipts[1] is new_receipt
+    # Slot 0 (one-shot) untouched
+    output._mixer.voice[0].play.assert_not_called()
+    r1.stop.assert_not_called()
+
+
+def test_new_oneshot_evicts_oldest_oneshot_not_loop_in_mixed_pool(tmp_path) -> None:
+    """Mixed pool: new one-shot evicts oldest one-shot, not a loop."""
+    wav = tmp_path / "sting.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("new_sting", str(wav))
+
+    output = _make_output(registry, num_voices=2)
+
+    # Slot 0 = older loop (claim_seq=0), slot 1 = newer one-shot (claim_seq=1)
+    r0 = _make_receipt()
+    output._receipts[0] = r0
+    output._wave_files[0] = MagicMock()
+    output._wave_objs[0] = MagicMock()
+    output._is_loop[0] = True
+    output._claim_seq[0] = 0
+
+    r1 = _make_receipt()
+    output._receipts[1] = r1
+    output._wave_files[1] = MagicMock()
+    output._wave_objs[1] = MagicMock()
+    output._is_loop[1] = False
+    output._claim_seq[1] = 1
+
+    effect = _effect_oneshot("start", "new_sting")
+    new_receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "sting", "start"), frozenset({"personal"}), effect, new_receipt
+    )
+
+    # Slot 1 is the only one-shot — must be evicted
+    output._mixer.voice[1].stop.assert_called()
+    output._mixer.voice[1].play.assert_called()
+    assert output._receipts[1] is new_receipt
+    # Slot 0 (loop) untouched
+    output._mixer.voice[0].play.assert_not_called()
+    r1.stop.assert_not_called()
+
+
+def test_new_oneshot_silently_dropped_when_all_loops(tmp_path) -> None:
+    """All voices hold loops: new one-shot is silently dropped."""
+    wav = tmp_path / "sting.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("new_sting", str(wav))
+
+    output = _make_output(registry, num_voices=2)
+    _fill_pool_with_loops(output, 2)
+
+    effect = _effect_oneshot("start", "new_sting")
+    new_receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "sting", "start"), frozenset({"personal"}), effect, new_receipt
+    )
+
+    output._mixer.voice[0].play.assert_not_called()
+    output._mixer.voice[1].play.assert_not_called()
+
+
+def test_new_loop_evicts_oldest_oneshot_when_no_loop_in_pool(tmp_path) -> None:
+    """All voices hold one-shots: new loop falls back to evicting oldest one-shot."""
+    wav = tmp_path / "music.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("new_music", str(wav))
+
+    output = _make_output(registry, num_voices=2)
+    old_receipts = _fill_pool_with_oneshots(output, 2)
+
+    effect = _effect_loop("start", "new_music")
+    new_receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "music", "start"), frozenset({"ambient"}), effect, new_receipt
+    )
+
+    # Slot 0 is oldest overall (claim_seq=0) — evicted as fallback
+    output._mixer.voice[0].stop.assert_called()
+    output._mixer.voice[0].play.assert_called()
+    assert output._receipts[0] is new_receipt
+    old_receipts[0].stop.assert_not_called()
+
+
+def test_evicted_slot_gets_higher_claim_seq_than_all_others(tmp_path) -> None:
+    """After eviction, the reclaimed slot has claim_seq greater than all other slots."""
+    wav = tmp_path / "clip.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("new_clip", str(wav))
+
+    output = _make_output(registry, num_voices=3)
+    _fill_pool_with_oneshots(output, 3)  # claim_seq: 0, 1, 2
+
+    effect = _effect_oneshot("start", "new_clip")
+    new_receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "clip", "start"), frozenset({"personal"}), effect, new_receipt
+    )
+
+    # Slot 0 was evicted; its new claim_seq must be > all other slots
+    evicted_seq = output._claim_seq[0]
+    for i in range(1, 3):
+        assert evicted_seq > output._claim_seq[i], (
+            f"evicted slot claim_seq={evicted_seq} not > slot {i} claim_seq={output._claim_seq[i]}"
+        )
+
+
+def test_evicted_slot_file_closed_and_voice_stopped(tmp_path) -> None:
+    """On eviction: mixer voice stopped, file closed, slot cleared before new clip plays."""
+    wav = tmp_path / "clip.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("new_clip", str(wav))
+
+    output = _make_output(registry, num_voices=2)
+    old_wave_file = MagicMock()
+    r0 = _make_receipt()
+    output._receipts[0] = r0
+    output._wave_files[0] = old_wave_file
+    output._wave_objs[0] = MagicMock()
+    output._is_loop[0] = False
+    output._claim_seq[0] = 0
+
+    r1 = _make_receipt()
+    output._receipts[1] = r1
+    output._wave_files[1] = MagicMock()
+    output._wave_objs[1] = MagicMock()
+    output._is_loop[1] = False
+    output._claim_seq[1] = 1
+
+    effect = _effect_oneshot("start", "new_clip")
+    new_receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "clip", "start"), frozenset({"personal"}), effect, new_receipt
+    )
+
+    output._mixer.voice[0].stop.assert_called()
+    old_wave_file.close.assert_called_once()
+    assert output._receipts[0] is new_receipt
+
+
+def test_evicted_receipt_is_not_stopped(tmp_path) -> None:
+    """Evicted receipt is left alive — its lifecycle is managed by rules, not AudioEffectOutput."""
+    wav = tmp_path / "clip.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("new_clip", str(wav))
+
+    output = _make_output(registry, num_voices=2)
+    old_receipts = _fill_pool_with_oneshots(output, 2)
+
+    effect = _effect_oneshot("start", "new_clip")
+    new_receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "clip", "start"), frozenset({"personal"}), effect, new_receipt
+    )
+
+    old_receipts[0].stop.assert_not_called()
