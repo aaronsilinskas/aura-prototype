@@ -157,13 +157,6 @@ def test_ready_shows_ready_effect_on_all_scopes(spy):
     assert ready_calls[0][0] is Scope.ALL
 
 
-def test_ready_shows_ready_effect(spy):
-    state, engine, timer = _make_state(spy)
-    _tick(state, engine, timer, total=0.0)
-    ready_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.ready"]
-    assert len(ready_calls) == 1
-
-
 # ---------------------------------------------------------------------------
 # Ready — no transition without a button press
 # ---------------------------------------------------------------------------
@@ -214,7 +207,7 @@ def test_button_press_from_ready_shows_yellow_warning_on_all_scopes(spy):
 
     yellow_calls = [c for c in spy.set_effect_calls if c[2].get("end_color") == 0xFFFF00]
     assert len(yellow_calls) == 1
-    assert yellow_calls[0][0] is Scope.NON_AMBIENT
+    assert yellow_calls[0][0] is Scope.ALL
 
 
 def test_button_press_from_ready_uses_warning_sting_effect_for_warning(spy):
@@ -226,7 +219,7 @@ def test_button_press_from_ready_uses_warning_sting_effect_for_warning(spy):
 
     sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
     assert len(sting_calls) == 1
-    assert sting_calls[0][0] is Scope.NON_AMBIENT
+    assert sting_calls[0][0] is Scope.ALL
 
 
 def test_red_warning_sting_uses_one_second_breathe_cycle(spy):
@@ -279,7 +272,7 @@ def test_red_phase_transition_uses_solid_with_red_color(spy):
 
     solid_calls = [c for c in spy.set_effect_calls if c[1] == "basic.solid"]
     assert len(solid_calls) == 1
-    assert solid_calls[0][0] is Scope.NON_AMBIENT
+    assert solid_calls[0][0] is Scope.ALL
     assert solid_calls[0][2]["color"] == 0xFF0000
 
 
@@ -396,7 +389,7 @@ def test_green_warning_transition_uses_warning_sting_with_yellow_end_color(spy):
 
     sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
     assert len(sting_calls) == 1
-    assert sting_calls[0][0] is Scope.NON_AMBIENT
+    assert sting_calls[0][0] is Scope.ALL
     assert sting_calls[0][2]["end_color"] == 0xFFFF00
 
 
@@ -414,7 +407,7 @@ def test_green_phase_transition_uses_solid_with_green_color(spy):
 
     solid_calls = [c for c in spy.set_effect_calls if c[1] == "basic.solid"]
     assert len(solid_calls) == 1
-    assert solid_calls[0][0] is Scope.NON_AMBIENT
+    assert solid_calls[0][0] is Scope.ALL
     assert solid_calls[0][2]["color"] == 0x00FF00
 
 
@@ -510,18 +503,7 @@ def test_game_over_shows_fire_effect_on_all_scopes(spy):
 
     fire_calls = [c for c in spy.set_effect_calls if c[1] == "elements.fire"]
     assert len(fire_calls) == 1
-    assert fire_calls[0][0] is Scope.NON_AMBIENT
-
-
-def test_game_over_shows_fire_effect(spy):
-    state, engine, timer = _setup_red_phase(spy, grace=1.0)
-    phase_start = state.get("rlgl_phase_start", 0.0)
-    spy.set_effect_calls.clear()
-
-    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)
-
-    fire_calls = [c for c in spy.set_effect_calls if c[1] == "elements.fire"]
-    assert len(fire_calls) == 1
+    assert fire_calls[0][0] is Scope.ALL
 
 
 def test_game_over_transitions_to_ready_after_game_over_duration(spy):
@@ -553,39 +535,12 @@ def test_game_over_expiry_restores_ready_effect_on_all_scopes(spy):
     assert ready_calls[0][0] is Scope.ALL
 
 
-def test_game_over_expiry_restores_ready_effect(spy):
-    state, engine, timer = _setup_red_phase(
-        spy, grace=1.0, initial_data={"rlgl_game_over_duration": 2.0}
-    )
-    phase_start = state.get("rlgl_phase_start", 0.0)
-    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)
-    go_start = state.get("rlgl_phase_start", 0.0)
-    spy.set_effect_calls.clear()
-
-    _tick(state, engine, timer, total=go_start + 2.0)
-
-    ready_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.ready"]
-    assert len(ready_calls) == 1
-
-
 # ---------------------------------------------------------------------------
 # Audio — Red Warning phase
 # ---------------------------------------------------------------------------
 
 
-def test_red_warning_sets_warning_sting_on_non_ambient(spy):
-    state, engine, timer = _make_state(spy)
-    _tick(state, engine, timer, total=0.0)
-    spy.set_effect_calls.clear()
-
-    _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
-
-    sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
-    assert len(sting_calls) == 1
-    assert sting_calls[0][0] is Scope.NON_AMBIENT
-
-
-def test_red_warning_does_not_add_effect_for_warning_sting(spy):
+def test_red_warning_sting_replaces_current_visual_not_layers_on_top(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
     spy.add_effect_calls.clear()
@@ -599,11 +554,11 @@ def test_red_warning_does_not_add_effect_for_warning_sting(spy):
 def test_red_warning_does_not_start_ambient_music(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
-    spy.set_effect_calls.clear()
+    spy.add_effect_calls.clear()
 
     _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
 
-    music_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.red_light_music"]
+    music_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.red_light_music"]
     assert len(music_calls) == 0
 
 
@@ -632,7 +587,7 @@ def test_red_phase_starts_ambient_music_on_ambient_scope(spy):
 
     _tick(state, engine, timer, total=0.0)  # RED_WARNING → RED
 
-    music_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.red_light_music"]
+    music_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.red_light_music"]
     assert len(music_calls) == 1
     assert music_calls[0][0] is Scope.AMBIENT
 
@@ -648,7 +603,7 @@ def test_red_phase_stores_ambient_receipt_in_game_state(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_green_warning_sets_warning_sting_on_non_ambient(spy):
+def test_green_warning_sets_warning_sting_on_all(spy):
     state, engine, timer = _make_state(
         spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
     )
@@ -661,10 +616,10 @@ def test_green_warning_sets_warning_sting_on_non_ambient(spy):
 
     sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
     assert len(sting_calls) == 1
-    assert sting_calls[0][0] is Scope.NON_AMBIENT
+    assert sting_calls[0][0] is Scope.ALL
 
 
-def test_green_warning_does_not_add_effect_for_warning_sting(spy):
+def test_green_warning_sting_replaces_current_visual_not_layers_on_top(spy):
     state, engine, timer = _make_state(
         spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
     )
@@ -686,11 +641,11 @@ def test_green_warning_does_not_start_ambient_music(spy):
     _tick(state, engine, timer, total=0.0)
     _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
     _tick(state, engine, timer, total=0.0)  # → RED
-    spy.set_effect_calls.clear()
+    spy.add_effect_calls.clear()
 
     _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
 
-    music_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.green_light_music"]
+    music_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.green_light_music"]
     assert len(music_calls) == 0
 
 
@@ -723,7 +678,7 @@ def test_green_phase_starts_ambient_music_on_ambient_scope(spy):
 
     _tick(state, engine, timer, total=0.0)  # GREEN_WARNING → GREEN
 
-    music_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.green_light_music"]
+    music_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.green_light_music"]
     assert len(music_calls) == 1
     assert music_calls[0][0] is Scope.AMBIENT
 
@@ -739,7 +694,7 @@ def test_green_phase_stores_ambient_receipt_in_game_state(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_game_over_plays_game_over_sting_on_personal(spy):
+def test_game_over_plays_game_over_sting_on_all(spy):
     state, engine, timer = _setup_red_phase(spy, grace=1.0)
     phase_start = state.get("rlgl_phase_start", 0.0)
     spy.add_effect_calls.clear()
@@ -748,7 +703,7 @@ def test_game_over_plays_game_over_sting_on_personal(spy):
 
     sting_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.game_over_sting"]
     assert len(sting_calls) == 1
-    assert sting_calls[0][0] is Scope.PERSONAL
+    assert sting_calls[0][0] is Scope.ALL
 
 
 def test_game_over_stops_ambient_receipt(spy):
@@ -777,7 +732,7 @@ def test_game_over_removes_ambient_receipt_from_game_state(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_ready_does_not_crash_when_no_ambient_receipt_held(spy):
+def test_first_game_start_enters_ready_without_prior_ambient_receipt(spy):
     state, engine, timer = _make_state(spy)
 
     _tick(state, engine, timer, total=0.0)  # init → READY (no ambient receipt)

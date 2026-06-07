@@ -82,8 +82,9 @@ def _enter_ready(state: GameState) -> None:
     state.effect_controls.set_effect(Scope.ALL, "rlgl.ready", {"level": 3})
 
 
-_PULSE_OPTS_BASE = {
+_WARNING_STING_OPTS: Final = {
     "start_color": 0x000000,
+    "end_color": 0xFFFF00,
     "brighten_duration": 0.3,
     "on_duration": 0.4,
     "darken_duration": 0.3,
@@ -96,16 +97,14 @@ def _enter_red_warning(state: GameState) -> None:
     state.set(_KEY_PHASE_START, state.total)
     if state.has(_KEY_AMBIENT_RECEIPT):
         state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
-    opts = dict(_PULSE_OPTS_BASE)
-    opts["end_color"] = 0xFFFF00
-    state.effect_controls.set_effect(Scope.NON_AMBIENT, "rlgl.warning_sting", opts)
+    state.effect_controls.set_effect(Scope.ALL, "rlgl.warning_sting", _WARNING_STING_OPTS)
 
 
 def _enter_red(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_RED)
     state.set(_KEY_PHASE_START, state.total)
-    state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.solid", {"color": 0xFF0000})
-    receipt = state.effect_controls.set_effect(Scope.AMBIENT, "rlgl.red_light_music", {})
+    state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": 0xFF0000})
+    receipt = state.effect_controls.add_effect(Scope.AMBIENT, "rlgl.red_light_music", {})
     state.set(_KEY_AMBIENT_RECEIPT, receipt)
 
 
@@ -114,17 +113,15 @@ def _enter_green_warning(state: GameState) -> None:
     state.set(_KEY_PHASE_START, state.total)
     if state.has(_KEY_AMBIENT_RECEIPT):
         state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
-    opts = dict(_PULSE_OPTS_BASE)
-    opts["end_color"] = 0xFFFF00
-    state.effect_controls.set_effect(Scope.NON_AMBIENT, "rlgl.warning_sting", opts)
+    state.effect_controls.set_effect(Scope.ALL, "rlgl.warning_sting", _WARNING_STING_OPTS)
 
 
 def _enter_green(state: GameState) -> None:
     state.set(_KEY_PHASE, PHASE_GREEN)
     state.set(_KEY_PHASE_START, state.total)
     state.set(_KEY_LAST_MOTION_TIME, state.total)
-    state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.solid", {"color": 0x00FF00})
-    receipt = state.effect_controls.set_effect(Scope.AMBIENT, "rlgl.green_light_music", {})
+    state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": 0x00FF00})
+    receipt = state.effect_controls.add_effect(Scope.AMBIENT, "rlgl.green_light_music", {})
     state.set(_KEY_AMBIENT_RECEIPT, receipt)
 
 
@@ -133,8 +130,8 @@ def _enter_game_over(state: GameState) -> None:
     state.set(_KEY_PHASE_START, state.total)
     if state.has(_KEY_AMBIENT_RECEIPT):
         state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
-    state.effect_controls.set_effect(Scope.NON_AMBIENT, "elements.fire", {})
-    state.effect_controls.add_effect(Scope.PERSONAL, "rlgl.game_over_sting", {})
+    state.effect_controls.set_effect(Scope.ALL, "elements.fire", {})
+    state.effect_controls.add_effect(Scope.ALL, "rlgl.game_over_sting", {})
 
 
 # ---------------------------------------------------------------------------
