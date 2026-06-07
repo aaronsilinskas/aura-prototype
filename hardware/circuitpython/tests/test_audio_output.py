@@ -1,8 +1,10 @@
-"""Tests for AudioEffectOutput — EffectAudio-based clip lookup."""
+"""Tests for AudioEffectOutput — flat N-voice pool with idle-first selection."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
+
+import pytest
 
 from effects.effect import AudioPlaybackConfig, Effect, EffectAudio
 from engine.audio import AudioRegistry
@@ -22,7 +24,9 @@ def _make_receipt(loudness: float = 1.0) -> MagicMock:
     return r
 
 
-def _make_output(audio_registry: AudioRegistry, max_volume: float = 0.2) -> AudioEffectOutput:
+def _make_output(
+    audio_registry: AudioRegistry, max_volume: float = 0.2, num_voices: int = 2
+) -> AudioEffectOutput:
     """Build an AudioEffectOutput with all hardware deps patched out."""
     import audiobusio  # type: ignore[import]
     import audiocore  # type: ignore[import]
@@ -31,14 +35,14 @@ def _make_output(audio_registry: AudioRegistry, max_volume: float = 0.2) -> Audi
     audiobusio.I2SOut = MagicMock(return_value=MagicMock())
     audiocore.WaveFile = MagicMock(return_value=MagicMock())
     mock_mixer = MagicMock()
-    mock_voice0 = MagicMock()
-    mock_voice1 = MagicMock()
-    mock_mixer.voice = [mock_voice0, mock_voice1]
+    mock_mixer.voice = [MagicMock() for _ in range(num_voices)]
     audiomixer.Mixer = MagicMock(return_value=mock_mixer)
 
     from hardware.circuitpython.audio_output import AudioEffectOutput
 
-    return AudioEffectOutput(audio_registry=audio_registry, max_volume=max_volume)
+    return AudioEffectOutput(
+        audio_registry=audio_registry, max_volume=max_volume, num_voices=num_voices
+    )
 
 
 def _effect_oneshot(verb: str, clip_name: str) -> Effect:
@@ -56,12 +60,45 @@ def _effect_loop(verb: str, clip_name: str) -> Effect:
 
 
 # ---------------------------------------------------------------------------
-# Voice selection — loop vs one-shot
+# Constructor — required parameters
 # ---------------------------------------------------------------------------
 
 
-def test_loop_clip_plays_on_voice_0(tmp_path) -> None:
-    """loop=True clips play on voice 0."""
+def test_requires_num_voices_and_max_volume() -> None:
+    """AudioEffectOutput must be constructed with max_volume and num_voices — no defaults."""
+    import audiobusio  # type: ignore[import]
+    import audiomixer  # type: ignore[import]
+
+    audiobusio.I2SOut = MagicMock(return_value=MagicMock())
+    mock_mixer = MagicMock()
+    mock_mixer.voice = []
+    audiomixer.Mixer = MagicMock(return_value=mock_mixer)
+
+    from hardware.circuitpython.audio_output import AudioEffectOutput
+
+    with pytest.raises(TypeError):
+        AudioEffectOutput(audio_registry=AudioRegistry())  # type: ignore[call-arg]
+
+
+def test_mixer_constructed_with_num_voices() -> None:
+    """audiomixer.Mixer is constructed with voice_count=num_voices."""
+    import audiomixer  # type: ignore[import]
+
+    registry = AudioRegistry()
+    _make_output(registry, num_voices=4)
+
+    audiomixer.Mixer.assert_called_once()
+    call_kwargs = audiomixer.Mixer.call_args[1]
+    assert call_kwargs["voice_count"] == 4
+
+
+# ---------------------------------------------------------------------------
+# Voice selection — idle-first, loop vs one-shot
+# ---------------------------------------------------------------------------
+
+
+def test_loop_clip_claims_first_idle_slot(tmp_path) -> None:
+    """A loop clip claims slot 0 when all voices are idle."""
     wav = tmp_path / "music_start.wav"
     wav.write_bytes(b"RIFF")
 
@@ -80,8 +117,8 @@ def test_loop_clip_plays_on_voice_0(tmp_path) -> None:
     output._mixer.voice[1].play.assert_not_called()
 
 
-def test_oneshot_clip_plays_on_voice_1(tmp_path) -> None:
-    """loop=False clips play on voice 1."""
+def test_oneshot_clip_claims_first_idle_slot(tmp_path) -> None:
+    """A one-shot clip claims slot 0 when all voices are idle."""
     wav = tmp_path / "sting_start.wav"
     wav.write_bytes(b"RIFF")
 
@@ -96,28 +133,56 @@ def test_oneshot_clip_plays_on_voice_1(tmp_path) -> None:
         EffectEvent("rlgl", "sting", "start"), frozenset({"personal"}), effect, receipt
     )
 
-    output._mixer.voice[1].play.assert_called()
-    output._mixer.voice[0].play.assert_not_called()
+    output._mixer.voice[0].play.assert_called()
+    output._mixer.voice[1].play.assert_not_called()
 
 
-def test_peak_verb_with_loop_false_plays_on_voice_1(tmp_path) -> None:
-    """peak verb with loop=False plays on voice 1."""
-    wav = tmp_path / "warning_sting_peak.wav"
+def test_second_clip_claims_next_idle_slot(tmp_path) -> None:
+    """A second clip claims slot 1 when slot 0 is occupied."""
+    wav = tmp_path / "clip.wav"
     wav.write_bytes(b"RIFF")
 
     registry = AudioRegistry()
-    registry.register("warning_sting_peak", str(wav))
+    registry.register("clip_a", str(wav))
+    registry.register("clip_b", str(wav))
 
     output = _make_output(registry)
-    effect = _effect_oneshot("peak", "warning_sting_peak")
-    receipt = _make_receipt()
 
+    # Occupy slot 0 manually
+    output._receipts[0] = _make_receipt()
+
+    effect = _effect_oneshot("start", "clip_b")
+    receipt = _make_receipt()
     output.handle_event(
-        EffectEvent("rlgl", "warning_sting", "peak"), frozenset({"personal"}), effect, receipt
+        EffectEvent("rlgl", "clip", "start"), frozenset({"personal"}), effect, receipt
     )
 
-    output._mixer.voice[1].play.assert_called()
     output._mixer.voice[0].play.assert_not_called()
+    output._mixer.voice[1].play.assert_called()
+
+
+def test_clip_silently_dropped_when_all_voices_occupied(tmp_path) -> None:
+    """With all voices occupied, a new clip is silently dropped — no play, no crash."""
+    wav = tmp_path / "clip.wav"
+    wav.write_bytes(b"RIFF")
+
+    registry = AudioRegistry()
+    registry.register("new_clip", str(wav))
+
+    output = _make_output(registry, num_voices=2)
+
+    # Occupy all slots
+    output._receipts[0] = _make_receipt()
+    output._receipts[1] = _make_receipt()
+
+    effect = _effect_oneshot("start", "new_clip")
+    receipt = _make_receipt()
+    output.handle_event(
+        EffectEvent("rlgl", "clip", "start"), frozenset({"personal"}), effect, receipt
+    )
+
+    output._mixer.voice[0].play.assert_not_called()
+    output._mixer.voice[1].play.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +216,7 @@ def test_handle_event_ignores_unknown_verb() -> None:
         EffectEvent("rlgl", "effect", "stop"), frozenset({"personal"}), effect, receipt
     )
 
+    output._mixer.voice[0].play.assert_not_called()
     output._mixer.voice[1].play.assert_not_called()
 
 
@@ -165,7 +231,7 @@ def test_handle_event_ignores_unregistered_clip() -> None:
         EffectEvent("rlgl", "effect", "start"), frozenset({"personal"}), effect, receipt
     )
 
-    output._mixer.voice[1].stop.assert_not_called()
+    output._mixer.voice[0].play.assert_not_called()
     output._mixer.voice[1].play.assert_not_called()
 
 
@@ -182,171 +248,177 @@ def test_handle_event_ignores_oserror_on_file_open(tmp_path) -> None:
         EffectEvent("rlgl", "effect", "start"), frozenset({"personal"}), effect, receipt
     )
 
+    output._mixer.voice[0].play.assert_not_called()
     output._mixer.voice[1].play.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
-# One-shot replacement on voice 1
+# flush — natural one-shot finish frees slot
 # ---------------------------------------------------------------------------
 
 
-def test_new_oneshot_stops_and_replaces_existing_oneshot(tmp_path) -> None:
-    """A new one-shot event stops the existing voice 1 playback before starting."""
-    wav = tmp_path / "sting.wav"
-    wav.write_bytes(b"RIFF")
-
-    registry = AudioRegistry()
-    registry.register("sting_start", str(wav))
-
-    output = _make_output(registry)
-
-    old_receipt = _make_receipt()
-    old_file = MagicMock()
-    output._once_file = old_file
-    output._once_receipt = old_receipt
-    output._once_verb = "start"
-
-    effect = _effect_oneshot("start", "sting_start")
-    receipt = _make_receipt()
-    output.handle_event(
-        EffectEvent("rlgl", "sting", "start"), frozenset({"personal"}), effect, receipt
-    )
-
-    output._mixer.voice[1].stop.assert_called()
-    old_file.close.assert_called()
-    old_receipt.stop.assert_called()
-
-
-def test_replacing_peak_oneshot_does_not_stop_pixel_effect_receipt(tmp_path) -> None:
-    """Replacing a 'peak' one-shot does NOT stop the pixel effect's receipt."""
-    wav = tmp_path / "pulse_peak.wav"
-    wav.write_bytes(b"RIFF")
-
-    registry = AudioRegistry()
-    registry.register("pulse_peak", str(wav))
-
-    output = _make_output(registry)
-
-    old_receipt = _make_receipt()
-    old_file = MagicMock()
-    output._once_file = old_file
-    output._once_receipt = old_receipt
-    output._once_verb = "peak"
-
-    effect = _effect_oneshot("peak", "pulse_peak")
-    receipt = _make_receipt()
-    output.handle_event(
-        EffectEvent("rlgl", "pulse", "peak"), frozenset({"personal"}), effect, receipt
-    )
-
-    output._mixer.voice[1].stop.assert_called()
-    old_file.close.assert_called()
-    old_receipt.stop.assert_not_called()
-
-
-# ---------------------------------------------------------------------------
-# flush — natural end-of-playback and external stop
-# ---------------------------------------------------------------------------
-
-
-def test_flush_cleans_up_oneshot_state_when_voice1_finishes_naturally() -> None:
-    """flush: voice 1 finishes playing → audio state is cleaned up, receipt is NOT stopped."""
+def test_flush_frees_slot_when_oneshot_finishes_naturally() -> None:
+    """flush: voice finishes playing naturally → slot freed, receipt NOT stopped."""
     registry = AudioRegistry()
     output = _make_output(registry)
 
     receipt = _make_receipt()
-    once_file = MagicMock()
-    output._once_receipt = receipt
-    output._once_file = once_file
-    output._once_verb = "start"
-    output._mixer.voice[1].playing = False
+    wave_file = MagicMock()
+    output._receipts[0] = receipt
+    output._wave_files[0] = wave_file
+    output._is_loop[0] = False
+    output._mixer.voice[0].playing = False
 
     output.flush()
 
     receipt.stop.assert_not_called()
-    once_file.close.assert_called_once()
-    assert output._once_receipt is None
-    assert output._once_file is None
-    assert output._once_wave is None
+    wave_file.close.assert_called_once()
+    assert output._receipts[0] is None
+    assert output._wave_files[0] is None
+    assert output._wave_objs[0] is None
 
 
-def test_flush_stops_voice1_early_when_receipt_externally_stopped() -> None:
-    """flush: externally-stopped receipt causes voice 1 to halt and file to close."""
+def test_flush_frees_slot_on_any_index(tmp_path) -> None:
+    """flush detects natural one-shot finish on any slot index, not just slot 0."""
+    registry = AudioRegistry()
+    output = _make_output(registry, num_voices=3)
+
+    receipt = _make_receipt()
+    wave_file = MagicMock()
+    # Occupy slot 2 only (slots 0 and 1 idle)
+    output._receipts[2] = receipt
+    output._wave_files[2] = wave_file
+    output._is_loop[2] = False
+    output._mixer.voice[2].playing = False
+
+    output.flush()
+
+    receipt.stop.assert_not_called()
+    wave_file.close.assert_called_once()
+    assert output._receipts[2] is None
+
+
+def test_flush_does_not_free_loop_slot_when_still_playing() -> None:
+    """flush: loop voice still playing and receipt alive → slot not freed."""
+    registry = AudioRegistry()
+    output = _make_output(registry)
+
+    receipt = _make_receipt()
+    output._receipts[0] = receipt
+    output._is_loop[0] = True
+    output._mixer.voice[0].playing = True
+
+    output.flush()
+
+    assert output._receipts[0] is receipt
+    output._mixer.voice[0].stop.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# flush — externally-stopped receipt
+# ---------------------------------------------------------------------------
+
+
+def test_flush_stops_voice_and_frees_slot_when_receipt_externally_stopped() -> None:
+    """flush: externally-stopped receipt → voice stopped, file closed, slot freed."""
     registry = AudioRegistry()
     output = _make_output(registry)
 
     receipt = _make_receipt()
     receipt.is_stopped.return_value = True
-    once_file = MagicMock()
-    output._once_receipt = receipt
-    output._once_file = once_file
-    output._mixer.voice[1].playing = True
-
-    output.flush()
-
-    output._mixer.voice[1].stop.assert_called_once()
-    once_file.close.assert_called_once()
-    assert output._once_receipt is None
-    assert output._once_wave is None
-
-
-def test_flush_stops_voice0_when_loop_receipt_externally_stopped() -> None:
-    """flush: externally-stopped loop receipt causes voice 0 to halt and file to close."""
-    registry = AudioRegistry()
-    output = _make_output(registry)
-
-    loop_receipt = _make_receipt()
-    loop_receipt.is_stopped.return_value = True
-    loop_file = MagicMock()
-    output._loop_receipt = loop_receipt
-    output._loop_file = loop_file
+    wave_file = MagicMock()
+    output._receipts[0] = receipt
+    output._wave_files[0] = wave_file
+    output._mixer.voice[0].playing = True
 
     output.flush()
 
     output._mixer.voice[0].stop.assert_called_once()
-    loop_file.close.assert_called_once()
-    assert output._loop_receipt is None
-    assert output._loop_file is None
-    assert output._loop_wave is None
+    wave_file.close.assert_called_once()
+    assert output._receipts[0] is None
+    assert output._wave_files[0] is None
+    assert output._wave_objs[0] is None
 
 
-def test_flush_does_nothing_when_voice1_still_playing() -> None:
-    """flush: active one-shot with externally-alive receipt is left running."""
+def test_flush_clears_natural_finish_before_stopped_check() -> None:
+    """flush: naturally-finished slot clears receipt before stopped check — no double processing."""
     registry = AudioRegistry()
     output = _make_output(registry)
 
+    # Receipt that reports stopped=True
     receipt = _make_receipt()
-    receipt.is_stopped.return_value = False
-    output._once_receipt = receipt
-    output._mixer.voice[1].playing = True
+    receipt.is_stopped.return_value = True
+    wave_file = MagicMock()
+    output._receipts[0] = receipt
+    output._wave_files[0] = wave_file
+    output._is_loop[0] = False
+    # Simulate natural finish (voice not playing)
+    output._mixer.voice[0].playing = False
 
     output.flush()
 
-    output._mixer.voice[1].stop.assert_not_called()
-    receipt.stop.assert_not_called()
+    # Natural finish cleared first, so stopped check sees receipt=None and skips
+    # voice.stop should NOT be called (natural finish path doesn't call stop)
+    output._mixer.voice[0].stop.assert_not_called()
+    assert output._receipts[0] is None
 
 
 # ---------------------------------------------------------------------------
-# max_volume — required constructor parameter
+# flush — per-slot loudness updates
 # ---------------------------------------------------------------------------
 
 
-def test_audio_effect_output_requires_max_volume() -> None:
-    """AudioEffectOutput must be constructed with max_volume — no default."""
-    import audiobusio  # type: ignore[import]
-    import audiomixer  # type: ignore[import]
+def test_flush_updates_loudness_when_receipt_loudness_changes() -> None:
+    """flush: receipt.loudness changed since last tick → voice level reapplied."""
+    registry = AudioRegistry()
+    output = _make_output(registry, max_volume=0.4)
 
-    audiobusio.I2SOut = MagicMock(return_value=MagicMock())
-    mock_mixer = MagicMock()
-    mock_mixer.voice = [MagicMock(), MagicMock()]
-    audiomixer.Mixer = MagicMock(return_value=mock_mixer)
+    receipt = _make_receipt(loudness=0.5)
+    receipt.is_stopped.return_value = False
+    output._receipts[0] = receipt
+    output._loudness[0] = 1.0
+    output._mixer.voice[0].playing = True
 
-    import pytest
+    output.flush()
 
-    from hardware.circuitpython.audio_output import AudioEffectOutput
+    assert output._mixer.voice[0].level == pytest.approx(0.4 * 0.5)
+    assert output._loudness[0] == 0.5
 
-    with pytest.raises(TypeError):
-        AudioEffectOutput(audio_registry=AudioRegistry())
+
+def test_flush_does_not_update_loudness_when_unchanged() -> None:
+    """flush: receipt.loudness unchanged → voice level not reapplied."""
+    registry = AudioRegistry()
+    output = _make_output(registry, max_volume=0.4)
+
+    receipt = _make_receipt(loudness=0.75)
+    receipt.is_stopped.return_value = False
+    output._receipts[0] = receipt
+    output._loudness[0] = 0.75
+    output._mixer.voice[0].playing = True
+
+    # Reset mock to track new calls only
+    output._mixer.voice[0].reset_mock()
+
+    output.flush()
+
+    # level should not have been set
+    assert output._loudness[0] == 0.75
+
+
+def test_flush_updates_loudness_on_any_slot_index() -> None:
+    """flush updates loudness on any slot, not just slot 0."""
+    registry = AudioRegistry()
+    output = _make_output(registry, max_volume=0.4, num_voices=3)
+
+    receipt = _make_receipt(loudness=0.3)
+    receipt.is_stopped.return_value = False
+    output._receipts[2] = receipt
+    output._loudness[2] = 1.0
+    output._mixer.voice[2].playing = True
+
+    output.flush()
+
+    assert output._loudness[2] == 0.3
 
 
 # ---------------------------------------------------------------------------
@@ -354,8 +426,8 @@ def test_audio_effect_output_requires_max_volume() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_loop_clip_sets_voice0_level_from_receipt_loudness(tmp_path) -> None:
-    """loop=True: voice 0 level = max_volume * receipt.loudness when playback starts."""
+def test_clip_sets_voice_level_from_receipt_loudness(tmp_path) -> None:
+    """Voice level = max_volume * receipt.loudness when playback starts."""
     wav = tmp_path / "music.wav"
     wav.write_bytes(b"RIFF")
 
@@ -370,111 +442,5 @@ def test_loop_clip_sets_voice0_level_from_receipt_loudness(tmp_path) -> None:
         EffectEvent("pack", "effect", "start"), frozenset({"ambient"}), effect, receipt
     )
 
-    output._mixer.voice[0].level = 0.4 * 0.5
-    assert output._loop_loudness == 0.5
-
-
-def test_oneshot_clip_sets_voice1_level_from_receipt_loudness(tmp_path) -> None:
-    """loop=False: voice 1 level = max_volume * receipt.loudness when playback starts."""
-    wav = tmp_path / "sting.wav"
-    wav.write_bytes(b"RIFF")
-
-    registry = AudioRegistry()
-    registry.register("sting", str(wav))
-
-    output = _make_output(registry, max_volume=0.4)
-    effect = _effect_oneshot("start", "sting")
-    receipt = _make_receipt(loudness=0.5)
-
-    output.handle_event(
-        EffectEvent("pack", "effect", "start"), frozenset({"personal"}), effect, receipt
-    )
-
-    output._mixer.voice[1].level = 0.4 * 0.5
-    assert output._once_loudness == 0.5
-
-
-# ---------------------------------------------------------------------------
-# loudness — flush() polling
-# ---------------------------------------------------------------------------
-
-
-def test_flush_updates_voice1_level_when_once_loudness_changes() -> None:
-    """flush: receipt.loudness changed since last tick → voice 1 level reapplied."""
-    registry = AudioRegistry()
-    output = _make_output(registry, max_volume=0.4)
-
-    receipt = _make_receipt(loudness=0.5)
-    receipt.is_stopped.return_value = False
-    output._once_receipt = receipt
-    output._once_loudness = 1.0
-    output._mixer.voice[1].playing = True
-
-    output.flush()
-
-    output._mixer.voice[1].level = 0.4 * 0.5
-    assert output._once_loudness == 0.5
-
-
-def test_flush_does_not_reapply_voice1_level_when_loudness_unchanged() -> None:
-    """flush: receipt.loudness unchanged → voice 1 level assignment not called."""
-    registry = AudioRegistry()
-    output = _make_output(registry, max_volume=0.4)
-
-    receipt = _make_receipt(loudness=0.75)
-    receipt.is_stopped.return_value = False
-    output._once_receipt = receipt
-    output._once_loudness = 0.75
-    output._mixer.voice[1].playing = True
-
-    output.flush()
-
-    output._mixer.voice[1].level = MagicMock()
-    output._mixer.voice[1].level.assert_not_called()
-
-
-def test_flush_updates_voice0_level_when_loop_loudness_changes() -> None:
-    """flush: loop receipt.loudness changed → voice 0 level reapplied."""
-    registry = AudioRegistry()
-    output = _make_output(registry, max_volume=0.4)
-
-    receipt = _make_receipt(loudness=0.25)
-    receipt.is_stopped.return_value = False
-    output._loop_receipt = receipt
-    output._loop_loudness = 1.0
-
-    output.flush()
-
-    output._mixer.voice[0].level = 0.4 * 0.25
-    assert output._loop_loudness == 0.25
-
-
-def test_flush_resets_once_loudness_to_one_when_receipt_cleared() -> None:
-    """flush: once receipt cleared → _once_loudness resets to 1.0."""
-    registry = AudioRegistry()
-    output = _make_output(registry, max_volume=0.2)
-
-    receipt = _make_receipt(loudness=0.3)
-    receipt.is_stopped.return_value = True
-    output._once_receipt = receipt
-    output._once_loudness = 0.3
-    output._mixer.voice[1].playing = True
-
-    output.flush()
-
-    assert output._once_loudness == 1.0
-
-
-def test_flush_resets_loop_loudness_to_one_when_receipt_cleared() -> None:
-    """flush: loop receipt cleared → _loop_loudness resets to 1.0."""
-    registry = AudioRegistry()
-    output = _make_output(registry, max_volume=0.2)
-
-    receipt = _make_receipt(loudness=0.3)
-    receipt.is_stopped.return_value = True
-    output._loop_receipt = receipt
-    output._loop_loudness = 0.3
-
-    output.flush()
-
-    assert output._loop_loudness == 1.0
+    assert output._mixer.voice[0].level == pytest.approx(0.4 * 0.5)
+    assert output._loudness[0] == 0.5

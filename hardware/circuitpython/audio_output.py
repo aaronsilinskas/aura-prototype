@@ -17,43 +17,56 @@ class AudioEffectOutput(EffectOutput):
     ``handle_event`` calls for every effect on every scope without incurring
     pixel buffer allocation.
 
-    Uses a 2-voice ``audiomixer.Mixer``:
-      - Voice 0 — ambient loop (``loop=True``); started when
-        ``effect.audio.clips[verb].loop`` is ``True``.  Stopped when the
-        matching receipt stops (detected in ``flush()``).
-      - Voice 1 — one-shot; started when ``loop`` is ``False``.  Replaced
-        immediately if a new one-shot starts.  Stopped automatically in
-        ``flush()`` once playback ends naturally, or early if the receipt is
-        stopped externally.
+    Uses a flat pool of ``num_voices`` mixer voices.  Voice selection in
+    ``handle_event`` iterates slots 0 to N-1 and claims the first whose
+    receipt is ``None``.  If no idle slot exists the clip is silently dropped.
 
-    Teardown of both voices is driven entirely by ``flush()`` receipt guards.
+    ``flush()`` iterates all N slots each tick:
+      1. Natural one-shot finish (``not voice[i].playing``) — frees the slot
+         without stopping the receipt.
+      2. Externally-stopped receipt — stops the voice and frees the slot.
+      3. Loudness change — updates the voice level.
     """
 
-    def __init__(self, audio_registry: AudioRegistry, max_volume: float) -> None:
+    __slots__ = (
+        "_audio",
+        "_audio_registry",
+        "_is_loop",
+        "_loudness",
+        "_max_volume",
+        "_mixer",
+        "_num_voices",
+        "_receipts",
+        "_wave_files",
+        "_wave_objs",
+    )
+
+    def __init__(self, audio_registry: AudioRegistry, max_volume: float, num_voices: int) -> None:
         super().__init__(receives_pixels=False)
         self.min_resolution = 1
         self.scopes = [Scope.ALL]
         self._audio_registry = audio_registry
         self._max_volume = max_volume
+        self._num_voices = num_voices
         self._audio = audiobusio.I2SOut(board.I2S_BIT_CLOCK, board.I2S_WORD_SELECT, board.I2S_DATA)
         self._mixer = audiomixer.Mixer(
-            voice_count=2,
+            voice_count=num_voices,
             sample_rate=11025,
             channel_count=1,
             bits_per_sample=16,
             samples_signed=True,
         )
-
         self._audio.play(self._mixer)
-        self._loop_file = None
-        self._loop_wave = None  # held to prevent GC collecting it during playback
-        self._once_file = None
-        self._once_wave = None  # held to prevent GC collecting it during playback
-        self._loop_receipt: EffectReceipt | None = None
-        self._once_receipt: EffectReceipt | None = None
-        self._once_verb: str | None = None
-        self._loop_loudness: float = 1.0
-        self._once_loudness: float = 1.0
+
+        # Parallel lists — one entry per voice index, pre-allocated.
+        # _wave_files holds raw file objects; _wave_objs holds audiocore.WaveFile instances.
+        # Both are annotated as object because CircuitPython stubs for these types are
+        # incomplete or unavailable at static-analysis time.
+        self._receipts: list[EffectReceipt | None] = [None] * num_voices
+        self._wave_files: list[object | None] = [None] * num_voices
+        self._wave_objs: list[object | None] = [None] * num_voices
+        self._loudness: list[float] = [1.0] * num_voices
+        self._is_loop: list[bool] = [False] * num_voices
 
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
@@ -72,68 +85,60 @@ class AudioEffectOutput(EffectOutput):
         except OSError:
             return
 
-        if config.loop:
-            self._mixer.voice[0].stop()
-            if self._loop_file is not None:
-                self._loop_file.close()
-            self._loop_wave = audiocore.WaveFile(f)
-            self._loop_file = f
-            self._loop_receipt = receipt
-            self._loop_loudness = receipt.loudness
-            self._mixer.voice[0].level = self._max_volume * receipt.loudness
-            self._mixer.voice[0].play(self._loop_wave, loop=True)
-        else:
-            self._mixer.voice[1].stop()
-            if self._once_file is not None:
-                self._once_file.close()
-            if self._once_receipt is not None and self._once_verb == "start":
-                self._once_receipt.stop()
-            self._once_file = f
-            self._once_receipt = receipt
-            self._once_verb = event.verb
-            self._once_loudness = receipt.loudness
-            self._mixer.voice[1].level = self._max_volume * receipt.loudness
-            self._once_wave = audiocore.WaveFile(self._once_file)
-            self._mixer.voice[1].play(self._once_wave)
+        # Claim first idle slot
+        slot = -1
+        for i in range(self._num_voices):
+            if self._receipts[i] is None:
+                slot = i
+                break
+
+        if slot == -1:
+            # No idle slot — drop silently
+            f.close()
+            return
+
+        self._mixer.voice[slot].stop()
+        if self._wave_files[slot] is not None:
+            self._wave_files[slot].close()
+
+        self._wave_objs[slot] = audiocore.WaveFile(f)
+        self._wave_files[slot] = f
+        self._receipts[slot] = receipt
+        self._loudness[slot] = receipt.loudness
+        self._is_loop[slot] = config.loop
+        self._mixer.voice[slot].level = self._max_volume * receipt.loudness
+        self._mixer.voice[slot].play(self._wave_objs[slot], loop=config.loop)
 
     def flush(self) -> None:
-        # Clean up one-shot state when playback ends naturally
-        if self._once_receipt is not None and not self._mixer.voice[1].playing:
-            if self._once_file is not None:
-                self._once_file.close()
-                self._once_file = None
-            self._once_wave = None
-            self._once_receipt = None
-            self._once_verb = None
-            self._once_loudness = 1.0
+        for i in range(self._num_voices):
+            if self._receipts[i] is None:
+                continue
 
-        # Stop voice 1 early if a rule stopped the receipt externally
-        if self._once_receipt is not None and self._once_receipt.is_stopped():
-            self._mixer.voice[1].stop()
-            if self._once_file is not None:
-                self._once_file.close()
-                self._once_file = None
-            self._once_wave = None
-            self._once_receipt = None
-            self._once_verb = None
-            self._once_loudness = 1.0
-        elif self._once_receipt is not None:
-            loudness = self._once_receipt.loudness
-            if loudness != self._once_loudness:
-                self._mixer.voice[1].level = self._max_volume * loudness
-                self._once_loudness = loudness
+            # 1. Natural one-shot finish — clear before stopped check
+            if not self._is_loop[i] and not self._mixer.voice[i].playing:
+                if self._wave_files[i] is not None:
+                    self._wave_files[i].close()
+                    self._wave_files[i] = None
+                self._wave_objs[i] = None
+                self._receipts[i] = None
+                self._loudness[i] = 1.0
+                self._is_loop[i] = False
+                continue
 
-        # Stop voice 0 if a rule stopped the loop receipt directly
-        if self._loop_receipt is not None and self._loop_receipt.is_stopped():
-            self._mixer.voice[0].stop()
-            if self._loop_file is not None:
-                self._loop_file.close()
-                self._loop_file = None
-            self._loop_wave = None
-            self._loop_receipt = None
-            self._loop_loudness = 1.0
-        elif self._loop_receipt is not None:
-            loudness = self._loop_receipt.loudness
-            if loudness != self._loop_loudness:
-                self._mixer.voice[0].level = self._max_volume * loudness
-                self._loop_loudness = loudness
+            # 2. Externally-stopped receipt
+            if self._receipts[i].is_stopped():
+                self._mixer.voice[i].stop()
+                if self._wave_files[i] is not None:
+                    self._wave_files[i].close()
+                    self._wave_files[i] = None
+                self._wave_objs[i] = None
+                self._receipts[i] = None
+                self._loudness[i] = 1.0
+                self._is_loop[i] = False
+                continue
+
+            # 3. Loudness update
+            loudness = self._receipts[i].loudness
+            if loudness != self._loudness[i]:
+                self._mixer.voice[i].level = self._max_volume * loudness
+                self._loudness[i] = loudness

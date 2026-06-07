@@ -90,7 +90,8 @@ _audio_registry.register("red_light_music_start", "sounds/jaws_dundun.wav")
 _audio_registry.register("green_light_music_start", "sounds/move.wav")
 _audio_registry.register("game_over_sting_start", "sounds/game_over.wav")
 
-_outputs = [IS31FL3741EffectOutput(_matrix), AudioEffectOutput(_audio_registry, 0.2)]
+_audio_output = AudioEffectOutput(_audio_registry, max_volume=0.2, num_voices=2)
+_outputs = [IS31FL3741EffectOutput(_matrix), _audio_output]
 if _motor is not None:
     _outputs.append(Drv2605EffectOutput(_motor))
 
