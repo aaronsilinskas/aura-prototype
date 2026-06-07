@@ -10,10 +10,10 @@ class PulseBuilder(EffectBuilder):
 
     Reads ``start_color`` (default ``0x000000``), ``end_color`` (default
     ``0xFFFFFF``), ``brighten_duration``, ``on_duration``, ``darken_duration``,
-    and ``off_duration`` (all default ``0.5`` seconds) from options. Brightness
-    scaling is applied to both colors at build time via the ``brightness``
-    option (float, ``[0.0, 1.0]``, default ``1.0``); values outside the range
-    are clamped silently.
+    and ``off_duration`` (all default ``0.5`` seconds) from options. Colors are
+    stored raw and unscaled; the ``brightness`` option is silently ignored.
+    Brightness is an output-level concern applied by ``MatrixEffectOutput`` at
+    render time.
 
     Raises ``ValueError`` if any duration is negative or if all durations sum
     to zero.
@@ -21,8 +21,8 @@ class PulseBuilder(EffectBuilder):
 
     def __call__(self, name: str, config: EffectConfig) -> Effect:
         opts = config.options
-        start_color_raw = opts.get("start_color", 0x000000)
-        end_color_raw = opts.get("end_color", 0xFFFFFF)
+        start_color = opts.get("start_color", 0x000000)
+        end_color = opts.get("end_color", 0xFFFFFF)
         brighten_duration = opts.get("brighten_duration", 0.5)
         on_duration = opts.get("on_duration", 0.5)
         darken_duration = opts.get("darken_duration", 0.5)
@@ -34,13 +34,12 @@ class PulseBuilder(EffectBuilder):
         if cycle_total == 0.0:
             raise ValueError("At least one pulse phase duration must be non-zero")
 
-        brightness = max(0.0, min(1.0, float(config.options.get("brightness", 1.0))))
-        sr = int(((start_color_raw >> 16) & 0xFF) * brightness)
-        sg = int(((start_color_raw >> 8) & 0xFF) * brightness)
-        sb = int((start_color_raw & 0xFF) * brightness)
-        er = int(((end_color_raw >> 16) & 0xFF) * brightness)
-        eg = int(((end_color_raw >> 8) & 0xFF) * brightness)
-        eb = int((end_color_raw & 0xFF) * brightness)
+        sr = (start_color >> 16) & 0xFF
+        sg = (start_color >> 8) & 0xFF
+        sb = start_color & 0xFF
+        er = (end_color >> 16) & 0xFF
+        eg = (end_color >> 8) & 0xFF
+        eb = end_color & 0xFF
         palette = PaletteLUT256(bytes([0, sr, sg, sb, 255, er, eg, eb]))
 
         b_on = brighten_duration
