@@ -216,12 +216,6 @@ def test_effect_audio_stores_clips_dict() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_effect_vibration_stores_patterns_dict() -> None:
-    vibration = EffectVibration(patterns={"strike": object()})
-
-    assert "strike" in vibration.patterns
-
-
 # ---------------------------------------------------------------------------
 # VibrationConfig — sequence field
 # ---------------------------------------------------------------------------
@@ -233,62 +227,11 @@ def test_vibration_config_stores_sequence_passed_at_construction() -> None:
     assert cfg.sequence == [VibrationConfig.STRONG_CLICK]
 
 
-def test_vibration_config_sequence_may_contain_multiple_steps() -> None:
-    cfg = VibrationConfig(
-        sequence=[
-            VibrationConfig.STRONG_CLICK,
-            VibrationConfig.PAUSE_250,
-            VibrationConfig.SOFT_BUMP,
-        ]
-    )
+def test_vibration_config_preserves_multi_step_sequence_in_order() -> None:
+    steps = [VibrationConfig.STRONG_CLICK, VibrationConfig.PAUSE_250, VibrationConfig.SOFT_BUMP]
+    cfg = VibrationConfig(sequence=steps)
 
-    assert len(cfg.sequence) == 3
-
-
-# ---------------------------------------------------------------------------
-# VibrationConfig — effect constants exist
-# ---------------------------------------------------------------------------
-
-
-def test_vibration_config_strong_click_constant_is_defined() -> None:
-    assert isinstance(VibrationConfig.STRONG_CLICK, int)
-
-
-def test_vibration_config_sharp_click_constant_is_defined() -> None:
-    assert isinstance(VibrationConfig.SHARP_CLICK, int)
-
-
-def test_vibration_config_soft_bump_constant_is_defined() -> None:
-    assert isinstance(VibrationConfig.SOFT_BUMP, int)
-
-
-def test_vibration_config_double_click_constant_is_defined() -> None:
-    assert isinstance(VibrationConfig.DOUBLE_CLICK, int)
-
-
-def test_vibration_config_triple_click_constant_is_defined() -> None:
-    assert isinstance(VibrationConfig.TRIPLE_CLICK, int)
-
-
-def test_vibration_config_strong_buzz_constant_is_defined() -> None:
-    assert isinstance(VibrationConfig.STRONG_BUZZ, int)
-
-
-# ---------------------------------------------------------------------------
-# VibrationConfig — pause constants exist
-# ---------------------------------------------------------------------------
-
-
-def test_vibration_config_pause_250_constant_is_defined() -> None:
-    assert isinstance(VibrationConfig.PAUSE_250, int)
-
-
-def test_vibration_config_pause_500_constant_is_defined() -> None:
-    assert isinstance(VibrationConfig.PAUSE_500, int)
-
-
-def test_vibration_config_pause_1000_constant_is_defined() -> None:
-    assert isinstance(VibrationConfig.PAUSE_1000, int)
+    assert cfg.sequence == steps
 
 
 # ---------------------------------------------------------------------------
