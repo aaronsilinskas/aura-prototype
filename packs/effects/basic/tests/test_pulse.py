@@ -87,27 +87,44 @@ def test_pulse_after_full_cycle_pixels_return_to_start_color() -> None:
     assert all(p == 0x112233 for p in pixels)
 
 
-# --- Brightness scaling ---
+# --- Raw color pass-through ---
 
 
-def test_pulse_default_brightness_is_full() -> None:
-    # default brightness=1.0: end=0xFFFFFF unchanged
+def test_pulse_stores_start_color_unscaled() -> None:
+    # start=0x7F3F1F stored raw (not brightness-scaled)
+    effect = _build(
+        options={
+            "start_color": 0x7F3F1F,
+            "end_color": 0x000000,
+            "brighten_duration": 0.0,
+            "on_duration": 0.0,
+            "darken_duration": 0.0,
+            "off_duration": 1.0,
+        }
+    )
+    effect.pixels.update(0.5)  # mid-OFF phase → start_color
+    pixels = _render(effect)
+    assert all(p == 0x7F3F1F for p in pixels)
+
+
+def test_pulse_stores_end_color_unscaled() -> None:
+    # end=0x7F3F1F stored raw (not brightness-scaled)
     effect = _build(
         options={
             "start_color": 0x000000,
-            "end_color": 0xFFFFFF,
+            "end_color": 0x7F3F1F,
             "brighten_duration": 0.0,
             "on_duration": 1.0,
         }
     )
-    effect.pixels.update(0.5)  # mid-ON phase
+    effect.pixels.update(0.5)  # mid-ON phase → end_color
     pixels = _render(effect)
-    assert all(p == 0xFFFFFF for p in pixels)
+    assert all(p == 0x7F3F1F for p in pixels)
 
 
-def test_pulse_brightness_0_5_halves_end_color_channels() -> None:
-    # end=0xFFFFFF, brightness=0.5: int(255 * 0.5) = 127 = 0x7F
-    effect = _build(
+def test_pulse_ignores_brightness_option() -> None:
+    # brightness option is silently ignored; raw end_color is stored as-is
+    effect_with_brightness = _build(
         options={
             "start_color": 0x000000,
             "end_color": 0xFFFFFF,
@@ -116,55 +133,19 @@ def test_pulse_brightness_0_5_halves_end_color_channels() -> None:
             "brightness": 0.5,
         }
     )
-    effect.pixels.update(0.5)  # mid-ON phase
-    pixels = _render(effect)
-    assert all(p == 0x7F7F7F for p in pixels)
-
-
-def test_pulse_brightness_0_0_produces_black() -> None:
-    # brightness=0.0: all channels → 0
-    effect = _build(
+    effect_without_brightness = _build(
         options={
-            "start_color": 0xFFFFFF,
+            "start_color": 0x000000,
             "end_color": 0xFFFFFF,
             "brighten_duration": 0.0,
             "on_duration": 1.0,
-            "brightness": 0.0,
         }
     )
-    effect.pixels.update(0.5)  # mid-ON phase
-    pixels = _render(effect)
-    assert all(p == 0x000000 for p in pixels)
-
-
-def test_pulse_brightness_1_5_clamps_to_full() -> None:
-    # out-of-range: 1.5 → 1.0, same result as brightness=1.0
-    opts_base = {
-        "start_color": 0x000000,
-        "end_color": 0xFFFFFF,
-        "brighten_duration": 0.0,
-        "on_duration": 1.0,
-    }
-    effect_clamped = _build(options={**opts_base, "brightness": 1.5})
-    effect_full = _build(options={**opts_base, "brightness": 1.0})
-    effect_clamped.pixels.update(0.5)
-    effect_full.pixels.update(0.5)
-    assert _render(effect_clamped) == _render(effect_full)
-
-
-def test_pulse_brightness_negative_0_2_clamps_to_zero() -> None:
-    # out-of-range: -0.2 → 0.0, same result as brightness=0.0
-    opts_base = {
-        "start_color": 0x000000,
-        "end_color": 0xFFFFFF,
-        "brighten_duration": 0.0,
-        "on_duration": 1.0,
-    }
-    effect_clamped = _build(options={**opts_base, "brightness": -0.2})
-    effect_zero = _build(options={**opts_base, "brightness": 0.0})
-    effect_clamped.pixels.update(0.5)
-    effect_zero.pixels.update(0.5)
-    assert _render(effect_clamped) == _render(effect_zero)
+    effect_with_brightness.pixels.update(0.5)
+    effect_without_brightness.pixels.update(0.5)
+    # both should produce full white since brightness is ignored
+    assert _render(effect_with_brightness) == _render(effect_without_brightness)
+    assert all(p == 0xFFFFFF for p in _render(effect_without_brightness))
 
 
 # --- Default options ---
