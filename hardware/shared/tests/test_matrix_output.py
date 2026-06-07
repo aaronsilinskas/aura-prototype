@@ -1,6 +1,7 @@
 import pytest
 
 from effects.effect import PixelBuffer
+from engine.state import EffectReceipt
 from hardware.shared.matrix_output import MatrixEffectOutput
 
 # ---------------------------------------------------------------------------
@@ -137,6 +138,48 @@ def test_clear_pixels_reuses_same_zero_buffer(output: SpyMatrixOutput) -> None:
     output.clear_pixels("global.buff")
     second_call_pixels = output.write_row_calls[0][1]
     assert first_call_pixels is second_call_pixels
+
+
+# ---------------------------------------------------------------------------
+# update_pixels — brightness scaling
+# ---------------------------------------------------------------------------
+
+
+def test_update_pixels_brightness_one_passes_buffer_unchanged(output: SpyMatrixOutput) -> None:
+    buf = PixelBuffer(_COLS)
+    buf[0] = 0xFF8040
+    receipt = EffectReceipt(1)
+    receipt.brightness = 1.0
+    output.update_pixels("personal", [buf], [receipt])
+    for _, pixels in output.write_row_calls:
+        assert pixels is buf
+
+
+def test_update_pixels_brightness_scales_channels_correctly(output: SpyMatrixOutput) -> None:
+    buf = PixelBuffer(_COLS)
+    buf[0] = 0xFF8040  # R=255, G=128, B=64
+    receipt = EffectReceipt(1)
+    receipt.brightness = 0.5
+    output.update_pixels("personal", [buf], [receipt])
+    scaled = output.write_row_calls[0][1][0]
+    r = (scaled >> 16) & 0xFF
+    g = (scaled >> 8) & 0xFF
+    b = scaled & 0xFF
+    assert r == int(255 * 0.5)
+    assert g == int(128 * 0.5)
+    assert b == int(64 * 0.5)
+
+
+def test_update_pixels_brightness_applies_to_every_pixel(output: SpyMatrixOutput) -> None:
+    buf = PixelBuffer(_COLS)
+    for i in range(_COLS):
+        buf[i] = 0xFFFFFF
+    receipt = EffectReceipt(1)
+    receipt.brightness = 0.5
+    output.update_pixels("personal", [buf], [receipt])
+    for _, pixels in output.write_row_calls:
+        for i in range(_COLS):
+            assert pixels[i] < 0xFFFFFF
 
 
 # ---------------------------------------------------------------------------
