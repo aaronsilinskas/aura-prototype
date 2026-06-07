@@ -13,6 +13,7 @@ Typical usage::
     buttons = propmaker.setup_buttons(board.D9, board.D10, board.D11, board.D12)
     propmaker.setup_external_power()
     accelerometer = propmaker.setup_accelerometer(i2c)  # None if absent
+    motor = propmaker.setup_drv2605(i2c)  # None if absent
 """
 
 import time
@@ -89,4 +90,25 @@ def setup_accelerometer(i2c):
         return adafruit_lis3dh.LIS3DH_I2C(i2c)
     except Exception:
         print("accelerometer not found on I2C bus")
+        return None
+
+
+def setup_drv2605(i2c):
+    """Return a configured DRV2605 haptic motor driver on *i2c*, or ``None`` if absent.
+
+    Prints a distinct warning depending on the failure mode:
+    - ``"drv2605 library not installed"`` when ``adafruit_drv2605`` cannot
+      be imported.
+    - ``"drv2605 not found on I2C bus"`` when the library is present but
+      the driver cannot be reached.
+    """
+    try:
+        import adafruit_drv2605
+    except ImportError:
+        print("drv2605 library not installed")
+        return None
+    try:
+        return adafruit_drv2605.DRV2605(i2c)
+    except Exception:
+        print("drv2605 not found on I2C bus")
         return None

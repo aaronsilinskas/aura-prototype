@@ -1,5 +1,26 @@
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig
+from effects.effect import (
+    AudioPlaybackConfig,
+    Effect,
+    EffectAudio,
+    EffectConfig,
+    EffectVibration,
+    VibrationConfig,
+)
 from engine.effects.manager import EffectBuilder
+
+_GAME_OVER_VIBRATION = EffectVibration(
+    patterns={
+        "start": VibrationConfig(
+            [
+                VibrationConfig.STRONG_BUZZ,
+                VibrationConfig.PAUSE_250,
+                VibrationConfig.STRONG_BUZZ,
+                VibrationConfig.PAUSE_250,
+                VibrationConfig.STRONG_BUZZ,
+            ]
+        )
+    }
+)
 
 
 class _Builder(EffectBuilder):
@@ -9,6 +30,7 @@ class _Builder(EffectBuilder):
             audio=EffectAudio(
                 clips={"start": AudioPlaybackConfig(name=name + "_start", loop=False)}
             ),
+            vibration=_GAME_OVER_VIBRATION,
         )
 
 

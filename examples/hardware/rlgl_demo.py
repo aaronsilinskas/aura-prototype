@@ -10,6 +10,7 @@ Hardware
 - Adafruit IS31FL3741 13×9 RGB LED Matrix Breakout (I2C on default SDA/SCL)
 - Two buttons (pull-up) on BUTTON_A_PIN / BUTTON_B_PIN (default: D9 / D10)
 - LIS3DH I2C accelerometer on default SDA/SCL (shared bus with IS31FL3741)
+- DRV2605L haptic motor driver on default SDA/SCL (optional — game runs without it)
 
 Installation
 ------------
@@ -19,6 +20,7 @@ Installation
 2. Copy required libraries to CIRCUITPY/lib/:
      adafruit_is31fl3741/
      adafruit_lis3dh.mpy
+     adafruit_drv2605.mpy  (optional — required only when a DRV2605L is wired up)
 
 3. Run the deploy script to copy all source files and set code.py:
      python scripts/deploy.py examples/hardware/rlgl_demo.py
@@ -44,6 +46,7 @@ from engine.input import AccelerationData, InputEvents
 from engine.packs import PackRegistry
 from engine.scene import SceneManager
 from hardware.circuitpython.audio_output import AudioEffectOutput
+from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from scenes.rlgl.scene import factory as rlgl_factory
 
@@ -68,6 +71,7 @@ _i2c = propmaker.setup_i2c()
 _matrix = propmaker.setup_matrix_is31fl3741(_i2c)
 _buttons = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
 _accelerometer = propmaker.setup_accelerometer(_i2c)
+_motor = propmaker.setup_drv2605(_i2c)
 
 # ---------------------------------------------------------------------------
 # Effect system
@@ -86,9 +90,13 @@ _audio_registry.register("red_light_music_start", "sounds/jaws_dundun.wav")
 _audio_registry.register("green_light_music_start", "sounds/move.wav")
 _audio_registry.register("game_over_sting_start", "sounds/game_over.wav")
 
+_outputs = [IS31FL3741EffectOutput(_matrix), AudioEffectOutput(_audio_registry, 0.2)]
+if _motor is not None:
+    _outputs.append(Drv2605EffectOutput(_motor))
+
 _effect_manager = EffectManager(
     registry=_effect_registry,
-    outputs=[IS31FL3741EffectOutput(_matrix), AudioEffectOutput(_audio_registry, 0.2)],
+    outputs=_outputs,
 )
 
 # ---------------------------------------------------------------------------
