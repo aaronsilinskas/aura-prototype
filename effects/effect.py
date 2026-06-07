@@ -56,16 +56,52 @@ class EffectAudio:
         self.clips = clips
 
 
-class EffectVibration:
-    """Placeholder capability object for future vibration hardware support.
+class VibrationConfig:
+    """Declares a vibration playback sequence as an ordered list of steps.
 
-    ``patterns`` maps event verbs to opaque vibration config objects.
-    Set on ``Effect.vibration``; no hardware output implements it yet.
+    Each step is one of the named class-level constants (effect or pause).
+    Constants are deliberately offset from DRV2605L hardware waveform IDs
+    (1, 4, 7, 10, 12, 14) so that passing a raw hardware ID to the output
+    layer raises an error.  The mapping from these constants to actual
+    DRV2605L waveform IDs lives inside ``Drv2605EffectOutput``.
+
+    Effect constants:
+      ``STRONG_CLICK``, ``SHARP_CLICK``, ``SOFT_BUMP``,
+      ``DOUBLE_CLICK``, ``TRIPLE_CLICK``, ``STRONG_BUZZ``
+
+    Pause constants:
+      ``PAUSE_250``, ``PAUSE_500``, ``PAUSE_1000``
+    """
+
+    __slots__ = ["sequence"]
+
+    # Effect constants — offset from DRV2605L IDs {1, 4, 7, 10, 12, 14}
+    STRONG_CLICK: int = 101
+    SHARP_CLICK: int = 104
+    SOFT_BUMP: int = 107
+    DOUBLE_CLICK: int = 110
+    TRIPLE_CLICK: int = 112
+    STRONG_BUZZ: int = 114
+
+    # Pause constants — offset from DRV2605L IDs {1, 4, 7, 10, 12, 14}
+    PAUSE_250: int = 201
+    PAUSE_500: int = 202
+    PAUSE_1000: int = 203
+
+    def __init__(self, sequence: list[int]) -> None:
+        self.sequence = sequence
+
+
+class EffectVibration:
+    """Capability object declaring the vibration behaviour of an effect.
+
+    ``patterns`` maps event verbs to ``VibrationConfig`` instances.
+    Set on ``Effect.vibration``; if ``None``, the effect produces no vibration.
     """
 
     __slots__ = ["patterns"]
 
-    def __init__(self, patterns: dict[str, object]) -> None:
+    def __init__(self, patterns: dict[str, VibrationConfig]) -> None:
         self.patterns = patterns
 
 

@@ -8,6 +8,7 @@ from effects.effect import (
     EffectPixels,
     EffectVibration,
     PixelBuffer,
+    VibrationConfig,
 )
 
 # ---------------------------------------------------------------------------
@@ -215,7 +216,56 @@ def test_effect_audio_stores_clips_dict() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_effect_vibration_stores_patterns_dict() -> None:
-    vibration = EffectVibration(patterns={"strike": object()})
+# ---------------------------------------------------------------------------
+# VibrationConfig — sequence field
+# ---------------------------------------------------------------------------
 
-    assert "strike" in vibration.patterns
+
+def test_vibration_config_stores_sequence_passed_at_construction() -> None:
+    cfg = VibrationConfig(sequence=[VibrationConfig.STRONG_CLICK])
+
+    assert cfg.sequence == [VibrationConfig.STRONG_CLICK]
+
+
+def test_vibration_config_preserves_multi_step_sequence_in_order() -> None:
+    steps = [VibrationConfig.STRONG_CLICK, VibrationConfig.PAUSE_250, VibrationConfig.SOFT_BUMP]
+    cfg = VibrationConfig(sequence=steps)
+
+    assert cfg.sequence == steps
+
+
+# ---------------------------------------------------------------------------
+# VibrationConfig — constants do not overlap with DRV2605L hardware IDs
+# ---------------------------------------------------------------------------
+
+_DRV2605L_HARDWARE_IDS = {1, 4, 7, 10, 12, 14}
+_ALL_VIBRATION_CONSTANTS = [
+    VibrationConfig.STRONG_CLICK,
+    VibrationConfig.SHARP_CLICK,
+    VibrationConfig.SOFT_BUMP,
+    VibrationConfig.DOUBLE_CLICK,
+    VibrationConfig.TRIPLE_CLICK,
+    VibrationConfig.STRONG_BUZZ,
+    VibrationConfig.PAUSE_250,
+    VibrationConfig.PAUSE_500,
+    VibrationConfig.PAUSE_1000,
+]
+
+
+def test_no_vibration_constant_overlaps_with_drv2605l_hardware_waveform_ids() -> None:
+    for constant in _ALL_VIBRATION_CONSTANTS:
+        assert constant not in _DRV2605L_HARDWARE_IDS, (
+            f"VibrationConfig constant {constant} collides with a DRV2605L hardware waveform ID"
+        )
+
+
+# ---------------------------------------------------------------------------
+# EffectVibration — typed patterns dict
+# ---------------------------------------------------------------------------
+
+
+def test_effect_vibration_accepts_vibration_config_as_pattern_value() -> None:
+    cfg = VibrationConfig(sequence=[VibrationConfig.STRONG_CLICK])
+    vibration = EffectVibration(patterns={"cast": cfg})
+
+    assert vibration.patterns["cast"] is cfg
