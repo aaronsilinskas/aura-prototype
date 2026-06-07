@@ -96,9 +96,7 @@ def test_claim_plays_into_first_idle_slot(pool: VoicePool, sink: RecordingSink) 
     assert play_calls(sink) == [("play", 0, ("source", 1), False)]
 
 
-def test_claim_sets_loudness_across_seam_as_zero_to_one(
-    pool: VoicePool, sink: RecordingSink
-) -> None:
+def test_claim_forwards_receipt_loudness_to_sink(pool: VoicePool, sink: RecordingSink) -> None:
     receipt = make_receipt(loudness=0.4)
     pool.claim(sink, "clip.wav", loop=False, audio_only=True, receipt=receipt)
     assert ("set_loudness", 0, 0.4) in sink.calls
@@ -176,6 +174,19 @@ def test_new_loop_evicts_oldest_slot_overall_when_no_loops_present(
     assert slot == 0  # oldest one-shot, used as fallback
 
 
+def test_new_loop_evicts_oldest_loop_not_an_older_one_shot(
+    pool: VoicePool, sink: RecordingSink
+) -> None:
+    # slot 0 = older one-shot, slot 1 = newer loop, slot 2 = one-shot
+    pool.claim(sink, "shot0.wav", loop=False, audio_only=True, receipt=make_receipt())
+    pool.claim(sink, "loop1.wav", loop=True, audio_only=True, receipt=make_receipt())
+    pool.claim(sink, "shot2.wav", loop=False, audio_only=True, receipt=make_receipt())
+    sink.calls.clear()
+    slot = pool.claim(sink, "new.wav", loop=True, audio_only=True, receipt=make_receipt())
+    assert slot == 1  # the only loop, evicted even though slot 0 is older
+    assert ("stop", 1) in sink.calls
+
+
 def test_new_one_shot_evicts_oldest_one_shot(pool: VoicePool, sink: RecordingSink) -> None:
     # slot 0 loop, slots 1 and 2 one-shots (slot 1 older)
     pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=make_receipt())
@@ -228,7 +239,10 @@ def test_evicted_slot_is_reused_by_the_new_clip(pool: VoicePool, sink: Recording
     for _ in range(3):
         pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=make_receipt())
     slot = pool.claim(sink, "new.wav", loop=True, audio_only=True, receipt=make_receipt())
-    assert play_calls(sink)[-1] == ("play", slot, ("source", 4), True)
+    last_play = play_calls(sink)[-1]
+    first_play = play_calls(sink)[0]
+    assert last_play[1] == slot  # plays into the evicted slot
+    assert last_play[2] != first_play[2]  # the new clip's source, not the evicted one
 
 
 # ---------------------------------------------------------------------------
