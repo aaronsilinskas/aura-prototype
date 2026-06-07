@@ -77,7 +77,7 @@ A standalone registry in `engine/audio.py` that maps clip names (plain strings) 
 _Avoid_: using `PackRegistry.sound_path` for new audio effects (deprecated — migrate to `AudioRegistry`)
 
 ### AudioEffectOutput
-A CircuitPython `EffectOutput` that drives `audiomixer.Mixer` via I2S. Registered on all scopes with `receives_pixels = False`. In `handle_event`, looks up `effect.audio.clips.get(event.verb)` to get an `AudioPlaybackConfig`, resolves the WAV path via `AudioRegistry`, and plays on voice 0 (`loop=True`) or voice 1 (`loop=False`). The `"stop"` verb does **not** halt audio — teardown for both voices is driven by `flush()` receipt guards. Rules trigger audio via `add_effect`/`set_effect` — they do not pass filenames. Audio-completion-driven effect lifecycle is a future opt-in.
+A CircuitPython `EffectOutput` that drives `audiomixer.Mixer` via I2S. Registered on all scopes with `receives_pixels = False`. In `handle_event`, looks up `effect.audio.clips.get(event.verb)` to get an `AudioPlaybackConfig`, resolves the WAV path via `AudioRegistry`, and plays on voice 0 (`loop=True`) or voice 1 (`loop=False`). The `"stop"` verb does **not** halt audio — teardown for both voices is driven by `flush()` receipt guards. Audio completion never stops an effect receipt — receipt lifecycle is controlled entirely by rules or external stops. Rules trigger audio via `add_effect`/`set_effect` — they do not pass filenames.
 _Avoid_: `PackRegistry.sound_path` for new effects (deprecated — use `AudioRegistry`); stopping playback in `handle_event` on `"stop"`
 
 ### Accelerometer
