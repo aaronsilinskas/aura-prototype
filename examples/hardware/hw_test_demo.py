@@ -1,10 +1,10 @@
 """Hardware verification demo — hw_test scene on RP2040 PropMaker + IS31FL3741.
 
 Loads the ``hw_test`` scene via ``SceneManager`` so every hardware subsystem
-(LEDs, buttons, accelerometer, IR transceiver, radio) can be exercised through
-the same scene logic used in production.  The ``debug`` rules pack logs every
-dispatched event to the serial console, giving a text trace alongside the visual
-output.
+(LEDs, buttons, accelerometer, IR transceiver, radio, audio, haptics) can be
+exercised through the same scene logic used in production.  The ``debug`` rules
+pack logs every dispatched event to the serial console, giving a text trace
+alongside the visual output.
 
 Hardware
 --------
@@ -14,6 +14,7 @@ Hardware
 - LIS3DH I2C accelerometer on default SDA/SCL (shared bus with IS31FL3741)
 - IR transceiver wired to HardwareNetworkControls
 - Radio module wired to HardwareNetworkControls
+- DRV2605L haptic motor driver on default SDA/SCL (optional — demo runs without it)
 
 Installation
 ------------
@@ -23,6 +24,7 @@ Installation
 2. Copy required libraries to CIRCUITPY/lib/:
      adafruit_is31fl3741/
      adafruit_lis3dh.mpy
+     adafruit_drv2605.mpy  (optional — required only when a DRV2605L is wired up)
 
 3. Run the deploy script to copy all source files and set code.py:
      python scripts/deploy.py examples/hardware/hw_test_demo.py
@@ -48,6 +50,13 @@ Mode 3 — Radio receive
     Press A to simulate sending a radio packet (queues RadioReceived internally).
     On a real receive, Global.ALL flashes white at level 9 for 0.5 s, then
     returns to the idle solid white.  Console shows ``net.radio_received``.
+
+Mode 4 — SFX
+    Press A to fire the ``hw_test.sfx_test`` effect, which plays the clip
+    ``sounds/sfx_test.wav`` via the I2S amp and triggers a STRONG_CLICK haptic
+    pattern on the DRV2605L (if present).  If the WAV file is absent from the
+    device filesystem, ``AudioEffectOutput`` silently no-ops; if the DRV2605L is
+    not wired, the haptic output is simply absent from the ``EffectManager``.
 """
 
 import time as _time
@@ -55,12 +64,15 @@ import time as _time
 import board
 
 import hardware.circuitpython.propmaker as propmaker
+from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.input import AccelerationData, InputEvents
 from engine.network import HardwareNetworkControls
 from engine.packs import PackRegistry
 from engine.scene import SceneManager
+from hardware.circuitpython.audio_output import AudioEffectOutput
+from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from scenes.hw_test.scene import factory as hw_test_factory
 
@@ -84,6 +96,7 @@ _i2c = propmaker.setup_i2c()
 _matrix = propmaker.setup_matrix_is31fl3741(_i2c)
 _buttons = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
 _accelerometer = propmaker.setup_accelerometer(_i2c)
+_motor = propmaker.setup_drv2605(_i2c)
 
 # ---------------------------------------------------------------------------
 # Effect system
@@ -95,9 +108,17 @@ _effect_registry.scan_dir("packs/effects", "packs.effects")
 _rule_registry = PackRegistry(item_attr="RULE")
 _rule_registry.scan_dir("packs/rules", "packs.rules")
 
+_audio_registry = AudioRegistry()
+_audio_registry.register("sfx_test_start", "sounds/sfx_test.wav")
+
+_audio_output = AudioEffectOutput(_audio_registry, max_volume=0.1, num_voices=1)
+_outputs = [IS31FL3741EffectOutput(_matrix), _audio_output]
+if _motor is not None:
+    _outputs.append(Drv2605EffectOutput(_motor))
+
 _effect_manager = EffectManager(
     registry=_effect_registry,
-    outputs=[IS31FL3741EffectOutput(_matrix)],
+    outputs=_outputs,
 )
 
 # ---------------------------------------------------------------------------
