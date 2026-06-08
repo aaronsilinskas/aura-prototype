@@ -84,13 +84,13 @@ class MakeEffectRule(GameRule):
     def handle_event(self, event: Event, state: GameState) -> None:
         if isinstance(event, InputEvents.ButtonAndAcceleration):
             button_data = event.buttons
-            if button_data.states["A"] == ButtonData.PRESSED:
+            if button_data.is_pressed("A"):
                 state.effect_controls.add_effect(Scope.PERSONAL, "elements.fire", {"level": 5})
-            elif button_data.states["B"] == ButtonData.PRESSED:
+            elif button_data.is_pressed("B"):
                 state.effect_controls.add_effect(Scope.PERSONAL, "elements.water", {"level": 5})
-            elif button_data.states["C"] == ButtonData.PRESSED:
+            elif button_data.is_pressed("C"):
                 state.effect_controls.add_effect(Scope.PERSONAL, "elements.lightning", {"level": 5})
-            elif button_data.states["D"] == ButtonData.PRESSED:
+            elif button_data.is_pressed("D"):
                 state.effect_controls.stop_effect(Scope.ALL)
 
 
