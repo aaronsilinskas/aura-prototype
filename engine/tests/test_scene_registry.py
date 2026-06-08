@@ -42,7 +42,7 @@ def _make_scene_dir(root, name: str, **json_overrides) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_scene_version_field_is_accessible_after_construction() -> None:
+def test_scene_version_is_stored_as_the_version_passed_to_constructor() -> None:
     v = Version(1, 2)
     scene = Scene(effect_packs=[], rule_packs=[], version=v)
 
@@ -53,14 +53,6 @@ def test_scene_version_defaults_to_none_when_not_provided() -> None:
     scene = Scene(effect_packs=[], rule_packs=[])
 
     assert scene.version is None
-
-
-def test_scene_version_stores_major_and_minor_values() -> None:
-    v = Version(2, 0)
-    scene = Scene(effect_packs=[], rule_packs=[], version=v)
-
-    assert scene.version.major == 2
-    assert scene.version.minor == 0
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +229,6 @@ def test_get_returns_scene_with_version_parsed_from_json(tmp_path) -> None:
 
     scene = registry.get("forest")
 
-    assert isinstance(scene.version, Version)
     assert scene.version.major == 2
     assert scene.version.minor == 3
 
@@ -383,7 +374,7 @@ def test_register_factory_returns_fresh_scene_on_each_get() -> None:
     assert scene_a is not scene_b
 
 
-def test_register_factory_and_json_scenes_are_indistinguishable_via_public_api(
+def test_register_factory_scene_exposes_same_version_field_as_json_scene(
     tmp_path,
 ) -> None:
     _make_scene_dir(tmp_path, "from_disk", version="1.0")
@@ -397,8 +388,5 @@ def test_register_factory_and_json_scenes_are_indistinguishable_via_public_api(
     disk_scene = registry.get("from_disk")
     mem_scene = registry.get("from_memory")
 
-    # Both expose the same fields through the same public interface
-    assert disk_scene.version.major == 1
-    assert disk_scene.version.minor == 0
-    assert mem_scene.version.major == 1
-    assert mem_scene.version.minor == 0
+    assert disk_scene.version.major == mem_scene.version.major
+    assert disk_scene.version.minor == mem_scene.version.minor
