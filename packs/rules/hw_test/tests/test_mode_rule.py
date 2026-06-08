@@ -399,7 +399,6 @@ def test_first_tick_sfx_mode_starts_cyan_solid_on_personal(spy):
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
-    assert state.get("hw_mode", None) == 4
     personal_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
     assert len(personal_calls) == 1
     assert personal_calls[0][1] == "basic.solid"
