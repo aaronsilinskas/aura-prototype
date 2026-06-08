@@ -390,3 +390,14 @@ def test_register_factory_scene_exposes_same_version_field_as_json_scene(
 
     assert disk_scene.version.major == mem_scene.version.major
     assert disk_scene.version.minor == mem_scene.version.minor
+
+
+def test_names_does_not_duplicate_when_factory_overrides_scanned_scene(
+    tmp_path,
+) -> None:
+    _make_scene_dir(tmp_path, "forest")
+    registry = SceneRegistry()
+    registry.scan_dir(str(tmp_path))
+    registry.register("forest", lambda: Scene(effect_packs=[], rule_packs=[]))
+
+    assert registry.names().count("forest") == 1

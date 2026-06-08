@@ -11,7 +11,7 @@ from engine.effects.manager import EffectBuilder
 from engine.engine import GameEngine, GameRule
 from engine.events import EffectEvent
 from engine.packs import PackRegistry
-from engine.scene import Scene, SceneManager
+from engine.scene import Scene, SceneManager, SceneRegistry
 from engine.state import EffectControls
 from packs.rules.debug.button_events import ButtonEventsRule
 from packs.rules.debug.event_logger import EventLoggerRule
@@ -163,11 +163,12 @@ def loaded_debug_engine():
     rule_registry.scan_dir(_packs_path("rules"), "packs.rules")
     effect_registry = PackRegistry(item_attr="BUILD")
     engine = GameEngine(EffectControls())
-    manager = SceneManager(engine, effect_registry, rule_registry)
-    manager.register(
+    scene_registry = SceneRegistry()
+    scene_registry.register(
         "test_scene",
         lambda: Scene(effect_packs=[], rule_packs=[("debug", "1.0")]),
     )
+    manager = SceneManager(engine, effect_registry, rule_registry, scene_registry)
     manager.load("test_scene")
     manager.update()
     return engine, rule_registry
@@ -205,11 +206,12 @@ def test_scene_manager_load_raises_for_incompatible_pack_version() -> None:
     rule_registry.scan_dir(_packs_path("rules"), "packs.rules")
     effect_registry = PackRegistry(item_attr="BUILD")
     engine = GameEngine(EffectControls())
-    manager = SceneManager(engine, effect_registry, rule_registry)
-    manager.register(
+    scene_registry = SceneRegistry()
+    scene_registry.register(
         "test_scene",
         lambda: Scene(effect_packs=[], rule_packs=[("debug", "99.0")]),
     )
+    manager = SceneManager(engine, effect_registry, rule_registry, scene_registry)
 
     with pytest.raises(ValueError):
         manager.load("test_scene")
