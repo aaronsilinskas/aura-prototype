@@ -25,15 +25,16 @@ from packs.rules.rlgl.helpers.motion_detector import (
 
 _G = AccelerationData.GRAVITY
 
-# Produces motion above RED_MAX_MOTION_THRESHOLD
-_HIGH_ACCEL = AccelerationData(x=0.0, y=0.0, z=_G + 2.0)
+# A device at rest reads only the gravity vector — zero motion once gravity is seeded.
+_AT_REST = AccelerationData(x=0.0, y=0.0, z=_G)
 
-# Produces motion below GREEN_MIN_MOTION_THRESHOLD (mag = 0.0)
-_LOW_ACCEL = AccelerationData(x=0.0, y=0.0, z=_G)
+# Held still on z, then deviated; relative to seeded gravity these read as the motion below.
+_HIGH_ACCEL = AccelerationData(x=0.0, y=0.0, z=_G + 2.0)  # 2.0 m/s² of motion
+_LOW_ACCEL = _AT_REST  # no motion
 
 
 def _accel_with_mag(mag: float) -> AccelerationData:
-    """Build a sample whose ``motion_magnitude`` equals ``mag`` (m/s²)."""
+    """Build a sample reading ``mag`` (m/s²) of motion above the gravity vector."""
     return AccelerationData(x=0.0, y=0.0, z=_G + mag)
 
 
@@ -100,11 +101,14 @@ def _setup_red_phase(
 
     Uses zero-duration warning so the transition happens on the very next tick.
     Motion smoothing is disabled by default (``rlgl_motion_smoothing`` = 1.0) so a
-    single sample registers immediately; debounce tests override it explicitly.
+    single sample registers immediately, and gravity tracking is frozen
+    (``rlgl_gravity_beta`` = 0.0) so motion reads as the exact deviation from the
+    seeded gravity vector; debounce tests override these explicitly.
     """
     data: dict = {
         "rlgl_warning_duration": 0.0,
         "rlgl_motion_smoothing": 1.0,
+        "rlgl_gravity_beta": 0.0,
     }
     if initial_data:
         data.update(initial_data)
@@ -124,12 +128,15 @@ def _setup_green_phase(
 
     Uses zero-duration warning and red phases so transitions are immediate.
     Motion smoothing is disabled by default (``rlgl_motion_smoothing`` = 1.0) so a
-    single sample registers immediately; debounce tests override it explicitly.
+    single sample registers immediately, and gravity tracking is frozen
+    (``rlgl_gravity_beta`` = 0.0) so motion reads as the exact deviation from the
+    seeded gravity vector; debounce tests override these explicitly.
     """
     data: dict = {
         "rlgl_warning_duration": 0.0,
         "rlgl_red_duration": 0.0,
         "rlgl_motion_smoothing": 1.0,
+        "rlgl_gravity_beta": 0.0,
     }
     if initial_data:
         data.update(initial_data)
@@ -141,6 +148,22 @@ def _setup_green_phase(
     _tick(state, engine, timer, total=0.0)  # GREEN_WARNING → GREEN
     assert state.get("rlgl_phase", None) == PHASE_GREEN
     return state, engine, timer
+
+
+def _seed_gravity_at_rest(
+    state: GameState,
+    engine: GameEngine,
+    timer: _StubTimer,
+    total: float = 0.0,
+) -> None:
+    """Tick one at-rest sample so the gravity estimate is established before motion.
+
+    Motion is measured relative to the tracked gravity vector, so a test must
+    establish gravity (as if the device were held steady) before a deviation can
+    register.  With gravity frozen (``rlgl_gravity_beta`` = 0.0 in the setup
+    helpers) this pins it at the at-rest reading.
+    """
+    _tick(state, engine, timer, accel=_AT_REST, total=total)
 
 
 # ---------------------------------------------------------------------------
@@ -296,9 +319,11 @@ def test_red_phase_transition_uses_solid_with_red_color(spy):
 
 
 def test_red_motion_ends_game_on_first_frame_with_no_grace_period(spy):
-    """There is no grace window: motion on the very first Red frame ends the game."""
+    """There is no grace window: once gravity is established, motion on the very
+    first Red frame ends the game."""
     state, engine, timer = _setup_red_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
 
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 0.0)
 
@@ -310,6 +335,7 @@ def test_red_lone_spike_does_not_trigger_game_over(spy):
     # One spike at 1.5x threshold; with smoothing on, a lone sample must not trip the gate.
     state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_motion_smoothing": 0.5})
     phase_start = state.get("rlgl_phase_start", 0.0)
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
     spike = _accel_with_mag(RED_MAX_MOTION_THRESHOLD * 1.5)
 
     _tick(state, engine, timer, accel=spike, total=phase_start + 0.1)
@@ -322,10 +348,25 @@ def test_red_sustained_motion_triggers_game_over(spy):
     # Same 1.5x-threshold motion as the lone-spike test, but sustained: it must be caught.
     state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_motion_smoothing": 0.5})
     phase_start = state.get("rlgl_phase_start", 0.0)
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
     motion = _accel_with_mag(RED_MAX_MOTION_THRESHOLD * 1.5)
 
     _tick(state, engine, timer, accel=motion, total=phase_start + 0.1)  # one sample: still safe
     _tick(state, engine, timer, accel=motion, total=phase_start + 0.2)  # held: now caught
+
+    assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
+
+
+def test_red_motion_perpendicular_to_gravity_ends_game_like_aligned_motion(spy):
+    """Orientation independence: with the device tilted, motion across the gravity
+    axis ends the game just as motion along it would — no axis is privileged."""
+    state, engine, timer = _setup_red_phase(spy)
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    tilted_rest = AccelerationData(x=_G, y=0.0, z=0.0)  # gravity resolved on x
+    _tick(state, engine, timer, accel=tilted_rest, total=phase_start + 0.0)  # seed gravity
+
+    moved = AccelerationData(x=_G, y=0.0, z=2.0)  # 2 m/s² perpendicular to gravity
+    _tick(state, engine, timer, accel=moved, total=phase_start + 0.1)
 
     assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
 
@@ -346,6 +387,19 @@ def test_red_timer_expiry_transitions_to_green_warning(spy):
     _tick(state, engine, timer, total=phase_start + 3.0)
 
     assert state.get("rlgl_phase", None) == PHASE_GREEN_WARNING
+
+
+def test_phase_change_clears_the_gravity_estimate(spy):
+    """A phase transition drops the gravity estimate so the next phase re-seeds it
+    from a fresh sample instead of carrying a stale orientation across."""
+    state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_red_duration": 3.0})
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
+    assert state.has("rlgl_gravity_x")  # established during Red
+
+    _tick(state, engine, timer, total=phase_start + 3.0)  # RED → GREEN_WARNING
+
+    assert not state.has("rlgl_gravity_x")
 
 
 def test_red_timer_expiry_takes_priority_over_motion(spy):
@@ -450,6 +504,7 @@ def test_green_phase_transition_uses_solid_with_green_color(spy):
 def test_green_motion_below_threshold_for_less_than_still_timeout_does_not_trigger_game_over(spy):
     state, engine, timer = _setup_green_phase(spy, initial_data={"rlgl_green_still_timeout": 1.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
 
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 1.2)
     _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 1.5)
@@ -460,6 +515,7 @@ def test_green_motion_below_threshold_for_less_than_still_timeout_does_not_trigg
 def test_green_motion_above_threshold_resets_still_timer_so_brief_pause_is_forgiven(spy):
     state, engine, timer = _setup_green_phase(spy, initial_data={"rlgl_green_still_timeout": 1.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
 
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 1.5)
     _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 1.9)
@@ -513,6 +569,7 @@ def test_green_lone_motion_spike_does_not_count_as_moving(spy):
         initial_data={"rlgl_motion_smoothing": 0.5, "rlgl_green_still_timeout": 1.0},
     )
     phase_start = state.get("rlgl_phase_start", 0.0)
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
     spike = _accel_with_mag(GREEN_MIN_MOTION_THRESHOLD * 1.5)
 
     _tick(state, engine, timer, accel=spike, total=phase_start + 1.5)
@@ -531,6 +588,7 @@ def test_green_sustained_motion_registers_as_moving_and_resets_still_timer(spy):
         },
     )
     phase_start = state.get("rlgl_phase_start", 0.0)
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
     motion = _accel_with_mag(GREEN_MIN_MOTION_THRESHOLD * 1.5)
 
     _tick(state, engine, timer, accel=motion, total=phase_start + 1.1)  # one sample: not yet
@@ -574,6 +632,7 @@ def test_green_timer_expiry_takes_priority_over_motion(spy):
 def test_game_over_shows_fire_effect_on_all_scopes(spy):
     state, engine, timer = _setup_red_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
     spy.set_effect_calls.clear()
 
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)
@@ -586,6 +645,7 @@ def test_game_over_shows_fire_effect_on_all_scopes(spy):
 def test_game_over_transitions_to_ready_after_game_over_duration(spy):
     state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_game_over_duration": 2.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)  # → GAME_OVER
 
     go_start = state.get("rlgl_phase_start", 0.0)
@@ -597,6 +657,7 @@ def test_game_over_transitions_to_ready_after_game_over_duration(spy):
 def test_game_over_expiry_restores_ready_effect_on_all_scopes(spy):
     state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_game_over_duration": 2.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)
     go_start = state.get("rlgl_phase_start", 0.0)
     spy.set_effect_calls.clear()
@@ -770,6 +831,7 @@ def test_green_phase_stores_ambient_receipt_in_game_state(spy):
 def test_game_over_plays_game_over_sting_on_all(spy):
     state, engine, timer = _setup_red_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
     spy.add_effect_calls.clear()
 
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)  # → GAME_OVER
@@ -786,6 +848,7 @@ def test_game_over_stops_ambient_receipt(spy):
     ambient_receipt = state.get("rlgl_ambient_receipt", None)
     assert ambient_receipt is not None
 
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)  # → GAME_OVER
 
     assert ambient_receipt.is_stopped()
@@ -794,6 +857,7 @@ def test_game_over_stops_ambient_receipt(spy):
 def test_game_over_removes_ambient_receipt_from_game_state(spy):
     state, engine, timer = _setup_red_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
+    _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
 
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)  # → GAME_OVER
 
