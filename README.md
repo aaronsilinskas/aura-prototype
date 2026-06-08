@@ -93,16 +93,15 @@ Version format is `MAJOR.MINOR`. A `Scene` declares minimum required versions;
 
 A **Scene** is a declarative bundle:
 
-- `rules: list[GameRule]` — direct rule instances
 - `effect_packs: list[tuple[str, str]]` — `(pack_name, min_version)` pairs; version-validated at load
 - `rule_packs: list[tuple[str, str]]` — `(pack_name, min_version)` pairs; all rules loaded and appended
 - Optional `initial_data: dict` — seed values for `GameState.data`
-- Optional lifecycle callbacks: `on_load(ec)`, `on_unload(ec)`, `on_suspend(ec)`, `on_resume(ec)`
 
 `SceneManager` owns a scene stack. `load(name)` replaces the stack; `overlay(name)` pushes
 on top (suspending the current scene); `pop()` restores the previous scene. Transitions are
 deferred to end-of-tick — rules call `state.scene_controls.load/overlay/pop()` during a tick
-and the transition is applied after `engine.update(state)` returns.
+and the transition is applied after `engine.update(state)` returns. Every scene the manager
+unloads or suspends has its effects stopped on `Scope.ALL` automatically.
 
 ---
 
