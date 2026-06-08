@@ -19,7 +19,7 @@ except ImportError:
 
 from engine.input import AccelerationData
 
-RED_MAX_MOTION_THRESHOLD: Final = 0.25
+RED_MAX_MOTION_THRESHOLD: Final = 0.3
 """Player must not exceed this magnitude (m/s²) during a Red Light phase."""
 
 GREEN_MIN_MOTION_THRESHOLD: Final = 2.0
