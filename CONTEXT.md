@@ -85,7 +85,19 @@ _Avoid_: "ambient effect", "background effect" as synonyms (`Scope.AMBIENT` is a
 
 ### Progress bar
 A linear fill effect (`basic.progress`) that lights pixels from the first toward the last in proportion to a `progress` value in `[0.0, 1.0]`: `0.0` all dark, `1.0` all lit in a single `color` (default white), `0.5` the first half lit. The lit/dark boundary pixel is anti-aliased — lit in proportion to its coverage. `progress` is a build-time effect option, not a runtime control: changing it means re-issuing `set_effect`.
-_Avoid_: confusing `progress` (0.0–1.0 spatial fill) with `Level` (1–10 integer effect intensity) or with receipt `brightness` (0.0–1.0 output-level visual scaling of the whole strip); treating `progress` as a runtime-mutable receipt field
+_Avoid_: confusing `progress` (0.0–1.0 spatial fill) with `Game Level` (1–10 player progression integer) or with receipt `brightness` (0.0–1.0 output-level visual scaling of the whole strip); treating `progress` as a runtime-mutable receipt field
+
+### Effect Level
+A 1–10 integer `level` option controlling an effect's visual/audio intensity. A build-time effect parameter, not a game concept.
+_Avoid_: using `level` as a runtime control (it only initializes the effect); conflating with `Game Level`
+
+### Game Level
+A player's progression through a game session, stored in `GameState`. Integer in `[1, max_level]`: starts at 1, advances one per surviving Round, resets to 1 on game over or win. Drives difficulty scaling and the `Scope.AMBIENT` progress bar. Completing the Round *at* `max_level` wins.
+_Avoid_: confusing with `Effect Level`; holding it as rule instance state (must live in `GameState`)
+
+### Round
+One red→green cycle at a single Game Level (red warning → red → green warning → green). Surviving its green phase advances the Game Level, or wins if played at `max_level`. A full game is `max_level` Rounds.
+_Avoid_: "phase" (a Round spans several phases); "level-up" (the celebratory beat *between* Rounds, not the Round)
 
 ### AudioRegistry
 A registry that maps clip names to WAV file paths. Populated explicitly via `register(name, path)` — no naming-convention magic.
