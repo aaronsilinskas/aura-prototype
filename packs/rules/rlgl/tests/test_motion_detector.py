@@ -1,4 +1,5 @@
-"""Tests for motion_magnitude() pure function."""
+"""Tests for the motion-detection helpers: ``motion_magnitude``, ``smooth_motion``,
+and the tuned threshold / smoothing constants."""
 
 from __future__ import annotations
 
@@ -79,12 +80,19 @@ def test_result_is_always_non_negative():
         assert motion_magnitude(accel) >= 0.0
 
 
-def test_red_max_motion_threshold_is_defined():
-    assert RED_MAX_MOTION_THRESHOLD > 0.0
+def test_red_threshold_is_stricter_than_green_move_threshold():
+    """Red must catch the smallest twitch; green requires deliberate movement."""
+    assert RED_MAX_MOTION_THRESHOLD < GREEN_MIN_MOTION_THRESHOLD
 
 
-def test_green_min_motion_threshold_is_defined():
-    assert GREEN_MIN_MOTION_THRESHOLD > 0.0
+def test_red_max_threshold_is_tuned_to_quarter():
+    """Lock the hand-tuned Red threshold so a change to it is deliberate."""
+    assert pytest.approx(0.25) == RED_MAX_MOTION_THRESHOLD
+
+
+def test_green_min_threshold_is_tuned_to_one():
+    """Lock the hand-tuned Green threshold so a change to it is deliberate."""
+    assert pytest.approx(1.0) == GREEN_MIN_MOTION_THRESHOLD
 
 
 # ---------------------------------------------------------------------------
@@ -102,10 +110,12 @@ def test_first_sample_is_attenuated_by_alpha():
     assert ema == pytest.approx(0.3 * 4.0)
 
 
-def test_a_lone_spike_stays_below_its_own_magnitude():
-    """A single spike from a calm baseline is heavily attenuated, not passed through."""
-    ema = smooth_motion(0.0, _STRONG, alpha=0.3)
-    assert ema < motion_magnitude(_STRONG)
+def test_a_lone_threshold_level_spike_smooths_below_the_move_threshold():
+    """One sample at the move-threshold magnitude, smoothed, falls below the
+    threshold — so a single noisy reading at gate level never reads as moving."""
+    at_threshold = AccelerationData(x=0.0, y=0.0, z=_G + GREEN_MIN_MOTION_THRESHOLD)
+    ema = smooth_motion(0.0, at_threshold, alpha=0.4)
+    assert ema < GREEN_MIN_MOTION_THRESHOLD
 
 
 def test_sustained_motion_converges_toward_the_true_magnitude():
@@ -131,4 +141,5 @@ def test_alpha_of_one_disables_smoothing():
 
 
 def test_default_alpha_is_used_when_unspecified():
-    assert smooth_motion(0.0, _STRONG) == pytest.approx(MOTION_EMA_ALPHA * 4.0)
+    """Omitting ``alpha`` smooths with ``MOTION_EMA_ALPHA`` rather than some other rate."""
+    assert smooth_motion(0.0, _STRONG) == smooth_motion(0.0, _STRONG, alpha=MOTION_EMA_ALPHA)

@@ -295,19 +295,19 @@ def test_red_phase_transition_uses_solid_with_red_color(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_red_motion_above_threshold_triggers_game_over(spy):
+def test_red_motion_ends_game_on_first_frame_with_no_grace_period(spy):
+    """There is no grace window: motion on the very first Red frame ends the game."""
     state, engine, timer = _setup_red_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
 
-    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 0.1)
+    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 0.0)
 
     assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
 
 
 def test_red_lone_spike_does_not_trigger_game_over(spy):
     """A single noisy sample above threshold is smoothed away, not a game over."""
-    # alpha 0.5 → one sample contributes only half its magnitude to the average,
-    # so a spike at 1.5× threshold lands at 0.75× threshold: below the line.
+    # One spike at 1.5x threshold; with smoothing on, a lone sample must not trip the gate.
     state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_motion_smoothing": 0.5})
     phase_start = state.get("rlgl_phase_start", 0.0)
     spike = _accel_with_mag(RED_MAX_MOTION_THRESHOLD * 1.5)
@@ -319,12 +319,13 @@ def test_red_lone_spike_does_not_trigger_game_over(spy):
 
 def test_red_sustained_motion_triggers_game_over(spy):
     """Motion held across consecutive samples accumulates past the threshold."""
+    # Same 1.5x-threshold motion as the lone-spike test, but sustained: it must be caught.
     state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_motion_smoothing": 0.5})
     phase_start = state.get("rlgl_phase_start", 0.0)
     motion = _accel_with_mag(RED_MAX_MOTION_THRESHOLD * 1.5)
 
-    _tick(state, engine, timer, accel=motion, total=phase_start + 0.1)  # 0.75× — safe
-    _tick(state, engine, timer, accel=motion, total=phase_start + 0.2)  # 1.125× — caught
+    _tick(state, engine, timer, accel=motion, total=phase_start + 0.1)  # one sample: still safe
+    _tick(state, engine, timer, accel=motion, total=phase_start + 0.2)  # held: now caught
 
     assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
 
@@ -475,10 +476,38 @@ def test_green_sustained_stillness_for_still_timeout_triggers_game_over(spy):
     assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
 
 
+def test_green_stillness_below_default_timeout_is_forgiven(spy):
+    """With no override, stillness just under the 0.75s default keeps the game alive.
+
+    ``_LOW_ACCEL`` reads as motionless regardless of the smoothing factor, so this
+    exercises the still-timer alone.
+    """
+    state, engine, timer = _setup_green_phase(spy)  # default still-timeout
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 0.74)
+
+    assert state.get("rlgl_phase", None) == PHASE_GREEN
+
+
+def test_green_stillness_at_default_timeout_ends_game(spy):
+    """With no override, stillness reaching the 0.75s default ends the game.
+
+    Together with the forgiven-below test this locks ``_DEFAULT_GREEN_STILL_TIMEOUT``
+    so a change to it is deliberate.
+    """
+    state, engine, timer = _setup_green_phase(spy)  # default still-timeout
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 0.75)
+
+    assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
+
+
 def test_green_lone_motion_spike_does_not_count_as_moving(spy):
     """A single sample isn't enough to register as moving, so stillness still wins."""
-    # alpha 0.5 → a lone spike at 1.5× the move threshold averages to 0.75×: too low
-    # to count as moving, so the still-timer keeps running and expires.
+    # One spike at 1.5x the move threshold; with smoothing on it must not register as
+    # moving, so the still-timer keeps running and expires.
     state, engine, timer = _setup_green_phase(
         spy,
         initial_data={"rlgl_motion_smoothing": 0.5, "rlgl_green_still_timeout": 1.0},
@@ -504,8 +533,8 @@ def test_green_sustained_motion_registers_as_moving_and_resets_still_timer(spy):
     phase_start = state.get("rlgl_phase_start", 0.0)
     motion = _accel_with_mag(GREEN_MIN_MOTION_THRESHOLD * 1.5)
 
-    _tick(state, engine, timer, accel=motion, total=phase_start + 1.1)  # 0.75× — not yet
-    _tick(state, engine, timer, accel=motion, total=phase_start + 1.2)  # 1.125× — moving
+    _tick(state, engine, timer, accel=motion, total=phase_start + 1.1)  # one sample: not yet
+    _tick(state, engine, timer, accel=motion, total=phase_start + 1.2)  # held: now moving
 
     assert state.get("rlgl_phase", None) == PHASE_GREEN
 
