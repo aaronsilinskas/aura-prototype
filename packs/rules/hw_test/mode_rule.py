@@ -6,7 +6,7 @@ except ImportError:
     pass
 
 from engine.engine import GameRule
-from engine.input import ButtonData, InputEvents
+from engine.input import InputEvents
 from engine.network import NetworkEvents
 from engine.state import EffectReceipt, GameState, Scope
 
@@ -66,10 +66,9 @@ class HwTestModeRule(GameRule):
 
         self._check_flash_expiry(state)
 
-        buttons = event.buttons.states
-        if buttons.get("B") == ButtonData.PRESSED:
+        if event.buttons.is_pressed("B"):
             self._advance_mode(state)
-        elif buttons.get("A") == ButtonData.PRESSED:
+        elif event.buttons.is_pressed("A"):
             self._handle_button_a(state)
 
     def _advance_mode(self, state: GameState) -> None:

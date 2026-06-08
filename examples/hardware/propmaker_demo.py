@@ -34,7 +34,7 @@ import board
 import hardware.circuitpython.propmaker as propmaker
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine, GameRule
-from engine.input import ButtonData, InputEvents
+from engine.input import InputEvents
 from engine.packs import PackRegistry
 from engine.state import SceneControls, Scope
 from engine.timer import Timer
@@ -97,13 +97,13 @@ class ButtonEffectRule(GameRule):
 
     def _on_buttons(self, event, state):
         button_data = event.buttons
-        if button_data.states["A"] == ButtonData.PRESSED:
+        if button_data.is_pressed("A"):
             page = (state.get("demo_page", 0) + 1) % 2
             level = state.get("demo_level", 1)
             state.set("demo_page", page)
             for scope, name in _ELEMENT_PAGES[page]:
                 state.effect_controls.set_effect(scope, name, {"level": level})
-        elif button_data.states["B"] == ButtonData.PRESSED:
+        elif button_data.is_pressed("B"):
             page = state.get("demo_page", 0)
             level = state.get("demo_level", 1) + 1
             if level > 10:

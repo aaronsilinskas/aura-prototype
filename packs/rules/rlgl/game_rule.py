@@ -24,7 +24,7 @@ except ImportError:
     pass
 
 from engine.engine import GameRule
-from engine.input import AccelerationData, ButtonData, InputEvents
+from engine.input import AccelerationData, InputEvents
 from engine.state import EffectReceipt, GameState, Scope
 from packs.rules.rlgl.helpers.motion_detector import (
     GRAVITY_LOWPASS_BETA,
@@ -225,10 +225,7 @@ class RlglGameRule(GameRule):
             self._check_game_over(state, phase_elapsed)
 
     def _check_ready(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
-        buttons = event.buttons.states
-        a_pressed = buttons.get("A") == ButtonData.PRESSED
-        b_pressed = buttons.get("B") == ButtonData.PRESSED
-        if a_pressed or b_pressed:
+        if event.buttons.is_pressed("A") or event.buttons.is_pressed("B"):
             _enter_red_warning(state)
 
     def _check_red_warning(self, state: GameState, elapsed: float) -> None:
