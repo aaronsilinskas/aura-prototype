@@ -109,3 +109,7 @@ _Avoid_: "IMU" (overpromises — LIS3DH has no gyroscope or magnetometer)
 ### AccelerationData
 A snapshot of 3-axis accelerometer readings at a point in time. When no accelerometer is present, the field is `None` — signals "no sensor data," not "device at rest." Rules must check for `None` before using the value.
 _Avoid_: `MovementData`
+
+### ButtonData
+A snapshot of button states at a point in time. Each button maps to one of four constants: `UP`, `DOWN`, `PRESSED` (transitioned down this frame), `RELEASED` (transitioned up this frame). Convenience query methods (`is_pressed`, `is_down`, etc.) return `bool`; `is_down` returns `True` on both the `PRESSED` and `DOWN` frames ("currently contacting"). Unknown button names return `False`/`None` rather than raising.
+_Avoid_: reading `_states` directly (use the query methods); assuming `is_down` excludes the `PRESSED` frame
