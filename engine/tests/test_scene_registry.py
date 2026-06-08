@@ -225,24 +225,6 @@ def test_scan_dir_raises_when_rule_packs_field_is_missing(tmp_path) -> None:
         registry.scan_dir(str(tmp_path))
 
 
-def test_scan_dir_raises_when_unknown_top_level_key_is_present(tmp_path) -> None:
-    scene_dir = tmp_path / "bad"
-    scene_dir.mkdir()
-    _write_scene_json(
-        scene_dir,
-        {
-            "version": "1.0",
-            "effect_packs": [],
-            "rule_packs": [],
-            "unexpected_key": "oops",
-        },
-    )
-    registry = SceneRegistry()
-
-    with pytest.raises(ValueError, match="unexpected_key"):
-        registry.scan_dir(str(tmp_path))
-
-
 # ---------------------------------------------------------------------------
 # SceneRegistry.get — correct data returned
 # ---------------------------------------------------------------------------

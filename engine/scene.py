@@ -21,7 +21,6 @@ from engine.packs import PackRegistry
 from engine.state import GameState, SceneControls, Scope
 
 _REQUIRED_KEYS = frozenset(("version", "effect_packs", "rule_packs"))
-_ALLOWED_KEYS = frozenset(("version", "effect_packs", "rule_packs", "initial_data"))
 
 
 class Scene:
@@ -111,8 +110,8 @@ class SceneRegistry:
         """Scan *path* for subdirectories that contain a ``scene.json``.
 
         Each such subdirectory is registered as a scene with the directory name
-        as its scene name.  All validation (required fields, version format,
-        unknown keys) happens here so that misconfigured scenes fail at startup.
+        as its scene name.  All validation (required fields, version format)
+        happens here so that misconfigured scenes fail at startup.
 
         This method is idempotent: calling it a second time with the same *path*
         is a no-op.  Discovering a scene name that was already registered from a
@@ -122,7 +121,6 @@ class SceneRegistry:
             ValueError: if a required field (``version``, ``effect_packs``,
                 ``rule_packs``) is missing from ``scene.json``.
             ValueError: if ``version`` cannot be parsed by ``Version.parse``.
-            ValueError: if an unknown top-level key is present in ``scene.json``.
             ValueError: if the same scene name is found in two different paths.
         """
         norm_path = _path.normpath(path)
@@ -155,19 +153,6 @@ class SceneRegistry:
             with open(scene_json_path) as fh:
                 data = json.load(fh)
 
-            # Validate keys
-            unknown = set(data.keys()) - _ALLOWED_KEYS
-            if unknown:
-                bad = sorted(unknown)[0]
-                raise ValueError(
-                    "Scene '"
-                    + scene_name
-                    + "' in '"
-                    + norm_path
-                    + "' has unknown key '"
-                    + bad
-                    + "' in scene.json"
-                )
             for key in _REQUIRED_KEYS:
                 if key not in data:
                     raise ValueError(
