@@ -30,11 +30,11 @@ def _enter_rgb(state: GameState) -> None:
         ec.set_effect(scope, name, {"level": 1})
 
 
-def _enter_imu(state: GameState) -> None:
+def _enter_accelerometer(state: GameState) -> None:
     ec = state.effect_controls
-    ec.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0xFF0000})
-    ec.set_effect(Scope.DIRECTIONAL, "basic.solid", {"color": 0x00FF00})
-    ec.set_effect(Scope.Global.ALL, "basic.solid", {"color": 0x0000FF})
+    ec.set_effect(Scope.PERSONAL, "basic.progress", {"color": 0xFF0000, "progress": 0.0})
+    ec.set_effect(Scope.DIRECTIONAL, "basic.progress", {"color": 0x00FF00, "progress": 0.0})
+    ec.set_effect(Scope.Global.ALL, "basic.progress", {"color": 0x0000FF, "progress": 0.0})
 
 
 def _enter_ir(state: GameState) -> None:
@@ -47,7 +47,7 @@ def _enter_radio(state: GameState) -> None:
     ec.set_effect(Scope.ALL, "basic.solid", {"color": 0xFFFFFF})
 
 
-_MODE_ENTRY: Final = (_enter_rgb, _enter_imu, _enter_ir, _enter_radio)
+_MODE_ENTRY: Final = (_enter_rgb, _enter_accelerometer, _enter_ir, _enter_radio)
 _NUM_MODES: Final = 4
 
 
@@ -93,7 +93,7 @@ class HwTestModeRule(GameRule):
             for scope, name in _RGB_IDLE:
                 ec.set_effect(scope, name, {"level": new_level})
         elif mode == 1:
-            pass  # IMU mode: no-op
+            pass  # accelerometer mode: no-op
         elif mode == 2:
             state.queue_event(NetworkEvents.IRReceived(HW_TEST_PAYLOAD))
         elif mode == 3:
