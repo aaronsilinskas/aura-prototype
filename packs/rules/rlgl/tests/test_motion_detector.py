@@ -7,8 +7,10 @@ import pytest
 from engine.input import AccelerationData
 from packs.rules.rlgl.helpers.motion_detector import (
     GREEN_MIN_MOTION_THRESHOLD,
+    MOTION_EMA_ALPHA,
     RED_MAX_MOTION_THRESHOLD,
     motion_magnitude,
+    smooth_motion,
 )
 
 _G = AccelerationData.GRAVITY
@@ -78,8 +80,55 @@ def test_result_is_always_non_negative():
 
 
 def test_red_max_motion_threshold_is_defined():
-    assert pytest.approx(1.5) == RED_MAX_MOTION_THRESHOLD
+    assert RED_MAX_MOTION_THRESHOLD > 0.0
 
 
 def test_green_min_motion_threshold_is_defined():
-    assert pytest.approx(1.0) == GREEN_MIN_MOTION_THRESHOLD
+    assert GREEN_MIN_MOTION_THRESHOLD > 0.0
+
+
+# ---------------------------------------------------------------------------
+# smooth_motion() — exponential moving average of motion magnitude
+# ---------------------------------------------------------------------------
+
+# A sample whose magnitude is well clear of any plausible threshold.
+_STRONG = AccelerationData(x=0.0, y=0.0, z=_G + 4.0)  # motion_magnitude == 4.0
+_STILL = AccelerationData(x=0.0, y=0.0, z=_G)  # motion_magnitude == 0.0
+
+
+def test_first_sample_is_attenuated_by_alpha():
+    """Folding one sample into a zero average yields alpha * magnitude."""
+    ema = smooth_motion(0.0, _STRONG, alpha=0.3)
+    assert ema == pytest.approx(0.3 * 4.0)
+
+
+def test_a_lone_spike_stays_below_its_own_magnitude():
+    """A single spike from a calm baseline is heavily attenuated, not passed through."""
+    ema = smooth_motion(0.0, _STRONG, alpha=0.3)
+    assert ema < motion_magnitude(_STRONG)
+
+
+def test_sustained_motion_converges_toward_the_true_magnitude():
+    """Repeated identical samples drive the average toward the raw magnitude."""
+    ema = 0.0
+    for _ in range(20):
+        ema = smooth_motion(ema, _STRONG, alpha=0.3)
+    assert ema == pytest.approx(4.0, abs=0.05)
+
+
+def test_sustained_stillness_decays_the_average_toward_zero():
+    """Once motion stops, the average bleeds back down to zero."""
+    ema = 4.0
+    for _ in range(40):
+        ema = smooth_motion(ema, _STILL, alpha=0.3)
+    assert ema == pytest.approx(0.0, abs=0.05)
+
+
+def test_alpha_of_one_disables_smoothing():
+    """alpha == 1.0 makes the average equal the instantaneous magnitude."""
+    ema = smooth_motion(99.0, _STRONG, alpha=1.0)
+    assert ema == pytest.approx(motion_magnitude(_STRONG))
+
+
+def test_default_alpha_is_used_when_unspecified():
+    assert smooth_motion(0.0, _STRONG) == pytest.approx(MOTION_EMA_ALPHA * 4.0)

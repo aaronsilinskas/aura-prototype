@@ -18,14 +18,23 @@ from packs.rules.rlgl.game_rule import (
     RULE,
     RlglGameRule,
 )
+from packs.rules.rlgl.helpers.motion_detector import (
+    GREEN_MIN_MOTION_THRESHOLD,
+    RED_MAX_MOTION_THRESHOLD,
+)
 
 _G = AccelerationData.GRAVITY
 
-# Produces motion above RED_MAX_MOTION_THRESHOLD (mag ≈ 2.0 > 1.5)
+# Produces motion above RED_MAX_MOTION_THRESHOLD
 _HIGH_ACCEL = AccelerationData(x=0.0, y=0.0, z=_G + 2.0)
 
-# Produces motion below GREEN_MIN_MOTION_THRESHOLD (mag = 0.0 < 1.0)
+# Produces motion below GREEN_MIN_MOTION_THRESHOLD (mag = 0.0)
 _LOW_ACCEL = AccelerationData(x=0.0, y=0.0, z=_G)
+
+
+def _accel_with_mag(mag: float) -> AccelerationData:
+    """Build a sample whose ``motion_magnitude`` equals ``mag`` (m/s²)."""
+    return AccelerationData(x=0.0, y=0.0, z=_G + mag)
 
 
 class _StubTimer:
@@ -85,14 +94,18 @@ def _tick(
 
 def _setup_red_phase(
     spy: SpyEffectControls,
-    grace: float = 1.0,
     initial_data: dict | None = None,
 ) -> tuple[GameState, GameEngine, _StubTimer]:
-    """Advance to RED phase with configurable grace duration.
+    """Advance to RED phase.
 
     Uses zero-duration warning so the transition happens on the very next tick.
+    Motion smoothing is disabled by default (``rlgl_motion_smoothing`` = 1.0) so a
+    single sample registers immediately; debounce tests override it explicitly.
     """
-    data: dict = {"rlgl_warning_duration": 0.0, "rlgl_grace_duration": grace}
+    data: dict = {
+        "rlgl_warning_duration": 0.0,
+        "rlgl_motion_smoothing": 1.0,
+    }
     if initial_data:
         data.update(initial_data)
     state, engine, timer = _make_state(spy, initial_data=data)
@@ -105,17 +118,18 @@ def _setup_red_phase(
 
 def _setup_green_phase(
     spy: SpyEffectControls,
-    grace: float = 1.0,
     initial_data: dict | None = None,
 ) -> tuple[GameState, GameEngine, _StubTimer]:
-    """Advance to GREEN phase with configurable grace duration.
+    """Advance to GREEN phase.
 
     Uses zero-duration warning and red phases so transitions are immediate.
+    Motion smoothing is disabled by default (``rlgl_motion_smoothing`` = 1.0) so a
+    single sample registers immediately; debounce tests override it explicitly.
     """
     data: dict = {
         "rlgl_warning_duration": 0.0,
         "rlgl_red_duration": 0.0,
-        "rlgl_grace_duration": grace,
+        "rlgl_motion_smoothing": 1.0,
     }
     if initial_data:
         data.update(initial_data)
@@ -281,26 +295,42 @@ def test_red_phase_transition_uses_solid_with_red_color(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_red_motion_above_threshold_within_grace_does_not_trigger_game_over(spy):
-    state, engine, timer = _setup_red_phase(spy, grace=2.0)
+def test_red_motion_above_threshold_triggers_game_over(spy):
+    state, engine, timer = _setup_red_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
 
-    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 1.0)
+    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 0.1)
+
+    assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
+
+
+def test_red_lone_spike_does_not_trigger_game_over(spy):
+    """A single noisy sample above threshold is smoothed away, not a game over."""
+    # alpha 0.5 → one sample contributes only half its magnitude to the average,
+    # so a spike at 1.5× threshold lands at 0.75× threshold: below the line.
+    state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_motion_smoothing": 0.5})
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    spike = _accel_with_mag(RED_MAX_MOTION_THRESHOLD * 1.5)
+
+    _tick(state, engine, timer, accel=spike, total=phase_start + 0.1)
 
     assert state.get("rlgl_phase", None) == PHASE_RED
 
 
-def test_red_motion_above_threshold_after_grace_triggers_game_over(spy):
-    state, engine, timer = _setup_red_phase(spy, grace=1.0)
+def test_red_sustained_motion_triggers_game_over(spy):
+    """Motion held across consecutive samples accumulates past the threshold."""
+    state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_motion_smoothing": 0.5})
     phase_start = state.get("rlgl_phase_start", 0.0)
+    motion = _accel_with_mag(RED_MAX_MOTION_THRESHOLD * 1.5)
 
-    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)
+    _tick(state, engine, timer, accel=motion, total=phase_start + 0.1)  # 0.75× — safe
+    _tick(state, engine, timer, accel=motion, total=phase_start + 0.2)  # 1.125× — caught
 
     assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
 
 
 def test_red_none_acceleration_does_not_trigger_game_over(spy):
-    state, engine, timer = _setup_red_phase(spy, grace=1.0)
+    state, engine, timer = _setup_red_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
 
     _tick(state, engine, timer, accel=None, total=phase_start + 2.0)
@@ -318,7 +348,7 @@ def test_red_timer_expiry_transitions_to_green_warning(spy):
 
 
 def test_red_timer_expiry_takes_priority_over_motion(spy):
-    state, engine, timer = _setup_red_phase(spy, grace=1.0, initial_data={"rlgl_red_duration": 3.0})
+    state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_red_duration": 3.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
 
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 3.0)
@@ -416,19 +446,8 @@ def test_green_phase_transition_uses_solid_with_green_color(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_green_motion_below_threshold_within_grace_does_not_trigger_game_over(spy):
-    state, engine, timer = _setup_green_phase(spy, grace=2.0)
-    phase_start = state.get("rlgl_phase_start", 0.0)
-
-    _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 1.0)
-
-    assert state.get("rlgl_phase", None) == PHASE_GREEN
-
-
 def test_green_motion_below_threshold_for_less_than_still_timeout_does_not_trigger_game_over(spy):
-    state, engine, timer = _setup_green_phase(
-        spy, grace=1.0, initial_data={"rlgl_green_still_timeout": 1.0}
-    )
+    state, engine, timer = _setup_green_phase(spy, initial_data={"rlgl_green_still_timeout": 1.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
 
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 1.2)
@@ -438,9 +457,7 @@ def test_green_motion_below_threshold_for_less_than_still_timeout_does_not_trigg
 
 
 def test_green_motion_above_threshold_resets_still_timer_so_brief_pause_is_forgiven(spy):
-    state, engine, timer = _setup_green_phase(
-        spy, grace=1.0, initial_data={"rlgl_green_still_timeout": 1.0}
-    )
+    state, engine, timer = _setup_green_phase(spy, initial_data={"rlgl_green_still_timeout": 1.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
 
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 1.5)
@@ -450,9 +467,7 @@ def test_green_motion_above_threshold_resets_still_timer_so_brief_pause_is_forgi
 
 
 def test_green_sustained_stillness_for_still_timeout_triggers_game_over(spy):
-    state, engine, timer = _setup_green_phase(
-        spy, grace=1.0, initial_data={"rlgl_green_still_timeout": 1.0}
-    )
+    state, engine, timer = _setup_green_phase(spy, initial_data={"rlgl_green_still_timeout": 1.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
 
     _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 2.0)
@@ -460,8 +475,43 @@ def test_green_sustained_stillness_for_still_timeout_triggers_game_over(spy):
     assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
 
 
+def test_green_lone_motion_spike_does_not_count_as_moving(spy):
+    """A single sample isn't enough to register as moving, so stillness still wins."""
+    # alpha 0.5 → a lone spike at 1.5× the move threshold averages to 0.75×: too low
+    # to count as moving, so the still-timer keeps running and expires.
+    state, engine, timer = _setup_green_phase(
+        spy,
+        initial_data={"rlgl_motion_smoothing": 0.5, "rlgl_green_still_timeout": 1.0},
+    )
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    spike = _accel_with_mag(GREEN_MIN_MOTION_THRESHOLD * 1.5)
+
+    _tick(state, engine, timer, accel=spike, total=phase_start + 1.5)
+
+    assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
+
+
+def test_green_sustained_motion_registers_as_moving_and_resets_still_timer(spy):
+    """Motion held across samples drives the average over the move threshold."""
+    state, engine, timer = _setup_green_phase(
+        spy,
+        initial_data={
+            "rlgl_motion_smoothing": 0.5,
+            "rlgl_green_still_timeout": 2.0,
+            "rlgl_green_duration": 10.0,
+        },
+    )
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    motion = _accel_with_mag(GREEN_MIN_MOTION_THRESHOLD * 1.5)
+
+    _tick(state, engine, timer, accel=motion, total=phase_start + 1.1)  # 0.75× — not yet
+    _tick(state, engine, timer, accel=motion, total=phase_start + 1.2)  # 1.125× — moving
+
+    assert state.get("rlgl_phase", None) == PHASE_GREEN
+
+
 def test_green_none_acceleration_does_not_trigger_game_over(spy):
-    state, engine, timer = _setup_green_phase(spy, grace=1.0)
+    state, engine, timer = _setup_green_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
 
     _tick(state, engine, timer, accel=None, total=phase_start + 2.0)
@@ -479,9 +529,7 @@ def test_green_timer_expiry_transitions_to_red_warning(spy):
 
 
 def test_green_timer_expiry_takes_priority_over_motion(spy):
-    state, engine, timer = _setup_green_phase(
-        spy, grace=1.0, initial_data={"rlgl_green_duration": 3.0}
-    )
+    state, engine, timer = _setup_green_phase(spy, initial_data={"rlgl_green_duration": 3.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
 
     _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 3.0)
@@ -495,7 +543,7 @@ def test_green_timer_expiry_takes_priority_over_motion(spy):
 
 
 def test_game_over_shows_fire_effect_on_all_scopes(spy):
-    state, engine, timer = _setup_red_phase(spy, grace=1.0)
+    state, engine, timer = _setup_red_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
     spy.set_effect_calls.clear()
 
@@ -507,9 +555,7 @@ def test_game_over_shows_fire_effect_on_all_scopes(spy):
 
 
 def test_game_over_transitions_to_ready_after_game_over_duration(spy):
-    state, engine, timer = _setup_red_phase(
-        spy, grace=1.0, initial_data={"rlgl_game_over_duration": 2.0}
-    )
+    state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_game_over_duration": 2.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)  # → GAME_OVER
 
@@ -520,9 +566,7 @@ def test_game_over_transitions_to_ready_after_game_over_duration(spy):
 
 
 def test_game_over_expiry_restores_ready_effect_on_all_scopes(spy):
-    state, engine, timer = _setup_red_phase(
-        spy, grace=1.0, initial_data={"rlgl_game_over_duration": 2.0}
-    )
+    state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_game_over_duration": 2.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)
     go_start = state.get("rlgl_phase_start", 0.0)
@@ -695,7 +739,7 @@ def test_green_phase_stores_ambient_receipt_in_game_state(spy):
 
 
 def test_game_over_plays_game_over_sting_on_all(spy):
-    state, engine, timer = _setup_red_phase(spy, grace=1.0)
+    state, engine, timer = _setup_red_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
     spy.add_effect_calls.clear()
 
@@ -707,7 +751,7 @@ def test_game_over_plays_game_over_sting_on_all(spy):
 
 
 def test_game_over_stops_ambient_receipt(spy):
-    state, engine, timer = _setup_red_phase(spy, grace=1.0)
+    state, engine, timer = _setup_red_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
 
     ambient_receipt = state.get("rlgl_ambient_receipt", None)
@@ -719,7 +763,7 @@ def test_game_over_stops_ambient_receipt(spy):
 
 
 def test_game_over_removes_ambient_receipt_from_game_state(spy):
-    state, engine, timer = _setup_red_phase(spy, grace=1.0)
+    state, engine, timer = _setup_red_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
 
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)  # → GAME_OVER
