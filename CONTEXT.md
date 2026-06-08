@@ -43,7 +43,7 @@ _Avoid_: calling `clear_queue()` from rules (reserved for `SceneManager` during 
 Owned internally by `GameEngine`. Rules access time only via `state.elapsed` and `state.total` — never hold a `Timer` reference.
 
 ### Scene
-A declarative bundle of a self-contained game context: rules, effect/rule packs, optional initial data, and optional lifecycle callbacks. Carries no mutable runtime state — game data lives in a `GameState` that `SceneManager` creates on the scene's behalf.
+A declarative bundle of a self-contained game context: effect/rule packs and optional initial data. Carries no mutable runtime state — game data lives in a `GameState` that `SceneManager` creates on the scene's behalf.
 
 ### NetworkControls
 Abstract interface for network transmit (`send_ir`, `send_radio`). Always present on `GameState`; raises unless the live implementation is injected. The receive side is covered by `NetworkEvents`.
@@ -52,7 +52,7 @@ Abstract interface for network transmit (`send_ir`, `send_radio`). Always presen
 Abstract interface with `load`, `overlay`, and `pop` — each records a pending transition applied after the current tick ends. `SceneManager` is the live implementation.
 
 ### SceneManager
-Owns the scene stack and drives transitions. `load` clears the stack; `overlay` suspends the active scene and pushes a new one; `pop` unloads the top and resumes the previous.
+Owns the scene stack and drives transitions. `load` clears the stack; `overlay` suspends the active scene and pushes a new one; `pop` unloads the top and restores the previous. Every scene it unloads or suspends has its effects stopped on `Scope.ALL` automatically.
 
 ### Scope
 Identifies what a game effect targets. Output-agnostic — routes to all outputs (LED, audio, vibration) registered for it. Leaf scopes: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN`, `Global.BUFF`, `Global.DEBUFF`, `AMBIENT`. Composite scopes: `Global.ALL` (all global zones), `NON_AMBIENT` (all except AMBIENT), `Scope.ALL` (every scope including AMBIENT — use for teardown).
