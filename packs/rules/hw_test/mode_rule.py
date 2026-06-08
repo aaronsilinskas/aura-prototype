@@ -47,8 +47,13 @@ def _enter_radio(state: GameState) -> None:
     ec.set_effect(Scope.ALL, "basic.solid", {"color": 0xFFFFFF})
 
 
-_MODE_ENTRY: Final = (_enter_rgb, _enter_accelerometer, _enter_ir, _enter_radio)
-_NUM_MODES: Final = 4
+def _enter_sfx(state: GameState) -> None:
+    ec = state.effect_controls
+    ec.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0x00FFFF})
+
+
+_MODE_ENTRY: Final = (_enter_rgb, _enter_accelerometer, _enter_ir, _enter_radio, _enter_sfx)
+_NUM_MODES: Final = 5
 
 
 class HwTestModeRule(GameRule):
@@ -97,6 +102,8 @@ class HwTestModeRule(GameRule):
             state.queue_event(NetworkEvents.IRReceived(HW_TEST_PAYLOAD))
         elif mode == 3:
             state.queue_event(NetworkEvents.RadioReceived(HW_TEST_PAYLOAD, "local"))
+        elif mode == 4:
+            state.effect_controls.set_effect(Scope.PERSONAL, "hw_test.sfx_test", {})
 
     def _check_flash_expiry(self, state: GameState) -> None:
         if (
