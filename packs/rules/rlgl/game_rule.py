@@ -78,9 +78,22 @@ _DEFAULT_MOTION_SMOOTHING: Final = MOTION_EMA_ALPHA
 # ---------------------------------------------------------------------------
 
 
-def _enter_ready(state: GameState) -> None:
-    state.set(_KEY_PHASE, PHASE_READY)
+def _enter_phase(state: GameState, phase: str) -> None:
+    """Record the new phase and its start time, stopping any ambient music left
+    running by the previous phase.
+
+    Every ``_enter_*`` helper begins here, so a looping ambient effect can never
+    leak across a transition.  The ``has`` guard makes it a no-op when nothing is
+    playing (e.g. entering Ready at game start).
+    """
+    state.set(_KEY_PHASE, phase)
     state.set(_KEY_PHASE_START, state.total)
+    if state.has(_KEY_AMBIENT_RECEIPT):
+        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
+
+
+def _enter_ready(state: GameState) -> None:
+    _enter_phase(state, PHASE_READY)
     state.effect_controls.set_effect(Scope.ALL, "rlgl.ready", {"level": 3})
 
 
@@ -95,16 +108,12 @@ _WARNING_STING_OPTS: Final = {
 
 
 def _enter_red_warning(state: GameState) -> None:
-    state.set(_KEY_PHASE, PHASE_RED_WARNING)
-    state.set(_KEY_PHASE_START, state.total)
-    if state.has(_KEY_AMBIENT_RECEIPT):
-        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
+    _enter_phase(state, PHASE_RED_WARNING)
     state.effect_controls.set_effect(Scope.ALL, "rlgl.warning_sting", _WARNING_STING_OPTS)
 
 
 def _enter_red(state: GameState) -> None:
-    state.set(_KEY_PHASE, PHASE_RED)
-    state.set(_KEY_PHASE_START, state.total)
+    _enter_phase(state, PHASE_RED)
     state.set(_KEY_MOTION_EMA, 0.0)
     state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": 0xFF0000})
     receipt = state.effect_controls.add_effect(Scope.AMBIENT, "rlgl.red_light_music", {})
@@ -112,16 +121,12 @@ def _enter_red(state: GameState) -> None:
 
 
 def _enter_green_warning(state: GameState) -> None:
-    state.set(_KEY_PHASE, PHASE_GREEN_WARNING)
-    state.set(_KEY_PHASE_START, state.total)
-    if state.has(_KEY_AMBIENT_RECEIPT):
-        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
+    _enter_phase(state, PHASE_GREEN_WARNING)
     state.effect_controls.set_effect(Scope.ALL, "rlgl.warning_sting", _WARNING_STING_OPTS)
 
 
 def _enter_green(state: GameState) -> None:
-    state.set(_KEY_PHASE, PHASE_GREEN)
-    state.set(_KEY_PHASE_START, state.total)
+    _enter_phase(state, PHASE_GREEN)
     state.set(_KEY_LAST_MOTION_TIME, state.total)
     state.set(_KEY_MOTION_EMA, 0.0)
     state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": 0x00FF00})
@@ -130,10 +135,7 @@ def _enter_green(state: GameState) -> None:
 
 
 def _enter_game_over(state: GameState) -> None:
-    state.set(_KEY_PHASE, PHASE_GAME_OVER)
-    state.set(_KEY_PHASE_START, state.total)
-    if state.has(_KEY_AMBIENT_RECEIPT):
-        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
+    _enter_phase(state, PHASE_GAME_OVER)
     state.effect_controls.set_effect(Scope.ALL, "elements.fire", {})
     state.effect_controls.add_effect(Scope.ALL, "rlgl.game_over_sting", {})
 
