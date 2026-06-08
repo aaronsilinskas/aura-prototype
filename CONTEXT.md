@@ -78,6 +78,10 @@ _Avoid_: using `options["brightness"]` as a runtime control (it only initializes
 A low-level, looping effect running on a scope when no active game logic requires a specific response. Replaced when an active effect starts; restored when it ends.
 _Avoid_: "ambient effect", "background effect" as synonyms (`Scope.AMBIENT` is a routing destination, not a description of idle effects)
 
+### Progress bar
+A linear fill effect (`basic.progress`) that lights pixels from the first toward the last in proportion to a `progress` value in `[0.0, 1.0]`: `0.0` all dark, `1.0` all lit in a single `color` (default white), `0.5` the first half lit. The lit/dark boundary pixel is anti-aliased — lit in proportion to its coverage. `progress` is a build-time effect option, not a runtime control: changing it means re-issuing `set_effect`.
+_Avoid_: confusing `progress` (0.0–1.0 spatial fill) with `Level` (1–10 integer effect intensity) or with receipt `brightness` (0.0–1.0 output-level visual scaling of the whole strip); treating `progress` as a runtime-mutable receipt field
+
 ### AudioRegistry
 A registry that maps clip names to WAV file paths. Populated explicitly via `register(name, path)` — no naming-convention magic.
 _Avoid_: using `PackRegistry.sound_path` for new audio effects (deprecated — migrate to `AudioRegistry`)
