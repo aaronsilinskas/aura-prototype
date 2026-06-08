@@ -67,8 +67,8 @@ class _SceneEntry:
     def __init__(
         self,
         version: Version,
-        effect_packs: list,
-        rule_packs: list,
+        effect_packs: list[list],
+        rule_packs: list[list],
         initial_data: dict | None,
         source_path: str,
     ) -> None:
@@ -216,9 +216,9 @@ class SceneRegistry:
             version=entry.version,
         )
 
-    def names(self) -> list:
+    def names(self) -> list[str]:
         """Return all registered scene names sorted alphabetically."""
-        all_names = list(self._scenes.keys()) + list(self._factories.keys())
+        all_names = set(self._scenes.keys()) | set(self._factories.keys())
         return sorted(all_names)
 
     def register(self, name: str, factory: Callable[[], Scene]) -> None:
