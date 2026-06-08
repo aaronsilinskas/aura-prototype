@@ -24,7 +24,7 @@ RED_MAX_MOTION_THRESHOLD: Final = 0.25
 GREEN_MIN_MOTION_THRESHOLD: Final = 1.0
 """Player must exceed this magnitude (m/s²) to count as moving on Green Light."""
 
-MOTION_EMA_ALPHA: Final = 0.4
+MOTION_EMA_ALPHA: Final = 0.35
 """Default smoothing factor for :func:`smooth_motion` (0 < alpha ≤ 1).
 
 Lower values average over more samples — stronger spike rejection but slower to
