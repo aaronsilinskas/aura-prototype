@@ -109,7 +109,7 @@ _rule_registry = PackRegistry(item_attr="RULE")
 _rule_registry.scan_dir("packs/rules", "packs.rules")
 
 _audio_registry = AudioRegistry()
-_audio_registry.register("sfx_test_start", "sounds/sfx_test.wav")
+_audio_registry.register("sfx_test_start", "sounds/blip.wav")
 
 _audio_output = AudioEffectOutput(_audio_registry, max_volume=0.1, num_voices=1)
 _outputs = [IS31FL3741EffectOutput(_matrix), _audio_output]
