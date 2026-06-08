@@ -55,11 +55,10 @@ def test_scene_version_defaults_to_none_when_not_provided() -> None:
     assert scene.version is None
 
 
-def test_scene_version_is_stored_as_version_instance() -> None:
+def test_scene_version_stores_major_and_minor_values() -> None:
     v = Version(2, 0)
     scene = Scene(effect_packs=[], rule_packs=[], version=v)
 
-    assert isinstance(scene.version, Version)
     assert scene.version.major == 2
     assert scene.version.minor == 0
 
@@ -347,9 +346,8 @@ def test_get_returns_fresh_initial_data_so_mutation_does_not_affect_next_call(
 # ---------------------------------------------------------------------------
 
 
-def test_get_raises_value_error_for_unknown_scene_name(tmp_path) -> None:
+def test_get_raises_value_error_for_unknown_scene_name() -> None:
     registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path))
 
     with pytest.raises(ValueError, match="Unknown scene"):
         registry.get("nonexistent")
@@ -383,7 +381,7 @@ def test_register_factory_allows_get_without_any_disk_scan() -> None:
 
     scene = registry.get("in_memory")
 
-    assert isinstance(scene, Scene)
+    assert scene.version is v
 
 
 def test_register_factory_scene_appears_in_names() -> None:
@@ -417,8 +415,8 @@ def test_register_factory_and_json_scenes_are_indistinguishable_via_public_api(
     disk_scene = registry.get("from_disk")
     mem_scene = registry.get("from_memory")
 
-    # Both are plain Scene instances with version set; no way to tell them apart
-    assert isinstance(disk_scene, Scene)
-    assert isinstance(mem_scene, Scene)
-    assert isinstance(disk_scene.version, Version)
-    assert isinstance(mem_scene.version, Version)
+    # Both expose the same fields through the same public interface
+    assert disk_scene.version.major == 1
+    assert disk_scene.version.minor == 0
+    assert mem_scene.version.major == 1
+    assert mem_scene.version.minor == 0
