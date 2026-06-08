@@ -171,7 +171,7 @@ def test_progress_clamps_to_1_0_when_acceleration_exceeds_max(spy):
     assert x_calls[-1][2]["progress"] == pytest.approx(1.0)
 
 
-def test_near_zero_axis_yields_near_zero_progress(spy):
+def test_zero_acceleration_yields_zero_progress(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(x=0.0, y=0.0, z=0.0))
 
