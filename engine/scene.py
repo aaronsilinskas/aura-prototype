@@ -14,11 +14,11 @@ except ImportError:
 
 from engine.engine import GameEngine, GameRule, Version
 from engine.packs import PackRegistry
-from engine.state import EffectControls, GameState, SceneControls
+from engine.state import GameState, SceneControls, Scope
 
 
 class Scene:
-    """Declarative bundle describing a scene's rules, packs, and lifecycle hooks.
+    """Declarative bundle describing a scene's rules, packs, and initial data.
 
     Carries no mutable runtime state.  Pass a zero-arg factory that returns a
     fresh ``Scene`` to ``SceneManager.register``; ``SceneManager`` calls the
@@ -26,20 +26,12 @@ class Scene:
 
     ``effect_packs`` and ``rule_packs`` are lists of ``(pack_name, "MAJOR.MINOR")``
     tuples referencing packs registered in the respective ``PackRegistry``.
-
-    Lifecycle callbacks receive only ``effect_controls``::
-
-        def on_load(effect_controls: EffectControls) -> None: ...
     """
 
     __slots__ = (
         "__weakref__",
         "effect_packs",
         "initial_data",
-        "on_load",
-        "on_resume",
-        "on_suspend",
-        "on_unload",
         "rule_packs",
     )
 
@@ -48,18 +40,10 @@ class Scene:
         effect_packs: list[tuple[str, str]],
         rule_packs: list[tuple[str, str]],
         initial_data: dict[str, object] | None = None,
-        on_load: Callable[[EffectControls], None] | None = None,
-        on_unload: Callable[[EffectControls], None] | None = None,
-        on_suspend: Callable[[EffectControls], None] | None = None,
-        on_resume: Callable[[EffectControls], None] | None = None,
     ) -> None:
         self.effect_packs = effect_packs
         self.rule_packs = rule_packs
         self.initial_data = initial_data
-        self.on_load = on_load
-        self.on_unload = on_unload
-        self.on_suspend = on_suspend
-        self.on_resume = on_resume
 
 
 class SceneManager(SceneControls):
@@ -197,14 +181,13 @@ class SceneManager(SceneControls):
         return combined
 
     def _do_load(self, scene: Scene) -> None:
-        """Execute a load transition: unload all, create fresh state, fire on_load."""
+        """Execute a load transition: stop and unload all, create fresh state."""
         combined_rules = self._resolve_rules(scene)
 
-        # Fire on_unload top-down and clear each state's queue
+        # Stop all effects on each outgoing scene top-down, then clear its queue
         for i in range(len(self._stack) - 1, -1, -1):
-            s, st, _ = self._stack[i]
-            if s.on_unload is not None:
-                s.on_unload(st.effect_controls)
+            _, st, _ = self._stack[i]
+            st.effect_controls.stop_effect(Scope.ALL)
             st.clear_queue()
 
         self._stack = []
@@ -212,17 +195,13 @@ class SceneManager(SceneControls):
         self._engine.set_rules(combined_rules)
         self._stack.append((scene, state, combined_rules))
 
-        if scene.on_load is not None:
-            scene.on_load(state.effect_controls)
-
     def _do_overlay(self, scene: Scene) -> None:
-        """Execute an overlay transition: suspend top, push new scene."""
+        """Execute an overlay transition: stop and suspend top, push new scene."""
         combined_rules = self._resolve_rules(scene)
 
-        # Suspend current top
-        s, st, _ = self._stack[-1]
-        if s.on_suspend is not None:
-            s.on_suspend(st.effect_controls)
+        # Stop all effects on the suspended top, then clear its queue
+        _, st, _ = self._stack[-1]
+        st.effect_controls.stop_effect(Scope.ALL)
         st.clear_queue()
 
         # Push overlay without clearing the stack
@@ -231,17 +210,14 @@ class SceneManager(SceneControls):
         self._stack.append((scene, state, combined_rules))
 
     def _do_pop(self) -> None:
-        """Execute a pop transition: unload top, restore and resume scene below."""
-        # Unload the top entry
-        s, st, _ = self._stack[-1]
-        if s.on_unload is not None:
-            s.on_unload(st.effect_controls)
+        """Execute a pop transition: stop and unload top, restore scene below."""
+        # Stop all effects on the top entry, then clear its queue and pop it
+        _, st, _ = self._stack[-1]
+        st.effect_controls.stop_effect(Scope.ALL)
         st.clear_queue()
         self._stack.pop()
 
         # Restore the now-active entry
-        s, st, combined_rules = self._stack[-1]
+        _, st, combined_rules = self._stack[-1]
         self._engine.set_rules(combined_rules)
         st.clear_queue()  # defensive clear on restored state
-        if s.on_resume is not None:
-            s.on_resume(st.effect_controls)
