@@ -34,7 +34,7 @@ def _fire(state: GameState, engine: GameEngine, acceleration: AccelerationData |
 
 
 # ---------------------------------------------------------------------------
-# No-op when not IMU mode
+# No-op when not accelerometer mode
 # ---------------------------------------------------------------------------
 
 
@@ -67,26 +67,24 @@ def test_motion_rule_is_noop_when_acceleration_is_none(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_x_axis_max_positive_sets_red_on_personal(spy):
+def test_x_axis_max_positive_sets_red_progress_on_personal(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX))
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
     assert len(x_calls) == 1
     _, _name, options = x_calls[0]
-    assert options == {"color": 0xFF0000}
-    assert state.get("hw_motion_receipt_x", None).brightness == pytest.approx(1.0)
+    assert options == {"color": 0xFF0000, "progress": pytest.approx(1.0)}
 
 
-def test_x_axis_max_negative_sets_cyan_on_personal(spy):
+def test_x_axis_max_negative_sets_cyan_progress_on_personal(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(x=-ACCEL_MAX))
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
     assert len(x_calls) == 1
     _, _name, options = x_calls[0]
-    assert options == {"color": 0x00FFFF}
-    assert state.get("hw_motion_receipt_x", None).brightness == pytest.approx(1.0)
+    assert options == {"color": 0x00FFFF, "progress": pytest.approx(1.0)}
 
 
 # ---------------------------------------------------------------------------
@@ -94,26 +92,24 @@ def test_x_axis_max_negative_sets_cyan_on_personal(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_y_axis_max_positive_sets_green_on_directional(spy):
+def test_y_axis_max_positive_sets_green_progress_on_directional(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(y=ACCEL_MAX))
 
     y_calls = [c for c in spy.set_effect_calls if c[0] == Scope.DIRECTIONAL]
     assert len(y_calls) == 1
     _, _name, options = y_calls[0]
-    assert options == {"color": 0x00FF00}
-    assert state.get("hw_motion_receipt_y", None).brightness == pytest.approx(1.0)
+    assert options == {"color": 0x00FF00, "progress": pytest.approx(1.0)}
 
 
-def test_y_axis_max_negative_sets_magenta_on_directional(spy):
+def test_y_axis_max_negative_sets_magenta_progress_on_directional(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(y=-ACCEL_MAX))
 
     y_calls = [c for c in spy.set_effect_calls if c[0] == Scope.DIRECTIONAL]
     assert len(y_calls) == 1
     _, _name, options = y_calls[0]
-    assert options == {"color": 0xFF00FF}
-    assert state.get("hw_motion_receipt_y", None).brightness == pytest.approx(1.0)
+    assert options == {"color": 0xFF00FF, "progress": pytest.approx(1.0)}
 
 
 # ---------------------------------------------------------------------------
@@ -121,26 +117,24 @@ def test_y_axis_max_negative_sets_magenta_on_directional(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_z_axis_max_positive_sets_blue_on_global_all(spy):
+def test_z_axis_max_positive_sets_blue_progress_on_global_all(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(z=ACCEL_MAX))
 
     z_calls = [c for c in spy.set_effect_calls if c[0] == Scope.Global.ALL]
     assert len(z_calls) == 1
     _, _name, options = z_calls[0]
-    assert options == {"color": 0x0000FF}
-    assert state.get("hw_motion_receipt_z", None).brightness == pytest.approx(1.0)
+    assert options == {"color": 0x0000FF, "progress": pytest.approx(1.0)}
 
 
-def test_z_axis_max_negative_sets_yellow_on_global_all(spy):
+def test_z_axis_max_negative_sets_yellow_progress_on_global_all(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(z=-ACCEL_MAX))
 
     z_calls = [c for c in spy.set_effect_calls if c[0] == Scope.Global.ALL]
     assert len(z_calls) == 1
     _, _name, options = z_calls[0]
-    assert options == {"color": 0xFFFF00}
-    assert state.get("hw_motion_receipt_z", None).brightness == pytest.approx(1.0)
+    assert options == {"color": 0xFFFF00, "progress": pytest.approx(1.0)}
 
 
 # ---------------------------------------------------------------------------
@@ -148,45 +142,46 @@ def test_z_axis_max_negative_sets_yellow_on_global_all(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_motion_rule_uses_basic_solid_effect_for_all_axes(spy):
+def test_motion_rule_uses_basic_progress_effect_for_all_axes(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX, y=ACCEL_MAX, z=ACCEL_MAX))
 
     names = [c[1] for c in spy.set_effect_calls]
-    assert all(n == "basic.solid" for n in names)
+    assert all(n == "basic.progress" for n in names)
 
 
 # ---------------------------------------------------------------------------
-# Brightness scales with acceleration magnitude
+# Progress scales with acceleration magnitude
 # ---------------------------------------------------------------------------
 
 
-def test_x_axis_half_max_acceleration_sets_brightness_0_5(spy):
+def test_x_axis_half_max_acceleration_sets_progress_0_5(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX / 2))
 
-    receipt = state.get("hw_motion_receipt_x", None)
-    assert receipt.brightness == pytest.approx(0.5)
+    x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
+    assert x_calls[-1][2]["progress"] == pytest.approx(0.5)
 
 
-def test_brightness_clamps_to_1_0_when_acceleration_exceeds_max(spy):
+def test_progress_clamps_to_1_0_when_acceleration_exceeds_max(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX * 2))
 
-    receipt = state.get("hw_motion_receipt_x", None)
-    assert receipt.brightness == pytest.approx(1.0)
+    x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
+    assert x_calls[-1][2]["progress"] == pytest.approx(1.0)
 
 
-# ---------------------------------------------------------------------------
-# Zero acceleration — brightness clamps to 0.0
-# ---------------------------------------------------------------------------
-
-
-def test_zero_acceleration_on_all_axes_fires_three_effects(spy):
+def test_zero_acceleration_yields_zero_progress(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(x=0.0, y=0.0, z=0.0))
 
-    assert len(spy.set_effect_calls) == 3
+    for _scope, _name, options in spy.set_effect_calls:
+        assert options["progress"] == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# All three axes fire every tick
+# ---------------------------------------------------------------------------
 
 
 def test_all_three_axes_fire_on_first_tick(spy):
@@ -199,65 +194,20 @@ def test_all_three_axes_fire_on_first_tick(spy):
     assert Scope.Global.ALL in scopes
 
 
-# ---------------------------------------------------------------------------
-# Receipt and color stored in GameState on first tick
-# ---------------------------------------------------------------------------
-
-
-def test_first_tick_stores_receipt_and_color_in_state(spy):
+def test_each_axis_fires_set_effect_every_tick(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX))
-
-    assert state.get("hw_motion_receipt_x", None) is not None
-    assert state.get("hw_motion_color_x", None) == 0xFF0000
-
-
-# ---------------------------------------------------------------------------
-# Same color: brightness updated on receipt, no set_effect call
-# ---------------------------------------------------------------------------
-
-
-def test_same_color_second_tick_updates_brightness_without_set_effect(spy):
-    state, engine = _make_state(spy, hw_mode=1)
-    _fire(state, engine, AccelerationData(x=ACCEL_MAX))
-    first_tick_x_count = len([c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL])
-
     _fire(state, engine, AccelerationData(x=ACCEL_MAX / 2))
 
-    assert len([c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]) == first_tick_x_count
-    assert state.get("hw_motion_receipt_x", None).brightness == pytest.approx(0.5)
+    x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
+    assert len(x_calls) == 2
+    assert x_calls[-1][2]["progress"] == pytest.approx(0.5)
 
 
-# ---------------------------------------------------------------------------
-# Color flip: set_effect called with new color, new receipt stored
-# ---------------------------------------------------------------------------
-
-
-def test_color_flip_calls_set_effect_with_new_color(spy):
+def test_color_flips_with_sign_each_tick(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX))
-    before_count = len([c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL])
-
     _fire(state, engine, AccelerationData(x=-ACCEL_MAX))
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
-    assert len(x_calls) == before_count + 1
-    assert x_calls[-1][2] == {"color": 0x00FFFF}
-    assert state.get("hw_motion_color_x", None) == 0x00FFFF
-
-
-# ---------------------------------------------------------------------------
-# Stopped receipt: set_effect called to start fresh effect
-# ---------------------------------------------------------------------------
-
-
-def test_stopped_receipt_restarts_effect(spy):
-    state, engine = _make_state(spy, hw_mode=1)
-    _fire(state, engine, AccelerationData(x=ACCEL_MAX))
-    before_count = len([c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL])
-
-    state.get("hw_motion_receipt_x", None).stop()
-
-    _fire(state, engine, AccelerationData(x=ACCEL_MAX))
-
-    assert len([c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]) == before_count + 1
+    assert x_calls[-1][2]["color"] == 0x00FFFF

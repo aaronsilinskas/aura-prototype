@@ -100,16 +100,16 @@ def test_first_tick_sets_rgb_level_in_state_data(spy):
     assert state.get("rgb_level", None) == 1
 
 
-def test_first_tick_imu_mode_starts_solid_effects(spy):
+def test_first_tick_accelerometer_mode_starts_progress_effects(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 1})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     assert state.get("hw_mode", None) == 1
     names_and_options = [(call[1], call[2]) for call in spy.set_effect_calls]
-    assert ("basic.solid", {"color": 0xFF0000}) in names_and_options
-    assert ("basic.solid", {"color": 0x00FF00}) in names_and_options
-    assert ("basic.solid", {"color": 0x0000FF}) in names_and_options
+    assert ("basic.progress", {"color": 0xFF0000, "progress": 0.0}) in names_and_options
+    assert ("basic.progress", {"color": 0x00FF00, "progress": 0.0}) in names_and_options
+    assert ("basic.progress", {"color": 0x0000FF, "progress": 0.0}) in names_and_options
 
 
 def test_first_tick_ir_mode_starts_white_solid_effects(spy):
@@ -137,7 +137,7 @@ def test_first_tick_radio_mode_starts_white_solid_effects(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_button_b_advances_mode_from_rgb_to_imu(spy):
+def test_button_b_advances_mode_from_rgb_to_accelerometer(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
     # First tick initialises mode
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
@@ -263,7 +263,7 @@ def test_button_a_in_rgb_mode_wraps_level_passes_level_1_to_effects(spy):
         assert options.get("level") == 1, f"expected level=1 after wrap, got options={options}"
 
 
-def test_button_a_in_imu_mode_is_noop(spy):
+def test_button_a_in_accelerometer_mode_is_noop(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 1})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
