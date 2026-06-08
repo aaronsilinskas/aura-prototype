@@ -4,11 +4,11 @@ accelerometer and buttons.
 Phase flow::
 
     PHASE_READY → PHASE_RED_WARNING → PHASE_RED
-                                          ↓ timer       ↓ motion (after grace)
+                                          ↓ timer       ↓ motion
                                    PHASE_GREEN_WARNING  PHASE_GAME_OVER
                                           ↓ timer              ↓ timer
                                      PHASE_GREEN          PHASE_READY
-                                          ↓ timer  ↓ motion (after grace)
+                                          ↓ timer  ↓ motion
                                    PHASE_RED_WARNING   PHASE_GAME_OVER
 
 All durations are read from ``GameState`` (seeded by ``initial_data`` at scene
@@ -24,12 +24,13 @@ except ImportError:
     pass
 
 from engine.engine import GameRule
-from engine.input import ButtonData, InputEvents
+from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.state import EffectReceipt, GameState, Scope
 from packs.rules.rlgl.helpers.motion_detector import (
     GREEN_MIN_MOTION_THRESHOLD,
+    MOTION_EMA_ALPHA,
     RED_MAX_MOTION_THRESHOLD,
-    motion_magnitude,
+    smooth_motion,
 )
 
 # ---------------------------------------------------------------------------
@@ -54,10 +55,11 @@ _KEY_PHASE_START: Final = "rlgl_phase_start"
 _KEY_WARNING_DURATION: Final = "rlgl_warning_duration"
 _KEY_RED_DURATION: Final = "rlgl_red_duration"
 _KEY_GREEN_DURATION: Final = "rlgl_green_duration"
-_KEY_GRACE_DURATION: Final = "rlgl_grace_duration"
 _KEY_GAME_OVER_DURATION: Final = "rlgl_game_over_duration"
 _KEY_GREEN_STILL_TIMEOUT: Final = "rlgl_green_still_timeout"
 _KEY_LAST_MOTION_TIME: Final = "rlgl_last_motion_time"
+_KEY_MOTION_SMOOTHING: Final = "rlgl_motion_smoothing"
+_KEY_MOTION_EMA: Final = "rlgl_motion_ema"
 _KEY_AMBIENT_RECEIPT: Final = "rlgl_ambient_receipt"
 
 # ---------------------------------------------------------------------------
@@ -67,18 +69,31 @@ _KEY_AMBIENT_RECEIPT: Final = "rlgl_ambient_receipt"
 _DEFAULT_WARNING_DURATION: Final = 3.0
 _DEFAULT_RED_DURATION: Final = 5.0
 _DEFAULT_GREEN_DURATION: Final = 5.0
-_DEFAULT_GRACE_DURATION: Final = 1.0
 _DEFAULT_GAME_OVER_DURATION: Final = 3.0
-_DEFAULT_GREEN_STILL_TIMEOUT: Final = 1.5
+_DEFAULT_GREEN_STILL_TIMEOUT: Final = 0.75
+_DEFAULT_MOTION_SMOOTHING: Final = MOTION_EMA_ALPHA
 
 # ---------------------------------------------------------------------------
 # Phase entry helpers
 # ---------------------------------------------------------------------------
 
 
-def _enter_ready(state: GameState) -> None:
-    state.set(_KEY_PHASE, PHASE_READY)
+def _enter_phase(state: GameState, phase: str) -> None:
+    """Record the new phase and its start time, stopping any ambient music left
+    running by the previous phase.
+
+    Every ``_enter_*`` helper begins here, so a looping ambient effect can never
+    leak across a transition.  The ``has`` guard makes it a no-op when nothing is
+    playing (e.g. entering Ready at game start).
+    """
+    state.set(_KEY_PHASE, phase)
     state.set(_KEY_PHASE_START, state.total)
+    if state.has(_KEY_AMBIENT_RECEIPT):
+        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
+
+
+def _enter_ready(state: GameState) -> None:
+    _enter_phase(state, PHASE_READY)
     state.effect_controls.set_effect(Scope.ALL, "rlgl.ready", {"level": 3})
 
 
@@ -93,45 +108,56 @@ _WARNING_STING_OPTS: Final = {
 
 
 def _enter_red_warning(state: GameState) -> None:
-    state.set(_KEY_PHASE, PHASE_RED_WARNING)
-    state.set(_KEY_PHASE_START, state.total)
-    if state.has(_KEY_AMBIENT_RECEIPT):
-        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
+    _enter_phase(state, PHASE_RED_WARNING)
     state.effect_controls.set_effect(Scope.ALL, "rlgl.warning_sting", _WARNING_STING_OPTS)
 
 
 def _enter_red(state: GameState) -> None:
-    state.set(_KEY_PHASE, PHASE_RED)
-    state.set(_KEY_PHASE_START, state.total)
+    _enter_phase(state, PHASE_RED)
+    state.set(_KEY_MOTION_EMA, 0.0)
     state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": 0xFF0000})
     receipt = state.effect_controls.add_effect(Scope.AMBIENT, "rlgl.red_light_music", {})
     state.set(_KEY_AMBIENT_RECEIPT, receipt)
 
 
 def _enter_green_warning(state: GameState) -> None:
-    state.set(_KEY_PHASE, PHASE_GREEN_WARNING)
-    state.set(_KEY_PHASE_START, state.total)
-    if state.has(_KEY_AMBIENT_RECEIPT):
-        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
+    _enter_phase(state, PHASE_GREEN_WARNING)
     state.effect_controls.set_effect(Scope.ALL, "rlgl.warning_sting", _WARNING_STING_OPTS)
 
 
 def _enter_green(state: GameState) -> None:
-    state.set(_KEY_PHASE, PHASE_GREEN)
-    state.set(_KEY_PHASE_START, state.total)
+    _enter_phase(state, PHASE_GREEN)
     state.set(_KEY_LAST_MOTION_TIME, state.total)
+    state.set(_KEY_MOTION_EMA, 0.0)
     state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": 0x00FF00})
     receipt = state.effect_controls.add_effect(Scope.AMBIENT, "rlgl.green_light_music", {})
     state.set(_KEY_AMBIENT_RECEIPT, receipt)
 
 
 def _enter_game_over(state: GameState) -> None:
-    state.set(_KEY_PHASE, PHASE_GAME_OVER)
-    state.set(_KEY_PHASE_START, state.total)
-    if state.has(_KEY_AMBIENT_RECEIPT):
-        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
+    _enter_phase(state, PHASE_GAME_OVER)
     state.effect_controls.set_effect(Scope.ALL, "elements.fire", {})
     state.effect_controls.add_effect(Scope.ALL, "rlgl.game_over_sting", {})
+
+
+# ---------------------------------------------------------------------------
+# Motion smoothing
+# ---------------------------------------------------------------------------
+
+
+def _update_motion_ema(state: GameState, accel: AccelerationData) -> float:
+    """Fold one sample into the rolling motion average and persist it.
+
+    The average is reset to ``0.0`` on entering Red/Green and updated every
+    frame thereafter — green motion never carries into Red.  A lone spike cannot
+    end the game while sustained motion accumulates across ticks.  Returns the
+    updated average.
+    """
+    alpha = state.get(_KEY_MOTION_SMOOTHING, _DEFAULT_MOTION_SMOOTHING)
+    previous = state.get(_KEY_MOTION_EMA, 0.0)
+    ema = smooth_motion(previous, accel, alpha)
+    state.set(_KEY_MOTION_EMA, ema)
+    return ema
 
 
 # ---------------------------------------------------------------------------
@@ -189,19 +215,16 @@ class RlglGameRule(GameRule):
         elapsed: float,
     ) -> None:
         red_duration = state.get(_KEY_RED_DURATION, _DEFAULT_RED_DURATION)
-        grace_duration = state.get(_KEY_GRACE_DURATION, _DEFAULT_GRACE_DURATION)
 
         # Timer expiry is always checked before motion
         if elapsed >= red_duration:
             _enter_green_warning(state)
             return
 
-        if (
-            event.acceleration is not None
-            and elapsed >= grace_duration
-            and motion_magnitude(event.acceleration) > RED_MAX_MOTION_THRESHOLD
-        ):
-            _enter_game_over(state)
+        if event.acceleration is not None:
+            ema = _update_motion_ema(state, event.acceleration)
+            if ema > RED_MAX_MOTION_THRESHOLD:
+                _enter_game_over(state)
 
     def _check_green_warning(self, state: GameState, elapsed: float) -> None:
         duration = state.get(_KEY_WARNING_DURATION, _DEFAULT_WARNING_DURATION)
@@ -215,16 +238,15 @@ class RlglGameRule(GameRule):
         elapsed: float,
     ) -> None:
         green_duration = state.get(_KEY_GREEN_DURATION, _DEFAULT_GREEN_DURATION)
-        grace_duration = state.get(_KEY_GRACE_DURATION, _DEFAULT_GRACE_DURATION)
 
         # Timer expiry is always checked before motion
         if elapsed >= green_duration:
             _enter_red_warning(state)
             return
 
-        if event.acceleration is not None and elapsed >= grace_duration:
-            mag = motion_magnitude(event.acceleration)
-            if mag >= GREEN_MIN_MOTION_THRESHOLD:
+        if event.acceleration is not None:
+            ema = _update_motion_ema(state, event.acceleration)
+            if ema >= GREEN_MIN_MOTION_THRESHOLD:
                 state.set(_KEY_LAST_MOTION_TIME, state.total)
             else:
                 still_timeout = state.get(_KEY_GREEN_STILL_TIMEOUT, _DEFAULT_GREEN_STILL_TIMEOUT)
