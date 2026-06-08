@@ -44,11 +44,10 @@ from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.input import AccelerationData, InputEvents
 from engine.packs import PackRegistry
-from engine.scene import SceneManager
+from engine.scene import SceneManager, SceneRegistry
 from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
-from scenes.rlgl.scene import factory as rlgl_factory
 
 try:
     from typing import Final
@@ -108,8 +107,10 @@ _engine = GameEngine(
     effect_controls=_effect_manager,
 )
 
-_scene_manager = SceneManager(_engine, _effect_registry, _rule_registry)
-_scene_manager.register("rlgl", rlgl_factory)
+_scene_registry = SceneRegistry()
+_scene_registry.scan_dir("packs/scenes")
+
+_scene_manager = SceneManager(_engine, _effect_registry, _rule_registry, _scene_registry)
 _scene_manager.load("rlgl")
 _scene_manager.update()  # applies the load transition; rlgl scene is now active
 

@@ -43,16 +43,21 @@ _Avoid_: calling `clear_queue()` from rules (reserved for `SceneManager` during 
 Owned internally by `GameEngine`. Rules access time only via `state.elapsed` and `state.total` — never hold a `Timer` reference.
 
 ### Scene
-A declarative bundle of a self-contained game context: effect/rule packs and optional initial data. Carries no mutable runtime state — game data lives in a `GameState` that `SceneManager` creates on the scene's behalf.
+A declarative bundle of a self-contained game context: effect/rule packs, optional initial data, and a `version` field (parsed from `scene.json` at discovery time). Carries no mutable runtime state — game data lives in a `GameState` that `SceneManager` creates on the scene's behalf.
 
 ### NetworkControls
 Abstract interface for network transmit (`send_ir`, `send_radio`). Always present on `GameState`; raises unless the live implementation is injected. The receive side is covered by `NetworkEvents`.
+
+### SceneRegistry
+Auto-discovers JSON-described scenes from a directory tree. Constructed with no arguments, then populated via `scan_dir(path)` (reads every subdirectory that contains a `scene.json`). Provides `get(name) -> Scene` (fresh instance per call), `names() -> list[str]` (sorted), and `register(name, factory)` (in-memory escape hatch for tests). Validates required fields and version format at scan time so misconfigured scenes fail at startup. Calling `scan_dir` twice with the same path is a no-op; different paths that resolve the same scene name raise `ValueError`.
+_Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); constructing `SceneRegistry` after harness startup (scan once, then pass to `SceneManager`)
 
 ### SceneControls
 Abstract interface with `load`, `overlay`, and `pop` — each records a pending transition applied after the current tick ends. `SceneManager` is the live implementation.
 
 ### SceneManager
-Owns the scene stack and drives transitions. `load` clears the stack; `overlay` suspends the active scene and pushes a new one; `pop` unloads the top and restores the previous. Every scene it unloads or suspends has its effects stopped on `Scope.ALL` automatically.
+Owns the scene stack and drives transitions. Constructed with `SceneManager(engine, effect_registry, rule_registry, scene_registry)` — no `register()` method; all scene lookup delegates to the injected `SceneRegistry`. `load` clears the stack; `overlay` suspends the active scene and pushes a new one; `pop` unloads the top and restores the previous. Every scene it unloads or suspends has its effects stopped on `Scope.ALL` automatically.
+_Avoid_: calling `register()` on `SceneManager` (method removed — add scenes to `SceneRegistry` before construction)
 
 ### Scope
 Identifies what a game effect targets. Output-agnostic — routes to all outputs (LED, audio, vibration) registered for it. Leaf scopes: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN`, `Global.BUFF`, `Global.DEBUFF`, `AMBIENT`. Composite scopes: `Global.ALL` (all global zones), `NON_AMBIENT` (all except AMBIENT), `Scope.ALL` (every scope including AMBIENT — use for teardown).

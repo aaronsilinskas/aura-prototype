@@ -70,11 +70,10 @@ from engine.engine import GameEngine
 from engine.input import AccelerationData, InputEvents
 from engine.network import HardwareNetworkControls
 from engine.packs import PackRegistry
-from engine.scene import SceneManager
+from engine.scene import SceneManager, SceneRegistry
 from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
-from scenes.hw_test.scene import factory as hw_test_factory
 
 try:
     from typing import Final
@@ -131,8 +130,10 @@ _engine = GameEngine(
     network_controls=HardwareNetworkControls(),
 )
 
-_manager = SceneManager(_engine, _effect_registry, _rule_registry)
-_manager.register("hw_test", hw_test_factory)
+_scene_registry = SceneRegistry()
+_scene_registry.scan_dir("packs/scenes")
+
+_manager = SceneManager(_engine, _effect_registry, _rule_registry, _scene_registry)
 _manager.load("hw_test")
 _manager.update()  # applies the load transition; hw_test scene is now active
 

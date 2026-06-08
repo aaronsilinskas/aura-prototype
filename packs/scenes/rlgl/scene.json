@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "effect_packs": [
+    ["elements", "1.0"],
+    ["basic", "1.1"],
+    ["rlgl", "1.0"]
+  ],
+  "rule_packs": [
+    ["rlgl", "1.0"]
+  ]
+}

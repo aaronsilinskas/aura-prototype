@@ -235,11 +235,7 @@ class SceneManager(SceneControls):
 
     Construction::
 
-        manager = SceneManager(engine, effect_registry, rule_registry)
-
-    Registration::
-
-        manager.register("main_menu", lambda: Scene(...))
+        manager = SceneManager(engine, effect_registry, rule_registry, scene_registry)
 
     Driving the game loop::
 
@@ -250,6 +246,10 @@ class SceneManager(SceneControls):
     record a pending transition and the last call per tick wins.  The
     transition executes at the end of ``update()`` after ``engine.update``
     has processed all queued events.
+
+    Scene lookup delegates entirely to *scene_registry*: ``load`` and
+    ``overlay`` call ``scene_registry.get(name)``; ``load`` raises
+    ``ValueError`` for unknown names because ``SceneRegistry.get`` does.
     """
 
     __slots__ = (
@@ -257,7 +257,7 @@ class SceneManager(SceneControls):
         "_engine",
         "_pending",
         "_rule_registry",
-        "_scenes",
+        "_scene_registry",
         "_stack",
     )
 
@@ -266,11 +266,12 @@ class SceneManager(SceneControls):
         engine: GameEngine,
         effect_registry: PackRegistry,
         rule_registry: PackRegistry,
+        scene_registry: SceneRegistry,
     ) -> None:
         self._engine = engine
         self._effect_registry = effect_registry
         self._rule_registry = rule_registry
-        self._scenes: dict[str, Callable[[], Scene]] = {}
+        self._scene_registry = scene_registry
         self._stack: list[tuple[Scene, GameState, list[GameRule]]] = []
         self._pending: (
             tuple[Literal["load"], Scene]
@@ -279,29 +280,21 @@ class SceneManager(SceneControls):
             | None
         ) = None
 
-    def register(self, name: str, factory: Callable[[], Scene]) -> None:
-        """Register *factory* — a zero-arg callable returning a ``Scene`` — for *name*."""
-        self._scenes[name] = factory
-
     # ------------------------------------------------------------------
     # SceneControls interface — deferred transitions
     # ------------------------------------------------------------------
 
     def load(self, name: str) -> None:
         """Record a load transition for *name*; raises immediately if unknown or packs invalid."""
-        if name not in self._scenes:
-            raise ValueError("Unknown scene '" + name + "'")
-        scene = self._scenes[name]()
+        scene = self._scene_registry.get(name)
         self._validate_packs(scene)
         self._pending = ("load", scene)
 
     def overlay(self, name: str) -> None:
         """Record an overlay transition for *name*; raises immediately if invalid."""
-        if name not in self._scenes:
-            raise ValueError("Unknown scene '" + name + "'")
         if not self._stack:
             raise ValueError("Cannot overlay: no active scene on stack")
-        scene = self._scenes[name]()
+        scene = self._scene_registry.get(name)
         self._validate_packs(scene)
         self._pending = ("overlay", scene)
 
