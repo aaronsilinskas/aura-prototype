@@ -39,7 +39,7 @@ def motion_magnitude(accel: AccelerationData) -> float:
     Computed as ``max(0.0, sqrt(x² + y² + z²) - GRAVITY)``.  The ``max``
     clamp prevents negative results (e.g. sensor dropout during free fall).
     """
-    raw = math.sqrt(accel.x**2 + accel.y**2 + accel.z**2)
+    raw = math.sqrt(accel.x * accel.x + accel.y * accel.y + accel.z * accel.z)
     return max(0.0, raw - AccelerationData.GRAVITY)
 
 
