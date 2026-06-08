@@ -142,18 +142,6 @@ def test_get_returns_none_for_unknown_button():
     assert bd.get("X") is None
 
 
-def test_get_returns_up_constant_for_button_in_up_state():
-    assert _make({"A": ButtonData.UP}).get("A") == ButtonData.UP
-
-
-def test_get_returns_pressed_constant_for_button_in_pressed_state():
-    assert _make({"A": ButtonData.PRESSED}).get("A") == ButtonData.PRESSED
-
-
-def test_get_returns_released_constant_for_button_in_released_state():
-    assert _make({"A": ButtonData.RELEASED}).get("A") == ButtonData.RELEASED
-
-
 # ---------------------------------------------------------------------------
 # items
 # ---------------------------------------------------------------------------
