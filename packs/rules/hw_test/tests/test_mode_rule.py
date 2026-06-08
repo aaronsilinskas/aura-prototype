@@ -150,12 +150,12 @@ def test_button_b_advances_mode_from_rgb_to_accelerometer(spy):
     assert state.get("hw_mode", None) == 1
 
 
-def test_button_b_cycles_mode_through_0_1_2_3_and_back_to_0(spy):
+def test_button_b_cycles_mode_through_0_1_2_3_4_and_back_to_0(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
-    for expected_mode in [1, 2, 3, 0]:
+    for expected_mode in [1, 2, 3, 4, 0]:
         _press_button(state, "B")
         engine.update(state)
         assert state.get("hw_mode", None) == expected_mode
@@ -387,3 +387,95 @@ def test_ir_flash_does_not_expire_before_duration(spy):
 
     assert not receipt.is_stopped()
     assert "ir_flash_receipt" in state
+
+
+# ---------------------------------------------------------------------------
+# SFX mode (mode 4)
+# ---------------------------------------------------------------------------
+
+
+def test_first_tick_sfx_mode_starts_cyan_solid_on_personal(spy):
+    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 4})
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+
+    assert state.get("hw_mode", None) == 4
+    personal_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
+    assert len(personal_calls) == 1
+    assert personal_calls[0][1] == "basic.solid"
+    assert personal_calls[0][2] == {"color": 0x00FFFF}
+
+
+def test_enter_sfx_sets_only_personal_scope(spy):
+    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 4})
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+
+    scopes = [c[0] for c in spy.set_effect_calls]
+    assert all(s == Scope.PERSONAL for s in scopes)
+
+
+def test_button_a_in_sfx_mode_fires_sfx_test_effect_on_personal(spy):
+    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 4})
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+    spy.set_effect_calls.clear()
+
+    _press_button(state, "A")
+    engine.update(state)
+
+    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "hw_test.sfx_test"]
+    assert len(sfx_calls) == 1
+    assert sfx_calls[0][0] == Scope.PERSONAL
+
+
+def test_button_a_in_rgb_mode_does_not_fire_sfx_test(spy):
+    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+    spy.set_effect_calls.clear()
+
+    _press_button(state, "A")
+    engine.update(state)
+
+    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "hw_test.sfx_test"]
+    assert sfx_calls == []
+
+
+def test_button_a_in_accelerometer_mode_does_not_fire_sfx_test(spy):
+    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 1})
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+    spy.set_effect_calls.clear()
+
+    _press_button(state, "A")
+    engine.update(state)
+
+    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "hw_test.sfx_test"]
+    assert sfx_calls == []
+
+
+def test_button_a_in_ir_mode_does_not_fire_sfx_test(spy):
+    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2})
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+    spy.set_effect_calls.clear()
+
+    _press_button(state, "A")
+    engine.update(state)
+
+    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "hw_test.sfx_test"]
+    assert sfx_calls == []
+
+
+def test_button_a_in_radio_mode_does_not_fire_sfx_test(spy):
+    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 3})
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+    spy.set_effect_calls.clear()
+
+    _press_button(state, "A")
+    engine.update(state)
+
+    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "hw_test.sfx_test"]
+    assert sfx_calls == []
