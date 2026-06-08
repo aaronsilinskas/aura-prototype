@@ -31,7 +31,6 @@ MODULE_DIRS: Final = [
     "magic",
     "packs",
     "rules",
-    "scenes",
     "sounds",
 ]
 _EXCLUDE_DIRS: Final = {"__pycache__", "tests"}
