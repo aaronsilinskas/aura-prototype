@@ -70,7 +70,7 @@ _DEFAULT_WARNING_DURATION: Final = 3.0
 _DEFAULT_RED_DURATION: Final = 5.0
 _DEFAULT_GREEN_DURATION: Final = 5.0
 _DEFAULT_GAME_OVER_DURATION: Final = 3.0
-_DEFAULT_GREEN_STILL_TIMEOUT: Final = 1.5
+_DEFAULT_GREEN_STILL_TIMEOUT: Final = 0.75
 _DEFAULT_MOTION_SMOOTHING: Final = MOTION_EMA_ALPHA
 
 # ---------------------------------------------------------------------------
@@ -156,6 +156,7 @@ def _update_motion_ema(state: GameState, accel: AccelerationData) -> float:
     alpha = state.get(_KEY_MOTION_SMOOTHING, _DEFAULT_MOTION_SMOOTHING)
     previous = state.get(_KEY_MOTION_EMA, 0.0)
     ema = smooth_motion(previous, accel, alpha)
+    print(f"Motion EMA: {ema:.3f} m/s²")
     state.set(_KEY_MOTION_EMA, ema)
     return ema
 

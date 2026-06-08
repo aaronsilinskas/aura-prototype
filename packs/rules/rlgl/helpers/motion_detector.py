@@ -18,13 +18,13 @@ except ImportError:
 
 from engine.input import AccelerationData
 
-RED_MAX_MOTION_THRESHOLD: Final = 0.35
+RED_MAX_MOTION_THRESHOLD: Final = 0.25
 """Player must not exceed this magnitude (m/s²) during a Red Light phase."""
 
 GREEN_MIN_MOTION_THRESHOLD: Final = 1.0
 """Player must exceed this magnitude (m/s²) to count as moving on Green Light."""
 
-MOTION_EMA_ALPHA: Final = 0.3
+MOTION_EMA_ALPHA: Final = 0.4
 """Default smoothing factor for :func:`smooth_motion` (0 < alpha ≤ 1).
 
 Lower values average over more samples — stronger spike rejection but slower to
