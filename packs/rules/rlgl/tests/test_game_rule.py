@@ -1353,14 +1353,20 @@ def test_full_game_at_fast_config_reaches_win_phase(spy):
     _tick(state, engine, timer, total=0.0)  # init → READY
     _tick(state, engine, timer, button_a=True, total=0.0)  # READY → RED_WARNING (level=1)
 
-    for _ in range(10):
+    # Each of the first 9 rounds: GREEN expires → LEVEL_UP, then LEVEL_UP → RED_WARNING.
+    # Round 10: GREEN expires → WIN (level 10 == max_level 10).  The final tick stays in
+    # WIN because win_duration defaults to 4.0 s and elapsed is 0 at t=0.
+    for _ in range(9):
         _tick(state, engine, timer, total=0.0)  # RED_WARNING → RED
         _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
         _tick(state, engine, timer, total=0.0)  # GREEN_WARNING → GREEN
-        phase = state.get("rlgl_phase", None)
-        if phase == PHASE_WIN:
-            break
-        _tick(state, engine, timer, total=0.0)  # GREEN → LEVEL_UP (or WIN if last)
+        _tick(state, engine, timer, total=0.0)  # GREEN → LEVEL_UP
         _tick(state, engine, timer, total=0.0)  # LEVEL_UP → RED_WARNING
+
+    # Round 10 (level == max_level): GREEN expires → WIN
+    _tick(state, engine, timer, total=0.0)  # RED_WARNING → RED
+    _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
+    _tick(state, engine, timer, total=0.0)  # GREEN_WARNING → GREEN
+    _tick(state, engine, timer, total=0.0)  # GREEN → WIN
 
     assert state.get("rlgl_phase", None) == PHASE_WIN
