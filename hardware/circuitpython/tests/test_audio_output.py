@@ -1,6 +1,6 @@
 """Tests for AudioEffectOutput — the live VoiceSink adapter.
 
-Voice-slot bookkeeping (claim/eviction/sweep, the audio-only receipt-stop rule,
+Voice-slot bookkeeping (claim/eviction/sweep, the stops-receipt release rule,
 loudness tracking) lives in ``VoicePool`` and is covered by ``test_voice_pool.py``.
 These tests cover only what the adapter itself owns: the shell-routing guards in
 ``handle_event`` and the last-mile hardware mapping of the five ``VoiceSink``
@@ -234,7 +234,7 @@ def test_valid_clip_plays_on_an_idle_voice(tmp_path) -> None:
     assert mixer.voice[0].level == pytest.approx(0.4 * 0.5)
 
 
-def test_audio_only_clip_routes_as_audio_only(tmp_path) -> None:
+def test_audio_only_effect_implicitly_stops_receipt_on_finish(tmp_path) -> None:
     """An effect with no pixels/vibration implicitly sets stops_receipt=True: its
 
     receipt is stopped when the clip finishes naturally (audio is the whole effect)."""
@@ -256,8 +256,8 @@ def test_audio_only_clip_routes_as_audio_only(tmp_path) -> None:
     receipt.stop.assert_called_once()
 
 
-def test_clip_with_pixels_routes_as_not_audio_only(tmp_path) -> None:
-    """An effect with pixels is not audio-only: its receipt is left to rules on finish."""
+def test_clip_with_pixels_and_no_stops_effect_flag_leaves_receipt_to_rules(tmp_path) -> None:
+    """An effect with pixels and no stops_effect flag leaves its receipt to rules on finish."""
     registry = AudioRegistry()
     _register_wav(tmp_path, registry, "sting")
     output, mixer = _make_output(registry)

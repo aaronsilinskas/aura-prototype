@@ -323,7 +323,7 @@ def test_sweep_frees_externally_stopped_receipt(pool: VoicePool, sink: Recording
 def test_sweep_does_not_stop_an_already_externally_stopped_receipt_again(
     pool: VoicePool, sink: RecordingSink
 ) -> None:
-    # An externally stopped, audio-only receipt must not be re-stopped by sweep.
+    # An externally stopped receipt must not be re-stopped by sweep.
     class CountingReceipt(EffectReceipt):
         def __init__(self) -> None:
             super().__init__(99)
