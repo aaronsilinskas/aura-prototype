@@ -332,9 +332,8 @@ def test_scene_manager_pushes_local_effects_on_load(scene_env) -> None:
     assert "flash" in pushed.items()
 
 
-def test_scene_manager_pushes_none_when_stack_empties_after_full_unload(scene_env) -> None:
-    """When every outgoing scene is stopped (load replaces all), the new
-    scene's registry is pushed.  A bare load from empty pushes once."""
+def test_scene_manager_load_replaces_active_scene_registry_with_new_scenes(scene_env) -> None:
+    """When load replaces the current scene, the new scene's registry is pushed once."""
     _make_scene_dir(scene_env, "a")
     _make_scene_dir(scene_env, "b")
 
