@@ -1,4 +1,4 @@
-"""Unit tests for packs.effects.rlgl.win_sting."""
+"""Unit tests for packs.scenes.rlgl.effects.win_sting."""
 
 from __future__ import annotations
 
@@ -10,14 +10,14 @@ def _config() -> EffectConfig:
 
 
 def _build():
-    from packs.effects.rlgl.win_sting import BUILD
+    from packs.scenes.rlgl.effects.win_sting import BUILD
 
-    return BUILD("rlgl.win_sting", _config())
+    return BUILD("scene.win_sting", _config())
 
 
 def test_win_sting_build_is_effect_builder() -> None:
     from engine.effects.manager import EffectBuilder
-    from packs.effects.rlgl.win_sting import BUILD
+    from packs.scenes.rlgl.effects.win_sting import BUILD
 
     assert isinstance(BUILD, EffectBuilder)
 
@@ -53,10 +53,10 @@ def test_win_sting_emits_vibration_on_start() -> None:
 
 
 def test_win_sting_vibration_pattern_is_distinct_from_game_over_sting() -> None:
-    from packs.effects.rlgl.game_over_sting import BUILD as GAME_OVER_BUILD
+    from packs.scenes.rlgl.effects.game_over_sting import BUILD as GAME_OVER_BUILD
 
     win_effect = _build()
-    game_over_effect = GAME_OVER_BUILD("rlgl.game_over_sting", _config())
+    game_over_effect = GAME_OVER_BUILD("scene.game_over_sting", _config())
 
     win_pattern = win_effect.vibration.patterns["start"].sequence
     game_over_pattern = game_over_effect.vibration.patterns["start"].sequence

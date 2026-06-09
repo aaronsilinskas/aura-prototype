@@ -35,7 +35,7 @@ from engine.engine import GameRule
 from engine.input import AccelerationData, InputEvents
 from engine.lerp import level_lerp
 from engine.state import EffectReceipt, GameState, Scope
-from packs.rules.rlgl.helpers.motion_detector import (
+from packs.scenes.rlgl.rules.helpers.motion_detector import (
     GRAVITY_LOWPASS_BETA,
     GREEN_MIN_MOTION_THRESHOLD,
     MOTION_EMA_ALPHA,
@@ -185,7 +185,7 @@ def _enter_phase(state: GameState, phase: str) -> None:
 
 def _enter_ready(state: GameState) -> None:
     _enter_phase(state, PHASE_READY)
-    state.effect_controls.set_effect(Scope.ALL, "rlgl.ready", {})
+    state.effect_controls.set_effect(Scope.ALL, "scene.ready", {})
     state.delete(_KEY_LEVEL_RECEIPT)
 
 
@@ -210,7 +210,7 @@ def _start_game(state: GameState) -> None:
 def _enter_red_warning(state: GameState) -> None:
     _enter_phase(state, PHASE_RED_WARNING)
     state.effect_controls.set_effect(
-        Scope.NON_AMBIENT, "rlgl.warning_sting", _warning_sting_opts(state)
+        Scope.NON_AMBIENT, "scene.warning_sting", _warning_sting_opts(state)
     )
 
 
@@ -218,14 +218,14 @@ def _enter_red(state: GameState) -> None:
     _enter_phase(state, PHASE_RED)
     state.set(_KEY_MOTION_EMA, 0.0)
     state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.solid", {"color": 0xFF0000})
-    receipt = state.effect_controls.add_effect(Scope.PERSONAL, "rlgl.red_light_music", {})
+    receipt = state.effect_controls.add_effect(Scope.PERSONAL, "scene.red_light_music", {})
     state.set(_KEY_MUSIC_RECEIPT, receipt)
 
 
 def _enter_green_warning(state: GameState) -> None:
     _enter_phase(state, PHASE_GREEN_WARNING)
     state.effect_controls.set_effect(
-        Scope.NON_AMBIENT, "rlgl.warning_sting", _warning_sting_opts(state)
+        Scope.NON_AMBIENT, "scene.warning_sting", _warning_sting_opts(state)
     )
 
 
@@ -234,7 +234,7 @@ def _enter_green(state: GameState) -> None:
     state.set(_KEY_LAST_MOTION_TIME, state.total)
     state.set(_KEY_MOTION_EMA, 0.0)
     state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.solid", {"color": 0x00FF00})
-    receipt = state.effect_controls.add_effect(Scope.PERSONAL, "rlgl.green_light_music", {})
+    receipt = state.effect_controls.add_effect(Scope.PERSONAL, "scene.green_light_music", {})
     state.set(_KEY_MUSIC_RECEIPT, receipt)
 
 
@@ -247,20 +247,20 @@ def _enter_level_up(state: GameState) -> None:
         Scope.AMBIENT, "basic.progress", {"progress": level / max_level}
     )
     state.set(_KEY_LEVEL_RECEIPT, receipt)
-    state.effect_controls.add_effect(Scope.NON_AMBIENT, "rlgl.level_up", {})
+    state.effect_controls.add_effect(Scope.NON_AMBIENT, "scene.level_up", {})
 
 
 def _enter_win(state: GameState) -> None:
     _enter_phase(state, PHASE_WIN)
     state.effect_controls.set_effect(Scope.ALL, "elements.lightning", {"level": 7})
-    receipt = state.effect_controls.add_effect(Scope.ALL, "rlgl.win_sting", {})
+    receipt = state.effect_controls.add_effect(Scope.ALL, "scene.win_sting", {})
     state.set(_KEY_WIN_STING_RECEIPT, receipt)
 
 
 def _enter_game_over(state: GameState) -> None:
     _enter_phase(state, PHASE_GAME_OVER)
     state.effect_controls.set_effect(Scope.ALL, "elements.fire", {})
-    state.effect_controls.add_effect(Scope.ALL, "rlgl.game_over_sting", {})
+    state.effect_controls.add_effect(Scope.ALL, "scene.game_over_sting", {})
 
 
 # ---------------------------------------------------------------------------
