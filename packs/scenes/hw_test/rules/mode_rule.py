@@ -99,7 +99,14 @@ class HwTestModeRule(GameRule):
         elif mode == 1:
             pass  # accelerometer mode: no-op
         elif mode == 2:
-            state.queue_event(NetworkEvents.IRReceived(HW_TEST_PAYLOAD))
+            state.queue_event(
+                NetworkEvents.IRReceived(
+                    HW_TEST_PAYLOAD,
+                    signal_strength=1.0,
+                    error_margin=0,
+                    best_receiver=None,
+                )
+            )
         elif mode == 3:
             state.queue_event(NetworkEvents.RadioReceived(HW_TEST_PAYLOAD, "local"))
         elif mode == 4:
