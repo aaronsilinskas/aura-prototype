@@ -221,6 +221,9 @@ class _RecordingEffectControls(EffectControls):
     def stop_effect(self, scope) -> None:
         pass
 
+    def set_local_effects(self, local_registry: object) -> None:
+        pass  # no-op for scene-local rule discovery tests
+
 
 def _make_engine() -> GameEngine:
     return GameEngine(effect_controls=_RecordingEffectControls())

@@ -70,6 +70,9 @@ class _RecordingEffectControls(EffectControls):
     def stop_effect(self, scope) -> None:
         self.stopped_scopes.append(scope)
 
+    def set_local_effects(self, local_registry: object) -> None:
+        pass  # no-op for tests that only care about stop_effect
+
 
 def _make_engine() -> GameEngine:
     return GameEngine(effect_controls=_RecordingEffectControls())

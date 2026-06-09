@@ -185,6 +185,21 @@ class EffectControls:
         """Stop all effects whose keys overlap scope."""
         raise NotImplementedError
 
+    def set_local_effects(self, local_registry: object) -> None:
+        """Push the active scene's local effect registry into the effect system.
+
+        Reserved for ``SceneManager`` during scene transitions — rules must not
+        call this method (mirrors the ``GameState.clear_queue()`` precedent).
+        Pass ``None`` when the scene stack empties so that ``scene.`` lookups
+        fail immediately rather than resolving against a stale registry.
+
+        The base class is a no-op; ``EffectManager`` overrides it to store the
+        registry so that ``scene.<effect>`` names resolve at ``set_effect``
+        time.  Standalone test helpers that only stub ``stop_effect`` inherit
+        this no-op automatically.
+        """
+        pass
+
 
 class GameState:
     """Portable game context passed to every rule handler on every tick.

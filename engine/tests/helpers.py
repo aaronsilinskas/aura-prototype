@@ -26,3 +26,6 @@ class SpyEffectControls(EffectControls):
 
     def stop_effect(self, scope: ScopeValue) -> None:
         self.stop_effect_calls.append(scope)
+
+    def set_local_effects(self, local_registry: object) -> None:
+        pass  # no-op: SpyEffectControls is for rule unit tests, not SceneManager
