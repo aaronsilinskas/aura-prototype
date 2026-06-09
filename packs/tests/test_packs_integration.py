@@ -53,6 +53,7 @@ def test_rlgl_pack_exposes_valid_effect_builders() -> None:
         "green_light_music",
         "warning_sting",
         "game_over_sting",
+        "win_sting",
         "level_up",
     ):
         builder = registry.get("rlgl", effect_name, EffectBuilder)
@@ -63,7 +64,7 @@ def test_rlgl_audio_only_effects_have_no_pixels() -> None:
     registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(_packs_path("effects"), "packs.effects")
 
-    for effect_name in ("red_light_music", "green_light_music", "game_over_sting"):
+    for effect_name in ("red_light_music", "green_light_music", "game_over_sting", "win_sting"):
         builder = registry.get("rlgl", effect_name, EffectBuilder)
         config = EffectConfig(resolution=16, options={})
         effect = builder(effect_name, config)
