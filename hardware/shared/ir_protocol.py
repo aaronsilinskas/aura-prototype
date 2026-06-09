@@ -27,21 +27,21 @@ except ImportError:
 # Wire-frame timing constants (µs)
 # ---------------------------------------------------------------------------
 
-IR_UNIT: "Final" = 500
+IR_UNIT: Final = 500
 
-IR_HEADER_MARK: "Final" = IR_UNIT * 8  # 4000 µs
-IR_HEADER_SPACE: "Final" = IR_UNIT * 6  # 3000 µs
+IR_HEADER_MARK: Final = IR_UNIT * 8  # 4000 µs
+IR_HEADER_SPACE: Final = IR_UNIT * 6  # 3000 µs
 
-IR_MARK_ZERO: "Final" = IR_UNIT  # 500 µs mark for a zero bit
-IR_SPACE_ZERO: "Final" = IR_UNIT  # 500 µs space for a zero bit
+IR_MARK_ZERO: Final = IR_UNIT  # 500 µs mark for a zero bit
+IR_SPACE_ZERO: Final = IR_UNIT  # 500 µs space for a zero bit
 
-IR_MARK_ONE: "Final" = IR_UNIT  # 500 µs mark for a one bit
-IR_SPACE_ONE: "Final" = IR_UNIT * 3  # 1500 µs space for a one bit
+IR_MARK_ONE: Final = IR_UNIT  # 500 µs mark for a one bit
+IR_SPACE_ONE: Final = IR_UNIT * 3  # 1500 µs space for a one bit
 
-IR_LEAD_OUT: "Final" = IR_UNIT * 10  # 5000 µs terminator
+IR_LEAD_OUT: Final = IR_UNIT * 10  # 5000 µs terminator
 
-_IR_ERROR_MARGIN: "Final" = IR_UNIT // 2  # 250 µs — internal tolerance threshold
-_CRC_GENERATOR: "Final" = 0x1D
+_IR_ERROR_MARGIN: Final = IR_UNIT // 2  # 250 µs — internal tolerance threshold
+_CRC_GENERATOR: Final = 0x1D
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +49,7 @@ _CRC_GENERATOR: "Final" = 0x1D
 # ---------------------------------------------------------------------------
 
 
-def _calculate_crc(data: "bytes | bytearray", length: int = -1) -> int:
+def _calculate_crc(data: bytes | bytearray, length: int = -1) -> int:
     """Return the CRC-8 (generator 0x1D) of the first *length* bytes of *data*.
 
     Accepts ``bytes`` or ``bytearray``.  If *length* is -1 (default) the
@@ -134,7 +134,7 @@ class InfraredDecoder:
     # Public API
     # ------------------------------------------------------------------
 
-    def decode(self, pulse: int) -> "bytearray | None":
+    def decode(self, pulse: int) -> bytearray | None:
         """Process a single pulse duration and return decoded data if complete.
 
         Args:
@@ -151,7 +151,7 @@ class InfraredDecoder:
         raise NotImplementedError
 
     @property
-    def last_error_margin(self) -> "int | None":
+    def last_error_margin(self) -> int | None:
         """Worst-case timing deviation (µs) from the last decoded packet.
 
         Returns ``None`` before any packet has been successfully decoded.
@@ -159,7 +159,7 @@ class InfraredDecoder:
         return self._last_error_margin
 
     @property
-    def last_signal_strength(self) -> "float | None":
+    def last_signal_strength(self) -> float | None:
         """Normalised signal quality (0.0–1.0) from the last decoded packet.
 
         An error margin of 0 or ≤ 30 % of the error threshold yields 1.0.
@@ -176,7 +176,7 @@ class InfraredDecoder:
     # Helpers for subclasses (not part of the public API)
     # ------------------------------------------------------------------
 
-    def _reset(self, error_margin: "int | None") -> None:
+    def _reset(self, error_margin: int | None) -> None:
         """Reset decoder state and record *error_margin* for this packet."""
         self._decoder_state = 0
         self._received_data.clear()  # mutate in place — no allocation
@@ -213,9 +213,9 @@ class InfraredDecoder:
 # ---------------------------------------------------------------------------
 
 # Decoder state constants
-_STATE_IDLE: "Final" = 0
-_STATE_HEADER_SPACE: "Final" = 1
-_STATE_DATA: "Final" = 2
+_STATE_IDLE: Final = 0
+_STATE_HEADER_SPACE: Final = 1
+_STATE_DATA: Final = 2
 
 
 class AuraInfraredEncoder(InfraredEncoder):
@@ -240,7 +240,8 @@ class AuraInfraredEncoder(InfraredEncoder):
         """
         # Layout: 2 (header) + (len(data)+1)*8*2 (payload+CRC bits) + 1 (lead-out)
         n_bit_slots = (len(data) + 1) * 8 * 2  # mark+space pairs for payload and CRC
-        pulses = array("H", [0] * (2 + n_bit_slots + 1))
+        n_slots = 2 + n_bit_slots + 1
+        pulses = array("H", bytearray(n_slots * 2))  # zero-init via bytearray — no temp list
 
         pulses[0] = IR_HEADER_MARK
         pulses[1] = IR_HEADER_SPACE
@@ -294,7 +295,7 @@ class AuraInfraredDecoder(InfraredDecoder):
         # True while waiting for the space half of the current bit
         self._awaiting_space: bool = False
 
-    def decode(self, pulse: int) -> "bytearray | None":
+    def decode(self, pulse: int) -> bytearray | None:
         """Process one pulse and return payload bytes when a packet completes.
 
         States:
@@ -345,7 +346,7 @@ class AuraInfraredDecoder(InfraredDecoder):
 
         return None
 
-    def _finalise(self) -> "bytearray | None":
+    def _finalise(self) -> bytearray | None:
         """Validate CRC and return payload, or reset and return ``None``."""
         data = self._received_data
         n = len(data)
@@ -360,7 +361,7 @@ class AuraInfraredDecoder(InfraredDecoder):
 
         saved_margin = self._max_error_margin
         if received_crc == calculated_crc:
-            payload = bytearray(data[:payload_len])
+            payload = data[:payload_len]  # bytearray slice returns bytearray — no extra wrap
             self._reset(saved_margin)
             return payload
 

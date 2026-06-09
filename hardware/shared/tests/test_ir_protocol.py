@@ -248,8 +248,8 @@ def test_signal_strength_is_partial_when_error_exceeds_thirty_percent_of_thresho
     assert 0.0 < strength < 1.0
 
 
-def test_signal_strength_below_half_at_worst_accepted_error():
-    """An error margin just under the rejection threshold yields low signal strength."""
+def test_signal_strength_below_forty_percent_at_worst_accepted_error():
+    """An error margin just under the rejection threshold yields very low signal strength."""
     encoder = AuraInfraredEncoder()
     decoder = AuraInfraredDecoder()
 
