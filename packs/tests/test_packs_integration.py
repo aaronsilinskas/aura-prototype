@@ -9,7 +9,6 @@ import pytest
 from effects.effect import EffectConfig
 from engine.effects.manager import EffectBuilder
 from engine.engine import GameEngine, GameRule
-from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.scene import Scene, SceneManager, SceneRegistry
 from engine.state import EffectControls
@@ -44,9 +43,12 @@ def test_solid_pack_exposes_valid_effect_builder() -> None:
     assert isinstance(builder, EffectBuilder)
 
 
-def test_rlgl_pack_exposes_valid_effect_builders() -> None:
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(_packs_path("effects"), "packs.effects")
+def test_rlgl_scene_local_effect_builders_are_discovered() -> None:
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
+
+    scene = scene_registry.get("rlgl")
+    local_effects = scene.local_effect_registry
 
     for effect_name in (
         "red_light_music",
@@ -55,41 +57,49 @@ def test_rlgl_pack_exposes_valid_effect_builders() -> None:
         "game_over_sting",
         "win_sting",
         "level_up",
+        "ready",
     ):
-        builder = registry.get("rlgl", effect_name, EffectBuilder)
+        builder = local_effects.get(effect_name, EffectBuilder)
         assert isinstance(builder, EffectBuilder)
 
 
-def test_rlgl_audio_only_effects_have_no_pixels() -> None:
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(_packs_path("effects"), "packs.effects")
+def test_rlgl_scene_local_audio_only_effects_have_no_pixels() -> None:
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
+
+    scene = scene_registry.get("rlgl")
+    local_effects = scene.local_effect_registry
 
     for effect_name in ("red_light_music", "green_light_music", "game_over_sting", "win_sting"):
-        builder = registry.get("rlgl", effect_name, EffectBuilder)
+        builder = local_effects.get(effect_name, EffectBuilder)
         config = EffectConfig(resolution=16, options={})
         effect = builder(effect_name, config)
         assert effect.pixels is None
 
 
-def test_warning_sting_effect_has_pixels() -> None:
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(_packs_path("effects"), "packs.effects")
+def test_rlgl_scene_local_warning_sting_effect_has_pixels() -> None:
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
 
-    builder = registry.get("rlgl", "warning_sting", EffectBuilder)
+    scene = scene_registry.get("rlgl")
+    local_effects = scene.local_effect_registry
+
+    builder = local_effects.get("warning_sting", EffectBuilder)
     config = EffectConfig(resolution=16, options={})
     effect = builder("warning_sting", config)
     assert effect.pixels is not None
 
 
-def test_rlgl_sound_path_returns_wav_path() -> None:
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(_packs_path("effects"), "packs.effects")
+def test_rlgl_scene_json_does_not_list_rlgl_effect_or_rule_packs() -> None:
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
 
-    event = EffectEvent("rlgl", "red_light", "music")
-    path = registry.sound_path(event)
+    scene = scene_registry.get("rlgl")
 
-    assert path is not None
-    assert path.endswith("/sounds/red_light_music.wav")
+    pack_names = [name for name, _ in scene.effect_packs]
+    assert "rlgl" not in pack_names
+    rule_pack_names = [name for name, _ in scene.rule_packs]
+    assert "rlgl" not in rule_pack_names
 
 
 # --- Rules registry ---
