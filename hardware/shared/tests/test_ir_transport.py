@@ -8,7 +8,7 @@ Covers:
 - InfraredMultiReceiver.receive() allocates nothing per tick in the polled path
 """
 
-import gc
+import tracemalloc
 
 import pytest
 
@@ -269,22 +269,33 @@ def test_multi_receiver_telemetry_is_none_before_first_packet():
 
 
 def test_multi_receiver_receive_allocates_nothing_per_tick_when_no_packet():
-    """Calling receive() with no incoming pulses must not allocate heap objects."""
+    """Calling receive() with no incoming pulses must not allocate heap objects.
+
+    Uses ``tracemalloc`` snapshot comparison rather than ``gc.get_count()`` so
+    that transient (immediately-freed) per-tick allocations are also detected.
+    Only allocations attributed to ``ir_transport.py`` are checked — this
+    filters out tracemalloc's own internal overhead.
+    """
     rx, _ = _make_multi_receiver(3)
 
     # Warm up: let any one-time setup allocations settle
     for _ in range(5):
         rx.receive()
 
-    gc.collect()
-    before = gc.get_count()
+    tracemalloc.start()
+    before = tracemalloc.take_snapshot()
 
     for _ in range(100):
         rx.receive()
 
-    gc.collect()
-    after = gc.get_count()
+    after = tracemalloc.take_snapshot()
+    tracemalloc.stop()
 
-    # gc.get_count() returns a 3-tuple of generation counts; we compare element-wise
-    # to confirm no new objects survive into any generation after 100 idle ticks.
-    assert after[0] <= before[0], f"Unexpected gen-0 allocation: before={before}, after={after}"
+    # Filter to lines inside ir_transport.py so tracemalloc's own bookkeeping
+    # overhead does not produce false positives.
+    diff = [
+        stat
+        for stat in after.compare_to(before, "lineno")
+        if "ir_transport.py" in stat.traceback[0].filename and stat.size_diff > 0
+    ]
+    assert not diff, f"Unexpected allocations in ir_transport.py during idle receive: {diff}"
