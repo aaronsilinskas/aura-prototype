@@ -1450,8 +1450,13 @@ def test_level_lerp_at_midpoint_returns_interpolated_value():
 
 
 def test_level_lerp_max_level_1_guard_returns_max_val():
-    """When max_level <= 1, fraction is guarded to 0 — always returns max_val."""
+    """When max_level == 1, fraction is guarded to 0 — always returns max_val."""
     assert _level_lerp(1, max_val=5.0, min_val=2.0, max_level=1) == pytest.approx(5.0)
+
+
+def test_level_lerp_max_level_0_guard_returns_max_val():
+    """When max_level == 0 (≤ 1), fraction is guarded to 0 — always returns max_val."""
+    assert _level_lerp(1, max_val=5.0, min_val=2.0, max_level=0) == pytest.approx(5.0)
 
 
 def test_level_lerp_level_below_1_is_clamped_to_max_val():
@@ -1513,6 +1518,10 @@ def test_warning_duration_at_max_level_is_three_times_pulse_min(spy):
     state.set("rlgl_level", max_level)
 
     warning_duration = 3 * pulse_min
+    # Just before the derived warning duration: still in RED_WARNING
+    _tick(state, engine, timer, total=warning_duration - 0.01)
+    assert state.get("rlgl_phase", None) == PHASE_RED_WARNING
+
     # At the derived warning duration: transition to RED
     _tick(state, engine, timer, total=warning_duration)
     assert state.get("rlgl_phase", None) == PHASE_RED
