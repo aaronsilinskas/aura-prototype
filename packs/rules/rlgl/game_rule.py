@@ -335,7 +335,7 @@ class RlglGameRule(GameRule):
         elif phase == PHASE_LEVEL_UP:
             self._check_level_up(state, phase_elapsed)
         elif phase == PHASE_WIN:
-            self._check_win(state, phase_elapsed)
+            self._check_win(state)
         elif phase == PHASE_GAME_OVER:
             self._check_game_over(state, phase_elapsed)
 
@@ -398,7 +398,7 @@ class RlglGameRule(GameRule):
         if elapsed >= duration:
             _enter_red_warning(state)
 
-    def _check_win(self, state: GameState, elapsed: float) -> None:
+    def _check_win(self, state: GameState) -> None:
         receipt = state.get(_KEY_WIN_STING_RECEIPT, None)
         if receipt is not None and receipt.is_stopped():
             _enter_ready(state)
