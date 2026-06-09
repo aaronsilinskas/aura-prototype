@@ -33,6 +33,7 @@ except ImportError:
 
 from engine.engine import GameRule
 from engine.input import AccelerationData, InputEvents
+from engine.lerp import level_lerp
 from engine.state import EffectReceipt, GameState, Scope
 from packs.rules.rlgl.helpers.motion_detector import (
     GRAVITY_LOWPASS_BETA,
@@ -114,27 +115,13 @@ _WARNING_DARKEN_RATIO: Final = 0.3
 # ---------------------------------------------------------------------------
 
 
-def _level_lerp(level: int, max_val: float, min_val: float, max_level: int) -> float:
-    """Interpolate between ``max_val`` (level 1, easiest) and ``min_val`` (hardest).
-
-    ``fraction = (level - 1) / (max_level - 1)`` clamped to ``[0.0, 1.0]``.
-    When ``max_level <= 1`` the guard returns ``max_val`` (fraction = 0).
-    """
-    fraction = 0.0 if max_level <= 1 else (level - 1) / (max_level - 1)
-    if fraction < 0.0:
-        fraction = 0.0
-    elif fraction > 1.0:
-        fraction = 1.0
-    return max_val + (min_val - max_val) * fraction
-
-
 def _warning_pulse_duration(state: GameState) -> float:
     """Return the current warning pulse duration (seconds) scaled by Game Level."""
     level = state.get(_KEY_LEVEL, 1)
     max_level = state.get(_KEY_MAX_LEVEL, _DEFAULT_MAX_LEVEL)
     pulse_max = state.get(_KEY_WARNING_PULSE_MAX, _DEFAULT_WARNING_PULSE_MAX)
     pulse_min = state.get(_KEY_WARNING_PULSE_MIN, _DEFAULT_WARNING_PULSE_MIN)
-    return _level_lerp(level, pulse_max, pulse_min, max_level)
+    return level_lerp(level, pulse_max, pulse_min, max_level)
 
 
 def _warning_sting_opts(state: GameState) -> dict[str, object]:
@@ -161,7 +148,7 @@ def _red_duration(state: GameState) -> float:
     max_level = state.get(_KEY_MAX_LEVEL, _DEFAULT_MAX_LEVEL)
     red_max = state.get(_KEY_RED_DURATION, _DEFAULT_RED_DURATION)
     red_min = state.get(_KEY_RED_DURATION_MIN, _DEFAULT_RED_DURATION_MIN)
-    return _level_lerp(level, red_max, red_min, max_level)
+    return level_lerp(level, red_max, red_min, max_level)
 
 
 def _green_duration(state: GameState) -> float:
@@ -170,7 +157,7 @@ def _green_duration(state: GameState) -> float:
     max_level = state.get(_KEY_MAX_LEVEL, _DEFAULT_MAX_LEVEL)
     green_max = state.get(_KEY_GREEN_DURATION, _DEFAULT_GREEN_DURATION)
     green_min = state.get(_KEY_GREEN_DURATION_MIN, _DEFAULT_GREEN_DURATION_MIN)
-    return _level_lerp(level, green_max, green_min, max_level)
+    return level_lerp(level, green_max, green_min, max_level)
 
 
 # ---------------------------------------------------------------------------
