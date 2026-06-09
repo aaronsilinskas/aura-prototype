@@ -66,7 +66,7 @@ _KEY_MOTION_EMA: Final = "rlgl_motion_ema"
 _KEY_GRAVITY_X: Final = "rlgl_gravity_x"
 _KEY_GRAVITY_Y: Final = "rlgl_gravity_y"
 _KEY_GRAVITY_Z: Final = "rlgl_gravity_z"
-_KEY_AMBIENT_RECEIPT: Final = "rlgl_ambient_receipt"
+_KEY_MUSIC_RECEIPT: Final = "rlgl_music_receipt"
 
 # ---------------------------------------------------------------------------
 # Default durations (seconds)
@@ -86,10 +86,10 @@ _DEFAULT_GRAVITY_BETA: Final = GRAVITY_LOWPASS_BETA
 
 
 def _enter_phase(state: GameState, phase: str) -> None:
-    """Record the new phase and its start time, stop any ambient music left
-    running by the previous phase, and drop the gravity estimate.
+    """Record the new phase and its start time, stop any music left running by
+    the previous phase, and drop the gravity estimate.
 
-    Every ``_enter_*`` helper begins here, so a looping ambient effect can never
+    Every ``_enter_*`` helper begins here, so a looping music effect can never
     leak across a transition.  The ``has`` guard makes the stop a no-op when
     nothing is playing (e.g. entering Ready at game start).  Clearing the gravity
     keys forces :func:`_update_motion` to re-seed from the first sample of the
@@ -97,8 +97,8 @@ def _enter_phase(state: GameState, phase: str) -> None:
     """
     state.set(_KEY_PHASE, phase)
     state.set(_KEY_PHASE_START, state.total)
-    if state.has(_KEY_AMBIENT_RECEIPT):
-        state.pop(_KEY_AMBIENT_RECEIPT, EffectReceipt).stop()
+    if state.has(_KEY_MUSIC_RECEIPT):
+        state.pop(_KEY_MUSIC_RECEIPT, EffectReceipt).stop()
     state.delete(_KEY_GRAVITY_X)
     state.delete(_KEY_GRAVITY_Y)
     state.delete(_KEY_GRAVITY_Z)
@@ -106,7 +106,7 @@ def _enter_phase(state: GameState, phase: str) -> None:
 
 def _enter_ready(state: GameState) -> None:
     _enter_phase(state, PHASE_READY)
-    state.effect_controls.set_effect(Scope.ALL, "rlgl.ready", {"level": 3})
+    state.effect_controls.set_effect(Scope.ALL, "rlgl.ready", {})
 
 
 _WARNING_STING_OPTS: Final = {
@@ -121,29 +121,29 @@ _WARNING_STING_OPTS: Final = {
 
 def _enter_red_warning(state: GameState) -> None:
     _enter_phase(state, PHASE_RED_WARNING)
-    state.effect_controls.set_effect(Scope.ALL, "rlgl.warning_sting", _WARNING_STING_OPTS)
+    state.effect_controls.set_effect(Scope.NON_AMBIENT, "rlgl.warning_sting", _WARNING_STING_OPTS)
 
 
 def _enter_red(state: GameState) -> None:
     _enter_phase(state, PHASE_RED)
     state.set(_KEY_MOTION_EMA, 0.0)
-    state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": 0xFF0000})
-    receipt = state.effect_controls.add_effect(Scope.AMBIENT, "rlgl.red_light_music", {})
-    state.set(_KEY_AMBIENT_RECEIPT, receipt)
+    state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.solid", {"color": 0xFF0000})
+    receipt = state.effect_controls.add_effect(Scope.PERSONAL, "rlgl.red_light_music", {})
+    state.set(_KEY_MUSIC_RECEIPT, receipt)
 
 
 def _enter_green_warning(state: GameState) -> None:
     _enter_phase(state, PHASE_GREEN_WARNING)
-    state.effect_controls.set_effect(Scope.ALL, "rlgl.warning_sting", _WARNING_STING_OPTS)
+    state.effect_controls.set_effect(Scope.NON_AMBIENT, "rlgl.warning_sting", _WARNING_STING_OPTS)
 
 
 def _enter_green(state: GameState) -> None:
     _enter_phase(state, PHASE_GREEN)
     state.set(_KEY_LAST_MOTION_TIME, state.total)
     state.set(_KEY_MOTION_EMA, 0.0)
-    state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": 0x00FF00})
-    receipt = state.effect_controls.add_effect(Scope.AMBIENT, "rlgl.green_light_music", {})
-    state.set(_KEY_AMBIENT_RECEIPT, receipt)
+    state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.solid", {"color": 0x00FF00})
+    receipt = state.effect_controls.add_effect(Scope.PERSONAL, "rlgl.green_light_music", {})
+    state.set(_KEY_MUSIC_RECEIPT, receipt)
 
 
 def _enter_game_over(state: GameState) -> None:
