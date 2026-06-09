@@ -14,6 +14,40 @@ except ImportError:
     pass
 
 
+def load_item(
+    full_module: str,
+    item_attr: str,
+    context: str,
+    expected_class: "type[T]",
+) -> "T":
+    """Import *full_module*, extract *item_attr*, and verify it is an instance of
+    *expected_class*.
+
+    *context* is a human-readable description of the owning registry entry used
+    in error messages (e.g. ``"Pack 'rlgl' item 'fire'"`` or
+    ``"Scene 'forest' local item 'ambush'"``).  *full_module* is the dotted
+    import path; *item_attr* is the attribute name to read from the module.
+
+    Raises:
+        ValueError: if the module has no attribute named *item_attr*.
+        ValueError: if the attribute value is not an instance of *expected_class*.
+    """
+    module = __import__(full_module, None, None, [""])
+    try:
+        value = getattr(module, item_attr)
+    except AttributeError:
+        raise ValueError(context + " has no attribute '" + item_attr + "'") from None
+    if not isinstance(value, expected_class):
+        raise ValueError(
+            context
+            + " attribute '"
+            + item_attr
+            + "' is not an instance of "
+            + expected_class.__name__
+        )
+    return value  # type: ignore[return-value]
+
+
 class _PackEntry:
     """Metadata for a single discovered pack. Internal use only."""
 
@@ -152,30 +186,8 @@ class PackRegistry:
             return self._cache[cache_key]  # type: ignore[return-value]
 
         full_module = meta.module_prefix + "." + item_name
-        module = __import__(full_module, None, None, [""])
-        try:
-            value = getattr(module, self._item_attr)
-        except AttributeError:
-            raise ValueError(
-                "Pack '"
-                + pack_name
-                + "' item '"
-                + item_name
-                + "' has no attribute '"
-                + self._item_attr
-                + "'"
-            ) from None
-        if not isinstance(value, expected_class):
-            raise ValueError(
-                "Pack '"
-                + pack_name
-                + "' item '"
-                + item_name
-                + "' attribute '"
-                + self._item_attr
-                + "' is not an instance of "
-                + expected_class.__name__
-            )
+        context = "Pack '" + pack_name + "' item '" + item_name + "'"
+        value = load_item(full_module, self._item_attr, context, expected_class)
         self._cache[cache_key] = value
         return value  # type: ignore[return-value]
 

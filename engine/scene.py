@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["Scene", "SceneManager", "SceneRegistry"]
+__all__ = ["Scene", "SceneLocalRegistry", "SceneManager", "SceneRegistry"]
 
 import json
 import os
@@ -11,16 +11,83 @@ except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
 try:
-    from typing import Literal
+    from typing import Literal, TypeVar
+
+    T = TypeVar("T")
 except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
 import engine._path as _path
 from engine.engine import GameEngine, GameRule, Version
-from engine.packs import PackRegistry
+from engine.packs import PackRegistry, load_item
 from engine.state import GameState, SceneControls, Scope
 
 _REQUIRED_KEYS = frozenset(("version", "effect_packs", "rule_packs"))
+
+
+class SceneLocalRegistry:
+    """Single-namespace registry for one scene's local items (rules or effects).
+
+    Maps item name → loaded item, sharing item-loading internals (import,
+    attribute extraction, isinstance check, cache) with ``PackRegistry`` via
+    ``load_item``.  No version concept.
+
+    Populated at scene discovery time via ``_register_items``; accessed via
+    ``get`` and ``items``.
+
+    Example::
+
+        registry = SceneLocalRegistry(item_attr="RULE")
+        registry._register_items({"my_rule"}, "scenes.forest.rules")
+        rule = registry.get("my_rule", GameRule)
+    """
+
+    __slots__ = ("_cache", "_item_attr", "_item_names", "_module_prefix")
+
+    def __init__(self, item_attr: str) -> None:
+        self._item_attr = item_attr
+        self._item_names: set[str] = set()
+        self._module_prefix: str = ""
+        self._cache: dict[str, object] = {}
+
+    def _register_items(self, item_names: set[str], module_prefix: str) -> None:
+        """Record the known item names and module prefix for this registry.
+
+        Called once by ``SceneRegistry.scan_dir`` during discovery.
+        """
+        self._item_names = item_names
+        self._module_prefix = module_prefix
+
+    def get(self, item_name: str, expected_class: type[T]) -> T:
+        """Return the *item_attr* attribute of *item_name*.
+
+        The item is imported on first access and the result is cached.
+
+        Raises:
+            ValueError: if *item_name* is not in the recorded set.
+            ValueError: if the module has no attribute named *item_attr*.
+            ValueError: if the attribute value is not an instance of *expected_class*.
+        """
+        if item_name not in self._item_names:
+            raise ValueError(
+                "Unknown item '"
+                + item_name
+                + "'. Available: "
+                + ", ".join(sorted(self._item_names))
+            )
+
+        if item_name in self._cache:
+            return self._cache[item_name]  # type: ignore[return-value]
+
+        full_module = self._module_prefix + "." + item_name
+        context = "Local item '" + item_name + "'"
+        value = load_item(full_module, self._item_attr, context, expected_class)
+        self._cache[item_name] = value
+        return value  # type: ignore[return-value]
+
+    def items(self) -> list[str]:
+        """Return all registered item names in alphabetical order."""
+        return sorted(self._item_names)
 
 
 class Scene:
@@ -36,12 +103,18 @@ class Scene:
     ``version`` is the scene's own declared version, parsed from ``scene.json`` at
     discovery time.  It is informational for now — format-validated and stored, but
     not checked against any requirement.
+
+    ``local_rule_registry`` is the ``SceneLocalRegistry`` for this scene's
+    scene-local rules.  It is built once at discovery and shared across fresh
+    ``Scene`` instances; mutable import-cache state lives on the registry, not
+    on the ``Scene`` itself.
     """
 
     __slots__ = (
         "__weakref__",
         "effect_packs",
         "initial_data",
+        "local_rule_registry",
         "rule_packs",
         "version",
     )
@@ -52,17 +125,30 @@ class Scene:
         rule_packs: list[tuple[str, str]],
         initial_data: dict[str, object] | None = None,
         version: Version | None = None,
+        local_rule_registry: SceneLocalRegistry | None = None,
     ) -> None:
         self.effect_packs = effect_packs
         self.rule_packs = rule_packs
         self.initial_data = initial_data
         self.version = version
+        self.local_rule_registry = (
+            local_rule_registry
+            if local_rule_registry is not None
+            else SceneLocalRegistry(item_attr="RULE")
+        )
 
 
 class _SceneEntry:
     """Stored metadata for a single discovered scene.  Internal use only."""
 
-    __slots__ = ("effect_packs", "initial_data", "rule_packs", "source_path", "version")
+    __slots__ = (
+        "effect_packs",
+        "initial_data",
+        "local_rule_registry",
+        "rule_packs",
+        "source_path",
+        "version",
+    )
 
     def __init__(
         self,
@@ -71,12 +157,14 @@ class _SceneEntry:
         rule_packs: list[list],
         initial_data: dict | None,
         source_path: str,
+        local_rule_registry: SceneLocalRegistry,
     ) -> None:
         self.version = version
         self.effect_packs = effect_packs
         self.rule_packs = rule_packs
         self.initial_data = initial_data
         self.source_path = source_path
+        self.local_rule_registry = local_rule_registry
 
 
 class SceneRegistry:
@@ -88,7 +176,7 @@ class SceneRegistry:
 
     Scanning::
 
-        registry.scan_dir("/path/to/scenes")
+        registry.scan_dir("/path/to/scenes", "packs.scenes")
 
     Scene access::
 
@@ -106,12 +194,22 @@ class SceneRegistry:
         self._factories: dict[str, Callable[[], Scene]] = {}
         self._scanned_dirs: set[str] = set()
 
-    def scan_dir(self, path: str) -> None:
+    def scan_dir(self, path: str, module_prefix: str) -> None:
         """Scan *path* for subdirectories that contain a ``scene.json``.
 
         Each such subdirectory is registered as a scene with the directory name
-        as its scene name.  All validation (required fields, version format)
-        happens here so that misconfigured scenes fail at startup.
+        as its scene name.  If a scene folder contains a ``rules/`` subdirectory,
+        every ``.py`` file in it (except ``__init__.py`` and any ``tests/`` subdir)
+        is recorded as a scene-local rule item in that scene's
+        ``SceneLocalRegistry``.  The local module prefix for each item is derived
+        as ``module_prefix + "." + scene_name + ".rules"``.
+
+        *module_prefix* is the dotted import root for scene directories (e.g.
+        ``"packs.scenes"``).  It is required; path-relative derivation is
+        rejected as fragile.
+
+        All validation (required fields, version format) happens here so that
+        misconfigured scenes fail at startup.
 
         This method is idempotent: calling it a second time with the same *path*
         is a no-op.  Discovering a scene name that was already registered from a
@@ -181,13 +279,45 @@ class SceneRegistry:
 
             initial_data = data.get("initial_data")
 
+            local_rule_registry = self._build_local_rule_registry(
+                scene_dir, scene_name, module_prefix
+            )
+
             self._scenes[scene_name] = _SceneEntry(
                 version=version,
                 effect_packs=data["effect_packs"],
                 rule_packs=data["rule_packs"],
                 initial_data=initial_data,
                 source_path=norm_path,
+                local_rule_registry=local_rule_registry,
             )
+
+    def _build_local_rule_registry(
+        self, scene_dir: str, scene_name: str, module_prefix: str
+    ) -> SceneLocalRegistry:
+        """Scan *scene_dir*/rules/ and return a ``SceneLocalRegistry`` for it.
+
+        Returns an empty registry when no ``rules/`` subdirectory exists.
+        """
+        registry = SceneLocalRegistry(item_attr="RULE")
+        rules_dir = _path.join(scene_dir, "rules")
+        if not _path.isdir(rules_dir):
+            return registry
+
+        item_names: set[str] = set()
+        for fname in os.listdir(rules_dir):
+            if fname == "__init__.py":
+                continue
+            # skip subdirectories (e.g. tests/)
+            full = _path.join(rules_dir, fname)
+            if _path.isdir(full):
+                continue
+            if fname.endswith(".py"):
+                item_names.add(fname[:-3])
+
+        local_prefix = module_prefix + "." + scene_name + ".rules"
+        registry._register_items(item_names, local_prefix)
+        return registry
 
     def get(self, name: str) -> Scene:
         """Return a fresh ``Scene`` for *name*.
@@ -214,6 +344,7 @@ class SceneRegistry:
             rule_packs=entry.rule_packs,
             initial_data=initial_data,
             version=entry.version,
+            local_rule_registry=entry.local_rule_registry,
         )
 
     def names(self) -> list[str]:
@@ -350,11 +481,13 @@ class SceneManager(SceneControls):
             self._rule_registry.check_version(pack_name, Version.parse(min_version))
 
     def _resolve_rules(self, scene: Scene) -> list[GameRule]:
-        """Return combined rules from all rule-pack items."""
+        """Return combined rules: shared-pack items first, scene-local items after."""
         combined = []
         for pack_name, _ in scene.rule_packs:
             for item_name in self._rule_registry.items(pack_name):
                 combined.append(self._rule_registry.get(pack_name, item_name, GameRule))
+        for item_name in scene.local_rule_registry.items():
+            combined.append(scene.local_rule_registry.get(item_name, GameRule))
         return combined
 
     def _do_load(self, scene: Scene) -> None:

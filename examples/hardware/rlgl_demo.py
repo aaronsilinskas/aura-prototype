@@ -110,7 +110,7 @@ _engine = GameEngine(
 )
 
 _scene_registry = SceneRegistry()
-_scene_registry.scan_dir("packs/scenes")
+_scene_registry.scan_dir("packs/scenes", "packs.scenes")
 
 _scene_manager = SceneManager(_engine, _effect_registry, _rule_registry, _scene_registry)
 _scene_manager.load("rlgl")
