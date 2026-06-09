@@ -21,7 +21,7 @@ Full game and hardware design lives in `~/dev/aura/aura-docs/` (an Obsidian vaul
 
 ```
 effects/          Animation engine (CircuitPython-safe)
-  render.py       EffectConfig, PixelBuffer, Effect
+  effect.py       EffectConfig, PixelBuffer, Effect
   palette.py      Palette, PaletteLUT256 (pre-computed, immutable)
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
@@ -31,12 +31,17 @@ effects/          Animation engine (CircuitPython-safe)
   elements/       One builder function per element + registry.py, ElementBuilder
 
 engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
-  engine.py       GameEngine, GameRule, GameState, Version
+  engine.py       GameEngine, GameRule
+  state.py        GameState, EffectControls, EffectReceipt, NetworkControls, Scope, ScopeValue
+  scene.py        Scene, SceneRegistry, SceneLocalRegistry, SceneManager, SceneControls
   events.py       Event, EventGroup
   timer.py        Timer
+  packs.py        PackRegistry
+  input.py        ButtonData, AccelerationData, InputEvents
+  audio.py        AudioRegistry
+  network.py      NetworkEvents, HardwareNetworkControls
   effects/
-    manager.py    EffectManager, EffectControls, EffectOutput, EffectBuilder, EffectConfig, EffectReceipt
-    scope.py      Scope, ScopeValue
+    manager.py    EffectManager, EffectOutput, EffectBuilder
 
 magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
   aura.py         Aura, Spell, Spells, SpellTags, SpellLevelScaler, AuraEvent (+ subclasses), EventListener
@@ -44,8 +49,16 @@ magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
   values.py       MinMaxValue, ValueWithModifiers, ValueModifier, ValueModifiers, Duration, Counter
   spell/          Individual spell implementations (elemental/, combo/)
 
-rules/            Game-specific rule packs (loaded at runtime, CircuitPython/MicroPython-safe)
-scripts/          Deploy and maintenance scripts
+packs/            Game-specific packs loaded at runtime (CircuitPython/MicroPython-safe)
+  effects/        Effect packs (basic, elements, hw_test)
+  rules/          Rule packs (debug, hw_test)
+  scenes/         Scene definitions (hw_test, rlgl)
+
+hardware/         Hardware abstraction layer
+  circuitpython/  CircuitPython drivers (propmaker, IS31FL3741, DRV2605, audio)
+  shared/         Shared hardware helpers (matrix_output, voice_pool, debounced_buttons)
+
+scripts/          Deploy and maintenance scripts (CPython-only)
 ```
 
 ---
@@ -64,15 +77,19 @@ scripts/          Deploy and maintenance scripts
 | `AddSamplesRenderer` | `effects/layers/add_samples_renderer.py` | Composites layers by summing float samples then sampling a palette |
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
 | `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
-| `EffectControls` | `engine/effects/manager.py` | Abstract interface: `set_effect`, `add_effect`, `stop_effect` |
+| `EffectControls` | `engine/state.py` | Abstract interface: `set_effect`, `add_effect`, `stop_effect` |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/manager.py` | Abstract hardware output: `create_buffer`, `update_pixels`, `handle_event` |
 | `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → Effect`; one per effect pack |
-| `EffectReceipt` | `engine/effects/manager.py` | Opaque handle for a running effect instance; used to stop by receipt |
-| `ScopeValue` / `Scope` | `engine/effects/scope.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN/BUFF/DEBUFF`, `ALL` |
+| `EffectReceipt` | `engine/state.py` | Opaque handle for a running effect instance; used to stop by receipt |
+| `ScopeValue` / `Scope` | `engine/state.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN/BUFF/DEBUFF`, `ALL` |
+| `NetworkControls` | `engine/state.py` | Abstract interface for sending/receiving network messages |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update(timer)` tick |
-| `GameState` | `engine/engine.py` | Passed to each rule: holds `engine`, `timer`, `effect_controls` |
+| `GameState` | `engine/state.py` | Passed to each rule: holds `engine`, `timer`, `effect_controls`, `network_controls` |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
+| `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
+| `SceneManager` | `engine/scene.py` | Activates/deactivates scenes; owns `SceneLocalRegistry` per scene |
+| `PackRegistry` | `engine/packs.py` | Loads and looks up named packs (effects, rules, scenes) by entry point |
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
 | `Aura` | `magic/aura.py` | A player/object's magic pool + active `Spells` collection |
@@ -120,4 +137,4 @@ All code in `effects/`, `engine/`, `magic/`, and `rules/` must run on CPython, C
 
 ## Tests
 
-760 tests under `effects/tests/`, `engine/tests/`, `magic/tests/`, `rules/`, and `scripts/tests/`. Run with `python -m pytest`. All must pass before commit. Pre-commit hooks run `python -m ruff` (lint) and `ruff format`.
+1166 tests under `effects/tests/`, `engine/tests/`, `magic/tests/`, `packs/rules/`, and `scripts/tests/`. Run with `python -m pytest`. All must pass before commit. Pre-commit hooks run `python -m ruff` (lint) and `ruff format`.

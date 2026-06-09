@@ -11,43 +11,15 @@ microcontrollers. Full game and hardware design lives in `~/dev/aura/aura-docs/`
 ## Module Layout
 
 ```
-effects/          LED animation engine (CircuitPython-safe)
-  render.py       EffectConfig, PixelBuffer, Effect
-  palette.py      Palette, PaletteLUT256
-  shape.py        Shape (factory), EffectShapeFunc
-  level.py        clamp_level, level_progress, level_lerp, level_lerp_int
-  value.py        DynamicValue, ValueGenerator, lerp
-  performance.py  PerformanceTracker
-  layers/         Layer, Scroll, LayerRenderer, AddColorsRenderer, AddSamplesRenderer,
-                  ScrollLayer, FlameLayer, DriftNoiseLayer, SparkleLayer, ShapeLayer
-
-engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
-  engine.py       GameEngine, GameRule, GameState
-  events.py       Event, EventGroup
-  timer.py        Timer
-  packs.py        PackRegistry — multi-pack discovery and lazy loading
-  scene.py        Scene, SceneControls, SceneManager
-  effects/
-    manager.py    EffectManager, EffectControls, EffectOutput, EffectReceipt
-    scope.py      Scope, ScopeValue
-
-packs/            First-party game content packs
-  effects/
-    basic/        Basic effect builders (solid, pulse)
-    elements/     Element effect builders (Fire, Water, Earth, …)
-  rules/
-    debug/        Debug rule pack (button events, event logger)
-    hw_test/      Hardware test rule pack
-    rlgl/         Red Light Green Light rule pack
-
-magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
-  aura.py         Aura, Spell, Spells, SpellTags, AuraEvent, EventListener
-  caster.py       Caster, CastType
-  values.py       MinMaxValue, ValueWithModifiers, ValueModifier, Duration, Counter
-  spell/          Individual spell implementations (elemental/, combo/)
-
-scripts/          Deploy and maintenance scripts
+effects/     Composable LED animation engine; runs on CPython and CircuitPython
+engine/      Event-driven game loop: rules, scenes, state, packs, and I/O abstractions
+packs/       First-party effect, rule, and scene packs (elements, rlgl, hw_test, …)
+hardware/    Hardware drivers and shared abstractions for CircuitPython props
+magic/       Spell and aura game logic (elements, buffs/debuffs, cast types)
+scripts/     Deploy and maintenance scripts (CPython-only)
 ```
+
+See [`docs/agents/domain.md`](docs/agents/domain.md) for key types, vocabulary, and constraints.
 
 ---
 
@@ -103,8 +75,3 @@ deferred to end-of-tick — rules call `state.scene_controls.load/overlay/pop()`
 and the transition is applied after `engine.update(state)` returns. Every scene the manager
 unloads or suspends has its effects stopped on `Scope.ALL` automatically.
 
----
-
-## Key Types, Domain Vocabulary, and Constraints
-
-See [`docs/agents/domain.md`](docs/agents/domain.md).
