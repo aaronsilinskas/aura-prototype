@@ -33,6 +33,7 @@ except ImportError:
 
 from engine.engine import GameRule
 from engine.input import AccelerationData, InputEvents
+from engine.lerp import level_lerp
 from engine.state import EffectReceipt, GameState, Scope
 from packs.rules.rlgl.helpers.motion_detector import (
     GRAVITY_LOWPASS_BETA,
@@ -64,9 +65,12 @@ _KEY_PHASE: Final = "rlgl_phase"
 _KEY_PHASE_START: Final = "rlgl_phase_start"
 
 # Config keys — readable from GameState, overridable via initial_data
-_KEY_WARNING_DURATION: Final = "rlgl_warning_duration"
 _KEY_RED_DURATION: Final = "rlgl_red_duration"
+_KEY_RED_DURATION_MIN: Final = "rlgl_red_duration_min"
 _KEY_GREEN_DURATION: Final = "rlgl_green_duration"
+_KEY_GREEN_DURATION_MIN: Final = "rlgl_green_duration_min"
+_KEY_WARNING_PULSE_MAX: Final = "rlgl_warning_pulse_max"
+_KEY_WARNING_PULSE_MIN: Final = "rlgl_warning_pulse_min"
 _KEY_GAME_OVER_DURATION: Final = "rlgl_game_over_duration"
 _KEY_GREEN_STILL_TIMEOUT: Final = "rlgl_green_still_timeout"
 _KEY_LAST_MOTION_TIME: Final = "rlgl_last_motion_time"
@@ -87,9 +91,12 @@ _KEY_WIN_DURATION: Final = "rlgl_win_duration"
 # Default durations (seconds)
 # ---------------------------------------------------------------------------
 
-_DEFAULT_WARNING_DURATION: Final = 3.0
 _DEFAULT_RED_DURATION: Final = 5.0
+_DEFAULT_RED_DURATION_MIN: Final = 2.0
 _DEFAULT_GREEN_DURATION: Final = 5.0
+_DEFAULT_GREEN_DURATION_MIN: Final = 2.0
+_DEFAULT_WARNING_PULSE_MAX: Final = 1.0
+_DEFAULT_WARNING_PULSE_MIN: Final = 0.4
 _DEFAULT_GAME_OVER_DURATION: Final = 3.0
 _DEFAULT_GREEN_STILL_TIMEOUT: Final = 0.75
 _DEFAULT_MOTION_SMOOTHING: Final = MOTION_EMA_ALPHA
@@ -97,6 +104,61 @@ _DEFAULT_GRAVITY_BETA: Final = GRAVITY_LOWPASS_BETA
 _DEFAULT_MAX_LEVEL: Final = 10
 _DEFAULT_LEVEL_UP_DURATION: Final = 1.0
 _DEFAULT_WIN_DURATION: Final = 4.0
+
+# Level-1 warning pulse sub-duration ratios (brighten / on / darken = 0.3 / 0.4 / 0.3)
+_WARNING_BRIGHTEN_RATIO: Final = 0.3
+_WARNING_ON_RATIO: Final = 0.4
+_WARNING_DARKEN_RATIO: Final = 0.3
+
+# ---------------------------------------------------------------------------
+# Difficulty scaling
+# ---------------------------------------------------------------------------
+
+
+def _warning_pulse_duration(state: GameState) -> float:
+    """Return the current warning pulse duration (seconds) scaled by Game Level."""
+    level = state.get(_KEY_LEVEL, 1)
+    max_level = state.get(_KEY_MAX_LEVEL, _DEFAULT_MAX_LEVEL)
+    pulse_max = state.get(_KEY_WARNING_PULSE_MAX, _DEFAULT_WARNING_PULSE_MAX)
+    pulse_min = state.get(_KEY_WARNING_PULSE_MIN, _DEFAULT_WARNING_PULSE_MIN)
+    return level_lerp(level, pulse_max, pulse_min, max_level)
+
+
+def _warning_sting_opts(state: GameState) -> dict[str, object]:
+    """Build warning sting options with sub-durations scaled to the current pulse duration."""
+    pulse = _warning_pulse_duration(state)
+    return {
+        "start_color": 0x000000,
+        "end_color": 0xFFFF00,
+        "brighten_duration": pulse * _WARNING_BRIGHTEN_RATIO,
+        "on_duration": pulse * _WARNING_ON_RATIO,
+        "darken_duration": pulse * _WARNING_DARKEN_RATIO,
+        "off_duration": 0.0,
+    }
+
+
+def _warning_duration(state: GameState) -> float:
+    """Return the warning phase duration = 3 × pulse_duration(level)."""
+    return 3.0 * _warning_pulse_duration(state)
+
+
+def _red_duration(state: GameState) -> float:
+    """Return the red phase duration scaled by Game Level."""
+    level = state.get(_KEY_LEVEL, 1)
+    max_level = state.get(_KEY_MAX_LEVEL, _DEFAULT_MAX_LEVEL)
+    red_max = state.get(_KEY_RED_DURATION, _DEFAULT_RED_DURATION)
+    red_min = state.get(_KEY_RED_DURATION_MIN, _DEFAULT_RED_DURATION_MIN)
+    return level_lerp(level, red_max, red_min, max_level)
+
+
+def _green_duration(state: GameState) -> float:
+    """Return the green phase duration scaled by Game Level."""
+    level = state.get(_KEY_LEVEL, 1)
+    max_level = state.get(_KEY_MAX_LEVEL, _DEFAULT_MAX_LEVEL)
+    green_max = state.get(_KEY_GREEN_DURATION, _DEFAULT_GREEN_DURATION)
+    green_min = state.get(_KEY_GREEN_DURATION_MIN, _DEFAULT_GREEN_DURATION_MIN)
+    return level_lerp(level, green_max, green_min, max_level)
+
 
 # ---------------------------------------------------------------------------
 # Phase entry helpers
@@ -146,19 +208,11 @@ def _start_game(state: GameState) -> None:
     _enter_red_warning(state)
 
 
-_WARNING_STING_OPTS: Final = {
-    "start_color": 0x000000,
-    "end_color": 0xFFFF00,
-    "brighten_duration": 0.3,
-    "on_duration": 0.4,
-    "darken_duration": 0.3,
-    "off_duration": 0.0,
-}
-
-
 def _enter_red_warning(state: GameState) -> None:
     _enter_phase(state, PHASE_RED_WARNING)
-    state.effect_controls.set_effect(Scope.NON_AMBIENT, "rlgl.warning_sting", _WARNING_STING_OPTS)
+    state.effect_controls.set_effect(
+        Scope.NON_AMBIENT, "rlgl.warning_sting", _warning_sting_opts(state)
+    )
 
 
 def _enter_red(state: GameState) -> None:
@@ -171,7 +225,9 @@ def _enter_red(state: GameState) -> None:
 
 def _enter_green_warning(state: GameState) -> None:
     _enter_phase(state, PHASE_GREEN_WARNING)
-    state.effect_controls.set_effect(Scope.NON_AMBIENT, "rlgl.warning_sting", _WARNING_STING_OPTS)
+    state.effect_controls.set_effect(
+        Scope.NON_AMBIENT, "rlgl.warning_sting", _warning_sting_opts(state)
+    )
 
 
 def _enter_green(state: GameState) -> None:
@@ -288,8 +344,7 @@ class RlglGameRule(GameRule):
             _start_game(state)
 
     def _check_red_warning(self, state: GameState, elapsed: float) -> None:
-        duration = state.get(_KEY_WARNING_DURATION, _DEFAULT_WARNING_DURATION)
-        if elapsed >= duration:
+        if elapsed >= _warning_duration(state):
             _enter_red(state)
 
     def _check_red(
@@ -298,10 +353,8 @@ class RlglGameRule(GameRule):
         state: GameState,
         elapsed: float,
     ) -> None:
-        red_duration = state.get(_KEY_RED_DURATION, _DEFAULT_RED_DURATION)
-
         # Timer expiry is always checked before motion
-        if elapsed >= red_duration:
+        if elapsed >= _red_duration(state):
             _enter_green_warning(state)
             return
 
@@ -311,8 +364,7 @@ class RlglGameRule(GameRule):
                 _enter_game_over(state)
 
     def _check_green_warning(self, state: GameState, elapsed: float) -> None:
-        duration = state.get(_KEY_WARNING_DURATION, _DEFAULT_WARNING_DURATION)
-        if elapsed >= duration:
+        if elapsed >= _warning_duration(state):
             _enter_green(state)
 
     def _check_green(
@@ -321,10 +373,8 @@ class RlglGameRule(GameRule):
         state: GameState,
         elapsed: float,
     ) -> None:
-        green_duration = state.get(_KEY_GREEN_DURATION, _DEFAULT_GREEN_DURATION)
-
         # Timer expiry is always checked before motion
-        if elapsed >= green_duration:
+        if elapsed >= _green_duration(state):
             level = state.get(_KEY_LEVEL, 1)
             max_level = state.get(_KEY_MAX_LEVEL, _DEFAULT_MAX_LEVEL)
             if level < max_level:
