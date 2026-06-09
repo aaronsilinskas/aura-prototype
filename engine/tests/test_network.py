@@ -69,7 +69,7 @@ def test_ir_received_identifies_itself_to_the_engine_as_ir_received() -> None:
     assert event.name == "ir_received"
 
 
-def test_ir_received_data() -> None:
+def test_ir_received_stores_payload_so_rules_can_read_it() -> None:
     event = NetworkEvents.IRReceived(
         b"hello",
         signal_strength=0.9,
@@ -91,7 +91,7 @@ def test_ir_received_belongs_to_net_event_group_for_routing() -> None:
     assert event.group is NetworkEvents.GROUP
 
 
-def test_ir_received_signal_strength() -> None:
+def test_ir_received_stores_signal_strength_from_hardware() -> None:
     event = NetworkEvents.IRReceived(
         b"x",
         signal_strength=0.75,
@@ -102,7 +102,7 @@ def test_ir_received_signal_strength() -> None:
     assert event.signal_strength == 0.75
 
 
-def test_ir_received_error_margin() -> None:
+def test_ir_received_stores_error_margin_from_hardware() -> None:
     event = NetworkEvents.IRReceived(
         b"x",
         signal_strength=0.8,

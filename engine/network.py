@@ -78,6 +78,8 @@ class HardwareNetworkControls(NetworkControls):
     ``send_radio`` remains a no-op until a radio peripheral is wired.
     """
 
+    __slots__ = ("_transmitters",)
+
     def __init__(self, transmitters: dict[str, InfraredTransmitter]) -> None:
         self._transmitters = transmitters
 
