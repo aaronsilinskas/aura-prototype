@@ -52,7 +52,7 @@ Mode 3 — Radio receive
     returns to the idle solid white.  Console shows ``net.radio_received``.
 
 Mode 4 — SFX
-    Press A to fire the ``hw_test.sfx_test`` effect, which plays the clip
+    Press A to fire the ``scene.sfx_test`` effect, which plays the clip
     ``sounds/sfx_test.wav`` via the I2S amp and triggers a STRONG_CLICK haptic
     pattern on the DRV2605L (if present).  If the WAV file is absent from the
     device filesystem, ``AudioEffectOutput`` silently no-ops; if the DRV2605L is

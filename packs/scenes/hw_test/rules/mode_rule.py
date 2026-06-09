@@ -103,7 +103,7 @@ class HwTestModeRule(GameRule):
         elif mode == 3:
             state.queue_event(NetworkEvents.RadioReceived(HW_TEST_PAYLOAD, "local"))
         elif mode == 4:
-            state.effect_controls.set_effect(Scope.PERSONAL, "hw_test.sfx_test", {})
+            state.effect_controls.set_effect(Scope.PERSONAL, "scene.sfx_test", {})
 
     def _check_flash_expiry(self, state: GameState) -> None:
         if (

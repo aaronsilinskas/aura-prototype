@@ -8,7 +8,7 @@ from engine.engine import GameEngine
 from engine.network import NetworkEvents
 from engine.state import EffectReceipt, GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
-from packs.rules.hw_test.network_rule import HwTestNetworkRule
+from packs.scenes.hw_test.rules.network_rule import HwTestNetworkRule
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers

@@ -1,4 +1,4 @@
-"""Unit tests for packs.effects.hw_test.sfx_test."""
+"""Unit tests for packs.scenes.hw_test.effects.sfx_test."""
 
 from __future__ import annotations
 
@@ -10,14 +10,14 @@ def _config() -> EffectConfig:
 
 
 def _build():
-    from packs.effects.hw_test.sfx_test import BUILD
+    from packs.scenes.hw_test.effects.sfx_test import BUILD
 
-    return BUILD("hw_test.sfx_test", _config())
+    return BUILD("sfx_test", _config())
 
 
 def test_sfx_test_build_is_effect_builder() -> None:
     from engine.effects.manager import EffectBuilder
-    from packs.effects.hw_test.sfx_test import BUILD
+    from packs.scenes.hw_test.effects.sfx_test import BUILD
 
     assert isinstance(BUILD, EffectBuilder)
 
@@ -28,10 +28,15 @@ def test_sfx_test_produces_no_pixel_output() -> None:
     assert effect.pixels is None
 
 
-def test_sfx_test_plays_audio_on_start() -> None:
+def test_sfx_test_has_audio_capability() -> None:
     effect = _build()
 
     assert effect.audio is not None
+
+
+def test_sfx_test_audio_responds_to_start_verb() -> None:
+    effect = _build()
+
     assert "start" in effect.audio.clips
 
 
@@ -47,10 +52,15 @@ def test_sfx_test_audio_start_clip_is_non_looping() -> None:
     assert effect.audio.clips["start"].loop is False
 
 
-def test_sfx_test_triggers_vibration_on_start() -> None:
+def test_sfx_test_has_vibration_capability() -> None:
     effect = _build()
 
     assert effect.vibration is not None
+
+
+def test_sfx_test_vibration_responds_to_start_verb() -> None:
+    effect = _build()
+
     assert "start" in effect.vibration.patterns
 
 

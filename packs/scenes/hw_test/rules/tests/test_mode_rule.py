@@ -9,7 +9,7 @@ from engine.input import ButtonData, InputEvents
 from engine.network import NetworkEvents
 from engine.state import EffectReceipt, GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
-from packs.rules.hw_test.mode_rule import (
+from packs.scenes.hw_test.rules.mode_rule import (
     FLASH_DURATION,
     HW_TEST_PAYLOAD,
     HwTestModeRule,
@@ -390,7 +390,7 @@ def test_ir_flash_does_not_expire_before_duration(spy):
 
 
 # ---------------------------------------------------------------------------
-# SFX mode (mode 4)
+# SFX mode (mode 4) — uses scene-local effect name
 # ---------------------------------------------------------------------------
 
 
@@ -414,7 +414,7 @@ def test_enter_sfx_sets_only_personal_scope(spy):
     assert all(s == Scope.PERSONAL for s in scopes)
 
 
-def test_button_a_in_sfx_mode_fires_sfx_test_effect_on_personal(spy):
+def test_button_a_in_sfx_mode_fires_scene_sfx_test_effect_on_personal(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 4})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
@@ -423,7 +423,7 @@ def test_button_a_in_sfx_mode_fires_sfx_test_effect_on_personal(spy):
     _press_button(state, "A")
     engine.update(state)
 
-    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "hw_test.sfx_test"]
+    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "scene.sfx_test"]
     assert len(sfx_calls) == 1
     assert sfx_calls[0][0] == Scope.PERSONAL
 
@@ -437,7 +437,7 @@ def test_button_a_in_rgb_mode_does_not_fire_sfx_test(spy):
     _press_button(state, "A")
     engine.update(state)
 
-    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "hw_test.sfx_test"]
+    sfx_calls = [c for c in spy.set_effect_calls if "sfx_test" in c[1]]
     assert sfx_calls == []
 
 
@@ -450,7 +450,7 @@ def test_button_a_in_accelerometer_mode_does_not_fire_sfx_test(spy):
     _press_button(state, "A")
     engine.update(state)
 
-    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "hw_test.sfx_test"]
+    sfx_calls = [c for c in spy.set_effect_calls if "sfx_test" in c[1]]
     assert sfx_calls == []
 
 
@@ -463,7 +463,7 @@ def test_button_a_in_ir_mode_does_not_fire_sfx_test(spy):
     _press_button(state, "A")
     engine.update(state)
 
-    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "hw_test.sfx_test"]
+    sfx_calls = [c for c in spy.set_effect_calls if "sfx_test" in c[1]]
     assert sfx_calls == []
 
 
@@ -476,5 +476,5 @@ def test_button_a_in_radio_mode_does_not_fire_sfx_test(spy):
     _press_button(state, "A")
     engine.update(state)
 
-    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "hw_test.sfx_test"]
+    sfx_calls = [c for c in spy.set_effect_calls if "sfx_test" in c[1]]
     assert sfx_calls == []
