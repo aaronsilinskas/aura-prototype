@@ -694,7 +694,7 @@ def test_red_warning_sting_replaces_current_visual_not_layers_on_top(spy):
     assert len(sting_add_calls) == 0
 
 
-def test_red_warning_does_not_start_ambient_music(spy):
+def test_red_warning_does_not_start_music(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
     spy.add_effect_calls.clear()
@@ -777,7 +777,7 @@ def test_green_warning_sting_replaces_current_visual_not_layers_on_top(spy):
     assert len(sting_add_calls) == 0
 
 
-def test_green_warning_does_not_start_ambient_music(spy):
+def test_green_warning_does_not_start_music(spy):
     state, engine, timer = _make_state(
         spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
     )
@@ -878,9 +878,10 @@ def test_game_over_removes_music_receipt_from_game_state(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_first_game_start_enters_ready_without_prior_ambient_receipt(spy):
+def test_first_game_start_enters_ready_without_prior_music_receipt(spy):
     state, engine, timer = _make_state(spy)
 
-    _tick(state, engine, timer, total=0.0)  # init → READY (no ambient receipt)
+    _tick(state, engine, timer, total=0.0)  # init → READY (no music receipt)
 
     assert state.get("rlgl_phase", None) == PHASE_READY
+    assert not state.has("rlgl_music_receipt")
