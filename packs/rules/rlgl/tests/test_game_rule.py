@@ -194,6 +194,15 @@ def test_ready_shows_ready_effect_on_all_scopes(spy):
     assert ready_calls[0][0] is Scope.ALL
 
 
+def test_ready_effect_does_not_pass_level_option(spy):
+    """The ``level`` option was never consumed by rlgl.ready; it must not be sent."""
+    state, engine, timer = _make_state(spy)
+    _tick(state, engine, timer, total=0.0)
+    ready_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.ready"]
+    assert len(ready_calls) == 1
+    assert "level" not in ready_calls[0][2]
+
+
 # ---------------------------------------------------------------------------
 # Ready — no transition without a button press
 # ---------------------------------------------------------------------------
@@ -235,7 +244,7 @@ def test_button_b_from_ready_enters_red_warning(spy):
     assert state.get("rlgl_phase", None) == PHASE_RED_WARNING
 
 
-def test_button_press_from_ready_shows_yellow_warning_on_all_scopes(spy):
+def test_button_press_from_ready_shows_yellow_warning_on_non_ambient_scopes(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0)
     spy.set_effect_calls.clear()
@@ -244,7 +253,7 @@ def test_button_press_from_ready_shows_yellow_warning_on_all_scopes(spy):
 
     yellow_calls = [c for c in spy.set_effect_calls if c[2].get("end_color") == 0xFFFF00]
     assert len(yellow_calls) == 1
-    assert yellow_calls[0][0] is Scope.ALL
+    assert yellow_calls[0][0] is Scope.NON_AMBIENT
 
 
 def test_button_press_from_ready_uses_warning_sting_effect_for_warning(spy):
@@ -256,7 +265,7 @@ def test_button_press_from_ready_uses_warning_sting_effect_for_warning(spy):
 
     sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
     assert len(sting_calls) == 1
-    assert sting_calls[0][0] is Scope.ALL
+    assert sting_calls[0][0] is Scope.NON_AMBIENT
 
 
 def test_red_warning_sting_uses_one_second_breathe_cycle(spy):
@@ -309,7 +318,7 @@ def test_red_phase_transition_uses_solid_with_red_color(spy):
 
     solid_calls = [c for c in spy.set_effect_calls if c[1] == "basic.solid"]
     assert len(solid_calls) == 1
-    assert solid_calls[0][0] is Scope.ALL
+    assert solid_calls[0][0] is Scope.NON_AMBIENT
     assert solid_calls[0][2]["color"] == 0xFF0000
 
 
@@ -474,7 +483,7 @@ def test_green_warning_transition_uses_warning_sting_with_yellow_end_color(spy):
 
     sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
     assert len(sting_calls) == 1
-    assert sting_calls[0][0] is Scope.ALL
+    assert sting_calls[0][0] is Scope.NON_AMBIENT
     assert sting_calls[0][2]["end_color"] == 0xFFFF00
 
 
@@ -492,7 +501,7 @@ def test_green_phase_transition_uses_solid_with_green_color(spy):
 
     solid_calls = [c for c in spy.set_effect_calls if c[1] == "basic.solid"]
     assert len(solid_calls) == 1
-    assert solid_calls[0][0] is Scope.ALL
+    assert solid_calls[0][0] is Scope.NON_AMBIENT
     assert solid_calls[0][2]["color"] == 0x00FF00
 
 
@@ -696,16 +705,16 @@ def test_red_warning_does_not_start_ambient_music(spy):
     assert len(music_calls) == 0
 
 
-def test_red_warning_stops_ambient_receipt_from_green_phase(spy):
+def test_red_warning_stops_music_receipt_from_green_phase(spy):
     state, engine, timer = _setup_green_phase(spy, initial_data={"rlgl_green_duration": 3.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
-    ambient_receipt = state.get("rlgl_ambient_receipt", None)
-    assert ambient_receipt is not None
+    music_receipt = state.get("rlgl_music_receipt", None)
+    assert music_receipt is not None
 
     _tick(state, engine, timer, total=phase_start + 3.0)  # GREEN → RED_WARNING
 
-    assert ambient_receipt.is_stopped()
-    assert not state.has("rlgl_ambient_receipt")
+    assert music_receipt.is_stopped()
+    assert not state.has("rlgl_music_receipt")
 
 
 # ---------------------------------------------------------------------------
@@ -713,7 +722,7 @@ def test_red_warning_stops_ambient_receipt_from_green_phase(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_red_phase_starts_ambient_music_on_ambient_scope(spy):
+def test_red_phase_starts_music_on_personal_scope(spy):
     state, engine, timer = _make_state(spy, initial_data={"rlgl_warning_duration": 0.0})
     _tick(state, engine, timer, total=0.0)
     _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
@@ -723,13 +732,13 @@ def test_red_phase_starts_ambient_music_on_ambient_scope(spy):
 
     music_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.red_light_music"]
     assert len(music_calls) == 1
-    assert music_calls[0][0] is Scope.AMBIENT
+    assert music_calls[0][0] is Scope.PERSONAL
 
 
-def test_red_phase_stores_ambient_receipt_in_game_state(spy):
+def test_red_phase_stores_music_receipt_in_game_state(spy):
     state, _engine, _timer = _setup_red_phase(spy)
 
-    assert state.has("rlgl_ambient_receipt")
+    assert state.has("rlgl_music_receipt")
 
 
 # ---------------------------------------------------------------------------
@@ -737,7 +746,7 @@ def test_red_phase_stores_ambient_receipt_in_game_state(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_green_warning_sets_warning_sting_on_all(spy):
+def test_green_warning_sets_warning_sting_on_non_ambient(spy):
     state, engine, timer = _make_state(
         spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
     )
@@ -750,7 +759,7 @@ def test_green_warning_sets_warning_sting_on_all(spy):
 
     sting_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.warning_sting"]
     assert len(sting_calls) == 1
-    assert sting_calls[0][0] is Scope.ALL
+    assert sting_calls[0][0] is Scope.NON_AMBIENT
 
 
 def test_green_warning_sting_replaces_current_visual_not_layers_on_top(spy):
@@ -783,16 +792,16 @@ def test_green_warning_does_not_start_ambient_music(spy):
     assert len(music_calls) == 0
 
 
-def test_green_warning_stops_ambient_receipt_from_red_phase(spy):
+def test_green_warning_stops_music_receipt_from_red_phase(spy):
     state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_red_duration": 3.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
-    ambient_receipt = state.get("rlgl_ambient_receipt", None)
-    assert ambient_receipt is not None
+    music_receipt = state.get("rlgl_music_receipt", None)
+    assert music_receipt is not None
 
     _tick(state, engine, timer, total=phase_start + 3.0)  # RED → GREEN_WARNING
 
-    assert ambient_receipt.is_stopped()
-    assert not state.has("rlgl_ambient_receipt")
+    assert music_receipt.is_stopped()
+    assert not state.has("rlgl_music_receipt")
 
 
 # ---------------------------------------------------------------------------
@@ -800,7 +809,7 @@ def test_green_warning_stops_ambient_receipt_from_red_phase(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_green_phase_starts_ambient_music_on_ambient_scope(spy):
+def test_green_phase_starts_music_on_personal_scope(spy):
     state, engine, timer = _make_state(
         spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
     )
@@ -814,13 +823,13 @@ def test_green_phase_starts_ambient_music_on_ambient_scope(spy):
 
     music_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.green_light_music"]
     assert len(music_calls) == 1
-    assert music_calls[0][0] is Scope.AMBIENT
+    assert music_calls[0][0] is Scope.PERSONAL
 
 
-def test_green_phase_stores_ambient_receipt_in_game_state(spy):
+def test_green_phase_stores_music_receipt_in_game_state(spy):
     state, _engine, _timer = _setup_green_phase(spy)
 
-    assert state.has("rlgl_ambient_receipt")
+    assert state.has("rlgl_music_receipt")
 
 
 # ---------------------------------------------------------------------------
@@ -841,27 +850,27 @@ def test_game_over_plays_game_over_sting_on_all(spy):
     assert sting_calls[0][0] is Scope.ALL
 
 
-def test_game_over_stops_ambient_receipt(spy):
+def test_game_over_stops_music_receipt(spy):
     state, engine, timer = _setup_red_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
 
-    ambient_receipt = state.get("rlgl_ambient_receipt", None)
-    assert ambient_receipt is not None
+    music_receipt = state.get("rlgl_music_receipt", None)
+    assert music_receipt is not None
 
     _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)  # → GAME_OVER
 
-    assert ambient_receipt.is_stopped()
+    assert music_receipt.is_stopped()
 
 
-def test_game_over_removes_ambient_receipt_from_game_state(spy):
+def test_game_over_removes_music_receipt_from_game_state(spy):
     state, engine, timer = _setup_red_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
     _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
 
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 2.0)  # → GAME_OVER
 
-    assert not state.has("rlgl_ambient_receipt")
+    assert not state.has("rlgl_music_receipt")
 
 
 # ---------------------------------------------------------------------------
