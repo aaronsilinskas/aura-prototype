@@ -1330,39 +1330,39 @@ def test_win_stops_music_receipt_from_green_phase(spy):
     assert not state.has("rlgl_music_receipt")
 
 
-def test_win_transitions_to_ready_after_win_duration(spy):
-    """PHASE_WIN → PHASE_READY after rlgl_win_duration."""
-    state, engine, timer = _setup_win_phase(spy, initial_data={"rlgl_win_duration": 4.0})
+def test_win_stores_win_sting_receipt_in_game_state(spy):
+    """_enter_win stores the win-sting receipt under rlgl_win_sting_receipt."""
+    state, _engine, _timer = _setup_win_phase(spy)
+
+    assert state.has("rlgl_win_sting_receipt")
+
+
+def test_win_advances_to_ready_when_win_sting_receipt_is_stopped(spy):
+    """PHASE_WIN → PHASE_READY on the tick after the win-sting receipt is stopped."""
+    state, engine, timer = _setup_win_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
+    win_sting_receipt = state.get("rlgl_win_sting_receipt", None)
+    assert win_sting_receipt is not None
 
-    _tick(state, engine, timer, total=phase_start + 4.0)
+    win_sting_receipt.stop()
 
+    _tick(state, engine, timer, total=phase_start + 1.0)
     assert state.get("rlgl_phase", None) == PHASE_READY
 
 
-def test_win_does_not_transition_before_win_duration(spy):
-    """PHASE_WIN waits the full rlgl_win_duration before returning to READY."""
-    state, engine, timer = _setup_win_phase(spy, initial_data={"rlgl_win_duration": 4.0})
-    phase_start = state.get("rlgl_phase_start", 0.0)
-
-    _tick(state, engine, timer, total=phase_start + 3.9)
-
-    assert state.get("rlgl_phase", None) == PHASE_WIN
-
-
-def test_win_default_duration_is_eight_seconds(spy):
-    """rlgl_win_duration defaults to 8.0s."""
+def test_win_does_not_advance_while_win_sting_is_running(spy):
+    """PHASE_WIN stays in WIN as long as the win-sting receipt has not stopped."""
     state, engine, timer = _setup_win_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
 
-    _tick(state, engine, timer, total=phase_start + 8.0)
-
-    assert state.get("rlgl_phase", None) == PHASE_READY
+    for t in [1.0, 5.0, 10.0, 50.0]:
+        _tick(state, engine, timer, total=phase_start + t)
+        assert state.get("rlgl_phase", None) == PHASE_WIN
 
 
 def test_motion_is_ignored_during_win(spy):
     """Motion events during PHASE_WIN do not trigger game over."""
-    state, engine, timer = _setup_win_phase(spy, initial_data={"rlgl_win_duration": 5.0})
+    state, engine, timer = _setup_win_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
 
     _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 0.5)
@@ -1371,12 +1371,15 @@ def test_motion_is_ignored_during_win(spy):
 
 
 def test_win_expiry_restores_ready_effect_on_all_scopes(spy):
-    """After win expires, the ready effect is set on Scope.ALL."""
-    state, engine, timer = _setup_win_phase(spy, initial_data={"rlgl_win_duration": 2.0})
+    """After win-sting receipt stops, the ready effect is set on Scope.ALL."""
+    state, engine, timer = _setup_win_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
+    win_sting_receipt = state.get("rlgl_win_sting_receipt", None)
+    assert win_sting_receipt is not None
+    win_sting_receipt.stop()
     spy.set_effect_calls.clear()
 
-    _tick(state, engine, timer, total=phase_start + 2.0)
+    _tick(state, engine, timer, total=phase_start + 1.0)
 
     ready_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.ready"]
     assert len(ready_calls) == 1

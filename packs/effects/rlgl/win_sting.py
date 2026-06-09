@@ -24,7 +24,11 @@ class _Builder(EffectBuilder):
         return Effect(
             name=name,
             audio=EffectAudio(
-                clips={"start": AudioPlaybackConfig(name="win_sting_start", loop=False)}
+                clips={
+                    "start": AudioPlaybackConfig(
+                        name="win_sting_start", loop=False, stops_effect=True
+                    )
+                }
             ),
             vibration=_WIN_STING_VIBRATION,
         )
