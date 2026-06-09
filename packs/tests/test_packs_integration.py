@@ -54,6 +54,7 @@ def test_rlgl_pack_exposes_valid_effect_builders() -> None:
         "warning_sting",
         "game_over_sting",
         "win_sting",
+        "level_up",
     ):
         builder = registry.get("rlgl", effect_name, EffectBuilder)
         assert isinstance(builder, EffectBuilder)
