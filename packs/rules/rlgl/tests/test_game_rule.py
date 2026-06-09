@@ -1,4 +1,4 @@
-"""Tests for RlglGameRule behaviour — six-phase state machine."""
+"""Tests for RlglGameRule behaviour — eight-phase state machine."""
 
 from __future__ import annotations
 
@@ -12,9 +12,11 @@ from packs.rules.rlgl.game_rule import (
     PHASE_GAME_OVER,
     PHASE_GREEN,
     PHASE_GREEN_WARNING,
+    PHASE_LEVEL_UP,
     PHASE_READY,
     PHASE_RED,
     PHASE_RED_WARNING,
+    PHASE_WIN,
     RULE,
     RlglGameRule,
 )
@@ -606,13 +608,14 @@ def test_green_none_acceleration_does_not_trigger_game_over(spy):
     assert state.get("rlgl_phase", None) == PHASE_GREEN
 
 
-def test_green_timer_expiry_transitions_to_red_warning(spy):
+def test_green_timer_expiry_transitions_to_level_up_when_level_below_max(spy):
+    """Green timer expiry at level 1 (below default max of 10) enters PHASE_LEVEL_UP."""
     state, engine, timer = _setup_green_phase(spy, initial_data={"rlgl_green_duration": 3.0})
     phase_start = state.get("rlgl_phase_start", 0.0)
 
     _tick(state, engine, timer, total=phase_start + 3.0)
 
-    assert state.get("rlgl_phase", None) == PHASE_RED_WARNING
+    assert state.get("rlgl_phase", None) == PHASE_LEVEL_UP
 
 
 def test_green_timer_expiry_takes_priority_over_motion(spy):
@@ -621,7 +624,8 @@ def test_green_timer_expiry_takes_priority_over_motion(spy):
 
     _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 3.0)
 
-    assert state.get("rlgl_phase", None) == PHASE_RED_WARNING
+    # Green expiry at level 1 (< max) goes to LEVEL_UP, not directly to RED_WARNING
+    assert state.get("rlgl_phase", None) == PHASE_LEVEL_UP
 
 
 # ---------------------------------------------------------------------------
@@ -1011,3 +1015,358 @@ def test_enter_ready_deletes_level_receipt_from_state(spy):
     assert state.get("rlgl_phase", None) == PHASE_READY
 
     assert not state.has("rlgl_level_receipt")
+
+
+def _setup_level_up_phase(
+    spy: SpyEffectControls,
+    initial_data: dict | None = None,
+) -> tuple[GameState, GameEngine, _StubTimer]:
+    """Advance to PHASE_LEVEL_UP.
+
+    Uses zero-duration phases so transitions are immediate.  max_level defaults to
+    10 so level < max_level at level 1, meaning green timer expiry enters LEVEL_UP.
+    """
+    data: dict = {
+        "rlgl_warning_duration": 0.0,
+        "rlgl_red_duration": 0.0,
+        "rlgl_green_duration": 0.0,
+        "rlgl_motion_smoothing": 1.0,
+        "rlgl_gravity_beta": 0.0,
+    }
+    if initial_data:
+        data.update(initial_data)
+    state, engine, timer = _make_state(spy, initial_data=data)
+    _tick(state, engine, timer, total=0.0)  # init → READY
+    _tick(state, engine, timer, button_a=True, total=0.0)  # READY → RED_WARNING (_start_game)
+    _tick(state, engine, timer, total=0.0)  # RED_WARNING → RED
+    _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
+    _tick(state, engine, timer, total=0.0)  # GREEN_WARNING → GREEN
+    _tick(state, engine, timer, total=0.0)  # GREEN → LEVEL_UP (green_duration=0, level<max)
+    assert state.get("rlgl_phase", None) == PHASE_LEVEL_UP
+    return state, engine, timer
+
+
+def _setup_win_phase(
+    spy: SpyEffectControls,
+    initial_data: dict | None = None,
+) -> tuple[GameState, GameEngine, _StubTimer]:
+    """Advance to PHASE_WIN by starting at max_level=1 so the first green expiry wins."""
+    data: dict = {
+        "rlgl_warning_duration": 0.0,
+        "rlgl_red_duration": 0.0,
+        "rlgl_green_duration": 0.0,
+        "rlgl_max_level": 1,
+        "rlgl_motion_smoothing": 1.0,
+        "rlgl_gravity_beta": 0.0,
+    }
+    if initial_data:
+        data.update(initial_data)
+    state, engine, timer = _make_state(spy, initial_data=data)
+    _tick(state, engine, timer, total=0.0)  # init → READY
+    _tick(state, engine, timer, button_a=True, total=0.0)  # READY → RED_WARNING (_start_game)
+    _tick(state, engine, timer, total=0.0)  # RED_WARNING → RED
+    _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
+    _tick(state, engine, timer, total=0.0)  # GREEN_WARNING → GREEN
+    _tick(state, engine, timer, total=0.0)  # GREEN → WIN (green_duration=0, level==max)
+    assert state.get("rlgl_phase", None) == PHASE_WIN
+    return state, engine, timer
+
+
+# ---------------------------------------------------------------------------
+# PHASE_LEVEL_UP — green timer expiry when level < max_level
+# ---------------------------------------------------------------------------
+
+
+def test_green_timer_expiry_at_level_below_max_enters_level_up(spy):
+    """Green timer expiry when level < max_level transitions to PHASE_LEVEL_UP."""
+    state, engine, timer = _setup_green_phase(
+        spy, initial_data={"rlgl_green_duration": 3.0, "rlgl_max_level": 10}
+    )
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, total=phase_start + 3.0)
+
+    assert state.get("rlgl_phase", None) == PHASE_LEVEL_UP
+
+
+def test_level_up_increments_rlgl_level(spy):
+    """Entering PHASE_LEVEL_UP increments rlgl_level by 1."""
+    state, _engine, _timer = _setup_level_up_phase(spy)
+
+    assert state.get("rlgl_level", None) == 2
+
+
+def test_level_up_updates_ambient_progress_bar(spy):
+    """PHASE_LEVEL_UP sets basic.progress on Scope.AMBIENT with new_level / max_level."""
+    state, engine, timer = _make_state(
+        spy,
+        initial_data={
+            "rlgl_warning_duration": 0.0,
+            "rlgl_red_duration": 0.0,
+            "rlgl_green_duration": 0.0,
+            "rlgl_max_level": 10,
+        },
+    )
+    _tick(state, engine, timer, total=0.0)
+    _tick(state, engine, timer, button_a=True, total=0.0)  # _start_game → level=1
+    _tick(state, engine, timer, total=0.0)  # RED_WARNING → RED
+    _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
+    _tick(state, engine, timer, total=0.0)  # GREEN_WARNING → GREEN
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, total=0.0)  # GREEN → LEVEL_UP
+
+    progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
+    assert len(progress_calls) == 1
+    assert progress_calls[0][0] is Scope.AMBIENT
+    assert progress_calls[0][2]["progress"] == pytest.approx(2 / 10)
+
+
+def test_level_up_stores_level_receipt_in_game_state(spy):
+    """PHASE_LEVEL_UP stores a new receipt under rlgl_level_receipt."""
+    state, _engine, _timer = _setup_level_up_phase(spy)
+
+    assert state.has("rlgl_level_receipt")
+
+
+def test_level_up_plays_level_up_effect_on_non_ambient(spy):
+    """PHASE_LEVEL_UP plays rlgl.level_up on Scope.NON_AMBIENT."""
+    state, engine, timer = _setup_green_phase(
+        spy, initial_data={"rlgl_green_duration": 3.0, "rlgl_max_level": 10}
+    )
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    spy.add_effect_calls.clear()
+
+    _tick(state, engine, timer, total=phase_start + 3.0)  # GREEN → LEVEL_UP
+
+    level_up_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.level_up"]
+    assert len(level_up_calls) == 1
+    assert level_up_calls[0][0] is Scope.NON_AMBIENT
+
+
+def test_level_up_stops_music_receipt_from_green_phase(spy):
+    """_enter_level_up calls _enter_phase which stops music."""
+    state, engine, timer = _setup_green_phase(
+        spy, initial_data={"rlgl_green_duration": 3.0, "rlgl_max_level": 10}
+    )
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    music_receipt = state.get("rlgl_music_receipt", None)
+    assert music_receipt is not None
+
+    _tick(state, engine, timer, total=phase_start + 3.0)  # GREEN → LEVEL_UP
+
+    assert music_receipt.is_stopped()
+    assert not state.has("rlgl_music_receipt")
+
+
+def test_level_up_transitions_to_red_warning_after_level_up_duration(spy):
+    """PHASE_LEVEL_UP → PHASE_RED_WARNING after rlgl_level_up_duration."""
+    state, engine, timer = _setup_level_up_phase(spy, initial_data={"rlgl_level_up_duration": 2.0})
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, total=phase_start + 2.0)
+
+    assert state.get("rlgl_phase", None) == PHASE_RED_WARNING
+
+
+def test_level_up_does_not_transition_before_level_up_duration(spy):
+    """PHASE_LEVEL_UP waits the full rlgl_level_up_duration before advancing."""
+    state, engine, timer = _setup_level_up_phase(spy, initial_data={"rlgl_level_up_duration": 2.0})
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, total=phase_start + 1.9)
+
+    assert state.get("rlgl_phase", None) == PHASE_LEVEL_UP
+
+
+def test_level_up_default_duration_is_one_second(spy):
+    """rlgl_level_up_duration defaults to 1.0s."""
+    state, engine, timer = _setup_level_up_phase(spy)
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, total=phase_start + 1.0)
+
+    assert state.get("rlgl_phase", None) == PHASE_RED_WARNING
+
+
+def test_motion_is_ignored_during_level_up(spy):
+    """Motion events during PHASE_LEVEL_UP do not trigger game over."""
+    state, engine, timer = _setup_level_up_phase(spy, initial_data={"rlgl_level_up_duration": 5.0})
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 0.5)
+
+    assert state.get("rlgl_phase", None) == PHASE_LEVEL_UP
+
+
+def test_game_over_motion_during_green_does_not_increment_level(spy):
+    """Level does NOT increment when game over is triggered by motion in green."""
+    state, engine, timer = _setup_green_phase(
+        spy,
+        initial_data={
+            "rlgl_green_still_timeout": 1.0,
+            "rlgl_max_level": 10,
+        },
+    )
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, accel=_LOW_ACCEL, total=phase_start + 2.0)  # → GAME_OVER
+
+    assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
+    assert state.get("rlgl_level", None) == 1  # unchanged
+
+
+# ---------------------------------------------------------------------------
+# PHASE_WIN — green timer expiry when level == max_level
+# ---------------------------------------------------------------------------
+
+
+def test_green_timer_expiry_at_max_level_enters_win(spy):
+    """Green timer expiry when level == max_level transitions to PHASE_WIN."""
+    state, engine, timer = _setup_green_phase(
+        spy, initial_data={"rlgl_green_duration": 3.0, "rlgl_max_level": 1}
+    )
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, total=phase_start + 3.0)
+
+    assert state.get("rlgl_phase", None) == PHASE_WIN
+
+
+def test_win_plays_lightning_on_all_scopes_with_level_7(spy):
+    """PHASE_WIN sets elements.lightning with level=7 on Scope.ALL."""
+    state, engine, timer = _setup_green_phase(
+        spy, initial_data={"rlgl_green_duration": 3.0, "rlgl_max_level": 1}
+    )
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, total=phase_start + 3.0)  # GREEN → WIN
+
+    lightning_calls = [c for c in spy.set_effect_calls if c[1] == "elements.lightning"]
+    assert len(lightning_calls) == 1
+    assert lightning_calls[0][0] is Scope.ALL
+    assert lightning_calls[0][2].get("level") == 7
+
+
+def test_win_adds_win_sting_on_all_scopes(spy):
+    """PHASE_WIN adds rlgl.win_sting on Scope.ALL."""
+    state, engine, timer = _setup_green_phase(
+        spy, initial_data={"rlgl_green_duration": 3.0, "rlgl_max_level": 1}
+    )
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    spy.add_effect_calls.clear()
+
+    _tick(state, engine, timer, total=phase_start + 3.0)  # GREEN → WIN
+
+    win_calls = [c for c in spy.add_effect_calls if c[1] == "rlgl.win_sting"]
+    assert len(win_calls) == 1
+    assert win_calls[0][0] is Scope.ALL
+
+
+def test_win_stops_music_receipt_from_green_phase(spy):
+    """_enter_win calls _enter_phase which stops green music."""
+    state, engine, timer = _setup_green_phase(
+        spy, initial_data={"rlgl_green_duration": 3.0, "rlgl_max_level": 1}
+    )
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    music_receipt = state.get("rlgl_music_receipt", None)
+    assert music_receipt is not None
+
+    _tick(state, engine, timer, total=phase_start + 3.0)  # GREEN → WIN
+
+    assert music_receipt.is_stopped()
+    assert not state.has("rlgl_music_receipt")
+
+
+def test_win_transitions_to_ready_after_win_duration(spy):
+    """PHASE_WIN → PHASE_READY after rlgl_win_duration."""
+    state, engine, timer = _setup_win_phase(spy, initial_data={"rlgl_win_duration": 4.0})
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, total=phase_start + 4.0)
+
+    assert state.get("rlgl_phase", None) == PHASE_READY
+
+
+def test_win_does_not_transition_before_win_duration(spy):
+    """PHASE_WIN waits the full rlgl_win_duration before returning to READY."""
+    state, engine, timer = _setup_win_phase(spy, initial_data={"rlgl_win_duration": 4.0})
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, total=phase_start + 3.9)
+
+    assert state.get("rlgl_phase", None) == PHASE_WIN
+
+
+def test_win_default_duration_is_four_seconds(spy):
+    """rlgl_win_duration defaults to 4.0s."""
+    state, engine, timer = _setup_win_phase(spy)
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, total=phase_start + 4.0)
+
+    assert state.get("rlgl_phase", None) == PHASE_READY
+
+
+def test_motion_is_ignored_during_win(spy):
+    """Motion events during PHASE_WIN do not trigger game over."""
+    state, engine, timer = _setup_win_phase(spy, initial_data={"rlgl_win_duration": 5.0})
+    phase_start = state.get("rlgl_phase_start", 0.0)
+
+    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=phase_start + 0.5)
+
+    assert state.get("rlgl_phase", None) == PHASE_WIN
+
+
+def test_win_expiry_restores_ready_effect_on_all_scopes(spy):
+    """After win expires, the ready effect is set on Scope.ALL."""
+    state, engine, timer = _setup_win_phase(spy, initial_data={"rlgl_win_duration": 2.0})
+    phase_start = state.get("rlgl_phase_start", 0.0)
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, total=phase_start + 2.0)
+
+    ready_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.ready"]
+    assert len(ready_calls) == 1
+    assert ready_calls[0][0] is Scope.ALL
+
+
+# ---------------------------------------------------------------------------
+# Full 10-round game reaches PHASE_WIN
+# ---------------------------------------------------------------------------
+
+
+def test_full_game_at_fast_config_reaches_win_phase(spy):
+    """A complete 10-round game with zero-duration phases ends in PHASE_WIN."""
+    data: dict = {
+        "rlgl_warning_duration": 0.0,
+        "rlgl_red_duration": 0.0,
+        "rlgl_green_duration": 0.0,
+        "rlgl_green_still_timeout": 999.0,  # disable stillness game-over
+        "rlgl_level_up_duration": 0.0,
+        "rlgl_max_level": 10,
+        "rlgl_motion_smoothing": 1.0,
+        "rlgl_gravity_beta": 0.0,
+    }
+    state, engine, timer = _make_state(spy, initial_data=data)
+    _tick(state, engine, timer, total=0.0)  # init → READY
+    _tick(state, engine, timer, button_a=True, total=0.0)  # READY → RED_WARNING (level=1)
+
+    # Each of the first 9 rounds: GREEN expires → LEVEL_UP, then LEVEL_UP → RED_WARNING.
+    # Round 10: GREEN expires → WIN (level 10 == max_level 10).  The final tick stays in
+    # WIN because win_duration defaults to 4.0 s and elapsed is 0 at t=0.
+    for _ in range(9):
+        _tick(state, engine, timer, total=0.0)  # RED_WARNING → RED
+        _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
+        _tick(state, engine, timer, total=0.0)  # GREEN_WARNING → GREEN
+        _tick(state, engine, timer, total=0.0)  # GREEN → LEVEL_UP
+        _tick(state, engine, timer, total=0.0)  # LEVEL_UP → RED_WARNING
+
+    # Round 10 (level == max_level): GREEN expires → WIN
+    _tick(state, engine, timer, total=0.0)  # RED_WARNING → RED
+    _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
+    _tick(state, engine, timer, total=0.0)  # GREEN_WARNING → GREEN
+    _tick(state, engine, timer, total=0.0)  # GREEN → WIN
+
+    assert state.get("rlgl_phase", None) == PHASE_WIN

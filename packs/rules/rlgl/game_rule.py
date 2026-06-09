@@ -1,15 +1,23 @@
-"""Red Light Green Light game rule — six-phase state machine driven by
+"""Red Light Green Light game rule — eight-phase state machine driven by
 accelerometer and buttons.
 
 Phase flow::
 
     PHASE_READY → PHASE_RED_WARNING → PHASE_RED
-                                          ↓ timer       ↓ motion
+                                          ↓ timer          ↓ motion
                                    PHASE_GREEN_WARNING  PHASE_GAME_OVER
-                                          ↓ timer              ↓ timer
-                                     PHASE_GREEN          PHASE_READY
-                                          ↓ timer  ↓ motion
-                                   PHASE_RED_WARNING   PHASE_GAME_OVER
+                                          ↓ timer               ↓ timer
+                                     PHASE_GREEN           PHASE_READY
+                                       ↓ timer (level<max)  ↓ motion
+                                   PHASE_LEVEL_UP       PHASE_GAME_OVER
+                                       ↓ timer
+                                   PHASE_RED_WARNING
+
+                                     PHASE_GREEN
+                                       ↓ timer (level==max)
+                                     PHASE_WIN
+                                       ↓ timer
+                                   PHASE_READY
 
 All durations are read from ``GameState`` (seeded by ``initial_data`` at scene
 creation) so values can be tuned per scene without code changes.  All keys use
@@ -44,6 +52,8 @@ PHASE_RED_WARNING: Final = "red_warning"
 PHASE_RED: Final = "red"
 PHASE_GREEN_WARNING: Final = "green_warning"
 PHASE_GREEN: Final = "green"
+PHASE_LEVEL_UP: Final = "level_up"
+PHASE_WIN: Final = "win"
 PHASE_GAME_OVER: Final = "game_over"
 
 # ---------------------------------------------------------------------------
@@ -70,6 +80,8 @@ _KEY_MUSIC_RECEIPT: Final = "rlgl_music_receipt"
 _KEY_LEVEL: Final = "rlgl_level"
 _KEY_LEVEL_RECEIPT: Final = "rlgl_level_receipt"
 _KEY_MAX_LEVEL: Final = "rlgl_max_level"
+_KEY_LEVEL_UP_DURATION: Final = "rlgl_level_up_duration"
+_KEY_WIN_DURATION: Final = "rlgl_win_duration"
 
 # ---------------------------------------------------------------------------
 # Default durations (seconds)
@@ -83,6 +95,8 @@ _DEFAULT_GREEN_STILL_TIMEOUT: Final = 0.75
 _DEFAULT_MOTION_SMOOTHING: Final = MOTION_EMA_ALPHA
 _DEFAULT_GRAVITY_BETA: Final = GRAVITY_LOWPASS_BETA
 _DEFAULT_MAX_LEVEL: Final = 10
+_DEFAULT_LEVEL_UP_DURATION: Final = 1.0
+_DEFAULT_WIN_DURATION: Final = 4.0
 
 # ---------------------------------------------------------------------------
 # Phase entry helpers
@@ -169,6 +183,24 @@ def _enter_green(state: GameState) -> None:
     state.set(_KEY_MUSIC_RECEIPT, receipt)
 
 
+def _enter_level_up(state: GameState) -> None:
+    _enter_phase(state, PHASE_LEVEL_UP)
+    level = state.get(_KEY_LEVEL, 1) + 1
+    state.set(_KEY_LEVEL, level)
+    max_level = state.get(_KEY_MAX_LEVEL, _DEFAULT_MAX_LEVEL)
+    receipt = state.effect_controls.set_effect(
+        Scope.AMBIENT, "basic.progress", {"progress": level / max_level}
+    )
+    state.set(_KEY_LEVEL_RECEIPT, receipt)
+    state.effect_controls.add_effect(Scope.NON_AMBIENT, "rlgl.level_up", {})
+
+
+def _enter_win(state: GameState) -> None:
+    _enter_phase(state, PHASE_WIN)
+    state.effect_controls.set_effect(Scope.ALL, "elements.lightning", {"level": 7})
+    state.effect_controls.add_effect(Scope.ALL, "rlgl.win_sting", {})
+
+
 def _enter_game_over(state: GameState) -> None:
     _enter_phase(state, PHASE_GAME_OVER)
     state.effect_controls.set_effect(Scope.ALL, "elements.fire", {})
@@ -217,7 +249,7 @@ def _update_motion(state: GameState, accel: AccelerationData) -> float:
 
 
 class RlglGameRule(GameRule):
-    """Drives the Red Light Green Light six-phase state machine.
+    """Drives the Red Light Green Light eight-phase state machine.
 
     All mutable state is kept in ``GameState`` under ``rlgl_`` keys.  The rule
     itself is stateless beyond the registered event handler.
@@ -244,6 +276,10 @@ class RlglGameRule(GameRule):
             self._check_green_warning(state, phase_elapsed)
         elif phase == PHASE_GREEN:
             self._check_green(event, state, phase_elapsed)
+        elif phase == PHASE_LEVEL_UP:
+            self._check_level_up(state, phase_elapsed)
+        elif phase == PHASE_WIN:
+            self._check_win(state, phase_elapsed)
         elif phase == PHASE_GAME_OVER:
             self._check_game_over(state, phase_elapsed)
 
@@ -289,7 +325,12 @@ class RlglGameRule(GameRule):
 
         # Timer expiry is always checked before motion
         if elapsed >= green_duration:
-            _enter_red_warning(state)
+            level = state.get(_KEY_LEVEL, 1)
+            max_level = state.get(_KEY_MAX_LEVEL, _DEFAULT_MAX_LEVEL)
+            if level < max_level:
+                _enter_level_up(state)
+            else:
+                _enter_win(state)
             return
 
         if event.acceleration is not None:
@@ -301,6 +342,16 @@ class RlglGameRule(GameRule):
                 last_motion = state.get(_KEY_LAST_MOTION_TIME, state.total)
                 if state.total - last_motion >= still_timeout:
                     _enter_game_over(state)
+
+    def _check_level_up(self, state: GameState, elapsed: float) -> None:
+        duration = state.get(_KEY_LEVEL_UP_DURATION, _DEFAULT_LEVEL_UP_DURATION)
+        if elapsed >= duration:
+            _enter_red_warning(state)
+
+    def _check_win(self, state: GameState, elapsed: float) -> None:
+        duration = state.get(_KEY_WIN_DURATION, _DEFAULT_WIN_DURATION)
+        if elapsed >= duration:
+            _enter_ready(state)
 
     def _check_game_over(self, state: GameState, elapsed: float) -> None:
         duration = state.get(_KEY_GAME_OVER_DURATION, _DEFAULT_GAME_OVER_DURATION)
