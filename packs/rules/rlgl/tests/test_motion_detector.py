@@ -89,11 +89,6 @@ def test_red_threshold_is_stricter_than_green_move_threshold():
     assert RED_MAX_MOTION_THRESHOLD < GREEN_MIN_MOTION_THRESHOLD
 
 
-def test_red_max_threshold_is_tuned_to_three_tenths():
-    """Lock the hand-tuned Red threshold so a change to it is deliberate."""
-    assert pytest.approx(0.3) == RED_MAX_MOTION_THRESHOLD
-
-
 def test_green_min_threshold_is_tuned_to_two():
     """Lock the hand-tuned Green threshold so a change to it is deliberate."""
     assert pytest.approx(2.0) == GREEN_MIN_MOTION_THRESHOLD

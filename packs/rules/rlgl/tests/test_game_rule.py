@@ -1350,12 +1350,12 @@ def test_win_does_not_transition_before_win_duration(spy):
     assert state.get("rlgl_phase", None) == PHASE_WIN
 
 
-def test_win_default_duration_is_four_seconds(spy):
-    """rlgl_win_duration defaults to 4.0s."""
+def test_win_default_duration_is_eight_seconds(spy):
+    """rlgl_win_duration defaults to 8.0s."""
     state, engine, timer = _setup_win_phase(spy)
     phase_start = state.get("rlgl_phase_start", 0.0)
 
-    _tick(state, engine, timer, total=phase_start + 4.0)
+    _tick(state, engine, timer, total=phase_start + 8.0)
 
     assert state.get("rlgl_phase", None) == PHASE_READY
 

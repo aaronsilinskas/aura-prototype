@@ -103,7 +103,7 @@ _DEFAULT_MOTION_SMOOTHING: Final = MOTION_EMA_ALPHA
 _DEFAULT_GRAVITY_BETA: Final = GRAVITY_LOWPASS_BETA
 _DEFAULT_MAX_LEVEL: Final = 10
 _DEFAULT_LEVEL_UP_DURATION: Final = 1.0
-_DEFAULT_WIN_DURATION: Final = 4.0
+_DEFAULT_WIN_DURATION: Final = 8.0
 
 # Level-1 warning pulse sub-duration ratios (brighten / on / darken = 0.3 / 0.4 / 0.3)
 _WARNING_BRIGHTEN_RATIO: Final = 0.3
