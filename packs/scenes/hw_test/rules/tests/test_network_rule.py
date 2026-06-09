@@ -29,7 +29,9 @@ def _make_state(spy: SpyEffectControls, hw_mode: int) -> tuple[GameState, GameEn
 
 
 def _fire_ir(state: GameState, engine: GameEngine) -> None:
-    state.queue_event(NetworkEvents.IRReceived(b"test"))
+    state.queue_event(
+        NetworkEvents.IRReceived(b"test", signal_strength=0.9, error_margin=10, best_receiver=None)
+    )
     engine.update(state)
 
 

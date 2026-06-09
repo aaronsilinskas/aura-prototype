@@ -130,8 +130,8 @@ class NetworkControls:
 
     __slots__ = ()
 
-    def send_ir(self, data: bytes) -> None:
-        """Transmit an IR packet."""
+    def send_ir(self, data: bytes, emitter: str) -> None:
+        """Transmit an IR packet on the named emitter."""
         raise NotImplementedError
 
     def send_radio(self, data: bytes) -> None:
