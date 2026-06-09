@@ -1,7 +1,7 @@
 """Hardware-agnostic audio voice-slot bookkeeping.
 
 ``VoicePool`` owns every voice-slot decision — slot occupancy, claim ordering,
-the eviction policy, the audio-only receipt-stop rule, and loudness tracking —
+the eviction policy, the stops-receipt release rule, and loudness tracking —
 without ever touching audio hardware.  All hardware lives behind the
 ``VoiceSink`` port, so the pool runs unchanged on CPython, CircuitPython, and
 MicroPython and is testable with a plain recording fake.
@@ -51,12 +51,12 @@ class _Slot:
     lists.
     """
 
-    __slots__ = ("audio_only", "claim_seq", "is_loop", "loudness", "receipt")
+    __slots__ = ("claim_seq", "is_loop", "loudness", "receipt", "stops_receipt")
 
     def __init__(self) -> None:
         self.receipt = None
         self.is_loop = False
-        self.audio_only = False
+        self.stops_receipt = False
         self.loudness = 1.0
         self.claim_seq = 0
 
@@ -64,7 +64,7 @@ class _Slot:
         """Clear the slot back to idle (``receipt is None``)."""
         self.receipt = None
         self.is_loop = False
-        self.audio_only = False
+        self.stops_receipt = False
         self.loudness = 1.0
         self.claim_seq = 0
 
@@ -125,16 +125,16 @@ class VoicePool:
         sink: VoiceSink,
         path: str,
         loop: bool,
-        audio_only: bool,
+        stops_receipt: bool,
         receipt: EffectReceipt,
     ) -> int:
         """Play ``path`` on a claimed slot; return the slot, or ``-1`` if dropped.
 
         Selects the slot first (pure), then loads via ``sink.open_source``.  A
         slot pick of ``-1`` or a failed load evicts nothing — teardown is
-        deferred until after a successful load.  When the evicted slot held an
-        audio-only effect, its receipt is stopped (audio ending is the effect
-        ending); non-audio-only receipts are left to rules.
+        deferred until after a successful load.  When the evicted slot has
+        ``stops_receipt`` set, its receipt is stopped on eviction; otherwise
+        receipt lifecycle stays with rules.
         """
         slot = self._select_slot(loop)
         if slot == -1:
@@ -143,13 +143,13 @@ class VoicePool:
         if source is None:
             return -1
         s = self._slots[slot]
-        if s.receipt is not None and s.audio_only:
+        if s.receipt is not None and s.stops_receipt:
             s.receipt.stop()
         sink.stop(slot)
         self._claim_counter += 1
         s.receipt = receipt
         s.is_loop = loop
-        s.audio_only = audio_only
+        s.stops_receipt = stops_receipt
         s.loudness = receipt.loudness
         s.claim_seq = self._claim_counter
         sink.play(slot, source, loop)
@@ -160,20 +160,20 @@ class VoicePool:
         """Reconcile every slot once per tick.
 
         For each occupied slot: free a naturally-finished one-shot (stopping the
-        receipt when audio-only), free an externally-stopped receipt (without
-        stopping it again — rules already did), or reapply a changed loudness.
-        ``range``-indexed to avoid per-tick tuple allocation.
+        receipt when ``stops_receipt`` is set), free an externally-stopped
+        receipt (without stopping it again — rules already did), or reapply a
+        changed loudness.  ``range``-indexed to avoid per-tick tuple allocation.
         """
         for i in range(self._num_voices):
             s = self._slots[i]
             if s.receipt is None:
                 continue
             if not s.is_loop and not sink.is_playing(i):
-                audio_only = s.audio_only
+                stops = s.stops_receipt
                 receipt = s.receipt
                 sink.stop(i)
                 s.reset()
-                if audio_only:
+                if stops:
                     receipt.stop()
                 continue
             if s.receipt.is_stopped():
