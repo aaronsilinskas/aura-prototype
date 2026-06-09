@@ -7,7 +7,7 @@ import pytest
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.state import GameState, SceneControls, Scope
-from packs.rules.hw_test.tests.helpers import SpyEffectControls
+from engine.tests.helpers import SpyEffectControls
 from packs.rules.rlgl.game_rule import (
     PHASE_GAME_OVER,
     PHASE_GREEN,
