@@ -121,6 +121,12 @@ class PackRegistry:
 
             pack_name = entry
 
+            if pack_name == "scene":
+                raise ValueError(
+                    "'scene' is a reserved system-wide name and cannot be used as a pack name"
+                    " (found at '" + pack_dir + "')"
+                )
+
             if pack_name in self._packs:
                 existing = self._packs[pack_name]
                 if existing.source_path != norm_path:

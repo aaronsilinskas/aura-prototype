@@ -1,6 +1,7 @@
 from effects.effect import Effect, EffectConfig, PixelBuffer
 from engine.events import EffectEvent
 from engine.packs import PackRegistry
+from engine.scene import SceneLocalRegistry
 from engine.state import EffectControls, EffectReceipt, ScopeValue
 from engine.timer import Timer
 
@@ -140,6 +141,7 @@ class EffectManager(EffectControls):
         "_effects",
         "_frame_bufs",
         "_frame_receipts",
+        "_local_effects",
         "_next_id",
         "_output_key_sets",
         "_outputs",
@@ -149,6 +151,7 @@ class EffectManager(EffectControls):
     def __init__(self, registry: PackRegistry, outputs: list[EffectOutput]) -> None:
         self._registry: PackRegistry = registry
         self._outputs: list[EffectOutput] = outputs
+        self._local_effects: SceneLocalRegistry | None = None
         self._effects: list[EffectManager._EffectEntry] = []
         self._next_id: int = 1
         self._output_key_sets: list[frozenset[str]] = [
@@ -194,23 +197,49 @@ class EffectManager(EffectControls):
         if "." not in name:
             raise ValueError(f"Effect name '{name}' missing pack prefix (expected 'pack.effect')")
         pack_name, effect_name = name.split(".", 1)
-        try:
-            builder = self._registry.get(pack_name, effect_name, EffectBuilder)
-        except ValueError as exc:
-            msg = str(exc)
-            if msg.startswith("Unknown pack '"):
-                raise ValueError(f"Unknown effect pack '{pack_name}'") from exc
-            if msg.startswith("Unknown item '"):
-                raise ValueError(f"Unknown effect '{effect_name}' in pack '{pack_name}'") from exc
-            if "is not an instance of" in msg:
+
+        if pack_name == "scene":
+            # Route to active scene's local effect registry.
+            if self._local_effects is None:
                 raise ValueError(
-                    f"Effect '{effect_name}' in pack '{pack_name}' has an invalid BUILD attribute"
-                ) from exc
-            if msg.startswith("Pack '"):
-                raise ValueError(
-                    f"Effect pack '{pack_name}' item '{effect_name}' is missing a BUILD attribute"
-                ) from exc
-            raise
+                    "Effect name '"
+                    + name
+                    + "' uses the reserved 'scene.' prefix but no scene is active"
+                )
+            try:
+                builder = self._local_effects.get(effect_name, EffectBuilder)
+            except ValueError as exc:
+                msg = str(exc)
+                if msg.startswith("Unknown item '"):
+                    raise ValueError(
+                        "Unknown scene-local effect '"
+                        + effect_name
+                        + "'. Available: "
+                        + ", ".join(self._local_effects.items())
+                    ) from exc
+                raise
+        else:
+            try:
+                builder = self._registry.get(pack_name, effect_name, EffectBuilder)
+            except ValueError as exc:
+                msg = str(exc)
+                if msg.startswith("Unknown pack '"):
+                    raise ValueError(f"Unknown effect pack '{pack_name}'") from exc
+                if msg.startswith("Unknown item '"):
+                    raise ValueError(
+                        f"Unknown effect '{effect_name}' in pack '{pack_name}'"
+                    ) from exc
+                if "is not an instance of" in msg:
+                    raise ValueError(
+                        f"Effect '{effect_name}' in pack '{pack_name}'"
+                        " has an invalid BUILD attribute"
+                    ) from exc
+                if msg.startswith("Pack '"):
+                    raise ValueError(
+                        f"Effect pack '{pack_name}' item '{effect_name}'"
+                        " is missing a BUILD attribute"
+                    ) from exc
+                raise
 
         receipt = EffectReceipt(self._next_id)
         self._next_id += 1
@@ -324,6 +353,17 @@ class EffectManager(EffectControls):
                 new_effects.append(entry)
         self._stop_entries(stopped, new_effects)
         self._effects = new_effects
+
+    def set_local_effects(self, local_registry: SceneLocalRegistry | None) -> None:
+        """Store the active scene's local effect registry.
+
+        Called by ``SceneManager`` at each scene transition so that
+        ``scene.<effect>`` names resolve against the top-of-stack scene's
+        local effects.  Pass ``None`` when the stack empties.
+
+        Reserved for ``SceneManager`` — rules must not call this method.
+        """
+        self._local_effects = local_registry
 
     def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
         """Replace any running effect(s) in scope and start this one."""

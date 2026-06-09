@@ -108,12 +108,17 @@ class Scene:
     scene-local rules.  It is built once at discovery and shared across fresh
     ``Scene`` instances; mutable import-cache state lives on the registry, not
     on the ``Scene`` itself.
+
+    ``local_effect_registry`` is the ``SceneLocalRegistry`` for this scene's
+    scene-local effects (items expose a ``BUILD`` ``EffectBuilder``).  Built
+    once at discovery and shared across fresh ``Scene`` instances.
     """
 
     __slots__ = (
         "__weakref__",
         "effect_packs",
         "initial_data",
+        "local_effect_registry",
         "local_rule_registry",
         "rule_packs",
         "version",
@@ -126,6 +131,7 @@ class Scene:
         initial_data: dict[str, object] | None = None,
         version: Version | None = None,
         local_rule_registry: SceneLocalRegistry | None = None,
+        local_effect_registry: SceneLocalRegistry | None = None,
     ) -> None:
         self.effect_packs = effect_packs
         self.rule_packs = rule_packs
@@ -136,6 +142,11 @@ class Scene:
             if local_rule_registry is not None
             else SceneLocalRegistry(item_attr="RULE")
         )
+        self.local_effect_registry = (
+            local_effect_registry
+            if local_effect_registry is not None
+            else SceneLocalRegistry(item_attr="BUILD")
+        )
 
 
 class _SceneEntry:
@@ -144,6 +155,7 @@ class _SceneEntry:
     __slots__ = (
         "effect_packs",
         "initial_data",
+        "local_effect_registry",
         "local_rule_registry",
         "rule_packs",
         "source_path",
@@ -158,6 +170,7 @@ class _SceneEntry:
         initial_data: dict | None,
         source_path: str,
         local_rule_registry: SceneLocalRegistry,
+        local_effect_registry: SceneLocalRegistry,
     ) -> None:
         self.version = version
         self.effect_packs = effect_packs
@@ -165,6 +178,7 @@ class _SceneEntry:
         self.initial_data = initial_data
         self.source_path = source_path
         self.local_rule_registry = local_rule_registry
+        self.local_effect_registry = local_effect_registry
 
 
 class SceneRegistry:
@@ -282,6 +296,9 @@ class SceneRegistry:
             local_rule_registry = self._build_local_rule_registry(
                 scene_dir, scene_name, module_prefix
             )
+            local_effect_registry = self._build_local_effect_registry(
+                scene_dir, scene_name, module_prefix
+            )
 
             self._scenes[scene_name] = _SceneEntry(
                 version=version,
@@ -290,6 +307,7 @@ class SceneRegistry:
                 initial_data=initial_data,
                 source_path=norm_path,
                 local_rule_registry=local_rule_registry,
+                local_effect_registry=local_effect_registry,
             )
 
     def _build_local_rule_registry(
@@ -319,6 +337,34 @@ class SceneRegistry:
         registry._register_items(item_names, local_prefix)
         return registry
 
+    def _build_local_effect_registry(
+        self, scene_dir: str, scene_name: str, module_prefix: str
+    ) -> SceneLocalRegistry:
+        """Scan *scene_dir*/effects/ and return a ``SceneLocalRegistry`` for it.
+
+        Items expose a ``BUILD`` ``EffectBuilder`` attribute.  Returns an empty
+        registry when no ``effects/`` subdirectory exists.  Excludes
+        ``__init__.py`` and any subdirectories (e.g. ``tests/``).
+        """
+        registry = SceneLocalRegistry(item_attr="BUILD")
+        effects_dir = _path.join(scene_dir, "effects")
+        if not _path.isdir(effects_dir):
+            return registry
+
+        item_names: set[str] = set()
+        for fname in os.listdir(effects_dir):
+            if fname == "__init__.py":
+                continue
+            full = _path.join(effects_dir, fname)
+            if _path.isdir(full):
+                continue
+            if fname.endswith(".py"):
+                item_names.add(fname[:-3])
+
+        local_prefix = module_prefix + "." + scene_name + ".effects"
+        registry._register_items(item_names, local_prefix)
+        return registry
+
     def get(self, name: str) -> Scene:
         """Return a fresh ``Scene`` for *name*.
 
@@ -345,6 +391,7 @@ class SceneRegistry:
             initial_data=initial_data,
             version=entry.version,
             local_rule_registry=entry.local_rule_registry,
+            local_effect_registry=entry.local_effect_registry,
         )
 
     def names(self) -> list[str]:
@@ -504,6 +551,7 @@ class SceneManager(SceneControls):
         state = self._engine.create_state(self, scene.initial_data)
         self._engine.set_rules(combined_rules)
         self._stack.append((scene, state, combined_rules))
+        state.effect_controls.set_local_effects(scene.local_effect_registry)
 
     def _do_overlay(self, scene: Scene) -> None:
         """Execute an overlay transition: stop and suspend top, push new scene."""
@@ -518,6 +566,7 @@ class SceneManager(SceneControls):
         state = self._engine.create_state(self, scene.initial_data)
         self._engine.set_rules(combined_rules)
         self._stack.append((scene, state, combined_rules))
+        state.effect_controls.set_local_effects(scene.local_effect_registry)
 
     def _do_pop(self) -> None:
         """Execute a pop transition: stop and unload top, restore scene below."""
@@ -528,6 +577,7 @@ class SceneManager(SceneControls):
         self._stack.pop()
 
         # Restore the now-active entry
-        _, st, combined_rules = self._stack[-1]
+        revealed_scene, st, combined_rules = self._stack[-1]
         self._engine.set_rules(combined_rules)
         st.clear_queue()  # defensive clear on restored state
+        st.effect_controls.set_local_effects(revealed_scene.local_effect_registry)
