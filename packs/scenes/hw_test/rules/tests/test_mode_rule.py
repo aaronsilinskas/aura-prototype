@@ -6,9 +6,9 @@ import pytest
 
 from engine.engine import GameEngine, GameRule
 from engine.input import ButtonData, InputEvents
-from engine.network import NetworkEvents
+from engine.network import LINE, NetworkEvents
 from engine.state import EffectReceipt, GameState, SceneControls, Scope
-from engine.tests.helpers import SpyEffectControls
+from engine.tests.helpers import SpyEffectControls, SpyNetworkControls
 from packs.scenes.hw_test.rules.mode_rule import (
     FLASH_DURATION,
     HW_TEST_PAYLOAD,
@@ -47,8 +47,9 @@ def _make_state_with_rule(
     spy: SpyEffectControls,
     initial_data: dict,
     timer: _StubTimer | None = None,
+    network_spy: SpyNetworkControls | None = None,
 ) -> tuple[GameState, GameEngine, HwTestModeRule]:
-    engine = GameEngine(spy, timer=timer)
+    engine = GameEngine(spy, timer=timer, network_controls=network_spy)
     rule = HwTestModeRule()
     engine.add_rules(rule)
     state = engine.create_state(SceneControls(), initial_data=dict(initial_data))
@@ -277,8 +278,39 @@ def test_button_a_in_accelerometer_mode_is_noop(spy):
     assert spy.stop_effect_calls == []
 
 
-def test_button_a_in_ir_mode_queues_ir_received_event(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2})
+def test_button_a_in_ir_mode_calls_send_ir_with_hw_test_payload_on_line_emitter(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2}, network_spy=network_spy)
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+    network_spy.send_ir_calls.clear()
+
+    _press_button(state, "A")
+    engine.update(state)
+
+    assert len(network_spy.send_ir_calls) == 1
+    assert network_spy.send_ir_calls[0] == (HW_TEST_PAYLOAD, LINE)
+
+
+def test_button_a_in_ir_mode_fires_scene_sfx_test_on_personal_as_sent_cue(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2}, network_spy=network_spy)
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+    spy.set_effect_calls.clear()
+
+    _press_button(state, "A")
+    engine.update(state)
+
+    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "scene.sfx_test"]
+    assert len(sfx_calls) == 1
+    assert sfx_calls[0][0] == Scope.PERSONAL
+    assert sfx_calls[0][2] == {}
+
+
+def test_button_a_in_ir_mode_does_not_queue_fake_ir_received_event(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2}, network_spy=network_spy)
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -294,8 +326,7 @@ def test_button_a_in_ir_mode_queues_ir_received_event(spy):
     engine.update(state)
 
     ir_events = [e for e in captured_events if isinstance(e, NetworkEvents.IRReceived)]
-    assert len(ir_events) == 1
-    assert ir_events[0].data == HW_TEST_PAYLOAD
+    assert ir_events == []
 
 
 def test_button_a_in_radio_mode_queues_radio_received_event(spy):
@@ -443,19 +474,6 @@ def test_button_a_in_rgb_mode_does_not_fire_sfx_test(spy):
 
 def test_button_a_in_accelerometer_mode_does_not_fire_sfx_test(spy):
     state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 1})
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-    spy.set_effect_calls.clear()
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    sfx_calls = [c for c in spy.set_effect_calls if "sfx_test" in c[1]]
-    assert sfx_calls == []
-
-
-def test_button_a_in_ir_mode_does_not_fire_sfx_test(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
