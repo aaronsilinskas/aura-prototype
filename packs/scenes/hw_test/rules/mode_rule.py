@@ -7,7 +7,7 @@ except ImportError:
 
 from engine.engine import GameRule
 from engine.input import InputEvents
-from engine.network import NetworkEvents
+from engine.network import LINE, NetworkEvents
 from engine.state import EffectReceipt, GameState, Scope
 
 HW_TEST_PAYLOAD: Final = b"hw_test"
@@ -99,14 +99,8 @@ class HwTestModeRule(GameRule):
         elif mode == 1:
             pass  # accelerometer mode: no-op
         elif mode == 2:
-            state.queue_event(
-                NetworkEvents.IRReceived(
-                    HW_TEST_PAYLOAD,
-                    signal_strength=1.0,
-                    error_margin=0,
-                    best_receiver=None,
-                )
-            )
+            state.network_controls.send_ir(HW_TEST_PAYLOAD, LINE)
+            state.effect_controls.set_effect(Scope.PERSONAL, "scene.sfx_test", {})
         elif mode == 3:
             state.queue_event(NetworkEvents.RadioReceived(HW_TEST_PAYLOAD, "local"))
         elif mode == 4:

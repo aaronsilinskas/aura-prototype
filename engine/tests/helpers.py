@@ -1,8 +1,22 @@
 from __future__ import annotations
 
-from engine.state import EffectControls, EffectReceipt, ScopeValue
+from engine.state import EffectControls, EffectReceipt, NetworkControls, ScopeValue
 
 _STUB_RECEIPT_ID = 0
+
+
+class SpyNetworkControls(NetworkControls):
+    """Test spy that records send_ir and send_radio calls."""
+
+    def __init__(self) -> None:
+        self.send_ir_calls: list[tuple[bytes, str]] = []
+        self.send_radio_calls: list[bytes] = []
+
+    def send_ir(self, data: bytes, emitter: str) -> None:
+        self.send_ir_calls.append((data, emitter))
+
+    def send_radio(self, data: bytes) -> None:
+        self.send_radio_calls.append(data)
 
 
 class SpyEffectControls(EffectControls):
