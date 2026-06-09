@@ -18,8 +18,8 @@ def _build() -> Effect:
 # --- Pixel output ---
 
 
-def test_level_up_flash_is_black_before_it_starts() -> None:
-    # At elapsed 0.0 the flash has not started — all LEDs are dark
+def test_level_up_flash_starts_dark_at_elapsed_zero() -> None:
+    # At elapsed 0.0 the brighten ramp has not advanced — all LEDs are dark
     effect = _build()
     effect.pixels.update(0.0)
     buf = PixelBuffer(8)
@@ -47,6 +47,27 @@ def test_level_up_flash_is_uniform_across_all_led_positions() -> None:
 
     first = buf[0]
     assert all(p == first for p in buf)
+
+
+def test_level_up_flash_dims_during_darken_phase() -> None:
+    # Mid-darken (t=0.75): frac = 1.0 - (0.75-0.6)/0.3 = 0.5 — pixels are
+    # partially lit: not black and not at peak gold
+    effect = _build()
+    effect.pixels.update(0.75)
+    buf = PixelBuffer(8)
+    effect.pixels.render(buf)
+
+    assert all(p != 0x000000 and p != 0xFFD700 for p in buf)
+
+
+def test_level_up_flash_is_dark_during_off_phase() -> None:
+    # At t=0.95 (off phase, after darken ends at 0.9) the strip is dark again
+    effect = _build()
+    effect.pixels.update(0.95)
+    buf = PixelBuffer(8)
+    effect.pixels.render(buf)
+
+    assert all(p == 0x000000 for p in buf)
 
 
 # --- Audio ---
