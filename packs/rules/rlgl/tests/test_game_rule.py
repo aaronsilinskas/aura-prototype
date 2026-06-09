@@ -876,3 +876,138 @@ def test_first_game_start_enters_ready_without_prior_music_receipt(spy):
 
     assert state.get("rlgl_phase", None) == PHASE_READY
     assert not state.has("rlgl_music_receipt")
+
+
+# ---------------------------------------------------------------------------
+# Game Level — initialisation on game start
+# ---------------------------------------------------------------------------
+
+
+def test_game_start_sets_rlgl_level_to_1(spy):
+    """``_start_game`` sets ``rlgl_level`` to 1 in GameState."""
+    state, engine, timer = _make_state(spy)
+    _tick(state, engine, timer, total=0.0)  # init → READY
+
+    _tick(state, engine, timer, button_a=True, total=0.0)  # READY → RED_WARNING via _start_game
+
+    assert state.get("rlgl_level", None) == 1
+
+
+def test_game_start_sets_ambient_progress_bar_to_one_over_max_level(spy):
+    """``_start_game`` sets ``basic.progress`` on ``Scope.AMBIENT`` with
+    ``progress = 1 / max_level`` (default max_level=10)."""
+    state, engine, timer = _make_state(spy)
+    _tick(state, engine, timer, total=0.0)  # init → READY
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, button_a=True, total=0.0)  # READY → _start_game
+
+    progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
+    assert len(progress_calls) == 1
+    assert progress_calls[0][0] is Scope.AMBIENT
+    assert progress_calls[0][2]["progress"] == pytest.approx(1 / 10)
+
+
+def test_game_start_respects_rlgl_max_level_config(spy):
+    """``rlgl_max_level`` config key controls the denominator of the progress fraction."""
+    state, engine, timer = _make_state(spy, initial_data={"rlgl_max_level": 5})
+    _tick(state, engine, timer, total=0.0)  # init → READY
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, button_a=True, total=0.0)  # READY → _start_game
+
+    progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
+    assert len(progress_calls) == 1
+    assert progress_calls[0][2]["progress"] == pytest.approx(1 / 5)
+
+
+def test_game_start_stores_level_receipt_in_game_state(spy):
+    """``_start_game`` stores the AMBIENT bar receipt under ``rlgl_level_receipt``."""
+    state, engine, timer = _make_state(spy)
+    _tick(state, engine, timer, total=0.0)  # init → READY
+
+    _tick(state, engine, timer, button_a=True, total=0.0)  # READY → _start_game
+
+    assert state.has("rlgl_level_receipt")
+
+
+def test_game_start_still_enters_red_warning_phase(spy):
+    """``_start_game`` calls ``_enter_red_warning`` — the phase still becomes RED_WARNING."""
+    state, engine, timer = _make_state(spy)
+    _tick(state, engine, timer, total=0.0)  # init → READY
+
+    _tick(state, engine, timer, button_a=True, total=0.0)  # READY → RED_WARNING
+
+    assert state.get("rlgl_phase", None) == PHASE_RED_WARNING
+
+
+# ---------------------------------------------------------------------------
+# Game Level — AMBIENT bar persists across mid-game phase transitions
+# ---------------------------------------------------------------------------
+
+
+def test_level_receipt_persists_through_red_warning_to_red_transition(spy):
+    """``_enter_phase`` does NOT stop ``rlgl_level_receipt``; it persists mid-game."""
+    state, engine, timer = _make_state(spy, initial_data={"rlgl_warning_duration": 0.0})
+    _tick(state, engine, timer, total=0.0)  # init → READY
+    _tick(state, engine, timer, button_a=True, total=0.0)  # READY → RED_WARNING (_start_game)
+
+    level_receipt = state.get("rlgl_level_receipt", None)
+    assert level_receipt is not None
+
+    _tick(state, engine, timer, total=0.0)  # RED_WARNING → RED
+
+    # Receipt object must still be present and not stopped
+    assert state.has("rlgl_level_receipt")
+    assert not level_receipt.is_stopped()
+
+
+def test_level_receipt_persists_through_red_to_green_warning_transition(spy):
+    """``rlgl_level_receipt`` survives the RED → GREEN_WARNING transition."""
+    state, engine, timer = _make_state(
+        spy, initial_data={"rlgl_warning_duration": 0.0, "rlgl_red_duration": 0.0}
+    )
+    _tick(state, engine, timer, total=0.0)
+    _tick(state, engine, timer, button_a=True, total=0.0)  # → RED_WARNING
+    _tick(state, engine, timer, total=0.0)  # → RED
+
+    level_receipt = state.get("rlgl_level_receipt", None)
+    assert level_receipt is not None
+
+    _tick(state, engine, timer, total=0.0)  # RED → GREEN_WARNING
+
+    assert state.has("rlgl_level_receipt")
+    assert not level_receipt.is_stopped()
+
+
+# ---------------------------------------------------------------------------
+# Game Level — AMBIENT bar cleared on return to READY
+# ---------------------------------------------------------------------------
+
+
+def test_enter_ready_deletes_level_receipt_from_state(spy):
+    """``_enter_ready`` deletes ``rlgl_level_receipt`` so the AMBIENT bar does not persist
+    across a full game cycle (game over → ready)."""
+    state, engine, timer = _make_state(
+        spy,
+        initial_data={
+            "rlgl_warning_duration": 0.0,
+            "rlgl_red_duration": 5.0,  # long enough that motion ends the game, not the timer
+            "rlgl_game_over_duration": 0.0,
+            "rlgl_motion_smoothing": 1.0,
+            "rlgl_gravity_beta": 0.0,
+        },
+    )
+    _tick(state, engine, timer, total=0.0)  # init → READY
+    _tick(state, engine, timer, button_a=True, total=0.0)  # READY → RED_WARNING (_start_game)
+    assert state.has("rlgl_level_receipt")
+
+    _tick(state, engine, timer, total=0.0)  # RED_WARNING → RED
+    _tick(state, engine, timer, accel=_AT_REST, total=0.0)  # seed gravity
+    _tick(state, engine, timer, accel=_HIGH_ACCEL, total=0.0)  # motion → GAME_OVER
+    assert state.get("rlgl_phase", None) == PHASE_GAME_OVER
+
+    _tick(state, engine, timer, total=0.0)  # GAME_OVER → READY (duration=0)
+    assert state.get("rlgl_phase", None) == PHASE_READY
+
+    assert not state.has("rlgl_level_receipt")

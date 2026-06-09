@@ -67,6 +67,9 @@ _KEY_GRAVITY_X: Final = "rlgl_gravity_x"
 _KEY_GRAVITY_Y: Final = "rlgl_gravity_y"
 _KEY_GRAVITY_Z: Final = "rlgl_gravity_z"
 _KEY_MUSIC_RECEIPT: Final = "rlgl_music_receipt"
+_KEY_LEVEL: Final = "rlgl_level"
+_KEY_LEVEL_RECEIPT: Final = "rlgl_level_receipt"
+_KEY_MAX_LEVEL: Final = "rlgl_max_level"
 
 # ---------------------------------------------------------------------------
 # Default durations (seconds)
@@ -79,6 +82,7 @@ _DEFAULT_GAME_OVER_DURATION: Final = 3.0
 _DEFAULT_GREEN_STILL_TIMEOUT: Final = 0.75
 _DEFAULT_MOTION_SMOOTHING: Final = MOTION_EMA_ALPHA
 _DEFAULT_GRAVITY_BETA: Final = GRAVITY_LOWPASS_BETA
+_DEFAULT_MAX_LEVEL: Final = 10
 
 # ---------------------------------------------------------------------------
 # Phase entry helpers
@@ -107,6 +111,25 @@ def _enter_phase(state: GameState, phase: str) -> None:
 def _enter_ready(state: GameState) -> None:
     _enter_phase(state, PHASE_READY)
     state.effect_controls.set_effect(Scope.ALL, "rlgl.ready", {})
+    state.delete(_KEY_LEVEL_RECEIPT)
+
+
+def _start_game(state: GameState) -> None:
+    """Initialise a new game at level 1 and enter the Red Warning phase.
+
+    Sets ``rlgl_level`` to 1, starts the ``Scope.AMBIENT`` progress bar at
+    ``1 / max_level`` (denominator from ``rlgl_max_level``, default 10), stores
+    the receipt under ``rlgl_level_receipt``, then hands off to
+    ``_enter_red_warning``.  The level receipt persists across all mid-game
+    phase transitions and is only cleared when ``_enter_ready`` is called.
+    """
+    state.set(_KEY_LEVEL, 1)
+    max_level = state.get(_KEY_MAX_LEVEL, _DEFAULT_MAX_LEVEL)
+    receipt = state.effect_controls.set_effect(
+        Scope.AMBIENT, "basic.progress", {"progress": 1 / max_level}
+    )
+    state.set(_KEY_LEVEL_RECEIPT, receipt)
+    _enter_red_warning(state)
 
 
 _WARNING_STING_OPTS: Final = {
@@ -226,7 +249,7 @@ class RlglGameRule(GameRule):
 
     def _check_ready(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
         if event.buttons.is_pressed("A") or event.buttons.is_pressed("B"):
-            _enter_red_warning(state)
+            _start_game(state)
 
     def _check_red_warning(self, state: GameState, elapsed: float) -> None:
         duration = state.get(_KEY_WARNING_DURATION, _DEFAULT_WARNING_DURATION)
