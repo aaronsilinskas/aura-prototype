@@ -44,20 +44,28 @@ _Avoid_: calling `clear_queue()` from rules (reserved for `SceneManager` during 
 Owned internally by `GameEngine`. Rules access time only via `state.elapsed` and `state.total` — never hold a `Timer` reference.
 
 ### Scene
-A declarative bundle of a self-contained game context: effect/rule packs, optional initial data, and a `version` field (parsed from `scene.json` at discovery time). Carries no mutable runtime state — game data lives in a `GameState` that `SceneManager` creates on the scene's behalf.
+A declarative bundle of a self-contained game context: effect/rule packs, optional initial data, a `version` field (parsed from `scene.json` at discovery time), and references to its scene-local effects/rules. Carries no mutable runtime state — game data lives in a `GameState` that `SceneManager` creates on the scene's behalf, and the mutating import cache for scene-local items lives on the registry held by the persistent scene entry, never on the `Scene`.
+
+### Scene-local effect / Scene-local rule
+An effect or rule discovered from an optional `effects/` or `rules/` subdirectory inside a scene's own folder (the directory holding `scene.json`), loaded automatically when that scene loads and private to it — no other scene can reference it. Unlike a shared **Effect pack** / rule pack under `packs/`, it has no `version.txt` and no semver contract. Scene-local effects are addressed from rule code with the reserved `scene.` prefix (e.g. `set_effect(scope, "scene.victory_flash", …)`), which always resolves against the currently active scene's local effects.
+_Avoid_: "private pack" (it is not a pack — no version, no pack-name layer); putting scene-only code under `packs/effects` or `packs/rules` (those are for shared, versioned, cross-scene building blocks)
+
+### SceneLocalRegistry
+A single-namespace registry for one scene's local effects (or rules): maps item name → module, exposing the same `get(item_name, expected_class)` / `items()` surface as `PackRegistry` so resolution is uniform, but with no version concept. Built once at scene discovery and held by the scene's persistent entry; shares its item-loading internals with `PackRegistry`.
+_Avoid_: modelling scene-local items as a synthetic single `PackRegistry` pack (no version layer applies)
 
 ### NetworkControls
 Abstract interface for network transmit (`send_ir`, `send_radio`). Always present on `GameState`; raises unless the live implementation is injected. The receive side is covered by `NetworkEvents`.
 
 ### SceneRegistry
-Auto-discovers JSON-described scenes from a directory tree. Constructed with no arguments, then populated via `scan_dir(path)` (reads every subdirectory that contains a `scene.json`). Provides `get(name) -> Scene` (fresh instance per call), `names() -> list[str]` (sorted), and `register(name, factory)` (in-memory escape hatch for tests). Validates required fields and version format at scan time so misconfigured scenes fail at startup. Calling `scan_dir` twice with the same path is a no-op; different paths that resolve the same scene name raise `ValueError`.
+Auto-discovers JSON-described scenes from a directory tree. Constructed with no arguments, then populated via `scan_dir(path, module_prefix)` (reads every subdirectory that contains a `scene.json`, and any optional `effects/` / `rules/` subdirs within it as that scene's scene-local items; `module_prefix` is the dotted import root for those local items). Provides `get(name) -> Scene` (fresh instance per call), `names() -> list[str]` (sorted), and `register(name, factory)` (in-memory escape hatch for tests). Validates required fields and version format at scan time so misconfigured scenes fail at startup. Calling `scan_dir` twice with the same path is a no-op; different paths that resolve the same scene name raise `ValueError`.
 _Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); constructing `SceneRegistry` after harness startup (scan once, then pass to `SceneManager`)
 
 ### SceneControls
 Abstract interface with `load`, `overlay`, and `pop` — each records a pending transition applied after the current tick ends. `SceneManager` is the live implementation.
 
 ### SceneManager
-Owns the scene stack and drives transitions. Constructed with `SceneManager(engine, effect_registry, rule_registry, scene_registry)` — no `register()` method; all scene lookup delegates to the injected `SceneRegistry`. `load` clears the stack; `overlay` suspends the active scene and pushes a new one; `pop` unloads the top and restores the previous. Every scene it unloads or suspends has its effects stopped on `Scope.ALL` automatically.
+Owns the scene stack and drives transitions. Constructed with `SceneManager(engine, effect_registry, rule_registry, scene_registry)` — no `register()` method; all scene lookup delegates to the injected `SceneRegistry`. `load` clears the stack; `overlay` suspends the active scene and pushes a new one; `pop` unloads the top and restores the previous. Every scene it unloads or suspends has its effects stopped on `Scope.ALL` automatically. On each transition it also pushes the now-active scene's scene-local effects to the effect controls (via a `set_local_effects` call reserved for `SceneManager`, like `clear_queue`), so the reserved `scene.` prefix resolves against the top-of-stack scene.
 _Avoid_: calling `register()` on `SceneManager` (method removed — add scenes to `SceneRegistry` before construction)
 
 ### Scope
