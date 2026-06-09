@@ -90,7 +90,7 @@ def pool() -> VoicePool:
 
 def test_claim_plays_into_first_idle_slot(pool: VoicePool, sink: RecordingSink) -> None:
     receipt = make_receipt()
-    slot = pool.claim(sink, "clip.wav", loop=False, audio_only=True, receipt=receipt)
+    slot = pool.claim(sink, "clip.wav", loop=False, stops_receipt=True, receipt=receipt)
     assert slot == 0
     assert ("open_source", "clip.wav") in sink.calls
     assert play_calls(sink) == [("play", 0, ("source", 1), False)]
@@ -98,13 +98,13 @@ def test_claim_plays_into_first_idle_slot(pool: VoicePool, sink: RecordingSink) 
 
 def test_claim_forwards_receipt_loudness_to_sink(pool: VoicePool, sink: RecordingSink) -> None:
     receipt = make_receipt(loudness=0.4)
-    pool.claim(sink, "clip.wav", loop=False, audio_only=True, receipt=receipt)
+    pool.claim(sink, "clip.wav", loop=False, stops_receipt=True, receipt=receipt)
     assert ("set_loudness", 0, 0.4) in sink.calls
 
 
 def test_claim_fills_idle_slots_in_order(pool: VoicePool, sink: RecordingSink) -> None:
     slots = [
-        pool.claim(sink, "a.wav", loop=False, audio_only=True, receipt=make_receipt())
+        pool.claim(sink, "a.wav", loop=False, stops_receipt=True, receipt=make_receipt())
         for _ in range(3)
     ]
     assert slots == [0, 1, 2]
@@ -114,9 +114,9 @@ def test_claim_returns_minus_one_and_opens_nothing_when_all_loops_and_new_one_sh
     pool: VoicePool, sink: RecordingSink
 ) -> None:
     for _ in range(3):
-        pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=make_receipt())
+        pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=make_receipt())
     sink.calls.clear()
-    slot = pool.claim(sink, "shot.wav", loop=False, audio_only=True, receipt=make_receipt())
+    slot = pool.claim(sink, "shot.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     assert slot == -1
     assert sink.calls == []  # nothing opened, nothing torn down
 
@@ -130,22 +130,22 @@ def test_failed_load_into_idle_slot_returns_minus_one_without_playing(
     pool: VoicePool, sink: RecordingSink
 ) -> None:
     sink.fail_next_open()
-    slot = pool.claim(sink, "missing.wav", loop=False, audio_only=True, receipt=make_receipt())
+    slot = pool.claim(sink, "missing.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     assert slot == -1
     assert play_calls(sink) == []
 
 
 def test_failed_load_does_not_evict_a_live_voice(pool: VoicePool, sink: RecordingSink) -> None:
     for _ in range(3):
-        pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=make_receipt())
+        pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=make_receipt())
     sink.calls.clear()
     sink.fail_next_open()
-    slot = pool.claim(sink, "new.wav", loop=True, audio_only=True, receipt=make_receipt())
+    slot = pool.claim(sink, "new.wav", loop=True, stops_receipt=True, receipt=make_receipt())
     assert slot == -1
     assert stop_slots(sink) == []  # no teardown of any existing voice
     # All three originals still playing — a fresh one-shot claim finds no idle slot
     sink.calls.clear()
-    dropped = pool.claim(sink, "shot.wav", loop=False, audio_only=True, receipt=make_receipt())
+    dropped = pool.claim(sink, "shot.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     assert dropped == -1
 
 
@@ -157,9 +157,9 @@ def test_failed_load_does_not_evict_a_live_voice(pool: VoicePool, sink: Recordin
 def test_new_loop_evicts_oldest_loop(pool: VoicePool, sink: RecordingSink) -> None:
     # Fill with loops in slots 0,1,2 (claim order makes slot 0 oldest)
     for _ in range(3):
-        pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=make_receipt())
+        pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=make_receipt())
     sink.calls.clear()
-    slot = pool.claim(sink, "new.wav", loop=True, audio_only=True, receipt=make_receipt())
+    slot = pool.claim(sink, "new.wav", loop=True, stops_receipt=True, receipt=make_receipt())
     assert slot == 0
     assert ("stop", 0) in sink.calls
 
@@ -168,9 +168,9 @@ def test_new_loop_evicts_oldest_slot_overall_when_no_loops_present(
     pool: VoicePool, sink: RecordingSink
 ) -> None:
     for _ in range(3):
-        pool.claim(sink, "shot.wav", loop=False, audio_only=True, receipt=make_receipt())
+        pool.claim(sink, "shot.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     sink.calls.clear()
-    slot = pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=make_receipt())
+    slot = pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=make_receipt())
     assert slot == 0  # oldest one-shot, used as fallback
 
 
@@ -178,55 +178,57 @@ def test_new_loop_evicts_oldest_loop_not_an_older_one_shot(
     pool: VoicePool, sink: RecordingSink
 ) -> None:
     # slot 0 = older one-shot, slot 1 = newer loop, slot 2 = one-shot
-    pool.claim(sink, "shot0.wav", loop=False, audio_only=True, receipt=make_receipt())
-    pool.claim(sink, "loop1.wav", loop=True, audio_only=True, receipt=make_receipt())
-    pool.claim(sink, "shot2.wav", loop=False, audio_only=True, receipt=make_receipt())
+    pool.claim(sink, "shot0.wav", loop=False, stops_receipt=True, receipt=make_receipt())
+    pool.claim(sink, "loop1.wav", loop=True, stops_receipt=True, receipt=make_receipt())
+    pool.claim(sink, "shot2.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     sink.calls.clear()
-    slot = pool.claim(sink, "new.wav", loop=True, audio_only=True, receipt=make_receipt())
+    slot = pool.claim(sink, "new.wav", loop=True, stops_receipt=True, receipt=make_receipt())
     assert slot == 1  # the only loop, evicted even though slot 0 is older
     assert ("stop", 1) in sink.calls
 
 
 def test_new_one_shot_evicts_oldest_one_shot(pool: VoicePool, sink: RecordingSink) -> None:
     # slot 0 loop, slots 1 and 2 one-shots (slot 1 older)
-    pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=make_receipt())
-    pool.claim(sink, "s1.wav", loop=False, audio_only=True, receipt=make_receipt())
-    pool.claim(sink, "s2.wav", loop=False, audio_only=True, receipt=make_receipt())
+    pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=make_receipt())
+    pool.claim(sink, "s1.wav", loop=False, stops_receipt=True, receipt=make_receipt())
+    pool.claim(sink, "s2.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     sink.calls.clear()
-    slot = pool.claim(sink, "new.wav", loop=False, audio_only=True, receipt=make_receipt())
+    slot = pool.claim(sink, "new.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     assert slot == 1  # oldest one-shot, loop in slot 0 untouched
     assert ("stop", 1) in sink.calls
 
 
 def test_new_one_shot_never_evicts_a_loop(pool: VoicePool, sink: RecordingSink) -> None:
     for _ in range(3):
-        pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=make_receipt())
-    slot = pool.claim(sink, "shot.wav", loop=False, audio_only=True, receipt=make_receipt())
+        pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=make_receipt())
+    slot = pool.claim(sink, "shot.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     assert slot == -1
 
 
 # ---------------------------------------------------------------------------
-# claim — audio-only receipt-stop on eviction
+# claim — stops_receipt receipt-stop on eviction
 # ---------------------------------------------------------------------------
 
 
-def test_evicting_audio_only_effect_stops_its_receipt(pool: VoicePool, sink: RecordingSink) -> None:
-    evicted = make_receipt()
-    pool.claim(sink, "a.wav", loop=True, audio_only=True, receipt=evicted)
-    pool.claim(sink, "b.wav", loop=True, audio_only=True, receipt=make_receipt())
-    pool.claim(sink, "c.wav", loop=True, audio_only=True, receipt=make_receipt())
-    pool.claim(sink, "new.wav", loop=True, audio_only=True, receipt=make_receipt())
-    assert evicted.is_stopped()
-
-
-def test_evicting_non_audio_only_effect_leaves_receipt_to_rules(
+def test_evicting_stops_receipt_slot_stops_its_receipt(
     pool: VoicePool, sink: RecordingSink
 ) -> None:
     evicted = make_receipt()
-    pool.claim(sink, "a.wav", loop=True, audio_only=False, receipt=evicted)
-    pool.claim(sink, "b.wav", loop=True, audio_only=True, receipt=make_receipt())
-    pool.claim(sink, "c.wav", loop=True, audio_only=True, receipt=make_receipt())
-    pool.claim(sink, "new.wav", loop=True, audio_only=True, receipt=make_receipt())
+    pool.claim(sink, "a.wav", loop=True, stops_receipt=True, receipt=evicted)
+    pool.claim(sink, "b.wav", loop=True, stops_receipt=True, receipt=make_receipt())
+    pool.claim(sink, "c.wav", loop=True, stops_receipt=True, receipt=make_receipt())
+    pool.claim(sink, "new.wav", loop=True, stops_receipt=True, receipt=make_receipt())
+    assert evicted.is_stopped()
+
+
+def test_evicting_slot_without_stops_receipt_leaves_receipt_to_rules(
+    pool: VoicePool, sink: RecordingSink
+) -> None:
+    evicted = make_receipt()
+    pool.claim(sink, "a.wav", loop=True, stops_receipt=False, receipt=evicted)
+    pool.claim(sink, "b.wav", loop=True, stops_receipt=True, receipt=make_receipt())
+    pool.claim(sink, "c.wav", loop=True, stops_receipt=True, receipt=make_receipt())
+    pool.claim(sink, "new.wav", loop=True, stops_receipt=True, receipt=make_receipt())
     assert not evicted.is_stopped()
 
 
@@ -237,8 +239,8 @@ def test_evicting_non_audio_only_effect_leaves_receipt_to_rules(
 
 def test_evicted_slot_is_reused_by_the_new_clip(pool: VoicePool, sink: RecordingSink) -> None:
     for _ in range(3):
-        pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=make_receipt())
-    slot = pool.claim(sink, "new.wav", loop=True, audio_only=True, receipt=make_receipt())
+        pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=make_receipt())
+    slot = pool.claim(sink, "new.wav", loop=True, stops_receipt=True, receipt=make_receipt())
     last_play = play_calls(sink)[-1]
     first_play = play_calls(sink)[0]
     assert last_play[1] == slot  # plays into the evicted slot
@@ -251,49 +253,51 @@ def test_evicted_slot_is_reused_by_the_new_clip(pool: VoicePool, sink: Recording
 
 
 def test_sweep_frees_naturally_finished_one_shot(pool: VoicePool, sink: RecordingSink) -> None:
-    pool.claim(sink, "shot.wav", loop=False, audio_only=False, receipt=make_receipt())
+    pool.claim(sink, "shot.wav", loop=False, stops_receipt=False, receipt=make_receipt())
     sink.playing[0] = False  # clip ran to its end
     sink.calls.clear()
     pool.sweep(sink)
     assert ("stop", 0) in sink.calls
     # Slot is free: next claim reuses slot 0
-    next_slot = pool.claim(sink, "next.wav", loop=False, audio_only=False, receipt=make_receipt())
+    next_slot = pool.claim(
+        sink, "next.wav", loop=False, stops_receipt=False, receipt=make_receipt()
+    )
     assert next_slot == 0
 
 
-def test_sweep_stops_receipt_of_finished_audio_only_one_shot(
+def test_sweep_stops_receipt_when_stops_receipt_flag_is_set_on_natural_finish(
     pool: VoicePool, sink: RecordingSink
 ) -> None:
     receipt = make_receipt()
-    pool.claim(sink, "shot.wav", loop=False, audio_only=True, receipt=receipt)
+    pool.claim(sink, "shot.wav", loop=False, stops_receipt=True, receipt=receipt)
     sink.playing[0] = False
     pool.sweep(sink)
     assert receipt.is_stopped()
 
 
-def test_sweep_leaves_finished_non_audio_only_receipt_to_rules(
+def test_sweep_leaves_receipt_to_rules_when_stops_receipt_flag_is_not_set(
     pool: VoicePool, sink: RecordingSink
 ) -> None:
     receipt = make_receipt()
-    pool.claim(sink, "shot.wav", loop=False, audio_only=False, receipt=receipt)
+    pool.claim(sink, "shot.wav", loop=False, stops_receipt=False, receipt=receipt)
     sink.playing[0] = False
     pool.sweep(sink)
     assert not receipt.is_stopped()
 
 
 def test_sweep_does_not_free_a_still_playing_one_shot(pool: VoicePool, sink: RecordingSink) -> None:
-    pool.claim(sink, "shot.wav", loop=False, audio_only=True, receipt=make_receipt())
+    pool.claim(sink, "shot.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     sink.calls.clear()
     pool.sweep(sink)  # still playing
     assert stop_slots(sink) == []
     # Slot still occupied: a new one-shot claim takes a different slot
-    other = pool.claim(sink, "b.wav", loop=False, audio_only=True, receipt=make_receipt())
+    other = pool.claim(sink, "b.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     assert other == 1
 
 
 def test_sweep_does_not_free_a_finished_loop(pool: VoicePool, sink: RecordingSink) -> None:
     # A loop reports not playing only transiently; sweep must not treat it as finished
-    pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=make_receipt())
+    pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=make_receipt())
     sink.playing[0] = False
     sink.calls.clear()
     pool.sweep(sink)
@@ -307,19 +311,19 @@ def test_sweep_does_not_free_a_finished_loop(pool: VoicePool, sink: RecordingSin
 
 def test_sweep_frees_externally_stopped_receipt(pool: VoicePool, sink: RecordingSink) -> None:
     receipt = make_receipt()
-    pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=receipt)
+    pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=receipt)
     receipt.stop()
     sink.calls.clear()
     pool.sweep(sink)
     assert ("stop", 0) in sink.calls
-    next_slot = pool.claim(sink, "next.wav", loop=True, audio_only=True, receipt=make_receipt())
+    next_slot = pool.claim(sink, "next.wav", loop=True, stops_receipt=True, receipt=make_receipt())
     assert next_slot == 0
 
 
 def test_sweep_does_not_stop_an_already_externally_stopped_receipt_again(
     pool: VoicePool, sink: RecordingSink
 ) -> None:
-    # An externally stopped, audio-only receipt must not be re-stopped by sweep.
+    # An externally stopped receipt must not be re-stopped by sweep.
     class CountingReceipt(EffectReceipt):
         def __init__(self) -> None:
             super().__init__(99)
@@ -330,7 +334,7 @@ def test_sweep_does_not_stop_an_already_externally_stopped_receipt_again(
             super().stop()
 
     receipt = CountingReceipt()
-    pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=receipt)
+    pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=receipt)
     receipt.stop()  # rules stop it (count -> 1)
     pool.sweep(sink)
     assert receipt.stop_count == 1  # sweep did not stop it a second time
@@ -343,7 +347,7 @@ def test_sweep_does_not_stop_an_already_externally_stopped_receipt_again(
 
 def test_sweep_reapplies_changed_loudness(pool: VoicePool, sink: RecordingSink) -> None:
     receipt = make_receipt(loudness=1.0)
-    pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=receipt)
+    pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=receipt)
     receipt.loudness = 0.25
     sink.calls.clear()
     pool.sweep(sink)
@@ -352,7 +356,7 @@ def test_sweep_reapplies_changed_loudness(pool: VoicePool, sink: RecordingSink) 
 
 def test_sweep_does_not_reapply_unchanged_loudness(pool: VoicePool, sink: RecordingSink) -> None:
     receipt = make_receipt(loudness=0.5)
-    pool.claim(sink, "loop.wav", loop=True, audio_only=True, receipt=receipt)
+    pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=receipt)
     sink.calls.clear()
     pool.sweep(sink)
     assert sink.calls == []

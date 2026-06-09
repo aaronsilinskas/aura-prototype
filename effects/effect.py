@@ -33,14 +33,24 @@ class AudioPlaybackConfig:
 
     Fields:
       - ``name``: the clip name looked up in ``AudioRegistry``.
-      - ``loop``: ``True`` → voice 0, looping background; ``False`` → voice 1, one-shot.
+      - ``loop``: ``True`` → looping background; ``False`` → one-shot.
+      - ``stops_effect``: ``False`` (default) → receipt lifecycle stays with rules;
+        ``True`` → when this one-shot is released (natural finish or eviction) the
+        owning ``EffectReceipt`` is stopped, ending the whole effect (pixels and
+        vibration included).  Combining ``stops_effect=True`` with ``loop=True`` is
+        a contradiction (a loop never finishes) and raises ``ValueError``.
     """
 
-    __slots__ = ["loop", "name"]
+    __slots__ = ["loop", "name", "stops_effect"]
 
-    def __init__(self, name: str, loop: bool) -> None:
+    def __init__(self, name: str, loop: bool, stops_effect: bool = False) -> None:
+        if stops_effect and loop:
+            raise ValueError(
+                "stops_effect=True is incompatible with loop=True: a loop never finishes"
+            )
         self.name = name
         self.loop = loop
+        self.stops_effect = stops_effect
 
 
 class EffectAudio:

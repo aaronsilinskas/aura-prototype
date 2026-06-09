@@ -19,7 +19,7 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
     pixel buffer allocation.
 
     All voice-slot bookkeeping (slot occupancy, the eviction policy, the
-    audio-only receipt-stop rule, loudness tracking) lives in :class:`VoicePool`.
+    stops-receipt release rule, loudness tracking) lives in :class:`VoicePool`.
     This class is the live :class:`VoiceSink` adapter: it owns only hardware —
     the I2S amp, the ``audiomixer.Mixer``, the ``max_volume`` calibration, and a
     per-slot ``source`` list of open WAV files — and translates the pool's slot
@@ -70,7 +70,8 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
         if path is None:
             return
         audio_only = effect.pixels is None and effect.vibration is None
-        self._pool.claim(self, path, config.loop, audio_only, receipt)
+        stops_receipt = audio_only or config.stops_effect
+        self._pool.claim(self, path, config.loop, stops_receipt, receipt)
 
     def flush(self) -> None:
         self._pool.sweep(self)

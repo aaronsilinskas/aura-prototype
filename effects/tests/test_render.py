@@ -199,6 +199,23 @@ def test_audio_playback_config_stores_one_shot_loop_false() -> None:
     assert cfg.loop is False
 
 
+def test_audio_playback_config_stops_effect_defaults_to_false() -> None:
+    cfg = AudioPlaybackConfig(name="sting", loop=False)
+
+    assert cfg.stops_effect is False
+
+
+def test_audio_playback_config_accepts_stops_effect_true_for_one_shot() -> None:
+    cfg = AudioPlaybackConfig(name="sting", loop=False, stops_effect=True)
+
+    assert cfg.stops_effect is True
+
+
+def test_audio_playback_config_raises_when_loop_and_stops_effect_both_true() -> None:
+    with pytest.raises(ValueError):
+        AudioPlaybackConfig(name="bg", loop=True, stops_effect=True)
+
+
 # ---------------------------------------------------------------------------
 # EffectAudio — clips
 # ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """Tests for AudioEffectOutput — the live VoiceSink adapter.
 
-Voice-slot bookkeeping (claim/eviction/sweep, the audio-only receipt-stop rule,
+Voice-slot bookkeeping (claim/eviction/sweep, the stops-receipt release rule,
 loudness tracking) lives in ``VoicePool`` and is covered by ``test_voice_pool.py``.
 These tests cover only what the adapter itself owns: the shell-routing guards in
 ``handle_event`` and the last-mile hardware mapping of the five ``VoiceSink``
@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectPixels
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectPixels, EffectVibration
 from engine.audio import AudioRegistry
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
@@ -79,6 +79,29 @@ def _effect_audio_only(verb: str, clip_name: str) -> Effect:
     return Effect(
         name="audio_only",
         audio=EffectAudio(clips={verb: AudioPlaybackConfig(name=clip_name, loop=False)}),
+    )
+
+
+def _effect_oneshot_stops_effect(verb: str, clip_name: str) -> Effect:
+    """One-shot effect with pixels and stops_effect=True."""
+    return Effect(
+        name="test",
+        pixels=MagicMock(spec=EffectPixels),
+        audio=EffectAudio(
+            clips={verb: AudioPlaybackConfig(name=clip_name, loop=False, stops_effect=True)}
+        ),
+    )
+
+
+def _effect_oneshot_with_vibration_stops_effect(verb: str, clip_name: str) -> Effect:
+    """One-shot effect with pixels, vibration, and stops_effect=True."""
+    return Effect(
+        name="test",
+        pixels=MagicMock(spec=EffectPixels),
+        vibration=MagicMock(spec=EffectVibration),
+        audio=EffectAudio(
+            clips={verb: AudioPlaybackConfig(name=clip_name, loop=False, stops_effect=True)}
+        ),
     )
 
 
@@ -211,11 +234,10 @@ def test_valid_clip_plays_on_an_idle_voice(tmp_path) -> None:
     assert mixer.voice[0].level == pytest.approx(0.4 * 0.5)
 
 
-def test_audio_only_clip_routes_as_audio_only(tmp_path) -> None:
-    """An effect with no pixels/vibration is claimed as audio-only: its receipt is
+def test_audio_only_effect_implicitly_stops_receipt_on_finish(tmp_path) -> None:
+    """An effect with no pixels/vibration implicitly sets stops_receipt=True: its
 
-    stopped when the clip finishes naturally (the adapter computes audio_only from
-    effect shape; the pool acts on it)."""
+    receipt is stopped when the clip finishes naturally (audio is the whole effect)."""
     registry = AudioRegistry()
     _register_wav(tmp_path, registry, "sting")
     output, mixer = _make_output(registry)
@@ -234,8 +256,8 @@ def test_audio_only_clip_routes_as_audio_only(tmp_path) -> None:
     receipt.stop.assert_called_once()
 
 
-def test_clip_with_pixels_routes_as_not_audio_only(tmp_path) -> None:
-    """An effect with pixels is not audio-only: its receipt is left to rules on finish."""
+def test_clip_with_pixels_and_no_stops_effect_flag_leaves_receipt_to_rules(tmp_path) -> None:
+    """An effect with pixels and no stops_effect flag leaves its receipt to rules on finish."""
     registry = AudioRegistry()
     _register_wav(tmp_path, registry, "sting")
     output, mixer = _make_output(registry)
@@ -252,6 +274,73 @@ def test_clip_with_pixels_routes_as_not_audio_only(tmp_path) -> None:
     output.flush()
 
     receipt.stop.assert_not_called()
+
+
+def test_clip_with_pixels_and_stops_effect_stops_receipt_on_natural_finish(tmp_path) -> None:
+    """A pixels effect with stops_effect=True stops its receipt when the clip finishes."""
+    registry = AudioRegistry()
+    _register_wav(tmp_path, registry, "sting")
+    output, mixer = _make_output(registry)
+    receipt = _make_receipt()
+
+    output.handle_event(
+        EffectEvent("rlgl", "sting", "start"),
+        frozenset({"personal"}),
+        _effect_oneshot_stops_effect("start", "sting"),
+        receipt,
+    )
+
+    mixer.voice[0].playing = False
+    output.flush()
+
+    receipt.stop.assert_called_once()
+
+
+def test_clip_with_pixels_and_stops_effect_stops_receipt_on_eviction(tmp_path) -> None:
+    """A pixels effect with stops_effect=True stops its receipt when evicted by a new one-shot."""
+    registry = AudioRegistry()
+    _register_wav(tmp_path, registry, "sting")
+    _register_wav(tmp_path, registry, "sting2")
+    output, _mixer = _make_output(registry, num_voices=1)
+    evicted_receipt = _make_receipt()
+    evicted_receipt.is_stopped.return_value = False
+
+    # Claim the only slot with stops_effect=True pixels effect (one-shot)
+    output.handle_event(
+        EffectEvent("rlgl", "sting", "start"),
+        frozenset({"personal"}),
+        _effect_oneshot_stops_effect("start", "sting"),
+        evicted_receipt,
+    )
+    # A new one-shot evicts the oldest one-shot (slot 0)
+    output.handle_event(
+        EffectEvent("rlgl", "sting2", "start"),
+        frozenset({"personal"}),
+        _effect_oneshot("start", "sting2"),
+        _make_receipt(),
+    )
+
+    evicted_receipt.stop.assert_called_once()
+
+
+def test_clip_with_pixels_vibration_and_stops_effect_stops_receipt_on_finish(tmp_path) -> None:
+    """A pixels+vibration effect with stops_effect=True stops its receipt on natural finish."""
+    registry = AudioRegistry()
+    _register_wav(tmp_path, registry, "sting")
+    output, mixer = _make_output(registry)
+    receipt = _make_receipt()
+
+    output.handle_event(
+        EffectEvent("rlgl", "sting", "start"),
+        frozenset({"personal"}),
+        _effect_oneshot_with_vibration_stops_effect("start", "sting"),
+        receipt,
+    )
+
+    mixer.voice[0].playing = False
+    output.flush()
+
+    receipt.stop.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
