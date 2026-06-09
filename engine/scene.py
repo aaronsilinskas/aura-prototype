@@ -176,7 +176,7 @@ class SceneRegistry:
 
     Scanning::
 
-        registry.scan_dir("/path/to/scenes")
+        registry.scan_dir("/path/to/scenes", "packs.scenes")
 
     Scene access::
 
