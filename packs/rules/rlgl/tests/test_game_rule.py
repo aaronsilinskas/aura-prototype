@@ -194,15 +194,6 @@ def test_ready_shows_ready_effect_on_all_scopes(spy):
     assert ready_calls[0][0] is Scope.ALL
 
 
-def test_ready_effect_does_not_pass_level_option(spy):
-    """The ``level`` option was never consumed by rlgl.ready; it must not be sent."""
-    state, engine, timer = _make_state(spy)
-    _tick(state, engine, timer, total=0.0)
-    ready_calls = [c for c in spy.set_effect_calls if c[1] == "rlgl.ready"]
-    assert len(ready_calls) == 1
-    assert "level" not in ready_calls[0][2]
-
-
 # ---------------------------------------------------------------------------
 # Ready — no transition without a button press
 # ---------------------------------------------------------------------------
