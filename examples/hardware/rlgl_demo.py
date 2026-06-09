@@ -89,6 +89,7 @@ _audio_registry.register("red_light_music_start", "sounds/rlgl_stop_music.wav")
 _audio_registry.register("green_light_music_start", "sounds/rlgl_go_music.wav")
 _audio_registry.register("game_over_sting_start", "sounds/game_over.wav")
 _audio_registry.register("win_sting_start", "sounds/game_won.wav")
+_audio_registry.register("level_up_start", "sounds/level_up.wav")
 
 _audio_output = AudioEffectOutput(_audio_registry, max_volume=0.1, num_voices=2)
 _outputs = [IS31FL3741EffectOutput(_matrix), _audio_output]
