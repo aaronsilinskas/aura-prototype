@@ -7,8 +7,8 @@ import pytest
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.state import GameState, SceneControls, Scope
+from engine.tests.helpers import SpyEffectControls
 from packs.rules.hw_test.motion_rule import ACCEL_MAX, HwTestMotionRule
-from packs.rules.hw_test.tests.helpers import SpyEffectControls
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers

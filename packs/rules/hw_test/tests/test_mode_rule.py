@@ -8,12 +8,12 @@ from engine.engine import GameEngine, GameRule
 from engine.input import ButtonData, InputEvents
 from engine.network import NetworkEvents
 from engine.state import EffectReceipt, GameState, SceneControls, Scope
+from engine.tests.helpers import SpyEffectControls
 from packs.rules.hw_test.mode_rule import (
     FLASH_DURATION,
     HW_TEST_PAYLOAD,
     HwTestModeRule,
 )
-from packs.rules.hw_test.tests.helpers import SpyEffectControls
 
 
 class _StubTimer:
