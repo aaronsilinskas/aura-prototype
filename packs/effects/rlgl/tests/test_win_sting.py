@@ -70,3 +70,9 @@ def test_win_sting_vibration_start_uses_triple_click() -> None:
     effect = _build()
 
     assert VibrationConfig.TRIPLE_CLICK in effect.vibration.patterns["start"].sequence
+
+
+def test_win_sting_audio_start_clip_stops_effect() -> None:
+    effect = _build()
+
+    assert effect.audio.clips["start"].stops_effect is True

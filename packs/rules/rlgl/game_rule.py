@@ -85,7 +85,7 @@ _KEY_LEVEL: Final = "rlgl_level"
 _KEY_LEVEL_RECEIPT: Final = "rlgl_level_receipt"
 _KEY_MAX_LEVEL: Final = "rlgl_max_level"
 _KEY_LEVEL_UP_DURATION: Final = "rlgl_level_up_duration"
-_KEY_WIN_DURATION: Final = "rlgl_win_duration"
+_KEY_WIN_STING_RECEIPT: Final = "rlgl_win_sting_receipt"
 
 # ---------------------------------------------------------------------------
 # Default durations (seconds)
@@ -103,7 +103,6 @@ _DEFAULT_MOTION_SMOOTHING: Final = MOTION_EMA_ALPHA
 _DEFAULT_GRAVITY_BETA: Final = GRAVITY_LOWPASS_BETA
 _DEFAULT_MAX_LEVEL: Final = 10
 _DEFAULT_LEVEL_UP_DURATION: Final = 1.0
-_DEFAULT_WIN_DURATION: Final = 8.0
 
 # Level-1 warning pulse sub-duration ratios (brighten / on / darken = 0.3 / 0.4 / 0.3)
 _WARNING_BRIGHTEN_RATIO: Final = 0.3
@@ -254,7 +253,8 @@ def _enter_level_up(state: GameState) -> None:
 def _enter_win(state: GameState) -> None:
     _enter_phase(state, PHASE_WIN)
     state.effect_controls.set_effect(Scope.ALL, "elements.lightning", {"level": 7})
-    state.effect_controls.add_effect(Scope.ALL, "rlgl.win_sting", {})
+    receipt = state.effect_controls.add_effect(Scope.ALL, "rlgl.win_sting", {})
+    state.set(_KEY_WIN_STING_RECEIPT, receipt)
 
 
 def _enter_game_over(state: GameState) -> None:
@@ -335,7 +335,7 @@ class RlglGameRule(GameRule):
         elif phase == PHASE_LEVEL_UP:
             self._check_level_up(state, phase_elapsed)
         elif phase == PHASE_WIN:
-            self._check_win(state, phase_elapsed)
+            self._check_win(state)
         elif phase == PHASE_GAME_OVER:
             self._check_game_over(state, phase_elapsed)
 
@@ -398,9 +398,9 @@ class RlglGameRule(GameRule):
         if elapsed >= duration:
             _enter_red_warning(state)
 
-    def _check_win(self, state: GameState, elapsed: float) -> None:
-        duration = state.get(_KEY_WIN_DURATION, _DEFAULT_WIN_DURATION)
-        if elapsed >= duration:
+    def _check_win(self, state: GameState) -> None:
+        receipt = state.get(_KEY_WIN_STING_RECEIPT, None)
+        if receipt is not None and receipt.is_stopped():
             _enter_ready(state)
 
     def _check_game_over(self, state: GameState, elapsed: float) -> None:
