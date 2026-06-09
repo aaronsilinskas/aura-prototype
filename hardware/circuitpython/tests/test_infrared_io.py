@@ -19,7 +19,7 @@ from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 class FakePulseIn:
     """Minimal stub for pulseio.PulseIn.
 
-    Backed by a list; index access returns the value, del removes it,
+    Backed by a list; popleft removes and returns the oldest entry,
     len returns the current count, and clear empties the list.
     """
 
@@ -29,11 +29,8 @@ class FakePulseIn:
     def __len__(self) -> int:
         return len(self._pulses)
 
-    def __getitem__(self, index: int) -> int:
-        return self._pulses[index]
-
-    def __delitem__(self, index: int) -> None:
-        del self._pulses[index]
+    def popleft(self) -> int:
+        return self._pulses.pop(0)
 
     def clear(self) -> None:
         self._pulses.clear()

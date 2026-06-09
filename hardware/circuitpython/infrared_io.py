@@ -49,12 +49,9 @@ class PulseInReader(PulseReader):
         Returns:
             Pulse duration in µs, or ``None`` if no pulse is ready.
         """
-        pulsein = self._pulsein
-        if len(pulsein) == 0:
+        if len(self._pulsein) == 0:
             return None
-        pulse = pulsein[0]
-        del pulsein[0]
-        return pulse
+        return self._pulsein.popleft()
 
 
 class PulseOutWriter(PulseWriter):
