@@ -1,35 +1,43 @@
-"""Tag scene "ready" effect — a thin, visual-only pulse.
+"""Tag scene "ready" effect — a rotating red laser sweep.
 
-A simple white pulse (0x000000 -> 0xFFFFFF) used to indicate the device is
-idle in the Ready phase, waiting for a button press to start the game.
+A red shape that rotates around the strip, looking like a laser sweeping
+across the screen. Used to indicate the device is idle in the Ready phase,
+waiting for a button press to start the game.
 """
 
 from __future__ import annotations
 
 from effects.effect import Effect, EffectConfig
+from effects.layers.add_colors_renderer import AddColorsRenderer
+from effects.layers.scroll import ScrollOffset
+from effects.layers.scroll_layer import ScrollLayer
+from effects.layers.shape_layer import ShapeLayer
+from effects.palette import PaletteLUT256
+from effects.shape import Shape
 from engine.effects.manager import EffectBuilder
-from packs.effects.basic.pulse import PulseBuilder
 
-_pulse = PulseBuilder()
+# Black -> red: the laser body lights up red, the dead zones stay dark.
+_RED_PALETTE = bytes([0, 0, 0, 0, 255, 255, 0, 0])
 
-_READY_OPTIONS = {
-    "start_color": 0x000000,
-    "end_color": 0xFFFFFF,
-    "brighten_duration": 0.5,
-    "on_duration": 0.2,
-    "darken_duration": 0.5,
-    "off_duration": 0.2,
-}
+# Revolutions per second of the sweeping laser.
+_ROTATE_SPEED = 0.6
 
 
 class _Builder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        ready_config = EffectConfig(
-            resolution=config.resolution,
-            options=_READY_OPTIONS,
-            listeners=config.listeners,
+        rotate_speed = config.get_option("rotate_speed", _ROTATE_SPEED)
+        laser = ScrollLayer(
+            ShapeLayer(Shape.padded(0.25, Shape.centered_gradient())),
+            ScrollOffset(speed=rotate_speed),
         )
-        return _pulse(name, ready_config)
+        return Effect(
+            name=name,
+            pixels=AddColorsRenderer(
+                [
+                    (laser, PaletteLUT256(_RED_PALETTE)),
+                ],
+            ),
+        )
 
 
 BUILD = _Builder()
