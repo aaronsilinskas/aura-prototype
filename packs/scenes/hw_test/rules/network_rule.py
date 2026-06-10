@@ -3,6 +3,7 @@ from __future__ import annotations
 from engine.engine import GameRule
 from engine.network import NetworkEvents
 from engine.state import GameState, Scope
+from packs.scenes.hw_test.rules.helpers.mode import MODE_IR, MODE_RADIO, current_mode
 
 
 class HwTestNetworkRule(GameRule):
@@ -19,7 +20,7 @@ class HwTestNetworkRule(GameRule):
         self.on(NetworkEvents.RadioReceived, self._handle_radio)
 
     def _handle_ir(self, event: NetworkEvents.IRReceived, state: GameState) -> None:
-        if state.get("hw_mode", None) != 2:
+        if current_mode(state) != MODE_IR:
             return
         receipt = state.effect_controls.set_effect(
             Scope.DIRECTIONAL, "basic.solid", {"color": 0xFFFFFF}
@@ -28,7 +29,7 @@ class HwTestNetworkRule(GameRule):
         state.set("ir_flash_start", state.total)
 
     def _handle_radio(self, event: NetworkEvents.RadioReceived, state: GameState) -> None:
-        if state.get("hw_mode", None) != 3:
+        if current_mode(state) != MODE_RADIO:
             return
         receipt = state.effect_controls.set_effect(
             Scope.Global.ALL, "basic.solid", {"color": 0xFFFFFF}

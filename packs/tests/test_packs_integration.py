@@ -189,14 +189,14 @@ def test_hw_test_scene_json_does_not_list_hw_test_rule_pack() -> None:
     assert "hw_test" not in rule_pack_names
 
 
-def test_hw_test_scene_json_retains_debug_rule_pack() -> None:
+def test_hw_test_scene_json_does_not_list_debug_rule_pack() -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
 
     scene = scene_registry.get("hw_test")
 
     rule_pack_names = [name for name, _ in scene.rule_packs]
-    assert "debug" in rule_pack_names
+    assert "debug" not in rule_pack_names
 
 
 # --- SceneManager integration ---

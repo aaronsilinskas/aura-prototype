@@ -9,18 +9,10 @@ from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.network import LINE, NetworkEvents
 from engine.state import EffectReceipt, GameState, Scope
+from packs.scenes.hw_test.rules.helpers.mode import _RGB_IDLE, NUM_MODES, current_mode
 
 HW_TEST_PAYLOAD: Final = b"hw_test"
 FLASH_DURATION: Final = 0.5
-
-# RGB mode idle effect table: (scope, name)
-_RGB_IDLE: Final = (
-    (Scope.PERSONAL, "elements.water"),
-    (Scope.DIRECTIONAL, "elements.fire"),
-    (Scope.Global.MAIN, "elements.lightning"),
-    (Scope.Global.BUFF, "elements.earth"),
-    (Scope.Global.DEBUFF, "elements.ice"),
-)
 
 
 def _enter_rgb(state: GameState) -> None:
@@ -53,7 +45,6 @@ def _enter_sfx(state: GameState) -> None:
 
 
 _MODE_ENTRY: Final = (_enter_rgb, _enter_accelerometer, _enter_ir, _enter_radio, _enter_sfx)
-_NUM_MODES: Final = 5
 
 
 class HwTestModeRule(GameRule):
@@ -63,11 +54,12 @@ class HwTestModeRule(GameRule):
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
-        # First-tick init: initialise mode from initial_mode
-        if "hw_mode" not in state:
-            mode = state.pop("initial_mode", int)
-            state.set("hw_mode", mode)
-            _MODE_ENTRY[mode](state)
+        # Fire mode-entry effects once on load. ``hw_mode`` is seeded into
+        # ``initial_data``, so a separate ``hw_entered`` flag (not the presence
+        # of ``hw_mode``) marks whether entry effects have run.
+        if "hw_entered" not in state:
+            state.set("hw_entered", True)
+            _MODE_ENTRY[current_mode(state)](state)
 
         self._check_flash_expiry(state)
 
@@ -84,12 +76,13 @@ class HwTestModeRule(GameRule):
         state.delete("radio_flash_receipt")
         state.delete("radio_flash_start")
 
-        new_mode = (state.get("hw_mode", 0) + 1) % _NUM_MODES
+        new_mode = (current_mode(state) + 1) % NUM_MODES
+        print("changing to mode " + str(new_mode))
         state.set("hw_mode", new_mode)
         _MODE_ENTRY[new_mode](state)
 
     def _handle_button_a(self, state: GameState) -> None:
-        mode = state.get("hw_mode", 0)
+        mode = current_mode(state)
         if mode == 0:
             new_level = (state.get("rgb_level", 1) % 10) + 1
             state.set("rgb_level", new_level)

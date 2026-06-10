@@ -61,17 +61,42 @@ def _make_state_with_rule(
 # ---------------------------------------------------------------------------
 
 
-def test_first_tick_sets_hw_mode_from_initial_mode(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+def test_first_tick_keeps_seeded_hw_mode(spy):
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
     assert state.get("hw_mode", None) == 0
-    assert "initial_mode" not in state
+
+
+def test_entry_effects_fire_once_on_load_and_not_again_without_mode_change(spy):
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+    assert spy.set_effect_calls  # entry effects fired on load
+
+    # A second tick with no button press must not re-fire mode-entry effects.
+    spy.set_effect_calls.clear()
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+
+    assert spy.set_effect_calls == []
+
+
+def test_button_b_logs_changing_to_new_mode(spy, capsys):
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
+    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    engine.update(state)
+    capsys.readouterr()  # discard load output
+
+    _press_button(state, "B")
+    engine.update(state)
+
+    assert "changing to mode 1" in capsys.readouterr().out
 
 
 def test_first_tick_starts_rgb_idle_effects(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -85,7 +110,7 @@ def test_first_tick_starts_rgb_idle_effects(spy):
 
 
 def test_first_tick_rgb_idle_effects_have_level_1_in_options(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -94,7 +119,7 @@ def test_first_tick_rgb_idle_effects_have_level_1_in_options(spy):
 
 
 def test_first_tick_sets_rgb_level_in_state_data(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -102,7 +127,7 @@ def test_first_tick_sets_rgb_level_in_state_data(spy):
 
 
 def test_first_tick_accelerometer_mode_starts_progress_effects(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 1})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 1})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -114,7 +139,7 @@ def test_first_tick_accelerometer_mode_starts_progress_effects(spy):
 
 
 def test_first_tick_ir_mode_starts_white_solid_effects(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 2})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -124,7 +149,7 @@ def test_first_tick_ir_mode_starts_white_solid_effects(spy):
 
 
 def test_first_tick_radio_mode_starts_white_solid_effects(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 3})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 3})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -139,7 +164,7 @@ def test_first_tick_radio_mode_starts_white_solid_effects(spy):
 
 
 def test_button_b_advances_mode_from_rgb_to_accelerometer(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
     # First tick initialises mode
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
@@ -152,7 +177,7 @@ def test_button_b_advances_mode_from_rgb_to_accelerometer(spy):
 
 
 def test_button_b_cycles_mode_through_0_1_2_3_4_and_back_to_0(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -163,7 +188,7 @@ def test_button_b_cycles_mode_through_0_1_2_3_4_and_back_to_0(spy):
 
 
 def test_button_b_stops_all_effects_before_starting_new_mode(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.stop_effect_calls.clear()
@@ -175,7 +200,7 @@ def test_button_b_stops_all_effects_before_starting_new_mode(spy):
 
 
 def test_button_b_clears_flash_keys_on_mode_change(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 2})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     state.set("ir_flash_receipt", object())
@@ -198,7 +223,7 @@ def test_button_b_clears_flash_keys_on_mode_change(spy):
 
 
 def test_button_a_in_rgb_mode_increments_level(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
@@ -210,7 +235,7 @@ def test_button_a_in_rgb_mode_increments_level(spy):
 
 
 def test_button_a_in_rgb_mode_wraps_level_from_10_to_1(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     state.set("rgb_level", 10)
@@ -223,7 +248,7 @@ def test_button_a_in_rgb_mode_wraps_level_from_10_to_1(spy):
 
 
 def test_button_a_in_rgb_mode_calls_set_effect_on_all_five_scopes(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
@@ -236,7 +261,7 @@ def test_button_a_in_rgb_mode_calls_set_effect_on_all_five_scopes(spy):
 
 
 def test_button_a_in_rgb_mode_passes_new_level_to_element_effects(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
@@ -251,7 +276,7 @@ def test_button_a_in_rgb_mode_passes_new_level_to_element_effects(spy):
 
 
 def test_button_a_in_rgb_mode_wraps_level_passes_level_1_to_effects(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     state.set("rgb_level", 10)
@@ -265,7 +290,7 @@ def test_button_a_in_rgb_mode_wraps_level_passes_level_1_to_effects(spy):
 
 
 def test_button_a_in_accelerometer_mode_is_noop(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 1})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 1})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
@@ -280,7 +305,7 @@ def test_button_a_in_accelerometer_mode_is_noop(spy):
 
 def test_button_a_in_ir_mode_calls_send_ir_with_hw_test_payload_on_line_emitter(spy):
     network_spy = SpyNetworkControls()
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2}, network_spy=network_spy)
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 2}, network_spy=network_spy)
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     network_spy.send_ir_calls.clear()
@@ -294,7 +319,7 @@ def test_button_a_in_ir_mode_calls_send_ir_with_hw_test_payload_on_line_emitter(
 
 def test_button_a_in_ir_mode_fires_scene_sfx_test_on_personal_as_sent_cue(spy):
     network_spy = SpyNetworkControls()
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2}, network_spy=network_spy)
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 2}, network_spy=network_spy)
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
@@ -310,7 +335,7 @@ def test_button_a_in_ir_mode_fires_scene_sfx_test_on_personal_as_sent_cue(spy):
 
 def test_button_a_in_ir_mode_does_not_queue_fake_ir_received_event(spy):
     network_spy = SpyNetworkControls()
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2}, network_spy=network_spy)
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 2}, network_spy=network_spy)
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -330,7 +355,7 @@ def test_button_a_in_ir_mode_does_not_queue_fake_ir_received_event(spy):
 
 
 def test_button_a_in_radio_mode_queues_radio_received_event(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 3})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 3})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -358,7 +383,7 @@ def test_button_a_in_radio_mode_queues_radio_received_event(spy):
 
 def test_ir_flash_expires_and_restarts_directional_idle(spy):
     timer = _StubTimer()
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2}, timer=timer)
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 2}, timer=timer)
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -382,7 +407,7 @@ def test_ir_flash_expires_and_restarts_directional_idle(spy):
 
 def test_radio_flash_expires_and_restarts_global_all_idle(spy):
     timer = _StubTimer()
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 3}, timer=timer)
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 3}, timer=timer)
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -404,7 +429,7 @@ def test_radio_flash_expires_and_restarts_global_all_idle(spy):
 
 def test_ir_flash_does_not_expire_before_duration(spy):
     timer = _StubTimer()
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 2}, timer=timer)
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 2}, timer=timer)
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -426,7 +451,7 @@ def test_ir_flash_does_not_expire_before_duration(spy):
 
 
 def test_first_tick_sfx_mode_starts_cyan_solid_on_personal(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 4})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 4})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -437,7 +462,7 @@ def test_first_tick_sfx_mode_starts_cyan_solid_on_personal(spy):
 
 
 def test_enter_sfx_sets_only_personal_scope(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 4})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 4})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
 
@@ -446,7 +471,7 @@ def test_enter_sfx_sets_only_personal_scope(spy):
 
 
 def test_button_a_in_sfx_mode_fires_scene_sfx_test_effect_on_personal(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 4})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 4})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
@@ -460,7 +485,7 @@ def test_button_a_in_sfx_mode_fires_scene_sfx_test_effect_on_personal(spy):
 
 
 def test_button_a_in_rgb_mode_does_not_fire_sfx_test(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 0})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
@@ -473,7 +498,7 @@ def test_button_a_in_rgb_mode_does_not_fire_sfx_test(spy):
 
 
 def test_button_a_in_accelerometer_mode_does_not_fire_sfx_test(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 1})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 1})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
@@ -486,7 +511,7 @@ def test_button_a_in_accelerometer_mode_does_not_fire_sfx_test(spy):
 
 
 def test_button_a_in_radio_mode_does_not_fire_sfx_test(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"initial_mode": 3})
+    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 3})
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
