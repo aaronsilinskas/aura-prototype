@@ -144,6 +144,22 @@ _Avoid_: reading `_states` directly (use the query methods); assuming `is_down` 
 The hardware-agnostic infrared send/receive subsystem (`hardware/shared/`, no `pulseio`), reached through `PulseReader`/`PulseWriter` ports with CircuitPython adapters — the same seam as `VoicePool`/`VoiceSink`. Moves opaque `bytes` with no game semantics: transmit via `NetworkControls.send_ir`, receive surfaced as `NetworkEvents.IRReceived`.
 _Avoid_: importing `pulseio` into shared IR code; encoding spell fields in the transport (that belongs to a game-layer codec over the payload)
 
+### Wire-frame codec
+Encoder/decoder pair mapping an opaque payload `byte`(s) ↔ IR pulse durations, injected into the IR transport (transmitter + receiver), which is itself wire-frame-agnostic. Two coexist: the **Aura wire-frame** (internal) and the **Tag protocol** (external). A scene picks its wire-frame by injecting the matching codec.
+_Avoid_: assuming a single global wire-frame; treating wire-frames as interchangeable across scenes with different hardware
+
+### Aura wire-frame
+Aura's internal IR wire-frame: header mark/space, MSB-first bits, CRC-8, lead-out terminator. Carries any-length payloads and is free to change since both ends are Aura devices. Used for all Aura-to-Aura features.
+_Avoid_: using it where third-party interop is required (use the **Tag protocol**)
+
+### Tag protocol
+A fixed, external IR wire-frame ported verbatim from third-party tooling and **immutable** — its timings and bit layout are a compatibility contract with non-Aura tag hardware, with no CRC. Coexists with the Aura wire-frame, selected per-scene via the **Wire-frame codec**.
+_Avoid_: adding a CRC, altering timings, or otherwise diverging from the external spec; folding it into the Aura wire-frame
+
+### TagData
+The game-layer payload of a tag shot — `team`, `player`, `damage` packed into one opaque byte by the tag game-layer codec and handed to the IR transport as bytes. Game fields live here, never in the wire-frame, which transmits the byte without interpreting it.
+_Avoid_: reading tag fields off the wire-frame; conflating the data codec (`TagData` ↔ byte) with the wire-frame codec (byte ↔ pulses)
+
 ### IR emitter
 A directed infrared transmit channel. Constants `LINE` (narrow line-of-sight), `CONE`, `AREA_OF_EFFECT` are the `send_ir` vocabulary, defined in `engine/network.py` (not the shared transport) and each mapped to its own `InfraredTransmitter` by `HardwareNetworkControls`. The caller must name the emitter; sending to an unwired one is a programming error.
 _Avoid_: importing `magic.CastType` for IR emitters (the network seam owns these); a default emitter on `send_ir` (intent must be explicit)
