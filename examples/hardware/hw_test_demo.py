@@ -1,6 +1,6 @@
-"""Hardware verification demo — hw_test scene on RP2040 PropMaker + IS31FL3741.
+"""Hardware verification demo — hardware_test scene on RP2040 PropMaker + IS31FL3741.
 
-Loads the ``hw_test`` scene via ``SceneManager`` so every hardware subsystem
+Loads the ``hardware_test`` scene via ``SceneManager`` so every hardware subsystem
 (LEDs, buttons, accelerometer, IR transceiver, radio, audio, haptics) can be
 exercised through the same scene logic used in production.  Each per-mode rule
 prints a concise action log to the serial console, giving a text trace
@@ -158,8 +158,8 @@ _scene_registry = SceneRegistry()
 _scene_registry.scan_dir("packs/scenes", "packs.scenes")
 
 _manager = SceneManager(_engine, _effect_registry, _rule_registry, _scene_registry)
-_manager.load("hw_test")
-_manager.update()  # applies the load transition; hw_test scene is now active
+_manager.load("hardware_test")
+_manager.update()  # applies the load transition; hardware_test scene is now active
 
 # ---------------------------------------------------------------------------
 # Main loop

@@ -8,7 +8,7 @@ from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
-from packs.scenes.hw_test.rules.motion_rule import (
+from packs.scenes.hardware_test.rules.motion_rule import (
     ACCEL_LOG_INTERVAL,
     ACCEL_MAX,
     HwTestMotionRule,

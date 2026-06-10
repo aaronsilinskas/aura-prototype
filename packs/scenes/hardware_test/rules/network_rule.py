@@ -9,7 +9,7 @@ from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.network import LINE, NetworkEvents
 from engine.state import GameState, Scope
-from packs.scenes.hw_test.rules.helpers.mode import MODE_IR, MODE_RADIO, current_mode
+from packs.scenes.hardware_test.rules.helpers.mode import MODE_IR, MODE_RADIO, current_mode
 
 HW_TEST_PAYLOAD: Final = b"hw_test"
 

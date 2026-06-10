@@ -8,7 +8,7 @@ except ImportError:
 from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import EffectReceipt, GameState, Scope
-from packs.scenes.hw_test.rules.helpers.mode import _RGB_IDLE, NUM_MODES, current_mode
+from packs.scenes.hardware_test.rules.helpers.mode import _RGB_IDLE, NUM_MODES, current_mode
 
 FLASH_DURATION: Final = 0.5
 
@@ -46,7 +46,7 @@ _MODE_ENTRY: Final = (_enter_rgb, _enter_accelerometer, _enter_ir, _enter_radio,
 
 
 class HwTestModeRule(GameRule):
-    """Drives hw_test mode transitions: entry effects, Button B, flash expiry.
+    """Drives hardware_test mode transitions: entry effects, Button B, flash expiry.
 
     Per-mode Button A behaviour lives in each mode's owning rule (``rgb_rule``,
     ``network_rule``, ``sfx_rule``); this rule only dispatches one-time mode

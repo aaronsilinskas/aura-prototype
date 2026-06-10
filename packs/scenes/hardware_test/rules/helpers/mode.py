@@ -1,4 +1,4 @@
-"""Shared mode plumbing for the hw_test scene rules.
+"""Shared mode plumbing for the hardware_test scene rules.
 
 Lives in ``rules/helpers/`` (a subpackage the scene scanner skips, like
 ``tests/``) so it can hold cross-rule constants and lookups without being
@@ -35,5 +35,5 @@ _RGB_IDLE: Final = (
 
 
 def current_mode(state: GameState) -> int:
-    """Return the active hw_test mode, defaulting to ``MODE_RGB`` when unseeded."""
+    """Return the active hardware_test mode, defaulting to ``MODE_RGB`` when unseeded."""
     return state.get("hw_mode", 0)

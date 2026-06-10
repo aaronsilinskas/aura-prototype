@@ -8,7 +8,7 @@ from engine.engine import GameEngine
 from engine.input import ButtonData, InputEvents
 from engine.state import GameState, SceneControls
 from engine.tests.helpers import SpyEffectControls
-from packs.scenes.hw_test.rules.rgb_rule import HwTestRgbRule
+from packs.scenes.hardware_test.rules.rgb_rule import HwTestRgbRule
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers

@@ -6,7 +6,7 @@ import pytest
 
 from engine.state import GameState, SceneControls
 from engine.tests.helpers import SpyEffectControls
-from packs.scenes.hw_test.rules.helpers.mode import current_mode
+from packs.scenes.hardware_test.rules.helpers.mode import current_mode
 
 
 @pytest.fixture()

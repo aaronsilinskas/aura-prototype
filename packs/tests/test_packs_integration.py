@@ -133,22 +133,22 @@ def test_debug_exposes_all_expected_rule_modules() -> None:
     assert "event_logger" in items
 
 
-def test_hw_test_scene_local_effect_sfx_test_is_discovered() -> None:
+def test_hardware_test_scene_local_effect_sfx_test_is_discovered() -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
 
-    scene = scene_registry.get("hw_test")
+    scene = scene_registry.get("hardware_test")
     local_effects = scene.local_effect_registry
 
     builder = local_effects.get("sfx_test", EffectBuilder)
     assert isinstance(builder, EffectBuilder)
 
 
-def test_hw_test_scene_local_sfx_test_produces_no_pixels() -> None:
+def test_hardware_test_scene_local_sfx_test_produces_no_pixels() -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
 
-    scene = scene_registry.get("hw_test")
+    scene = scene_registry.get("hardware_test")
     local_effects = scene.local_effect_registry
 
     builder = local_effects.get("sfx_test", EffectBuilder)
@@ -157,11 +157,11 @@ def test_hw_test_scene_local_sfx_test_produces_no_pixels() -> None:
     assert effect.pixels is None
 
 
-def test_hw_test_scene_local_rules_are_discovered() -> None:
+def test_hardware_test_scene_local_rules_are_discovered() -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
 
-    scene = scene_registry.get("hw_test")
+    scene = scene_registry.get("hardware_test")
     local_rules = scene.local_rule_registry
 
     for rule_name in ("mode_rule", "motion_rule", "network_rule"):
@@ -169,31 +169,31 @@ def test_hw_test_scene_local_rules_are_discovered() -> None:
         assert isinstance(rule, GameRule), f"{rule_name} expected to be a GameRule"
 
 
-def test_hw_test_scene_json_does_not_list_hw_test_effect_pack() -> None:
+def test_hardware_test_scene_json_does_not_list_own_effect_pack() -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
 
-    scene = scene_registry.get("hw_test")
+    scene = scene_registry.get("hardware_test")
 
     pack_names = [name for name, _ in scene.effect_packs]
-    assert "hw_test" not in pack_names
+    assert "hardware_test" not in pack_names
 
 
-def test_hw_test_scene_json_does_not_list_hw_test_rule_pack() -> None:
+def test_hardware_test_scene_json_does_not_list_own_rule_pack() -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
 
-    scene = scene_registry.get("hw_test")
+    scene = scene_registry.get("hardware_test")
 
     rule_pack_names = [name for name, _ in scene.rule_packs]
-    assert "hw_test" not in rule_pack_names
+    assert "hardware_test" not in rule_pack_names
 
 
-def test_hw_test_scene_json_does_not_list_debug_rule_pack() -> None:
+def test_hardware_test_scene_json_does_not_list_debug_rule_pack() -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
 
-    scene = scene_registry.get("hw_test")
+    scene = scene_registry.get("hardware_test")
 
     rule_pack_names = [name for name, _ in scene.rule_packs]
     assert "debug" not in rule_pack_names

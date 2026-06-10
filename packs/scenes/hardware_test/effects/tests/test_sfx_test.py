@@ -1,4 +1,4 @@
-"""Unit tests for packs.scenes.hw_test.effects.sfx_test."""
+"""Unit tests for packs.scenes.hardware_test.effects.sfx_test."""
 
 from __future__ import annotations
 
@@ -10,14 +10,14 @@ def _config() -> EffectConfig:
 
 
 def _build():
-    from packs.scenes.hw_test.effects.sfx_test import BUILD
+    from packs.scenes.hardware_test.effects.sfx_test import BUILD
 
     return BUILD("sfx_test", _config())
 
 
 def test_sfx_test_build_is_effect_builder() -> None:
     from engine.effects.manager import EffectBuilder
-    from packs.scenes.hw_test.effects.sfx_test import BUILD
+    from packs.scenes.hardware_test.effects.sfx_test import BUILD
 
     assert isinstance(BUILD, EffectBuilder)
 

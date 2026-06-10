@@ -9,7 +9,7 @@ from engine.input import ButtonData, InputEvents
 from engine.network import LINE, NetworkEvents
 from engine.state import EffectReceipt, GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls, SpyNetworkControls
-from packs.scenes.hw_test.rules.network_rule import HW_TEST_PAYLOAD, HwTestNetworkRule
+from packs.scenes.hardware_test.rules.network_rule import HW_TEST_PAYLOAD, HwTestNetworkRule
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers

@@ -8,7 +8,7 @@ except ImportError:
 from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState, Scope
-from packs.scenes.hw_test.rules.helpers.mode import MODE_ACCELEROMETER, current_mode
+from packs.scenes.hardware_test.rules.helpers.mode import MODE_ACCELEROMETER, current_mode
 
 ACCEL_MAX: Final = 9.8
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState
-from packs.scenes.hw_test.rules.helpers.mode import _RGB_IDLE, MODE_RGB, current_mode
+from packs.scenes.hardware_test.rules.helpers.mode import _RGB_IDLE, MODE_RGB, current_mode
 
 
 class HwTestRgbRule(GameRule):

@@ -8,7 +8,7 @@ from engine.engine import GameEngine
 from engine.input import ButtonData, InputEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
-from packs.scenes.hw_test.rules.sfx_rule import HwTestSfxRule
+from packs.scenes.hardware_test.rules.sfx_rule import HwTestSfxRule
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
