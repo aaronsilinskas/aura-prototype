@@ -1,0 +1,204 @@
+"""Behaviour-driven tests for the infrared tag IR protocol codec.
+
+Covers:
+- TagData value object (slots, no dataclasses)
+- encode_tag_data / decode_tag_data round-trip and validation
+- TagInfraredEncoder / TagInfraredDecoder wire round-trip
+- last_error_margin / last_signal_strength after a successful decode
+"""
+
+import pytest
+
+from hardware.shared.tag_protocol import (
+    TAG_DAMAGE_BITS,
+    TAG_PLAYER_BITS,
+    TAG_PREAMBLE,
+    TAG_SPACE_ONE,
+    TAG_SPACE_ZERO,
+    TAG_TEAM_BITS,
+    TagData,
+    TagInfraredDecoder,
+    TagInfraredEncoder,
+    decode_tag_data,
+    encode_tag_data,
+)
+
+# ---------------------------------------------------------------------------
+# TagData value object
+# ---------------------------------------------------------------------------
+
+
+def test_tag_data_stores_team_player_and_damage():
+    tag = TagData(team=2, player=5, damage=3)
+
+    assert tag.team == 2
+    assert tag.player == 5
+    assert tag.damage == 3
+
+
+def test_tag_data_uses_slots_with_no_instance_dict():
+    tag = TagData(team=0, player=1, damage=1)
+
+    assert not hasattr(tag, "__dict__")
+
+
+# ---------------------------------------------------------------------------
+# encode_tag_data / decode_tag_data
+# ---------------------------------------------------------------------------
+
+
+def test_minimum_tag_data_encodes_to_zero_byte():
+    assert encode_tag_data(TagData(team=0, player=1, damage=1)) == bytearray([0x00])
+
+
+@pytest.mark.parametrize("team", range(4))
+@pytest.mark.parametrize("player", range(1, 9))
+@pytest.mark.parametrize("damage", range(1, 5))
+def test_encode_decode_round_trips_for_all_valid_field_values(team, player, damage):
+    tag = TagData(team=team, player=player, damage=damage)
+
+    decoded = decode_tag_data(encode_tag_data(tag))
+
+    assert decoded.team == team
+    assert decoded.player == player
+    assert decoded.damage == damage
+
+
+@pytest.mark.parametrize(
+    "team, player, damage",
+    [
+        (-1, 1, 1),
+        (4, 1, 1),
+        (0, 0, 1),
+        (0, 9, 1),
+        (0, 1, 0),
+        (0, 1, 5),
+    ],
+)
+def test_encode_raises_for_out_of_range_fields(team, player, damage):
+    tag = TagData(team=team, player=player, damage=damage)
+
+    with pytest.raises(ValueError):
+        encode_tag_data(tag)
+
+
+def test_decode_raises_for_empty_data():
+    with pytest.raises(ValueError):
+        decode_tag_data(b"")
+
+
+# ---------------------------------------------------------------------------
+# Wire round-trip
+# ---------------------------------------------------------------------------
+
+
+def _encode_decode_byte(byte: int) -> bytearray | None:
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    # The decoder finalises a packet on the pulse *after* the last data bit
+    # (e.g. the next frame's leading preamble pulse), so append one extra
+    # pulse to flush the completed packet.
+    pulses = [*encoder.encode(bytearray([byte])), TAG_PREAMBLE[0]]
+    for pulse in pulses:
+        result = decoder.decode(pulse)
+        if result is not None:
+            return result
+    return None
+
+
+@pytest.mark.parametrize("byte", [0x00, 0x01, 0x7F, 0x55, 0x2A])
+def test_wire_round_trip_recovers_original_byte(byte):
+    assert _encode_decode_byte(byte) == bytearray([byte])
+
+
+def test_encoder_frame_starts_with_preamble():
+    pulses = TagInfraredEncoder().encode(bytearray([0x00]))
+
+    assert list(pulses[: len(TAG_PREAMBLE)]) == TAG_PREAMBLE
+
+
+def test_encoder_frame_length_covers_preamble_and_data_bits():
+    data_bits = TAG_TEAM_BITS + TAG_PLAYER_BITS + TAG_DAMAGE_BITS
+    pulses = TagInfraredEncoder().encode(bytearray([0x00]))
+
+    assert len(pulses) == len(TAG_PREAMBLE) + data_bits * 2
+
+
+def test_encoder_encodes_one_bit_as_long_space():
+    # 0x40 -> shifted left by 1 -> 0x80 -> first data bit is 1
+    pulses = TagInfraredEncoder().encode(bytearray([0x40]))
+
+    first_bit_space_index = len(TAG_PREAMBLE) + 1
+    assert pulses[first_bit_space_index] == TAG_SPACE_ONE
+
+
+def test_encoder_encodes_zero_bit_as_short_space():
+    pulses = TagInfraredEncoder().encode(bytearray([0x00]))
+
+    first_bit_space_index = len(TAG_PREAMBLE) + 1
+    assert pulses[first_bit_space_index] == TAG_SPACE_ZERO
+
+
+# ---------------------------------------------------------------------------
+# Telemetry: last_error_margin / last_signal_strength
+# ---------------------------------------------------------------------------
+
+
+def test_successful_decode_exposes_error_margin_and_signal_strength():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    pulses = [*encoder.encode(bytearray([0x55])), TAG_PREAMBLE[0]]
+    for pulse in pulses:
+        decoder.decode(pulse)
+
+    assert decoder.last_error_margin is not None
+    assert decoder.last_signal_strength is not None
+
+
+def test_perfect_timing_yields_zero_error_margin_and_full_signal_strength():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    pulses = [*encoder.encode(bytearray([0x2A])), TAG_PREAMBLE[0]]
+    for pulse in pulses:
+        decoder.decode(pulse)
+
+    assert decoder.last_error_margin == 0
+    assert decoder.last_signal_strength == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Decoder: noise tolerance and frame rejection
+# ---------------------------------------------------------------------------
+
+
+def test_decoder_discards_unrecognised_pulses_before_preamble():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    noise = [100, 200, 50]
+    pulses = [*noise, *encoder.encode(bytearray([0x33])), TAG_PREAMBLE[0]]
+
+    result = None
+    for pulse in pulses:
+        outcome = decoder.decode(pulse)
+        if outcome is not None:
+            result = outcome
+    assert result == bytearray([0x33])
+
+
+def test_invalid_preamble_pulse_resets_decoder():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    pulses = list(encoder.encode(bytearray([0x10])))
+    pulses[1] = 9999  # corrupt the second preamble pulse
+
+    result = None
+    for pulse in pulses:
+        outcome = decoder.decode(pulse)
+        if outcome is not None:
+            result = outcome
+    assert result is None
