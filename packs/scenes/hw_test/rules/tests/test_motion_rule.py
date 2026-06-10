@@ -8,7 +8,23 @@ from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
-from packs.scenes.hw_test.rules.motion_rule import ACCEL_MAX, HwTestMotionRule
+from packs.scenes.hw_test.rules.motion_rule import (
+    ACCEL_LOG_INTERVAL,
+    ACCEL_MAX,
+    HwTestMotionRule,
+)
+
+
+class _StubTimer:
+    """Controllable timer for tests that need specific total values."""
+
+    def __init__(self) -> None:
+        self.elapsed: float = 0.0
+        self.total: float = 0.0
+
+    def update(self) -> None:
+        pass  # Caller controls elapsed/total directly
+
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -20,8 +36,12 @@ def spy() -> SpyEffectControls:
     return SpyEffectControls()
 
 
-def _make_state(spy: SpyEffectControls, hw_mode: int) -> tuple[GameState, GameEngine]:
-    engine = GameEngine(spy)
+def _make_state(
+    spy: SpyEffectControls,
+    hw_mode: int,
+    timer: _StubTimer | None = None,
+) -> tuple[GameState, GameEngine]:
+    engine = GameEngine(spy, timer=timer)
     rule = HwTestMotionRule()
     engine.add_rules(rule)
     state = engine.create_state(SceneControls(), initial_data={"hw_mode": hw_mode})
@@ -30,6 +50,15 @@ def _make_state(spy: SpyEffectControls, hw_mode: int) -> tuple[GameState, GameEn
 
 def _fire(state: GameState, engine: GameEngine, acceleration: AccelerationData | None) -> None:
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={}), acceleration))
+    engine.update(state)
+
+
+def _press_a(state: GameState, engine: GameEngine, acceleration: AccelerationData | None) -> None:
+    state.queue_event(
+        InputEvents.ButtonAndAcceleration(
+            ButtonData(states={"A": ButtonData.PRESSED}), acceleration
+        )
+    )
     engine.update(state)
 
 
@@ -211,3 +240,76 @@ def test_color_flips_with_sign_each_tick(spy):
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
     assert x_calls[-1][2]["color"] == 0x00FFFF
+
+
+# ---------------------------------------------------------------------------
+# Button A is a no-op in accelerometer mode
+# ---------------------------------------------------------------------------
+
+
+def test_button_a_with_no_acceleration_is_noop(spy):
+    state, engine = _make_state(spy, hw_mode=1)
+    _press_a(state, engine, None)
+
+    assert spy.set_effect_calls == []
+
+
+def test_button_a_does_not_add_effects_beyond_the_three_axes(spy):
+    state, engine = _make_state(spy, hw_mode=1)
+    _press_a(state, engine, AccelerationData(x=ACCEL_MAX, y=ACCEL_MAX, z=ACCEL_MAX))
+
+    # Only the three per-axis progress bars fire — Button A adds nothing.
+    assert len(spy.set_effect_calls) == 3
+
+
+# ---------------------------------------------------------------------------
+# Throttled accelerometer logging (~2/sec)
+# ---------------------------------------------------------------------------
+
+
+def test_logs_xyz_on_first_matching_tick(spy, capsys):
+    timer = _StubTimer()
+    state, engine = _make_state(spy, hw_mode=1, timer=timer)
+
+    _fire(state, engine, AccelerationData(x=1.0, y=2.0, z=3.0))
+
+    out = capsys.readouterr().out
+    assert "accel" in out
+    assert "1.0" in out and "2.0" in out and "3.0" in out
+
+
+def test_does_not_log_again_before_interval_elapses(spy, capsys):
+    timer = _StubTimer()
+    state, engine = _make_state(spy, hw_mode=1, timer=timer)
+
+    timer.total = 0.0
+    _fire(state, engine, AccelerationData(x=1.0))
+    capsys.readouterr()  # discard first log
+
+    timer.total = ACCEL_LOG_INTERVAL - 0.01
+    _fire(state, engine, AccelerationData(x=1.0))
+
+    assert capsys.readouterr().out == ""
+
+
+def test_logs_again_after_interval_elapses(spy, capsys):
+    timer = _StubTimer()
+    state, engine = _make_state(spy, hw_mode=1, timer=timer)
+
+    timer.total = 0.0
+    _fire(state, engine, AccelerationData(x=1.0))
+    capsys.readouterr()  # discard first log
+
+    timer.total = ACCEL_LOG_INTERVAL + 0.01
+    _fire(state, engine, AccelerationData(x=1.0))
+
+    assert "accel" in capsys.readouterr().out
+
+
+def test_does_not_log_when_not_accelerometer_mode(spy, capsys):
+    timer = _StubTimer()
+    state, engine = _make_state(spy, hw_mode=0, timer=timer)
+
+    _fire(state, engine, AccelerationData(x=1.0, y=2.0, z=3.0))
+
+    assert capsys.readouterr().out == ""
