@@ -1,19 +1,21 @@
-"""Tests for HwTestModeRule behaviour."""
+"""Tests for HwTestModeRule behaviour.
+
+Per-mode Button A behaviour now lives in each mode's owning rule; those tests
+live in ``test_rgb_rule.py``, ``test_motion_rule.py``, ``test_network_rule.py``,
+and ``test_sfx_rule.py``. This file covers only what ``HwTestModeRule`` still
+owns: one-time mode-entry effects, Button B advancement + flash-key cleanup,
+mode-change logging, and flash expiry.
+"""
 
 from __future__ import annotations
 
 import pytest
 
-from engine.engine import GameEngine, GameRule
+from engine.engine import GameEngine
 from engine.input import ButtonData, InputEvents
-from engine.network import LINE, NetworkEvents
 from engine.state import EffectReceipt, GameState, SceneControls, Scope
-from engine.tests.helpers import SpyEffectControls, SpyNetworkControls
-from packs.scenes.hw_test.rules.mode_rule import (
-    FLASH_DURATION,
-    HW_TEST_PAYLOAD,
-    HwTestModeRule,
-)
+from engine.tests.helpers import SpyEffectControls
+from packs.scenes.hw_test.rules.mode_rule import FLASH_DURATION, HwTestModeRule
 
 
 class _StubTimer:
@@ -47,9 +49,8 @@ def _make_state_with_rule(
     spy: SpyEffectControls,
     initial_data: dict,
     timer: _StubTimer | None = None,
-    network_spy: SpyNetworkControls | None = None,
 ) -> tuple[GameState, GameEngine, HwTestModeRule]:
-    engine = GameEngine(spy, timer=timer, network_controls=network_spy)
+    engine = GameEngine(spy, timer=timer)
     rule = HwTestModeRule()
     engine.add_rules(rule)
     state = engine.create_state(SceneControls(), initial_data=dict(initial_data))
@@ -218,165 +219,6 @@ def test_button_b_clears_flash_keys_on_mode_change(spy):
 
 
 # ---------------------------------------------------------------------------
-# Button A — per-mode behaviour
-# ---------------------------------------------------------------------------
-
-
-def test_button_a_in_rgb_mode_increments_level(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-    spy.set_effect_calls.clear()
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    assert state.get("rgb_level", None) == 2
-
-
-def test_button_a_in_rgb_mode_wraps_level_from_10_to_1(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-    state.set("rgb_level", 10)
-    spy.set_effect_calls.clear()
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    assert state.get("rgb_level", None) == 1
-
-
-def test_button_a_in_rgb_mode_calls_set_effect_on_all_five_scopes(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-    spy.set_effect_calls.clear()
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    # 5 set_effect calls — one per scope
-    assert len(spy.set_effect_calls) == 5
-
-
-def test_button_a_in_rgb_mode_passes_new_level_to_element_effects(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-    spy.set_effect_calls.clear()
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    for _scope, _name, options in spy.set_effect_calls:
-        assert options.get("level") == 2, (
-            f"expected level=2 after first A press, got options={options}"
-        )
-
-
-def test_button_a_in_rgb_mode_wraps_level_passes_level_1_to_effects(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-    state.set("rgb_level", 10)
-    spy.set_effect_calls.clear()
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    for _scope, _name, options in spy.set_effect_calls:
-        assert options.get("level") == 1, f"expected level=1 after wrap, got options={options}"
-
-
-def test_button_a_in_accelerometer_mode_is_noop(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 1})
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-    spy.set_effect_calls.clear()
-    spy.stop_effect_calls.clear()
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    assert spy.set_effect_calls == []
-    assert spy.stop_effect_calls == []
-
-
-def test_button_a_in_ir_mode_calls_send_ir_with_hw_test_payload_on_line_emitter(spy):
-    network_spy = SpyNetworkControls()
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 2}, network_spy=network_spy)
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-    network_spy.send_ir_calls.clear()
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    assert len(network_spy.send_ir_calls) == 1
-    assert network_spy.send_ir_calls[0] == (HW_TEST_PAYLOAD, LINE)
-
-
-def test_button_a_in_ir_mode_fires_scene_sfx_test_on_personal_as_sent_cue(spy):
-    network_spy = SpyNetworkControls()
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 2}, network_spy=network_spy)
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-    spy.set_effect_calls.clear()
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "scene.sfx_test"]
-    assert len(sfx_calls) == 1
-    assert sfx_calls[0][0] == Scope.PERSONAL
-    assert sfx_calls[0][2] == {}
-
-
-def test_button_a_in_ir_mode_does_not_queue_fake_ir_received_event(spy):
-    network_spy = SpyNetworkControls()
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 2}, network_spy=network_spy)
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-
-    captured_events = []
-
-    class _Capture(GameRule):
-        def handle_event(self, event, s):
-            captured_events.append(event)
-
-    engine.add_rules(_Capture())
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    ir_events = [e for e in captured_events if isinstance(e, NetworkEvents.IRReceived)]
-    assert ir_events == []
-
-
-def test_button_a_in_radio_mode_queues_radio_received_event(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 3})
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-
-    captured_events = []
-
-    class _Capture(GameRule):
-        def handle_event(self, event, s):
-            captured_events.append(event)
-
-    engine.add_rules(_Capture())
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    radio_events = [e for e in captured_events if isinstance(e, NetworkEvents.RadioReceived)]
-    assert len(radio_events) == 1
-    assert radio_events[0].data == HW_TEST_PAYLOAD
-    assert radio_events[0].sender == "local"
-
-
-# ---------------------------------------------------------------------------
 # Flash expiry
 # ---------------------------------------------------------------------------
 
@@ -446,7 +288,7 @@ def test_ir_flash_does_not_expire_before_duration(spy):
 
 
 # ---------------------------------------------------------------------------
-# SFX mode (mode 4) — uses scene-local effect name
+# SFX mode (mode 4) — entry effect only; Button A behaviour lives in sfx_rule
 # ---------------------------------------------------------------------------
 
 
@@ -468,56 +310,3 @@ def test_enter_sfx_sets_only_personal_scope(spy):
 
     scopes = [c[0] for c in spy.set_effect_calls]
     assert all(s == Scope.PERSONAL for s in scopes)
-
-
-def test_button_a_in_sfx_mode_fires_scene_sfx_test_effect_on_personal(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 4})
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-    spy.set_effect_calls.clear()
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    sfx_calls = [c for c in spy.set_effect_calls if c[1] == "scene.sfx_test"]
-    assert len(sfx_calls) == 1
-    assert sfx_calls[0][0] == Scope.PERSONAL
-
-
-def test_button_a_in_rgb_mode_does_not_fire_sfx_test(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 0})
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-    spy.set_effect_calls.clear()
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    sfx_calls = [c for c in spy.set_effect_calls if "sfx_test" in c[1]]
-    assert sfx_calls == []
-
-
-def test_button_a_in_accelerometer_mode_does_not_fire_sfx_test(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 1})
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-    spy.set_effect_calls.clear()
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    sfx_calls = [c for c in spy.set_effect_calls if "sfx_test" in c[1]]
-    assert sfx_calls == []
-
-
-def test_button_a_in_radio_mode_does_not_fire_sfx_test(spy):
-    state, engine, _ = _make_state_with_rule(spy, {"hw_mode": 3})
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
-    engine.update(state)
-    spy.set_effect_calls.clear()
-
-    _press_button(state, "A")
-    engine.update(state)
-
-    sfx_calls = [c for c in spy.set_effect_calls if "sfx_test" in c[1]]
-    assert sfx_calls == []

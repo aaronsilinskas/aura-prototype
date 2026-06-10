@@ -7,11 +7,9 @@ except ImportError:
 
 from engine.engine import GameRule
 from engine.input import InputEvents
-from engine.network import LINE, NetworkEvents
 from engine.state import EffectReceipt, GameState, Scope
 from packs.scenes.hw_test.rules.helpers.mode import _RGB_IDLE, NUM_MODES, current_mode
 
-HW_TEST_PAYLOAD: Final = b"hw_test"
 FLASH_DURATION: Final = 0.5
 
 
@@ -48,7 +46,13 @@ _MODE_ENTRY: Final = (_enter_rgb, _enter_accelerometer, _enter_ir, _enter_radio,
 
 
 class HwTestModeRule(GameRule):
-    """Drives hw_test mode transitions and Button A/B behaviour."""
+    """Drives hw_test mode transitions: entry effects, Button B, flash expiry.
+
+    Per-mode Button A behaviour lives in each mode's owning rule (``rgb_rule``,
+    ``network_rule``, ``sfx_rule``); this rule only dispatches one-time mode
+    entry effects, advances the mode on Button B, logs the change, and expires
+    the IR/radio receive flashes.
+    """
 
     def __init__(self) -> None:
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
@@ -65,8 +69,6 @@ class HwTestModeRule(GameRule):
 
         if event.buttons.is_pressed("B"):
             self._advance_mode(state)
-        elif event.buttons.is_pressed("A"):
-            self._handle_button_a(state)
 
     def _advance_mode(self, state: GameState) -> None:
         state.effect_controls.stop_effect(Scope.ALL)
@@ -80,24 +82,6 @@ class HwTestModeRule(GameRule):
         print("changing to mode " + str(new_mode))
         state.set("hw_mode", new_mode)
         _MODE_ENTRY[new_mode](state)
-
-    def _handle_button_a(self, state: GameState) -> None:
-        mode = current_mode(state)
-        if mode == 0:
-            new_level = (state.get("rgb_level", 1) % 10) + 1
-            state.set("rgb_level", new_level)
-            ec = state.effect_controls
-            for scope, name in _RGB_IDLE:
-                ec.set_effect(scope, name, {"level": new_level})
-        elif mode == 1:
-            pass  # accelerometer mode: no-op
-        elif mode == 2:
-            state.network_controls.send_ir(HW_TEST_PAYLOAD, LINE)
-            state.effect_controls.set_effect(Scope.PERSONAL, "scene.sfx_test", {})
-        elif mode == 3:
-            state.queue_event(NetworkEvents.RadioReceived(HW_TEST_PAYLOAD, "local"))
-        elif mode == 4:
-            state.effect_controls.set_effect(Scope.PERSONAL, "scene.sfx_test", {})
 
     def _check_flash_expiry(self, state: GameState) -> None:
         if (

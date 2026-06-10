@@ -2,9 +2,18 @@
 
 Loads the ``hw_test`` scene via ``SceneManager`` so every hardware subsystem
 (LEDs, buttons, accelerometer, IR transceiver, radio, audio, haptics) can be
-exercised through the same scene logic used in production.  Pressing Button B
-logs the mode change to the serial console, giving a text trace alongside the
-visual output.
+exercised through the same scene logic used in production.  Each per-mode rule
+prints a concise action log to the serial console, giving a text trace
+alongside the visual output:
+
+- Button B: ``changing to mode N``
+- Mode 0 Button A: ``rgb level -> N``
+- Mode 1 (each ~0.5 s): ``accel (x, y, z)``
+- Mode 2 Button A: ``sending IR packet``; on receive:
+  ``ir received <payload> strength=<s> margin=<m>``
+- Mode 3 Button A: ``sending radio packet``; on receive:
+  ``radio received <payload> from <sender>``
+- Mode 4 Button A: ``playing sfx``
 
 Hardware
 --------
@@ -34,28 +43,33 @@ Modes (press Button B to cycle)
 --------------------------------
 Mode 0 — RGB idle
     Five element effects (water, fire, lightning, earth, ice) fill each scope.
-    Press A to step the brightness level from 1 → 10 → 1.
+    Press A to step the brightness level from 1 → 10 → 1; the console logs
+    ``rgb level -> N``.
 
 Mode 1 — Accelerometer
     Accelerometer axes map to scopes: X → PERSONAL (red/cyan),
     Y → DIRECTIONAL (green/magenta), Z → Global.ALL (blue/yellow).
-    Tilt the device to change colours and intensity.
+    Tilt the device to change colours and intensity.  The console logs
+    ``accel (x, y, z)`` at most ~twice per second.  Button A is a no-op here.
 
 Mode 2 — IR receive
-    Press A to transmit a real IR packet via the LINE emitter (blip + haptic fire).
-    On a real receive from another device, DIRECTIONAL flashes white at level 9
-    for 0.5 s, then returns to idle solid white.  Console shows
-    ``net.ir_received`` with signal strength.  Note: self-reception on a single
-    board is unreliable due to IR LED ↔ receiver AGC bleed — a second device or
-    reflective surface is needed for end-to-end verification.
+    Press A to transmit a real IR packet via the LINE emitter (blip + haptic
+    fire); the console logs ``sending IR packet``.  On a real receive from
+    another device, DIRECTIONAL flashes white for 0.5 s, then returns to idle
+    solid white, and the console logs
+    ``ir received <payload> strength=<s> margin=<m>``.  Note: self-reception on
+    a single board is unreliable due to IR LED ↔ receiver AGC bleed — a second
+    device or reflective surface is needed for end-to-end verification.
 
 Mode 3 — Radio receive
-    Press A to simulate sending a radio packet (queues RadioReceived internally).
-    On a real receive, Global.ALL flashes white at level 9 for 0.5 s, then
-    returns to the idle solid white.  Console shows ``net.radio_received``.
+    Press A to simulate sending a radio packet (queues RadioReceived
+    internally); the console logs ``sending radio packet``.  On a receive,
+    Global.ALL flashes white for 0.5 s, then returns to the idle solid white,
+    and the console logs ``radio received <payload> from <sender>``.
 
 Mode 4 — SFX
-    Press A to fire the ``scene.sfx_test`` effect, which plays the clip
+    Press A to fire the ``scene.sfx_test`` effect (console logs ``playing
+    sfx``), which plays the clip
     ``sounds/sfx_test.wav`` via the I2S amp and triggers a STRONG_CLICK haptic
     pattern on the DRV2605L (if present).  If the WAV file is absent from the
     device filesystem, ``AudioEffectOutput`` silently no-ops; if the DRV2605L is

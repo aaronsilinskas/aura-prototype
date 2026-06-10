@@ -12,6 +12,9 @@ from packs.scenes.hw_test.rules.helpers.mode import MODE_ACCELEROMETER, current_
 
 ACCEL_MAX: Final = 9.8
 
+# Minimum seconds between accelerometer log lines (~2 per second).
+ACCEL_LOG_INTERVAL: Final = 0.5
+
 X_POS_COLOR: Final = 0xFF0000
 X_NEG_COLOR: Final = 0x00FFFF
 Y_POS_COLOR: Final = 0x00FF00
@@ -46,6 +49,15 @@ class HwTestMotionRule(GameRule):
             color = pos_color if accel >= 0 else neg_color
             progress = min(1.0, abs(accel) / ACCEL_MAX)
             ec.set_effect(scope, "basic.progress", {"color": color, "progress": progress})
+
+        # Throttle console logging to ~2/sec. ``state.total`` is monotonic, so
+        # the last-logged timestamp needs no teardown across mode changes.
+        if (
+            "accel_log_last" not in state
+            or state.total - state.get("accel_log_last", 0.0) >= ACCEL_LOG_INTERVAL
+        ):
+            state.set("accel_log_last", state.total)
+            print("accel " + str((acceleration.x, acceleration.y, acceleration.z)))
 
 
 RULE = HwTestMotionRule()
