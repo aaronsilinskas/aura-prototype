@@ -9,6 +9,11 @@ immediately registered as a hit.
 
 from __future__ import annotations
 
+try:
+    from typing import Final
+except ImportError:
+    pass  # typing not available on all embedded runtimes
+
 from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.network import LINE
@@ -30,7 +35,7 @@ from packs.scenes.tag.rules.helpers.phases import (
     PHASE_PLAYING,
 )
 
-_SHOT_DAMAGE = 1
+_SHOT_DAMAGE: Final = 1
 
 
 class TagPlayingRule(GameRule):
