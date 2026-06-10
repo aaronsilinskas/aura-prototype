@@ -43,11 +43,11 @@ def test_solid_pack_exposes_valid_effect_builder() -> None:
     assert isinstance(builder, EffectBuilder)
 
 
-def test_rlgl_scene_local_effect_builders_are_discovered() -> None:
+def test_red_light_green_light_scene_local_effect_builders_are_discovered() -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
 
-    scene = scene_registry.get("rlgl")
+    scene = scene_registry.get("red_light_green_light")
     local_effects = scene.local_effect_registry
 
     for effect_name in (
@@ -63,11 +63,11 @@ def test_rlgl_scene_local_effect_builders_are_discovered() -> None:
         assert isinstance(builder, EffectBuilder)
 
 
-def test_rlgl_scene_local_audio_only_effects_have_no_pixels() -> None:
+def test_red_light_green_light_scene_local_audio_only_effects_have_no_pixels() -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
 
-    scene = scene_registry.get("rlgl")
+    scene = scene_registry.get("red_light_green_light")
     local_effects = scene.local_effect_registry
 
     for effect_name in ("red_light_music", "green_light_music", "game_over_sting", "win_sting"):
@@ -77,11 +77,11 @@ def test_rlgl_scene_local_audio_only_effects_have_no_pixels() -> None:
         assert effect.pixels is None
 
 
-def test_rlgl_scene_local_warning_sting_effect_has_pixels() -> None:
+def test_red_light_green_light_scene_local_warning_sting_effect_has_pixels() -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
 
-    scene = scene_registry.get("rlgl")
+    scene = scene_registry.get("red_light_green_light")
     local_effects = scene.local_effect_registry
 
     builder = local_effects.get("warning_sting", EffectBuilder)
@@ -90,16 +90,16 @@ def test_rlgl_scene_local_warning_sting_effect_has_pixels() -> None:
     assert effect.pixels is not None
 
 
-def test_rlgl_scene_json_does_not_list_rlgl_effect_or_rule_packs() -> None:
+def test_red_light_green_light_scene_json_does_not_list_own_effect_or_rule_packs() -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
 
-    scene = scene_registry.get("rlgl")
+    scene = scene_registry.get("red_light_green_light")
 
     pack_names = [name for name, _ in scene.effect_packs]
-    assert "rlgl" not in pack_names
+    assert "red_light_green_light" not in pack_names
     rule_pack_names = [name for name, _ in scene.rule_packs]
-    assert "rlgl" not in rule_pack_names
+    assert "red_light_green_light" not in rule_pack_names
 
 
 # --- Rules registry ---

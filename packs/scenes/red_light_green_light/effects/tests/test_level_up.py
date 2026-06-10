@@ -1,4 +1,4 @@
-"""Unit tests for packs.scenes.rlgl.effects.level_up."""
+"""Unit tests for packs.scenes.red_light_green_light.effects.level_up."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ def _config() -> EffectConfig:
 
 
 def _build() -> Effect:
-    from packs.scenes.rlgl.effects.level_up import BUILD
+    from packs.scenes.red_light_green_light.effects.level_up import BUILD
 
     return BUILD("scene.level_up", _config())
 

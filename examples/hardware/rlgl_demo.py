@@ -1,6 +1,6 @@
 """Red Light Green Light mini-game — RP2040 PropMaker Feather + IS31FL3741.
 
-Runs the RLGL mini-game scene on a PropMaker Feather with an IS31FL3741 LED
+Runs the Red Light, Green Light mini-game scene on a PropMaker Feather with an IS31FL3741 LED
 matrix.  The accelerometer detects player motion so the game can catch cheaters
 moving on a red light.
 
@@ -113,8 +113,8 @@ _scene_registry = SceneRegistry()
 _scene_registry.scan_dir("packs/scenes", "packs.scenes")
 
 _scene_manager = SceneManager(_engine, _effect_registry, _rule_registry, _scene_registry)
-_scene_manager.load("rlgl")
-_scene_manager.update()  # applies the load transition; rlgl scene is now active
+_scene_manager.load("red_light_green_light")
+_scene_manager.update()  # applies the load transition; red_light_green_light scene is now active
 
 # ---------------------------------------------------------------------------
 # Main loop

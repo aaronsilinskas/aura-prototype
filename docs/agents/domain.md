@@ -52,7 +52,7 @@ magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
 packs/            Game-specific packs loaded at runtime (CircuitPython/MicroPython-safe)
   effects/        Effect packs (basic, elements, hw_test)
   rules/          Rule packs (debug, hw_test)
-  scenes/         Scene definitions (hw_test, rlgl)
+  scenes/         Scene definitions (hw_test, red_light_green_light)
 
 hardware/         Hardware abstraction layer
   circuitpython/  CircuitPython drivers (propmaker, IS31FL3741, DRV2605, audio)

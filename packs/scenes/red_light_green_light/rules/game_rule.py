@@ -35,7 +35,7 @@ from engine.engine import GameRule
 from engine.input import AccelerationData, InputEvents
 from engine.lerp import level_lerp
 from engine.state import EffectReceipt, GameState, Scope
-from packs.scenes.rlgl.rules.helpers.motion_detector import (
+from packs.scenes.red_light_green_light.rules.helpers.motion_detector import (
     GRAVITY_LOWPASS_BETA,
     GREEN_MIN_MOTION_THRESHOLD,
     MOTION_EMA_ALPHA,

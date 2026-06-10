@@ -8,7 +8,7 @@ from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
-from packs.scenes.rlgl.rules.game_rule import (
+from packs.scenes.red_light_green_light.rules.game_rule import (
     PHASE_GAME_OVER,
     PHASE_GREEN,
     PHASE_GREEN_WARNING,
@@ -20,7 +20,7 @@ from packs.scenes.rlgl.rules.game_rule import (
     RULE,
     RlglGameRule,
 )
-from packs.scenes.rlgl.rules.helpers.motion_detector import (
+from packs.scenes.red_light_green_light.rules.helpers.motion_detector import (
     GREEN_MIN_MOTION_THRESHOLD,
     RED_MAX_MOTION_THRESHOLD,
 )

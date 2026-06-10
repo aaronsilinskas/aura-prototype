@@ -13,7 +13,7 @@ microcontrollers. Full game and hardware design lives in `~/dev/aura/aura-docs/`
 ```
 effects/     Composable LED animation engine; runs on CPython and CircuitPython
 engine/      Event-driven game loop: rules, scenes, state, packs, and I/O abstractions
-packs/       First-party effect, rule, and scene packs (elements, rlgl, hw_test, …)
+packs/       First-party effect, rule, and scene packs (elements, red_light_green_light, hw_test, …)
 hardware/    Hardware drivers and shared abstractions for CircuitPython props
 magic/       Spell and aura game logic (elements, buffs/debuffs, cast types)
 scripts/     Deploy and maintenance scripts (CPython-only)
