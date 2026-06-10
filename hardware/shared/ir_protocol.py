@@ -179,7 +179,7 @@ class InfraredDecoder:
     def _reset(self, error_margin: int | None) -> None:
         """Reset decoder state and record *error_margin* for this packet."""
         self._decoder_state = 0
-        self._received_data.clear()  # mutate in place — no allocation
+        self._received_data = bytearray()  # MicroPython does not support clear() on bytearray
         self._received_bit_index = 7
         self._received_byte = 0
         self._max_error_margin = 0
