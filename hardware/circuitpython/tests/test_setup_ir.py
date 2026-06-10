@@ -9,6 +9,9 @@ Covers:
 - setup_ir transmitters are InfraredTransmitter instances
 - setup_ir receiver is an InfraredSingleReceiver instance
 - setup_ir omits optional emitters when their pin is None
+- setup_ir defaults to Aura codecs when encoder/decoder are omitted
+- setup_ir wires a provided encoder/decoder pair into transmitters/receiver
+- setup_ir reuses the same encoder instance across all wired transmitters
 """
 
 from __future__ import annotations
@@ -123,6 +126,8 @@ import pytest  # noqa: E402
 
 import hardware.circuitpython.propmaker as propmaker  # noqa: E402
 from engine.network import AREA_OF_EFFECT, CONE, LINE  # noqa: E402
+from hardware.shared.ir_protocol import AuraInfraredDecoder, AuraInfraredEncoder  # noqa: E402
+from hardware.shared.tag_protocol import TagInfraredDecoder, TagInfraredEncoder  # noqa: E402
 
 _RX_PIN = object()
 _LINE_PIN = object()
@@ -210,3 +215,38 @@ def test_setup_ir_raises_when_line_pin_is_none():
     """setup_ir raises ValueError when line_pin is None — LINE is always required."""
     with pytest.raises(ValueError, match="line_pin is required"):
         propmaker.setup_ir(_RX_PIN, None)
+
+
+# ---------------------------------------------------------------------------
+# setup_ir — codec injection
+# ---------------------------------------------------------------------------
+
+
+def test_setup_ir_defaults_to_aura_encoder_for_transmitters():
+    """Omitting encoder wires transmitters with AuraInfraredEncoder."""
+    transmitters, _receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN)
+    assert isinstance(transmitters[LINE]._encoder, AuraInfraredEncoder)
+
+
+def test_setup_ir_defaults_to_aura_decoder_for_receiver():
+    """Omitting decoder wires the receiver with AuraInfraredDecoder."""
+    _transmitters, receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN)
+    assert isinstance(receiver._decoder, AuraInfraredDecoder)
+
+
+def test_setup_ir_wires_provided_encoder_into_transmitters():
+    """A passed-in encoder is used by the wired transmitters."""
+    encoder = TagInfraredEncoder()
+    transmitters, _receiver = propmaker.setup_ir(
+        _RX_PIN, _LINE_PIN, cone_pin=_CONE_PIN, aoe_pin=_AOE_PIN, encoder=encoder
+    )
+    assert transmitters[LINE]._encoder is encoder
+    assert transmitters[CONE]._encoder is encoder
+    assert transmitters[AREA_OF_EFFECT]._encoder is encoder
+
+
+def test_setup_ir_wires_provided_decoder_into_receiver():
+    """A passed-in decoder is used by the receiver."""
+    decoder = TagInfraredDecoder()
+    _transmitters, receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN, decoder=decoder)
+    assert receiver._decoder is decoder

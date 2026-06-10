@@ -29,7 +29,12 @@ from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 from engine.network import AREA_OF_EFFECT, CONE, LINE
 from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 from hardware.shared.debounced_buttons import DebouncedButtons
-from hardware.shared.ir_protocol import AuraInfraredDecoder, AuraInfraredEncoder
+from hardware.shared.ir_protocol import (
+    AuraInfraredDecoder,
+    AuraInfraredEncoder,
+    InfraredDecoder,
+    InfraredEncoder,
+)
 from hardware.shared.ir_transport import InfraredSingleReceiver, InfraredTransmitter
 
 
@@ -125,6 +130,8 @@ def setup_ir(
     line_pin: object,  # pulseio pin — no stub on CPython
     cone_pin: object | None = None,
     aoe_pin: object | None = None,
+    encoder: InfraredEncoder | None = None,
+    decoder: InfraredDecoder | None = None,
 ) -> tuple[dict[str, InfraredTransmitter], InfraredSingleReceiver]:
     """Set up IR transceiver hardware and return the transmitter map + receiver.
 
@@ -145,6 +152,14 @@ def setup_ir(
         line_pin: CircuitPython pin for the LINE emitter (required, must not be ``None``).
         cone_pin: CircuitPython pin for the CONE emitter, or ``None`` to omit.
         aoe_pin: CircuitPython pin for the AREA_OF_EFFECT emitter, or ``None``.
+        encoder: :class:`~hardware.shared.ir_protocol.InfraredEncoder` shared by
+            all wired transmitters, or ``None`` to use ``AuraInfraredEncoder()``.
+        decoder: :class:`~hardware.shared.ir_protocol.InfraredDecoder` used by
+            the receiver, or ``None`` to use ``AuraInfraredDecoder()``.
+
+            ``encoder`` and ``decoder`` must use the same wire protocol — a
+            mismatched pair will not raise an error but will silently fail to
+            decode received frames.
 
     Returns:
         A tuple ``(transmitters, receiver)`` where ``transmitters`` is a
@@ -157,9 +172,14 @@ def setup_ir(
     if line_pin is None:
         raise ValueError("line_pin is required — the LINE emitter must always be wired")
 
+    if encoder is None:
+        encoder = AuraInfraredEncoder()
+    if decoder is None:
+        decoder = AuraInfraredDecoder()
+
     pulsein = pulseio.PulseIn(rx_pin, maxlen=256, idle_state=True)
     reader = PulseInReader(pulsein)
-    receiver = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+    receiver = InfraredSingleReceiver(reader, decoder)
 
     transmitters: dict[str, InfraredTransmitter] = {}
     for emitter, pin in ((LINE, line_pin), (CONE, cone_pin), (AREA_OF_EFFECT, aoe_pin)):
@@ -167,6 +187,6 @@ def setup_ir(
             continue
         pulseout = pulseio.PulseOut(pin, frequency=38000, duty_cycle=0x8000)
         writer = PulseOutWriter(pulseout)
-        transmitters[emitter] = InfraredTransmitter(writer, AuraInfraredEncoder())
+        transmitters[emitter] = InfraredTransmitter(writer, encoder)
 
     return transmitters, receiver
