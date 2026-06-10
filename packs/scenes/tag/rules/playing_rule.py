@@ -4,7 +4,8 @@ On entry, sets hitpoints to the configured starting value and shows a full
 ``basic.progress`` bar on ``Scope.PERSONAL``. Button A fires a shot: encodes
 the player's own ``TagData`` identity, sends it on the LINE IR emitter, logs
 the send, and starts the self-deafen window so the player's own shot is not
-immediately registered as a hit.
+immediately registered as a hit. When hitpoints reach zero or below, transitions
+to the ``game_over`` phase (clearing the shared ``tag_entered`` flag).
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ from packs.scenes.tag.rules.helpers.phases import (
     KEY_HITPOINTS,
     KEY_PHASE,
     KEY_STARTING_HITPOINTS,
+    PHASE_GAME_OVER,
     PHASE_PLAYING,
 )
 
@@ -57,6 +59,10 @@ class TagPlayingRule(GameRule):
 
         if event.buttons.is_pressed("A"):
             self._fire_shot(state)
+
+        if state.get(KEY_HITPOINTS, DEFAULT_STARTING_HITPOINTS) <= 0:
+            state.set(KEY_PHASE, PHASE_GAME_OVER)
+            state.set(KEY_ENTERED, False)
 
     def _fire_shot(self, state: GameState) -> None:
         team = state.get(KEY_EXPECTED_TEAM, DEFAULT_EXPECTED_TEAM)

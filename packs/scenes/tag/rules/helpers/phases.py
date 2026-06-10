@@ -22,6 +22,7 @@ except ImportError:
 PHASE_READY: Final = "ready"
 PHASE_STARTING: Final = "starting"
 PHASE_PLAYING: Final = "playing"
+PHASE_GAME_OVER: Final = "game_over"
 
 # ---------------------------------------------------------------------------
 # GameState key names (all tag_ prefixed)
@@ -44,6 +45,7 @@ KEY_PROGRESS_RECEIPT: Final = "tag_progress_receipt"
 KEY_WARNING_RECEIPT: Final = "tag_warning_receipt"
 KEY_WARNING_START: Final = "tag_warning_start"
 KEY_DEAFEN_UNTIL: Final = "tag_deafen_until"
+KEY_GAME_OVER_RECEIPT: Final = "tag_game_over_receipt"
 
 # ---------------------------------------------------------------------------
 # Defaults

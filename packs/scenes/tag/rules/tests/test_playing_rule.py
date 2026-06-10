@@ -14,8 +14,10 @@ from packs.scenes.tag.rules.helpers.phases import (
     DEFAULT_STARTING_HITPOINTS,
     KEY_DEAFEN_UNTIL,
     KEY_DEAFEN_WINDOW,
+    KEY_ENTERED,
     KEY_HITPOINTS,
     KEY_PHASE,
+    PHASE_GAME_OVER,
     PHASE_PLAYING,
 )
 from packs.scenes.tag.rules.playing_rule import TagPlayingRule
@@ -123,3 +125,35 @@ def test_non_playing_phase_is_ignored(spy):
     _tick(state, engine, timer, 0.0)
 
     assert spy.set_effect_calls == []
+
+
+def test_hitpoints_reaching_zero_transitions_to_game_over(spy):
+    state, engine, timer = _make_state(spy, initial_data={KEY_HITPOINTS: 0, KEY_ENTERED: True})
+
+    _tick(state, engine, timer, 0.0)
+
+    assert state.get(KEY_PHASE, None) == PHASE_GAME_OVER
+
+
+def test_hitpoints_dropping_below_zero_transitions_to_game_over(spy):
+    state, engine, timer = _make_state(spy, initial_data={KEY_HITPOINTS: -3, KEY_ENTERED: True})
+
+    _tick(state, engine, timer, 0.0)
+
+    assert state.get(KEY_PHASE, None) == PHASE_GAME_OVER
+
+
+def test_transitioning_to_game_over_clears_entered_flag(spy):
+    state, engine, timer = _make_state(spy, initial_data={KEY_HITPOINTS: 0, KEY_ENTERED: True})
+
+    _tick(state, engine, timer, 0.0)
+
+    assert state.get(KEY_ENTERED, True) is False
+
+
+def test_positive_hitpoints_does_not_transition_to_game_over(spy):
+    state, engine, timer = _make_state(spy)
+
+    _tick(state, engine, timer, 0.0)
+
+    assert state.get(KEY_PHASE, None) == PHASE_PLAYING
