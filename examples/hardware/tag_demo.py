@@ -95,6 +95,7 @@ _rule_registry.scan_dir("packs/rules", "packs.rules")
 
 _audio_registry = AudioRegistry()
 _audio_registry.register("warning_pulse_peak", "sounds/blip.wav")
+_audio_registry.register("scene.game_over_sting_start", "sounds/game_over.wav")
 
 _audio_output = AudioEffectOutput(_audio_registry, max_volume=0.1, num_voices=1)
 _outputs = [IS31FL3741EffectOutput(_matrix), _audio_output]
