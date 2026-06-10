@@ -211,6 +211,38 @@ def test_handle_event_ignores_oserror_on_file_open(tmp_path) -> None:
     mixer.voice[1].play.assert_not_called()
 
 
+def test_unregistered_clip_with_stops_effect_stops_receipt_immediately() -> None:
+    """A stops_effect clip name missing from AudioRegistry must not run forever."""
+    output, _mixer = _make_output(AudioRegistry())
+    receipt = _make_receipt()
+
+    output.handle_event(
+        EffectEvent("tag", "effect", "start"),
+        frozenset({"personal"}),
+        _effect_oneshot_stops_effect("start", "missing_clip"),
+        receipt,
+    )
+
+    receipt.stop.assert_called_once()
+
+
+def test_oserror_on_file_open_with_stops_effect_stops_receipt_immediately(tmp_path) -> None:
+    """A stops_effect clip whose file fails to open must not run forever."""
+    registry = AudioRegistry()
+    registry.register("missing", str(tmp_path / "nonexistent.wav"))
+    output, _mixer = _make_output(registry)
+    receipt = _make_receipt()
+
+    output.handle_event(
+        EffectEvent("tag", "effect", "start"),
+        frozenset({"personal"}),
+        _effect_oneshot_stops_effect("start", "missing"),
+        receipt,
+    )
+
+    receipt.stop.assert_called_once()
+
+
 # ---------------------------------------------------------------------------
 # handle_event — routing a valid clip into the pool reaches the hardware
 # ---------------------------------------------------------------------------

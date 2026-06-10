@@ -135,6 +135,26 @@ def test_failed_load_into_idle_slot_returns_minus_one_without_playing(
     assert play_calls(sink) == []
 
 
+def test_failed_load_with_stops_receipt_stops_the_receipt_immediately(
+    pool: VoicePool, sink: RecordingSink
+) -> None:
+    sink.fail_next_open()
+    receipt = make_receipt()
+    slot = pool.claim(sink, "missing.wav", loop=False, stops_receipt=True, receipt=receipt)
+    assert slot == -1
+    assert receipt.is_stopped()
+
+
+def test_failed_load_without_stops_receipt_leaves_receipt_to_rules(
+    pool: VoicePool, sink: RecordingSink
+) -> None:
+    sink.fail_next_open()
+    receipt = make_receipt()
+    slot = pool.claim(sink, "missing.wav", loop=False, stops_receipt=False, receipt=receipt)
+    assert slot == -1
+    assert not receipt.is_stopped()
+
+
 def test_failed_load_does_not_evict_a_live_voice(pool: VoicePool, sink: RecordingSink) -> None:
     for _ in range(3):
         pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=make_receipt())

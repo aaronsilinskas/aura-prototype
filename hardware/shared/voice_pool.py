@@ -134,13 +134,17 @@ class VoicePool:
         slot pick of ``-1`` or a failed load evicts nothing — teardown is
         deferred until after a successful load.  When the evicted slot has
         ``stops_receipt`` set, its receipt is stopped on eviction; otherwise
-        receipt lifecycle stays with rules.
+        receipt lifecycle stays with rules.  A failed load with
+        ``stops_receipt`` set stops ``receipt`` immediately, since nothing
+        will ever own its release.
         """
         slot = self._select_slot(loop)
         if slot == -1:
             return -1
         source = sink.open_source(path)
         if source is None:
+            if stops_receipt:
+                receipt.stop()
             return -1
         s = self._slots[slot]
         if s.receipt is not None and s.stops_receipt:
