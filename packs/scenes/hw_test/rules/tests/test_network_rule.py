@@ -274,8 +274,9 @@ def test_ir_received_logs_payload_and_signal_quality(spy, capsys):
 
 def test_radio_received_logs_payload_and_sender(spy, capsys):
     state, engine = _make_state(spy, hw_mode=3)
-    _fire_radio(state, engine)
+    state.queue_event(NetworkEvents.RadioReceived(b"payload-xyz", "device-7"))
+    engine.update(state)
 
     out = capsys.readouterr().out
-    assert str(b"test") in out
-    assert "sender" in out
+    assert str(b"payload-xyz") in out
+    assert "device-7" in out
