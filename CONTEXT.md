@@ -139,3 +139,23 @@ _Avoid_: `MovementData`
 ### ButtonData
 A snapshot of button states at a point in time. Each button maps to one of four constants: `UP`, `DOWN`, `PRESSED` (transitioned down this frame), `RELEASED` (transitioned up this frame). Convenience query methods (`is_pressed`, `is_down`, etc.) return `bool`; `is_down` returns `True` on both the `PRESSED` and `DOWN` frames ("currently contacting"). Unknown button names return `False`/`None` rather than raising.
 _Avoid_: reading `_states` directly (use the query methods); assuming `is_down` excludes the `PRESSED` frame
+
+### IR transport
+The hardware-agnostic infrared send/receive subsystem (`hardware/shared/`, no `pulseio`), reached through `PulseReader`/`PulseWriter` ports with CircuitPython adapters — the same seam as `VoicePool`/`VoiceSink`. Moves opaque `bytes` with no game semantics: transmit via `NetworkControls.send_ir`, receive surfaced as `NetworkEvents.IRReceived`.
+_Avoid_: importing `pulseio` into shared IR code; encoding spell fields in the transport (that belongs to a game-layer codec over the payload)
+
+### IR emitter
+A directed infrared transmit channel. Constants `LINE` (narrow line-of-sight), `CONE`, `AREA_OF_EFFECT` are the `send_ir` vocabulary, defined in `engine/network.py` (not the shared transport) and each mapped to its own `InfraredTransmitter` by `HardwareNetworkControls`. The caller must name the emitter; sending to an unwired one is a programming error.
+_Avoid_: importing `magic.CastType` for IR emitters (the network seam owns these); a default emitter on `send_ir` (intent must be explicit)
+
+### IR multi-receiver
+Several IR receivers, each on its own data line, returning the packet with the lowest **error margin**. Improves *reception reliability only* — it does not yield hit direction.
+_Avoid_: treating the array as a direction finder (abandoned in field testing); sharing one data line across receivers
+
+### IR error margin
+The worst-case pulse-timing deviation (µs) tolerated while still decoding a packet. Lower is better; the key the multi-receiver uses to pick the best receiver.
+_Avoid_: conflating with **IR signal strength** (a normalized derivative, not the raw margin)
+
+### IR signal strength
+A normalized 0.0–1.0 quality metric derived from a packet's error margin (timing error ≤30% of threshold = full strength). A coarse proximity stand-in, inferred from timing accuracy — not measured power, and conveys no direction.
+_Avoid_: calling it "RSSI" as if measured; using it to derive hit direction
