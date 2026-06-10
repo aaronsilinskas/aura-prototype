@@ -8,6 +8,7 @@ except ImportError:
 from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState, Scope
+from packs.scenes.hw_test.rules.helpers.mode import MODE_ACCELEROMETER, current_mode
 
 ACCEL_MAX: Final = 9.8
 
@@ -32,7 +33,7 @@ class HwTestMotionRule(GameRule):
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
-        if state.get("hw_mode", -1) != 1:
+        if current_mode(state) != MODE_ACCELEROMETER:
             return
 
         if event.acceleration is None:

@@ -4,10 +4,8 @@
     ["elements", "1.0"],
     ["basic", "1.0"]
   ],
-  "rule_packs": [
-    ["debug", "1.0"]
-  ],
+  "rule_packs": [],
   "initial_data": {
-    "initial_mode": 0
+    "hw_mode": 0
   }
 }

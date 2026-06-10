@@ -2,9 +2,9 @@
 
 Loads the ``hw_test`` scene via ``SceneManager`` so every hardware subsystem
 (LEDs, buttons, accelerometer, IR transceiver, radio, audio, haptics) can be
-exercised through the same scene logic used in production.  The ``debug`` rules
-pack logs every dispatched event to the serial console, giving a text trace
-alongside the visual output.
+exercised through the same scene logic used in production.  Pressing Button B
+logs the mode change to the serial console, giving a text trace alongside the
+visual output.
 
 Hardware
 --------
