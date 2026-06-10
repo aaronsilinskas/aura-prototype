@@ -23,7 +23,7 @@ class GravityBuilder(EffectBuilder):
 
         simulation state lives directly on the effect.
         """
-        level = clamp_level(int(config.options.get("level", 1)))
+        level = clamp_level(config.get_option("level", 1))
 
         nebula_resolution = max(config.resolution, level_lerp_int(level, 18, 36))
         nebula_drift_speed = level_lerp(level, 0.02, 0.038)

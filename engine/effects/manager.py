@@ -92,7 +92,7 @@ class EffectBuilder:
 
         Args:
             name: The registered effect name (e.g. ``"color.flash"``).
-            config: Runtime configuration for the render pass. ``config.options``
+            config: Runtime configuration for the render pass. ``config.get_option``
                 carries any effect-specific parameters (e.g. duration, color).
                 ``config.resolution`` describes the output hardware.
 

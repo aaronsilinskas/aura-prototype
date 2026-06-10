@@ -17,9 +17,8 @@ class ProgressBuilder(EffectBuilder):
     """
 
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        opts = config.options
-        color = opts.get("color", 0xFFFFFF)
-        progress = opts.get("progress", 0.0)
+        color = config.get_option("color", 0xFFFFFF)
+        progress = config.get_option("progress", 0.0)
         layer = ProgressLayer(progress)
         return Effect(name=name, pixels=ProgressEffect(layer, color))
 

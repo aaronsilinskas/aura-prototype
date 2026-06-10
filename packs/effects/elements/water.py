@@ -23,7 +23,7 @@ class WaterBuilder(EffectBuilder):
         Level: the current accelerates and the flame grows more turbulent,
         producing faster, stronger ripples.
         """
-        level = clamp_level(int(config.options.get("level", 1)))
+        level = clamp_level(config.get_option("level", 1))
         return Effect(
             name=name,
             pixels=LayerRenderer(

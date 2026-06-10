@@ -23,21 +23,26 @@ def test_config_clamps_resolution_below_one_to_one() -> None:
 
 
 # ---------------------------------------------------------------------------
-# EffectConfig — options
+# EffectConfig — get_option
 # ---------------------------------------------------------------------------
 
 
-def test_config_preserves_options_dict_passed_at_construction() -> None:
-    opts = {"color": "red"}
-    config = EffectConfig(resolution=10, options=opts)
+def test_get_option_returns_stored_value_for_present_key() -> None:
+    config = EffectConfig(resolution=10, options={"color": "red"})
 
-    assert config.options == opts
+    assert config.get_option("color", "blue") == "red"
 
 
-def test_config_options_defaults_to_empty_dict() -> None:
+def test_get_option_returns_default_for_absent_key() -> None:
+    config = EffectConfig(resolution=10, options={"color": "red"})
+
+    assert config.get_option("level", 3) == 3
+
+
+def test_get_option_returns_default_when_no_options_were_provided() -> None:
     config = EffectConfig(resolution=10)
 
-    assert config.options == {}
+    assert config.get_option("color", "blue") == "blue"
 
 
 # ---------------------------------------------------------------------------
