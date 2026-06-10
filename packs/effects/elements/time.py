@@ -26,7 +26,7 @@ class TimeBuilder(EffectBuilder):
 
         simulation state lives directly on the effect.
         """
-        level = clamp_level(int(config.options.get("level", 1)))
+        level = clamp_level(config.get_option("level", 1))
 
         drift_speed = level_lerp(level, 0.02, 0.065)
         ticker_rotate_speed = level_lerp(level, 0.1, 0.28)

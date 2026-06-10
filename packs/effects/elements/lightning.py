@@ -133,7 +133,7 @@ class LightningBuilder(EffectBuilder):
 
         runs its own IDLE/STRIKE FSM directly on the effect.
         """
-        level = clamp_level(int(config.options.get("level", 1)))
+        level = clamp_level(config.get_option("level", 1))
 
         hide_max = 1.5 - (1 - 1 / level)
         strike_duration_max = 1.25 - (1 - 1 / level)

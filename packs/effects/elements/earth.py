@@ -21,7 +21,7 @@ class EarthBuilder(EffectBuilder):
         Level: more heat sparks with a narrower spread, concentrating the smolder
         into a tighter, more active column.
         """
-        level = clamp_level(int(config.options.get("level", 1)))
+        level = clamp_level(config.get_option("level", 1))
         return Effect(
             name=name,
             pixels=LayerRenderer(

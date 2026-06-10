@@ -149,7 +149,7 @@ class AirBuilder(EffectBuilder):
 
         Each breeze runs its own IDLE/SWEEP/FADE FSM directly on the effect.
         """
-        level = clamp_level(int(config.options.get("level", 1)))
+        level = clamp_level(config.get_option("level", 1))
 
         breeze_count = 1 + level // 5
         padding = 0.3 - level_lerp(level, 0.0, 0.3)

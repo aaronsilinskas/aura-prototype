@@ -23,7 +23,7 @@ class IceBuilder(EffectBuilder):
         Level: the flame flows faster with a tighter spread, producing a sharper,
         more active column.
         """
-        level = clamp_level(int(config.options.get("level", 1)))
+        level = clamp_level(config.get_option("level", 1))
         return Effect(
             name=name,
             pixels=LayerRenderer(

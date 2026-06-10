@@ -20,13 +20,12 @@ class PulseBuilder(EffectBuilder):
     """
 
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        opts = config.options
-        start_color = opts.get("start_color", 0x000000)
-        end_color = opts.get("end_color", 0xFFFFFF)
-        brighten_duration = opts.get("brighten_duration", 0.5)
-        on_duration = opts.get("on_duration", 0.5)
-        darken_duration = opts.get("darken_duration", 0.5)
-        off_duration = opts.get("off_duration", 0.5)
+        start_color = config.get_option("start_color", 0x000000)
+        end_color = config.get_option("end_color", 0xFFFFFF)
+        brighten_duration = config.get_option("brighten_duration", 0.5)
+        on_duration = config.get_option("on_duration", 0.5)
+        darken_duration = config.get_option("darken_duration", 0.5)
+        off_duration = config.get_option("off_duration", 0.5)
 
         if brighten_duration < 0 or on_duration < 0 or darken_duration < 0 or off_duration < 0:
             raise ValueError("Pulse durations must be non-negative")

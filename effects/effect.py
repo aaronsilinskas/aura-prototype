@@ -6,6 +6,13 @@ try:
 except ImportError:
     pass
 
+try:
+    from typing import TypeVar
+
+    T = TypeVar("T")
+except ImportError:
+    pass  # Not available on CircuitPython
+
 EffectListenerFunc: TypeAlias = "Callable[[str], None]"
 
 
@@ -126,7 +133,7 @@ class EffectConfig:
       - ``resolution`` is clamped to a minimum of ``1`` at construction.
     """
 
-    __slots__ = ["listeners", "options", "resolution"]
+    __slots__ = ["_options", "listeners", "resolution"]
 
     def __init__(
         self,
@@ -135,8 +142,18 @@ class EffectConfig:
         listeners: list[EffectListenerFunc] | None = None,
     ) -> None:
         self.resolution = max(1, resolution)
-        self.options = options if options is not None else {}
+        self._options = options if options is not None else {}
         self.listeners = listeners if listeners is not None else []
+
+    def get_option(self, key: str, default: T) -> T:
+        """Return the option stored at ``key``, or ``default`` if absent.
+
+        The returned value is not coerced; it is assumed to match the type
+        of ``default`` based on the caller's contract with the option.
+        """
+        if key in self._options:
+            return self._options[key]  # type: ignore[return-value]
+        return default
 
     def notify_listeners(self, event_name: str) -> None:
         """Invoke all registered listeners with ``event_name``."""

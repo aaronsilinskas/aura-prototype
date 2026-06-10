@@ -21,7 +21,7 @@ class DarkBuilder(EffectBuilder):
         Level: more sparks can glow simultaneously, though each spawns more slowly
         — the field grows denser rather than quickening.
         """
-        level = clamp_level(int(config.options.get("level", 1)))
+        level = clamp_level(config.get_option("level", 1))
         spawn_delay_min = level_lerp(level, 0.5, 1.0)
         spawn_delay_max = level_lerp(level, 3.0, 5.0)
 
