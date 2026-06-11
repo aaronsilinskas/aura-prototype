@@ -8,25 +8,10 @@ from engine.engine import GameEngine
 from engine.input import ButtonData, InputEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
-from packs.scenes.tag.rules.helpers.phases import (
-    KEY_PHASE,
-    KEY_WARNING_PULSE_COUNT,
-    KEY_WARNING_PULSE_DURATION,
-    PHASE_PLAYING,
-    PHASE_STARTING,
-)
+from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, PHASE_STARTING
+from packs.scenes.tag.rules.helpers.tag_state import tag_state
 from packs.scenes.tag.rules.starting_rule import TagStartingRule
-
-
-class _StubTimer:
-    """Controllable timer for tests that need specific total values."""
-
-    def __init__(self) -> None:
-        self.elapsed: float = 0.0
-        self.total: float = 0.0
-
-    def update(self) -> None:
-        pass  # Caller controls total directly
+from packs.scenes.tag.rules.tests.helpers import StubTimer, seed_phase
 
 
 @pytest.fixture()
@@ -36,18 +21,16 @@ def spy() -> SpyEffectControls:
 
 def _make_state(
     spy: SpyEffectControls, initial_data: dict | None = None
-) -> tuple[GameState, GameEngine, _StubTimer]:
-    timer = _StubTimer()
+) -> tuple[GameState, GameEngine, StubTimer]:
+    timer = StubTimer()
     engine = GameEngine(spy, timer=timer)  # pyright: ignore[reportArgumentType]
     engine.add_rules(TagStartingRule())
-    data = {"tag_phase": PHASE_STARTING}
-    if initial_data:
-        data.update(initial_data)
-    state = engine.create_state(SceneControls(), initial_data=data)
+    state = engine.create_state(SceneControls(), initial_data=initial_data or {})
+    seed_phase(state, PHASE_STARTING)
     return state, engine, timer
 
 
-def _tick(state: GameState, engine: GameEngine, timer: _StubTimer, total: float) -> None:
+def _tick(state: GameState, engine: GameEngine, timer: StubTimer, total: float) -> None:
     timer.total = total
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
     engine.update(state)
@@ -66,20 +49,20 @@ def test_entering_starting_sets_looping_warning_pulse_once(spy):
 
 def test_transitions_to_playing_after_count_times_duration_seconds(spy):
     state, engine, timer = _make_state(
-        spy, {KEY_WARNING_PULSE_COUNT: 5, KEY_WARNING_PULSE_DURATION: 0.6}
+        spy, {"tag_warning_pulse_count": 5, "tag_warning_pulse_duration": 0.6}
     )
 
     _tick(state, engine, timer, 0.0)
     _tick(state, engine, timer, 2.9)
-    assert state.get(KEY_PHASE, None) == PHASE_STARTING
+    assert tag_state(state).phase == PHASE_STARTING
 
     _tick(state, engine, timer, 3.0)
-    assert state.get(KEY_PHASE, None) == PHASE_PLAYING
+    assert tag_state(state).phase == PHASE_PLAYING
 
 
 def test_transitioning_to_playing_stops_the_warning_pulse(spy):
     state, engine, timer = _make_state(
-        spy, {KEY_WARNING_PULSE_COUNT: 1, KEY_WARNING_PULSE_DURATION: 0.1}
+        spy, {"tag_warning_pulse_count": 1, "tag_warning_pulse_duration": 0.1}
     )
 
     _tick(state, engine, timer, 0.0)
@@ -90,7 +73,7 @@ def test_transitioning_to_playing_stops_the_warning_pulse(spy):
 
 def test_non_starting_phase_is_ignored(spy):
     state, engine, timer = _make_state(spy)
-    state.set(KEY_PHASE, "ready")
+    seed_phase(state, "ready", entered=True)
 
     _tick(state, engine, timer, 0.0)
 

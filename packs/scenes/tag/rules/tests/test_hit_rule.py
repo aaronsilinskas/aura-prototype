@@ -9,25 +9,11 @@ from engine.network import NetworkEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
 from hardware.shared.tag_protocol import TagData, encode_tag_data
-from packs.scenes.tag.rules.helpers.phases import (
-    DEFAULT_STARTING_HITPOINTS,
-    KEY_DEAFEN_UNTIL,
-    KEY_HITPOINTS,
-    KEY_PHASE,
-    PHASE_PLAYING,
-)
+from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING
+from packs.scenes.tag.rules.helpers.tag_config import DEFAULT_STARTING_HITPOINTS
+from packs.scenes.tag.rules.helpers.tag_state import tag_state
 from packs.scenes.tag.rules.hit_rule import TagHitRule
-
-
-class _StubTimer:
-    """Controllable timer for tests that need specific total values."""
-
-    def __init__(self) -> None:
-        self.elapsed: float = 0.0
-        self.total: float = 0.0
-
-    def update(self) -> None:
-        pass  # Caller controls total directly
+from packs.scenes.tag.rules.tests.helpers import StubTimer, seed_phase
 
 
 @pytest.fixture()
@@ -37,24 +23,20 @@ def spy() -> SpyEffectControls:
 
 def _make_state(
     spy: SpyEffectControls, initial_data: dict | None = None
-) -> tuple[GameState, GameEngine, _StubTimer]:
-    timer = _StubTimer()
+) -> tuple[GameState, GameEngine, StubTimer]:
+    timer = StubTimer()
     engine = GameEngine(spy, timer=timer)  # pyright: ignore
     engine.add_rules(TagHitRule())
-    data = {
-        "tag_phase": PHASE_PLAYING,
-        KEY_HITPOINTS: DEFAULT_STARTING_HITPOINTS,
-    }
-    if initial_data:
-        data.update(initial_data)
-    state = engine.create_state(SceneControls(), initial_data=data)
+    state = engine.create_state(SceneControls(), initial_data=initial_data or {})
+    tag = seed_phase(state, PHASE_PLAYING, entered=True)
+    tag.hitpoints = DEFAULT_STARTING_HITPOINTS
     return state, engine, timer
 
 
 def _receive(
     state: GameState,
     engine: GameEngine,
-    timer: _StubTimer,
+    timer: StubTimer,
     total: float,
     tag_data: TagData,
     signal_strength: float | None = 1.0,
@@ -71,7 +53,7 @@ def test_matching_hit_reduces_hitpoints_and_reissues_progress_bar(spy):
 
     _receive(state, engine, timer, 1.0, TagData(team=0, player=1, damage=1))
 
-    assert state.get(KEY_HITPOINTS, None) == DEFAULT_STARTING_HITPOINTS - 1
+    assert tag_state(state).hitpoints == DEFAULT_STARTING_HITPOINTS - 1
     progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
     assert len(progress_calls) == 1
     scope, _, options = progress_calls[0]
@@ -80,12 +62,20 @@ def test_matching_hit_reduces_hitpoints_and_reissues_progress_bar(spy):
     assert options == {"progress": pytest.approx(expected_fraction)}
 
 
+def test_matching_hit_stores_progress_receipt(spy):
+    state, engine, timer = _make_state(spy)
+
+    _receive(state, engine, timer, 1.0, TagData(team=0, player=1, damage=1))
+
+    assert tag_state(state).progress_receipt is not None
+
+
 def test_hit_with_higher_damage_reduces_hitpoints_by_that_amount(spy):
     state, engine, timer = _make_state(spy)
 
     _receive(state, engine, timer, 1.0, TagData(team=0, player=1, damage=4))
 
-    assert state.get(KEY_HITPOINTS, None) == DEFAULT_STARTING_HITPOINTS - 4
+    assert tag_state(state).hitpoints == DEFAULT_STARTING_HITPOINTS - 4
 
 
 def test_identity_mismatch_does_not_change_hitpoints(spy, capsys):
@@ -93,7 +83,7 @@ def test_identity_mismatch_does_not_change_hitpoints(spy, capsys):
 
     _receive(state, engine, timer, 1.0, TagData(team=1, player=2, damage=1))
 
-    assert state.get(KEY_HITPOINTS, None) == DEFAULT_STARTING_HITPOINTS
+    assert tag_state(state).hitpoints == DEFAULT_STARTING_HITPOINTS
     assert spy.set_effect_calls == []
     out = capsys.readouterr().out
     assert "ignored" in out
@@ -102,11 +92,12 @@ def test_identity_mismatch_does_not_change_hitpoints(spy, capsys):
 
 
 def test_within_deafen_window_does_not_change_hitpoints(spy, capsys):
-    state, engine, timer = _make_state(spy, initial_data={KEY_DEAFEN_UNTIL: 1.0})
+    state, engine, timer = _make_state(spy)
+    tag_state(state).deafen_until = 1.0
 
     _receive(state, engine, timer, 0.5, TagData(team=0, player=1, damage=1))
 
-    assert state.get(KEY_HITPOINTS, None) == DEFAULT_STARTING_HITPOINTS
+    assert tag_state(state).hitpoints == DEFAULT_STARTING_HITPOINTS
     assert spy.set_effect_calls == []
     assert "deafened" in capsys.readouterr().out
 
@@ -134,9 +125,9 @@ def test_counted_hit_logs_tag_data_signal_strength_and_error_margin(spy, capsys)
 
 def test_non_playing_phase_is_ignored(spy):
     state, engine, timer = _make_state(spy)
-    state.set(KEY_PHASE, "ready")
+    seed_phase(state, "ready", entered=True)
 
     _receive(state, engine, timer, 1.0, TagData(team=0, player=1, damage=1))
 
-    assert state.get(KEY_HITPOINTS, None) == DEFAULT_STARTING_HITPOINTS
+    assert tag_state(state).hitpoints == DEFAULT_STARTING_HITPOINTS
     assert spy.set_effect_calls == []

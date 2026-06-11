@@ -1,15 +1,15 @@
 """Tag scene hit-handling rule.
 
 Subscribes to ``NetworkEvents.IRReceived`` and turns matching tag packets into
-hitpoint loss while ``tag_phase`` is ``playing``. Decodes every received
+hitpoint loss while ``TagState.phase`` is ``playing``. Decodes every received
 packet (decoding never fails), then applies the accuracy-rig gate order:
 
 1. Phase guard — only acts during the Playing phase.
-2. Identity gate — counts only packets matching ``tag_expected_team`` /
-   ``tag_expected_player``; mismatches are logged and ignored.
-3. Deafen gate — packets received before ``tag_deafen_until`` (the player's
-   own freshly-fired echo, which carries the expected identity) are logged
-   and suppressed.
+2. Identity gate — counts only packets matching the configured expected
+   team/player; mismatches are logged and ignored.
+3. Deafen gate — packets received before ``TagState.deafen_until`` (the
+   player's own freshly-fired echo, which carries the expected identity) are
+   logged and suppressed.
 4. Hit — subtracts the decoded ``damage`` from hitpoints and re-issues the
    ``Scope.PERSONAL`` ``basic.progress`` bar with the new fraction (clamped to
    ``[0, 1]`` by the layer).
@@ -21,19 +21,9 @@ from engine.engine import GameRule
 from engine.network import NetworkEvents
 from engine.state import GameState, Scope
 from hardware.shared.tag_protocol import decode_tag_data
-from packs.scenes.tag.rules.helpers.phases import (
-    DEFAULT_DEAFEN_UNTIL,
-    DEFAULT_EXPECTED_PLAYER,
-    DEFAULT_EXPECTED_TEAM,
-    DEFAULT_STARTING_HITPOINTS,
-    KEY_DEAFEN_UNTIL,
-    KEY_EXPECTED_PLAYER,
-    KEY_EXPECTED_TEAM,
-    KEY_HITPOINTS,
-    KEY_PHASE,
-    KEY_STARTING_HITPOINTS,
-    PHASE_PLAYING,
-)
+from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING
+from packs.scenes.tag.rules.helpers.tag_config import tag_config
+from packs.scenes.tag.rules.helpers.tag_state import tag_state
 
 
 class TagHitRule(GameRule):
@@ -43,15 +33,15 @@ class TagHitRule(GameRule):
         self.on(NetworkEvents.IRReceived, self._handle)
 
     def _handle(self, event: NetworkEvents.IRReceived, state: GameState) -> None:
-        phase = state.get(KEY_PHASE, "ready")
-        if phase != PHASE_PLAYING:
+        tag = tag_state(state)
+        if tag.phase != PHASE_PLAYING:
             return
+
+        config = tag_config(state)
 
         tag_data = decode_tag_data(event.data)
 
-        expected_team = state.get(KEY_EXPECTED_TEAM, DEFAULT_EXPECTED_TEAM)
-        expected_player = state.get(KEY_EXPECTED_PLAYER, DEFAULT_EXPECTED_PLAYER)
-        if tag_data.team != expected_team or tag_data.player != expected_player:
+        if tag_data.team != config.expected_team or tag_data.player != config.expected_player:
             print(
                 "[ignored team="
                 + str(tag_data.team)
@@ -63,8 +53,7 @@ class TagHitRule(GameRule):
             )
             return
 
-        deafen_until = state.get(KEY_DEAFEN_UNTIL, DEFAULT_DEAFEN_UNTIL)
-        if state.total < deafen_until:
+        if state.total < tag.deafen_until:
             print(
                 "[deafened team="
                 + str(tag_data.team)
@@ -76,13 +65,12 @@ class TagHitRule(GameRule):
             )
             return
 
-        hitpoints = state.get(KEY_HITPOINTS, DEFAULT_STARTING_HITPOINTS)
-        hitpoints -= tag_data.damage
-        state.set(KEY_HITPOINTS, hitpoints)
+        tag.hitpoints -= tag_data.damage
 
-        starting_hitpoints = state.get(KEY_STARTING_HITPOINTS, DEFAULT_STARTING_HITPOINTS)
-        fraction = hitpoints / starting_hitpoints
-        state.effect_controls.set_effect(Scope.PERSONAL, "basic.progress", {"progress": fraction})
+        fraction = tag.hitpoints / config.starting_hitpoints
+        tag.progress_receipt = state.effect_controls.set_effect(
+            Scope.PERSONAL, "basic.progress", {"progress": fraction}
+        )
 
         print(
             "[hit team="

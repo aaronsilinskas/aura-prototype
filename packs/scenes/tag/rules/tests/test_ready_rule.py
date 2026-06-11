@@ -8,8 +8,10 @@ from engine.engine import GameEngine
 from engine.input import ButtonData, InputEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
-from packs.scenes.tag.rules.helpers.phases import PHASE_READY
+from packs.scenes.tag.rules.helpers.phases import PHASE_READY, PHASE_STARTING
+from packs.scenes.tag.rules.helpers.tag_state import tag_state
 from packs.scenes.tag.rules.ready_rule import TagReadyRule
+from packs.scenes.tag.rules.tests.helpers import seed_phase
 
 
 @pytest.fixture()
@@ -37,7 +39,7 @@ def test_first_tick_with_no_phase_enters_ready_and_sets_ready_effect(spy):
 
     _tick(state, engine)
 
-    assert state.get("tag_phase", None) == PHASE_READY
+    assert tag_state(state).phase == PHASE_READY
     ready_calls = [c for c in spy.set_effect_calls if c[1] == "scene.ready"]
     assert len(ready_calls) == 1
     assert ready_calls[0][0] is Scope.ALL
@@ -59,13 +61,13 @@ def test_button_press_in_ready_transitions_to_starting(spy):
     _tick(state, engine)
     _tick(state, engine, button_a=True)
 
-    assert state.get("tag_phase", None) == "starting"
+    assert tag_state(state).phase == PHASE_STARTING
 
 
 def test_button_press_in_non_ready_phase_is_ignored(spy):
     state, engine = _make_state(spy)
-    state.set("tag_phase", "starting")
+    seed_phase(state, PHASE_STARTING, entered=True)
 
     _tick(state, engine, button_a=True)
 
-    assert state.get("tag_phase", None) == "starting"
+    assert tag_state(state).phase == PHASE_STARTING
