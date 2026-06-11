@@ -9,7 +9,12 @@ from engine.input import ButtonData, InputEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
 from packs.scenes.tag.rules.game_over_rule import TagGameOverRule
-from packs.scenes.tag.rules.helpers.phases import PHASE_GAME_OVER, PHASE_PLAYING, PHASE_READY
+from packs.scenes.tag.rules.helpers.phases import (
+    PHASE_GAME_OVER,
+    PHASE_PLAYING,
+    PHASE_READY,
+    tag_phase,
+)
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 from packs.scenes.tag.rules.hit_rule import TagHitRule
 from packs.scenes.tag.rules.playing_rule import TagPlayingRule
@@ -73,7 +78,7 @@ def test_stays_in_game_over_while_sting_receipt_is_unstopped(spy):
 
     for total in [0.0, 1.0, 5.0, 50.0]:
         _tick(state, engine, timer, total)
-        assert tag_state(state).phase == PHASE_GAME_OVER
+        assert tag_phase(state).phase == PHASE_GAME_OVER
 
 
 def test_transitions_to_ready_when_sting_receipt_is_stopped(spy):
@@ -86,23 +91,12 @@ def test_transitions_to_ready_when_sting_receipt_is_stopped(spy):
 
     _tick(state, engine, timer, 1.0)
 
-    assert tag_state(state).phase == PHASE_READY
-
-
-def test_transitioning_to_ready_marks_phase_not_yet_entered(spy):
-    state, engine, timer = _make_state(spy)
-    _tick(state, engine, timer, 0.0)
-
-    receipt = tag_state(state).game_over_receipt
-    receipt.stop()
-    _tick(state, engine, timer, 1.0)
-
-    assert tag_state(state).take_just_entered() is True
+    assert tag_phase(state).phase == PHASE_READY
 
 
 def test_non_game_over_phase_is_ignored(spy):
     state, engine, timer = _make_state(spy)
-    seed_phase(state, "playing", entered=True)
+    seed_phase(state, PHASE_PLAYING, entered=True)
 
     _tick(state, engine, timer, 0.0)
 
@@ -120,7 +114,7 @@ def test_full_loop_returns_to_playable_ready_after_hitpoints_reach_zero(spy):
     tag.hitpoints = 0
 
     _tick(state, engine, timer, 0.0)
-    assert tag_state(state).phase == PHASE_GAME_OVER
+    assert tag_phase(state).phase == PHASE_GAME_OVER
 
     receipt = tag_state(state).game_over_receipt
     assert receipt is not None
@@ -128,7 +122,7 @@ def test_full_loop_returns_to_playable_ready_after_hitpoints_reach_zero(spy):
     spy.set_effect_calls.clear()
 
     _tick(state, engine, timer, 1.0)
-    assert tag_state(state).phase == PHASE_READY
+    assert tag_phase(state).phase == PHASE_READY
 
     spy.set_effect_calls.clear()
     _tick(state, engine, timer, 1.01)
@@ -163,7 +157,7 @@ def test_playing_to_game_over_transition_is_independent_of_rule_dispatch_order(s
     _tick(state, engine, timer, 0.0)
     _tick(state, engine, timer, 0.01)
 
-    assert tag_state(state).phase == PHASE_GAME_OVER
+    assert tag_phase(state).phase == PHASE_GAME_OVER
     fire_calls = [c for c in spy.set_effect_calls if c[1] == "elements.fire"]
     assert len(fire_calls) == 1
     sting_calls = [c for c in spy.add_effect_calls if c[1] == "scene.game_over_sting"]

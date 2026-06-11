@@ -1,12 +1,15 @@
-"""Tests for ``TagState`` — phase transitions, the entered flag, and the
-``tag_state`` get-or-create accessor."""
+"""Tests for the residual ``TagState`` and its ``tag_state`` accessor.
+
+Phase mechanics now live in the scene's :class:`PhaseMachine` (covered by
+``engine.tests.test_phase``); what remains here is the flat gameplay state:
+hitpoints, the deafen deadline, and the per-phase receipts.
+"""
 
 from __future__ import annotations
 
 from engine.engine import GameEngine
 from engine.state import SceneControls
 from engine.tests.helpers import SpyEffectControls
-from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, PHASE_READY
 from packs.scenes.tag.rules.helpers.tag_state import TagState, tag_state
 
 
@@ -31,53 +34,18 @@ def _make_state(initial_data: dict | None = None):
 # ---------------------------------------------------------------------------
 
 
-def test_new_tag_state_starts_in_ready_phase_not_yet_entered():
+def test_new_tag_state_starts_with_zeroed_gameplay_fields():
     tag = TagState()
 
-    assert tag.phase == PHASE_READY
-    assert tag.take_just_entered() is True
+    assert tag.hitpoints == 0
+    assert tag.deafen_until == 0.0
 
 
 def test_new_tag_state_has_no_receipts():
     tag = TagState()
 
     assert tag.progress_receipt is None
-    assert tag.warning_receipt is None
     assert tag.game_over_receipt is None
-
-
-# ---------------------------------------------------------------------------
-# enter — atomic phase transition + entered reset
-# ---------------------------------------------------------------------------
-
-
-def test_enter_sets_the_new_phase():
-    tag = TagState()
-    tag.take_just_entered()
-
-    tag.enter(PHASE_PLAYING)
-
-    assert tag.phase == PHASE_PLAYING
-
-
-def test_enter_resets_just_entered_to_true():
-    tag = TagState()
-    tag.take_just_entered()
-    assert tag.take_just_entered() is False
-
-    tag.enter(PHASE_PLAYING)
-
-    assert tag.take_just_entered() is True
-
-
-def test_take_just_entered_returns_true_then_false():
-    tag = TagState()
-
-    first = tag.take_just_entered()
-    second = tag.take_just_entered()
-
-    assert first is True
-    assert second is False
 
 
 # ---------------------------------------------------------------------------

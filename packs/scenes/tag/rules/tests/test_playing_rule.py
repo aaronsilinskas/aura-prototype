@@ -10,7 +10,12 @@ from engine.network import LINE
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls, SpyNetworkControls
 from hardware.shared.tag_protocol import TagData, encode_tag_data
-from packs.scenes.tag.rules.helpers.phases import PHASE_GAME_OVER, PHASE_PLAYING
+from packs.scenes.tag.rules.helpers.phases import (
+    PHASE_GAME_OVER,
+    PHASE_PLAYING,
+    PHASE_READY,
+    tag_phase,
+)
 from packs.scenes.tag.rules.helpers.tag_config import DEFAULT_STARTING_HITPOINTS
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 from packs.scenes.tag.rules.playing_rule import TagPlayingRule
@@ -109,7 +114,7 @@ def test_button_a_sets_deafen_deadline(spy):
 
 def test_non_playing_phase_is_ignored(spy):
     state, engine, timer = _make_state(spy)
-    seed_phase(state, "ready", entered=True)
+    seed_phase(state, PHASE_READY, entered=True)
 
     _tick(state, engine, timer, 0.0)
 
@@ -123,7 +128,7 @@ def test_hitpoints_reaching_zero_transitions_to_game_over(spy):
 
     _tick(state, engine, timer, 0.0)
 
-    assert tag_state(state).phase == PHASE_GAME_OVER
+    assert tag_phase(state).phase == PHASE_GAME_OVER
 
 
 def test_hitpoints_dropping_below_zero_transitions_to_game_over(spy):
@@ -133,17 +138,7 @@ def test_hitpoints_dropping_below_zero_transitions_to_game_over(spy):
 
     _tick(state, engine, timer, 0.0)
 
-    assert tag_state(state).phase == PHASE_GAME_OVER
-
-
-def test_transitioning_to_game_over_marks_phase_not_yet_entered(spy):
-    state, engine, timer = _make_state(spy)
-    tag = seed_phase(state, PHASE_PLAYING, entered=True)
-    tag.hitpoints = 0
-
-    _tick(state, engine, timer, 0.0)
-
-    assert tag_state(state).take_just_entered() is True
+    assert tag_phase(state).phase == PHASE_GAME_OVER
 
 
 def test_positive_hitpoints_does_not_transition_to_game_over(spy):
@@ -151,4 +146,4 @@ def test_positive_hitpoints_does_not_transition_to_game_over(spy):
 
     _tick(state, engine, timer, 0.0)
 
-    assert tag_state(state).phase == PHASE_PLAYING
+    assert tag_phase(state).phase == PHASE_PLAYING

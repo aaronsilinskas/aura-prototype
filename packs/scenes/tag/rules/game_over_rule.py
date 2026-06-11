@@ -10,34 +10,33 @@ duration — entering Ready replaces the looping fire with the ready effect.
 
 from __future__ import annotations
 
-from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState, Scope
 from packs.scenes.tag.rules.helpers.phases import PHASE_GAME_OVER, PHASE_READY
+from packs.scenes.tag.rules.helpers.tag_phase_rule import TagPhaseRule
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 
 
-class TagGameOverRule(GameRule):
+class TagGameOverRule(TagPhaseRule):
     """Drives the Game Over phase: fire + sting, then back to Ready."""
 
     def __init__(self) -> None:
+        super().__init__(PHASE_GAME_OVER)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
+    def on_enter(self, state: GameState) -> None:
+        state.effect_controls.set_effect(Scope.ALL, "elements.fire", {})
+        tag_state(state).game_over_receipt = state.effect_controls.add_effect(
+            Scope.ALL, "scene.game_over_sting", {}
+        )
+
+    def on_exit(self, state: GameState) -> None:
+        tag_state(state).game_over_receipt = None
+
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
-        tag = tag_state(state)
-        if tag.phase != PHASE_GAME_OVER:
-            return
-
-        if tag.take_just_entered():
-            state.effect_controls.set_effect(Scope.ALL, "elements.fire", {})
-            tag.game_over_receipt = state.effect_controls.add_effect(
-                Scope.ALL, "scene.game_over_sting", {}
-            )
-
-        receipt = tag.game_over_receipt
+        receipt = tag_state(state).game_over_receipt
         if receipt is not None and receipt.is_stopped():
-            tag.enter(PHASE_READY)
-            tag.game_over_receipt = None
+            self.transition_to(state, PHASE_READY)
 
 
 RULE = TagGameOverRule()
