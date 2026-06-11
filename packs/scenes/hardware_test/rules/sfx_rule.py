@@ -1,27 +1,25 @@
 from __future__ import annotations
 
-from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState, Scope
-from packs.scenes.hardware_test.rules.helpers.mode import MODE_SFX, current_mode
+from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import HwModeRule
+from packs.scenes.hardware_test.rules.helpers.phases import MODE_SFX
 
 
-class HwTestSfxRule(GameRule):
-    """Fires the ``scene.sfx_test`` cue on Button A in SFX mode.
+class HwTestSfxRule(HwModeRule):
+    """Drives the SFX mode: cyan idle entry effect and Button A test cue.
 
-    Button A plays the test sound/haptic cue on ``Scope.PERSONAL``. Presses in
-    any other mode are ignored.
+    On entry, shows a cyan solid on ``Scope.PERSONAL``. Button A plays the
+    test sound/haptic cue on ``Scope.PERSONAL``.
     """
 
     def __init__(self) -> None:
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        super().__init__(MODE_SFX)
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
-        if current_mode(state) != MODE_SFX:
-            return
-        if not event.buttons.is_pressed("A"):
-            return
+    def on_enter(self, state: GameState) -> None:
+        state.effect_controls.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0x00FFFF})
 
+    def on_button_a(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
         state.effect_controls.set_effect(Scope.PERSONAL, "scene.sfx_test", {})
         print("playing sfx")
 

@@ -7,7 +7,15 @@ import pytest
 from engine.state import EffectReceipt, GameState, SceneControls
 from engine.tests.helpers import SpyEffectControls
 from packs.scenes.hardware_test.rules.helpers.flash import Flash
-from packs.scenes.hardware_test.rules.helpers.mode import current_mode
+from packs.scenes.hardware_test.rules.helpers.phases import (
+    MODE_ACCELEROMETER,
+    MODE_IR,
+    MODE_ORDER,
+    MODE_RADIO,
+    MODE_RGB,
+    MODE_SFX,
+    next_in_cycle,
+)
 
 
 @pytest.fixture()
@@ -15,14 +23,26 @@ def state() -> GameState:
     return GameState(SpyEffectControls(), SceneControls())
 
 
-def test_current_mode_returns_seeded_hw_mode(state):
-    state.set("hw_mode", 3)
+# ---------------------------------------------------------------------------
+# next_in_cycle
+# ---------------------------------------------------------------------------
 
-    assert current_mode(state) == 3
 
+def test_next_in_cycle_advances_through_all_five_modes_and_wraps():
+    sequence = [MODE_RGB]
+    current = MODE_RGB
+    for _ in range(5):
+        current = next_in_cycle(MODE_ORDER, current)
+        sequence.append(current)
 
-def test_current_mode_defaults_to_zero_when_hw_mode_absent(state):
-    assert current_mode(state) == 0
+    assert sequence == [
+        MODE_RGB,
+        MODE_ACCELEROMETER,
+        MODE_IR,
+        MODE_RADIO,
+        MODE_SFX,
+        MODE_RGB,
+    ]
 
 
 # ---------------------------------------------------------------------------
