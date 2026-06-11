@@ -40,14 +40,12 @@ class TagState:
         "game_over_receipt",
         "hitpoints",
         "progress_receipt",
-        "warning_receipt",
     )
 
     def __init__(self) -> None:
         self.hitpoints = 0
         self.deafen_until = 0.0
         self.progress_receipt: EffectReceipt | None = None
-        self.warning_receipt: EffectReceipt | None = None
         self.game_over_receipt: EffectReceipt | None = None
 
 
