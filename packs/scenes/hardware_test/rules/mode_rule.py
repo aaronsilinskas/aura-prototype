@@ -95,6 +95,7 @@ class HwTestModeRule(GameRule):
             return
 
         receipt = flash_state.receipt
+        assert receipt is not None  # expired() is only True once restart() set a receipt
         state.delete(key)
         receipt.stop()
         state.effect_controls.set_effect(idle_scope, "basic.solid", {"color": 0xFFFFFF})
