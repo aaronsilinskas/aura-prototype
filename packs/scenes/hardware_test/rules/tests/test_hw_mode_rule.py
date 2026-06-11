@@ -58,11 +58,15 @@ def _make_state(
     timer: _StubTimer | None = None,
 ) -> tuple[GameState, GameEngine]:
     engine = GameEngine(spy, timer=timer)
+    # Match SceneManager._resolve_rules: scene-local rules are added in
+    # alphabetical order by module name (ir, motion, radio, rgb, sfx). Several
+    # tests below depend on this order to reproduce the same dispatch sequence
+    # rules see in production within a single PhaseMachine.enter() tick.
     engine.add_rules(
-        HwTestRgbRule(),
-        HwTestMotionRule(),
         HwTestIrRule(),
+        HwTestMotionRule(),
         HwTestRadioRule(),
+        HwTestRgbRule(),
         HwTestSfxRule(),
     )
     state = engine.create_state(SceneControls(), initial_data={})
@@ -163,14 +167,27 @@ def test_button_b_clears_flash_keys_on_mode_change(spy):
     assert RADIO_FLASH_KEY not in state
 
 
-def test_advancing_to_new_mode_fires_its_entry_effect_in_the_same_tick(spy):
+def test_advancing_to_new_mode_fires_its_entry_effect_by_the_next_tick(spy):
+    # With rules registered in production (alphabetical) order, motion_rule
+    # (Accelerometer) is dispatched before rgb_rule for a given event, so a
+    # Button-B advance from RGB to Accelerometer is observed by motion_rule
+    # only on the *next* tick's dispatch (see PhaseMachine.enter /
+    # take_just_entered). The entry effect must still fire exactly once, on
+    # that next tick, with no extra prompting.
     state, engine = _make_state(spy)
     _tick(state, engine)
     spy.set_effect_calls.clear()
 
     _press_button(state, engine, "B")
+    assert hw_phase(state).phase is MODE_ACCELEROMETER
 
     # Accelerometer entry effect: three basic.progress bars.
+    names = [c[1] for c in spy.set_effect_calls]
+    assert names.count("basic.progress") == 0
+
+    spy.set_effect_calls.clear()
+    _tick(state, engine)
+
     names = [c[1] for c in spy.set_effect_calls]
     assert names.count("basic.progress") == 3
 

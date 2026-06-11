@@ -35,11 +35,16 @@ from packs.scenes.hardware_test.rules.helpers.phases import (
 
 FLASH_DURATION: Final = 0.5
 
-# Set by _advance_mode and consumed by the newly-entered mode's own _handle,
-# so a single Button-B press advances exactly one mode per tick even though
-# the new mode's rule sees the same event in the same dispatch (see
-# HwModeRule._handle).
-_ADVANCED_THIS_TICK_KEY: Final = "hw_mode_advanced_this_tick"
+# Set by _advance_mode to (PhaseKey just transitioned to, state.total at the
+# time of the transition), and consumed by the newly-entered mode's own
+# _handle if it is dispatched again within the *same* tick (its rule comes
+# after the advancing rule in registration order). The state.total stamp
+# distinguishes this from a stale entry left over from a previous tick (when
+# the newly-entered mode's rule had already been dispatched and so never saw
+# the new phase until the next tick) — a stale entry's stamp won't match the
+# current tick's state.total, so it is never mistaken for "skip this
+# dispatch".
+_ADVANCED_TO_KEY: Final = "hw_mode_advanced_to"
 
 
 class HwModeRule(PhaseRule):
@@ -63,12 +68,19 @@ class HwModeRule(PhaseRule):
         """Per-mode Button A behaviour. No-op by default."""
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
-        # A Button-B advance just transitioned into this mode within this same
-        # dispatch (see _advance_mode); this dispatch is a continuation of
-        # that one press, not a fresh tick, so skip it entirely.
-        if state.get(_ADVANCED_THIS_TICK_KEY, False):
-            state.delete(_ADVANCED_THIS_TICK_KEY)
-            return
+        # Consume any pending advance marker stamped during *this* tick. If it
+        # targets this mode, a Button-B advance just transitioned into this
+        # mode within this same dispatch (see _advance_mode); this dispatch is
+        # a continuation of that one press, not a fresh tick, so skip it
+        # entirely. A marker stamped during a previous tick (left over because
+        # the newly-entered mode's rule had already been dispatched that tick)
+        # is stale and is simply discarded without skipping.
+        advanced = state.get(_ADVANCED_TO_KEY, None)
+        if advanced is not None:
+            advanced_to, advanced_at = advanced
+            state.delete(_ADVANCED_TO_KEY)
+            if advanced_to is self.phase and advanced_at == state.total:
+                return
 
         if event.buttons.is_pressed("A"):
             self.on_button_a(event, state)
@@ -86,7 +98,7 @@ class HwModeRule(PhaseRule):
 
         next_mode = next_in_cycle(MODE_ORDER, self.phase)
         print("changing to mode " + str(MODE_ORDER.index(next_mode)))
-        state.set(_ADVANCED_THIS_TICK_KEY, True)
+        state.set(_ADVANCED_TO_KEY, (next_mode, state.total))
         self.transition_to(state, next_mode)
 
     def _check_flash_expiry(self, state: GameState) -> None:
