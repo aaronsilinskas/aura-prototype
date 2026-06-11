@@ -97,7 +97,7 @@ def test_transitioning_to_ready_marks_phase_not_yet_entered(spy):
     receipt.stop()
     _tick(state, engine, timer, 1.0)
 
-    assert tag_state(state).just_entered is True
+    assert tag_state(state).take_just_entered() is True
 
 
 def test_non_game_over_phase_is_ignored(spy):

@@ -24,9 +24,8 @@ class TagReadyRule(GameRule):
         if tag.phase != PHASE_READY:
             return
 
-        if tag.just_entered:
+        if tag.take_just_entered():
             state.effect_controls.set_effect(Scope.ALL, "scene.ready", {})
-            tag.mark_entered()
 
         if event.buttons.is_pressed("A") or event.buttons.is_pressed("B"):
             tag.enter(PHASE_STARTING)

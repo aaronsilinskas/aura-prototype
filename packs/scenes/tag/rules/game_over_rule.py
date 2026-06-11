@@ -28,12 +28,11 @@ class TagGameOverRule(GameRule):
         if tag.phase != PHASE_GAME_OVER:
             return
 
-        if tag.just_entered:
+        if tag.take_just_entered():
             state.effect_controls.set_effect(Scope.ALL, "elements.fire", {})
             tag.game_over_receipt = state.effect_controls.add_effect(
                 Scope.ALL, "scene.game_over_sting", {}
             )
-            tag.mark_entered()
 
         receipt = tag.game_over_receipt
         if receipt is not None and receipt.is_stopped():

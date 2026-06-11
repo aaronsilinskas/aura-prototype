@@ -26,10 +26,10 @@ def seed_phase(state: GameState, phase: str, entered: bool = False) -> TagState:
     """Return the shared ``TagState`` jumped to *phase*.
 
     If *entered* is ``True``, the phase's one-time entry side-effects are
-    treated as already having run (``just_entered`` is ``False``).
+    treated as already having run (the just-entered flag is cleared).
     """
     tag = tag_state(state)
     tag.enter(phase)
     if entered:
-        tag.mark_entered()
+        tag.take_just_entered()
     return tag

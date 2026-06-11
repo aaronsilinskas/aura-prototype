@@ -40,12 +40,11 @@ class TagPlayingRule(GameRule):
 
         config = tag_config(state)
 
-        if tag.just_entered:
+        if tag.take_just_entered():
             tag.hitpoints = config.starting_hitpoints
             tag.progress_receipt = state.effect_controls.set_effect(
                 Scope.PERSONAL, "basic.progress", {"progress": 1.0}
             )
-            tag.mark_entered()
 
         if event.buttons.is_pressed("A"):
             self._fire_shot(state, tag, config)

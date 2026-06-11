@@ -5,12 +5,13 @@ Groups the phase, hitpoints, warning/deafen bookkeeping, and per-phase
 ``GameState`` into a single mutable object shared by all five Tag rules
 (``ready``, ``starting``, ``playing``, ``hit``, ``game_over``).
 
-The shared "entered" flag is folded into an atomic transition method:
-:meth:`enter` sets the phase and resets the flag in one operation, and
-:attr:`just_entered` / :meth:`mark_entered` replace the raw flag. Because all
-five rules share one ``TagState`` instance and the transition is atomic on
-it, the alphabetical-dispatch order-independence contract is preserved
-regardless of which rule performs the transition.
+The shared "entered" flag is folded into atomic methods: :meth:`enter` sets
+the phase and resets the flag in one operation, and :meth:`take_just_entered`
+returns whether this is the first tick of the phase and clears the flag in
+one operation. Because all five rules share one ``TagState`` instance and
+these transitions are atomic on it, the alphabetical-dispatch
+order-independence contract is preserved regardless of which rule performs
+the transition.
 
 ``tag_state(state)`` is the get-or-create accessor: it lazily builds the
 object on first use and caches it under a single ``GameState`` key, mirroring
@@ -60,14 +61,17 @@ class TagState:
         self.warning_receipt: EffectReceipt | None = None
         self.game_over_receipt: EffectReceipt | None = None
 
-    @property
-    def just_entered(self) -> bool:
-        """``True`` on the first tick of the current phase, until :meth:`mark_entered`."""
-        return self._just_entered
+    def take_just_entered(self) -> bool:
+        """Return ``True`` if this is the first tick of the current phase, and clear the flag.
 
-    def mark_entered(self) -> None:
-        """Record that the current phase's one-time entry side-effects have run."""
+        Atomically combines the old ``just_entered`` check with
+        ``mark_entered()``: a rule calls this once per tick to both test and
+        consume the one-time entry signal, so there is no separate
+        "mark entered" step to forget.
+        """
+        was_just_entered = self._just_entered
         self._just_entered = False
+        return was_just_entered
 
     def enter(self, phase: str) -> None:
         """Atomically transition to *phase* and mark it as not-yet-entered.

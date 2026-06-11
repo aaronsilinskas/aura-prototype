@@ -35,7 +35,7 @@ def test_new_tag_state_starts_in_ready_phase_not_yet_entered():
     tag = TagState()
 
     assert tag.phase == PHASE_READY
-    assert tag.just_entered is True
+    assert tag.take_just_entered() is True
 
 
 def test_new_tag_state_has_no_receipts():
@@ -53,7 +53,7 @@ def test_new_tag_state_has_no_receipts():
 
 def test_enter_sets_the_new_phase():
     tag = TagState()
-    tag.mark_entered()
+    tag.take_just_entered()
 
     tag.enter(PHASE_PLAYING)
 
@@ -62,20 +62,22 @@ def test_enter_sets_the_new_phase():
 
 def test_enter_resets_just_entered_to_true():
     tag = TagState()
-    tag.mark_entered()
-    assert tag.just_entered is False
+    tag.take_just_entered()
+    assert tag.take_just_entered() is False
 
     tag.enter(PHASE_PLAYING)
 
-    assert tag.just_entered is True
+    assert tag.take_just_entered() is True
 
 
-def test_mark_entered_clears_just_entered():
+def test_take_just_entered_returns_true_then_false():
     tag = TagState()
 
-    tag.mark_entered()
+    first = tag.take_just_entered()
+    second = tag.take_just_entered()
 
-    assert tag.just_entered is False
+    assert first is True
+    assert second is False
 
 
 # ---------------------------------------------------------------------------

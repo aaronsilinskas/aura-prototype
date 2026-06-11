@@ -143,7 +143,7 @@ def test_transitioning_to_game_over_marks_phase_not_yet_entered(spy):
 
     _tick(state, engine, timer, 0.0)
 
-    assert tag_state(state).just_entered is True
+    assert tag_state(state).take_just_entered() is True
 
 
 def test_positive_hitpoints_does_not_transition_to_game_over(spy):

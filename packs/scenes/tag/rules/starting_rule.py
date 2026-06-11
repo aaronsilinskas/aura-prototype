@@ -30,7 +30,7 @@ class TagStartingRule(GameRule):
 
         config = tag_config(state)
 
-        if tag.just_entered:
+        if tag.take_just_entered():
             duration = config.warning_pulse_duration
             half = duration / 2
             state.effect_controls.set_effect(
@@ -44,7 +44,6 @@ class TagStartingRule(GameRule):
                 },
             )
             tag.warning_start = state.total
-            tag.mark_entered()
 
         if state.total - tag.warning_start >= config.warning_duration():
             state.effect_controls.stop_effect(Scope.ALL)
