@@ -40,6 +40,26 @@ An event handler registered with `GameEngine`. **Game-data-stateless** — must 
 The game context passed to every rule handler each tick. Exposes `effect_controls`, `network_controls`, `scene_controls`, read-only `elapsed`/`total`, and `queue_event`. Mutable game data stored via `get`/`set`/`pop`/`delete`/`has`.
 _Avoid_: calling `clear_queue()` from rules (reserved for `SceneManager` during scene transitions)
 
+### Phase
+A named stage of a scene's game flow (Tag's Ready/Starting/Playing/Game Over; an RLGL Round's red/green sub-stages; a hardware_test mode). Identified by a `PhaseKey`.
+_Avoid_: "state" (collides with `GameState`); "mode" except as the hardware_test label for a phase
+
+### PhaseKey
+An opaque, identity-typed constant naming one phase, defined once per scene in its `phases.py`. Compared by identity, so a bare string literal never matches it — a typo fails loudly instead of silently working.
+_Avoid_: bare `str`/`int` phase values; comparing a phase against a string literal
+
+### PhaseMachine
+The mutable per-scene object cached in `GameState` that holds **only** the current `PhaseKey`, the once-per-entry flag, and the phase-start time. Holds no receipts. Reached through a scene's typed accessor (e.g. `tag_phase`), which owns the key and initial phase.
+_Avoid_: storing receipts or per-phase scratch on it; auto-stopping effects inside `enter()`
+
+### PhaseRule
+A `GameRule` that owns one phase's lifecycle: `on_enter`, `on_exit`, phase-gated typed handlers (registered with the ordinary `self.on(EventType, handler)`, auto-gated to its phase), and `transition_to`. Exactly one per `(machine, phase)` — enforced at scene load.
+_Avoid_: `take_just_entered()` or hand-rolled entry flags (use `on_enter`); a per-tick `on_event` hook (use ordinary `self.on` handlers); reaching `super().on(...)` directly (bypasses the phase guard)
+
+### InPhaseRule
+A `GameRule` whose typed handlers fire only while a given phase is active, with no lifecycle hooks and no transitions. The home for reactors that are merely active during a phase (e.g. Tag's hit detection). Any number may share a phase.
+_Avoid_: making it own or change phases (use `PhaseRule`)
+
 ### Scene Config
 A scene's tunable knobs (phase durations, thresholds, counts) resolved **once** into a single immutable object: built from the flat values a scene seeds via `scene.json` `initial_data`, with defaults applied at construction. Exposes derived calculations (e.g. level-scaled durations) as methods rather than as free functions that re-read state. One per scene (`RlglConfig`, `TagConfig`), cached in `GameState` under a single key. Concrete classes live in the scene's `rules/helpers/`.
 _Avoid_: confusing with `EffectConfig` (effect-render config: resolution/options/listeners — unrelated to game tuning); spreading the same default across a `_DEFAULT_*` constant table and many `state.get(key, default)` read sites (the default belongs in the Config, defined once); re-reading and re-defaulting these values every tick (build once, cache)
