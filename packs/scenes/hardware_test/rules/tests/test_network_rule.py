@@ -9,6 +9,7 @@ from engine.input import ButtonData, InputEvents
 from engine.network import LINE, NetworkEvents
 from engine.state import EffectReceipt, GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls, SpyNetworkControls
+from packs.scenes.hardware_test.rules.helpers.flash import IR_FLASH_KEY, RADIO_FLASH_KEY, flash
 from packs.scenes.hardware_test.rules.network_rule import HW_TEST_PAYLOAD, HwTestNetworkRule
 
 # ---------------------------------------------------------------------------
@@ -61,24 +62,21 @@ def test_ir_received_is_noop_when_hw_mode_is_0(spy):
     state, engine = _make_state(spy, hw_mode=0)
     _fire_ir(state, engine)
     assert spy.set_effect_calls == []
-    assert "ir_flash_receipt" not in state
-    assert "ir_flash_start" not in state
+    assert IR_FLASH_KEY not in state
 
 
 def test_ir_received_is_noop_when_hw_mode_is_1(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire_ir(state, engine)
     assert spy.set_effect_calls == []
-    assert "ir_flash_receipt" not in state
-    assert "ir_flash_start" not in state
+    assert IR_FLASH_KEY not in state
 
 
 def test_ir_received_is_noop_when_hw_mode_is_3(spy):
     state, engine = _make_state(spy, hw_mode=3)
     _fire_ir(state, engine)
     assert spy.set_effect_calls == []
-    assert "ir_flash_receipt" not in state
-    assert "ir_flash_start" not in state
+    assert IR_FLASH_KEY not in state
 
 
 # ---------------------------------------------------------------------------
@@ -99,13 +97,13 @@ def test_ir_received_calls_set_effect_on_directional_with_white_solid(spy):
 def test_ir_received_writes_ir_flash_receipt_to_state(spy):
     state, engine = _make_state(spy, hw_mode=2)
     _fire_ir(state, engine)
-    assert isinstance(state.get("ir_flash_receipt", None), EffectReceipt)
+    assert isinstance(flash(state, IR_FLASH_KEY).receipt, EffectReceipt)
 
 
 def test_ir_received_writes_ir_flash_start_to_state(spy):
     state, engine = _make_state(spy, hw_mode=2)
     _fire_ir(state, engine)
-    assert state.get("ir_flash_start", None) is not None
+    assert flash(state, IR_FLASH_KEY).start_time is not None
 
 
 # ---------------------------------------------------------------------------
@@ -117,24 +115,21 @@ def test_radio_received_is_noop_when_hw_mode_is_0(spy):
     state, engine = _make_state(spy, hw_mode=0)
     _fire_radio(state, engine)
     assert spy.set_effect_calls == []
-    assert "radio_flash_receipt" not in state
-    assert "radio_flash_start" not in state
+    assert RADIO_FLASH_KEY not in state
 
 
 def test_radio_received_is_noop_when_hw_mode_is_1(spy):
     state, engine = _make_state(spy, hw_mode=1)
     _fire_radio(state, engine)
     assert spy.set_effect_calls == []
-    assert "radio_flash_receipt" not in state
-    assert "radio_flash_start" not in state
+    assert RADIO_FLASH_KEY not in state
 
 
 def test_radio_received_is_noop_when_hw_mode_is_2(spy):
     state, engine = _make_state(spy, hw_mode=2)
     _fire_radio(state, engine)
     assert spy.set_effect_calls == []
-    assert "radio_flash_receipt" not in state
-    assert "radio_flash_start" not in state
+    assert RADIO_FLASH_KEY not in state
 
 
 # ---------------------------------------------------------------------------
@@ -155,13 +150,13 @@ def test_radio_received_calls_set_effect_on_global_all_with_white_solid(spy):
 def test_radio_received_writes_radio_flash_receipt_to_state(spy):
     state, engine = _make_state(spy, hw_mode=3)
     _fire_radio(state, engine)
-    assert isinstance(state.get("radio_flash_receipt", None), EffectReceipt)
+    assert isinstance(flash(state, RADIO_FLASH_KEY).receipt, EffectReceipt)
 
 
 def test_radio_received_writes_radio_flash_start_to_state(spy):
     state, engine = _make_state(spy, hw_mode=3)
     _fire_radio(state, engine)
-    assert state.get("radio_flash_start", None) is not None
+    assert flash(state, RADIO_FLASH_KEY).start_time is not None
 
 
 # ---------------------------------------------------------------------------
