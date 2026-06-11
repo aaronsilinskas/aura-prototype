@@ -9,7 +9,7 @@ from engine.network import NetworkEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
 from hardware.shared.tag_protocol import TagData, encode_tag_data
-from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING
+from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, PHASE_READY
 from packs.scenes.tag.rules.helpers.tag_config import DEFAULT_STARTING_HITPOINTS
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 from packs.scenes.tag.rules.hit_rule import TagHitRule
@@ -125,7 +125,7 @@ def test_counted_hit_logs_tag_data_signal_strength_and_error_margin(spy, capsys)
 
 def test_non_playing_phase_is_ignored(spy):
     state, engine, timer = _make_state(spy)
-    seed_phase(state, "ready", entered=True)
+    seed_phase(state, PHASE_READY, entered=True)
 
     _receive(state, engine, timer, 1.0, TagData(team=0, player=1, damage=1))
 

@@ -6,29 +6,25 @@ button press transitions to Starting.
 
 from __future__ import annotations
 
-from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState, Scope
 from packs.scenes.tag.rules.helpers.phases import PHASE_READY, PHASE_STARTING
-from packs.scenes.tag.rules.helpers.tag_state import tag_state
+from packs.scenes.tag.rules.helpers.tag_phase_rule import TagPhaseRule
 
 
-class TagReadyRule(GameRule):
+class TagReadyRule(TagPhaseRule):
     """Drives the Ready phase: plays the ready effect, waits for a button press."""
 
     def __init__(self) -> None:
+        super().__init__(PHASE_READY)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
+    def on_enter(self, state: GameState) -> None:
+        state.effect_controls.set_effect(Scope.ALL, "scene.ready", {})
+
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
-        tag = tag_state(state)
-        if tag.phase != PHASE_READY:
-            return
-
-        if tag.take_just_entered():
-            state.effect_controls.set_effect(Scope.ALL, "scene.ready", {})
-
         if event.buttons.is_pressed("A") or event.buttons.is_pressed("B"):
-            tag.enter(PHASE_STARTING)
+            self.transition_to(state, PHASE_STARTING)
 
 
 RULE = TagReadyRule()

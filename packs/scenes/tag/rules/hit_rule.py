@@ -1,42 +1,42 @@
 """Tag scene hit-handling rule.
 
-Subscribes to ``NetworkEvents.IRReceived`` and turns matching tag packets into
-hitpoint loss while ``TagState.phase`` is ``playing``. Decodes every received
-packet (decoding never fails), then applies the accuracy-rig gate order:
+A non-owning :class:`InPhaseRule` reactor on the Playing phase: it subscribes
+to ``NetworkEvents.IRReceived`` and turns matching tag packets into hitpoint
+loss while the shared phase machine is in Playing, but it does not own the
+phase's lifecycle. Decodes every received packet (decoding never fails), then
+applies the accuracy-rig gate order:
 
-1. Phase guard — only acts during the Playing phase.
+1. Phase guard — the ``InPhaseRule`` only fires during the Playing phase.
 2. Identity gate — counts only packets matching the configured expected
    team/player; mismatches are logged and ignored.
 3. Deafen gate — packets received before ``TagState.deafen_until`` (the
    player's own freshly-fired echo, which carries the expected identity) are
    logged and suppressed.
 4. Hit — subtracts the decoded ``damage`` from hitpoints and re-issues the
-   ``Scope.PERSONAL`` ``basic.progress`` bar with the new fraction (clamped to
-   ``[0, 1]`` by the layer).
+   shared ``Scope.PERSONAL`` ``basic.progress`` bar (owned by the Playing rule)
+   with the new fraction (clamped to ``[0, 1]`` by the layer).
 """
 
 from __future__ import annotations
 
-from engine.engine import GameRule
 from engine.network import NetworkEvents
 from engine.state import GameState, Scope
 from hardware.shared.tag_protocol import decode_tag_data
 from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING
 from packs.scenes.tag.rules.helpers.tag_config import tag_config
+from packs.scenes.tag.rules.helpers.tag_phase_rule import TagInPhaseRule
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 
 
-class TagHitRule(GameRule):
+class TagHitRule(TagInPhaseRule):
     """Drives hit detection during the Playing phase from received IR packets."""
 
     def __init__(self) -> None:
+        super().__init__(PHASE_PLAYING)
         self.on(NetworkEvents.IRReceived, self._handle)
 
     def _handle(self, event: NetworkEvents.IRReceived, state: GameState) -> None:
         tag = tag_state(state)
-        if tag.phase != PHASE_PLAYING:
-            return
-
         config = tag_config(state)
 
         tag_data = decode_tag_data(event.data)

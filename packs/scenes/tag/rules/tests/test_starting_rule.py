@@ -8,8 +8,12 @@ from engine.engine import GameEngine
 from engine.input import ButtonData, InputEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
-from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, PHASE_STARTING
-from packs.scenes.tag.rules.helpers.tag_state import tag_state
+from packs.scenes.tag.rules.helpers.phases import (
+    PHASE_PLAYING,
+    PHASE_READY,
+    PHASE_STARTING,
+    tag_phase,
+)
 from packs.scenes.tag.rules.starting_rule import TagStartingRule
 from packs.scenes.tag.rules.tests.helpers import StubTimer, seed_phase
 
@@ -54,10 +58,10 @@ def test_transitions_to_playing_after_count_times_duration_seconds(spy):
 
     _tick(state, engine, timer, 0.0)
     _tick(state, engine, timer, 2.9)
-    assert tag_state(state).phase == PHASE_STARTING
+    assert tag_phase(state).phase == PHASE_STARTING
 
     _tick(state, engine, timer, 3.0)
-    assert tag_state(state).phase == PHASE_PLAYING
+    assert tag_phase(state).phase == PHASE_PLAYING
 
 
 def test_transitioning_to_playing_stops_the_warning_pulse(spy):
@@ -73,7 +77,7 @@ def test_transitioning_to_playing_stops_the_warning_pulse(spy):
 
 def test_non_starting_phase_is_ignored(spy):
     state, engine, timer = _make_state(spy)
-    seed_phase(state, "ready", entered=True)
+    seed_phase(state, PHASE_READY, entered=True)
 
     _tick(state, engine, timer, 0.0)
 
