@@ -7,7 +7,8 @@ except ImportError:
 
 from engine.engine import GameRule
 from engine.input import InputEvents
-from engine.state import EffectReceipt, GameState, Scope
+from engine.state import GameState, Scope
+from packs.scenes.hardware_test.rules.helpers.flash import IR_FLASH_KEY, RADIO_FLASH_KEY, flash
 from packs.scenes.hardware_test.rules.helpers.mode import _RGB_IDLE, NUM_MODES, current_mode
 
 FLASH_DURATION: Final = 0.5
@@ -73,10 +74,8 @@ class HwTestModeRule(GameRule):
     def _advance_mode(self, state: GameState) -> None:
         state.effect_controls.stop_effect(Scope.ALL)
         # Clear all flash keys
-        state.delete("ir_flash_receipt")
-        state.delete("ir_flash_start")
-        state.delete("radio_flash_receipt")
-        state.delete("radio_flash_start")
+        state.delete(IR_FLASH_KEY)
+        state.delete(RADIO_FLASH_KEY)
 
         new_mode = (current_mode(state) + 1) % NUM_MODES
         print("changing to mode " + str(new_mode))
@@ -84,23 +83,22 @@ class HwTestModeRule(GameRule):
         _MODE_ENTRY[new_mode](state)
 
     def _check_flash_expiry(self, state: GameState) -> None:
-        if (
-            "ir_flash_start" in state
-            and state.total - state.get("ir_flash_start", 0.0) > FLASH_DURATION
-        ):
-            receipt = state.pop("ir_flash_receipt", EffectReceipt)
-            state.delete("ir_flash_start")
-            receipt.stop()
-            state.effect_controls.set_effect(Scope.DIRECTIONAL, "basic.solid", {"color": 0xFFFFFF})
+        self._expire_flash(state, IR_FLASH_KEY, Scope.DIRECTIONAL)
+        self._expire_flash(state, RADIO_FLASH_KEY, Scope.Global.ALL)
 
-        if (
-            "radio_flash_start" in state
-            and state.total - state.get("radio_flash_start", 0.0) > FLASH_DURATION
-        ):
-            receipt = state.pop("radio_flash_receipt", EffectReceipt)
-            state.delete("radio_flash_start")
-            receipt.stop()
-            state.effect_controls.set_effect(Scope.Global.ALL, "basic.solid", {"color": 0xFFFFFF})
+    def _expire_flash(self, state: GameState, key: str, idle_scope: Scope) -> None:
+        if not state.has(key):
+            return
+
+        flash_state = flash(state, key)
+        if not flash_state.expired(state.total, FLASH_DURATION):
+            return
+
+        receipt = flash_state.receipt
+        assert receipt is not None  # expired() is only True once restart() set a receipt
+        state.delete(key)
+        receipt.stop()
+        state.effect_controls.set_effect(idle_scope, "basic.solid", {"color": 0xFFFFFF})
 
 
 RULE = HwTestModeRule()

@@ -9,6 +9,7 @@ from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.network import LINE, NetworkEvents
 from engine.state import GameState, Scope
+from packs.scenes.hardware_test.rules.helpers.flash import IR_FLASH_KEY, RADIO_FLASH_KEY, flash
 from packs.scenes.hardware_test.rules.helpers.mode import MODE_IR, MODE_RADIO, current_mode
 
 HW_TEST_PAYLOAD: Final = b"hw_test"
@@ -53,8 +54,7 @@ class HwTestNetworkRule(GameRule):
         receipt = state.effect_controls.set_effect(
             Scope.DIRECTIONAL, "basic.solid", {"color": 0xFFFFFF}
         )
-        state.set("ir_flash_receipt", receipt)
-        state.set("ir_flash_start", state.total)
+        flash(state, IR_FLASH_KEY).restart(state.total, receipt)
         print(
             "ir received "
             + str(event.data)
@@ -70,8 +70,7 @@ class HwTestNetworkRule(GameRule):
         receipt = state.effect_controls.set_effect(
             Scope.Global.ALL, "basic.solid", {"color": 0xFFFFFF}
         )
-        state.set("radio_flash_receipt", receipt)
-        state.set("radio_flash_start", state.total)
+        flash(state, RADIO_FLASH_KEY).restart(state.total, receipt)
         print("radio received " + str(event.data) + " from " + str(event.sender))
 
 
