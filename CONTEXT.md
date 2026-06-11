@@ -40,6 +40,10 @@ An event handler registered with `GameEngine`. **Game-data-stateless** — must 
 The game context passed to every rule handler each tick. Exposes `effect_controls`, `network_controls`, `scene_controls`, read-only `elapsed`/`total`, and `queue_event`. Mutable game data stored via `get`/`set`/`pop`/`delete`/`has`.
 _Avoid_: calling `clear_queue()` from rules (reserved for `SceneManager` during scene transitions)
 
+### Scene Config
+A scene's tunable knobs (phase durations, thresholds, counts) resolved **once** into a single immutable object: built from the flat values a scene seeds via `scene.json` `initial_data`, with defaults applied at construction. Exposes derived calculations (e.g. level-scaled durations) as methods rather than as free functions that re-read state. One per scene (`RlglConfig`, `TagConfig`), cached in `GameState` under a single key. Concrete classes live in the scene's `rules/helpers/`.
+_Avoid_: confusing with `EffectConfig` (effect-render config: resolution/options/listeners — unrelated to game tuning); spreading the same default across a `_DEFAULT_*` constant table and many `state.get(key, default)` read sites (the default belongs in the Config, defined once); re-reading and re-defaulting these values every tick (build once, cache)
+
 ### Timer
 Owned internally by `GameEngine`. Rules access time only via `state.elapsed` and `state.total` — never hold a `Timer` reference.
 
