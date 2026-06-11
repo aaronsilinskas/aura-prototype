@@ -10,28 +10,11 @@ from engine.network import LINE
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls, SpyNetworkControls
 from hardware.shared.tag_protocol import TagData, encode_tag_data
-from packs.scenes.tag.rules.helpers.phases import (
-    DEFAULT_STARTING_HITPOINTS,
-    KEY_DEAFEN_UNTIL,
-    KEY_DEAFEN_WINDOW,
-    KEY_ENTERED,
-    KEY_HITPOINTS,
-    KEY_PHASE,
-    PHASE_GAME_OVER,
-    PHASE_PLAYING,
-)
+from packs.scenes.tag.rules.helpers.phases import PHASE_GAME_OVER, PHASE_PLAYING
+from packs.scenes.tag.rules.helpers.tag_config import DEFAULT_STARTING_HITPOINTS
+from packs.scenes.tag.rules.helpers.tag_state import tag_state
 from packs.scenes.tag.rules.playing_rule import TagPlayingRule
-
-
-class _StubTimer:
-    """Controllable timer for tests that need specific total values."""
-
-    def __init__(self) -> None:
-        self.elapsed: float = 0.0
-        self.total: float = 0.0
-
-    def update(self) -> None:
-        pass  # Caller controls total directly
+from packs.scenes.tag.rules.tests.helpers import StubTimer, seed_phase
 
 
 @pytest.fixture()
@@ -43,19 +26,17 @@ def _make_state(
     spy: SpyEffectControls,
     initial_data: dict | None = None,
     network_spy: SpyNetworkControls | None = None,
-) -> tuple[GameState, GameEngine, _StubTimer]:
-    timer = _StubTimer()
+) -> tuple[GameState, GameEngine, StubTimer]:
+    timer = StubTimer()
     engine = GameEngine(spy, network_controls=network_spy, timer=timer)  # pyright: ignore
     engine.add_rules(TagPlayingRule())
-    data = {"tag_phase": PHASE_PLAYING}
-    if initial_data:
-        data.update(initial_data)
-    state = engine.create_state(SceneControls(), initial_data=data)
+    state = engine.create_state(SceneControls(), initial_data=initial_data or {})
+    seed_phase(state, PHASE_PLAYING)
     return state, engine, timer
 
 
 def _tick(
-    state: GameState, engine: GameEngine, timer: _StubTimer, total: float, button_a: bool = False
+    state: GameState, engine: GameEngine, timer: StubTimer, total: float, button_a: bool = False
 ) -> None:
     timer.total = total
     states: dict[str, int] = {}
@@ -70,7 +51,7 @@ def test_entering_playing_sets_starting_hitpoints(spy):
 
     _tick(state, engine, timer, 0.0)
 
-    assert state.get(KEY_HITPOINTS, None) == DEFAULT_STARTING_HITPOINTS
+    assert tag_state(state).hitpoints == DEFAULT_STARTING_HITPOINTS
 
 
 def test_entering_playing_sets_full_progress_bar_on_personal(spy):
@@ -83,6 +64,14 @@ def test_entering_playing_sets_full_progress_bar_on_personal(spy):
     scope, _, options = progress_calls[0]
     assert scope is Scope.PERSONAL
     assert options == {"progress": 1.0}
+
+
+def test_entering_playing_stores_progress_receipt(spy):
+    state, engine, timer = _make_state(spy)
+
+    _tick(state, engine, timer, 0.0)
+
+    assert tag_state(state).progress_receipt is not None
 
 
 def test_button_a_sends_tag_data_payload_on_line_emitter(spy):
@@ -109,18 +98,18 @@ def test_button_a_logs_the_send(spy, capsys):
 def test_button_a_sets_deafen_deadline(spy):
     network_spy = SpyNetworkControls()
     state, engine, timer = _make_state(
-        spy, network_spy=network_spy, initial_data={KEY_DEAFEN_WINDOW: 0.1}
+        spy, network_spy=network_spy, initial_data={"tag_deafen_window": 0.1}
     )
 
     _tick(state, engine, timer, 0.0)
     _tick(state, engine, timer, 1.0, button_a=True)
 
-    assert state.get(KEY_DEAFEN_UNTIL, None) == pytest.approx(1.1)
+    assert tag_state(state).deafen_until == pytest.approx(1.1)
 
 
 def test_non_playing_phase_is_ignored(spy):
     state, engine, timer = _make_state(spy)
-    state.set(KEY_PHASE, "ready")
+    seed_phase(state, "ready", entered=True)
 
     _tick(state, engine, timer, 0.0)
 
@@ -128,27 +117,33 @@ def test_non_playing_phase_is_ignored(spy):
 
 
 def test_hitpoints_reaching_zero_transitions_to_game_over(spy):
-    state, engine, timer = _make_state(spy, initial_data={KEY_HITPOINTS: 0, KEY_ENTERED: True})
+    state, engine, timer = _make_state(spy)
+    tag = seed_phase(state, PHASE_PLAYING, entered=True)
+    tag.hitpoints = 0
 
     _tick(state, engine, timer, 0.0)
 
-    assert state.get(KEY_PHASE, None) == PHASE_GAME_OVER
+    assert tag_state(state).phase == PHASE_GAME_OVER
 
 
 def test_hitpoints_dropping_below_zero_transitions_to_game_over(spy):
-    state, engine, timer = _make_state(spy, initial_data={KEY_HITPOINTS: -3, KEY_ENTERED: True})
+    state, engine, timer = _make_state(spy)
+    tag = seed_phase(state, PHASE_PLAYING, entered=True)
+    tag.hitpoints = -3
 
     _tick(state, engine, timer, 0.0)
 
-    assert state.get(KEY_PHASE, None) == PHASE_GAME_OVER
+    assert tag_state(state).phase == PHASE_GAME_OVER
 
 
-def test_transitioning_to_game_over_clears_entered_flag(spy):
-    state, engine, timer = _make_state(spy, initial_data={KEY_HITPOINTS: 0, KEY_ENTERED: True})
+def test_transitioning_to_game_over_marks_phase_not_yet_entered(spy):
+    state, engine, timer = _make_state(spy)
+    tag = seed_phase(state, PHASE_PLAYING, entered=True)
+    tag.hitpoints = 0
 
     _tick(state, engine, timer, 0.0)
 
-    assert state.get(KEY_ENTERED, True) is False
+    assert tag_state(state).take_just_entered() is True
 
 
 def test_positive_hitpoints_does_not_transition_to_game_over(spy):
@@ -156,4 +151,4 @@ def test_positive_hitpoints_does_not_transition_to_game_over(spy):
 
     _tick(state, engine, timer, 0.0)
 
-    assert state.get(KEY_PHASE, None) == PHASE_PLAYING
+    assert tag_state(state).phase == PHASE_PLAYING

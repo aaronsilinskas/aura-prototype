@@ -9,12 +9,8 @@ from __future__ import annotations
 from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState, Scope
-from packs.scenes.tag.rules.helpers.phases import (
-    KEY_ENTERED,
-    KEY_PHASE,
-    PHASE_READY,
-    PHASE_STARTING,
-)
+from packs.scenes.tag.rules.helpers.phases import PHASE_READY, PHASE_STARTING
+from packs.scenes.tag.rules.helpers.tag_state import tag_state
 
 
 class TagReadyRule(GameRule):
@@ -24,18 +20,15 @@ class TagReadyRule(GameRule):
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
-        phase = state.get(KEY_PHASE, PHASE_READY)
-        if phase != PHASE_READY:
+        tag = tag_state(state)
+        if tag.phase != PHASE_READY:
             return
 
-        if not state.get(KEY_ENTERED, False):
-            state.set(KEY_PHASE, PHASE_READY)
+        if tag.take_just_entered():
             state.effect_controls.set_effect(Scope.ALL, "scene.ready", {})
-            state.set(KEY_ENTERED, True)
 
         if event.buttons.is_pressed("A") or event.buttons.is_pressed("B"):
-            state.set(KEY_PHASE, PHASE_STARTING)
-            state.set(KEY_ENTERED, False)
+            tag.enter(PHASE_STARTING)
 
 
 RULE = TagReadyRule()

@@ -1,11 +1,11 @@
 """Tag scene Playing phase rule.
 
 On entry, sets hitpoints to the configured starting value and shows a full
-``basic.progress`` bar on ``Scope.PERSONAL``. Button A fires a shot: encodes
-the player's own ``TagData`` identity, sends it on the LINE IR emitter, logs
-the send, and starts the self-deafen window so the player's own shot is not
-immediately registered as a hit. When hitpoints reach zero or below, transitions
-to the ``game_over`` phase (clearing the shared ``tag_entered`` flag).
+``basic.progress`` bar on ``Scope.PERSONAL``, storing its ``EffectReceipt``.
+Button A fires a shot: encodes the player's own ``TagData`` identity, sends
+it on the LINE IR emitter, logs the send, and starts the self-deafen window
+so the player's own shot is not immediately registered as a hit. When
+hitpoints reach zero or below, transitions to the ``game_over`` phase.
 """
 
 from __future__ import annotations
@@ -20,22 +20,9 @@ from engine.input import InputEvents
 from engine.network import LINE
 from engine.state import GameState, Scope
 from hardware.shared.tag_protocol import TagData, encode_tag_data
-from packs.scenes.tag.rules.helpers.phases import (
-    DEFAULT_DEAFEN_WINDOW,
-    DEFAULT_EXPECTED_PLAYER,
-    DEFAULT_EXPECTED_TEAM,
-    DEFAULT_STARTING_HITPOINTS,
-    KEY_DEAFEN_UNTIL,
-    KEY_DEAFEN_WINDOW,
-    KEY_ENTERED,
-    KEY_EXPECTED_PLAYER,
-    KEY_EXPECTED_TEAM,
-    KEY_HITPOINTS,
-    KEY_PHASE,
-    KEY_STARTING_HITPOINTS,
-    PHASE_GAME_OVER,
-    PHASE_PLAYING,
-)
+from packs.scenes.tag.rules.helpers.phases import PHASE_GAME_OVER, PHASE_PLAYING
+from packs.scenes.tag.rules.helpers.tag_config import TagConfig, tag_config
+from packs.scenes.tag.rules.helpers.tag_state import TagState, tag_state
 
 _SHOT_DAMAGE: Final = 1
 
@@ -47,32 +34,32 @@ class TagPlayingRule(GameRule):
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
-        phase = state.get(KEY_PHASE, "ready")
-        if phase != PHASE_PLAYING:
+        tag = tag_state(state)
+        if tag.phase != PHASE_PLAYING:
             return
 
-        if not state.get(KEY_ENTERED, False):
-            hitpoints = state.get(KEY_STARTING_HITPOINTS, DEFAULT_STARTING_HITPOINTS)
-            state.set(KEY_HITPOINTS, hitpoints)
-            state.effect_controls.set_effect(Scope.PERSONAL, "basic.progress", {"progress": 1.0})
-            state.set(KEY_ENTERED, True)
+        config = tag_config(state)
+
+        if tag.take_just_entered():
+            tag.hitpoints = config.starting_hitpoints
+            tag.progress_receipt = state.effect_controls.set_effect(
+                Scope.PERSONAL, "basic.progress", {"progress": 1.0}
+            )
 
         if event.buttons.is_pressed("A"):
-            self._fire_shot(state)
+            self._fire_shot(state, tag, config)
 
-        if state.get(KEY_HITPOINTS, DEFAULT_STARTING_HITPOINTS) <= 0:
-            state.set(KEY_PHASE, PHASE_GAME_OVER)
-            state.set(KEY_ENTERED, False)
+        if tag.hitpoints <= 0:
+            tag.enter(PHASE_GAME_OVER)
 
-    def _fire_shot(self, state: GameState) -> None:
-        team = state.get(KEY_EXPECTED_TEAM, DEFAULT_EXPECTED_TEAM)
-        player = state.get(KEY_EXPECTED_PLAYER, DEFAULT_EXPECTED_PLAYER)
-        payload = encode_tag_data(TagData(team, player, _SHOT_DAMAGE))
+    def _fire_shot(self, state: GameState, tag: TagState, config: TagConfig) -> None:
+        payload = encode_tag_data(
+            TagData(config.expected_team, config.expected_player, _SHOT_DAMAGE)
+        )
         state.network_controls.send_ir(payload, LINE)
         print("sending IR packet")
 
-        deafen_window = state.get(KEY_DEAFEN_WINDOW, DEFAULT_DEAFEN_WINDOW)
-        state.set(KEY_DEAFEN_UNTIL, state.total + deafen_window)
+        tag.deafen_until = state.total + config.deafen_window
 
 
 RULE = TagPlayingRule()
