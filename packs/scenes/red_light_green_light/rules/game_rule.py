@@ -32,15 +32,14 @@ except ImportError:
     pass
 
 from engine.engine import GameRule
-from engine.input import AccelerationData, InputEvents
+from engine.input import InputEvents
 from engine.state import EffectReceipt, GameState, Scope
 from packs.scenes.red_light_green_light.rules.helpers.motion_detector import (
     GREEN_MIN_MOTION_THRESHOLD,
     RED_MAX_MOTION_THRESHOLD,
-    linear_magnitude,
-    low_pass,
 )
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_config import rlgl_config
+from packs.scenes.red_light_green_light.rules.helpers.rlgl_motion import rlgl_motion
 
 # ---------------------------------------------------------------------------
 # Phase constants
@@ -62,11 +61,6 @@ PHASE_GAME_OVER: Final = "game_over"
 _KEY_PHASE: Final = "rlgl_phase"
 _KEY_PHASE_START: Final = "rlgl_phase_start"
 
-_KEY_LAST_MOTION_TIME: Final = "rlgl_last_motion_time"
-_KEY_MOTION_EMA: Final = "rlgl_motion_ema"
-_KEY_GRAVITY_X: Final = "rlgl_gravity_x"
-_KEY_GRAVITY_Y: Final = "rlgl_gravity_y"
-_KEY_GRAVITY_Z: Final = "rlgl_gravity_z"
 _KEY_MUSIC_RECEIPT: Final = "rlgl_music_receipt"
 _KEY_LEVEL: Final = "rlgl_level"
 _KEY_LEVEL_RECEIPT: Final = "rlgl_level_receipt"
@@ -83,17 +77,16 @@ def _enter_phase(state: GameState, phase: str) -> None:
 
     Every ``_enter_*`` helper begins here, so a looping music effect can never
     leak across a transition.  The ``has`` guard makes the stop a no-op when
-    nothing is playing (e.g. entering Ready at game start).  Clearing the gravity
-    keys forces :func:`_update_motion` to re-seed from the first sample of the
-    next phase rather than carrying a stale orientation across the transition.
+    nothing is playing (e.g. entering Ready at game start).  Resetting the
+    gravity estimate forces :meth:`RlglMotion.update` to re-seed from the
+    first sample of the next phase rather than carrying a stale orientation
+    across the transition.
     """
     state.set(_KEY_PHASE, phase)
     state.set(_KEY_PHASE_START, state.total)
     if state.has(_KEY_MUSIC_RECEIPT):
         state.pop(_KEY_MUSIC_RECEIPT, EffectReceipt).stop()
-    state.delete(_KEY_GRAVITY_X)
-    state.delete(_KEY_GRAVITY_Y)
-    state.delete(_KEY_GRAVITY_Z)
+    rlgl_motion(state).reset_gravity()
 
 
 def _enter_ready(state: GameState) -> None:
@@ -130,7 +123,7 @@ def _enter_red_warning(state: GameState) -> None:
 
 def _enter_red(state: GameState) -> None:
     _enter_phase(state, PHASE_RED)
-    state.set(_KEY_MOTION_EMA, 0.0)
+    rlgl_motion(state).ema = 0.0
     state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.solid", {"color": 0xFF0000})
     receipt = state.effect_controls.add_effect(Scope.PERSONAL, "scene.red_light_music", {})
     state.set(_KEY_MUSIC_RECEIPT, receipt)
@@ -146,8 +139,9 @@ def _enter_green_warning(state: GameState) -> None:
 
 def _enter_green(state: GameState) -> None:
     _enter_phase(state, PHASE_GREEN)
-    state.set(_KEY_LAST_MOTION_TIME, state.total)
-    state.set(_KEY_MOTION_EMA, 0.0)
+    motion = rlgl_motion(state)
+    motion.last_motion_time = state.total
+    motion.ema = 0.0
     state.effect_controls.set_effect(Scope.NON_AMBIENT, "basic.solid", {"color": 0x00FF00})
     receipt = state.effect_controls.add_effect(Scope.PERSONAL, "scene.green_light_music", {})
     state.set(_KEY_MUSIC_RECEIPT, receipt)
@@ -176,43 +170,6 @@ def _enter_game_over(state: GameState) -> None:
     _enter_phase(state, PHASE_GAME_OVER)
     state.effect_controls.set_effect(Scope.ALL, "elements.fire", {})
     state.effect_controls.add_effect(Scope.ALL, "scene.game_over_sting", {})
-
-
-# ---------------------------------------------------------------------------
-# Motion tracking
-# ---------------------------------------------------------------------------
-
-
-def _update_motion(state: GameState, accel: AccelerationData) -> float:
-    """Update the gravity estimate and rolling motion average; return the average.
-
-    Gravity is tracked with a slow per-axis low-pass and subtracted as a vector,
-    so motion reads the same in any orientation.  The residual magnitude is then
-    smoothed for spike rejection: a lone spike cannot cross a threshold while
-    sustained motion accumulates across ticks.
-
-    The gravity estimate is cleared on every phase change (see
-    :func:`_enter_phase`) and re-seeded from the first sample of the new phase,
-    so it never starts at zero and never carries a stale orientation across a
-    transition.
-    """
-    config = rlgl_config(state)
-    beta = config.gravity_beta
-    if state.has(_KEY_GRAVITY_X):
-        gx = low_pass(state.get(_KEY_GRAVITY_X, accel.x), accel.x, beta)
-        gy = low_pass(state.get(_KEY_GRAVITY_Y, accel.y), accel.y, beta)
-        gz = low_pass(state.get(_KEY_GRAVITY_Z, accel.z), accel.z, beta)
-    else:
-        gx, gy, gz = accel.x, accel.y, accel.z
-    state.set(_KEY_GRAVITY_X, gx)
-    state.set(_KEY_GRAVITY_Y, gy)
-    state.set(_KEY_GRAVITY_Z, gz)
-
-    alpha = config.motion_smoothing
-    linear = linear_magnitude(accel, gx, gy, gz)
-    ema = low_pass(state.get(_KEY_MOTION_EMA, 0.0), linear, alpha)
-    state.set(_KEY_MOTION_EMA, ema)
-    return ema
 
 
 # ---------------------------------------------------------------------------
@@ -277,7 +234,10 @@ class RlglGameRule(GameRule):
             return
 
         if event.acceleration is not None:
-            ema = _update_motion(state, event.acceleration)
+            config = rlgl_config(state)
+            ema = rlgl_motion(state).update(
+                event.acceleration, config.gravity_beta, config.motion_smoothing
+            )
             if ema > RED_MAX_MOTION_THRESHOLD:
                 _enter_game_over(state)
 
@@ -303,13 +263,13 @@ class RlglGameRule(GameRule):
             return
 
         if event.acceleration is not None:
-            ema = _update_motion(state, event.acceleration)
+            motion = rlgl_motion(state)
+            ema = motion.update(event.acceleration, config.gravity_beta, config.motion_smoothing)
             if ema >= GREEN_MIN_MOTION_THRESHOLD:
-                state.set(_KEY_LAST_MOTION_TIME, state.total)
+                motion.last_motion_time = state.total
             else:
                 still_timeout = config.green_still_timeout
-                last_motion = state.get(_KEY_LAST_MOTION_TIME, state.total)
-                if state.total - last_motion >= still_timeout:
+                if state.total - motion.last_motion_time >= still_timeout:
                     _enter_game_over(state)
 
     def _check_level_up(self, state: GameState, elapsed: float) -> None:

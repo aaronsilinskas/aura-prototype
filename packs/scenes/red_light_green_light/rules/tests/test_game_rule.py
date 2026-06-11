@@ -397,17 +397,31 @@ def test_red_timer_expiry_transitions_to_green_warning(spy):
     assert state.get("rlgl_phase", None) == PHASE_GREEN_WARNING
 
 
-def test_phase_change_clears_the_gravity_estimate(spy):
+def test_phase_change_reseeds_gravity_from_the_new_phases_first_sample(spy):
     """A phase transition drops the gravity estimate so the next phase re-seeds it
-    from a fresh sample instead of carrying a stale orientation across."""
-    state, engine, timer = _setup_red_phase(spy, initial_data={"rlgl_red_duration": 3.0})
+    from a fresh sample instead of carrying a stale orientation across.
+
+    Gravity is seeded at rest on the z-axis during Red. After transitioning to
+    Green Warning then Green, the device is held still on the x-axis instead —
+    a stale z-axis gravity estimate would read this as a large deviation, but
+    re-seeding from the first Green sample reads it as no motion at all.
+    """
+    state, engine, timer = _setup_red_phase(
+        spy, initial_data={"rlgl_red_duration": 0.0, "rlgl_motion_smoothing": 1.0}
+    )
     phase_start = state.get("rlgl_phase_start", 0.0)
     _seed_gravity_at_rest(state, engine, timer, total=phase_start + 0.0)
-    assert state.has("rlgl_gravity_x")  # established during Red
 
-    _tick(state, engine, timer, total=phase_start + 3.0)  # RED → GREEN_WARNING
+    _tick(state, engine, timer, total=phase_start + 0.0)  # RED → GREEN_WARNING (duration=0)
+    _tick(state, engine, timer, total=phase_start + 0.0)  # GREEN_WARNING → GREEN
+    assert state.get("rlgl_phase", None) == PHASE_GREEN
 
-    assert not state.has("rlgl_gravity_x")
+    new_orientation = AccelerationData(x=_G, y=0.0, z=0.0)
+    _tick(state, engine, timer, accel=new_orientation, total=phase_start + 0.1)
+
+    # Re-seeded gravity reads the new orientation as "at rest" — no game over
+    # from the (stale-gravity) "motion" that a carried-over estimate would see.
+    assert state.get("rlgl_phase", None) == PHASE_GREEN
 
 
 def test_red_timer_expiry_takes_priority_over_motion(spy):
