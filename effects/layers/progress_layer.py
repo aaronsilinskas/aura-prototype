@@ -19,6 +19,11 @@ class ProgressLayer(Layer):
     __slots__ = ["_progress"]
 
     def __init__(self, progress: float) -> None:
+        self._progress = 0.0
+        self.set_progress(progress)
+
+    def set_progress(self, progress: float) -> None:
+        """Set the lit fraction, clamping to ``[0.0, 1.0]``."""
         if progress < 0.0:
             progress = 0.0
         elif progress > 1.0:
