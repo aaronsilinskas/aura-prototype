@@ -48,7 +48,7 @@ def test_new_tag_state_has_no_receipts():
     assert tag.game_over_receipt is None
 
 
-def test_new_tag_state_has_a_shot_state_ready_to_fire_immediately():
+def test_new_tag_state_has_a_shot_state_with_no_ammo_and_no_cooldown_pending():
     tag = TagState()
 
     assert tag.shot.ammo == 0
