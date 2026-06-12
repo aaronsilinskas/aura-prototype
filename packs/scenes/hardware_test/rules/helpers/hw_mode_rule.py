@@ -5,13 +5,14 @@ Each hardware_test mode (RGB, Accelerometer, IR, Radio, SFX) is a
 scene's shared :func:`hw_phase` machine. Because the override-``on()`` model
 in :mod:`engine.phase` dispatches one handler per event type, this base
 registers the single ``ButtonAndAcceleration`` handler for all five modes and
-uses a template method: :meth:`_handle` calls :meth:`on_button_a` (each mode
-overrides) for per-mode Button A logic, then performs the behaviour every mode
-shares — Button B advances to the next mode in :data:`MODE_ORDER`, and the
-IR/radio receive-flash expiry is checked every tick.
+uses a template method: :meth:`_handle` calls :meth:`on_input_event` (each
+mode overrides) with the whole event for per-mode logic, then performs the
+behaviour every mode shares — Button B advances to the next mode in
+:data:`MODE_ORDER`, and the IR/radio receive-flash expiry is checked every
+tick.
 
-``on_button_a`` is scene-local: it is not a general ``on_event`` and is only
-ever called for ``ButtonAndAcceleration`` events.
+``on_input_event`` is scene-local: it is not a general ``on_event`` and is
+only ever called for ``ButtonAndAcceleration`` events.
 """
 
 from __future__ import annotations
@@ -51,10 +52,10 @@ class HwModeRule(PhaseRule):
     """A :class:`PhaseRule` bound to the hardware_test scene's shared phase machine.
 
     Subclasses provide ``on_enter`` (the mode's one-time entry effect) and
-    :meth:`on_button_a` (the mode's Button A behaviour). This base owns the
-    Button-B "advance to next mode" transition and the IR/radio receive-flash
-    expiry, both of which run on every dispatch regardless of which button (if
-    any) was pressed.
+    :meth:`on_input_event` (the mode's per-tick/per-button behaviour). This
+    base owns the Button-B "advance to next mode" transition and the
+    IR/radio receive-flash expiry, both of which run on every dispatch
+    regardless of which button (if any) was pressed.
     """
 
     def __init__(self, phase: PhaseKey) -> None:
@@ -64,8 +65,8 @@ class HwModeRule(PhaseRule):
     def _machine(self, state: GameState) -> PhaseMachine:
         return hw_phase(state)
 
-    def on_button_a(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
-        """Per-mode Button A behaviour. No-op by default."""
+    def on_input_event(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+        """Per-mode handling of the whole input event. No-op by default."""
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
         # Consume any pending advance marker stamped during *this* tick. If it
@@ -82,8 +83,7 @@ class HwModeRule(PhaseRule):
             if advanced_to is self.phase and advanced_at == state.total:
                 return
 
-        if event.buttons.is_pressed("A"):
-            self.on_button_a(event, state)
+        self.on_input_event(event, state)
 
         self._check_flash_expiry(state)
 

@@ -26,7 +26,10 @@ class HwTestRadioRule(HwModeRule):
     def on_enter(self, state: GameState) -> None:
         state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": 0xFFFFFF})
 
-    def on_button_a(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def on_input_event(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+        if not event.buttons.is_pressed("A"):
+            return
+
         state.queue_event(NetworkEvents.RadioReceived(HW_TEST_PAYLOAD, "local"))
         print("sending radio packet")
 
