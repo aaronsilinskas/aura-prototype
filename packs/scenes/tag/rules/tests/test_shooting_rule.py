@@ -7,7 +7,7 @@ import pytest
 from engine.engine import GameEngine
 from engine.input import ButtonData, InputEvents
 from engine.network import LINE
-from engine.state import GameState, SceneControls, Scope
+from engine.state import EffectReceipt, GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls, SpyNetworkControls
 from hardware.shared.tag_protocol import TagData, encode_tag_data
 from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, PHASE_READY
@@ -238,6 +238,7 @@ def test_holding_to_reload_duration_restores_ammo_to_max(spy):
     tag = tag_state(state)
     tag.shot.ammo = 0
     tag.shot.reload_started_at = 0.0
+    tag.shot.reload_receipt = EffectReceipt(0)
 
     _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)  # held, total - start >= 3.0
 
@@ -250,6 +251,7 @@ def test_completing_reload_snaps_ammo_bar_full_via_basic_progress(spy):
     tag = tag_state(state)
     tag.shot.ammo = 0
     tag.shot.reload_started_at = 0.0
+    tag.shot.reload_receipt = EffectReceipt(0)
 
     _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)
 
@@ -266,6 +268,7 @@ def test_completing_reload_adds_reload_complete_effect(spy):
     tag = tag_state(state)
     tag.shot.ammo = 0
     tag.shot.reload_started_at = 0.0
+    tag.shot.reload_receipt = EffectReceipt(0)
 
     _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)
 
@@ -281,6 +284,7 @@ def test_completing_reload_clears_reload_started_at(spy):
     tag = tag_state(state)
     tag.shot.ammo = 0
     tag.shot.reload_started_at = 0.0
+    tag.shot.reload_receipt = EffectReceipt(0)
 
     _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)
 
@@ -293,6 +297,7 @@ def test_held_trigger_after_completion_does_not_auto_fire(spy):
     tag = tag_state(state)
     tag.shot.ammo = 0
     tag.shot.reload_started_at = 0.0
+    tag.shot.reload_receipt = EffectReceipt(0)
 
     _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)  # completes reload
     _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)  # still held
@@ -312,6 +317,7 @@ def test_releasing_before_reload_completion_restores_empty_ammo_bar(spy):
     tag = tag_state(state)
     tag.shot.ammo = 0
     tag.shot.reload_started_at = 0.0
+    tag.shot.reload_receipt = EffectReceipt(0)
 
     _tick(state, engine, timer, 1.0)  # release before the 3.0s duration elapses
 
@@ -328,6 +334,7 @@ def test_releasing_before_reload_completion_clears_reload_started_at(spy):
     tag = tag_state(state)
     tag.shot.ammo = 0
     tag.shot.reload_started_at = 0.0
+    tag.shot.reload_receipt = EffectReceipt(0)
 
     _tick(state, engine, timer, 1.0)
 
@@ -341,6 +348,7 @@ def test_releasing_before_reload_completion_does_not_add_reload_complete(spy):
     tag = tag_state(state)
     tag.shot.ammo = 0
     tag.shot.reload_started_at = 0.0
+    tag.shot.reload_receipt = EffectReceipt(0)
 
     _tick(state, engine, timer, 1.0)
 
@@ -358,6 +366,7 @@ def test_reaching_duration_threshold_on_release_tick_completes_not_cancels(spy):
     tag = tag_state(state)
     tag.shot.ammo = 0
     tag.shot.reload_started_at = 0.0
+    tag.shot.reload_receipt = EffectReceipt(0)
 
     _tick(state, engine, timer, 3.0)  # released, but threshold met on this tick
 
@@ -374,6 +383,7 @@ def test_firing_is_suppressed_while_reloading(spy):
     tag = tag_state(state)
     tag.shot.ammo = 0
     tag.shot.reload_started_at = 0.0
+    tag.shot.reload_receipt = EffectReceipt(0)
 
     _tick(state, engine, timer, 1.0, button_a=ButtonData.DOWN)  # still mid-reload, held
 

@@ -74,11 +74,13 @@ class TagShootingRule(TagInPhaseRule):
         state.effect_controls.set_effect(Scope.Global.BUFF, "basic.progress", {"progress": 1.0})
         state.effect_controls.add_effect(Scope.Global.BUFF, "scene.reload_complete", {})
         tag.shot.reload_started_at = None
+        tag.shot.reload_receipt.stop()
         tag.shot.reload_receipt = None
 
     def _cancel_reload(self, state: GameState, tag: TagState) -> None:
         state.effect_controls.set_effect(Scope.Global.BUFF, "basic.progress", {"progress": 0.0})
         tag.shot.reload_started_at = None
+        tag.shot.reload_receipt.stop()
         tag.shot.reload_receipt = None
 
     def _can_fire(self, state: GameState, tag: TagState, config: TagConfig) -> bool:
