@@ -8,23 +8,13 @@ from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
+from packs.scenes.hardware_test.rules.helpers.phases import MODE_ACCELEROMETER, MODE_RGB
 from packs.scenes.hardware_test.rules.motion_rule import (
     ACCEL_LOG_INTERVAL,
     ACCEL_MAX,
     HwTestMotionRule,
 )
-
-
-class _StubTimer:
-    """Controllable timer for tests that need specific total values."""
-
-    def __init__(self) -> None:
-        self.elapsed: float = 0.0
-        self.total: float = 0.0
-
-    def update(self) -> None:
-        pass  # Caller controls elapsed/total directly
-
+from packs.scenes.hardware_test.rules.tests.helpers import StubTimer, seed_phase
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -38,13 +28,14 @@ def spy() -> SpyEffectControls:
 
 def _make_state(
     spy: SpyEffectControls,
-    hw_mode: int,
-    timer: _StubTimer | None = None,
+    mode=MODE_ACCELEROMETER,
+    timer: StubTimer | None = None,
 ) -> tuple[GameState, GameEngine]:
     engine = GameEngine(spy, timer=timer)
     rule = HwTestMotionRule()
     engine.add_rules(rule)
-    state = engine.create_state(SceneControls(), initial_data={"hw_mode": hw_mode})
+    state = engine.create_state(SceneControls(), initial_data={})
+    seed_phase(state, mode, entered=(mode is MODE_ACCELEROMETER))
     return state, engine
 
 
@@ -67,26 +58,14 @@ def _press_a(state: GameState, engine: GameEngine, acceleration: AccelerationDat
 # ---------------------------------------------------------------------------
 
 
-def test_motion_rule_is_noop_when_hw_mode_is_0(spy):
-    state, engine = _make_state(spy, hw_mode=0)
+def test_motion_rule_is_noop_when_mode_is_rgb(spy):
+    state, engine = _make_state(spy, mode=MODE_RGB)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX, y=ACCEL_MAX, z=ACCEL_MAX))
     assert spy.set_effect_calls == []
 
 
-def test_motion_rule_is_noop_when_hw_mode_is_2(spy):
-    state, engine = _make_state(spy, hw_mode=2)
-    _fire(state, engine, AccelerationData(x=ACCEL_MAX))
-    assert spy.set_effect_calls == []
-
-
-def test_motion_rule_is_noop_when_hw_mode_is_3(spy):
-    state, engine = _make_state(spy, hw_mode=3)
-    _fire(state, engine, AccelerationData(z=ACCEL_MAX))
-    assert spy.set_effect_calls == []
-
-
 def test_motion_rule_is_noop_when_acceleration_is_none(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, None)
     assert spy.set_effect_calls == []
 
@@ -97,7 +76,7 @@ def test_motion_rule_is_noop_when_acceleration_is_none(spy):
 
 
 def test_x_axis_max_positive_sets_red_progress_on_personal(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX))
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
@@ -107,7 +86,7 @@ def test_x_axis_max_positive_sets_red_progress_on_personal(spy):
 
 
 def test_x_axis_max_negative_sets_cyan_progress_on_personal(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, AccelerationData(x=-ACCEL_MAX))
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
@@ -122,7 +101,7 @@ def test_x_axis_max_negative_sets_cyan_progress_on_personal(spy):
 
 
 def test_y_axis_max_positive_sets_green_progress_on_directional(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, AccelerationData(y=ACCEL_MAX))
 
     y_calls = [c for c in spy.set_effect_calls if c[0] == Scope.DIRECTIONAL]
@@ -132,7 +111,7 @@ def test_y_axis_max_positive_sets_green_progress_on_directional(spy):
 
 
 def test_y_axis_max_negative_sets_magenta_progress_on_directional(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, AccelerationData(y=-ACCEL_MAX))
 
     y_calls = [c for c in spy.set_effect_calls if c[0] == Scope.DIRECTIONAL]
@@ -147,7 +126,7 @@ def test_y_axis_max_negative_sets_magenta_progress_on_directional(spy):
 
 
 def test_z_axis_max_positive_sets_blue_progress_on_global_all(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, AccelerationData(z=ACCEL_MAX))
 
     z_calls = [c for c in spy.set_effect_calls if c[0] == Scope.Global.ALL]
@@ -157,7 +136,7 @@ def test_z_axis_max_positive_sets_blue_progress_on_global_all(spy):
 
 
 def test_z_axis_max_negative_sets_yellow_progress_on_global_all(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, AccelerationData(z=-ACCEL_MAX))
 
     z_calls = [c for c in spy.set_effect_calls if c[0] == Scope.Global.ALL]
@@ -172,7 +151,7 @@ def test_z_axis_max_negative_sets_yellow_progress_on_global_all(spy):
 
 
 def test_motion_rule_uses_basic_progress_effect_for_all_axes(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX, y=ACCEL_MAX, z=ACCEL_MAX))
 
     names = [c[1] for c in spy.set_effect_calls]
@@ -185,7 +164,7 @@ def test_motion_rule_uses_basic_progress_effect_for_all_axes(spy):
 
 
 def test_x_axis_half_max_acceleration_sets_progress_0_5(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX / 2))
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
@@ -193,7 +172,7 @@ def test_x_axis_half_max_acceleration_sets_progress_0_5(spy):
 
 
 def test_progress_clamps_to_1_0_when_acceleration_exceeds_max(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX * 2))
 
     x_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
@@ -201,7 +180,7 @@ def test_progress_clamps_to_1_0_when_acceleration_exceeds_max(spy):
 
 
 def test_zero_acceleration_yields_zero_progress(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, AccelerationData(x=0.0, y=0.0, z=0.0))
 
     for _scope, _name, options in spy.set_effect_calls:
@@ -214,7 +193,7 @@ def test_zero_acceleration_yields_zero_progress(spy):
 
 
 def test_all_three_axes_fire_on_first_tick(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX, y=ACCEL_MAX, z=ACCEL_MAX))
 
     scopes = [c[0] for c in spy.set_effect_calls]
@@ -224,7 +203,7 @@ def test_all_three_axes_fire_on_first_tick(spy):
 
 
 def test_each_axis_fires_set_effect_every_tick(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX))
     _fire(state, engine, AccelerationData(x=ACCEL_MAX / 2))
 
@@ -234,7 +213,7 @@ def test_each_axis_fires_set_effect_every_tick(spy):
 
 
 def test_color_flips_with_sign_each_tick(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _fire(state, engine, AccelerationData(x=ACCEL_MAX))
     _fire(state, engine, AccelerationData(x=-ACCEL_MAX))
 
@@ -248,14 +227,14 @@ def test_color_flips_with_sign_each_tick(spy):
 
 
 def test_button_a_with_no_acceleration_is_noop(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _press_a(state, engine, None)
 
     assert spy.set_effect_calls == []
 
 
 def test_button_a_does_not_add_effects_beyond_the_three_axes(spy):
-    state, engine = _make_state(spy, hw_mode=1)
+    state, engine = _make_state(spy)
     _press_a(state, engine, AccelerationData(x=ACCEL_MAX, y=ACCEL_MAX, z=ACCEL_MAX))
 
     # Only the three per-axis progress bars fire — Button A adds nothing.
@@ -268,8 +247,8 @@ def test_button_a_does_not_add_effects_beyond_the_three_axes(spy):
 
 
 def test_logs_xyz_on_first_matching_tick(spy, capsys):
-    timer = _StubTimer()
-    state, engine = _make_state(spy, hw_mode=1, timer=timer)
+    timer = StubTimer()
+    state, engine = _make_state(spy, timer=timer)
 
     _fire(state, engine, AccelerationData(x=1.0, y=2.0, z=3.0))
 
@@ -279,8 +258,8 @@ def test_logs_xyz_on_first_matching_tick(spy, capsys):
 
 
 def test_does_not_log_again_before_interval_elapses(spy, capsys):
-    timer = _StubTimer()
-    state, engine = _make_state(spy, hw_mode=1, timer=timer)
+    timer = StubTimer()
+    state, engine = _make_state(spy, timer=timer)
 
     timer.total = 0.0
     _fire(state, engine, AccelerationData(x=1.0))
@@ -293,8 +272,8 @@ def test_does_not_log_again_before_interval_elapses(spy, capsys):
 
 
 def test_logs_again_after_interval_elapses(spy, capsys):
-    timer = _StubTimer()
-    state, engine = _make_state(spy, hw_mode=1, timer=timer)
+    timer = StubTimer()
+    state, engine = _make_state(spy, timer=timer)
 
     timer.total = 0.0
     _fire(state, engine, AccelerationData(x=1.0))
@@ -307,8 +286,8 @@ def test_logs_again_after_interval_elapses(spy, capsys):
 
 
 def test_does_not_log_when_not_accelerometer_mode(spy, capsys):
-    timer = _StubTimer()
-    state, engine = _make_state(spy, hw_mode=0, timer=timer)
+    timer = StubTimer()
+    state, engine = _make_state(spy, mode=MODE_RGB, timer=timer)
 
     _fire(state, engine, AccelerationData(x=1.0, y=2.0, z=3.0))
 

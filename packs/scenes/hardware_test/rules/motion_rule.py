@@ -5,10 +5,10 @@ try:
 except ImportError:
     pass
 
-from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState, Scope
-from packs.scenes.hardware_test.rules.helpers.mode import MODE_ACCELEROMETER, current_mode
+from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import HwModeRule
+from packs.scenes.hardware_test.rules.helpers.phases import MODE_ACCELEROMETER
 
 ACCEL_MAX: Final = 9.8
 
@@ -29,16 +29,27 @@ _AXIS_MAP: Final = (
 )
 
 
-class HwTestMotionRule(GameRule):
-    """Maps accelerometer axes to per-scope ``basic.progress`` bars."""
+class HwTestMotionRule(HwModeRule):
+    """Drives the Accelerometer mode: idle entry effect and per-tick axis bars.
+
+    Maps accelerometer axes to per-scope ``basic.progress`` bars every tick,
+    independent of button state. Button A has no behaviour in this mode.
+    """
 
     def __init__(self) -> None:
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        super().__init__(MODE_ACCELEROMETER)
+
+    def on_enter(self, state: GameState) -> None:
+        ec = state.effect_controls
+        ec.set_effect(Scope.PERSONAL, "basic.progress", {"color": 0xFF0000, "progress": 0.0})
+        ec.set_effect(Scope.DIRECTIONAL, "basic.progress", {"color": 0x00FF00, "progress": 0.0})
+        ec.set_effect(Scope.Global.ALL, "basic.progress", {"color": 0x0000FF, "progress": 0.0})
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
-        if current_mode(state) != MODE_ACCELEROMETER:
-            return
+        self._update_axes(event, state)
+        super()._handle(event, state)
 
+    def _update_axes(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
         if event.acceleration is None:
             return
 

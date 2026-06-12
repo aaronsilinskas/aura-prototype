@@ -164,7 +164,7 @@ def test_hardware_test_scene_local_rules_are_discovered() -> None:
     scene = scene_registry.get("hardware_test")
     local_rules = scene.local_rule_registry
 
-    for rule_name in ("mode_rule", "motion_rule", "network_rule"):
+    for rule_name in ("rgb_rule", "motion_rule", "ir_rule", "radio_rule", "sfx_rule"):
         rule = local_rules.get(rule_name, GameRule)
         assert isinstance(rule, GameRule), f"{rule_name} expected to be a GameRule"
 

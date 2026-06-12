@@ -1,31 +1,34 @@
 from __future__ import annotations
 
-from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState
-from packs.scenes.hardware_test.rules.helpers.mode import _RGB_IDLE, MODE_RGB, current_mode
+from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import HwModeRule
+from packs.scenes.hardware_test.rules.helpers.mode import RGB_IDLE
+from packs.scenes.hardware_test.rules.helpers.phases import MODE_RGB
 
 
-class HwTestRgbRule(GameRule):
-    """Cycles the RGB idle brightness level on Button A in RGB mode.
+class HwTestRgbRule(HwModeRule):
+    """Drives the RGB mode: idle entry effect and Button A brightness cycling.
 
-    Button A steps ``rgb_level`` 1 → 10 → 1 and re-applies the ``_RGB_IDLE``
-    effect table at the new level. Presses in any other mode are ignored.
+    On entry, sets ``rgb_level`` to 1 and applies the ``RGB_IDLE`` effect table
+    at level 1. Button A steps ``rgb_level`` 1 → 10 → 1 and re-applies the
+    ``RGB_IDLE`` effect table at the new level.
     """
 
     def __init__(self) -> None:
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        super().__init__(MODE_RGB)
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
-        if current_mode(state) != MODE_RGB:
-            return
-        if not event.buttons.is_pressed("A"):
-            return
+    def on_enter(self, state: GameState) -> None:
+        ec = state.effect_controls
+        state.set("rgb_level", 1)
+        for scope, name in RGB_IDLE:
+            ec.set_effect(scope, name, {"level": 1})
 
+    def on_button_a(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
         new_level = (state.get("rgb_level", 1) % 10) + 1
         state.set("rgb_level", new_level)
         ec = state.effect_controls
-        for scope, name in _RGB_IDLE:
+        for scope, name in RGB_IDLE:
             ec.set_effect(scope, name, {"level": new_level})
         print("rgb level -> " + str(new_level))
 
