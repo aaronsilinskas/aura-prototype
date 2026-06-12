@@ -11,6 +11,8 @@
     "tag_expected_team": 0,
     "tag_expected_player": 1,
     "tag_warning_pulse_count": 5,
-    "tag_warning_pulse_duration": 0.6
+    "tag_warning_pulse_duration": 0.6,
+    "tag_max_ammo": 10,
+    "tag_shot_cooldown": 1.0
   }
 }

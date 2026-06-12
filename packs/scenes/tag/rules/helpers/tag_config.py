@@ -28,6 +28,8 @@ DEFAULT_EXPECTED_TEAM: Final = 0
 DEFAULT_EXPECTED_PLAYER: Final = 1
 DEFAULT_WARNING_PULSE_COUNT: Final = 5
 DEFAULT_WARNING_PULSE_DURATION: Final = 0.6
+DEFAULT_MAX_AMMO: Final = 10
+DEFAULT_SHOT_COOLDOWN: Final = 1.0
 
 
 class TagConfig:
@@ -42,6 +44,8 @@ class TagConfig:
         "deafen_window",
         "expected_player",
         "expected_team",
+        "max_ammo",
+        "shot_cooldown",
         "starting_hitpoints",
         "warning_pulse_count",
         "warning_pulse_duration",
@@ -55,6 +59,8 @@ class TagConfig:
         expected_player: int,
         warning_pulse_count: int,
         warning_pulse_duration: float,
+        max_ammo: int,
+        shot_cooldown: float,
     ) -> None:
         self.starting_hitpoints = starting_hitpoints
         self.deafen_window = deafen_window
@@ -62,6 +68,8 @@ class TagConfig:
         self.expected_player = expected_player
         self.warning_pulse_count = warning_pulse_count
         self.warning_pulse_duration = warning_pulse_duration
+        self.max_ammo = max_ammo
+        self.shot_cooldown = shot_cooldown
 
     @classmethod
     def from_state(cls, state: GameState) -> TagConfig:
@@ -75,6 +83,8 @@ class TagConfig:
             warning_pulse_duration=state.get(
                 "tag_warning_pulse_duration", DEFAULT_WARNING_PULSE_DURATION
             ),
+            max_ammo=state.get("tag_max_ammo", DEFAULT_MAX_AMMO),
+            shot_cooldown=state.get("tag_shot_cooldown", DEFAULT_SHOT_COOLDOWN),
         )
 
     def warning_duration(self) -> float:

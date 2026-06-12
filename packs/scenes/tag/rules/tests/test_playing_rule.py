@@ -14,7 +14,7 @@ from packs.scenes.tag.rules.helpers.phases import (
     PHASE_READY,
     tag_phase,
 )
-from packs.scenes.tag.rules.helpers.tag_config import DEFAULT_STARTING_HITPOINTS
+from packs.scenes.tag.rules.helpers.tag_config import DEFAULT_MAX_AMMO, DEFAULT_STARTING_HITPOINTS
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 from packs.scenes.tag.rules.playing_rule import TagPlayingRule
 from packs.scenes.tag.rules.tests.helpers import StubTimer, seed_phase
@@ -62,9 +62,10 @@ def test_entering_playing_sets_full_progress_bar_on_personal(spy):
     _tick(state, engine, timer, 0.0)
 
     progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
-    assert len(progress_calls) == 1
-    scope, _, options = progress_calls[0]
-    assert scope is Scope.PERSONAL
+    assert len(progress_calls) == 2
+    personal_calls = [c for c in progress_calls if c[0] is Scope.PERSONAL]
+    assert len(personal_calls) == 1
+    _, _, options = personal_calls[0]
     assert options == {"progress": 1.0}
 
 
@@ -74,6 +75,45 @@ def test_entering_playing_stores_progress_receipt(spy):
     _tick(state, engine, timer, 0.0)
 
     assert tag_state(state).progress_receipt is not None
+
+
+def test_entering_playing_sets_starting_ammo(spy):
+    state, engine, timer = _make_state(spy)
+
+    _tick(state, engine, timer, 0.0)
+
+    assert tag_state(state).shot.ammo == DEFAULT_MAX_AMMO
+
+
+def test_entering_playing_sets_full_ammo_bar_on_global_buff(spy):
+    state, engine, timer = _make_state(spy)
+
+    _tick(state, engine, timer, 0.0)
+
+    progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
+    buff_calls = [c for c in progress_calls if c[0] is Scope.Global.BUFF]
+    assert len(buff_calls) == 1
+    _, _, options = buff_calls[0]
+    assert options == {"progress": 1.0}
+
+
+def test_entering_playing_stores_ammo_receipt(spy):
+    state, engine, timer = _make_state(spy)
+
+    _tick(state, engine, timer, 0.0)
+
+    assert tag_state(state).ammo_receipt is not None
+
+
+def test_exiting_playing_stops_ammo_bar(spy):
+    state, engine, timer = _make_state(spy)
+    tag = seed_phase(state, PHASE_PLAYING, entered=True)
+    tag.hitpoints = 0
+
+    _tick(state, engine, timer, 0.0)
+
+    assert tag_phase(state).phase == PHASE_GAME_OVER
+    assert tag.ammo_receipt is None
 
 
 def test_non_playing_phase_is_ignored(spy):
