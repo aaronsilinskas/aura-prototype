@@ -12,9 +12,10 @@ applies the accuracy-rig gate order:
 3. Deafen gate — packets received before ``TagState.deafen_until`` (the
    player's own freshly-fired echo, which carries the expected identity) are
    logged and suppressed.
-4. Hit — subtracts the decoded ``damage`` from hitpoints and re-issues the
+4. Hit — subtracts the decoded ``damage`` from hitpoints, re-issues the
    shared ``Scope.PERSONAL`` ``basic.progress`` bar (owned by the Playing rule)
-   with the new fraction (clamped to ``[0, 1]`` by the layer).
+   with the new fraction (clamped to ``[0, 1]`` by the layer), and plays the
+   shared ``scene.hit`` effect on ``Scope.Global.MAIN``.
 """
 
 from __future__ import annotations
@@ -71,6 +72,8 @@ class TagHitRule(TagInPhaseRule):
         tag.progress_receipt = state.effect_controls.set_effect(
             Scope.PERSONAL, "basic.progress", {"progress": fraction}
         )
+
+        state.effect_controls.set_effect(Scope.Global.MAIN, "scene.hit", {})
 
         print(
             "[hit team="

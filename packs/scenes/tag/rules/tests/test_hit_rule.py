@@ -48,6 +48,17 @@ def _receive(
     engine.update(state)
 
 
+def test_matching_hit_plays_hit_effect_on_global_main(spy):
+    state, engine, timer = _make_state(spy)
+
+    _receive(state, engine, timer, 1.0, TagData(team=0, player=1, damage=1))
+
+    hit_calls = [c for c in spy.set_effect_calls if c[1] == "scene.hit"]
+    assert len(hit_calls) == 1
+    scope, _, _ = hit_calls[0]
+    assert scope is Scope.Global.MAIN
+
+
 def test_matching_hit_reduces_hitpoints_and_reissues_progress_bar(spy):
     state, engine, timer = _make_state(spy)
 
