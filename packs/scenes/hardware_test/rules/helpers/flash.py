@@ -50,4 +50,4 @@ def flash(state: GameState, key: str) -> Flash:
     """Return the cached :class:`Flash` for *key*, building and caching it on first use."""
     if not state.has(key):
         state.set(key, Flash())
-    return state.get(key, None)
+    return state.get_or_none(key, Flash)  # type: ignore[return-value]

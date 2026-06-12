@@ -93,4 +93,4 @@ def rlgl_motion(state: GameState) -> RlglMotion:
     """Return the cached :class:`RlglMotion`, building and caching it on first use."""
     if not state.has(_MOTION_KEY):
         state.set(_MOTION_KEY, RlglMotion())
-    return state.get(_MOTION_KEY, None)
+    return state.get_or_none(_MOTION_KEY, RlglMotion)  # type: ignore[return-value]

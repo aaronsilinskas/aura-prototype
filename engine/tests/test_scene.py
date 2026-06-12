@@ -529,7 +529,9 @@ def test_last_pending_transition_wins_within_one_tick() -> None:
     manager.update()
     manager.update()  # engine.update(active_state)
 
-    assert manager.active_state.get("which", None) == "b", "last load() call in tick should win"
+    assert manager.active_state.get_or_none("which", str) == "b", (
+        "last load() call in tick should win"
+    )
 
 
 def test_overlay_wins_when_load_and_overlay_both_called_in_same_tick() -> None:
@@ -555,12 +557,12 @@ def test_overlay_wins_when_load_and_overlay_both_called_in_same_tick() -> None:
     manager.update()  # tick on overlay
 
     # overlay was applied: the overlay scene is on top of base
-    assert manager.active_state.get("which", None) == "overlay"
+    assert manager.active_state.get_or_none("which", str) == "overlay"
     # popping returns to the suspended base, proving overlay suspended (not replaced) it
     manager.pop()
     manager.update()
     manager.update()
-    assert manager.active_state.get("which", None) == "base"
+    assert manager.active_state.get_or_none("which", str) == "base"
 
 
 # ---------------------------------------------------------------------------
@@ -591,7 +593,7 @@ def test_load_seeds_active_state_data_from_scene_initial_data() -> None:
     manager.update()  # load fires; state created with initial_data
     manager.update()  # engine.update(active_state); _last_state is now set
 
-    assert engine._last_state.get("level", None) == 5
+    assert engine._last_state.get_or_none("level", int) == 5
 
 
 def test_load_stops_all_effects_on_the_outgoing_scene() -> None:
@@ -813,13 +815,13 @@ def test_overlay_suspends_active_scene_and_pushes_without_clearing_stack() -> No
     manager.overlay("overlay_scene")
     manager.update()
     manager.update()  # tick on overlay
-    assert manager.active_state.get("which", None) == "overlay"
+    assert manager.active_state.get_or_none("which", str) == "overlay"
 
     # base was suspended (not cleared): popping restores it
     manager.pop()
     manager.update()
     manager.update()
-    assert manager.active_state.get("which", None) == "base"
+    assert manager.active_state.get_or_none("which", str) == "base"
 
 
 def test_overlay_clears_suspended_base_state_queue_before_pushing() -> None:
@@ -969,7 +971,7 @@ def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
     manager.update()
     manager.update()  # tick on restored scene
 
-    assert manager.active_state.get("which", None) == "mid", (
+    assert manager.active_state.get_or_none("which", str) == "mid", (
         "pop from 3-layer stack must restore the scene directly below"
     )
 
@@ -977,7 +979,7 @@ def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
     manager.update()
     manager.update()
 
-    assert manager.active_state.get("which", None) == "base"
+    assert manager.active_state.get_or_none("which", str) == "base"
 
 
 # ---------------------------------------------------------------------------

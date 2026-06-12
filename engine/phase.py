@@ -121,7 +121,7 @@ def phase_machine(state: GameState, key: str, initial_phase: PhaseKey) -> PhaseM
     """
     if not state.has(key):
         state.set(key, PhaseMachine(initial_phase))
-    return state.get(key, None)
+    return state.get_or_none(key, PhaseMachine)  # type: ignore[return-value]
 
 
 class _PhaseGuardedRule(GameRule):

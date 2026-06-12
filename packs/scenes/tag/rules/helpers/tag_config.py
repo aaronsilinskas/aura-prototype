@@ -86,4 +86,4 @@ def tag_config(state: GameState) -> TagConfig:
     """Return the cached :class:`TagConfig`, building and caching it on first use."""
     if not state.has(_CONFIG_KEY):
         state.set(_CONFIG_KEY, TagConfig.from_state(state))
-    return state.get(_CONFIG_KEY, None)
+    return state.get_or_none(_CONFIG_KEY, TagConfig)  # type: ignore[return-value]

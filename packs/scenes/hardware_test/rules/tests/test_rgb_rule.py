@@ -51,7 +51,7 @@ def test_entering_rgb_sets_level_to_1(spy):
 
     _tick(state, engine)
 
-    assert state.get("rgb_level", None) == 1
+    assert state.get_or_none("rgb_level", int) == 1
 
 
 def test_entering_rgb_applies_idle_effects_at_level_1(spy):
@@ -91,7 +91,7 @@ def test_button_a_increments_level_from_1_to_2(spy):
 
     _press_a(state, engine)
 
-    assert state.get("rgb_level", None) == 2
+    assert state.get_or_none("rgb_level", int) == 2
 
 
 def test_button_a_wraps_level_from_10_to_1(spy):
@@ -101,7 +101,7 @@ def test_button_a_wraps_level_from_10_to_1(spy):
 
     _press_a(state, engine)
 
-    assert state.get("rgb_level", None) == 1
+    assert state.get_or_none("rgb_level", int) == 1
 
 
 # ---------------------------------------------------------------------------

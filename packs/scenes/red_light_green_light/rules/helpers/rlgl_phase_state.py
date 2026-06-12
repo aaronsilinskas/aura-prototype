@@ -64,4 +64,4 @@ def rlgl_phase_state(state: GameState) -> RlglPhaseState:
     """Return the cached :class:`RlglPhaseState`, building and caching it on first use."""
     if not state.has(_PHASE_STATE_KEY):
         state.set(_PHASE_STATE_KEY, RlglPhaseState())
-    return state.get(_PHASE_STATE_KEY, None)
+    return state.get_or_none(_PHASE_STATE_KEY, RlglPhaseState)  # type: ignore[return-value]
