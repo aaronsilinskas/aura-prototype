@@ -25,6 +25,22 @@ from engine.state import EffectReceipt, GameState
 _STATE_KEY: Final = "tag_state"
 
 
+class ShotState:
+    """Shot-related gameplay state: ammo and shot-cooldown tracking.
+
+    Reserves room for the reload fields added in a later issue.
+    """
+
+    __slots__ = (
+        "ammo",
+        "last_shot_at",
+    )
+
+    def __init__(self) -> None:
+        self.ammo = 0
+        self.last_shot_at = float("-inf")
+
+
 class TagState:
     """Mutable flat gameplay state shared by the Tag rules.
 
@@ -36,10 +52,12 @@ class TagState:
     """
 
     __slots__ = (
+        "ammo_receipt",
         "deafen_until",
         "game_over_receipt",
         "hitpoints",
         "progress_receipt",
+        "shot",
     )
 
     def __init__(self) -> None:
@@ -47,6 +65,8 @@ class TagState:
         self.deafen_until = 0.0
         self.progress_receipt: EffectReceipt | None = None
         self.game_over_receipt: EffectReceipt | None = None
+        self.ammo_receipt: EffectReceipt | None = None
+        self.shot = ShotState()
 
 
 def tag_state(state: GameState) -> TagState:

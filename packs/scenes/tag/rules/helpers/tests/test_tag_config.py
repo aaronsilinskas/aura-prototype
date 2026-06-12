@@ -12,6 +12,8 @@ from packs.scenes.tag.rules.helpers.tag_config import (
     DEFAULT_DEAFEN_WINDOW,
     DEFAULT_EXPECTED_PLAYER,
     DEFAULT_EXPECTED_TEAM,
+    DEFAULT_MAX_AMMO,
+    DEFAULT_SHOT_COOLDOWN,
     DEFAULT_STARTING_HITPOINTS,
     DEFAULT_WARNING_PULSE_COUNT,
     DEFAULT_WARNING_PULSE_DURATION,
@@ -52,6 +54,8 @@ def test_from_state_applies_defaults_when_unseeded():
     assert config.expected_player == DEFAULT_EXPECTED_PLAYER
     assert config.warning_pulse_count == DEFAULT_WARNING_PULSE_COUNT
     assert config.warning_pulse_duration == pytest.approx(DEFAULT_WARNING_PULSE_DURATION)
+    assert config.max_ammo == DEFAULT_MAX_AMMO
+    assert config.shot_cooldown == pytest.approx(DEFAULT_SHOT_COOLDOWN)
 
 
 def test_from_state_reads_seeded_overrides():
@@ -63,6 +67,8 @@ def test_from_state_reads_seeded_overrides():
             "tag_expected_player": 3,
             "tag_warning_pulse_count": 4,
             "tag_warning_pulse_duration": 1.0,
+            "tag_max_ammo": 5,
+            "tag_shot_cooldown": 0.5,
         }
     )
 
@@ -74,6 +80,8 @@ def test_from_state_reads_seeded_overrides():
     assert config.expected_player == 3
     assert config.warning_pulse_count == 4
     assert config.warning_pulse_duration == pytest.approx(1.0)
+    assert config.max_ammo == 5
+    assert config.shot_cooldown == pytest.approx(0.5)
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +97,8 @@ def test_warning_duration_is_count_times_pulse_duration():
         expected_player=1,
         warning_pulse_count=5,
         warning_pulse_duration=0.6,
+        max_ammo=10,
+        shot_cooldown=1.0,
     )
 
     assert config.warning_duration() == pytest.approx(3.0)

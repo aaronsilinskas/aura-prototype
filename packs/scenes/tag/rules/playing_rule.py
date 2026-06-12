@@ -33,11 +33,20 @@ class TagPlayingRule(TagPhaseRule):
             Scope.PERSONAL, "basic.progress", {"progress": 1.0}
         )
 
+        tag.shot.ammo = tag_config(state).max_ammo
+        tag.ammo_receipt = state.effect_controls.set_effect(
+            Scope.Global.BUFF, "basic.progress", {"progress": 1.0}
+        )
+
     def on_exit(self, state: GameState) -> None:
         tag = tag_state(state)
         if tag.progress_receipt is not None:
             tag.progress_receipt.stop()
             tag.progress_receipt = None
+
+        if tag.ammo_receipt is not None:
+            tag.ammo_receipt.stop()
+            tag.ammo_receipt = None
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
         tag = tag_state(state)

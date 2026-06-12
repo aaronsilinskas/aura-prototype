@@ -41,7 +41,13 @@ class TagShootingRule(TagInPhaseRule):
         if event.buttons.is_pressed("A"):
             tag = tag_state(state)
             config = tag_config(state)
-            self._fire_shot(state, tag, config)
+            if self._can_fire(state, tag, config):
+                self._fire_shot(state, tag, config)
+
+    def _can_fire(self, state: GameState, tag: TagState, config: TagConfig) -> bool:
+        if tag.shot.ammo <= 0:
+            return False
+        return state.total - tag.shot.last_shot_at >= config.shot_cooldown
 
     def _fire_shot(self, state: GameState, tag: TagState, config: TagConfig) -> None:
         payload = encode_tag_data(
@@ -52,7 +58,13 @@ class TagShootingRule(TagInPhaseRule):
 
         tag.deafen_until = state.total + config.deafen_window
 
+        tag.shot.ammo -= 1
+        tag.shot.last_shot_at = state.total
+
         state.effect_controls.set_effect(Scope.DIRECTIONAL, "scene.fire_shot", {})
+        state.effect_controls.set_effect(
+            Scope.Global.BUFF, "basic.progress", {"progress": tag.shot.ammo / config.max_ammo}
+        )
 
 
 RULE = TagShootingRule()

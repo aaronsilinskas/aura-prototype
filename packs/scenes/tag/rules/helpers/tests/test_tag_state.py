@@ -48,6 +48,13 @@ def test_new_tag_state_has_no_receipts():
     assert tag.game_over_receipt is None
 
 
+def test_new_tag_state_has_a_shot_state_ready_to_fire_immediately():
+    tag = TagState()
+
+    assert tag.shot.ammo == 0
+    assert tag.shot.last_shot_at == float("-inf")
+
+
 # ---------------------------------------------------------------------------
 # tag_state — get-or-create accessor
 # ---------------------------------------------------------------------------
