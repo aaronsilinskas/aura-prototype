@@ -260,6 +260,28 @@ class GameState:
             return self._data[key]  # type: ignore[return-value]
         return default
 
+    def get_or_none(self, key: str, expected_class: type[T]) -> T | None:
+        """Return the stored value for *key*, or ``None`` if absent.
+
+        For optional/absent lookups, where ``get``'s required *default*
+        is inconvenient. Mirrors ``SceneLocalRegistry.get``'s
+        ``expected_class: type[T]`` type-hint convention: the
+        ``isinstance`` check below lets the type checker narrow the
+        return value to ``T | None`` without ``# type: ignore``.
+
+        Raises:
+            ValueError: if *key* is present but the stored value is not
+                an instance of *expected_class*.
+        """
+        if key not in self._data:
+            return None
+        value = self._data[key]
+        if not isinstance(value, expected_class):
+            raise ValueError(
+                "Key '" + key + "' value is not an instance of " + expected_class.__name__
+            )
+        return value
+
     def set(self, key: str, value: object) -> None:
         """Store *value* under *key*."""
         self._data[key] = value
