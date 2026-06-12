@@ -37,12 +37,18 @@ def _make_state(
 
 
 def _tick(
-    state: GameState, engine: GameEngine, timer: StubTimer, total: float, button_a: bool = False
+    state: GameState,
+    engine: GameEngine,
+    timer: StubTimer,
+    total: float,
+    button_a: bool | int = False,
 ) -> None:
     timer.total = total
     states: dict[str, int] = {}
-    if button_a:
+    if button_a is True:
         states["A"] = ButtonData.PRESSED
+    elif button_a is not False:
+        states["A"] = button_a
     state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states=states)))
     engine.update(state)
 
@@ -172,4 +178,203 @@ def test_pressing_with_no_ammo_does_not_fire(spy):
     _tick(state, engine, timer, 0.0, button_a=True)
 
     assert network_spy.send_ir_calls == []
-    assert spy.set_effect_calls == []
+
+
+# ---------------------------------------------------------------------------
+# Reload start
+# ---------------------------------------------------------------------------
+
+
+def test_fresh_press_with_no_ammo_starts_reload(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag_state(state).shot.ammo = 0
+
+    _tick(state, engine, timer, 2.0, button_a=True)
+
+    assert tag_state(state).shot.reload_started_at == pytest.approx(2.0)
+    reload_calls = [c for c in spy.set_effect_calls if c[1] == "scene.reload"]
+    assert len(reload_calls) == 1
+    scope, _, options = reload_calls[0]
+    assert scope is Scope.Global.BUFF
+    assert options == {"duration": pytest.approx(3.0)}
+
+
+def test_held_trigger_from_emptying_shot_does_not_start_reload(spy):
+    """The tick that empties the magazine is a fresh PRESSED; the next held
+    tick is DOWN, not PRESSED, so it must not start a reload."""
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag_state(state).shot.ammo = 1
+
+    _tick(state, engine, timer, 0.0, button_a=True)  # fires the last shot, ammo -> 0
+
+    assert tag_state(state).shot.ammo == 0
+    reload_calls = [c for c in spy.set_effect_calls if c[1] == "scene.reload"]
+    assert reload_calls == []
+    assert tag_state(state).shot.reload_started_at is None
+
+
+def test_reload_start_is_not_gated_by_cooldown(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag = tag_state(state)
+    tag.shot.ammo = 0
+    tag.shot.last_shot_at = 0.0  # cooldown would otherwise block until shot_cooldown elapses
+
+    _tick(state, engine, timer, 0.01, button_a=True)
+
+    assert tag_state(state).shot.reload_started_at == pytest.approx(0.01)
+
+
+# ---------------------------------------------------------------------------
+# Reload hold / complete
+# ---------------------------------------------------------------------------
+
+
+def test_holding_to_reload_duration_restores_ammo_to_max(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag = tag_state(state)
+    tag.shot.ammo = 0
+    tag.shot.reload_started_at = 0.0
+
+    _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)  # held, total - start >= 3.0
+
+    assert tag_state(state).shot.ammo == DEFAULT_MAX_AMMO
+
+
+def test_completing_reload_snaps_ammo_bar_full_via_basic_progress(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag = tag_state(state)
+    tag.shot.ammo = 0
+    tag.shot.reload_started_at = 0.0
+
+    _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)
+
+    progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
+    buff_calls = [c for c in progress_calls if c[0] is Scope.Global.BUFF]
+    assert len(buff_calls) == 1
+    _, _, options = buff_calls[0]
+    assert options == {"progress": pytest.approx(1.0)}
+
+
+def test_completing_reload_adds_reload_complete_effect(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag = tag_state(state)
+    tag.shot.ammo = 0
+    tag.shot.reload_started_at = 0.0
+
+    _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)
+
+    complete_calls = [c for c in spy.add_effect_calls if c[1] == "scene.reload_complete"]
+    assert len(complete_calls) == 1
+    scope, _, _ = complete_calls[0]
+    assert scope is Scope.Global.BUFF
+
+
+def test_completing_reload_clears_reload_started_at(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag = tag_state(state)
+    tag.shot.ammo = 0
+    tag.shot.reload_started_at = 0.0
+
+    _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)
+
+    assert tag_state(state).shot.reload_started_at is None
+
+
+def test_held_trigger_after_completion_does_not_auto_fire(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag = tag_state(state)
+    tag.shot.ammo = 0
+    tag.shot.reload_started_at = 0.0
+
+    _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)  # completes reload
+    _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)  # still held
+
+    assert network_spy.send_ir_calls == []
+    assert tag_state(state).shot.ammo == DEFAULT_MAX_AMMO
+
+
+# ---------------------------------------------------------------------------
+# Reload cancel
+# ---------------------------------------------------------------------------
+
+
+def test_releasing_before_reload_completion_restores_empty_ammo_bar(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag = tag_state(state)
+    tag.shot.ammo = 0
+    tag.shot.reload_started_at = 0.0
+
+    _tick(state, engine, timer, 1.0)  # release before the 3.0s duration elapses
+
+    progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
+    buff_calls = [c for c in progress_calls if c[0] is Scope.Global.BUFF]
+    assert len(buff_calls) == 1
+    _, _, options = buff_calls[0]
+    assert options == {"progress": pytest.approx(0.0)}
+
+
+def test_releasing_before_reload_completion_clears_reload_started_at(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag = tag_state(state)
+    tag.shot.ammo = 0
+    tag.shot.reload_started_at = 0.0
+
+    _tick(state, engine, timer, 1.0)
+
+    assert tag_state(state).shot.reload_started_at is None
+    assert tag_state(state).shot.ammo == 0
+
+
+def test_releasing_before_reload_completion_does_not_add_reload_complete(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag = tag_state(state)
+    tag.shot.ammo = 0
+    tag.shot.reload_started_at = 0.0
+
+    _tick(state, engine, timer, 1.0)
+
+    assert spy.add_effect_calls == []
+
+
+# ---------------------------------------------------------------------------
+# Completion precedence and firing suppression
+# ---------------------------------------------------------------------------
+
+
+def test_reaching_duration_threshold_on_release_tick_completes_not_cancels(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag = tag_state(state)
+    tag.shot.ammo = 0
+    tag.shot.reload_started_at = 0.0
+
+    _tick(state, engine, timer, 3.0)  # released, but threshold met on this tick
+
+    assert tag_state(state).shot.ammo == DEFAULT_MAX_AMMO
+    progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
+    buff_calls = [c for c in progress_calls if c[0] is Scope.Global.BUFF]
+    _, _, options = buff_calls[0]
+    assert options == {"progress": pytest.approx(1.0)}
+
+
+def test_firing_is_suppressed_while_reloading(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag = tag_state(state)
+    tag.shot.ammo = 0
+    tag.shot.reload_started_at = 0.0
+
+    _tick(state, engine, timer, 1.0, button_a=ButtonData.DOWN)  # still mid-reload, held
+
+    assert network_spy.send_ir_calls == []

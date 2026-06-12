@@ -30,6 +30,7 @@ DEFAULT_WARNING_PULSE_COUNT: Final = 5
 DEFAULT_WARNING_PULSE_DURATION: Final = 0.6
 DEFAULT_MAX_AMMO: Final = 10
 DEFAULT_SHOT_COOLDOWN: Final = 1.0
+DEFAULT_RELOAD_DURATION: Final = 3.0
 
 
 class TagConfig:
@@ -45,6 +46,7 @@ class TagConfig:
         "expected_player",
         "expected_team",
         "max_ammo",
+        "reload_duration",
         "shot_cooldown",
         "starting_hitpoints",
         "warning_pulse_count",
@@ -61,6 +63,7 @@ class TagConfig:
         warning_pulse_duration: float,
         max_ammo: int,
         shot_cooldown: float,
+        reload_duration: float,
     ) -> None:
         self.starting_hitpoints = starting_hitpoints
         self.deafen_window = deafen_window
@@ -70,6 +73,7 @@ class TagConfig:
         self.warning_pulse_duration = warning_pulse_duration
         self.max_ammo = max_ammo
         self.shot_cooldown = shot_cooldown
+        self.reload_duration = reload_duration
 
     @classmethod
     def from_state(cls, state: GameState) -> TagConfig:
@@ -85,6 +89,7 @@ class TagConfig:
             ),
             max_ammo=state.get("tag_max_ammo", DEFAULT_MAX_AMMO),
             shot_cooldown=state.get("tag_shot_cooldown", DEFAULT_SHOT_COOLDOWN),
+            reload_duration=state.get("tag_reload_duration", DEFAULT_RELOAD_DURATION),
         )
 
     def warning_duration(self) -> float:

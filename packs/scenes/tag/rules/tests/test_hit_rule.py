@@ -81,6 +81,17 @@ def test_matching_hit_stores_progress_receipt(spy):
     assert tag_state(state).progress_receipt is not None
 
 
+def test_hit_during_reload_subtracts_hitpoints_without_interrupting_reload(spy):
+    state, engine, timer = _make_state(spy)
+    tag = tag_state(state)
+    tag.shot.reload_started_at = 0.5
+
+    _receive(state, engine, timer, 1.0, TagData(team=0, player=1, damage=1))
+
+    assert tag_state(state).hitpoints == DEFAULT_STARTING_HITPOINTS - 1
+    assert tag_state(state).shot.reload_started_at == pytest.approx(0.5)
+
+
 def test_hit_with_higher_damage_reduces_hitpoints_by_that_amount(spy):
     state, engine, timer = _make_state(spy)
 

@@ -98,8 +98,10 @@ _audio_registry.register("warning_pulse_peak", "sounds/blip.wav")
 _audio_registry.register("game_over_sting_start", "sounds/game_over.wav")
 _audio_registry.register("fire_shot_start", "sounds/blip.wav")
 _audio_registry.register("scene.hit_start", "sounds/blip.wav")
+_audio_registry.register("reload", "sounds/blip.wav")
+_audio_registry.register("reload_complete", "sounds/blip.wav")
 
-_audio_output = AudioEffectOutput(_audio_registry, max_volume=0.1, num_voices=1)
+_audio_output = AudioEffectOutput(_audio_registry, max_volume=0.1, num_voices=2)
 _outputs = [IS31FL3741EffectOutput(_matrix), _audio_output]
 if _motor is not None:
     _outputs.append(Drv2605EffectOutput(_motor))
