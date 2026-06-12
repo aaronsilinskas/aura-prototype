@@ -2,35 +2,25 @@
 
 On entry, sets hitpoints to the configured starting value and shows a full
 ``basic.progress`` bar on ``Scope.PERSONAL``, storing its ``EffectReceipt`` (the
-shared progress receipt this rule owns and the hit reactor re-issues). Button A
-fires a shot: encodes the player's own ``TagData`` identity, sends it on the
-LINE IR emitter, logs the send, and starts the self-deafen window so the
-player's own shot is not immediately registered as a hit. When hitpoints reach
-zero or below, transitions to the ``game_over`` phase, stopping the progress
-bar on the way out.
+shared progress receipt this rule owns and the hit reactor re-issues). Button-A
+shot firing and its felt feedback are owned by :class:`TagShootingRule`; this
+rule retains only the phase lifecycle: hitpoints, the progress bar, and the
+game-over transition when hitpoints reach zero or below (stopping the progress
+bar on the way out).
 """
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass  # typing not available on all embedded runtimes
-
 from engine.input import InputEvents
-from engine.network import LINE
 from engine.state import GameState, Scope
-from hardware.shared.tag_protocol import TagData, encode_tag_data
 from packs.scenes.tag.rules.helpers.phases import PHASE_GAME_OVER, PHASE_PLAYING
-from packs.scenes.tag.rules.helpers.tag_config import TagConfig, tag_config
+from packs.scenes.tag.rules.helpers.tag_config import tag_config
 from packs.scenes.tag.rules.helpers.tag_phase_rule import TagPhaseRule
-from packs.scenes.tag.rules.helpers.tag_state import TagState, tag_state
-
-_SHOT_DAMAGE: Final = 1
+from packs.scenes.tag.rules.helpers.tag_state import tag_state
 
 
 class TagPlayingRule(TagPhaseRule):
-    """Drives the Playing phase: hitpoints, progress bar, and shot firing."""
+    """Drives the Playing phase: hitpoints, progress bar, and game-over transition."""
 
     def __init__(self) -> None:
         super().__init__(PHASE_PLAYING)
@@ -51,22 +41,9 @@ class TagPlayingRule(TagPhaseRule):
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
         tag = tag_state(state)
-        config = tag_config(state)
-
-        if event.buttons.is_pressed("A"):
-            self._fire_shot(state, tag, config)
 
         if tag.hitpoints <= 0:
             self.transition_to(state, PHASE_GAME_OVER)
-
-    def _fire_shot(self, state: GameState, tag: TagState, config: TagConfig) -> None:
-        payload = encode_tag_data(
-            TagData(config.expected_team, config.expected_player, _SHOT_DAMAGE)
-        )
-        state.network_controls.send_ir(payload, LINE)
-        print("sending IR packet")
-
-        tag.deafen_until = state.total + config.deafen_window
 
 
 RULE = TagPlayingRule()
