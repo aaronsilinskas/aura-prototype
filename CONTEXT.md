@@ -37,8 +37,8 @@ _Avoid_: importing layer helpers from anywhere other than `effects.layers`
 An event handler registered with `GameEngine`. **Game-data-stateless** — must not accumulate mutable game data as instance attributes. All game data (scores, durations, counters) must be stored and retrieved via `GameState` accessor methods. Construction-time configuration is the only permitted use of instance attributes.
 
 ### GameState
-The game context passed to every rule handler each tick. Exposes `effect_controls`, `network_controls`, `scene_controls`, read-only `elapsed`/`total`, and `queue_event`. Mutable game data stored via `get`/`set`/`pop`/`delete`/`has`.
-_Avoid_: calling `clear_queue()` from rules (reserved for `SceneManager` during scene transitions)
+The game context passed to every rule handler each tick. Exposes `effect_controls`, `network_controls`, `scene_controls`, read-only `elapsed`/`total`, and `queue_event`. Mutable game data stored via `get`/`get_or_none`/`set`/`pop`/`delete`/`has`. `get_or_none(key, expected_class)` returns `None` if absent, else validates with `expected_class` like `pop`.
+_Avoid_: calling `clear_queue()` from rules (reserved for `SceneManager` during scene transitions); `get(key, None)` (use `get_or_none` instead)
 
 ### Phase
 A named stage of a scene's game flow (Tag's Ready/Starting/Playing/Game Over; an RLGL Round's red/green sub-stages; a hardware_test mode). Identified by a `PhaseKey`.
