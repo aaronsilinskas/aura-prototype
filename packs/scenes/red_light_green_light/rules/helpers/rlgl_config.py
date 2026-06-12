@@ -137,4 +137,4 @@ def rlgl_config(state: GameState) -> RlglConfig:
     """Return the cached :class:`RlglConfig`, building and caching it on first use."""
     if not state.has(_CONFIG_KEY):
         state.set(_CONFIG_KEY, RlglConfig.from_state(state))
-    return state.get(_CONFIG_KEY, None)
+    return state.get_or_none(_CONFIG_KEY, RlglConfig)  # type: ignore[return-value]

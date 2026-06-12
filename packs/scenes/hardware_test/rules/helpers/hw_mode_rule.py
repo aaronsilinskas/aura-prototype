@@ -48,6 +48,20 @@ FLASH_DURATION: Final = 0.5
 _ADVANCED_TO_KEY: Final = "hw_mode_advanced_to"
 
 
+class AdvancedTo:
+    """Records the mode just transitioned to and the ``state.total`` stamp of that transition.
+
+    See :data:`_ADVANCED_TO_KEY` for how this is used to detect and skip a
+    same-tick re-dispatch into the newly-entered mode.
+    """
+
+    __slots__ = ("at", "phase")
+
+    def __init__(self, phase: PhaseKey, at: float) -> None:
+        self.phase = phase
+        self.at = at
+
+
 class HwModeRule(PhaseRule):
     """A :class:`PhaseRule` bound to the hardware_test scene's shared phase machine.
 
@@ -76,11 +90,10 @@ class HwModeRule(PhaseRule):
         # entirely. A marker stamped during a previous tick (left over because
         # the newly-entered mode's rule had already been dispatched that tick)
         # is stale and is simply discarded without skipping.
-        advanced = state.get(_ADVANCED_TO_KEY, None)
+        advanced = state.get_or_none(_ADVANCED_TO_KEY, AdvancedTo)
         if advanced is not None:
-            advanced_to, advanced_at = advanced
             state.delete(_ADVANCED_TO_KEY)
-            if advanced_to is self.phase and advanced_at == state.total:
+            if advanced.phase is self.phase and advanced.at == state.total:
                 return
 
         self.on_input_event(event, state)
@@ -98,7 +111,7 @@ class HwModeRule(PhaseRule):
 
         next_mode = next_in_cycle(MODE_ORDER, self.phase)
         print("changing to mode " + str(MODE_ORDER.index(next_mode)))
-        state.set(_ADVANCED_TO_KEY, (next_mode, state.total))
+        state.set(_ADVANCED_TO_KEY, AdvancedTo(next_mode, state.total))
         self.transition_to(state, next_mode)
 
     def _check_flash_expiry(self, state: GameState) -> None:

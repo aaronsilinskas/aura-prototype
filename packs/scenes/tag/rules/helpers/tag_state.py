@@ -53,4 +53,4 @@ def tag_state(state: GameState) -> TagState:
     """Return the cached :class:`TagState`, building and caching it on first use."""
     if not state.has(_STATE_KEY):
         state.set(_STATE_KEY, TagState())
-    return state.get(_STATE_KEY, None)
+    return state.get_or_none(_STATE_KEY, TagState)  # type: ignore[return-value]

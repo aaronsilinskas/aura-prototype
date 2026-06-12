@@ -287,7 +287,7 @@ def test_create_state_seeds_data_from_initial_data() -> None:
 
     state = engine.create_state(_make_scene_controls(), initial_data={"score": 0})
 
-    assert state.get("score", None) == 0
+    assert state.get_or_none("score", int) == 0
 
 
 def test_create_state_returns_empty_data_when_no_initial_data_provided() -> None:
@@ -317,7 +317,7 @@ def test_data_written_in_one_tick_is_readable_in_a_later_tick() -> None:
     state.queue_event(Event(_GROUP, "tick"))
     engine.update(state)
 
-    assert state.get("n", None) == 2
+    assert state.get_or_none("n", int) == 2
 
 
 def test_data_written_by_an_earlier_rule_is_visible_to_a_later_rule_in_the_same_tick() -> None:
@@ -330,7 +330,7 @@ def test_data_written_by_an_earlier_rule_is_visible_to_a_later_rule_in_the_same_
             self.value = None
 
         def handle_event(self, event: Event, state: GameState) -> None:
-            self.value = state.get("shared", None)
+            self.value = state.get_or_none("shared", int)
 
     engine = GameEngine(effect_controls=_make_effect_controls())
     state = engine.create_state(_make_scene_controls())
@@ -361,8 +361,8 @@ def test_different_state_objects_are_independent() -> None:
     state_b.queue_event(Event(_GROUP, "tick"))
     engine.update(state_b)
 
-    assert state_a.get("n", None) == 2
-    assert state_b.get("n", None) == 1
+    assert state_a.get_or_none("n", int) == 2
+    assert state_b.get_or_none("n", int) == 1
 
 
 # ---------------------------------------------------------------------------
