@@ -1,4 +1,36 @@
-from engine.state import EffectReceipt, Scope, ScopeValue
+import pytest
+
+from engine.state import EffectControls, EffectReceipt, GameState, SceneControls, Scope, ScopeValue
+
+# ---------------------------------------------------------------------------
+# GameState.get_or_none
+# ---------------------------------------------------------------------------
+
+
+def _make_state() -> GameState:
+    return GameState(effect_controls=EffectControls(), scene_controls=SceneControls())
+
+
+def test_get_or_none_returns_none_when_key_absent() -> None:
+    state = _make_state()
+
+    assert state.get_or_none("missing", str) is None
+
+
+def test_get_or_none_returns_value_when_present_and_matching_type() -> None:
+    state = _make_state()
+    state.set("name", "aura")
+
+    assert state.get_or_none("name", str) == "aura"
+
+
+def test_get_or_none_raises_value_error_when_type_mismatch() -> None:
+    state = _make_state()
+    state.set("name", 123)
+
+    with pytest.raises(ValueError):
+        state.get_or_none("name", str)
+
 
 # ---------------------------------------------------------------------------
 # ScopeValue — leaf scopes
