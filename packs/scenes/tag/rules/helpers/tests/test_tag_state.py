@@ -55,6 +55,13 @@ def test_new_tag_state_has_a_shot_state_with_no_ammo_and_no_cooldown_pending():
     assert tag.shot.last_shot_at == float("-inf")
 
 
+def test_new_shot_state_is_not_reloading_and_has_no_reload_receipt():
+    tag = TagState()
+
+    assert tag.shot.reload_started_at is None
+    assert tag.shot.reload_receipt is None
+
+
 # ---------------------------------------------------------------------------
 # tag_state — get-or-create accessor
 # ---------------------------------------------------------------------------

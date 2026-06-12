@@ -105,6 +105,31 @@ def test_entering_playing_stores_ammo_receipt(spy):
     assert tag_state(state).ammo_receipt is not None
 
 
+def test_entering_playing_resets_reload_state(spy):
+    state, engine, timer = _make_state(spy)
+    tag = seed_phase(state, PHASE_PLAYING, entered=True)
+    tag.shot.reload_started_at = 1.5
+
+    _tick(state, engine, timer, 0.0)
+
+    assert tag_state(state).shot.reload_started_at is None
+    assert tag_state(state).shot.reload_receipt is None
+
+
+def test_exiting_playing_mid_reload_stops_reload_effect(spy):
+    state, engine, timer = _make_state(spy)
+    tag = seed_phase(state, PHASE_PLAYING, entered=True)
+    tag.hitpoints = 0
+    tag.shot.reload_started_at = 1.0
+    tag.shot.reload_receipt = spy.set_effect(Scope.Global.BUFF, "scene.reload", {"duration": 3.0})
+
+    _tick(state, engine, timer, 0.0)
+
+    assert tag_phase(state).phase == PHASE_GAME_OVER
+    assert tag.shot.reload_started_at is None
+    assert tag.shot.reload_receipt is None
+
+
 def test_exiting_playing_stops_ammo_bar(spy):
     state, engine, timer = _make_state(spy)
     tag = seed_phase(state, PHASE_PLAYING, entered=True)

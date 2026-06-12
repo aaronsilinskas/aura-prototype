@@ -26,19 +26,26 @@ _STATE_KEY: Final = "tag_state"
 
 
 class ShotState:
-    """Shot-related gameplay state: ammo and shot-cooldown tracking.
+    """Shot-related gameplay state: ammo, shot-cooldown, and reload tracking.
 
-    Reserves room for the reload fields added in a later issue.
+    ``reload_started_at`` is ``None`` when not reloading, else the
+    ``state.total`` timestamp the current hold-to-reload began.
+    ``reload_receipt`` is the in-flight ``scene.reload`` effect on
+    ``Scope.Global.BUFF``, if any.
     """
 
     __slots__ = (
         "ammo",
         "last_shot_at",
+        "reload_receipt",
+        "reload_started_at",
     )
 
     def __init__(self) -> None:
         self.ammo = 0
         self.last_shot_at = float("-inf")
+        self.reload_started_at: float | None = None
+        self.reload_receipt: EffectReceipt | None = None
 
 
 class TagState:

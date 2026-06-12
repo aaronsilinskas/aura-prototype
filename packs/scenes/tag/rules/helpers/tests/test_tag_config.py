@@ -13,6 +13,7 @@ from packs.scenes.tag.rules.helpers.tag_config import (
     DEFAULT_EXPECTED_PLAYER,
     DEFAULT_EXPECTED_TEAM,
     DEFAULT_MAX_AMMO,
+    DEFAULT_RELOAD_DURATION,
     DEFAULT_SHOT_COOLDOWN,
     DEFAULT_STARTING_HITPOINTS,
     DEFAULT_WARNING_PULSE_COUNT,
@@ -56,6 +57,7 @@ def test_from_state_applies_defaults_when_unseeded():
     assert config.warning_pulse_duration == pytest.approx(DEFAULT_WARNING_PULSE_DURATION)
     assert config.max_ammo == DEFAULT_MAX_AMMO
     assert config.shot_cooldown == pytest.approx(DEFAULT_SHOT_COOLDOWN)
+    assert config.reload_duration == pytest.approx(DEFAULT_RELOAD_DURATION)
 
 
 def test_from_state_reads_seeded_overrides():
@@ -69,6 +71,7 @@ def test_from_state_reads_seeded_overrides():
             "tag_warning_pulse_duration": 1.0,
             "tag_max_ammo": 5,
             "tag_shot_cooldown": 0.5,
+            "tag_reload_duration": 2.5,
         }
     )
 
@@ -82,6 +85,7 @@ def test_from_state_reads_seeded_overrides():
     assert config.warning_pulse_duration == pytest.approx(1.0)
     assert config.max_ammo == 5
     assert config.shot_cooldown == pytest.approx(0.5)
+    assert config.reload_duration == pytest.approx(2.5)
 
 
 # ---------------------------------------------------------------------------
@@ -99,6 +103,7 @@ def test_warning_duration_is_count_times_pulse_duration():
         warning_pulse_duration=0.6,
         max_ammo=10,
         shot_cooldown=1.0,
+        reload_duration=3.0,
     )
 
     assert config.warning_duration() == pytest.approx(3.0)

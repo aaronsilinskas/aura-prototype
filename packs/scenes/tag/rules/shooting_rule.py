@@ -38,11 +38,48 @@ class TagShootingRule(TagInPhaseRule):
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+        tag = tag_state(state)
+        config = tag_config(state)
+
+        if tag.shot.reload_started_at is not None:
+            self._handle_reload(event, state, tag, config)
+            return
+
         if event.buttons.is_pressed("A"):
-            tag = tag_state(state)
-            config = tag_config(state)
-            if self._can_fire(state, tag, config):
+            if tag.shot.ammo == 0:
+                tag.shot.reload_started_at = state.total
+                tag.shot.reload_receipt = state.effect_controls.set_effect(
+                    Scope.Global.BUFF, "scene.reload", {"duration": config.reload_duration}
+                )
+            elif self._can_fire(state, tag, config):
                 self._fire_shot(state, tag, config)
+
+    def _handle_reload(
+        self,
+        event: InputEvents.ButtonAndAcceleration,
+        state: GameState,
+        tag: TagState,
+        config: TagConfig,
+    ) -> None:
+        reload_complete = state.total - tag.shot.reload_started_at >= config.reload_duration
+        if reload_complete:
+            self._complete_reload(state, tag, config)
+        elif event.buttons.is_down("A"):
+            return
+        else:
+            self._cancel_reload(state, tag)
+
+    def _complete_reload(self, state: GameState, tag: TagState, config: TagConfig) -> None:
+        tag.shot.ammo = config.max_ammo
+        state.effect_controls.set_effect(Scope.Global.BUFF, "basic.progress", {"progress": 1.0})
+        state.effect_controls.add_effect(Scope.Global.BUFF, "scene.reload_complete", {})
+        tag.shot.reload_started_at = None
+        tag.shot.reload_receipt = None
+
+    def _cancel_reload(self, state: GameState, tag: TagState) -> None:
+        state.effect_controls.set_effect(Scope.Global.BUFF, "basic.progress", {"progress": 0.0})
+        tag.shot.reload_started_at = None
+        tag.shot.reload_receipt = None
 
     def _can_fire(self, state: GameState, tag: TagState, config: TagConfig) -> bool:
         if tag.shot.ammo <= 0:

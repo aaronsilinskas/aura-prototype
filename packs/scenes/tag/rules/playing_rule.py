@@ -34,6 +34,8 @@ class TagPlayingRule(TagPhaseRule):
         )
 
         tag.shot.ammo = tag_config(state).max_ammo
+        tag.shot.reload_started_at = None
+        tag.shot.reload_receipt = None
         tag.ammo_receipt = state.effect_controls.set_effect(
             Scope.Global.BUFF, "basic.progress", {"progress": 1.0}
         )
@@ -47,6 +49,11 @@ class TagPlayingRule(TagPhaseRule):
         if tag.ammo_receipt is not None:
             tag.ammo_receipt.stop()
             tag.ammo_receipt = None
+
+        if tag.shot.reload_receipt is not None:
+            tag.shot.reload_receipt.stop()
+            tag.shot.reload_receipt = None
+        tag.shot.reload_started_at = None
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
         tag = tag_state(state)
