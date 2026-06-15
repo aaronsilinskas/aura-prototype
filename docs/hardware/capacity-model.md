@@ -393,8 +393,8 @@ Fixed CPU and heap tax each role's bare framework loop consumes before any compo
 
 | Board  | Runtime | Driver | Role | `cpu_percent` | `heap_bytes` |
 |--------|---------|--------|------|---------------|--------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | engine-host | 4.57% | 450 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | satellite   | 4.58% | 256 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | engine-host | 2.35% | 624 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | satellite | 2.08% | 432 |
 
 ### Engine component costs
 
@@ -402,7 +402,8 @@ Per-tick cost terms for the `GameEngine` loop, scaling with rules, events, and r
 
 | Board | Runtime | Driver | `tick_fixed_ms` | `per_rule_ms` | `per_event_ms` | `router_overhead_ms` |
 |-------|---------|--------|------------------|----------------|-----------------|------------------------|
-| _TBD_ | _TBD_   | _TBD_  | _TBD_            | _TBD_          | _TBD_           | _TBD_ (#409, see note) |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.0694 | 0.0621 | 0.1177 | _TBD_ |
+
 
 #### Reading the profiler output (`engine_profiler.py`, #409)
 
@@ -461,7 +462,7 @@ Per-frame render+flush cost terms for a `PixelScopeComponent`, keyed by driver
 
 | Board | Runtime | Driver | `worst_case_effect_per_pixel_ms` | `flush_ms` | `i2c_bandwidth_bytes_per_sec` |
 |-------|---------|--------|----------------------------------|------------|-------------------------------|
-| _TBD_ | _TBD_   | _TBD_  | _TBD_                            | _TBD_      | _TBD_                         |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | neopixel_pwm | 0.530921 | 6.6184 | 0 |
 
 `pixel_profiler.py` sweeps `pixel_count`, effect identity, and `stack_depth`.
 Because `cost_ms = stack_depth * worst_case_effect_per_pixel_ms * pixel_count +
@@ -480,7 +481,7 @@ Per-frame mixer cost terms for the shared `SoundComponent`. From `sound_profiler
 
 | Board | Runtime | Driver | `mixer_fixed_ms` | `per_voice_ms` |
 |-------|---------|--------|------------------|----------------|
-| _TBD_ | _TBD_   | _TBD_  | _TBD_            | _TBD_          |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.1132 | 0.0946 |
 
 `sound_profiler.py` sweeps `concurrent_voices`. Because `cost_ms = mixer_fixed_ms
 + per_voice_ms * effective_voices`, the `linear_fit` **intercept** is
@@ -493,7 +494,7 @@ Per-event cost for the shared `VibrationComponent` (DRV2605L over I2C). From
 
 | Board | Runtime | Driver | `cost_ms` | `i2c_bandwidth_bytes_per_sec` |
 |-------|---------|--------|-----------|-------------------------------|
-| _TBD_ | _TBD_   | _TBD_  | _TBD_     | _TBD_                         |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 6.5104 | 0.80 |
 
 `cost_ms` is the measured average per-event CPU cost of `handle_event` +
 `motor.play()`. `i2c_bandwidth_bytes_per_sec` is `i2c_transaction_bytes *
@@ -507,7 +508,7 @@ Cost terms for the shared `IrTransmitComponent`. From `ir_tx_profiler.py`.
 
 | Board | Runtime | Driver | `cost_ms` | `blocking_send_ms` |
 |-------|---------|--------|-----------|--------------------|
-| _TBD_ | _TBD_   | _TBD_  | _TBD_     | _TBD_              |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | _TBD_ | 757.81 |
 
 `blocking_send_ms` is the worst-case `PulseOut.send` blocking duration across the
 `PAYLOAD_LENGTHS` sweep (the longest payload). `cost_ms` -- the *average*
@@ -521,7 +522,7 @@ Hard-real-time deadline for the shared `ReceiverComponent`, keyed additionally b
 
 | Board | Runtime | Driver | `buffer_depth` | `incoming_rate_hz` | `max_frame_ms` |
 |-------|---------|--------|----------------|--------------------|----------------|
-| _TBD_ | _TBD_   | _TBD_  | _TBD_          | _TBD_              | _TBD_          |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 64 | 50.0 | _TBD_ |
 
 `ir_rx_profiler.py` sweeps an injected per-frame busy-load while a known incoming
 packet rate is induced via loopback. `max_frame_ms` is the peak frame time at the
