@@ -23,13 +23,16 @@ class PerformanceTracker:
         self.memory_allocated_total = 0
         self.memory_delta_peak = 0
         self.last_memory_delta = 0
+        self.frame_time_peak = 0.0
         self._memory_before = 0
         self._update_started_at = 0.0
         self._render_started_at = 0.0
+        self._frame_started_at = 0.0
 
     def start_frame(self) -> None:
-        """Record the heap allocation baseline for this frame."""
+        """Record the heap allocation baseline and start time for this frame."""
         self._memory_before = gc.mem_alloc()
+        self._frame_started_at = time.monotonic()
 
     def start_update_time(self) -> None:
         """Record the start of the update phase."""
@@ -60,6 +63,10 @@ class PerformanceTracker:
             self.memory_delta_peak = memory_delta
         self.last_memory_delta = memory_delta
 
+        frame_time = current_time - self._frame_started_at
+        if frame_time > self.frame_time_peak:
+            self.frame_time_peak = frame_time
+
         self.frame_count += 1
         if current_time > self.next_log_time:
             fps = self.frame_count / (current_time - self.start_time)
@@ -76,6 +83,7 @@ class PerformanceTracker:
                 f"Mem Delta Last: {self.last_memory_delta}B, "
                 f"Mem Delta Peak: {self.memory_delta_peak}B, "
                 f"Mem Used: {memory_after}B, "
-                f"Mem Free: {available_memory}B"
+                f"Mem Free: {available_memory}B, "
+                f"Frame Time Peak: {self.frame_time_peak:.4f}s"
             )
             self.next_log_time = current_time + self.log_interval
