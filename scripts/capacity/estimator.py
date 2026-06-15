@@ -8,11 +8,28 @@ from dataclasses import dataclass
 from scripts.capacity.profiles import (
     BoardProfile,
     EngineComponent,
+    IrTransmitComponent,
     PixelScopeComponent,
     PropProfile,
     ReceiverComponent,
     SimpleComponent,
+    SoundComponent,
+    VibrationComponent,
 )
+
+
+def _ir_tx_blocking_send_ms(prop: PropProfile) -> float:
+    """Return the prop's `IrTransmitComponent.blocking_send_ms`, or 0.0 if none.
+
+    `PulseOut.send` blocks for the whole pulse train -- this soft cost is added to
+    every `ReceiverComponent`'s worst-case frame time when checking the hard-real-time
+    deadline (#398), since a co-located receiver's buffer must absorb the gap while
+    the transmitter blocks.
+    """
+    for component in prop.components:
+        if isinstance(component, IrTransmitComponent):
+            return component.blocking_send_ms
+    return 0.0
 
 
 def _deadline_conflict(prop: PropProfile) -> "ReceiverComponent | None":
@@ -20,13 +37,42 @@ def _deadline_conflict(prop: PropProfile) -> "ReceiverComponent | None":
 
     `max_frame_ms` is `None` when a receiver has no declared `incoming_rate_hz` --
     such receivers have no deadline to check.
+
+    The worst-case frame time used for this check adds the prop's IR-transmit
+    component's `blocking_send_ms` (if any) -- `PulseOut.send` blocks for the whole
+    pulse train, so a co-located transmit contributes to the receiver's worst-case
+    frame even though it is a soft cost not reflected in `cost_ms`.
     """
+    ir_tx_blocking_ms = _ir_tx_blocking_send_ms(prop)
     for component in prop.components:
         if not isinstance(component, ReceiverComponent):
             continue
         max_frame_ms = component.max_frame_ms
-        if max_frame_ms is not None and component.worst_case_frame_ms > max_frame_ms:
+        if max_frame_ms is None:
+            continue
+        worst_case_frame_ms = component.worst_case_frame_ms + ir_tx_blocking_ms
+        if worst_case_frame_ms > max_frame_ms:
             return component
+    return None
+
+
+def _peripheral_conflict(prop: PropProfile, board: BoardProfile) -> tuple[str, int, int] | None:
+    """Return `(peripheral, required, available)` for the first over-budget peripheral.
+
+    Sums each component's `peripherals_required` (e.g. `{"i2s": 1}`) across the
+    prop's components and compares the total against `board.peripheral_budgets`.
+    Peripherals with no declared budget are treated as unconstrained. Returns `None`
+    if every required peripheral is within its budget.
+    """
+    usage: dict[str, int] = {}
+    for component in prop.components:
+        for peripheral, count in getattr(component, "peripherals_required", {}).items():
+            usage[peripheral] = usage.get(peripheral, 0) + count
+
+    for peripheral, required in usage.items():
+        budget = board.peripheral_budgets.get(peripheral)
+        if budget is not None and required > budget.count:
+            return peripheral, required, budget.count
     return None
 
 
@@ -80,7 +126,10 @@ def _usable_heap(board: BoardProfile, role: str) -> float:
 
 
 def _memory_footprint_bytes(
-    component: "EngineComponent | SimpleComponent | ReceiverComponent | PixelScopeComponent",
+    component: (
+        "EngineComponent | SimpleComponent | ReceiverComponent | PixelScopeComponent"
+        " | SoundComponent | VibrationComponent | IrTransmitComponent"
+    ),
 ) -> int:
     """Return a component's static steady-state heap footprint in bytes."""
     return component.memory_footprint_bytes
@@ -128,6 +177,24 @@ def assign(
                 f"incoming_rate_hz={deadline_violator.incoming_rate_hz:.2f} * 1000)"
             ),
             conflict_type="deadline",
+        )
+
+    # Peripheral-count constraint: finite I2S/SPI/I2C/PWM units per board. Checked
+    # before CPU/memory packing, alongside the deadline constraint -- a peripheral
+    # conflict (e.g. two components both requiring the single I2S) is a structural
+    # impossibility independent of CPU headroom.
+    peripheral_violation = _peripheral_conflict(prop, board)
+    if peripheral_violation is not None:
+        peripheral, required, available = peripheral_violation
+        return AssignmentResult(
+            feasible=False,
+            mcus=[],
+            co_location_validated=False,
+            reason=(
+                f"prop requires {required} '{peripheral}' peripheral(s) but board "
+                f"'{board.name}' provides {available}"
+            ),
+            conflict_type="peripheral",
         )
 
     reserve = (
@@ -254,11 +321,16 @@ def assign(
 
     # Bus-bandwidth constraint: each shared bus (I2C/SPI/I2S) has a board-wide
     # bandwidth budget. Pixel scopes using an I2C-bus driver (e.g. the IS31FL3741
-    # matrix) contribute `transaction_size * frequency` to that bus's total usage,
+    # matrix), the vibration component (DRV2605L event rate), and any I2C-polled
+    # SimpleComponent (e.g. a LIS3DH per-frame accelerometer read) contribute
+    # `transaction_size * frequency` to that bus's total usage,
     # regardless of which MCU they are placed on. NeoPixel PWM scopes contribute 0.
     bus_usage: dict[str, float] = {}
     for component in prop.components:
-        if isinstance(component, PixelScopeComponent) and component.i2c_bandwidth_bytes_per_sec:
+        if (
+            isinstance(component, (PixelScopeComponent, VibrationComponent, SimpleComponent))
+            and component.i2c_bandwidth_bytes_per_sec
+        ):
             bus_usage["i2c"] = bus_usage.get("i2c", 0.0) + component.i2c_bandwidth_bytes_per_sec
 
     for bus_name, used in bus_usage.items():
