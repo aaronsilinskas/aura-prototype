@@ -40,6 +40,11 @@ class BoardProfile:
 
     `headroom_reserve_percent` is the default fraction of CPU budget held back across
     all MCUs of this board, tunable per assignment via `assign(..., headroom_reserve_percent=...)`.
+
+    `gc_margin_bytes` is a fixed amount of heap held back on every MCU of this board,
+    on top of the role's `heap_bytes` baseline, to leave room for CircuitPython's
+    mark-sweep collector. It should be generous: GC needs free space to work in, and
+    fragmentation shrinks the heap that is actually usable for allocations.
     """
 
     name: str
@@ -50,6 +55,7 @@ class BoardProfile:
     engine_host_baseline: McuBaseline
     satellite_baseline: McuBaseline
     headroom_reserve_percent: float = 20.0
+    gc_margin_bytes: int = 0
 
     @property
     def frame_budget_ms(self) -> float:
@@ -71,6 +77,9 @@ class EngineComponent:
     `router_overhead_ms` is a per-remote-MCU command/event overhead charged to the
     engine's MCU (not a pixel-bandwidth cost) -- it scales with how many other MCUs
     the engine must send commands/events to, not with strip length.
+
+    `memory_footprint_bytes` is the component's static steady-state heap usage
+    (profiler-measured via `mem_free` delta; placeholder/synthetic until calibrated).
     """
 
     name: str
@@ -81,6 +90,7 @@ class EngineComponent:
     rules: int
     events_per_tick: int
     remote_mcus: int
+    memory_footprint_bytes: int = 0
 
     @property
     def cost_ms(self) -> float:
@@ -99,10 +109,38 @@ class SimpleComponent:
 
     Used for non-engine workloads (e.g. effect renderers, input pollers) where the
     cost model is a single constant rather than a formula.
+
+    `memory_footprint_bytes` is the component's static steady-state heap usage
+    (profiler-measured via `mem_free` delta; placeholder/synthetic until calibrated).
     """
 
     name: str
     cost_ms: float
+    memory_footprint_bytes: int = 0
+
+
+@dataclass(frozen=True)
+class ReceiverComponent:
+    """A hard-real-time receiver component whose buffer depth trades RAM for deadline relief.
+
+    Cost model is a fixed `cost_ms` like `SimpleComponent`. Its memory footprint grows
+    with `buffer_depth` (e.g. a deeper IR pulse buffer or radio FIFO), so raising the
+    buffer depth to relieve a polling deadline visibly increases the component's heap
+    usage.
+
+    `memory_footprint_bytes = base_footprint_bytes + bytes_per_buffer_slot * buffer_depth`
+    """
+
+    name: str
+    cost_ms: float
+    base_footprint_bytes: int
+    bytes_per_buffer_slot: int
+    buffer_depth: int
+
+    @property
+    def memory_footprint_bytes(self) -> int:
+        """Static steady-state heap usage, including the buffer's current depth."""
+        return self.base_footprint_bytes + self.bytes_per_buffer_slot * self.buffer_depth
 
 
 @dataclass(frozen=True)
@@ -115,4 +153,6 @@ class PropProfile:
     """
 
     name: str
-    components: list["EngineComponent | SimpleComponent"] = field(default_factory=list)
+    components: list["EngineComponent | SimpleComponent | ReceiverComponent"] = field(
+        default_factory=list
+    )

@@ -38,28 +38,61 @@ on its role:
 
 ```
 usable_cpu%  = 100 - baseline_cpu_percent[role] - headroom_reserve_percent
-usable_heap  = total_free_heap_bytes - baseline_heap_bytes[role]
+usable_heap  = total_free_heap_bytes - baseline_heap_bytes[role] - gc_margin_bytes
 ```
 
 `headroom_reserve_percent` defaults to 20% and is tunable per board (and per
-assignment run).
+assignment run). `gc_margin_bytes` defaults to 0 and is configurable per board (see
+"Memory constraint" below).
 
-## CPU-only bin-packing
+## CPU and memory bin-packing
 
 Components are packed onto the fewest MCUs such that, for every MCU:
 
 ```
-sum(reserved% for components on this MCU) <= usable_cpu%
+sum(reserved% for components on this MCU)            <= usable_cpu%
+sum(memory_footprint_bytes for components on this MCU) <= usable_heap
 ```
 
 The engine-host MCU is seeded with the engine component; remaining components are
-packed first-fit-decreasing (largest reservation first) onto the engine-host, then
-onto satellite MCUs, opening a new satellite whenever a component does not fit on any
-existing MCU.
+packed first-fit-decreasing by CPU reservation (largest reservation first) onto the
+engine-host, then onto satellite MCUs, opening a new satellite whenever a component
+does not fit on any existing MCU's CPU budget.
 
-If a component's reservation exceeds the usable budget of a fresh satellite MCU, the
-assignment is infeasible and the result names the offending component and the
-violated constraint.
+If a component's reservation exceeds the usable CPU budget of a fresh satellite MCU,
+the assignment is infeasible and the result names the offending component and the
+violated constraint (`conflict_type="cpu"`).
+
+After CPU packing succeeds, each MCU's summed memory footprint is checked against its
+`usable_heap`. If any MCU overflows, the assignment is infeasible with
+`conflict_type="memory"`, naming the offending MCU role and the violated heap budget.
+
+## Memory constraint
+
+Every component declares a static `memory_footprint_bytes`: its steady-state heap
+usage, profiler-measured via a `mem_free` delta (placeholder/synthetic constants until
+calibrated against real hardware).
+
+`gc_margin_bytes` is a fixed amount of heap held back on every MCU of a board, on top
+of the role's `heap_bytes` baseline, to leave room for CircuitPython's mark-sweep
+collector. It should be set generously: GC needs free space to operate, and
+fragmentation shrinks the heap that is actually usable for allocations. It is
+configurable per board via `BoardProfile.gc_margin_bytes` (default `0`).
+
+### Receiver buffer depth (RAM-for-deadline trade-off)
+
+A hard-real-time receiver component (`ReceiverComponent`) has a tunable
+`buffer_depth` -- e.g. the depth of an IR pulse buffer or a radio FIFO. Raising
+`buffer_depth` relieves the receiver's polling deadline (it can tolerate longer gaps
+between polls before overflowing) but increases its memory footprint:
+
+```
+memory_footprint_bytes = base_footprint_bytes + bytes_per_buffer_slot * buffer_depth
+```
+
+This makes the RAM-for-deadline trade-off visible to the estimator: raising
+`buffer_depth` to relieve a deadline can flip an otherwise-feasible assignment into a
+memory conflict.
 
 ## Engine component cost model
 
