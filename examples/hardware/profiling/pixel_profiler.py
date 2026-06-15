@@ -63,11 +63,7 @@ from engine.packs import PackRegistry
 from engine.state import Scope
 from engine.timer import Timer
 from hardware.shared.matrix_output import MatrixEffectOutput
-from hardware.shared.profiling_helpers import (
-    print_profile_header,
-    print_stats_line,
-    stats_due,
-)
+from hardware.shared.profiling_helpers import print_profile_header, print_stats_line, stats_due
 
 try:
     from typing import Final
@@ -119,6 +115,9 @@ class NeoPixelPwmOutput(EffectOutput):
     def flush(self) -> None:
         self._strip.show()
 
+    def deinit(self) -> None:
+        self._strip.deinit()
+
 
 class Is31fl3741MatrixOutput(MatrixEffectOutput):
     """Satellite output for an IS31FL3741 matrix driven over I2C.
@@ -129,10 +128,11 @@ class Is31fl3741MatrixOutput(MatrixEffectOutput):
     ``show()``, the dominant I2C consumer.
     """
 
-    def __init__(self, cols: int, rows: int, matrix) -> None:
+    def __init__(self, cols: int, rows: int, matrix, i2c) -> None:
         super().__init__(cols, {"personal": range(rows)})
         self.scopes = [Scope.PERSONAL]
         self._matrix = matrix
+        self._i2c = i2c
 
     def _write_row(self, row: int, pixels) -> None:
         for col in range(self._cols):
@@ -141,8 +141,11 @@ class Is31fl3741MatrixOutput(MatrixEffectOutput):
     def flush(self) -> None:
         self._matrix.show()
 
+    def deinit(self) -> None:
+        self._i2c.deinit()
 
-def _build_neopixel_output(pixel_count: int) -> EffectOutput:
+
+def _build_neopixel_output(pixel_count: int) -> NeoPixelPwmOutput | Is31fl3741MatrixOutput:
     import board
     import neopixel
 
@@ -150,7 +153,7 @@ def _build_neopixel_output(pixel_count: int) -> EffectOutput:
     return NeoPixelPwmOutput(pixel_count, strip)
 
 
-def _build_matrix_output(pixel_count: int) -> EffectOutput:
+def _build_matrix_output(pixel_count: int) -> NeoPixelPwmOutput | Is31fl3741MatrixOutput:
     import board
     import busio
     from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
@@ -159,10 +162,10 @@ def _build_matrix_output(pixel_count: int) -> EffectOutput:
     matrix = Adafruit_RGBMatrixQT(i2c)
     cols = 13
     rows = max(1, (pixel_count + cols - 1) // cols)
-    return Is31fl3741MatrixOutput(cols, rows, matrix)
+    return Is31fl3741MatrixOutput(cols, rows, matrix, i2c)
 
 
-def _build_output(driver: str, pixel_count: int) -> EffectOutput:
+def _build_output(driver: str, pixel_count: int) -> NeoPixelPwmOutput | Is31fl3741MatrixOutput:
     if driver == "neopixel_pwm":
         return _build_neopixel_output(pixel_count)
     if driver == "is31fl3741_matrix":
@@ -229,6 +232,8 @@ def run() -> None:
                 for receipt in receipts:
                     receipt.stop()
                 gc.collect()
+
+        output.deinit()
 
 
 run()
