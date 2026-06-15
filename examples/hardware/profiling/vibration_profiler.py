@@ -49,7 +49,12 @@ from effects.effect import Effect, EffectVibration, VibrationConfig
 from effects.performance import PerformanceTracker
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
-from hardware.shared.profiling_helpers import print_profile_header, print_stats_line, stats_due
+from hardware.shared.profiling_helpers import (
+    print_profile_header,
+    print_stats_line,
+    print_table_row,
+    stats_due,
+)
 
 try:
     from typing import Final
@@ -60,6 +65,10 @@ EVENT_INTERVAL_SECONDS: Final = 10.0  # 6 calls/minute
 ITERATIONS: Final = 12
 TARGET_FPS: Final = 24.0
 LOG_INTERVAL_SECONDS: Final = 5.0
+# Bytes the DRV2605L sequence + go-register write puts on the I2C bus per event.
+# A configured seed (like the pixel matrix's I2C_TRANSACTION_BYTES), not measured
+# here -- refine via an I2C bus capture if a tighter figure is needed.
+I2C_TRANSACTION_BYTES: Final = 8
 
 _EVENT_VERB: Final = "buzz"
 
@@ -116,6 +125,13 @@ def run() -> None:
             )
 
         time.sleep(EVENT_INTERVAL_SECONDS)
+
+    cost_ms = perf.update_time_total / perf.frame_count * 1000.0
+    i2c_bandwidth = I2C_TRANSACTION_BYTES * (max_calls_per_minute / 60.0)
+    print_table_row(
+        "vibration_component_costs",
+        [f"{cost_ms:.4f}", f"{i2c_bandwidth:.2f}"],
+    )
 
 
 run()

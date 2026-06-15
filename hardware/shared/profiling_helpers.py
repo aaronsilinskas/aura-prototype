@@ -34,6 +34,89 @@ def board_id() -> str:
     return sys.platform
 
 
+def print_table_row(table: str, cells: list, driver: str = "-") -> None:
+    """Print a paste-ready capacity-model constants row for ``table``.
+
+    Prepends the row key every constants table shares -- board, runtime, and
+    driver -- to the component-specific ``cells`` the caller computed, then
+    prints a ``__TABLE_ROW`` marker line (naming the target table so it is
+    greppable in serial output) followed by the markdown row itself. Call once
+    at the end of a sweep, after the constants have been aggregated.
+
+    Args:
+        table: Name of the target capacity-model table (e.g.
+            ``"engine_component_costs"``).
+        cells: The component-specific cell values, already formatted by the
+            caller; unmeasured cells should be the literal ``"_TBD_"``.
+        driver: The driver dimension for this row; ``"-"`` for components that
+            are not driver-specific.
+    """
+    row = format_table_row([board_id(), runtime_id(), driver, *cells])
+    print(f"__TABLE_ROW table={table}")
+    print(row)
+
+
+def format_table_row(cells: list) -> str:
+    """Join pre-formatted ``cells`` into a markdown table row.
+
+    Each profiler formats its own cell values (it knows the units and the
+    precision each constant needs) and unmeasured cells are passed as the
+    literal ``"_TBD_"``; this helper only assembles them into a paste-ready
+    ``| a | b | c |`` row for the capacity-model constants tables.
+    """
+    return "| " + " | ".join(str(cell) for cell in cells) + " |"
+
+
+def format_runtime_id(name: str, version: tuple) -> str:
+    """Format an implementation name and version into the table key style.
+
+    The capacity-model constants tables key every row by runtime as
+    ``circuitpython_10_0_3`` (name and dotted version joined with
+    underscores). This builds that key from ``sys.implementation.name`` and
+    ``sys.implementation.version`` so emitted rows drop straight into the
+    table.
+    """
+    return "_".join([name, *(str(part) for part in version[:3])])
+
+
+def runtime_id() -> str:
+    """Return this interpreter's runtime key (e.g. ``circuitpython_10_0_3``)."""
+    impl = sys.implementation
+    return format_runtime_id(impl.name, impl.version)
+
+
+def linear_fit(xs: list[float], ys: list[float]) -> tuple[float, float]:
+    """Least-squares fit of ``ys`` against ``xs``, returning ``(slope, intercept)``.
+
+    Profilers sweep one axis (rule count, pixel count, concurrent voices, ...)
+    and record the steady-state per-tick cost at each point. The slope is the
+    marginal per-unit cost the capacity estimator models; the intercept is the
+    fixed cost at zero units. Both are reported in the paste-ready table row so
+    the constants never have to be eyeballed from raw stats lines.
+
+    Args:
+        xs: The swept independent values (e.g. rule counts).
+        ys: The measured costs at each ``xs`` point, same length and order.
+
+    Returns:
+        ``(slope, intercept)`` of the best-fit line. With a single point the
+        slope is ``0.0`` and the intercept is that point's ``y`` (no slope is
+        defined from one sample).
+    """
+    n = len(xs)
+    sum_x = sum(xs)
+    sum_y = sum(ys)
+    sum_xx = sum(x * x for x in xs)
+    sum_xy = sum(x * y for x, y in zip(xs, ys))
+    denominator = n * sum_xx - sum_x * sum_x
+    if denominator == 0:
+        # All xs identical (e.g. a single point): no slope is defined.
+        return 0.0, sum_y / n
+    slope = (n * sum_xy - sum_x * sum_y) / denominator
+    intercept = (sum_y - slope * sum_x) / n
+    return slope, intercept
+
+
 def print_profile_header(
     component: str,
     sweep_axes: list[str],

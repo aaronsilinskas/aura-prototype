@@ -55,7 +55,12 @@ import time
 from effects.performance import PerformanceTracker
 from hardware.shared.ir_protocol import AuraInfraredDecoder
 from hardware.shared.ir_transport import InfraredMultiReceiver
-from hardware.shared.profiling_helpers import print_profile_header, print_stats_line, stats_due
+from hardware.shared.profiling_helpers import (
+    print_profile_header,
+    print_stats_line,
+    print_table_row,
+    stats_due,
+)
 
 try:
     from typing import Final
@@ -107,6 +112,11 @@ def run() -> None:
         target_fps=TARGET_FPS,
     )
 
+    # max_frame_ms is the injected frame time at which packet loss first becomes
+    # non-zero. Track each point's peak frame time, its loss, and whether any
+    # packet arrived (a bare board with no external IR source receives none).
+    total_received = 0
+    max_frame_ms = "_TBD_"
     for injected_load_ms in INJECTED_LOAD_SWEEP_MS:
         perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
         last_sequence = None
@@ -150,6 +160,23 @@ def run() -> None:
 
             if current_time > next_change_time:
                 break
+
+        total_received += packets_received
+        total_packets = packets_received + packets_dropped
+        loss_rate = packets_dropped / total_packets if total_packets > 0 else 0.0
+        # First point that drops packets locates the deadline; keep the earliest.
+        if loss_rate > 0.0 and max_frame_ms == "_TBD_":
+            max_frame_ms = f"{perf.frame_time_peak * 1000.0:.2f}"
+
+    # No packets at all means no external IR source was driving the loopback, so
+    # the deadline cannot be located on this run -- emit _TBD_ for max_frame_ms.
+    if total_received == 0:
+        max_frame_ms = "_TBD_"
+
+    print_table_row(
+        "ir_receive_component_costs",
+        [BUFFER_DEPTH, f"{INCOMING_RATE_HZ:.1f}", max_frame_ms],
+    )
 
 
 run()

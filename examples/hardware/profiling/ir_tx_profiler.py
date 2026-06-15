@@ -52,7 +52,12 @@ import time
 
 from effects.performance import PerformanceTracker
 from engine.network import LINE, HardwareNetworkControls
-from hardware.shared.profiling_helpers import print_profile_header, print_stats_line, stats_due
+from hardware.shared.profiling_helpers import (
+    print_profile_header,
+    print_stats_line,
+    print_table_row,
+    stats_due,
+)
 
 try:
     from typing import Final
@@ -82,16 +87,19 @@ def run() -> None:
     """Sweep payload length, reporting PulseOut.send blocking duration."""
     network_controls = _build_network_controls()
 
+    print_profile_header(
+        component="ir_tx",
+        sweep_axes=["payload_length"],
+        sweep_values=[PAYLOAD_LENGTHS[0]],
+        target_fps=TARGET_FPS,
+    )
+
+    # blocking_send_ms is the worst-case PulseOut.send blocking for the longest
+    # payload this prop transmits -- track the peak across the sweep.
+    worst_blocking_send_ms = 0.0
     for length in PAYLOAD_LENGTHS:
         payload = bytes(i % 256 for i in range(length))
         perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
-
-        print_profile_header(
-            component="ir_tx",
-            sweep_axes=["payload_length"],
-            sweep_values=[length],
-            target_fps=TARGET_FPS,
-        )
 
         for _ in range(ITERATIONS_PER_LENGTH):
             current_time = time.monotonic()
@@ -103,6 +111,9 @@ def run() -> None:
             blocking_send_ms = (time.monotonic() - send_start) * 1000.0
             perf.add_update_time()
 
+            if blocking_send_ms > worst_blocking_send_ms:
+                worst_blocking_send_ms = blocking_send_ms
+
             due = stats_due(perf, current_time)
             perf.complete_frame(current_time)
             if due:
@@ -112,6 +123,13 @@ def run() -> None:
                     payload_length=length,
                     blocking_send_ms=f"{blocking_send_ms:.2f}",
                 )
+
+    # cost_ms (average per-frame CPU reservation) depends on send cadence, which
+    # this profiler does not sweep -- left _TBD_. blocking_send_ms is measured.
+    print_table_row(
+        "ir_transmit_component_costs",
+        ["_TBD_", f"{worst_blocking_send_ms:.2f}"],
+    )
 
 
 run()

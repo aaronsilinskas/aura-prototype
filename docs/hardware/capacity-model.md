@@ -357,6 +357,28 @@ Constants are keyed by `(board, runtime, driver)`. These tables are currently em
 placeholders -- they will be populated as real hardware measurements become
 available (see #392).
 
+#### Emitting rows from profilers
+
+Each profiler under `examples/hardware/profiling/` computes its target table's
+constants on-device and prints a **paste-ready markdown row** at the end of its
+run, so the values never have to be eyeballed from raw stats lines. The row is
+preceded by a greppable marker line naming the table:
+
+```
+__TABLE_ROW table=engine_component_costs
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.1234 | 0.0456 | 0.0789 | _TBD_ |
+```
+
+The shared `print_table_row` helper (`hardware/shared/profiling_helpers.py`)
+prepends the board, runtime, and driver key every table shares; the profiler
+supplies the component-specific cells. Slopes and intercepts (per-rule,
+per-pixel, per-voice costs and their fixed terms) are fit on-device with
+`linear_fit` over the sweep. Cells a bare board cannot measure -- e.g. IR-rx
+`max_frame_ms` with no external packet source, or IR-tx `cost_ms` whose average
+depends on an unswept send cadence -- are emitted as the literal `_TBD_` so the
+row stays paste-ready with its gaps explicit. Copy the row for the
+`(board, runtime, driver)` you profiled into the matching table below.
+
 ### Board profiles
 
 Per-board frame budget and global heap/headroom budgets the packer deducts from. `gc_margin_bytes` is not a per-board column here -- the engine baseline showed ~23KB of GC churn, so set `BoardProfile.gc_margin_bytes` to ~23KB for every board on this runtime.
@@ -386,20 +408,19 @@ Per-tick cost terms for the `GameEngine` loop, scaling with rules, events, and r
 
 `examples/hardware/profiling/engine_profiler.py` drives the real
 `GameEngine.update(state)` dispatch loop with a synthetic `_ProfilerRule` /
-`_ProfilerEvent` pair and reports per-tick Update Time via the uniform stats
-line, sweeping `rule_count` and `events_per_tick` as independent axes (each
-holding the other at a fixed reference of 1):
+`_ProfilerEvent` pair, sweeping `rule_count` and `events_per_tick` as
+independent axes (each holding the other at a fixed reference of 1). It fits the
+constants on-device and emits the completed row as
+`__TABLE_ROW table=engine_component_costs` -- copy that row in above. The cells:
 
-- **`tick_fixed_ms`** -- read directly from the `(rule_count=0,
-  events_per_tick=0)` point's average Update Time. This is the fixed cost of
-  one `GameEngine.update` tick with no rules and no queued events.
-- **`per_rule_ms`** -- the slope of average Update Time vs `rule_count`, with
-  `events_per_tick` held at 1. Computed as `(update_time(rules) -
-  update_time(rules=0, events=1)) / rules` across the `RULE_COUNTS` sweep.
-- **`per_event_ms`** -- the slope of average Update Time vs `events_per_tick`,
-  with `rule_count` held at 1. Computed as `(update_time(events) -
-  update_time(rules=1, events=0)) / events` across the `EVENTS_PER_TICK_VALUES`
-  sweep.
+- **`tick_fixed_ms`** -- the `(rule_count=0, events_per_tick=0)` point's average
+  Update Time: the fixed cost of one `GameEngine.update` tick with no rules and
+  no queued events.
+- **`per_rule_ms`** -- the `linear_fit` slope of average Update Time vs
+  `rule_count` across the `RULE_COUNTS` sweep, with `events_per_tick` held at 1.
+- **`per_event_ms`** -- the `linear_fit` slope of average Update Time vs
+  `events_per_tick` across the `EVENTS_PER_TICK_VALUES` sweep, with `rule_count`
+  held at 1.
 
 **Additive model vs. real dispatch shape.** The estimator models per-tick
 engine cost additively as `tick_fixed_ms + per_rule_ms * rules + per_event_ms *
@@ -432,3 +453,79 @@ shipping commands from the engine host to remote satellite MCUs, which has no
 seam inside the `GameEngine.update` tick loop measured here. The table cell
 remains `_TBD_` pending a separate counting network stub or analytic seeding
 (no tracking issue yet -- to be filed as a follow-up).
+
+### Pixel scope costs
+
+Per-frame render+flush cost terms for a `PixelScopeComponent`, keyed by driver
+(`neopixel_pwm` or `is31fl3741_matrix`). From `pixel_profiler.py`.
+
+| Board | Runtime | Driver | `worst_case_effect_per_pixel_ms` | `flush_ms` | `i2c_bandwidth_bytes_per_sec` |
+|-------|---------|--------|----------------------------------|------------|-------------------------------|
+| _TBD_ | _TBD_   | _TBD_  | _TBD_                            | _TBD_      | _TBD_                         |
+
+`pixel_profiler.py` sweeps `pixel_count`, effect identity, and `stack_depth`.
+Because `cost_ms = stack_depth * worst_case_effect_per_pixel_ms * pixel_count +
+flush_ms`, per-frame cost is linear in `stack_depth * pixel_count`: the
+`linear_fit` **slope** is `worst_case_effect_per_pixel_ms` and the **intercept**
+is the fixed `flush_ms` (so no separate flush-timing seam is needed --
+`effect_manager.update` already renders and flushes in one call). The profiler
+fits each effect element independently and reports the **worst-case element's**
+slope, with that element's intercept as `flush_ms`. `i2c_bandwidth_bytes_per_sec`
+is `0` for `neopixel_pwm` (off the I2C bus) and `i2c_transaction_bytes *
+i2c_frequency_hz` for the matrix driver.
+
+### Sound component costs
+
+Per-frame mixer cost terms for the shared `SoundComponent`. From `sound_profiler.py`.
+
+| Board | Runtime | Driver | `mixer_fixed_ms` | `per_voice_ms` |
+|-------|---------|--------|------------------|----------------|
+| _TBD_ | _TBD_   | _TBD_  | _TBD_            | _TBD_          |
+
+`sound_profiler.py` sweeps `concurrent_voices`. Because `cost_ms = mixer_fixed_ms
++ per_voice_ms * effective_voices`, the `linear_fit` **intercept** is
+`mixer_fixed_ms` and the **slope** is `per_voice_ms`.
+
+### Vibration component costs
+
+Per-event cost for the shared `VibrationComponent` (DRV2605L over I2C). From
+`vibration_profiler.py`.
+
+| Board | Runtime | Driver | `cost_ms` | `i2c_bandwidth_bytes_per_sec` |
+|-------|---------|--------|-----------|-------------------------------|
+| _TBD_ | _TBD_   | _TBD_  | _TBD_     | _TBD_                         |
+
+`cost_ms` is the measured average per-event CPU cost of `handle_event` +
+`motor.play()`. `i2c_bandwidth_bytes_per_sec` is `i2c_transaction_bytes *
+(max_calls_per_minute / 60)`; the profiler's `I2C_TRANSACTION_BYTES` is a
+configured seed (the DRV2605L sequence + go-register write), not measured here --
+refine via an I2C bus capture if a tighter figure is needed.
+
+### IR-transmit component costs
+
+Cost terms for the shared `IrTransmitComponent`. From `ir_tx_profiler.py`.
+
+| Board | Runtime | Driver | `cost_ms` | `blocking_send_ms` |
+|-------|---------|--------|-----------|--------------------|
+| _TBD_ | _TBD_   | _TBD_  | _TBD_     | _TBD_              |
+
+`blocking_send_ms` is the worst-case `PulseOut.send` blocking duration across the
+`PAYLOAD_LENGTHS` sweep (the longest payload). `cost_ms` -- the *average*
+per-frame CPU reservation -- depends on send cadence, which this profiler does
+not sweep, so it is emitted as `_TBD_`.
+
+### IR-receive component costs
+
+Hard-real-time deadline for the shared `ReceiverComponent`, keyed additionally by
+`buffer_depth` and `incoming_rate_hz`. From `ir_rx_profiler.py`.
+
+| Board | Runtime | Driver | `buffer_depth` | `incoming_rate_hz` | `max_frame_ms` |
+|-------|---------|--------|----------------|--------------------|----------------|
+| _TBD_ | _TBD_   | _TBD_  | _TBD_          | _TBD_              | _TBD_          |
+
+`ir_rx_profiler.py` sweeps an injected per-frame busy-load while a known incoming
+packet rate is induced via loopback. `max_frame_ms` is the peak frame time at the
+**first injected-load point where packet loss becomes non-zero** for the profiled
+`buffer_depth` / `incoming_rate_hz`. This requires an **external IR packet
+source** (a loopback transmitter or second board); on a bare board no packets
+arrive and `max_frame_ms` is emitted as `_TBD_`.

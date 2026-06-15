@@ -32,6 +32,12 @@ For each `(rule_count, events_per_tick)` point, the profiler:
 3. Reports `PerformanceTracker` stats via the uniform stats line, including
    both sweep values (`rule_count` and `events_per_tick`) for this point.
 
+After the sweep completes, the profiler fits `per_rule_ms` and `per_event_ms`
+from the slopes (via `linear_fit`), reads `tick_fixed_ms` from the `(0, 0)`
+point, and prints the completed `engine_component_costs` table row as a
+`__TABLE_ROW` line ready to paste into `docs/hardware/capacity-model.md`.
+`router_overhead_ms` is out of scope here and is emitted as `_TBD_`.
+
 Hardware
 --------
 - Any CircuitPython-compatible board. No additional wiring is required -- this
@@ -72,7 +78,13 @@ from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
 from engine.packs import PackRegistry
 from engine.state import GameState, SceneControls
-from hardware.shared.profiling_helpers import print_profile_header, print_stats_line, stats_due
+from hardware.shared.profiling_helpers import (
+    linear_fit,
+    print_profile_header,
+    print_stats_line,
+    print_table_row,
+    stats_due,
+)
 
 try:
     from typing import Final
@@ -118,8 +130,13 @@ def _build_engine(rule_count: int) -> tuple[GameEngine, GameState]:
     return game_engine, game_state
 
 
-def _run_point(rule_count: int, events_per_tick: int) -> None:
-    """Run one steady-state sweep point and report its stats line."""
+def _run_point(rule_count: int, events_per_tick: int) -> float:
+    """Run one steady-state sweep point and return its average Update Time (ms).
+
+    Reports the uniform stats line each interval while the point runs, then
+    returns the steady-state per-tick Update Time so the caller can fit the
+    `tick_fixed_ms` / `per_rule_ms` / `per_event_ms` constants across the sweep.
+    """
     game_engine, game_state = _build_engine(rule_count)
     perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
 
@@ -159,23 +176,47 @@ def _run_point(rule_count: int, events_per_tick: int) -> None:
         if current_time > next_change_time:
             break
 
+    return perf.update_time_total / perf.frame_count * 1000.0
+
 
 def run() -> None:
     """Sweep rule_count and events_per_tick independently, each at a fixed reference."""
     # (0, 0) point: tick_fixed_ms zero point, reproduces the engine-host baseline.
-    _run_point(rule_count=0, events_per_tick=0)
+    tick_fixed_ms = _run_point(rule_count=0, events_per_tick=0)
 
     # Sweep rule_count, holding events_per_tick at the reference -> per_rule_ms slope.
+    rule_counts = []
+    rule_update_ms = []
     for rule_count in RULE_COUNTS:
         if rule_count == 0:
             continue  # already covered by the (0, 0) point above
-        _run_point(rule_count=rule_count, events_per_tick=REFERENCE_EVENTS_PER_TICK)
+        rule_counts.append(rule_count)
+        rule_update_ms.append(_run_point(rule_count, REFERENCE_EVENTS_PER_TICK))
 
     # Sweep events_per_tick, holding rule_count at the reference -> per_event_ms slope.
+    event_counts = []
+    event_update_ms = []
     for events_per_tick in EVENTS_PER_TICK_VALUES:
         if events_per_tick == 0:
             continue  # already covered by the (0, 0) point above
-        _run_point(rule_count=REFERENCE_RULE_COUNT, events_per_tick=events_per_tick)
+        event_counts.append(events_per_tick)
+        event_update_ms.append(_run_point(REFERENCE_RULE_COUNT, events_per_tick))
+
+    per_rule_ms, _ = linear_fit(rule_counts, rule_update_ms)
+    per_event_ms, _ = linear_fit(event_counts, event_update_ms)
+
+    # router_overhead_ms is command-shipping cost to remote MCUs, charged to the
+    # engine host -- it has no seam in the GameEngine.update tick loop measured
+    # here, so it stays _TBD_ (see docs/hardware/capacity-model.md).
+    print_table_row(
+        "engine_component_costs",
+        [
+            f"{tick_fixed_ms:.4f}",
+            f"{per_rule_ms:.4f}",
+            f"{per_event_ms:.4f}",
+            "_TBD_",
+        ],
+    )
 
 
 run()

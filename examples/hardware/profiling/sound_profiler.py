@@ -58,7 +58,13 @@ from effects.performance import PerformanceTracker
 from engine.audio import AudioRegistry
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
-from hardware.shared.profiling_helpers import print_profile_header, print_stats_line, stats_due
+from hardware.shared.profiling_helpers import (
+    linear_fit,
+    print_profile_header,
+    print_stats_line,
+    print_table_row,
+    stats_due,
+)
 
 try:
     from typing import Final
@@ -95,16 +101,21 @@ def run() -> None:
     )
     play_event = EffectEvent("profiler", "loop", _EVENT_VERB)
 
+    print_profile_header(
+        component="sound",
+        sweep_axes=["concurrent_voices", "num_voices"],
+        sweep_values=[CONCURRENT_VOICES[0], NUM_VOICES],
+        target_fps=TARGET_FPS,
+    )
+
+    # cost_ms = mixer_fixed_ms + per_voice_ms * effective_voices, so per-frame cost
+    # is linear in the number of claimed voices: slope is per_voice_ms, intercept is
+    # mixer_fixed_ms.
+    voice_counts = []
+    voice_update_ms = []
     for voices in CONCURRENT_VOICES:
         claimed = min(voices, NUM_VOICES)
         perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
-
-        print_profile_header(
-            component="sound",
-            sweep_axes=["concurrent_voices", "num_voices"],
-            sweep_values=[claimed, NUM_VOICES],
-            target_fps=TARGET_FPS,
-        )
 
         # Claim `claimed` voice slots -- each handle_event call plays the looping
         # clip on a new VoicePool slot via pool.claim.
@@ -139,6 +150,15 @@ def run() -> None:
         for receipt in receipts:
             receipt.stop()
         output.flush()
+
+        voice_counts.append(claimed)
+        voice_update_ms.append(perf.update_time_total / perf.frame_count * 1000.0)
+
+    per_voice_ms, mixer_fixed_ms = linear_fit(voice_counts, voice_update_ms)
+    print_table_row(
+        "sound_component_costs",
+        [f"{mixer_fixed_ms:.4f}", f"{per_voice_ms:.4f}"],
+    )
 
 
 run()

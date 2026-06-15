@@ -43,6 +43,7 @@ Configuration
 
 from __future__ import annotations
 
+import gc
 import time
 
 from effects.performance import PerformanceTracker
@@ -54,6 +55,7 @@ from engine.timer import Timer
 from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,
+    print_table_row,
     stats_due,
 )
 
@@ -81,23 +83,38 @@ class NullEffectOutput(EffectOutput):
         self.scopes = []
 
 
-def _build_engine_host() -> tuple[EffectManager, GameEngine, GameState]:
+def _heap_tax(mem_free_before: int) -> int:
+    """Heap consumed since ``mem_free_before`` was snapshotted.
+
+    Collects garbage first so the figure is the framework's retained tax (the
+    `heap_bytes` column of the Per-MCU baselines table), not transient
+    construction litter.
+    """
+    gc.collect()
+    return mem_free_before - gc.mem_free()
+
+
+def _build_engine_host() -> tuple[EffectManager, GameEngine, GameState, int]:
+    gc.collect()
+    mem_free_before = gc.mem_free()
     registry = PackRegistry(item_attr="BUILD")
     effect_manager = EffectManager(registry=registry, outputs=[])
     game_engine = GameEngine(effect_controls=effect_manager)
     game_state = game_engine.create_state(SceneControls())
-    return effect_manager, game_engine, game_state
+    return effect_manager, game_engine, game_state, _heap_tax(mem_free_before)
 
 
-def _build_satellite() -> EffectManager:
+def _build_satellite() -> tuple[EffectManager, int]:
+    gc.collect()
+    mem_free_before = gc.mem_free()
     registry = PackRegistry(item_attr="BUILD")
     effect_manager = EffectManager(registry=registry, outputs=[NullEffectOutput()])
-    return effect_manager
+    return effect_manager, _heap_tax(mem_free_before)
 
 
 def run_engine_host() -> None:
     """Run the bare-loop baseline with a rule-less GameEngine driving an EffectManager."""
-    effect_manager, game_engine, game_state = _build_engine_host()
+    effect_manager, game_engine, game_state, heap_bytes = _build_engine_host()
     timer = Timer()
     perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
 
@@ -124,11 +141,16 @@ def run_engine_host() -> None:
             busy_time = perf.update_time_total + perf.render_time_total
             cpu_percent = 100.0 * busy_time / (current_time - perf.start_time)
             print_stats_line(perf, current_time, cpu_percent=f"{cpu_percent:.2f}%")
+            # Per-MCU baselines row -- read once cpu_percent has converged.
+            print_table_row(
+                "per_mcu_baselines",
+                ["engine-host", f"{cpu_percent:.2f}%", heap_bytes],
+            )
 
 
 def run_satellite() -> None:
     """Run the bare-loop baseline with an EffectManager and command-receive scaffold."""
-    effect_manager = _build_satellite()
+    effect_manager, heap_bytes = _build_satellite()
     timer = Timer()
     perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
 
@@ -154,6 +176,11 @@ def run_satellite() -> None:
             busy_time = perf.update_time_total + perf.render_time_total
             cpu_percent = 100.0 * busy_time / (current_time - perf.start_time)
             print_stats_line(perf, current_time, cpu_percent=f"{cpu_percent:.2f}%")
+            # Per-MCU baselines row -- read once cpu_percent has converged.
+            print_table_row(
+                "per_mcu_baselines",
+                ["satellite", f"{cpu_percent:.2f}%", heap_bytes],
+            )
 
 
 if MODE == "engine_host":
