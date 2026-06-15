@@ -62,7 +62,8 @@ def print_profile_header(
         f"sweep=[{sweep_parts}], "
         f"target_fps={target_fps:.2f}, "
         f"board={board_id()}, "
-        f"impl={impl.name} {impl_version}"
+        f"impl={impl.name} {impl_version}, "
+        f"Mem Free: {gc.mem_free()}B"
     )
 
 

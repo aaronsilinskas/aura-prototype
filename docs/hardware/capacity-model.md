@@ -359,18 +359,24 @@ available (see #392).
 
 ### Board profiles
 
+Per-board frame budget and global heap/headroom budgets the packer deducts from. `gc_margin_bytes` is not a per-board column here -- the engine baseline showed ~23KB of GC churn, so set `BoardProfile.gc_margin_bytes` to ~23KB for every board on this runtime.
+
 | Board | Runtime | Driver | `target_fps` | `total_free_heap_bytes` | `headroom_reserve_percent` |
 |-------|---------|--------|--------------|-------------------------|------------------------------|
-| _TBD_ | _TBD_   | _TBD_  | _TBD_        | _TBD_                   | _TBD_                         |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 24 | 130576 | 20% |
 
 ### Per-MCU baselines
 
-| Board | Runtime | Driver | Role | `cpu_percent` | `heap_bytes` |
-|-------|---------|--------|------|---------------|--------------|
-| _TBD_ | _TBD_   | _TBD_  | engine-host | _TBD_ | _TBD_ |
-| _TBD_ | _TBD_   | _TBD_  | satellite   | _TBD_ | _TBD_ |
+Fixed CPU and heap tax each role's bare framework loop consumes before any component work (from `baseline_profiler.py`).
+
+| Board  | Runtime | Driver | Role | `cpu_percent` | `heap_bytes` |
+|--------|---------|--------|------|---------------|--------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | engine-host | 4.57% | 450 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | satellite   | 4.58% | 256 |
 
 ### Engine component costs
+
+Per-tick cost terms for the `GameEngine` loop, scaling with rules, events, and remote MCUs.
 
 | Board | Runtime | Driver | `tick_fixed_ms` | `per_rule_ms` | `per_event_ms` | `router_overhead_ms` |
 |-------|---------|--------|------------------|----------------|-----------------|------------------------|
