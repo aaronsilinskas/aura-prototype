@@ -44,6 +44,19 @@ class BusBudget:
 
 
 @dataclass(frozen=True)
+class PeripheralBudget:
+    """Count of one shared peripheral type (I2S/SPI/I2C/PWM) available on a board.
+
+    Components declare how many units of a peripheral they require via
+    `peripherals_required` (e.g. `{"i2s": 1}`). The summed requirement across all of
+    a prop's components is checked against this count -- if it exceeds `count`, the
+    assignment is infeasible with `conflict_type="peripheral"`, naming the peripheral.
+    """
+
+    count: int
+
+
+@dataclass(frozen=True)
 class BoardProfile:
     """Capacity profile for one board model running a given runtime.
 
@@ -69,6 +82,7 @@ class BoardProfile:
     headroom_reserve_percent: float = 20.0
     gc_margin_bytes: int = 0
     bus_budgets: dict[str, BusBudget] = field(default_factory=dict)
+    peripheral_budgets: dict[str, PeripheralBudget] = field(default_factory=dict)
 
     @property
     def frame_budget_ms(self) -> float:
@@ -104,6 +118,7 @@ class EngineComponent:
     events_per_tick: int
     remote_mcus: int
     memory_footprint_bytes: int = 0
+    peripherals_required: dict[str, int] = field(default_factory=dict)
 
     @property
     def cost_ms(self) -> float:
@@ -125,11 +140,26 @@ class SimpleComponent:
 
     `memory_footprint_bytes` is the component's static steady-state heap usage
     (profiler-measured via `mem_free` delta; placeholder/synthetic until calibrated).
+
+    `i2c_transaction_bytes` / `i2c_frequency_hz` model an I2C-polled input, such as a
+    LIS3DH accelerometer read once per frame (`i2c_frequency_hz` == the board's
+    `target_fps`). Both default to 0 for components that are off the I2C bus.
     """
 
     name: str
     cost_ms: float
     memory_footprint_bytes: int = 0
+    peripherals_required: dict[str, int] = field(default_factory=dict)
+    i2c_transaction_bytes: int = 0
+    i2c_frequency_hz: float = 0
+
+    @property
+    def i2c_bandwidth_bytes_per_sec(self) -> float:
+        """I2C bus bandwidth this component's polling consumes, in bytes/sec.
+
+        Zero for components that are off the I2C bus.
+        """
+        return self.i2c_transaction_bytes * self.i2c_frequency_hz
 
 
 @dataclass(frozen=True)
@@ -164,6 +194,7 @@ class ReceiverComponent:
     buffer_depth: int
     incoming_rate_hz: float = 0.0
     worst_case_frame_ms: float = 0.0
+    peripherals_required: dict[str, int] = field(default_factory=dict)
 
     @property
     def memory_footprint_bytes(self) -> int:
@@ -216,6 +247,7 @@ class PixelScopeComponent:
     i2c_transaction_bytes: int = 0
     i2c_frequency_hz: float = 0
     memory_footprint_bytes: int = 0
+    peripherals_required: dict[str, int] = field(default_factory=dict)
 
     @property
     def cost_ms(self) -> float:
@@ -234,6 +266,117 @@ class PixelScopeComponent:
 
 
 @dataclass(frozen=True)
+class SoundComponent:
+    """The single shared sound output: one I2S amp + `audiomixer.Mixer`.
+
+    There is exactly one of these per prop -- ``AudioEffectOutput`` is registered on
+    ``Scope.ALL`` and serves every scope through one shared mixer.
+
+    Cost model (in ms, evaluated once per frame):
+
+        cost_ms = mixer_fixed_ms + per_voice_ms * max_concurrent_voices
+
+    `max_concurrent_voices` is the worst-case number of voices a scene can stack via
+    `add_effect` -- including audio-only effects that hold a voice but render no
+    pixels (an effect whose `pixels` and `vibration` are both `None`, per
+    `AudioEffectOutput.handle_event`'s `audio_only` check). It is clamped to
+    `num_voices` -- :class:`~hardware.shared.voice_pool.VoicePool`'s hard cap; a
+    scene that would stack more concurrent voices than `num_voices` simply evicts
+    the oldest one (see `VoicePool._select_slot`), so the cost never exceeds the cap.
+
+    `memory_footprint_bytes` is the component's static steady-state heap usage
+    (profiler-measured via a `mem_free` delta; placeholder/synthetic until
+    calibrated).
+    """
+
+    name: str
+    mixer_fixed_ms: float
+    per_voice_ms: float
+    num_voices: int
+    max_concurrent_voices: int
+    memory_footprint_bytes: int = 0
+    peripherals_required: dict[str, int] = field(default_factory=lambda: {"i2s": 1})
+
+    @property
+    def effective_voices(self) -> int:
+        """`max_concurrent_voices` clamped to the `VoicePool` hard cap `num_voices`."""
+        return min(self.max_concurrent_voices, self.num_voices)
+
+    @property
+    def cost_ms(self) -> float:
+        """Estimated per-frame CPU cost in milliseconds.
+
+        `cost_ms = mixer_fixed_ms + per_voice_ms * effective_voices` -- worst case is
+        sized by the scene's max concurrent voices, capped at `num_voices`.
+        """
+        return self.mixer_fixed_ms + self.per_voice_ms * self.effective_voices
+
+
+@dataclass(frozen=True)
+class VibrationComponent:
+    """The single shared haptic motor: a DRV2605L driven over I2C.
+
+    There is exactly one of these per prop -- ``Drv2605EffectOutput`` is registered
+    on ``Scope.ALL`` and drives one motor.
+
+    Cost model: a per-event cost (`cost_ms`), evaluated as if charged every frame for
+    CPU-reservation purposes, even though events fire far less often than every frame
+    -- `max_calls_per_minute` bounds how often `handle_event` actually calls the
+    DRV2605L (a low rate, so the bus share is negligible but still counted).
+
+    `i2c_bandwidth_bytes_per_sec` derives the DRV2605L's average I2C bus contribution
+    from its event rate:
+
+        i2c_bandwidth_bytes_per_sec = i2c_transaction_bytes * (max_calls_per_minute / 60)
+
+    `memory_footprint_bytes` is the component's static steady-state heap usage
+    (profiler-measured via a `mem_free` delta; placeholder/synthetic until
+    calibrated).
+    """
+
+    name: str
+    cost_ms: float
+    max_calls_per_minute: float
+    i2c_transaction_bytes: int = 0
+    memory_footprint_bytes: int = 0
+    peripherals_required: dict[str, int] = field(default_factory=lambda: {"i2c": 1})
+
+    @property
+    def i2c_bandwidth_bytes_per_sec(self) -> float:
+        """Average I2C bus bandwidth this component's events consume, in bytes/sec."""
+        return self.i2c_transaction_bytes * (self.max_calls_per_minute / 60.0)
+
+
+@dataclass(frozen=True)
+class IrTransmitComponent:
+    """The single shared IR-transmit path: 1 of 3 emitter pins selected per send.
+
+    There is exactly one of these per prop -- ``HardwareNetworkControls.send_ir``
+    selects one of up to 3 wired :class:`~hardware.shared.ir_transport.InfraredTransmitter`
+    instances (LINE / CONE / AREA_OF_EFFECT) per send. The emitters themselves add no
+    parallel cost: only one transmits at a time, so the cost model does not scale
+    with how many emitter pins are wired.
+
+    `cost_ms` is the average per-frame CPU reservation (typically near zero --
+    transmits are infrequent). `blocking_send_ms` is the **worst-case** blocking
+    duration of `PulseOut.send` for the longest payload this prop transmits --
+    `send_ir` blocks for the whole pulse train, so this is a *soft* real-time cost
+    that contributes to `worst_case_frame_ms` for any co-located `ReceiverComponent`
+    (a receiver whose buffer must absorb the gap while the transmitter blocks).
+
+    `memory_footprint_bytes` is the component's static steady-state heap usage
+    (profiler-measured via a `mem_free` delta; placeholder/synthetic until
+    calibrated).
+    """
+
+    name: str
+    cost_ms: float
+    blocking_send_ms: float
+    memory_footprint_bytes: int = 0
+    peripherals_required: dict[str, int] = field(default_factory=lambda: {"pwm": 1})
+
+
+@dataclass(frozen=True)
 class PropProfile:
     """Workload description for one prop: the components that must be placed on MCUs.
 
@@ -245,4 +388,5 @@ class PropProfile:
     name: str
     components: list[
         "EngineComponent | SimpleComponent | ReceiverComponent | PixelScopeComponent"
+        " | SoundComponent | VibrationComponent | IrTransmitComponent"
     ] = field(default_factory=list)

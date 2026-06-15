@@ -1,0 +1,144 @@
+"""CircuitPython sound profiler -- drives the real `AudioEffectOutput` / `VoicePool` /
+`VoiceSink` path to find the per-voice and mixer-fixed costs for the capacity
+estimator's `SoundComponent` model (see `docs/hardware/capacity-model.md` and #398).
+
+Sweeps one axis:
+
+- **concurrent voices** -- `CONCURRENT_VOICES`, the number of `handle_event` calls
+  made (each claiming a `VoicePool` slot) before the steady-state loop begins. Mirrors
+  the estimator's `max_concurrent_voices` workload parameter, clamped to
+  `NUM_VOICES` (`VoicePool`'s hard cap).
+
+For each concurrent-voice count, the profiler:
+
+1. Calls `AudioEffectOutput.handle_event` once per voice with a one-shot looping clip
+   (each call claims one `VoicePool` slot via `pool.claim`).
+2. Runs a steady-state loop calling `flush()` (which calls `VoicePool.sweep`) every
+   frame, reporting `PerformanceTracker` stats -- this is the per-frame
+   `cost_ms = mixer_fixed_ms + per_voice_ms * voices` the estimator models.
+
+`AudioEffectOutput` is registered on `Scope.ALL` -- there is exactly one shared sound
+component per prop (one I2S amp + one `audiomixer.Mixer`), so this profiler drives it
+directly rather than through `EffectManager`.
+
+Hardware
+--------
+- PropMaker FeatherWing (or equivalent) I2S amp wired to `board.I2S_BIT_CLOCK`,
+  `board.I2S_WORD_SELECT`, `board.I2S_DATA`.
+- A short looping WAV file at `CLIP_PATH` on the board's filesystem (mono, 11025 Hz,
+  16-bit, matching `AudioEffectOutput`'s mixer configuration).
+
+Installation
+------------
+1. Install CircuitPython on your board:
+   https://learn.adafruit.com/welcome-to-circuitpython/installing-circuitpython
+
+2. Run the deploy script to copy all source files and set code.py:
+     python scripts/deploy.py examples/hardware/profiling/sound_profiler.py
+   The board reboots and starts running automatically.
+
+Configuration
+-------------
+- NUM_VOICES: `VoicePool.num_voices` -- the hard cap on concurrent voices
+- CONCURRENT_VOICES: voice counts to sweep, in order (each clamped to NUM_VOICES)
+- CLIP_PATH: path to the looping WAV clip claimed by each voice
+- MAX_VOLUME: `AudioEffectOutput`'s `max_volume` calibration
+- TARGET_FPS: informational only -- included in the header for comparison against
+  other profilers
+- DISPLAY_SECONDS: how long to spend on each concurrent-voice count before advancing
+- LOG_INTERVAL_SECONDS: how often the stats line is printed
+"""
+
+from __future__ import annotations
+
+import time
+
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio
+from effects.performance import PerformanceTracker
+from engine.audio import AudioRegistry
+from engine.events import EffectEvent
+from engine.state import EffectReceipt
+from hardware.shared.profiling_helpers import print_profile_header, print_stats_line, stats_due
+
+try:
+    from typing import Final
+except ImportError:
+    pass
+
+NUM_VOICES: Final = 4
+CONCURRENT_VOICES: Final = [1, 2, 4]
+CLIP_PATH: Final = "sounds/loop.wav"
+MAX_VOLUME: Final = 0.5
+TARGET_FPS: Final = 24.0
+DISPLAY_SECONDS: Final = 10.0
+LOG_INTERVAL_SECONDS: Final = 5.0
+
+_CLIP_NAME: Final = "profiler_loop"
+_EVENT_VERB: Final = "play"
+
+
+def _build_output(audio_registry: AudioRegistry):
+    from hardware.circuitpython.audio_output import AudioEffectOutput
+
+    return AudioEffectOutput(audio_registry, max_volume=MAX_VOLUME, num_voices=NUM_VOICES)
+
+
+def run() -> None:
+    """Sweep concurrent voices, reporting per-frame mixer-fixed + per-voice cost."""
+    audio_registry = AudioRegistry()
+    audio_registry.register(_CLIP_NAME, CLIP_PATH)
+    output = _build_output(audio_registry)
+
+    looping_effect = Effect(
+        "profiler.loop",
+        audio=EffectAudio({_EVENT_VERB: AudioPlaybackConfig(_CLIP_NAME, loop=True)}),
+    )
+    play_event = EffectEvent("profiler", "loop", _EVENT_VERB)
+
+    for voices in CONCURRENT_VOICES:
+        claimed = min(voices, NUM_VOICES)
+        perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
+
+        print_profile_header(
+            component="sound",
+            sweep_axes=["concurrent_voices", "num_voices"],
+            sweep_values=[claimed, NUM_VOICES],
+            target_fps=TARGET_FPS,
+        )
+
+        # Claim `claimed` voice slots -- each handle_event call plays the looping
+        # clip on a new VoicePool slot via pool.claim.
+        receipts = []
+        for _ in range(claimed):
+            receipt = EffectReceipt(0)
+            output.handle_event(play_event, frozenset({"all"}), looping_effect, receipt)
+            receipts.append(receipt)
+
+        next_change_time = time.monotonic() + DISPLAY_SECONDS
+        while True:
+            current_time = time.monotonic()
+
+            perf.start_frame()
+            perf.start_update_time()
+            output.flush()
+            perf.add_update_time()
+
+            due = stats_due(perf, current_time)
+            perf.complete_frame(current_time)
+            if due:
+                print_stats_line(
+                    perf,
+                    current_time,
+                    concurrent_voices=claimed,
+                    num_voices=NUM_VOICES,
+                )
+
+            if current_time > next_change_time:
+                break
+
+        for receipt in receipts:
+            receipt.stop()
+        output.flush()
+
+
+run()

@@ -191,7 +191,8 @@ case. The engine component and other indivisible components never split.
 
 Each shared bus (I2C/SPI/I2S) declared in `BoardProfile.bus_budgets` has a
 `bandwidth_bytes_per_sec` budget. After CPU and memory packing succeed, the summed
-`i2c_bandwidth_bytes_per_sec` across all of a prop's pixel scopes is checked against
+`i2c_bandwidth_bytes_per_sec` across all of a prop's pixel scopes **and its
+`VibrationComponent`** (the DRV2605L's event-rate contribution) is checked against
 the board's `"i2c"` bus budget. If it exceeds the budget, the assignment is infeasible
 with `conflict_type="bus"`, even if CPU and memory both have room. Switching an
 over-budget scope's driver to NeoPixel PWM removes its I2C load entirely.
@@ -203,6 +204,102 @@ distinct remote (non-engine-host) MCUs hosting any of the named output component
 An effect command's router cost for a scope is
 `router_overhead_ms * fan_out_mcu_count(result, scope_output_names)` -- it fans out to
 every MCU hosting an output in the scope, not once per output.
+
+## Sound component cost model
+
+`SoundComponent` represents the single shared sound output: one I2S amp + one
+`audiomixer.Mixer`. ``AudioEffectOutput`` is registered on `Scope.ALL`, so exactly one
+`SoundComponent` serves every scope.
+
+```
+cost_ms = mixer_fixed_ms + per_voice_ms * effective_voices
+effective_voices = min(max_concurrent_voices, num_voices)
+```
+
+`max_concurrent_voices` is the worst-case number of voices a scene can stack via
+`add_effect`, **including audio-only effects** that hold a voice but render no pixels
+(an effect whose `pixels` and `vibration` are both `None`, per
+`AudioEffectOutput.handle_event`'s `audio_only` check -- such an effect still claims a
+`VoicePool` slot). `num_voices` is `VoicePool`'s hard cap: a scene that would stack
+more concurrent voices than `num_voices` simply evicts the oldest voice (see
+`VoicePool._select_slot`), so `effective_voices` never exceeds `num_voices` and
+`cost_ms` is bounded.
+
+## Vibration component cost model
+
+`VibrationComponent` represents the single shared haptic motor: a DRV2605L driven
+over I2C via `Drv2605EffectOutput`, registered on `Scope.ALL`.
+
+```
+cost_ms  -- a fixed per-event cost, declared directly (not a formula)
+i2c_bandwidth_bytes_per_sec = i2c_transaction_bytes * (max_calls_per_minute / 60)
+```
+
+`max_calls_per_minute` bounds how often `handle_event` writes a new sequence and
+calls `motor.play()` -- a low rate, so the DRV2605L's average I2C bus share is
+negligible but still summed into the board's `"i2c"` bus budget alongside any pixel
+scope's matrix-flush usage (see "Bus-bandwidth constraint" below).
+
+### LIS3DH accelerometer (I2C bus contribution)
+
+A LIS3DH accelerometer read once per frame (e.g. for `AccelerationData` in
+`engine/input.py`) is modeled as a `SimpleComponent` with `i2c_transaction_bytes` and
+`i2c_frequency_hz` set (`i2c_frequency_hz` == the board's `target_fps`, since it is
+read once per tick):
+
+```
+i2c_bandwidth_bytes_per_sec = i2c_transaction_bytes * i2c_frequency_hz
+```
+
+`SimpleComponent`'s I2C fields default to 0 for components off the I2C bus. Any
+`SimpleComponent` with nonzero `i2c_bandwidth_bytes_per_sec` is summed into the
+board's `"i2c"` bus budget alongside pixel-scope and vibration I2C usage.
+
+## IR-transmit component cost model
+
+`IrTransmitComponent` represents the single shared IR-transmit path:
+`HardwareNetworkControls.send_ir` selects 1 of up to 3 wired
+`InfraredTransmitter` instances (LINE / CONE / AREA_OF_EFFECT) per send. The emitters
+add no parallel cost -- only one transmits at a time, so the cost model does not scale
+with how many emitter pins are wired.
+
+```
+cost_ms            -- average per-frame CPU reservation (typically near zero)
+blocking_send_ms   -- worst-case PulseOut.send blocking duration for the longest
+                      payload this prop transmits
+```
+
+`blocking_send_ms` is a *soft* real-time cost: `send_ir` blocks for the whole pulse
+train, so it contributes to the worst-case frame time of any co-located
+`ReceiverComponent` -- the receiver's buffer must absorb the gap while the
+transmitter blocks. The deadline check adds `blocking_send_ms` to
+`worst_case_frame_ms` before comparing against `max_frame_ms`:
+
+```
+receiver_worst_case_frame_ms = worst_case_frame_ms + blocking_send_ms (if an
+                                IrTransmitComponent is present in the prop)
+```
+
+A prop with no `ReceiverComponent` has nothing for the blocking send to threaten, so
+`IrTransmitComponent` alone never triggers a deadline conflict.
+
+## Peripheral-count constraint
+
+Each board declares a finite count of shared peripheral types (I2S/SPI/I2C/PWM) via
+`BoardProfile.peripheral_budgets: dict[str, PeripheralBudget]`. Each component
+declares how many units of a peripheral it requires via
+`peripherals_required: dict[str, int]` (e.g. `SoundComponent` defaults to
+`{"i2s": 1}`, `VibrationComponent` to `{"i2c": 1}`, `IrTransmitComponent` to
+`{"pwm": 1}`).
+
+The summed `peripherals_required` across all of a prop's components is checked
+against `board.peripheral_budgets`, **before CPU/memory packing** -- alongside the
+hard-real-time deadline check. If any peripheral's total requirement exceeds its
+budget, the assignment is infeasible with `conflict_type="peripheral"`, naming the
+peripheral, the required count, and the available count (e.g. two components both
+requiring the single I2S is reported as a peripheral conflict even if CPU and memory
+both have ample room). A peripheral with no entry in `peripheral_budgets` is treated
+as unconstrained.
 
 ## Assignment output
 
