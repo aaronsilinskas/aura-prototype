@@ -5,7 +5,13 @@ See `docs/hardware/capacity-model.md` for the formulas this module implements.
 
 from dataclasses import dataclass
 
-from scripts.capacity.profiles import BoardProfile, EngineComponent, PropProfile
+from scripts.capacity.profiles import (
+    BoardProfile,
+    EngineComponent,
+    PropProfile,
+    ReceiverComponent,
+    SimpleComponent,
+)
 
 
 @dataclass(frozen=True)
@@ -57,9 +63,11 @@ def _usable_heap(board: BoardProfile, role: str) -> float:
     return board.total_free_heap_bytes - baseline.heap_bytes - board.gc_margin_bytes
 
 
-def _memory_footprint_bytes(component) -> int:
+def _memory_footprint_bytes(
+    component: "EngineComponent | SimpleComponent | ReceiverComponent",
+) -> int:
     """Return a component's static steady-state heap footprint in bytes."""
-    return getattr(component, "memory_footprint_bytes", 0)
+    return component.memory_footprint_bytes
 
 
 def assign(
