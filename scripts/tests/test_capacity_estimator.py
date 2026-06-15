@@ -13,6 +13,7 @@ from scripts.capacity.profiles import (
     EngineComponent,
     McuBaseline,
     PropProfile,
+    ReceiverComponent,
     SimpleComponent,
 )
 
@@ -47,6 +48,133 @@ def make_engine(*, remote_mcus: int = 0) -> EngineComponent:
         events_per_tick=2,
         remote_mcus=remote_mcus,
     )
+
+
+def test_workload_within_memory_budget_is_feasible_with_memory_headroom():
+    """A workload whose summed footprint fits within the GC-margined heap budget passes."""
+    engine = make_engine()
+    engine_with_footprint = EngineComponent(
+        name="engine",
+        tick_fixed_ms=engine.tick_fixed_ms,
+        per_rule_ms=engine.per_rule_ms,
+        per_event_ms=engine.per_event_ms,
+        router_overhead_ms=engine.router_overhead_ms,
+        rules=engine.rules,
+        events_per_tick=engine.events_per_tick,
+        remote_mcus=engine.remote_mcus,
+        memory_footprint_bytes=20_000,
+    )
+    prop = PropProfile(name="synthetic-prop", components=[engine_with_footprint])
+
+    result = assign(prop, SYNTHETIC_BOARD)
+
+    assert result.feasible
+    assert result.conflict_type is None
+
+    # usable_heap = total_free_heap(200_000) - engine_host_baseline.heap_bytes(20_000)
+    #             - gc_margin_bytes(default 0 on SYNTHETIC_BOARD) = 180_000
+    # summed footprint = 20_000 <= 180_000
+    mcu = result.mcus[0]
+    assert mcu.remaining_heap_bytes == pytest.approx(160_000)
+
+
+def test_workload_within_cpu_budget_but_exceeding_memory_budget_is_a_memory_conflict():
+    """A workload that fits the CPU budget but overflows the GC-margined heap is rejected."""
+    engine = make_engine()
+    engine_with_footprint = EngineComponent(
+        name="engine",
+        tick_fixed_ms=engine.tick_fixed_ms,
+        per_rule_ms=engine.per_rule_ms,
+        per_event_ms=engine.per_event_ms,
+        router_overhead_ms=engine.router_overhead_ms,
+        rules=engine.rules,
+        events_per_tick=engine.events_per_tick,
+        remote_mcus=engine.remote_mcus,
+        # engine-host usable heap = 200_000 - 20_000 (baseline) - 0 (gc margin) = 180_000
+        # a 200_000-byte footprint comfortably exceeds that, while CPU reservation
+        # (~10.08%) is well within the engine-host's usable CPU budget (70%).
+        memory_footprint_bytes=200_000,
+    )
+    prop = PropProfile(name="synthetic-prop", components=[engine_with_footprint])
+
+    result = assign(prop, SYNTHETIC_BOARD)
+
+    assert not result.feasible
+    assert result.mcus == []
+    assert result.conflict_type == "memory"
+    assert "memory footprint" in result.reason
+
+
+def test_raising_receiver_buffer_depth_can_flip_a_feasible_assignment_to_memory_conflict():
+    """Raising a receiver's buffer depth for deadline relief increases its footprint and
+    can push an assignment over the GC-margined heap budget."""
+    engine = make_engine()
+    # engine-host usable heap = 200_000 - 20_000 (baseline) - 0 (gc margin) = 180_000
+    # shallow receiver: 170_000 + 1_000 * 4 = 174_000 <= 180_000 -> feasible
+    shallow_receiver = ReceiverComponent(
+        name="ir-receiver",
+        cost_ms=1.0,
+        base_footprint_bytes=170_000,
+        bytes_per_buffer_slot=1_000,
+        buffer_depth=4,
+    )
+    # deep receiver: 170_000 + 1_000 * 12 = 182_000 > 180_000 -> memory conflict
+    deep_receiver = ReceiverComponent(
+        name="ir-receiver",
+        cost_ms=1.0,
+        base_footprint_bytes=170_000,
+        bytes_per_buffer_slot=1_000,
+        buffer_depth=12,
+    )
+
+    shallow_prop = PropProfile(name="synthetic-prop", components=[engine, shallow_receiver])
+    deep_prop = PropProfile(name="synthetic-prop", components=[engine, deep_receiver])
+
+    shallow_result = assign(shallow_prop, SYNTHETIC_BOARD)
+    deep_result = assign(deep_prop, SYNTHETIC_BOARD)
+
+    assert shallow_result.feasible
+    assert not deep_result.feasible
+    assert deep_result.conflict_type == "memory"
+
+
+def test_gc_margin_is_configurable_per_board_and_can_cause_a_memory_conflict():
+    """A board with a larger GC margin rejects a footprint that a smaller-margin board accepts."""
+    engine = make_engine()
+    # engine-host usable heap (no gc margin) = 200_000 - 20_000 = 180_000
+    # footprint 175_000 fits with no margin, but a 10_000-byte gc margin shrinks
+    # usable heap to 170_000, which the same footprint overflows.
+    engine_with_footprint = EngineComponent(
+        name="engine",
+        tick_fixed_ms=engine.tick_fixed_ms,
+        per_rule_ms=engine.per_rule_ms,
+        per_event_ms=engine.per_event_ms,
+        router_overhead_ms=engine.router_overhead_ms,
+        rules=engine.rules,
+        events_per_tick=engine.events_per_tick,
+        remote_mcus=engine.remote_mcus,
+        memory_footprint_bytes=175_000,
+    )
+    prop = PropProfile(name="synthetic-prop", components=[engine_with_footprint])
+
+    no_margin_result = assign(prop, SYNTHETIC_BOARD)
+    assert no_margin_result.feasible
+
+    board_with_margin = BoardProfile(
+        name=SYNTHETIC_BOARD.name,
+        runtime=SYNTHETIC_BOARD.runtime,
+        target_fps=SYNTHETIC_BOARD.target_fps,
+        peripherals=SYNTHETIC_BOARD.peripherals,
+        total_free_heap_bytes=SYNTHETIC_BOARD.total_free_heap_bytes,
+        engine_host_baseline=SYNTHETIC_BOARD.engine_host_baseline,
+        satellite_baseline=SYNTHETIC_BOARD.satellite_baseline,
+        headroom_reserve_percent=SYNTHETIC_BOARD.headroom_reserve_percent,
+        gc_margin_bytes=10_000,
+    )
+
+    margin_result = assign(prop, board_with_margin)
+    assert not margin_result.feasible
+    assert margin_result.conflict_type == "memory"
 
 
 def test_single_engine_component_fits_on_one_mcu_with_expected_headroom():
