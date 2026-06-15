@@ -78,10 +78,17 @@ def _peripheral_conflict(prop: PropProfile, board: BoardProfile) -> tuple[str, i
 
 @dataclass(frozen=True)
 class ComponentAssignment:
-    """One component placed on an MCU, with its CPU reservation."""
+    """One component placed on an MCU, with its CPU reservation.
+
+    `uncalibrated` is `True` when the component's constants are documented seed
+    values (e.g. from a datasheet) rather than profiler measurements -- surfaced here
+    so assignment output and reports can distinguish measured from seed constants
+    (see the radio-tx/radio-rx components, #399).
+    """
 
     name: str
     reserved_percent: float
+    uncalibrated: bool = False
 
 
 @dataclass(frozen=True)
@@ -205,9 +212,14 @@ def assign(
 
     frame_budget_ms = board.frame_budget_ms
     reservations = [
-        (component.name, _reserved_percent(component.cost_ms, frame_budget_ms))
+        (
+            component.name,
+            _reserved_percent(component.cost_ms, frame_budget_ms),
+            getattr(component, "uncalibrated", False),
+        )
         for component in prop.components
     ]
+    uncalibrated_by_name = {name: uncalibrated for name, _, uncalibrated in reservations}
     footprints = {
         component.name: _memory_footprint_bytes(component) for component in prop.components
     }
@@ -228,7 +240,7 @@ def assign(
 
     bins: list[dict] = []
     if engine_name is not None:
-        engine_percent = next(p for n, p in reservations if n == engine_name)
+        engine_percent = next(p for n, p, _ in reservations if n == engine_name)
         if engine_percent > engine_usable:
             return AssignmentResult(
                 feasible=False,
@@ -252,7 +264,7 @@ def assign(
             }
         )
 
-    for name, percent in remaining:
+    for name, percent, _uncalibrated in remaining:
         placed = False
         for bin_ in bins:
             if bin_["used"] + percent <= bin_["usable"]:
@@ -351,7 +363,11 @@ def assign(
         McuAssignment(
             role=bin_["role"],
             components=[
-                ComponentAssignment(name=name, reserved_percent=percent)
+                ComponentAssignment(
+                    name=name,
+                    reserved_percent=percent,
+                    uncalibrated=uncalibrated_by_name.get(name, False),
+                )
                 for name, percent in bin_["items"]
             ],
             remaining_headroom_percent=bin_["usable"] - bin_["used"],

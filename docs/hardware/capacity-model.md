@@ -283,6 +283,46 @@ receiver_worst_case_frame_ms = worst_case_frame_ms + blocking_send_ms (if an
 A prop with no `ReceiverComponent` has nothing for the blocking send to threaten, so
 `IrTransmitComponent` alone never triggers a deadline conflict.
 
+## Radio tx/rx components (uncalibrated, #399)
+
+The radio transmitter and radio receiver are carried in the estimator as
+**uncalibrated model entries** so the deployment math covers all 8 components, even
+though the radio transport seam and its profilers are deferred to a follow-on PRD --
+`send_radio` is currently a stub, there is no RFM69 driver, and no receive seam exists.
+
+- **radio-tx** is modeled as a `SimpleComponent` (a near-zero average `cost_ms`,
+  analogous to `IrTransmitComponent`'s average cost).
+- **radio-rx** is modeled as a `ReceiverComponent`, reusing the hard-real-time
+  deadline model from IR-rx (#397): `max_frame_ms = buffer_depth / incoming_rate_hz *
+  1000`, with the radio's FIFO depth as `buffer_depth`.
+
+Both entries set `uncalibrated=True`. Assignment output (`ComponentAssignment.uncalibrated`)
+surfaces this flag per component, so reports can distinguish components placed using
+real profiler measurements from components placed using documented seed constants.
+
+### RFM69HCW seed figures (datasheet, calibration deferred)
+
+The following constants are seeded from the RFM69HCW datasheet, not profiler
+measurements. They will be replaced once a real radio seam and profiler exist
+(follow-on PRD):
+
+| Constant | Seed value | Source |
+|----------|-----------|--------|
+| FIFO depth (`buffer_depth`) | 66 bytes | RFM69HCW datasheet FIFO size |
+| Incoming rate (`incoming_rate_hz`) | ~31,250 bytes/sec | 250 kbps GFSK air rate / 8 |
+| Derived `max_frame_ms` (raw FIFO) | ~2.1 ms | `66 / 31250 * 1000` |
+
+The raw-FIFO `max_frame_ms` (~2.1ms) is a *tight* deadline -- reading the FIFO only
+once it is completely full leaves almost no slack. `FifoNotEmpty` / `FifoThreshold`
+interrupt-driven streaming reads (draining the FIFO as bytes arrive, rather than
+waiting for it to fill) relax this ceiling by effectively raising the buffer depth
+the estimator can absorb before overflow -- this is the same buffer-depth-relief
+trade-off described above for IR-rx, and is left as a deployment knob.
+
+Calibration of these constants against real RFM69HCW hardware (`worst_case_frame_ms`
+via `PerformanceTracker`, actual `cost_ms`, and `memory_footprint_bytes`) and a
+real receive seam are deferred to a follow-on PRD.
+
 ## Peripheral-count constraint
 
 Each board declares a finite count of shared peripheral types (I2S/SPI/I2C/PWM) via
@@ -306,8 +346,8 @@ as unconstrained.
 `assign(prop, board, headroom_reserve_percent=None)` returns an `AssignmentResult`:
 
 - **Feasible**: a list of MCUs, each with its role (`engine-host` / `satellite`), the
-  components placed on it with their `reserved%`, the MCU's `remaining_headroom%`,
-  and a `co_location_validated` flag.
+  components placed on it with their `reserved%` and `uncalibrated` flag, the MCU's
+  `remaining_headroom%`, and a `co_location_validated` flag.
 - **Infeasible**: `feasible=False`, an empty MCU list, and a `reason` string naming
   the violated constraint (e.g. which component exceeded which budget).
 

@@ -144,6 +144,11 @@ class SimpleComponent:
     `i2c_transaction_bytes` / `i2c_frequency_hz` model an I2C-polled input, such as a
     LIS3DH accelerometer read once per frame (`i2c_frequency_hz` == the board's
     `target_fps`). Both default to 0 for components that are off the I2C bus.
+
+    `uncalibrated` flags a component whose constants are documented seed values (e.g.
+    from a datasheet) rather than profiler measurements -- `False` by default. Reports
+    and assignment output surface this flag so measured and seed constants are not
+    confused (see the radio-tx component, #399).
     """
 
     name: str
@@ -152,6 +157,7 @@ class SimpleComponent:
     peripherals_required: dict[str, int] = field(default_factory=dict)
     i2c_transaction_bytes: int = 0
     i2c_frequency_hz: float = 0
+    uncalibrated: bool = False
 
     @property
     def i2c_bandwidth_bytes_per_sec(self) -> float:
@@ -179,12 +185,21 @@ class ReceiverComponent:
 
         max_frame_ms = buffer_depth / incoming_rate_hz * 1000
 
+    Both `buffer_depth` and `incoming_rate_hz` must use the same unit of "item" --
+    e.g. pulses and pulses/sec for IR-rx, or bytes and bytes/sec for a radio FIFO
+    (the RFM69's 66-byte FIFO and its ~31,250 B/s incoming rate, see #399).
+
     `worst_case_frame_ms` is the worst-case single frame time measured on the
     receiver's MCU (profiler-measured via `PerformanceTracker.frame_time_peak`,
     converted to milliseconds). If `worst_case_frame_ms > max_frame_ms`, the
     co-location is rejected with `conflict_type="deadline"` -- even if CPU
     reservation would otherwise fit. Raising `buffer_depth` raises `max_frame_ms`
     (relieving the deadline) at the cost of a larger `memory_footprint_bytes`.
+
+    `uncalibrated` flags a component whose constants are documented seed values (e.g.
+    from a datasheet) rather than profiler measurements -- `False` by default. Reports
+    and assignment output surface this flag so measured and seed constants are not
+    confused (see the radio-rx component, #399).
     """
 
     name: str
@@ -195,6 +210,7 @@ class ReceiverComponent:
     incoming_rate_hz: float = 0.0
     worst_case_frame_ms: float = 0.0
     peripherals_required: dict[str, int] = field(default_factory=dict)
+    uncalibrated: bool = False
 
     @property
     def memory_footprint_bytes(self) -> int:
