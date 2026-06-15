@@ -94,6 +94,55 @@ This makes the RAM-for-deadline trade-off visible to the estimator: raising
 `buffer_depth` to relieve a deadline can flip an otherwise-feasible assignment into a
 memory conflict.
 
+## Hard-real-time deadline constraint
+
+`ReceiverComponent` introduces a correctness guard that average CPU reservation
+percentages cannot provide: a hard-real-time **deadline**. Unlike `cost_ms` (a
+per-frame *average* CPU cost), the deadline is checked against the **worst-case**
+single frame.
+
+```
+max_frame_ms = buffer_depth / incoming_rate_hz * 1000
+```
+
+`max_frame_ms` is *derived*, not declared: it is the longest a frame can take before
+the receiver's buffer (e.g. `PulseIn.maxlen`) overflows and pulses are dropped. It is
+the same `buffer_depth` used by the memory footprint above -- raising `buffer_depth`
+both relaxes the deadline (raises `max_frame_ms`) and increases
+`memory_footprint_bytes`, making the RAM-for-deadline trade-off a single knob.
+
+`worst_case_frame_ms` is the worst-case single frame time measured on the receiver's
+MCU (profiler-measured via `PerformanceTracker.frame_time_peak`, in milliseconds --
+see the IR-rx profiler below).
+
+**The deadline dominates the budget**: if `worst_case_frame_ms > max_frame_ms`, the
+assignment is infeasible with `conflict_type="deadline"`, checked *before* CPU/memory
+packing -- even a co-located workload that would otherwise fit comfortably within the
+CPU reservation budget is rejected once it pushes the worst-case frame past the
+receiver's deadline. A receiver with `incoming_rate_hz <= 0` (not yet profiled for
+incoming rate) has `max_frame_ms = None` and no deadline is checked.
+
+### IR-rx component
+
+The IR-receive component (`InfraredMultiReceiver` polling 4 `PulseInReader`s) is
+modeled as a single `ReceiverComponent`. The 4 receivers are **fixed, not a
+deployment axis** -- `cost_ms` is the `fixed_drain` per-tick polling cost across all
+4 readers, plus the deadline described above.
+
+### IR-rx profiler
+
+`examples/hardware/profiling/ir_rx_profiler.py` drives `InfraredMultiReceiver.receive()`
+polling the fixed 4 `PulseInReader`s, using the **tunable-injected-load technique**:
+an artificial per-frame busy-loop (`INJECTED_LOAD_MS`) is swept upward
+(`INJECTED_LOAD_SWEEP_MS`) to simulate co-located CPU load. A known incoming packet
+rate is induced via loopback from an IR transmitter or a second board; the profiler
+counts sequence-number gaps to compute a packet-loss rate. The injected load at which
+packet loss first becomes non-zero empirically locates `max_frame_ms` for the
+profiled `BUFFER_DEPTH` (`PulseIn.maxlen`) and `INCOMING_RATE_HZ`. The profiler
+reports packet-loss rate vs. injected frame time alongside the uniform
+`PerformanceTracker` stats line (including `frame_time_peak`, the `worst_case_frame_ms`
+term).
+
 ## Engine component cost model
 
 ```
