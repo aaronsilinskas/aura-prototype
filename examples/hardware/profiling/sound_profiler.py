@@ -67,7 +67,7 @@ except ImportError:
 
 NUM_VOICES: Final = 4
 CONCURRENT_VOICES: Final = [1, 2, 4]
-CLIP_PATH: Final = "sounds/loop.wav"
+CLIP_PATH: Final = "sounds/sound_profiler.wav"
 MAX_VOLUME: Final = 0.5
 TARGET_FPS: Final = 24.0
 DISPLAY_SECONDS: Final = 10.0

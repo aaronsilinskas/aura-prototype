@@ -60,7 +60,7 @@ except ImportError:
     pass
 
 LINE_PIN_NAME: Final = "D9"
-RX_PIN_NAME: Final = "D2"
+RX_PIN_NAME: Final = "A0"
 PAYLOAD_LENGTHS: Final = [1, 4, 16, 64]
 ITERATIONS_PER_LENGTH: Final = 10
 TARGET_FPS: Final = 24.0

@@ -55,11 +55,7 @@ import time
 from effects.performance import PerformanceTracker
 from hardware.shared.ir_protocol import AuraInfraredDecoder
 from hardware.shared.ir_transport import InfraredMultiReceiver
-from hardware.shared.profiling_helpers import (
-    print_profile_header,
-    print_stats_line,
-    stats_due,
-)
+from hardware.shared.profiling_helpers import print_profile_header, print_stats_line, stats_due
 
 try:
     from typing import Final
@@ -67,7 +63,7 @@ except ImportError:
     pass
 
 # Fixed at 4 receivers -- not a deployment axis (#397).
-RX_PIN_NAMES: Final = ("D2", "D3", "D4", "D5")
+RX_PIN_NAMES: Final = ("A0", "A1", "A2", "A3")
 BUFFER_DEPTH: Final = 64
 INCOMING_RATE_HZ: Final = 50.0
 INJECTED_LOAD_SWEEP_MS: Final = [0.0, 5.0, 10.0, 20.0, 40.0, 80.0]
