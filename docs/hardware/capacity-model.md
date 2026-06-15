@@ -107,6 +107,54 @@ cost_ms = tick_fixed_ms
 engine's MCU. It scales with the number of remote MCUs the engine sends
 commands/events to -- it is **not** based on pixel bandwidth or strip length.
 
+## Pixel scope cost model
+
+A `PixelScopeComponent` represents one pixel scope's per-frame render+flush cost:
+
+```
+cost_ms = stack_depth * worst_case_effect_per_pixel_ms * pixel_count + flush_ms
+```
+
+`stack_depth` is the maximum number of concurrent `add_effect` layers expected on the
+scope (a scene-declared workload parameter); it defaults to 1. Resolution is not a
+top-level axis here -- it only affects flame/drift-noise update internally and is
+absorbed into the profiled `worst_case_effect_per_pixel_ms`.
+
+### Per-scope splitting
+
+Unlike `EngineComponent`, `SimpleComponent`, and `ReceiverComponent` (always packed as
+a single indivisible unit), each `PixelScopeComponent` in a prop's `components` list
+may be placed independently -- the packer can spread a prop's pixel scopes across
+multiple satellite MCUs, including placing each scope on its own MCU in the extreme
+case. The engine component and other indivisible components never split.
+
+### Driver dimension
+
+`driver` is one of `"neopixel_pwm"` or `"is31fl3741_matrix"`. The driver changes:
+
+- `worst_case_effect_per_pixel_ms` and `flush_ms` (both per-`(board, runtime, driver)`
+  constants)
+- I2C bus usage: `i2c_bandwidth_bytes_per_sec = i2c_transaction_bytes * i2c_frequency_hz`.
+  NeoPixel PWM is off the I2C bus and reports 0; the IS31FL3741 matrix flush is the
+  dominant I2C consumer.
+
+### Bus-bandwidth constraint
+
+Each shared bus (I2C/SPI/I2S) declared in `BoardProfile.bus_budgets` has a
+`bandwidth_bytes_per_sec` budget. After CPU and memory packing succeed, the summed
+`i2c_bandwidth_bytes_per_sec` across all of a prop's pixel scopes is checked against
+the board's `"i2c"` bus budget. If it exceeds the budget, the assignment is infeasible
+with `conflict_type="bus"`, even if CPU and memory both have room. Switching an
+over-budget scope's driver to NeoPixel PWM removes its I2C load entirely.
+
+### Router fan-out
+
+`estimator.fan_out_mcu_count(result, output_component_names)` returns the number of
+distinct remote (non-engine-host) MCUs hosting any of the named output components.
+An effect command's router cost for a scope is
+`router_overhead_ms * fan_out_mcu_count(result, scope_output_names)` -- it fans out to
+every MCU hosting an output in the scope, not once per output.
+
 ## Assignment output
 
 `assign(prop, board, headroom_reserve_percent=None)` returns an `AssignmentResult`:
