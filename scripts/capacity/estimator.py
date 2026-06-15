@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from scripts.capacity.profiles import (
     BoardProfile,
     EngineComponent,
+    PixelScopeComponent,
     PropProfile,
     ReceiverComponent,
     SimpleComponent,
@@ -217,6 +218,29 @@ def assign(
                 conflict_type="memory",
             )
 
+    # Bus-bandwidth constraint: each shared bus (I2C/SPI/I2S) has a board-wide
+    # bandwidth budget. Pixel scopes using an I2C-bus driver (e.g. the IS31FL3741
+    # matrix) contribute `transaction_size * frequency` to that bus's total usage,
+    # regardless of which MCU they are placed on. NeoPixel PWM scopes contribute 0.
+    bus_usage: dict[str, float] = {}
+    for component in prop.components:
+        if isinstance(component, PixelScopeComponent) and component.i2c_bandwidth_bytes_per_sec:
+            bus_usage["i2c"] = bus_usage.get("i2c", 0.0) + component.i2c_bandwidth_bytes_per_sec
+
+    for bus_name, used in bus_usage.items():
+        budget = board.bus_budgets.get(bus_name)
+        if budget is not None and used > budget.bandwidth_bytes_per_sec:
+            return AssignmentResult(
+                feasible=False,
+                mcus=[],
+                co_location_validated=False,
+                reason=(
+                    f"{bus_name} bus usage {used:.0f} bytes/sec exceeds its budget "
+                    f"{budget.bandwidth_bytes_per_sec:.0f} bytes/sec"
+                ),
+                conflict_type="bus",
+            )
+
     mcus = [
         McuAssignment(
             role=bin_["role"],
@@ -234,4 +258,22 @@ def assign(
         feasible=True,
         mcus=mcus,
         co_location_validated=True,
+    )
+
+
+def fan_out_mcu_count(result: AssignmentResult, output_component_names: set[str]) -> int:
+    """Return the number of MCUs hosting any of `output_component_names`.
+
+    An effect command's router cost scales with how many distinct MCUs the
+    engine-host must send that command to -- one per MCU hosting an output in the
+    scope, regardless of how many outputs that MCU hosts. Use this count as the
+    `remote_mcus` term in `EngineComponent.router_overhead_ms * remote_mcus` for a
+    scope's effect commands (excluding the engine-host itself, which never needs a
+    network hop).
+    """
+    return sum(
+        1
+        for mcu in result.mcus
+        if mcu.role != "engine-host"
+        and any(c.name in output_component_names for c in mcu.components)
     )

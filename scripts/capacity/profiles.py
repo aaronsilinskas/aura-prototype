@@ -32,6 +32,18 @@ class McuBaseline:
 
 
 @dataclass(frozen=True)
+class BusBudget:
+    """Bandwidth budget for one shared bus (I2C/SPI/I2S) on a board.
+
+    `bandwidth_bytes_per_sec` is the total bytes/sec the bus can sustain across all
+    components that share it. Components declare their own usage as
+    `transaction_size * frequency` (see `PixelScopeComponent.i2c_bandwidth_bytes_per_sec`).
+    """
+
+    bandwidth_bytes_per_sec: float
+
+
+@dataclass(frozen=True)
 class BoardProfile:
     """Capacity profile for one board model running a given runtime.
 
@@ -56,6 +68,7 @@ class BoardProfile:
     satellite_baseline: McuBaseline
     headroom_reserve_percent: float = 20.0
     gc_margin_bytes: int = 0
+    bus_budgets: dict[str, BusBudget] = field(default_factory=dict)
 
     @property
     def frame_budget_ms(self) -> float:
@@ -144,6 +157,57 @@ class ReceiverComponent:
 
 
 @dataclass(frozen=True)
+class PixelScopeComponent:
+    """One pixel scope's workload: a per-scope splittable LED render+flush cost.
+
+    Unlike `SimpleComponent` / `ReceiverComponent` / `EngineComponent` (which are
+    indivisible and always packed as a single unit), each `PixelScopeComponent` in a
+    prop's `components` list may be placed on its own MCU -- the packer can spread a
+    prop's pixel scopes across multiple satellites independently.
+
+    Cost model (in ms, evaluated once per frame):
+
+        cost_ms = stack_depth * worst_case_effect_per_pixel_ms * pixel_count + flush_ms
+
+    `stack_depth` is the maximum number of concurrent `add_effect` layers expected on
+    this scope (a scene-declared workload parameter); it defaults to 1.
+
+    `driver` is one of `"neopixel_pwm"` or `"is31fl3741_matrix"` -- the driver
+    dimension changes `worst_case_effect_per_pixel_ms`, `flush_ms`, and I2C bus usage.
+    NeoPixel PWM is off the I2C bus, so `i2c_transaction_bytes` and
+    `i2c_frequency_hz` should be left at 0 for that driver.
+
+    `memory_footprint_bytes` is the component's static steady-state heap usage
+    (profiler-measured via `mem_free` delta; placeholder/synthetic until calibrated).
+    """
+
+    name: str
+    driver: str
+    pixel_count: int
+    worst_case_effect_per_pixel_ms: float
+    flush_ms: float
+    stack_depth: int = 1
+    i2c_transaction_bytes: int = 0
+    i2c_frequency_hz: float = 0
+    memory_footprint_bytes: int = 0
+
+    @property
+    def cost_ms(self) -> float:
+        """Estimated per-frame CPU cost in milliseconds."""
+        return self.stack_depth * self.worst_case_effect_per_pixel_ms * self.pixel_count + (
+            self.flush_ms
+        )
+
+    @property
+    def i2c_bandwidth_bytes_per_sec(self) -> float:
+        """I2C bus bandwidth this scope's flush consumes, in bytes/sec.
+
+        Zero for drivers that are off the I2C bus (e.g. NeoPixel PWM).
+        """
+        return self.i2c_transaction_bytes * self.i2c_frequency_hz
+
+
+@dataclass(frozen=True)
 class PropProfile:
     """Workload description for one prop: the components that must be placed on MCUs.
 
@@ -153,6 +217,6 @@ class PropProfile:
     """
 
     name: str
-    components: list["EngineComponent | SimpleComponent | ReceiverComponent"] = field(
-        default_factory=list
-    )
+    components: list[
+        "EngineComponent | SimpleComponent | ReceiverComponent | PixelScopeComponent"
+    ] = field(default_factory=list)
