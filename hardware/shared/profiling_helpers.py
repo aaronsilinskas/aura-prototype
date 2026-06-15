@@ -51,7 +51,9 @@ def print_table_row(table: str, cells: list, driver: str = "-") -> None:
         driver: The driver dimension for this row; ``"-"`` for components that
             are not driver-specific.
     """
-    row = format_table_row([board_id(), runtime_id(), driver, *cells])
+    # Concatenation, not [a, b, *cells]: CircuitPython's parser rejects star
+    # unpacking inside a list literal.
+    row = format_table_row([board_id(), runtime_id(), driver] + list(cells))  # noqa: RUF005
     print(f"__TABLE_ROW table={table}")
     print(row)
 
@@ -76,7 +78,12 @@ def format_runtime_id(name: str, version: tuple) -> str:
     ``sys.implementation.version`` so emitted rows drop straight into the
     table.
     """
-    return "_".join([name, *(str(part) for part in version[:3])])
+    # Build the parts list without star unpacking -- CircuitPython's parser
+    # rejects [name, *(...)] inside a list literal.
+    parts = [name]
+    for part in version[:3]:
+        parts.append(str(part))
+    return "_".join(parts)
 
 
 def runtime_id() -> str:
