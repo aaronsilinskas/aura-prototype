@@ -63,7 +63,13 @@ from engine.packs import PackRegistry
 from engine.state import Scope
 from engine.timer import Timer
 from hardware.shared.matrix_output import MatrixEffectOutput
-from hardware.shared.profiling_helpers import print_profile_header, print_stats_line, stats_due
+from hardware.shared.profiling_helpers import (
+    linear_fit,
+    print_profile_header,
+    print_stats_line,
+    print_table_row,
+    stats_due,
+)
 
 try:
     from typing import Final
@@ -173,6 +179,61 @@ def _build_output(driver: str, pixel_count: int) -> NeoPixelPwmOutput | Is31fl37
     raise ValueError(f"Unknown DRIVER: {driver!r}")
 
 
+def _measure_point(
+    effect_manager: EffectManager,
+    timer: Timer,
+    element: str,
+    stack_depth: int,
+    pixel_count: int,
+    i2c_bandwidth: float,
+) -> float:
+    """Run one steady-state point and return its average per-frame cost (ms).
+
+    `effect_manager.update` renders every active layer and flushes the output,
+    so the returned average is the full per-frame render+flush cost the pixel
+    scope cost model charges. Reports the uniform stats line each interval.
+    """
+    receipts = []
+    for _ in range(stack_depth):
+        receipt = effect_manager.add_effect(
+            Scope.PERSONAL,
+            "elements." + element,
+            {"level": SAMPLE_LEVEL},
+        )
+        receipts.append(receipt)
+
+    perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
+    next_change_time = time.monotonic() + DISPLAY_SECONDS
+    while True:
+        current_time = time.monotonic()
+
+        perf.start_frame()
+        perf.start_update_time()
+        timer.update()
+        effect_manager.update(timer)
+        perf.add_update_time()
+
+        due = stats_due(perf, current_time)
+        perf.complete_frame(current_time)
+        if due:
+            print_stats_line(
+                perf,
+                current_time,
+                pixel_count=pixel_count,
+                element=element,
+                stack_depth=stack_depth,
+                i2c_bandwidth_bytes_per_sec=i2c_bandwidth,
+            )
+
+        if current_time > next_change_time:
+            break
+
+    for receipt in receipts:
+        receipt.stop()
+    gc.collect()
+    return perf.update_time_total / perf.frame_count * 1000.0
+
+
 def run() -> None:
     """Sweep pixel count, effect identity, and stack depth for `DRIVER`."""
     registry = PackRegistry(item_attr="BUILD")
@@ -181,59 +242,47 @@ def run() -> None:
 
     i2c_bandwidth = I2C_TRANSACTION_BYTES * I2C_FREQUENCY_HZ if DRIVER == "is31fl3741_matrix" else 0
 
+    print_profile_header(
+        component=f"pixel.{DRIVER}",
+        sweep_axes=["pixel_count", "element", "stack_depth"],
+        sweep_values=[PIXEL_COUNTS[0], element_names[0], STACK_DEPTHS[0]],
+        target_fps=TARGET_FPS,
+    )
+
+    # cost_ms = stack_depth * worst_case_effect_per_pixel_ms * pixel_count + flush_ms,
+    # so per-frame cost is linear in (stack_depth * pixel_count): the slope is the
+    # per-pixel-per-layer cost and the intercept is the fixed flush. Collect points
+    # per element so the worst-case element's slope can be selected.
+    samples = {element: [] for element in element_names}
     for pixel_count in PIXEL_COUNTS:
         output = _build_output(DRIVER, pixel_count)
         effect_manager = EffectManager(registry=registry, outputs=[output])
         timer = Timer()
-        perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
-
-        print_profile_header(
-            component=f"pixel.{DRIVER}",
-            sweep_axes=["pixel_count", "element", "stack_depth"],
-            sweep_values=[pixel_count, element_names[0], STACK_DEPTHS[0]],
-            target_fps=TARGET_FPS,
-        )
-
         for element in element_names:
             for stack_depth in STACK_DEPTHS:
-                receipts = []
-                for _ in range(stack_depth):
-                    receipt = effect_manager.add_effect(
-                        Scope.PERSONAL,
-                        "elements." + element,
-                        {"level": SAMPLE_LEVEL},
-                    )
-                    receipts.append(receipt)
-
-                next_change_time = time.monotonic() + DISPLAY_SECONDS
-                while True:
-                    current_time = time.monotonic()
-
-                    perf.start_frame()
-                    perf.start_update_time()
-                    timer.update()
-                    effect_manager.update(timer)
-                    perf.add_update_time()
-
-                    due = stats_due(perf, current_time)
-                    perf.complete_frame(current_time)
-                    if due:
-                        extra = {
-                            "pixel_count": pixel_count,
-                            "element": element,
-                            "stack_depth": stack_depth,
-                            "i2c_bandwidth_bytes_per_sec": i2c_bandwidth,
-                        }
-                        print_stats_line(perf, current_time, **extra)
-
-                    if current_time > next_change_time:
-                        break
-
-                for receipt in receipts:
-                    receipt.stop()
-                gc.collect()
-
+                update_ms = _measure_point(
+                    effect_manager, timer, element, stack_depth, pixel_count, i2c_bandwidth
+                )
+                samples[element].append((stack_depth * pixel_count, update_ms))
         output.deinit()
+
+    # Worst-case element drives worst_case_effect_per_pixel_ms; its fit's intercept
+    # is the matching flush_ms (flush is element-independent in the model).
+    worst_per_pixel_ms = 0.0
+    flush_ms = 0.0
+    for points in samples.values():
+        xs = [x for x, _ in points]
+        ys = [y for _, y in points]
+        slope, intercept = linear_fit(xs, ys)
+        if slope > worst_per_pixel_ms:
+            worst_per_pixel_ms = slope
+            flush_ms = intercept
+
+    print_table_row(
+        "pixel_scope_costs",
+        [f"{worst_per_pixel_ms:.6f}", f"{flush_ms:.4f}", i2c_bandwidth],
+        driver=DRIVER,
+    )
 
 
 run()
