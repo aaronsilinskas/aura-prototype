@@ -15,6 +15,21 @@ from scripts.capacity.profiles import (
 )
 
 
+def _deadline_conflict(prop: PropProfile) -> "ReceiverComponent | None":
+    """Return the first receiver whose worst-case frame blows its derived deadline.
+
+    `max_frame_ms` is `None` when a receiver has no declared `incoming_rate_hz` --
+    such receivers have no deadline to check.
+    """
+    for component in prop.components:
+        if not isinstance(component, ReceiverComponent):
+            continue
+        max_frame_ms = component.max_frame_ms
+        if max_frame_ms is not None and component.worst_case_frame_ms > max_frame_ms:
+            return component
+    return None
+
+
 @dataclass(frozen=True)
 class ComponentAssignment:
     """One component placed on an MCU, with its CPU reservation."""
@@ -96,6 +111,25 @@ def assign(
     against `total_free_heap_bytes - role_baseline_heap_bytes - gc_margin_bytes`. If any
     MCU overflows, returns an infeasible `AssignmentResult` with `conflict_type="memory"`.
     """
+    # Hard-real-time deadline constraint: a receiver whose worst-case frame exceeds
+    # its derived `max_frame_ms` is rejected outright -- the deadline dominates the
+    # budget, even when CPU reservation would otherwise fit (checked before packing).
+    deadline_violator = _deadline_conflict(prop)
+    if deadline_violator is not None:
+        return AssignmentResult(
+            feasible=False,
+            mcus=[],
+            co_location_validated=False,
+            reason=(
+                f"component '{deadline_violator.name}' worst-case frame "
+                f"{deadline_violator.worst_case_frame_ms:.2f}ms exceeds its derived "
+                f"deadline max_frame_ms={deadline_violator.max_frame_ms:.2f}ms "
+                f"(buffer_depth={deadline_violator.buffer_depth} / "
+                f"incoming_rate_hz={deadline_violator.incoming_rate_hz:.2f} * 1000)"
+            ),
+            conflict_type="deadline",
+        )
+
     reserve = (
         board.headroom_reserve_percent
         if headroom_reserve_percent is None

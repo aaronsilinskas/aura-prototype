@@ -136,12 +136,25 @@ class SimpleComponent:
 class ReceiverComponent:
     """A hard-real-time receiver component whose buffer depth trades RAM for deadline relief.
 
-    Cost model is a fixed `cost_ms` like `SimpleComponent`. Its memory footprint grows
-    with `buffer_depth` (e.g. a deeper IR pulse buffer or radio FIFO), so raising the
-    buffer depth to relieve a polling deadline visibly increases the component's heap
-    usage.
+    Cost model is a fixed `cost_ms` (the `fixed_drain` per-tick polling cost) like
+    `SimpleComponent`. Its memory footprint grows with `buffer_depth` (e.g. a deeper
+    IR pulse buffer or radio FIFO), so raising the buffer depth to relieve a polling
+    deadline visibly increases the component's heap usage.
 
     `memory_footprint_bytes = base_footprint_bytes + bytes_per_buffer_slot * buffer_depth`
+
+    **Deadline constraint**: `max_frame_ms` is a *derived* ceiling, not declared --
+    it is how long the receiver's buffer can absorb incoming data before a slow frame
+    causes an overflow (dropped data):
+
+        max_frame_ms = buffer_depth / incoming_rate_hz * 1000
+
+    `worst_case_frame_ms` is the worst-case single frame time measured on the
+    receiver's MCU (profiler-measured via `PerformanceTracker.frame_time_peak`,
+    converted to milliseconds). If `worst_case_frame_ms > max_frame_ms`, the
+    co-location is rejected with `conflict_type="deadline"` -- even if CPU
+    reservation would otherwise fit. Raising `buffer_depth` raises `max_frame_ms`
+    (relieving the deadline) at the cost of a larger `memory_footprint_bytes`.
     """
 
     name: str
@@ -149,11 +162,24 @@ class ReceiverComponent:
     base_footprint_bytes: int
     bytes_per_buffer_slot: int
     buffer_depth: int
+    incoming_rate_hz: float = 0.0
+    worst_case_frame_ms: float = 0.0
 
     @property
     def memory_footprint_bytes(self) -> int:
         """Static steady-state heap usage, including the buffer's current depth."""
         return self.base_footprint_bytes + self.bytes_per_buffer_slot * self.buffer_depth
+
+    @property
+    def max_frame_ms(self) -> float | None:
+        """Derived hard-real-time deadline: how long the buffer can absorb a slow frame.
+
+        Returns `None` when `incoming_rate_hz` is 0 (no deadline declared -- e.g. a
+        receiver not yet profiled for incoming rate).
+        """
+        if self.incoming_rate_hz <= 0:
+            return None
+        return self.buffer_depth / self.incoming_rate_hz * 1000.0
 
 
 @dataclass(frozen=True)
