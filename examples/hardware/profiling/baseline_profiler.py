@@ -49,6 +49,8 @@ Configuration
 - LOG_INTERVAL_SECONDS: how often the stats line is printed
 """
 
+from __future__ import annotations
+
 import time
 
 from profiling_helpers import (
@@ -69,9 +71,9 @@ try:
 except ImportError:
     pass
 
-MODE: "Final" = "engine_host"  # or "satellite"
-TARGET_FPS: "Final" = 60.0
-LOG_INTERVAL_SECONDS: "Final" = 5.0
+MODE: Final = "engine_host"  # or "satellite"
+TARGET_FPS: Final = 60.0
+LOG_INTERVAL_SECONDS: Final = 5.0
 
 
 class NullEffectOutput(EffectOutput):
