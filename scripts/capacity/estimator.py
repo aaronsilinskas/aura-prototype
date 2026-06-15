@@ -65,7 +65,7 @@ def _usable_heap(board: BoardProfile, role: str) -> float:
 
 
 def _memory_footprint_bytes(
-    component: "EngineComponent | SimpleComponent | ReceiverComponent",
+    component: "EngineComponent | SimpleComponent | ReceiverComponent | PixelScopeComponent",
 ) -> int:
     """Return a component's static steady-state heap footprint in bytes."""
     return component.memory_footprint_bytes
