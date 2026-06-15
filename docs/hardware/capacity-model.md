@@ -374,4 +374,55 @@ available (see #392).
 
 | Board | Runtime | Driver | `tick_fixed_ms` | `per_rule_ms` | `per_event_ms` | `router_overhead_ms` |
 |-------|---------|--------|------------------|----------------|-----------------|------------------------|
-| _TBD_ | _TBD_   | _TBD_  | _TBD_            | _TBD_          | _TBD_           | _TBD_                  |
+| _TBD_ | _TBD_   | _TBD_  | _TBD_            | _TBD_          | _TBD_           | _TBD_ (#409, see note) |
+
+#### Reading the profiler output (`engine_profiler.py`, #409)
+
+`examples/hardware/profiling/engine_profiler.py` drives the real
+`GameEngine.update(state)` dispatch loop with a synthetic `_ProfilerRule` /
+`_ProfilerEvent` pair and reports per-tick Update Time via the uniform stats
+line, sweeping `rule_count` and `events_per_tick` as independent axes (each
+holding the other at a fixed reference of 1):
+
+- **`tick_fixed_ms`** -- read directly from the `(rule_count=0,
+  events_per_tick=0)` point's average Update Time. This is the fixed cost of
+  one `GameEngine.update` tick with no rules and no queued events.
+- **`per_rule_ms`** -- the slope of average Update Time vs `rule_count`, with
+  `events_per_tick` held at 1. Computed as `(update_time(rules) -
+  update_time(rules=0, events=1)) / rules` across the `RULE_COUNTS` sweep.
+- **`per_event_ms`** -- the slope of average Update Time vs `events_per_tick`,
+  with `rule_count` held at 1. Computed as `(update_time(events) -
+  update_time(rules=1, events=0)) / events` across the `EVENTS_PER_TICK_VALUES`
+  sweep.
+
+**Additive model vs. real dispatch shape.** The estimator models per-tick
+engine cost additively as `tick_fixed_ms + per_rule_ms * rules + per_event_ms *
+events`, but the real `GameEngine.update` dispatch loop is product-shaped: every
+queued event is dispatched to every registered rule (`O(events x rules)`
+`handle_event` calls), not `O(events + rules)`. The additive model is an
+approximation; `per_rule_ms` and `per_event_ms` are slopes measured at the
+sweep's reference cross-load (1 event when sweeping rules, 1 rule when sweeping
+events), not pure marginal costs at all cross-loads. At small reference values
+(1) the product and sum shapes are close, but the approximation degrades as
+both `rules` and `events` grow simultaneously -- callers with large props
+(many rules and many events per tick) should treat the additive estimate as a
+lower bound.
+
+**`tick_fixed_ms` <-> engine-host baseline overlap.** The `(rule_count=0,
+events_per_tick=0)` point profiled here calls the exact same rule-less
+`GameEngine.update(state)` as `baseline_profiler.py`'s `engine_host` mode,
+whose `cpu_percent` is recorded in the Per-MCU baselines table above. The two
+measurements cover the same cost: the fixed per-tick engine overhead with zero
+rules and zero events. The estimator must not charge both the engine-host
+`cpu_percent` baseline *and* `tick_fixed_ms` for the same prop -- either treat
+`tick_fixed_ms` as already included in the engine-host baseline (and add only
+the marginal `per_rule_ms` / `per_event_ms` terms on top of it), or treat the
+engine-host baseline's non-engine portion (framework loop, effect manager tick)
+as the baseline and add the full `tick_fixed_ms` + marginal terms -- but not
+both in full.
+
+**`router_overhead_ms`** is out of scope for this profiler: it is the cost of
+shipping commands from the engine host to remote satellite MCUs, which has no
+seam inside the `GameEngine.update` tick loop measured here. The table cell
+remains `_TBD_` pending a separate counting network stub or analytic seeding
+(no tracking issue yet -- to be filed as a follow-up).
