@@ -29,17 +29,9 @@ Installation
 1. Install CircuitPython on your board:
    https://learn.adafruit.com/welcome-to-circuitpython/installing-circuitpython
 
-2. Copy the effects/ and engine/ directories from this repo onto the CIRCUITPY
-   drive so they live at /CIRCUITPY/effects/ and /CIRCUITPY/engine/.
-
-3. Copy this file's sibling module to the root of the CIRCUITPY drive so it is
-   importable as a top-level module:
-     cp examples/hardware/profiling/profiling_helpers.py /Volumes/CIRCUITPY/profiling_helpers.py
-
-4. Copy this file to the root of the CIRCUITPY drive as code.py:
-     cp examples/hardware/profiling/baseline_profiler.py /Volumes/CIRCUITPY/code.py
-
-5. The board will reboot and start running automatically.
+2. Run the deploy script to copy all source files and set code.py:
+     python scripts/deploy.py examples/hardware/profiling/baseline_profiler.py
+   The board reboots and starts running automatically.
 
 Configuration
 -------------
@@ -53,18 +45,17 @@ from __future__ import annotations
 
 import time
 
-from profiling_helpers import (
-    print_profile_header,
-    print_stats_line,
-    stats_due,
-)
-
 from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager, EffectOutput
 from engine.engine import GameEngine
 from engine.packs import PackRegistry
 from engine.state import GameState, SceneControls
 from engine.timer import Timer
+from hardware.shared.profiling_helpers import (
+    print_profile_header,
+    print_stats_line,
+    stats_due,
+)
 
 try:
     from typing import Final
