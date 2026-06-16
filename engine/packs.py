@@ -14,6 +14,22 @@ except ImportError:
     pass
 
 
+def scan_item_names(dir: str) -> set[str]:
+    """Return item names found in *dir* under the canonical pack-item rule.
+
+    Includes files ending in ``.py``, excludes ``__init__.py``, and skips
+    anything that is a directory (even if its name ends in ``.py``).
+    """
+    names: set[str] = set()
+    for fname in os.listdir(dir):
+        if not fname.endswith(".py") or fname == "__init__.py":
+            continue
+        if _path.isdir(_path.join(dir, fname)):
+            continue
+        names.add(fname[:-3])
+    return names
+
+
 def load_item(
     full_module: str,
     item_attr: str,
@@ -144,10 +160,7 @@ class PackRegistry:
             with open(version_file) as fh:
                 version_str = fh.readline().strip()
 
-            item_names: set[str] = set()
-            for fname in os.listdir(pack_dir):
-                if fname.endswith(".py") and fname != "__init__.py":
-                    item_names.add(fname[:-3])
+            item_names = scan_item_names(pack_dir)
 
             full_prefix = module_prefix + "." + pack_name
             self._packs[pack_name] = _PackEntry(
