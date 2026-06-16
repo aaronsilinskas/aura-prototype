@@ -463,8 +463,7 @@ Per-frame render+flush cost terms for a `PixelScopeComponent`, keyed by driver
 | Board | Runtime | Driver | `worst_case_effect_per_pixel_ms` | `flush_ms` | `i2c_bandwidth_bytes_per_sec` |
 |-------|---------|--------|----------------------------------|------------|-------------------------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | neopixel_pwm | 0.530921 | 6.6184 | 0 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | is31fl3741_matrix (no buffer) | 0.375446 | 70.3601 | 4800.0 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | is31fl3741_matrix | 0.086095 | 58.4886 | 4800.0 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | is31fl3741_matrix | 0.102490 | 60.0876 | 8664.0 |
 
 `pixel_profiler.py` sweeps `pixel_count`, effect identity, and `stack_depth`.
 Because `cost_ms = stack_depth * worst_case_effect_per_pixel_ms * pixel_count +
@@ -516,7 +515,7 @@ Per-event cost for the shared `VibrationComponent` (DRV2605L over I2C). From
 
 | Board | Runtime | Driver | `cost_ms` | `i2c_bandwidth_bytes_per_sec` |
 |-------|---------|--------|-----------|-------------------------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 6.5104 | _TBD_ |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 7.4870 | 1.80 |
 
 `cost_ms` is the measured average per-event CPU cost of `handle_event` +
 `motor.play()`. `i2c_bandwidth_bytes_per_sec` is `i2c_transaction_bytes *
