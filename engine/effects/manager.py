@@ -8,6 +8,29 @@ from engine.timer import Timer
 _DEFAULT_RESOLUTION = 16
 
 
+class EffectBuilder:
+    """Factory interface for constructing ``Effect`` instances by name.
+
+    Concrete implementations look up the named effect and return an effect
+    configured for the given ``EffectConfig``. Raise ``KeyError`` or
+    ``ValueError`` for unregistered names.
+    """
+
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        """Build an Effect for the named effect.
+
+        Args:
+            name: The registered effect name (e.g. ``"color.flash"``).
+            config: Runtime configuration for the render pass. ``config.get_option``
+                carries any effect-specific parameters (e.g. duration, color).
+                ``config.resolution`` describes the output hardware.
+
+        Returns:
+            A configured ``Effect`` ready to be advanced each frame.
+        """
+        raise NotImplementedError
+
+
 class EffectResolver:
     """Maps a qualified effect name to an (builder, pack_name, effect_name) tuple.
 
@@ -30,7 +53,7 @@ class EffectResolver:
         """Replace the active scene-local registry.  Pass ``None`` to clear."""
         self._local_effects = local_registry
 
-    def resolve(self, name: str) -> "tuple[EffectBuilder, str, str]":
+    def resolve(self, name: str) -> tuple[EffectBuilder, str, str]:
         """Return ``(builder, pack_name, effect_name)`` for *name*.
 
         *name* must be in ``"pack.effect"`` or ``"scene.effect"`` format.
@@ -56,7 +79,7 @@ class EffectResolver:
 
         return builder, pack_name, effect_name
 
-    def _resolve_scene(self, name: str, effect_name: str) -> "EffectBuilder":
+    def _resolve_scene(self, name: str, effect_name: str) -> EffectBuilder:
         if self._local_effects is None:
             raise ValueError(
                 "Effect name '"
@@ -76,7 +99,7 @@ class EffectResolver:
                 ) from exc
             raise
 
-    def _resolve_pack(self, pack_name: str, effect_name: str) -> "EffectBuilder":
+    def _resolve_pack(self, pack_name: str, effect_name: str) -> EffectBuilder:
         try:
             return self._registry.get(pack_name, effect_name, EffectBuilder)
         except ValueError as exc:
@@ -169,29 +192,6 @@ class EffectOutput:
         an ``EffectEvent`` instance.
         """
         pass
-
-
-class EffectBuilder:
-    """Factory interface for constructing ``Effect`` instances by name.
-
-    Concrete implementations look up the named effect and return an effect
-    configured for the given ``EffectConfig``. Raise ``KeyError`` or
-    ``ValueError`` for unregistered names.
-    """
-
-    def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """Build an Effect for the named effect.
-
-        Args:
-            name: The registered effect name (e.g. ``"color.flash"``).
-            config: Runtime configuration for the render pass. ``config.get_option``
-                carries any effect-specific parameters (e.g. duration, color).
-                ``config.resolution`` describes the output hardware.
-
-        Returns:
-            A configured ``Effect`` ready to be advanced each frame.
-        """
-        raise NotImplementedError
 
 
 class EffectManager(EffectControls):
