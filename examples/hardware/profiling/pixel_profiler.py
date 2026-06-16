@@ -15,7 +15,9 @@ Sweeps three axes in sequence:
 
 - ``"neopixel_pwm"`` — a NeoPixel strip driven over PWM. Off the I2C bus.
 - ``"is31fl3741_matrix"`` — an IS31FL3741 RGB matrix driven over I2C. Reports I2C
-  bandwidth (`transaction_size * frequency`) alongside CPU/heap stats.
+  bandwidth (`i2c_transaction_bytes * i2c_frequency_hz`) alongside CPU/heap stats.
+  ``i2c_transaction_bytes`` is measured from one full render+flush tick at the
+  worst-case (largest) pixel count — not guessed.
 
 This profiler drives the satellite path (an `EffectManager` with one registered
 `EffectOutput`, no rules) -- the same shape as `baseline_profiler.py`'s satellite
@@ -47,8 +49,9 @@ Configuration
 - DISPLAY_SECONDS: how long to spend on each (pixel_count, effect, stack_depth)
   combination before advancing
 - LOG_INTERVAL_SECONDS: how often the stats line is printed
-- I2C_TRANSACTION_BYTES / I2C_FREQUENCY_HZ: matrix-driver constants used to report
-  `i2c_bandwidth_bytes_per_sec = transaction_size * frequency`
+- I2C_FREQUENCY_HZ: matrix-driver frequency term used to report
+  `i2c_bandwidth_bytes_per_sec = i2c_transaction_bytes * i2c_frequency_hz`
+  (i2c_transaction_bytes is measured, not declared)
 """
 
 from __future__ import annotations
@@ -62,6 +65,7 @@ from engine.effects.manager import EffectManager, EffectOutput
 from engine.packs import PackRegistry
 from engine.state import Scope
 from engine.timer import Timer
+from hardware.shared.counting_i2c import CountingI2C
 from hardware.shared.matrix_output import MatrixEffectOutput
 from hardware.shared.profiling_helpers import (
     linear_fit,
@@ -84,8 +88,8 @@ TARGET_FPS: Final = 24.0
 DISPLAY_SECONDS: Final = 10.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
-# IS31FL3741 matrix driver constants -- used only when DRIVER == "is31fl3741_matrix".
-I2C_TRANSACTION_BYTES: Final = 200
+# IS31FL3741 matrix driver constant -- used only when DRIVER == "is31fl3741_matrix".
+# i2c_transaction_bytes is measured from one full update() tick (not declared here).
 I2C_FREQUENCY_HZ: Final = TARGET_FPS
 
 
@@ -134,11 +138,11 @@ class Is31fl3741MatrixOutput(MatrixEffectOutput):
     ``show()``, the dominant I2C consumer.
     """
 
-    def __init__(self, cols: int, rows: int, matrix, i2c) -> None:
+    def __init__(self, cols: int, rows: int, matrix, counting_i2c: CountingI2C) -> None:
         super().__init__(cols, {"personal": range(rows)})
         self.scopes = [Scope.PERSONAL]
         self._matrix = matrix
-        self._i2c = i2c
+        self._counting_i2c = counting_i2c
 
     def _write_row(self, row: int, pixels) -> None:
         for col in range(self._cols):
@@ -148,7 +152,7 @@ class Is31fl3741MatrixOutput(MatrixEffectOutput):
         self._matrix.show()
 
     def deinit(self) -> None:
-        self._i2c.deinit()
+        self._counting_i2c.deinit()
 
 
 def _build_neopixel_output(pixel_count: int) -> NeoPixelPwmOutput | Is31fl3741MatrixOutput:
@@ -159,24 +163,55 @@ def _build_neopixel_output(pixel_count: int) -> NeoPixelPwmOutput | Is31fl3741Ma
     return NeoPixelPwmOutput(pixel_count, strip)
 
 
-def _build_matrix_output(pixel_count: int) -> NeoPixelPwmOutput | Is31fl3741MatrixOutput:
+def _build_matrix_output(
+    pixel_count: int,
+) -> tuple[Is31fl3741MatrixOutput, CountingI2C]:
     import board
     import busio
-    from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
+
+    import hardware.circuitpython.propmaker as propmaker
 
     i2c = busio.I2C(board.SCL, board.SDA)
-    matrix = Adafruit_RGBMatrixQT(i2c)
+    counting_i2c = CountingI2C(i2c)
+    matrix = propmaker.setup_matrix_is31fl3741(counting_i2c)
     cols = 13
     rows = max(1, (pixel_count + cols - 1) // cols)
-    return Is31fl3741MatrixOutput(cols, rows, matrix, i2c)
+    return Is31fl3741MatrixOutput(cols, rows, matrix, counting_i2c), counting_i2c
 
 
-def _build_output(driver: str, pixel_count: int) -> NeoPixelPwmOutput | Is31fl3741MatrixOutput:
+def _build_output(
+    driver: str, pixel_count: int
+) -> tuple[NeoPixelPwmOutput | Is31fl3741MatrixOutput, CountingI2C | None]:
     if driver == "neopixel_pwm":
-        return _build_neopixel_output(pixel_count)
+        return _build_neopixel_output(pixel_count), None
     if driver == "is31fl3741_matrix":
         return _build_matrix_output(pixel_count)
     raise ValueError(f"Unknown DRIVER: {driver!r}")
+
+
+def _measure_i2c_transaction_bytes(
+    effect_manager: EffectManager,
+    timer: Timer,
+    element: str,
+    counting_i2c: CountingI2C,
+) -> int:
+    """Return I2C bytes written across one full render+flush tick.
+
+    Counts the whole ``update()`` tick, not just ``show()``: a no-buffer driver
+    emits bytes per pixel during the render pass, so a ``show()``-only count
+    would miss all traffic.
+    """
+    receipt = effect_manager.add_effect(
+        Scope.PERSONAL, "elements." + element, {"level": SAMPLE_LEVEL}
+    )
+    timer.update()
+    effect_manager.update(timer)  # warm-up tick — discard
+    counting_i2c.reset()
+    timer.update()
+    effect_manager.update(timer)  # measured tick
+    i2c_transaction_bytes = counting_i2c.bytes_written
+    receipt.stop()
+    return i2c_transaction_bytes
 
 
 def _measure_point(
@@ -240,7 +275,11 @@ def run() -> None:
     registry.scan_dir("packs/effects", "packs.effects")
     element_names = registry.items("elements")
 
-    i2c_bandwidth = I2C_TRANSACTION_BYTES * I2C_FREQUENCY_HZ if DRIVER == "is31fl3741_matrix" else 0
+    # For the matrix driver, measure i2c_transaction_bytes at the largest
+    # (worst-case) pixel count so the bandwidth figure is conservative.
+    worst_pixel_count = PIXEL_COUNTS[-1]
+    i2c_bandwidth = 0.0
+    counting_i2c = None
 
     print_profile_header(
         component=f"pixel.{DRIVER}",
@@ -255,9 +294,17 @@ def run() -> None:
     # per element so the worst-case element's slope can be selected.
     samples = {element: [] for element in element_names}
     for pixel_count in PIXEL_COUNTS:
-        output = _build_output(DRIVER, pixel_count)
+        output, counting_i2c = _build_output(DRIVER, pixel_count)
         effect_manager = EffectManager(registry=registry, outputs=[output])
         timer = Timer()
+
+        # Measure I2C transaction bytes once at the largest pixel count.
+        if DRIVER == "is31fl3741_matrix" and pixel_count == worst_pixel_count:
+            i2c_transaction_bytes = _measure_i2c_transaction_bytes(
+                effect_manager, timer, element_names[0], counting_i2c
+            )
+            i2c_bandwidth = i2c_transaction_bytes * I2C_FREQUENCY_HZ
+
         for element in element_names:
             for stack_depth in STACK_DEPTHS:
                 update_ms = _measure_point(
