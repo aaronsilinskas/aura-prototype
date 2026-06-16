@@ -278,14 +278,7 @@ class EffectManager(EffectControls):
         name: str,
         options: dict[str, object],
     ) -> "EffectManager._EffectEntry":
-        """Construct an Effect for the named effect.
-
-        *name* must be in ``"pack.effect"`` format.  Resolution (pack/scene
-        dispatch, error translation) is fully delegated to ``self._resolver``.
-        The remainder of this method creates the receipt, computes resolution,
-        wires the scoped listener, calls the builder, and allocates output
-        buffers.
-        """
+        """Construct an Effect for the named effect."""
         builder, pack_name, effect_name = self._resolver.resolve(name)
 
         receipt = EffectReceipt(self._next_id)
