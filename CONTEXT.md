@@ -104,6 +104,10 @@ _Avoid_: "output" (ambiguous in multi-output contexts)
 A structured event payload routed to every `EffectOutput.handle_event` in scope. Three fields: `pack`, `name`, `verb`. Lifecycle verbs `"start"` and `"stop"` are emitted automatically; custom verbs (e.g. `"peak"`, `"strike"`) are emitted via `config.notify_listeners`.
 _Avoid_: confusing with `Event` (game-rule events); assuming only `"start"`/`"stop"` verbs are possible
 
+### EffectResolver
+Maps a qualified effect name to its `EffectBuilder`, owning the reserved `scene.` prefix rule: a `scene.`-prefixed name resolves against the active scene's scene-local effects, any other `pack.`-prefixed name against the shared effect packs. Held by `EffectManager`, which delegates all effect-name resolution to it.
+_Avoid_: putting qualified-effect-name parsing or the `scene.` rule in `EffectManager`; confusing with `EffectManager` (routing and rendering, not name resolution)
+
 ### Resolution
 The mathematical detail level at which an effect generates animation data. Independent of pixel count. Each `EffectOutput` declares a `min_resolution`; the engine uses the highest across all targeted outputs.
 _Avoid_: conflating resolution with pixel count
