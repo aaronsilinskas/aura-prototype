@@ -51,20 +51,7 @@ class SceneLocalRegistry:
         self._cache: dict[str, object] = {}
 
     def scan_dir(self, item_dir: str, module_prefix: str) -> None:
-        """Record item names found in *item_dir* and the *module_prefix* for this registry.
-
-        Uses ``scan_item_names`` to collect ``.py`` files (excluding
-        ``__init__.py`` and subdirectories).  If *item_dir* is missing or is
-        not a directory the registry is left empty — no error is raised.
-
-        This method is single-shot: it is called once during scene discovery.
-        Calling it again with a valid directory overwrites the previous item set
-        (last call wins); calling it with a missing or non-directory path is a
-        no-op that leaves the existing state unchanged.
-
-        *module_prefix* is the full dotted prefix for items in *item_dir*
-        (e.g. ``"packs.scenes.forest.rules"``), not an import root.
-        """
+        """Populate from item_dir using scan_item_names. Single-shot; missing/non-dir is a no-op."""
         if not _path.isdir(item_dir):
             return
         self._item_names = scan_item_names(item_dir)
