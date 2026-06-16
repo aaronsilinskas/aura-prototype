@@ -11,7 +11,7 @@ import sys
 import pytest
 
 from engine.events import EffectEvent
-from engine.packs import PackRegistry
+from engine.packs import PackRegistry, scan_item_names
 from engine.version import Version
 
 # ---------------------------------------------------------------------------
@@ -472,3 +472,75 @@ def test_sound_path_uses_pack_source_path(pack_env) -> None:
     result = registry.sound_path(event)
 
     assert result == str(src / "mygame") + "/sounds/shield_alert.wav"
+
+
+# ---------------------------------------------------------------------------
+# scan_item_names — public helper
+# ---------------------------------------------------------------------------
+
+
+def test_scan_item_names_returns_py_files_as_item_names(tmp_path) -> None:
+    (tmp_path / "fire.py").write_text("")
+    (tmp_path / "water.py").write_text("")
+
+    result = scan_item_names(str(tmp_path))
+
+    assert result == {"fire", "water"}
+
+
+def test_scan_item_names_excludes_init_py(tmp_path) -> None:
+    (tmp_path / "__init__.py").write_text("")
+    (tmp_path / "item_a.py").write_text("")
+
+    result = scan_item_names(str(tmp_path))
+
+    assert result == {"item_a"}
+
+
+def test_scan_item_names_ignores_non_py_entries(tmp_path) -> None:
+    (tmp_path / "subdir").mkdir()
+    (tmp_path / "item_a.py").write_text("")
+
+    result = scan_item_names(str(tmp_path))
+
+    assert result == {"item_a"}
+
+
+def test_scan_item_names_excludes_directory_whose_name_ends_in_py(tmp_path) -> None:
+    fake = tmp_path / "looks_like.py"
+    fake.mkdir()
+    (tmp_path / "real_item.py").write_text("")
+
+    result = scan_item_names(str(tmp_path))
+
+    assert result == {"real_item"}
+
+
+def test_scan_item_names_returns_empty_set_for_directory_with_no_py_files(
+    tmp_path,
+) -> None:
+    (tmp_path / "version.txt").write_text("1.0\n")
+    (tmp_path / "sounds").mkdir()
+
+    result = scan_item_names(str(tmp_path))
+
+    assert result == set()
+
+
+# ---------------------------------------------------------------------------
+# scan_dir — subdirectory named *.py is excluded from pack item names
+# ---------------------------------------------------------------------------
+
+
+def test_scan_dir_excludes_subdirectory_ending_in_py_from_item_names(pack_env) -> None:
+    pack_dir = pack_env / "mypack"
+    pack_dir.mkdir()
+    (pack_dir / "version.txt").write_text("1.0\n")
+    fake = pack_dir / "fake.py"
+    fake.mkdir()
+    (pack_dir / "real_item.py").write_text("VALUE = 1")
+
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    assert registry.items("mypack") == ["real_item"]
