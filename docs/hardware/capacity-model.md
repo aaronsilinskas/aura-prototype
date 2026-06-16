@@ -463,6 +463,7 @@ Per-frame render+flush cost terms for a `PixelScopeComponent`, keyed by driver
 | Board | Runtime | Driver | `worst_case_effect_per_pixel_ms` | `flush_ms` | `i2c_bandwidth_bytes_per_sec` |
 |-------|---------|--------|----------------------------------|------------|-------------------------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | neopixel_pwm | 0.530921 | 6.6184 | 0 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | is31fl3741_matrix | _TBD_ | _TBD_ | _TBD_ |
 
 `pixel_profiler.py` sweeps `pixel_count`, effect identity, and `stack_depth`.
 Because `cost_ms = stack_depth * worst_case_effect_per_pixel_ms * pixel_count +
@@ -474,6 +475,26 @@ fits each effect element independently and reports the **worst-case element's**
 slope, with that element's intercept as `flush_ms`. `i2c_bandwidth_bytes_per_sec`
 is `0` for `neopixel_pwm` (off the I2C bus) and `i2c_transaction_bytes *
 i2c_frequency_hz` for the matrix driver.
+
+#### Matrix driver: buffered vs. no-buffer and the transaction boundary
+
+The IS31FL3741 driver can operate in two modes: **buffered** (``allocate=MUST_BUFFER``,
+the default in the production ``propmaker.setup_matrix_is31fl3741`` helper) and
+**no-buffer**. In buffered mode the driver accumulates pixel writes in RAM and
+flushes them to hardware in a single I2C burst when ``show()`` is called, so
+``flush_ms`` dominates and ``worst_case_effect_per_pixel_ms`` is low. In no-buffer
+mode each ``pixel()`` call sends a small I2C transaction immediately, scattering
+bus traffic across the whole render pass rather than collecting it at ``show()``.
+
+This distinction matters for the I2C bandwidth measurement: counting only ``show()``
+correctly captures buffered-mode traffic, but misses *all* no-buffer traffic (which
+arrives during the per-pixel render pass, before ``show()`` is called). The profiler
+therefore counts bytes across the **entire** ``effect_manager.update()`` tick --
+render and flush together -- via a ``CountingI2C`` decorator wrapping the real bus.
+``i2c_transaction_bytes`` is that measured whole-tick byte count at the worst-case
+(largest) pixel count; byte volume is independent of stack depth and effect identity,
+so no separate I2C sweep axis is needed. The matrix's ``i2c_transaction_bytes`` cell
+above will be filled by the first on-device run of the updated profiler.
 
 ### Sound component costs
 
