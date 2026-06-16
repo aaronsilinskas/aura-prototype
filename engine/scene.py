@@ -486,13 +486,11 @@ class SceneManager(SceneControls):
         return combined
 
     def _deactivate(self, entry: tuple[Scene, GameState, list[GameRule]]) -> None:
-        """Tear down a stack entry: stop all effects and clear its event queue."""
         _, state, _ = entry
         state.effect_controls.stop_effect(Scope.ALL)
         state.clear_queue()
 
     def _activate(self, entry: tuple[Scene, GameState, list[GameRule]]) -> None:
-        """Wire up a stack entry as the active scene with a clean event queue."""
         scene, state, rules = entry
         self._engine.set_rules(rules)
         state.clear_queue()
