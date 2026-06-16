@@ -497,7 +497,7 @@ def test_scan_item_names_excludes_init_py(tmp_path) -> None:
     assert result == {"item_a"}
 
 
-def test_scan_item_names_excludes_directories(tmp_path) -> None:
+def test_scan_item_names_ignores_non_py_entries(tmp_path) -> None:
     (tmp_path / "subdir").mkdir()
     (tmp_path / "item_a.py").write_text("")
 
