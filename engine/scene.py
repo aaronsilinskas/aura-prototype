@@ -19,7 +19,7 @@ except ImportError:
 
 import engine._path as _path
 from engine.engine import GameEngine, GameRule, Version
-from engine.packs import PackRegistry, load_item
+from engine.packs import PackRegistry, load_item, scan_item_names
 from engine.state import GameState, SceneControls, Scope
 
 _REQUIRED_KEYS = frozenset(("version", "effect_packs", "rule_packs"))
@@ -32,13 +32,13 @@ class SceneLocalRegistry:
     attribute extraction, isinstance check, cache) with ``PackRegistry`` via
     ``load_item``.  No version concept.
 
-    Populated at scene discovery time via ``_register_items``; accessed via
+    Populated at scene discovery time via ``scan_dir``; accessed via
     ``get`` and ``items``.
 
     Example::
 
         registry = SceneLocalRegistry(item_attr="RULE")
-        registry._register_items({"my_rule"}, "scenes.forest.rules")
+        registry.scan_dir("/path/to/scene/rules", "packs.scenes.forest.rules")
         rule = registry.get("my_rule", GameRule)
     """
 
@@ -50,12 +50,11 @@ class SceneLocalRegistry:
         self._module_prefix: str = ""
         self._cache: dict[str, object] = {}
 
-    def _register_items(self, item_names: set[str], module_prefix: str) -> None:
-        """Record the known item names and module prefix for this registry.
-
-        Called once by ``SceneRegistry.scan_dir`` during discovery.
-        """
-        self._item_names = item_names
+    def scan_dir(self, item_dir: str, module_prefix: str) -> None:
+        """Populate from item_dir using scan_item_names. Single-shot; missing/non-dir is a no-op."""
+        if not _path.isdir(item_dir):
+            return
+        self._item_names = scan_item_names(item_dir)
         self._module_prefix = module_prefix
 
     def get(self, item_name: str, expected_class: type[T]) -> T:
@@ -293,11 +292,15 @@ class SceneRegistry:
 
             initial_data = data.get("initial_data")
 
-            local_rule_registry = self._build_local_rule_registry(
-                scene_dir, scene_name, module_prefix
+            local_rule_registry = SceneLocalRegistry(item_attr="RULE")
+            local_rule_registry.scan_dir(
+                _path.join(scene_dir, "rules"),
+                module_prefix + "." + scene_name + ".rules",
             )
-            local_effect_registry = self._build_local_effect_registry(
-                scene_dir, scene_name, module_prefix
+            local_effect_registry = SceneLocalRegistry(item_attr="BUILD")
+            local_effect_registry.scan_dir(
+                _path.join(scene_dir, "effects"),
+                module_prefix + "." + scene_name + ".effects",
             )
 
             self._scenes[scene_name] = _SceneEntry(
@@ -309,61 +312,6 @@ class SceneRegistry:
                 local_rule_registry=local_rule_registry,
                 local_effect_registry=local_effect_registry,
             )
-
-    def _build_local_rule_registry(
-        self, scene_dir: str, scene_name: str, module_prefix: str
-    ) -> SceneLocalRegistry:
-        """Scan *scene_dir*/rules/ and return a ``SceneLocalRegistry`` for it.
-
-        Returns an empty registry when no ``rules/`` subdirectory exists.
-        """
-        registry = SceneLocalRegistry(item_attr="RULE")
-        rules_dir = _path.join(scene_dir, "rules")
-        if not _path.isdir(rules_dir):
-            return registry
-
-        item_names: set[str] = set()
-        for fname in os.listdir(rules_dir):
-            if fname == "__init__.py":
-                continue
-            # skip subdirectories (e.g. tests/)
-            full = _path.join(rules_dir, fname)
-            if _path.isdir(full):
-                continue
-            if fname.endswith(".py"):
-                item_names.add(fname[:-3])
-
-        local_prefix = module_prefix + "." + scene_name + ".rules"
-        registry._register_items(item_names, local_prefix)
-        return registry
-
-    def _build_local_effect_registry(
-        self, scene_dir: str, scene_name: str, module_prefix: str
-    ) -> SceneLocalRegistry:
-        """Scan *scene_dir*/effects/ and return a ``SceneLocalRegistry`` for it.
-
-        Items expose a ``BUILD`` ``EffectBuilder`` attribute.  Returns an empty
-        registry when no ``effects/`` subdirectory exists.  Excludes
-        ``__init__.py`` and any subdirectories (e.g. ``tests/``).
-        """
-        registry = SceneLocalRegistry(item_attr="BUILD")
-        effects_dir = _path.join(scene_dir, "effects")
-        if not _path.isdir(effects_dir):
-            return registry
-
-        item_names: set[str] = set()
-        for fname in os.listdir(effects_dir):
-            if fname == "__init__.py":
-                continue
-            full = _path.join(effects_dir, fname)
-            if _path.isdir(full):
-                continue
-            if fname.endswith(".py"):
-                item_names.add(fname[:-3])
-
-        local_prefix = module_prefix + "." + scene_name + ".effects"
-        registry._register_items(item_names, local_prefix)
-        return registry
 
     def get(self, name: str) -> Scene:
         """Return a fresh ``Scene`` for *name*.

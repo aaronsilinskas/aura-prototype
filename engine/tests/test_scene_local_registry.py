@@ -66,7 +66,42 @@ def test_scene_local_registry_items_is_empty_on_construction() -> None:
 
 
 # ---------------------------------------------------------------------------
-# SceneLocalRegistry.get — item loading
+# SceneLocalRegistry.scan_dir — self-population
+# ---------------------------------------------------------------------------
+
+
+def test_scan_dir_on_missing_directory_leaves_registry_empty_and_raises_nothing(
+    tmp_path,
+) -> None:
+    registry = SceneLocalRegistry(item_attr="RULE")
+    missing = str(tmp_path / "does_not_exist")
+
+    registry.scan_dir(missing, MODULE_PREFIX)  # must not raise
+
+    assert registry.items() == []
+
+
+def test_scan_dir_on_file_path_leaves_registry_empty(tmp_path) -> None:
+    not_a_dir = tmp_path / "file.py"
+    not_a_dir.write_text("")
+    registry = SceneLocalRegistry(item_attr="RULE")
+
+    registry.scan_dir(str(not_a_dir), MODULE_PREFIX)
+
+    assert registry.items() == []
+
+
+def test_scan_dir_on_populated_directory_yields_expected_items(local_env) -> None:
+    _make_local_rules(local_env, {"alpha": _rule_module("Alpha"), "beta": _rule_module("Beta")})
+    registry = SceneLocalRegistry(item_attr="RULE")
+
+    registry.scan_dir(str(local_env), MODULE_PREFIX)
+
+    assert registry.items() == ["alpha", "beta"]
+
+
+# ---------------------------------------------------------------------------
+# SceneLocalRegistry.get — item loading (via scan_dir)
 # ---------------------------------------------------------------------------
 
 
@@ -75,10 +110,7 @@ def test_get_returns_game_rule_for_registered_item_name(local_env) -> None:
     from engine.engine import GameRule
 
     registry = SceneLocalRegistry(item_attr="RULE")
-    registry._register_items(
-        item_names={"my_rule"},
-        module_prefix=MODULE_PREFIX,
-    )
+    registry.scan_dir(str(local_env), MODULE_PREFIX)
 
     result = registry.get("my_rule", GameRule)
 
@@ -90,10 +122,7 @@ def test_get_returns_same_instance_on_repeated_calls(local_env) -> None:
     from engine.engine import GameRule
 
     registry = SceneLocalRegistry(item_attr="RULE")
-    registry._register_items(
-        item_names={"my_rule"},
-        module_prefix=MODULE_PREFIX,
-    )
+    registry.scan_dir(str(local_env), MODULE_PREFIX)
 
     first = registry.get("my_rule", GameRule)
     second = registry.get("my_rule", GameRule)
@@ -103,7 +132,7 @@ def test_get_returns_same_instance_on_repeated_calls(local_env) -> None:
 
 def test_get_raises_for_unknown_item_name(local_env) -> None:
     registry = SceneLocalRegistry(item_attr="RULE")
-    registry._register_items(item_names=set(), module_prefix=MODULE_PREFIX)
+    registry.scan_dir(str(local_env), MODULE_PREFIX)
     from engine.engine import GameRule
 
     with pytest.raises(ValueError, match="Unknown item"):
@@ -115,7 +144,7 @@ def test_get_raises_when_item_module_has_no_rule_attribute(local_env) -> None:
     from engine.engine import GameRule
 
     registry = SceneLocalRegistry(item_attr="RULE")
-    registry._register_items(item_names={"bad_rule"}, module_prefix=MODULE_PREFIX)
+    registry.scan_dir(str(local_env), MODULE_PREFIX)
 
     with pytest.raises(ValueError, match="no attribute 'RULE'"):
         registry.get("bad_rule", GameRule)
@@ -126,7 +155,7 @@ def test_get_raises_when_rule_attribute_is_not_a_game_rule(local_env) -> None:
     from engine.engine import GameRule
 
     registry = SceneLocalRegistry(item_attr="RULE")
-    registry._register_items(item_names={"bad_rule"}, module_prefix=MODULE_PREFIX)
+    registry.scan_dir(str(local_env), MODULE_PREFIX)
 
     with pytest.raises(ValueError, match="is not an instance of"):
         registry.get("bad_rule", GameRule)
@@ -138,11 +167,16 @@ def test_get_raises_when_rule_attribute_is_not_a_game_rule(local_env) -> None:
 
 
 def test_items_returns_sorted_item_names(local_env) -> None:
-    registry = SceneLocalRegistry(item_attr="RULE")
-    registry._register_items(
-        item_names={"zebra", "alpha", "mango"},
-        module_prefix=MODULE_PREFIX,
+    _make_local_rules(
+        local_env,
+        {
+            "zebra": _rule_module("Zebra"),
+            "alpha": _rule_module("Alpha"),
+            "mango": _rule_module("Mango"),
+        },
     )
+    registry = SceneLocalRegistry(item_attr="RULE")
+    registry.scan_dir(str(local_env), MODULE_PREFIX)
 
     assert registry.items() == ["alpha", "mango", "zebra"]
 
