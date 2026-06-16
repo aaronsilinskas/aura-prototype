@@ -7,7 +7,7 @@ counters between measurement windows.
 """
 
 
-def _slice_len(buffer, start: int, end: int | None) -> int:
+def _slice_len(buffer: bytearray, start: int, end: int | None) -> int:
     """Byte count of a ``[start:end]`` slice; ``end=None`` means end of *buffer*."""
     return (end if end is not None else len(buffer)) - start
 
