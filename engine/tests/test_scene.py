@@ -62,16 +62,17 @@ def _make_registries(pack_env_path: str):
 
 
 class _RecordingEffectControls(EffectControls):
-    """EffectControls that records every stop_effect scope for assertions."""
+    """EffectControls that records stop_effect scopes and set_local_effects calls."""
 
     def __init__(self) -> None:
         self.stopped_scopes: list = []
+        self.local_effects_history: list = []
 
     def stop_effect(self, scope) -> None:
         self.stopped_scopes.append(scope)
 
     def set_local_effects(self, local_registry: object) -> None:
-        pass  # no-op for tests that only care about stop_effect
+        self.local_effects_history.append(local_registry)
 
 
 def _make_engine() -> GameEngine:
@@ -1085,6 +1086,94 @@ def test_unloaded_scene_is_not_retained_by_manager() -> None:
 
     gc.collect()
     assert ref() is None, "Scene should be GC-eligible after full unload"
+
+
+# ---------------------------------------------------------------------------
+# SceneManager — activation invariant pin
+# ---------------------------------------------------------------------------
+
+
+def test_pop_activates_revealed_entry_with_both_rules_and_local_effects() -> None:
+    """After load → overlay → pop, the revealed entry has rules on the engine
+    AND its local effect registry pushed to the effect controls (invariant: no half-activation)."""
+    engine, controls = _make_engine_with_controls()
+    base_local_registry = Scene(effect_packs=[], rule_packs=[]).local_effect_registry
+    base_rule = GameRule()
+    rule_registry = _TestPackRegistry(item_attr="RULE")
+    rule_registry.register_instance("stubs", "base_rule", base_rule)
+
+    base_events: list = []
+    base_rule.on(Event, lambda e, s: base_events.append(e.name))
+
+    def base_factory():
+        return Scene(
+            effect_packs=[],
+            rule_packs=[("stubs", "1.0")],
+            local_effect_registry=base_local_registry,
+        )
+
+    scene_reg = SceneRegistry()
+    scene_reg.register("base", base_factory)
+    scene_reg.register("overlay_scene", _scene_factory())
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), rule_registry, scene_reg)
+
+    manager.load("base")
+    manager.update()
+    manager.overlay("overlay_scene")
+    manager.update()
+    controls.local_effects_history.clear()
+
+    manager.pop()
+    manager.update()
+
+    manager.active_state.queue_event(Event(_GROUP, "check"))
+    manager.update()
+    assert base_events, "base rules must be active on the engine after pop"
+    assert controls.local_effects_history, (
+        "set_local_effects must be called when pop reveals the base entry"
+    )
+    assert controls.local_effects_history[-1] is base_local_registry, (
+        "pop must push the revealed entry's own local_effect_registry"
+    )
+
+
+# ---------------------------------------------------------------------------
+# SceneManager — resolution-failure ordering
+# ---------------------------------------------------------------------------
+
+
+def test_load_whose_rule_resolution_fails_does_not_stop_effects_on_active_scene() -> None:
+    """Rule resolution runs before teardown; a failure must leave the active scene untouched."""
+    engine, controls = _make_engine_with_controls()
+    rule_registry = _TestPackRegistry(item_attr="RULE")
+    existing_rule = GameRule()
+    rule_registry.register_instance("stubs", "existing_rule", existing_rule)
+
+    class _BrokenRegistry:
+        def items(self):
+            raise ValueError("simulated rule load failure")
+
+    def bad_factory():
+        scene = Scene(effect_packs=[], rule_packs=[])
+        object.__setattr__(scene, "local_rule_registry", _BrokenRegistry())
+        return scene
+
+    scene_reg = SceneRegistry()
+    scene_reg.register("initial", _scene_factory(rule_packs=[("stubs", "1.0")]))
+    scene_reg.register("bad", bad_factory)
+    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), rule_registry, scene_reg)
+
+    manager.load("initial")
+    manager.update()
+    controls.stopped_scopes.clear()
+
+    manager.load("bad")
+    with pytest.raises(ValueError, match="simulated rule load failure"):
+        manager.update()
+
+    assert controls.stopped_scopes == [], (
+        "effects must not be stopped when rule resolution fails during load"
+    )
 
 
 def test_suspended_scene_remains_on_stack_after_overlay() -> None:

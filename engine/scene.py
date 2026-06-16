@@ -485,47 +485,44 @@ class SceneManager(SceneControls):
             combined.append(scene.local_rule_registry.get(item_name, GameRule))
         return combined
 
+    def _deactivate(self, entry: tuple[Scene, GameState, list[GameRule]]) -> None:
+        _, state, _ = entry
+        state.effect_controls.stop_effect(Scope.ALL)
+        state.clear_queue()
+
+    def _activate(self, entry: tuple[Scene, GameState, list[GameRule]]) -> None:
+        scene, state, rules = entry
+        self._engine.set_rules(rules)
+        state.clear_queue()
+        state.effect_controls.set_local_effects(scene.local_effect_registry)
+
     def _do_load(self, scene: Scene) -> None:
-        """Execute a load transition: stop and unload all, create fresh state."""
+        """Replace the entire stack with a single fresh entry for *scene*."""
         combined_rules = self._resolve_rules(scene)
 
-        # Stop all effects on each outgoing scene top-down, then clear its queue
         for i in range(len(self._stack) - 1, -1, -1):
-            _, st, _ = self._stack[i]
-            st.effect_controls.stop_effect(Scope.ALL)
-            st.clear_queue()
+            self._deactivate(self._stack[i])
 
         self._stack = []
         state = self._engine.create_state(self, scene.initial_data)
-        self._engine.set_rules(combined_rules)
-        self._stack.append((scene, state, combined_rules))
-        state.effect_controls.set_local_effects(scene.local_effect_registry)
+        entry = (scene, state, combined_rules)
+        self._stack.append(entry)
+        self._activate(entry)
 
     def _do_overlay(self, scene: Scene) -> None:
-        """Execute an overlay transition: stop and suspend top, push new scene."""
+        """Suspend the current top and push *scene* above it."""
         combined_rules = self._resolve_rules(scene)
 
-        # Stop all effects on the suspended top, then clear its queue
-        _, st, _ = self._stack[-1]
-        st.effect_controls.stop_effect(Scope.ALL)
-        st.clear_queue()
+        self._deactivate(self._stack[-1])
 
-        # Push overlay without clearing the stack
         state = self._engine.create_state(self, scene.initial_data)
-        self._engine.set_rules(combined_rules)
-        self._stack.append((scene, state, combined_rules))
-        state.effect_controls.set_local_effects(scene.local_effect_registry)
+        entry = (scene, state, combined_rules)
+        self._stack.append(entry)
+        self._activate(entry)
 
     def _do_pop(self) -> None:
-        """Execute a pop transition: stop and unload top, restore scene below."""
-        # Stop all effects on the top entry, then clear its queue and pop it
-        _, st, _ = self._stack[-1]
-        st.effect_controls.stop_effect(Scope.ALL)
-        st.clear_queue()
+        """Remove the top entry and restore the entry below it."""
+        self._deactivate(self._stack[-1])
         self._stack.pop()
 
-        # Restore the now-active entry
-        revealed_scene, st, combined_rules = self._stack[-1]
-        self._engine.set_rules(combined_rules)
-        st.clear_queue()  # defensive clear on restored state
-        st.effect_controls.set_local_effects(revealed_scene.local_effect_registry)
+        self._activate(self._stack[-1])
