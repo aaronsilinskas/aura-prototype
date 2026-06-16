@@ -225,7 +225,14 @@ class TestWritetoThenReadfrom:
         in_buf = bytearray(6)
         counting.writeto_then_readfrom(0x42, out_buf, in_buf, out_start=2, out_end=5)
         assert counting.bytes_written == 3
-        assert counting.bytes_read == 6  # full in_buf; out slice does not affect read count
+
+    def test_out_slice_does_not_affect_bytes_read(
+        self, counting: CountingI2C, fake: FakeI2C
+    ) -> None:
+        out_buf = bytearray(10)
+        in_buf = bytearray(6)
+        counting.writeto_then_readfrom(0x42, out_buf, in_buf, out_start=2, out_end=5)
+        assert counting.bytes_read == 6
 
     def test_sliced_in_counts_only_in_slice_length_as_read(
         self, counting: CountingI2C, fake: FakeI2C
@@ -234,7 +241,14 @@ class TestWritetoThenReadfrom:
         in_buf = bytearray(10)
         counting.writeto_then_readfrom(0x42, out_buf, in_buf, in_start=1, in_end=4)
         assert counting.bytes_read == 3
-        assert counting.bytes_written == 4  # full out_buf; in slice does not affect write count
+
+    def test_in_slice_does_not_affect_bytes_written(
+        self, counting: CountingI2C, fake: FakeI2C
+    ) -> None:
+        out_buf = bytearray(4)
+        in_buf = bytearray(10)
+        counting.writeto_then_readfrom(0x42, out_buf, in_buf, in_start=1, in_end=4)
+        assert counting.bytes_written == 4
 
     def test_forwards_all_arguments_to_inner_bus(
         self, counting: CountingI2C, fake: FakeI2C

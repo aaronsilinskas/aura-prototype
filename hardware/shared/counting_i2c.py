@@ -3,12 +3,11 @@
 Wraps a ``busio.I2C`` bus and forwards every method
 ``adafruit_bus_device.I2CDevice`` exercises while tallying running
 ``bytes_written`` / ``bytes_read`` totals.  Call ``reset()`` to zero both
-counters between measurement windows.  No per-frame allocation on any
-forwarding path — counters are plain ints incremented in place.
+counters between measurement windows.
 """
 
 
-def _slice_len(buffer, start: int, end) -> int:
+def _slice_len(buffer, start: int, end: int | None) -> int:
     """Byte count of a ``[start:end]`` slice; ``end=None`` means end of *buffer*."""
     return (end if end is not None else len(buffer)) - start
 
@@ -20,14 +19,13 @@ class CountingI2C:
     Lock/scan/deinit calls do not affect counters.
     """
 
-    def __init__(self, inner) -> None:
+    def __init__(self, inner: object) -> None:
         # inner is a duck-typed busio.I2C — no CircuitPython stub available on CPython
         self._inner = inner
         self.bytes_written: int = 0
         self.bytes_read: int = 0
 
     def reset(self) -> None:
-        """Zero both ``bytes_written`` and ``bytes_read``."""
         self.bytes_written = 0
         self.bytes_read = 0
 
@@ -37,24 +35,28 @@ class CountingI2C:
     def unlock(self) -> None:
         self._inner.unlock()
 
-    def writeto(self, address: int, buffer, *, start: int = 0, end=None) -> None:
+    def writeto(
+        self, address: int, buffer: bytearray, *, start: int = 0, end: int | None = None
+    ) -> None:
         self.bytes_written += _slice_len(buffer, start, end)
         self._inner.writeto(address, buffer, start=start, end=end)
 
-    def readfrom_into(self, address: int, buffer, *, start: int = 0, end=None) -> None:
+    def readfrom_into(
+        self, address: int, buffer: bytearray, *, start: int = 0, end: int | None = None
+    ) -> None:
         self.bytes_read += _slice_len(buffer, start, end)
         self._inner.readfrom_into(address, buffer, start=start, end=end)
 
     def writeto_then_readfrom(
         self,
         address: int,
-        out_buffer,
-        in_buffer,
+        out_buffer: bytearray,
+        in_buffer: bytearray,
         *,
         out_start: int = 0,
-        out_end=None,
+        out_end: int | None = None,
         in_start: int = 0,
-        in_end=None,
+        in_end: int | None = None,
     ) -> None:
         self.bytes_written += _slice_len(out_buffer, out_start, out_end)
         self.bytes_read += _slice_len(in_buffer, in_start, in_end)
@@ -68,7 +70,7 @@ class CountingI2C:
             in_end=in_end,
         )
 
-    def scan(self) -> list:
+    def scan(self) -> list[int]:
         return self._inner.scan()
 
     def deinit(self) -> None:
@@ -78,5 +80,7 @@ class CountingI2C:
         self._inner.__enter__()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+    def __exit__(
+        self, exc_type: type | None, exc_val: BaseException | None, exc_tb: object
+    ) -> bool:
         return self._inner.__exit__(exc_type, exc_val, exc_tb)
