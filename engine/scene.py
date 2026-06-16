@@ -58,7 +58,9 @@ class SceneLocalRegistry:
         not a directory the registry is left empty — no error is raised.
 
         This method is single-shot: it is called once during scene discovery.
-        Calling it again overwrites the previous item set (last call wins).
+        Calling it again with a valid directory overwrites the previous item set
+        (last call wins); calling it with a missing or non-directory path is a
+        no-op that leaves the existing state unchanged.
 
         *module_prefix* is the full dotted prefix for items in *item_dir*
         (e.g. ``"packs.scenes.forest.rules"``), not an import root.
