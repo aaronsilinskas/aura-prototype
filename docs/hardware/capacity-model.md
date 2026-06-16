@@ -515,13 +515,15 @@ Per-event cost for the shared `VibrationComponent` (DRV2605L over I2C). From
 
 | Board | Runtime | Driver | `cost_ms` | `i2c_bandwidth_bytes_per_sec` |
 |-------|---------|--------|-----------|-------------------------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 6.5104 | 0.80 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 6.5104 | _TBD_ |
 
 `cost_ms` is the measured average per-event CPU cost of `handle_event` +
 `motor.play()`. `i2c_bandwidth_bytes_per_sec` is `i2c_transaction_bytes *
-(max_calls_per_minute / 60)`; the profiler's `I2C_TRANSACTION_BYTES` is a
-configured seed (the DRV2605L sequence + go-register write), not measured here --
-refine via an I2C bus capture if a tighter figure is needed.
+(max_calls_per_minute / 60)`; `i2c_transaction_bytes` is measured on-device by
+wrapping the real `busio.I2C` bus in a `CountingI2C` decorator before
+`setup_drv2605`, resetting the counter before a representative vibration event,
+and reading `bytes_written` after that event. The table cell is `_TBD_` pending
+the on-device run.
 
 ### IR-transmit component costs
 

@@ -18,6 +18,10 @@ Each iteration:
 `PerformanceTracker` reports the per-event `handle_event` cost (the
 `VibrationComponent.cost_ms` term) alongside the uniform stats line.
 
+The I2C bus is wrapped in `CountingI2C` before `setup_drv2605`. The decorator is
+reset before a representative vibration event and `bytes_written` after that event
+gives the measured `i2c_transaction_bytes` -- no guessing required.
+
 Hardware
 --------
 - DRV2605L haptic motor driver on the board's default I2C bus (SDA/SCL).
@@ -49,6 +53,7 @@ from effects.effect import Effect, EffectVibration, VibrationConfig
 from effects.performance import PerformanceTracker
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
+from hardware.shared.counting_i2c import CountingI2C
 from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,
@@ -65,10 +70,6 @@ EVENT_INTERVAL_SECONDS: Final = 10.0  # 6 calls/minute
 ITERATIONS: Final = 12
 TARGET_FPS: Final = 24.0
 LOG_INTERVAL_SECONDS: Final = 5.0
-# Bytes the DRV2605L sequence + go-register write puts on the I2C bus per event.
-# A configured seed (like the pixel matrix's I2C_TRANSACTION_BYTES), not measured
-# here -- refine via an I2C bus capture if a tighter figure is needed.
-I2C_TRANSACTION_BYTES: Final = 8
 
 _EVENT_VERB: Final = "buzz"
 
@@ -80,14 +81,14 @@ def _build_output():
     from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
     from hardware.circuitpython.propmaker import setup_drv2605
 
-    i2c = busio.I2C(board.SCL, board.SDA)
+    i2c = CountingI2C(busio.I2C(board.SCL, board.SDA))
     motor = setup_drv2605(i2c)
-    return Drv2605EffectOutput(motor)
+    return Drv2605EffectOutput(motor), i2c
 
 
 def run() -> None:
     """Drive `handle_event` once per `EVENT_INTERVAL_SECONDS`, reporting per-event cost."""
-    output = _build_output()
+    output, counting_bus = _build_output()
 
     buzz_effect = Effect(
         "profiler.buzz",
@@ -104,6 +105,12 @@ def run() -> None:
         sweep_values=[max_calls_per_minute],
         target_fps=TARGET_FPS,
     )
+
+    counting_bus.reset()
+    receipt = EffectReceipt(0)
+    output.handle_event(buzz_event, frozenset({"all"}), buzz_effect, receipt)
+    output.flush()
+    i2c_transaction_bytes = counting_bus.bytes_written
 
     for _ in range(ITERATIONS):
         current_time = time.monotonic()
@@ -127,7 +134,7 @@ def run() -> None:
         time.sleep(EVENT_INTERVAL_SECONDS)
 
     cost_ms = perf.update_time_total / perf.frame_count * 1000.0
-    i2c_bandwidth = I2C_TRANSACTION_BYTES * (max_calls_per_minute / 60.0)
+    i2c_bandwidth = i2c_transaction_bytes * (max_calls_per_minute / 60.0)
     print_table_row(
         "vibration_component_costs",
         [f"{cost_ms:.4f}", f"{i2c_bandwidth:.2f}"],

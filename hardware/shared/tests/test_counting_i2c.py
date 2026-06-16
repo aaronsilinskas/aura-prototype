@@ -307,7 +307,7 @@ class TestReset:
 
 
 class TestTryLockUnlock:
-    def test_try_lock_returns_inner_result(self, counting: CountingI2C, fake: FakeI2C) -> None:
+    def test_try_lock_relays_true_from_inner(self, counting: CountingI2C, fake: FakeI2C) -> None:
         fake._lock_result = True
         assert counting.try_lock() is True
 
