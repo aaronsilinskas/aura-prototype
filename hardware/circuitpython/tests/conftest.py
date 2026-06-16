@@ -3,7 +3,7 @@
 import sys
 import types
 
-for _name in ("audiobusio", "audiocore", "audiomixer", "board"):
+for _name in ("audiobusio", "audiocore", "audiomixer", "board", "busio"):
     sys.modules.setdefault(_name, types.ModuleType(_name))
 
 # board constants needed by AudioEffectOutput.__init__

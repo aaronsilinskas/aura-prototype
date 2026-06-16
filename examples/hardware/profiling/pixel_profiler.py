@@ -65,7 +65,7 @@ from engine.effects.manager import EffectManager, EffectOutput
 from engine.packs import PackRegistry
 from engine.state import Scope
 from engine.timer import Timer
-from hardware.shared.counting_i2c import CountingI2C
+from hardware.circuitpython.counting_i2c import CountingI2C
 from hardware.shared.matrix_output import MatrixEffectOutput
 from hardware.shared.profiling_helpers import (
     linear_fit,
@@ -80,7 +80,7 @@ try:
 except ImportError:
     pass
 
-DRIVER: Final = "neopixel_pwm"  # or "is31fl3741_matrix"
+DRIVER: Final = "is31fl3741_matrix"  # or "neopixel_pwm"
 PIXEL_COUNTS: Final = [10, 50, 150]
 STACK_DEPTHS: Final = [1, 2, 4]
 SAMPLE_LEVEL: Final = 7

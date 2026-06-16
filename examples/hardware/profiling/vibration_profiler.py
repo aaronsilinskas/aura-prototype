@@ -53,7 +53,7 @@ from effects.effect import Effect, EffectVibration, VibrationConfig
 from effects.performance import PerformanceTracker
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
-from hardware.shared.counting_i2c import CountingI2C
+from hardware.circuitpython.counting_i2c import CountingI2C
 from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,

@@ -6,6 +6,10 @@ Wraps a ``busio.I2C`` bus and forwards every method
 counters between measurement windows.
 """
 
+from __future__ import annotations
+
+import busio
+
 
 def _slice_len(buffer: bytearray, start: int, end: int | None) -> int:
     """Byte count of a ``[start:end]`` slice; ``end=None`` means end of *buffer*."""
@@ -19,8 +23,7 @@ class CountingI2C:
     Lock/scan/deinit calls do not affect counters.
     """
 
-    def __init__(self, inner: object) -> None:
-        # inner is a duck-typed busio.I2C — no CircuitPython stub available on CPython
+    def __init__(self, inner: busio.I2C) -> None:
         self._inner = inner
         self.bytes_written: int = 0
         self.bytes_read: int = 0
@@ -38,14 +41,16 @@ class CountingI2C:
     def writeto(
         self, address: int, buffer: bytearray, *, start: int = 0, end: int | None = None
     ) -> None:
+        resolved_end = end if end is not None else len(buffer)
         self.bytes_written += _slice_len(buffer, start, end)
-        self._inner.writeto(address, buffer, start=start, end=end)
+        self._inner.writeto(address, buffer, start=start, end=resolved_end)
 
     def readfrom_into(
         self, address: int, buffer: bytearray, *, start: int = 0, end: int | None = None
     ) -> None:
+        resolved_end = end if end is not None else len(buffer)
         self.bytes_read += _slice_len(buffer, start, end)
-        self._inner.readfrom_into(address, buffer, start=start, end=end)
+        self._inner.readfrom_into(address, buffer, start=start, end=resolved_end)
 
     def writeto_then_readfrom(
         self,
@@ -58,6 +63,8 @@ class CountingI2C:
         in_start: int = 0,
         in_end: int | None = None,
     ) -> None:
+        resolved_out_end = out_end if out_end is not None else len(out_buffer)
+        resolved_in_end = in_end if in_end is not None else len(in_buffer)
         self.bytes_written += _slice_len(out_buffer, out_start, out_end)
         self.bytes_read += _slice_len(in_buffer, in_start, in_end)
         self._inner.writeto_then_readfrom(
@@ -65,22 +72,26 @@ class CountingI2C:
             out_buffer,
             in_buffer,
             out_start=out_start,
-            out_end=out_end,
+            out_end=resolved_out_end,
             in_start=in_start,
-            in_end=in_end,
+            in_end=resolved_in_end,
         )
 
     def scan(self) -> list[int]:
         return self._inner.scan()
 
+    def probe(self, address: int) -> bool:
+        return self._inner.probe(address)  # type: ignore[return-value]  # stub incorrectly declares List[int]; C source returns bool
+
     def deinit(self) -> None:
         self._inner.deinit()
 
-    def __enter__(self) -> "CountingI2C":
+    def __del__(self) -> None:
+        self._inner.deinit()
+
+    def __enter__(self) -> CountingI2C:
         self._inner.__enter__()
         return self
 
-    def __exit__(
-        self, exc_type: type | None, exc_val: BaseException | None, exc_tb: object
-    ) -> bool:
-        return self._inner.__exit__(exc_type, exc_val, exc_tb)
+    def __exit__(self) -> None:
+        self._inner.__exit__()

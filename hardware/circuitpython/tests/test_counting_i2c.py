@@ -8,7 +8,7 @@ Prior art: test_matrix_output.py, test_profiling_helpers.py.
 
 import pytest
 
-from hardware.shared.counting_i2c import CountingI2C
+from hardware.circuitpython.counting_i2c import CountingI2C
 
 # ---------------------------------------------------------------------------
 # Fake inner bus — records every call for assertion
@@ -78,9 +78,8 @@ class FakeI2C:
         self.calls.append(("__enter__",))
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.calls.append(("__exit__", exc_type, exc_val, exc_tb))
-        return False
+    def __exit__(self) -> None:
+        self.calls.append(("__exit__",))
 
 
 # ---------------------------------------------------------------------------
@@ -403,11 +402,11 @@ class TestContextManager:
 
     def test_exit_forwards_to_inner(self, counting: CountingI2C, fake: FakeI2C) -> None:
         counting.__exit__(None, None, None)
-        assert ("__exit__", None, None, None) in fake.calls
+        assert ("__exit__",) in fake.calls
 
-    def test_exit_returns_inner_result(self, counting: CountingI2C, fake: FakeI2C) -> None:
+    def test_exit_returns_none(self, counting: CountingI2C) -> None:
         result = counting.__exit__(None, None, None)
-        assert result is False
+        assert result is None
 
     def test_context_manager_protocol_works_end_to_end(self, fake: FakeI2C) -> None:
         with CountingI2C(fake) as bus:
