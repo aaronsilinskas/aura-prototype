@@ -366,8 +366,7 @@ preceded by a greppable marker line naming the table:
 
 ```
 __TABLE_ROW table=engine_component_costs
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.1721 | 0.0619 | 0.1230 | _TBD_ |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 0.1728 | 0.0565 | 0.1147 | _TBD_ |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.1234 | 0.0456 | 0.0789 | _TBD_ |
 ```
 
 The shared `print_table_row` helper (`hardware/shared/profiling_helpers.py`)
@@ -403,28 +402,29 @@ achievable_fps           = min(24, 1000 / required_frame_budget_ms)
 ```
 
 `usable_fraction = (100 − baseline_cpu_percent − headroom_reserve_percent) / 100`, i.e.
-**0.7765** on the engine-host (2.35% baseline) and **0.7792** on a satellite (2.08%
+**0.7435** on the engine-host (5.65% baseline) and **0.7479** on a satellite (5.21%
 baseline). Engine marginal cost here uses `per_rule_ms × rules + per_event_ms × events`
 only -- `tick_fixed_ms` is treated as already folded into the engine-host baseline (see
 the `tick_fixed_ms` <-> baseline overlap note below), so it is not charged twice.
 
-Worked from the measured constants below (each scope alone on its MCU, `stack_depth = 1`):
+Worked from the `circuitpython_10_2_1` measured constants below (each scope alone on its
+MCU, `stack_depth = 1`):
 
 | Representative busiest MCU | Σ cost_ms (worst frame) | required budget | achievable FPS |
 |----------------------------|-------------------------|-----------------|----------------|
-| Logic-only / satellite executor (engine 10 rules + 5 events, sound 4 voices, 1 haptic event) | ≈9.2 ms | 11.8 ms | **24** (capped) |
-| NeoPixel PWM scope, 60 px | 0.531×60 + 6.62 = 38.5 ms | 49.4 ms | **≈20** |
-| IS31FL3741 matrix scope, 100 px | 0.102×100 + 60.09 = 70.3 ms | 90.3 ms | **≈11** |
-| IS31FL3741 matrix scope (flush floor, 0 px) | 60.09 ms | 77.1 ms | **≈13** |
-| NeoPixel PWM scope, 144 px | 0.531×144 + 6.62 = 83.1 ms | 106.6 ms | **≈9** |
+| Logic-only / satellite executor (engine 10 rules + 5 events, sound 4 voices, 1 haptic event) | ≈8.6 ms | 11.5 ms | **24** (capped) |
+| NeoPixel PWM scope, 60 px | 0.552×60 + 5.84 = 38.96 ms | 52.1 ms | **≈19** |
+| IS31FL3741 matrix scope, 100 px | 0.106×100 + 60.69 = 71.29 ms | 95.3 ms | **≈10** |
+| IS31FL3741 matrix scope (flush floor, 0 px) | 60.69 ms | 81.1 ms | **≈12** |
+| NeoPixel PWM scope, 144 px | 0.552×144 + 5.84 = 85.32 ms | 114.1 ms | **≈9** |
 
 **Binding constraints.** Two terms dominate and force well below the 24 FPS ceiling for
 any non-trivial pixel workload:
 
-- **Matrix `flush_ms` = 60.09 ms** alone exceeds the entire 24 FPS budget (41.7 ms), so a
-  prop with any IS31FL3741 scope tops out near **11-13 FPS** regardless of pixel count.
-- **NeoPixel `per_pixel` = 0.531 ms/px** makes long strips the binding term: ~60 px still
-  reaches ~20 FPS, but ~144 px collapses to ~9 FPS.
+- **Matrix `flush_ms` = 60.69 ms** alone exceeds the entire 24 FPS budget (41.7 ms), so a
+  prop with any IS31FL3741 scope tops out near **10-12 FPS** regardless of pixel count.
+- **NeoPixel `per_pixel` = 0.552 ms/px** makes long strips the binding term: ~60 px still
+  reaches ~19 FPS, but ~144 px collapses to ~9 FPS.
 
 Logic-only MCUs (no pixel scope on them) stay CPU-cheap and hit the 24 FPS cap. Because
 the packer can split each `PixelScopeComponent` onto its own satellite, the ceiling for a
@@ -443,22 +443,24 @@ same inequality to ask "at the FPS I want, how many pixels can one MCU drive?":
 max_pixels = (usable_fraction × frame_budget_ms − flush_ms) / (per_pixel_ms × stack_depth)
 ```
 
-One scope alone on a satellite (`usable_fraction = 0.7792`, `stack_depth = 1`):
+One scope alone on a satellite (`circuitpython_10_2_1`, `usable_fraction = 0.7479`,
+`stack_depth = 1`):
 
-| Target FPS | budget (ms) | NeoPixel max px (0.531/px, 6.62 flush) | Matrix max px (0.102/px, 60.09 flush) |
+| Target FPS | budget (ms) | NeoPixel max px (0.552/px, 5.84 flush) | Matrix max px (0.106/px, 60.69 flush) |
 |-----------|-------------|----------------------------------------|----------------------------------------|
-| 24 | 41.7 | **48** | infeasible (flush alone > budget) |
-| 20 | 50.0 | **62** | infeasible |
-| 15 | 66.7 | **100** | ~7 |
-| 12 | 83.3 | **126** | ~91 |
-| 10 | 100.0 | **176** | ~226 |
+| 24 | 41.7 | **45** | infeasible (flush alone > budget) |
+| 20 | 50.0 | **57** | infeasible |
+| 15 | 66.7 | **79** | infeasible |
+| 12 | 83.3 | **102** | ~15 |
+| 10 | 100.0 | **124** | ~133 |
 
-The crossover is the key design signal: the **matrix is unusable above ~13 FPS at any
-size** (its 60 ms flush does not fit the budget), but once the target drops to ~10-12 FPS
-its much cheaper per-pixel cost (0.102 vs 0.531 ms/px) lets it scale to far more LEDs than
-NeoPixel. Driver choice and target FPS are therefore one coupled decision -- pixel count
-falls out of it rather than being a fixed input. Raising `stack_depth` (concurrent effect
-layers) divides `max_pixels` proportionally.
+The crossover is the key design signal: the **matrix is unusable above ~12 FPS at any
+size** (its 60.69 ms flush does not fit the budget), and only around **~10 FPS** does its
+much cheaper per-pixel cost (0.106 vs 0.552 ms/px) let it match then overtake NeoPixel's
+pixel capacity -- below that it scales to far more LEDs. Driver choice and target FPS are
+therefore one coupled decision -- pixel count falls out of it rather than being a fixed
+input. Raising `stack_depth` (concurrent effect layers) divides `max_pixels`
+proportionally.
 
 ### Per-MCU baselines
 
@@ -478,7 +480,7 @@ Per-tick cost terms for the `GameEngine` loop, scaling with rules, events, and r
 | Board | Runtime | Driver | `tick_fixed_ms` | `per_rule_ms` | `per_event_ms` | `router_overhead_ms` |
 |-------|---------|--------|------------------|----------------|-----------------|------------------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.0694 | 0.0621 | 0.1177 | _TBD_ |
-
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 0.1728 | 0.0565 | 0.1147 | _TBD_ |
 
 #### Reading the profiler output (`engine_profiler.py`, #409)
 
@@ -611,7 +613,7 @@ Cost terms for the shared `IrTransmitComponent`. From `ir_tx_profiler.py`.
 | Board | Runtime | Driver | `cost_ms` | `blocking_send_ms` |
 |-------|---------|--------|-----------|--------------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.50 | 59.81 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | _TBD_ | 59.57 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 0.50 | 59.57 |
 
 `blocking_send_ms` in the table is the realistic 4-byte AURA payload's
 `PulseOut.send` blocking duration -- the packet size this prop actually sends.
@@ -627,8 +629,8 @@ cost_ms = blocking_send_ms × send_rate_hz / target_fps
 ```
 
 At the realistic AURA cadence of one 4-byte packet per 5 s (`send_rate_hz = 0.2`)
-and `target_fps = 24`: `59.81 × 0.2 / 24 ≈ 0.50 ms` -- the recorded value. The
-absolute-max burst of 2 sends/s would average `59.81 × 2 / 24 ≈ 4.98 ms/frame`,
+and `target_fps = 24`: `59.57 × 0.2 / 24 ≈ 0.50 ms` -- the recorded value. The
+absolute-max burst of 2 sends/s would average `59.57 × 2 / 24 ≈ 4.96 ms/frame`,
 but that is a short burst rather than a sustained rate, and the single-frame spike
 it produces is already captured separately by `blocking_send_ms`. The sustained
 0.2 Hz figure is therefore the one recorded as the average reservation.
