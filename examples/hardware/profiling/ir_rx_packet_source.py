@@ -58,7 +58,7 @@ except ImportError:
 LINE_PIN_NAME: Final = "D12"
 RX_PIN_NAME: Final = "D11"
 PACKET_SIZE: Final = 4
-DELAY_MS: Final = 100.0
+DELAY_MS: Final = 0.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
 
