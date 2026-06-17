@@ -387,6 +387,77 @@ Per-board frame budget and global heap/headroom budgets the packer deducts from.
 |-------|---------|--------|--------------|-------------------------|------------------------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 24 | 130576 | 20% |
 
+#### Realistic target tick rate (RP2040, #400)
+
+The `target_fps = 24` above is the **ceiling**, not an achievable rate for every prop.
+The real tick rate is set by the **single busiest MCU** in a deployment: the frame
+budget must hold that MCU's worst-case summed `cost_ms`, after the role baseline and the
+20% headroom are deducted. Inverting the packing inequality
+(`Σ cost_ms ≤ usable_cpu%/100 × frame_budget_ms`):
+
+```
+required_frame_budget_ms = Σ(cost_ms on busiest MCU) / usable_fraction
+achievable_fps           = min(24, 1000 / required_frame_budget_ms)
+```
+
+`usable_fraction = (100 − baseline_cpu_percent − headroom_reserve_percent) / 100`, i.e.
+**0.7765** on the engine-host (2.35% baseline) and **0.7792** on a satellite (2.08%
+baseline). Engine marginal cost here uses `per_rule_ms × rules + per_event_ms × events`
+only -- `tick_fixed_ms` is treated as already folded into the engine-host baseline (see
+the `tick_fixed_ms` <-> baseline overlap note below), so it is not charged twice.
+
+Worked from the measured constants below (each scope alone on its MCU, `stack_depth = 1`):
+
+| Representative busiest MCU | Σ cost_ms (worst frame) | required budget | achievable FPS |
+|----------------------------|-------------------------|-----------------|----------------|
+| Logic-only / satellite executor (engine 10 rules + 5 events, sound 4 voices, 1 haptic event) | ≈9.2 ms | 11.8 ms | **24** (capped) |
+| NeoPixel PWM scope, 60 px | 0.531×60 + 6.62 = 38.5 ms | 49.4 ms | **≈20** |
+| IS31FL3741 matrix scope, 100 px | 0.102×100 + 60.09 = 70.3 ms | 90.3 ms | **≈11** |
+| IS31FL3741 matrix scope (flush floor, 0 px) | 60.09 ms | 77.1 ms | **≈13** |
+| NeoPixel PWM scope, 144 px | 0.531×144 + 6.62 = 83.1 ms | 106.6 ms | **≈9** |
+
+**Binding constraints.** Two terms dominate and force well below the 24 FPS ceiling for
+any non-trivial pixel workload:
+
+- **Matrix `flush_ms` = 60.09 ms** alone exceeds the entire 24 FPS budget (41.7 ms), so a
+  prop with any IS31FL3741 scope tops out near **11-13 FPS** regardless of pixel count.
+- **NeoPixel `per_pixel` = 0.531 ms/px** makes long strips the binding term: ~60 px still
+  reaches ~20 FPS, but ~144 px collapses to ~9 FPS.
+
+Logic-only MCUs (no pixel scope on them) stay CPU-cheap and hit the 24 FPS cap. Because
+the packer can split each `PixelScopeComponent` onto its own satellite, the ceiling for a
+multi-scope prop is set by its single heaviest scope's MCU, not the sum of all scopes.
+
+**Recommendation:** do not set a single board-wide `target_fps` below 24; keep 24 as the
+ceiling and choose the per-prop tick rate from the heaviest scope it deploys, per the
+table above.
+
+#### Designing the other way: max pixels per MCU at a target FPS
+
+While designing hardware (where pixel count is an output, not a fixed input), invert the
+same inequality to ask "at the FPS I want, how many pixels can one MCU drive?":
+
+```
+max_pixels = (usable_fraction × frame_budget_ms − flush_ms) / (per_pixel_ms × stack_depth)
+```
+
+One scope alone on a satellite (`usable_fraction = 0.7792`, `stack_depth = 1`):
+
+| Target FPS | budget (ms) | NeoPixel max px (0.531/px, 6.62 flush) | Matrix max px (0.102/px, 60.09 flush) |
+|-----------|-------------|----------------------------------------|----------------------------------------|
+| 24 | 41.7 | **48** | infeasible (flush alone > budget) |
+| 20 | 50.0 | **62** | infeasible |
+| 15 | 66.7 | **100** | ~7 |
+| 12 | 83.3 | **126** | ~91 |
+| 10 | 100.0 | **176** | ~226 |
+
+The crossover is the key design signal: the **matrix is unusable above ~13 FPS at any
+size** (its 60 ms flush does not fit the budget), but once the target drops to ~10-12 FPS
+its much cheaper per-pixel cost (0.102 vs 0.531 ms/px) lets it scale to far more LEDs than
+NeoPixel. Driver choice and target FPS are therefore one coupled decision -- pixel count
+falls out of it rather than being a fixed input. Raising `stack_depth` (concurrent effect
+layers) divides `max_pixels` proportionally.
+
 ### Per-MCU baselines
 
 Fixed CPU and heap tax each role's bare framework loop consumes before any component work (from `baseline_profiler.py`).
