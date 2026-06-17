@@ -631,7 +631,7 @@ Hard-real-time deadline for the shared `ReceiverComponent`, keyed additionally b
 
 | Board | Runtime | Driver | `buffer_depth` | `incoming_rate_hz` | `max_frame_ms` |
 |-------|---------|--------|----------------|--------------------|----------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 64 | 50.0 | 58.59 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 64 | 13.91 | 58.59 |
 
 `ir_rx_profiler.py` sweeps an injected per-frame busy-load while a known incoming
 packet rate is induced via loopback. `max_frame_ms` is the peak frame time at the
