@@ -381,7 +381,7 @@ row stays paste-ready with its gaps explicit. Copy the row for the
 
 ### Board profiles
 
-Per-board frame budget and global heap/headroom budgets the packer deducts from. `gc_margin_bytes` is not a per-board column here -- the engine baseline showed ~23KB of GC churn, so set `BoardProfile.gc_margin_bytes` to ~23KB for every board on this runtime.
+Per-board frame budget and global heap/headroom budgets the packer deducts from. `total_free_heap_bytes` is profiler-measured from `baseline_profiler.py`'s `gc.mem_free()` reading (the "Mem Free" stats line); `target_fps` (24 ceiling) and `headroom_reserve_percent` (20% default) are config inputs, not profiler measurements. `gc_margin_bytes` is not a per-board column here -- the engine baseline (also from `baseline_profiler.py`) showed ~23KB of GC churn, so set `BoardProfile.gc_margin_bytes` to ~23KB for every board on this runtime.
 
 | Board | Runtime | Driver | `target_fps` | `total_free_heap_bytes` | `headroom_reserve_percent` |
 |-------|---------|--------|--------------|-------------------------|------------------------------|
