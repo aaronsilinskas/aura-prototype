@@ -367,6 +367,7 @@ preceded by a greppable marker line naming the table:
 ```
 __TABLE_ROW table=engine_component_costs
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.1721 | 0.0619 | 0.1230 | _TBD_ |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 0.1728 | 0.0565 | 0.1147 | _TBD_ |
 ```
 
 The shared `print_table_row` helper (`hardware/shared/profiling_helpers.py`)
@@ -386,6 +387,7 @@ Per-board frame budget and global heap/headroom budgets the packer deducts from.
 | Board | Runtime | Driver | `target_fps` | `total_free_heap_bytes` | `headroom_reserve_percent` |
 |-------|---------|--------|--------------|-------------------------|------------------------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 24 | 130576 | 20% |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 24 | 129536 | 20% |
 
 #### Realistic target tick rate (RP2040, #400)
 
@@ -466,6 +468,8 @@ Fixed CPU and heap tax each role's bare framework loop consumes before any compo
 |--------|---------|--------|------|---------------|--------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | engine-host | 4.75% | 656 |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | satellite | 4.50% | 111 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | engine-host | 5.65% | 656 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | satellite | 5.21% | 464 |
 
 ### Engine component costs
 
@@ -535,6 +539,8 @@ Per-frame render+flush cost terms for a `PixelScopeComponent`, keyed by driver
 |-------|---------|--------|----------------------------------|------------|-------------------------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | neopixel_pwm | 0.523107 | 5.9815 | 0.0 |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | is31fl3741_matrix | 0.103225 | 59.2329 | 8664.0 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | neopixel_pwm | 0.551999 | 5.8358 | 0.0 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | is31fl3741_matrix | 0.105998 | 60.6856 | 8664.0 |
 
 `pixel_profiler.py` sweeps `pixel_count`, effect identity, and `stack_depth`.
 Because `cost_ms = stack_depth * worst_case_effect_per_pixel_ms * pixel_count +
@@ -574,6 +580,7 @@ Per-frame mixer cost terms for the shared `SoundComponent`. From `sound_profiler
 | Board | Runtime | Driver | `mixer_fixed_ms` | `per_voice_ms` |
 |-------|---------|--------|------------------|----------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.1834 | 0.0521 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 0.1929 | 0.0425 |
 
 `sound_profiler.py` sweeps `concurrent_voices`. Because `cost_ms = mixer_fixed_ms
 + per_voice_ms * effective_voices`, the `linear_fit` **intercept** is
@@ -587,6 +594,7 @@ Per-event cost for the shared `VibrationComponent` (DRV2605L over I2C). From
 | Board | Runtime | Driver | `cost_ms` | `i2c_bandwidth_bytes_per_sec` |
 |-------|---------|--------|-----------|-------------------------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 7.4870 | 1.80 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 7.0801 | 1.80 |
 
 `cost_ms` is the measured average per-event CPU cost of `handle_event` +
 `motor.play()`. `i2c_bandwidth_bytes_per_sec` is `i2c_transaction_bytes *
@@ -603,6 +611,7 @@ Cost terms for the shared `IrTransmitComponent`. From `ir_tx_profiler.py`.
 | Board | Runtime | Driver | `cost_ms` | `blocking_send_ms` |
 |-------|---------|--------|-----------|--------------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.50 | 59.81 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | _TBD_ | 59.57 |
 
 `blocking_send_ms` in the table is the realistic 4-byte AURA payload's
 `PulseOut.send` blocking duration -- the packet size this prop actually sends.
@@ -632,6 +641,7 @@ Hard-real-time deadline for the shared `ReceiverComponent`, keyed additionally b
 | Board | Runtime | Driver | `buffer_depth` | `incoming_rate_hz` | `max_frame_ms` |
 |-------|---------|--------|----------------|--------------------|----------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 64 | 13.91 | 58.59 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 64 | 13.9 | 63.01 |
 
 `ir_rx_profiler.py` sweeps an injected per-frame busy-load while a known incoming
 packet rate is induced via loopback. `max_frame_ms` is the peak frame time at the
