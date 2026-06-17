@@ -63,7 +63,7 @@ except ImportError:
     pass
 
 MODE: Final = "engine_host"  # or "satellite"
-TARGET_FPS: Final = 60.0
+TARGET_FPS: Final = 24.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
 
