@@ -602,12 +602,27 @@ Cost terms for the shared `IrTransmitComponent`. From `ir_tx_profiler.py`.
 
 | Board | Runtime | Driver | `cost_ms` | `blocking_send_ms` |
 |-------|---------|--------|-----------|--------------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | _TBD_ | 757.81 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.50 | 59.81 |
 
-`blocking_send_ms` is the worst-case `PulseOut.send` blocking duration across the
-`PAYLOAD_LENGTHS` sweep (the longest payload). `cost_ms` -- the *average*
-per-frame CPU reservation -- depends on send cadence, which this profiler does
-not sweep, so it is emitted as `_TBD_`.
+`blocking_send_ms` in the table is the realistic 4-byte AURA payload's
+`PulseOut.send` blocking duration -- the packet size this prop actually sends.
+For reference, the worst-case across the full `PAYLOAD_LENGTHS` sweep (the longest
+payload) measures **757.81 ms**; use that figure only if a prop transmits much
+longer payloads.
+
+`cost_ms` -- the *average* per-frame CPU reservation -- is not swept by the
+profiler; it is the blocking duration amortized across the frames between sends:
+
+```
+cost_ms = blocking_send_ms × send_rate_hz / target_fps
+```
+
+At the realistic AURA cadence of one 4-byte packet per 5 s (`send_rate_hz = 0.2`)
+and `target_fps = 24`: `59.81 × 0.2 / 24 ≈ 0.50 ms` -- the recorded value. The
+absolute-max burst of 2 sends/s would average `59.81 × 2 / 24 ≈ 4.98 ms/frame`,
+but that is a short burst rather than a sustained rate, and the single-frame spike
+it produces is already captured separately by `blocking_send_ms`. The sustained
+0.2 Hz figure is therefore the one recorded as the average reservation.
 
 ### IR-receive component costs
 
