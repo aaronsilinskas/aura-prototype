@@ -72,7 +72,6 @@ from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,
     print_table_row,
-    stats_due,
 )
 
 try:
@@ -240,27 +239,22 @@ def _measure_point(
     perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
     next_change_time = time.monotonic() + DISPLAY_SECONDS
     while True:
-        current_time = time.monotonic()
-
         perf.start_frame()
         perf.start_update_time()
         timer.update()
         effect_manager.update(timer)
         perf.add_update_time()
 
-        due = stats_due(perf, current_time)
-        perf.complete_frame(current_time)
-        if due:
+        if perf.complete_frame():
             print_stats_line(
                 perf,
-                current_time,
                 pixel_count=pixel_count,
                 element=element,
                 stack_depth=stack_depth,
                 i2c_bandwidth_bytes_per_sec=i2c_bandwidth,
             )
 
-        if current_time > next_change_time:
+        if perf.last_frame_end > next_change_time:
             break
 
     for receipt in receipts:

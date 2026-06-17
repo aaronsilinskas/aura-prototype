@@ -44,7 +44,6 @@ Configuration
 from __future__ import annotations
 
 import gc
-import time
 
 from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager, EffectOutput
@@ -56,7 +55,6 @@ from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,
     print_table_row,
-    stats_due,
 )
 
 try:
@@ -126,7 +124,6 @@ def run_engine_host() -> None:
     )
 
     while True:
-        current_time = time.monotonic()
         perf.start_frame()
 
         perf.start_update_time()
@@ -135,12 +132,10 @@ def run_engine_host() -> None:
         game_engine.update(game_state)
         perf.add_update_time()
 
-        due = stats_due(perf, current_time)
-        perf.complete_frame(current_time)
-        if due:
+        if perf.complete_frame():
             busy_time = perf.update_time_total + perf.render_time_total
-            cpu_percent = 100.0 * busy_time / (current_time - perf.start_time)
-            print_stats_line(perf, current_time, cpu_percent=f"{cpu_percent:.2f}%")
+            cpu_percent = 100.0 * busy_time / (perf.last_frame_end - perf.start_time)
+            print_stats_line(perf, cpu_percent=f"{cpu_percent:.2f}%")
             # Per-MCU baselines row -- read once cpu_percent has converged.
             print_table_row(
                 "per_mcu_baselines",
@@ -162,7 +157,6 @@ def run_satellite() -> None:
     )
 
     while True:
-        current_time = time.monotonic()
         perf.start_frame()
 
         perf.start_update_time()
@@ -170,12 +164,10 @@ def run_satellite() -> None:
         effect_manager.update(timer)
         perf.add_update_time()
 
-        due = stats_due(perf, current_time)
-        perf.complete_frame(current_time)
-        if due:
+        if perf.complete_frame():
             busy_time = perf.update_time_total + perf.render_time_total
-            cpu_percent = 100.0 * busy_time / (current_time - perf.start_time)
-            print_stats_line(perf, current_time, cpu_percent=f"{cpu_percent:.2f}%")
+            cpu_percent = 100.0 * busy_time / (perf.last_frame_end - perf.start_time)
+            print_stats_line(perf, cpu_percent=f"{cpu_percent:.2f}%")
             # Per-MCU baselines row -- read once cpu_percent has converged.
             print_table_row(
                 "per_mcu_baselines",

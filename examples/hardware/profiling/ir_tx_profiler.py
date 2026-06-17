@@ -56,7 +56,6 @@ from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,
     print_table_row,
-    stats_due,
 )
 
 try:
@@ -102,8 +101,6 @@ def run() -> None:
         perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
 
         for _ in range(ITERATIONS_PER_LENGTH):
-            current_time = time.monotonic()
-
             perf.start_frame()
             perf.start_update_time()
             send_start = time.monotonic()
@@ -114,12 +111,9 @@ def run() -> None:
             if blocking_send_ms > worst_blocking_send_ms:
                 worst_blocking_send_ms = blocking_send_ms
 
-            due = stats_due(perf, current_time)
-            perf.complete_frame(current_time)
-            if due:
+            if perf.complete_frame():
                 print_stats_line(
                     perf,
-                    current_time,
                     payload_length=length,
                     blocking_send_ms=f"{blocking_send_ms:.2f}",
                 )

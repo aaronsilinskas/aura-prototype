@@ -59,7 +59,6 @@ from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,
     print_table_row,
-    stats_due,
 )
 
 try:
@@ -68,7 +67,7 @@ except ImportError:
     pass
 
 # Fixed at 4 receivers -- not a deployment axis (#397).
-RX_PIN_NAMES: Final = ("A0", "A1", "A2", "A3")
+RX_PIN_NAMES: Final = ("D11", "A1", "A2", "A3")
 BUFFER_DEPTH: Final = 64
 INCOMING_RATE_HZ: Final = 50.0
 INJECTED_LOAD_SWEEP_MS: Final = [0.0, 5.0, 10.0, 20.0, 40.0, 80.0]
@@ -125,8 +124,6 @@ def run() -> None:
 
         next_change_time = time.monotonic() + DISPLAY_SECONDS
         while True:
-            current_time = time.monotonic()
-
             perf.start_frame()
             perf.start_update_time()
             packet = receiver.receive()
@@ -141,14 +138,11 @@ def run() -> None:
             _busy_wait_ms(injected_load_ms)
             perf.add_update_time()
 
-            due = stats_due(perf, current_time)
-            perf.complete_frame(current_time)
-            if due:
+            if perf.complete_frame():
                 total_packets = packets_received + packets_dropped
                 loss_rate = packets_dropped / total_packets if total_packets > 0 else 0.0
                 print_stats_line(
                     perf,
-                    current_time,
                     injected_load_ms=injected_load_ms,
                     buffer_depth=BUFFER_DEPTH,
                     incoming_rate_hz=INCOMING_RATE_HZ,
@@ -158,7 +152,7 @@ def run() -> None:
                     frame_time_peak_ms=f"{perf.frame_time_peak * 1000.0:.2f}",
                 )
 
-            if current_time > next_change_time:
+            if perf.last_frame_end > next_change_time:
                 break
 
         total_received += packets_received

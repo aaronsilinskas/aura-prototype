@@ -114,7 +114,18 @@ while True:
 
     pixels.show()
 
-    perf.complete_frame(current_time)
+    if perf.complete_frame():
+        frames = perf.frame_count
+        fps = frames / (perf.last_frame_end - perf.start_time)
+        print(
+            f"FPS: {fps:.2f}, "
+            f"Update Time: {perf.update_time_total / frames:.4f}s, "
+            f"Render Time: {perf.render_time_total / frames:.4f}s, "
+            f"Mem Delta Avg: {perf.memory_delta_total / frames:.2f}B, "
+            f"Mem Delta Peak: {perf.memory_delta_peak}B, "
+            f"Mem Free: {perf.last_mem_free}B, "
+            f"Frame Time Peak: {perf.frame_time_peak:.4f}s"
+        )
 
     if current_time > next_change_time:
         level_index += 1

@@ -83,7 +83,6 @@ from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,
     print_table_row,
-    stats_due,
 )
 
 try:
@@ -154,8 +153,6 @@ def _run_point(rule_count: int, events_per_tick: int) -> float:
 
     next_change_time = time.monotonic() + DISPLAY_SECONDS
     while True:
-        current_time = time.monotonic()
-
         perf.start_frame()
         perf.start_update_time()
         for i in range(events_per_tick):
@@ -163,17 +160,14 @@ def _run_point(rule_count: int, events_per_tick: int) -> float:
         game_engine.update(game_state)
         perf.add_update_time()
 
-        due = stats_due(perf, current_time)
-        perf.complete_frame(current_time)
-        if due:
+        if perf.complete_frame():
             print_stats_line(
                 perf,
-                current_time,
                 rule_count=rule_count,
                 events_per_tick=events_per_tick,
             )
 
-        if current_time > next_change_time:
+        if perf.last_frame_end > next_change_time:
             break
 
     return perf.update_time_total / perf.frame_count * 1000.0

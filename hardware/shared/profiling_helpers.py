@@ -157,37 +157,34 @@ def print_profile_header(
     )
 
 
-def stats_due(perf: PerformanceTracker, current_time: float) -> bool:
-    """Return whether ``current_time`` has reached ``perf``'s next log interval.
+def print_stats_line(perf: PerformanceTracker, **extra: object) -> None:
+    """Print the uniform per-interval profiling stats line (``__STATS``).
 
-    Call before ``perf.complete_frame(current_time)`` (which advances
-    ``next_log_time``) to decide whether to print extra profiler-specific
-    fields alongside ``perf``'s own stats line for this frame.
-    """
-    return current_time > perf.next_log_time
+    This is the single profiling stats line: it reports the full set of fields
+    ``PerformanceTracker`` accumulates (FPS, average update/render time, GC
+    delta average/last/peak, allocation average, heap used/free, and peak
+    frame time) plus any profiler-specific ``extra`` keyword values (e.g.
+    ``cpu_percent``), so every profiler's output parses the same way.
 
-
-def print_stats_line(perf: PerformanceTracker, current_time: float, **extra: object) -> None:
-    """Print the uniform per-interval profiling stats line.
-
-    Mirrors the fields ``PerformanceTracker`` already tracks (FPS, average
-    update/render time, GC delta/peak, free heap, and peak frame time) plus
-    any profiler-specific ``extra`` keyword values (e.g. ``cpu_percent``),
-    so every profiler's output can be parsed the same way.
-
-    Call once per frame, immediately *before* ``perf.complete_frame(current_time)``
-    (which advances ``perf``'s bookkeeping for the next interval), and only
-    when ``stats_due(perf, current_time)`` is ``True``.
+    Call once when ``perf.complete_frame()`` returns ``True``. The FPS and
+    memory snapshot are read from the frame ``complete_frame`` just closed
+    (via ``perf.last_frame_end`` / ``perf.last_mem_used`` /
+    ``perf.last_mem_free``), so no second clock or heap sample is taken here.
     """
     extra_parts = ", ".join(f"{name}={value}" for name, value in extra.items())
-    fps = perf.frame_count / (current_time - perf.start_time)
+    frames = perf.frame_count
+    elapsed = perf.last_frame_end - perf.start_time
+    fps = frames / elapsed if elapsed > 0 else 0.0
     print(
         f"__STATS FPS: {fps:.2f}, "
-        f"Update Time: {perf.update_time_total / perf.frame_count:.4f}s, "
-        f"Render Time: {perf.render_time_total / perf.frame_count:.4f}s, "
-        f"Mem Delta Avg: {perf.memory_delta_total / perf.frame_count:.2f}B, "
+        f"Update Time: {perf.update_time_total / frames:.4f}s, "
+        f"Render Time: {perf.render_time_total / frames:.4f}s, "
+        f"Mem Delta Avg: {perf.memory_delta_total / frames:.2f}B, "
+        f"Mem Alloc Avg: {perf.memory_allocated_total / frames:.2f}B, "
+        f"Mem Delta Last: {perf.last_memory_delta}B, "
         f"Mem Delta Peak: {perf.memory_delta_peak}B, "
-        f"Mem Free: {gc.mem_free()}B, "
+        f"Mem Used: {perf.last_mem_used}B, "
+        f"Mem Free: {perf.last_mem_free}B, "
         f"Frame Time Peak: {perf.frame_time_peak:.4f}s"
         + (f", {extra_parts}" if extra_parts else "")
     )
