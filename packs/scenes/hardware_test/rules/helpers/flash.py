@@ -1,11 +1,9 @@
 """``Flash`` — receipt + start-time bookkeeping for a timed hardware_test flash.
 
-The IR and radio receive paths each start a "flash" effect (a white solid)
-and need to know when to expire it and restore the idle effect. Both paths
-previously duplicated a "receipt + start timestamp, expires after a fixed
-duration" pattern as loose ``GameState`` keys; ``Flash`` collapses that into a
-single value object that ``HwTestModeRule._check_flash_expiry`` can drive
-identically for both flashes.
+``ir_flash`` and ``radio_flash`` are :class:`~engine.state.StateSlot` callables
+that own the get-or-create pattern for each flash; the slot's ``.key``
+attribute is the canonical state key used for ``state.delete`` / ``state.has``
+operations.
 """
 
 from __future__ import annotations
@@ -15,10 +13,7 @@ try:
 except ImportError:
     pass
 
-from engine.state import EffectReceipt, GameState
-
-IR_FLASH_KEY: Final = "ir_flash"
-RADIO_FLASH_KEY: Final = "radio_flash"
+from engine.state import EffectReceipt, StateSlot
 
 
 class Flash:
@@ -46,8 +41,5 @@ class Flash:
         return now - self.start_time > duration
 
 
-def flash(state: GameState, key: str) -> Flash:
-    """Return the cached :class:`Flash` for *key*, building and caching it on first use."""
-    if not state.has(key):
-        state.set(key, Flash())
-    return state.get_or_none(key, Flash)  # type: ignore[return-value]
+ir_flash: Final = StateSlot("ir_flash", lambda s: Flash(), Flash)
+radio_flash: Final = StateSlot("radio_flash", lambda s: Flash(), Flash)

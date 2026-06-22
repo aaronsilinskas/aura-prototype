@@ -24,8 +24,8 @@ except ImportError:
 
 from engine.input import InputEvents
 from engine.phase import PhaseKey, PhaseRule
-from engine.state import GameState, Scope, ScopeValue
-from packs.scenes.hardware_test.rules.helpers.flash import IR_FLASH_KEY, RADIO_FLASH_KEY, flash
+from engine.state import GameState, Scope, ScopeValue, StateSlot
+from packs.scenes.hardware_test.rules.helpers.flash import ir_flash, radio_flash
 from packs.scenes.hardware_test.rules.helpers.phases import (
     HW_MACHINE_KEY,
     MODE_ORDER,
@@ -102,8 +102,8 @@ class HwModeRule(PhaseRule):
     def _advance_mode(self, state: GameState) -> None:
         state.effect_controls.stop_effect(Scope.ALL)
         # Clear all flash keys
-        state.delete(IR_FLASH_KEY)
-        state.delete(RADIO_FLASH_KEY)
+        state.delete(ir_flash.key)
+        state.delete(radio_flash.key)
 
         next_mode = next_in_cycle(MODE_ORDER, self.phase)
         print("changing to mode " + str(MODE_ORDER.index(next_mode)))
@@ -111,19 +111,19 @@ class HwModeRule(PhaseRule):
         self.transition_to(state, next_mode)
 
     def _check_flash_expiry(self, state: GameState) -> None:
-        self._expire_flash(state, IR_FLASH_KEY, Scope.DIRECTIONAL)
-        self._expire_flash(state, RADIO_FLASH_KEY, Scope.Global.ALL)
+        self._expire_flash(state, ir_flash, Scope.DIRECTIONAL)
+        self._expire_flash(state, radio_flash, Scope.Global.ALL)
 
-    def _expire_flash(self, state: GameState, key: str, idle_scope: ScopeValue) -> None:
-        if not state.has(key):
+    def _expire_flash(self, state: GameState, slot: StateSlot, idle_scope: ScopeValue) -> None:
+        if not slot.is_in(state):
             return
 
-        flash_state = flash(state, key)
+        flash_state = slot(state)
         if not flash_state.expired(state.total, FLASH_DURATION):
             return
 
         receipt = flash_state.receipt
         assert receipt is not None  # expired() is only True once restart() set a receipt
-        state.delete(key)
+        state.delete(slot.key)
         receipt.stop()
         state.effect_controls.set_effect(idle_scope, "basic.solid", {"color": 0xFFFFFF})

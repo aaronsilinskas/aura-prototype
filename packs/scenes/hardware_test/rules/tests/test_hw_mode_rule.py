@@ -14,7 +14,7 @@ from engine.engine import GameEngine
 from engine.input import ButtonData, InputEvents
 from engine.state import EffectReceipt, GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
-from packs.scenes.hardware_test.rules.helpers.flash import IR_FLASH_KEY, RADIO_FLASH_KEY, flash
+from packs.scenes.hardware_test.rules.helpers.flash import ir_flash, radio_flash
 from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import FLASH_DURATION
 from packs.scenes.hardware_test.rules.helpers.phases import (
     MODE_ACCELEROMETER,
@@ -158,13 +158,13 @@ def test_button_b_clears_flash_keys_on_mode_change(spy):
     state, engine = _make_state(spy)
     seed_phase(state, MODE_IR, entered=True)
     _tick(state, engine)
-    flash(state, IR_FLASH_KEY).restart(1.0, EffectReceipt(1))
-    flash(state, RADIO_FLASH_KEY).restart(1.0, EffectReceipt(2))
+    ir_flash(state).restart(1.0, EffectReceipt(1))
+    radio_flash(state).restart(1.0, EffectReceipt(2))
 
     _press_button(state, engine, "B")
 
-    assert IR_FLASH_KEY not in state
-    assert RADIO_FLASH_KEY not in state
+    assert ir_flash.key not in state
+    assert radio_flash.key not in state
 
 
 def test_advancing_to_new_mode_fires_its_entry_effect_by_the_next_tick(spy):
@@ -204,14 +204,14 @@ def test_ir_flash_expires_and_restarts_directional_idle(spy):
     _tick(state, engine)
 
     receipt = EffectReceipt(42)
-    flash(state, IR_FLASH_KEY).restart(0.0, receipt)
+    ir_flash(state).restart(0.0, receipt)
     timer.total = FLASH_DURATION + 0.01
     spy.set_effect_calls.clear()
 
     _tick(state, engine)
 
     assert receipt.is_stopped()
-    assert IR_FLASH_KEY not in state
+    assert ir_flash.key not in state
     directional_calls = [c for c in spy.set_effect_calls if c[0] == Scope.DIRECTIONAL]
     assert len(directional_calls) >= 1
 
@@ -223,14 +223,14 @@ def test_radio_flash_expires_and_restarts_global_all_idle(spy):
     _tick(state, engine)
 
     receipt = EffectReceipt(99)
-    flash(state, RADIO_FLASH_KEY).restart(0.0, receipt)
+    radio_flash(state).restart(0.0, receipt)
     timer.total = FLASH_DURATION + 0.01
     spy.set_effect_calls.clear()
 
     _tick(state, engine)
 
     assert receipt.is_stopped()
-    assert RADIO_FLASH_KEY not in state
+    assert radio_flash.key not in state
     all_calls = [c for c in spy.set_effect_calls if c[0] in (Scope.Global.ALL, Scope.ALL)]
     assert len(all_calls) >= 1
 
@@ -242,10 +242,10 @@ def test_ir_flash_does_not_expire_before_duration(spy):
     _tick(state, engine)
 
     receipt = EffectReceipt(7)
-    flash(state, IR_FLASH_KEY).restart(0.0, receipt)
+    ir_flash(state).restart(0.0, receipt)
     timer.total = FLASH_DURATION - 0.01
 
     _tick(state, engine)
 
     assert not receipt.is_stopped()
-    assert IR_FLASH_KEY in state
+    assert ir_flash.key in state

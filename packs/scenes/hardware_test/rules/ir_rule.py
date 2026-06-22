@@ -3,7 +3,7 @@ from __future__ import annotations
 from engine.input import InputEvents
 from engine.network import LINE, NetworkEvents
 from engine.state import GameState, Scope
-from packs.scenes.hardware_test.rules.helpers.flash import IR_FLASH_KEY, flash
+from packs.scenes.hardware_test.rules.helpers.flash import ir_flash
 from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import HwModeRule
 from packs.scenes.hardware_test.rules.helpers.mode import HW_TEST_PAYLOAD
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_IR
@@ -39,7 +39,7 @@ class HwTestIrRule(HwModeRule):
         receipt = state.effect_controls.set_effect(
             Scope.DIRECTIONAL, "basic.solid", {"color": 0xFFFFFF}
         )
-        flash(state, IR_FLASH_KEY).restart(state.total, receipt)
+        ir_flash(state).restart(state.total, receipt)
         print(
             "ir received "
             + str(event.data)

@@ -342,3 +342,32 @@ def test_two_state_slots_with_the_same_key_resolve_the_same_cached_value() -> No
     b = slot_b(state)
 
     assert a is b
+
+
+# ---------------------------------------------------------------------------
+# StateSlot.is_in
+# ---------------------------------------------------------------------------
+
+
+def test_state_slot_is_in_returns_false_before_first_call() -> None:
+    slot = _make_slot()
+    state = _make_state()
+
+    assert not slot.is_in(state)
+
+
+def test_state_slot_is_in_returns_true_after_first_call() -> None:
+    slot = _make_slot()
+    state = _make_state()
+    slot(state)
+
+    assert slot.is_in(state)
+
+
+def test_state_slot_is_in_is_false_after_key_deleted_from_state() -> None:
+    slot = _make_slot()
+    state = _make_state()
+    slot(state)
+    state.delete(slot.key)
+
+    assert not slot.is_in(state)
