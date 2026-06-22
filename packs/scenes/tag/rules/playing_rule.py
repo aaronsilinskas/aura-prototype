@@ -12,18 +12,23 @@ bar on the way out).
 from __future__ import annotations
 
 from engine.input import InputEvents
+from engine.phase import PhaseRule
 from engine.state import GameState, Scope
-from packs.scenes.tag.rules.helpers.phases import PHASE_GAME_OVER, PHASE_PLAYING
+from packs.scenes.tag.rules.helpers.phases import (
+    PHASE_GAME_OVER,
+    PHASE_PLAYING,
+    PHASE_READY,
+    TAG_MACHINE_KEY,
+)
 from packs.scenes.tag.rules.helpers.tag_config import tag_config
-from packs.scenes.tag.rules.helpers.tag_phase_rule import TagPhaseRule
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 
 
-class TagPlayingRule(TagPhaseRule):
+class TagPlayingRule(PhaseRule):
     """Drives the Playing phase: hitpoints, progress bar, and game-over transition."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_PLAYING)
+        super().__init__(PHASE_PLAYING, TAG_MACHINE_KEY, PHASE_READY)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_enter(self, state: GameState) -> None:

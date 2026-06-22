@@ -10,17 +10,23 @@ stopping the pulse on the way out.
 from __future__ import annotations
 
 from engine.input import InputEvents
+from engine.phase import PhaseRule
 from engine.state import GameState, Scope
-from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, PHASE_STARTING, tag_phase
+from packs.scenes.tag.rules.helpers.phases import (
+    PHASE_PLAYING,
+    PHASE_READY,
+    PHASE_STARTING,
+    TAG_MACHINE_KEY,
+    tag_phase,
+)
 from packs.scenes.tag.rules.helpers.tag_config import tag_config
-from packs.scenes.tag.rules.helpers.tag_phase_rule import TagPhaseRule
 
 
-class TagStartingRule(TagPhaseRule):
+class TagStartingRule(PhaseRule):
     """Drives the Starting phase: warning countdown into Playing."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_STARTING)
+        super().__init__(PHASE_STARTING, TAG_MACHINE_KEY, PHASE_READY)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_enter(self, state: GameState) -> None:
