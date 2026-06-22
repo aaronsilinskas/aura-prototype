@@ -22,16 +22,6 @@ from engine.state import GameState, StateSlot
 
 _CONFIG_KEY: Final = "tag_config"
 
-DEFAULT_STARTING_HITPOINTS: Final = 10
-DEFAULT_DEAFEN_WINDOW: Final = 0.1
-DEFAULT_EXPECTED_TEAM: Final = 0
-DEFAULT_EXPECTED_PLAYER: Final = 1
-DEFAULT_WARNING_PULSE_COUNT: Final = 5
-DEFAULT_WARNING_PULSE_DURATION: Final = 0.6
-DEFAULT_MAX_AMMO: Final = 10
-DEFAULT_SHOT_COOLDOWN: Final = 1.0
-DEFAULT_RELOAD_DURATION: Final = 3.0
-
 
 class TagConfig:
     """Immutable tunable configuration for the Tag scene.
@@ -79,17 +69,15 @@ class TagConfig:
     def from_state(cls, state: GameState) -> TagConfig:
         """Build a config from the flat seeded ``tag_*`` keys, applying defaults."""
         return cls(
-            starting_hitpoints=state.get("tag_starting_hitpoints", DEFAULT_STARTING_HITPOINTS),
-            deafen_window=state.get("tag_deafen_window", DEFAULT_DEAFEN_WINDOW),
-            expected_team=state.get("tag_expected_team", DEFAULT_EXPECTED_TEAM),
-            expected_player=state.get("tag_expected_player", DEFAULT_EXPECTED_PLAYER),
-            warning_pulse_count=state.get("tag_warning_pulse_count", DEFAULT_WARNING_PULSE_COUNT),
-            warning_pulse_duration=state.get(
-                "tag_warning_pulse_duration", DEFAULT_WARNING_PULSE_DURATION
-            ),
-            max_ammo=state.get("tag_max_ammo", DEFAULT_MAX_AMMO),
-            shot_cooldown=state.get("tag_shot_cooldown", DEFAULT_SHOT_COOLDOWN),
-            reload_duration=state.get("tag_reload_duration", DEFAULT_RELOAD_DURATION),
+            starting_hitpoints=state.get("tag_starting_hitpoints", 10),
+            deafen_window=state.get("tag_deafen_window", 0.1),
+            expected_team=state.get("tag_expected_team", 0),
+            expected_player=state.get("tag_expected_player", 1),
+            warning_pulse_count=state.get("tag_warning_pulse_count", 5),
+            warning_pulse_duration=state.get("tag_warning_pulse_duration", 0.6),
+            max_ammo=state.get("tag_max_ammo", 10),
+            shot_cooldown=state.get("tag_shot_cooldown", 1.0),
+            reload_duration=state.get("tag_reload_duration", 3.0),
         )
 
     def warning_duration(self) -> float:

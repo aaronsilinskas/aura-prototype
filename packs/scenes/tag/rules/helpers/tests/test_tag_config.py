@@ -9,15 +9,6 @@ from engine.engine import GameEngine
 from engine.state import SceneControls
 from engine.tests.helpers import SpyEffectControls
 from packs.scenes.tag.rules.helpers.tag_config import (
-    DEFAULT_DEAFEN_WINDOW,
-    DEFAULT_EXPECTED_PLAYER,
-    DEFAULT_EXPECTED_TEAM,
-    DEFAULT_MAX_AMMO,
-    DEFAULT_RELOAD_DURATION,
-    DEFAULT_SHOT_COOLDOWN,
-    DEFAULT_STARTING_HITPOINTS,
-    DEFAULT_WARNING_PULSE_COUNT,
-    DEFAULT_WARNING_PULSE_DURATION,
     TagConfig,
     tag_config,
 )
@@ -49,15 +40,15 @@ def test_from_state_applies_defaults_when_unseeded():
 
     config = TagConfig.from_state(state)
 
-    assert config.starting_hitpoints == DEFAULT_STARTING_HITPOINTS
-    assert config.deafen_window == pytest.approx(DEFAULT_DEAFEN_WINDOW)
-    assert config.expected_team == DEFAULT_EXPECTED_TEAM
-    assert config.expected_player == DEFAULT_EXPECTED_PLAYER
-    assert config.warning_pulse_count == DEFAULT_WARNING_PULSE_COUNT
-    assert config.warning_pulse_duration == pytest.approx(DEFAULT_WARNING_PULSE_DURATION)
-    assert config.max_ammo == DEFAULT_MAX_AMMO
-    assert config.shot_cooldown == pytest.approx(DEFAULT_SHOT_COOLDOWN)
-    assert config.reload_duration == pytest.approx(DEFAULT_RELOAD_DURATION)
+    assert config.starting_hitpoints == 10
+    assert config.deafen_window == pytest.approx(0.1)
+    assert config.expected_team == 0
+    assert config.expected_player == 1
+    assert config.warning_pulse_count == 5
+    assert config.warning_pulse_duration == pytest.approx(0.6)
+    assert config.max_ammo == 10
+    assert config.shot_cooldown == pytest.approx(1.0)
+    assert config.reload_duration == pytest.approx(3.0)
 
 
 def test_from_state_reads_seeded_overrides():
