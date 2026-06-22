@@ -23,14 +23,13 @@ except ImportError:
     pass
 
 from engine.input import InputEvents
-from engine.phase import PhaseKey, PhaseMachine, PhaseRule
+from engine.phase import PhaseKey, PhaseRule
 from engine.state import GameState, Scope, ScopeValue
 from packs.scenes.hardware_test.rules.helpers.flash import IR_FLASH_KEY, RADIO_FLASH_KEY, flash
 from packs.scenes.hardware_test.rules.helpers.phases import (
     HW_MACHINE_KEY,
     MODE_ORDER,
     MODE_RGB,
-    hw_phase,
     next_in_cycle,
 )
 
@@ -75,9 +74,6 @@ class HwModeRule(PhaseRule):
     def __init__(self, phase: PhaseKey) -> None:
         super().__init__(phase, HW_MACHINE_KEY, MODE_RGB)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
-
-    def _machine(self, state: GameState) -> PhaseMachine:
-        return hw_phase(state)
 
     def on_input_event(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
         """Per-mode handling of the whole input event. No-op by default."""

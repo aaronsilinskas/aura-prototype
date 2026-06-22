@@ -18,9 +18,8 @@ from engine.phase import (
     PhaseKey,
     PhaseMachine,
     PhaseRule,
-    phase_machine,
 )
-from engine.state import GameState, SceneControls, Scope
+from engine.state import GameState, SceneControls, Scope, StateSlot
 from engine.tests.helpers import SpyEffectControls
 
 _GROUP = EventGroup("phase_test")
@@ -102,6 +101,11 @@ def _run(rules: list, ticks: int) -> list[str]:
     return [name for _, name, _ in spy.add_effect_calls]
 
 
+def _rule_machine(rule: _LifecycleRule, state: GameState) -> PhaseMachine:
+    """Dedicated helper: expose a rule's internal machine for seam-level identity tests."""
+    return rule._machine(state)
+
+
 # ---------------------------------------------------------------------------
 # PhaseKey — identity typing
 # ---------------------------------------------------------------------------
@@ -146,41 +150,6 @@ def test_take_just_entered_returns_true_once_then_false() -> None:
 
     assert machine.take_just_entered() is True
     assert machine.take_just_entered() is False
-
-
-# ---------------------------------------------------------------------------
-# phase_machine accessor — get-or-create, keyed
-# ---------------------------------------------------------------------------
-
-
-def _make_state() -> GameState:
-    return GameState(SpyEffectControls(), SceneControls())
-
-
-def test_phase_machine_caches_one_instance_per_key() -> None:
-    state = _make_state()
-
-    first = phase_machine(state, _MACHINE_KEY, _PHASE_A)
-    second = phase_machine(state, _MACHINE_KEY, _PHASE_A)
-
-    assert first is second
-
-
-def test_phase_machine_seeds_the_initial_phase() -> None:
-    state = _make_state()
-
-    machine = phase_machine(state, _MACHINE_KEY, _PHASE_B)
-
-    assert machine.phase is _PHASE_B
-
-
-def test_distinct_keys_yield_distinct_machines() -> None:
-    state = _make_state()
-
-    one = phase_machine(state, "machine_one", _PHASE_A)
-    two = phase_machine(state, "machine_two", _PHASE_A)
-
-    assert one is not two
 
 
 # ---------------------------------------------------------------------------
@@ -325,3 +294,32 @@ def test_in_phase_rule_sharing_a_phase_with_its_owner_is_not_a_duplicate() -> No
     engine.set_rules([owner, bystander])  # does not raise
 
     assert len(engine.rules) == 2
+
+
+# ---------------------------------------------------------------------------
+# PhaseRule per-instance StateSlot — slot identity and phase_ownership
+# ---------------------------------------------------------------------------
+
+
+def test_phase_rule_phase_ownership_returns_slot_key_and_phase() -> None:
+    rule = _LifecycleRule(_PHASE_A, "owner", machine_key=_MACHINE_KEY)
+
+    key, phase = rule.phase_ownership()
+
+    assert key == _MACHINE_KEY
+    assert phase is _PHASE_A
+
+
+def test_module_level_slot_and_rule_per_instance_slot_same_key_resolve_same_machine() -> None:
+    # A module-level StateSlot (simulating tag_phase / rlgl_phase) and the rule's
+    # own per-instance slot both keyed to _MACHINE_KEY must resolve the identical
+    # cached PhaseMachine from the same GameState.
+    module_slot: StateSlot = StateSlot(_MACHINE_KEY, lambda s: PhaseMachine(_PHASE_A), PhaseMachine)
+    rule = _LifecycleRule(_PHASE_A, "owner", machine_key=_MACHINE_KEY)
+
+    state = GameState(SpyEffectControls(), SceneControls())
+
+    via_module_slot = module_slot(state)
+    via_rule = _rule_machine(rule, state)
+
+    assert via_module_slot is via_rule

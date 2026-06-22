@@ -325,3 +325,20 @@ def test_state_slot_is_independent_across_separate_game_state_instances() -> Non
     v2 = slot(state2)
 
     assert v1 is not v2
+
+
+# ---------------------------------------------------------------------------
+# StateSlot — two slots sharing a key resolve the same cached value
+# ---------------------------------------------------------------------------
+
+
+def test_two_state_slots_with_the_same_key_resolve_the_same_cached_value() -> None:
+    shared_key = "shared_machine"
+    slot_a = StateSlot(shared_key, lambda s: _Marker(), _Marker)
+    slot_b = StateSlot(shared_key, lambda s: _Marker(), _Marker)
+    state = _make_state()
+
+    a = slot_a(state)
+    b = slot_b(state)
+
+    assert a is b

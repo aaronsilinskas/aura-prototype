@@ -12,8 +12,6 @@ This module ships that machinery once:
   only the *type*; scenes own the named instances.
 - :class:`PhaseMachine` — the mutable phase mechanics (current phase, a private
   first-tick entry flag, and ``phase_start``), cached in :class:`GameState`.
-- :func:`phase_machine` — a generic get-or-create accessor keyed by name, so a
-  scene can run more than one machine.
 - :class:`PhaseRule` — owns one phase's lifecycle: ``on_enter`` /
   ``on_exit`` hooks plus the scene's normal typed event handlers, all gated to
   fire only while its phase is active.
@@ -23,6 +21,13 @@ This module ships that machinery once:
 The entry flag is consumed atomically by whichever :class:`PhaseRule` first
 dispatches while in its phase, so ``on_enter`` fires exactly once per entry
 regardless of rule registration order (see :meth:`PhaseMachine.enter`).
+
+Each :class:`PhaseRule` and :class:`InPhaseRule` builds a per-instance
+:class:`~engine.state.StateSlot` at construction from its *machine_key* and
+*initial_phase*.  A scene's module-level phase slot (e.g. ``tag_phase``) and a
+rule's per-instance slot share the same ``GameState`` key, so they resolve the
+*same* cached :class:`PhaseMachine` — slot-key identity is the consistency
+mechanism; no extra guard is needed.
 """
 
 from __future__ import annotations
@@ -37,14 +42,13 @@ except ImportError:
 
 from engine.engine import GameRule
 from engine.events import Event
-from engine.state import GameState
+from engine.state import GameState, StateSlot
 
 __all__ = [
     "InPhaseRule",
     "PhaseKey",
     "PhaseMachine",
     "PhaseRule",
-    "phase_machine",
 ]
 
 
@@ -112,18 +116,6 @@ class PhaseMachine:
         return was_just_entered
 
 
-def phase_machine(state: GameState, key: str, initial_phase: PhaseKey) -> PhaseMachine:
-    """Return the :class:`PhaseMachine` cached under *key*, building it on first use.
-
-    Mirrors the ``tag_state`` / ``rlgl_phase_state`` accessors.  The *key*
-    argument lets one scene cache more than one machine; distinct keys yield
-    distinct machines.
-    """
-    if not state.has(key):
-        state.set(key, PhaseMachine(initial_phase))
-    return state.get_or_none(key, PhaseMachine)  # type: ignore[return-value]
-
-
 class _PhaseGuardedRule(GameRule):
     """Shared base for phase-gated rules: the ``on`` override and phase guard.
 
@@ -131,12 +123,21 @@ class _PhaseGuardedRule(GameRule):
     map and subscribe a single private dispatcher.  The dispatcher fetches the
     machine through :meth:`_machine`, returns immediately unless the machine is
     in this rule's phase, then defers to subclass behaviour.
+
+    Builds a per-instance :class:`~engine.state.StateSlot` at construction from
+    *machine_key* and *initial_phase*.  A scene's module-level phase slot (e.g.
+    ``tag_phase``) and this per-instance slot share the same ``GameState`` key,
+    so they resolve the *same* cached :class:`PhaseMachine` — slot-key identity
+    is the consistency mechanism.
     """
 
     def __init__(self, phase: PhaseKey, machine_key: str, initial_phase: PhaseKey) -> None:
         self.phase = phase
-        self._machine_key = machine_key
-        self._initial_phase = initial_phase
+        self._slot: StateSlot = StateSlot(
+            machine_key,
+            lambda s: PhaseMachine(initial_phase),
+            PhaseMachine,
+        )
         self._phase_handlers: dict[type, Callable[..., None]] = {}
 
     def on(self, event_type: type[T], handler: Callable[[T, GameState], None]) -> None:
@@ -150,12 +151,8 @@ class _PhaseGuardedRule(GameRule):
         super().on(event_type, self._phase_dispatch)
 
     def _machine(self, state: GameState) -> PhaseMachine:
-        """Return this rule's :class:`PhaseMachine`.
-
-        Defaults to the generic :func:`phase_machine` accessor; a scene with a
-        typed accessor overrides this hook to point the rule at it.
-        """
-        return phase_machine(state, self._machine_key, self._initial_phase)
+        """Return this rule's :class:`PhaseMachine` via the per-instance slot."""
+        return self._slot(state)
 
     def _phase_dispatch(self, event: Event, state: GameState) -> None:
         machine = self._machine(state)
@@ -207,7 +204,7 @@ class PhaseRule(_PhaseGuardedRule):
         Used by ``GameEngine.set_rules`` to fail fast when two ``PhaseRule``s
         claim the same pair.
         """
-        return (self._machine_key, self.phase)
+        return (self._slot.key, self.phase)
 
     def _before_handler(self, machine: PhaseMachine, state: GameState) -> None:
         if machine.take_just_entered():
