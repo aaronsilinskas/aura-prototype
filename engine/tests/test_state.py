@@ -280,6 +280,22 @@ def test_state_slot_factory_is_called_with_the_game_state() -> None:
     assert received == [state]
 
 
+def test_state_slot_factory_is_not_called_again_on_cache_hit() -> None:
+    call_count = [0]
+
+    def factory(s: GameState) -> _Marker:
+        call_count[0] += 1
+        return _Marker()
+
+    slot = StateSlot("counted_slot", factory, _Marker)
+    state = _make_state()
+
+    slot(state)
+    slot(state)
+
+    assert call_count[0] == 1
+
+
 def test_state_slot_distinct_keys_produce_independent_values() -> None:
     slot_a = StateSlot("slot_a", lambda s: _Marker(), _Marker)
     slot_b = StateSlot("slot_b", lambda s: _Marker(), _Marker)
