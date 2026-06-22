@@ -11,6 +11,7 @@ Warning. On exit, stops the music so it never leaks into the next phase.
 from __future__ import annotations
 
 from engine.input import InputEvents
+from engine.phase import PhaseRule
 from engine.state import GameState, Scope
 from packs.scenes.red_light_green_light.rules.helpers.motion_detector import (
     RED_MAX_MOTION_THRESHOLD,
@@ -18,20 +19,21 @@ from packs.scenes.red_light_green_light.rules.helpers.motion_detector import (
 from packs.scenes.red_light_green_light.rules.helpers.phases import (
     PHASE_GAME_OVER,
     PHASE_GREEN_WARNING,
+    PHASE_READY,
     PHASE_RED,
+    RLGL_MACHINE_KEY,
     rlgl_phase,
 )
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_config import rlgl_config
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_motion import rlgl_motion
-from packs.scenes.red_light_green_light.rules.helpers.rlgl_phase_rule import RlglPhaseRule
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_phase_state import rlgl_phase_state
 
 
-class RlglRedRule(RlglPhaseRule):
+class RlglRedRule(PhaseRule):
     """Drives the Red phase: solid red, music, and the motion gate."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_RED)
+        super().__init__(PHASE_RED, RLGL_MACHINE_KEY, PHASE_READY)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_enter(self, state: GameState) -> None:

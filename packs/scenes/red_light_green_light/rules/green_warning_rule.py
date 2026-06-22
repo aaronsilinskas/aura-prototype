@@ -8,22 +8,24 @@ duration for the current level has elapsed.
 from __future__ import annotations
 
 from engine.input import InputEvents
+from engine.phase import PhaseRule
 from engine.state import GameState, Scope
 from packs.scenes.red_light_green_light.rules.helpers.phases import (
     PHASE_GREEN,
     PHASE_GREEN_WARNING,
+    PHASE_READY,
+    RLGL_MACHINE_KEY,
     rlgl_phase,
 )
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_config import rlgl_config
-from packs.scenes.red_light_green_light.rules.helpers.rlgl_phase_rule import RlglPhaseRule
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_phase_state import rlgl_phase_state
 
 
-class RlglGreenWarningRule(RlglPhaseRule):
+class RlglGreenWarningRule(PhaseRule):
     """Drives the Green Warning phase: warning sting, then into Green."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_GREEN_WARNING)
+        super().__init__(PHASE_GREEN_WARNING, RLGL_MACHINE_KEY, PHASE_READY)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_enter(self, state: GameState) -> None:

@@ -21,19 +21,19 @@ applies the accuracy-rig gate order:
 from __future__ import annotations
 
 from engine.network import NetworkEvents
+from engine.phase import InPhaseRule
 from engine.state import GameState, Scope
 from hardware.shared.tag_protocol import decode_tag_data
-from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING
+from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, PHASE_READY, TAG_MACHINE_KEY
 from packs.scenes.tag.rules.helpers.tag_config import tag_config
-from packs.scenes.tag.rules.helpers.tag_phase_rule import TagInPhaseRule
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 
 
-class TagHitRule(TagInPhaseRule):
+class TagHitRule(InPhaseRule):
     """Drives hit detection during the Playing phase from received IR packets."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_PLAYING)
+        super().__init__(PHASE_PLAYING, TAG_MACHINE_KEY, PHASE_READY)
         self.on(NetworkEvents.IRReceived, self._handle)
 
     def _handle(self, event: NetworkEvents.IRReceived, state: GameState) -> None:

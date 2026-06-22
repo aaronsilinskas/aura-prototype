@@ -20,21 +20,21 @@ except ImportError:
 
 from engine.input import InputEvents
 from engine.network import LINE
+from engine.phase import InPhaseRule
 from engine.state import GameState, Scope
 from hardware.shared.tag_protocol import TagData, encode_tag_data
-from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING
+from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, PHASE_READY, TAG_MACHINE_KEY
 from packs.scenes.tag.rules.helpers.tag_config import TagConfig, tag_config
-from packs.scenes.tag.rules.helpers.tag_phase_rule import TagInPhaseRule
 from packs.scenes.tag.rules.helpers.tag_state import TagState, tag_state
 
 _SHOT_DAMAGE: Final = 1
 
 
-class TagShootingRule(TagInPhaseRule):
+class TagShootingRule(InPhaseRule):
     """Drives Button-A shot firing and felt feedback during the Playing phase."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_PLAYING)
+        super().__init__(PHASE_PLAYING, TAG_MACHINE_KEY, PHASE_READY)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
