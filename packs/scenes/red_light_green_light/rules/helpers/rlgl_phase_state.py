@@ -11,8 +11,9 @@ survives a phase transition -- Game Level and its ``Scope.AMBIENT`` progress
 bar persist across mid-game phase transitions and are reset only on entering
 Ready.
 
-``rlgl_phase_state(state)`` is the get-or-create accessor: it lazily builds
-the object on first use and caches it under a single ``GameState`` key.
+``rlgl_phase_state`` is a :class:`engine.state.StateSlot` callable accessor:
+it lazily builds the object on first use and caches it under a single
+``GameState`` key.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ try:
 except ImportError:
     pass
 
-from engine.state import EffectReceipt, GameState
+from engine.state import EffectReceipt, StateSlot
 
 _PHASE_STATE_KEY: Final = "rlgl_phase_state"
 
@@ -60,8 +61,6 @@ class RlglPhaseState:
             self.music_receipt = None
 
 
-def rlgl_phase_state(state: GameState) -> RlglPhaseState:
-    """Return the cached :class:`RlglPhaseState`, building and caching it on first use."""
-    if not state.has(_PHASE_STATE_KEY):
-        state.set(_PHASE_STATE_KEY, RlglPhaseState())
-    return state.get_or_none(_PHASE_STATE_KEY, RlglPhaseState)  # type: ignore[return-value]
+rlgl_phase_state: StateSlot = StateSlot(
+    _PHASE_STATE_KEY, lambda s: RlglPhaseState(), RlglPhaseState
+)

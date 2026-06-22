@@ -6,9 +6,10 @@ mutable object. The gravity estimate is held as three float fields plus a
 ``_seeded`` flag rather than a tuple, so :meth:`update` can advance it without
 allocating on every accelerometer sample.
 
-``rlgl_motion(state)`` is the get-or-create accessor: it lazily builds the
-object on first use and caches it under a single ``GameState`` key, mirroring
-the ``rlgl_config(state)`` accessor introduced for :class:`RlglConfig`.
+``rlgl_motion`` is a :class:`engine.state.StateSlot` callable accessor: it
+lazily builds the object on first use and caches it under a single
+``GameState`` key, mirroring the ``rlgl_config`` accessor for
+:class:`RlglConfig`.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ except ImportError:
     pass
 
 from engine.input import AccelerationData
-from engine.state import GameState
+from engine.state import StateSlot
 from packs.scenes.red_light_green_light.rules.helpers.motion_detector import (
     linear_magnitude,
     low_pass,
@@ -89,8 +90,4 @@ class RlglMotion:
         return self.ema
 
 
-def rlgl_motion(state: GameState) -> RlglMotion:
-    """Return the cached :class:`RlglMotion`, building and caching it on first use."""
-    if not state.has(_MOTION_KEY):
-        state.set(_MOTION_KEY, RlglMotion())
-    return state.get_or_none(_MOTION_KEY, RlglMotion)  # type: ignore[return-value]
+rlgl_motion: StateSlot = StateSlot(_MOTION_KEY, lambda s: RlglMotion(), RlglMotion)
