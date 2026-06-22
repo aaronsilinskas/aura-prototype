@@ -11,7 +11,6 @@ from engine.state import EffectReceipt, GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls, SpyNetworkControls
 from hardware.shared.tag_protocol import TagData, encode_tag_data
 from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, PHASE_READY
-from packs.scenes.tag.rules.helpers.tag_config import DEFAULT_MAX_AMMO
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 from packs.scenes.tag.rules.shooting_rule import TagShootingRule
 from packs.scenes.tag.rules.tests.helpers import StubTimer, seed_phase
@@ -32,7 +31,7 @@ def _make_state(
     engine.add_rules(TagShootingRule())
     state = engine.create_state(SceneControls(), initial_data=initial_data or {})
     tag = seed_phase(state, PHASE_PLAYING, entered=True)
-    tag.shot.ammo = DEFAULT_MAX_AMMO
+    tag.shot.ammo = 10
     return state, engine, timer
 
 
@@ -122,7 +121,7 @@ def test_firing_decrements_ammo(spy):
 
     _tick(state, engine, timer, 0.0, button_a=True)
 
-    assert tag_state(state).shot.ammo == DEFAULT_MAX_AMMO - 1
+    assert tag_state(state).shot.ammo == 10 - 1
 
 
 def test_firing_stamps_last_shot_at(spy):
@@ -144,7 +143,7 @@ def test_firing_reissues_ammo_bar_on_global_buff(spy):
     buff_calls = [c for c in progress_calls if c[0] is Scope.Global.BUFF]
     assert len(buff_calls) == 1
     _, _, options = buff_calls[0]
-    expected_fraction = (DEFAULT_MAX_AMMO - 1) / DEFAULT_MAX_AMMO
+    expected_fraction = (10 - 1) / 10
     assert options == {"progress": pytest.approx(expected_fraction)}
 
 
@@ -156,7 +155,7 @@ def test_second_shot_within_cooldown_is_blocked(spy):
     _tick(state, engine, timer, 0.5, button_a=True)
 
     assert len(network_spy.send_ir_calls) == 1
-    assert tag_state(state).shot.ammo == DEFAULT_MAX_AMMO - 1
+    assert tag_state(state).shot.ammo == 10 - 1
 
 
 def test_shot_after_cooldown_interval_is_allowed(spy):
@@ -167,7 +166,7 @@ def test_shot_after_cooldown_interval_is_allowed(spy):
     _tick(state, engine, timer, 1.0, button_a=True)
 
     assert len(network_spy.send_ir_calls) == 2
-    assert tag_state(state).shot.ammo == DEFAULT_MAX_AMMO - 2
+    assert tag_state(state).shot.ammo == 10 - 2
 
 
 def test_pressing_with_no_ammo_does_not_fire(spy):
@@ -242,7 +241,7 @@ def test_holding_to_reload_duration_restores_ammo_to_max(spy):
 
     _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)  # held, total - start >= 3.0
 
-    assert tag_state(state).shot.ammo == DEFAULT_MAX_AMMO
+    assert tag_state(state).shot.ammo == 10
 
 
 def test_completing_reload_snaps_ammo_bar_full_via_basic_progress(spy):
@@ -303,7 +302,7 @@ def test_held_trigger_after_completion_does_not_auto_fire(spy):
     _tick(state, engine, timer, 3.0, button_a=ButtonData.DOWN)  # still held
 
     assert network_spy.send_ir_calls == []
-    assert tag_state(state).shot.ammo == DEFAULT_MAX_AMMO
+    assert tag_state(state).shot.ammo == 10
 
 
 # ---------------------------------------------------------------------------
@@ -370,7 +369,7 @@ def test_reaching_duration_threshold_on_release_tick_completes_not_cancels(spy):
 
     _tick(state, engine, timer, 3.0)  # released, but threshold met on this tick
 
-    assert tag_state(state).shot.ammo == DEFAULT_MAX_AMMO
+    assert tag_state(state).shot.ammo == 10
     progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
     buff_calls = [c for c in progress_calls if c[0] is Scope.Global.BUFF]
     _, _, options = buff_calls[0]

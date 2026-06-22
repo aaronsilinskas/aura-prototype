@@ -14,7 +14,6 @@ from packs.scenes.tag.rules.helpers.phases import (
     PHASE_READY,
     tag_phase,
 )
-from packs.scenes.tag.rules.helpers.tag_config import DEFAULT_MAX_AMMO, DEFAULT_STARTING_HITPOINTS
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 from packs.scenes.tag.rules.playing_rule import TagPlayingRule
 from packs.scenes.tag.rules.tests.helpers import StubTimer, seed_phase
@@ -53,7 +52,7 @@ def test_entering_playing_sets_starting_hitpoints(spy):
 
     _tick(state, engine, timer, 0.0)
 
-    assert tag_state(state).hitpoints == DEFAULT_STARTING_HITPOINTS
+    assert tag_state(state).hitpoints == 10
 
 
 def test_entering_playing_sets_full_progress_bar_on_personal(spy):
@@ -82,7 +81,7 @@ def test_entering_playing_sets_starting_ammo(spy):
 
     _tick(state, engine, timer, 0.0)
 
-    assert tag_state(state).shot.ammo == DEFAULT_MAX_AMMO
+    assert tag_state(state).shot.ammo == 10
 
 
 def test_entering_playing_sets_full_ammo_bar_on_global_buff(spy):
