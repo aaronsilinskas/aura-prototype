@@ -5,9 +5,9 @@ Holds the tunables seeded via ``initial_data`` (all ``tag_*`` seed keys).
 directly with no ``GameState`` involved; ``from_state`` is the factory that
 reads the flat seeded ``tag_*`` keys and applies defaults.
 
-``tag_config(state)`` is the get-or-create accessor: it lazily builds the
-config from ``state`` on first use and caches it under a single ``GameState``
-key, mirroring the ``rlgl_config(state)`` precedent in the
+``tag_config`` is a :class:`engine.state.StateSlot` callable accessor: it lazily
+builds the config from ``state`` on first use and caches it under a single
+``GameState`` key, mirroring the ``rlgl_config`` precedent in the
 red_light_green_light scene.
 """
 
@@ -18,7 +18,7 @@ try:
 except ImportError:
     pass
 
-from engine.state import GameState
+from engine.state import GameState, StateSlot
 
 _CONFIG_KEY: Final = "tag_config"
 
@@ -97,8 +97,4 @@ class TagConfig:
         return self.warning_pulse_count * self.warning_pulse_duration
 
 
-def tag_config(state: GameState) -> TagConfig:
-    """Return the cached :class:`TagConfig`, building and caching it on first use."""
-    if not state.has(_CONFIG_KEY):
-        state.set(_CONFIG_KEY, TagConfig.from_state(state))
-    return state.get_or_none(_CONFIG_KEY, TagConfig)  # type: ignore[return-value]
+tag_config: StateSlot = StateSlot(_CONFIG_KEY, TagConfig.from_state, TagConfig)

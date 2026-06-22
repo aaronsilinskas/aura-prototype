@@ -5,10 +5,10 @@ seed keys).  ``RlglConfig.__init__`` takes already-resolved values so it is
 unit-testable directly with no ``GameState`` involved; ``from_state`` is the
 factory that reads the flat seeded ``rlgl_*`` keys and applies defaults.
 
-``rlgl_config(state)`` is the get-or-create accessor: it lazily builds the
-config from ``state`` on first use and caches it under a single ``GameState``
-key, mirroring the ``current_mode(state)`` precedent in the hardware_test
-scene.  Game Level is read separately each tick (it changes during play), so
+``rlgl_config`` is a :class:`engine.state.StateSlot` callable accessor: it lazily
+builds the config from ``state`` on first use and caches it under a single
+``GameState`` key, mirroring the ``current_mode(state)`` precedent in the
+hardware_test scene.  Game Level is read separately each tick (it changes during play), so
 the level-scaled methods below take ``level`` as a parameter and the config
 itself stays immutable and level-agnostic.
 """
@@ -21,7 +21,7 @@ except ImportError:
     pass
 
 from engine.lerp import level_lerp
-from engine.state import GameState
+from engine.state import GameState, StateSlot
 from packs.scenes.red_light_green_light.rules.helpers.motion_detector import (
     GRAVITY_LOWPASS_BETA,
     MOTION_EMA_ALPHA,
@@ -133,8 +133,4 @@ class RlglConfig:
         }
 
 
-def rlgl_config(state: GameState) -> RlglConfig:
-    """Return the cached :class:`RlglConfig`, building and caching it on first use."""
-    if not state.has(_CONFIG_KEY):
-        state.set(_CONFIG_KEY, RlglConfig.from_state(state))
-    return state.get_or_none(_CONFIG_KEY, RlglConfig)  # type: ignore[return-value]
+rlgl_config: StateSlot = StateSlot(_CONFIG_KEY, RlglConfig.from_state, RlglConfig)
