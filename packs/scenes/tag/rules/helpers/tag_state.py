@@ -9,8 +9,8 @@ own: hitpoints, the self-deafen deadline, and the in-flight per-phase
 
 Each owning rule clears the fields it owns in its ``on_exit``: the Playing rule
 owns ``progress_receipt`` (shared with the hit reactor) and the Game Over rule
-owns ``game_over_receipt``. ``tag_state(state)`` is the get-or-create accessor,
-mirroring ``tag_config(state)``.
+owns ``game_over_receipt``. ``tag_state`` is a :class:`engine.state.StateSlot`
+callable accessor, mirroring ``tag_config``.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ try:
 except ImportError:
     pass
 
-from engine.state import EffectReceipt, GameState
+from engine.state import EffectReceipt, StateSlot
 
 _STATE_KEY: Final = "tag_state"
 
@@ -76,8 +76,4 @@ class TagState:
         self.shot = ShotState()
 
 
-def tag_state(state: GameState) -> TagState:
-    """Return the cached :class:`TagState`, building and caching it on first use."""
-    if not state.has(_STATE_KEY):
-        state.set(_STATE_KEY, TagState())
-    return state.get_or_none(_STATE_KEY, TagState)  # type: ignore[return-value]
+tag_state: StateSlot = StateSlot(_STATE_KEY, lambda s: TagState(), TagState)
