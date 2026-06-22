@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from engine.engine import GameEngine
-from engine.state import EffectReceipt, SceneControls
+from engine.state import EffectReceipt, SceneControls, StateSlot
 from engine.tests.helpers import SpyEffectControls
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_phase_state import (
     RlglPhaseState,
@@ -84,3 +84,10 @@ def test_rlgl_phase_state_caches_the_same_instance_across_calls():
     second = rlgl_phase_state(state)
 
     assert first is second
+
+
+def test_rlgl_phase_state_is_a_state_slot():
+    """rlgl_phase_state must be a StateSlot so that the key, factory,
+    and revalidate cast are owned in one place with no # type: ignore at
+    call sites."""
+    assert isinstance(rlgl_phase_state, StateSlot)

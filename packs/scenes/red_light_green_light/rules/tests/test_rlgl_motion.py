@@ -7,7 +7,7 @@ import pytest
 
 from engine.engine import GameEngine
 from engine.input import AccelerationData
-from engine.state import SceneControls
+from engine.state import SceneControls, StateSlot
 from engine.tests.helpers import SpyEffectControls
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_motion import (
     RlglMotion,
@@ -112,3 +112,10 @@ def test_rlgl_motion_caches_the_same_instance_across_calls():
     second = rlgl_motion(state)
 
     assert first is second
+
+
+def test_rlgl_motion_is_a_state_slot():
+    """rlgl_motion must be a StateSlot so that the key, factory, and
+    revalidate cast are owned in one place with no # type: ignore at
+    call sites."""
+    assert isinstance(rlgl_motion, StateSlot)
