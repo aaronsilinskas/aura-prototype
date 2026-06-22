@@ -101,6 +101,11 @@ def _run(rules: list, ticks: int) -> list[str]:
     return [name for _, name, _ in spy.add_effect_calls]
 
 
+def _rule_machine(rule: _LifecycleRule, state: GameState) -> PhaseMachine:
+    """Dedicated helper: expose a rule's internal machine for seam-level identity tests."""
+    return rule._machine(state)
+
+
 # ---------------------------------------------------------------------------
 # PhaseKey — identity typing
 # ---------------------------------------------------------------------------
@@ -315,6 +320,6 @@ def test_module_level_slot_and_rule_per_instance_slot_same_key_resolve_same_mach
     state = GameState(SpyEffectControls(), SceneControls())
 
     via_module_slot = module_slot(state)
-    via_rule = rule._machine(state)  # testing internal seam deliberately
+    via_rule = _rule_machine(rule, state)
 
     assert via_module_slot is via_rule
