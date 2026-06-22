@@ -115,7 +115,7 @@ class HwModeRule(PhaseRule):
         self._expire_flash(state, radio_flash, Scope.Global.ALL)
 
     def _expire_flash(self, state: GameState, slot: StateSlot, idle_scope: ScopeValue) -> None:
-        if not state.has(slot.key):
+        if not slot.is_in(state):
             return
 
         flash_state = slot(state)

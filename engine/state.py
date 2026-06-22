@@ -227,6 +227,10 @@ class StateSlot:
             state.set(self.key, self._factory(state))
         return state.get_or_none(self.key, self._expected_class)  # type: ignore[return-value]
 
+    def is_in(self, state: GameState) -> bool:
+        """Return True if this slot's key is present in *state*."""
+        return state.has(self.key)
+
 
 class GameState:
     """Portable game context passed to every rule handler on every tick.
