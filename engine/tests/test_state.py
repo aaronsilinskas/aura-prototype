@@ -1,6 +1,14 @@
 import pytest
 
-from engine.state import EffectControls, EffectReceipt, GameState, SceneControls, Scope, ScopeValue
+from engine.state import (
+    EffectControls,
+    EffectReceipt,
+    GameState,
+    SceneControls,
+    Scope,
+    ScopeValue,
+    StateSlot,
+)
 
 # ---------------------------------------------------------------------------
 # GameState.get_or_none
@@ -217,3 +225,87 @@ def test_effect_receipt_constructor_accepts_only_effect_id() -> None:
     receipt = EffectReceipt(42)
 
     assert receipt.id == 42
+
+
+# ---------------------------------------------------------------------------
+# StateSlot
+# ---------------------------------------------------------------------------
+
+
+class _Marker:
+    __slots__ = ()
+
+
+def _make_slot(key: str = "test_slot") -> StateSlot:
+    return StateSlot(key, lambda s: _Marker(), _Marker)
+
+
+def test_state_slot_exposes_key_used_to_store_value_in_game_state() -> None:
+    slot = StateSlot("my_key", lambda s: _Marker(), _Marker)
+
+    assert slot.key == "my_key"
+
+
+def test_state_slot_builds_value_via_factory_on_first_call() -> None:
+    slot = _make_slot()
+    state = _make_state()
+
+    result = slot(state)
+
+    assert isinstance(result, _Marker)
+
+
+def test_state_slot_cache_hit_returns_the_same_instance() -> None:
+    slot = _make_slot()
+    state = _make_state()
+
+    first = slot(state)
+    second = slot(state)
+
+    assert first is second
+
+
+def test_state_slot_factory_is_called_with_the_game_state() -> None:
+    received: list[GameState] = []
+
+    def factory(s: GameState) -> _Marker:
+        received.append(s)
+        return _Marker()
+
+    slot = StateSlot("factory_slot", factory, _Marker)
+    state = _make_state()
+
+    slot(state)
+
+    assert received == [state]
+
+
+def test_state_slot_distinct_keys_produce_independent_values() -> None:
+    slot_a = StateSlot("slot_a", lambda s: _Marker(), _Marker)
+    slot_b = StateSlot("slot_b", lambda s: _Marker(), _Marker)
+    state = _make_state()
+
+    a = slot_a(state)
+    b = slot_b(state)
+
+    assert a is not b
+
+
+def test_state_slot_raises_when_pre_seeded_value_has_wrong_type() -> None:
+    slot = _make_slot("typed_slot")
+    state = _make_state()
+    state.set("typed_slot", "wrong type")
+
+    with pytest.raises(ValueError):
+        slot(state)
+
+
+def test_state_slot_is_independent_across_separate_game_state_instances() -> None:
+    slot = _make_slot()
+    state1 = _make_state()
+    state2 = _make_state()
+
+    v1 = slot(state1)
+    v2 = slot(state2)
+
+    assert v1 is not v2

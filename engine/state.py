@@ -8,15 +8,12 @@ __all__ = [
     "SceneControls",
     "Scope",
     "ScopeValue",
+    "StateSlot",
 ]
 
 try:
-    from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython
-
-try:
-    from typing import TypeVar
+    from collections.abc import Callable
+    from typing import Final, TypeVar
 
     T = TypeVar("T")
 except ImportError:
@@ -199,6 +196,36 @@ class EffectControls:
         this no-op automatically.
         """
         pass
+
+
+class StateSlot:
+    """Callable accessor that owns the get-or-create-and-revalidate pattern for a GameState key.
+
+    Constructed once at module load; the single ``# type: ignore[return-value]`` cast lives
+    here so call sites are cast-free.
+    """
+
+    __slots__ = ("_expected_class", "_factory", "key")
+
+    def __init__(
+        self,
+        key: str,
+        factory: Callable[[GameState], object],
+        expected_class: type[T],
+    ) -> None:
+        self.key: str = key
+        self._factory = factory
+        self._expected_class = expected_class
+
+    def __call__(self, state: GameState) -> T:
+        """Return the value for *key*, creating and caching it on first use.
+
+        Raises:
+            ValueError: if the stored value is not an instance of *expected_class*.
+        """
+        if not state.has(self.key):
+            state.set(self.key, self._factory(state))
+        return state.get_or_none(self.key, self._expected_class)  # type: ignore[return-value]
 
 
 class GameState:
