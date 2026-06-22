@@ -9,7 +9,7 @@ from engine.input import ButtonData, InputEvents
 from engine.network import LINE, NetworkEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls, SpyNetworkControls
-from packs.scenes.hardware_test.rules.helpers.flash import IR_FLASH_KEY, flash
+from packs.scenes.hardware_test.rules.helpers.flash import ir_flash
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_IR, MODE_RGB
 from packs.scenes.hardware_test.rules.ir_rule import HW_TEST_PAYLOAD, HwTestIrRule
 from packs.scenes.hardware_test.rules.tests.helpers import seed_phase
@@ -76,7 +76,7 @@ def test_ir_received_is_noop_when_mode_is_rgb(spy):
     state, engine = _make_state(spy, mode=MODE_RGB)
     _fire_ir(state, engine)
     assert spy.set_effect_calls == []
-    assert IR_FLASH_KEY not in state
+    assert ir_flash.key not in state
 
 
 # ---------------------------------------------------------------------------
@@ -97,13 +97,13 @@ def test_ir_received_calls_set_effect_on_directional_with_white_solid(spy):
 def test_ir_received_writes_ir_flash_receipt_to_state(spy):
     state, engine = _make_state(spy)
     _fire_ir(state, engine)
-    assert flash(state, IR_FLASH_KEY).receipt is not None
+    assert ir_flash(state).receipt is not None
 
 
 def test_ir_received_writes_ir_flash_start_to_state(spy):
     state, engine = _make_state(spy)
     _fire_ir(state, engine)
-    assert flash(state, IR_FLASH_KEY).start_time is not None
+    assert ir_flash(state).start_time is not None
 
 
 def test_ir_received_logs_payload_and_signal_quality(spy, capsys):

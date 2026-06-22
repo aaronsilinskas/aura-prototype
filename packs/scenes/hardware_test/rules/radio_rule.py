@@ -3,7 +3,7 @@ from __future__ import annotations
 from engine.input import InputEvents
 from engine.network import NetworkEvents
 from engine.state import GameState, Scope
-from packs.scenes.hardware_test.rules.helpers.flash import RADIO_FLASH_KEY, flash
+from packs.scenes.hardware_test.rules.helpers.flash import radio_flash
 from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import HwModeRule
 from packs.scenes.hardware_test.rules.helpers.mode import HW_TEST_PAYLOAD
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_RADIO
@@ -37,7 +37,7 @@ class HwTestRadioRule(HwModeRule):
         receipt = state.effect_controls.set_effect(
             Scope.Global.ALL, "basic.solid", {"color": 0xFFFFFF}
         )
-        flash(state, RADIO_FLASH_KEY).restart(state.total, receipt)
+        radio_flash(state).restart(state.total, receipt)
         print("radio received " + str(event.data) + " from " + str(event.sender))
 
 

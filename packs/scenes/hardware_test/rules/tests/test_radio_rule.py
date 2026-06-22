@@ -9,7 +9,7 @@ from engine.input import ButtonData, InputEvents
 from engine.network import NetworkEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
-from packs.scenes.hardware_test.rules.helpers.flash import RADIO_FLASH_KEY, flash
+from packs.scenes.hardware_test.rules.helpers.flash import radio_flash
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_RADIO, MODE_RGB
 from packs.scenes.hardware_test.rules.radio_rule import HW_TEST_PAYLOAD, HwTestRadioRule
 from packs.scenes.hardware_test.rules.tests.helpers import seed_phase
@@ -70,7 +70,7 @@ def test_radio_received_is_noop_when_mode_is_rgb(spy):
     state, engine = _make_state(spy, mode=MODE_RGB)
     _fire_radio(state, engine)
     assert spy.set_effect_calls == []
-    assert RADIO_FLASH_KEY not in state
+    assert radio_flash.key not in state
 
 
 # ---------------------------------------------------------------------------
@@ -91,13 +91,13 @@ def test_radio_received_calls_set_effect_on_global_all_with_white_solid(spy):
 def test_radio_received_writes_radio_flash_receipt_to_state(spy):
     state, engine = _make_state(spy)
     _fire_radio(state, engine)
-    assert flash(state, RADIO_FLASH_KEY).receipt is not None
+    assert radio_flash(state).receipt is not None
 
 
 def test_radio_received_writes_radio_flash_start_to_state(spy):
     state, engine = _make_state(spy)
     _fire_radio(state, engine)
-    assert flash(state, RADIO_FLASH_KEY).start_time is not None
+    assert radio_flash(state).start_time is not None
 
 
 def test_radio_received_logs_payload_and_sender(spy, capsys):
