@@ -8,6 +8,11 @@ operations.
 
 from __future__ import annotations
 
+try:
+    from typing import Final
+except ImportError:
+    pass
+
 from engine.state import EffectReceipt, StateSlot
 
 
@@ -36,5 +41,5 @@ class Flash:
         return now - self.start_time > duration
 
 
-ir_flash: StateSlot = StateSlot("ir_flash", lambda s: Flash(), Flash)
-radio_flash: StateSlot = StateSlot("radio_flash", lambda s: Flash(), Flash)
+ir_flash: Final = StateSlot("ir_flash", lambda s: Flash(), Flash)
+radio_flash: Final = StateSlot("radio_flash", lambda s: Flash(), Flash)

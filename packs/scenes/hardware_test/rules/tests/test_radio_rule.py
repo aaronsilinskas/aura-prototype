@@ -97,7 +97,7 @@ def test_radio_received_writes_radio_flash_receipt_to_state(spy):
 def test_radio_received_writes_radio_flash_start_to_state(spy):
     state, engine = _make_state(spy)
     _fire_radio(state, engine)
-    assert radio_flash(state).start_time is not None
+    assert radio_flash(state).start_time == state.total
 
 
 def test_radio_received_logs_payload_and_sender(spy, capsys):

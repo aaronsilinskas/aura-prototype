@@ -103,7 +103,7 @@ def test_ir_received_writes_ir_flash_receipt_to_state(spy):
 def test_ir_received_writes_ir_flash_start_to_state(spy):
     state, engine = _make_state(spy)
     _fire_ir(state, engine)
-    assert ir_flash(state).start_time is not None
+    assert ir_flash(state).start_time == state.total
 
 
 def test_ir_received_logs_payload_and_signal_quality(spy, capsys):
