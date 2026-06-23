@@ -473,6 +473,53 @@ Fixed CPU and heap tax each role's bare framework loop consumes before any compo
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | engine-host | 5.65% | 656 |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | satellite | 5.21% | 464 |
 
+The `heap_bytes` above is the **bare** framework (empty registry, no packs, no scene).
+A real prop also loads a scene, which dominates its heap -- see scene-content memory below.
+
+#### Assembled-prop memory breakdown (#448)
+
+The bare baseline (656 B) excludes the scanned packs and the loaded scene. The reference
+`tag` prop's measured footprint (~32.8 KB) decomposes via `tag_prop_profiler.py`'s
+`__PROP_BREAKDOWN` (staged `gc.mem_free()` deltas) as:
+
+| Stage | Bytes | What it is |
+|-------|-------|------------|
+| peripherals | 6,624 | matrix/buttons/accel/motor/IR hardware drivers + shared I2C bus |
+| registries | 1,328 | scanned effect + rule pack registries (factory callables) |
+| audio_outputs | 5,632 | audio registry+output, `EffectOutput` wrappers, `EffectManager` |
+| engine | 160 | Timer + GameEngine + HardwareNetworkControls |
+| **scene** | **19,088** | **scene load + first tick (see below)** |
+| **total** | **32,832** | matches the measured assembled footprint |
+
+This is the only decomposition that sums to the measured total; it is a measurement of
+*this* prop, not a portable predictive model.
+
+#### Scene-content memory: a model gap, not a calibratable term (#448)
+
+The `scene` stage (~58% of the heap) was investigated with `baseline_profiler.py`
+`MODE = "scene_content"` (finer `__SCENE_STAGES` snapshots + a `BALLAST_BYTES`
+free-heap test). Findings:
+
+- **It is entirely the first tick.** `manager.load()` allocates ~80 B (just queues the
+  transition); `manager.update()` -- which instantiates the active phase and **adds its
+  effects** -- allocates the rest. So this is *dynamic first-tick effect allocation*, not
+  a static scene graph.
+- **It is output-coupled, and headless over-measures it ~2x.** Loaded headless (a
+  `NullEffectOutput`), the first tick allocates ~30-33 KB vs. ~15.5 KB in-situ. Against
+  the real matrix the buffered IS31FL3741 driver keeps pixels in a **native framebuffer
+  (off the GC heap)** -- which is why the matrix per-slot footprint measured ~0 -- so
+  the effects' pixel data lives off-heap; headless it falls back onto the GC heap.
+- **It is not allocation context.** Shrinking the free heap by 50 KB of ballast (to the
+  in-situ ~71 KB at load) moved the figure only ~3 KB, ruling out free-heap-dependent
+  GC retention.
+
+**Conclusion:** scene/effect memory cannot be captured as a portable additive term -- it
+is dynamic and output-coupled, so a headless measurement is an artifact (~2x), and the
+in-situ `scene` stage (~19 KB) is only measurable on the assembled prop. The capacity
+model's per-component footprints therefore **do not sum to the assembled total**, and a
+predicted-vs-measured memory validation to a tight tolerance is not achievable with the
+current model. Tracked as #450 (an output-coupled scene/effect memory model).
+
 ### Engine component costs
 
 Per-tick cost terms for the `GameEngine` loop, scaling with rules, events, and remote MCUs.
