@@ -172,11 +172,17 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
         encoder=TagInfraredEncoder(),
         decoder=TagInfraredDecoder(),
     )
+    # Stage snapshot: hardware drivers (matrix/buttons/accel/motor/IR) on the heap.
+    gc.collect()
+    free_after_peripherals = gc.mem_free()
 
     effect_registry = PackRegistry(item_attr="BUILD")
     effect_registry.scan_dir("packs/effects", "packs.effects")
     rule_registry = PackRegistry(item_attr="RULE")
     rule_registry.scan_dir("packs/rules", "packs.rules")
+    # Stage snapshot: scanned effect + rule pack registries (imported pack modules).
+    gc.collect()
+    free_after_registries = gc.mem_free()
 
     audio_registry = AudioRegistry()
     audio_registry.register("warning_pulse_peak", "sounds/blip.wav")
@@ -186,12 +192,15 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
     audio_registry.register("reload", "sounds/blip.wav")
     audio_registry.register("reload_complete", "sounds/blip.wav")
 
-    audio_output = AudioEffectOutput(audio_registry, max_volume=0.1, num_voices=2)
+    audio_output = AudioEffectOutput(audio_registry, max_volume=0.1, num_voices=4)
     outputs = [IS31FL3741EffectOutput(matrix), audio_output]
     if motor is not None:
         outputs.append(Drv2605EffectOutput(motor))
 
     effect_manager = EffectManager(registry=effect_registry, outputs=outputs)
+    # Stage snapshot: audio (registry + output) + EffectOutput wrappers + EffectManager.
+    gc.collect()
+    free_after_audio = gc.mem_free()
 
     # Own the Timer explicitly so the render phase can advance it without reaching
     # into GameEngine's internals (the engine advances this same instance in
@@ -202,6 +211,9 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
         timer=timer,
         network_controls=HardwareNetworkControls(ir_transmitters),
     )
+    # Stage snapshot: Timer + GameEngine + HardwareNetworkControls.
+    gc.collect()
+    free_after_engine = gc.mem_free()
 
     scene_registry = SceneRegistry()
     scene_registry.scan_dir("packs/scenes", "packs.scenes")
@@ -211,7 +223,20 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
     manager.update()  # applies the load transition; tag scene is now active
 
     gc.collect()
-    footprint_bytes = free_before - gc.mem_free()
+    free_after_scene = gc.mem_free()
+    footprint_bytes = free_before - free_after_scene
+
+    # Decompose the total footprint into construction stages so the ~32 KB can be
+    # attributed (hardware components vs. the scanned pack registries vs. the loaded
+    # scene), and cross-checked against the per-component profiler figures (#448).
+    print(
+        "__PROP_BREAKDOWN "
+        f"peripherals={free_before - free_after_peripherals}, "
+        f"registries={free_after_peripherals - free_after_registries}, "
+        f"audio_outputs={free_after_registries - free_after_audio}, "
+        f"engine={free_after_audio - free_after_engine}, "
+        f"scene={free_after_engine - free_after_scene}"
+    )
     return manager, effect_manager, timer, buttons, accelerometer, ir_receiver, footprint_bytes
 
 

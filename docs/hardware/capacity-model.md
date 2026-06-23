@@ -473,6 +473,53 @@ Fixed CPU and heap tax each role's bare framework loop consumes before any compo
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | engine-host | 5.65% | 656 |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | satellite | 5.21% | 464 |
 
+The `heap_bytes` above is the **bare** framework (empty registry, no packs, no scene).
+A real prop also loads a scene, which dominates its heap -- see scene-content memory below.
+
+#### Assembled-prop memory breakdown (#448)
+
+The bare baseline (656 B) excludes the scanned packs and the loaded scene. The reference
+`tag` prop's measured footprint (~32.8 KB) decomposes via `tag_prop_profiler.py`'s
+`__PROP_BREAKDOWN` (staged `gc.mem_free()` deltas) as:
+
+| Stage | Bytes | What it is |
+|-------|-------|------------|
+| peripherals | 6,624 | matrix/buttons/accel/motor/IR hardware drivers + shared I2C bus |
+| registries | 1,328 | scanned effect + rule pack registries (factory callables) |
+| audio_outputs | 5,632 | audio registry+output, `EffectOutput` wrappers, `EffectManager` |
+| engine | 160 | Timer + GameEngine + HardwareNetworkControls |
+| **scene** | **19,088** | **scene load + first tick (see below)** |
+| **total** | **32,832** | matches the measured assembled footprint |
+
+This is the only decomposition that sums to the measured total; it is a measurement of
+*this* prop, not a portable predictive model.
+
+#### Scene-content memory: a model gap, not a calibratable term (#448)
+
+The `scene` stage (~58% of the heap) was investigated with `baseline_profiler.py`
+`MODE = "scene_content"` (finer `__SCENE_STAGES` snapshots + a `BALLAST_BYTES`
+free-heap test). Findings:
+
+- **It is entirely the first tick.** `manager.load()` allocates ~80 B (just queues the
+  transition); `manager.update()` -- which instantiates the active phase and **adds its
+  effects** -- allocates the rest. So this is *dynamic first-tick effect allocation*, not
+  a static scene graph.
+- **It is output-coupled, and headless over-measures it ~2x.** Loaded headless (a
+  `NullEffectOutput`), the first tick allocates ~30-33 KB vs. ~15.5 KB in-situ. Against
+  the real matrix the buffered IS31FL3741 driver keeps pixels in a **native framebuffer
+  (off the GC heap)** -- which is why the matrix per-slot footprint measured ~0 -- so
+  the effects' pixel data lives off-heap; headless it falls back onto the GC heap.
+- **It is not allocation context.** Shrinking the free heap by 50 KB of ballast (to the
+  in-situ ~71 KB at load) moved the figure only ~3 KB, ruling out free-heap-dependent
+  GC retention.
+
+**Conclusion:** scene/effect memory cannot be captured as a portable additive term -- it
+is dynamic and output-coupled, so a headless measurement is an artifact (~2x), and the
+in-situ `scene` stage (~19 KB) is only measurable on the assembled prop. The capacity
+model's per-component footprints therefore **do not sum to the assembled total**, and a
+predicted-vs-measured memory validation to a tight tolerance is not achievable with the
+current model. Tracked as #450 (an output-coupled scene/effect memory model).
+
 ### Engine component costs
 
 Per-tick cost terms for the `GameEngine` loop, scaling with rules, events, and remote MCUs.
@@ -575,6 +622,34 @@ render and flush together -- via a ``CountingI2C`` decorator wrapping the real b
 so no separate I2C sweep axis is needed. The matrix's ``i2c_transaction_bytes`` cell
 above will be filled by the first on-device run of the updated profiler.
 
+#### Pixel scope memory (#448)
+
+Retained heap footprint for a `PixelScopeComponent`, keyed by driver. From
+`pixel_profiler.py` (a `gc.mem_free()` delta around the warmed scope, after a
+`gc.collect()` on both sides so only retained heap is counted).
+
+| Board | Runtime | Driver | `footprint_base_bytes` | `footprint_per_pixel_bytes` |
+|-------|---------|--------|------------------------|-----------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | neopixel_pwm | 8520 | 46.74 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | is31fl3741_matrix | 9607 | 2.80 |
+
+The profiler snapshots free heap *before* building the scope and measures the delta
+*after* the full sweep, so the figure includes the output object, its driver, and the
+per-scope `PixelBuffer`s (allocated lazily during the sweep). The shared `PackRegistry`
+is built once before the loop and so is excluded; the `EffectManager` engine baseline is
+built inside the loop and lands in the fixed `footprint_base_bytes` intercept. Because
+footprint is linear in pixel_count, `linear_fit` gives the per-pixel buffer slope and the
+fixed base intercept -- predict a scope's footprint as
+`base + per_pixel * pixel_count` (e.g. the reference prop's 117-pixel matrix gives
+`9607 + 2.80 * 117 ≈ 9935 B`).
+
+The two drivers split very differently. `neopixel_pwm` scales steeply (46.74 B/px) --
+the strip buffer grows per pixel. `is31fl3741_matrix` is nearly flat (2.80 B/px): the
+buffered driver allocates a **fixed full-matrix (13x9) framebuffer** at construction
+regardless of the logical pixel count, so that ~9.6 KB lands in `footprint_base_bytes`
+and the slope reflects only the small per-row `PixelBuffer`s. For the matrix the base
+term dominates; the slope is near measurement noise.
+
 ### Sound component costs
 
 Per-frame mixer cost terms for the shared `SoundComponent`. From `sound_profiler.py`.
@@ -587,6 +662,25 @@ Per-frame mixer cost terms for the shared `SoundComponent`. From `sound_profiler
 `sound_profiler.py` sweeps `concurrent_voices`. Because `cost_ms = mixer_fixed_ms
 + per_voice_ms * effective_voices`, the `linear_fit` **intercept** is
 `mixer_fixed_ms` and the **slope** is `per_voice_ms`.
+
+#### Sound component memory (#448)
+
+Static retained footprint of the shared `SoundComponent` (`AudioEffectOutput`:
+I2SOut + `audiomixer.Mixer` + `VoicePool`), measured idle before any voice is claimed.
+From `sound_profiler.py` (a `gc.mem_free()` delta around construction, after a
+`gc.collect()` on both sides). Keyed by `num_voices` -- the mixer/voice-pool
+construction cap the footprint scales with. The reference `tag` prop uses
+`num_voices = 4`.
+
+| Board | Runtime | Driver | `num_voices` | `memory_footprint_bytes` |
+|-------|---------|--------|--------------|--------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 4 | 4304 |
+
+The output has no deinit (it owns the I2S pins) and so is built exactly once per run;
+the profiler therefore measures one `num_voices` per run, and the module-load heap is
+paid by an import-only warm-up before the snapshot rather than a build-then-discard one.
+Run at additional `num_voices` values to record the scaling. Cell is `_TBD_` until the
+first on-device run.
 
 ### Vibration component costs
 
@@ -605,6 +699,19 @@ wrapping the real `busio.I2C` bus in a `CountingI2C` decorator before
 `setup_drv2605`, resetting the counter before a representative vibration event,
 and reading `bytes_written` after that event. The table cell is `_TBD_` pending
 the on-device run.
+
+#### Vibration component memory (#448)
+
+Static retained footprint of the shared `VibrationComponent` (the DRV2605L driver +
+`Drv2605EffectOutput`). From `vibration_profiler.py` (a `gc.mem_free()` delta around
+construction, after a `gc.collect()` on both sides). A single value -- nothing about
+the component scales. The shared I2C bus (also used by the matrix and accelerometer)
+is built before the snapshot and so excluded; the driver-module import is pre-paid by
+an import-only warm-up.
+
+| Board | Runtime | Driver | `memory_footprint_bytes` |
+|-------|---------|--------|--------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 176 |
 
 ### IR-transmit component costs
 
@@ -635,6 +742,20 @@ but that is a short burst rather than a sustained rate, and the single-frame spi
 it produces is already captured separately by `blocking_send_ms`. The sustained
 0.2 Hz figure is therefore the one recorded as the average reservation.
 
+#### IR-transmit component memory (#448)
+
+Static retained footprint of the shared `IrTransmitComponent` (the LINE `PulseOut` +
+`InfraredTransmitter` wrapper + `HardwareNetworkControls`). From `ir_tx_profiler.py`
+(a `gc.mem_free()` delta around construction, after a `gc.collect()` on both sides). A
+single value -- the transmitter path does not scale. The profiler builds only the
+transmitter, **not** the receiver, so the receiver's `PulseIn(maxlen=256)` is excluded
+(it is the separate IR-rx component below); the module imports are pre-paid by an
+import-only warm-up.
+
+| Board | Runtime | Driver | `memory_footprint_bytes` |
+|-------|---------|--------|--------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 192 |
+
 ### IR-receive component costs
 
 Hard-real-time deadline for the shared `ReceiverComponent`, keyed additionally by
@@ -651,6 +772,28 @@ packet rate is induced via loopback. `max_frame_ms` is the peak frame time at th
 `buffer_depth` / `incoming_rate_hz`. This requires an **external IR packet
 source** (a loopback transmitter or second board); on a bare board no packets
 arrive and `max_frame_ms` is emitted as `_TBD_`.
+
+#### IR-receive component memory (#448)
+
+Retained footprint of one `ReceiverComponent` (a `PulseIn` + `PulseInReader` +
+`InfraredSingleReceiver` + decoder), measured by `ir_rx_profiler.py` as a `gc.mem_free()`
+delta around the warmed single-receiver chain (`gc.collect()` on both sides), sweeping
+`PulseIn.maxlen`. The `PulseIn` ring buffer **is** on the GC heap (so it counts toward
+the assembled-prop footprint), but the relationship is **not linear**, so the model's
+`base + per_slot * buffer_depth` form does not fit cleanly across the range:
+
+| `PulseIn.maxlen` | measured footprint |
+|------------------|--------------------|
+| 64               | 752 B              |
+| 256              | 672 B              |
+| 1024             | 3488 B             |
+| 2048             | 5536 B             |
+
+At large depths the buffer scales at **~2.0 B/slot** (a `uint16` per slot; 1024→2048 is
+exactly +2048 B), but small buffers quantize into a flat ~700 B baseline far below that
+line. The reference `tag` prop's single receiver is fixed at **maxlen = 256**, where the
+footprint is measured directly as **672 B** -- that is the value used for reconciliation,
+rather than extrapolating the non-linear fit (which would over-predict it at ~1088 B).
 
 ## Reference prop validation (#401)
 
@@ -687,21 +830,30 @@ tolerance -- every component's `memory_footprint_bytes` is still uncalibrated
 (`_TBD_`), so the predicted footprint is ~0 and only the measured value is recorded
 (see follow-up below).
 
+All figures at the reference prop's `num_voices = 4`.
+
 | Metric | Predicted (amortized, 7 FPS) | Measured | Relative Δ | Within ±5%? |
 |--------|------------------------------|----------|------------|-------------|
-| CPU reservation | 60.86% | 60.46% | +0.7% | ✅ |
-| Headroom | 13.49% | 13.89% | −2.9% | ✅ |
-| Worst-case frame | 146.5 ms | 140.99 ms | +3.9% | ✅ |
-| Memory footprint | ~0 (uncalibrated) | 32,240 B | n/a (excluded) | — |
+| CPU reservation | 60.92% | 60.41% | +0.8% | ✅ |
+| Headroom | 13.43% | 13.94% | −3.7% | ✅ |
+| Worst-case frame | 146.6 ms | 150.88 ms | −2.8% | ✅ |
+| Memory footprint | ~0 (uncalibrated) | 32,608 B | n/a (excluded) | — |
 
 Measured row (`circuitpython_10_2_1`, `tag_prop_profiler.py`):
 
 | Board | Runtime | Driver | reservation% | footprint_B | headroom% | peak_frame_ms |
 |-------|---------|--------|--------------|-------------|-----------|---------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 60.46% | 32240 | 13.89% | 140.9912 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 60.41% | 32608 | 13.94% | 150.8789 |
 
-**Result: PASS.** All three CPU metrics fall within ±5%, and every prediction errs in
-the safe direction (over-predicts cost / under-predicts headroom).
+**Result: PASS.** All three CPU metrics fall within ±5%. Reservation and headroom still
+err in the safe direction (the model over-predicts cost). The **worst-case frame is now
+under-predicted by 2.8%** (146.6 ms predicted vs 150.88 ms measured) -- the unsafe side,
+though within tolerance. At `num_voices = 2` it was over-predicted (146.5 vs 140.99 ms);
+the measured peak rose ~10 ms while the predicted steady frame moved only ~0.085 ms, so
+the swing is dominated by `frame_time_peak` run-to-run noise (whether a blocking IR send
+coincides with GC or other spikes on the single worst frame), not the two extra voices.
+Worth watching: if the worst-frame margin matters, widen it (the IR-rx deadline is
+checked against it) or characterise the peak across several runs rather than one.
 
 **Model correction captured (acceptance criterion 4).** Before correction the
 predictions were uniformly ~8.8% high. The cause was charging the sparse haptic event
@@ -711,5 +863,5 @@ its duty cycle for the comparison (a comparison-only adjustment in
 all metrics from ~8.8% to ≤3.9%.
 
 **Follow-up (open).** Calibrate component `memory_footprint_bytes` (all `_TBD_`): the
-predicted memory footprint is ~0 against a measured 32,240 B for the assembled prop,
+predicted memory footprint is ~0 against a measured 32,608 B for the assembled prop,
 so memory cannot yet be validated against tolerance.

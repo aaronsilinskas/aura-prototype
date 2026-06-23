@@ -21,10 +21,15 @@ For each payload length, the profiler times `send_ir` directly with
 `PerformanceTracker`'s per-frame update-time captures it) and reports the blocking
 duration alongside the uniform stats line.
 
+It also measures the transmitter's **static memory footprint** (a `gc.mem_free()`
+delta around construction) for the `ir_transmit_component_memory` constants table
+(#448). The profiler builds only the LINE transmitter -- not the IR receiver -- so
+the footprint is the transmitter path alone; the receiver's `PulseIn(maxlen=256)`
+belongs to the separate IR-rx component (`ir_rx_profiler.py`).
+
 Hardware
 --------
-- IR emitter (LINE) wired to `LINE_PIN`, driven via `pulseio.PulseOut` at 38kHz
-  (see `propmaker.setup_ir`).
+- IR emitter (LINE) wired to `LINE_PIN`, driven via `pulseio.PulseOut` at 38kHz.
 
 Installation
 ------------
@@ -48,6 +53,7 @@ Configuration
 
 from __future__ import annotations
 
+import gc
 import time
 
 from effects.performance import PerformanceTracker
@@ -64,7 +70,6 @@ except ImportError:
     pass
 
 LINE_PIN_NAME: Final = "D9"
-RX_PIN_NAME: Final = "A0"
 PAYLOAD_LENGTHS: Final = [1, 4, 16, 64]
 ITERATIONS_PER_LENGTH: Final = 10
 TARGET_FPS: Final = 24.0
@@ -72,19 +77,42 @@ LOG_INTERVAL_SECONDS: Final = 5.0
 
 
 def _build_network_controls() -> HardwareNetworkControls:
+    """Build the LINE transmitter directly (the same PulseOut + wrapper `setup_ir`
+    constructs), but *without* the receiver. Isolating the transmitter keeps the
+    footprint measurement clean -- the receiver's `PulseIn(maxlen=256)` belongs to
+    the separate IR-rx component (`ir_rx_profiler.py`), not IR-tx.
+    """
     import board
+    import pulseio
 
-    from hardware.circuitpython.propmaker import setup_ir
+    from hardware.circuitpython.infrared_io import PulseOutWriter
+    from hardware.shared.ir_protocol import AuraInfraredEncoder
+    from hardware.shared.ir_transport import InfraredTransmitter
 
     line_pin = getattr(board, LINE_PIN_NAME)
-    rx_pin = getattr(board, RX_PIN_NAME)
-    transmitters, _receiver = setup_ir(rx_pin, line_pin)
-    return HardwareNetworkControls(transmitters)
+    pulseout = pulseio.PulseOut(line_pin, frequency=38000, duty_cycle=0x8000)
+    transmitter = InfraredTransmitter(PulseOutWriter(pulseout), AuraInfraredEncoder())
+    return HardwareNetworkControls({LINE: transmitter})
 
 
 def run() -> None:
     """Sweep payload length, reporting PulseOut.send blocking duration."""
+    # Import-only warm-up: pay the pulseio / IR-transport module imports before the
+    # footprint snapshot. The transmitter is built once (PulseOut owns the emitter
+    # pin), so a build-then-discard warm-up is not possible.
+    import pulseio  # noqa: F401
+
+    from hardware.circuitpython.infrared_io import PulseOutWriter  # noqa: F401
+    from hardware.shared.ir_protocol import AuraInfraredEncoder  # noqa: F401
+    from hardware.shared.ir_transport import InfraredTransmitter  # noqa: F401
+
+    # Static footprint: the LINE PulseOut + transmitter wrapper + HardwareNetworkControls.
+    # No shared bus to exclude -- the PulseOut is dedicated to the emitter pin.
+    gc.collect()
+    free_before = gc.mem_free()
     network_controls = _build_network_controls()
+    gc.collect()
+    footprint_bytes = free_before - gc.mem_free()
 
     print_profile_header(
         component="ir_tx",
@@ -123,6 +151,11 @@ def run() -> None:
     print_table_row(
         "ir_transmit_component_costs",
         ["_TBD_", f"{worst_blocking_send_ms:.2f}"],
+    )
+    # Static memory footprint (single value -- the transmitter path does not scale).
+    print_table_row(
+        "ir_transmit_component_memory",
+        [footprint_bytes],
     )
 
 

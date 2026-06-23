@@ -8,11 +8,13 @@ reservation, headroom, achievable FPS, and memory footprint can be compared
 against the measured values from
 `examples/hardware/profiling/tag_prop_profiler.py`.
 
-All constants are sourced from `docs/hardware/capacity-model.md`. Cells the doc
-still carries as `_TBD_` (router overhead, IR-tx average cost, IR-rx incoming
-rate, and -- critically -- every component's `memory_footprint_bytes`) are set
-to 0 here and flagged via `uncalibrated=True` so the runner can call out which
-predictions rest on real measurements vs. uncalibrated gaps.
+All constants are sourced from `docs/hardware/capacity-model.md`. Per-component
+`memory_footprint_bytes` are now calibrated (matrix scope, sound, vibration, IR-tx,
+IR-rx). A few cost cells the doc still carries as `_TBD_` (router overhead, IR-rx
+fixed drain) are set to 0 and flagged via `uncalibrated=True`. Note the calibrated
+component footprints do NOT sum to the assembled prop's measured heap: that total is
+dominated by the loaded scene's first-tick effect allocation, which is output-coupled
+and not a per-component term (see capacity-model.md "Scene-content memory" / #448).
 
 Run the prediction with:
 
@@ -82,9 +84,9 @@ MATRIX_STACK_DEPTH = 2
 TAG_RULE_COUNT = 6
 TAG_EVENTS_PER_TICK = 2
 
-# AudioEffectOutput is built with num_voices=2 in the tag prop; the scene can
+# AudioEffectOutput is built with num_voices=4 in the tag prop; the scene can
 # stack at most that many concurrent voices.
-TAG_NUM_VOICES = 2
+TAG_NUM_VOICES = 4
 
 # IR receiver PulseIn is allocated with maxlen=256 (propmaker.setup_ir).
 IR_BUFFER_DEPTH = 256
@@ -121,6 +123,8 @@ def tag_reference_prop() -> PropProfile:
         # is informational only (not a feasibility constraint here).
         i2c_transaction_bytes=361,
         i2c_frequency_hz=24.0,
+        # pixel_scope_memory (doc): base 9607 + per_pixel 2.80 * 117 px ~= 9935 B.
+        memory_footprint_bytes=9935,
     )
     sound = SoundComponent(
         name="sound",
@@ -128,17 +132,20 @@ def tag_reference_prop() -> PropProfile:
         per_voice_ms=0.0425,
         num_voices=TAG_NUM_VOICES,
         max_concurrent_voices=TAG_NUM_VOICES,
+        memory_footprint_bytes=4304,  # sound_component_memory (doc), num_voices=4
     )
     vibration = VibrationComponent(
         name="vibration",
         cost_ms=7.0801,
         max_calls_per_minute=6.0,
         i2c_transaction_bytes=18,  # reproduces the doc's ~1.80 B/s bus share
+        memory_footprint_bytes=176,  # vibration_component_memory (doc)
     )
     ir_tx = IrTransmitComponent(
         name="ir-tx-line",
         cost_ms=0.50,  # realistic 4-byte AURA payload at 0.2 Hz cadence (doc)
         blocking_send_ms=59.57,  # 4-byte payload PulseOut.send (not the 757 max)
+        memory_footprint_bytes=192,  # ir_transmit_component_memory (doc)
     )
     # One IR receiver (this prop's actual loadout -- a subset of the fixed-4
     # design maximum). incoming_rate_hz left at 0: the model's derived
@@ -149,9 +156,13 @@ def tag_reference_prop() -> PropProfile:
     # "Reference prop validation"), so no hard deadline is asserted here.
     ir_rx = ReceiverComponent(
         name="ir-rx",
-        cost_ms=0.0,  # fixed_drain _TBD_ in doc
-        base_footprint_bytes=0,  # _TBD_ (uncalibrated memory footprint)
-        bytes_per_buffer_slot=0,  # _TBD_
+        cost_ms=0.0,  # fixed_drain still _TBD_ in doc (so still uncalibrated overall)
+        # ir_receive_component_memory (doc): the PulseIn buffer is GC-heap but quantizes
+        # non-linearly, so the receiver was measured directly at the prop's maxlen=256 =
+        # 672 B. base=672 / per_slot=0 reproduces that at this fixed depth (the base +
+        # per_slot fit is unreliable across depths -- see the doc note).
+        base_footprint_bytes=672,
+        bytes_per_buffer_slot=0,
         buffer_depth=IR_BUFFER_DEPTH,
         incoming_rate_hz=0.0,
         uncalibrated=True,
@@ -368,10 +379,19 @@ def main() -> None:
         "  examples/hardware/profiling/tag_prop_profiler.py "
         f"(set TARGET_FPS = {comparison_fps:.0f})"
     )
+    print()
+    component_heap = sum(c.memory_footprint_bytes for c in prop.components)
+    baseline_heap = board.engine_host_baseline.heap_bytes
+    print("Memory (calibrated component footprints + engine baseline):")
+    print(f"  components      : {component_heap} B")
+    print(f"  engine baseline : {baseline_heap} B")
+    print(f"  predicted sum   : {component_heap + baseline_heap} B")
     print(
-        "Known model gap (acceptance criterion 4): component memory_footprint_bytes "
-        "are still uncalibrated, so the predicted memory footprint is ~0 -- record "
-        "the measured footprint and file a follow-up to calibrate it."
+        "  measured prop   : 32832 B -- the ~17 KB gap is the loaded scene's first-tick\n"
+        "                    effect allocation (output-coupled, not a per-component term;\n"
+        "                    see capacity-model.md 'Scene-content memory'). A predicted-\n"
+        "                    vs-measured total-memory validation is deferred to that\n"
+        "                    follow-up; the component footprints above are calibrated."
     )
 
 
