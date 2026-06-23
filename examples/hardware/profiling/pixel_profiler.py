@@ -84,7 +84,7 @@ try:
 except ImportError:
     pass
 
-DRIVER: Final = "is31fl3741_matrix"  # or "is31fl3741_matrix"
+DRIVER: Final = "is31fl3741_matrix"  # or "neopixel_pwm"
 PIXEL_COUNTS: Final = [10, 50, 150]
 STACK_DEPTHS: Final = [1, 2, 4]
 SAMPLE_LEVEL: Final = 7
