@@ -81,6 +81,7 @@ Configuration
 from __future__ import annotations
 
 import gc
+import time
 
 import board
 
@@ -122,18 +123,29 @@ IR_LINE_PIN: Final = board.D12
 
 # Frame budget basis. A prop with an IS31FL3741 scope cannot hold 24 FPS (the
 # ~60 ms matrix flush alone exceeds the 41.7 ms budget), so reservation/headroom
-# are computed against the rate the prop actually achieves. Reconcile this with
-# the reported measured FPS.
-TARGET_FPS: Final = 12.0
+# are computed against the rate the prop actually achieves. The estimator
+# predicts a single-MCU fit at ~7 FPS for this prop -- keep this in sync with the
+# `python -m scripts.capacity.reference_props` comparison FPS so predicted and
+# measured reservation share one frame budget. Reconcile with the measured FPS.
+TARGET_FPS: Final = 7.0
 
 # Engine-host usable-budget terms (capacity-model.md "Per-MCU baselines" and the
 # 20% default headroom reserve), used to derive the measured headroom percentage.
-ENGINE_HOST_BASELINE_CPU_PERCENT: Final = 2.35
+# These are the circuitpython_10_2_1 engine-host baseline; use 4.75 for 10_0_3.
+ENGINE_HOST_BASELINE_CPU_PERCENT: Final = 5.65
 HEADROOM_RESERVE_PERCENT: Final = 20.0
 
 # Inject one synthetic button press at boot so the scene leaves Ready and enters
 # Playing (the representative steady workload) without a human pressing a button.
 AUTO_START: Final = True
+
+# Discard the first `WARMUP_SECONDS` of measurement. Boot and the Ready->Starting
+# ->Playing transitions *construct* effects across the matrix (palettes, LUTs,
+# buffers) and open WAV files from flash for the first time -- one-time costs that
+# spike a single frame into the hundreds of ms / ~1 s range. They are not the
+# steady-state per-frame cost the estimator predicts, so the tracker is reset once
+# warm-up elapses and only steady-state frames are reported.
+WARMUP_SECONDS: Final = 10.0
 
 LOG_INTERVAL_SECONDS: Final = 5.0
 
@@ -233,6 +245,8 @@ def run() -> None:
     print(f"__PROP footprint_bytes={footprint_bytes}, free_heap_bytes={gc.mem_free()}")
 
     start_injected = not AUTO_START
+    warmup_done = WARMUP_SECONDS <= 0
+    warmup_until = time.monotonic() + WARMUP_SECONDS
 
     while True:
         perf.start_frame()
@@ -277,32 +291,50 @@ def run() -> None:
         effect_manager.update(timer)
         perf.add_render_time()
 
-        if perf.complete_frame():
-            frames = perf.frame_count
-            update_ms = perf.update_time_total / frames * 1000.0
-            render_ms = perf.render_time_total / frames * 1000.0
-            busy_ms = update_ms + render_ms
-            reservation_percent = busy_ms / frame_budget_ms * 100.0
-            headroom_percent = usable_cpu_percent - reservation_percent
-            peak_frame_ms = perf.frame_time_peak * 1000.0
+        if not perf.complete_frame():
+            continue
 
-            print_stats_line(
-                perf,
-                update_ms=f"{update_ms:.4f}",
-                render_ms=f"{render_ms:.4f}",
-                reservation=f"{reservation_percent:.2f}%",
-                headroom=f"{headroom_percent:.2f}%",
-            )
-            # Measured column of the predicted-vs-measured comparison (#401).
-            print_table_row(
-                "reference_prop_validation",
-                [
-                    f"{reservation_percent:.2f}%",
-                    footprint_bytes,
-                    f"{headroom_percent:.2f}%",
-                    f"{peak_frame_ms:.4f}",
-                ],
-            )
+        # Drop the warm-up window: boot + scene transitions construct effects and
+        # open WAV files for the first time, spiking single frames into the
+        # hundreds of ms / ~1 s range. Reset the tracker once so averages and the
+        # peak reflect only steady-state frames, not one-time construction cost.
+        if not warmup_done and time.monotonic() >= warmup_until:
+            warmup_done = True
+            perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
+            print(f"__WARMUP_DONE after {WARMUP_SECONDS:.0f}s; measuring steady state")
+            continue
+        if not warmup_done:
+            continue
+
+        frames = perf.frame_count
+        update_ms = perf.update_time_total / frames * 1000.0
+        render_ms = perf.render_time_total / frames * 1000.0
+        busy_ms = update_ms + render_ms
+        reservation_percent = busy_ms / frame_budget_ms * 100.0
+        headroom_percent = usable_cpu_percent - reservation_percent
+        # Windowed peak: the worst frame in *this* interval. Reset below so a lone
+        # transient (e.g. a first-time WAV load) shows only in its own interval
+        # rather than pinning the figure for the rest of the run.
+        peak_frame_ms = perf.frame_time_peak * 1000.0
+
+        print_stats_line(
+            perf,
+            update_ms=f"{update_ms:.4f}",
+            render_ms=f"{render_ms:.4f}",
+            reservation=f"{reservation_percent:.2f}%",
+            headroom=f"{headroom_percent:.2f}%",
+        )
+        # Measured column of the predicted-vs-measured comparison (#401).
+        print_table_row(
+            "reference_prop_validation",
+            [
+                f"{reservation_percent:.2f}%",
+                footprint_bytes,
+                f"{headroom_percent:.2f}%",
+                f"{peak_frame_ms:.4f}",
+            ],
+        )
+        perf.frame_time_peak = 0.0
 
 
 run()

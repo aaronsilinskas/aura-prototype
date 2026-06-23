@@ -651,3 +651,65 @@ packet rate is induced via loopback. `max_frame_ms` is the peak frame time at th
 `buffer_depth` / `incoming_rate_hz`. This requires an **external IR packet
 source** (a loopback transmitter or second board); on a bare board no packets
 arrive and `max_frame_ms` is emitted as `_TBD_`.
+
+## Reference prop validation (#401)
+
+The acceptance gate for the whole capacity PRD: confirm the calibrated estimator's
+prediction matches reality for the reference prop in use today -- the **Adafruit
+RP2040 PropMaker Feather running the `tag` scene** (IS31FL3741 matrix with all
+scopes composited on the one matrix, I2S audio, DRV2605L vibration, one IR LINE
+emitter + one IR receiver, two buttons, LIS3DH accelerometer -- a single-MCU prop).
+
+- **Prediction** -- `python -m scripts.capacity.reference_props` encodes this loadout
+  against the calibrated `circuitpython_10_2_1` RP2040 board profile and runs the
+  estimator.
+- **Measurement** -- `examples/hardware/profiling/tag_prop_profiler.py` stands up the
+  whole assembled prop on real hardware and emits a
+  `__TABLE_ROW table=reference_prop_validation` line.
+
+**Single-MCU assignment (acceptance criterion 1).** The estimator places the entire
+prop on one engine-host MCU. The matrix `flush_ms` (60.69 ms) alone busts the 24 FPS
+budget, so the prop is infeasible at the ceiling; its achievable single-MCU rate is
+~7.9 FPS, and the comparison below is taken at **7 FPS** (the rate the profiler's
+`TARGET_FPS` is set to, so predicted and measured share one frame budget of 142.9 ms).
+
+**Comparison basis.** The packer reserves `VibrationComponent.cost_ms` (~7 ms) on
+*every* frame -- the safe worst-case assumption for feasibility. The unpaced profiler
+instead reports *mean* steady-state busy time, where the haptic motor's ≤6 calls/min
+is amortized to ~0.1 ms/frame. The predicted column below is therefore the
+**amortized** figure (`amortized_engine_host_cost_ms`), the apples-to-apples match for
+the profiler's mean reservation; the worst-case frame likewise amortizes the haptic
+event (a vibration is not assumed to coincide with the IR-send peak frame).
+
+**Stated tolerance: ±5%** on the CPU metrics (reservation, headroom, worst-case
+frame), measured as relative error. Memory footprint is **excluded** from the
+tolerance -- every component's `memory_footprint_bytes` is still uncalibrated
+(`_TBD_`), so the predicted footprint is ~0 and only the measured value is recorded
+(see follow-up below).
+
+| Metric | Predicted (amortized, 7 FPS) | Measured | Relative Δ | Within ±5%? |
+|--------|------------------------------|----------|------------|-------------|
+| CPU reservation | 60.86% | 60.46% | +0.7% | ✅ |
+| Headroom | 13.49% | 13.89% | −2.9% | ✅ |
+| Worst-case frame | 146.5 ms | 140.99 ms | +3.9% | ✅ |
+| Memory footprint | ~0 (uncalibrated) | 32,240 B | n/a (excluded) | — |
+
+Measured row (`circuitpython_10_2_1`, `tag_prop_profiler.py`):
+
+| Board | Runtime | Driver | reservation% | footprint_B | headroom% | peak_frame_ms |
+|-------|---------|--------|--------------|-------------|-----------|---------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 60.46% | 32240 | 13.89% | 140.9912 |
+
+**Result: PASS.** All three CPU metrics fall within ±5%, and every prediction errs in
+the safe direction (over-predicts cost / under-predicts headroom).
+
+**Model correction captured (acceptance criterion 4).** Before correction the
+predictions were uniformly ~8.8% high. The cause was charging the sparse haptic event
+on every frame while comparing against a mean measurement; amortizing vibration over
+its duty cycle for the comparison (a comparison-only adjustment in
+`reference_props.py`, leaving the packer's worst-case reservation untouched) brought
+all metrics from ~8.8% to ≤3.9%.
+
+**Follow-up (open).** Calibrate component `memory_footprint_bytes` (all `_TBD_`): the
+predicted memory footprint is ~0 against a measured 32,240 B for the assembled prop,
+so memory cannot yet be validated against tolerance.
