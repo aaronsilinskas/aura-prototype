@@ -575,6 +575,34 @@ render and flush together -- via a ``CountingI2C`` decorator wrapping the real b
 so no separate I2C sweep axis is needed. The matrix's ``i2c_transaction_bytes`` cell
 above will be filled by the first on-device run of the updated profiler.
 
+#### Pixel scope memory (#448)
+
+Retained heap footprint for a `PixelScopeComponent`, keyed by driver. From
+`pixel_profiler.py` (a `gc.mem_free()` delta around the warmed scope, after a
+`gc.collect()` on both sides so only retained heap is counted).
+
+| Board | Runtime | Driver | `footprint_base_bytes` | `footprint_per_pixel_bytes` |
+|-------|---------|--------|------------------------|-----------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | neopixel_pwm | 8520 | 46.74 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | is31fl3741_matrix | 9607 | 2.80 |
+
+The profiler snapshots free heap *before* building the scope and measures the delta
+*after* the full sweep, so the figure includes the output object, its driver, and the
+per-scope `PixelBuffer`s (allocated lazily during the sweep). The shared `PackRegistry`
+is built once before the loop and so is excluded; the `EffectManager` engine baseline is
+built inside the loop and lands in the fixed `footprint_base_bytes` intercept. Because
+footprint is linear in pixel_count, `linear_fit` gives the per-pixel buffer slope and the
+fixed base intercept -- predict a scope's footprint as
+`base + per_pixel * pixel_count` (e.g. the reference prop's 117-pixel matrix gives
+`9607 + 2.80 * 117 ≈ 9935 B`).
+
+The two drivers split very differently. `neopixel_pwm` scales steeply (46.74 B/px) --
+the strip buffer grows per pixel. `is31fl3741_matrix` is nearly flat (2.80 B/px): the
+buffered driver allocates a **fixed full-matrix (13x9) framebuffer** at construction
+regardless of the logical pixel count, so that ~9.6 KB lands in `footprint_base_bytes`
+and the slope reflects only the small per-row `PixelBuffer`s. For the matrix the base
+term dominates; the slope is near measurement noise.
+
 ### Sound component costs
 
 Per-frame mixer cost terms for the shared `SoundComponent`. From `sound_profiler.py`.
