@@ -726,6 +726,28 @@ packet rate is induced via loopback. `max_frame_ms` is the peak frame time at th
 source** (a loopback transmitter or second board); on a bare board no packets
 arrive and `max_frame_ms` is emitted as `_TBD_`.
 
+#### IR-receive component memory (#448)
+
+Retained footprint of one `ReceiverComponent` (a `PulseIn` + `PulseInReader` +
+`InfraredSingleReceiver` + decoder), measured by `ir_rx_profiler.py` as a `gc.mem_free()`
+delta around the warmed single-receiver chain (`gc.collect()` on both sides), sweeping
+`PulseIn.maxlen`. The `PulseIn` ring buffer **is** on the GC heap (so it counts toward
+the assembled-prop footprint), but the relationship is **not linear**, so the model's
+`base + per_slot * buffer_depth` form does not fit cleanly across the range:
+
+| `PulseIn.maxlen` | measured footprint |
+|------------------|--------------------|
+| 64               | 752 B              |
+| 256              | 672 B              |
+| 1024             | 3488 B             |
+| 2048             | 5536 B             |
+
+At large depths the buffer scales at **~2.0 B/slot** (a `uint16` per slot; 1024→2048 is
+exactly +2048 B), but small buffers quantize into a flat ~700 B baseline far below that
+line. The reference `tag` prop's single receiver is fixed at **maxlen = 256**, where the
+footprint is measured directly as **672 B** -- that is the value used for reconciliation,
+rather than extrapolating the non-linear fit (which would over-predict it at ~1088 B).
+
 ## Reference prop validation (#401)
 
 The acceptance gate for the whole capacity PRD: confirm the calibrated estimator's
