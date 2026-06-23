@@ -653,6 +653,19 @@ wrapping the real `busio.I2C` bus in a `CountingI2C` decorator before
 and reading `bytes_written` after that event. The table cell is `_TBD_` pending
 the on-device run.
 
+#### Vibration component memory (#448)
+
+Static retained footprint of the shared `VibrationComponent` (the DRV2605L driver +
+`Drv2605EffectOutput`). From `vibration_profiler.py` (a `gc.mem_free()` delta around
+construction, after a `gc.collect()` on both sides). A single value -- nothing about
+the component scales. The shared I2C bus (also used by the matrix and accelerometer)
+is built before the snapshot and so excluded; the driver-module import is pre-paid by
+an import-only warm-up.
+
+| Board | Runtime | Driver | `memory_footprint_bytes` |
+|-------|---------|--------|--------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 176 |
+
 ### IR-transmit component costs
 
 Cost terms for the shared `IrTransmitComponent`. From `ir_tx_profiler.py`.

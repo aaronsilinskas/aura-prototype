@@ -22,6 +22,10 @@ The I2C bus is wrapped in `CountingI2C` before `setup_drv2605`. The decorator is
 reset before a representative vibration event and `bytes_written` after that event
 gives the measured `i2c_transaction_bytes` -- no guessing required.
 
+It also measures the component's **static memory footprint** (a `gc.mem_free()` delta
+around the DRV2605L driver + output, excluding the shared I2C bus) for the
+`vibration_component_memory` constants table (#448).
+
 Hardware
 --------
 - DRV2605L haptic motor driver on the board's default I2C bus (SDA/SCL).
@@ -47,6 +51,7 @@ Configuration
 
 from __future__ import annotations
 
+import gc
 import time
 
 from effects.effect import Effect, EffectVibration, VibrationConfig
@@ -73,21 +78,39 @@ LOG_INTERVAL_SECONDS: Final = 5.0
 _EVENT_VERB: Final = "buzz"
 
 
-def _build_output():
+def _build_bus() -> CountingI2C:
     import board
     import busio
 
+    return CountingI2C(busio.I2C(board.SCL, board.SDA))
+
+
+def _build_output(i2c: CountingI2C):
     from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
     from hardware.circuitpython.propmaker import setup_drv2605
 
-    i2c = CountingI2C(busio.I2C(board.SCL, board.SDA))
     motor = setup_drv2605(i2c)
-    return Drv2605EffectOutput(motor), i2c
+    return Drv2605EffectOutput(motor)
 
 
 def run() -> None:
     """Drive `handle_event` once per `EVENT_INTERVAL_SECONDS`, reporting per-event cost."""
-    output, counting_bus = _build_output()
+    counting_bus = _build_bus()
+
+    # Import-only warm-up: pay the drv2605 module import before the footprint snapshot
+    # so its module-load heap does not inflate the measurement. The output is built
+    # once (no deinit), so a build-then-discard warm-up is not possible here.
+    from hardware.circuitpython.drv2605_output import Drv2605EffectOutput  # noqa: F401
+    from hardware.circuitpython.propmaker import setup_drv2605  # noqa: F401
+
+    # Static footprint: the DRV2605L driver + Drv2605EffectOutput wrapper. The shared
+    # I2C bus is built above and excluded -- in the assembled prop the bus is shared
+    # with the matrix and accelerometer, not owned by the vibration component.
+    gc.collect()
+    free_before = gc.mem_free()
+    output = _build_output(counting_bus)
+    gc.collect()
+    footprint_bytes = free_before - gc.mem_free()
 
     buzz_effect = Effect(
         "profiler.buzz",
@@ -132,6 +155,11 @@ def run() -> None:
     print_table_row(
         "vibration_component_costs",
         [f"{cost_ms:.4f}", f"{i2c_bandwidth:.2f}"],
+    )
+    # Static memory footprint (single value -- nothing about the component scales).
+    print_table_row(
+        "vibration_component_memory",
+        [footprint_bytes],
     )
 
 
