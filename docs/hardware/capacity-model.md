@@ -695,6 +695,20 @@ but that is a short burst rather than a sustained rate, and the single-frame spi
 it produces is already captured separately by `blocking_send_ms`. The sustained
 0.2 Hz figure is therefore the one recorded as the average reservation.
 
+#### IR-transmit component memory (#448)
+
+Static retained footprint of the shared `IrTransmitComponent` (the LINE `PulseOut` +
+`InfraredTransmitter` wrapper + `HardwareNetworkControls`). From `ir_tx_profiler.py`
+(a `gc.mem_free()` delta around construction, after a `gc.collect()` on both sides). A
+single value -- the transmitter path does not scale. The profiler builds only the
+transmitter, **not** the receiver, so the receiver's `PulseIn(maxlen=256)` is excluded
+(it is the separate IR-rx component below); the module imports are pre-paid by an
+import-only warm-up.
+
+| Board | Runtime | Driver | `memory_footprint_bytes` |
+|-------|---------|--------|--------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 192 |
+
 ### IR-receive component costs
 
 Hard-real-time deadline for the shared `ReceiverComponent`, keyed additionally by
