@@ -82,9 +82,9 @@ MATRIX_STACK_DEPTH = 2
 TAG_RULE_COUNT = 6
 TAG_EVENTS_PER_TICK = 2
 
-# AudioEffectOutput is built with num_voices=2 in the tag prop; the scene can
+# AudioEffectOutput is built with num_voices=4 in the tag prop; the scene can
 # stack at most that many concurrent voices.
-TAG_NUM_VOICES = 2
+TAG_NUM_VOICES = 4
 
 # IR receiver PulseIn is allocated with maxlen=256 (propmaker.setup_ir).
 IR_BUFFER_DEPTH = 256

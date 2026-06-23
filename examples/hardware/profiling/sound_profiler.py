@@ -21,6 +21,12 @@ For each concurrent-voice count, the profiler:
 component per prop (one I2S amp + one `audiomixer.Mixer`), so this profiler drives it
 directly rather than through `EffectManager`.
 
+It also measures the output's **static memory footprint** (a `gc.mem_free()` delta
+around idle construction) for the `sound_component_memory` constants table (#448).
+The footprint scales with `NUM_VOICES` (the mixer/voice-pool construction cap), so the
+emitted row is keyed by it; the output has no deinit and is built once per run, so to
+record the scaling, run the profiler at each `NUM_VOICES` of interest.
+
 Hardware
 --------
 - PropMaker FeatherWing (or equivalent) I2S amp wired to `board.I2S_BIT_CLOCK`,
@@ -51,6 +57,7 @@ Configuration
 
 from __future__ import annotations
 
+import gc
 import time
 
 from effects.effect import AudioPlaybackConfig, Effect, EffectAudio
@@ -92,7 +99,23 @@ def run() -> None:
     """Sweep concurrent voices, reporting per-frame mixer-fixed + per-voice cost."""
     audio_registry = AudioRegistry()
     audio_registry.register(_CLIP_NAME, CLIP_PATH)
+
+    # Import-only warm-up: pay the audio-module import (audio_output lazily pulls in
+    # audiobusio + audiomixer) before the footprint snapshot so its module-load heap
+    # does not inflate the measurement. AudioEffectOutput has no deinit -- it claims
+    # the I2S pins and is built exactly once -- so a build-then-discard warm-up is not
+    # possible here; only the module import can be pre-paid.
+    from hardware.circuitpython.audio_output import AudioEffectOutput  # noqa: F401
+
+    # Static footprint: the retained heap of standing up the one shared sound output
+    # (I2SOut + Mixer + VoicePool, all sized by num_voices), measured idle before any
+    # voice is claimed -- matching how the assembled prop is measured at setup. The
+    # shared AudioRegistry is built above, so it is excluded from the delta.
+    gc.collect()
+    free_before = gc.mem_free()
     output = _build_output(audio_registry)
+    gc.collect()
+    footprint_bytes = free_before - gc.mem_free()
 
     looping_effect = Effect(
         "profiler.loop",
@@ -152,6 +175,13 @@ def run() -> None:
     print_table_row(
         "sound_component_costs",
         [f"{mixer_fixed_ms:.4f}", f"{per_voice_ms:.4f}"],
+    )
+    # Static memory footprint, keyed by num_voices (the construction cap the mixer /
+    # voice pool are sized by). Run at the prop's num_voices for its footprint -- the
+    # reference tag prop uses 4 (the profiler default).
+    print_table_row(
+        "sound_component_memory",
+        [NUM_VOICES, footprint_bytes],
     )
 
 

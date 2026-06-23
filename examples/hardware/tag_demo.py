@@ -101,7 +101,7 @@ _audio_registry.register("scene.hit_start", "sounds/blip.wav")
 _audio_registry.register("reload", "sounds/blip.wav")
 _audio_registry.register("reload_complete", "sounds/blip.wav")
 
-_audio_output = AudioEffectOutput(_audio_registry, max_volume=0.1, num_voices=2)
+_audio_output = AudioEffectOutput(_audio_registry, max_volume=0.1, num_voices=4)
 _outputs = [IS31FL3741EffectOutput(_matrix), _audio_output]
 if _motor is not None:
     _outputs.append(Drv2605EffectOutput(_motor))

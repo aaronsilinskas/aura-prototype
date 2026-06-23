@@ -186,7 +186,7 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
     audio_registry.register("reload", "sounds/blip.wav")
     audio_registry.register("reload_complete", "sounds/blip.wav")
 
-    audio_output = AudioEffectOutput(audio_registry, max_volume=0.1, num_voices=2)
+    audio_output = AudioEffectOutput(audio_registry, max_volume=0.1, num_voices=4)
     outputs = [IS31FL3741EffectOutput(matrix), audio_output]
     if motor is not None:
         outputs.append(Drv2605EffectOutput(motor))

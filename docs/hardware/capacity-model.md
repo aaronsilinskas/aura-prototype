@@ -616,6 +616,25 @@ Per-frame mixer cost terms for the shared `SoundComponent`. From `sound_profiler
 + per_voice_ms * effective_voices`, the `linear_fit` **intercept** is
 `mixer_fixed_ms` and the **slope** is `per_voice_ms`.
 
+#### Sound component memory (#448)
+
+Static retained footprint of the shared `SoundComponent` (`AudioEffectOutput`:
+I2SOut + `audiomixer.Mixer` + `VoicePool`), measured idle before any voice is claimed.
+From `sound_profiler.py` (a `gc.mem_free()` delta around construction, after a
+`gc.collect()` on both sides). Keyed by `num_voices` -- the mixer/voice-pool
+construction cap the footprint scales with. The reference `tag` prop uses
+`num_voices = 4`.
+
+| Board | Runtime | Driver | `num_voices` | `memory_footprint_bytes` |
+|-------|---------|--------|--------------|--------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 4 | 4304 |
+
+The output has no deinit (it owns the I2S pins) and so is built exactly once per run;
+the profiler therefore measures one `num_voices` per run, and the module-load heap is
+paid by an import-only warm-up before the snapshot rather than a build-then-discard one.
+Run at additional `num_voices` values to record the scaling. Cell is `_TBD_` until the
+first on-device run.
+
 ### Vibration component costs
 
 Per-event cost for the shared `VibrationComponent` (DRV2605L over I2C). From
@@ -715,21 +734,30 @@ tolerance -- every component's `memory_footprint_bytes` is still uncalibrated
 (`_TBD_`), so the predicted footprint is ~0 and only the measured value is recorded
 (see follow-up below).
 
+All figures at the reference prop's `num_voices = 4`.
+
 | Metric | Predicted (amortized, 7 FPS) | Measured | Relative Δ | Within ±5%? |
 |--------|------------------------------|----------|------------|-------------|
-| CPU reservation | 60.86% | 60.46% | +0.7% | ✅ |
-| Headroom | 13.49% | 13.89% | −2.9% | ✅ |
-| Worst-case frame | 146.5 ms | 140.99 ms | +3.9% | ✅ |
-| Memory footprint | ~0 (uncalibrated) | 32,240 B | n/a (excluded) | — |
+| CPU reservation | 60.92% | 60.41% | +0.8% | ✅ |
+| Headroom | 13.43% | 13.94% | −3.7% | ✅ |
+| Worst-case frame | 146.6 ms | 150.88 ms | −2.8% | ✅ |
+| Memory footprint | ~0 (uncalibrated) | 32,608 B | n/a (excluded) | — |
 
 Measured row (`circuitpython_10_2_1`, `tag_prop_profiler.py`):
 
 | Board | Runtime | Driver | reservation% | footprint_B | headroom% | peak_frame_ms |
 |-------|---------|--------|--------------|-------------|-----------|---------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 60.46% | 32240 | 13.89% | 140.9912 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 60.41% | 32608 | 13.94% | 150.8789 |
 
-**Result: PASS.** All three CPU metrics fall within ±5%, and every prediction errs in
-the safe direction (over-predicts cost / under-predicts headroom).
+**Result: PASS.** All three CPU metrics fall within ±5%. Reservation and headroom still
+err in the safe direction (the model over-predicts cost). The **worst-case frame is now
+under-predicted by 2.8%** (146.6 ms predicted vs 150.88 ms measured) -- the unsafe side,
+though within tolerance. At `num_voices = 2` it was over-predicted (146.5 vs 140.99 ms);
+the measured peak rose ~10 ms while the predicted steady frame moved only ~0.085 ms, so
+the swing is dominated by `frame_time_peak` run-to-run noise (whether a blocking IR send
+coincides with GC or other spikes on the single worst frame), not the two extra voices.
+Worth watching: if the worst-frame margin matters, widen it (the IR-rx deadline is
+checked against it) or characterise the peak across several runs rather than one.
 
 **Model correction captured (acceptance criterion 4).** Before correction the
 predictions were uniformly ~8.8% high. The cause was charging the sparse haptic event
@@ -739,5 +767,5 @@ its duty cycle for the comparison (a comparison-only adjustment in
 all metrics from ~8.8% to ≤3.9%.
 
 **Follow-up (open).** Calibrate component `memory_footprint_bytes` (all `_TBD_`): the
-predicted memory footprint is ~0 against a measured 32,240 B for the assembled prop,
+predicted memory footprint is ~0 against a measured 32,608 B for the assembled prop,
 so memory cannot yet be validated against tolerance.
