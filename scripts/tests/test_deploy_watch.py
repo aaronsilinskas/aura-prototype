@@ -1,9 +1,9 @@
-"""Tests for deploy_watch.watch_stream, discard_until, and exit-code mapping."""
+"""Tests for deploy_watch.watch_stream, discard_until, exit-code mapping, and TeeWriter."""
 
 import io
 from collections.abc import Callable
 
-from scripts.deploy_watch import discard_until, exit_code_for, watch_stream
+from scripts.deploy_watch import TeeWriter, discard_until, exit_code_for, watch_stream
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -241,3 +241,62 @@ def test_discard_until_returns_false_when_stream_exhausted_before_marker() -> No
         clock=fixed_clock(0.0, 0.0),
     )
     assert result is False
+
+
+# ---------------------------------------------------------------------------
+# TeeWriter
+# ---------------------------------------------------------------------------
+
+
+def test_tee_writer_writes_to_stdout() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    tee = TeeWriter(stdout, file_out)
+    tee.write("hello\n")
+    assert stdout.getvalue() == "hello\n"
+
+
+def test_tee_writer_writes_to_file() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    tee = TeeWriter(stdout, file_out)
+    tee.write("hello\n")
+    assert file_out.getvalue() == "hello\n"
+
+
+def test_tee_writer_both_streams_receive_same_content() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    tee = TeeWriter(stdout, file_out)
+    tee.write("line one\n")
+    tee.write("line two\n")
+    assert stdout.getvalue() == file_out.getvalue()
+
+
+def test_watch_stream_with_tee_writer_captures_serial_to_file() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    tee = TeeWriter(stdout, file_out)
+    watch_stream(lines("alpha", "beta", "gamma"), out=tee)
+    assert file_out.getvalue() == "alpha\nbeta\ngamma\n"
+
+
+def test_watch_stream_with_tee_writer_still_echoes_to_stdout() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    tee = TeeWriter(stdout, file_out)
+    watch_stream(lines("alpha", "beta"), out=tee)
+    assert stdout.getvalue() == "alpha\nbeta\n"
+
+
+def test_tee_writer_file_contains_only_captured_lines_not_deploy_chatter() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    tee = TeeWriter(stdout, file_out)
+
+    stdout.write("Deploying code.py...\n")
+    stdout.write("Copy complete.\n")
+
+    watch_stream(lines("BOOT OK", "sensor=42", "DONE"), out=tee)
+
+    assert file_out.getvalue() == "BOOT OK\nsensor=42\nDONE\n"

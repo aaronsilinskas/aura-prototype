@@ -38,6 +38,30 @@ _CIRCUITPYTHON_BANNER: Final = "soft reboot"
 
 
 # ---------------------------------------------------------------------------
+# TeeWriter
+# ---------------------------------------------------------------------------
+
+
+class TeeWriter:
+    """Write to two streams simultaneously.
+
+    Args:
+        primary: The primary output stream (typically ``sys.stdout``).
+        secondary: The secondary output stream (typically an open file).
+    """
+
+    __slots__ = ("_primary", "_secondary")
+
+    def __init__(self, primary: IO[str], secondary: IO[str]) -> None:
+        self._primary = primary
+        self._secondary = secondary
+
+    def write(self, s: str) -> int:
+        self._primary.write(s)
+        return self._secondary.write(s)
+
+
+# ---------------------------------------------------------------------------
 # Result type
 # ---------------------------------------------------------------------------
 
@@ -266,6 +290,17 @@ def main() -> None:
             f"(default: {_DEFAULT_REBOOT_TIMEOUT}). Exit 3 if it never arrives."
         ),
     )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help=(
+            "Write captured post-anchor serial lines to FILE in addition to stdout. "
+            "FILE receives only the clean device output — no deploy chatter or "
+            "discarded pre-banner lines."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -298,32 +333,41 @@ def main() -> None:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    with ser:
-        rc = deploy(args.example_file, args.mount)
-        if rc != 0:
-            sys.exit(rc)
+    output_file = open(args.output, "w") if args.output is not None else None  # noqa: SIM115
+    try:
+        with ser:
+            rc = deploy(args.example_file, args.mount)
+            if rc != 0:
+                sys.exit(rc)
 
-        ser.reset_input_buffer()
+            ser.reset_input_buffer()
 
-        banner_deadline = time.monotonic() + args.reboot_timeout
-        found = discard_until(
-            iter_serial_lines(ser),
-            _CIRCUITPYTHON_BANNER,
-            deadline=banner_deadline,
-        )
-        if not found:
-            print(
-                f"Error: soft-reboot banner not seen within {args.reboot_timeout}s. "
-                "The device may have hung or missed the reload.",
-                file=sys.stderr,
+            banner_deadline = time.monotonic() + args.reboot_timeout
+            found = discard_until(
+                iter_serial_lines(ser),
+                _CIRCUITPYTHON_BANNER,
+                deadline=banner_deadline,
             )
-            sys.exit(exit_code_for("banner_missing", until=args.until))
+            if not found:
+                print(
+                    f"Error: soft-reboot banner not seen within {args.reboot_timeout}s. "
+                    "The device may have hung or missed the reload.",
+                    file=sys.stderr,
+                )
+                sys.exit(exit_code_for("banner_missing", until=args.until))
 
-        result = watch_stream(
-            iter_serial_lines(ser),
-            until=args.until,
-            timeout=args.seconds,
-        )
+            watch_out: IO[str] = (
+                TeeWriter(sys.stdout, output_file) if output_file is not None else sys.stdout
+            )
+            result = watch_stream(
+                iter_serial_lines(ser),
+                until=args.until,
+                timeout=args.seconds,
+                out=watch_out,
+            )
+    finally:
+        if output_file is not None:
+            output_file.close()
 
     sys.exit(exit_code_for(result.reason, until=args.until))
 
