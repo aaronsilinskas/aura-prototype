@@ -1,37 +1,74 @@
 # Capacity Model
 
-This document describes the formulas used by the capacity estimator
-(`scripts/capacity/`) to decide how a prop's components are packed onto a board's
-MCUs, and tracks the constants the estimator needs per `(board, runtime, driver)`.
+This document describes how the capacity estimator (`scripts/capacity/`) decides how a
+prop's components are packed onto a board's MCUs, what each component costs, and the
+measured constants it needs per `(board, runtime, driver)`.
 
-The estimator is CPU-only: it does not model pixel bandwidth, render time inside an
+The estimator is **CPU-only**: it does not model pixel bandwidth, render time inside an
 effect, or anything outside the per-frame CPU and heap budgets described below.
 
-## Frame budget
+> **Where things live.** This doc holds the model, the resource summary, and the
+> measured constant tables. The *mechanics* of producing those constants on hardware
+> (what each profiler sweeps and how to read its output) live in
+> [`calibration-guide.md`](calibration-guide.md).
+
+---
+
+## Quick reference
+
+### Component resource matrix
+
+Every prop is built from these components. "Count" is how many a prop has;
+"Splittable" is whether the packer may place it on its own MCU. Defaults are from
+`scripts/capacity/profiles.py`.
+
+| Component (`class`) | CPU cost shape | Heap footprint | I2C bus | Peripherals | Hard deadline? | Splittable? | Count per prop |
+|---------------------|----------------|----------------|---------|-------------|----------------|-------------|----------------|
+| Engine (`EngineComponent`) | `tick_fixed + per_rule·rules + per_event·events + router·remote_mcus` | static | — | — | no | no — anchors the engine-host | exactly 1 |
+| Pixel scope (`PixelScopeComponent`) | `stack_depth · per_pixel · pixels + flush` | `base + per_pixel·pixels` | matrix driver only | — | no | **yes — per scope** | one per scope |
+| Sound (`SoundComponent`) | `mixer_fixed + per_voice · voices` | static (by `num_voices`) | — | `i2s: 1` | no | no | 1 shared (`Scope.ALL`) |
+| Vibration (`VibrationComponent`) | fixed per-event `cost_ms` | static | event-rate share | `i2c: 1` | no | no | 1 shared (`Scope.ALL`) |
+| IR transmit (`IrTransmitComponent`) | near-zero avg `cost_ms` (+ `blocking_send_ms` soft-RT) | static | — | `pwm: 1` | no¹ | no | 1 shared |
+| IR receive (`ReceiverComponent`) | fixed `cost_ms` | `base + per_slot · buffer_depth` | — | — | **yes (`max_frame_ms`)** | no | one per receiver |
+| Accel / I2C poller (`SimpleComponent`) | fixed `cost_ms` | static | per-frame read | — | no | no | as wired |
+| radio-tx (`SimpleComponent`, *uncalibrated*) | fixed `cost_ms` | static | — | — | no | no | 1 shared |
+| radio-rx (`ReceiverComponent`, *uncalibrated*) | fixed `cost_ms` | `base + per_slot · depth` | — | — | **yes** | no | one per receiver |
+
+¹ An `IrTransmitComponent` has no deadline of its own, but its `blocking_send_ms` is
+added to the worst-case frame of any co-located receiver (see its cost model below).
+
+### Board / FPS at a glance
+
+- `target_fps` has a **24 FPS ceiling** and is the *ceiling*, not an achievable rate.
+  The real rate is set by the single busiest MCU after baseline + headroom deductions.
+- **Matrix `flush_ms` (~61 ms) alone exceeds the 24 FPS budget (41.7 ms)** — any
+  IS31FL3741 scope caps the prop near **10–12 FPS** regardless of pixel count.
+- **NeoPixel `per_pixel` (~0.55 ms/px)** makes long strips the binding term: ~60 px
+  ≈ 19 FPS, ~144 px collapses to ~9 FPS.
+- Logic-only MCUs (no pixel scope) stay CPU-cheap and hit the 24 FPS cap. Because pixel
+  scopes split per-MCU, a multi-scope prop's ceiling is set by its single heaviest
+  scope, not the sum.
+
+See [Designing across processors](#designing-across-processors) for the worked tables.
+
+---
+
+## How packing works
+
+### Frame budget and reservations
 
 ```
-frame_budget_ms = 1000 / target_fps
+frame_budget_ms = 1000 / target_fps          (target_fps <= 24)
+reserved%       = cost_ms / frame_budget_ms * 100
 ```
 
-`target_fps` is a tunable target tick rate per board, with a 24 FPS ceiling (i.e.
-`target_fps <= 24`).
+Each component's cost is a constant in milliseconds (`cost_ms`); the underlying
+constant always stays in ms, only the *reservation* is expressed as a percentage.
 
-## Reservation model
+### Per-MCU baseline
 
-Every component's cost is defined as a constant in milliseconds (`cost_ms`) and
-converted to a percentage of the frame budget:
-
-```
-reserved% = cost_ms / frame_budget_ms * 100
-```
-
-The underlying constant always stays in milliseconds; only the *reservation* is
-expressed as a percentage.
-
-## Per-MCU baseline deduction
-
-Before packing, each MCU's usable budget is reduced by a fixed baseline that depends
-on its role:
+Before packing, each MCU's usable budget is reduced by a fixed baseline that depends on
+its role:
 
 - **engine-host**: runs the `GameEngine` tick loop. Exactly one per prop.
 - **satellite**: a thin command executor with no rules.
@@ -41,109 +78,45 @@ usable_cpu%  = 100 - baseline_cpu_percent[role] - headroom_reserve_percent
 usable_heap  = total_free_heap_bytes - baseline_heap_bytes[role] - gc_margin_bytes
 ```
 
-`headroom_reserve_percent` defaults to 20% and is tunable per board (and per
-assignment run). `gc_margin_bytes` defaults to 0 and is configurable per board (see
-"Memory constraint" below).
+`headroom_reserve_percent` defaults to 20% (tunable per board and per run).
+`gc_margin_bytes` is heap held back on every MCU for CircuitPython's mark-sweep
+collector — set generously (GC needs free space; fragmentation shrinks the usable
+heap). It is configurable per board via `BoardProfile.gc_margin_bytes` (default `0`);
+the engine baseline showed ~23 KB of GC churn, so ~23 KB is a reasonable setting on
+this runtime.
 
-## CPU and memory bin-packing
+### The assignment algorithm
 
-Components are packed onto the fewest MCUs such that, for every MCU:
-
-```
-sum(reserved% for components on this MCU)            <= usable_cpu%
-sum(memory_footprint_bytes for components on this MCU) <= usable_heap
-```
-
-The engine-host MCU is seeded with the engine component; remaining components are
-packed first-fit-decreasing by CPU reservation (largest reservation first) onto the
+The engine-host MCU is seeded with the engine component. Remaining components are
+packed **first-fit-decreasing by CPU reservation** (largest first) onto the
 engine-host, then onto satellite MCUs, opening a new satellite whenever a component
-does not fit on any existing MCU's CPU budget.
+does not fit any existing MCU's CPU budget. Each `PixelScopeComponent` may be placed
+independently (spread across satellites, or each on its own MCU); all other components
+are indivisible.
 
-If a component's reservation exceeds the usable CPU budget of a fresh satellite MCU,
-the assignment is infeasible and the result names the offending component and the
-violated constraint (`conflict_type="cpu"`).
+`assign(prop, board, headroom_reserve_percent=None)` returns an `AssignmentResult`:
 
-After CPU packing succeeds, each MCU's summed memory footprint is checked against its
-`usable_heap`. If any MCU overflows, the assignment is infeasible with
-`conflict_type="memory"`, naming the offending MCU role and the violated heap budget.
+- **Feasible**: a list of MCUs, each with its role, the components placed on it (with
+  `reserved%` and `uncalibrated` flag), its `remaining_headroom%`, and a
+  `co_location_validated` flag.
+- **Infeasible**: `feasible=False`, empty MCU list, and a `reason` naming the violated
+  constraint.
 
-## Memory constraint
+### Constraints (in the order `assign()` checks them)
 
-Every component declares a static `memory_footprint_bytes`: its steady-state heap
-usage, profiler-measured via a `mem_free` delta (placeholder/synthetic constants until
-calibrated against real hardware).
+| Order | `conflict_type` | Check |
+|-------|-----------------|-------|
+| 1 | `peripheral` | Summed `peripherals_required` across all components must not exceed `board.peripheral_budgets` (I2S/SPI/I2C/PWM). A peripheral with no budget entry is unconstrained. **Pre-packing.** |
+| 2 | `deadline` | For each `ReceiverComponent`, `worst_case_frame_ms` (incl. any co-located IR-tx `blocking_send_ms`) must not exceed its derived `max_frame_ms`. **Pre-packing** — dominates the budget: even a workload that fits CPU/memory is rejected if it pushes the worst frame past the receiver's deadline. |
+| 3 | `cpu` | Per MCU, `sum(reserved%) <= usable_cpu%`. If a component's reservation exceeds a fresh satellite's usable CPU, the assignment is infeasible. |
+| 4 | `memory` | Per MCU, `sum(memory_footprint_bytes) <= usable_heap`. Checked after CPU packing succeeds; names the offending MCU role. |
+| 5 | `bus` | Summed `i2c_bandwidth_bytes_per_sec` across all pixel scopes, the `VibrationComponent`, and any I2C-polling `SimpleComponent` must not exceed the board's `"i2c"` bus budget. Checked after CPU and memory. |
 
-`gc_margin_bytes` is a fixed amount of heap held back on every MCU of a board, on top
-of the role's `heap_bytes` baseline, to leave room for CircuitPython's mark-sweep
-collector. It should be set generously: GC needs free space to operate, and
-fragmentation shrinks the heap that is actually usable for allocations. It is
-configurable per board via `BoardProfile.gc_margin_bytes` (default `0`).
+---
 
-### Receiver buffer depth (RAM-for-deadline trade-off)
+## Component cost models
 
-A hard-real-time receiver component (`ReceiverComponent`) has a tunable
-`buffer_depth` -- e.g. the depth of an IR pulse buffer or a radio FIFO. Raising
-`buffer_depth` relieves the receiver's polling deadline (it can tolerate longer gaps
-between polls before overflowing) but increases its memory footprint:
-
-```
-memory_footprint_bytes = base_footprint_bytes + bytes_per_buffer_slot * buffer_depth
-```
-
-This makes the RAM-for-deadline trade-off visible to the estimator: raising
-`buffer_depth` to relieve a deadline can flip an otherwise-feasible assignment into a
-memory conflict.
-
-## Hard-real-time deadline constraint
-
-`ReceiverComponent` introduces a correctness guard that average CPU reservation
-percentages cannot provide: a hard-real-time **deadline**. Unlike `cost_ms` (a
-per-frame *average* CPU cost), the deadline is checked against the **worst-case**
-single frame.
-
-```
-max_frame_ms = buffer_depth / incoming_rate_hz * 1000
-```
-
-`max_frame_ms` is *derived*, not declared: it is the longest a frame can take before
-the receiver's buffer (e.g. `PulseIn.maxlen`) overflows and pulses are dropped. It is
-the same `buffer_depth` used by the memory footprint above -- raising `buffer_depth`
-both relaxes the deadline (raises `max_frame_ms`) and increases
-`memory_footprint_bytes`, making the RAM-for-deadline trade-off a single knob.
-
-`worst_case_frame_ms` is the worst-case single frame time measured on the receiver's
-MCU (profiler-measured via `PerformanceTracker.frame_time_peak`, in milliseconds --
-see the IR-rx profiler below).
-
-**The deadline dominates the budget**: if `worst_case_frame_ms > max_frame_ms`, the
-assignment is infeasible with `conflict_type="deadline"`, checked *before* CPU/memory
-packing -- even a co-located workload that would otherwise fit comfortably within the
-CPU reservation budget is rejected once it pushes the worst-case frame past the
-receiver's deadline. A receiver with `incoming_rate_hz <= 0` (not yet profiled for
-incoming rate) has `max_frame_ms = None` and no deadline is checked.
-
-### IR-rx component
-
-The IR-receive component (`InfraredMultiReceiver` polling 4 `PulseInReader`s) is
-modeled as a single `ReceiverComponent`. The 4 receivers are **fixed, not a
-deployment axis** -- `cost_ms` is the `fixed_drain` per-tick polling cost across all
-4 readers, plus the deadline described above.
-
-### IR-rx profiler
-
-`examples/hardware/profiling/ir_rx_profiler.py` drives `InfraredMultiReceiver.receive()`
-polling the fixed 4 `PulseInReader`s, using the **tunable-injected-load technique**:
-an artificial per-frame busy-loop (`INJECTED_LOAD_MS`) is swept upward
-(`INJECTED_LOAD_SWEEP_MS`) to simulate co-located CPU load. A known incoming packet
-rate is induced via loopback from an IR transmitter or a second board; the profiler
-counts sequence-number gaps to compute a packet-loss rate. The injected load at which
-packet loss first becomes non-zero empirically locates `max_frame_ms` for the
-profiled `BUFFER_DEPTH` (`PulseIn.maxlen`) and `INCOMING_RATE_HZ`. The profiler
-reports packet-loss rate vs. injected frame time alongside the uniform
-`PerformanceTracker` stats line (including `frame_time_peak`, the `worst_case_frame_ms`
-term).
-
-## Engine component cost model
+### Engine
 
 ```
 cost_ms = tick_fixed_ms
@@ -153,158 +126,143 @@ cost_ms = tick_fixed_ms
 ```
 
 `router_overhead_ms` is a per-remote-MCU command/event overhead charged to the
-engine's MCU. It scales with the number of remote MCUs the engine sends
-commands/events to -- it is **not** based on pixel bandwidth or strip length.
+engine's MCU — it scales with the number of remote MCUs the engine sends to, **not**
+pixel bandwidth or strip length. (Still `_TBD_`; no in-tick seam to profile it yet.)
 
-## Pixel scope cost model
+Two durable caveats:
 
-A `PixelScopeComponent` represents one pixel scope's per-frame render+flush cost:
+- **Additive vs. product dispatch.** The real `GameEngine.update` loop dispatches every
+  queued event to every rule (`O(events × rules)`), but the model is additive. The
+  slopes are measured at a cross-load of 1; the additive estimate is a **lower bound**
+  as both `rules` and `events` grow simultaneously.
+- **`tick_fixed_ms` ↔ engine-host baseline overlap.** The `(0 rules, 0 events)` point
+  is the same rule-less tick the engine-host `cpu_percent` baseline measures. Do **not**
+  charge both in full — treat `tick_fixed_ms` as folded into the engine-host baseline
+  and add only the marginal `per_rule_ms` / `per_event_ms` terms on top.
+
+### Pixel scope
 
 ```
 cost_ms = stack_depth * worst_case_effect_per_pixel_ms * pixel_count + flush_ms
 ```
 
-`stack_depth` is the maximum number of concurrent `add_effect` layers expected on the
-scope (a scene-declared workload parameter); it defaults to 1. Resolution is not a
-top-level axis here -- it only affects flame/drift-noise update internally and is
-absorbed into the profiled `worst_case_effect_per_pixel_ms`.
+`stack_depth` is the max concurrent `add_effect` layers expected on the scope
+(scene-declared; defaults to 1). Resolution is not a top-level axis — it is absorbed
+into the profiled `worst_case_effect_per_pixel_ms`.
 
-### Per-scope splitting
+- **Per-scope splitting.** Each `PixelScopeComponent` may be placed independently — the
+  packer can spread a prop's scopes across satellites, even one scope per MCU.
+- **Driver dimension.** `driver` is `"neopixel_pwm"` or `"is31fl3741_matrix"`. It
+  changes `worst_case_effect_per_pixel_ms`, `flush_ms`, and I2C usage
+  (`i2c_bandwidth_bytes_per_sec = i2c_transaction_bytes * i2c_frequency_hz`). NeoPixel
+  PWM is off the I2C bus (reports 0); the matrix flush is the dominant I2C consumer.
+- **Router fan-out.** `estimator.fan_out_mcu_count(result, output_component_names)`
+  returns the number of distinct remote MCUs hosting any named output. An effect
+  command's router cost for a scope is `router_overhead_ms * fan_out_mcu_count(...)` —
+  it fans out to every MCU hosting an output in the scope, not once per output.
 
-Unlike `EngineComponent`, `SimpleComponent`, and `ReceiverComponent` (always packed as
-a single indivisible unit), each `PixelScopeComponent` in a prop's `components` list
-may be placed independently -- the packer can spread a prop's pixel scopes across
-multiple satellite MCUs, including placing each scope on its own MCU in the extreme
-case. The engine component and other indivisible components never split.
+### Sound
 
-### Driver dimension
-
-`driver` is one of `"neopixel_pwm"` or `"is31fl3741_matrix"`. The driver changes:
-
-- `worst_case_effect_per_pixel_ms` and `flush_ms` (both per-`(board, runtime, driver)`
-  constants)
-- I2C bus usage: `i2c_bandwidth_bytes_per_sec = i2c_transaction_bytes * i2c_frequency_hz`.
-  NeoPixel PWM is off the I2C bus and reports 0; the IS31FL3741 matrix flush is the
-  dominant I2C consumer.
-
-### Bus-bandwidth constraint
-
-Each shared bus (I2C/SPI/I2S) declared in `BoardProfile.bus_budgets` has a
-`bandwidth_bytes_per_sec` budget. After CPU and memory packing succeed, the summed
-`i2c_bandwidth_bytes_per_sec` across all of a prop's pixel scopes **and its
-`VibrationComponent`** (the DRV2605L's event-rate contribution) is checked against
-the board's `"i2c"` bus budget. If it exceeds the budget, the assignment is infeasible
-with `conflict_type="bus"`, even if CPU and memory both have room. Switching an
-over-budget scope's driver to NeoPixel PWM removes its I2C load entirely.
-
-### Router fan-out
-
-`estimator.fan_out_mcu_count(result, output_component_names)` returns the number of
-distinct remote (non-engine-host) MCUs hosting any of the named output components.
-An effect command's router cost for a scope is
-`router_overhead_ms * fan_out_mcu_count(result, scope_output_names)` -- it fans out to
-every MCU hosting an output in the scope, not once per output.
-
-## Sound component cost model
-
-`SoundComponent` represents the single shared sound output: one I2S amp + one
-`audiomixer.Mixer`. ``AudioEffectOutput`` is registered on `Scope.ALL`, so exactly one
-`SoundComponent` serves every scope.
+One shared I2S amp + `audiomixer.Mixer`; `AudioEffectOutput` is on `Scope.ALL`, so
+exactly one `SoundComponent` serves every scope.
 
 ```
 cost_ms = mixer_fixed_ms + per_voice_ms * effective_voices
 effective_voices = min(max_concurrent_voices, num_voices)
 ```
 
-`max_concurrent_voices` is the worst-case number of voices a scene can stack via
-`add_effect`, **including audio-only effects** that hold a voice but render no pixels
-(an effect whose `pixels` and `vibration` are both `None`, per
-`AudioEffectOutput.handle_event`'s `audio_only` check -- such an effect still claims a
-`VoicePool` slot). `num_voices` is `VoicePool`'s hard cap: a scene that would stack
-more concurrent voices than `num_voices` simply evicts the oldest voice (see
-`VoicePool._select_slot`), so `effective_voices` never exceeds `num_voices` and
-`cost_ms` is bounded.
+`max_concurrent_voices` is the worst-case voices a scene stacks via `add_effect`,
+**including audio-only effects** that hold a voice but render no pixels. `num_voices`
+is `VoicePool`'s hard cap: stacking beyond it evicts the oldest voice, so
+`effective_voices` (and `cost_ms`) is bounded.
 
-## Vibration component cost model
+### Vibration
 
-`VibrationComponent` represents the single shared haptic motor: a DRV2605L driven
-over I2C via `Drv2605EffectOutput`, registered on `Scope.ALL`.
+One shared DRV2605L haptic motor over I2C (`Drv2605EffectOutput` on `Scope.ALL`).
 
 ```
-cost_ms  -- a fixed per-event cost, declared directly (not a formula)
-i2c_bandwidth_bytes_per_sec = i2c_transaction_bytes * (max_calls_per_minute / 60)
+cost_ms                      -- fixed per-event cost, declared directly
+i2c_bandwidth_bytes_per_sec  = i2c_transaction_bytes * (max_calls_per_minute / 60)
 ```
 
-`max_calls_per_minute` bounds how often `handle_event` writes a new sequence and
-calls `motor.play()` -- a low rate, so the DRV2605L's average I2C bus share is
-negligible but still summed into the board's `"i2c"` bus budget alongside any pixel
-scope's matrix-flush usage (see "Bus-bandwidth constraint" below).
+`max_calls_per_minute` is low, so the average I2C share is negligible — but it is still
+summed into the `"i2c"` bus budget alongside matrix-flush usage.
 
-### LIS3DH accelerometer (I2C bus contribution)
+**LIS3DH accelerometer (I2C contribution).** An accelerometer read once per frame is
+modeled as a `SimpleComponent` with `i2c_frequency_hz == target_fps`. Its
+`i2c_bandwidth_bytes_per_sec = i2c_transaction_bytes * i2c_frequency_hz` is summed into
+the `"i2c"` budget like any other I2C consumer.
 
-A LIS3DH accelerometer read once per frame (e.g. for `AccelerationData` in
-`engine/input.py`) is modeled as a `SimpleComponent` with `i2c_transaction_bytes` and
-`i2c_frequency_hz` set (`i2c_frequency_hz` == the board's `target_fps`, since it is
-read once per tick):
+### IR transmit
 
-```
-i2c_bandwidth_bytes_per_sec = i2c_transaction_bytes * i2c_frequency_hz
-```
-
-`SimpleComponent`'s I2C fields default to 0 for components off the I2C bus. Any
-`SimpleComponent` with nonzero `i2c_bandwidth_bytes_per_sec` is summed into the
-board's `"i2c"` bus budget alongside pixel-scope and vibration I2C usage.
-
-## IR-transmit component cost model
-
-`IrTransmitComponent` represents the single shared IR-transmit path:
-`HardwareNetworkControls.send_ir` selects 1 of up to 3 wired
-`InfraredTransmitter` instances (LINE / CONE / AREA_OF_EFFECT) per send. The emitters
-add no parallel cost -- only one transmits at a time, so the cost model does not scale
-with how many emitter pins are wired.
+One shared transmit path: `HardwareNetworkControls.send_ir` selects 1 of up to 3 wired
+emitters (LINE / CONE / AREA_OF_EFFECT) per send. Only one transmits at a time, so cost
+does not scale with emitter count.
 
 ```
-cost_ms            -- average per-frame CPU reservation (typically near zero)
-blocking_send_ms   -- worst-case PulseOut.send blocking duration for the longest
-                      payload this prop transmits
+cost_ms           -- average per-frame CPU reservation (near zero)
+blocking_send_ms  -- worst-case PulseOut.send blocking for the longest payload
 ```
 
-`blocking_send_ms` is a *soft* real-time cost: `send_ir` blocks for the whole pulse
-train, so it contributes to the worst-case frame time of any co-located
-`ReceiverComponent` -- the receiver's buffer must absorb the gap while the
-transmitter blocks. The deadline check adds `blocking_send_ms` to
-`worst_case_frame_ms` before comparing against `max_frame_ms`:
+`blocking_send_ms` is a **soft** real-time cost: `send_ir` blocks for the whole pulse
+train, contributing to the worst-case frame of any co-located receiver. The deadline
+check adds it to the receiver's `worst_case_frame_ms`:
 
 ```
-receiver_worst_case_frame_ms = worst_case_frame_ms + blocking_send_ms (if an
-                                IrTransmitComponent is present in the prop)
+receiver_worst_case_frame_ms = worst_case_frame_ms + blocking_send_ms
+                               (if an IrTransmitComponent is present)
 ```
 
-A prop with no `ReceiverComponent` has nothing for the blocking send to threaten, so
+A prop with no `ReceiverComponent` has nothing for the blocking send to threaten, so an
 `IrTransmitComponent` alone never triggers a deadline conflict.
 
-## Radio tx/rx components (uncalibrated, #399)
+`cost_ms` is the blocking duration amortized across the frames between sends:
+`cost_ms = blocking_send_ms × send_rate_hz / target_fps`. At the realistic AURA cadence
+(one 4-byte packet / 5 s → `send_rate_hz = 0.2`, `target_fps = 24`): ≈ 0.50 ms.
 
-The radio transmitter and radio receiver are carried in the estimator as
-**uncalibrated model entries** so the deployment math covers all 8 components, even
-though the radio transport seam and its profilers are deferred to a follow-on PRD --
-`send_radio` is currently a stub, there is no RFM69 driver, and no receive seam exists.
+### IR receive (`ReceiverComponent`)
 
-- **radio-tx** is modeled as a `SimpleComponent` (a near-zero average `cost_ms`,
-  analogous to `IrTransmitComponent`'s average cost).
-- **radio-rx** is modeled as a `ReceiverComponent`, reusing the hard-real-time
-  deadline model from IR-rx (#397): `max_frame_ms = buffer_depth / incoming_rate_hz *
-  1000`, with the radio's FIFO depth as `buffer_depth`.
+A hard-real-time receiver. `cost_ms` is the `fixed_drain` per-tick polling cost; the
+correctness guard is a **deadline** checked against the worst-case single frame, not the
+average:
 
-Both entries set `uncalibrated=True`. Assignment output (`ComponentAssignment.uncalibrated`)
-surfaces this flag per component, so reports can distinguish components placed using
-real profiler measurements from components placed using documented seed constants.
+```
+max_frame_ms = buffer_depth / incoming_rate_hz * 1000
+```
 
-### RFM69HCW seed figures (datasheet, calibration deferred)
+`max_frame_ms` is *derived* — the longest a frame can take before the buffer (e.g.
+`PulseIn.maxlen`) overflows and data is dropped. If `worst_case_frame_ms > max_frame_ms`
+the assignment is infeasible (`conflict_type="deadline"`), checked before CPU/memory. A
+receiver with `incoming_rate_hz <= 0` has `max_frame_ms = None` and no deadline check.
 
-The following constants are seeded from the RFM69HCW datasheet, not profiler
-measurements. They will be replaced once a real radio seam and profiler exist
-(follow-on PRD):
+**Buffer-depth trade-off (RAM for deadline).** `buffer_depth` is a single knob that
+relaxes the deadline and raises memory together:
+
+```
+memory_footprint_bytes = base_footprint_bytes + bytes_per_buffer_slot * buffer_depth
+```
+
+Raising it to relieve a deadline can flip an otherwise-feasible assignment into a
+memory conflict.
+
+**IR-rx component.** `InfraredMultiReceiver` polling 4 `PulseInReader`s is modeled as a
+single `ReceiverComponent`. The 4 readers are fixed (not a deployment axis): `cost_ms`
+is the `fixed_drain` across all 4, plus the deadline above.
+
+### Radio tx/rx (uncalibrated, #399)
+
+Carried as **uncalibrated model entries** so the deployment math covers all 8
+components, even though the radio transport seam and profilers are deferred to a
+follow-on PRD (`send_radio` is a stub; no RFM69 driver; no receive seam yet).
+
+- **radio-tx** — a `SimpleComponent` with a near-zero average `cost_ms` (like IR-tx).
+- **radio-rx** — a `ReceiverComponent` reusing the IR-rx deadline model, with the
+  radio's FIFO depth as `buffer_depth`.
+
+Both set `uncalibrated=True`; `ComponentAssignment.uncalibrated` surfaces this per
+component so reports distinguish profiler-measured from seed-constant placements.
+
+RFM69HCW seed figures (datasheet, calibration deferred):
 
 | Constant | Seed value | Source |
 |----------|-----------|--------|
@@ -312,132 +270,47 @@ measurements. They will be replaced once a real radio seam and profiler exist
 | Incoming rate (`incoming_rate_hz`) | ~31,250 bytes/sec | 250 kbps GFSK air rate / 8 |
 | Derived `max_frame_ms` (raw FIFO) | ~2.1 ms | `66 / 31250 * 1000` |
 
-The raw-FIFO `max_frame_ms` (~2.1ms) is a *tight* deadline -- reading the FIFO only
-once it is completely full leaves almost no slack. `FifoNotEmpty` / `FifoThreshold`
-interrupt-driven streaming reads (draining the FIFO as bytes arrive, rather than
-waiting for it to fill) relax this ceiling by effectively raising the buffer depth
-the estimator can absorb before overflow -- this is the same buffer-depth-relief
-trade-off described above for IR-rx, and is left as a deployment knob.
+The raw-FIFO ~2.1 ms is a *tight* deadline. `FifoNotEmpty` / `FifoThreshold`
+interrupt-driven streaming reads relax it by effectively raising the absorbable buffer
+depth — the same buffer-depth-relief trade-off as IR-rx, left as a deployment knob.
 
-Calibration of these constants against real RFM69HCW hardware (`worst_case_frame_ms`
-via `PerformanceTracker`, actual `cost_ms`, and `memory_footprint_bytes`) and a
-real receive seam are deferred to a follow-on PRD.
+---
 
-## Peripheral-count constraint
+## Designing across processors
 
-Each board declares a finite count of shared peripheral types (I2S/SPI/I2C/PWM) via
-`BoardProfile.peripheral_budgets: dict[str, PeripheralBudget]`. Each component
-declares how many units of a peripheral it requires via
-`peripherals_required: dict[str, int]` (e.g. `SoundComponent` defaults to
-`{"i2s": 1}`, `VibrationComponent` to `{"i2c": 1}`, `IrTransmitComponent` to
-`{"pwm": 1}`).
+### Achievable FPS from the busiest MCU
 
-The summed `peripherals_required` across all of a prop's components is checked
-against `board.peripheral_budgets`, **before CPU/memory packing** -- alongside the
-hard-real-time deadline check. If any peripheral's total requirement exceeds its
-budget, the assignment is infeasible with `conflict_type="peripheral"`, naming the
-peripheral, the required count, and the available count (e.g. two components both
-requiring the single I2S is reported as a peripheral conflict even if CPU and memory
-both have ample room). A peripheral with no entry in `peripheral_budgets` is treated
-as unconstrained.
-
-## Assignment output
-
-`assign(prop, board, headroom_reserve_percent=None)` returns an `AssignmentResult`:
-
-- **Feasible**: a list of MCUs, each with its role (`engine-host` / `satellite`), the
-  components placed on it with their `reserved%` and `uncalibrated` flag, the MCU's
-  `remaining_headroom%`, and a `co_location_validated` flag.
-- **Infeasible**: `feasible=False`, an empty MCU list, and a `reason` string naming
-  the violated constraint (e.g. which component exceeded which budget).
-
-## Constants tables
-
-Constants are keyed by `(board, runtime, driver)`. These tables are currently empty
-placeholders -- they will be populated as real hardware measurements become
-available (see #392).
-
-#### Emitting rows from profilers
-
-Each profiler under `examples/hardware/profiling/` computes its target table's
-constants on-device and prints a **paste-ready markdown row** at the end of its
-run, so the values never have to be eyeballed from raw stats lines. The row is
-preceded by a greppable marker line naming the table:
-
-```
-__TABLE_ROW table=engine_component_costs
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.1234 | 0.0456 | 0.0789 | _TBD_ |
-```
-
-The shared `print_table_row` helper (`hardware/shared/profiling_helpers.py`)
-prepends the board, runtime, and driver key every table shares; the profiler
-supplies the component-specific cells. Slopes and intercepts (per-rule,
-per-pixel, per-voice costs and their fixed terms) are fit on-device with
-`linear_fit` over the sweep. Cells a bare board cannot measure -- e.g. IR-rx
-`max_frame_ms` with no external packet source, or IR-tx `cost_ms` whose average
-depends on an unswept send cadence -- are emitted as the literal `_TBD_` so the
-row stays paste-ready with its gaps explicit. Copy the row for the
-`(board, runtime, driver)` you profiled into the matching table below.
-
-### Board profiles
-
-Per-board frame budget and global heap/headroom budgets the packer deducts from. `total_free_heap_bytes` is profiler-measured from `baseline_profiler.py`'s `gc.mem_free()` reading (the "Mem Free" stats line); `target_fps` (24 ceiling) and `headroom_reserve_percent` (20% default) are config inputs, not profiler measurements. `gc_margin_bytes` is not a per-board column here -- the engine baseline (also from `baseline_profiler.py`) showed ~23KB of GC churn, so set `BoardProfile.gc_margin_bytes` to ~23KB for every board on this runtime.
-
-| Board | Runtime | Driver | `target_fps` | `total_free_heap_bytes` | `headroom_reserve_percent` |
-|-------|---------|--------|--------------|-------------------------|------------------------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 24 | 130576 | 20% |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 24 | 129536 | 20% |
-
-#### Realistic target tick rate (RP2040, #400)
-
-The `target_fps = 24` above is the **ceiling**, not an achievable rate for every prop.
-The real tick rate is set by the **single busiest MCU** in a deployment: the frame
-budget must hold that MCU's worst-case summed `cost_ms`, after the role baseline and the
-20% headroom are deducted. Inverting the packing inequality
-(`Σ cost_ms ≤ usable_cpu%/100 × frame_budget_ms`):
+`target_fps = 24` is the ceiling; the real rate is set by the busiest MCU's worst-case
+summed `cost_ms` after baseline + headroom. Inverting the packing inequality:
 
 ```
 required_frame_budget_ms = Σ(cost_ms on busiest MCU) / usable_fraction
 achievable_fps           = min(24, 1000 / required_frame_budget_ms)
 ```
 
-`usable_fraction = (100 − baseline_cpu_percent − headroom_reserve_percent) / 100`, i.e.
-**0.7435** on the engine-host (5.65% baseline) and **0.7479** on a satellite (5.21%
-baseline). Engine marginal cost here uses `per_rule_ms × rules + per_event_ms × events`
-only -- `tick_fixed_ms` is treated as already folded into the engine-host baseline (see
-the `tick_fixed_ms` <-> baseline overlap note below), so it is not charged twice.
+`usable_fraction = (100 − baseline_cpu_percent − headroom_reserve_percent) / 100` —
+i.e. **0.7435** on the engine-host (5.65% baseline) and **0.7479** on a satellite
+(5.21%). Engine marginal cost here uses `per_rule_ms × rules + per_event_ms × events`
+only (`tick_fixed_ms` is folded into the engine-host baseline; see the engine cost
+model).
 
-Worked from the `circuitpython_10_2_1` measured constants below (each scope alone on its
-MCU, `stack_depth = 1`):
+Worked from the `circuitpython_10_2_1` constants (each scope alone, `stack_depth = 1`):
 
 | Representative busiest MCU | Σ cost_ms (worst frame) | required budget | achievable FPS |
 |----------------------------|-------------------------|-----------------|----------------|
-| Logic-only / satellite executor (engine 10 rules + 5 events, sound 4 voices, 1 haptic event) | ≈8.6 ms | 11.5 ms | **24** (capped) |
+| Logic-only (engine 10 rules + 5 events, sound 4 voices, 1 haptic event) | ≈8.6 ms | 11.5 ms | **24** (capped) |
 | NeoPixel PWM scope, 60 px | 0.552×60 + 5.84 = 38.96 ms | 52.1 ms | **≈19** |
 | IS31FL3741 matrix scope, 100 px | 0.106×100 + 60.69 = 71.29 ms | 95.3 ms | **≈10** |
 | IS31FL3741 matrix scope (flush floor, 0 px) | 60.69 ms | 81.1 ms | **≈12** |
 | NeoPixel PWM scope, 144 px | 0.552×144 + 5.84 = 85.32 ms | 114.1 ms | **≈9** |
 
-**Binding constraints.** Two terms dominate and force well below the 24 FPS ceiling for
-any non-trivial pixel workload:
+**Recommendation:** don't set a board-wide `target_fps` below 24; keep 24 as the
+ceiling and choose the per-prop rate from the heaviest scope it deploys.
 
-- **Matrix `flush_ms` = 60.69 ms** alone exceeds the entire 24 FPS budget (41.7 ms), so a
-  prop with any IS31FL3741 scope tops out near **10-12 FPS** regardless of pixel count.
-- **NeoPixel `per_pixel` = 0.552 ms/px** makes long strips the binding term: ~60 px still
-  reaches ~19 FPS, but ~144 px collapses to ~9 FPS.
+### Max pixels per MCU at a target FPS
 
-Logic-only MCUs (no pixel scope on them) stay CPU-cheap and hit the 24 FPS cap. Because
-the packer can split each `PixelScopeComponent` onto its own satellite, the ceiling for a
-multi-scope prop is set by its single heaviest scope's MCU, not the sum of all scopes.
-
-**Recommendation:** do not set a single board-wide `target_fps` below 24; keep 24 as the
-ceiling and choose the per-prop tick rate from the heaviest scope it deploys, per the
-table above.
-
-#### Designing the other way: max pixels per MCU at a target FPS
-
-While designing hardware (where pixel count is an output, not a fixed input), invert the
-same inequality to ask "at the FPS I want, how many pixels can one MCU drive?":
+While designing hardware (pixel count is an output, not a fixed input), invert the same
+inequality:
 
 ```
 max_pixels = (usable_fraction × frame_budget_ms − flush_ms) / (per_pixel_ms × stack_depth)
@@ -455,16 +328,36 @@ One scope alone on a satellite (`circuitpython_10_2_1`, `usable_fraction = 0.747
 | 10 | 100.0 | **124** | ~133 |
 
 The crossover is the key design signal: the **matrix is unusable above ~12 FPS at any
-size** (its 60.69 ms flush does not fit the budget), and only around **~10 FPS** does its
-much cheaper per-pixel cost (0.106 vs 0.552 ms/px) let it match then overtake NeoPixel's
-pixel capacity -- below that it scales to far more LEDs. Driver choice and target FPS are
-therefore one coupled decision -- pixel count falls out of it rather than being a fixed
-input. Raising `stack_depth` (concurrent effect layers) divides `max_pixels`
-proportionally.
+size** (its 60.69 ms flush does not fit the budget), and only around **~10 FPS** does
+its much cheaper per-pixel cost (0.106 vs 0.552 ms/px) let it match then overtake
+NeoPixel's capacity. Driver choice and target FPS are one coupled decision; pixel count
+falls out of it. Raising `stack_depth` divides `max_pixels` proportionally.
+
+---
+
+## Calibration data
+
+Measured constants keyed by `(board, runtime, driver)`. See
+[`calibration-guide.md`](calibration-guide.md) for how each table is produced and read.
+Tables not yet populated carry `_TBD_` cells.
+
+### Board profiles
+
+Per-board frame budget and global heap/headroom budgets. `total_free_heap_bytes` is
+profiler-measured (`baseline_profiler.py` "Mem Free"); `target_fps` (24 ceiling) and
+`headroom_reserve_percent` (20% default) are config inputs. Source: `baseline_profiler.py`.
+
+| Board | Runtime | Driver | `target_fps` | `total_free_heap_bytes` | `headroom_reserve_percent` |
+|-------|---------|--------|--------------|-------------------------|------------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 24 | 130576 | 20% |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 24 | 129536 | 20% |
 
 ### Per-MCU baselines
 
-Fixed CPU and heap tax each role's bare framework loop consumes before any component work (from `baseline_profiler.py`).
+Fixed CPU and heap tax each role's bare framework loop consumes before any component
+work. The `heap_bytes` is the **bare** framework (empty registry, no packs, no scene);
+a real prop also loads a scene, which dominates its heap (see scene-content memory
+below). Source: `baseline_profiler.py`.
 
 | Board  | Runtime | Driver | Role | `cpu_percent` | `heap_bytes` |
 |--------|---------|--------|------|---------------|--------------|
@@ -473,14 +366,192 @@ Fixed CPU and heap tax each role's bare framework loop consumes before any compo
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | engine-host | 5.65% | 656 |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | satellite | 5.21% | 464 |
 
-The `heap_bytes` above is the **bare** framework (empty registry, no packs, no scene).
-A real prop also loads a scene, which dominates its heap -- see scene-content memory below.
+### Engine component costs
 
-#### Assembled-prop memory breakdown (#448)
+Per-tick cost terms scaling with rules, events, and remote MCUs. Source:
+`engine_profiler.py`.
 
-The bare baseline (656 B) excludes the scanned packs and the loaded scene. The reference
-`tag` prop's measured footprint (~32.8 KB) decomposes via `tag_prop_profiler.py`'s
-`__PROP_BREAKDOWN` (staged `gc.mem_free()` deltas) as:
+| Board | Runtime | Driver | `tick_fixed_ms` | `per_rule_ms` | `per_event_ms` | `router_overhead_ms` |
+|-------|---------|--------|------------------|----------------|-----------------|------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.0694 | 0.0621 | 0.1177 | _TBD_ |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 0.1728 | 0.0565 | 0.1147 | _TBD_ |
+
+### Pixel scope costs
+
+Per-frame render+flush terms, keyed by driver. `linear_fit` slope is
+`worst_case_effect_per_pixel_ms`, intercept is `flush_ms`. Source: `pixel_profiler.py`.
+
+| Board | Runtime | Driver | `worst_case_effect_per_pixel_ms` | `flush_ms` | `i2c_bandwidth_bytes_per_sec` |
+|-------|---------|--------|----------------------------------|------------|-------------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | neopixel_pwm | 0.523107 | 5.9815 | 0.0 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | is31fl3741_matrix | 0.103225 | 59.2329 | 8664.0 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | neopixel_pwm | 0.551999 | 5.8358 | 0.0 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | is31fl3741_matrix | 0.105998 | 60.6856 | 8664.0 |
+
+### Pixel scope memory
+
+Retained heap, keyed by driver. Predict a scope's footprint as
+`base + per_pixel * pixel_count` (e.g. a 117-pixel matrix: `9607 + 2.80 * 117 ≈ 9935 B`).
+Source: `pixel_profiler.py`.
+
+| Board | Runtime | Driver | `footprint_base_bytes` | `footprint_per_pixel_bytes` |
+|-------|---------|--------|------------------------|-----------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | neopixel_pwm | 8520 | 46.74 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | is31fl3741_matrix | 9607 | 2.80 |
+
+The drivers split very differently. `neopixel_pwm` scales steeply (46.74 B/px — the
+strip buffer grows per pixel). `is31fl3741_matrix` is nearly flat (2.80 B/px): the
+buffered driver allocates a **fixed full-matrix (13×9) framebuffer off the GC heap** at
+construction regardless of logical pixel count, so ~9.6 KB lands in
+`footprint_base_bytes` and the slope reflects only the small per-row `PixelBuffer`s
+(near measurement noise).
+
+### Sound component costs
+
+Per-frame mixer terms. `linear_fit` intercept is `mixer_fixed_ms`, slope is
+`per_voice_ms`. Source: `sound_profiler.py`.
+
+| Board | Runtime | Driver | `mixer_fixed_ms` | `per_voice_ms` |
+|-------|---------|--------|------------------|----------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.1834 | 0.0521 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 0.1929 | 0.0425 |
+
+### Sound component memory
+
+Static idle footprint (`AudioEffectOutput`: I2SOut + `audiomixer.Mixer` + `VoicePool`),
+keyed by `num_voices` (the reference `tag` prop uses 4). Source: `sound_profiler.py`.
+
+| Board | Runtime | Driver | `num_voices` | `memory_footprint_bytes` |
+|-------|---------|--------|--------------|--------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 4 | 4304 |
+
+### Vibration component costs
+
+Per-event cost for the shared DRV2605L. Source: `vibration_profiler.py`.
+
+| Board | Runtime | Driver | `cost_ms` | `i2c_bandwidth_bytes_per_sec` |
+|-------|---------|--------|-----------|-------------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 7.4870 | 1.80 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 7.0801 | 1.80 |
+
+### Vibration component memory
+
+Static footprint of the DRV2605L driver + `Drv2605EffectOutput` (a single value —
+nothing scales). The shared I2C bus is excluded. Source: `vibration_profiler.py`.
+
+| Board | Runtime | Driver | `memory_footprint_bytes` |
+|-------|---------|--------|--------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 176 |
+
+### IR-transmit component costs
+
+`blocking_send_ms` here is the realistic 4-byte AURA payload. The worst-case across the
+full payload sweep is ~757.81 ms — use that only for much longer payloads. Source:
+`ir_tx_profiler.py`.
+
+| Board | Runtime | Driver | `cost_ms` | `blocking_send_ms` |
+|-------|---------|--------|-----------|--------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.50 | 59.81 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 0.50 | 59.57 |
+
+### IR-transmit component memory
+
+Static footprint of the transmitter path (LINE `PulseOut` + `InfraredTransmitter` +
+`HardwareNetworkControls`); the receiver's `PulseIn` is excluded. Source:
+`ir_tx_profiler.py`.
+
+| Board | Runtime | Driver | `memory_footprint_bytes` |
+|-------|---------|--------|--------------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 192 |
+
+### IR-receive component costs
+
+Hard-real-time deadline, keyed additionally by `buffer_depth` and `incoming_rate_hz`.
+`max_frame_ms` requires an external IR packet source (`_TBD_` on a bare board). Source:
+`ir_rx_profiler.py`.
+
+| Board | Runtime | Driver | `buffer_depth` | `incoming_rate_hz` | `max_frame_ms` |
+|-------|---------|--------|----------------|--------------------|----------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 64 | 13.91 | 58.59 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 64 | 13.9 | 63.01 |
+
+### IR-receive component memory
+
+Retained footprint of one `ReceiverComponent`, sweeping `PulseIn.maxlen`. The
+relationship is **non-linear**, so the `base + per_slot * buffer_depth` form does not
+fit cleanly. Source: `ir_rx_profiler.py`.
+
+| `PulseIn.maxlen` | measured footprint |
+|------------------|--------------------|
+| 64               | 752 B              |
+| 256              | 672 B              |
+| 1024             | 3488 B             |
+| 2048             | 5536 B             |
+
+At large depths the buffer scales at **~2.0 B/slot** (a `uint16` per slot; 1024→2048 is
+exactly +2048 B), but small buffers quantize into a flat ~700 B baseline. The reference
+`tag` prop's receiver is fixed at **maxlen = 256**, measured directly as **672 B** — use
+that for reconciliation rather than extrapolating the non-linear fit (which would
+over-predict at ~1088 B).
+
+---
+
+## Validation & known gaps
+
+### Reference prop validation (#401)
+
+The acceptance gate for the capacity PRD: confirm the calibrated estimator's prediction
+matches reality for the reference prop — the **Adafruit RP2040 PropMaker Feather
+running the `tag` scene** (IS31FL3741 matrix with all scopes composited on the one
+matrix, I2S audio, DRV2605L vibration, one IR LINE emitter + one IR receiver, two
+buttons, LIS3DH accelerometer — a single-MCU prop).
+
+- **Prediction** — `python -m scripts.capacity.reference_props` runs the estimator
+  against the calibrated `circuitpython_10_2_1` profile.
+- **Measurement** — `tag_prop_profiler.py` stands up the assembled prop on hardware.
+
+The matrix `flush_ms` (60.69 ms) busts the 24 FPS budget, so the prop is infeasible at
+the ceiling; its achievable single-MCU rate is ~7.9 FPS. The comparison is taken at
+**7 FPS** (the profiler's `TARGET_FPS`, so predicted and measured share a 142.9 ms
+budget). Predicted figures are **amortized** (`amortized_engine_host_cost_ms`): the
+packer reserves the full `VibrationComponent.cost_ms` (~7 ms) every frame for
+feasibility, but the profiler reports *mean* busy time where the ≤6 calls/min haptic
+amortizes to ~0.1 ms/frame — so the comparison amortizes it to match. All figures at
+`num_voices = 4`. **Tolerance: ±5%** on CPU metrics; memory is excluded (all
+`memory_footprint_bytes` still uncalibrated).
+
+| Metric | Predicted (amortized, 7 FPS) | Measured | Relative Δ | Within ±5%? |
+|--------|------------------------------|----------|------------|-------------|
+| CPU reservation | 60.92% | 60.41% | +0.8% | ✅ |
+| Headroom | 13.43% | 13.94% | −3.7% | ✅ |
+| Worst-case frame | 146.6 ms | 150.88 ms | −2.8% | ✅ |
+| Memory footprint | ~0 (uncalibrated) | 32,608 B | n/a (excluded) | — |
+
+Measured row (`circuitpython_10_2_1`, `tag_prop_profiler.py`):
+
+| Board | Runtime | Driver | reservation% | footprint_B | headroom% | peak_frame_ms |
+|-------|---------|--------|--------------|-------------|-----------|---------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 60.41% | 32608 | 13.94% | 150.8789 |
+
+**Result: PASS.** All three CPU metrics fall within ±5%. Reservation and headroom err in
+the safe direction (the model over-predicts cost). The worst-case frame is
+under-predicted by 2.8% (the unsafe side, within tolerance); the swing is dominated by
+`frame_time_peak` run-to-run noise (whether a blocking IR send coincides with GC on the
+single worst frame), not voice count. If the worst-frame margin matters, characterise
+the peak across several runs rather than one. The pre-correction predictions were
+uniformly ~8.8% high; amortizing vibration over its duty cycle for the comparison (a
+comparison-only adjustment in `reference_props.py`, leaving the packer's worst-case
+reservation untouched) brought all metrics to ≤3.9%.
+
+**Follow-up (open).** Calibrate component `memory_footprint_bytes` (all `_TBD_`): the
+predicted memory footprint is ~0 against a measured 32,608 B, so memory cannot yet be
+validated against tolerance.
+
+### Assembled-prop memory breakdown (#448)
+
+The bare baseline (656 B) excludes scanned packs and the loaded scene. The reference
+`tag` prop's measured ~32.8 KB decomposes via `tag_prop_profiler.py`'s
+`__PROP_BREAKDOWN` (staged `gc.mem_free()` deltas):
 
 | Stage | Bytes | What it is |
 |-------|-------|------------|
@@ -519,349 +590,3 @@ in-situ `scene` stage (~19 KB) is only measurable on the assembled prop. The cap
 model's per-component footprints therefore **do not sum to the assembled total**, and a
 predicted-vs-measured memory validation to a tight tolerance is not achievable with the
 current model. Tracked as #450 (an output-coupled scene/effect memory model).
-
-### Engine component costs
-
-Per-tick cost terms for the `GameEngine` loop, scaling with rules, events, and remote MCUs.
-
-| Board | Runtime | Driver | `tick_fixed_ms` | `per_rule_ms` | `per_event_ms` | `router_overhead_ms` |
-|-------|---------|--------|------------------|----------------|-----------------|------------------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.0694 | 0.0621 | 0.1177 | _TBD_ |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 0.1728 | 0.0565 | 0.1147 | _TBD_ |
-
-#### Reading the profiler output (`engine_profiler.py`, #409)
-
-`examples/hardware/profiling/engine_profiler.py` drives the real
-`GameEngine.update(state)` dispatch loop with a synthetic `_ProfilerRule` /
-`_ProfilerEvent` pair, sweeping `rule_count` and `events_per_tick` as
-independent axes (each holding the other at a fixed reference of 1). It fits the
-constants on-device and emits the completed row as
-`__TABLE_ROW table=engine_component_costs` -- copy that row in above. The cells:
-
-- **`tick_fixed_ms`** -- the `(rule_count=0, events_per_tick=0)` point's average
-  Update Time: the fixed cost of one `GameEngine.update` tick with no rules and
-  no queued events.
-- **`per_rule_ms`** -- the `linear_fit` slope of average Update Time vs
-  `rule_count` across the `RULE_COUNTS` sweep, with `events_per_tick` held at 1.
-- **`per_event_ms`** -- the `linear_fit` slope of average Update Time vs
-  `events_per_tick` across the `EVENTS_PER_TICK_VALUES` sweep, with `rule_count`
-  held at 1.
-
-**Additive model vs. real dispatch shape.** The estimator models per-tick
-engine cost additively as `tick_fixed_ms + per_rule_ms * rules + per_event_ms *
-events`, but the real `GameEngine.update` dispatch loop is product-shaped: every
-queued event is dispatched to every registered rule (`O(events x rules)`
-`handle_event` calls), not `O(events + rules)`. The additive model is an
-approximation; `per_rule_ms` and `per_event_ms` are slopes measured at the
-sweep's reference cross-load (1 event when sweeping rules, 1 rule when sweeping
-events), not pure marginal costs at all cross-loads. At small reference values
-(1) the product and sum shapes are close, but the approximation degrades as
-both `rules` and `events` grow simultaneously -- callers with large props
-(many rules and many events per tick) should treat the additive estimate as a
-lower bound.
-
-**`tick_fixed_ms` <-> engine-host baseline overlap.** The `(rule_count=0,
-events_per_tick=0)` point profiled here calls the exact same rule-less
-`GameEngine.update(state)` as `baseline_profiler.py`'s `engine_host` mode,
-whose `cpu_percent` is recorded in the Per-MCU baselines table above. The two
-measurements cover the same cost: the fixed per-tick engine overhead with zero
-rules and zero events. The estimator must not charge both the engine-host
-`cpu_percent` baseline *and* `tick_fixed_ms` for the same prop -- either treat
-`tick_fixed_ms` as already included in the engine-host baseline (and add only
-the marginal `per_rule_ms` / `per_event_ms` terms on top of it), or treat the
-engine-host baseline's non-engine portion (framework loop, effect manager tick)
-as the baseline and add the full `tick_fixed_ms` + marginal terms -- but not
-both in full.
-
-**`router_overhead_ms`** is out of scope for this profiler: it is the cost of
-shipping commands from the engine host to remote satellite MCUs, which has no
-seam inside the `GameEngine.update` tick loop measured here. The table cell
-remains `_TBD_` pending a separate counting network stub or analytic seeding
-(no tracking issue yet -- to be filed as a follow-up).
-
-### Pixel scope costs
-
-Per-frame render+flush cost terms for a `PixelScopeComponent`, keyed by driver
-(`neopixel_pwm` or `is31fl3741_matrix`). From `pixel_profiler.py`.
-
-| Board | Runtime | Driver | `worst_case_effect_per_pixel_ms` | `flush_ms` | `i2c_bandwidth_bytes_per_sec` |
-|-------|---------|--------|----------------------------------|------------|-------------------------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | neopixel_pwm | 0.523107 | 5.9815 | 0.0 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | is31fl3741_matrix | 0.103225 | 59.2329 | 8664.0 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | neopixel_pwm | 0.551999 | 5.8358 | 0.0 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | is31fl3741_matrix | 0.105998 | 60.6856 | 8664.0 |
-
-`pixel_profiler.py` sweeps `pixel_count`, effect identity, and `stack_depth`.
-Because `cost_ms = stack_depth * worst_case_effect_per_pixel_ms * pixel_count +
-flush_ms`, per-frame cost is linear in `stack_depth * pixel_count`: the
-`linear_fit` **slope** is `worst_case_effect_per_pixel_ms` and the **intercept**
-is the fixed `flush_ms` (so no separate flush-timing seam is needed --
-`effect_manager.update` already renders and flushes in one call). The profiler
-fits each effect element independently and reports the **worst-case element's**
-slope, with that element's intercept as `flush_ms`. `i2c_bandwidth_bytes_per_sec`
-is `0` for `neopixel_pwm` (off the I2C bus) and `i2c_transaction_bytes *
-i2c_frequency_hz` for the matrix driver.
-
-#### Matrix driver: buffered vs. no-buffer and the transaction boundary
-
-The IS31FL3741 driver can operate in two modes: **buffered** (``allocate=MUST_BUFFER``,
-the default in the production ``propmaker.setup_matrix_is31fl3741`` helper) and
-**no-buffer**. In buffered mode the driver accumulates pixel writes in RAM and
-flushes them to hardware in a single I2C burst when ``show()`` is called, so
-``flush_ms`` dominates and ``worst_case_effect_per_pixel_ms`` is low. In no-buffer
-mode each ``pixel()`` call sends a small I2C transaction immediately, scattering
-bus traffic across the whole render pass rather than collecting it at ``show()``.
-
-This distinction matters for the I2C bandwidth measurement: counting only ``show()``
-correctly captures buffered-mode traffic, but misses *all* no-buffer traffic (which
-arrives during the per-pixel render pass, before ``show()`` is called). The profiler
-therefore counts bytes across the **entire** ``effect_manager.update()`` tick --
-render and flush together -- via a ``CountingI2C`` decorator wrapping the real bus.
-``i2c_transaction_bytes`` is that measured whole-tick byte count at the worst-case
-(largest) pixel count; byte volume is independent of stack depth and effect identity,
-so no separate I2C sweep axis is needed. The matrix's ``i2c_transaction_bytes`` cell
-above will be filled by the first on-device run of the updated profiler.
-
-#### Pixel scope memory (#448)
-
-Retained heap footprint for a `PixelScopeComponent`, keyed by driver. From
-`pixel_profiler.py` (a `gc.mem_free()` delta around the warmed scope, after a
-`gc.collect()` on both sides so only retained heap is counted).
-
-| Board | Runtime | Driver | `footprint_base_bytes` | `footprint_per_pixel_bytes` |
-|-------|---------|--------|------------------------|-----------------------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | neopixel_pwm | 8520 | 46.74 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | is31fl3741_matrix | 9607 | 2.80 |
-
-The profiler snapshots free heap *before* building the scope and measures the delta
-*after* the full sweep, so the figure includes the output object, its driver, and the
-per-scope `PixelBuffer`s (allocated lazily during the sweep). The shared `PackRegistry`
-is built once before the loop and so is excluded; the `EffectManager` engine baseline is
-built inside the loop and lands in the fixed `footprint_base_bytes` intercept. Because
-footprint is linear in pixel_count, `linear_fit` gives the per-pixel buffer slope and the
-fixed base intercept -- predict a scope's footprint as
-`base + per_pixel * pixel_count` (e.g. the reference prop's 117-pixel matrix gives
-`9607 + 2.80 * 117 ≈ 9935 B`).
-
-The two drivers split very differently. `neopixel_pwm` scales steeply (46.74 B/px) --
-the strip buffer grows per pixel. `is31fl3741_matrix` is nearly flat (2.80 B/px): the
-buffered driver allocates a **fixed full-matrix (13x9) framebuffer** at construction
-regardless of the logical pixel count, so that ~9.6 KB lands in `footprint_base_bytes`
-and the slope reflects only the small per-row `PixelBuffer`s. For the matrix the base
-term dominates; the slope is near measurement noise.
-
-### Sound component costs
-
-Per-frame mixer cost terms for the shared `SoundComponent`. From `sound_profiler.py`.
-
-| Board | Runtime | Driver | `mixer_fixed_ms` | `per_voice_ms` |
-|-------|---------|--------|------------------|----------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.1834 | 0.0521 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 0.1929 | 0.0425 |
-
-`sound_profiler.py` sweeps `concurrent_voices`. Because `cost_ms = mixer_fixed_ms
-+ per_voice_ms * effective_voices`, the `linear_fit` **intercept** is
-`mixer_fixed_ms` and the **slope** is `per_voice_ms`.
-
-#### Sound component memory (#448)
-
-Static retained footprint of the shared `SoundComponent` (`AudioEffectOutput`:
-I2SOut + `audiomixer.Mixer` + `VoicePool`), measured idle before any voice is claimed.
-From `sound_profiler.py` (a `gc.mem_free()` delta around construction, after a
-`gc.collect()` on both sides). Keyed by `num_voices` -- the mixer/voice-pool
-construction cap the footprint scales with. The reference `tag` prop uses
-`num_voices = 4`.
-
-| Board | Runtime | Driver | `num_voices` | `memory_footprint_bytes` |
-|-------|---------|--------|--------------|--------------------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 4 | 4304 |
-
-The output has no deinit (it owns the I2S pins) and so is built exactly once per run;
-the profiler therefore measures one `num_voices` per run, and the module-load heap is
-paid by an import-only warm-up before the snapshot rather than a build-then-discard one.
-Run at additional `num_voices` values to record the scaling. Cell is `_TBD_` until the
-first on-device run.
-
-### Vibration component costs
-
-Per-event cost for the shared `VibrationComponent` (DRV2605L over I2C). From
-`vibration_profiler.py`.
-
-| Board | Runtime | Driver | `cost_ms` | `i2c_bandwidth_bytes_per_sec` |
-|-------|---------|--------|-----------|-------------------------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 7.4870 | 1.80 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 7.0801 | 1.80 |
-
-`cost_ms` is the measured average per-event CPU cost of `handle_event` +
-`motor.play()`. `i2c_bandwidth_bytes_per_sec` is `i2c_transaction_bytes *
-(max_calls_per_minute / 60)`; `i2c_transaction_bytes` is measured on-device by
-wrapping the real `busio.I2C` bus in a `CountingI2C` decorator before
-`setup_drv2605`, resetting the counter before a representative vibration event,
-and reading `bytes_written` after that event. The table cell is `_TBD_` pending
-the on-device run.
-
-#### Vibration component memory (#448)
-
-Static retained footprint of the shared `VibrationComponent` (the DRV2605L driver +
-`Drv2605EffectOutput`). From `vibration_profiler.py` (a `gc.mem_free()` delta around
-construction, after a `gc.collect()` on both sides). A single value -- nothing about
-the component scales. The shared I2C bus (also used by the matrix and accelerometer)
-is built before the snapshot and so excluded; the driver-module import is pre-paid by
-an import-only warm-up.
-
-| Board | Runtime | Driver | `memory_footprint_bytes` |
-|-------|---------|--------|--------------------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 176 |
-
-### IR-transmit component costs
-
-Cost terms for the shared `IrTransmitComponent`. From `ir_tx_profiler.py`.
-
-| Board | Runtime | Driver | `cost_ms` | `blocking_send_ms` |
-|-------|---------|--------|-----------|--------------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.50 | 59.81 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 0.50 | 59.57 |
-
-`blocking_send_ms` in the table is the realistic 4-byte AURA payload's
-`PulseOut.send` blocking duration -- the packet size this prop actually sends.
-For reference, the worst-case across the full `PAYLOAD_LENGTHS` sweep (the longest
-payload) measures **757.81 ms**; use that figure only if a prop transmits much
-longer payloads.
-
-`cost_ms` -- the *average* per-frame CPU reservation -- is not swept by the
-profiler; it is the blocking duration amortized across the frames between sends:
-
-```
-cost_ms = blocking_send_ms × send_rate_hz / target_fps
-```
-
-At the realistic AURA cadence of one 4-byte packet per 5 s (`send_rate_hz = 0.2`)
-and `target_fps = 24`: `59.57 × 0.2 / 24 ≈ 0.50 ms` -- the recorded value. The
-absolute-max burst of 2 sends/s would average `59.57 × 2 / 24 ≈ 4.96 ms/frame`,
-but that is a short burst rather than a sustained rate, and the single-frame spike
-it produces is already captured separately by `blocking_send_ms`. The sustained
-0.2 Hz figure is therefore the one recorded as the average reservation.
-
-#### IR-transmit component memory (#448)
-
-Static retained footprint of the shared `IrTransmitComponent` (the LINE `PulseOut` +
-`InfraredTransmitter` wrapper + `HardwareNetworkControls`). From `ir_tx_profiler.py`
-(a `gc.mem_free()` delta around construction, after a `gc.collect()` on both sides). A
-single value -- the transmitter path does not scale. The profiler builds only the
-transmitter, **not** the receiver, so the receiver's `PulseIn(maxlen=256)` is excluded
-(it is the separate IR-rx component below); the module imports are pre-paid by an
-import-only warm-up.
-
-| Board | Runtime | Driver | `memory_footprint_bytes` |
-|-------|---------|--------|--------------------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 192 |
-
-### IR-receive component costs
-
-Hard-real-time deadline for the shared `ReceiverComponent`, keyed additionally by
-`buffer_depth` and `incoming_rate_hz`. From `ir_rx_profiler.py`.
-
-| Board | Runtime | Driver | `buffer_depth` | `incoming_rate_hz` | `max_frame_ms` |
-|-------|---------|--------|----------------|--------------------|----------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 64 | 13.91 | 58.59 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 64 | 13.9 | 63.01 |
-
-`ir_rx_profiler.py` sweeps an injected per-frame busy-load while a known incoming
-packet rate is induced via loopback. `max_frame_ms` is the peak frame time at the
-**first injected-load point where packet loss becomes non-zero** for the profiled
-`buffer_depth` / `incoming_rate_hz`. This requires an **external IR packet
-source** (a loopback transmitter or second board); on a bare board no packets
-arrive and `max_frame_ms` is emitted as `_TBD_`.
-
-#### IR-receive component memory (#448)
-
-Retained footprint of one `ReceiverComponent` (a `PulseIn` + `PulseInReader` +
-`InfraredSingleReceiver` + decoder), measured by `ir_rx_profiler.py` as a `gc.mem_free()`
-delta around the warmed single-receiver chain (`gc.collect()` on both sides), sweeping
-`PulseIn.maxlen`. The `PulseIn` ring buffer **is** on the GC heap (so it counts toward
-the assembled-prop footprint), but the relationship is **not linear**, so the model's
-`base + per_slot * buffer_depth` form does not fit cleanly across the range:
-
-| `PulseIn.maxlen` | measured footprint |
-|------------------|--------------------|
-| 64               | 752 B              |
-| 256              | 672 B              |
-| 1024             | 3488 B             |
-| 2048             | 5536 B             |
-
-At large depths the buffer scales at **~2.0 B/slot** (a `uint16` per slot; 1024→2048 is
-exactly +2048 B), but small buffers quantize into a flat ~700 B baseline far below that
-line. The reference `tag` prop's single receiver is fixed at **maxlen = 256**, where the
-footprint is measured directly as **672 B** -- that is the value used for reconciliation,
-rather than extrapolating the non-linear fit (which would over-predict it at ~1088 B).
-
-## Reference prop validation (#401)
-
-The acceptance gate for the whole capacity PRD: confirm the calibrated estimator's
-prediction matches reality for the reference prop in use today -- the **Adafruit
-RP2040 PropMaker Feather running the `tag` scene** (IS31FL3741 matrix with all
-scopes composited on the one matrix, I2S audio, DRV2605L vibration, one IR LINE
-emitter + one IR receiver, two buttons, LIS3DH accelerometer -- a single-MCU prop).
-
-- **Prediction** -- `python -m scripts.capacity.reference_props` encodes this loadout
-  against the calibrated `circuitpython_10_2_1` RP2040 board profile and runs the
-  estimator.
-- **Measurement** -- `examples/hardware/profiling/tag_prop_profiler.py` stands up the
-  whole assembled prop on real hardware and emits a
-  `__TABLE_ROW table=reference_prop_validation` line.
-
-**Single-MCU assignment (acceptance criterion 1).** The estimator places the entire
-prop on one engine-host MCU. The matrix `flush_ms` (60.69 ms) alone busts the 24 FPS
-budget, so the prop is infeasible at the ceiling; its achievable single-MCU rate is
-~7.9 FPS, and the comparison below is taken at **7 FPS** (the rate the profiler's
-`TARGET_FPS` is set to, so predicted and measured share one frame budget of 142.9 ms).
-
-**Comparison basis.** The packer reserves `VibrationComponent.cost_ms` (~7 ms) on
-*every* frame -- the safe worst-case assumption for feasibility. The unpaced profiler
-instead reports *mean* steady-state busy time, where the haptic motor's ≤6 calls/min
-is amortized to ~0.1 ms/frame. The predicted column below is therefore the
-**amortized** figure (`amortized_engine_host_cost_ms`), the apples-to-apples match for
-the profiler's mean reservation; the worst-case frame likewise amortizes the haptic
-event (a vibration is not assumed to coincide with the IR-send peak frame).
-
-**Stated tolerance: ±5%** on the CPU metrics (reservation, headroom, worst-case
-frame), measured as relative error. Memory footprint is **excluded** from the
-tolerance -- every component's `memory_footprint_bytes` is still uncalibrated
-(`_TBD_`), so the predicted footprint is ~0 and only the measured value is recorded
-(see follow-up below).
-
-All figures at the reference prop's `num_voices = 4`.
-
-| Metric | Predicted (amortized, 7 FPS) | Measured | Relative Δ | Within ±5%? |
-|--------|------------------------------|----------|------------|-------------|
-| CPU reservation | 60.92% | 60.41% | +0.8% | ✅ |
-| Headroom | 13.43% | 13.94% | −3.7% | ✅ |
-| Worst-case frame | 146.6 ms | 150.88 ms | −2.8% | ✅ |
-| Memory footprint | ~0 (uncalibrated) | 32,608 B | n/a (excluded) | — |
-
-Measured row (`circuitpython_10_2_1`, `tag_prop_profiler.py`):
-
-| Board | Runtime | Driver | reservation% | footprint_B | headroom% | peak_frame_ms |
-|-------|---------|--------|--------------|-------------|-----------|---------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 60.41% | 32608 | 13.94% | 150.8789 |
-
-**Result: PASS.** All three CPU metrics fall within ±5%. Reservation and headroom still
-err in the safe direction (the model over-predicts cost). The **worst-case frame is now
-under-predicted by 2.8%** (146.6 ms predicted vs 150.88 ms measured) -- the unsafe side,
-though within tolerance. At `num_voices = 2` it was over-predicted (146.5 vs 140.99 ms);
-the measured peak rose ~10 ms while the predicted steady frame moved only ~0.085 ms, so
-the swing is dominated by `frame_time_peak` run-to-run noise (whether a blocking IR send
-coincides with GC or other spikes on the single worst frame), not the two extra voices.
-Worth watching: if the worst-frame margin matters, widen it (the IR-rx deadline is
-checked against it) or characterise the peak across several runs rather than one.
-
-**Model correction captured (acceptance criterion 4).** Before correction the
-predictions were uniformly ~8.8% high. The cause was charging the sparse haptic event
-on every frame while comparing against a mean measurement; amortizing vibration over
-its duty cycle for the comparison (a comparison-only adjustment in
-`reference_props.py`, leaving the packer's worst-case reservation untouched) brought
-all metrics from ~8.8% to ≤3.9%.
-
-**Follow-up (open).** Calibrate component `memory_footprint_bytes` (all `_TBD_`): the
-predicted memory footprint is ~0 against a measured 32,608 B for the assembled prop,
-so memory cannot yet be validated against tolerance.
