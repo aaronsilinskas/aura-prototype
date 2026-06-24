@@ -106,8 +106,8 @@ are indivisible.
 
 | Order | `conflict_type` | Check |
 |-------|-----------------|-------|
-| 1 | `peripheral` | Summed `peripherals_required` across all components must not exceed `board.peripheral_budgets` (I2S/SPI/I2C/PWM). A peripheral with no budget entry is unconstrained. **Pre-packing.** |
-| 2 | `deadline` | For each `ReceiverComponent`, `worst_case_frame_ms` (incl. any co-located IR-tx `blocking_send_ms`) must not exceed its derived `max_frame_ms`. **Pre-packing** — dominates the budget: even a workload that fits CPU/memory is rejected if it pushes the worst frame past the receiver's deadline. |
+| 1 | `deadline` | For each `ReceiverComponent`, `worst_case_frame_ms` (incl. any co-located IR-tx `blocking_send_ms`) must not exceed its derived `max_frame_ms`. **Pre-packing** — dominates the budget: even a workload that fits CPU/memory is rejected if it pushes the worst frame past the receiver's deadline. |
+| 2 | `peripheral` | Summed `peripherals_required` across all components must not exceed `board.peripheral_budgets` (I2S/SPI/I2C/PWM). A peripheral with no budget entry is unconstrained. **Pre-packing.** |
 | 3 | `cpu` | Per MCU, `sum(reserved%) <= usable_cpu%`. If a component's reservation exceeds a fresh satellite's usable CPU, the assignment is infeasible. |
 | 4 | `memory` | Per MCU, `sum(memory_footprint_bytes) <= usable_heap`. Checked after CPU packing succeeds; names the offending MCU role. |
 | 5 | `bus` | Summed `i2c_bandwidth_bytes_per_sec` across all pixel scopes, the `VibrationComponent`, and any I2C-polling `SimpleComponent` must not exceed the board's `"i2c"` bus budget. Checked after CPU and memory. |
