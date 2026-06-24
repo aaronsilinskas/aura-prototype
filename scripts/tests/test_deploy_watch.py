@@ -1,9 +1,9 @@
-"""Tests for deploy_watch.watch_stream and exit-code mapping."""
+"""Tests for deploy_watch.watch_stream, discard_until, and exit-code mapping."""
 
 import io
 from collections.abc import Callable
 
-from scripts.deploy_watch import exit_code_for, watch_stream
+from scripts.deploy_watch import discard_until, exit_code_for, watch_stream
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -168,3 +168,76 @@ def test_exit_code_for_timed_out_with_until_set_is_two() -> None:
 
 def test_exit_code_for_stream_ended_with_until_set_is_two() -> None:
     assert exit_code_for("stream_ended", until="MARKER") == 2
+
+
+def test_exit_code_for_banner_missing_is_three() -> None:
+    assert exit_code_for("banner_missing", until=None) == 3
+
+
+def test_exit_code_for_banner_missing_with_until_set_is_three() -> None:
+    assert exit_code_for("banner_missing", until="MARKER") == 3
+
+
+# ---------------------------------------------------------------------------
+# discard_until
+# ---------------------------------------------------------------------------
+
+
+def test_discard_until_returns_true_when_marker_found_before_deadline() -> None:
+    result = discard_until(
+        iter(["soft reboot", "some noise", "Soft reboot"]),
+        "soft reboot",
+        deadline=100.0,
+        clock=fixed_clock(0.0, 0.0),
+    )
+    assert result is True
+
+
+def test_discard_until_consumes_lines_before_marker() -> None:
+    consumed: list[str | None] = []
+    it = iter(["noise1", "noise2", "soft reboot", "after"])
+
+    discard_until(it, "soft reboot", deadline=100.0, clock=fixed_clock(0.0, 0.0))
+
+    consumed.extend(it)
+    assert consumed == ["after"]
+
+
+def test_discard_until_matches_marker_as_substring_mid_line() -> None:
+    result = discard_until(
+        iter(["INFO soft reboot happening now"]),
+        "soft reboot",
+        deadline=100.0,
+        clock=fixed_clock(0.0, 0.0),
+    )
+    assert result is True
+
+
+def test_discard_until_returns_false_when_deadline_passes_before_marker() -> None:
+    result = discard_until(
+        iter([None, None, None, None]),
+        "soft reboot",
+        deadline=2.0,
+        clock=fixed_clock(0.0, 1.0),
+    )
+    assert result is False
+
+
+def test_discard_until_returns_false_on_idle_only_stream_after_deadline() -> None:
+    result = discard_until(
+        iter([None, None]),
+        "soft reboot",
+        deadline=1.0,
+        clock=fixed_clock(2.0, 0.0),
+    )
+    assert result is False
+
+
+def test_discard_until_returns_false_when_stream_exhausted_before_marker() -> None:
+    result = discard_until(
+        iter(["no match here", "still nothing"]),
+        "soft reboot",
+        deadline=100.0,
+        clock=fixed_clock(0.0, 0.0),
+    )
+    assert result is False

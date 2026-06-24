@@ -16,6 +16,7 @@ Exit codes
     0  matched (marker found) or timed out without --until or stream ended without --until
     1  usage / port-discovery error
     2  timed out before marker matched (--until was set)
+    3  soft-reboot banner never arrived within --reboot-timeout
 """
 
 import argparse
@@ -32,6 +33,8 @@ _DEFAULT_BAUD: Final = 115200
 _PORT_GLOB: Final = "/dev/tty.usbmodem*"
 _OPEN_RETRY_SECONDS: Final = 10.0
 _OPEN_RETRY_INTERVAL: Final = 0.5
+_DEFAULT_REBOOT_TIMEOUT: Final = 5.0
+_CIRCUITPYTHON_BANNER: Final = "soft reboot"
 
 
 # ---------------------------------------------------------------------------
@@ -49,8 +52,35 @@ class WatchResult:
 
 
 # ---------------------------------------------------------------------------
-# Core pure function
+# Core pure functions
 # ---------------------------------------------------------------------------
+
+
+def discard_until(
+    lines: Iterable[str | None],
+    marker: str,
+    *,
+    deadline: float,
+    clock: Callable[[], float] = time.monotonic,
+) -> bool:
+    """Consume *lines*, discarding each until one contains *marker*.
+
+    Args:
+        lines: Iterable of text lines or ``None`` on idle (no data available).
+        marker: Plain substring to search for in each line.
+        deadline: Absolute monotonic time after which the function gives up.
+        clock: Callable returning monotonic time in seconds.
+
+    Returns:
+        ``True`` when a line containing *marker* is found before *deadline*;
+        ``False`` if the deadline passes or the stream is exhausted first.
+    """
+    for line in lines:
+        if clock() >= deadline:
+            return False
+        if line is not None and marker in line:
+            return True
+    return False
 
 
 def watch_stream(
@@ -116,7 +146,10 @@ def exit_code_for(reason: str, *, until: str | None) -> int:
     Returns:
         0 — matched, or ended/timed-out without an --until target.
         2 — timed out or stream ended before the marker was matched.
+        3 — soft-reboot banner never arrived (banner_missing).
     """
+    if reason == "banner_missing":
+        return 3
     if reason == "matched":
         return 0
     if until is None:
@@ -231,6 +264,16 @@ def main() -> None:
         metavar="N",
         help="Bound the watch to N seconds.",
     )
+    parser.add_argument(
+        "--reboot-timeout",
+        type=float,
+        default=_DEFAULT_REBOOT_TIMEOUT,
+        metavar="N",
+        help=(
+            f"Seconds to wait for the CircuitPython soft-reboot banner "
+            f"(default: {_DEFAULT_REBOOT_TIMEOUT}). Exit 3 if it never arrives."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -269,6 +312,20 @@ def main() -> None:
             sys.exit(rc)
 
         ser.reset_input_buffer()
+
+        banner_deadline = time.monotonic() + args.reboot_timeout
+        found = discard_until(
+            iter_serial_lines(ser),
+            _CIRCUITPYTHON_BANNER,
+            deadline=banner_deadline,
+        )
+        if not found:
+            print(
+                f"Error: soft-reboot banner not seen within {args.reboot_timeout}s. "
+                "The device may have hung or missed the reload.",
+                file=sys.stderr,
+            )
+            sys.exit(exit_code_for("banner_missing", until=args.until))
 
         result = watch_stream(
             iter_serial_lines(ser),
