@@ -2,7 +2,7 @@
 
 The profiler scripts themselves run forever on-device and are not unit-tested,
 but the pure logic they rely on to turn a sweep into a paste-ready
-capacity-model table row -- least-squares slope fitting, runtime-id
+``recorded-metrics.md`` table row -- least-squares slope fitting, runtime-id
 formatting, and markdown row formatting -- lives here and is.
 """
 
@@ -41,7 +41,7 @@ class TestLinearFit:
 
 class TestFormatRuntimeId:
     def test_joins_name_and_version_with_underscores_for_the_table_key(self):
-        # Matches the capacity-model table key style: circuitpython_10_0_3.
+        # Matches the recorded-metrics table key style: circuitpython_10_0_3.
         assert format_runtime_id("circuitpython", (10, 0, 3)) == "circuitpython_10_0_3"
 
 

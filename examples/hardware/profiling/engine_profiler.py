@@ -1,8 +1,9 @@
 """CircuitPython engine profiler -- drives the real `GameEngine.update(state)`
 dispatch loop with a synthetic rule set and a controlled number of queued events
-per tick, to extract the `EngineComponent` cost terms the capacity estimator
-already models (`tick_fixed_ms`, `per_rule_ms`, `per_event_ms`; see
-`docs/hardware/capacity-model.md` and #409).
+per tick, to measure the engine cost terms (`tick_fixed_ms`, `per_rule_ms`,
+`per_event_ms`) for the `engine_component_costs` table in
+`docs/hardware/recorded-metrics.md` (see also
+`docs/hardware/calibration-guide.md`).
 
 Sweeps two axes **independently**, each holding the other at a fixed reference
 of 1 so the slopes are clean:
@@ -17,7 +18,7 @@ of 1 so the slopes are clean:
 The `(rule_count=0, events_per_tick=0)` point is profiled first and is the
 `tick_fixed_ms` zero point -- it reproduces the engine-host baseline measured
 by `baseline_profiler.py` in `engine_host` mode (a rule-less `GameEngine.update`
-loop), so the estimator must not double-count the fixed engine tick on top of
+loop), so the two overlap -- don't double-count the fixed engine tick on top of
 that baseline.
 
 For each `(rule_count, events_per_tick)` point, the profiler:
@@ -35,7 +36,7 @@ For each `(rule_count, events_per_tick)` point, the profiler:
 After the sweep completes, the profiler fits `per_rule_ms` and `per_event_ms`
 from the slopes (via `linear_fit`), reads `tick_fixed_ms` from the `(0, 0)`
 point, and prints the completed `engine_component_costs` table row as a
-`__TABLE_ROW` line ready to paste into `docs/hardware/capacity-model.md`.
+`__TABLE_ROW` line ready to paste into `docs/hardware/recorded-metrics.md`.
 `router_overhead_ms` is out of scope here and is emitted as `_TBD_`.
 
 Hardware
@@ -201,7 +202,7 @@ def run() -> None:
 
     # router_overhead_ms is command-shipping cost to remote MCUs, charged to the
     # engine host -- it has no seam in the GameEngine.update tick loop measured
-    # here, so it stays _TBD_ (see docs/hardware/capacity-model.md).
+    # here, so it stays _TBD_ (see docs/hardware/recorded-metrics.md).
     print_table_row(
         "engine_component_costs",
         [

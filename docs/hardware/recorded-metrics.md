@@ -163,5 +163,27 @@ the bare framework loop with no engine.
 
 ## Per-scene in-situ baselines
 
-_Placeholder._ Per-scene in-situ baselines (measured on the assembled prop, output-coupled)
-are recorded by a separate scene-load profiler slice and will land here.
+Per-scene heap measured **in situ** on the assembled prop by
+[`scene_load_profiler.py`](../../examples/hardware/profiling/scene_load_profiler.py): each
+scene loaded against the real prop's outputs (matrix + audio + motor + optional IR), split
+into a staged `load` Δ (the heap `SceneManager.load` retains) and a first-tick Δ (the heap
+the first `SceneManager.update` retains, when the scene's opening effects fire). The
+near-zero `load` Δ across all three scenes is expected: `load` only stages the transition;
+the scene graph is instantiated on the first tick.
+
+Each row is a **standalone measurement of one `(scene, harness)` pair** — not an additive
+term, and not comparable across harnesses. Scene memory is output-coupled, so a figure is
+valid only for the harness it was measured against (recorded in the `Harness` column). The
+harness is configured by hand in the profiler's `HARNESSES` table to mirror each scene's
+production demo; a mismatched harness reproduces the discredited ~2x headless artifact.
+
+| Board | Runtime | Driver | Scene | Harness | `load` Δ (B) | First-tick Δ (B) |
+|-------|---------|--------|-------|---------|--------------|-------------------|
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | tag | matrix+audio(v4)+motor+ir(tag) | 80 | 15,072 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | red_light_green_light | matrix+audio(v2)+motor+no-ir | 80 | 20,080 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | hardware_test | matrix+audio(v1)+motor+ir(default) | 112 | 13,936 |
+
+The `Harness` column records what each scene was measured against: the matrix scope, the
+audio voice count (`v4`/`v2`/`v1`), the haptic motor, and the IR codec (`ir(tag)` /
+`ir(default)` / `no-ir`). These are the in-situ comparison anchors for future before/after
+scene-change checks — re-record a scene's row only against the same harness.

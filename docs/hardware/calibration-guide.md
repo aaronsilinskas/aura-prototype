@@ -20,7 +20,9 @@ python -m scripts.deploy_watch examples/hardware/profiling/<profiler>.py \
 Several profilers have **config constants at the top of the module** that select what is
 measured — edit them in the file before deploying:
 
-- `baseline_profiler.py`: `MODE` (`"engine_host"` / `"satellite"` / `"scene_content"`).
+- `baseline_profiler.py`: `MODE` (`"engine_host"` / `"satellite"`).
+- `scene_load_profiler.py`: `SCENE_NAME` (which scene's `(scene, harness)` baseline to
+  measure; must be a key of its `HARNESSES` table).
 - `pixel_profiler.py`: `DRIVER` (`"neopixel_pwm"` / `"is31fl3741_matrix"`).
 - `sound_profiler.py`: `NUM_VOICES` (re-run per voice count to record the scaling).
 - The sweep arrays (`PIXEL_COUNTS`, `RULE_COUNTS`, `PAYLOAD_LENGTHS`, …) can be widened
@@ -49,11 +51,10 @@ __TABLE_ROW table=engine_component_costs
 Copy the row into the matching table in [`recorded-metrics.md`](recorded-metrics.md).
 
 > The profilers also emit per-component memory rows (`pixel_scope_memory`,
-> `sound_component_memory`, etc.) and `scene_content_memory`. `recorded-metrics.md`
-> records only directly-measured whole-prop heap and per-scene in-situ baselines, so
-> these per-component memory rows have **no destination table today** — they are inputs
-> for the future automated-profiling expansion and can be ignored when recording
-> isolation metrics now.
+> `sound_component_memory`, etc.). `recorded-metrics.md` records only directly-measured
+> whole-prop heap and per-scene in-situ baselines, so these per-component memory rows have
+> **no destination table today** — they are inputs for the future automated-profiling
+> expansion and can be ignored when recording isolation metrics now.
 
 ## `baseline_profiler.py` — board profiles & per-MCU baselines
 
@@ -65,11 +66,10 @@ Feeds the **Board profiles** and **Per-MCU baselines** tables.
 - `engine_host` mode profiles the rule-less `GameEngine.update(state)` tick; its
   `cpu_percent` is the engine-host baseline. `satellite` mode profiles the bare
   framework loop with no engine.
-- `scene_content` mode loads a scene headless (a `NullEffectOutput`, no hardware) to
-  isolate the scene graph's heap from the hardware-coupled pixel buffers. It is a
-  headless investigation mode for scene-graph memory debugging; its absolute figure is
-  an artifact (~2× over-count vs. the in-situ value on the assembled prop) and is not a
-  recorded constant.
+
+> Per-scene heap is measured in situ by `scene_load_profiler.py` (below), **not** here. A
+> headless scene load reports a misleading ~2× figure because scene memory is
+> output-coupled, so `baseline_profiler.py` no longer offers a `scene_content` mode.
 
 ## `engine_profiler.py` — engine component costs
 
@@ -175,3 +175,25 @@ rate the prop actually achieves (~7–13 FPS for any IS31FL3741 scope) so the re
 taken at one frame budget. The profiler also reports its **measured** FPS so the chosen
 budget can be sanity-checked against reality. Exercise the prop (fire shots, take hits)
 to drive the peak frame time.
+
+## `scene_load_profiler.py` — per-scene in-situ baselines
+
+Feeds the **Per-scene in-situ baselines** table under *Whole-prop measurements*. Stands
+up the **real assembled prop's outputs** (matrix + audio + optional motor + optional
+IR/network controls) and loads one named scene against them, reporting the staged heap it
+retains:
+
+- **`load` Δ** — the heap `SceneManager.load(SCENE_NAME)` retains (the scene graph:
+  phases, rules, effects).
+- **first-tick Δ** — the heap the first `SceneManager.update()` retains (opening effects
+  fire for the first time: palettes/LUTs/buffers built, WAV files opened).
+
+Set `SCENE_NAME` to the scene you want and **confirm its `HARNESSES` entry matches the
+prop you are running** — the registered audio clips, voice count, and IR wiring. The
+harness is configured by hand, not derived from the scene; a recorded figure is valid
+**only for the `(scene, harness)` pair it was measured against**. A mismatched harness
+(missing clips or scopes) reproduces the headless-style artifact that motivated dropping
+`scene_content`. Read the `__SCENE_STAGES` line for the staged free-heap breakdown and the
+`__TABLE_ROW table=scene_in_situ_baselines` row to paste into `recorded-metrics.md`. Run
+it once per scene (`tag`, `red_light_green_light`, `hardware_test`), each on its matching
+harness — these are standalone measurements, not additive terms.
