@@ -43,12 +43,7 @@ _CIRCUITPYTHON_BANNER: Final = "soft reboot"
 
 
 class TeeWriter:
-    """Write to two streams simultaneously.
-
-    Args:
-        primary: The primary output stream (typically ``sys.stdout``).
-        secondary: The secondary output stream (typically an open file).
-    """
+    """Write to two streams simultaneously."""
 
     __slots__ = ("_primary", "_secondary")
 
@@ -57,8 +52,13 @@ class TeeWriter:
         self._secondary = secondary
 
     def write(self, s: str) -> int:
-        self._primary.write(s)
-        return self._secondary.write(s)
+        n = self._primary.write(s)
+        self._secondary.write(s)
+        return n
+
+    def flush(self) -> None:
+        self._primary.flush()
+        self._secondary.flush()
 
 
 # ---------------------------------------------------------------------------

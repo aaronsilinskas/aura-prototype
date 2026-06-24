@@ -289,14 +289,42 @@ def test_watch_stream_with_tee_writer_still_echoes_to_stdout() -> None:
     assert stdout.getvalue() == "alpha\nbeta\n"
 
 
-def test_tee_writer_file_contains_only_captured_lines_not_deploy_chatter() -> None:
+def test_tee_writer_write_returns_primary_stream_count() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    tee = TeeWriter(stdout, file_out)
+    result = tee.write("hello\n")
+    assert result == len("hello\n")
+
+
+def test_tee_writer_flush_flushes_both_streams() -> None:
+    flushed: list[str] = []
+
+    class TrackingStream(io.StringIO):
+        def __init__(self, name: str) -> None:
+            super().__init__()
+            self._name = name
+
+        def flush(self) -> None:
+            flushed.append(self._name)
+            super().flush()
+
+    tee = TeeWriter(TrackingStream("primary"), TrackingStream("secondary"))
+    tee.flush()
+    assert flushed == ["primary", "secondary"]
+
+
+def test_tee_writer_file_receives_only_lines_written_through_tee_not_direct_stdout_writes() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
     tee = TeeWriter(stdout, file_out)
 
+    # Deploy chatter written directly to stdout (bypassing the tee) must not
+    # appear in file_out — only lines routed through the tee reach the file.
     stdout.write("Deploying code.py...\n")
     stdout.write("Copy complete.\n")
 
     watch_stream(lines("BOOT OK", "sensor=42", "DONE"), out=tee)
 
     assert file_out.getvalue() == "BOOT OK\nsensor=42\nDONE\n"
+    assert "Deploying" not in file_out.getvalue()
