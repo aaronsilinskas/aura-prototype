@@ -1,9 +1,9 @@
-"""Tests for deploy_watch.watch_stream, discard_until, and exit-code mapping."""
+"""Tests for deploy_watch.watch_stream, discard_until, exit-code mapping, and SplitWriter."""
 
 import io
 from collections.abc import Callable
 
-from scripts.deploy_watch import discard_until, exit_code_for, watch_stream
+from scripts.deploy_watch import SplitWriter, discard_until, exit_code_for, watch_stream
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -241,3 +241,90 @@ def test_discard_until_returns_false_when_stream_exhausted_before_marker() -> No
         clock=fixed_clock(0.0, 0.0),
     )
     assert result is False
+
+
+# ---------------------------------------------------------------------------
+# SplitWriter
+# ---------------------------------------------------------------------------
+
+
+def test_split_writer_writes_to_stdout() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    split = SplitWriter(stdout, file_out)
+    split.write("hello\n")
+    assert stdout.getvalue() == "hello\n"
+
+
+def test_split_writer_writes_to_file() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    split = SplitWriter(stdout, file_out)
+    split.write("hello\n")
+    assert file_out.getvalue() == "hello\n"
+
+
+def test_split_writer_both_streams_receive_same_content() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    split = SplitWriter(stdout, file_out)
+    split.write("line one\n")
+    split.write("line two\n")
+    assert stdout.getvalue() == file_out.getvalue()
+
+
+def test_watch_stream_with_split_writer_captures_serial_to_file() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    split = SplitWriter(stdout, file_out)
+    watch_stream(lines("alpha", "beta", "gamma"), out=split)
+    assert file_out.getvalue() == "alpha\nbeta\ngamma\n"
+
+
+def test_watch_stream_with_split_writer_still_echoes_to_stdout() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    split = SplitWriter(stdout, file_out)
+    watch_stream(lines("alpha", "beta"), out=split)
+    assert stdout.getvalue() == "alpha\nbeta\n"
+
+
+def test_split_writer_write_returns_primary_stream_count() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    split = SplitWriter(stdout, file_out)
+    result = split.write("hello\n")
+    assert result == len("hello\n")
+
+
+def test_split_writer_flush_flushes_both_streams() -> None:
+    flushed: list[str] = []
+
+    class TrackingStream(io.StringIO):
+        def __init__(self, name: str) -> None:
+            super().__init__()
+            self._name = name
+
+        def flush(self) -> None:
+            flushed.append(self._name)
+            super().flush()
+
+    split = SplitWriter(TrackingStream("primary"), TrackingStream("secondary"))
+    split.flush()
+    assert flushed == ["primary", "secondary"]
+
+
+def test_split_writer_file_excludes_lines_written_directly_to_stdout() -> None:
+    stdout = io.StringIO()
+    file_out = io.StringIO()
+    split = SplitWriter(stdout, file_out)
+
+    # Deploy chatter written directly to stdout (bypassing the split) must not
+    # appear in file_out — only lines routed through the split reach the file.
+    stdout.write("Deploying code.py...\n")
+    stdout.write("Copy complete.\n")
+
+    watch_stream(lines("BOOT OK", "sensor=42", "DONE"), out=split)
+
+    assert file_out.getvalue() == "BOOT OK\nsensor=42\nDONE\n"
+    assert "Deploying" not in file_out.getvalue()
