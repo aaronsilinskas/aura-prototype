@@ -38,11 +38,11 @@ _CIRCUITPYTHON_BANNER: Final = "soft reboot"
 
 
 # ---------------------------------------------------------------------------
-# TeeWriter
+# SplitWriter
 # ---------------------------------------------------------------------------
 
 
-class TeeWriter:
+class SplitWriter:
     """Write to two streams simultaneously."""
 
     __slots__ = ("_primary", "_secondary")
@@ -357,7 +357,7 @@ def main() -> None:
                 sys.exit(exit_code_for("banner_missing", until=args.until))
 
             watch_out: IO[str] = (
-                TeeWriter(sys.stdout, output_file) if output_file is not None else sys.stdout
+                SplitWriter(sys.stdout, output_file) if output_file is not None else sys.stdout
             )
             result = watch_stream(
                 iter_serial_lines(ser),

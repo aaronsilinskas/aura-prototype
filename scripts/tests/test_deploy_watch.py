@@ -1,9 +1,9 @@
-"""Tests for deploy_watch.watch_stream, discard_until, exit-code mapping, and TeeWriter."""
+"""Tests for deploy_watch.watch_stream, discard_until, exit-code mapping, and SplitWriter."""
 
 import io
 from collections.abc import Callable
 
-from scripts.deploy_watch import TeeWriter, discard_until, exit_code_for, watch_stream
+from scripts.deploy_watch import SplitWriter, discard_until, exit_code_for, watch_stream
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -244,14 +244,14 @@ def test_discard_until_returns_false_when_stream_exhausted_before_marker() -> No
 
 
 # ---------------------------------------------------------------------------
-# TeeWriter
+# SplitWriter
 # ---------------------------------------------------------------------------
 
 
 def test_tee_writer_writes_to_stdout() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = TeeWriter(stdout, file_out)
+    tee = SplitWriter(stdout, file_out)
     tee.write("hello\n")
     assert stdout.getvalue() == "hello\n"
 
@@ -259,7 +259,7 @@ def test_tee_writer_writes_to_stdout() -> None:
 def test_tee_writer_writes_to_file() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = TeeWriter(stdout, file_out)
+    tee = SplitWriter(stdout, file_out)
     tee.write("hello\n")
     assert file_out.getvalue() == "hello\n"
 
@@ -267,7 +267,7 @@ def test_tee_writer_writes_to_file() -> None:
 def test_tee_writer_both_streams_receive_same_content() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = TeeWriter(stdout, file_out)
+    tee = SplitWriter(stdout, file_out)
     tee.write("line one\n")
     tee.write("line two\n")
     assert stdout.getvalue() == file_out.getvalue()
@@ -276,7 +276,7 @@ def test_tee_writer_both_streams_receive_same_content() -> None:
 def test_watch_stream_with_tee_writer_captures_serial_to_file() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = TeeWriter(stdout, file_out)
+    tee = SplitWriter(stdout, file_out)
     watch_stream(lines("alpha", "beta", "gamma"), out=tee)
     assert file_out.getvalue() == "alpha\nbeta\ngamma\n"
 
@@ -284,7 +284,7 @@ def test_watch_stream_with_tee_writer_captures_serial_to_file() -> None:
 def test_watch_stream_with_tee_writer_still_echoes_to_stdout() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = TeeWriter(stdout, file_out)
+    tee = SplitWriter(stdout, file_out)
     watch_stream(lines("alpha", "beta"), out=tee)
     assert stdout.getvalue() == "alpha\nbeta\n"
 
@@ -292,7 +292,7 @@ def test_watch_stream_with_tee_writer_still_echoes_to_stdout() -> None:
 def test_tee_writer_write_returns_primary_stream_count() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = TeeWriter(stdout, file_out)
+    tee = SplitWriter(stdout, file_out)
     result = tee.write("hello\n")
     assert result == len("hello\n")
 
@@ -309,7 +309,7 @@ def test_tee_writer_flush_flushes_both_streams() -> None:
             flushed.append(self._name)
             super().flush()
 
-    tee = TeeWriter(TrackingStream("primary"), TrackingStream("secondary"))
+    tee = SplitWriter(TrackingStream("primary"), TrackingStream("secondary"))
     tee.flush()
     assert flushed == ["primary", "secondary"]
 
@@ -317,7 +317,7 @@ def test_tee_writer_flush_flushes_both_streams() -> None:
 def test_tee_writer_file_receives_only_lines_written_through_tee_not_direct_stdout_writes() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = TeeWriter(stdout, file_out)
+    tee = SplitWriter(stdout, file_out)
 
     # Deploy chatter written directly to stdout (bypassing the tee) must not
     # appear in file_out — only lines routed through the tee reach the file.
