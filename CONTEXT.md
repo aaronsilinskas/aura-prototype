@@ -205,7 +205,7 @@ A normalized 0.0–1.0 quality metric derived from a packet's error margin (timi
 _Avoid_: calling it "RSSI" as if measured; using it to derive hit direction
 
 ### Deploy-watch
-The `scripts/deploy_watch.py` host tool that deploys an example and captures the resulting serial run, for unattended workflows (e.g. profilers feeding the capacity model). Sibling to `deploy.py`: deploy flashes; deploy-watch flashes *and* captures. Always deploys — deploying is what produces the **reload boundary** the capture anchors to.
+The `scripts/deploy_watch.py` host tool that deploys an example and captures the resulting serial run, for unattended workflows (e.g. hardware profilers capturing measured metrics). Sibling to `deploy.py`: deploy flashes; deploy-watch flashes *and* captures. Always deploys — deploying is what produces the **reload boundary** the capture anchors to.
 _Avoid_: treating it as a read-only serial monitor (it overwrites `code.py` and reboots); a no-deploy "just watch" mode
 
 ### Reload boundary

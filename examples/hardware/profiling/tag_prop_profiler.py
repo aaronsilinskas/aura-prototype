@@ -3,35 +3,28 @@
 This is the measurement half of #401: it stands up the **whole** reference prop
 (IS31FL3741 matrix, I2S audio, DRV2605L vibration, IR LINE emitter + one IR
 receiver, two buttons) running the production `tag` scene -- the same wiring as
-`examples/hardware/tag_demo.py` -- and reports the three quantities the capacity
-estimator predicts for a single-MCU (engine-host) prop, so a human can compare
-predicted vs. measured within a stated tolerance and record the result in
-`docs/hardware/capacity-model.md`.
+`examples/hardware/tag_demo.py` -- and reports the measured cost of running the
+assembled prop on a single MCU (engine-host).
 
 Unlike the per-component profilers under this directory (which isolate one cost
-term each), this profiler measures the **assembled** prop end to end. The numbers
-it reports map onto the estimator's engine-host MCU:
+term each), this profiler measures the **assembled** prop end to end and reports:
 
 - **CPU reservation %** -- the measured per-frame busy time (engine update +
   effect render+flush, sound, vibration) expressed as a percentage of the frame
-  budget at `TARGET_FPS`. Compare against the sum of the prop's component
-  `reserved%` on the engine-host MCU.
+  budget at `TARGET_FPS`.
 - **Headroom %** -- the engine-host's usable budget
   (`100 - baseline_cpu_percent - headroom_reserve_percent`) minus the measured
-  reservation. Compare against `McuAssignment.remaining_headroom_percent`.
+  reservation.
 - **Memory footprint (bytes)** -- the heap consumed standing the whole prop up,
-  measured as a `gc.mem_free()` delta around setup. Compare against the summed
-  component `memory_footprint_bytes` deducted from the board's
-  `total_free_heap_bytes`.
+  measured as a `gc.mem_free()` delta around setup.
 - **Worst-case frame time (ms)** -- `PerformanceTracker.frame_time_peak`, the
-  `worst_case_frame_ms` term the IR receiver's hard-real-time deadline is checked
+  worst-case frame time the IR receiver's hard-real-time deadline is checked
   against. Exercise the prop (fire shots, take hits) to drive this peak.
 
 The matrix flush (~60 ms) dominates the per-frame cost, so the prop cannot hold
-24 FPS -- set `TARGET_FPS` to the rate the prop actually achieves (see the
-"Realistic target tick rate" section of the capacity doc; ~11-13 FPS for any
-IS31FL3741 scope). The profiler also reports its **measured** FPS so the chosen
-budget can be sanity-checked against reality.
+24 FPS -- set `TARGET_FPS` to the rate the prop actually achieves (~11-13 FPS for
+any IS31FL3741 scope). The profiler also reports its **measured** FPS so the
+chosen budget can be sanity-checked against reality.
 
 Hardware
 --------
@@ -66,14 +59,14 @@ How to use
   fire, and let it receive IR hits. The reported `peak_frame_ms` is a running
   maximum, so the highest spike over the whole run is retained.
 - Read the paste-ready `__TABLE_ROW table=reference_prop_validation` line at each
-  interval for the measured column of the predicted-vs-measured comparison.
+  interval for the measured reference-prop metrics.
 
 Configuration
 -------------
 - TARGET_FPS: frame budget basis for reservation/headroom (the prop's achievable
   rate, NOT the 24 FPS ceiling for any prop with a matrix scope).
 - ENGINE_HOST_BASELINE_CPU_PERCENT / HEADROOM_RESERVE_PERCENT: the engine-host
-  usable-budget terms from the capacity doc, used to derive measured headroom.
+  usable-budget terms used to derive measured headroom.
 - AUTO_START: inject a synthetic press at boot to reach Playing automatically.
 - LOG_INTERVAL_SECONDS: how often the stats line is printed.
 """
@@ -111,7 +104,7 @@ except ImportError:
     pass
 
 # ---------------------------------------------------------------------------
-# Configuration -- adjust to match your wiring and the capacity doc
+# Configuration -- adjust to match your wiring
 # ---------------------------------------------------------------------------
 
 BUTTON_A_PIN: Final = board.D9
@@ -123,14 +116,12 @@ IR_LINE_PIN: Final = board.D12
 
 # Frame budget basis. A prop with an IS31FL3741 scope cannot hold 24 FPS (the
 # ~60 ms matrix flush alone exceeds the 41.7 ms budget), so reservation/headroom
-# are computed against the rate the prop actually achieves. The estimator
-# predicts a single-MCU fit at ~7 FPS for this prop -- keep this in sync with the
-# `python -m scripts.capacity.reference_props` comparison FPS so predicted and
-# measured reservation share one frame budget. Reconcile with the measured FPS.
+# are computed against the rate the prop actually achieves. ~7 FPS is the rate
+# this prop holds on a single MCU -- reconcile with the measured FPS.
 TARGET_FPS: Final = 7.0
 
-# Engine-host usable-budget terms (capacity-model.md "Per-MCU baselines" and the
-# 20% default headroom reserve), used to derive the measured headroom percentage.
+# Engine-host usable-budget terms (the per-MCU baseline CPU cost and the 20%
+# default headroom reserve), used to derive the measured headroom percentage.
 # These are the circuitpython_10_2_1 engine-host baseline; use 4.75 for 10_0_3.
 ENGINE_HOST_BASELINE_CPU_PERCENT: Final = 5.65
 HEADROOM_RESERVE_PERCENT: Final = 20.0
@@ -143,7 +134,7 @@ AUTO_START: Final = True
 # ->Playing transitions *construct* effects across the matrix (palettes, LUTs,
 # buffers) and open WAV files from flash for the first time -- one-time costs that
 # spike a single frame into the hundreds of ms / ~1 s range. They are not the
-# steady-state per-frame cost the estimator predicts, so the tracker is reset once
+# steady-state per-frame cost we want to measure, so the tracker is reset once
 # warm-up elapses and only steady-state frames are reported.
 WARMUP_SECONDS: Final = 10.0
 
@@ -349,7 +340,7 @@ def run() -> None:
             reservation=f"{reservation_percent:.2f}%",
             headroom=f"{headroom_percent:.2f}%",
         )
-        # Measured column of the predicted-vs-measured comparison (#401).
+        # Measured reference-prop metrics (#401).
         print_table_row(
             "reference_prop_validation",
             [
