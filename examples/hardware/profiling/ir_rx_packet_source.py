@@ -1,5 +1,5 @@
 """CircuitPython IR-rx packet source -- the external transmitter companion to
-`ir_rx_profiler.py` (see `docs/hardware/capacity-model.md` and #397/#400).
+`ir_rx_profiler.py` (see `docs/hardware/calibration-guide.md`).
 
 `ir_rx_profiler.py` locates the receiver's `max_frame_ms` by counting gaps in a
 sequence number encoded in byte 0 of each received packet. On a bare board no

@@ -1,6 +1,6 @@
 """CircuitPython IR-rx profiler -- empirically locates `max_frame_ms` for the
-capacity estimator's receiver deadline model (see `docs/hardware/capacity-model.md`
-and #397).
+`ir_receive_component_costs` table in `docs/hardware/recorded-metrics.md` (see also
+`docs/hardware/calibration-guide.md`).
 
 Drives the real `InfraredMultiReceiver.receive()` polling loop over the fixed 4
 `PulseInReader`s using the **tunable-injected-load technique**: each frame, after
@@ -17,15 +17,7 @@ sequence counts as a dropped packet.
 
 This profiler reports packet-loss rate vs. injected frame time, alongside the
 uniform `PerformanceTracker` stats line (including `frame_time_peak`, the worst-case
-single frame -- the `worst_case_frame_ms` term the estimator compares against
-`max_frame_ms`).
-
-It also measures the receiver's **memory footprint** for the
-`ir_receive_component_memory` constants table (#448). The model sizes memory per
-single receiver as `base_footprint_bytes + bytes_per_buffer_slot * buffer_depth`, so a
-short sweep of `PulseIn.maxlen` (`FOOTPRINT_DEPTHS`) on one receiver is fit to that
-line -- the per-slot slope is the `PulseIn` buffer growth, the base intercept the fixed
-reader/decoder cost. This is separate from the fixed-4 deadline sweep.
+single frame that the receiver's hard-real-time deadline is checked against).
 
 Hardware
 --------
@@ -46,7 +38,7 @@ Installation
 Configuration
 -------------
 - RX_PINS: board pins for the 4 fixed `PulseInReader`s
-- BUFFER_DEPTH: `PulseIn.maxlen` -- the RAM-for-deadline knob (#397)
+- BUFFER_DEPTH: `PulseIn.maxlen` -- the RAM-for-deadline knob
 - INCOMING_RATE_HZ: known incoming packet rate from the loopback transmitter
 - INJECTED_LOAD_SWEEP_MS: per-frame injected busy-loop durations to sweep, in order
 - DISPLAY_SECONDS: how long to spend at each injected-load level before advancing
@@ -57,14 +49,12 @@ Configuration
 
 from __future__ import annotations
 
-import gc
 import time
 
 from effects.performance import PerformanceTracker
 from hardware.shared.ir_protocol import AuraInfraredDecoder
 from hardware.shared.ir_transport import InfraredMultiReceiver
 from hardware.shared.profiling_helpers import (
-    linear_fit,
     print_profile_header,
     print_stats_line,
     print_table_row,
@@ -75,7 +65,7 @@ try:
 except ImportError:
     pass
 
-# Fixed at 4 receivers -- not a deployment axis (#397).
+# Fixed at 4 receivers -- not a deployment axis.
 RX_PIN_NAMES: Final = ("D11", "A1", "A2", "A3")
 BUFFER_DEPTH: Final = 64
 INCOMING_RATE_HZ: Final = 13.91
@@ -83,57 +73,6 @@ INJECTED_LOAD_SWEEP_MS: Final = [0.0, 5.0, 10.0, 20.0, 40.0, 80.0]
 DISPLAY_SECONDS: Final = 10.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 TARGET_FPS: Final = 24.0
-
-# `PulseIn.maxlen` values swept to fit the receiver footprint (base + per-slot). Spans
-# 32x (well past the reference tag prop's 256) so the per-slot buffer signal clears the
-# GC granularity noise floor -- a narrow range buries it and the fit comes out as noise.
-FOOTPRINT_DEPTHS: Final = [64, 256, 1024, 2048]
-
-
-def _measure_footprint() -> tuple[int, float]:
-    """Fit one receiver's footprint to `base + per_slot * buffer_depth`.
-
-    The deadline sweep below uses the fixed-4 readers at `BUFFER_DEPTH`, but the model
-    sizes memory per *single* receiver and scaling with `PulseIn.maxlen` (the model's
-    `buffer_depth`). So this sweeps maxlen on one receiver, building the full single-
-    receiver chain (PulseIn + PulseInReader + InfraredSingleReceiver + decoder) so the
-    fixed reader/decoder cost lands in the base intercept and the PulseIn buffer drives
-    the per-slot slope. Returns `(base_bytes, per_slot_bytes)`.
-    """
-    import board
-    import pulseio
-
-    from hardware.circuitpython.infrared_io import PulseInReader
-    from hardware.shared.ir_transport import InfraredSingleReceiver
-
-    pin = getattr(board, RX_PIN_NAMES[0])
-
-    # Build-then-discard warm-up over the *full* single-receiver chain, not just the
-    # PulseIn: PulseInReader / InfraredSingleReceiver / the decoder all carry one-time
-    # first-use allocations (decoder tables, class state) that otherwise land on the
-    # first measured depth and corrupt the fit. PulseIn has a deinit, so this works.
-    _warm = pulseio.PulseIn(pin, maxlen=FOOTPRINT_DEPTHS[0], idle_state=True)
-    InfraredSingleReceiver(PulseInReader(_warm), AuraInfraredDecoder())
-    _warm.deinit()
-    gc.collect()
-
-    held: list = []
-    samples = []
-    for depth in FOOTPRINT_DEPTHS:
-        # Drop the previous receiver before snapshotting so free_before is a clean
-        # baseline and the delta is one receiver's absolute footprint, not a difference.
-        held = []
-        gc.collect()
-        free_before = gc.mem_free()
-        pulsein = pulseio.PulseIn(pin, maxlen=depth, idle_state=True)
-        held.append(InfraredSingleReceiver(PulseInReader(pulsein), AuraInfraredDecoder()))
-        gc.collect()
-        samples.append((depth, free_before - gc.mem_free()))
-        pulsein.deinit()
-
-    print("__FOOTPRINT_SAMPLES " + ", ".join(f"{d}d={b}B" for d, b in samples))
-    per_slot_bytes, base_bytes = linear_fit([d for d, _ in samples], [b for _, b in samples])
-    return round(base_bytes), per_slot_bytes
 
 
 def _build_readers() -> list:
@@ -161,14 +100,6 @@ def _busy_wait_ms(duration_ms: float) -> None:
 
 def run() -> None:
     """Sweep injected per-frame load, reporting packet-loss rate vs. frame time."""
-    # Measure the receiver footprint first (its maxlen sweep builds/deinits a PulseIn
-    # on RX_PIN_NAMES[0]), before the deadline sweep claims that pin for its readers.
-    base_bytes, per_slot_bytes = _measure_footprint()
-    print_table_row(
-        "ir_receive_component_memory",
-        [base_bytes, f"{per_slot_bytes:.2f}"],
-    )
-
     readers = _build_readers()
     receiver = InfraredMultiReceiver(readers, AuraInfraredDecoder)
 

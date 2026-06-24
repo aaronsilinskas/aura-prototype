@@ -1,6 +1,7 @@
 """CircuitPython vibration profiler -- drives `Drv2605EffectOutput.handle_event` over
-real I2C against a DRV2605L to find the per-event cost for the capacity estimator's
-`VibrationComponent` model (see `docs/hardware/capacity-model.md` and #398).
+real I2C against a DRV2605L to find the per-event cost for the
+`vibration_component_costs` table in `docs/hardware/recorded-metrics.md` (see also
+`docs/hardware/calibration-guide.md`).
 
 `Drv2605EffectOutput` is registered on `Scope.ALL` -- there is exactly one shared
 vibration component per prop (one DRV2605L haptic motor), so this profiler drives it
@@ -11,20 +12,15 @@ Each iteration:
 1. Calls `handle_event` with a short vibration pattern -- this writes the sequence to
    the DRV2605L over I2C and calls `motor.play()`.
 2. Calls `flush()` -- a no-op unless the receipt was externally stopped.
-3. Sleeps for `EVENT_INTERVAL_SECONDS` between events, modeling
-   `max_calls_per_minute` (a low event rate -- the I2C bus share is negligible but
-   still counted, per #398).
+3. Sleeps for `EVENT_INTERVAL_SECONDS` between events, at a low event rate -- the I2C
+   bus share is negligible but still counted.
 
-`PerformanceTracker` reports the per-event `handle_event` cost (the
-`VibrationComponent.cost_ms` term) alongside the uniform stats line.
+`PerformanceTracker` reports the per-event `handle_event` cost (the `cost_ms` term)
+alongside the uniform stats line.
 
 The I2C bus is wrapped in `CountingI2C` before `setup_drv2605`. The decorator is
 reset before a representative vibration event and `bytes_written` after that event
 gives the measured `i2c_transaction_bytes` -- no guessing required.
-
-It also measures the component's **static memory footprint** (a `gc.mem_free()` delta
-around the DRV2605L driver + output, excluding the shared I2C bus) for the
-`vibration_component_memory` constants table (#448).
 
 Hardware
 --------
@@ -41,7 +37,7 @@ Installation
 
 Configuration
 -------------
-- EVENT_INTERVAL_SECONDS: delay between events -- models `max_calls_per_minute`
+- EVENT_INTERVAL_SECONDS: delay between events -- sets the event rate
   (e.g. 10.0s -> 6 calls/minute)
 - ITERATIONS: number of vibration events to drive before exiting
 - TARGET_FPS: informational only -- included in the header for comparison against
@@ -51,7 +47,6 @@ Configuration
 
 from __future__ import annotations
 
-import gc
 import time
 
 from effects.effect import Effect, EffectVibration, VibrationConfig
@@ -96,21 +91,7 @@ def _build_output(i2c: CountingI2C):
 def run() -> None:
     """Drive `handle_event` once per `EVENT_INTERVAL_SECONDS`, reporting per-event cost."""
     counting_bus = _build_bus()
-
-    # Import-only warm-up: pay the drv2605 module import before the footprint snapshot
-    # so its module-load heap does not inflate the measurement. The output is built
-    # once (no deinit), so a build-then-discard warm-up is not possible here.
-    from hardware.circuitpython.drv2605_output import Drv2605EffectOutput  # noqa: F401
-    from hardware.circuitpython.propmaker import setup_drv2605  # noqa: F401
-
-    # Static footprint: the DRV2605L driver + Drv2605EffectOutput wrapper. The shared
-    # I2C bus is built above and excluded -- in the assembled prop the bus is shared
-    # with the matrix and accelerometer, not owned by the vibration component.
-    gc.collect()
-    free_before = gc.mem_free()
     output = _build_output(counting_bus)
-    gc.collect()
-    footprint_bytes = free_before - gc.mem_free()
 
     buzz_effect = Effect(
         "profiler.buzz",
@@ -155,11 +136,6 @@ def run() -> None:
     print_table_row(
         "vibration_component_costs",
         [f"{cost_ms:.4f}", f"{i2c_bandwidth:.2f}"],
-    )
-    # Static memory footprint (single value -- nothing about the component scales).
-    print_table_row(
-        "vibration_component_memory",
-        [footprint_bytes],
     )
 
 
