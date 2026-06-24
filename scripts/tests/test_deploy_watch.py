@@ -134,6 +134,17 @@ def test_watch_stream_matched_before_timeout() -> None:
     assert result.reason == "matched"
 
 
+def test_watch_stream_timed_out_when_timeout_elapses_after_stream_exhausted() -> None:
+    out = io.StringIO()
+    result = watch_stream(
+        lines("only-line"),
+        timeout=1.0,
+        clock=fixed_clock(0.0, 0.6),
+        out=out,
+    )
+    assert result.reason == "timed_out"
+
+
 # ---------------------------------------------------------------------------
 # exit_code_for: exit-code mapping
 # ---------------------------------------------------------------------------
