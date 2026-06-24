@@ -1,6 +1,7 @@
 """CircuitPython pixel profiler — drives the real EffectManager -> EffectOutput
-render+flush path to find the worst-case per-pixel and flush costs for the capacity
-estimator's pixel model (see `docs/hardware/capacity-model.md` and #396).
+render+flush path to find the worst-case per-pixel and flush costs for the
+``pixel_scope_costs`` table in `docs/hardware/recorded-metrics.md` (see also
+`docs/hardware/calibration-guide.md`).
 
 Sweeps three axes in sequence:
 
@@ -9,12 +10,7 @@ Sweeps three axes in sequence:
   ``element_perf_demo.py`` does) at a fixed level, to find the worst-case
   per-pixel cost across all real effects.
 - **stack depth** — `STACK_DEPTHS`, the number of concurrent ``add_effect`` layers
-  on the scope (mirrors the estimator's `stack_depth` workload parameter).
-
-It also measures the scope's **retained memory footprint** at each pixel count (a
-``gc.mem_free()`` delta around the warmed scope) and fits it to
-``footprint_base_bytes + footprint_per_pixel_bytes * pixel_count`` for the
-``pixel_scope_memory`` constants table (#448).
+  on the scope.
 
 `DRIVER` selects which output is profiled:
 
@@ -292,37 +288,8 @@ def run() -> None:
     # per-pixel-per-layer cost and the intercept is the fixed flush. Collect points
     # per element so the worst-case element's slope can be selected.
     samples = {element: [] for element in element_names}
-    footprint_samples = []  # (pixel_count, retained_bytes) for the memory fit
-
-    # Warm-up: pay every one-time retained allocation before measuring -- the
-    # driver-module import and the per-effect palettes/LUTs built and cached on
-    # first add_effect. These survive teardown (class-level), so unpaid they land
-    # only on the first pixel count's footprint sample and invert the fit.
-    warm_output, _ = _build_output(DRIVER, PIXEL_COUNTS[0])
-    warm_manager = EffectManager(registry=registry, outputs=[warm_output])
-    warm_timer = Timer()
-    for element in element_names:
-        receipt = warm_manager.add_effect(
-            Scope.PERSONAL, "elements." + element, {"level": SAMPLE_LEVEL}
-        )
-        warm_timer.update()
-        warm_manager.update(warm_timer)
-        receipt.stop()
-    warm_output.deinit()
-    warm_output = warm_manager = warm_timer = None
-    gc.collect()
 
     for pixel_count in PIXEL_COUNTS:
-        # Free the previous iteration's scope *before* snapshotting, so free_before
-        # is a clean baseline (only the shared registry alive). Otherwise the prior
-        # scope is alive at the snapshot but freed by the end-of-loop collect, and
-        # the delta measures the difference between consecutive scopes, not the
-        # absolute footprint. The post-sweep delta is then this scope's retained
-        # footprint (output + driver + PixelBuffers).
-        output = effect_manager = counting_i2c = timer = None
-        gc.collect()
-        free_before = gc.mem_free()
-
         output, counting_i2c = _build_output(DRIVER, pixel_count)
         effect_manager = EffectManager(registry=registry, outputs=[output])
         timer = Timer()
@@ -341,11 +308,9 @@ def run() -> None:
                 )
                 samples[element].append((stack_depth * pixel_count, update_ms))
 
-        # Measure now that the sweep has allocated the PixelBuffers; gc.collect on
-        # both sides keeps it to retained heap, not transient sweep litter.
-        gc.collect()
-        footprint_samples.append((pixel_count, free_before - gc.mem_free()))
         output.deinit()
+        output = effect_manager = counting_i2c = timer = None
+        gc.collect()
 
     # Worst-case element drives worst_case_effect_per_pixel_ms; its fit's intercept
     # is the matching flush_ms (flush is element-independent in the model).
@@ -362,22 +327,6 @@ def run() -> None:
     print_table_row(
         "pixel_scope_costs",
         [f"{worst_per_pixel_ms:.6f}", f"{flush_ms:.4f}", i2c_bandwidth],
-        driver=DRIVER,
-    )
-
-    # Raw per-point footprints, so a corrupted fit (e.g. an outlier sample) is
-    # diagnosable from the trend, not just the fitted slope/intercept.
-    print("__FOOTPRINT_SAMPLES " + ", ".join(f"{px}px={b}B" for px, b in footprint_samples))
-
-    # Footprint is linear in pixel_count: the fit's intercept is the fixed
-    # `footprint_base_bytes` and its slope the per-pixel `PixelBuffer` cost, so the
-    # model can predict the scope's footprint at any pixel count.
-    fp_xs = [px for px, _ in footprint_samples]
-    fp_ys = [b for _, b in footprint_samples]
-    per_pixel_bytes, base_bytes = linear_fit(fp_xs, fp_ys)
-    print_table_row(
-        "pixel_scope_memory",
-        [round(base_bytes), f"{per_pixel_bytes:.2f}"],
         driver=DRIVER,
     )
 
