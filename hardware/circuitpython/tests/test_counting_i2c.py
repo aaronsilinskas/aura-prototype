@@ -78,7 +78,7 @@ class FakeI2C:
         self.calls.append(("__enter__",))
         return self
 
-    def __exit__(self) -> None:
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         self.calls.append(("__exit__",))
 
 
