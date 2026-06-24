@@ -3,6 +3,7 @@
 - **Backlog** — GH issues in `aaronsilinskas/aura-prototype` via `gh` CLI. See `docs/agents/backlog.md`.
 - **Triage labels** — See `docs/agents/triage-labels.md`.
 - **Domain docs** — `docs/agents/domain.md` (module layout, key types, vocabulary, constraints). Extended design in Obsidian vault at `~/dev/aura/aura-docs/`.
+- **deploy-watch** — Deploy a CircuitPython example to the device and capture serial output. See `docs/agents/deploy-watch.md` before using `scripts/deploy_watch.py`.
 
 **When a workflow step names a skill, load its `SKILL.md` with `read_file` and follow it precisely before proceeding.**
 
