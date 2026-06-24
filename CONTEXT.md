@@ -203,3 +203,19 @@ _Avoid_: conflating with **IR signal strength** (a normalized derivative, not th
 ### IR signal strength
 A normalized 0.0–1.0 quality metric derived from a packet's error margin (timing error ≤30% of threshold = full strength). A coarse proximity stand-in, inferred from timing accuracy — not measured power, and conveys no direction.
 _Avoid_: calling it "RSSI" as if measured; using it to derive hit direction
+
+### Deploy-watch
+The `scripts/deploy_watch.py` host tool that deploys an example and captures the resulting serial run, for unattended workflows (e.g. profilers feeding the capacity model). Sibling to `deploy.py`: deploy flashes; deploy-watch flashes *and* captures. Always deploys — deploying is what produces the **reload boundary** the capture anchors to.
+_Avoid_: treating it as a read-only serial monitor (it overwrites `code.py` and reboots); a no-deploy "just watch" mode
+
+### Reload boundary
+The device's soft-reload after `code.py` is written — the line between the stale pre-reload run and the fresh run to capture. Found via the **start anchor**; everything before it is discarded so a **stop marker** can't match the previous run.
+_Avoid_: assuming it coincides with the deploy finishing (it lags behind it); capturing without anchoring to it
+
+### Start anchor
+The known substring marking the **reload boundary** (CircuitPython's soft-reboot banner). Capture discards lines until it appears, then honors the **stop marker**; if it never arrives, the run fails rather than capture stale data.
+_Avoid_: anchoring on the profiler's `__PROFILE` header (downstream content, not the reboot); proceeding silently when it is missing
+
+### Stop marker
+The substring that ends a capture, matched only on **post-anchor** output so it reflects the freshly deployed run. Plain substring, no regex.
+_Avoid_: regex; matching against pre-anchor output (a stale-run false stop)
