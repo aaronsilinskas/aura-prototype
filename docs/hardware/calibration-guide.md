@@ -1,14 +1,13 @@
-# Capacity Model Calibration Guide
+# Hardware Metrics Calibration Guide
 
-How the measured constants in [`capacity-model.md`](capacity-model.md) are produced
-on real hardware. The model doc holds the formulas, the resource summary, and the
-filled-in constant tables; this guide holds the *mechanics* of profiling — what each
-profiler under `examples/hardware/profiling/` sweeps and how to read its output into
-the matching table.
+How the recorded metrics in [`recorded-metrics.md`](recorded-metrics.md) are produced
+on real hardware. The metrics doc holds the filled-in constant tables; this guide holds
+the *mechanics* of profiling — what each profiler under `examples/hardware/profiling/`
+sweeps and how to read its output into the matching table.
 
 Each profiler computes its target table's constants on-device and prints a
 **paste-ready markdown row**, so values are never eyeballed from raw stats lines.
-Copy the emitted row into the matching table in `capacity-model.md`.
+Copy the emitted row into the matching table in `recorded-metrics.md`.
 
 ## Emitting rows from profilers
 
@@ -42,7 +41,7 @@ Feeds the **Board profiles** and **Per-MCU baselines** tables.
 - `MODE = "scene_content"` (finer `__SCENE_STAGES` snapshots + a `BALLAST_BYTES`
   free-heap test) is the headless investigation mode for scene memory — useful for
   relative comparisons and scene-graph debugging, but its absolute figure is an
-  artifact (~2× over-count; see the scene-content gap note in `capacity-model.md`).
+  artifact (~2× over-count vs. the in-situ value measured on the assembled prop).
 
 ## `engine_profiler.py` — engine component costs
 
@@ -62,9 +61,10 @@ commands from the engine host to remote satellite MCUs, which has no seam inside
 `GameEngine.update` tick loop. The cell stays `_TBD_` pending a counting network stub
 or analytic seeding.
 
-> Two durable caveats this profiler exposes are recorded in `capacity-model.md`'s
-> engine cost-model section: the additive-vs-product dispatch approximation, and the
-> `tick_fixed_ms` ↔ engine-host-baseline overlap (don't double-charge).
+> Two durable caveats this profiler exposes are noted alongside the engine cost table
+> in `recorded-metrics.md`: the `per_rule_ms` / `per_event_ms` slopes are measured at a
+> low cross-load (the real dispatch is `O(events × rules)`), and `tick_fixed_ms`
+> overlaps the engine-host baseline (don't double-charge).
 
 ## `pixel_profiler.py` — pixel scope costs & memory
 
@@ -129,7 +129,7 @@ Sweeps `PAYLOAD_LENGTHS`. `blocking_send_ms` recorded in the table is the realis
 full sweep (longest payload) measures ~757.81 ms — use that only if a prop transmits
 much longer payloads. `cost_ms` (the average per-frame reservation) is not swept; it
 is derived from `blocking_send_ms` and the send cadence (see the IR-transmit cost
-model in `capacity-model.md`).
+notes in `recorded-metrics.md`).
 
 For memory it measures a `gc.mem_free()` delta around construction of the transmitter
 path only (LINE `PulseOut` + `InfraredTransmitter` + `HardwareNetworkControls`) — the
@@ -151,8 +151,7 @@ This requires an **external IR packet source**; on a bare board no packets arriv
 
 For memory it measures a `gc.mem_free()` delta around the warmed single-receiver chain
 (`PulseIn` + `PulseInReader` + `InfraredSingleReceiver` + decoder), sweeping
-`PulseIn.maxlen`. The `PulseIn` ring buffer is on the GC heap but scales non-linearly
-(see the IR-receive memory note in `capacity-model.md`).
+`PulseIn.maxlen`. The `PulseIn` ring buffer is on the GC heap but scales non-linearly.
 
 ## `tag_prop_profiler.py` — reference prop validation
 
@@ -160,6 +159,5 @@ Stands up the whole assembled reference `tag` prop on real hardware and emits a
 `__TABLE_ROW table=reference_prop_validation` line (reservation%, footprint_B,
 headroom%, peak_frame_ms) plus a `__PROP_BREAKDOWN` of staged `gc.mem_free()` deltas
 (peripherals / registries / audio_outputs / engine / scene / total). The `scene`
-stage is the in-situ first-tick scene-content figure (see the scene-content gap note
-in `capacity-model.md`). `TARGET_FPS` is set to the prop's achievable single-MCU rate
-so predicted and measured share one frame budget.
+stage is the in-situ first-tick scene-content figure. `TARGET_FPS` is set to the prop's
+achievable single-MCU rate so the recording is taken at one frame budget.
