@@ -63,17 +63,9 @@ def discard_until(
     deadline: float,
     clock: Callable[[], float] = time.monotonic,
 ) -> bool:
-    """Consume *lines*, discarding each until one contains *marker*.
+    """Discard lines until one contains *marker*, returning True; False on deadline or exhaustion.
 
-    Args:
-        lines: Iterable of text lines or ``None`` on idle (no data available).
-        marker: Plain substring to search for in each line.
-        deadline: Absolute monotonic time after which the function gives up.
-        clock: Callable returning monotonic time in seconds.
-
-    Returns:
-        ``True`` when a line containing *marker* is found before *deadline*;
-        ``False`` if the deadline passes or the stream is exhausted first.
+    ``None`` items in *lines* represent idle ticks (no serial data available).
     """
     for line in lines:
         if clock() >= deadline:
