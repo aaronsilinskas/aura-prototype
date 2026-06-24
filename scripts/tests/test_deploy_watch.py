@@ -248,56 +248,56 @@ def test_discard_until_returns_false_when_stream_exhausted_before_marker() -> No
 # ---------------------------------------------------------------------------
 
 
-def test_tee_writer_writes_to_stdout() -> None:
+def test_split_writer_writes_to_stdout() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = SplitWriter(stdout, file_out)
-    tee.write("hello\n")
+    split = SplitWriter(stdout, file_out)
+    split.write("hello\n")
     assert stdout.getvalue() == "hello\n"
 
 
-def test_tee_writer_writes_to_file() -> None:
+def test_split_writer_writes_to_file() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = SplitWriter(stdout, file_out)
-    tee.write("hello\n")
+    split = SplitWriter(stdout, file_out)
+    split.write("hello\n")
     assert file_out.getvalue() == "hello\n"
 
 
-def test_tee_writer_both_streams_receive_same_content() -> None:
+def test_split_writer_both_streams_receive_same_content() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = SplitWriter(stdout, file_out)
-    tee.write("line one\n")
-    tee.write("line two\n")
+    split = SplitWriter(stdout, file_out)
+    split.write("line one\n")
+    split.write("line two\n")
     assert stdout.getvalue() == file_out.getvalue()
 
 
-def test_watch_stream_with_tee_writer_captures_serial_to_file() -> None:
+def test_watch_stream_with_split_writer_captures_serial_to_file() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = SplitWriter(stdout, file_out)
-    watch_stream(lines("alpha", "beta", "gamma"), out=tee)
+    split = SplitWriter(stdout, file_out)
+    watch_stream(lines("alpha", "beta", "gamma"), out=split)
     assert file_out.getvalue() == "alpha\nbeta\ngamma\n"
 
 
-def test_watch_stream_with_tee_writer_still_echoes_to_stdout() -> None:
+def test_watch_stream_with_split_writer_still_echoes_to_stdout() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = SplitWriter(stdout, file_out)
-    watch_stream(lines("alpha", "beta"), out=tee)
+    split = SplitWriter(stdout, file_out)
+    watch_stream(lines("alpha", "beta"), out=split)
     assert stdout.getvalue() == "alpha\nbeta\n"
 
 
-def test_tee_writer_write_returns_primary_stream_count() -> None:
+def test_split_writer_write_returns_primary_stream_count() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = SplitWriter(stdout, file_out)
-    result = tee.write("hello\n")
+    split = SplitWriter(stdout, file_out)
+    result = split.write("hello\n")
     assert result == len("hello\n")
 
 
-def test_tee_writer_flush_flushes_both_streams() -> None:
+def test_split_writer_flush_flushes_both_streams() -> None:
     flushed: list[str] = []
 
     class TrackingStream(io.StringIO):
@@ -309,22 +309,22 @@ def test_tee_writer_flush_flushes_both_streams() -> None:
             flushed.append(self._name)
             super().flush()
 
-    tee = SplitWriter(TrackingStream("primary"), TrackingStream("secondary"))
-    tee.flush()
+    split = SplitWriter(TrackingStream("primary"), TrackingStream("secondary"))
+    split.flush()
     assert flushed == ["primary", "secondary"]
 
 
-def test_tee_writer_file_receives_only_lines_written_through_tee_not_direct_stdout_writes() -> None:
+def test_split_writer_file_excludes_lines_written_directly_to_stdout() -> None:
     stdout = io.StringIO()
     file_out = io.StringIO()
-    tee = SplitWriter(stdout, file_out)
+    split = SplitWriter(stdout, file_out)
 
-    # Deploy chatter written directly to stdout (bypassing the tee) must not
-    # appear in file_out — only lines routed through the tee reach the file.
+    # Deploy chatter written directly to stdout (bypassing the split) must not
+    # appear in file_out — only lines routed through the split reach the file.
     stdout.write("Deploying code.py...\n")
     stdout.write("Copy complete.\n")
 
-    watch_stream(lines("BOOT OK", "sensor=42", "DONE"), out=tee)
+    watch_stream(lines("BOOT OK", "sensor=42", "DONE"), out=split)
 
     assert file_out.getvalue() == "BOOT OK\nsensor=42\nDONE\n"
     assert "Deploying" not in file_out.getvalue()
