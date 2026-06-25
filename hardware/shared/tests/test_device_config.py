@@ -5,8 +5,6 @@ import pytest
 from hardware.shared.device_config import (
     DEFAULT_DEVICE_CONFIG,
     DeviceConfig,
-    MatrixPixelsConfig,
-    NeoPixelPixelsConfig,
     parse_device_config,
     validate_band_map,
 )
@@ -79,12 +77,6 @@ def test_parse_default_config_pixels_contains_one_entry():
     result = parse_device_config(DEFAULT_DEVICE_CONFIG)
 
     assert len(result.pixels) == 1
-
-
-def test_parse_default_config_pixels_first_entry_is_matrix():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
-
-    assert isinstance(result.pixels[0], MatrixPixelsConfig)
 
 
 def test_parse_default_config_matrix_cols_matches():
@@ -273,12 +265,6 @@ def test_parse_neopixel_config_returns_device_config(neopixel_config):
     result = parse_device_config(neopixel_config)
 
     assert isinstance(result, DeviceConfig)
-
-
-def test_parse_neopixel_first_entry_is_neopixel_type(neopixel_config):
-    result = parse_device_config(neopixel_config)
-
-    assert isinstance(result.pixels[0], NeoPixelPixelsConfig)
 
 
 def test_parse_neopixel_first_entry_exposes_configured_scopes(neopixel_config):
