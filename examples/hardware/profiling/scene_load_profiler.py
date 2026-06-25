@@ -101,7 +101,11 @@ from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
 from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
-from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
+from hardware.circuitpython.is31fl3741_output import (
+    IS31FL3741_COLS,
+    IS31FL3741_SCOPE_ROWS,
+    IS31FL3741EffectOutput,
+)
 from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,
@@ -249,10 +253,18 @@ def _build_prop(scene_name: str, harness: dict) -> tuple[SceneManager, EffectMan
     for effect_name, wav_path in harness["audio_clips"].items():
         audio_registry.register(effect_name, wav_path)
     audio_output = AudioEffectOutput(
-        audio_registry, max_volume=0.1, num_voices=harness["num_voices"]
+        audio_registry,
+        max_volume=0.1,
+        num_voices=harness["num_voices"],
+        i2s_bit_clock=board.I2S_BIT_CLOCK,
+        i2s_word_select=board.I2S_WORD_SELECT,
+        i2s_data=board.I2S_DATA,
     )
 
-    outputs = [IS31FL3741EffectOutput(matrix), audio_output]
+    outputs = [
+        IS31FL3741EffectOutput(matrix, cols=IS31FL3741_COLS, scope_rows=IS31FL3741_SCOPE_ROWS),
+        audio_output,
+    ]
     if motor is not None:
         outputs.append(Drv2605EffectOutput(motor))
     effect_manager = EffectManager(registry=effect_registry, outputs=outputs)

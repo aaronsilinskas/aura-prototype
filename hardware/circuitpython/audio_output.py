@@ -1,7 +1,6 @@
 import audiobusio
 import audiocore
 import audiomixer
-import board
 
 from effects.effect import Effect
 from engine.audio import AudioRegistry
@@ -37,14 +36,23 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
         "_sources",
     )
 
-    def __init__(self, audio_registry: AudioRegistry, max_volume: float, num_voices: int) -> None:
+    def __init__(
+        self,
+        audio_registry: AudioRegistry,
+        max_volume: float,
+        num_voices: int,
+        *,
+        i2s_bit_clock: object,
+        i2s_word_select: object,
+        i2s_data: object,
+    ) -> None:
         super().__init__(receives_pixels=False)
         self.min_resolution = 1
         self.scopes = [Scope.ALL]
         self._audio_registry = audio_registry
         self._max_volume = max_volume
         self._pool = VoicePool(num_voices)
-        self._audio = audiobusio.I2SOut(board.I2S_BIT_CLOCK, board.I2S_WORD_SELECT, board.I2S_DATA)
+        self._audio = audiobusio.I2SOut(i2s_bit_clock, i2s_word_select, i2s_data)
         self._mixer = audiomixer.Mixer(
             voice_count=num_voices,
             sample_rate=11025,

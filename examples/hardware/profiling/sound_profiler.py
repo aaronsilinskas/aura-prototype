@@ -53,6 +53,8 @@ from __future__ import annotations
 
 import time
 
+import board
+
 from effects.effect import AudioPlaybackConfig, Effect, EffectAudio
 from effects.performance import PerformanceTracker
 from engine.audio import AudioRegistry
@@ -85,7 +87,14 @@ _EVENT_VERB: Final = "play"
 def _build_output(audio_registry: AudioRegistry):
     from hardware.circuitpython.audio_output import AudioEffectOutput
 
-    return AudioEffectOutput(audio_registry, max_volume=MAX_VOLUME, num_voices=NUM_VOICES)
+    return AudioEffectOutput(
+        audio_registry,
+        max_volume=MAX_VOLUME,
+        num_voices=NUM_VOICES,
+        i2s_bit_clock=board.I2S_BIT_CLOCK,
+        i2s_word_select=board.I2S_WORD_SELECT,
+        i2s_data=board.I2S_DATA,
+    )
 
 
 def run() -> None:

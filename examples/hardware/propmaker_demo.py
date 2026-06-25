@@ -38,7 +38,11 @@ from engine.input import InputEvents
 from engine.packs import PackRegistry
 from engine.state import SceneControls, Scope
 from engine.timer import Timer
-from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
+from hardware.circuitpython.is31fl3741_output import (
+    IS31FL3741_COLS,
+    IS31FL3741_SCOPE_ROWS,
+    IS31FL3741EffectOutput,
+)
 
 try:
     from typing import Final
@@ -113,7 +117,9 @@ class ButtonEffectRule(GameRule):
                 state.effect_controls.set_effect(scope, name, {"level": level})
 
 
-effect_output = IS31FL3741EffectOutput(_matrix)
+effect_output = IS31FL3741EffectOutput(
+    _matrix, cols=IS31FL3741_COLS, scope_rows=IS31FL3741_SCOPE_ROWS
+)
 effect_manager = EffectManager(
     registry=_registry,
     outputs=[effect_output],

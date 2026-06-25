@@ -47,7 +47,11 @@ from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
 from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
-from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
+from hardware.circuitpython.is31fl3741_output import (
+    IS31FL3741_COLS,
+    IS31FL3741_SCOPE_ROWS,
+    IS31FL3741EffectOutput,
+)
 from hardware.shared.tag_protocol import TagInfraredDecoder, TagInfraredEncoder
 
 try:
@@ -101,8 +105,18 @@ _audio_registry.register("scene.hit_start", "sounds/blip.wav")
 _audio_registry.register("reload", "sounds/blip.wav")
 _audio_registry.register("reload_complete", "sounds/blip.wav")
 
-_audio_output = AudioEffectOutput(_audio_registry, max_volume=0.1, num_voices=4)
-_outputs = [IS31FL3741EffectOutput(_matrix), _audio_output]
+_audio_output = AudioEffectOutput(
+    _audio_registry,
+    max_volume=0.1,
+    num_voices=4,
+    i2s_bit_clock=board.I2S_BIT_CLOCK,
+    i2s_word_select=board.I2S_WORD_SELECT,
+    i2s_data=board.I2S_DATA,
+)
+_outputs = [
+    IS31FL3741EffectOutput(_matrix, cols=IS31FL3741_COLS, scope_rows=IS31FL3741_SCOPE_ROWS),
+    _audio_output,
+]
 if _motor is not None:
     _outputs.append(Drv2605EffectOutput(_motor))
 
