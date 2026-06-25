@@ -1,9 +1,9 @@
 from engine.state import Scope
 from hardware.shared.matrix_output import MatrixEffectOutput
 
-_MATRIX_COLS = 13
+IS31FL3741_COLS = 13
 
-_SCOPE_ROWS = {
+IS31FL3741_SCOPE_ROWS = {
     "global.buff": range(0, 1),
     "global.debuff": range(1, 2),
     "global.main": range(2, 5),
@@ -25,10 +25,14 @@ class IS31FL3741EffectOutput(MatrixEffectOutput):
         matrix: A configured IS31FL3741 driver instance (e.g.
             ``Adafruit_RGBMatrixQT``).  Injected at construction so setup
             code remains in ``propmaker.py`` and this class stays testable.
+        cols: Number of columns in the LED matrix.  Pass ``IS31FL3741_COLS``
+            (13) for the standard Adafruit 13×9 board.
+        scope_rows: Mapping of scope key → row-band ``range`` for this matrix.
+            Pass ``IS31FL3741_SCOPE_ROWS`` for the standard aura wand layout.
     """
 
-    def __init__(self, matrix) -> None:
-        super().__init__(_MATRIX_COLS, _SCOPE_ROWS)
+    def __init__(self, matrix, *, cols: int, scope_rows: dict) -> None:
+        super().__init__(cols, scope_rows)
         self.scopes = [Scope.ALL]
         self._matrix = matrix
 

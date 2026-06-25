@@ -30,6 +30,11 @@ def _make_receipt(loudness: float = 1.0) -> MagicMock:
     return r
 
 
+_FAKE_BIT_CLOCK = object()
+_FAKE_WORD_SELECT = object()
+_FAKE_DATA = object()
+
+
 def _make_output(
     audio_registry: AudioRegistry, max_volume: float = 0.2, num_voices: int = 2
 ) -> tuple[object, MagicMock]:
@@ -51,7 +56,12 @@ def _make_output(
     from hardware.circuitpython.audio_output import AudioEffectOutput
 
     output = AudioEffectOutput(
-        audio_registry=audio_registry, max_volume=max_volume, num_voices=num_voices
+        audio_registry=audio_registry,
+        max_volume=max_volume,
+        num_voices=num_voices,
+        i2s_bit_clock=_FAKE_BIT_CLOCK,
+        i2s_word_select=_FAKE_WORD_SELECT,
+        i2s_data=_FAKE_DATA,
     )
     return output, mock_mixer
 
@@ -131,6 +141,16 @@ def test_requires_num_voices_and_max_volume() -> None:
 
     with pytest.raises(TypeError):
         AudioEffectOutput(audio_registry=AudioRegistry())  # type: ignore[call-arg]
+
+
+def test_i2sout_constructed_with_caller_supplied_pins() -> None:
+    """audiobusio.I2SOut is constructed with the caller-supplied I2S pins."""
+    import audiobusio  # type: ignore[import]
+
+    registry = AudioRegistry()
+    _make_output(registry)
+
+    audiobusio.I2SOut.assert_called_once_with(_FAKE_BIT_CLOCK, _FAKE_WORD_SELECT, _FAKE_DATA)
 
 
 def test_mixer_constructed_with_num_voices() -> None:
