@@ -89,8 +89,8 @@ from __future__ import annotations
 import gc
 
 import board
-
 import hardware.circuitpython.propmaker as propmaker
+
 from effects.performance import PerformanceTracker
 from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager

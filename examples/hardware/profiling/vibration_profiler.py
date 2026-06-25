@@ -81,8 +81,9 @@ def _build_bus() -> CountingI2C:
 
 
 def _build_output(i2c: CountingI2C):
-    from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
     from hardware.circuitpython.propmaker import setup_drv2605
+
+    from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 
     motor = setup_drv2605(i2c)
     return Drv2605EffectOutput(motor)

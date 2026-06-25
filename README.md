@@ -75,3 +75,67 @@ deferred to end-of-tick — rules call `state.scene_controls.load/overlay/pop()`
 and the transition is applied after `engine.update(state)` returns. Every scene the manager
 unloads or suspends has its effects stopped on `Scope.ALL` automatically.
 
+---
+
+## Hardware configuration (`aura-device.json`)
+
+Every hardware example (`examples/hardware/`) boots from an `aura-device.json` file at the
+CIRCUITPY drive root, loaded by `hardware.circuitpython.device_builder.load_device_config()`.
+If the file is absent the built-in default (PropMaker + IS31FL3741 matrix) is used.
+
+### Schema
+
+```json
+{
+  "pixels": {
+    "type": "matrix",
+    "cols": 13,
+    "scope_rows": {
+      "global.buff": [0, 1], "global.debuff": [1, 2], "global.main": [2, 5],
+      "personal": [5, 7], "directional": [7, 8], "ambient": [8, 9]
+    }
+  },
+  "buttons": ["D9", "D10"],
+  "ir": {
+    "rx": "D11",
+    "line": "D12",
+    "cone": "D13",
+    "area_of_effect": "D14"
+  },
+  "audio": {
+    "voices": 2,
+    "max_volume": 0.1,
+    "clips": {
+      "clip_name": "sounds/file.wav"
+    }
+  }
+}
+```
+
+**`pixels`** — required. `type` is `"matrix"` (IS31FL3741) or `"neopixel"`.
+
+- `"matrix"`: `cols` (int) + `scope_rows` (scope key → `[start_row, end_row]`)
+- `"neopixel"`: `scopes` map — each entry: `pin` (board pin name), `count` (int),
+  optional `order` (default `"GRB"`), optional `brightness` (0.0–1.0, default 1.0)
+
+**`buttons`** — required. List of board pin name strings.
+
+**`ir`** — optional. `rx` (receiver pin) + at least `line` emitter. Optional `cone` and
+`area_of_effect` emitters. The wire-frame codec is injected at `build_hardware()` call site
+via `ir_encoder` / `ir_decoder` — `tag_demo.py` passes `TagInfraredEncoder/Decoder` here.
+
+**`audio`** — optional. `voices` (int, ≥ 1), `max_volume` (0.0–1.0), `clips` (name → path).
+
+### Running an example
+
+```sh
+# Deploy and watch serial output:
+python scripts/deploy_watch.py examples/hardware/propmaker_demo.py --until FPS
+
+# Tag demo — uses Tag IR codec injected at build_hardware() call:
+python scripts/deploy_watch.py examples/hardware/tag_demo.py
+
+# Red Light Green Light — requires accelerometer on I2C:
+python scripts/deploy_watch.py examples/hardware/red_light_green_light_demo.py
+```
+

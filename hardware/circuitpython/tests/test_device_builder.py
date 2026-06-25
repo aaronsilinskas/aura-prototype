@@ -1,13 +1,13 @@
-"""Tests for device_builder.build_hardware — NeoPixel branch.
+"""Tests for device_builder.build_hardware — matrix and NeoPixel branches.
 
-Verifies that build_hardware produces a NeoPixelEffectOutput (not a matrix
-output) when the config selects pixels.type = 'neopixel'.  All hardware
-modules (board, busio, propmaker) are injected or patched so this suite
-runs under CPython.
+Verifies that build_hardware produces the correct EffectOutput for each
+pixels.type (matrix and neopixel).  All hardware modules (board, busio,
+pulseio, digitalio) are patched so this suite runs under CPython.
 """
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,6 +19,26 @@ from hardware.shared.device_config import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _matrix_config():
+    """Return a DeviceConfig with pixels.type='matrix'."""
+    mapping = {
+        "pixels": {
+            "type": "matrix",
+            "cols": 13,
+            "scope_rows": {
+                "global.buff": [0, 1],
+                "global.debuff": [1, 2],
+                "global.main": [2, 5],
+                "personal": [5, 7],
+                "directional": [7, 8],
+                "ambient": [8, 9],
+            },
+        },
+        "buttons": ["D9", "D10"],
+    }
+    return parse_device_config(mapping)
 
 
 def _neopixel_config(scopes: dict | None = None):
@@ -43,27 +63,113 @@ def _mock_board(**pins):
     return mock
 
 
+def _enter_hw_patches(stack: ExitStack) -> None:
+    """Enter patches for all CircuitPython hardware setup helpers."""
+    stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
+    stack.enter_context(
+        patch("hardware.circuitpython.device_builder._setup_i2c", return_value=MagicMock())
+    )
+    stack.enter_context(
+        patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
+    )
+    stack.enter_context(
+        patch("hardware.circuitpython.device_builder._setup_accelerometer", return_value=None)
+    )
+    stack.enter_context(
+        patch("hardware.circuitpython.device_builder._setup_drv2605", return_value=None)
+    )
+
+
+# ---------------------------------------------------------------------------
+# build_hardware produces IS31FL3741EffectOutput for matrix config
+# ---------------------------------------------------------------------------
+
+
+def test_build_hardware_matrix_produces_one_is31fl3741_output() -> None:
+    from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
+
+    config = _matrix_config()
+    board_mock = _mock_board(D9=MagicMock(), D10=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_matrix_is31fl3741",
+                return_value=MagicMock(),
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    matrix_outputs = [o for o in hw.outputs if isinstance(o, IS31FL3741EffectOutput)]
+    assert len(matrix_outputs) == 1
+
+
+def test_build_hardware_matrix_output_resolution_matches_config_cols() -> None:
+    from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
+
+    config = _matrix_config()
+    board_mock = _mock_board(D9=MagicMock(), D10=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_matrix_is31fl3741",
+                return_value=MagicMock(),
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    matrix_output = next(o for o in hw.outputs if isinstance(o, IS31FL3741EffectOutput))
+    assert matrix_output.min_resolution == 13
+
+
+def test_build_hardware_matrix_output_can_create_buffer_for_configured_scope() -> None:
+    from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
+
+    config = _matrix_config()
+    board_mock = _mock_board(D9=MagicMock(), D10=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_matrix_is31fl3741",
+                return_value=MagicMock(),
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    matrix_output = next(o for o in hw.outputs if isinstance(o, IS31FL3741EffectOutput))
+    # create_buffer raises KeyError if scope_rows was not passed correctly
+    buf = matrix_output.create_buffer("personal")
+    assert buf is not None
+
+
 # ---------------------------------------------------------------------------
 # build_hardware produces NeoPixelEffectOutput for neopixel config
 # ---------------------------------------------------------------------------
 
 
 def test_build_hardware_neopixel_produces_one_output_per_scope() -> None:
-    """build_hardware produces one NeoPixelEffectOutput per configured scope."""
     from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 
     config = _neopixel_config()
     board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
 
-    with (
-        patch("hardware.circuitpython.device_builder.propmaker") as mock_pm,
-        patch("hardware.circuitpython.device_builder.neopixel") as mock_neopixel,
-    ):
-        mock_pm.setup_external_power.return_value = None
-        mock_pm.setup_i2c.return_value = MagicMock()
-        mock_pm.setup_accelerometer.return_value = None
-        mock_pm.setup_drv2605.return_value = None
-        mock_pm.setup_buttons.return_value = MagicMock()
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
         mock_neopixel.NeoPixel.return_value = MagicMock()
 
         from hardware.circuitpython.device_builder import build_hardware
@@ -75,21 +181,14 @@ def test_build_hardware_neopixel_produces_one_output_per_scope() -> None:
 
 
 def test_build_hardware_neopixel_each_output_declares_one_scope() -> None:
-    """Each NeoPixelEffectOutput produced by build_hardware declares exactly one scope."""
     from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 
     config = _neopixel_config()
     board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
 
-    with (
-        patch("hardware.circuitpython.device_builder.propmaker") as mock_pm,
-        patch("hardware.circuitpython.device_builder.neopixel") as mock_neopixel,
-    ):
-        mock_pm.setup_external_power.return_value = None
-        mock_pm.setup_i2c.return_value = MagicMock()
-        mock_pm.setup_accelerometer.return_value = None
-        mock_pm.setup_drv2605.return_value = None
-        mock_pm.setup_buttons.return_value = MagicMock()
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
         mock_neopixel.NeoPixel.return_value = MagicMock()
 
         from hardware.circuitpython.device_builder import build_hardware
@@ -104,22 +203,15 @@ def test_build_hardware_neopixel_each_output_declares_one_scope() -> None:
 
 
 def test_build_hardware_neopixel_output_resolves_pin_names() -> None:
-    """build_hardware resolves each scope's pin name from the board module."""
     d5_pin = MagicMock(name="D5")
     d6_pin = MagicMock(name="D6")
     board_mock = _mock_board(D5=d5_pin, D6=d6_pin, D9=MagicMock())
 
     config = _neopixel_config()
 
-    with (
-        patch("hardware.circuitpython.device_builder.propmaker") as mock_pm,
-        patch("hardware.circuitpython.device_builder.neopixel") as mock_neopixel,
-    ):
-        mock_pm.setup_external_power.return_value = None
-        mock_pm.setup_i2c.return_value = MagicMock()
-        mock_pm.setup_accelerometer.return_value = None
-        mock_pm.setup_drv2605.return_value = None
-        mock_pm.setup_buttons.return_value = MagicMock()
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
         mock_neopixel.NeoPixel.return_value = MagicMock()
 
         from hardware.circuitpython.device_builder import build_hardware
@@ -141,15 +233,9 @@ def test_build_hardware_neopixel_strips_constructed_with_auto_write_false() -> N
     config = _neopixel_config()
     board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
 
-    with (
-        patch("hardware.circuitpython.device_builder.propmaker") as mock_pm,
-        patch("hardware.circuitpython.device_builder.neopixel") as mock_neopixel,
-    ):
-        mock_pm.setup_external_power.return_value = None
-        mock_pm.setup_i2c.return_value = MagicMock()
-        mock_pm.setup_accelerometer.return_value = None
-        mock_pm.setup_drv2605.return_value = None
-        mock_pm.setup_buttons.return_value = MagicMock()
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
         mock_neopixel.NeoPixel.return_value = MagicMock()
 
         from hardware.circuitpython.device_builder import build_hardware
@@ -163,21 +249,14 @@ def test_build_hardware_neopixel_strips_constructed_with_auto_write_false() -> N
 
 
 def test_build_hardware_neopixel_raises_on_unknown_pin() -> None:
-    """build_hardware raises ValueError when a scope pin does not exist on the board."""
     config = _neopixel_config(
         scopes={"personal": {"pin": "NONEXISTENT_PIN", "count": 5}},
     )
     board_mock = MagicMock(spec=[])  # no attributes → AttributeError on getattr
 
-    with (
-        patch("hardware.circuitpython.device_builder.propmaker") as mock_pm,
-        patch("hardware.circuitpython.device_builder.neopixel"),
-    ):
-        mock_pm.setup_external_power.return_value = None
-        mock_pm.setup_i2c.return_value = MagicMock()
-        mock_pm.setup_accelerometer.return_value = None
-        mock_pm.setup_drv2605.return_value = None
-        mock_pm.setup_buttons.return_value = MagicMock()
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
 
         from hardware.circuitpython.device_builder import build_hardware
 

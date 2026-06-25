@@ -77,8 +77,8 @@ import gc
 import time
 
 import board
-
 import hardware.circuitpython.propmaker as propmaker
+
 from effects.performance import PerformanceTracker
 from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager

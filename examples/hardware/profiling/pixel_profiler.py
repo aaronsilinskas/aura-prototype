@@ -168,7 +168,6 @@ def _build_matrix_output(
 ) -> tuple[Is31fl3741MatrixOutput, CountingI2C]:
     import board
     import busio
-
     import hardware.circuitpython.propmaker as propmaker
 
     i2c = busio.I2C(board.SCL, board.SDA)

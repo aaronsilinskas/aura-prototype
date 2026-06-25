@@ -3,13 +3,13 @@
 Usage
 -----
     # Deploy an example and sync all modules:
-    python scripts/deploy.py examples/effects/propmaker_demo.py
+    python scripts/deploy.py examples/hardware/propmaker_demo.py
 
     # Sync modules only, without changing code.py:
     python scripts/deploy.py
 
     # Override the default mount path:
-    python scripts/deploy.py examples/effects/propmaker_demo.py --mount /Volumes/MYBOARD
+    python scripts/deploy.py examples/hardware/propmaker_demo.py --mount /Volumes/MYBOARD
 """
 
 import argparse
