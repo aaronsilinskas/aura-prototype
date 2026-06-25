@@ -55,7 +55,7 @@ def test_scopes_are_the_configured_leaf_scopes() -> None:
     """NeoPixelEffectOutput.scopes lists each configured scope as a ScopeValue."""
     output, _ = _make_output()
     scope_values = output.scopes
-    scope_keys = {s._value for s in scope_values}
+    scope_keys = {s.keys[0] for s in scope_values}
     assert scope_keys == {"personal", "directional"}
 
 
@@ -198,6 +198,25 @@ def test_update_pixels_applies_scope_brightness() -> None:
 
     # 0xFF * 0.5 scope brightness = 0x7F
     strip.__setitem__.assert_called_once_with(0, 0x7F0000)
+
+
+def test_update_pixels_applies_combined_scope_and_receipt_brightness() -> None:
+    """update_pixels multiplies scope brightness by receipt brightness (not adds them)."""
+    strip = _make_strip(1)
+    output, _ = _make_output(
+        scope_strips={"personal": (strip, 1)},
+        scope_brightnesses={"personal": 0.5},
+    )
+
+    buf = PixelBuffer(1)
+    buf[0] = 0xFF0000  # pure red
+
+    receipt = MagicMock()
+    receipt.brightness = 0.5
+    output.update_pixels("personal", [buf], [receipt])
+
+    # 0xFF * (0.5 * 0.5) = 0xFF * 0.25 = 63 = 0x3F
+    strip.__setitem__.assert_called_once_with(0, 0x3F0000)
 
 
 def test_update_pixels_go_dark_writes_zeros() -> None:

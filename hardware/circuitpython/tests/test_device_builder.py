@@ -97,7 +97,7 @@ def test_build_hardware_neopixel_output_has_correct_scopes() -> None:
         hw = build_hardware(config, board_module=board_mock)
 
     output = next(o for o in hw.outputs if isinstance(o, NeoPixelEffectOutput))
-    scope_keys = {sv._value for sv in output.scopes}
+    scope_keys = {sv.keys[0] for sv in output.scopes}
     assert scope_keys == {"personal", "directional"}
 
 
@@ -128,6 +128,36 @@ def test_build_hardware_neopixel_output_resolves_pin_names() -> None:
     called_pins = {c.args[0] for c in mock_neopixel.NeoPixel.call_args_list}
     assert d5_pin in called_pins
     assert d6_pin in called_pins
+
+
+def test_build_hardware_neopixel_strips_constructed_with_auto_write_false() -> None:
+    """build_hardware constructs each NeoPixel strip with auto_write=False.
+
+    auto_write=False ensures flush() drives all hardware writes rather than
+    every pixel assignment triggering an immediate SPI/UART transaction.
+    """
+    config = _neopixel_config()
+    board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
+
+    with (
+        patch("hardware.circuitpython.device_builder.propmaker") as mock_pm,
+        patch("hardware.circuitpython.device_builder.neopixel") as mock_neopixel,
+    ):
+        mock_pm.setup_external_power.return_value = None
+        mock_pm.setup_i2c.return_value = MagicMock()
+        mock_pm.setup_accelerometer.return_value = None
+        mock_pm.setup_drv2605.return_value = None
+        mock_pm.setup_buttons.return_value = MagicMock()
+        mock_neopixel.NeoPixel.return_value = MagicMock()
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock)
+
+    for call_kwargs in mock_neopixel.NeoPixel.call_args_list:
+        assert call_kwargs.kwargs.get("auto_write") is False, (
+            "Each NeoPixel strip must be constructed with auto_write=False"
+        )
 
 
 def test_build_hardware_neopixel_raises_on_unknown_pin() -> None:
