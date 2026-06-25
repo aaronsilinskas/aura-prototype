@@ -6,17 +6,24 @@ Deploy-watch only: imports board, busio, pulseio, digitalio.
 from __future__ import annotations
 
 import json
+import time
 
+import adafruit_is31fl3741
 import board
+import busio
+import digitalio
 import neopixel
+import pulseio
+from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
-import hardware.circuitpython.propmaker as propmaker
 from engine.audio import AudioRegistry
-from engine.network import HardwareNetworkControls
+from engine.network import AREA_OF_EFFECT, CONE, LINE, HardwareNetworkControls
 from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
+from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
+from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
     DEFAULT_DEVICE_CONFIG,
     DeviceConfig,
@@ -24,7 +31,13 @@ from hardware.shared.device_config import (
     NeoPixelPixelsConfig,
     parse_device_config,
 )
-from hardware.shared.ir_protocol import AuraInfraredDecoder, AuraInfraredEncoder
+from hardware.shared.ir_protocol import (
+    AuraInfraredDecoder,
+    AuraInfraredEncoder,
+    InfraredDecoder,
+    InfraredEncoder,
+)
+from hardware.shared.ir_transport import InfraredSingleReceiver, InfraredTransmitter
 
 __all__ = [
     "DeviceHardware",
@@ -60,6 +73,126 @@ def _resolve_pin(board_module: object, field: str, name: str) -> object:
         raise ValueError(f"{field}: pin '{name}' not found on board") from None
 
 
+def _setup_external_power() -> None:
+    """Enable the PropMaker's EXTERNAL_POWER rail (powers NeoPixels, audio amp, and other
+    peripherals)."""
+    power = digitalio.DigitalInOut(board.EXTERNAL_POWER)
+    power.switch_to_output(value=True)
+
+
+def _setup_i2c() -> object:
+    """Return an I2C bus on the board's default SDA/SCL pins."""
+    return busio.I2C(board.SCL, board.SDA)
+
+
+def _setup_matrix_is31fl3741(i2c: object) -> object:
+    """Return a configured IS31FL3741 driver on *i2c*.
+
+    Retries until the matrix responds (useful if the I2C bus is still
+    settling at boot).  Sets LED scaling to 0x33 and global current to 0xFF
+    then enables the matrix.
+    """
+    while True:
+        try:
+            matrix = Adafruit_RGBMatrixQT(i2c, allocate=adafruit_is31fl3741.MUST_BUFFER)
+            break
+        except Exception:
+            time.sleep(1)
+    matrix.set_led_scaling(0x33)
+    matrix.global_current = 0xFF
+    matrix.enable = True
+    return matrix
+
+
+def _setup_buttons(*pins: object) -> DebouncedButtons:
+    """Return a ``DebouncedButtons`` instance for the given pins with pull-up resistors."""
+    labels = [chr(ord("A") + i) for i in range(len(pins))]
+    pairs = []
+    for label, pin in zip(labels, pins):
+        btn = digitalio.DigitalInOut(pin)
+        btn.switch_to_input(pull=digitalio.Pull.UP)
+        pairs.append((label, lambda p=btn: p.value))
+    return DebouncedButtons(pairs)
+
+
+def _setup_accelerometer(i2c: object) -> object | None:
+    """Return a configured LIS3DH accelerometer on *i2c*, or ``None`` if absent.
+
+    Prints a distinct warning depending on the failure mode:
+    - ``"accelerometer library not installed"`` when ``adafruit_lis3dh`` cannot
+      be imported.
+    - ``"accelerometer not found on I2C bus"`` when the library is present but
+      the sensor cannot be reached.
+    """
+    try:
+        import adafruit_lis3dh
+    except ImportError:
+        print("accelerometer library not installed")
+        return None
+    try:
+        return adafruit_lis3dh.LIS3DH_I2C(i2c)
+    except Exception:
+        print("accelerometer not found on I2C bus")
+        return None
+
+
+def _setup_drv2605(i2c: object) -> object | None:
+    """Return a configured DRV2605 haptic motor driver on *i2c*, or ``None`` if absent.
+
+    Prints a distinct warning depending on the failure mode:
+    - ``"drv2605 library not installed"`` when ``adafruit_drv2605`` cannot
+      be imported.
+    - ``"drv2605 not found on I2C bus"`` when the library is present but
+      the driver cannot be reached.
+    """
+    try:
+        import adafruit_drv2605
+    except ImportError:
+        print("drv2605 library not installed")
+        return None
+    try:
+        return adafruit_drv2605.DRV2605(i2c)
+    except Exception:
+        print("drv2605 not found on I2C bus")
+        return None
+
+
+def _setup_ir(
+    rx_pin: object,
+    line_pin: object,
+    cone_pin: object | None = None,
+    aoe_pin: object | None = None,
+    encoder: InfraredEncoder | None = None,
+    decoder: InfraredDecoder | None = None,
+) -> tuple[dict[str, InfraredTransmitter], InfraredSingleReceiver]:
+    """Wire IR transceiver pins and return (transmitters, receiver).
+
+    encoder and decoder must use the same wire protocol — a mismatched pair
+    silently fails to decode received frames with no error raised.
+    """
+    if line_pin is None:
+        raise ValueError("line_pin is required — the LINE emitter must always be wired")
+
+    if encoder is None:
+        encoder = AuraInfraredEncoder()
+    if decoder is None:
+        decoder = AuraInfraredDecoder()
+
+    pulsein = pulseio.PulseIn(rx_pin, maxlen=256, idle_state=True)
+    reader = PulseInReader(pulsein)
+    receiver = InfraredSingleReceiver(reader, decoder)
+
+    transmitters: dict[str, InfraredTransmitter] = {}
+    for emitter, pin in ((LINE, line_pin), (CONE, cone_pin), (AREA_OF_EFFECT, aoe_pin)):
+        if pin is None:
+            continue
+        pulseout = pulseio.PulseOut(pin, frequency=38000, duty_cycle=0x8000)
+        writer = PulseOutWriter(pulseout)
+        transmitters[emitter] = InfraredTransmitter(writer, encoder)
+
+    return transmitters, receiver
+
+
 def load_device_config() -> DeviceConfig:
     """Load config from aura-device.json, falling back to DEFAULT_DEVICE_CONFIG."""
     try:
@@ -82,13 +215,13 @@ def build_hardware(
     Raises:
         ValueError: If a declared pin name does not exist on the board.
     """
-    propmaker.setup_external_power()
-    i2c = propmaker.setup_i2c()
+    _setup_external_power()
+    i2c = _setup_i2c()
 
     outputs: list[object] = []
 
     if isinstance(config.pixels, MatrixPixelsConfig):
-        matrix = propmaker.setup_matrix_is31fl3741(i2c)
+        matrix = _setup_matrix_is31fl3741(i2c)
         outputs.append(
             IS31FL3741EffectOutput(
                 matrix,
@@ -112,17 +245,17 @@ def build_hardware(
     button_pins = [
         _resolve_pin(board_module, f"buttons[{i}]", name) for i, name in enumerate(config.buttons)
     ]
-    buttons = propmaker.setup_buttons(*button_pins)
+    buttons = _setup_buttons(*button_pins)
 
     accelerometer = None
     try:
-        accelerometer = propmaker.setup_accelerometer(i2c)
+        accelerometer = _setup_accelerometer(i2c)
     except Exception:
         print("accelerometer not reachable — omitting from hardware bundle")
 
     motor = None
     try:
-        motor = propmaker.setup_drv2605(i2c)
+        motor = _setup_drv2605(i2c)
     except Exception:
         print("drv2605 not reachable — omitting from hardware bundle")
 
@@ -159,7 +292,7 @@ def build_hardware(
         cone_pin = emitter_pins.get("cone")
         aoe_pin = emitter_pins.get("area_of_effect")
 
-        transmitters, ir_receiver = propmaker.setup_ir(
+        transmitters, ir_receiver = _setup_ir(
             rx_pin,
             line_pin,
             cone_pin=cone_pin,

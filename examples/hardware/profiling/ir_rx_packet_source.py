@@ -64,7 +64,6 @@ LOG_INTERVAL_SECONDS: Final = 5.0
 
 def _build_network_controls() -> HardwareNetworkControls:
     import board
-
     from hardware.circuitpython.propmaker import setup_ir
 
     line_pin = getattr(board, LINE_PIN_NAME)

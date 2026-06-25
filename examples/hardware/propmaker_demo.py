@@ -12,6 +12,26 @@ Hardware
 - Button A on GP9 (pull-up) — page forward
 - Button B on GP10 (pull-up) — level up
 
+Configuration
+-------------
+Deploy an ``aura-device.json`` to the CIRCUITPY drive root (see README for
+the full schema).  A minimal matrix-board config::
+
+    {
+      "pixels": {
+        "type": "matrix",
+        "cols": 13,
+        "scope_rows": {
+          "global.buff": [0, 1], "global.debuff": [1, 2],
+          "global.main": [2, 5], "personal": [5, 7],
+          "directional": [7, 8], "ambient": [8, 9]
+        }
+      },
+      "buttons": ["D9", "D10"]
+    }
+
+If ``aura-device.json`` is absent the default config above is used.
+
 Installation
 ------------
 1. Install CircuitPython on your PropMaker board:
@@ -29,40 +49,20 @@ Installation
 
 import time
 
-import board
-
-import hardware.circuitpython.propmaker as propmaker
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine, GameRule
 from engine.input import InputEvents
 from engine.packs import PackRegistry
 from engine.state import SceneControls, Scope
 from engine.timer import Timer
-from hardware.circuitpython.is31fl3741_output import (
-    IS31FL3741_COLS,
-    IS31FL3741_SCOPE_ROWS,
-    IS31FL3741EffectOutput,
-)
-
-try:
-    from typing import Final
-except ImportError:
-    pass
+from hardware.circuitpython.device_builder import build_hardware, load_device_config
 
 # ---------------------------------------------------------------------------
-# Constants
+# Hardware setup (config-driven)
 # ---------------------------------------------------------------------------
 
-BUTTON_A_PIN: "Final" = board.D9
-BUTTON_B_PIN: "Final" = board.D10
-
-# ---------------------------------------------------------------------------
-# Hardware setup
-# ---------------------------------------------------------------------------
-
-_i2c = propmaker.setup_i2c()
-_matrix = propmaker.setup_matrix_is31fl3741(_i2c)
-_buttons = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
+_config = load_device_config()
+_hw = build_hardware(_config)
 
 # ---------------------------------------------------------------------------
 # Element pages
@@ -117,12 +117,9 @@ class ButtonEffectRule(GameRule):
                 state.effect_controls.set_effect(scope, name, {"level": level})
 
 
-effect_output = IS31FL3741EffectOutput(
-    _matrix, cols=IS31FL3741_COLS, scope_rows=IS31FL3741_SCOPE_ROWS
-)
 effect_manager = EffectManager(
     registry=_registry,
-    outputs=[effect_output],
+    outputs=_hw.outputs,
 )
 
 game_engine = GameEngine(effect_controls=effect_manager)
@@ -144,7 +141,7 @@ while True:
     timer.update()
     effect_manager.update(timer)
 
-    _button_data = _buttons.update(timer.elapsed)
+    _button_data = _hw.buttons.update(timer.elapsed)
     game_state.queue_event(InputEvents.ButtonAndAcceleration(_button_data))
 
     game_engine.update(game_state)

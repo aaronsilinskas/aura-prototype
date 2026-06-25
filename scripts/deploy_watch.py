@@ -3,13 +3,13 @@
 Usage
 -----
     # Deploy and watch until a marker line appears:
-    python scripts/deploy_watch.py examples/effects/propmaker_demo.py --until READY
+    python scripts/deploy_watch.py examples/hardware/propmaker_demo.py --until READY
 
     # Deploy and watch for up to 30 seconds:
-    python scripts/deploy_watch.py examples/effects/propmaker_demo.py --seconds 30
+    python scripts/deploy_watch.py examples/hardware/propmaker_demo.py --seconds 30
 
     # Both: exits 0 on match, 2 on timeout-before-match:
-    python scripts/deploy_watch.py examples/effects/propmaker_demo.py --until READY --seconds 10
+    python scripts/deploy_watch.py examples/hardware/propmaker_demo.py --until READY --seconds 10
 
 Exit codes
 ----------

@@ -48,7 +48,7 @@ class Drv2605EffectOutput(EffectOutput):
 
     Args:
         motor: A configured ``adafruit_drv2605.DRV2605`` instance. Injected at
-            construction so setup code remains in ``propmaker.py`` and this class
+            construction so setup code remains in ``device_builder.py`` and this class
             stays testable.
     """
 

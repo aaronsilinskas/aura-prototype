@@ -9,9 +9,39 @@ Hardware
 --------
 - Adafruit RP2040 PropMaker Feather
 - Adafruit IS31FL3741 13x9 RGB LED Matrix Breakout (I2C on default SDA/SCL)
-- Two buttons (pull-up) on BUTTON_A_PIN / BUTTON_B_PIN (default: D9 / D10)
-- IR receiver on IR_RX_PIN; IR LINE emitter on IR_LINE_PIN
+- Two buttons (pull-up) — default: D9 / D10 (set via aura-device.json)
+- IR receiver and LINE IR emitter (set via aura-device.json)
 - DRV2605L haptic motor driver on default SDA/SCL (optional - demo runs without it)
+
+Configuration
+-------------
+Deploy an ``aura-device.json`` to the CIRCUITPY drive root.  Example::
+
+    {
+      "pixels": {
+        "type": "matrix",
+        "cols": 13,
+        "scope_rows": {
+          "global.buff": [0, 1], "global.debuff": [1, 2],
+          "global.main": [2, 5], "personal": [5, 7],
+          "directional": [7, 8], "ambient": [8, 9]
+        }
+      },
+      "buttons": ["D9", "D10"],
+      "ir": {"rx": "D11", "line": "D12"},
+      "audio": {
+        "voices": 4,
+        "max_volume": 0.1,
+        "clips": {
+          "warning_pulse_peak": "sounds/blip.wav",
+          "game_over_sting_start": "sounds/game_over.wav",
+          "fire_shot_start": "sounds/blip.wav",
+          "scene.hit_start": "sounds/blip.wav",
+          "reload": "sounds/blip.wav",
+          "reload_complete": "sounds/blip.wav"
+        }
+      }
+    }
 
 Installation
 ------------
@@ -33,58 +63,25 @@ How to play
 - Press A in Playing to fire a tag shot via the LINE IR emitter.
 """
 
-import time as _time
-
-import board
-
-import hardware.circuitpython.propmaker as propmaker
-from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.input import AccelerationData, InputEvents
-from engine.network import HardwareNetworkControls, NetworkEvents
+from engine.network import NetworkEvents
 from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
-from hardware.circuitpython.audio_output import AudioEffectOutput
-from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
-from hardware.circuitpython.is31fl3741_output import (
-    IS31FL3741_COLS,
-    IS31FL3741_SCOPE_ROWS,
-    IS31FL3741EffectOutput,
-)
+from engine.timer import Timer
+from hardware.circuitpython.device_builder import build_hardware, load_device_config
 from hardware.shared.tag_protocol import TagInfraredDecoder, TagInfraredEncoder
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 # ---------------------------------------------------------------------------
-# Configuration — adjust to match your wiring
+# Hardware setup (config-driven; tag scene uses Tag IR codec)
 # ---------------------------------------------------------------------------
 
-BUTTON_A_PIN: "Final" = board.D9
-BUTTON_B_PIN: "Final" = board.D10
-
-# IR transceiver pins — update these to match your board layout.
-IR_RX_PIN: "Final" = board.D11
-IR_LINE_PIN: "Final" = board.D12
-
-# ---------------------------------------------------------------------------
-# Hardware setup
-# ---------------------------------------------------------------------------
-
-propmaker.setup_external_power()
-_i2c = propmaker.setup_i2c()
-_matrix = propmaker.setup_matrix_is31fl3741(_i2c)
-_buttons = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
-_accelerometer = propmaker.setup_accelerometer(_i2c)
-_motor = propmaker.setup_drv2605(_i2c)
-_ir_transmitters, _ir_receiver = propmaker.setup_ir(
-    IR_RX_PIN,
-    IR_LINE_PIN,
-    encoder=TagInfraredEncoder(),
-    decoder=TagInfraredDecoder(),
+_config = load_device_config()
+_hw = build_hardware(
+    _config,
+    ir_encoder=TagInfraredEncoder(),
+    ir_decoder=TagInfraredDecoder(),
 )
 
 # ---------------------------------------------------------------------------
@@ -97,32 +94,9 @@ _effect_registry.scan_dir("packs/effects", "packs.effects")
 _rule_registry = PackRegistry(item_attr="RULE")
 _rule_registry.scan_dir("packs/rules", "packs.rules")
 
-_audio_registry = AudioRegistry()
-_audio_registry.register("warning_pulse_peak", "sounds/blip.wav")
-_audio_registry.register("game_over_sting_start", "sounds/game_over.wav")
-_audio_registry.register("fire_shot_start", "sounds/blip.wav")
-_audio_registry.register("scene.hit_start", "sounds/blip.wav")
-_audio_registry.register("reload", "sounds/blip.wav")
-_audio_registry.register("reload_complete", "sounds/blip.wav")
-
-_audio_output = AudioEffectOutput(
-    _audio_registry,
-    max_volume=0.1,
-    num_voices=4,
-    i2s_bit_clock=board.I2S_BIT_CLOCK,
-    i2s_word_select=board.I2S_WORD_SELECT,
-    i2s_data=board.I2S_DATA,
-)
-_outputs = [
-    IS31FL3741EffectOutput(_matrix, cols=IS31FL3741_COLS, scope_rows=IS31FL3741_SCOPE_ROWS),
-    _audio_output,
-]
-if _motor is not None:
-    _outputs.append(Drv2605EffectOutput(_motor))
-
 _effect_manager = EffectManager(
     registry=_effect_registry,
-    outputs=_outputs,
+    outputs=_hw.outputs,
 )
 
 # ---------------------------------------------------------------------------
@@ -131,7 +105,7 @@ _effect_manager = EffectManager(
 
 _engine = GameEngine(
     effect_controls=_effect_manager,
-    network_controls=HardwareNetworkControls(_ir_transmitters),
+    network_controls=_hw.network_controls,
 )
 
 _scene_registry = SceneRegistry()
@@ -145,35 +119,32 @@ _manager.update()  # applies the load transition; tag scene is now active
 # Main loop
 # ---------------------------------------------------------------------------
 
-_last_tick = _time.monotonic()
+_timer = Timer()
 
 while True:
-    _now = _time.monotonic()
-    elapsed = _now - _last_tick
-    _last_tick = _now
+    _timer.update()
 
     # --- Read button state ---
-    _button_data = _buttons.update(elapsed)
+    _button_data = _hw.buttons.update(_timer.elapsed)
 
     # --- Read accelerometer ---
-    if _accelerometer is not None:
+    _acceleration = None
+    if _hw.accelerometer is not None:
         try:
-            _ax, _ay, _az = _accelerometer.acceleration
+            _ax, _ay, _az = _hw.accelerometer.acceleration
             _acceleration = AccelerationData(_ax, _ay, _az)
         except Exception:
-            _acceleration = None
-    else:
-        _acceleration = None
+            pass
 
     # --- Poll IR receiver and queue any received packets ---
-    if _manager.active_state is not None:
-        _ir_data = _ir_receiver.receive()
+    if _manager.active_state is not None and _hw.ir_receiver is not None:
+        _ir_data = _hw.ir_receiver.receive()
         if _ir_data is not None:
             _manager.active_state.queue_event(
                 NetworkEvents.IRReceived(
                     _ir_data,
-                    _ir_receiver.last_signal_strength,
-                    _ir_receiver.last_error_margin,
+                    _hw.ir_receiver.last_signal_strength,
+                    _hw.ir_receiver.last_error_margin,
                     best_receiver=None,
                 )
             )
@@ -191,4 +162,4 @@ while True:
     _manager.update()
 
     # --- Advance effect rendering ---
-    _effect_manager.update(_engine._timer)
+    _effect_manager.update(_timer)

@@ -29,7 +29,7 @@ class IS31FL3741EffectOutput(MatrixEffectOutput):
     Args:
         matrix: A configured IS31FL3741 driver instance (e.g.
             ``Adafruit_RGBMatrixQT``).  Injected at construction so setup
-            code remains in ``propmaker.py`` and this class stays testable.
+            code remains in ``device_builder.py`` and this class stays testable.
         cols: Number of columns in the LED matrix.  Pass ``IS31FL3741_COLS``
             (13) for the standard Adafruit 13×9 board.
         scope_rows: Mapping of scope key → row-band ``range`` for this matrix.

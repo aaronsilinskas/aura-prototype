@@ -153,7 +153,7 @@ The port through which `VoicePool` reaches audio hardware — a real seam with t
 _Avoid_: passing a pre-multiplied hardware level across this seam (pass `0..1` loudness; the sink owns `max_volume`); leaking receipts through the port (the pool owns receipt lifecycle)
 
 ### Drv2605EffectOutput
-A CircuitPython `EffectOutput` driving a DRV2605L haptic motor. Registered on all scopes with `receives_pixels = False`. Translates `VibrationConfig` constants to DRV2605L waveforms via an internal mapping; clears remaining slots before each play. A new event always interrupts the current sequence. `flush()` cuts the sequence short if the active receipt is externally stopped. Constructed via `setup_drv2605(i2c)` in `propmaker.py`.
+A CircuitPython `EffectOutput` driving a DRV2605L haptic motor. Registered on all scopes with `receives_pixels = False`. Translates `VibrationConfig` constants to DRV2605L waveforms via an internal mapping; clears remaining slots before each play. A new event always interrupts the current sequence. `flush()` cuts the sequence short if the active receipt is externally stopped. Constructed by `build_hardware` in `device_builder.py`.
 _Avoid_: constructing with a `None` motor; subclassing for different haptic controllers (extract a base only when a second controller is needed); reading `receipt.loudness` (the DRV2605L has no volume control — intensity is baked into the waveform)
 
 ### Accelerometer

@@ -108,7 +108,7 @@ one call). The profiler fits each effect element independently and reports the
 ### Matrix driver: buffered vs. no-buffer and the I2C transaction boundary
 
 The IS31FL3741 driver runs **buffered** (`allocate=MUST_BUFFER`, the default in
-`propmaker.setup_matrix_is31fl3741`) or **no-buffer**:
+`device_builder._setup_matrix_is31fl3741`) or **no-buffer**:
 
 - **Buffered**: accumulates pixel writes in RAM, flushes in a single I2C burst at
   `show()`, so `flush_ms` dominates and `worst_case_effect_per_pixel_ms` is low.

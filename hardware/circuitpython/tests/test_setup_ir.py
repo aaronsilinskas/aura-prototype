@@ -1,17 +1,17 @@
-"""Tests for setup_ir in propmaker — builds IR hardware objects and returns
+"""Tests for _setup_ir in device_builder — builds IR hardware objects and returns
 the transmitter map + single receiver for injection into HardwareNetworkControls.
 
 Covers:
-- setup_ir with only required pins returns a LINE transmitter and receiver
-- setup_ir with cone_pin returns LINE and CONE transmitters
-- setup_ir with aoe_pin returns LINE and AREA_OF_EFFECT transmitters
-- setup_ir with all pins returns all three transmitters
-- setup_ir transmitters are InfraredTransmitter instances
-- setup_ir receiver is an InfraredSingleReceiver instance
-- setup_ir omits optional emitters when their pin is None
-- setup_ir defaults to Aura codecs when encoder/decoder are omitted
-- setup_ir wires a provided encoder/decoder pair into transmitters/receiver
-- setup_ir reuses the same encoder instance across all wired transmitters
+- _setup_ir with only required pins returns a LINE transmitter and receiver
+- _setup_ir with cone_pin returns LINE and CONE transmitters
+- _setup_ir with aoe_pin returns LINE and AREA_OF_EFFECT transmitters
+- _setup_ir with all pins returns all three transmitters
+- _setup_ir transmitters are InfraredTransmitter instances
+- _setup_ir receiver is an InfraredSingleReceiver instance
+- _setup_ir omits optional emitters when their pin is None
+- _setup_ir defaults to Aura codecs when encoder/decoder are omitted
+- _setup_ir wires a provided encoder/decoder pair into transmitters/receiver
+- _setup_ir reuses the same encoder instance across all wired transmitters
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ import sys
 import types
 
 # ---------------------------------------------------------------------------
-# Stub out CircuitPython-only hardware modules before importing propmaker.
-# We must be careful to set up all modules that propmaker.py imports at
+# Stub out CircuitPython-only hardware modules before importing device_builder.
+# We must be careful to set up all modules that device_builder.py imports at
 # module level, including pulseio and board constants for IR pins.
 # ---------------------------------------------------------------------------
 
@@ -124,8 +124,8 @@ _pulseio.PulseOut = _FakePulseOut  # type: ignore[attr-defined]
 
 import pytest  # noqa: E402
 
-import hardware.circuitpython.propmaker as propmaker  # noqa: E402
 from engine.network import AREA_OF_EFFECT, CONE, LINE  # noqa: E402
+from hardware.circuitpython.device_builder import _setup_ir  # noqa: E402
 from hardware.shared.ir_protocol import AuraInfraredDecoder, AuraInfraredEncoder  # noqa: E402
 from hardware.shared.tag_protocol import TagInfraredDecoder, TagInfraredEncoder  # noqa: E402
 
@@ -136,108 +136,106 @@ _AOE_PIN = object()
 
 
 # ---------------------------------------------------------------------------
-# setup_ir — transmitter map
+# _setup_ir — transmitter map
 # ---------------------------------------------------------------------------
 
 
 def test_setup_ir_returns_line_transmitter_when_only_required_pins_given():
-    """setup_ir always wires the LINE emitter from line_pin."""
-    transmitters, _receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN)
+    """_setup_ir always wires the LINE emitter from line_pin."""
+    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN)
     assert LINE in transmitters
 
 
 def test_setup_ir_omits_cone_when_cone_pin_is_none():
     """No CONE entry in transmitter map when cone_pin is not supplied."""
-    transmitters, _receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN)
+    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN)
     assert CONE not in transmitters
 
 
 def test_setup_ir_omits_aoe_when_aoe_pin_is_none():
     """No AREA_OF_EFFECT entry when aoe_pin is not supplied."""
-    transmitters, _receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN)
+    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN)
     assert AREA_OF_EFFECT not in transmitters
 
 
 def test_setup_ir_includes_cone_transmitter_when_cone_pin_provided():
     """CONE transmitter is present when cone_pin is given."""
-    transmitters, _receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN, cone_pin=_CONE_PIN)
+    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN, cone_pin=_CONE_PIN)
     assert CONE in transmitters
 
 
 def test_setup_ir_includes_aoe_transmitter_when_aoe_pin_provided():
     """AREA_OF_EFFECT transmitter is present when aoe_pin is given."""
-    transmitters, _receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN, aoe_pin=_AOE_PIN)
+    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN, aoe_pin=_AOE_PIN)
     assert AREA_OF_EFFECT in transmitters
 
 
 def test_setup_ir_all_pins_returns_three_transmitters():
     """All three emitter keys are present when all optional pins are given."""
-    transmitters, _receiver = propmaker.setup_ir(
-        _RX_PIN, _LINE_PIN, cone_pin=_CONE_PIN, aoe_pin=_AOE_PIN
-    )
+    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN, cone_pin=_CONE_PIN, aoe_pin=_AOE_PIN)
     assert set(transmitters.keys()) == {LINE, CONE, AREA_OF_EFFECT}
 
 
 # ---------------------------------------------------------------------------
-# setup_ir — receiver
+# _setup_ir — receiver
 # ---------------------------------------------------------------------------
 
 
 def test_setup_ir_receiver_is_wired_to_rx_pin():
     """The returned receiver reads pulses from the rx_pin PulseIn buffer."""
-    _transmitters, receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN)
+    _transmitters, receiver = _setup_ir(_RX_PIN, _LINE_PIN)
     pulsein = receiver._reader._pulsein
     assert pulsein.pin is _RX_PIN
 
 
 def test_setup_ir_receiver_pulsein_uses_active_low_idle_state():
     """PulseIn is constructed with idle_state=True for active-low IR receivers."""
-    _transmitters, receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN)
+    _transmitters, receiver = _setup_ir(_RX_PIN, _LINE_PIN)
     pulsein = receiver._reader._pulsein
     assert pulsein.idle_state is True
 
 
 def test_setup_ir_line_transmitter_is_wired_to_line_pin():
     """The LINE transmitter sends pulses via the line_pin PulseOut."""
-    transmitters, _receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN)
+    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN)
     pulseout = transmitters[LINE]._writer._pulseout
     assert pulseout.pin is _LINE_PIN
 
 
 def test_setup_ir_pulse_out_uses_38khz_carrier():
     """PulseOut is configured at 38 kHz carrier frequency."""
-    transmitters, _receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN)
+    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN)
     pulseout = transmitters[LINE]._writer._pulseout
     assert pulseout.frequency == 38000
 
 
 def test_setup_ir_raises_when_line_pin_is_none():
-    """setup_ir raises ValueError when line_pin is None — LINE is always required."""
+    """_setup_ir raises ValueError when line_pin is None — LINE is always required."""
     with pytest.raises(ValueError, match="line_pin is required"):
-        propmaker.setup_ir(_RX_PIN, None)
+        _setup_ir(_RX_PIN, None)
 
 
 # ---------------------------------------------------------------------------
-# setup_ir — codec injection
+# _setup_ir — codec injection
 # ---------------------------------------------------------------------------
 
 
 def test_setup_ir_defaults_to_aura_encoder_for_transmitters():
     """Omitting encoder wires transmitters with AuraInfraredEncoder."""
-    transmitters, _receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN)
+    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN)
     assert isinstance(transmitters[LINE]._encoder, AuraInfraredEncoder)
 
 
 def test_setup_ir_defaults_to_aura_decoder_for_receiver():
     """Omitting decoder wires the receiver with AuraInfraredDecoder."""
-    _transmitters, receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN)
+    _transmitters, receiver = _setup_ir(_RX_PIN, _LINE_PIN)
     assert isinstance(receiver._decoder, AuraInfraredDecoder)
 
 
 def test_setup_ir_wires_provided_encoder_into_transmitters():
     """A passed-in encoder is used by the wired transmitters."""
     encoder = TagInfraredEncoder()
-    transmitters, _receiver = propmaker.setup_ir(
+    transmitters, _receiver = _setup_ir(
         _RX_PIN, _LINE_PIN, cone_pin=_CONE_PIN, aoe_pin=_AOE_PIN, encoder=encoder
     )
     assert transmitters[LINE]._encoder is encoder
@@ -248,5 +246,5 @@ def test_setup_ir_wires_provided_encoder_into_transmitters():
 def test_setup_ir_wires_provided_decoder_into_receiver():
     """A passed-in decoder is used by the receiver."""
     decoder = TagInfraredDecoder()
-    _transmitters, receiver = propmaker.setup_ir(_RX_PIN, _LINE_PIN, decoder=decoder)
+    _transmitters, receiver = _setup_ir(_RX_PIN, _LINE_PIN, decoder=decoder)
     assert receiver._decoder is decoder

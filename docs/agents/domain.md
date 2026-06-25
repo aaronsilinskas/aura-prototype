@@ -55,7 +55,7 @@ packs/            Game-specific packs loaded at runtime (CircuitPython/MicroPyth
   scenes/         Scene definitions (hardware_test, red_light_green_light)
 
 hardware/         Hardware abstraction layer
-  circuitpython/  CircuitPython drivers (propmaker, IS31FL3741, DRV2605, audio)
+  circuitpython/  CircuitPython drivers (device_builder, IS31FL3741, DRV2605, audio)
   shared/         Shared hardware helpers (matrix_output, voice_pool, debounced_buttons)
 
 scripts/          Deploy and maintenance scripts (CPython-only)
