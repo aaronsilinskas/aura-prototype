@@ -1,7 +1,8 @@
 """Tests for NeoPixelEffectOutput — single-scope NeoPixel strip routing.
 
-One NeoPixelEffectOutput per scope; no neopixel hardware import in the
-routing logic. Uses in-memory fake strips to verify routing.
+Uses the constructor: NeoPixelEffectOutput(strip, scope_pixels, brightness).
+The single-scope case is the degenerate one-segment-covering-[0, count] shape.
+Uses in-memory fake strips to verify routing; no neopixel hardware import needed.
 """
 
 from __future__ import annotations
@@ -23,11 +24,12 @@ def _make_strip(count: int) -> MagicMock:
 
 
 def _make_output(scope_key: str = "personal", count: int = 5, brightness: float = 1.0):
-    """Build a NeoPixelEffectOutput with a mock strip."""
+    """Build a NeoPixelEffectOutput with a mock strip (single full-strip segment)."""
     from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 
     strip = _make_strip(count)
-    output = NeoPixelEffectOutput(scope_key, strip, count, brightness)
+    scope_pixels = {scope_key: range(0, count)}
+    output = NeoPixelEffectOutput(strip, scope_pixels, brightness)
     return output, strip
 
 
@@ -95,8 +97,8 @@ def test_update_pixels_does_not_write_to_unrelated_strip() -> None:
 
     strip_a = _make_strip(3)
     strip_b = _make_strip(2)
-    output_a = NeoPixelEffectOutput("personal", strip_a, 3)
-    NeoPixelEffectOutput("directional", strip_b, 2)  # independent instance
+    output_a = NeoPixelEffectOutput(strip_a, {"personal": range(0, 3)})
+    NeoPixelEffectOutput(strip_b, {"directional": range(0, 2)})  # independent instance
 
     buf = PixelBuffer(3)
     receipt = MagicMock()
@@ -199,8 +201,8 @@ def test_clear_pixels_does_not_touch_unrelated_strip() -> None:
 
     strip_personal = _make_strip(3)
     strip_directional = _make_strip(2)
-    NeoPixelEffectOutput("personal", strip_personal, 3)
-    output_b = NeoPixelEffectOutput("directional", strip_directional, 2)
+    NeoPixelEffectOutput(strip_personal, {"personal": range(0, 3)})
+    output_b = NeoPixelEffectOutput(strip_directional, {"directional": range(0, 2)})
 
     output_b.clear_pixels("directional")
 
@@ -227,8 +229,8 @@ def test_flush_on_one_instance_does_not_show_another_instances_strip() -> None:
 
     strip_a = _make_strip(3)
     strip_b = _make_strip(2)
-    output_a = NeoPixelEffectOutput("personal", strip_a, 3)
-    NeoPixelEffectOutput("directional", strip_b, 2)
+    output_a = NeoPixelEffectOutput(strip_a, {"personal": range(0, 3)})
+    NeoPixelEffectOutput(strip_b, {"directional": range(0, 2)})
 
     output_a.flush()
 

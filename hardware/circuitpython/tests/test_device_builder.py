@@ -268,6 +268,69 @@ def test_build_hardware_neopixel_raises_on_unknown_pin() -> None:
 
 
 # ---------------------------------------------------------------------------
+# build_hardware produces NeoPixelEffectOutput for scope_pixels strip config
+# ---------------------------------------------------------------------------
+
+
+def _segmented_strip_config():
+    """Return a DeviceConfig with one neopixel strip entry using scope_pixels."""
+    mapping = {
+        "pixels": [
+            {
+                "type": "neopixel",
+                "pin": "D5",
+                "count": 20,
+                "scope_pixels": {
+                    "personal": [0, 10],
+                    "ambient": [10, 20],
+                },
+            }
+        ],
+        "buttons": ["D9"],
+    }
+    return parse_device_config(mapping)
+
+
+def test_build_hardware_segmented_strip_produces_one_output() -> None:
+    from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
+
+    config = _segmented_strip_config()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
+        mock_neopixel.NeoPixel.return_value = MagicMock()
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    pixel_outputs = [o for o in hw.outputs if isinstance(o, NeoPixelEffectOutput)]
+    assert len(pixel_outputs) == 1
+
+
+def test_build_hardware_segmented_strip_output_serves_all_segment_scopes() -> None:
+    from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
+
+    config = _segmented_strip_config()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
+        mock_neopixel.NeoPixel.return_value = MagicMock()
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    pixel_output = next(o for o in hw.outputs if isinstance(o, NeoPixelEffectOutput))
+    all_keys = {sv.keys[0] for sv in pixel_output.scopes}
+    assert all_keys == {"personal", "ambient"}
+
+
+# ---------------------------------------------------------------------------
 # build_hardware wires audio output when config.audio is present
 # ---------------------------------------------------------------------------
 
