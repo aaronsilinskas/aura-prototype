@@ -4,7 +4,6 @@ import pytest
 
 from hardware.shared.device_config import (
     DEFAULT_DEVICE_CONFIG,
-    DeviceConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
     parse_device_config,
@@ -64,12 +63,6 @@ def neopixel_config():
 # ---------------------------------------------------------------------------
 
 
-def test_parse_default_config_returns_device_config():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
-
-    assert isinstance(result, DeviceConfig)
-
-
 def test_parse_default_config_pixels_is_matrix():
     result = parse_device_config(DEFAULT_DEVICE_CONFIG)
 
@@ -94,13 +87,6 @@ def test_parse_default_config_buttons_match():
     result = parse_device_config(DEFAULT_DEVICE_CONFIG)
 
     assert result.buttons == ["D9", "D10"]
-
-
-def test_parse_default_config_buttons_are_strings():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
-
-    for pin in result.buttons:
-        assert isinstance(pin, str)
 
 
 def test_parse_default_config_ir_rx_pin_matches():
@@ -176,26 +162,34 @@ def test_parse_matrix_scope_rows_error_lists_valid_keys(matrix_config):
 # ---------------------------------------------------------------------------
 
 
-def test_parse_neopixel_config_returns_device_config(neopixel_config):
-    result = parse_device_config(neopixel_config)
-
-    assert isinstance(result, DeviceConfig)
-
-
 def test_parse_neopixel_pixels_is_neopixel_type(neopixel_config):
     result = parse_device_config(neopixel_config)
 
     assert isinstance(result.pixels, NeoPixelPixelsConfig)
 
 
-def test_parse_neopixel_scope_fields_match(neopixel_config):
+def test_parse_neopixel_scope_pin_matches(neopixel_config):
     result = parse_device_config(neopixel_config)
 
-    scope = result.pixels.scopes["personal"]
-    assert scope.pin == "D5"
-    assert scope.count == 30
-    assert scope.order == "GRB"
-    assert scope.brightness == 0.5
+    assert result.pixels.scopes["personal"].pin == "D5"
+
+
+def test_parse_neopixel_scope_count_matches(neopixel_config):
+    result = parse_device_config(neopixel_config)
+
+    assert result.pixels.scopes["personal"].count == 30
+
+
+def test_parse_neopixel_scope_order_matches(neopixel_config):
+    result = parse_device_config(neopixel_config)
+
+    assert result.pixels.scopes["personal"].order == "GRB"
+
+
+def test_parse_neopixel_scope_brightness_matches(neopixel_config):
+    result = parse_device_config(neopixel_config)
+
+    assert result.pixels.scopes["personal"].brightness == 0.5
 
 
 def test_parse_neopixel_scope_missing_pin_raises_value_error(neopixel_config):

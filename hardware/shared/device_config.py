@@ -11,7 +11,12 @@ from engine.state import Scope
 
 __all__ = [
     "DEFAULT_DEVICE_CONFIG",
+    "AudioConfig",
     "DeviceConfig",
+    "IRConfig",
+    "MatrixPixelsConfig",
+    "NeoPixelPixelsConfig",
+    "NeoPixelScopeConfig",
     "parse_device_config",
 ]
 
@@ -61,8 +66,6 @@ DEFAULT_DEVICE_CONFIG: Final = {
 
 
 class MatrixPixelsConfig:
-    """Parsed matrix pixels configuration."""
-
     __slots__ = ("cols", "scope_rows")
 
     def __init__(self, cols: int, scope_rows: dict[str, range]) -> None:
@@ -71,8 +74,6 @@ class MatrixPixelsConfig:
 
 
 class NeoPixelScopeConfig:
-    """Parsed NeoPixel scope configuration."""
-
     __slots__ = ("brightness", "count", "order", "pin")
 
     def __init__(self, pin: str, count: int, order: str, brightness: float) -> None:
@@ -83,8 +84,6 @@ class NeoPixelScopeConfig:
 
 
 class NeoPixelPixelsConfig:
-    """Parsed NeoPixel pixels configuration."""
-
     __slots__ = ("scopes",)
 
     def __init__(self, scopes: dict[str, NeoPixelScopeConfig]) -> None:
@@ -92,8 +91,6 @@ class NeoPixelPixelsConfig:
 
 
 class AudioConfig:
-    """Parsed audio configuration."""
-
     __slots__ = ("clips", "max_volume", "voices")
 
     def __init__(self, voices: int, max_volume: float, clips: dict[str, str]) -> None:
@@ -103,8 +100,6 @@ class AudioConfig:
 
 
 class IRConfig:
-    """Parsed IR configuration."""
-
     __slots__ = ("emitters", "rx")
 
     def __init__(self, rx: str, emitters: dict[str, str]) -> None:
@@ -113,8 +108,6 @@ class IRConfig:
 
 
 class DeviceConfig:
-    """Parsed device configuration produced by parse_device_config."""
-
     __slots__ = ("audio", "buttons", "ir", "pixels")
 
     def __init__(

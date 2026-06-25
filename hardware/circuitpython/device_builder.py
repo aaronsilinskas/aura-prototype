@@ -58,7 +58,6 @@ def _resolve_pin(board_module: object, field: str, name: str) -> object:
 
 
 def load_device_config() -> DeviceConfig:
-    """Load config from aura-device.json, falling back to DEFAULT_DEVICE_CONFIG."""
     try:
         with open("aura-device.json") as f:
             mapping = json.load(f)
