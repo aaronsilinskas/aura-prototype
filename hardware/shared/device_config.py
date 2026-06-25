@@ -156,7 +156,6 @@ def validate_band_map(bands: dict[str, range], context: str) -> None:
             valid = ", ".join(sorted(_VALID_SCOPE_KEYS))
             raise ValueError(f"{context} key '{key}' is not valid; valid keys: {valid}")
 
-    # Check pairwise overlap: two ranges [a,b) and [c,d) overlap if a<d and c<b.
     items = list(bands.items())
     for i in range(len(items)):
         ka, ra = items[i]

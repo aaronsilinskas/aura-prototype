@@ -155,6 +155,13 @@ def test_parse_default_config_audio_clips_match():
 # ---------------------------------------------------------------------------
 
 
+def test_parse_pixels_given_as_dict_raises_value_error(matrix_config):
+    matrix_config["pixels"] = matrix_config["pixels"][0]  # old single-object shape
+
+    with pytest.raises(ValueError, match="list"):
+        parse_device_config(matrix_config)
+
+
 def test_parse_empty_pixels_list_raises_value_error(matrix_config):
     matrix_config["pixels"] = []
 
@@ -268,10 +275,15 @@ def test_parse_neopixel_config_returns_device_config(neopixel_config):
     assert isinstance(result, DeviceConfig)
 
 
-def test_parse_neopixel_first_entry_exposes_scopes(neopixel_config):
+def test_parse_neopixel_first_entry_is_neopixel_type(neopixel_config):
     result = parse_device_config(neopixel_config)
 
     assert isinstance(result.pixels[0], NeoPixelPixelsConfig)
+
+
+def test_parse_neopixel_first_entry_exposes_configured_scopes(neopixel_config):
+    result = parse_device_config(neopixel_config)
+
     assert "personal" in result.pixels[0].scopes
 
 
