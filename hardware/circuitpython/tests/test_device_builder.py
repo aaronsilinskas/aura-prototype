@@ -1,8 +1,9 @@
-"""Tests for device_builder.build_hardware — matrix and NeoPixel branches.
+"""Tests for device_builder.build_hardware — matrix, NeoPixel, audio, motor, and IR branches.
 
 Verifies that build_hardware produces the correct EffectOutput for each
-pixels.type (matrix and neopixel).  All hardware modules (board, busio,
-pulseio, digitalio) are patched so this suite runs under CPython.
+pixels.type (matrix and neopixel) and that audio, DRV2605 motor, and IR
+paths wire up correctly.  All hardware modules (board, busio, pulseio,
+digitalio) are patched so this suite runs under CPython.
 """
 
 from __future__ import annotations
@@ -262,3 +263,131 @@ def test_build_hardware_neopixel_raises_on_unknown_pin() -> None:
 
         with pytest.raises(ValueError, match="NONEXISTENT_PIN"):
             build_hardware(config, board_module=board_mock)
+
+
+# ---------------------------------------------------------------------------
+# build_hardware wires audio output when config.audio is present
+# ---------------------------------------------------------------------------
+
+
+def _neopixel_config_with_audio():
+    """Return a DeviceConfig with a neopixel pixels section and audio config."""
+    mapping = {
+        "pixels": {
+            "type": "neopixel",
+            "scopes": {"personal": {"pin": "D5", "count": 10}},
+        },
+        "buttons": ["D9"],
+        "audio": {
+            "voices": 1,
+            "max_volume": 0.5,
+            "clips": {"hit": "/sounds/hit.wav"},
+        },
+    }
+    return parse_device_config(mapping)
+
+
+def test_build_hardware_audio_config_adds_audio_effect_output() -> None:
+    from hardware.circuitpython.audio_output import AudioEffectOutput
+
+    config = _neopixel_config_with_audio()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    board_mock.I2S_BIT_CLOCK = MagicMock()
+    board_mock.I2S_WORD_SELECT = MagicMock()
+    board_mock.I2S_DATA = MagicMock()
+
+    mock_audio_output = MagicMock(spec=AudioEffectOutput)
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
+        mock_neopixel.NeoPixel.return_value = MagicMock()
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder.AudioEffectOutput",
+                return_value=mock_audio_output,
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    audio_outputs = [o for o in hw.outputs if isinstance(o, AudioEffectOutput)]
+    assert len(audio_outputs) == 1
+
+
+# ---------------------------------------------------------------------------
+# build_hardware wires motor output when _setup_drv2605 returns a driver
+# ---------------------------------------------------------------------------
+
+
+def test_build_hardware_drv2605_motor_adds_drv2605_effect_output() -> None:
+    from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
+
+    config = _neopixel_config()
+    board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
+    mock_motor = MagicMock()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        # Override the drv2605 patch set in _enter_hw_patches to return a mock motor
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_drv2605",
+                return_value=mock_motor,
+            )
+        )
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
+        mock_neopixel.NeoPixel.return_value = MagicMock()
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    motor_outputs = [o for o in hw.outputs if isinstance(o, Drv2605EffectOutput)]
+    assert len(motor_outputs) == 1
+
+
+# ---------------------------------------------------------------------------
+# build_hardware sets hw.ir_receiver when config.ir is present
+# ---------------------------------------------------------------------------
+
+
+def _neopixel_config_with_ir():
+    """Return a DeviceConfig with a neopixel pixels section and IR config."""
+    mapping = {
+        "pixels": {
+            "type": "neopixel",
+            "scopes": {"personal": {"pin": "D5", "count": 10}},
+        },
+        "buttons": ["D9"],
+        "ir": {
+            "rx": "D11",
+            "line": "D12",
+        },
+    }
+    return parse_device_config(mapping)
+
+
+def test_build_hardware_ir_config_sets_ir_receiver() -> None:
+    config = _neopixel_config_with_ir()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock(), D11=MagicMock(), D12=MagicMock())
+    mock_receiver = MagicMock()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
+        mock_neopixel.NeoPixel.return_value = MagicMock()
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_ir",
+                return_value=({}, mock_receiver),
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.ir_receiver is not None
