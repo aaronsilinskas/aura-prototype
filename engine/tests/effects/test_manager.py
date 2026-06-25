@@ -1249,3 +1249,56 @@ def test_add_effect_transfers_brightness_from_options(pack_env) -> None:
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {"brightness": 0.75})
 
     assert receipt.brightness == 0.75
+
+
+# ---------------------------------------------------------------------------
+# Mirrored outputs — two outputs share a scope key (issue #483)
+# ---------------------------------------------------------------------------
+
+
+def test_two_outputs_sharing_scope_both_receive_frame_on_update(pack_env) -> None:
+    output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_a, output_b],
+    )
+
+    manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+    manager.update(_make_timer())
+
+    assert len(output_a.update_pixels_calls[0][1]) == 1
+    assert len(output_b.update_pixels_calls[0][1]) == 1
+
+
+def test_two_outputs_sharing_scope_each_gets_its_own_buffer(pack_env) -> None:
+    output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_a, output_b],
+    )
+
+    manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+    manager.update(_make_timer())
+
+    buf_a, _ = output_a.update_pixels_calls[0][1][0]
+    buf_b, _ = output_b.update_pixels_calls[0][1][0]
+    assert buf_a is not buf_b
+
+
+def test_two_outputs_sharing_scope_both_receive_same_receipt(pack_env) -> None:
+    output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(
+        registry=_make_stub_registry(pack_env),
+        outputs=[output_a, output_b],
+    )
+
+    receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+    manager.update(_make_timer())
+
+    _, receipt_a = output_a.update_pixels_calls[0][1][0]
+    _, receipt_b = output_b.update_pixels_calls[0][1][0]
+    assert receipt_a is receipt
+    assert receipt_b is receipt

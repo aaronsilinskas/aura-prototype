@@ -423,3 +423,85 @@ def test_parse_neopixel_duplicate_pin_raises_value_error():
 
     with pytest.raises(ValueError, match="D5"):
         parse_device_config(config)
+
+
+# ---------------------------------------------------------------------------
+# Same scope key on multiple strips (mirrored outputs — issue #483)
+# ---------------------------------------------------------------------------
+
+
+def test_parse_two_strips_sharing_scope_key_produces_two_strip_configs():
+    config = {
+        "pixels": [
+            {
+                "type": "neopixel",
+                "pin": "D5",
+                "count": 10,
+                "scope_pixels": {"personal": [0, 10]},
+            },
+            {
+                "type": "neopixel",
+                "pin": "D6",
+                "count": 10,
+                "scope_pixels": {"personal": [0, 10]},
+            },
+        ],
+        "buttons": ["D9"],
+    }
+
+    result = parse_device_config(config)
+
+    strips = [s for p in result.pixels if isinstance(p, NeoPixelPixelsConfig) for s in p.strips]
+    assert len(strips) == 2
+
+
+def test_parse_two_strips_sharing_scope_key_preserves_both_pins():
+    config = {
+        "pixels": [
+            {
+                "type": "neopixel",
+                "pin": "D5",
+                "count": 10,
+                "scope_pixels": {"personal": [0, 10]},
+            },
+            {
+                "type": "neopixel",
+                "pin": "D6",
+                "count": 10,
+                "scope_pixels": {"personal": [0, 10]},
+            },
+        ],
+        "buttons": ["D9"],
+    }
+
+    result = parse_device_config(config)
+
+    strips = [s for p in result.pixels if isinstance(p, NeoPixelPixelsConfig) for s in p.strips]
+    pins = {s.pin for s in strips}
+    assert pins == {"D5", "D6"}
+
+
+def test_parse_two_strips_sharing_scope_key_each_strip_has_scope_pixels():
+    config = {
+        "pixels": [
+            {
+                "type": "neopixel",
+                "pin": "D5",
+                "count": 10,
+                "scope_pixels": {"personal": [0, 10]},
+            },
+            {
+                "type": "neopixel",
+                "pin": "D6",
+                "count": 10,
+                "scope_pixels": {"personal": [0, 10]},
+            },
+        ],
+        "buttons": ["D9"],
+    }
+
+    result = parse_device_config(config)
+
+    strips = [s for p in result.pixels if isinstance(p, NeoPixelPixelsConfig) for s in p.strips]
+    for strip in strips:
+        assert "personal" in strip.scope_pixels
