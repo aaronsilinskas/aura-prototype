@@ -283,6 +283,13 @@ def test_parse_ir_rx_non_string_raises_value_error(matrix_config):
         parse_device_config(matrix_config)
 
 
+def test_parse_ir_line_non_string_raises_value_error(matrix_config):
+    matrix_config["ir"]["line"] = 12
+
+    with pytest.raises(ValueError, match=r"ir\.line"):
+        parse_device_config(matrix_config)
+
+
 def test_parse_ir_unknown_emitter_key_raises_value_error(matrix_config):
     matrix_config["ir"]["laser"] = "D13"
 

@@ -37,13 +37,13 @@ class DeviceHardware:
 
     def __init__(
         self,
-        outputs: list,
+        outputs: list[object],
         buttons: object,
         accelerometer: object | None,
         network_controls: HardwareNetworkControls,
         ir_receiver: object | None,
     ) -> None:
-        self.outputs: list = outputs
+        self.outputs: list[object] = outputs
         self.buttons: object = buttons
         self.accelerometer: object | None = accelerometer
         self.network_controls: HardwareNetworkControls = network_controls
@@ -82,7 +82,7 @@ def build_hardware(
     propmaker.setup_external_power()
     i2c = propmaker.setup_i2c()
 
-    outputs: list = []
+    outputs: list[object] = []
 
     if isinstance(config.pixels, MatrixPixelsConfig):
         matrix = propmaker.setup_matrix_is31fl3741(i2c)
