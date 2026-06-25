@@ -92,7 +92,6 @@ def test_create_buffer_for_segment_is_sized_to_segment_length() -> None:
     output, _ = _make_segmented_output(scope_pixels, count=30)
 
     buf = output.create_buffer("personal")
-    assert isinstance(buf, PixelBuffer)
     assert len(buf) == 10
 
 

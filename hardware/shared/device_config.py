@@ -229,7 +229,6 @@ def _parse_matrix_pixels(mapping: dict, entry_index: int) -> MatrixPixelsConfig:
 
 
 def _parse_neopixel_strip_entry(mapping: dict, entry_index: int) -> NeoPixelStripConfig:
-    """Parse a single strip-shape neopixel entry (scope_pixels key present)."""
     label = f"pixels[{entry_index}]"
 
     if "pin" not in mapping:
@@ -273,13 +272,6 @@ def _parse_neopixel_strip_entry(mapping: dict, entry_index: int) -> NeoPixelStri
 
 
 def _parse_neopixel_pixels(mapping: dict, entry_index: int) -> NeoPixelPixelsConfig:
-    """Parse a neopixel pixels entry.
-
-    Supports two shapes:
-    - New strip shape: entry has ``pin``, ``count``, ``scope_pixels`` keys
-      (one physical strip with multiple scope segments).
-    - Legacy scope shape: entry has a ``scopes`` dict (one strip per scope).
-    """
     if "scope_pixels" in mapping or "pin" in mapping:
         strip = _parse_neopixel_strip_entry(mapping, entry_index)
         return NeoPixelPixelsConfig(strips=[strip])

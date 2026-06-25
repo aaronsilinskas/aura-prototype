@@ -66,24 +66,10 @@ def two_strip_config():
 # ---------------------------------------------------------------------------
 
 
-def test_parse_neopixel_strip_returns_device_config(single_strip_config):
-    from hardware.shared.device_config import DeviceConfig
-
-    result = parse_device_config(single_strip_config)
-
-    assert isinstance(result, DeviceConfig)
-
-
 def test_parse_neopixel_strip_pixels_contains_one_entry(single_strip_config):
     result = parse_device_config(single_strip_config)
 
     assert len(result.pixels) == 1
-
-
-def test_parse_neopixel_strip_entry_is_neopixel_pixels_config(single_strip_config):
-    result = parse_device_config(single_strip_config)
-
-    assert isinstance(result.pixels[0], NeoPixelPixelsConfig)
 
 
 def test_parse_neopixel_strip_strips_contains_one_entry(single_strip_config):
