@@ -231,16 +231,31 @@ def build_hardware(
                 )
             )
         elif isinstance(pixels_cfg, NeoPixelPixelsConfig):
+            for strip_cfg in pixels_cfg.strips:
+                pin = _resolve_pin(board_module, "pixels.pin", strip_cfg.pin)
+                hw_strip = neopixel.NeoPixel(
+                    pin,
+                    strip_cfg.count,
+                    pixel_order=strip_cfg.order,
+                    auto_write=False,
+                )
+                outputs.append(
+                    NeoPixelEffectOutput(hw_strip, strip_cfg.scope_pixels, strip_cfg.brightness)
+                )
             for scope_key, scope_cfg in pixels_cfg.scopes.items():
                 pin = _resolve_pin(board_module, f"pixels.scopes.{scope_key}.pin", scope_cfg.pin)
-                strip = neopixel.NeoPixel(
+                hw_strip = neopixel.NeoPixel(
                     pin,
                     scope_cfg.count,
                     pixel_order=scope_cfg.order,
                     auto_write=False,
                 )
                 outputs.append(
-                    NeoPixelEffectOutput(scope_key, strip, scope_cfg.count, scope_cfg.brightness)
+                    NeoPixelEffectOutput(
+                        hw_strip,
+                        {scope_key: range(0, scope_cfg.count)},
+                        scope_cfg.brightness,
+                    )
                 )
 
     button_pins = [
