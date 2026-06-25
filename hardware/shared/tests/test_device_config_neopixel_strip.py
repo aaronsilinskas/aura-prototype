@@ -430,7 +430,7 @@ def test_parse_neopixel_duplicate_pin_raises_value_error():
 # ---------------------------------------------------------------------------
 
 
-def test_parse_two_strips_sharing_scope_key_succeeds():
+def test_parse_two_strips_sharing_scope_key_produces_two_strip_configs():
     config = {
         "pixels": [
             {
