@@ -156,6 +156,26 @@ _Avoid_: passing a pre-multiplied hardware level across this seam (pass `0..1` l
 A CircuitPython `EffectOutput` driving a DRV2605L haptic motor. Registered on all scopes with `receives_pixels = False`. Translates `VibrationConfig` constants to DRV2605L waveforms via an internal mapping; clears remaining slots before each play. A new event always interrupts the current sequence. `flush()` cuts the sequence short if the active receipt is externally stopped. Constructed by `build_hardware` in `device_builder.py`.
 _Avoid_: constructing with a `None` motor; subclassing for different haptic controllers (extract a base only when a second controller is needed); reading `receipt.loudness` (the DRV2605L has no volume control — intensity is baked into the waveform)
 
+### aura-device.json
+The single on-device file holding **all** hardware configuration: button pins, IR pins/emitters, the `pixels` topology (matrix or per-scope NeoPixel), accelerometer/haptics presence, and audio amp pins/voices/volume. The `pixels` key names the LED/pixel output topology — distinct from the sibling `audio` / `haptics` outputs — echoing `EffectOutput.receives_pixels`. Pin references are name **strings** (e.g. `"D9"`), resolved against `board` only in the device-only builder. Read once at boot with `json` + `open()` (portable to CircuitPython and MicroPython). A missing file falls back to `DEFAULT_DEVICE_CONFIG` (stock PropMaker matrix) with a console message. _(Design vocabulary — local PRD `device-config-from-json`, not yet implemented.)_
+_Avoid_: `settings.toml` (removed — CircuitPython-only, unreadable on MicroPython); keying the pixel section `output` (audio/haptics are outputs too — use `pixels`); putting `board` pin objects in the file (it carries pin-name strings); folding scene selection in here (out of scope; a future convergence point)
+
+### DeviceConfig
+The validated value object produced by the pure `parse_device_config(mapping)` parser (in `hardware/shared/`, no `board` import, pytest-covered). Normalizes and validates an `aura-device.json` mapping; constructs no hardware. Raises `ValueError` naming the offending field on malformed config, including a scope key not in `set(Scope.ALL.keys)` (the single source of truth for leaf-scope keys) or an IR emitter key not in the `engine.network` emitter vocabulary (`line`/`cone`/`area_of_effect`). `__init__` + `__slots__`, no `dataclasses`.
+_Avoid_: importing `board` into the parser (pin names stay strings here); constructing hardware in the parser (that is `device_builder`'s job); re-hardcoding the leaf-scope key list (derive from `Scope.ALL.keys`); accepting unknown scope/emitter keys (validate, PhaseKey-style fail-loud)
+
+### device_builder
+The device-only generic hardware builder (`hardware/circuitpython/device_builder.py`), replacing the board-specific `propmaker.py` `setup_*` grab-bag. `build_hardware(config, board, ir_encoder=None, ir_decoder=None) -> DeviceHardware` resolves pin names via `board`, constructs the configured outputs/buttons/accelerometer/haptics/audio/IR, and wraps the IR transmitters in `HardwareNetworkControls`. Device-only, verified via `deploy-watch`. Pin-name resolution failures raise a message naming the offending field and pin.
+_Avoid_: the name `propmaker` (it builds whatever the config describes, not one fixed board); returning a bare tuple/dict (return `DeviceHardware`); putting config parsing/validation here (that lives in the pure parser)
+
+### DeviceHardware
+The named bundle `device_builder.build_hardware` returns, consumed by examples and the scene runtime. `__slots__`: `outputs` (`list[EffectOutput]`), `buttons`, `accelerometer` (or `None`), `network_controls` (a built `HardwareNetworkControls`), `ir_receiver` (or `None`, polled each tick). Raw IR transmitters are an internal detail wrapped before return — the runtime never handles them directly.
+_Avoid_: exposing raw transmitters (use `network_controls`); a bare tuple/dict (it is a named seam); building network controls in the runtime instead (the builder owns that)
+
+### NeoPixelEffectOutput
+A CircuitPython `EffectOutput` driving one NeoPixel strip per `Scope` (the alternative to a single LED matrix). Config maps each scope key to `{ pin, count }`. Implements the same scope-keyed routing as `MatrixEffectOutput`; declares `min_resolution` as the largest strip `count` across its scopes (resolution stays independent of pixel count). _(Design vocabulary — local PRD `device-config-from-json`, not yet implemented.)_
+_Avoid_: conflating per-strip `count` with `min_resolution` (count sizes the buffer; resolution is detail level); requiring every scope to be wired (a build may configure only some scopes)
+
 ### Accelerometer
 A hardware sensor providing 3-axis acceleration readings (x, y, z) in m/s². Optional — absent when hardware is not present. Readings are packaged into `AccelerationData` carried by input events.
 _Avoid_: "IMU" (overpromises — LIS3DH has no gyroscope or magnetometer)
