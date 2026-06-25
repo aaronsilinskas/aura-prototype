@@ -3,10 +3,33 @@
 import sys
 import types
 
-for _name in ("audiobusio", "audiocore", "audiomixer", "board", "busio"):
+for _name in (
+    "audiobusio",
+    "audiocore",
+    "audiomixer",
+    "board",
+    "busio",
+    "digitalio",
+    "neopixel",
+    "pulseio",
+):
     sys.modules.setdefault(_name, types.ModuleType(_name))
 
 _board = sys.modules["board"]
+
+# ---------------------------------------------------------------------------
+# adafruit_is31fl3741 stub — minimal for propmaker / device_builder imports
+# ---------------------------------------------------------------------------
+
+_is31_mod = types.ModuleType("adafruit_is31fl3741")
+_is31_mod.MUST_BUFFER = 1  # type: ignore[attr-defined]
+sys.modules.setdefault("adafruit_is31fl3741", _is31_mod)
+
+_rgbmatrix_mod = types.ModuleType("adafruit_is31fl3741.adafruit_rgbmatrixqt")
+_rgbmatrix_mod.Adafruit_RGBMatrixQT = type(  # type: ignore[attr-defined]
+    "Adafruit_RGBMatrixQT", (), {}
+)
+sys.modules.setdefault("adafruit_is31fl3741.adafruit_rgbmatrixqt", _rgbmatrix_mod)
 
 
 # ---------------------------------------------------------------------------

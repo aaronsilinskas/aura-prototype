@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 
 import board
+import neopixel
 
 import hardware.circuitpython.propmaker as propmaker
 from engine.audio import AudioRegistry
@@ -15,10 +16,12 @@ from engine.network import HardwareNetworkControls
 from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
+from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 from hardware.shared.device_config import (
     DEFAULT_DEVICE_CONFIG,
     DeviceConfig,
     MatrixPixelsConfig,
+    NeoPixelPixelsConfig,
     parse_device_config,
 )
 from hardware.shared.ir_protocol import AuraInfraredDecoder, AuraInfraredEncoder
@@ -93,6 +96,21 @@ def build_hardware(
                 scope_rows=config.pixels.scope_rows,
             )
         )
+    elif isinstance(config.pixels, NeoPixelPixelsConfig):
+        strips: dict[str, object] = {}
+        counts: dict[str, int] = {}
+        brightnesses: dict[str, float] = {}
+        for scope_key, scope_cfg in config.pixels.scopes.items():
+            pin = _resolve_pin(board_module, f"pixels.scopes.{scope_key}.pin", scope_cfg.pin)
+            strips[scope_key] = neopixel.NeoPixel(
+                pin,
+                scope_cfg.count,
+                pixel_order=scope_cfg.order,
+                auto_write=False,
+            )
+            counts[scope_key] = scope_cfg.count
+            brightnesses[scope_key] = scope_cfg.brightness
+        outputs.append(NeoPixelEffectOutput(strips, counts, brightnesses))
 
     button_pins = [
         _resolve_pin(board_module, f"buttons[{i}]", name) for i, name in enumerate(config.buttons)
