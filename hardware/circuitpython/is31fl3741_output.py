@@ -1,9 +1,14 @@
+try:
+    from typing import Final
+except ImportError:
+    pass
+
 from engine.state import Scope
 from hardware.shared.matrix_output import MatrixEffectOutput
 
-IS31FL3741_COLS = 13
+IS31FL3741_COLS: Final = 13
 
-IS31FL3741_SCOPE_ROWS = {
+IS31FL3741_SCOPE_ROWS: Final = {
     "global.buff": range(0, 1),
     "global.debuff": range(1, 2),
     "global.main": range(2, 5),
@@ -31,7 +36,7 @@ class IS31FL3741EffectOutput(MatrixEffectOutput):
             Pass ``IS31FL3741_SCOPE_ROWS`` for the standard aura wand layout.
     """
 
-    def __init__(self, matrix, *, cols: int, scope_rows: dict) -> None:
+    def __init__(self, matrix: object, *, cols: int, scope_rows: dict) -> None:
         super().__init__(cols, scope_rows)
         self.scopes = [Scope.ALL]
         self._matrix = matrix
