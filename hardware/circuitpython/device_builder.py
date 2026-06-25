@@ -220,27 +220,28 @@ def build_hardware(
 
     outputs: list[object] = []
 
-    if isinstance(config.pixels, MatrixPixelsConfig):
-        matrix = _setup_matrix_is31fl3741(i2c)
-        outputs.append(
-            IS31FL3741EffectOutput(
-                matrix,
-                cols=config.pixels.cols,
-                scope_rows=config.pixels.scope_rows,
-            )
-        )
-    elif isinstance(config.pixels, NeoPixelPixelsConfig):
-        for scope_key, scope_cfg in config.pixels.scopes.items():
-            pin = _resolve_pin(board_module, f"pixels.scopes.{scope_key}.pin", scope_cfg.pin)
-            strip = neopixel.NeoPixel(
-                pin,
-                scope_cfg.count,
-                pixel_order=scope_cfg.order,
-                auto_write=False,
-            )
+    for pixels_cfg in config.pixels:
+        if isinstance(pixels_cfg, MatrixPixelsConfig):
+            matrix = _setup_matrix_is31fl3741(i2c)
             outputs.append(
-                NeoPixelEffectOutput(scope_key, strip, scope_cfg.count, scope_cfg.brightness)
+                IS31FL3741EffectOutput(
+                    matrix,
+                    cols=pixels_cfg.cols,
+                    scope_rows=pixels_cfg.scope_rows,
+                )
             )
+        elif isinstance(pixels_cfg, NeoPixelPixelsConfig):
+            for scope_key, scope_cfg in pixels_cfg.scopes.items():
+                pin = _resolve_pin(board_module, f"pixels.scopes.{scope_key}.pin", scope_cfg.pin)
+                strip = neopixel.NeoPixel(
+                    pin,
+                    scope_cfg.count,
+                    pixel_order=scope_cfg.order,
+                    auto_write=False,
+                )
+                outputs.append(
+                    NeoPixelEffectOutput(scope_key, strip, scope_cfg.count, scope_cfg.brightness)
+                )
 
     button_pins = [
         _resolve_pin(board_module, f"buttons[{i}]", name) for i, name in enumerate(config.buttons)

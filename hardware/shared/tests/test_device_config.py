@@ -5,9 +5,8 @@ import pytest
 from hardware.shared.device_config import (
     DEFAULT_DEVICE_CONFIG,
     DeviceConfig,
-    MatrixPixelsConfig,
-    NeoPixelPixelsConfig,
     parse_device_config,
+    validate_band_map,
 )
 
 # ---------------------------------------------------------------------------
@@ -18,18 +17,20 @@ from hardware.shared.device_config import (
 @pytest.fixture
 def matrix_config():
     return {
-        "pixels": {
-            "type": "matrix",
-            "cols": 13,
-            "scope_rows": {
-                "global.buff": [0, 1],
-                "global.debuff": [1, 2],
-                "global.main": [2, 5],
-                "personal": [5, 7],
-                "directional": [7, 8],
-                "ambient": [8, 9],
-            },
-        },
+        "pixels": [
+            {
+                "type": "matrix",
+                "cols": 13,
+                "scope_rows": {
+                    "global.buff": [0, 1],
+                    "global.debuff": [1, 2],
+                    "global.main": [2, 5],
+                    "personal": [5, 7],
+                    "directional": [7, 8],
+                    "ambient": [8, 9],
+                },
+            }
+        ],
         "buttons": ["D9", "D10"],
         "ir": {
             "rx": "D11",
@@ -48,13 +49,15 @@ def matrix_config():
 @pytest.fixture
 def neopixel_config():
     return {
-        "pixels": {
-            "type": "neopixel",
-            "scopes": {
-                "personal": {"pin": "D5", "count": 30, "order": "GRB", "brightness": 0.5},
-                "ambient": {"pin": "D6", "count": 10, "order": "RGB", "brightness": 1.0},
-            },
-        },
+        "pixels": [
+            {
+                "type": "neopixel",
+                "scopes": {
+                    "personal": {"pin": "D5", "count": 30, "order": "GRB", "brightness": 0.5},
+                    "ambient": {"pin": "D6", "count": 10, "order": "RGB", "brightness": 1.0},
+                },
+            }
+        ],
         "buttons": ["D9"],
     }
 
@@ -70,24 +73,25 @@ def test_parse_default_config_returns_device_config():
     assert isinstance(result, DeviceConfig)
 
 
-def test_parse_default_config_pixels_is_matrix():
+def test_parse_default_config_pixels_contains_one_entry():
     result = parse_device_config(DEFAULT_DEVICE_CONFIG)
 
-    assert isinstance(result.pixels, MatrixPixelsConfig)
+    assert len(result.pixels) == 1
 
 
 def test_parse_default_config_matrix_cols_matches():
     result = parse_device_config(DEFAULT_DEVICE_CONFIG)
 
-    assert result.pixels.cols == 13
+    assert result.pixels[0].cols == 13
 
 
 def test_parse_default_config_scope_rows_converted_to_ranges():
     result = parse_device_config(DEFAULT_DEVICE_CONFIG)
 
-    assert result.pixels.scope_rows["global.buff"] == range(0, 1)
-    assert result.pixels.scope_rows["global.main"] == range(2, 5)
-    assert result.pixels.scope_rows["ambient"] == range(8, 9)
+    scope_rows = result.pixels[0].scope_rows
+    assert scope_rows["global.buff"] == range(0, 1)
+    assert scope_rows["global.main"] == range(2, 5)
+    assert scope_rows["ambient"] == range(8, 9)
 
 
 def test_parse_default_config_buttons_match():
@@ -139,36 +143,117 @@ def test_parse_default_config_audio_clips_match():
 
 
 # ---------------------------------------------------------------------------
+# pixels list shape: empty and duplicate matrix
+# ---------------------------------------------------------------------------
+
+
+def test_parse_pixels_given_as_dict_raises_value_error(matrix_config):
+    matrix_config["pixels"] = matrix_config["pixels"][0]  # old single-object shape
+
+    with pytest.raises(ValueError, match="list"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_empty_pixels_list_raises_value_error(matrix_config):
+    matrix_config["pixels"] = []
+
+    with pytest.raises(ValueError, match="at least one"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_second_matrix_entry_raises_value_error(matrix_config):
+    second = dict(matrix_config["pixels"][0])
+    matrix_config["pixels"].append(second)
+
+    with pytest.raises(ValueError, match="matrix"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_unknown_pixels_entry_type_raises_value_error_naming_entry(matrix_config):
+    matrix_config["pixels"].append({"type": "led_strip"})
+
+    with pytest.raises(ValueError, match="led_strip"):
+        parse_device_config(matrix_config)
+
+
+# ---------------------------------------------------------------------------
 # Matrix shape validation
 # ---------------------------------------------------------------------------
 
 
 def test_parse_matrix_without_cols_raises_value_error(matrix_config):
-    del matrix_config["pixels"]["cols"]
+    del matrix_config["pixels"][0]["cols"]
 
-    with pytest.raises(ValueError, match=r"pixels\.cols"):
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.cols"):
         parse_device_config(matrix_config)
 
 
 def test_parse_matrix_without_scope_rows_raises_value_error(matrix_config):
-    del matrix_config["pixels"]["scope_rows"]
+    del matrix_config["pixels"][0]["scope_rows"]
 
-    with pytest.raises(ValueError, match=r"pixels\.scope_rows"):
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.scope_rows"):
         parse_device_config(matrix_config)
 
 
 def test_parse_matrix_scope_rows_with_unknown_key_raises_value_error(matrix_config):
-    matrix_config["pixels"]["scope_rows"]["bad_scope"] = [0, 1]
+    matrix_config["pixels"][0]["scope_rows"]["bad_scope"] = [0, 1]
 
     with pytest.raises(ValueError, match="bad_scope"):
         parse_device_config(matrix_config)
 
 
 def test_parse_matrix_scope_rows_error_lists_valid_keys(matrix_config):
-    matrix_config["pixels"]["scope_rows"]["bad_scope"] = [0, 1]
+    matrix_config["pixels"][0]["scope_rows"]["bad_scope"] = [0, 1]
 
     with pytest.raises(ValueError, match="personal"):
         parse_device_config(matrix_config)
+
+
+# ---------------------------------------------------------------------------
+# Band-map validator: overlapping scope_rows
+# ---------------------------------------------------------------------------
+
+
+def test_parse_matrix_overlapping_scope_rows_raises_value_error(matrix_config):
+    # Replace scope_rows with two overlapping bands.
+    matrix_config["pixels"][0]["scope_rows"] = {
+        "global.main": [0, 5],
+        "personal": [3, 7],  # overlaps global.main at rows 3-4
+    }
+
+    with pytest.raises(ValueError, match="overlap"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_matrix_overlapping_scope_rows_error_names_conflicting_bands(matrix_config):
+    matrix_config["pixels"][0]["scope_rows"] = {
+        "global.main": [0, 5],
+        "personal": [3, 7],
+    }
+
+    with pytest.raises(ValueError, match=r"global\.main"):
+        parse_device_config(matrix_config)
+
+
+def test_validate_band_map_adjacent_bands_do_not_overlap():
+    bands = {"global.main": range(0, 5), "personal": range(5, 7)}
+
+    # Must not raise.
+    validate_band_map(bands, "test")
+
+
+def test_validate_band_map_overlapping_bands_raise_value_error():
+    bands = {"global.main": range(0, 5), "personal": range(3, 7)}
+
+    with pytest.raises(ValueError, match="overlap"):
+        validate_band_map(bands, "test")
+
+
+def test_validate_band_map_invalid_scope_key_raises_value_error():
+    bands = {"bad_scope": range(0, 5)}
+
+    with pytest.raises(ValueError, match="bad_scope"):
+        validate_band_map(bands, "test")
 
 
 # ---------------------------------------------------------------------------
@@ -182,16 +267,16 @@ def test_parse_neopixel_config_returns_device_config(neopixel_config):
     assert isinstance(result, DeviceConfig)
 
 
-def test_parse_neopixel_pixels_is_neopixel_type(neopixel_config):
+def test_parse_neopixel_first_entry_exposes_configured_scopes(neopixel_config):
     result = parse_device_config(neopixel_config)
 
-    assert isinstance(result.pixels, NeoPixelPixelsConfig)
+    assert "personal" in result.pixels[0].scopes
 
 
 def test_parse_neopixel_scope_fields_match(neopixel_config):
     result = parse_device_config(neopixel_config)
 
-    scope = result.pixels.scopes["personal"]
+    scope = result.pixels[0].scopes["personal"]
     assert scope.pin == "D5"
     assert scope.count == 30
     assert scope.order == "GRB"
@@ -199,28 +284,28 @@ def test_parse_neopixel_scope_fields_match(neopixel_config):
 
 
 def test_parse_neopixel_scope_missing_pin_raises_value_error(neopixel_config):
-    del neopixel_config["pixels"]["scopes"]["personal"]["pin"]
+    del neopixel_config["pixels"][0]["scopes"]["personal"]["pin"]
 
     with pytest.raises(ValueError, match=r"personal\.pin"):
         parse_device_config(neopixel_config)
 
 
 def test_parse_neopixel_scope_missing_count_raises_value_error(neopixel_config):
-    del neopixel_config["pixels"]["scopes"]["personal"]["count"]
+    del neopixel_config["pixels"][0]["scopes"]["personal"]["count"]
 
     with pytest.raises(ValueError, match=r"personal\.count"):
         parse_device_config(neopixel_config)
 
 
 def test_parse_neopixel_scope_with_unknown_key_raises_value_error(neopixel_config):
-    neopixel_config["pixels"]["scopes"]["bad_scope"] = {"pin": "D7", "count": 5}
+    neopixel_config["pixels"][0]["scopes"]["bad_scope"] = {"pin": "D7", "count": 5}
 
     with pytest.raises(ValueError, match="bad_scope"):
         parse_device_config(neopixel_config)
 
 
 def test_parse_neopixel_scope_error_lists_valid_keys(neopixel_config):
-    neopixel_config["pixels"]["scopes"]["bad_scope"] = {"pin": "D7", "count": 5}
+    neopixel_config["pixels"][0]["scopes"]["bad_scope"] = {"pin": "D7", "count": 5}
 
     with pytest.raises(ValueError, match="personal"):
         parse_device_config(neopixel_config)
@@ -232,7 +317,7 @@ def test_parse_neopixel_scope_error_lists_valid_keys(neopixel_config):
 
 
 def test_parse_unknown_pixels_type_raises_value_error(matrix_config):
-    matrix_config["pixels"]["type"] = "led_strip"
+    matrix_config["pixels"][0]["type"] = "led_strip"
 
     with pytest.raises(ValueError, match="led_strip"):
         parse_device_config(matrix_config)
