@@ -25,18 +25,20 @@ from hardware.shared.device_config import (
 def _matrix_config():
     """Return a DeviceConfig with pixels.type='matrix'."""
     mapping = {
-        "pixels": {
-            "type": "matrix",
-            "cols": 13,
-            "scope_rows": {
-                "global.buff": [0, 1],
-                "global.debuff": [1, 2],
-                "global.main": [2, 5],
-                "personal": [5, 7],
-                "directional": [7, 8],
-                "ambient": [8, 9],
-            },
-        },
+        "pixels": [
+            {
+                "type": "matrix",
+                "cols": 13,
+                "scope_rows": {
+                    "global.buff": [0, 1],
+                    "global.debuff": [1, 2],
+                    "global.main": [2, 5],
+                    "personal": [5, 7],
+                    "directional": [7, 8],
+                    "ambient": [8, 9],
+                },
+            }
+        ],
         "buttons": ["D9", "D10"],
     }
     return parse_device_config(mapping)
@@ -50,7 +52,7 @@ def _neopixel_config(scopes: dict | None = None):
             "directional": {"pin": "D6", "count": 4},
         }
     mapping = {
-        "pixels": {"type": "neopixel", "scopes": scopes},
+        "pixels": [{"type": "neopixel", "scopes": scopes}],
         "buttons": ["D9"],
     }
     return parse_device_config(mapping)
@@ -273,10 +275,7 @@ def test_build_hardware_neopixel_raises_on_unknown_pin() -> None:
 def _neopixel_config_with_audio():
     """Return a DeviceConfig with a neopixel pixels section and audio config."""
     mapping = {
-        "pixels": {
-            "type": "neopixel",
-            "scopes": {"personal": {"pin": "D5", "count": 10}},
-        },
+        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
         "buttons": ["D9"],
         "audio": {
             "voices": 1,
@@ -357,10 +356,7 @@ def test_build_hardware_drv2605_motor_adds_drv2605_effect_output() -> None:
 def _neopixel_config_with_ir():
     """Return a DeviceConfig with a neopixel pixels section and IR config."""
     mapping = {
-        "pixels": {
-            "type": "neopixel",
-            "scopes": {"personal": {"pin": "D5", "count": 10}},
-        },
+        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
         "buttons": ["D9"],
         "ir": {
             "rx": "D11",

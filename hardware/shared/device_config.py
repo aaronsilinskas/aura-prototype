@@ -12,7 +12,11 @@ from engine.state import Scope
 __all__ = [
     "DEFAULT_DEVICE_CONFIG",
     "DeviceConfig",
+    "MatrixPixelsConfig",
+    "NeoPixelPixelsConfig",
+    "NeoPixelScopeConfig",
     "parse_device_config",
+    "validate_band_map",
 ]
 
 # ---------------------------------------------------------------------------
@@ -28,18 +32,20 @@ _VALID_IR_EMITTER_KEYS: Final = {"line", "cone", "area_of_effect"}
 # ---------------------------------------------------------------------------
 
 DEFAULT_DEVICE_CONFIG: Final = {
-    "pixels": {
-        "type": "matrix",
-        "cols": 13,
-        "scope_rows": {
-            "global.buff": [0, 1],
-            "global.debuff": [1, 2],
-            "global.main": [2, 5],
-            "personal": [5, 7],
-            "directional": [7, 8],
-            "ambient": [8, 9],
-        },
-    },
+    "pixels": [
+        {
+            "type": "matrix",
+            "cols": 13,
+            "scope_rows": {
+                "global.buff": [0, 1],
+                "global.debuff": [1, 2],
+                "global.main": [2, 5],
+                "personal": [5, 7],
+                "directional": [7, 8],
+                "ambient": [8, 9],
+            },
+        }
+    ],
     "buttons": ["D9", "D10"],
     "ir": {
         "rx": "D11",
@@ -119,15 +125,48 @@ class DeviceConfig:
 
     def __init__(
         self,
-        pixels: MatrixPixelsConfig | NeoPixelPixelsConfig,
+        pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig],
         buttons: list[str],
         ir: IRConfig | None,
         audio: AudioConfig | None,
     ) -> None:
-        self.pixels: MatrixPixelsConfig | NeoPixelPixelsConfig = pixels
+        self.pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = pixels
         self.buttons: list[str] = buttons
         self.ir: IRConfig | None = ir
         self.audio: AudioConfig | None = audio
+
+
+# ---------------------------------------------------------------------------
+# Band-map validator (shared)
+# ---------------------------------------------------------------------------
+
+
+def validate_band_map(bands: dict[str, range], context: str) -> None:
+    """Validate that all scope keys are valid and bands do not overlap.
+
+    Args:
+        bands: Mapping of scope key → range.
+        context: Label used in error messages (e.g. ``"pixels[0].scope_rows"``).
+
+    Raises:
+        ValueError: If a key is invalid or two bands overlap.
+    """
+    for key in bands:
+        if key not in _VALID_SCOPE_KEYS:
+            valid = ", ".join(sorted(_VALID_SCOPE_KEYS))
+            raise ValueError(f"{context} key '{key}' is not valid; valid keys: {valid}")
+
+    # Check pairwise overlap: two ranges [a,b) and [c,d) overlap if a<d and c<b.
+    items = list(bands.items())
+    for i in range(len(items)):
+        ka, ra = items[i]
+        for j in range(i + 1, len(items)):
+            kb, rb = items[j]
+            if ra.start < rb.stop and rb.start < ra.stop:
+                raise ValueError(
+                    f"{context}: bands '{ka}' ({ra.start}-{ra.stop}) and "
+                    f"'{kb}' ({rb.start}-{rb.stop}) overlap"
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -135,21 +174,21 @@ class DeviceConfig:
 # ---------------------------------------------------------------------------
 
 
-def _parse_matrix_pixels(mapping: dict) -> MatrixPixelsConfig:
+def _parse_matrix_pixels(mapping: dict, entry_index: int) -> MatrixPixelsConfig:
+    label = f"pixels[{entry_index}]"
     if "cols" not in mapping:
-        raise ValueError("pixels.cols is required for matrix type")
+        raise ValueError(f"{label}.cols is required for matrix type")
     if "scope_rows" not in mapping:
-        raise ValueError("pixels.scope_rows is required for matrix type")
+        raise ValueError(f"{label}.scope_rows is required for matrix type")
 
     cols = mapping["cols"]
     raw_scope_rows = mapping["scope_rows"]
 
     scope_rows: dict[str, range] = {}
     for key, value in raw_scope_rows.items():
-        if key not in _VALID_SCOPE_KEYS:
-            valid = ", ".join(sorted(_VALID_SCOPE_KEYS))
-            raise ValueError(f"pixels.scope_rows key '{key}' is not valid; valid keys: {valid}")
         scope_rows[key] = range(value[0], value[1])
+
+    validate_band_map(scope_rows, f"{label}.scope_rows")
 
     return MatrixPixelsConfig(cols=cols, scope_rows=scope_rows)
 
@@ -178,13 +217,17 @@ def _parse_neopixel_pixels(mapping: dict) -> NeoPixelPixelsConfig:
     return NeoPixelPixelsConfig(scopes=scopes)
 
 
-def _parse_pixels(mapping: dict) -> MatrixPixelsConfig | NeoPixelPixelsConfig:
+def _parse_pixels_entry(
+    mapping: dict, entry_index: int
+) -> MatrixPixelsConfig | NeoPixelPixelsConfig:
     pixels_type = mapping.get("type")
     if pixels_type == "matrix":
-        return _parse_matrix_pixels(mapping)
+        return _parse_matrix_pixels(mapping, entry_index)
     if pixels_type == "neopixel":
         return _parse_neopixel_pixels(mapping)
-    raise ValueError(f"pixels.type '{pixels_type}' is not valid; expected 'matrix' or 'neopixel'")
+    raise ValueError(
+        f"pixels[{entry_index}].type '{pixels_type}' is not valid; expected 'matrix' or 'neopixel'"
+    )
 
 
 def _parse_buttons(buttons_raw: list) -> list[str]:
@@ -234,11 +277,47 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
 def parse_device_config(mapping: dict) -> DeviceConfig:
     """Parse a device config mapping into a DeviceConfig.
 
+    The ``pixels`` key must be a list of pixel-output entries.  Each entry
+    must have a ``type`` field of ``"matrix"`` or ``"neopixel"``.  The list
+    must contain at least one entry, and at most one entry of type
+    ``"matrix"``.
+
+    Example ``aura-device.json`` snippet::
+
+        {
+            "pixels": [
+                {
+                    "type": "matrix",
+                    "cols": 13,
+                    "scope_rows": {
+                        "global.main": [2, 5],
+                        "personal": [5, 7]
+                    }
+                }
+            ],
+            "buttons": ["D9", "D10"]
+        }
+
     Raises:
         ValueError: If any required field is missing or invalid.
     """
-    pixels_raw = mapping.get("pixels", {})
-    pixels = _parse_pixels(pixels_raw)
+    pixels_raw = mapping.get("pixels", [])
+
+    if not isinstance(pixels_raw, list):
+        raise ValueError("pixels must be a list of pixel-output entries")
+
+    if len(pixels_raw) == 0:
+        raise ValueError("pixels must contain at least one entry")
+
+    pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = []
+    matrix_count = 0
+    for i, entry in enumerate(pixels_raw):
+        parsed = _parse_pixels_entry(entry, i)
+        if isinstance(parsed, MatrixPixelsConfig):
+            matrix_count += 1
+            if matrix_count > 1:
+                raise ValueError(f"pixels[{i}]: only one matrix entry is allowed")
+        pixels.append(parsed)
 
     buttons_raw = mapping.get("buttons", [])
     buttons = _parse_buttons(buttons_raw)
