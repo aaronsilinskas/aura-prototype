@@ -48,8 +48,8 @@ def _mock_board(**pins):
 # ---------------------------------------------------------------------------
 
 
-def test_build_hardware_neopixel_returns_neopixel_effect_output() -> None:
-    """build_hardware produces a NeoPixelEffectOutput when pixels.type='neopixel'."""
+def test_build_hardware_neopixel_produces_one_output_per_scope() -> None:
+    """build_hardware produces one NeoPixelEffectOutput per configured scope."""
     from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 
     config = _neopixel_config()
@@ -71,11 +71,11 @@ def test_build_hardware_neopixel_returns_neopixel_effect_output() -> None:
         hw = build_hardware(config, board_module=board_mock)
 
     pixel_outputs = [o for o in hw.outputs if isinstance(o, NeoPixelEffectOutput)]
-    assert len(pixel_outputs) == 1
+    assert len(pixel_outputs) == 2
 
 
-def test_build_hardware_neopixel_output_has_correct_scopes() -> None:
-    """NeoPixelEffectOutput produced by build_hardware declares the configured scopes."""
+def test_build_hardware_neopixel_each_output_declares_one_scope() -> None:
+    """Each NeoPixelEffectOutput produced by build_hardware declares exactly one scope."""
     from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 
     config = _neopixel_config()
@@ -96,9 +96,11 @@ def test_build_hardware_neopixel_output_has_correct_scopes() -> None:
 
         hw = build_hardware(config, board_module=board_mock)
 
-    output = next(o for o in hw.outputs if isinstance(o, NeoPixelEffectOutput))
-    scope_keys = {sv.keys[0] for sv in output.scopes}
-    assert scope_keys == {"personal", "directional"}
+    pixel_outputs = [o for o in hw.outputs if isinstance(o, NeoPixelEffectOutput)]
+    all_scope_keys = {sv.keys[0] for o in pixel_outputs for sv in o.scopes}
+    assert all_scope_keys == {"personal", "directional"}
+    for o in pixel_outputs:
+        assert len(o.scopes) == 1
 
 
 def test_build_hardware_neopixel_output_resolves_pin_names() -> None:

@@ -1,4 +1,4 @@
-"""NeoPixel-per-scope effect output — one strip per configured leaf scope.
+"""NeoPixel effect output — one strip per scope, one instance per scope.
 
 The ``neopixel`` import lives only in ``device_builder`` (which supplies
 already-initialised strip objects), keeping this module testable under CPython.
@@ -14,54 +14,49 @@ __all__ = ["NeoPixelEffectOutput"]
 
 
 class NeoPixelEffectOutput(EffectOutput):
-    """Routes one NeoPixel strip per configured leaf scope.
+    """Routes a single NeoPixel strip for one configured leaf scope.
 
     Args:
-        strips: Mapping of scope key → strip object supporting
-            ``strip[i] = color`` (packed RGB int) and ``strip.show()``.
-        counts: Mapping of scope key → pixel count for that strip.
-        brightnesses: Mapping of scope key → per-scope brightness in
-            [0.0, 1.0], applied on top of the per-effect receipt brightness.
+        scope_key: The scope key this output serves.
+        strip: Strip object supporting ``strip[i] = color`` (packed RGB int)
+            and ``strip.show()``.
+        count: Number of pixels on the strip.
+        brightness: Per-scope brightness in [0.0, 1.0], applied on top of the
+            per-effect receipt brightness.
     """
 
-    __slots__ = ("_brightnesses", "_counts", "_strips", "_zero_bufs", "min_resolution", "scopes")
+    __slots__ = ("_brightness", "_count", "_strip", "min_resolution", "scopes")
 
     def __init__(
         self,
-        strips: dict[str, object],
-        counts: dict[str, int],
-        brightnesses: dict[str, float],
+        scope_key: str,
+        strip: object,
+        count: int,
+        brightness: float = 1.0,
     ) -> None:
         super().__init__()
-        self._strips: dict[str, object] = strips
-        self._counts: dict[str, int] = counts
-        self._brightnesses: dict[str, float] = brightnesses
-
-        self._zero_bufs: dict[str, PixelBuffer] = {
-            key: PixelBuffer(count) for key, count in counts.items()
-        }
-
-        self.scopes: list[ScopeValue] = [ScopeValue(key) for key in strips]
-        self.min_resolution: int = max(counts.values()) if counts else 0
+        self._strip = strip
+        self._count: int = count
+        self._brightness: float = brightness
+        self.scopes: list[ScopeValue] = [ScopeValue(scope_key)]
+        self.min_resolution: int = count
 
     def create_buffer(self, scope_key: str) -> PixelBuffer:
-        return PixelBuffer(self._counts[scope_key])
+        return PixelBuffer(self._count)
 
     def update_pixels(self, scope_key: str, buffers: list, receipts: list) -> None:
-        strip = self._strips[scope_key]
-        count = self._counts[scope_key]
+        strip = self._strip
+        count = self._count
 
         if not buffers:
-            zero = self._zero_bufs[scope_key]
             for i in range(count):
-                strip[i] = zero[i]
+                strip[i] = 0
             return
 
         pixels = buffers[-1]
         receipt = receipts[-1] if receipts else None
         effect_brightness = receipt.brightness if receipt is not None else 1.0
-        scope_brightness = self._brightnesses.get(scope_key, 1.0)
-        brightness = effect_brightness * scope_brightness
+        brightness = effect_brightness * self._brightness
 
         if brightness == 1.0:
             for i in range(count):
@@ -75,11 +70,9 @@ class NeoPixelEffectOutput(EffectOutput):
                 strip[i] = (r << 16) | (g << 8) | b
 
     def clear_pixels(self, scope_key: str) -> None:
-        strip = self._strips[scope_key]
-        count = self._counts[scope_key]
-        for i in range(count):
+        strip = self._strip
+        for i in range(self._count):
             strip[i] = 0
 
     def flush(self) -> None:
-        for strip in self._strips.values():
-            strip.show()
+        self._strip.show()

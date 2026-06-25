@@ -97,20 +97,17 @@ def build_hardware(
             )
         )
     elif isinstance(config.pixels, NeoPixelPixelsConfig):
-        strips: dict[str, object] = {}
-        counts: dict[str, int] = {}
-        brightnesses: dict[str, float] = {}
         for scope_key, scope_cfg in config.pixels.scopes.items():
             pin = _resolve_pin(board_module, f"pixels.scopes.{scope_key}.pin", scope_cfg.pin)
-            strips[scope_key] = neopixel.NeoPixel(
+            strip = neopixel.NeoPixel(
                 pin,
                 scope_cfg.count,
                 pixel_order=scope_cfg.order,
                 auto_write=False,
             )
-            counts[scope_key] = scope_cfg.count
-            brightnesses[scope_key] = scope_cfg.brightness
-        outputs.append(NeoPixelEffectOutput(strips, counts, brightnesses))
+            outputs.append(
+                NeoPixelEffectOutput(scope_key, strip, scope_cfg.count, scope_cfg.brightness)
+            )
 
     button_pins = [
         _resolve_pin(board_module, f"buttons[{i}]", name) for i, name in enumerate(config.buttons)
