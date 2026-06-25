@@ -43,7 +43,7 @@ import time
 import board
 import neopixel
 
-from effects.effect import EffectConfig, PixelBuffer
+from effects.effect import Effect, EffectConfig, PixelBuffer
 from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectBuilder
 from engine.packs import PackRegistry
@@ -56,7 +56,7 @@ PIXELS_PIN = board.D5
 # power.switch_to_output(value=True)
 # PIXELS_PIN=board.EXTERNAL_NEOPIXELS
 
-pixels = neopixel.NeoPixel(pin=PIXELS_PIN, n=NUM_LEDS, brightness=0.5, auto_write=False)
+pixels = neopixel.NeoPixel(pin=PIXELS_PIN, n=NUM_LEDS, brightness=0.3, auto_write=False)
 
 SAMPLE_LEVELS = [1, 4, 7, 10]
 DISPLAY_SECONDS = 10.0
@@ -71,7 +71,7 @@ def logging_listener(event_name: str) -> None:
     print(f"Event: {event_name}")
 
 
-def create_effect(element: str, level: int):
+def create_effect(element: str, level: int) -> Effect:
     config = EffectConfig(
         resolution=NUM_LEDS * 3,
         options={"level": level},
@@ -102,12 +102,12 @@ while True:
     perf.start_frame()
 
     perf.start_update_time()
-    current_effect.update(elapsed_time)
+    current_effect.pixels.update(elapsed_time)
     perf.add_update_time()
 
     perf.start_render_time()
     output = PixelBuffer(NUM_LEDS)
-    current_effect.render(output)
+    current_effect.pixels.render(output)
     for led_index in range(NUM_LEDS):
         pixels[led_index] = output[led_index]
     perf.add_render_time()
