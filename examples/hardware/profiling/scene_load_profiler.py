@@ -164,7 +164,7 @@ HARNESSES: Final = {
         "num_voices": 4,
         "ir": "tag",
     },
-    # examples/hardware/red_light_green_light_demo.py
+    # examples/hardware/scene_demo.py (scene="red_light_green_light")
     "red_light_green_light": {
         "audio_clips": {
             "ready_start": "sounds/red_light_green_light.wav",
@@ -178,7 +178,7 @@ HARNESSES: Final = {
         "num_voices": 2,
         "ir": None,
     },
-    # examples/hardware/hardware_test_demo.py
+    # examples/hardware/scene_demo.py (scene="hardware_test")
     "hardware_test": {
         "audio_clips": {
             "sfx_test_start": "sounds/blip.wav",
