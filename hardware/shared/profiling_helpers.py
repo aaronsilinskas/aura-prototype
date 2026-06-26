@@ -34,7 +34,7 @@ def board_id() -> str:
     return sys.platform
 
 
-def print_table_row(table: str, cells: list, driver: str = "-") -> None:
+def print_table_row(table: str, cells: list[object], driver: str = "-") -> None:
     """Print a paste-ready ``recorded-metrics.md`` row for ``table``.
 
     Prepends the row key every metrics table shares -- board, runtime, and
@@ -58,7 +58,7 @@ def print_table_row(table: str, cells: list, driver: str = "-") -> None:
     print(row)
 
 
-def format_table_row(cells: list) -> str:
+def format_table_row(cells: list[object]) -> str:
     """Join pre-formatted ``cells`` into a markdown table row.
 
     Each profiler formats its own cell values (it knows the units and the
@@ -69,7 +69,7 @@ def format_table_row(cells: list) -> str:
     return "| " + " | ".join(str(cell) for cell in cells) + " |"
 
 
-def format_runtime_id(name: str, version: tuple) -> str:
+def format_runtime_id(name: str, version: tuple[int, ...]) -> str:
     """Format an implementation name and version into the table key style.
 
     The ``recorded-metrics.md`` tables key every row by runtime as

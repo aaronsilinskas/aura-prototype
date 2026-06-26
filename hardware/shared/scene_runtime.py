@@ -16,6 +16,7 @@ from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
+from hardware.shared.ir_protocol import InfraredDecoder, InfraredEncoder
 from hardware.shared.scene_selection import DEFAULT_SCENE
 
 __all__ = ["run_scene"]
@@ -40,8 +41,8 @@ def _resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
 
 def run_scene(
     scene_name: str,
-    ir_encoder: object | None = None,
-    ir_decoder: object | None = None,
+    ir_encoder: InfraredEncoder | None = None,
+    ir_decoder: InfraredDecoder | None = None,
 ) -> None:
     """Bring hardware up via ``build_hardware`` and run *scene_name* forever.
 

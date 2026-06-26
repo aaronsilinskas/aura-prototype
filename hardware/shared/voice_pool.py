@@ -10,6 +10,8 @@ Imports no CircuitPython modules (``audiobusio`` / ``audiocore`` /
 ``audiomixer`` / ``board``).
 """
 
+from __future__ import annotations
+
 from engine.state import EffectReceipt
 
 
@@ -54,11 +56,11 @@ class _Slot:
     __slots__ = ("claim_seq", "is_loop", "loudness", "receipt", "stops_receipt")
 
     def __init__(self) -> None:
-        self.receipt = None
-        self.is_loop = False
-        self.stops_receipt = False
-        self.loudness = 1.0
-        self.claim_seq = 0
+        self.receipt: EffectReceipt | None = None
+        self.is_loop: bool = False
+        self.stops_receipt: bool = False
+        self.loudness: float = 1.0
+        self.claim_seq: int = 0
 
     def reset(self) -> None:
         """Clear the slot back to idle (``receipt is None``)."""

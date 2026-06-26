@@ -12,12 +12,15 @@ import adafruit_is31fl3741
 import board
 import busio
 import digitalio
+import microcontroller
 import neopixel
 import pulseio
 from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
 from engine.audio import AudioRegistry
+from engine.effects.manager import EffectOutput
 from engine.network import AREA_OF_EFFECT, CONE, LINE, HardwareNetworkControls
+from engine.state import NetworkControls
 from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
@@ -53,20 +56,20 @@ class DeviceHardware:
 
     def __init__(
         self,
-        outputs: list[object],
-        buttons: object,
+        outputs: list[EffectOutput],
+        buttons: DebouncedButtons,
         accelerometer: object | None,
-        network_controls: HardwareNetworkControls,
-        ir_receiver: object | None,
+        network_controls: NetworkControls,
+        ir_receiver: InfraredSingleReceiver | None,
     ) -> None:
-        self.outputs: list[object] = outputs
-        self.buttons: object = buttons
+        self.outputs: list[EffectOutput] = outputs
+        self.buttons: DebouncedButtons = buttons
         self.accelerometer: object | None = accelerometer
-        self.network_controls: HardwareNetworkControls = network_controls
-        self.ir_receiver: object | None = ir_receiver
+        self.network_controls: NetworkControls = network_controls
+        self.ir_receiver: InfraredSingleReceiver | None = ir_receiver
 
 
-def _resolve_pin(board_module: object, field: str, name: str) -> object:
+def _resolve_pin(board_module: object, field: str, name: str) -> microcontroller.Pin:
     try:
         return getattr(board_module, name)
     except AttributeError:
@@ -80,12 +83,12 @@ def _setup_external_power() -> None:
     power.switch_to_output(value=True)
 
 
-def _setup_i2c() -> object:
+def _setup_i2c() -> busio.I2C:
     """Return an I2C bus on the board's default SDA/SCL pins."""
     return busio.I2C(board.SCL, board.SDA)
 
 
-def _setup_matrix_is31fl3741(i2c: object) -> object:
+def _setup_matrix_is31fl3741(i2c: busio.I2C) -> Adafruit_RGBMatrixQT:
     """Return a configured IS31FL3741 driver on *i2c*.
 
     Retries until the matrix responds (useful if the I2C bus is still
@@ -104,7 +107,7 @@ def _setup_matrix_is31fl3741(i2c: object) -> object:
     return matrix
 
 
-def _setup_buttons(*pins: object) -> DebouncedButtons:
+def _setup_buttons(*pins: microcontroller.Pin) -> DebouncedButtons:
     """Return a ``DebouncedButtons`` instance for the given pins with pull-up resistors."""
     labels = [chr(ord("A") + i) for i in range(len(pins))]
     pairs = []
@@ -115,7 +118,7 @@ def _setup_buttons(*pins: object) -> DebouncedButtons:
     return DebouncedButtons(pairs)
 
 
-def _setup_accelerometer(i2c: object) -> object | None:
+def _setup_accelerometer(i2c: busio.I2C) -> object | None:
     """Return a configured LIS3DH accelerometer on *i2c*, or ``None`` if absent.
 
     Prints a distinct warning depending on the failure mode:
@@ -136,7 +139,7 @@ def _setup_accelerometer(i2c: object) -> object | None:
         return None
 
 
-def _setup_drv2605(i2c: object) -> object | None:
+def _setup_drv2605(i2c: busio.I2C) -> object | None:
     """Return a configured DRV2605 haptic motor driver on *i2c*, or ``None`` if absent.
 
     Prints a distinct warning depending on the failure mode:
@@ -158,10 +161,10 @@ def _setup_drv2605(i2c: object) -> object | None:
 
 
 def _setup_ir(
-    rx_pin: object,
-    line_pin: object,
-    cone_pin: object | None = None,
-    aoe_pin: object | None = None,
+    rx_pin: microcontroller.Pin,
+    line_pin: microcontroller.Pin | None,
+    cone_pin: microcontroller.Pin | None = None,
+    aoe_pin: microcontroller.Pin | None = None,
     encoder: InfraredEncoder | None = None,
     decoder: InfraredDecoder | None = None,
 ) -> tuple[dict[str, InfraredTransmitter], InfraredSingleReceiver]:
@@ -207,8 +210,8 @@ def load_device_config() -> DeviceConfig:
 def build_hardware(
     config: DeviceConfig,
     board_module: object = board,
-    ir_encoder: object | None = None,
-    ir_decoder: object | None = None,
+    ir_encoder: InfraredEncoder | None = None,
+    ir_decoder: InfraredDecoder | None = None,
 ) -> DeviceHardware:
     """Assemble DeviceHardware from a parsed DeviceConfig.
 
@@ -218,7 +221,7 @@ def build_hardware(
     _setup_external_power()
     i2c = _setup_i2c()
 
-    outputs: list[object] = []
+    outputs: list[EffectOutput] = []
 
     for pixels_cfg in config.pixels:
         if isinstance(pixels_cfg, MatrixPixelsConfig):
@@ -293,14 +296,14 @@ def build_hardware(
     if motor is not None:
         outputs.append(Drv2605EffectOutput(motor))
 
-    transmitters: dict[str, object] = {}
+    transmitters: dict[str, InfraredTransmitter] = {}
     ir_receiver = None
     if config.ir is not None:
         encoder = ir_encoder if ir_encoder is not None else AuraInfraredEncoder()
         decoder = ir_decoder if ir_decoder is not None else AuraInfraredDecoder()
 
         rx_pin = _resolve_pin(board_module, "ir.rx", config.ir.rx)
-        emitter_pins: dict[str, object] = {}
+        emitter_pins: dict[str, microcontroller.Pin] = {}
         for emitter_key, pin_name in config.ir.emitters.items():
             emitter_pins[emitter_key] = _resolve_pin(board_module, f"ir.{emitter_key}", pin_name)
 

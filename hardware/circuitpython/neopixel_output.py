@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from effects.effect import PixelBuffer
 from engine.effects.manager import EffectOutput
-from engine.state import ScopeValue
+from engine.state import EffectReceipt, ScopeValue
 
 __all__ = ["NeoPixelEffectOutput"]
 
@@ -43,7 +43,9 @@ class NeoPixelEffectOutput(EffectOutput):
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(len(self._scope_pixels[scope_key]))
 
-    def update_pixels(self, scope_key: str, buffers: list, receipts: list) -> None:
+    def update_pixels(
+        self, scope_key: str, buffers: list[PixelBuffer], receipts: list[EffectReceipt]
+    ) -> None:
         strip = self._strip
         seg = self._scope_pixels[scope_key]
         start = seg.start
