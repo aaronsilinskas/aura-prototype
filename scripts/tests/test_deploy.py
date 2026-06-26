@@ -1,6 +1,8 @@
+import json
 import os
 from pathlib import Path
 
+from hardware.shared.device_config import DEFAULT_DEVICE_CONFIG, parse_device_config
 from scripts.deploy import deploy
 
 # ---------------------------------------------------------------------------
@@ -620,3 +622,79 @@ def test_summary_includes_pruned_count(tmp_path: Path, capsys) -> None:
 
     captured = capsys.readouterr()
     assert "2 pruned" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# --scene flag: write scene to aura-device.json (#489)
+# ---------------------------------------------------------------------------
+
+
+def test_scene_flag_sets_scene_key_in_existing_device_config(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    existing_config = {
+        "pixels": [{"type": "matrix", "cols": 13, "scope_rows": {"personal": [0, 1]}}],
+        "buttons": ["D9"],
+        "audio": {"voices": 2, "max_volume": 0.5, "clips": {}},
+    }
+    (mount / "aura-device.json").write_text(json.dumps(existing_config))
+
+    deploy(None, mount, source_root=source, scene="red_light_green_light")
+
+    result = json.loads((mount / "aura-device.json").read_text())
+    assert result["scene"] == "red_light_green_light"
+
+
+def test_scene_flag_preserves_other_keys_in_existing_device_config(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    existing_config = {
+        "pixels": [{"type": "matrix", "cols": 13, "scope_rows": {"personal": [0, 1]}}],
+        "buttons": ["D9"],
+        "audio": {"voices": 2, "max_volume": 0.5, "clips": {}},
+    }
+    (mount / "aura-device.json").write_text(json.dumps(existing_config))
+
+    deploy(None, mount, source_root=source, scene="tag")
+
+    result = json.loads((mount / "aura-device.json").read_text())
+    assert result["buttons"] == ["D9"]
+    assert result["audio"]["voices"] == 2
+    assert result["pixels"] == existing_config["pixels"]
+
+
+def test_scene_flag_seeds_default_device_config_when_file_is_absent(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source, scene="hardware_test")
+
+    result = json.loads((mount / "aura-device.json").read_text())
+    assert result["scene"] == "hardware_test"
+    for key in DEFAULT_DEVICE_CONFIG:
+        assert key in result
+    parse_device_config(result)
+
+
+def test_omitting_scene_flag_leaves_existing_device_config_untouched(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    original_content = json.dumps({"pixels": [], "buttons": ["D9"], "scene": "tag"})
+    device_config_path = mount / "aura-device.json"
+    device_config_path.write_text(original_content)
+
+    deploy(None, mount, source_root=source)
+
+    assert device_config_path.read_text() == original_content
