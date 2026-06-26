@@ -8,6 +8,8 @@ be unit-tested under CPython without the board imports this module pulls in.
 
 from __future__ import annotations
 
+import gc
+
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.input import AccelerationData, InputEvents
@@ -115,3 +117,4 @@ def run_scene(
 
         manager.update()
         effect_manager.update(timer)
+        gc.collect()
