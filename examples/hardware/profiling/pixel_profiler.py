@@ -6,9 +6,8 @@ render+flush path to find the worst-case per-pixel and flush costs for the
 Sweeps three axes in sequence:
 
 - **pixel count** — `PIXEL_COUNTS`, applied to the active output's strip/matrix size.
-- **effect identity** — cycles every registered element effect (as
-  ``element_perf_demo.py`` does) at a fixed level, to find the worst-case
-  per-pixel cost across all real effects.
+- **effect identity** — cycles every registered element effect at a fixed level,
+  to find the worst-case per-pixel cost across all real effects.
 - **stack depth** — `STACK_DEPTHS`, the number of concurrent ``add_effect`` layers
   on the scope.
 
