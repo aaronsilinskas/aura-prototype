@@ -11,8 +11,6 @@ from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState, Scope
 
-# Two pages, each mapping five scopes to element effect names.
-# Order: BUFF, DEBUFF, MAIN, DIRECTIONAL, PERSONAL
 _ELEMENT_PAGES: Final = (
     (
         (Scope.Global.BUFF, "elements.air"),
@@ -40,8 +38,6 @@ def _apply_page(page: int, level: int, state: GameState) -> None:
 
 
 class ElementBrowserRule(GameRule):
-    """Handles element browsing input for the element_browser scene."""
-
     def __init__(self) -> None:
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 

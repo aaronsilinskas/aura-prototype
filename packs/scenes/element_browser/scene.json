@@ -3,9 +3,12 @@
   "effect_packs": [
     ["elements", "1.0"]
   ],
-  "rule_packs": [],
+  "rule_packs": [
+    ["debug", "1.0"]
+  ],
   "initial_data": {
     "page": 0,
-    "level": 1
+    "level": 1,
+    "event_logging_enabled": false
   }
 }

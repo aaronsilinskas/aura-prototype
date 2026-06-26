@@ -59,3 +59,36 @@ def test_log_entry_includes_elapsed_time(fixture: EngineFixture):
     log_entry = _capture_log_entry(fixture)
 
     assert "t=" in log_entry
+
+
+def test_no_output_when_enabled_key_is_false(fixture: EngineFixture):
+    logger = CapturingLogger()
+    fixture.game_engine.add_rules(EventLoggerRule(output=logger))
+    fixture.state.set("event_logging_enabled", False)
+
+    fixture.state.queue_event(InputEvents.ButtonAndAcceleration(_BUTTON_DATA))
+    fixture.update_engine()
+
+    assert logger.logs == []
+
+
+def test_logs_when_enabled_key_is_true(fixture: EngineFixture):
+    logger = CapturingLogger()
+    fixture.game_engine.add_rules(EventLoggerRule(output=logger))
+    fixture.state.set("event_logging_enabled", True)
+
+    fixture.state.queue_event(InputEvents.ButtonAndAcceleration(_BUTTON_DATA))
+    fixture.update_engine()
+
+    assert len(logger.logs) == 1
+
+
+def test_custom_enabled_key_is_respected(fixture: EngineFixture):
+    logger = CapturingLogger()
+    fixture.game_engine.add_rules(EventLoggerRule(output=logger, enabled_key="my_log_flag"))
+    fixture.state.set("my_log_flag", False)
+
+    fixture.state.queue_event(InputEvents.ButtonAndAcceleration(_BUTTON_DATA))
+    fixture.update_engine()
+
+    assert logger.logs == []

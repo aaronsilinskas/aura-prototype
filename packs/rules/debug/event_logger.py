@@ -1,22 +1,38 @@
 from __future__ import annotations
 
+from engine.engine import GameRule
+from engine.events import Event
+from engine.state import GameState
+
 try:
     from collections.abc import Callable
 except ImportError:
     pass
 
-from engine.engine import GameRule
-from engine.events import Event
-from engine.state import GameState
+
+_DEFAULT_ENABLED_KEY = "event_logging_enabled"
 
 
 class EventLoggerRule(GameRule):
-    """Logs every received event along with all its attributes."""
+    """Logs every received event along with all its attributes.
 
-    def __init__(self, output: Callable[[str], None] = lambda s: print(s)) -> None:
+    Set the state key (default ``"event_logging_enabled"``) to ``False`` in a
+    scene's ``initial_data`` to silence logging for that scene.
+    """
+
+    __slots__ = ("_enabled_key", "_output")
+
+    def __init__(
+        self,
+        output: Callable[[str], None] = lambda s: print(s),
+        enabled_key: str = _DEFAULT_ENABLED_KEY,
+    ) -> None:
         self._output = output
+        self._enabled_key = enabled_key
 
     def handle_event(self, event: Event, state: GameState) -> None:
+        if not state.get(self._enabled_key, True):
+            return
         parts = []
         cls = type(event)
         while cls is not object:
