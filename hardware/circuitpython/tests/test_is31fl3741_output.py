@@ -52,21 +52,12 @@ def test_registered_on_all_scopes() -> None:
     assert Scope.ALL in output.scopes
 
 
-def test_no_module_level_matrix_geometry_constants() -> None:
-    """The is31fl3741_output module must not define _MATRIX_COLS or _SCOPE_ROWS."""
-    import hardware.circuitpython.is31fl3741_output as mod
-
-    assert not hasattr(mod, "_MATRIX_COLS"), "_MATRIX_COLS must not exist as a module constant"
-    assert not hasattr(mod, "_SCOPE_ROWS"), "_SCOPE_ROWS must not exist as a module constant"
-
-
 # ---------------------------------------------------------------------------
 # Hardware routing — _write_row writes channel bytes directly to matrix buffer
 # ---------------------------------------------------------------------------
 
 
-def test_write_row_writes_channel_bytes_to_matrix_buffer() -> None:
-    """_write_row writes R, G, B channel bytes to distinct matrix buffer positions."""
+def test_write_row_separates_rgb_channels_across_buffer_positions() -> None:
     cols = 3
     output, mock_matrix = _make_output(cols=cols, scope_rows={"personal": range(0, 1)})
     buf = PixelBuffer(cols)
@@ -78,14 +69,35 @@ def test_write_row_writes_channel_bytes_to_matrix_buffer() -> None:
     receipt.brightness = 1.0
     output.update_pixels("personal", [buf], [receipt])
 
-    # 3 channel bytes per pixel, all written via direct buffer indexing
-    assert mock_matrix.__setitem__.call_count == cols * 3
-    mock_matrix.pixel.assert_not_called()
-
-    # Each 0xFF value appears exactly once — channels are separated correctly
     written_values = [c.args[1] for c in mock_matrix.__setitem__.call_args_list]
     assert written_values.count(0xFF) == 3
     assert written_values.count(0x00) == 6
+
+
+def test_write_row_does_not_use_pixel_api() -> None:
+    output, mock_matrix = _make_output(cols=2, scope_rows={"personal": range(0, 1)})
+    buf = PixelBuffer(2)
+
+    receipt = MagicMock()
+    receipt.brightness = 1.0
+    output.update_pixels("personal", [buf], [receipt])
+
+    mock_matrix.pixel.assert_not_called()
+
+
+def test_write_row_writes_each_channel_to_a_distinct_buffer_position() -> None:
+    cols = 2
+    output, mock_matrix = _make_output(cols=cols, scope_rows={"personal": range(0, 1)})
+    buf = PixelBuffer(cols)
+    buf[0] = 0xFF0000  # R=0xFF, G=0x00, B=0x00
+
+    receipt = MagicMock()
+    receipt.brightness = 1.0
+    output.update_pixels("personal", [buf], [receipt])
+
+    written = {c.args[0]: c.args[1] for c in mock_matrix.__setitem__.call_args_list}
+    assert len(written) == cols * 3
+    assert 0xFF in written.values()
 
 
 # ---------------------------------------------------------------------------

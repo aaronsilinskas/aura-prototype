@@ -24,39 +24,20 @@ IS31FL3741_SCOPE_ROWS: Final = {
 
 
 class IS31FL3741EffectOutput(MatrixEffectOutput):
-    """EffectOutput for the IS31FL3741 13×9 RGB LED matrix.
+    """EffectOutput for the IS31FL3741 13×9 RGB LED matrix."""
 
-    Subclasses ``MatrixEffectOutput``; all scope-to-row-band routing lives in
-    the base class.  This subclass provides only the last-mile hardware calls:
-    ``_write_row`` writes pixels via ``self._matrix.pixel(col, row, color)``
-    and ``flush`` calls ``self._matrix.show()``.
-
-    Args:
-        matrix: A configured IS31FL3741 driver instance (e.g.
-            ``Adafruit_RGBMatrixQT``).  Injected at construction so setup
-            code remains in ``device_builder.py`` and this class stays testable.
-        cols: Number of columns in the LED matrix.  Pass ``IS31FL3741_COLS``
-            (13) for the standard Adafruit 13×9 board.
-        scope_rows: Mapping of scope key → row-band ``range`` for this matrix.
-            Pass ``IS31FL3741_SCOPE_ROWS`` for the standard aura wand layout.
-    """
-
-    rowmap: Final = [8, 5, 4, 3, 2, 1, 0, 7, 6]
-    IS3741_BGR: Final = (2 << 4) | (1 << 2) | (0)  # Encode as B,G,R
-    r_offset: Final = 2
-    g_offset: Final = 1
-    b_offset: Final = 0
+    _rowmap: Final = [8, 5, 4, 3, 2, 1, 0, 7, 6]
 
     def __init__(
-        self, matrix: Adafruit_RGBMatrixQT, *, cols: int, scope_rows: dict
+        self, matrix: Adafruit_RGBMatrixQT, *, cols: int, scope_rows: dict[str, range]
     ) -> None:
         super().__init__(cols, scope_rows)
         self.scopes = [Scope.ALL]
         self._matrix = matrix
-        num_rows = len(self.rowmap)
+        num_rows = len(self._rowmap)
         offsets: array[int] = array("H", [0] * (num_rows * cols * 3))
         for row in range(num_rows):
-            y = self.rowmap[row]
+            y = self._rowmap[row]
             for x in range(cols):
                 base = 3 * (x + y * 10 if x < 10 else x + 80 + y * 3)
                 if x & 1 or x == 12:
