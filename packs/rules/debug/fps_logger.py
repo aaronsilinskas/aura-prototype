@@ -34,7 +34,7 @@ class FpsLoggerRule(GameRule):
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
-        if not state.get(self._enabled_key, True):
+        if not state.get(self._enabled_key, False):
             return
         self._frames += 1
         now = self._clock()

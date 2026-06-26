@@ -12,6 +12,7 @@ def _make_fixture_with_logger(start_time: float = 0.0):
     clock_time = [start_time]
     rule = FpsLoggerRule(output=logger, clock=lambda: clock_time[0])
     fixture.game_engine.add_rules(rule)
+    fixture.state.set("fps_logging_enabled", True)
     return fixture, logger, clock_time
 
 
@@ -19,6 +20,17 @@ def _dispatch(fixture: EngineFixture, n: int = 1) -> None:
     for _ in range(n):
         fixture.state.queue_event(InputEvents.ButtonAndAcceleration(_NO_BUTTONS))
         fixture.update_engine()
+
+
+def test_no_output_by_default():
+    fixture = EngineFixture()
+    logger = CapturingLogger()
+    clock_time = [_WINDOW]
+    fixture.game_engine.add_rules(FpsLoggerRule(output=logger, clock=lambda: clock_time[0]))
+
+    _dispatch(fixture, 10)
+
+    assert logger.logs == []
 
 
 def test_no_output_before_window_elapses():
@@ -73,23 +85,17 @@ def test_prints_once_per_window_not_every_frame():
     assert len(logger.logs) == 1
 
 
-def test_no_output_when_enabled_key_is_false():
-    fixture, logger, clock_time = _make_fixture_with_logger()
-    fixture.state.set("fps_logging_enabled", False)
-    clock_time[0] = _WINDOW
-    _dispatch(fixture, 10)
-
-    assert logger.logs == []
-
-
-def test_custom_enabled_key_is_respected():
+def test_custom_enabled_key_controls_output():
     fixture = EngineFixture()
     logger = CapturingLogger()
-    clock_time = [0.0]
+    clock_time = [_WINDOW]
     rule = FpsLoggerRule(output=logger, clock=lambda: clock_time[0], enabled_key="my_fps_flag")
     fixture.game_engine.add_rules(rule)
-    fixture.state.set("my_fps_flag", False)
-    clock_time[0] = _WINDOW
-    _dispatch(fixture, 10)
 
+    _dispatch(fixture, 10)
     assert logger.logs == []
+
+    fixture.state.set("my_fps_flag", True)
+    clock_time[0] = _WINDOW * 2
+    _dispatch(fixture)
+    assert len(logger.logs) == 1

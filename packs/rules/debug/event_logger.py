@@ -31,7 +31,7 @@ class EventLoggerRule(GameRule):
         self._enabled_key = enabled_key
 
     def handle_event(self, event: Event, state: GameState) -> None:
-        if not state.get(self._enabled_key, True):
+        if not state.get(self._enabled_key, False):
             return
         parts = []
         cls = type(event)
