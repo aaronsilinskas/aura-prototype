@@ -698,3 +698,18 @@ def test_omitting_scene_flag_leaves_existing_device_config_untouched(tmp_path: P
     deploy(None, mount, source_root=source)
 
     assert device_config_path.read_text() == original_content
+
+
+def test_scene_flag_with_dry_run_leaves_device_config_untouched(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    original_content = json.dumps({"pixels": [], "buttons": ["D9"], "scene": "tag"})
+    device_config_path = mount / "aura-device.json"
+    device_config_path.write_text(original_content)
+
+    deploy(None, mount, source_root=source, scene="hardware_test", dry_run=True)
+
+    assert device_config_path.read_text() == original_content
