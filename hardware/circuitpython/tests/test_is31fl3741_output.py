@@ -6,7 +6,7 @@ builder can supply hardware values without hard-coded module constants.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 from effects.effect import PixelBuffer
 from engine.state import Scope
@@ -61,28 +61,31 @@ def test_no_module_level_matrix_geometry_constants() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Hardware routing — _write_row delegates to matrix.pixel
+# Hardware routing — _write_row writes channel bytes directly to matrix buffer
 # ---------------------------------------------------------------------------
 
 
-def test_write_row_calls_matrix_pixel_for_each_column() -> None:
-    """_write_row writes each pixel in the row via matrix.pixel(col, row, color)."""
+def test_write_row_writes_channel_bytes_to_matrix_buffer() -> None:
+    """_write_row writes R, G, B channel bytes to distinct matrix buffer positions."""
     cols = 3
     output, mock_matrix = _make_output(cols=cols, scope_rows={"personal": range(0, 1)})
     buf = PixelBuffer(cols)
-    buf[0] = 0xFF0000
-    buf[1] = 0x00FF00
-    buf[2] = 0x0000FF
+    buf[0] = 0xFF0000  # R=0xFF, G=0x00, B=0x00
+    buf[1] = 0x00FF00  # R=0x00, G=0xFF, B=0x00
+    buf[2] = 0x0000FF  # R=0x00, G=0x00, B=0xFF
 
-    # Drive _write_row via update_pixels (the public path)
     receipt = MagicMock()
     receipt.brightness = 1.0
     output.update_pixels("personal", [buf], [receipt])
 
-    assert mock_matrix.pixel.call_count == cols
-    mock_matrix.pixel.assert_has_calls(
-        [call(0, 0, 0xFF0000), call(1, 0, 0x00FF00), call(2, 0, 0x0000FF)]
-    )
+    # 3 channel bytes per pixel, all written via direct buffer indexing
+    assert mock_matrix.__setitem__.call_count == cols * 3
+    mock_matrix.pixel.assert_not_called()
+
+    # Each 0xFF value appears exactly once — channels are separated correctly
+    written_values = [c.args[1] for c in mock_matrix.__setitem__.call_args_list]
+    assert written_values.count(0xFF) == 3
+    assert written_values.count(0x00) == 6
 
 
 # ---------------------------------------------------------------------------
