@@ -12,7 +12,6 @@ from engine.engine import GameEngine, GameRule
 from engine.packs import PackRegistry
 from engine.scene import Scene, SceneManager, SceneRegistry
 from engine.state import EffectControls
-from packs.rules.debug.button_events import ButtonEventsRule
 from packs.rules.debug.event_logger import EventLoggerRule
 
 _PACKS_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
@@ -105,15 +104,6 @@ def test_red_light_green_light_scene_json_does_not_list_own_effect_or_rule_packs
 # --- Rules registry ---
 
 
-def test_button_events_rule_is_a_game_rule() -> None:
-    registry = PackRegistry(item_attr="RULE")
-    registry.scan_dir(_packs_path("rules"), "packs.rules")
-
-    rule = registry.get("debug", "button_events", GameRule)
-
-    assert isinstance(rule, GameRule)
-
-
 def test_event_logger_rule_is_a_game_rule() -> None:
     registry = PackRegistry(item_attr="RULE")
     registry.scan_dir(_packs_path("rules"), "packs.rules")
@@ -129,7 +119,6 @@ def test_debug_exposes_all_expected_rule_modules() -> None:
 
     items = rule_registry.items("debug")
 
-    assert "button_events" in items
     assert "event_logger" in items
 
 
@@ -217,14 +206,6 @@ def loaded_debug_engine():
     manager.load("test_scene")
     manager.update()
     return engine, rule_registry
-
-
-def test_scene_manager_load_wires_button_events_rule_from_pack(
-    loaded_debug_engine,
-) -> None:
-    engine, _ = loaded_debug_engine
-
-    assert any(isinstance(r, ButtonEventsRule) for r in engine.rules)
 
 
 def test_scene_manager_load_wires_event_logger_rule_from_pack(
