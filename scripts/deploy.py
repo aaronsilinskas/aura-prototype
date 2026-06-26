@@ -13,6 +13,7 @@ Usage
 """
 
 import argparse
+import json
 import os
 import shutil
 import sys
@@ -129,11 +130,25 @@ def _sync_file(
         print(f"COPY  {label}")
 
 
+def _write_scene(mount: Path, scene: str) -> None:
+    """Set the ``"scene"`` key in ``aura-device.json``, seeding defaults if absent."""
+    from hardware.shared.device_config import DEFAULT_DEVICE_CONFIG
+
+    device_config_path = mount / "aura-device.json"
+    if device_config_path.exists():
+        config = json.loads(device_config_path.read_text())
+    else:
+        config = dict(DEFAULT_DEVICE_CONFIG)
+    config["scene"] = scene
+    device_config_path.write_text(json.dumps(config, indent=2))
+
+
 def deploy(
     example_file: "Path | None",
     mount: Path,
     source_root: "Path | None" = None,
     dry_run: bool = False,
+    scene: "str | None" = None,
 ) -> int:
     """Deploy to mount. Returns 0 on success, 1 on error.
 
@@ -144,6 +159,7 @@ def deploy(
         source_root: Root of the source tree. Defaults to ``Path.cwd()``.
         dry_run: When True, skip mount validation and print what would be copied
             without writing any files.
+        scene: Scene name to record in ``aura-device.json``; omit to leave it untouched.
     """
     if source_root is None:
         source_root = Path.cwd()
@@ -162,6 +178,9 @@ def deploy(
                 file=sys.stderr,
             )
             return 1
+
+    if scene is not None and not dry_run:
+        _write_scene(mount, scene)
 
     copied: list[Path] = []
     skipped: list[Path] = []
@@ -235,8 +254,18 @@ def main() -> None:
         default=False,
         help="Print what would be copied without writing any files. Skips mount validation.",
     )
+    parser.add_argument(
+        "--scene",
+        type=str,
+        default=None,
+        help=(
+            "Scene name to record in aura-device.json on the mounted volume. "
+            "Combines deploying code and selecting the game into one step. "
+            "Omit to leave any existing aura-device.json untouched."
+        ),
+    )
     args = parser.parse_args()
-    sys.exit(deploy(args.example_file, args.mount, dry_run=args.dry_run))
+    sys.exit(deploy(args.example_file, args.mount, dry_run=args.dry_run, scene=args.scene))
 
 
 if __name__ == "__main__":
