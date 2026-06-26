@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from effects.effect import PixelBuffer
 from engine.effects.manager import EffectOutput
+from engine.state import EffectReceipt
 
 
 class MatrixEffectOutput(EffectOutput):
@@ -10,7 +13,7 @@ class MatrixEffectOutput(EffectOutput):
     last-mile hardware calls.
     """
 
-    def __init__(self, cols: int, scope_rows: dict) -> None:
+    def __init__(self, cols: int, scope_rows: dict[str, range]) -> None:
         self.min_resolution = cols
         self._cols = cols
         self._scope_rows = scope_rows
@@ -20,7 +23,9 @@ class MatrixEffectOutput(EffectOutput):
         """Return a PixelBuffer sized for one row of the matrix (``cols`` pixels)."""
         return PixelBuffer(self._cols)
 
-    def update_pixels(self, scope_key: str, buffers: list, receipts: list) -> None:
+    def update_pixels(
+        self, scope_key: str, buffers: list[PixelBuffer], receipts: list[EffectReceipt]
+    ) -> None:
         """Render each buffer into the scope's row band via ``_write_row``."""
         row_band = self._scope_rows[scope_key]
         receipt = receipts[-1] if receipts else None

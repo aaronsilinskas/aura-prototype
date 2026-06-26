@@ -15,6 +15,10 @@ for _name in (
 ):
     sys.modules.setdefault(_name, types.ModuleType(_name))
 
+_microcontroller_mod = types.ModuleType("microcontroller")
+_microcontroller_mod.Pin = type("Pin", (), {})  # type: ignore[attr-defined]
+sys.modules.setdefault("microcontroller", _microcontroller_mod)
+
 _board = sys.modules["board"]
 
 # ---------------------------------------------------------------------------

@@ -16,6 +16,10 @@ Design notes
   the inner loop allocates nothing per tick.
 """
 
+from array import array
+
+from hardware.shared.ir_protocol import InfraredDecoder, InfraredEncoder
+
 # ---------------------------------------------------------------------------
 # Port abstractions
 # ---------------------------------------------------------------------------
@@ -28,7 +32,7 @@ class PulseWriter:
     connect to hardware (e.g. ``pulseio.PulseOut``) or a test fake.
     """
 
-    def write_pulses(self, durations: "list[int]") -> None:
+    def write_pulses(self, durations: "array[int] | list[int]") -> None:
         """Transmit a sequence of pulse durations in microseconds.
 
         Args:
@@ -77,7 +81,7 @@ class InfraredTransmitter:
             that converts bytes to a pulse-duration array.
     """
 
-    def __init__(self, pulse_writer: PulseWriter, encoder) -> None:
+    def __init__(self, pulse_writer: PulseWriter, encoder: InfraredEncoder) -> None:
         self._writer = pulse_writer
         self._encoder = encoder
 
@@ -159,7 +163,7 @@ class InfraredSingleReceiver(InfraredReceiver):
             that processes pulses and returns a payload when a packet completes.
     """
 
-    def __init__(self, pulse_reader: PulseReader, decoder) -> None:
+    def __init__(self, pulse_reader: PulseReader, decoder: InfraredDecoder) -> None:
         self._reader = pulse_reader
         self._decoder = decoder
 
@@ -225,7 +229,11 @@ class InfraredMultiReceiver(InfraredReceiver):
             the winning packet, or ``None`` before first.
     """
 
-    def __init__(self, pulse_readers, decoder_factory) -> None:
+    def __init__(
+        self,
+        pulse_readers: "list[PulseReader]",
+        decoder_factory: "object",
+    ) -> None:
         # Freeze the reader list and create one decoder per reader
         self._readers = list(pulse_readers)
         self._decoders = [decoder_factory() for _ in self._readers]
@@ -234,14 +242,14 @@ class InfraredMultiReceiver(InfraredReceiver):
         # Pre-allocate per-receiver scratch: one slot per reader for (margin, index)
         # _scratch_margins[i] holds the error_margin from reader i when it fires
         # _scratch_fired[i] is True when reader i produced a packet this tick
-        self._scratch_margins = [0] * self._count
-        self._scratch_fired = [False] * self._count
-        self._scratch_packets = [None] * self._count
+        self._scratch_margins: list[int] = [0] * self._count
+        self._scratch_fired: list[bool] = [False] * self._count
+        self._scratch_packets: list[bytearray | None] = [None] * self._count  # type: ignore[list-item]
 
         # Telemetry from the last winning packet
-        self._last_signal_strength = None
-        self._last_error_margin = None
-        self._last_best_receiver = None
+        self._last_signal_strength: float | None = None
+        self._last_error_margin: int | None = None
+        self._last_best_receiver: PulseReader | None = None
 
     def receive(self) -> "bytearray | None":
         """Poll all readers and return the best packet this tick, or ``None``.

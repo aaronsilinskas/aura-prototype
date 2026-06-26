@@ -93,5 +93,10 @@ class CountingI2C:
         self._inner.__enter__()
         return self
 
-    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object,
+    ) -> None:
         self._inner.__exit__(exc_type, exc_val, exc_tb)  # type: ignore
