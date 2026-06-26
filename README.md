@@ -128,12 +128,12 @@ via `ir_encoder` / `ir_decoder` — `tag_demo.py` passes `TagInfraredEncoder/Dec
 
 ### Running an example
 
-Standard scenes (e.g. `hardware_test`, `red_light_green_light`) are selected via the
-`"scene"` key in `aura-device.json` and run through `scene_demo.py`:
+Standard scenes (e.g. `hardware_test`, `red_light_green_light`, `element_browser`) are
+selected via the `"scene"` key in `aura-device.json` and run through `scene_demo.py`:
 
 ```json
 {
-  "scene": "red_light_green_light",
+  "scene": "element_browser",
   "pixels": { "..." : "..." },
   "buttons": ["D9", "D10"]
 }
@@ -145,8 +145,5 @@ python scripts/deploy_watch.py examples/hardware/scene_demo.py
 
 # Tag demo — retained separately because it injects the Tag IR codec at build time:
 python scripts/deploy_watch.py examples/hardware/tag_demo.py
-
-# PropMaker performance demo — watch until first FPS line:
-python scripts/deploy_watch.py examples/hardware/propmaker_demo.py --until FPS
 ```
 
