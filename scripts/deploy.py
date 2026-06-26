@@ -19,6 +19,8 @@ import shutil
 import sys
 from pathlib import Path
 
+from hardware.shared.device_config import DEFAULT_DEVICE_CONFIG
+
 try:
     from typing import Final
 except ImportError:
@@ -132,8 +134,6 @@ def _sync_file(
 
 def _write_scene(mount: Path, scene: str) -> None:
     """Set the ``"scene"`` key in ``aura-device.json``, seeding defaults if absent."""
-    from hardware.shared.device_config import DEFAULT_DEVICE_CONFIG
-
     device_config_path = mount / "aura-device.json"
     if device_config_path.exists():
         config = json.loads(device_config_path.read_text())
