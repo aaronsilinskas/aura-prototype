@@ -186,7 +186,9 @@ def test_button_b_increments_level_and_reapplies_current_page(spy):
     _dispatch(state, engine, _button_b_event())
 
     assert len(spy.set_effect_calls) == 5
-    for _, _, opts in spy.set_effect_calls:
+    for i, (scope, name, opts) in enumerate(spy.set_effect_calls):
+        assert scope is _PAGE_0_SCOPES[i]
+        assert name == _PAGE_0_EFFECTS[i]
         assert opts == {"level": 2}
 
 
