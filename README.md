@@ -128,14 +128,25 @@ via `ir_encoder` / `ir_decoder` — `tag_demo.py` passes `TagInfraredEncoder/Dec
 
 ### Running an example
 
-```sh
-# Deploy and watch serial output:
-python scripts/deploy_watch.py examples/hardware/propmaker_demo.py --until FPS
+Standard scenes (e.g. `hardware_test`, `red_light_green_light`) are selected via the
+`"scene"` key in `aura-device.json` and run through `scene_demo.py`:
 
-# Tag demo — uses Tag IR codec injected at build_hardware() call:
+```json
+{
+  "scene": "red_light_green_light",
+  "pixels": { "..." : "..." },
+  "buttons": ["D9", "D10"]
+}
+```
+
+```sh
+# Deploy scene_demo with a scene selected in aura-device.json:
+python scripts/deploy_watch.py examples/hardware/scene_demo.py
+
+# Tag demo — retained separately because it injects the Tag IR codec at build time:
 python scripts/deploy_watch.py examples/hardware/tag_demo.py
 
-# Red Light Green Light — requires accelerometer on I2C:
-python scripts/deploy_watch.py examples/hardware/red_light_green_light_demo.py
+# PropMaker performance demo — watch until first FPS line:
+python scripts/deploy_watch.py examples/hardware/propmaker_demo.py --until FPS
 ```
 
