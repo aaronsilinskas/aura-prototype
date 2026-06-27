@@ -1,5 +1,6 @@
 """Compile device .py modules to .mpy in a gitignored staging tree before deploy."""
 
+import hashlib
 import os
 import re
 import shutil
@@ -15,6 +16,7 @@ except ImportError:
 from scripts.deploy import _EXCLUDE_DIRS, _EXCLUDE_NAMES, MODULE_DIRS
 
 _RAW_SUFFIXES: Final = {".json", ".txt", ".wav"}
+_HASH_SUFFIX: Final = ".srcsha256"
 
 _REPO_ROOT: Final = Path(__file__).parent.parent
 _DEFAULT_MPY_CROSS: Final = str(_REPO_ROOT / "tools" / "mpy-cross")
@@ -42,10 +44,12 @@ class VersionError(Exception):
 class BuildResult:
     """Summary counts returned by :func:`build`."""
 
-    __slots__ = ("compiled",)
+    __slots__ = ("compiled", "pruned", "skipped")
 
-    def __init__(self, compiled: int) -> None:
+    def __init__(self, compiled: int, skipped: int = 0, pruned: int = 0) -> None:
         self.compiled = compiled
+        self.skipped = skipped
+        self.pruned = pruned
 
 
 def mpy_cross_compile(src: Path, dest: Path) -> None:
@@ -140,18 +144,62 @@ def _is_excluded(rel: Path) -> bool:
     return rel.name in _EXCLUDE_NAMES
 
 
+def _hash_path(dest_mpy: Path) -> Path:
+    return dest_mpy.with_suffix(_HASH_SUFFIX)
+
+
+def _src_content_hash(src: Path) -> str:
+    return hashlib.sha256(src.read_bytes()).hexdigest()
+
+
+def _should_skip_compile(src: Path, dest_mpy: Path) -> bool:
+    """Return True when the staged .mpy is up to date with the source .py.
+
+    Content-hash sidecar makes the skip immune to edits that land within the
+    FAT32 2-second mtime tolerance window (see also ``_should_skip`` in deploy).
+    """
+    hp = _hash_path(dest_mpy)
+    if not dest_mpy.exists() or not hp.exists():
+        return False
+    return hp.read_text().strip() == _src_content_hash(src)
+
+
+def _record_src_hash(src: Path, dest_mpy: Path) -> None:
+    _hash_path(dest_mpy).write_text(_src_content_hash(src))
+
+
+def _prune_staging(source_root: Path, staging_root: Path) -> int:
+    """Prune staged .mpy files whose source .py no longer exists.
+
+    Returns the number of .mpy files pruned.
+    """
+    pruned = 0
+    for module in MODULE_DIRS:
+        src_dir = source_root / module
+        dest_dir = staging_root / module
+        if not dest_dir.is_dir():
+            continue
+        for staged_file in sorted(dest_dir.rglob("*.mpy")):
+            rel = staged_file.relative_to(dest_dir)
+            src_py = src_dir / rel.with_suffix(".py")
+            if not src_py.exists():
+                staged_file.unlink(missing_ok=True)
+                _hash_path(staged_file).unlink(missing_ok=True)
+                pruned += 1
+    return pruned
+
+
 def build(
     source_root: Path,
     staging_root: Path,
     compile: Callable[[Path, Path], None],
 ) -> BuildResult:
     """Populate *staging_root* with compiled .mpy and raw data files ready to sync."""
-    # Always start from a clean staging tree.
-    if staging_root.exists():
-        shutil.rmtree(staging_root)
-    staging_root.mkdir(parents=True)
+    staging_root.mkdir(parents=True, exist_ok=True)
+    pruned = _prune_staging(source_root, staging_root)
 
     compiled = 0
+    skipped = 0
 
     try:
         for module in MODULE_DIRS:
@@ -173,11 +221,13 @@ def build(
                 if src_file.suffix == ".py":
                     dest_file = dest_dir / rel.with_suffix(".mpy")
                     dest_file.parent.mkdir(parents=True, exist_ok=True)
+                    if _should_skip_compile(src_file, dest_file):
+                        skipped += 1
+                        continue
                     compile(src_file, dest_file)
-                    # Preserve source mtime so the sync stage can skip unchanged
-                    # files on subsequent deploys (FAT32 2-second tolerance).
                     src_mtime = src_file.stat().st_mtime
                     os.utime(dest_file, (src_mtime, src_mtime))
+                    _record_src_hash(src_file, dest_file)
                     compiled += 1
 
                 elif src_file.suffix in _RAW_SUFFIXES:
@@ -190,7 +240,7 @@ def build(
         shutil.rmtree(staging_root, ignore_errors=True)
         raise
 
-    return BuildResult(compiled=compiled)
+    return BuildResult(compiled=compiled, skipped=skipped, pruned=pruned)
 
 
 def _build_intermediate_inits(
@@ -205,8 +255,10 @@ def _build_intermediate_inits(
         src_init = source_root / pkg_path / "__init__.py"
         if src_init.exists():
             dest_init = staging_root / pkg_path / "__init__.mpy"
-            if not dest_init.exists():
-                dest_init.parent.mkdir(parents=True, exist_ok=True)
-                compile(src_init, dest_init)
-                src_mtime = src_init.stat().st_mtime
-                os.utime(dest_init, (src_mtime, src_mtime))
+            if _should_skip_compile(src_init, dest_init):
+                continue
+            dest_init.parent.mkdir(parents=True, exist_ok=True)
+            compile(src_init, dest_init)
+            src_mtime = src_init.stat().st_mtime
+            os.utime(dest_init, (src_mtime, src_mtime))
+            _record_src_hash(src_init, dest_init)

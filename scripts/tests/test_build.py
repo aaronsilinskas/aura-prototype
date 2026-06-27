@@ -1,5 +1,6 @@
 """Tests for the build stage: compile .py -> .mpy into a staging tree."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -277,3 +278,211 @@ def test_build_compiled_count_matches_py_files_processed(tmp_path: Path) -> None
     result = build(source_root=source, staging_root=staging, compile=fake_compile)
 
     assert result.compiled == 1
+
+
+# ---------------------------------------------------------------------------
+# Incremental build: unchanged modules are skipped
+# ---------------------------------------------------------------------------
+
+
+def test_unchanged_module_is_skipped_on_second_build(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    staging = tmp_path / "build"
+    compile_calls: list[str] = []
+
+    def tracking_compile(src: Path, dest: Path) -> None:
+        compile_calls.append(src.name)
+        fake_compile(src, dest)
+
+    build(source_root=source, staging_root=staging, compile=tracking_compile)
+    compile_calls.clear()
+
+    result = build(source_root=source, staging_root=staging, compile=tracking_compile)
+
+    assert compile_calls == []
+    assert result.skipped > 0
+
+
+def test_changed_module_is_recompiled_on_second_build(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "effects").mkdir()
+    render_py = source / "effects" / "render.py"
+    render_py.write_text("# original")
+    staging = tmp_path / "build"
+    compile_calls: list[str] = []
+
+    def tracking_compile(src: Path, dest: Path) -> None:
+        compile_calls.append(src.name)
+        fake_compile(src, dest)
+
+    build(source_root=source, staging_root=staging, compile=tracking_compile)
+    assert compile_calls == ["render.py"]
+    compile_calls.clear()
+
+    render_py.write_text("# modified")
+
+    result = build(source_root=source, staging_root=staging, compile=tracking_compile)
+
+    assert "render.py" in compile_calls
+    assert result.compiled >= 1
+
+
+def test_only_changed_module_is_recompiled_not_unchanged_sibling(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "effects").mkdir()
+    render_py = source / "effects" / "render.py"
+    render_py.write_text("# original render")
+    (source / "effects" / "palette.py").write_text("# palette")
+    staging = tmp_path / "build"
+    compile_calls: list[str] = []
+
+    def tracking_compile(src: Path, dest: Path) -> None:
+        compile_calls.append(src.name)
+        fake_compile(src, dest)
+
+    build(source_root=source, staging_root=staging, compile=tracking_compile)
+    compile_calls.clear()
+
+    render_py.write_text("# modified render")
+
+    result = build(source_root=source, staging_root=staging, compile=tracking_compile)
+
+    assert "render.py" in compile_calls
+    assert "palette.py" not in compile_calls
+    assert result.compiled == 1
+    assert result.skipped >= 1
+
+
+# ---------------------------------------------------------------------------
+# Incremental build: deleted source prunes the staged .mpy
+# ---------------------------------------------------------------------------
+
+
+def test_deleted_source_py_is_pruned_from_staging_tree(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "effects").mkdir()
+    render_py = source / "effects" / "render.py"
+    render_py.write_text("# render")
+    (source / "effects" / "palette.py").write_text("# palette")
+    staging = tmp_path / "build"
+
+    build(source_root=source, staging_root=staging, compile=fake_compile)
+    assert (staging / "effects" / "render.mpy").exists()
+
+    render_py.unlink()
+
+    result = build(source_root=source, staging_root=staging, compile=fake_compile)
+
+    assert not (staging / "effects" / "render.mpy").exists()
+    assert result.pruned >= 1
+
+
+def test_multiple_deleted_sources_are_all_pruned_from_staging_tree(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "effects").mkdir()
+    (source / "effects" / "a.py").write_text("# a")
+    (source / "effects" / "b.py").write_text("# b")
+    (source / "effects" / "c.py").write_text("# c")
+    staging = tmp_path / "build"
+
+    build(source_root=source, staging_root=staging, compile=fake_compile)
+
+    (source / "effects" / "a.py").unlink()
+    (source / "effects" / "b.py").unlink()
+
+    result = build(source_root=source, staging_root=staging, compile=fake_compile)
+
+    assert result.pruned == 2
+    assert not (staging / "effects" / "a.mpy").exists()
+    assert not (staging / "effects" / "b.mpy").exists()
+    assert (staging / "effects" / "c.mpy").exists()
+
+
+# ---------------------------------------------------------------------------
+# Incremental build: content-hash skip is immune to mtime tolerance window
+# ---------------------------------------------------------------------------
+
+
+def test_skip_decision_uses_content_hash_not_mtime(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "effects").mkdir()
+    render_py = source / "effects" / "render.py"
+    render_py.write_text("# original")
+    staging = tmp_path / "build"
+    compile_calls: list[str] = []
+
+    def tracking_compile(src: Path, dest: Path) -> None:
+        compile_calls.append(src.name)
+        fake_compile(src, dest)
+
+    build(source_root=source, staging_root=staging, compile=tracking_compile)
+    compile_calls.clear()
+
+    # Backdate mtime to simulate an edit within the FAT32 2-second tolerance window.
+    orig_mtime = render_py.stat().st_mtime
+    render_py.write_text("# different content — should trigger recompile")
+    os.utime(render_py, (orig_mtime, orig_mtime))
+
+    result = build(source_root=source, staging_root=staging, compile=tracking_compile)
+
+    assert "render.py" in compile_calls
+    assert result.compiled >= 1
+
+
+def test_module_with_identical_content_is_skipped_even_when_mtime_advances(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "effects").mkdir()
+    render_py = source / "effects" / "render.py"
+    render_py.write_text("# same content")
+    staging = tmp_path / "build"
+    compile_calls: list[str] = []
+
+    def tracking_compile(src: Path, dest: Path) -> None:
+        compile_calls.append(src.name)
+        fake_compile(src, dest)
+
+    build(source_root=source, staging_root=staging, compile=tracking_compile)
+    compile_calls.clear()
+
+    new_mtime = render_py.stat().st_mtime + 10
+    os.utime(render_py, (new_mtime, new_mtime))
+
+    result = build(source_root=source, staging_root=staging, compile=tracking_compile)
+
+    assert compile_calls == []
+    assert result.skipped >= 1
+
+
+# ---------------------------------------------------------------------------
+# Incremental build: first-ever build always compiles (no staged file yet)
+# ---------------------------------------------------------------------------
+
+
+def test_first_build_compiles_all_modules_with_no_prior_staging_tree(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "effects").mkdir()
+    (source / "effects" / "render.py").write_text("# render")
+    (source / "effects" / "palette.py").write_text("# palette")
+    staging = tmp_path / "build"
+    compile_calls: list[str] = []
+
+    def tracking_compile(src: Path, dest: Path) -> None:
+        compile_calls.append(src.name)
+        fake_compile(src, dest)
+
+    result = build(source_root=source, staging_root=staging, compile=tracking_compile)
+
+    assert sorted(compile_calls) == ["palette.py", "render.py"]
+    assert result.compiled == 2
+    assert result.skipped == 0
