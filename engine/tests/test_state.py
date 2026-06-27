@@ -1,5 +1,6 @@
 import pytest
 
+from engine.events import Event, EventGroup
 from engine.state import (
     EffectControls,
     EffectReceipt,
@@ -9,6 +10,8 @@ from engine.state import (
     ScopeValue,
     StateSlot,
 )
+
+_GROUP = EventGroup("test")
 
 # ---------------------------------------------------------------------------
 # GameState.get_or_none
@@ -371,3 +374,86 @@ def test_state_slot_is_in_is_false_after_key_deleted_from_state() -> None:
     state.delete(slot.key)
 
     assert not slot.is_in(state)
+
+
+# ---------------------------------------------------------------------------
+# GameState event queue — enqueue and indexed read-back
+# ---------------------------------------------------------------------------
+
+
+def test_event_count_is_zero_for_a_fresh_state() -> None:
+    state = _make_state()
+
+    assert state.event_count == 0
+
+
+def test_queued_event_increments_event_count() -> None:
+    state = _make_state()
+
+    state.queue_event(Event(_GROUP, "tick"))
+
+    assert state.event_count == 1
+
+
+def test_event_at_returns_events_in_enqueue_order() -> None:
+    state = _make_state()
+    first = Event(_GROUP, "first")
+    second = Event(_GROUP, "second")
+
+    state.queue_event(first)
+    state.queue_event(second)
+
+    assert state.event_at(0) is first
+    assert state.event_at(1) is second
+
+
+# ---------------------------------------------------------------------------
+# GameState event queue — reset_queue and clear_queue
+# ---------------------------------------------------------------------------
+
+
+def test_reset_queue_empties_the_queue() -> None:
+    state = _make_state()
+    state.queue_event(Event(_GROUP, "tick"))
+
+    state.reset_queue()
+
+    assert state.event_count == 0
+
+
+def test_clear_queue_empties_the_queue() -> None:
+    state = _make_state()
+    state.queue_event(Event(_GROUP, "tick"))
+
+    state.clear_queue()
+
+    assert state.event_count == 0
+
+
+def test_events_queued_after_reset_start_at_index_zero() -> None:
+    state = _make_state()
+    state.queue_event(Event(_GROUP, "old"))
+    state.reset_queue()
+
+    fresh = Event(_GROUP, "new")
+    state.queue_event(fresh)
+
+    assert state.event_count == 1
+    assert state.event_at(0) is fresh
+
+
+# ---------------------------------------------------------------------------
+# GameState event queue — overflow grows the backing store
+# ---------------------------------------------------------------------------
+
+
+def test_queue_grows_to_hold_more_events_than_initial_capacity() -> None:
+    state = GameState(EffectControls(), SceneControls(), queue_capacity=2)
+    events = [Event(_GROUP, str(i)) for i in range(5)]
+
+    for event in events:
+        state.queue_event(event)
+
+    assert state.event_count == 5
+    for i, event in enumerate(events):
+        assert state.event_at(i) is event

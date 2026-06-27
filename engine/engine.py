@@ -126,10 +126,13 @@ class GameEngine:
         """Advance the timer, update state time, and dispatch all queued events."""
         self._timer.update()
         state._update_time(self._timer.elapsed, self._timer.total)
-        while state._queue:
-            event = state._queue.pop(0)
+        i = 0
+        while i < state.event_count:
+            event = state.event_at(i)
             for rule in self._rules:
                 rule.handle_event(event, state)
+            i += 1
+        state.reset_queue()
 
     def add_rules(self, *rules: GameRule) -> None:
         self._rules.extend(rules)

@@ -251,6 +251,7 @@ class GameState:
     __slots__ = (
         "_data",
         "_elapsed",
+        "_len",
         "_queue",
         "_total",
         "effect_controls",
@@ -264,13 +265,15 @@ class GameState:
         scene_controls: SceneControls,
         network_controls: NetworkControls | None = None,
         data: dict[str, object] | None = None,
+        queue_capacity: int = 8,
     ) -> None:
         self.effect_controls = effect_controls
         self.scene_controls = scene_controls
         self.network_controls = (
             network_controls if network_controls is not None else NetworkControls()
         )
-        self._queue: list[Event] = []
+        self._queue: list[Event | None] = [None] * queue_capacity
+        self._len: int = 0
         self._data: dict[str, object] = data if data is not None else {}
         self._elapsed: float = 0.0
         self._total: float = 0.0
@@ -345,13 +348,60 @@ class GameState:
         """Support ``"key" in state`` membership tests."""
         return key in self._data
 
+    @property
+    def event_count(self) -> int:
+        """Number of events currently queued (the queue's fill level)."""
+        return self._len
+
+    def event_at(self, index: int) -> Event:
+        """Return the queued event at *index*.
+
+        Valid for ``0 <= index < event_count``; the engine dispatches by
+        iterating these indices rather than popping, so same-tick appended
+        events are picked up by re-reading ``event_count``.
+        """
+        return self._queue[index]  # type: ignore[return-value]
+
     def queue_event(self, event: Event) -> None:
-        """Enqueue an event for processing on the current or next update."""
-        self._queue.append(event)
+        """Enqueue an event for processing on the current or next update.
+
+        Reuses a pre-allocated slot when one is free; only grows (and keeps the
+        larger capacity) on overflow, so the steady state never allocates.
+        """
+        if self._len < len(self._queue):
+            self._queue[self._len] = event
+        else:
+            self._queue.append(event)
+        self._len += 1
+
+    def reset_queue(self) -> None:
+        """Drop all queued events, releasing their references, without allocating.
+
+        Called by the engine after dispatching a tick's events.
+        """
+        self._reset_queue()
 
     def clear_queue(self) -> None:
-        """Discard all pending events without processing them."""
-        self._queue = []
+        """Discard all pending events without processing them.
+
+        Reserved for scene transitions (mirrors ``set_local_effects``); resets
+        the queue in place without allocating.
+        """
+        self._reset_queue()
+
+    def _reset_queue(self) -> None:
+        """Empty the queue in place, keeping the backing list's capacity.
+
+        Filled slots are nulled so the previous tick's event references are
+        released promptly rather than pinned alive until a later slot reuse.
+        """
+        queue = self._queue
+        i = 0
+        n = self._len
+        while i < n:
+            queue[i] = None
+            i += 1
+        self._len = 0
 
     def _update_time(self, elapsed: float, total: float) -> None:
         """Refresh time values from the engine's timer. Called only by GameEngine."""
