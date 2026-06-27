@@ -155,3 +155,28 @@ def test_items_returns_all_button_state_pairs():
 def test_items_is_empty_when_no_buttons():
     bd = _make({})
     assert list(bd.items()) == []
+
+
+# ---------------------------------------------------------------------------
+# set
+# ---------------------------------------------------------------------------
+
+
+def test_set_stores_state_for_new_button():
+    bd = _make({})
+    bd.set("A", ButtonData.PRESSED)
+    assert bd.is_pressed("A") is True
+
+
+def test_set_overwrites_existing_state():
+    bd = _make({"A": ButtonData.UP})
+    bd.set("A", ButtonData.DOWN)
+    assert bd.is_down("A") is True
+
+
+def test_set_multiple_buttons_independently():
+    bd = _make({})
+    bd.set("A", ButtonData.PRESSED)
+    bd.set("B", ButtonData.UP)
+    assert bd.is_pressed("A") is True
+    assert bd.is_up("B") is True

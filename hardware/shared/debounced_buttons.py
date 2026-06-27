@@ -43,9 +43,11 @@ class DebouncedButtons:
         self._predicates = buttons
         self._states = [_ButtonState(pred()) for _, pred in buttons]
 
-    def update(self, elapsed: float) -> ButtonData:
-        """Advance debounce state by ``elapsed`` seconds and return a ``ButtonData`` snapshot."""
-        states: dict[str, int] = {}
+    def update(self, elapsed: float, out: ButtonData) -> None:
+        """Advance debounce state by ``elapsed`` seconds and write results into *out*.
+
+        The caller pre-creates *out* before the loop and passes the same instance every frame.
+        """
         for i, (label, pred) in enumerate(self._predicates):
             state = self._states[i]
             current = pred()
@@ -57,7 +59,6 @@ class DebouncedButtons:
                 state.settled = state.candidate
                 # Falling edge (settled became False/LOW) → PRESSED
                 # Rising edge (settled became True/HIGH) → RELEASED
-                states[label] = ButtonData.PRESSED if not state.settled else ButtonData.RELEASED
+                out.set(label, ButtonData.PRESSED if not state.settled else ButtonData.RELEASED)
             else:
-                states[label] = ButtonData.DOWN if not state.settled else ButtonData.UP
-        return ButtonData(states)
+                out.set(label, ButtonData.DOWN if not state.settled else ButtonData.UP)

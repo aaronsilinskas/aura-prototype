@@ -245,9 +245,9 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
     return manager, effect_manager, timer, buttons, accelerometer, ir_receiver, footprint_bytes
 
 
-def _press(name: str) -> ButtonData:
-    """Build a one-frame synthetic press of `name` (the Ready->Starting trigger)."""
-    return ButtonData({name: ButtonData.PRESSED})
+def _inject_press(name: str, out: ButtonData) -> None:
+    """Overwrite *out* with a one-frame synthetic press of *name* (the Ready->Starting trigger)."""
+    out.set(name, ButtonData.PRESSED)
 
 
 def run() -> None:
@@ -274,6 +274,10 @@ def run() -> None:
     )
     print(f"__PROP footprint_bytes={footprint_bytes}, free_heap_bytes={gc.mem_free()}")
 
+    _button_data = ButtonData({})
+    _acceleration = AccelerationData(0.0, 0.0, 0.0) if accelerometer is not None else None
+    _input_event = InputEvents.ButtonAndAcceleration(_button_data, _acceleration)
+
     start_injected = not AUTO_START
     warmup_done = WARMUP_SECONDS <= 0
     warmup_until = time.monotonic() + WARMUP_SECONDS
@@ -284,20 +288,20 @@ def run() -> None:
         perf.start_update_time()
         elapsed = timer.elapsed
 
-        button_data = buttons.update(elapsed)
+        buttons.update(elapsed, _button_data)
         # One-time synthetic press to leave Ready without a human button press.
         if not start_injected:
-            button_data = _press("A")
+            _inject_press("A", _button_data)
             start_injected = True
 
-        if accelerometer is not None:
+        if _acceleration is not None:
             try:
                 ax, ay, az = accelerometer.acceleration
-                acceleration = AccelerationData(ax, ay, az)
+                _acceleration.x = ax
+                _acceleration.y = ay
+                _acceleration.z = az
             except Exception:
-                acceleration = None
-        else:
-            acceleration = None
+                pass  # keep last good values
 
         if manager.active_state is not None:
             ir_data = ir_receiver.receive()
@@ -310,9 +314,7 @@ def run() -> None:
                         best_receiver=None,
                     )
                 )
-            manager.active_state.queue_event(
-                InputEvents.ButtonAndAcceleration(button_data, acceleration)
-            )
+            manager.active_state.queue_event(_input_event)
 
         manager.update()
         perf.add_update_time()
