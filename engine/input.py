@@ -7,11 +7,14 @@ except ImportError:
 
 
 class ButtonData:
-    """Snapshot of button states at a point in time.
+    """Reusable buffer of button states, overwritten in place each poll.
 
     ``_states`` maps button name to one of the class constants:
     ``UP``, ``DOWN``, ``PRESSED`` (transitioned down this frame), or
     ``RELEASED`` (transitioned up this frame).
+
+    This buffer is mutated each frame via ``set`` — it is not a cross-frame
+    snapshot.  Callers that need to retain values across frames must copy.
 
     Use the query methods (``is_pressed``, ``is_released``, ``is_down``,
     ``is_up``) instead of accessing ``_states`` directly.  ``get`` and
@@ -28,6 +31,13 @@ class ButtonData:
 
     def __init__(self, states: dict[str, int]) -> None:
         self._states = states
+
+    # ------------------------------------------------------------------
+    # Mutation
+    # ------------------------------------------------------------------
+
+    def set(self, name: str, state: int) -> None:
+        self._states[name] = state
 
     # ------------------------------------------------------------------
     # Query helpers
@@ -71,12 +81,12 @@ class ButtonData:
 
 
 class AccelerationData:
-    """Snapshot of accelerometer readings at a point in time. Unit of measure is meters per second
-    squared (m/s^2).
+    """Reusable buffer of accelerometer readings, overwritten in place each poll.
 
-    Axes follow the device's local coordinate system. When no accelerometer is
-    present or a read fails, use ``None`` rather than an ``AccelerationData``
-    instance — ``None`` signals "no sensor data", not "device at rest".
+    Unit of measure is meters per second squared (m/s²). Axes follow the
+    device's local coordinate system. ``None`` in place of an instance signals
+    that no accelerometer hardware is present — transient read failures retain
+    the last good reading rather than replacing the buffer with ``None``.
     """
 
     __slots__ = ("x", "y", "z")
@@ -98,10 +108,13 @@ class InputEvents:
     GROUP: "Final" = EventGroup("in")
 
     class ButtonAndAcceleration(Event):
-        """Event carrying a button state snapshot and optional acceleration data.
+        """Event carrying button state and optional acceleration data.
 
-        Fired each input poll cycle. ``acceleration`` is ``None`` when the
-        device has no accelerometer or when a transient read failure occurs.
+        Fired each input poll cycle. The same instance is reused every frame;
+        ``buttons`` and ``acceleration`` are mutated in place before each
+        dispatch. ``acceleration`` is ``None`` only when the device has no
+        accelerometer hardware — transient read failures retain the last good
+        reading rather than setting ``None``.
         """
 
         __slots__ = ("acceleration", "buttons")

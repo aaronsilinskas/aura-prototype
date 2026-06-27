@@ -12,7 +12,7 @@ import gc
 
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
-from engine.input import AccelerationData, InputEvents
+from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.network import NetworkEvents
 from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
@@ -87,16 +87,21 @@ def run_scene(
     manager.load(_resolve_known_scene(scene_registry, scene_name))
     manager.update()  # applies the load transition; the scene is now active
 
-    while True:
-        button_data = hw.buttons.update(timer.elapsed)
+    _button_data = ButtonData({})
+    _acceleration = AccelerationData(0.0, 0.0, 0.0) if hw.accelerometer is not None else None
+    _input_event = InputEvents.ButtonAndAcceleration(_button_data, _acceleration)
 
-        acceleration = None
-        if hw.accelerometer is not None:
+    while True:
+        hw.buttons.update(timer.elapsed, _button_data)
+
+        if _acceleration is not None:
             try:
                 ax, ay, az = hw.accelerometer.acceleration
-                acceleration = AccelerationData(ax, ay, az)
+                _acceleration.x = ax
+                _acceleration.y = ay
+                _acceleration.z = az
             except Exception:
-                acceleration = None
+                pass  # keep last good values; None signals missing hardware, not read failure
 
         active_state = manager.active_state
 
@@ -113,7 +118,7 @@ def run_scene(
                 )
 
         if active_state is not None:
-            active_state.queue_event(InputEvents.ButtonAndAcceleration(button_data, acceleration))
+            active_state.queue_event(_input_event)
 
         manager.update()
         effect_manager.update(timer)
