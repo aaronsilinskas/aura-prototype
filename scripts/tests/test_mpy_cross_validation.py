@@ -49,14 +49,18 @@ def test_raises_version_error_when_boot_out_has_no_circuitpython_line() -> None:
 def test_returns_major_version_from_mpy_cross_output() -> None:
     with patch("subprocess.run") as mock_run:
         mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = b"mpy-cross 10.2.1\n"
+        mock_run.return_value.stdout = (
+            b"CircuitPython 10.2.1 on 2026-05-12; mpy-cross emitting mpy v6.3\n"
+        )
         assert get_mpy_cross_major("mpy-cross") == 10
 
 
 def test_parses_major_version_for_different_release() -> None:
     with patch("subprocess.run") as mock_run:
         mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = b"mpy-cross 9.0.0\n"
+        mock_run.return_value.stdout = (
+            b"CircuitPython 9.0.0 on 2025-01-01; mpy-cross emitting mpy v5.3\n"
+        )
         assert get_mpy_cross_major("mpy-cross") == 9
 
 

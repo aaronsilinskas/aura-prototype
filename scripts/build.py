@@ -28,7 +28,7 @@ _MPY_CROSS_BIN: Final = os.environ.get("MPY_CROSS", _DEFAULT_MPY_CROSS)
 EXPECTED_CIRCUITPYTHON_MAJOR: Final = 10
 
 _BOOT_OUT_VERSION_RE: Final = re.compile(r"Adafruit CircuitPython (\d+)\.")
-_MPY_CROSS_VERSION_RE: Final = re.compile(r"mpy-cross (\d+)\.")
+_MPY_CROSS_VERSION_RE: Final = re.compile(r"CircuitPython (\d+)\.")
 
 
 class BuildError(Exception):
@@ -88,7 +88,8 @@ def get_mpy_cross_major(mpy_cross_bin: str) -> int:
     if not match:
         raise VersionError(
             f"Cannot parse mpy-cross version from output: {output!r}. "
-            "Expected format: 'mpy-cross <major>.<minor>.<patch>'"
+            "Expected format: 'CircuitPython <major>.<minor>.<patch> on ...; "
+            "mpy-cross emitting mpy v<n>'"
         )
     return int(match.group(1))
 
