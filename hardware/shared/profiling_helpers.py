@@ -149,11 +149,11 @@ def print_profile_header(
     impl_version = ".".join(str(part) for part in impl.version[:3])
     print(
         f"__PROFILE component={component}, "
-        f"sweep=[{sweep_parts}], "
-        f"target_fps={target_fps:.2f}, "
-        f"board={board_id()}, "
-        f"impl={impl.name} {impl_version}, "
-        f"Mem Free: {gc.mem_free()}B"
+        + f"sweep=[{sweep_parts}], "
+        + f"target_fps={target_fps:.2f}, "
+        + f"board={board_id()}, "
+        + f"impl={impl.name} {impl_version}, "
+        + f"Mem Free: {gc.mem_free()}B"
     )
 
 
@@ -177,14 +177,14 @@ def print_stats_line(perf: PerformanceTracker, **extra: object) -> None:
     fps = frames / elapsed if elapsed > 0 else 0.0
     print(
         f"__STATS FPS: {fps:.2f}, "
-        f"Update Time: {perf.update_time_total / frames:.4f}s, "
-        f"Render Time: {perf.render_time_total / frames:.4f}s, "
-        f"Mem Delta Avg: {perf.memory_delta_total / frames:.2f}B, "
-        f"Mem Alloc Avg: {perf.memory_allocated_total / frames:.2f}B, "
-        f"Mem Delta Last: {perf.last_memory_delta}B, "
-        f"Mem Delta Peak: {perf.memory_delta_peak}B, "
-        f"Mem Used: {perf.last_mem_used}B, "
-        f"Mem Free: {perf.last_mem_free}B, "
-        f"Frame Time Peak: {perf.frame_time_peak:.4f}s"
+        + f"Update Time: {perf.update_time_total / frames:.4f}s, "
+        + f"Render Time: {perf.render_time_total / frames:.4f}s, "
+        + f"Mem Delta Avg: {perf.memory_delta_total / frames:.2f}B, "
+        + f"Mem Alloc Avg: {perf.memory_allocated_total / frames:.2f}B, "
+        + f"Mem Delta Last: {perf.last_memory_delta}B, "
+        + f"Mem Delta Peak: {perf.memory_delta_peak}B, "
+        + f"Mem Used: {perf.last_mem_used}B, "
+        + f"Mem Free: {perf.last_mem_free}B, "
+        + f"Frame Time Peak: {perf.frame_time_peak:.4f}s"
         + (f", {extra_parts}" if extra_parts else "")
     )

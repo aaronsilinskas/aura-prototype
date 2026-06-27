@@ -12,6 +12,9 @@ dependencies = []
 [dependency-groups]
 dev = [
     "import-linter>=2.3",
+    # mpy-cross is NOT on PyPI for CircuitPython — the PyPI package is MicroPython's.
+    # Download the CircuitPython binary via: scripts/setup_mpy_cross.sh
+    # Binary lands at tools/mpy-cross (gitignored). Bump version with CircuitPython upgrades.
     "pre-commit>=4.0.0",
     "pyserial>=3.5",
     "pytest>=9.0.2",
@@ -27,7 +30,7 @@ addopts = "-p no:debugging"
 
 [tool.ruff]
 line-length = 100
-exclude = ["scratch"]
+exclude = ["scratch", "*.sh"]
 
 [tool.ruff.lint]
 select = [
@@ -41,6 +44,7 @@ select = [
     "C4",  # flake8-comprehensions (cleaner list/dict/set expressions)
     "SIM", # flake8-simplify (redundant code patterns)
     "RUF", # ruff-native rules
+    "ISC", # implicit string concatenation (mpy-cross incompatible)
 ]
 ignore = [
     "B905",   # zip() without strict= — not available on CircuitPython
@@ -49,6 +53,14 @@ ignore = [
     "RUF003", # mathematical symbols (×, –) in comments are intentional
     "SIM105", # try/except/pass is clearer than contextlib.suppress for CircuitPython compat blocks
 ]
+
+[tool.ruff.lint.flake8-implicit-str-concat]
+allow-multiline = false  # mpy-cross rejects implicit concatenation even inside parens
+
+[tool.ruff.lint.per-file-ignores]
+# scripts/ and test dirs are CPython-only; ISC002 only matters for device-compiled code
+"scripts/**" = ["ISC002"]
+"**/tests/**" = ["ISC002"]
 
 [tool.importlinter]
 root_packages = ["effects", "engine", "magic", "packs"]

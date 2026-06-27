@@ -2,7 +2,7 @@
 
 Usage
 -----
-    # Deploy an example and sync all modules:
+    # Deploy an example and sync all modules (compiles .py → .mpy via mpy-cross):
     python scripts/deploy.py examples/hardware/scene_demo.py
 
     # Sync modules only, without changing code.py:
@@ -10,6 +10,11 @@ Usage
 
     # Override the default mount path:
     python scripts/deploy.py examples/hardware/scene_demo.py --mount /Volumes/MYBOARD
+
+mpy-cross
+---------
+Install with ``uv sync`` (pinned in ``[dependency-groups] dev`` via ``mpy-cross``).
+Matches the CircuitPython minor release in use.  Invoked as ``python -m mpy_cross``.
 """
 
 import argparse
@@ -22,6 +27,7 @@ from pathlib import Path
 from hardware.shared.device_config import DEFAULT_DEVICE_CONFIG
 
 try:
+    from collections.abc import Callable
     from typing import Final
 except ImportError:
     pass
@@ -88,25 +94,19 @@ def _should_skip(src: Path, dest: Path) -> bool:
 
 def _copy_intermediate_inits(
     module: str,
-    source_root: Path,
+    staging_root: Path,
     mount: Path,
     copied: "list[Path]",
     skipped: "list[Path]",
     dry_run: bool,
 ) -> None:
-    """Copy ``__init__.py`` for each intermediate package in a sub-package path.
-
-    For a module path like ``hardware/shared``, copies
-    ``<source_root>/hardware/__init__.py`` to ``<mount>/hardware/__init__.py``
-    so Python can import from the sub-package on the device.
-    """
     parts = Path(module).parts
     for i in range(len(parts) - 1):
         pkg_path = Path(*parts[: i + 1])
-        src_init = source_root / pkg_path / "__init__.py"
+        src_init = staging_root / pkg_path / "__init__.mpy"
         if src_init.exists():
-            label = str(pkg_path / "__init__.py")
-            _sync_file(src_init, mount / pkg_path / "__init__.py", label, copied, skipped, dry_run)
+            label = str(pkg_path / "__init__.mpy")
+            _sync_file(src_init, mount / pkg_path / "__init__.mpy", label, copied, skipped, dry_run)
 
 
 def _sync_file(
@@ -149,6 +149,7 @@ def deploy(
     source_root: "Path | None" = None,
     dry_run: bool = False,
     scene: "str | None" = None,
+    compile: "Callable[[Path, Path], None] | None" = None,
 ) -> int:
     """Deploy to mount. Returns 0 on success, 1 on error.
 
@@ -160,7 +161,14 @@ def deploy(
         dry_run: When True, skip mount validation and print what would be copied
             without writing any files.
         scene: Scene name to record in ``aura-device.json``; omit to leave it untouched.
+        compile: Callable ``(src, dest) -> None`` used to compile each ``.py`` file
+            to ``.mpy`` in a staging tree before syncing.  Defaults to the real
+            ``mpy_cross_compile`` (requires ``mpy-cross`` installed).  Pass a fake
+            for unit tests.  When ``None`` the real compiler is used.
     """
+    # Import here to avoid a circular import (build imports from deploy).
+    from scripts.build import BuildError, build, mpy_cross_compile
+
     if source_root is None:
         source_root = Path.cwd()
 
@@ -179,6 +187,20 @@ def deploy(
             )
             return 1
 
+    if compile is None:
+        compile = mpy_cross_compile
+
+    staging_root = source_root / "build"
+    try:
+        build_result = build(
+            source_root=source_root,
+            staging_root=staging_root,
+            compile=compile,
+        )
+    except BuildError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
     if scene is not None and not dry_run:
         _write_scene(mount, scene)
 
@@ -190,12 +212,12 @@ def deploy(
         _sync_file(example_file, mount / "code.py", "code.py", copied, skipped, dry_run, force=True)
 
     for module in MODULE_DIRS:
-        src_dir = source_root / module
+        src_dir = staging_root / module
         dest_dir = mount / module
 
         if src_dir.is_dir():
             if "/" in module:
-                _copy_intermediate_inits(module, source_root, mount, copied, skipped, dry_run)
+                _copy_intermediate_inits(module, staging_root, mount, copied, skipped, dry_run)
             for src_file in sorted(src_dir.rglob("*")):
                 if src_file.is_dir():
                     continue
@@ -227,7 +249,10 @@ def deploy(
             except OSError:
                 pass
 
-    print(f"Done. {len(copied)} copied, {len(skipped)} skipped, {len(pruned)} pruned.")
+    print(
+        f"Done. {build_result.compiled} compiled, "
+        f"{len(copied)} copied, {len(skipped)} skipped, {len(pruned)} pruned."
+    )
     return 0
 
 

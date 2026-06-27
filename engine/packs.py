@@ -17,16 +17,21 @@ except ImportError:
 def scan_item_names(dir: str) -> set[str]:
     """Return item names found in *dir* under the canonical pack-item rule.
 
-    Includes files ending in ``.py``, excludes ``__init__.py``, and skips
-    anything that is a directory (even if its name ends in ``.py``).
+    Recognises ``.py`` and ``.mpy`` files; excludes ``__init__`` and directories.
     """
     names: set[str] = set()
     for fname in os.listdir(dir):
-        if not fname.endswith(".py") or fname == "__init__.py":
+        if fname.endswith(".mpy"):
+            stem = fname[:-4]
+        elif fname.endswith(".py"):
+            stem = fname[:-3]
+        else:
+            continue
+        if stem == "__init__":
             continue
         if _path.isdir(_path.join(dir, fname)):
             continue
-        names.add(fname[:-3])
+        names.add(stem)
     return names
 
 
@@ -140,7 +145,9 @@ class PackRegistry:
             if pack_name == "scene":
                 raise ValueError(
                     "'scene' is a reserved system-wide name and cannot be used as a pack name"
-                    " (found at '" + pack_dir + "')"
+                    + " (found at '"
+                    + pack_dir
+                    + "')"
                 )
 
             if pack_name in self._packs:
