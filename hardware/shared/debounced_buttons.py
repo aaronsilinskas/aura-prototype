@@ -7,8 +7,6 @@ from engine.input import ButtonData
 
 
 class _ButtonState:
-    """Per-button debounce state: settled value, candidate value, accumulated candidate time."""
-
     __slots__ = ("candidate", "candidate_time", "settled")
 
     def __init__(self, initial: bool) -> None:
@@ -32,7 +30,7 @@ class DebouncedButtons:
     preventing spurious ``PRESSED`` events for buttons already held at boot.
     """
 
-    __slots__ = ("_interval", "_predicates", "_states")
+    __slots__ = ("_button_data", "_interval", "_predicates", "_state_cache", "_states")
 
     def __init__(
         self,
@@ -42,11 +40,13 @@ class DebouncedButtons:
         self._interval = interval
         self._predicates = buttons
         self._states = [_ButtonState(pred()) for _, pred in buttons]
+        self._state_cache: dict[str, int] = {label: ButtonData.UP for label, _ in buttons}
+        self._button_data = ButtonData(self._state_cache)
 
     def update(self, elapsed: float) -> ButtonData:
         """Advance debounce state by ``elapsed`` seconds and return a ``ButtonData`` snapshot."""
-        states: dict[str, int] = {}
-        for i, (label, pred) in enumerate(self._predicates):
+        for i in range(len(self._predicates)):
+            label, pred = self._predicates[i]
             state = self._states[i]
             current = pred()
             if current != state.candidate:
@@ -57,7 +57,9 @@ class DebouncedButtons:
                 state.settled = state.candidate
                 # Falling edge (settled became False/LOW) → PRESSED
                 # Rising edge (settled became True/HIGH) → RELEASED
-                states[label] = ButtonData.PRESSED if not state.settled else ButtonData.RELEASED
+                self._state_cache[label] = (
+                    ButtonData.PRESSED if not state.settled else ButtonData.RELEASED
+                )
             else:
-                states[label] = ButtonData.DOWN if not state.settled else ButtonData.UP
-        return ButtonData(states)
+                self._state_cache[label] = ButtonData.DOWN if not state.settled else ButtonData.UP
+        return self._button_data
