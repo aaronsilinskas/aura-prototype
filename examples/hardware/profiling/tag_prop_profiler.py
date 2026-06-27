@@ -246,7 +246,7 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
 
 
 def _inject_press(name: str, out: ButtonData) -> None:
-    """Overwrite *out* with a one-frame synthetic press of *name* (the Ready->Starting trigger)."""
+    """Inject the Ready->Starting trigger without a human button press."""
     out.set(name, ButtonData.PRESSED)
 
 

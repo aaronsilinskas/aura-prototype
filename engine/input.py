@@ -37,7 +37,6 @@ class ButtonData:
     # ------------------------------------------------------------------
 
     def set(self, name: str, state: int) -> None:
-        """Write *state* for *name* in place via the public API rather than ``_states`` directly."""
         self._states[name] = state
 
     # ------------------------------------------------------------------
