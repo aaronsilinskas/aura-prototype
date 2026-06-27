@@ -69,12 +69,20 @@ def get_mpy_cross_major(mpy_cross_bin: str) -> int:
             [mpy_cross_bin, "--version"],
             capture_output=True,
         )
-        output = result.stdout.decode(errors="replace").strip()
-    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+    except FileNotFoundError as exc:
         raise VersionError(
             f"mpy-cross not found or failed to run ('{mpy_cross_bin}'). "
             "Install it via: scripts/setup_mpy_cross.sh"
         ) from exc
+
+    if result.returncode != 0:
+        stderr = result.stderr.decode(errors="replace").strip()
+        raise VersionError(
+            f"mpy-cross --version failed (exit {result.returncode}): {stderr}. "
+            "Install it via: scripts/setup_mpy_cross.sh"
+        )
+
+    output = result.stdout.decode(errors="replace").strip()
 
     match = _MPY_CROSS_VERSION_RE.search(output)
     if not match:

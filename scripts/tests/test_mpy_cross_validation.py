@@ -1,6 +1,5 @@
 """Tests for mpy-cross version validation against the device's CircuitPython version."""
 
-import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -49,12 +48,14 @@ def test_raises_version_error_when_boot_out_has_no_circuitpython_line() -> None:
 
 def test_returns_major_version_from_mpy_cross_output() -> None:
     with patch("subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = b"mpy-cross 10.2.1\n"
         assert get_mpy_cross_major("mpy-cross") == 10
 
 
 def test_parses_major_version_for_different_release() -> None:
     with patch("subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = b"mpy-cross 9.0.0\n"
         assert get_mpy_cross_major("mpy-cross") == 9
 
@@ -68,14 +69,16 @@ def test_raises_version_error_when_mpy_cross_not_found() -> None:
 
 def test_raises_version_error_when_mpy_cross_output_is_unparseable() -> None:
     with patch("subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = b"something unexpected\n"
         with pytest.raises(VersionError, match="mpy-cross"):
             get_mpy_cross_major("mpy-cross")
 
 
-def test_raises_version_error_when_mpy_cross_subprocess_fails() -> None:
+def test_raises_version_error_when_mpy_cross_exits_nonzero() -> None:
     with patch("subprocess.run") as mock_run:
-        mock_run.side_effect = subprocess.CalledProcessError(1, "mpy-cross")
+        mock_run.return_value.returncode = 1
+        mock_run.return_value.stderr = b"some error\n"
         with pytest.raises(VersionError, match="mpy-cross"):
             get_mpy_cross_major("mpy-cross")
 
