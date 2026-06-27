@@ -94,19 +94,25 @@ def _should_skip(src: Path, dest: Path) -> bool:
 
 def _copy_intermediate_inits(
     module: str,
-    staging_root: Path,
+    sync_root: Path,
     mount: Path,
     copied: "list[Path]",
     skipped: "list[Path]",
     dry_run: bool,
+    use_source: bool = False,
 ) -> None:
     parts = Path(module).parts
     for i in range(len(parts) - 1):
         pkg_path = Path(*parts[: i + 1])
-        src_init = staging_root / pkg_path / "__init__.mpy"
+        if use_source:
+            src_init = sync_root / pkg_path / "__init__.py"
+        else:
+            src_init = sync_root / pkg_path / "__init__.mpy"
+            if not src_init.exists():
+                src_init = sync_root / pkg_path / "__init__.py"
         if src_init.exists():
-            label = str(pkg_path / "__init__.mpy")
-            _sync_file(src_init, mount / pkg_path / "__init__.mpy", label, copied, skipped, dry_run)
+            label = str(pkg_path / src_init.name)
+            _sync_file(src_init, mount / pkg_path / src_init.name, label, copied, skipped, dry_run)
 
 
 def _sync_file(
@@ -150,6 +156,7 @@ def deploy(
     dry_run: bool = False,
     scene: "str | None" = None,
     compile: "Callable[[Path, Path], None] | None" = None,
+    use_source: bool = False,
 ) -> int:
     """Deploy to mount. Returns 0 on success, 1 on error.
 
@@ -165,6 +172,8 @@ def deploy(
             to ``.mpy`` in a staging tree before syncing.  Defaults to the real
             ``mpy_cross_compile`` (requires ``mpy-cross`` installed).  Pass a fake
             for unit tests.  When ``None`` the real compiler is used.
+        use_source: When True, skip compilation entirely and sync raw ``.py`` files
+            directly from the source tree.  Requires no ``mpy-cross`` toolchain.
     """
     # Import here to avoid a circular import (build imports from deploy).
     from scripts.build import (
@@ -194,26 +203,34 @@ def deploy(
             )
             return 1
 
-    if compile is None:
-        compile = mpy_cross_compile
+    compiled_count = 0
 
-    validation_mount = None if dry_run else mount
-    try:
-        validate_mpy_cross_version(mount=validation_mount, mpy_cross_bin=_MPY_CROSS_BIN)
-    except VersionError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
+    if use_source:
+        sync_root = source_root
+    else:
+        if compile is None:
+            compile = mpy_cross_compile
 
-    staging_root = source_root / "build"
-    try:
-        build_result = build(
-            source_root=source_root,
-            staging_root=staging_root,
-            compile=compile,
-        )
-    except BuildError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
+        validation_mount = None if dry_run else mount
+        try:
+            validate_mpy_cross_version(mount=validation_mount, mpy_cross_bin=_MPY_CROSS_BIN)
+        except VersionError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+
+        staging_root = source_root / "build"
+        try:
+            build_result = build(
+                source_root=source_root,
+                staging_root=staging_root,
+                compile=compile,
+            )
+        except BuildError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+
+        compiled_count = build_result.compiled
+        sync_root = staging_root
 
     if scene is not None and not dry_run:
         _write_scene(mount, scene)
@@ -226,22 +243,34 @@ def deploy(
         _sync_file(example_file, mount / "code.py", "code.py", copied, skipped, dry_run, force=True)
 
     for module in MODULE_DIRS:
-        src_dir = staging_root / module
+        src_dir = sync_root / module
         dest_dir = mount / module
 
         if src_dir.is_dir():
             if "/" in module:
-                _copy_intermediate_inits(module, staging_root, mount, copied, skipped, dry_run)
+                _copy_intermediate_inits(
+                    module, sync_root, mount, copied, skipped, dry_run, use_source=use_source
+                )
             for src_file in sorted(src_dir.rglob("*")):
                 if src_file.is_dir():
                     continue
                 rel = src_file.relative_to(src_dir)
                 if _is_excluded(rel):
                     continue
+                if use_source and src_file.suffix == ".mpy":
+                    continue
                 label = f"{module}/{rel}"
                 _sync_file(src_file, dest_dir / rel, label, copied, skipped, dry_run)
 
-        for stale_file in _collect_stale_files(src_dir, dest_dir):
+        stale_files = _collect_stale_files(src_dir, dest_dir)
+        if use_source and dest_dir.is_dir():
+            stale_set = set(stale_files)
+            for dest_file in sorted(dest_dir.rglob("*")):
+                is_orphaned_mpy = not dest_file.is_dir() and dest_file.suffix == ".mpy"
+                if is_orphaned_mpy and dest_file not in stale_set:
+                    stale_files.append(dest_file)
+                    stale_set.add(dest_file)
+        for stale_file in stale_files:
             label = f"{module}/{stale_file.relative_to(dest_dir)}"
             if dry_run:
                 pruned.append(stale_file)
@@ -264,7 +293,7 @@ def deploy(
                 pass
 
     print(
-        f"Done. {build_result.compiled} compiled, "
+        f"Done. {compiled_count} compiled, "
         f"{len(copied)} copied, {len(skipped)} skipped, {len(pruned)} pruned."
     )
     return 0
@@ -303,8 +332,26 @@ def main() -> None:
             "Omit to leave any existing aura-device.json untouched."
         ),
     )
+    parser.add_argument(
+        "--source",
+        action="store_true",
+        default=False,
+        help=(
+            "Skip compilation and ship raw .py files directly from the source tree. "
+            "Useful for reproducing crashes on-device with full tracebacks. "
+            "Requires no mpy-cross toolchain."
+        ),
+    )
     args = parser.parse_args()
-    sys.exit(deploy(args.example_file, args.mount, dry_run=args.dry_run, scene=args.scene))
+    sys.exit(
+        deploy(
+            args.example_file,
+            args.mount,
+            dry_run=args.dry_run,
+            scene=args.scene,
+            use_source=args.source,
+        )
+    )
 
 
 if __name__ == "__main__":

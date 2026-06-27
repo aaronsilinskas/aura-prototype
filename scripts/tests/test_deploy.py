@@ -934,3 +934,108 @@ def test_dry_run_matching_version_succeeds(tmp_path: Path) -> None:
         )
 
     assert result == 0
+
+
+# ---------------------------------------------------------------------------
+# --source flag: raw .py deploy without mpy-cross (#516)
+# ---------------------------------------------------------------------------
+
+
+def test_source_mode_returns_success(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    result = deploy(None, mount, source_root=source, use_source=True)
+
+    assert result == 0
+
+
+def test_source_mode_ships_raw_py_files_not_compiled_mpy(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source, use_source=True)
+
+    assert (mount / "effects" / "render.py").exists()
+    assert not (mount / "effects" / "render.mpy").exists()
+
+
+def test_source_mode_prunes_orphaned_mpy_left_by_previous_compiled_deploy(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    # Simulate a previously-compiled deploy: device has .mpy files
+    (mount / "effects").mkdir()
+    orphaned_mpy = mount / "effects" / "render.mpy"
+    orphaned_mpy.write_bytes(b"OLD_MPY")
+
+    deploy(None, mount, source_root=source, use_source=True)
+
+    assert not orphaned_mpy.exists()
+
+
+def test_compiled_mode_prunes_orphaned_py_left_by_previous_source_deploy(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    # Simulate a previously-source deploy: device has .py files
+    (mount / "effects").mkdir()
+    orphaned_py = mount / "effects" / "render.py"
+    orphaned_py.write_bytes(b"OLD_PY")
+
+    deploy(None, mount, source_root=source, compile=fake_compile)
+
+    assert not orphaned_py.exists()
+
+
+def test_source_mode_deploys_intermediate_init_py_for_nested_packages(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source, use_source=True)
+
+    assert (mount / "hardware" / "__init__.py").exists()
+
+
+def test_source_mode_summary_reports_zero_compiled(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source, use_source=True)
+
+    captured = capsys.readouterr()
+    assert "0 compiled" in captured.out
+
+
+def test_source_mode_succeeds_without_mpy_cross_installed(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    with patch("scripts.build.validate_mpy_cross_version") as mock_validate:
+        result = deploy(None, mount, source_root=source, use_source=True)
+
+    assert result == 0
+    mock_validate.assert_not_called()
