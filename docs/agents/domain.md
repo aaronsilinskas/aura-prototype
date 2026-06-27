@@ -116,6 +116,7 @@ scripts/          Deploy and maintenance scripts (CPython-only)
 | **Spell power** | Amount of magic at cast time. 1 unit ≈ ambient magic gathered over 1 second in 1 m³. |
 | **DynamicValue** | `float | Callable[[], float]` — a value that may be constant or computed each sample. |
 | **EffectShapeFunc** | `Callable[[float], float]` — maps a normalized position [0,1] to an output value. |
+| **Fill-pointer queue** | `GameState`'s event buffer: a pre-allocated `list` plus an integer length (`_len`). `queue_event` writes into the next slot (no `append` in the normal case); dispatch reads by index via `event_count`/`event_at`; `reset_queue`/`clear_queue` null filled slots in place. Overflows by growing the list and keeping the larger capacity. Avoids per-frame list reallocation on-device. |
 
 ---
 
