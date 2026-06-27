@@ -167,7 +167,14 @@ def deploy(
             for unit tests.  When ``None`` the real compiler is used.
     """
     # Import here to avoid a circular import (build imports from deploy).
-    from scripts.build import BuildError, build, mpy_cross_compile
+    from scripts.build import (
+        _MPY_CROSS_BIN,
+        BuildError,
+        VersionError,
+        build,
+        mpy_cross_compile,
+        validate_mpy_cross_version,
+    )
 
     if source_root is None:
         source_root = Path.cwd()
@@ -189,6 +196,13 @@ def deploy(
 
     if compile is None:
         compile = mpy_cross_compile
+
+    validation_mount = None if dry_run else mount
+    try:
+        validate_mpy_cross_version(mount=validation_mount, mpy_cross_bin=_MPY_CROSS_BIN)
+    except VersionError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
 
     staging_root = source_root / "build"
     try:

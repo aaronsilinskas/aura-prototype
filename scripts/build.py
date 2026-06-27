@@ -1,6 +1,7 @@
 """Compile device .py modules to .mpy in a gitignored staging tree before deploy."""
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -21,9 +22,21 @@ _DEFAULT_MPY_CROSS: Final = str(_REPO_ROOT / "tools" / "mpy-cross")
 # Download the correct version via: scripts/setup_mpy_cross.sh
 _MPY_CROSS_BIN: Final = os.environ.get("MPY_CROSS", _DEFAULT_MPY_CROSS)
 
+# Repo-pinned CircuitPython major version.  Must match the major version used by
+# the installed mpy-cross binary (see scripts/setup_mpy_cross.sh) and the firmware
+# flashed on target devices.  Bump when upgrading CircuitPython.
+EXPECTED_CIRCUITPYTHON_MAJOR: Final = 10
+
+_BOOT_OUT_VERSION_RE: Final = re.compile(r"Adafruit CircuitPython (\d+)\.")
+_MPY_CROSS_VERSION_RE: Final = re.compile(r"mpy-cross (\d+)\.")
+
 
 class BuildError(Exception):
     """mpy-cross compile failure; carries the offending file and toolchain error."""
+
+
+class VersionError(Exception):
+    """mpy-cross / CircuitPython version mismatch; deploy aborted before any compile."""
 
 
 class BuildResult:
@@ -47,6 +60,68 @@ def mpy_cross_compile(src: Path, dest: Path) -> None:
     except subprocess.CalledProcessError as exc:
         stderr = exc.stderr.decode(errors="replace") if exc.stderr else ""
         raise BuildError(f"mpy-cross failed on {src}: {stderr}") from exc
+
+
+def get_mpy_cross_major(mpy_cross_bin: str) -> int:
+    """Return the major version integer from ``mpy-cross --version`` output."""
+    try:
+        result = subprocess.run(
+            [mpy_cross_bin, "--version"],
+            capture_output=True,
+        )
+        output = result.stdout.decode(errors="replace").strip()
+    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        raise VersionError(
+            f"mpy-cross not found or failed to run ('{mpy_cross_bin}'). "
+            "Install it via: scripts/setup_mpy_cross.sh"
+        ) from exc
+
+    match = _MPY_CROSS_VERSION_RE.search(output)
+    if not match:
+        raise VersionError(
+            f"Cannot parse mpy-cross version from output: {output!r}. "
+            "Expected format: 'mpy-cross <major>.<minor>.<patch>'"
+        )
+    return int(match.group(1))
+
+
+def parse_circuitpython_major_from_boot_out(boot_out_text: str) -> int:
+    """Return the CircuitPython major version integer from *boot_out_text*."""
+    match = _BOOT_OUT_VERSION_RE.search(boot_out_text)
+    if not match:
+        raise VersionError(
+            "Cannot parse CircuitPython version from boot_out.txt. "
+            f"Content: {boot_out_text[:120]!r}"
+        )
+    return int(match.group(1))
+
+
+def validate_mpy_cross_version(mount: Path | None, mpy_cross_bin: str) -> None:
+    """Raise :class:`VersionError` when the mpy-cross major version does not match.
+
+    Validates against the device's ``boot_out.txt`` when *mount* is given,
+    or against :data:`EXPECTED_CIRCUITPYTHON_MAJOR` for dry-run / CI (``mount=None``).
+    """
+    if mount is not None:
+        boot_out_path = mount / "boot_out.txt"
+        if not boot_out_path.exists():
+            raise VersionError(
+                f"boot_out.txt not found at '{boot_out_path}'. "
+                "Ensure the device is mounted and has booted at least once."
+            )
+        device_major = parse_circuitpython_major_from_boot_out(boot_out_path.read_text())
+        expected_major = device_major
+        context = f"device CircuitPython {device_major}.x (from boot_out.txt)"
+    else:
+        expected_major = EXPECTED_CIRCUITPYTHON_MAJOR
+        context = f"repo-pinned CircuitPython {EXPECTED_CIRCUITPYTHON_MAJOR}.x"
+
+    actual_major = get_mpy_cross_major(mpy_cross_bin)
+    if actual_major != expected_major:
+        raise VersionError(
+            f"mpy-cross major version {actual_major} does not match {context}. "
+            "Install the correct mpy-cross via: scripts/setup_mpy_cross.sh"
+        )
 
 
 def _is_excluded(rel: Path) -> bool:
