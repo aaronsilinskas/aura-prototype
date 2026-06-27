@@ -488,9 +488,36 @@ def test_scan_item_names_returns_py_files_as_item_names(tmp_path) -> None:
     assert result == {"fire", "water"}
 
 
+def test_scan_item_names_returns_mpy_files_as_item_names(tmp_path) -> None:
+    (tmp_path / "fire.mpy").write_bytes(b"")
+    (tmp_path / "water.mpy").write_bytes(b"")
+
+    result = scan_item_names(str(tmp_path))
+
+    assert result == {"fire", "water"}
+
+
+def test_scan_item_names_deduplicates_py_and_mpy_with_same_stem(tmp_path) -> None:
+    (tmp_path / "fire.py").write_text("")
+    (tmp_path / "fire.mpy").write_bytes(b"")
+
+    result = scan_item_names(str(tmp_path))
+
+    assert result == {"fire"}
+
+
 def test_scan_item_names_excludes_init_py(tmp_path) -> None:
     (tmp_path / "__init__.py").write_text("")
     (tmp_path / "item_a.py").write_text("")
+
+    result = scan_item_names(str(tmp_path))
+
+    assert result == {"item_a"}
+
+
+def test_scan_item_names_excludes_init_mpy(tmp_path) -> None:
+    (tmp_path / "__init__.mpy").write_bytes(b"")
+    (tmp_path / "item_a.mpy").write_bytes(b"")
 
     result = scan_item_names(str(tmp_path))
 

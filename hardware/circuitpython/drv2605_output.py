@@ -76,10 +76,9 @@ class Drv2605EffectOutput(EffectOutput):
 
         sequence = config.sequence
         if len(sequence) > _MAX_SEQUENCE_LEN:
-            raise ValueError(
-                f"VibrationConfig.sequence length {len(sequence)} exceeds"
-                f" maximum {_MAX_SEQUENCE_LEN}"
-            )
+            n = len(sequence)
+            msg = f"VibrationConfig.sequence length {n} exceeds maximum {_MAX_SEQUENCE_LEN}"
+            raise ValueError(msg)
 
         for i in range(len(sequence)):
             self._motor.sequence[i] = _DRV2605L_EFFECT_MAP[sequence[i]]

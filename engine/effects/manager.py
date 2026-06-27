@@ -112,13 +112,19 @@ class EffectResolver:
                 ) from exc
             if "is not an instance of" in msg:
                 raise ValueError(
-                    "Effect '" + effect_name + "' in pack '" + pack_name + "'"
-                    " has an invalid BUILD attribute"
+                    "Effect '"
+                    + effect_name
+                    + "' in pack '"
+                    + pack_name
+                    + "' has an invalid BUILD attribute"
                 ) from exc
             if msg.startswith("Pack '"):
                 raise ValueError(
-                    "Effect pack '" + pack_name + "' item '" + effect_name + "'"
-                    " is missing a BUILD attribute"
+                    "Effect pack '"
+                    + pack_name
+                    + "' item '"
+                    + effect_name
+                    + "' is missing a BUILD attribute"
                 ) from exc
             raise
 
@@ -224,10 +230,8 @@ class EffectManager(EffectControls):
             self.effect: Effect | None = effect
 
         def __repr__(self) -> str:
-            return (
-                f"_EffectEntry(name={self.name!r}, receipt_id={self.receipt.id},"
-                f" keys={self.keys!r})"
-            )
+            rid = self.receipt.id
+            return f"_EffectEntry(name={self.name!r}, receipt_id={rid}, keys={self.keys!r})"
 
     __slots__ = (
         "_effects",

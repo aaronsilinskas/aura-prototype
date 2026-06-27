@@ -15,6 +15,12 @@ from scripts.deploy import _EXCLUDE_DIRS, _EXCLUDE_NAMES, MODULE_DIRS
 
 _RAW_SUFFIXES: Final = {".json", ".txt", ".wav"}
 
+_REPO_ROOT: Final = Path(__file__).parent.parent
+_DEFAULT_MPY_CROSS: Final = str(_REPO_ROOT / "tools" / "mpy-cross")
+# Override with MPY_CROSS env var to point at any CircuitPython mpy-cross binary.
+# Download the correct version via: scripts/setup_mpy_cross.sh
+_MPY_CROSS_BIN: Final = os.environ.get("MPY_CROSS", _DEFAULT_MPY_CROSS)
+
 
 class BuildError(Exception):
     """mpy-cross compile failure; carries the offending file and toolchain error."""
@@ -30,11 +36,11 @@ class BuildResult:
 
 
 def mpy_cross_compile(src: Path, dest: Path) -> None:
-    """Compile *src* to *dest* via ``python -m mpy_cross``."""
+    """Compile *src* to *dest* using the CircuitPython mpy-cross binary."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
         subprocess.run(
-            ["python", "-m", "mpy_cross", str(src), "-o", str(dest)],
+            [_MPY_CROSS_BIN, str(src), "-o", str(dest)],
             check=True,
             capture_output=True,
         )

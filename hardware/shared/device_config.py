@@ -199,8 +199,8 @@ def validate_band_map(bands: dict[str, range], context: str) -> None:
             kb, rb = items[j]
             if ra.start < rb.stop and rb.start < ra.stop:
                 raise ValueError(
-                    f"{context}: bands '{ka}' ({ra.start}-{ra.stop}) and "
-                    f"'{kb}' ({rb.start}-{rb.stop}) overlap"
+                    f"{context}: bands '{ka}' ({ra.start}-{ra.stop})"
+                    + f" and '{kb}' ({rb.start}-{rb.stop}) overlap"
                 )
 
 
@@ -254,10 +254,11 @@ def _parse_neopixel_strip_entry(mapping: dict, entry_index: int) -> NeoPixelStri
             raise ValueError(f"{label}.scope_pixels key '{key}' is not valid; valid keys: {valid}")
         start, end = value[0], value[1]
         if not (0 <= start < end <= count):
-            raise ValueError(
-                f"{label} pin '{pin}' scope '{key}': segment [{start}, {end}] is out of range "
-                f"for strip count {count} (requires 0 <= start < end <= count)"
+            msg = (
+                f"{label} pin '{pin}' scope '{key}': segment [{start}, {end}] is out of range"
+                + f" for strip count {count} (requires 0 <= start < end <= count)"
             )
+            raise ValueError(msg)
         scope_pixels[key] = range(start, end)
 
     validate_band_map(scope_pixels, f"{label} pin '{pin}' scope_pixels")

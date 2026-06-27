@@ -17,6 +17,9 @@ wheels/
 # Virtual environments
 .venv
 
+# mpy-cross binary (platform-specific, downloaded via scripts/setup_mpy_cross.sh)
+tools/mpy-cross
+
 # CircuitPythonSync
 libArchive/
 stubArchive/
