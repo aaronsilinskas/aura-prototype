@@ -182,6 +182,19 @@ class EffectControls:
         """Stop all effects whose keys overlap scope."""
         raise NotImplementedError
 
+    def warm_effect(self, name: str) -> None:
+        """Pre-import the module backing *name* without starting an effect.
+
+        On CircuitPython the first import of an effect module invokes the
+        compiler, which needs a large contiguous heap block.  Calling
+        ``warm_effect`` during scene setup — while the boot heap is still fresh
+        and unfragmented — moves that one-time compile spike off the gameplay
+        path, so a later ``set_effect``/``add_effect`` for *name* only builds an
+        effect object and never triggers a mid-game compile.  The base class is
+        a no-op; ``EffectManager`` overrides it.
+        """
+        pass
+
     def set_local_effects(self, local_registry: object) -> None:
         """Push the active scene's local effect registry into the effect system.
 

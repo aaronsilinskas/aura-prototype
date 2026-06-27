@@ -434,6 +434,13 @@ class EffectManager(EffectControls):
         """Stop all running effects in scope."""
         self._remove_effects_in_scope(set(scope.keys))
 
+    def warm_effect(self, name: str) -> None:
+        """Import and cache *name*'s builder without building an effect or buffers.
+
+        See ``EffectControls.warm_effect`` for why this runs at scene setup.
+        """
+        self._resolver.resolve(name)
+
     def update(self, timer: Timer) -> None:
         """Tick all active effects and deliver frames to every registered output."""
         # Deferred-stop: remove any effects whose receipt was marked stopped since

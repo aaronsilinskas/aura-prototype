@@ -77,6 +77,43 @@ def test_manager_with_no_outputs_updates_without_error() -> None:
 
 
 # ---------------------------------------------------------------------------
+# warm_effect — pre-import the module without building an effect
+# ---------------------------------------------------------------------------
+
+
+def test_warm_effect_imports_module_without_starting_an_effect(pack_env) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    manager.warm_effect("stub.fire")
+
+    # The backing module was imported (the compile spike on CircuitPython) ...
+    assert "tp.stub.fire" in sys.modules
+    # ... but no effect is running: the output goes dark and no buffer was built.
+    manager.update(_make_timer())
+    assert output.update_pixels_calls == [("personal", [])]
+    assert output.created_buffers == []
+
+
+def test_set_effect_after_warm_runs_the_effect(pack_env) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[output])
+
+    manager.warm_effect("stub.fire")
+    receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+    manager.update(_make_timer())
+
+    assert output.update_pixels_calls == [("personal", [(output.created_buffers[0], receipt)])]
+
+
+def test_warm_effect_with_unknown_pack_raises_value_error(pack_env) -> None:
+    manager = EffectManager(registry=_make_stub_registry(pack_env), outputs=[])
+
+    with pytest.raises(ValueError):
+        manager.warm_effect("nope.fire")
+
+
+# ---------------------------------------------------------------------------
 # update — go-dark signal when no effects are active
 # ---------------------------------------------------------------------------
 

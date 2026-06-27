@@ -29,6 +29,7 @@ class SpyEffectControls(EffectControls):
         self.set_effect_calls: list[tuple[ScopeValue, str, dict]] = []
         self.stop_effect_calls: list[ScopeValue] = []
         self.add_effect_calls: list[tuple[ScopeValue, str, dict]] = []
+        self.warm_effect_calls: list[str] = []
 
     def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
         self.set_effect_calls.append((scope, name, options))
@@ -40,6 +41,9 @@ class SpyEffectControls(EffectControls):
 
     def stop_effect(self, scope: ScopeValue) -> None:
         self.stop_effect_calls.append(scope)
+
+    def warm_effect(self, name: str) -> None:
+        self.warm_effect_calls.append(name)
 
     def set_local_effects(self, local_registry: object) -> None:
         pass  # no-op: SpyEffectControls is for rule unit tests, not SceneManager

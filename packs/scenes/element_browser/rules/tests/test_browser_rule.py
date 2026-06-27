@@ -66,6 +66,27 @@ def _dispatch(
     engine.update(state)
 
 
+def test_first_dispatch_warms_every_element_module_across_all_pages(spy):
+    state, engine = _make_state(spy)
+
+    _dispatch(state, engine, _no_button_event())
+
+    # Every effect on every page is imported up front at setup — not lazily on
+    # the first switch to that page, which is when the on-device MemoryError hit.
+    assert spy.warm_effect_calls == _PAGE_0_EFFECTS + _PAGE_1_EFFECTS
+
+
+def test_page_advance_does_not_re_warm_already_warmed_modules(spy):
+    state, engine = _make_state(spy)
+    _dispatch(state, engine, _no_button_event())  # setup warms all modules
+    spy.warm_effect_calls.clear()
+
+    _dispatch(state, engine, _button_a_event())
+
+    # Page switches only build effect objects; warming is a one-time setup cost.
+    assert spy.warm_effect_calls == []
+
+
 def test_first_dispatch_sets_all_page0_effects_at_level_1(spy):
     state, engine = _make_state(spy)
 

@@ -37,6 +37,20 @@ def _apply_page(page: int, level: int, state: GameState) -> None:
         state.effect_controls.set_effect(scope, name, {"level": level})
 
 
+def _warm_all_pages(state: GameState) -> None:
+    """Pre-import every page's effect modules while the boot heap is still fresh.
+
+    On CircuitPython the first import of an element module invokes the compiler,
+    which needs a large contiguous heap block.  Doing it lazily on the first
+    switch to a later page crashes with ``MemoryError`` once the current page's
+    live effects have fragmented the heap.  Warming every module up front at
+    scene setup moves that one-time compile spike off the page-switch path.
+    """
+    for page in _ELEMENT_PAGES:
+        for _scope, name in page:
+            state.effect_controls.warm_effect(name)
+
+
 class ElementBrowserRule(GameRule):
     def __init__(self) -> None:
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
@@ -44,6 +58,7 @@ class ElementBrowserRule(GameRule):
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
         if not state.get("shown", False):
             state.set("shown", True)
+            _warm_all_pages(state)
             _apply_page(state.get("page", 0), state.get("level", 1), state)
             return
 
