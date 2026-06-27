@@ -156,7 +156,7 @@ def _should_skip_compile(src: Path, dest_mpy: Path) -> bool:
     """Return True when the staged .mpy is up to date with the source .py.
 
     Content-hash sidecar makes the skip immune to edits that land within the
-    FAT32 2-second mtime tolerance window (see also ``_should_skip`` in deploy).
+    FAT32 2-second mtime tolerance window.
     """
     hp = _hash_path(dest_mpy)
     if not dest_mpy.exists() or not hp.exists():
@@ -169,10 +169,7 @@ def _record_src_hash(src: Path, dest_mpy: Path) -> None:
 
 
 def _prune_staging(source_root: Path, staging_root: Path) -> int:
-    """Prune staged .mpy files whose source .py no longer exists.
-
-    Returns the number of .mpy files pruned.
-    """
+    """Prune staged .mpy files whose source .py no longer exists."""
     pruned = 0
     for module in MODULE_DIRS:
         src_dir = source_root / module
