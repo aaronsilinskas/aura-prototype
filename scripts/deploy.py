@@ -99,13 +99,17 @@ def _copy_intermediate_inits(
     copied: "list[Path]",
     skipped: "list[Path]",
     dry_run: bool,
+    use_source: bool = False,
 ) -> None:
     parts = Path(module).parts
     for i in range(len(parts) - 1):
         pkg_path = Path(*parts[: i + 1])
-        src_init = sync_root / pkg_path / "__init__.mpy"
-        if not src_init.exists():
+        if use_source:
             src_init = sync_root / pkg_path / "__init__.py"
+        else:
+            src_init = sync_root / pkg_path / "__init__.mpy"
+            if not src_init.exists():
+                src_init = sync_root / pkg_path / "__init__.py"
         if src_init.exists():
             label = str(pkg_path / src_init.name)
             _sync_file(src_init, mount / pkg_path / src_init.name, label, copied, skipped, dry_run)
@@ -244,7 +248,9 @@ def deploy(
 
         if src_dir.is_dir():
             if "/" in module:
-                _copy_intermediate_inits(module, sync_root, mount, copied, skipped, dry_run)
+                _copy_intermediate_inits(
+                    module, sync_root, mount, copied, skipped, dry_run, use_source=use_source
+                )
             for src_file in sorted(src_dir.rglob("*")):
                 if src_file.is_dir():
                     continue

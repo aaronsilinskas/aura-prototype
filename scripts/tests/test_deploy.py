@@ -1034,7 +1034,8 @@ def test_source_mode_succeeds_without_mpy_cross_installed(tmp_path: Path) -> Non
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    with patch("scripts.build.get_mpy_cross_major", side_effect=Exception("mpy-cross not found")):
+    with patch("scripts.build.validate_mpy_cross_version") as mock_validate:
         result = deploy(None, mount, source_root=source, use_source=True)
 
     assert result == 0
+    mock_validate.assert_not_called()
