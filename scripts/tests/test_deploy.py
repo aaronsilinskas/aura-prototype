@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+from unittest.mock import patch
 
 from hardware.shared.device_config import DEFAULT_DEVICE_CONFIG, parse_device_config
 from scripts.deploy import deploy
@@ -839,3 +840,97 @@ def test_deploy_compile_failure_prints_error_with_file_and_toolchain_output(
     captured = capsys.readouterr()
     assert failed[0] in captured.err
     assert "SyntaxError" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# mpy-cross version validation (#515)
+# ---------------------------------------------------------------------------
+
+
+def _boot_out(major: int = 10) -> str:
+    return f"Adafruit CircuitPython {major}.2.1 on 2025-01-15; Adafruit Feather RP2040"
+
+
+def test_version_mismatch_with_device_mounted_returns_nonzero(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "boot_out.txt").write_text(_boot_out(major=10))
+
+    with patch("scripts.build.get_mpy_cross_major", return_value=9):
+        result = deploy(None, mount, source_root=source, compile=fake_compile)
+
+    assert result != 0
+
+
+def test_version_mismatch_with_device_mounted_prints_error(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "boot_out.txt").write_text(_boot_out(major=10))
+
+    with patch("scripts.build.get_mpy_cross_major", return_value=9):
+        deploy(None, mount, source_root=source, compile=fake_compile)
+
+    captured = capsys.readouterr()
+    assert "mpy-cross" in captured.err.lower() or "version" in captured.err.lower()
+
+
+def test_version_mismatch_with_device_mounted_copies_nothing(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "boot_out.txt").write_text(_boot_out(major=10))
+
+    with patch("scripts.build.get_mpy_cross_major", return_value=9):
+        deploy(None, mount, source_root=source, compile=fake_compile)
+
+    synced = [p for p in mount.rglob("*") if p.name != "boot_out.txt"]
+    assert synced == []
+
+
+def test_matching_version_with_device_mounted_deploys_normally(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "boot_out.txt").write_text(_boot_out(major=10))
+
+    with patch("scripts.build.get_mpy_cross_major", return_value=10):
+        result = deploy(None, mount, source_root=source, compile=fake_compile)
+
+    assert result == 0
+    assert (mount / "effects" / "render.mpy").exists()
+
+
+def test_dry_run_version_mismatch_returns_nonzero(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+
+    with patch("scripts.build.get_mpy_cross_major", return_value=9):
+        result = deploy(
+            None, tmp_path / "nonexistent", source_root=source, compile=fake_compile, dry_run=True
+        )
+
+    assert result != 0
+
+
+def test_dry_run_matching_version_succeeds(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+
+    with patch("scripts.build.get_mpy_cross_major", return_value=10):
+        result = deploy(
+            None, tmp_path / "nonexistent", source_root=source, compile=fake_compile, dry_run=True
+        )
+
+    assert result == 0
