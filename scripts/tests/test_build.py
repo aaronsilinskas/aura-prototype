@@ -1,6 +1,5 @@
 """Tests for the build stage: compile .py -> .mpy into a staging tree."""
 
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -100,8 +99,11 @@ def test_all_module_dirs_are_compiled(tmp_path: Path) -> None:
 
     build(source_root=source, staging_root=staging, compile=fake_compile)
 
+    assert (staging / "effects" / "render.mpy").exists()
     assert (staging / "engine" / "timer.mpy").exists()
     assert (staging / "magic" / "aura.mpy").exists()
+    assert (staging / "packs" / "__init__.mpy").exists()
+    assert (staging / "rules" / "__init__.mpy").exists()
 
 
 def test_hardware_subdirectory_modules_are_compiled(tmp_path: Path) -> None:
@@ -219,7 +221,7 @@ def test_compile_failure_raises_build_error(tmp_path: Path) -> None:
 
     def failing_compile(src: Path, dest: Path) -> None:
         if src.name == target_file:
-            raise subprocess.CalledProcessError(1, "mpy-cross", stderr=b"SyntaxError: bad syntax")
+            raise BuildError(f"mpy-cross failed on {src}: SyntaxError: bad syntax")
         fake_compile(src, dest)
 
     with pytest.raises(BuildError) as exc_info:
@@ -239,7 +241,7 @@ def test_compile_failure_leaves_no_partial_staging_tree(tmp_path: Path) -> None:
     def first_fails_compile(src: Path, dest: Path) -> None:
         if not compiled:
             compiled.append(src.name)
-            raise subprocess.CalledProcessError(1, "mpy-cross", stderr=b"error")
+            raise BuildError(f"mpy-cross failed on {src}: error")
         fake_compile(src, dest)
 
     with pytest.raises(BuildError):

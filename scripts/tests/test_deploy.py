@@ -783,7 +783,7 @@ def test_deploy_summary_includes_compiled_count(tmp_path: Path, capsys) -> None:
 
 
 def test_deploy_compile_failure_returns_nonzero_exit_code(tmp_path: Path) -> None:
-    import subprocess
+    from scripts.build import BuildError
 
     source = tmp_path / "source"
     source.mkdir()
@@ -792,7 +792,7 @@ def test_deploy_compile_failure_returns_nonzero_exit_code(tmp_path: Path) -> Non
     mount.mkdir()
 
     def always_fails(src: Path, dest: Path) -> None:
-        raise subprocess.CalledProcessError(1, "mpy-cross", stderr=b"SyntaxError")
+        raise BuildError(f"mpy-cross failed on {src}: SyntaxError")
 
     result = deploy(None, mount, source_root=source, compile=always_fails)
 
@@ -800,7 +800,7 @@ def test_deploy_compile_failure_returns_nonzero_exit_code(tmp_path: Path) -> Non
 
 
 def test_deploy_compile_failure_leaves_mount_untouched(tmp_path: Path) -> None:
-    import subprocess
+    from scripts.build import BuildError
 
     source = tmp_path / "source"
     source.mkdir()
@@ -809,7 +809,7 @@ def test_deploy_compile_failure_leaves_mount_untouched(tmp_path: Path) -> None:
     mount.mkdir()
 
     def always_fails(src: Path, dest: Path) -> None:
-        raise subprocess.CalledProcessError(1, "mpy-cross", stderr=b"SyntaxError")
+        raise BuildError(f"mpy-cross failed on {src}: SyntaxError")
 
     deploy(None, mount, source_root=source, compile=always_fails)
 
@@ -819,7 +819,7 @@ def test_deploy_compile_failure_leaves_mount_untouched(tmp_path: Path) -> None:
 def test_deploy_compile_failure_prints_error_with_file_and_toolchain_output(
     tmp_path: Path, capsys
 ) -> None:
-    import subprocess
+    from scripts.build import BuildError
 
     source = tmp_path / "source"
     source.mkdir()
@@ -831,7 +831,7 @@ def test_deploy_compile_failure_prints_error_with_file_and_toolchain_output(
     def first_fails(src: Path, dest: Path) -> None:
         if not failed:
             failed.append(src.name)
-            raise subprocess.CalledProcessError(1, "mpy-cross", stderr=b"SyntaxError: oops")
+            raise BuildError(f"mpy-cross failed on {src}: SyntaxError: oops")
         fake_compile(src, dest)
 
     deploy(None, mount, source_root=source, compile=first_fails)

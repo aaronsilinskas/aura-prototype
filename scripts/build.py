@@ -83,11 +83,7 @@ def build(
                 if src_file.suffix == ".py":
                     dest_file = dest_dir / rel.with_suffix(".mpy")
                     dest_file.parent.mkdir(parents=True, exist_ok=True)
-                    try:
-                        compile(src_file, dest_file)
-                    except subprocess.CalledProcessError as exc:
-                        stderr = exc.stderr.decode(errors="replace") if exc.stderr else ""
-                        raise BuildError(f"mpy-cross failed on {src_file}: {stderr}") from exc
+                    compile(src_file, dest_file)
                     # Preserve source mtime so the sync stage can skip unchanged
                     # files on subsequent deploys (FAT32 2-second tolerance).
                     src_mtime = src_file.stat().st_mtime
@@ -121,10 +117,6 @@ def _build_intermediate_inits(
             dest_init = staging_root / pkg_path / "__init__.mpy"
             if not dest_init.exists():
                 dest_init.parent.mkdir(parents=True, exist_ok=True)
-                try:
-                    compile(src_init, dest_init)
-                except subprocess.CalledProcessError as exc:
-                    stderr = exc.stderr.decode(errors="replace") if exc.stderr else ""
-                    raise BuildError(f"mpy-cross failed on {src_init}: {stderr}") from exc
+                compile(src_init, dest_init)
                 src_mtime = src_init.stat().st_mtime
                 os.utime(dest_init, (src_mtime, src_mtime))
