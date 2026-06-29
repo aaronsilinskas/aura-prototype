@@ -72,12 +72,12 @@ def test_matching_hit_reduces_hitpoints_and_reissues_progress_bar(spy):
     assert options == {"progress": pytest.approx(expected_fraction)}
 
 
-def test_matching_hit_stores_progress_receipt(spy):
+def test_matching_hit_stores_hitpoints_receipt(spy):
     state, engine, timer = _make_state(spy)
 
     _receive(state, engine, timer, 1.0, TagData(team=0, player=1, damage=1))
 
-    assert tag_state(state).progress_receipt is not None
+    assert tag_state(state).hitpoints_receipt is not None
 
 
 def test_hit_during_reload_subtracts_hitpoints_without_interrupting_reload(spy):

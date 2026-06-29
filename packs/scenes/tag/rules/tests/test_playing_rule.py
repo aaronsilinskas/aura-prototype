@@ -68,12 +68,12 @@ def test_entering_playing_sets_full_progress_bar_on_personal(spy):
     assert options == {"progress": 1.0}
 
 
-def test_entering_playing_stores_progress_receipt(spy):
+def test_entering_playing_stores_hitpoints_receipt(spy):
     state, engine, timer = _make_state(spy)
 
     _tick(state, engine, timer, 0.0)
 
-    assert tag_state(state).progress_receipt is not None
+    assert tag_state(state).hitpoints_receipt is not None
 
 
 def test_entering_playing_sets_starting_ammo(spy):

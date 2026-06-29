@@ -8,7 +8,7 @@ own: hitpoints, the self-deafen deadline, and the in-flight per-phase
 ``EffectReceipt``s.
 
 Each owning rule clears the fields it owns in its ``on_exit``: the Playing rule
-owns ``progress_receipt`` (shared with the hit reactor) and the Game Over rule
+owns ``hitpoints_receipt`` (shared with the hit reactor) and the Game Over rule
 owns ``game_over_receipt``. ``tag_state`` is a :class:`engine.state.StateSlot`
 callable accessor, mirroring ``tag_config``.
 """
@@ -63,14 +63,14 @@ class TagState:
         "deafen_until",
         "game_over_receipt",
         "hitpoints",
-        "progress_receipt",
+        "hitpoints_receipt",
         "shot",
     )
 
     def __init__(self) -> None:
         self.hitpoints = 0
         self.deafen_until = 0.0
-        self.progress_receipt: EffectReceipt | None = None
+        self.hitpoints_receipt: EffectReceipt | None = None
         self.game_over_receipt: EffectReceipt | None = None
         self.ammo_receipt: EffectReceipt | None = None
         self.shot = ShotState()

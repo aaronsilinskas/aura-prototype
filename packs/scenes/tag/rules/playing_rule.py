@@ -34,7 +34,7 @@ class TagPlayingRule(PhaseRule):
     def on_enter(self, state: GameState) -> None:
         tag = tag_state(state)
         tag.hitpoints = tag_config(state).starting_hitpoints
-        tag.progress_receipt = state.effect_controls.set_effect(
+        tag.hitpoints_receipt = state.effect_controls.set_effect(
             Scope.PERSONAL, "basic.progress", {"progress": 1.0}
         )
 
@@ -47,9 +47,9 @@ class TagPlayingRule(PhaseRule):
 
     def on_exit(self, state: GameState) -> None:
         tag = tag_state(state)
-        if tag.progress_receipt is not None:
-            tag.progress_receipt.stop()
-            tag.progress_receipt = None
+        if tag.hitpoints_receipt is not None:
+            tag.hitpoints_receipt.stop()
+            tag.hitpoints_receipt = None
 
         if tag.ammo_receipt is not None:
             tag.ammo_receipt.stop()

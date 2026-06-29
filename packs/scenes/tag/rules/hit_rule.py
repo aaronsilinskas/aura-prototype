@@ -69,7 +69,7 @@ class TagHitRule(InPhaseRule):
         tag.hitpoints -= tag_data.damage
 
         fraction = tag.hitpoints / config.starting_hitpoints
-        tag.progress_receipt = state.effect_controls.set_effect(
+        tag.hitpoints_receipt = state.effect_controls.set_effect(
             Scope.PERSONAL, "basic.progress", {"progress": fraction}
         )
 

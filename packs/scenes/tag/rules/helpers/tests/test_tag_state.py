@@ -44,7 +44,7 @@ def test_new_tag_state_starts_with_zeroed_gameplay_fields():
 def test_new_tag_state_has_no_receipts():
     tag = TagState()
 
-    assert tag.progress_receipt is None
+    assert tag.hitpoints_receipt is None
     assert tag.game_over_receipt is None
 
 
