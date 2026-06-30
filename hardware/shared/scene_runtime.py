@@ -160,6 +160,7 @@ def run_scene(
                     ir_receiver.space_reject,
                     ir_receiver.packets_completed,
                     ir_receiver.packets_surfaced,
+                    ir_receiver.pulses_dropped_transmitting,
                     _events_queued,
                 )
             )
