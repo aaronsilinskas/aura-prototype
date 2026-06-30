@@ -26,6 +26,7 @@ def _snapshot(**overrides) -> IrTelemetrySnapshot:
         "space_reject": 0,
         "packets_completed": 0,
         "packets_surfaced": 0,
+        "pulses_dropped_transmitting": 0,
         "events_queued": 0,
     }
     fields.update(overrides)
@@ -47,6 +48,7 @@ def test_format_line_includes_every_counter_in_pipeline_order():
         space_reject=5,
         packets_completed=6,
         packets_surfaced=7,
+        pulses_dropped_transmitting=9,
         events_queued=8,
     )
 
@@ -54,7 +56,7 @@ def test_format_line_includes_every_counter_in_pipeline_order():
 
     # Pipeline order per the issue: pulses_seen -> buffer_full_on_poll ->
     # packets_started -> rejected{preamble,mark,space} -> packets_completed
-    # -> packets_surfaced -> events_queued.
+    # -> packets_surfaced -> pulses_dropped_transmitting -> events_queued.
     fields_in_order = [
         "pulses_seen=10",
         "buffer_full_on_poll=1",
@@ -64,6 +66,7 @@ def test_format_line_includes_every_counter_in_pipeline_order():
         "space_reject=5",
         "packets_completed=6",
         "packets_surfaced=7",
+        "pulses_dropped_transmitting=9",
         "events_queued=8",
     ]
     positions = [line.index(field) for field in fields_in_order]
@@ -107,6 +110,24 @@ def test_gate_does_not_report_again_until_another_change():
     gate.poll(_snapshot(packets_surfaced=1))
 
     assert gate.poll(_snapshot(packets_surfaced=1)) is None
+
+
+def test_gate_returns_line_when_pulses_dropped_transmitting_changed():
+    gate = IrTelemetryGate()
+    gate.poll(_snapshot())
+
+    result = gate.poll(_snapshot(pulses_dropped_transmitting=1))
+
+    assert result is not None
+    assert "pulses_dropped_transmitting=1" in result
+
+
+def test_gate_does_not_report_again_until_pulses_dropped_transmitting_changes_further():
+    gate = IrTelemetryGate()
+    gate.poll(_snapshot())
+    gate.poll(_snapshot(pulses_dropped_transmitting=1))
+
+    assert gate.poll(_snapshot(pulses_dropped_transmitting=1)) is None
 
 
 # ---------------------------------------------------------------------------

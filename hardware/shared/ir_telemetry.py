@@ -15,7 +15,7 @@ class IrTelemetrySnapshot:
     runtimes); fields mirror the stage counters named in the issue:
     ``pulses_seen -> buffer_full_on_poll -> packets_started ->
     rejected{preamble,mark,space} -> packets_completed -> packets_surfaced
-    -> events_queued``.
+    -> pulses_dropped_transmitting -> events_queued``.
     """
 
     __slots__ = (
@@ -26,6 +26,7 @@ class IrTelemetrySnapshot:
         "packets_started",
         "packets_surfaced",
         "preamble_reject",
+        "pulses_dropped_transmitting",
         "pulses_seen",
         "space_reject",
     )
@@ -40,6 +41,7 @@ class IrTelemetrySnapshot:
         space_reject: int,
         packets_completed: int,
         packets_surfaced: int,
+        pulses_dropped_transmitting: int,
         events_queued: int,
     ) -> None:
         self.pulses_seen = pulses_seen
@@ -50,6 +52,7 @@ class IrTelemetrySnapshot:
         self.space_reject = space_reject
         self.packets_completed = packets_completed
         self.packets_surfaced = packets_surfaced
+        self.pulses_dropped_transmitting = pulses_dropped_transmitting
         self.events_queued = events_queued
 
 
@@ -81,6 +84,8 @@ def format_ir_telemetry_line(snapshot: IrTelemetrySnapshot) -> str:
         + str(snapshot.packets_completed)
         + " packets_surfaced="
         + str(snapshot.packets_surfaced)
+        + " pulses_dropped_transmitting="
+        + str(snapshot.pulses_dropped_transmitting)
         + " events_queued="
         + str(snapshot.events_queued)
     )
@@ -103,6 +108,7 @@ class IrTelemetryGate:
         "_packets_started",
         "_packets_surfaced",
         "_preamble_reject",
+        "_pulses_dropped_transmitting",
         "_pulses_seen",
         "_space_reject",
     )
@@ -117,6 +123,7 @@ class IrTelemetryGate:
         self._space_reject = 0
         self._packets_completed = 0
         self._packets_surfaced = 0
+        self._pulses_dropped_transmitting = 0
         self._events_queued = 0
 
     def poll(self, snapshot: IrTelemetrySnapshot) -> str | None:
@@ -140,6 +147,7 @@ class IrTelemetryGate:
             or snapshot.space_reject != self._space_reject
             or snapshot.packets_completed != self._packets_completed
             or snapshot.packets_surfaced != self._packets_surfaced
+            or snapshot.pulses_dropped_transmitting != self._pulses_dropped_transmitting
             or snapshot.events_queued != self._events_queued
         )
         if not changed:
@@ -154,6 +162,7 @@ class IrTelemetryGate:
         self._space_reject = snapshot.space_reject
         self._packets_completed = snapshot.packets_completed
         self._packets_surfaced = snapshot.packets_surfaced
+        self._pulses_dropped_transmitting = snapshot.pulses_dropped_transmitting
         self._events_queued = snapshot.events_queued
 
         return format_ir_telemetry_line(snapshot)
