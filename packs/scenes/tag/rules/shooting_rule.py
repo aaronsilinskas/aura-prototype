@@ -48,6 +48,7 @@ class TagShootingRule(InPhaseRule):
 
         if event.buttons.is_pressed("A"):
             if tag.shot.ammo == 0:
+                state.effect_controls.add_effect(Scope.DIRECTIONAL, "scene.dry_fire", {})
                 tag.shot.reload_started_at = state.total
                 tag.shot.reload_receipt = state.effect_controls.set_effect(
                     Scope.Global.BUFF, "scene.reload", {"duration": config.reload_duration}

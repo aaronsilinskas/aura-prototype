@@ -11,7 +11,9 @@ together by reading every rule.
   ``TagPlayingRule``; re-issued by ``TagHitRule`` on each hit. Lives for the
   Playing phase, updated transiently on each hit.
 - ``DIRECTIONAL`` — ``scene.fire_shot``. Owned by ``TagShootingRule``.
-  Transient, per shot fired.
+  Transient, per shot fired. ``scene.dry_fire`` is also layered here via
+  ``add_effect`` on an empty-magazine Button-A press, alongside (not instead
+  of) the ``Global.BUFF`` reload it kicks off.
 - ``Global.MAIN`` — ``scene.hit``. Owned by ``TagHitRule``. Transient, per
   hit received.
 - ``Global.BUFF`` — a single mutually-exclusive "what's currently shown for
