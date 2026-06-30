@@ -81,6 +81,67 @@ class PulseReader:
 
 
 # ---------------------------------------------------------------------------
+# IR transmit gate
+# ---------------------------------------------------------------------------
+
+
+class IrTransmitGate:
+    """Coordinates transmit and receive so a device never decodes its own
+    **self-echo** — the IR pulses its own receiver captures while its own
+    emitter is lit.
+
+    The single seam between an otherwise-decoupled transmitter and receiver:
+    transmitters *drive* the gate (:meth:`begin_transmit` / :meth:`end_transmit`
+    bracketing emission), the receiver *reads* it (:attr:`transmitting` to drop
+    pulses captured mid-emission; :meth:`consume_flush` for one final
+    drain-and-discard on the falling edge). Neither side references the other.
+
+    Tracks an active-emission depth (not a bare boolean) so suppression stays
+    armed across concurrent or back-to-back emissions, falling to "not
+    transmitting" only when the last active emission ends. ``__slots__`` —
+    no per-instance dict, safe to construct once per device.
+    """
+
+    __slots__ = ("_depth", "_flush_pending")
+
+    def __init__(self) -> None:
+        self._depth: int = 0
+        self._flush_pending: bool = False
+
+    def begin_transmit(self) -> None:
+        """Mark one emission as starting. Increments the active-emission depth."""
+        self._depth += 1
+
+    def end_transmit(self) -> None:
+        """Mark one emission as ending.
+
+        Decrements the active-emission depth (never below 0) and arms the
+        one-shot flush latch so the receiver performs exactly one more
+        drain-and-discard on its next poll.
+        """
+        if self._depth > 0:
+            self._depth -= 1
+        self._flush_pending = True
+
+    @property
+    def transmitting(self) -> bool:
+        """``True`` while at least one emission is active."""
+        return self._depth > 0
+
+    def consume_flush(self) -> bool:
+        """Return ``True`` at most once per completed emission, then clear the latch.
+
+        Returns:
+            ``True`` exactly once after an emission ends (falling edge);
+            ``False`` otherwise, including while still transmitting.
+        """
+        if self._flush_pending:
+            self._flush_pending = False
+            return True
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Transmitter
 # ---------------------------------------------------------------------------
 
@@ -92,20 +153,41 @@ class InfraredTransmitter:
         pulse_writer: Hardware port that physically transmits pulses.
         encoder: :class:`~hardware.shared.ir_protocol.InfraredEncoder` subclass
             that converts bytes to a pulse-duration array.
+        gate: :class:`IrTransmitGate` driven across the write so the receiver
+            can suppress self-echo.
     """
 
-    def __init__(self, pulse_writer: PulseWriter, encoder: InfraredEncoder) -> None:
+    def __init__(
+        self,
+        pulse_writer: PulseWriter,
+        encoder: InfraredEncoder,
+        gate: "IrTransmitGate | None" = None,
+    ) -> None:
         self._writer = pulse_writer
         self._encoder = encoder
+        self._gate = gate
 
     def send(self, data: bytes) -> None:
         """Encode *data* and transmit it via the pulse writer.
+
+        When constructed with a *gate*, brackets the write with
+        :meth:`IrTransmitGate.begin_transmit` / :meth:`IrTransmitGate.end_transmit`
+        in a ``try``/``finally`` so the gate is released even if the writer
+        raises. With no gate, behaviour is unchanged.
 
         Args:
             data: Opaque payload bytes to transmit.
         """
         pulses = self._encoder.encode(data)
-        self._writer.write_pulses(pulses)
+        gate = self._gate
+        if gate is None:
+            self._writer.write_pulses(pulses)
+            return
+        gate.begin_transmit()
+        try:
+            self._writer.write_pulses(pulses)
+        finally:
+            gate.end_transmit()
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +218,9 @@ class InfraredReceiver:
         mark_reject: Decoder mark-reject count (delegated).
         space_reject: Decoder space-reject count (delegated).
         buffer_full_on_poll: Reader buffer-full-on-poll count (delegated).
+        pulses_dropped_transmitting: Count of pulses drained and discarded
+            under **drain-but-discard** while the :class:`IrTransmitGate` was
+            transmitting or flushing. Kept out of ``pulses_seen``.
     """
 
     pulses_seen: int = 0
@@ -146,6 +231,7 @@ class InfraredReceiver:
     mark_reject: int = 0
     space_reject: int = 0
     buffer_full_on_poll: int = 0
+    pulses_dropped_transmitting: int = 0
 
     def reset_telemetry(self) -> None:
         """Zero every counter in the IR-path telemetry contract.
@@ -162,6 +248,7 @@ class InfraredReceiver:
         self.mark_reject = 0
         self.space_reject = 0
         self.buffer_full_on_poll = 0
+        self.pulses_dropped_transmitting = 0
 
     def receive(self) -> "bytearray | None":
         """Poll for a complete received packet.
@@ -215,24 +302,40 @@ class InfraredSingleReceiver(InfraredReceiver):
         pulse_reader: Hardware port supplying pulse durations.
         decoder: :class:`~hardware.shared.ir_protocol.InfraredDecoder` subclass
             that processes pulses and returns a payload when a packet completes.
+        gate: :class:`IrTransmitGate` read for self-echo suppression.
     """
 
-    def __init__(self, pulse_reader: PulseReader, decoder: InfraredDecoder) -> None:
+    def __init__(
+        self,
+        pulse_reader: PulseReader,
+        decoder: InfraredDecoder,
+        gate: "IrTransmitGate | None" = None,
+    ) -> None:
         self._reader = pulse_reader
         self._decoder = decoder
+        self._gate = gate
 
         # Monotonic-since-boot telemetry owned by this receiver. Decoder and
         # reader counters are not copied — they are forwarded live via the
         # properties below so the whole path reads off this one handle.
         self.pulses_seen: int = 0
         self.packets_surfaced: int = 0
+        self.pulses_dropped_transmitting: int = 0
 
     def receive(self) -> "bytearray | None":
         """Drain available pulses from the reader and return a packet if complete.
 
+        With a *gate* present, pulses captured while transmitting are
+        drained and discarded rather than decoded (self-echo suppression).
+
         Returns:
             ``bytearray`` payload on a successful decode; ``None`` otherwise.
         """
+        gate = self._gate
+        if gate is not None and (gate.transmitting or gate.consume_flush()):
+            self._drain_discard()
+            return None
+
         while True:
             pulse = self._reader.read_pulse()
             if pulse is None:
@@ -242,6 +345,18 @@ class InfraredSingleReceiver(InfraredReceiver):
             if result is not None:
                 self.packets_surfaced += 1
                 return result
+
+    def _drain_discard(self) -> None:
+        """Drain every available pulse from the reader, discarding each.
+
+        Increments ``pulses_dropped_transmitting`` per pulse (not
+        ``pulses_seen``) and resets the decoder so any in-progress decode is
+        abandoned.
+        """
+        reader = self._reader
+        while reader.read_pulse() is not None:
+            self.pulses_dropped_transmitting += 1
+        self._decoder.reset()
 
     @property
     def last_signal_strength(self) -> "float | None":
@@ -292,6 +407,7 @@ class InfraredSingleReceiver(InfraredReceiver):
         """Zero the whole IR path: this receiver, its decoder, and its reader."""
         self.pulses_seen = 0
         self.packets_surfaced = 0
+        self.pulses_dropped_transmitting = 0
         self._decoder.reset_telemetry()
         self._reader.reset_telemetry()
 
@@ -318,6 +434,7 @@ class InfraredMultiReceiver(InfraredReceiver):
         decoder_factory: Callable (no arguments) that returns a new
             :class:`~hardware.shared.ir_protocol.InfraredDecoder` instance.
             Called once per reader at construction time.
+        gate: :class:`IrTransmitGate` read for self-echo suppression.
 
     Attributes:
         last_signal_strength: Normalised quality (0.0–1.0) of the best packet
@@ -332,11 +449,13 @@ class InfraredMultiReceiver(InfraredReceiver):
         self,
         pulse_readers: "list[PulseReader]",
         decoder_factory: "object",
+        gate: "IrTransmitGate | None" = None,
     ) -> None:
         # Freeze the reader list and create one decoder per reader
         self._readers = list(pulse_readers)
         self._decoders = [decoder_factory() for _ in self._readers]
         self._count = len(self._readers)
+        self._gate = gate
 
         # Pre-allocate per-receiver scratch: one slot per reader for (margin, index)
         # _scratch_margins[i] holds the error_margin from reader i when it fires
@@ -350,8 +469,14 @@ class InfraredMultiReceiver(InfraredReceiver):
         self._last_error_margin: int | None = None
         self._last_best_receiver: PulseReader | None = None
 
+        self.pulses_dropped_transmitting: int = 0
+
     def receive(self) -> "bytearray | None":
         """Poll all readers and return the best packet this tick, or ``None``.
+
+        With a *gate* present, pulses captured while transmitting are
+        drained and discarded across every reader rather than decoded
+        (self-echo suppression).
 
         The inner loop allocates nothing — scratch lists are cleared and
         reused each call.  The best packet is the one whose decoder reports
@@ -360,6 +485,11 @@ class InfraredMultiReceiver(InfraredReceiver):
         Returns:
             ``bytearray`` payload from the best-signal receiver, or ``None``.
         """
+        gate = self._gate
+        if gate is not None and (gate.transmitting or gate.consume_flush()):
+            self._drain_discard_all()
+            return None
+
         # Hoist scratch lists to locals for fast access (avoids repeated attr lookup)
         scratch_margins = self._scratch_margins
         scratch_fired = self._scratch_fired
@@ -413,6 +543,24 @@ class InfraredMultiReceiver(InfraredReceiver):
 
         return scratch_packets[best_i]
 
+    def _drain_discard_all(self) -> None:
+        """Drain every available pulse from every reader, discarding each.
+
+        Increments ``pulses_dropped_transmitting`` per pulse across all
+        readers and resets every decoder so no in-progress decode survives.
+        Allocates nothing — reuses the existing reader/decoder lists.
+        """
+        readers = self._readers
+        decoders = self._decoders
+        count = self._count
+        dropped = 0
+        for i in range(count):
+            reader = readers[i]
+            while reader.read_pulse() is not None:
+                dropped += 1
+            decoders[i].reset()
+        self.pulses_dropped_transmitting += dropped
+
     @property
     def last_signal_strength(self) -> "float | None":
         """Normalised signal quality from the last winning packet."""
@@ -427,3 +575,9 @@ class InfraredMultiReceiver(InfraredReceiver):
     def last_best_receiver(self) -> "PulseReader | None":
         """The :class:`PulseReader` that produced the best packet last tick."""
         return self._last_best_receiver
+
+    def reset_telemetry(self) -> None:
+        """Zero this receiver's drop counter and reset every decoder's telemetry."""
+        self.pulses_dropped_transmitting = 0
+        for decoder in self._decoders:
+            decoder.reset_telemetry()
