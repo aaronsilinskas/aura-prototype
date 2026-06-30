@@ -196,6 +196,15 @@ class TagInfraredDecoder(InfraredDecoder):
     def __init__(self) -> None:
         super().__init__(TAG_ERROR_MARGIN)
 
+        # Monotonic-since-boot telemetry counters. Instance attributes shadow
+        # the zero defaults on InfraredDecoder; reset_telemetry() (inherited
+        # from the base) zeroes them by name.
+        self.packets_started: int = 0
+        self.packets_completed: int = 0
+        self.preamble_reject: int = 0
+        self.mark_reject: int = 0
+        self.space_reject: int = 0
+
     def decode(self, pulse: int) -> bytearray | None:
         """Process one pulse and return the decoded byte when a packet completes.
 
@@ -219,7 +228,10 @@ class TagInfraredDecoder(InfraredDecoder):
         if state < len(TAG_PREAMBLE):
             if self._check_pulse(pulse, TAG_PREAMBLE[state]):
                 self._decoder_state += 1
+                if self._decoder_state == len(TAG_PREAMBLE):
+                    self.packets_started += 1
             else:
+                self.preamble_reject += 1
                 self._reset(self._max_error_margin)
         elif state < TAG_TOTAL_PULSES:
             bit_index = state - len(TAG_PREAMBLE)
@@ -227,6 +239,7 @@ class TagInfraredDecoder(InfraredDecoder):
                 if self._check_pulse(pulse, TAG_MARK):
                     self._decoder_state += 1
                 else:
+                    self.mark_reject += 1
                     self._reset(self._max_error_margin)
                     return None
             else:
@@ -235,6 +248,7 @@ class TagInfraredDecoder(InfraredDecoder):
                 elif self._check_pulse(pulse, TAG_SPACE_ZERO):
                     self._write_bit(0)
                 else:
+                    self.space_reject += 1
                     self._reset(self._max_error_margin)
                     return None
                 self._decoder_state += 1
@@ -244,6 +258,7 @@ class TagInfraredDecoder(InfraredDecoder):
             self._write_bit(0)
             tag_byte = self._received_data[0] >> 1
             saved_margin = self._max_error_margin
+            self.packets_completed += 1
             self._reset(saved_margin)
             return bytearray([tag_byte])
         else:

@@ -112,7 +112,26 @@ class InfraredDecoder:
         last_signal_strength: Normalised quality metric (0.0–1.0) derived
             from *last_error_margin*.  An error ≤ 30 % of the threshold
             counts as full strength (1.0).  ``None`` before first decode.
+        packets_started: Monotonic-since-boot count of packets that began
+            decoding (e.g. a fully matched preamble). Defaults to 0 — only
+            :class:`~hardware.shared.tag_protocol.TagInfraredDecoder` tracks
+            this; other decoders (and fakes) satisfy the contract via this
+            class-level default.
+        packets_completed: Monotonic-since-boot count of successfully
+            decoded packets. Defaults to 0, as above.
+        preamble_reject: Monotonic-since-boot count of preamble-stage
+            rejections. Defaults to 0, as above.
+        mark_reject: Monotonic-since-boot count of mark-pulse rejections.
+            Defaults to 0, as above.
+        space_reject: Monotonic-since-boot count of space-pulse rejections.
+            Defaults to 0, as above.
     """
+
+    packets_started: int = 0
+    packets_completed: int = 0
+    preamble_reject: int = 0
+    mark_reject: int = 0
+    space_reject: int = 0
 
     def __init__(self, error_threshold: int) -> None:
         self._error_threshold = error_threshold
@@ -171,6 +190,15 @@ class InfraredDecoder:
             return 1.0
         error_ratio = self._last_error_margin / self._error_threshold
         return min(1.0, 1.3 - error_ratio)
+
+    def reset_telemetry(self) -> None:
+        """Zero the decoder's telemetry counters. No-op on the base — decoders
+        that track real counters (e.g. ``TagInfraredDecoder``) override this."""
+        self.packets_started = 0
+        self.packets_completed = 0
+        self.preamble_reject = 0
+        self.mark_reject = 0
+        self.space_reject = 0
 
     # ------------------------------------------------------------------
     # Helpers for subclasses (not part of the public API)

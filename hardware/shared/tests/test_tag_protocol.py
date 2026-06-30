@@ -202,3 +202,118 @@ def test_invalid_preamble_pulse_resets_decoder():
         if outcome is not None:
             result = outcome
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Telemetry: per-stage reject/completion counters
+# ---------------------------------------------------------------------------
+
+
+def test_invalid_preamble_pulse_increments_preamble_reject():
+    decoder = TagInfraredDecoder()
+
+    pulses = list(TAG_PREAMBLE)
+    pulses[1] = 9999  # corrupt the second preamble pulse
+
+    for pulse in pulses:
+        decoder.decode(pulse)
+
+    assert decoder.preamble_reject == 1
+    assert decoder.mark_reject == 0
+    assert decoder.space_reject == 0
+
+
+def test_invalid_mark_pulse_after_preamble_increments_mark_reject():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    # Stop right after the corrupted pulse — feeding further pulses would be
+    # reinterpreted as preamble noise once the decoder resets to idle.
+    pulses = list(encoder.encode(bytearray([0x10])))[: len(TAG_PREAMBLE) + 1]
+    pulses[-1] = 9999  # corrupt the first data-bit mark
+
+    for pulse in pulses:
+        decoder.decode(pulse)
+
+    assert decoder.mark_reject == 1
+    assert decoder.preamble_reject == 0
+    assert decoder.space_reject == 0
+
+
+def test_invalid_space_pulse_increments_space_reject():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    # Stop right after the corrupted pulse — feeding further pulses would be
+    # reinterpreted as preamble noise once the decoder resets to idle.
+    pulses = list(encoder.encode(bytearray([0x10])))[: len(TAG_PREAMBLE) + 2]
+    pulses[-1] = 9999  # corrupt the first data-bit space
+
+    for pulse in pulses:
+        decoder.decode(pulse)
+
+    assert decoder.space_reject == 1
+    assert decoder.preamble_reject == 0
+    assert decoder.mark_reject == 0
+
+
+def test_full_preamble_match_increments_packets_started():
+    decoder = TagInfraredDecoder()
+
+    for pulse in TAG_PREAMBLE:
+        decoder.decode(pulse)
+
+    assert decoder.packets_started == 1
+    assert decoder.packets_completed == 0
+
+
+def test_completed_packet_increments_packets_completed():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    pulses = [*encoder.encode(bytearray([0x55])), TAG_PREAMBLE[0]]
+    for pulse in pulses:
+        decoder.decode(pulse)
+
+    assert decoder.packets_started == 1
+    assert decoder.packets_completed == 1
+
+
+def test_packets_started_counts_every_preamble_match_not_just_completions():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    # First packet: preamble matches but mark is corrupted — never completes.
+    aborted = list(encoder.encode(bytearray([0x10])))[: len(TAG_PREAMBLE) + 1]
+    aborted[-1] = 9999
+    for pulse in aborted:
+        decoder.decode(pulse)
+
+    # Second packet: completes normally.
+    completed = [*encoder.encode(bytearray([0x2A])), TAG_PREAMBLE[0]]
+    for pulse in completed:
+        decoder.decode(pulse)
+
+    assert decoder.packets_started == 2
+    assert decoder.packets_completed == 1
+
+
+def test_reset_telemetry_zeroes_all_decoder_counters():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    pulses = [*encoder.encode(bytearray([0x55])), TAG_PREAMBLE[0]]
+    for pulse in pulses:
+        decoder.decode(pulse)
+    bad_preamble = list(TAG_PREAMBLE)
+    bad_preamble[1] = 9999
+    for pulse in bad_preamble:
+        decoder.decode(pulse)
+
+    decoder.reset_telemetry()
+
+    assert decoder.packets_started == 0
+    assert decoder.packets_completed == 0
+    assert decoder.preamble_reject == 0
+    assert decoder.mark_reject == 0
+    assert decoder.space_reject == 0

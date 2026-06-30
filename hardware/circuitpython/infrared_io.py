@@ -35,23 +35,38 @@ class PulseInReader(PulseReader):
             receive pin (idle_state=True for active-low IR receivers).
     """
 
-    __slots__ = ("_pulsein",)
+    __slots__ = ("_pulsein", "buffer_full_on_poll")
 
     def __init__(self, pulsein: object) -> None:  # pulseio.PulseIn — no stub on CPython
         self._pulsein = pulsein
+
+        # Monotonic-since-boot count of reads that observed a full buffer —
+        # a proxy for buffer-overrun pulse loss (pulseio exposes no real
+        # overflow signal). Reset via reset_telemetry() on the receiver.
+        self.buffer_full_on_poll: int = 0
 
     def read_pulse(self) -> int | None:
         """Return the oldest available pulse duration in µs, or ``None``.
 
         Removes the returned pulse from the ``PulseIn`` buffer.  Non-blocking —
-        returns ``None`` immediately when the buffer is empty.
+        returns ``None`` immediately when the buffer is empty.  Increments
+        ``buffer_full_on_poll`` when the buffer is found at ``maxlen`` —
+        a proxy for pulses that may have been dropped by overrun.
 
         Returns:
             Pulse duration in µs, or ``None`` if no pulse is ready.
         """
-        if len(self._pulsein) == 0:
+        pulsein = self._pulsein
+        count = len(pulsein)
+        if count == 0:
             return None
-        return self._pulsein.popleft()
+        if count == pulsein.maxlen:
+            self.buffer_full_on_poll += 1
+        return pulsein.popleft()
+
+    def reset_telemetry(self) -> None:
+        """Zero ``buffer_full_on_poll`` (for CPython test resets)."""
+        self.buffer_full_on_poll = 0
 
 
 class PulseOutWriter(PulseWriter):

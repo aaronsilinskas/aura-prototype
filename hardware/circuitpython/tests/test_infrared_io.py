@@ -20,11 +20,13 @@ class FakePulseIn:
     """Minimal stub for pulseio.PulseIn.
 
     Backed by a list; popleft removes and returns the oldest entry,
-    len returns the current count, and clear empties the list.
+    len returns the current count, and clear empties the list. ``maxlen``
+    mirrors the real ``pulseio.PulseIn`` attribute used to detect overrun.
     """
 
-    def __init__(self, pulses=None) -> None:
+    def __init__(self, pulses=None, maxlen=256) -> None:
         self._pulses: list[int] = list(pulses) if pulses else []
+        self.maxlen = maxlen
 
     def __len__(self) -> int:
         return len(self._pulses)
@@ -90,6 +92,64 @@ def test_pulse_in_reader_returns_none_after_buffer_drained():
     reader = PulseInReader(pulsein)
     reader.read_pulse()
     assert reader.read_pulse() is None
+
+
+# ---------------------------------------------------------------------------
+# PulseInReader — buffer_full_on_poll telemetry
+# ---------------------------------------------------------------------------
+
+
+def test_buffer_full_on_poll_increments_when_buffer_at_maxlen_on_read():
+    """A read that finds the buffer at maxlen counts as a possible overrun."""
+    pulsein = FakePulseIn([500, 1000], maxlen=2)
+    reader = PulseInReader(pulsein)
+
+    reader.read_pulse()
+
+    assert reader.buffer_full_on_poll == 1
+
+
+def test_buffer_full_on_poll_does_not_increment_when_buffer_below_maxlen():
+    """A read on a buffer that isn't at capacity does not count as an overrun."""
+    pulsein = FakePulseIn([500], maxlen=2)
+    reader = PulseInReader(pulsein)
+
+    reader.read_pulse()
+
+    assert reader.buffer_full_on_poll == 0
+
+
+def test_buffer_full_on_poll_does_not_increment_when_buffer_empty():
+    """Polling an empty buffer never counts as an overrun."""
+    pulsein = FakePulseIn(maxlen=2)
+    reader = PulseInReader(pulsein)
+
+    reader.read_pulse()
+
+    assert reader.buffer_full_on_poll == 0
+
+
+def test_buffer_full_on_poll_counts_once_per_full_read_not_per_drain():
+    """Only the read that observes maxlen counts; later reads of the same
+    drain see a shorter buffer and do not increment further."""
+    pulsein = FakePulseIn([500, 1000], maxlen=2)
+    reader = PulseInReader(pulsein)
+
+    reader.read_pulse()  # buffer was at maxlen (2) -> counts
+    reader.read_pulse()  # buffer now has 1 entry -> does not count
+
+    assert reader.buffer_full_on_poll == 1
+
+
+def test_reset_telemetry_zeroes_buffer_full_on_poll():
+    pulsein = FakePulseIn([500, 1000], maxlen=2)
+    reader = PulseInReader(pulsein)
+    reader.read_pulse()
+    assert reader.buffer_full_on_poll == 1
+
+    reader.reset_telemetry()
+
+    assert reader.buffer_full_on_poll == 0
 
 
 # ---------------------------------------------------------------------------
