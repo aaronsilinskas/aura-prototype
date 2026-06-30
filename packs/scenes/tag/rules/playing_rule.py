@@ -3,10 +3,12 @@
 On entry, sets hitpoints to the configured starting value and shows a full
 ``basic.progress`` bar on ``Scope.PERSONAL``, storing its ``EffectReceipt`` (the
 shared progress receipt this rule owns and the hit reactor re-issues). It also
-issues the full amber ammo bar on ``Scope.Global.BUFF``. Button-A shot firing
-and its felt feedback are owned by :class:`TagShootingRule`; this rule retains
-only the phase lifecycle: hitpoints, the progress bar, the ammo bar, and the
-game-over transition when hitpoints reach zero or below.
+issues the full amber ammo bar on ``Scope.Global.BUFF`` and layers the one-shot
+``scene.go`` cue on ``Scope.PERSONAL`` via ``add_effect`` (sound + strong buzz
+marking the instant Playing begins). Button-A shot firing and its felt
+feedback are owned by :class:`TagShootingRule`; this rule retains only the
+phase lifecycle: hitpoints, the progress bar, the ammo bar, the GO cue, and
+the game-over transition when hitpoints reach zero or below.
 
 ``Scope.Global.BUFF`` is a single mutually-exclusive "what's currently shown
 for ammo" slot: the amber bar, ``scene.ammo_empty``, and ``scene.reload`` all
@@ -57,6 +59,8 @@ class TagPlayingRule(PhaseRule):
         state.effect_controls.set_effect(
             Scope.Global.BUFF, "basic.progress", {"progress": 1.0, "color": AMMO_COLOR}
         )
+
+        state.effect_controls.add_effect(Scope.PERSONAL, "scene.go", {})
 
     def on_exit(self, state: GameState) -> None:
         tag = tag_state(state)

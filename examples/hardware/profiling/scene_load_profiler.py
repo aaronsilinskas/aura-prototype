@@ -155,6 +155,7 @@ HARNESSES: Final = {
     "tag": {
         "audio_clips": {
             "warning_pulse_peak": "sounds/blip.wav",
+            "go_start": "sounds/blip.wav",
             "game_over_sting_start": "sounds/game_over.wav",
             "fire_shot_start": "sounds/blip.wav",
             "scene.hit_start": "sounds/blip.wav",
@@ -297,14 +298,10 @@ def _build_prop(scene_name: str, harness: dict) -> tuple[SceneManager, EffectMan
     first_tick_bytes = free_after_load - free_after_tick
 
     print(
-        "__SCENE_STAGES "
-        f"scene={scene_name}, "
-        f"motor_present={motor is not None}, "
-        f"free_before_load={free_before_load}, "
-        f"load={load_bytes}, "
-        f"free_after_load={free_after_load}, "
-        f"first_tick={first_tick_bytes}, "
-        f"free_after_tick={free_after_tick}"
+        f"__SCENE_STAGES scene={scene_name}, motor_present={motor is not None}, "
+        + f"free_before_load={free_before_load}, load={load_bytes}, "
+        + f"free_after_load={free_after_load}, first_tick={first_tick_bytes}, "
+        + f"free_after_tick={free_after_tick}"
     )
     # Per-scene in-situ baseline: the (scene, harness) pair, its staged `load`
     # heap, and its first-tick heap. A standalone measurement -- not an additive
@@ -320,8 +317,8 @@ def run() -> None:
     """Measure SCENE_NAME's in-situ load/first-tick heap, then keep it ticking."""
     if SCENE_NAME not in HARNESSES:
         raise ValueError(
-            f"No harness defined for SCENE_NAME={SCENE_NAME!r}; "
-            f"add one to HARNESSES (have: {list(HARNESSES.keys())})"
+            f"No harness defined for SCENE_NAME={SCENE_NAME!r}; add one to HARNESSES "
+            + f"(have: {list(HARNESSES.keys())})"
         )
     harness = HARNESSES[SCENE_NAME]
 
