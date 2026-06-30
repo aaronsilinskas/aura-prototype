@@ -70,7 +70,7 @@ class TagHitRule(InPhaseRule):
 
         fraction = tag.hitpoints / config.starting_hitpoints
         tag.hitpoints_receipt = state.effect_controls.set_effect(
-            Scope.PERSONAL, "basic.progress", {"progress": fraction}
+            Scope.PERSONAL, "basic.progress", {"progress": fraction, "color": 0x00FF00}
         )
 
         state.effect_controls.set_effect(Scope.Global.MAIN, "scene.hit", {})

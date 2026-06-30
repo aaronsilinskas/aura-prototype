@@ -35,7 +35,7 @@ class TagPlayingRule(PhaseRule):
         tag = tag_state(state)
         tag.hitpoints = tag_config(state).starting_hitpoints
         tag.hitpoints_receipt = state.effect_controls.set_effect(
-            Scope.PERSONAL, "basic.progress", {"progress": 1.0}
+            Scope.PERSONAL, "basic.progress", {"progress": 1.0, "color": 0x00FF00}
         )
 
         tag.shot.ammo = tag_config(state).max_ammo

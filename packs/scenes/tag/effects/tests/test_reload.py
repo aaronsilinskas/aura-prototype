@@ -39,6 +39,16 @@ def test_reload_fills_proportionally_to_elapsed_over_duration_option() -> None:
     assert list(buf) == [0xFFFFFF, 0xFFFFFF, 0x000000, 0x000000]
 
 
+def test_reload_defaults_to_red_fill_when_no_color_option_given() -> None:
+    effect = _build(duration=2.0)
+
+    effect.pixels.update(1.0)  # halfway through the 2.0s duration -> progress 0.5
+
+    buf = PixelBuffer(4)
+    effect.pixels.render(buf)
+    assert list(buf) == [0xFF0000, 0xFF0000, 0x000000, 0x000000]
+
+
 def test_reload_plays_a_looping_reload_clip() -> None:
     effect = _build(duration=2.0)
 

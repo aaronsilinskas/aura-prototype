@@ -65,7 +65,7 @@ def test_entering_playing_sets_full_progress_bar_on_personal(spy):
     personal_calls = [c for c in progress_calls if c[0] is Scope.PERSONAL]
     assert len(personal_calls) == 1
     _, _, options = personal_calls[0]
-    assert options == {"progress": 1.0}
+    assert options == {"progress": 1.0, "color": 0x00FF00}
 
 
 def test_entering_playing_stores_hitpoints_receipt(spy):
