@@ -48,7 +48,11 @@ def test_hit_emits_vibration_on_start() -> None:
     assert "start" in effect.vibration.patterns
 
 
-def test_hit_vibration_start_uses_strong_buzz() -> None:
+def test_hit_vibration_start_uses_buzz_pause_click_sequence() -> None:
     effect = _build()
 
-    assert VibrationConfig.STRONG_BUZZ in effect.vibration.patterns["start"].sequence
+    assert effect.vibration.patterns["start"].sequence == [
+        VibrationConfig.STRONG_BUZZ,
+        VibrationConfig.PAUSE_250,
+        VibrationConfig.STRONG_CLICK,
+    ]
