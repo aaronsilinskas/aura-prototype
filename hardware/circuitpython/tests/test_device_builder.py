@@ -457,6 +457,17 @@ def test_build_hardware_ir_config_sets_ir_receiver() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _wired_gate(receiver_or_transmitter: object) -> object:
+    """Return the private ``_gate`` wired onto a receiver or transmitter.
+
+    Isolated helper for the one test below that must observe internal
+    wiring directly — there is no public API for "which gate instance is
+    this object using", and the test exists specifically to pin that
+    internal contract (see AGENTS.md's no-internal-state-access exception).
+    """
+    return receiver_or_transmitter._gate
+
+
 def test_setup_ir_injects_same_gate_into_receiver_and_every_transmitter() -> None:
     from hardware.shared.ir_transport import IrTransmitGate
 
@@ -472,10 +483,10 @@ def test_setup_ir_injects_same_gate_into_receiver_and_every_transmitter() -> Non
             aoe_pin=MagicMock(),
         )
 
-    receiver_gate = receiver._gate
+    receiver_gate = _wired_gate(receiver)
     assert isinstance(receiver_gate, IrTransmitGate)
     for transmitter in transmitters.values():
-        assert transmitter._gate is receiver_gate
+        assert _wired_gate(transmitter) is receiver_gate
 
 
 def test_device_hardware_does_not_expose_the_ir_transmit_gate() -> None:
