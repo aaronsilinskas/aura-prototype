@@ -70,13 +70,13 @@ class TagConfig:
         """Build a config from the flat seeded ``tag_*`` keys, applying defaults."""
         return cls(
             starting_hitpoints=state.get("tag_starting_hitpoints", 10),
-            deafen_window=state.get("tag_deafen_window", 0.1),
+            deafen_window=state.get("tag_deafen_window", 0.2),
             expected_team=state.get("tag_expected_team", 0),
             expected_player=state.get("tag_expected_player", 1),
             warning_pulse_count=state.get("tag_warning_pulse_count", 5),
             warning_pulse_duration=state.get("tag_warning_pulse_duration", 0.6),
             max_ammo=state.get("tag_max_ammo", 10),
-            shot_cooldown=state.get("tag_shot_cooldown", 1.0),
+            shot_cooldown=state.get("tag_shot_cooldown", 0.3),
             reload_duration=state.get("tag_reload_duration", 3.0),
         )
 
