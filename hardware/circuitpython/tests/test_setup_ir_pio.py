@@ -105,8 +105,13 @@ class _FakeStateMachine:
 
     instances: ClassVar[list[_FakeStateMachine]] = []
 
-    def __init__(self, pin, **kwargs) -> None:
-        self.pin = pin
+    def __init__(self, program, frequency, /, *, first_set_pin=None, **kwargs) -> None:
+        # Mirror the real rp2pio.StateMachine signature: program and frequency
+        # are positional-only, the transmit pin arrives as first_set_pin. A
+        # regression that passes program=/frequency= by keyword fails here.
+        self.program = program
+        self.frequency = frequency
+        self.pin = first_set_pin
         self.kwargs = kwargs
         self.writing = False
         _FakeStateMachine.instances.append(self)

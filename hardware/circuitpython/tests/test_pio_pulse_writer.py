@@ -32,10 +32,12 @@ class _FakeStateMachine:
     completion.
     """
 
-    def __init__(self, pin, *, program, frequency, **kwargs) -> None:
-        self.pin = pin
+    def __init__(self, program, frequency, /, *, first_set_pin=None, **kwargs) -> None:
+        # Mirrors the real rp2pio.StateMachine signature (see make_state_machine):
+        # program and frequency are positional-only, the pin is first_set_pin.
         self.program = program
         self.frequency = frequency
+        self.pin = first_set_pin
         self.kwargs = kwargs
         self.background_writes: list = []
         self.writing = False
@@ -61,7 +63,7 @@ from hardware.circuitpython.pio_pulse_writer import PioPulseWriter  # noqa: E402
 
 
 def _make_writer():
-    sm = _FakeStateMachine(pin=object(), program=_FakeProgram("nop"), frequency=1)
+    sm = _FakeStateMachine(_FakeProgram("nop"), 1, first_set_pin=object())
     return PioPulseWriter(sm), sm
 
 

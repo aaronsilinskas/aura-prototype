@@ -74,11 +74,13 @@ def make_state_machine(pin: object) -> object:
     import rp2pio
 
     program = adafruit_pioasm.Program(_PIO_SOURCE)
-    # Two PIO clocks per carrier cycle (one high, one low half-period).
+    # rp2pio.StateMachine takes the assembled program and frequency as
+    # positional-only args (they precede the keyword-only `*`); the transmit pin
+    # is the program's `set pins` target, wired via first_set_pin. Two PIO clocks
+    # per carrier cycle (one high, one low half-period).
     return rp2pio.StateMachine(
-        pin,
-        program=program.assembled,
-        frequency=_CARRIER_HZ * 2,
+        program.assembled,
+        _CARRIER_HZ * 2,
         first_set_pin=pin,
     )
 
