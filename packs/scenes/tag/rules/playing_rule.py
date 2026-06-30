@@ -2,14 +2,25 @@
 
 On entry, sets hitpoints to the configured starting value and shows a full
 ``basic.progress`` bar on ``Scope.PERSONAL``, storing its ``EffectReceipt`` (the
-shared progress receipt this rule owns and the hit reactor re-issues). Button-A
-shot firing and its felt feedback are owned by :class:`TagShootingRule`; this
-rule retains only the phase lifecycle: hitpoints, the progress bar, and the
-game-over transition when hitpoints reach zero or below (stopping the progress
-bar on the way out).
+shared progress receipt this rule owns and the hit reactor re-issues). It also
+issues the full amber ammo bar on ``Scope.Global.BUFF``. Button-A shot firing
+and its felt feedback are owned by :class:`TagShootingRule`; this rule retains
+only the phase lifecycle: hitpoints, the progress bar, the ammo bar, and the
+game-over transition when hitpoints reach zero or below.
+
+``Scope.Global.BUFF`` is a single mutually-exclusive "what's currently shown
+for ammo" slot: the amber bar, ``scene.ammo_empty``, and ``scene.reload`` all
+swap each other out via ``set_effect``. On exit, the whole slot is torn down
+via ``stop_effect(Scope.Global.BUFF)`` rather than a stored receipt, since any
+of those effects (or none) may be occupying it at the time.
 """
 
 from __future__ import annotations
+
+try:
+    from typing import Final
+except ImportError:
+    pass
 
 from engine.input import InputEvents
 from engine.phase import PhaseRule
@@ -23,9 +34,11 @@ from packs.scenes.tag.rules.helpers.phases import (
 from packs.scenes.tag.rules.helpers.tag_config import tag_config
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 
+AMMO_COLOR: Final = 0xFFBF00
+
 
 class TagPlayingRule(PhaseRule):
-    """Drives the Playing phase: hitpoints, progress bar, and game-over transition."""
+    """Drives the Playing phase: hitpoints, ammo bar, and game-over transition."""
 
     def __init__(self) -> None:
         super().__init__(PHASE_PLAYING, TAG_MACHINE_KEY, PHASE_READY)
@@ -41,8 +54,8 @@ class TagPlayingRule(PhaseRule):
         tag.shot.ammo = tag_config(state).max_ammo
         tag.shot.reload_started_at = None
         tag.shot.reload_receipt = None
-        tag.ammo_receipt = state.effect_controls.set_effect(
-            Scope.Global.BUFF, "basic.progress", {"progress": 1.0}
+        state.effect_controls.set_effect(
+            Scope.Global.BUFF, "basic.progress", {"progress": 1.0, "color": AMMO_COLOR}
         )
 
     def on_exit(self, state: GameState) -> None:
@@ -51,9 +64,7 @@ class TagPlayingRule(PhaseRule):
             tag.hitpoints_receipt.stop()
             tag.hitpoints_receipt = None
 
-        if tag.ammo_receipt is not None:
-            tag.ammo_receipt.stop()
-            tag.ammo_receipt = None
+        state.effect_controls.stop_effect(Scope.Global.BUFF)
 
         if tag.shot.reload_receipt is not None:
             tag.shot.reload_receipt.stop()

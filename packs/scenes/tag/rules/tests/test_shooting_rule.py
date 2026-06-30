@@ -133,7 +133,7 @@ def test_firing_stamps_last_shot_at(spy):
     assert tag_state(state).shot.last_shot_at == pytest.approx(5.0)
 
 
-def test_firing_reissues_ammo_bar_on_global_buff(spy):
+def test_firing_reissues_amber_ammo_bar_on_global_buff_when_ammo_remains(spy):
     network_spy = SpyNetworkControls()
     state, engine, timer = _make_state(spy, network_spy=network_spy)
 
@@ -144,7 +144,23 @@ def test_firing_reissues_ammo_bar_on_global_buff(spy):
     assert len(buff_calls) == 1
     _, _, options = buff_calls[0]
     expected_fraction = (10 - 1) / 10
-    assert options == {"progress": pytest.approx(expected_fraction)}
+    assert options == {"progress": pytest.approx(expected_fraction), "color": 0xFFBF00}
+
+
+def test_firing_the_last_shot_sets_ammo_empty_pulse_on_global_buff(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag_state(state).shot.ammo = 1
+
+    _tick(state, engine, timer, 0.0, button_a=True)  # fires the last shot, ammo -> 0
+
+    assert tag_state(state).shot.ammo == 0
+    empty_calls = [c for c in spy.set_effect_calls if c[1] == "scene.ammo_empty"]
+    assert len(empty_calls) == 1
+    scope, _, _ = empty_calls[0]
+    assert scope is Scope.Global.BUFF
+    progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
+    assert progress_calls == []
 
 
 def test_second_shot_within_cooldown_is_blocked(spy):
@@ -244,7 +260,7 @@ def test_holding_to_reload_duration_restores_ammo_to_max(spy):
     assert tag_state(state).shot.ammo == 10
 
 
-def test_completing_reload_snaps_ammo_bar_full_via_basic_progress(spy):
+def test_completing_reload_snaps_amber_ammo_bar_full_via_basic_progress(spy):
     network_spy = SpyNetworkControls()
     state, engine, timer = _make_state(spy, network_spy=network_spy)
     tag = tag_state(state)
@@ -258,7 +274,7 @@ def test_completing_reload_snaps_ammo_bar_full_via_basic_progress(spy):
     buff_calls = [c for c in progress_calls if c[0] is Scope.Global.BUFF]
     assert len(buff_calls) == 1
     _, _, options = buff_calls[0]
-    assert options == {"progress": pytest.approx(1.0)}
+    assert options == {"progress": pytest.approx(1.0), "color": 0xFFBF00}
 
 
 def test_completing_reload_adds_reload_complete_effect(spy):
@@ -310,7 +326,7 @@ def test_held_trigger_after_completion_does_not_auto_fire(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_releasing_before_reload_completion_restores_empty_ammo_bar(spy):
+def test_releasing_before_reload_completion_restores_ammo_empty_pulse(spy):
     network_spy = SpyNetworkControls()
     state, engine, timer = _make_state(spy, network_spy=network_spy)
     tag = tag_state(state)
@@ -320,11 +336,11 @@ def test_releasing_before_reload_completion_restores_empty_ammo_bar(spy):
 
     _tick(state, engine, timer, 1.0)  # release before the 3.0s duration elapses
 
-    progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
-    buff_calls = [c for c in progress_calls if c[0] is Scope.Global.BUFF]
+    empty_calls = [c for c in spy.set_effect_calls if c[1] == "scene.ammo_empty"]
+    buff_calls = [c for c in empty_calls if c[0] is Scope.Global.BUFF]
     assert len(buff_calls) == 1
-    _, _, options = buff_calls[0]
-    assert options == {"progress": pytest.approx(0.0)}
+    progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
+    assert progress_calls == []
 
 
 def test_releasing_before_reload_completion_clears_reload_started_at(spy):
@@ -373,7 +389,7 @@ def test_reaching_duration_threshold_on_release_tick_completes_not_cancels(spy):
     progress_calls = [c for c in spy.set_effect_calls if c[1] == "basic.progress"]
     buff_calls = [c for c in progress_calls if c[0] is Scope.Global.BUFF]
     _, _, options = buff_calls[0]
-    assert options == {"progress": pytest.approx(1.0)}
+    assert options == {"progress": pytest.approx(1.0), "color": 0xFFBF00}
 
 
 def test_firing_is_suppressed_while_reloading(spy):
