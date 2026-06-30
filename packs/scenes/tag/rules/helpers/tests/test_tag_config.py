@@ -41,13 +41,13 @@ def test_from_state_applies_defaults_when_unseeded():
     config = TagConfig.from_state(state)
 
     assert config.starting_hitpoints == 10
-    assert config.deafen_window == pytest.approx(0.1)
+    assert config.deafen_window == pytest.approx(0.2)
     assert config.expected_team == 0
     assert config.expected_player == 1
     assert config.warning_pulse_count == 5
     assert config.warning_pulse_duration == pytest.approx(0.6)
     assert config.max_ammo == 10
-    assert config.shot_cooldown == pytest.approx(1.0)
+    assert config.shot_cooldown == pytest.approx(0.3)
     assert config.reload_duration == pytest.approx(3.0)
 
 

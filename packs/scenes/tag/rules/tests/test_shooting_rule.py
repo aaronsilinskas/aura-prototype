@@ -168,7 +168,7 @@ def test_second_shot_within_cooldown_is_blocked(spy):
     state, engine, timer = _make_state(spy, network_spy=network_spy)
 
     _tick(state, engine, timer, 0.0, button_a=True)
-    _tick(state, engine, timer, 0.5, button_a=True)
+    _tick(state, engine, timer, 0.2, button_a=True)
 
     assert len(network_spy.send_ir_calls) == 1
     assert tag_state(state).shot.ammo == 10 - 1
