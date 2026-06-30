@@ -125,6 +125,12 @@ def run_scene(
 
         active_state = manager.active_state
 
+        # Outside the active_state guard and before receive(): a send can be
+        # in flight across a scene transition, and end_transmit (fired here
+        # when a deferred write completes) arms the flush latch this same
+        # tick's receive() must consume.
+        hw.network_controls.poll_transmits()
+
         if active_state is not None and hw.ir_receiver is not None:
             ir_data = hw.ir_receiver.receive()
             if ir_data is not None:

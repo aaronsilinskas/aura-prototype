@@ -43,13 +43,44 @@ _IR_ERROR_THRESHOLD = _IR_UNIT // 2  # 250 µs
 
 
 class FakePulseWriter(PulseWriter):
-    """Recording fake — stores every write_pulses call for assertions."""
+    """Recording fake — stores every write_pulses call for assertions.
+
+    ``is_busy()`` always reports ``False`` (write completes synchronously),
+    matching the blocking ``PulseOutWriter``'s externally-observable behaviour.
+    """
 
     def __init__(self):
         self.calls = []
 
     def write_pulses(self, durations) -> None:
         self.calls.append(list(durations))
+
+    def is_busy(self) -> bool:
+        return False
+
+
+class ControllableFakePulseWriter(PulseWriter):
+    """Recording fake whose ``is_busy()`` the test controls directly — simulates
+    a non-blocking (e.g. DMA-backed) writer that stays busy across ticks.
+
+    Each ``write_pulses`` call marks the writer busy (as a real DMA-backed
+    writer would be the instant a send is kicked off); the test then drives
+    ``set_busy(False)`` to simulate the hardware signalling completion.
+    """
+
+    def __init__(self):
+        self.calls = []
+        self._busy = False
+
+    def write_pulses(self, durations) -> None:
+        self.calls.append(list(durations))
+        self._busy = True
+
+    def is_busy(self) -> bool:
+        return self._busy
+
+    def set_busy(self, busy: bool) -> None:
+        self._busy = busy
 
 
 class FakePulseReader(PulseReader):
@@ -83,6 +114,12 @@ def test_pulse_reader_base_raises_not_implemented():
     reader = PulseReader()
     with pytest.raises(NotImplementedError):
         reader.read_pulse()
+
+
+def test_pulse_writer_base_is_busy_raises_not_implemented():
+    writer = PulseWriter()
+    with pytest.raises(NotImplementedError):
+        writer.is_busy()
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +231,9 @@ def test_transmitter_with_gate_is_transmitting_during_write_pulses():
         def write_pulses(self, durations) -> None:
             self.was_transmitting = self.gate.transmitting
 
+        def is_busy(self) -> bool:
+            return False
+
     gate = IrTransmitGate()
     writer = ObservingWriter(gate)
     tx = InfraredTransmitter(writer, AuraInfraredEncoder(), gate)
@@ -214,10 +254,161 @@ def test_transmitter_with_gate_releases_gate_after_send_completes():
     assert gate.consume_flush() is True
 
 
-def test_transmitter_with_gate_releases_gate_even_when_writer_raises():
+# ---------------------------------------------------------------------------
+# InfraredTransmitter — queue-one policy and poll
+# ---------------------------------------------------------------------------
+
+
+def test_send_while_idle_starts_write_immediately():
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder())
+
+    tx.send(b"\x01")
+
+    assert len(writer.calls) == 1
+
+
+def test_send_while_busy_buffers_and_does_not_start_a_write():
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder())
+
+    tx.send(b"\x01")  # starts the write; writer reports busy afterward
+    writer.calls.clear()
+
+    tx.send(b"\x02")  # writer still busy — must buffer, not start a write
+
+    assert len(writer.calls) == 0
+
+
+def test_second_send_while_pending_replaces_the_pending_payload():
+    writer = ControllableFakePulseWriter()
+    encoder = AuraInfraredEncoder()
+    tx = InfraredTransmitter(writer, encoder)
+
+    tx.send(b"\x01")
+    tx.send(b"\x02")  # buffered — replaces nothing yet
+    tx.send(b"\x03")  # replaces the pending \x02 — latest wins
+
+    writer.set_busy(False)
+    tx.poll()  # starts the pending payload
+
+    assert writer.calls[-1] == list(encoder.encode(b"\x03"))
+    assert len(writer.calls) == 2  # initial \x01 + the pending \x03 — \x02 never sent
+
+
+def test_poll_does_nothing_while_writer_is_busy():
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder())
+
+    tx.send(b"\x01")
+    tx.send(b"\x02")  # buffered
+    writer.calls.clear()
+
+    tx.poll()  # writer still busy — must not start the pending payload
+
+    assert len(writer.calls) == 0
+
+
+def test_poll_starts_pending_payload_once_writer_reports_idle():
+    writer = ControllableFakePulseWriter()
+    encoder = AuraInfraredEncoder()
+    tx = InfraredTransmitter(writer, encoder)
+
+    tx.send(b"\x01")
+    tx.send(b"\x02")  # buffered
+    writer.calls.clear()
+
+    writer.set_busy(False)
+    tx.poll()
+
+    assert len(writer.calls) == 1
+    assert writer.calls[0] == list(encoder.encode(b"\x02"))
+
+
+def test_poll_clears_pending_slot_after_starting_it():
+    """A second poll with nothing newly queued must not re-send."""
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder())
+
+    tx.send(b"\x01")
+    tx.send(b"\x02")  # buffered
+    writer.set_busy(False)
+    tx.poll()  # starts \x02
+    writer.calls.clear()
+
+    tx.poll()  # nothing pending — must be a no-op
+
+    assert len(writer.calls) == 0
+
+
+def test_encoder_runs_once_per_transmitted_payload_not_per_tick():
+    class CountingEncoder(AuraInfraredEncoder):
+        def __init__(self):
+            self.encode_calls = 0
+
+        def encode(self, data):
+            self.encode_calls += 1
+            return super().encode(data)
+
+    writer = ControllableFakePulseWriter()
+    encoder = CountingEncoder()
+    tx = InfraredTransmitter(writer, encoder)
+
+    tx.send(b"\x01")  # encodes once, starts the write
+    tx.send(b"\x02")  # buffered raw bytes — no encode yet
+    tx.poll()  # writer still busy — no encode
+    tx.poll()  # still busy — no encode
+
+    assert encoder.encode_calls == 1
+
+    writer.set_busy(False)
+    tx.poll()  # writer now idle — starts pending \x02, encodes once
+
+    assert encoder.encode_calls == 2
+
+
+def test_gate_fires_end_transmit_synchronously_when_writer_finishes_inline():
+    """A writer that reports is_busy()==False right after write_pulses (the
+    blocking PulseOutWriter) gets end_transmit called inside send(), not poll()."""
+    gate = IrTransmitGate()
+    writer = FakePulseWriter()  # always reports is_busy() False
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder(), gate)
+
+    tx.send(b"\x01")
+
+    assert gate.transmitting is False
+    assert gate.consume_flush() is True  # already armed — fired during send()
+
+
+def test_gate_defers_end_transmit_to_the_poll_that_first_observes_idle():
+    gate = IrTransmitGate()
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder(), gate)
+
+    tx.send(b"\x01")  # writer reports busy after write_pulses — DMA in flight
+
+    assert gate.transmitting is True  # still armed — DMA in flight
+    assert gate.consume_flush() is False  # not yet fired
+
+    tx.poll()  # writer still busy — gate stays armed
+
+    assert gate.transmitting is True
+    assert gate.consume_flush() is False
+
+    writer.set_busy(False)
+    tx.poll()  # writer now idle — end_transmit fires here
+
+    assert gate.transmitting is False
+    assert gate.consume_flush() is True
+
+
+def test_gate_released_when_writer_raises_on_kick_off_via_send():
     class RaisingWriter(PulseWriter):
         def write_pulses(self, durations) -> None:
             raise RuntimeError("hardware fault")
+
+        def is_busy(self) -> bool:
+            return False
 
     gate = IrTransmitGate()
     tx = InfraredTransmitter(RaisingWriter(), AuraInfraredEncoder(), gate)
@@ -227,6 +418,31 @@ def test_transmitter_with_gate_releases_gate_even_when_writer_raises():
 
     assert gate.transmitting is False
     assert gate.consume_flush() is True
+
+
+def test_queued_send_encode_error_surfaces_in_poll_not_in_send():
+    """An encode error on a queued send is fire-and-forget — it surfaces on
+    the poll that attempts to start it, not at the send() call."""
+
+    class FlakyEncoder(AuraInfraredEncoder):
+        def __init__(self):
+            self.calls = 0
+
+        def encode(self, data):
+            self.calls += 1
+            if self.calls == 2:
+                raise ValueError("bad payload")
+            return super().encode(data)
+
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, FlakyEncoder())
+
+    tx.send(b"\x01")  # encodes fine, starts the write — writer now busy
+    tx.send(b"\x02")  # buffered — no encode attempted yet, so send() does not raise
+
+    writer.set_busy(False)
+    with pytest.raises(ValueError):
+        tx.poll()  # the queued send's encode now runs and raises
 
 
 # ---------------------------------------------------------------------------

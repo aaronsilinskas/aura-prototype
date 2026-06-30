@@ -145,7 +145,9 @@ WARMUP_SECONDS: Final = 10.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
 
-def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, object, int]:
+def _build_prop() -> tuple[
+    SceneManager, EffectManager, Timer, object, object, object, HardwareNetworkControls, int
+]:
     """Stand up the whole reference tag prop and return its driving objects.
 
     Snapshots free heap before and after construction (with a GC collect on each
@@ -212,10 +214,11 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
     # into GameEngine's internals (the engine advances this same instance in
     # update()). Passing it in keeps the profiler on the public API.
     timer = Timer()
+    network_controls = HardwareNetworkControls(ir_transmitters)
     engine = GameEngine(
         effect_controls=effect_manager,
         timer=timer,
-        network_controls=HardwareNetworkControls(ir_transmitters),
+        network_controls=network_controls,
     )
     # Stage snapshot: Timer + GameEngine + HardwareNetworkControls.
     gc.collect()
@@ -242,7 +245,16 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
         + f"engine={free_after_audio - free_after_engine}, "
         + f"scene={free_after_engine - free_after_scene}"
     )
-    return manager, effect_manager, timer, buttons, accelerometer, ir_receiver, footprint_bytes
+    return (
+        manager,
+        effect_manager,
+        timer,
+        buttons,
+        accelerometer,
+        ir_receiver,
+        network_controls,
+        footprint_bytes,
+    )
 
 
 def _inject_press(name: str, out: ButtonData) -> None:
@@ -259,6 +271,7 @@ def run() -> None:
         buttons,
         accelerometer,
         ir_receiver,
+        network_controls,
         footprint_bytes,
     ) = _build_prop()
 
@@ -302,6 +315,12 @@ def run() -> None:
                 _acceleration.z = az
             except Exception:
                 pass  # keep last good values
+
+        # Outside the active_state guard and before receive(): a send can be
+        # in flight across a scene transition, and end_transmit (fired here
+        # when a deferred write completes) arms the flush latch this same
+        # tick's receive() must consume.
+        network_controls.poll_transmits()
 
         if manager.active_state is not None:
             ir_data = ir_receiver.receive()

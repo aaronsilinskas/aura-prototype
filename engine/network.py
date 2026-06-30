@@ -102,3 +102,15 @@ class HardwareNetworkControls(NetworkControls):
 
     def send_radio(self, data: bytes) -> None:
         pass  # TODO: wire to hardware peripheral
+
+    def poll_transmits(self) -> None:
+        """Pump every wired :class:`InfraredTransmitter`'s ``poll()``.
+
+        Runtime-facing — must be called every tick so a non-blocking write
+        in flight on any emitter eventually fires its deferred
+        ``end_transmit`` and starts its pending send. Not part of the
+        abstract ``NetworkControls`` interface: it is a lifecycle/runtime
+        concern, not a game rule, so it stays off the seam game rules see.
+        """
+        for tx in self._transmitters.values():
+            tx.poll()

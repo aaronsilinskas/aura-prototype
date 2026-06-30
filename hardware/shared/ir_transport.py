@@ -44,6 +44,20 @@ class PulseWriter:
         """
         raise NotImplementedError
 
+    def is_busy(self) -> bool:
+        """Return ``True`` while a previously started send is still outstanding.
+
+        A truthful query, not a hard-coded constant — a blocking writer
+        reports ``True`` only for the (externally unobservable, on a
+        single-core runtime) duration of its blocking send; a non-blocking
+        (e.g. DMA-backed) writer reports ``True`` until the hardware signals
+        completion.
+
+        Raises:
+            NotImplementedError: Always — subclasses must override.
+        """
+        raise NotImplementedError
+
 
 class PulseReader:
     """Port through which receivers consume IR pulses one at a time.
@@ -147,7 +161,35 @@ class IrTransmitGate:
 
 
 class InfraredTransmitter:
-    """Encodes byte payloads and writes IR pulses via a :class:`PulseWriter`.
+    """Unified queue-one state machine: encodes byte payloads and writes IR
+    pulses via a :class:`PulseWriter` — one class for both blocking and
+    non-blocking writers.
+
+    ``send(data)`` starts the write immediately if the writer is idle; if the
+    writer is busy, the raw bytes are buffered in a single pending slot (a
+    later ``send`` while one is already pending *replaces* it — latest wins,
+    pending depth never exceeds one). Encoding happens exactly once per
+    transmitted payload, at start-of-write — never per-tick.
+
+    Must be polled every tick via :meth:`poll`: while the writer is busy
+    ``poll`` does nothing; once the writer reports idle, ``poll`` fires the
+    transmit gate's ``end_transmit`` (if deferred — see below) and starts any
+    pending payload.
+
+    Gate timing: starting a write calls :meth:`IrTransmitGate.begin_transmit`,
+    encodes, calls :meth:`PulseWriter.write_pulses`, then checks
+    :meth:`PulseWriter.is_busy`. If already ``False`` (a blocking writer
+    finished synchronously) :meth:`IrTransmitGate.end_transmit` fires
+    immediately — reproducing the original ``try``/``finally`` byte-for-byte.
+    If ``True`` (e.g. DMA in flight) the gate stays armed and the per-tick
+    :meth:`poll` fires ``end_transmit`` later, on the tick ``is_busy()``
+    falls, before starting any pending send.
+
+    An encode error raised while kicking off a write from :meth:`send`
+    propagates immediately (with the gate released via ``try``/``finally``).
+    An encode error on a payload that was queued (buffered) surfaces later,
+    from the :meth:`poll` call that attempts to start it — accepted for a
+    fire-and-forget API.
 
     Args:
         pulse_writer: Hardware port that physically transmits pulses.
@@ -166,27 +208,75 @@ class InfraredTransmitter:
         self._writer = pulse_writer
         self._encoder = encoder
         self._gate = gate
+        self._pending: bytes | None = None
+        self._gate_armed: bool = False
 
     def send(self, data: bytes) -> None:
-        """Encode *data* and transmit it via the pulse writer.
+        """Start transmitting *data* if idle, else buffer it as the pending send.
 
-        When constructed with a *gate*, brackets the write with
-        :meth:`IrTransmitGate.begin_transmit` / :meth:`IrTransmitGate.end_transmit`
-        in a ``try``/``finally`` so the gate is released even if the writer
-        raises. With no gate, behaviour is unchanged.
+        While a write is outstanding (``PulseWriter.is_busy()`` is ``True``),
+        *data* replaces any previously buffered pending payload — latest wins,
+        pending depth never exceeds one. No encoding happens for a buffered
+        payload until it is started (by :meth:`send` or :meth:`poll`).
 
         Args:
             data: Opaque payload bytes to transmit.
         """
-        pulses = self._encoder.encode(data)
+        if self._writer.is_busy():
+            self._pending = data
+            return
+        self._start_write(data)
+
+    def poll(self) -> None:
+        """Per-tick pump: release a deferred gate and start any pending send.
+
+        Must be called every tick. Does nothing while the writer reports
+        busy. Once the writer reports idle, fires the transmit gate's
+        ``end_transmit`` if it was left armed by a non-blocking write, then
+        starts the pending payload (if any) and clears the slot.
+
+        Raises:
+            Exception: Whatever the encoder raises, if a payload was pending
+                and its encoding fails — surfaced here rather than at the
+                original ``send()`` call.
+        """
+        if self._writer.is_busy():
+            return
+
+        if self._gate_armed:
+            self._gate_armed = False
+            gate = self._gate
+            if gate is not None:
+                gate.end_transmit()
+
+        pending = self._pending
+        if pending is not None:
+            self._pending = None
+            self._start_write(pending)
+
+    def _start_write(self, data: bytes) -> None:
+        """Encode *data* and kick off the write, bracketing it with the gate.
+
+        Args:
+            data: Opaque payload bytes to transmit.
+        """
         gate = self._gate
         if gate is None:
+            pulses = self._encoder.encode(data)
             self._writer.write_pulses(pulses)
             return
+
         gate.begin_transmit()
         try:
+            pulses = self._encoder.encode(data)
             self._writer.write_pulses(pulses)
-        finally:
+        except Exception:
+            gate.end_transmit()
+            raise
+
+        if self._writer.is_busy():
+            self._gate_armed = True
+        else:
             gate.end_transmit()
 
 

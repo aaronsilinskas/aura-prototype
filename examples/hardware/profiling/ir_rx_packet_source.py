@@ -98,6 +98,7 @@ def run() -> None:
     while True:
         payload[0] = sequence & 0xFF
         network_controls.send_ir(payload, LINE)
+        network_controls.poll_transmits()
         sequence += 1
         packets_sent += 1
 
