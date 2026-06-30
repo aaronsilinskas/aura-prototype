@@ -9,7 +9,9 @@ together by reading every rule.
 
 - ``PERSONAL`` — ``basic.progress`` (hitpoints). Set up and torn down by
   ``TagPlayingRule``; re-issued by ``TagHitRule`` on each hit. Lives for the
-  Playing phase, updated transiently on each hit.
+  Playing phase, updated transiently on each hit. ``scene.go`` is also
+  layered here via ``add_effect`` on Playing entry — a one-shot GO cue
+  (sound + strong buzz) alongside the freshly-issued HP bar.
 - ``DIRECTIONAL`` — ``scene.fire_shot``. Owned by ``TagShootingRule``.
   Transient, per shot fired. ``scene.dry_fire`` is also layered here via
   ``add_effect`` on an empty-magazine Button-A press, alongside (not instead

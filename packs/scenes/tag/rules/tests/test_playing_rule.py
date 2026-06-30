@@ -76,6 +76,15 @@ def test_entering_playing_stores_hitpoints_receipt(spy):
     assert tag_state(state).hitpoints_receipt is not None
 
 
+def test_entering_playing_adds_the_go_cue(spy):
+    state, engine, timer = _make_state(spy)
+
+    _tick(state, engine, timer, 0.0)
+
+    go_calls = [c for c in spy.add_effect_calls if c[1] == "scene.go"]
+    assert len(go_calls) == 1
+
+
 def test_entering_playing_sets_starting_ammo(spy):
     state, engine, timer = _make_state(spy)
 

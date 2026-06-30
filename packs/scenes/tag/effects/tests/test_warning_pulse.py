@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from effects.effect import EffectConfig, PixelBuffer
+from effects.effect import EffectConfig, PixelBuffer, VibrationConfig
 from packs.scenes.tag.effects.warning_pulse import BUILD
 
 
@@ -25,6 +25,13 @@ def test_warning_pulse_blip_clip_is_one_shot_not_looping() -> None:
     effect = _build()
 
     assert effect.audio.clips["peak"].loop is False
+
+
+def test_warning_pulse_buzzes_once_per_pulse_peak() -> None:
+    effect = _build()
+
+    assert effect.vibration is not None
+    assert effect.vibration.patterns["peak"].sequence == [VibrationConfig.SHARP_CLICK]
 
 
 def test_warning_pulse_notifies_peak_listener_at_the_pulse_peak() -> None:

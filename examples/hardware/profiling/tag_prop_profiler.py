@@ -181,6 +181,7 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
 
     audio_registry = AudioRegistry()
     audio_registry.register("warning_pulse_peak", "sounds/blip.wav")
+    audio_registry.register("go_start", "sounds/blip.wav")
     audio_registry.register("game_over_sting_start", "sounds/game_over.wav")
     audio_registry.register("fire_shot_start", "sounds/blip.wav")
     audio_registry.register("scene.hit_start", "sounds/blip.wav")
@@ -235,12 +236,11 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
     # attributed (hardware components vs. the scanned pack registries vs. the loaded
     # scene), and cross-checked against the per-component profiler figures (#448).
     print(
-        "__PROP_BREAKDOWN "
-        f"peripherals={free_before - free_after_peripherals}, "
-        f"registries={free_after_peripherals - free_after_registries}, "
-        f"audio_outputs={free_after_registries - free_after_audio}, "
-        f"engine={free_after_audio - free_after_engine}, "
-        f"scene={free_after_engine - free_after_scene}"
+        f"__PROP_BREAKDOWN peripherals={free_before - free_after_peripherals}, "
+        + f"registries={free_after_peripherals - free_after_registries}, "
+        + f"audio_outputs={free_after_registries - free_after_audio}, "
+        + f"engine={free_after_audio - free_after_engine}, "
+        + f"scene={free_after_engine - free_after_scene}"
     )
     return manager, effect_manager, timer, buttons, accelerometer, ir_receiver, footprint_bytes
 
