@@ -112,6 +112,7 @@ def run() -> None:
             send_start = time.monotonic()
             network_controls.send_ir(payload, LINE)
             blocking_send_ms = (time.monotonic() - send_start) * 1000.0
+            network_controls.poll_transmits()
             perf.add_update_time()
 
             if blocking_send_ms > worst_blocking_send_ms:

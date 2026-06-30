@@ -11,13 +11,20 @@ from hardware.shared.ir_transport import InfraredTransmitter, PulseWriter
 
 
 class _RecordingPulseWriter(PulseWriter):
-    """Captures written pulse sequences without touching hardware."""
+    """Captures written pulse sequences without touching hardware.
+
+    ``is_busy()`` always reports ``False`` — matches the blocking
+    ``PulseOutWriter``'s externally-observable behaviour.
+    """
 
     def __init__(self) -> None:
         self.calls: list[list[int]] = []
 
     def write_pulses(self, durations: list[int]) -> None:
         self.calls.append(list(durations))
+
+    def is_busy(self) -> bool:
+        return False
 
 
 class _StubEncoder:
@@ -221,6 +228,53 @@ def test_hardware_network_controls_send_ir_raises_for_empty_map() -> None:
 
     with pytest.raises(ValueError):
         controls.send_ir(b"x", LINE)
+
+
+class _PollCountingTransmitter:
+    """Fake transmitter that just records how many times poll() was called —
+    isolates HardwareNetworkControls.poll_transmits's fan-out from
+    InfraredTransmitter's own poll() behaviour (covered separately)."""
+
+    def __init__(self) -> None:
+        self.poll_calls = 0
+
+    def poll(self) -> None:
+        self.poll_calls += 1
+
+    def send(self, data: bytes) -> None:
+        pass  # not exercised by these tests
+
+
+def test_poll_transmits_polls_every_wired_transmitter() -> None:
+    tx_line = _PollCountingTransmitter()
+    tx_cone = _PollCountingTransmitter()
+    controls = HardwareNetworkControls({LINE: tx_line, CONE: tx_cone})
+
+    controls.poll_transmits()
+
+    assert tx_line.poll_calls == 1
+    assert tx_cone.poll_calls == 1
+
+
+def test_poll_transmits_polls_each_transmitter_once_per_call() -> None:
+    tx = _PollCountingTransmitter()
+    controls = HardwareNetworkControls({LINE: tx})
+
+    controls.poll_transmits()
+    controls.poll_transmits()
+
+    assert tx.poll_calls == 2
+
+
+def test_poll_transmits_is_a_noop_with_no_wired_transmitters() -> None:
+    controls = HardwareNetworkControls({})
+    controls.poll_transmits()  # must not raise
+
+
+def test_abstract_network_controls_has_no_poll_transmits() -> None:
+    """The lifecycle pump is HardwareNetworkControls-only — the abstract
+    seam game rules see stays send-only."""
+    assert not hasattr(NetworkControls(), "poll_transmits")
 
 
 def test_send_radio_is_a_noop_until_hardware_is_wired() -> None:

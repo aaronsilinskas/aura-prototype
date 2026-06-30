@@ -77,18 +77,29 @@ class PulseOutWriter(PulseWriter):
             transmit pin (frequency=38000, duty_cycle=0x8000 for 50 % carrier).
     """
 
-    __slots__ = ("_pulseout",)
+    __slots__ = ("_busy", "_pulseout")
 
     def __init__(self, pulseout: object) -> None:  # pulseio.PulseOut — no stub on CPython
         self._pulseout = pulseout
+        self._busy: bool = False
 
     def write_pulses(self, durations: list[int]) -> None:
         """Send *durations* via the PulseOut hardware.
 
+        Blocks until transmission completes. ``is_busy()`` reports ``True``
+        for the duration of the call (set before ``send``, cleared after) —
+        on a single-core runtime this window is never externally observable
+        since the loop is frozen through the blocking call, but it keeps the
+        contract honest for non-blocking writers.
+
         Args:
             durations: Sequence of integer pulse durations (µs), alternating
-                mark/space, starting with a mark.  The underlying
-                ``pulseio.PulseOut.send`` call blocks until transmission
-                completes.
+                mark/space, starting with a mark.
         """
+        self._busy = True
         self._pulseout.send(durations)
+        self._busy = False
+
+    def is_busy(self) -> bool:
+        """Return ``True`` while ``pulseout.send`` is in progress."""
+        return self._busy
