@@ -86,16 +86,15 @@ class PulseOutWriter(PulseWriter):
     def write_pulses(self, durations: list[int]) -> None:
         """Send *durations* via the PulseOut hardware.
 
+        Blocks until transmission completes. ``is_busy()`` reports ``True``
+        for the duration of the call (set before ``send``, cleared after) —
+        on a single-core runtime this window is never externally observable
+        since the loop is frozen through the blocking call, but it keeps the
+        contract honest for non-blocking writers.
+
         Args:
             durations: Sequence of integer pulse durations (µs), alternating
-                mark/space, starting with a mark.  The underlying
-                ``pulseio.PulseOut.send`` call blocks until transmission
-                completes.  ``is_busy()`` reports ``True`` for the duration of
-                the call (set before ``send``, cleared after) — on a
-                single-core runtime this window is never externally
-                observable since the loop is frozen through the blocking
-                call, but it makes the contract honest for non-blocking
-                writers.
+                mark/space, starting with a mark.
         """
         self._busy = True
         self._pulseout.send(durations)

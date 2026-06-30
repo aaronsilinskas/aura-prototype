@@ -161,35 +161,37 @@ class IrTransmitGate:
 
 
 class InfraredTransmitter:
-    """Unified queue-one state machine: encodes byte payloads and writes IR
-    pulses via a :class:`PulseWriter` — one class for both blocking and
-    non-blocking writers.
+    """Transmits IR payloads through a :class:`PulseWriter`, hiding whether the
+    underlying write is blocking or non-blocking from callers — one class
+    drives both kinds of writer.
 
-    ``send(data)`` starts the write immediately if the writer is idle; if the
-    writer is busy, the raw bytes are buffered in a single pending slot (a
-    later ``send`` while one is already pending *replaces* it — latest wins,
-    pending depth never exceeds one). Encoding happens exactly once per
-    transmitted payload, at start-of-write — never per-tick.
+    Send/poll model:
+      - :meth:`send` starts the write immediately if the writer is idle; if
+        busy, the raw bytes replace any previously buffered pending payload
+        (latest wins, pending depth never exceeds one).
+      - :meth:`poll` must be called every tick. It does nothing while the
+        writer is busy; once idle, it releases a deferred gate (see *Gate
+        timing* below) and starts any pending payload.
+      - Encoding happens exactly once per transmitted payload, at
+        start-of-write — never per-tick.
 
-    Must be polled every tick via :meth:`poll`: while the writer is busy
-    ``poll`` does nothing; once the writer reports idle, ``poll`` fires the
-    transmit gate's ``end_transmit`` (if deferred — see below) and starts any
-    pending payload.
+    Gate timing:
+      - Starting a write calls :meth:`IrTransmitGate.begin_transmit`, encodes,
+        calls :meth:`PulseWriter.write_pulses`, then checks
+        :meth:`PulseWriter.is_busy`. If already ``False`` (a blocking writer
+        finished synchronously) :meth:`IrTransmitGate.end_transmit` fires
+        immediately — reproducing the original ``try``/``finally``
+        byte-for-byte. If ``True`` (e.g. DMA in flight) the gate stays armed
+        and the next :meth:`poll` that observes ``is_busy() == False`` fires
+        ``end_transmit`` before starting any pending send.
 
-    Gate timing: starting a write calls :meth:`IrTransmitGate.begin_transmit`,
-    encodes, calls :meth:`PulseWriter.write_pulses`, then checks
-    :meth:`PulseWriter.is_busy`. If already ``False`` (a blocking writer
-    finished synchronously) :meth:`IrTransmitGate.end_transmit` fires
-    immediately — reproducing the original ``try``/``finally`` byte-for-byte.
-    If ``True`` (e.g. DMA in flight) the gate stays armed and the per-tick
-    :meth:`poll` fires ``end_transmit`` later, on the tick ``is_busy()``
-    falls, before starting any pending send.
-
-    An encode error raised while kicking off a write from :meth:`send`
-    propagates immediately (with the gate released via ``try``/``finally``).
-    An encode error on a payload that was queued (buffered) surfaces later,
-    from the :meth:`poll` call that attempts to start it — accepted for a
-    fire-and-forget API.
+    Error semantics:
+      - An encode error raised while kicking off a write from :meth:`send`
+        propagates immediately (the gate is still released via
+        ``try``/``finally``).
+      - An encode error on a payload that was queued (buffered) surfaces
+        later, from the :meth:`poll` call that attempts to start it —
+        accepted for a fire-and-forget API.
 
     Args:
         pulse_writer: Hardware port that physically transmits pulses.
