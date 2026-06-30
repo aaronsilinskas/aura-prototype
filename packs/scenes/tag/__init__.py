@@ -28,7 +28,9 @@ together by reading every rule.
   no receipt is stored, since any of the above effects (or none) may occupy
   the slot at the time.
 - ``ALL`` — ``scene.ready``, owned by ``TagReadyRule``. Lives for the Ready
-  phase.
+  phase. ``scene.ready_shots`` is layered alongside it via ``add_effect`` on
+  Ready entry — a one-shot, audio-only three-shot sting announcing a
+  powered-on device.
 - ``ALL`` — ``scene.warning_pulse``, owned by ``TagStartingRule``. Lives for
   the Starting phase.
 - ``ALL`` — ``elements.fire`` then ``scene.game_over_sting``, both owned by
