@@ -50,7 +50,15 @@ class PulseReader:
 
     A plain base class — subclass and override :meth:`read_pulse` to
     connect to hardware (e.g. ``pulseio.PulseIn``) or a test fake.
+
+    Attributes:
+        buffer_full_on_poll: Monotonic-since-boot count of reads that
+            observed a full underlying buffer — a proxy for overrun pulse
+            loss. Defaults to 0 so readers that cannot detect overrun (e.g.
+            test fakes) still satisfy the telemetry contract.
     """
+
+    buffer_full_on_poll: int = 0
 
     def read_pulse(self) -> "int | None":
         """Return the next available pulse duration in microseconds, or ``None``.
@@ -65,6 +73,11 @@ class PulseReader:
             NotImplementedError: Always — subclasses must override.
         """
         raise NotImplementedError
+
+    def reset_telemetry(self) -> None:
+        """Zero ``buffer_full_on_poll``. No-op on the base — overridden by
+        readers that track real telemetry (e.g. :class:`PulseInReader`)."""
+        self.buffer_full_on_poll = 0
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +120,48 @@ class InfraredReceiver:
     Exposes telemetry attributes populated after each successful decode:
     ``last_signal_strength``, ``last_error_margin``, and
     ``last_best_receiver``.
+
+    Defines the telemetry-counter contract for the whole IR receive path —
+    every counter below defaults to 0 so any receiver (including test fakes)
+    satisfies the contract. Concrete receivers (e.g.
+    :class:`InfraredSingleReceiver`) override these to report real,
+    monotonic-since-boot counts.
+
+    Attributes:
+        pulses_seen: Count of pulses drained from the reader.
+        packets_surfaced: Count of decoded packets returned by :meth:`receive`.
+        packets_started: Decoder packets-started count (delegated).
+        packets_completed: Decoder packets-completed count (delegated).
+        preamble_reject: Decoder preamble-reject count (delegated).
+        mark_reject: Decoder mark-reject count (delegated).
+        space_reject: Decoder space-reject count (delegated).
+        buffer_full_on_poll: Reader buffer-full-on-poll count (delegated).
     """
+
+    pulses_seen: int = 0
+    packets_surfaced: int = 0
+    packets_started: int = 0
+    packets_completed: int = 0
+    preamble_reject: int = 0
+    mark_reject: int = 0
+    space_reject: int = 0
+    buffer_full_on_poll: int = 0
+
+    def reset_telemetry(self) -> None:
+        """Zero every counter in the IR-path telemetry contract.
+
+        No-op on the base — receivers that track real counters (e.g.
+        :class:`InfraredSingleReceiver`) override this to also reset their
+        decoder and reader.
+        """
+        self.pulses_seen = 0
+        self.packets_surfaced = 0
+        self.packets_started = 0
+        self.packets_completed = 0
+        self.preamble_reject = 0
+        self.mark_reject = 0
+        self.space_reject = 0
+        self.buffer_full_on_poll = 0
 
     def receive(self) -> "bytearray | None":
         """Poll for a complete received packet.
@@ -167,6 +221,12 @@ class InfraredSingleReceiver(InfraredReceiver):
         self._reader = pulse_reader
         self._decoder = decoder
 
+        # Monotonic-since-boot telemetry owned by this receiver. Decoder and
+        # reader counters are not copied — they are forwarded live via the
+        # properties below so the whole path reads off this one handle.
+        self.pulses_seen: int = 0
+        self.packets_surfaced: int = 0
+
     def receive(self) -> "bytearray | None":
         """Drain available pulses from the reader and return a packet if complete.
 
@@ -177,8 +237,10 @@ class InfraredSingleReceiver(InfraredReceiver):
             pulse = self._reader.read_pulse()
             if pulse is None:
                 return None
+            self.pulses_seen += 1
             result = self._decoder.decode(pulse)
             if result is not None:
+                self.packets_surfaced += 1
                 return result
 
     @property
@@ -195,6 +257,43 @@ class InfraredSingleReceiver(InfraredReceiver):
     def last_best_receiver(self) -> "PulseReader | None":
         """Always ``None`` — a single receiver has no selection concept."""
         return None
+
+    @property
+    def packets_started(self) -> int:
+        """Decoder packets-started count, forwarded live."""
+        return self._decoder.packets_started
+
+    @property
+    def packets_completed(self) -> int:
+        """Decoder packets-completed count, forwarded live."""
+        return self._decoder.packets_completed
+
+    @property
+    def preamble_reject(self) -> int:
+        """Decoder preamble-reject count, forwarded live."""
+        return self._decoder.preamble_reject
+
+    @property
+    def mark_reject(self) -> int:
+        """Decoder mark-reject count, forwarded live."""
+        return self._decoder.mark_reject
+
+    @property
+    def space_reject(self) -> int:
+        """Decoder space-reject count, forwarded live."""
+        return self._decoder.space_reject
+
+    @property
+    def buffer_full_on_poll(self) -> int:
+        """Reader buffer-full-on-poll count, forwarded live."""
+        return self._reader.buffer_full_on_poll
+
+    def reset_telemetry(self) -> None:
+        """Zero the whole IR path: this receiver, its decoder, and its reader."""
+        self.pulses_seen = 0
+        self.packets_surfaced = 0
+        self._decoder.reset_telemetry()
+        self._reader.reset_telemetry()
 
 
 # ---------------------------------------------------------------------------

@@ -21,6 +21,7 @@ from hardware.shared.ir_transport import (
     PulseReader,
     PulseWriter,
 )
+from hardware.shared.tag_protocol import TAG_PREAMBLE, TagInfraredDecoder, TagInfraredEncoder
 
 # ---------------------------------------------------------------------------
 # Local copies of wire-frame constants used by tests to nudge pulses.
@@ -120,6 +121,19 @@ def test_receiver_base_raises_not_implemented():
         rx.receive()
 
 
+def test_receiver_base_defaults_all_telemetry_counters_to_zero():
+    rx = InfraredReceiver()
+
+    assert rx.pulses_seen == 0
+    assert rx.packets_surfaced == 0
+    assert rx.packets_started == 0
+    assert rx.packets_completed == 0
+    assert rx.preamble_reject == 0
+    assert rx.mark_reject == 0
+    assert rx.space_reject == 0
+    assert rx.buffer_full_on_poll == 0
+
+
 # ---------------------------------------------------------------------------
 # InfraredSingleReceiver — round-trip
 # ---------------------------------------------------------------------------
@@ -179,6 +193,93 @@ def test_single_receiver_telemetry_is_none_before_first_packet():
     assert rx.last_signal_strength is None
     assert rx.last_error_margin is None
     assert rx.last_best_receiver is None
+
+
+# ---------------------------------------------------------------------------
+# InfraredSingleReceiver — telemetry counters
+# ---------------------------------------------------------------------------
+
+
+def test_single_receiver_pulses_seen_counts_every_drained_pulse():
+    payload = b"\xde\xad"
+    pulses = _encode_pulses(payload)
+    reader = FakePulseReader(pulses)
+    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+
+    rx.receive()
+
+    assert rx.pulses_seen == len(pulses)
+
+
+def test_single_receiver_pulses_seen_accumulates_across_receive_calls():
+    reader = FakePulseReader()
+    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+
+    reader.load([100, 200])
+    rx.receive()
+    reader.load([300])
+    rx.receive()
+
+    assert rx.pulses_seen == 3
+
+
+def test_single_receiver_packets_surfaced_increments_on_successful_receive():
+    payload = b"\x01"
+    reader = FakePulseReader(_encode_pulses(payload))
+    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+
+    rx.receive()
+    rx.receive()  # second call: no more pulses, no new packet
+
+    assert rx.packets_surfaced == 1
+
+
+def test_single_receiver_delegates_decoder_counters_from_tag_decoder():
+    """The whole path reads off ir_receiver — decoder counters surface here."""
+    decoder = TagInfraredDecoder()
+    bad_preamble = list(TAG_PREAMBLE)
+    bad_preamble[1] = 9999
+    reader = FakePulseReader(bad_preamble)
+    rx = InfraredSingleReceiver(reader, decoder)
+
+    rx.receive()
+
+    assert rx.preamble_reject == decoder.preamble_reject == 1
+    assert rx.packets_started == decoder.packets_started == 0
+    assert rx.packets_completed == decoder.packets_completed == 0
+    assert rx.mark_reject == decoder.mark_reject == 0
+    assert rx.space_reject == decoder.space_reject == 0
+
+
+def test_single_receiver_delegates_buffer_full_on_poll_from_reader():
+    reader = FakePulseReader()
+    reader.buffer_full_on_poll = 3
+    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+
+    assert rx.buffer_full_on_poll == 3
+
+
+def test_single_receiver_reset_telemetry_zeroes_whole_ir_path():
+    decoder = TagInfraredDecoder()
+    payload = [*list(TagInfraredEncoder().encode(bytearray([0x10]))), TAG_PREAMBLE[0]]
+    reader = FakePulseReader(payload)
+    rx = InfraredSingleReceiver(reader, decoder)
+    reader.buffer_full_on_poll = 2
+    rx.receive()
+
+    rx.reset_telemetry()
+
+    assert rx.pulses_seen == 0
+    assert rx.packets_surfaced == 0
+    assert rx.packets_started == 0
+    assert rx.packets_completed == 0
+    assert rx.preamble_reject == 0
+    assert rx.mark_reject == 0
+    assert rx.space_reject == 0
+    assert rx.buffer_full_on_poll == 0
+    assert decoder.packets_started == 0
+    assert decoder.packets_completed == 0
+    assert reader.buffer_full_on_poll == 0
 
 
 # ---------------------------------------------------------------------------
