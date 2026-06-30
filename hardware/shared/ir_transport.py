@@ -153,9 +153,8 @@ class InfraredTransmitter:
         pulse_writer: Hardware port that physically transmits pulses.
         encoder: :class:`~hardware.shared.ir_protocol.InfraredEncoder` subclass
             that converts bytes to a pulse-duration array.
-        gate: Optional :class:`IrTransmitGate` to drive across the write so the
-            receiver can suppress self-echo. ``None`` (default) preserves prior
-            behaviour byte-for-byte.
+        gate: :class:`IrTransmitGate` driven across the write so the receiver
+            can suppress self-echo.
     """
 
     def __init__(
@@ -303,9 +302,7 @@ class InfraredSingleReceiver(InfraredReceiver):
         pulse_reader: Hardware port supplying pulse durations.
         decoder: :class:`~hardware.shared.ir_protocol.InfraredDecoder` subclass
             that processes pulses and returns a payload when a packet completes.
-        gate: Optional :class:`IrTransmitGate` to read for self-echo
-            suppression. ``None`` (default) preserves prior behaviour
-            byte-for-byte.
+        gate: :class:`IrTransmitGate` read for self-echo suppression.
     """
 
     def __init__(
@@ -441,9 +438,7 @@ class InfraredMultiReceiver(InfraredReceiver):
         decoder_factory: Callable (no arguments) that returns a new
             :class:`~hardware.shared.ir_protocol.InfraredDecoder` instance.
             Called once per reader at construction time.
-        gate: Optional :class:`IrTransmitGate` to read for self-echo
-            suppression. ``None`` (default) preserves prior behaviour
-            byte-for-byte.
+        gate: :class:`IrTransmitGate` read for self-echo suppression.
 
     Attributes:
         last_signal_strength: Normalised quality (0.0–1.0) of the best packet
@@ -478,8 +473,6 @@ class InfraredMultiReceiver(InfraredReceiver):
         self._last_error_margin: int | None = None
         self._last_best_receiver: PulseReader | None = None
 
-        # Monotonic-since-boot count of pulses drained and discarded under
-        # drain-but-discard while the gate was transmitting or flushing.
         self.pulses_dropped_transmitting: int = 0
 
     def receive(self) -> "bytearray | None":
