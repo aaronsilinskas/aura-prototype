@@ -78,9 +78,9 @@ def run() -> None:
 
     print(
         f"__IR_RX_PACKET_SOURCE packet_size={PACKET_SIZE}, "
-        f"delay_ms={DELAY_MS:.1f}, "
-        f"board={board_id()}, "
-        f"runtime={runtime_id()}"
+        + f"delay_ms={DELAY_MS:.1f}, "
+        + f"board={board_id()}, "
+        + f"runtime={runtime_id()}"
     )
 
     # Pre-allocate the payload once and mutate byte 0 each send -- the only byte
@@ -110,9 +110,9 @@ def run() -> None:
             send_rate_hz = packets_sent / elapsed if elapsed > 0 else 0.0
             print(
                 f"__IR_TX packets_sent={packets_sent}, "
-                f"send_rate_hz={send_rate_hz:.2f}, "
-                f"packet_size={PACKET_SIZE}, "
-                f"delay_ms={DELAY_MS:.1f}"
+                + f"send_rate_hz={send_rate_hz:.2f}, "
+                + f"packet_size={PACKET_SIZE}, "
+                + f"delay_ms={DELAY_MS:.1f}"
             )
             next_log_time = current_time + LOG_INTERVAL_SECONDS
 
