@@ -61,9 +61,9 @@ def test_fire_shot_emits_vibration_on_start() -> None:
     assert "start" in effect.vibration.patterns
 
 
-def test_fire_shot_vibration_start_uses_sharp_click() -> None:
+def test_fire_shot_vibration_start_uses_strong_click() -> None:
     from effects.effect import VibrationConfig
 
     effect = _build()
 
-    assert VibrationConfig.SHARP_CLICK in effect.vibration.patterns["start"].sequence
+    assert VibrationConfig.STRONG_CLICK in effect.vibration.patterns["start"].sequence

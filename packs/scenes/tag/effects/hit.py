@@ -3,7 +3,8 @@
 Built on ``basic.pulse`` for pixels: a quick red flash. Layers on a one-shot
 ``start`` audio clip (the ``game_over_sting`` composition pattern) with
 ``stops_effect=True`` so the effect ends — and the scope returns to dark —
-the moment the clip finishes, plus a single strong-buzz vibration pulse.
+the moment the clip finishes, plus a strong-buzz/pause/strong-click
+vibration sequence for a punchier hit feel.
 """
 
 from __future__ import annotations
@@ -21,7 +22,17 @@ from packs.effects.basic.pulse import PulseBuilder
 
 _pulse = PulseBuilder()
 
-_HIT_VIBRATION = EffectVibration(patterns={"start": VibrationConfig([VibrationConfig.STRONG_BUZZ])})
+_HIT_VIBRATION = EffectVibration(
+    patterns={
+        "start": VibrationConfig(
+            [
+                VibrationConfig.STRONG_BUZZ,
+                VibrationConfig.PAUSE_250,
+                VibrationConfig.STRONG_CLICK,
+            ]
+        )
+    }
+)
 
 
 class _Builder(EffectBuilder):

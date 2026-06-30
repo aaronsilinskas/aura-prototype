@@ -3,7 +3,7 @@
 Built on ``basic.solid``: a bright flash of color, layered with a one-shot
 ``fire_shot_start`` audio clip (``stops_effect=True`` so the whole effect —
 pixels and vibration included — ends when the clip finishes, returning
-``Scope.DIRECTIONAL`` to dark) and a sharp vibration pulse.
+``Scope.DIRECTIONAL`` to dark) and a strong vibration pulse.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ _FIRE_SHOT_AUDIO = EffectAudio(
 )
 
 _FIRE_SHOT_VIBRATION = EffectVibration(
-    patterns={"start": VibrationConfig([VibrationConfig.SHARP_CLICK])}
+    patterns={"start": VibrationConfig([VibrationConfig.STRONG_CLICK])}
 )
 
 _FLASH_COLOR = 0xFFFFFF
