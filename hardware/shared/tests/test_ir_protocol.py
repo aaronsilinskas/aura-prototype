@@ -20,6 +20,7 @@ from hardware.shared.ir_protocol import (
     InfraredDecoder,
     InfraredEncoder,
 )
+from hardware.shared.tag_protocol import TAG_PREAMBLE, TagInfraredDecoder
 
 # ---------------------------------------------------------------------------
 # Local copies of wire-frame constants used by tests to corrupt pulses.
@@ -304,6 +305,51 @@ def test_error_margin_is_replaced_by_subsequent_packet():
     _feed_pulses(decoder, pulses)
 
     assert decoder.last_error_margin == nudge
+
+
+# ---------------------------------------------------------------------------
+# reset_decode()
+# ---------------------------------------------------------------------------
+
+
+def test_reset_decode_aborts_in_progress_decode():
+    """Feeding the remainder of a frame after reset_decode() does not complete it."""
+    encoder = AuraInfraredEncoder()
+    decoder = AuraInfraredDecoder()
+
+    pulses = list(encoder.encode(b"\xab\xcd"))
+    mid = len(pulses) // 2
+    for pulse in pulses[:mid]:
+        decoder.decode(pulse)
+
+    decoder.reset_decode()
+
+    result = _feed_pulses(decoder, pulses[mid:])
+    assert result is None
+
+
+def test_reset_decode_does_not_zero_telemetry_counters():
+    decoder = TagInfraredDecoder()
+    bad_preamble = list(TAG_PREAMBLE)
+    bad_preamble[1] = 4000  # invalid but below the inter-frame gap threshold
+    _feed_pulses(decoder, bad_preamble)
+    assert decoder.preamble_reject == 1
+
+    decoder.reset_decode()
+
+    assert decoder.preamble_reject == 1
+
+
+def test_reset_decode_after_reset_allows_a_fresh_packet_to_decode_normally():
+    encoder = AuraInfraredEncoder()
+    decoder = AuraInfraredDecoder()
+
+    decoder.decode(encoder.encode(b"\x01")[0])  # partial: just the header mark
+    decoder.reset_decode()
+
+    payload = b"\x42"
+    result = _feed_pulses(decoder, encoder.encode(payload))
+    assert result == bytearray(payload)
 
 
 # ---------------------------------------------------------------------------

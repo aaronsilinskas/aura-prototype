@@ -216,6 +216,17 @@ class InfraredDecoder:
         self.mark_reject = 0
         self.space_reject = 0
 
+    def reset_decode(self) -> None:
+        """Abort an in-progress decode and return the decoder to idle.
+
+        Resets decode state only — telemetry counters are untouched (use
+        :meth:`reset_telemetry` for those). Lets callers outside the decoder
+        (e.g. a receiver reacting to the :class:`IrTransmitGate`) reset partial
+        decode state through the public API rather than the protected
+        ``_reset`` helper.
+        """
+        self._reset(None)
+
     # ------------------------------------------------------------------
     # Helpers for subclasses (not part of the public API)
     # ------------------------------------------------------------------
