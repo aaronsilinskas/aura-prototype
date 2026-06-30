@@ -180,11 +180,6 @@ class TagInfraredEncoder(InfraredEncoder):
         return durations
 
 
-# Decoder state: indices < len(TAG_PREAMBLE) validate the preamble; indices
-# >= len(TAG_PREAMBLE) and < TAG_TOTAL_PULSES decode data bits; the state
-# equal to TAG_TOTAL_PULSES finalises the packet.
-
-
 class TagInfraredDecoder(InfraredDecoder):
     """Infrared tag IR decoder.
 
@@ -213,8 +208,9 @@ class TagInfraredDecoder(InfraredDecoder):
           reset on mismatch.
         - ``len(TAG_PREAMBLE)`` to ``TAG_TOTAL_PULSES - 1``: decode data
           bits, alternating between a mark pulse and a space pulse (the
-          space determines the bit value).
-        - ``TAG_TOTAL_PULSES``: finalise the packet.
+          space determines the bit value). The space pulse that completes
+          the final data bit (the 17th pulse overall) finalises the packet
+          in this same call — no trailing pulse is consumed or awaited.
 
         Args:
             pulse: Pulse duration in microseconds.
@@ -233,7 +229,10 @@ class TagInfraredDecoder(InfraredDecoder):
             else:
                 self.preamble_reject += 1
                 self._reset(self._max_error_margin)
-        elif state < TAG_TOTAL_PULSES:
+        else:
+            # state < TAG_TOTAL_PULSES: decode data bits. The decoder always
+            # finalises and resets on the 17th pulse below, so state can
+            # never reach or exceed TAG_TOTAL_PULSES on entry.
             bit_index = state - len(TAG_PREAMBLE)
             if bit_index % 2 == 0:
                 if self._check_pulse(pulse, TAG_MARK):
@@ -252,16 +251,15 @@ class TagInfraredDecoder(InfraredDecoder):
                     self._reset(self._max_error_margin)
                     return None
                 self._decoder_state += 1
-        elif state == TAG_TOTAL_PULSES:
-            # Add the padding bit so the 7 data bits flush into a byte,
-            # then drop the padding bit by shifting right.
-            self._write_bit(0)
-            tag_byte = self._received_data[0] >> 1
-            saved_margin = self._max_error_margin
-            self.packets_completed += 1
-            self._reset(saved_margin)
-            return bytearray([tag_byte])
-        else:
-            self._reset(self._max_error_margin)
+                if self._decoder_state == TAG_TOTAL_PULSES:
+                    # Last data bit's space just landed (17th pulse). Add the
+                    # padding bit so the 7 data bits flush into a byte, then
+                    # drop the padding bit by shifting right.
+                    self._write_bit(0)
+                    tag_byte = self._received_data[0] >> 1
+                    saved_margin = self._max_error_margin
+                    self.packets_completed += 1
+                    self._reset(saved_margin)
+                    return bytearray([tag_byte])
 
         return None

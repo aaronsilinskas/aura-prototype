@@ -96,10 +96,9 @@ def _encode_decode_byte(byte: int) -> bytearray | None:
     encoder = TagInfraredEncoder()
     decoder = TagInfraredDecoder()
 
-    # The decoder finalises a packet on the pulse *after* the last data bit
-    # (e.g. the next frame's leading preamble pulse), so append one extra
-    # pulse to flush the completed packet.
-    pulses = [*encoder.encode(bytearray([byte])), TAG_PREAMBLE[0]]
+    # The decoder finalises inline on the 17th pulse (the space pulse that
+    # completes the final data bit) — no trailing pulse is needed.
+    pulses = encoder.encode(bytearray([byte]))
     for pulse in pulses:
         result = decoder.decode(pulse)
         if result is not None:
@@ -110,6 +109,35 @@ def _encode_decode_byte(byte: int) -> bytearray | None:
 @pytest.mark.parametrize("byte", [0x00, 0x01, 0x7F, 0x55, 0x2A])
 def test_wire_round_trip_recovers_original_byte(byte):
     assert _encode_decode_byte(byte) == bytearray([byte])
+
+
+def test_isolated_packet_decodes_on_its_17th_pulse_with_no_trailing_pulse():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    pulses = encoder.encode(bytearray([0x55]))
+    assert len(pulses) == 17
+
+    result = None
+    for pulse in pulses:
+        result = decoder.decode(pulse)
+
+    assert result == bytearray([0x55])
+
+
+def test_back_to_back_burst_decodes_both_shots_without_dropping_the_second_preamble():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    pulses = [*encoder.encode(bytearray([0x55])), *encoder.encode(bytearray([0x2A]))]
+
+    results = []
+    for pulse in pulses:
+        outcome = decoder.decode(pulse)
+        if outcome is not None:
+            results.append(outcome)
+
+    assert results == [bytearray([0x55]), bytearray([0x2A])]
 
 
 def test_encoder_frame_starts_with_preamble():
@@ -149,7 +177,7 @@ def test_successful_decode_exposes_error_margin_and_signal_strength():
     encoder = TagInfraredEncoder()
     decoder = TagInfraredDecoder()
 
-    pulses = [*encoder.encode(bytearray([0x55])), TAG_PREAMBLE[0]]
+    pulses = encoder.encode(bytearray([0x55]))
     for pulse in pulses:
         decoder.decode(pulse)
 
@@ -161,7 +189,7 @@ def test_perfect_timing_yields_zero_error_margin_and_full_signal_strength():
     encoder = TagInfraredEncoder()
     decoder = TagInfraredDecoder()
 
-    pulses = [*encoder.encode(bytearray([0x2A])), TAG_PREAMBLE[0]]
+    pulses = encoder.encode(bytearray([0x2A]))
     for pulse in pulses:
         decoder.decode(pulse)
 
@@ -179,7 +207,7 @@ def test_decoder_discards_unrecognised_pulses_before_preamble():
     decoder = TagInfraredDecoder()
 
     noise = [100, 200, 50]
-    pulses = [*noise, *encoder.encode(bytearray([0x33])), TAG_PREAMBLE[0]]
+    pulses = [*noise, *encoder.encode(bytearray([0x33]))]
 
     result = None
     for pulse in pulses:
@@ -271,7 +299,7 @@ def test_completed_packet_increments_packets_completed():
     encoder = TagInfraredEncoder()
     decoder = TagInfraredDecoder()
 
-    pulses = [*encoder.encode(bytearray([0x55])), TAG_PREAMBLE[0]]
+    pulses = encoder.encode(bytearray([0x55]))
     for pulse in pulses:
         decoder.decode(pulse)
 
@@ -290,7 +318,7 @@ def test_packets_started_counts_every_preamble_match_not_just_completions():
         decoder.decode(pulse)
 
     # Second packet: completes normally.
-    completed = [*encoder.encode(bytearray([0x2A])), TAG_PREAMBLE[0]]
+    completed = encoder.encode(bytearray([0x2A]))
     for pulse in completed:
         decoder.decode(pulse)
 
@@ -302,7 +330,7 @@ def test_reset_telemetry_zeroes_all_decoder_counters():
     encoder = TagInfraredEncoder()
     decoder = TagInfraredDecoder()
 
-    pulses = [*encoder.encode(bytearray([0x55])), TAG_PREAMBLE[0]]
+    pulses = encoder.encode(bytearray([0x55]))
     for pulse in pulses:
         decoder.decode(pulse)
     bad_preamble = list(TAG_PREAMBLE)
