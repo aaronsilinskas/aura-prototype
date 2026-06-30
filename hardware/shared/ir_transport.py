@@ -325,12 +325,8 @@ class InfraredSingleReceiver(InfraredReceiver):
     def receive(self) -> "bytearray | None":
         """Drain available pulses from the reader and return a packet if complete.
 
-        With a *gate*: while :attr:`IrTransmitGate.transmitting` is ``True``,
-        or on the one-shot falling-edge flush (:meth:`IrTransmitGate.consume_flush`),
-        every available pulse is drained and discarded (**drain-but-discard**)
-        and the decoder is reset via :meth:`~ir_protocol.InfraredDecoder.reset`
-        — no pulse is decoded and ``None`` is returned. Otherwise, decoding
-        proceeds normally.
+        With a *gate* present, pulses captured while transmitting are
+        drained and discarded rather than decoded (self-echo suppression).
 
         Returns:
             ``bytearray`` payload on a successful decode; ``None`` otherwise.
@@ -478,12 +474,9 @@ class InfraredMultiReceiver(InfraredReceiver):
     def receive(self) -> "bytearray | None":
         """Poll all readers and return the best packet this tick, or ``None``.
 
-        With a *gate*: while :attr:`IrTransmitGate.transmitting` is ``True``,
-        or on the one-shot falling-edge flush (:meth:`IrTransmitGate.consume_flush`),
-        every available pulse on every reader is drained and discarded
-        (**drain-but-discard**) and every decoder is reset — no reader
-        surfaces the echo and ``None`` is returned. Otherwise, decoding
-        proceeds normally.
+        With a *gate* present, pulses captured while transmitting are
+        drained and discarded across every reader rather than decoded
+        (self-echo suppression).
 
         The inner loop allocates nothing — scratch lists are cleared and
         reused each call.  The best packet is the one whose decoder reports
