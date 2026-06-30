@@ -217,14 +217,9 @@ class InfraredDecoder:
         self.space_reject = 0
 
     def reset(self, error_margin: int | None = None) -> None:
-        """Reset decode state and return the decoder to idle.
+        """Return the decoder to idle, discarding any in-progress decode.
 
-        Resets decode state only — telemetry counters are untouched (use
-        :meth:`reset_telemetry` for those). Called internally after every
-        completed or rejected packet (with the margin observed for that
-        packet); callers outside the decoder (e.g. a receiver reacting to the
-        :class:`IrTransmitGate`) call ``reset()`` with no argument to abort an
-        in-progress decode and discard any partial state.
+        Decode state only — telemetry is untouched (see :meth:`reset_telemetry`).
         """
         self._decoder_state = 0
         self._received_data = bytearray()  # MicroPython does not support clear() on bytearray
