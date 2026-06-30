@@ -215,6 +215,19 @@ def test_fresh_press_with_no_ammo_starts_reload(spy):
     assert options == {"duration": pytest.approx(3.0)}
 
 
+def test_fresh_press_with_no_ammo_adds_dry_fire_feedback(spy):
+    network_spy = SpyNetworkControls()
+    state, engine, timer = _make_state(spy, network_spy=network_spy)
+    tag_state(state).shot.ammo = 0
+
+    _tick(state, engine, timer, 2.0, button_a=True)
+
+    dry_fire_calls = [c for c in spy.add_effect_calls if c[1] == "scene.dry_fire"]
+    assert len(dry_fire_calls) == 1
+    scope, _, _ = dry_fire_calls[0]
+    assert scope is Scope.DIRECTIONAL
+
+
 def test_held_trigger_from_emptying_shot_does_not_start_reload(spy):
     """The tick that empties the magazine is a fresh PRESSED; the next held
     tick is DOWN, not PRESSED, so it must not start a reload."""
