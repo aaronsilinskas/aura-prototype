@@ -44,6 +44,16 @@ def test_first_tick_with_no_phase_enters_ready_and_sets_ready_effect(spy):
     assert ready_calls[0][0] is Scope.ALL
 
 
+def test_first_tick_with_no_phase_adds_ready_shots_effect(spy):
+    state, engine = _make_state(spy)
+
+    _tick(state, engine)
+
+    ready_shots_calls = [c for c in spy.add_effect_calls if c[1] == "scene.ready_shots"]
+    assert len(ready_shots_calls) == 1
+    assert ready_shots_calls[0][0] is Scope.ALL
+
+
 def test_ready_effect_is_not_reissued_on_subsequent_ticks(spy):
     state, engine = _make_state(spy)
 

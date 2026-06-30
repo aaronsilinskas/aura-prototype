@@ -1,6 +1,7 @@
 """Tag scene Ready phase rule.
 
-On entry, plays the scene's "ready" effect across the whole device. Any
+On entry, plays the scene's "ready" effect across the whole device, layered
+with the one-shot "ready_shots" audio sting announcing a live blaster. Any
 button press transitions to Starting.
 """
 
@@ -13,7 +14,7 @@ from packs.scenes.tag.rules.helpers.phases import PHASE_READY, PHASE_STARTING, T
 
 
 class TagReadyRule(PhaseRule):
-    """Drives the Ready phase: plays the ready effect, waits for a button press."""
+    """Drives the Ready phase: plays the ready effect and shot sting, waits for a button press."""
 
     def __init__(self) -> None:
         super().__init__(PHASE_READY, TAG_MACHINE_KEY, PHASE_READY)
@@ -21,6 +22,7 @@ class TagReadyRule(PhaseRule):
 
     def on_enter(self, state: GameState) -> None:
         state.effect_controls.set_effect(Scope.ALL, "scene.ready", {})
+        state.effect_controls.add_effect(Scope.ALL, "scene.ready_shots", {})
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
         if event.buttons.is_pressed("A") or event.buttons.is_pressed("B"):
