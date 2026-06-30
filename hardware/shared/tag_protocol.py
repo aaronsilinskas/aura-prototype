@@ -225,7 +225,7 @@ class TagInfraredDecoder(InfraredDecoder):
             otherwise.
         """
         if pulse >= TAG_GAP_THRESHOLD:
-            self._reset(self._max_error_margin)
+            self.reset(self._max_error_margin)
             return None
 
         state = self._decoder_state
@@ -237,7 +237,7 @@ class TagInfraredDecoder(InfraredDecoder):
                     self.packets_started += 1
             else:
                 self.preamble_reject += 1
-                self._reset(self._max_error_margin)
+                self.reset(self._max_error_margin)
         else:
             # state < TAG_TOTAL_PULSES: decode data bits. The decoder always
             # finalises and resets on the 17th pulse below, so state can
@@ -248,7 +248,7 @@ class TagInfraredDecoder(InfraredDecoder):
                     self._decoder_state += 1
                 else:
                     self.mark_reject += 1
-                    self._reset(self._max_error_margin)
+                    self.reset(self._max_error_margin)
                     return None
             else:
                 if self._check_pulse(pulse, TAG_SPACE_ONE):
@@ -257,7 +257,7 @@ class TagInfraredDecoder(InfraredDecoder):
                     self._write_bit(0)
                 else:
                     self.space_reject += 1
-                    self._reset(self._max_error_margin)
+                    self.reset(self._max_error_margin)
                     return None
                 self._decoder_state += 1
                 if self._decoder_state == TAG_TOTAL_PULSES:
@@ -268,7 +268,7 @@ class TagInfraredDecoder(InfraredDecoder):
                     tag_byte = self._received_data[0] >> 1
                     saved_margin = self._max_error_margin
                     self.packets_completed += 1
-                    self._reset(saved_margin)
+                    self.reset(saved_margin)
                     return bytearray([tag_byte])
 
         return None

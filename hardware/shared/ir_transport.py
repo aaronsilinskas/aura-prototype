@@ -331,7 +331,7 @@ class InfraredSingleReceiver(InfraredReceiver):
         With a *gate*: while :attr:`IrTransmitGate.transmitting` is ``True``,
         or on the one-shot falling-edge flush (:meth:`IrTransmitGate.consume_flush`),
         every available pulse is drained and discarded (**drain-but-discard**)
-        and the decoder is reset via :meth:`~ir_protocol.InfraredDecoder.reset_decode`
+        and the decoder is reset via :meth:`~ir_protocol.InfraredDecoder.reset`
         — no pulse is decoded and ``None`` is returned. Otherwise, decoding
         proceeds normally.
 
@@ -363,7 +363,7 @@ class InfraredSingleReceiver(InfraredReceiver):
         reader = self._reader
         while reader.read_pulse() is not None:
             self.pulses_dropped_transmitting += 1
-        self._decoder.reset_decode()
+        self._decoder.reset()
 
     @property
     def last_signal_strength(self) -> "float | None":
@@ -572,7 +572,7 @@ class InfraredMultiReceiver(InfraredReceiver):
             reader = readers[i]
             while reader.read_pulse() is not None:
                 dropped += 1
-            decoders[i].reset_decode()
+            decoders[i].reset()
         self.pulses_dropped_transmitting += dropped
 
     @property

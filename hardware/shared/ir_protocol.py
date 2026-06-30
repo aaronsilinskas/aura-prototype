@@ -216,29 +216,26 @@ class InfraredDecoder:
         self.mark_reject = 0
         self.space_reject = 0
 
-    def reset_decode(self) -> None:
-        """Abort an in-progress decode and return the decoder to idle.
+    def reset(self, error_margin: int | None = None) -> None:
+        """Reset decode state and return the decoder to idle.
 
         Resets decode state only — telemetry counters are untouched (use
-        :meth:`reset_telemetry` for those). Lets callers outside the decoder
-        (e.g. a receiver reacting to the :class:`IrTransmitGate`) reset partial
-        decode state through the public API rather than the protected
-        ``_reset`` helper.
+        :meth:`reset_telemetry` for those). Called internally after every
+        completed or rejected packet (with the margin observed for that
+        packet); callers outside the decoder (e.g. a receiver reacting to the
+        :class:`IrTransmitGate`) call ``reset()`` with no argument to abort an
+        in-progress decode and discard any partial state.
         """
-        self._reset(None)
-
-    # ------------------------------------------------------------------
-    # Helpers for subclasses (not part of the public API)
-    # ------------------------------------------------------------------
-
-    def _reset(self, error_margin: int | None) -> None:
-        """Reset decoder state and record *error_margin* for this packet."""
         self._decoder_state = 0
         self._received_data = bytearray()  # MicroPython does not support clear() on bytearray
         self._received_bit_index = 7
         self._received_byte = 0
         self._max_error_margin = 0
         self._last_error_margin = error_margin
+
+    # ------------------------------------------------------------------
+    # Helpers for subclasses (not part of the public API)
+    # ------------------------------------------------------------------
 
     def _check_pulse(
         self, received: int, expected: int, error_threshold: int | None = None
@@ -384,7 +381,7 @@ class AuraInfraredDecoder(InfraredDecoder):
                 self._decoder_state = _STATE_DATA
                 self._awaiting_space = False
             else:
-                self._reset(self._error_threshold)
+                self.reset(self._error_threshold)
 
         elif self._decoder_state == _STATE_DATA:
             if not self._awaiting_space:
@@ -394,7 +391,7 @@ class AuraInfraredDecoder(InfraredDecoder):
                 elif self._check_pulse(pulse, IR_LEAD_OUT):
                     return self._finalise()
                 else:
-                    self._reset(self._error_threshold)
+                    self.reset(self._error_threshold)
             else:
                 # Space determines bit value. Check one first — further from zero.
                 if self._check_pulse(pulse, IR_SPACE_ONE):
@@ -404,7 +401,7 @@ class AuraInfraredDecoder(InfraredDecoder):
                     self._write_bit(0)
                     self._awaiting_space = False
                 else:
-                    self._reset(self._error_threshold)
+                    self.reset(self._error_threshold)
 
         return None
 
@@ -414,7 +411,7 @@ class AuraInfraredDecoder(InfraredDecoder):
         n = len(data)
         if n < 2:
             # Need at least 1 payload byte + 1 CRC byte
-            self._reset(self._error_threshold)
+            self.reset(self._error_threshold)
             return None
 
         payload_len = n - 1
@@ -424,9 +421,9 @@ class AuraInfraredDecoder(InfraredDecoder):
         saved_margin = self._max_error_margin
         if received_crc == calculated_crc:
             payload = data[:payload_len]  # bytearray slice returns bytearray — no extra wrap
-            self._reset(saved_margin)
+            self.reset(saved_margin)
             return payload
 
         # CRC mismatch — reject silently
-        self._reset(self._error_threshold)
+        self.reset(self._error_threshold)
         return None

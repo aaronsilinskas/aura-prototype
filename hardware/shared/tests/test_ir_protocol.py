@@ -308,12 +308,12 @@ def test_error_margin_is_replaced_by_subsequent_packet():
 
 
 # ---------------------------------------------------------------------------
-# reset_decode()
+# reset()
 # ---------------------------------------------------------------------------
 
 
-def test_reset_decode_aborts_in_progress_decode():
-    """Feeding the remainder of a frame after reset_decode() does not complete it."""
+def test_reset_aborts_in_progress_decode():
+    """Feeding the remainder of a frame after reset() does not complete it."""
     encoder = AuraInfraredEncoder()
     decoder = AuraInfraredDecoder()
 
@@ -322,30 +322,30 @@ def test_reset_decode_aborts_in_progress_decode():
     for pulse in pulses[:mid]:
         decoder.decode(pulse)
 
-    decoder.reset_decode()
+    decoder.reset()
 
     result = _feed_pulses(decoder, pulses[mid:])
     assert result is None
 
 
-def test_reset_decode_does_not_zero_telemetry_counters():
+def test_reset_does_not_zero_telemetry_counters():
     decoder = TagInfraredDecoder()
     bad_preamble = list(TAG_PREAMBLE)
     bad_preamble[1] = 4000  # invalid but below the inter-frame gap threshold
     _feed_pulses(decoder, bad_preamble)
     assert decoder.preamble_reject == 1
 
-    decoder.reset_decode()
+    decoder.reset()
 
     assert decoder.preamble_reject == 1
 
 
-def test_reset_decode_after_reset_allows_a_fresh_packet_to_decode_normally():
+def test_reset_after_reset_allows_a_fresh_packet_to_decode_normally():
     encoder = AuraInfraredEncoder()
     decoder = AuraInfraredDecoder()
 
     decoder.decode(encoder.encode(b"\x01")[0])  # partial: just the header mark
-    decoder.reset_decode()
+    decoder.reset()
 
     payload = b"\x42"
     result = _feed_pulses(decoder, encoder.encode(payload))
