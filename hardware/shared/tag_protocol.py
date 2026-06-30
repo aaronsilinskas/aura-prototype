@@ -40,6 +40,12 @@ except ImportError:
 TAG_ERROR_MARGIN: Final = 500  # Maximum allowed timing deviation
 TAG_PREAMBLE: Final = [3000, 6000, 3000]  # Laser tag start sequence
 
+# Inter-frame idle gap: PulseIn reports the silence between frames as a single
+# long space pulse. Longest valid in-frame pulse is the preamble space
+# (TAG_PREAMBLE[1] == 6000 µs); anything beyond that plus the error margin
+# can only be the trailing gap, never a legitimate frame pulse.
+TAG_GAP_THRESHOLD: Final = TAG_PREAMBLE[1] + TAG_ERROR_MARGIN  # 6500 µs
+
 TAG_MARK: Final = 2000  # Duration of mark (ON) pulse for data bits
 TAG_SPACE_ZERO: Final = 1000  # Duration of space (OFF) pulse for bit 0
 TAG_SPACE_ONE: Final = 2000  # Duration of space (OFF) pulse for bit 1
@@ -212,6 +218,11 @@ class TagInfraredDecoder(InfraredDecoder):
           the final data bit (the 17th pulse overall) finalises the packet
           in this same call — no trailing pulse is consumed or awaited.
 
+        A pulse at or beyond ``TAG_GAP_THRESHOLD`` is the inter-frame idle gap
+        (``PulseIn`` reports the silence between frames as one long space),
+        not frame data — checked first, ahead of the state machine, so it
+        always wins over any in-progress decode.
+
         Args:
             pulse: Pulse duration in microseconds.
 
@@ -219,6 +230,10 @@ class TagInfraredDecoder(InfraredDecoder):
             Single-byte ``bytearray`` payload on successful decode; ``None``
             otherwise.
         """
+        if pulse >= TAG_GAP_THRESHOLD:
+            self._reset(self._max_error_margin)
+            return None
+
         state = self._decoder_state
 
         if state < len(TAG_PREAMBLE):

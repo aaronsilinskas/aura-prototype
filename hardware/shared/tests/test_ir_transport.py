@@ -238,7 +238,7 @@ def test_single_receiver_delegates_decoder_counters_from_tag_decoder():
     """The whole path reads off ir_receiver — decoder counters surface here."""
     decoder = TagInfraredDecoder()
     bad_preamble = list(TAG_PREAMBLE)
-    bad_preamble[1] = 9999
+    bad_preamble[1] = 4000  # invalid but below the inter-frame gap threshold
     reader = FakePulseReader(bad_preamble)
     rx = InfraredSingleReceiver(reader, decoder)
 

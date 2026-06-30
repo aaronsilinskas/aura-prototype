@@ -11,6 +11,7 @@ import pytest
 
 from hardware.shared.tag_protocol import (
     TAG_DAMAGE_BITS,
+    TAG_GAP_THRESHOLD,
     TAG_PLAYER_BITS,
     TAG_PREAMBLE,
     TAG_SPACE_ONE,
@@ -217,12 +218,77 @@ def test_decoder_discards_unrecognised_pulses_before_preamble():
     assert result == bytearray([0x33])
 
 
+# ---------------------------------------------------------------------------
+# Decoder: inter-frame gap termination
+# ---------------------------------------------------------------------------
+
+
+def test_gap_pulse_mid_preamble_returns_none_instead_of_decoding_as_data():
+    decoder = TagInfraredDecoder()
+
+    decoder.decode(TAG_PREAMBLE[0])
+    result = decoder.decode(TAG_GAP_THRESHOLD)
+
+    assert result is None
+
+
+def test_gap_pulse_mid_packet_is_not_counted_as_a_mark_or_space_reject():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    partial = list(encoder.encode(bytearray([0x55])))[: len(TAG_PREAMBLE) + 2]
+    for pulse in partial:
+        decoder.decode(pulse)
+    decoder.decode(TAG_GAP_THRESHOLD)
+
+    assert decoder.mark_reject == 0
+    assert decoder.space_reject == 0
+    assert decoder.preamble_reject == 0
+
+
+def test_gap_pulse_does_not_cause_the_following_pulse_to_be_discarded():
+    decoder = TagInfraredDecoder()
+
+    decoder.decode(TAG_PREAMBLE[0])
+    decoder.decode(TAG_GAP_THRESHOLD)
+    encoder = TagInfraredEncoder()
+    pulses = encoder.encode(bytearray([0x2A]))
+    result = None
+    for pulse in pulses:
+        outcome = decoder.decode(pulse)
+        if outcome is not None:
+            result = outcome
+
+    assert result == bytearray([0x2A])
+
+
+def test_corrupt_partial_packet_then_gap_then_clean_packet_yields_clean_payload():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    # Simulates an overlapping/interrupted transmission: preamble matches,
+    # then a corrupted mark pulse collides mid-decode.
+    corrupt = list(encoder.encode(bytearray([0x10])))[: len(TAG_PREAMBLE) + 1]
+    corrupt[-1] = 4000  # invalid mark pulse
+    for pulse in corrupt:
+        decoder.decode(pulse)
+    decoder.decode(TAG_GAP_THRESHOLD)
+    clean = encoder.encode(bytearray([0x55]))
+    result = None
+    for pulse in clean:
+        outcome = decoder.decode(pulse)
+        if outcome is not None:
+            result = outcome
+
+    assert result == bytearray([0x55])
+
+
 def test_invalid_preamble_pulse_resets_decoder():
     encoder = TagInfraredEncoder()
     decoder = TagInfraredDecoder()
 
     pulses = list(encoder.encode(bytearray([0x10])))
-    pulses[1] = 9999  # corrupt the second preamble pulse
+    pulses[1] = 4000  # corrupt the second preamble pulse
 
     result = None
     for pulse in pulses:
@@ -241,7 +307,7 @@ def test_invalid_preamble_pulse_increments_preamble_reject():
     decoder = TagInfraredDecoder()
 
     pulses = list(TAG_PREAMBLE)
-    pulses[1] = 9999  # corrupt the second preamble pulse
+    pulses[1] = 4000  # corrupt the second preamble pulse
 
     for pulse in pulses:
         decoder.decode(pulse)
@@ -258,7 +324,7 @@ def test_invalid_mark_pulse_after_preamble_increments_mark_reject():
     # Stop right after the corrupted pulse — feeding further pulses would be
     # reinterpreted as preamble noise once the decoder resets to idle.
     pulses = list(encoder.encode(bytearray([0x10])))[: len(TAG_PREAMBLE) + 1]
-    pulses[-1] = 9999  # corrupt the first data-bit mark
+    pulses[-1] = 4000  # corrupt the first data-bit mark
 
     for pulse in pulses:
         decoder.decode(pulse)
@@ -275,7 +341,7 @@ def test_invalid_space_pulse_increments_space_reject():
     # Stop right after the corrupted pulse — feeding further pulses would be
     # reinterpreted as preamble noise once the decoder resets to idle.
     pulses = list(encoder.encode(bytearray([0x10])))[: len(TAG_PREAMBLE) + 2]
-    pulses[-1] = 9999  # corrupt the first data-bit space
+    pulses[-1] = 4000  # corrupt the first data-bit space
 
     for pulse in pulses:
         decoder.decode(pulse)
@@ -313,7 +379,7 @@ def test_packets_started_counts_every_preamble_match_not_just_completions():
 
     # First packet: preamble matches but mark is corrupted — never completes.
     aborted = list(encoder.encode(bytearray([0x10])))[: len(TAG_PREAMBLE) + 1]
-    aborted[-1] = 9999
+    aborted[-1] = 4000
     for pulse in aborted:
         decoder.decode(pulse)
 
@@ -334,7 +400,7 @@ def test_reset_telemetry_zeroes_all_decoder_counters():
     for pulse in pulses:
         decoder.decode(pulse)
     bad_preamble = list(TAG_PREAMBLE)
-    bad_preamble[1] = 9999
+    bad_preamble[1] = 4000
     for pulse in bad_preamble:
         decoder.decode(pulse)
 
