@@ -14,11 +14,15 @@ together by reading every rule.
   Transient, per shot fired.
 - ``Global.MAIN`` — ``scene.hit``. Owned by ``TagHitRule``. Transient, per
   hit received.
-- ``Global.BUFF`` — ``basic.progress`` (ammo), ``scene.reload``, and
-  ``scene.reload_complete``. The ammo bar is set up and torn down by
-  ``TagPlayingRule``; ``TagShootingRule`` updates it on fire and drives
-  ``scene.reload``/``scene.reload_complete`` while reloading. Lives for the
-  Playing phase, with transient reload effects layered on top.
+- ``Global.BUFF`` — a single mutually-exclusive "what's currently shown for
+  ammo" slot: ``basic.progress`` (amber ammo bar), ``scene.ammo_empty`` (red
+  pulse), ``scene.reload``, and ``scene.reload_complete`` all swap each other
+  out via ``set_effect``. Set up by ``TagPlayingRule`` on Playing entry;
+  ``TagShootingRule`` updates it on fire and drives
+  ``scene.reload``/``scene.reload_complete`` while reloading. Torn down as a
+  whole by ``TagPlayingRule`` via ``stop_effect(Scope.Global.BUFF)`` on exit —
+  no receipt is stored, since any of the above effects (or none) may occupy
+  the slot at the time.
 - ``ALL`` — ``scene.ready``, owned by ``TagReadyRule``. Lives for the Ready
   phase.
 - ``ALL`` — ``scene.warning_pulse``, owned by ``TagStartingRule``. Lives for
@@ -28,9 +32,13 @@ together by reading every rule.
 
 Notes:
 
-- ``Global.BUFF``'s ``basic.progress`` effect is the ammo bar: reset to full
-  on Playing entry, updated after each shot, reset to full on reload
-  completion, and zeroed if a reload is cancelled.
+- ``Global.BUFF``'s ammo bar reads amber (``basic.progress``, ``0xFFBF00``)
+  whenever it shows a non-empty value: full on Playing entry, updated after
+  each shot that leaves ammo > 0, and full again on reload completion. The
+  moment ammo reaches zero — the last shot or a cancelled reload — it switches
+  to the self-looping ``scene.ammo_empty`` red pulse instead of a static empty
+  ``basic.progress`` bar. Starting a reload replaces the pulse with
+  ``scene.reload``, which takes the scope.
 - ``Global.MAIN``'s ``scene.hit`` and ``DIRECTIONAL``'s ``scene.fire_shot``
   are one-shot felt-feedback effects, not bound to a phase's lifecycle.
 

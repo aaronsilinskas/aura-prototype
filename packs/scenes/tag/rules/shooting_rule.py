@@ -26,6 +26,7 @@ from hardware.shared.tag_protocol import TagData, encode_tag_data
 from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, PHASE_READY, TAG_MACHINE_KEY
 from packs.scenes.tag.rules.helpers.tag_config import TagConfig, tag_config
 from packs.scenes.tag.rules.helpers.tag_state import TagState, tag_state
+from packs.scenes.tag.rules.playing_rule import AMMO_COLOR
 
 _SHOT_DAMAGE: Final = 1
 
@@ -71,14 +72,16 @@ class TagShootingRule(InPhaseRule):
 
     def _complete_reload(self, state: GameState, tag: TagState, config: TagConfig) -> None:
         tag.shot.ammo = config.max_ammo
-        state.effect_controls.set_effect(Scope.Global.BUFF, "basic.progress", {"progress": 1.0})
+        state.effect_controls.set_effect(
+            Scope.Global.BUFF, "basic.progress", {"progress": 1.0, "color": AMMO_COLOR}
+        )
         state.effect_controls.add_effect(Scope.Global.BUFF, "scene.reload_complete", {})
         tag.shot.reload_started_at = None
         tag.shot.reload_receipt.stop()
         tag.shot.reload_receipt = None
 
     def _cancel_reload(self, state: GameState, tag: TagState) -> None:
-        state.effect_controls.set_effect(Scope.Global.BUFF, "basic.progress", {"progress": 0.0})
+        state.effect_controls.set_effect(Scope.Global.BUFF, "scene.ammo_empty", {})
         tag.shot.reload_started_at = None
         tag.shot.reload_receipt.stop()
         tag.shot.reload_receipt = None
@@ -101,9 +104,14 @@ class TagShootingRule(InPhaseRule):
         tag.shot.last_shot_at = state.total
 
         state.effect_controls.set_effect(Scope.DIRECTIONAL, "scene.fire_shot", {})
-        state.effect_controls.set_effect(
-            Scope.Global.BUFF, "basic.progress", {"progress": tag.shot.ammo / config.max_ammo}
-        )
+        if tag.shot.ammo > 0:
+            state.effect_controls.set_effect(
+                Scope.Global.BUFF,
+                "basic.progress",
+                {"progress": tag.shot.ammo / config.max_ammo, "color": AMMO_COLOR},
+            )
+        else:
+            state.effect_controls.set_effect(Scope.Global.BUFF, "scene.ammo_empty", {})
 
 
 RULE = TagShootingRule()

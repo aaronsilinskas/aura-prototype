@@ -59,7 +59,6 @@ class TagState:
     """
 
     __slots__ = (
-        "ammo_receipt",
         "deafen_until",
         "game_over_receipt",
         "hitpoints",
@@ -72,7 +71,6 @@ class TagState:
         self.deafen_until = 0.0
         self.hitpoints_receipt: EffectReceipt | None = None
         self.game_over_receipt: EffectReceipt | None = None
-        self.ammo_receipt: EffectReceipt | None = None
         self.shot = ShotState()
 
 

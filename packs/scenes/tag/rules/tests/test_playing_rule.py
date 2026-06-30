@@ -84,7 +84,7 @@ def test_entering_playing_sets_starting_ammo(spy):
     assert tag_state(state).shot.ammo == 10
 
 
-def test_entering_playing_sets_full_ammo_bar_on_global_buff(spy):
+def test_entering_playing_sets_full_amber_ammo_bar_on_global_buff(spy):
     state, engine, timer = _make_state(spy)
 
     _tick(state, engine, timer, 0.0)
@@ -93,15 +93,7 @@ def test_entering_playing_sets_full_ammo_bar_on_global_buff(spy):
     buff_calls = [c for c in progress_calls if c[0] is Scope.Global.BUFF]
     assert len(buff_calls) == 1
     _, _, options = buff_calls[0]
-    assert options == {"progress": 1.0}
-
-
-def test_entering_playing_stores_ammo_receipt(spy):
-    state, engine, timer = _make_state(spy)
-
-    _tick(state, engine, timer, 0.0)
-
-    assert tag_state(state).ammo_receipt is not None
+    assert options == {"progress": 1.0, "color": 0xFFBF00}
 
 
 def test_entering_playing_resets_reload_state(spy):
@@ -131,13 +123,13 @@ def test_exiting_playing_mid_reload_stops_reload_effect(spy):
 
 def test_exiting_playing_stops_ammo_bar(spy):
     state, engine, timer = _make_state(spy)
-    tag = seed_phase(state, PHASE_PLAYING, entered=True)
-    tag.hitpoints = 0
+    seed_phase(state, PHASE_PLAYING, entered=True)
+    tag_state(state).hitpoints = 0
 
     _tick(state, engine, timer, 0.0)
 
     assert tag_phase(state).phase == PHASE_GAME_OVER
-    assert tag.ammo_receipt is None
+    assert Scope.Global.BUFF in spy.stop_effect_calls
 
 
 def test_non_playing_phase_is_ignored(spy):
