@@ -26,3 +26,9 @@ def test_ready_shots_plays_a_one_shot_clip() -> None:
     assert effect.audio is not None
     assert effect.audio.clips["start"].name == "ready_shots_start"
     assert effect.audio.clips["start"].loop is False
+
+
+def test_ready_shots_clip_stops_the_effect() -> None:
+    effect = _build()
+
+    assert effect.audio.clips["start"].stops_effect is True
