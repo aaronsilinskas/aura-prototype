@@ -71,17 +71,6 @@ def test_button_a_logs_the_send(spy, capsys):
     assert "sending IR packet" in capsys.readouterr().out
 
 
-def test_button_a_sets_deafen_deadline(spy):
-    network_spy = SpyNetworkControls()
-    state, engine, timer = _make_state(
-        spy, network_spy=network_spy, initial_data={"tag_deafen_window": 0.1}
-    )
-
-    _tick(state, engine, timer, 1.0, button_a=True)
-
-    assert tag_state(state).deafen_until == pytest.approx(1.1)
-
-
 def test_button_a_plays_fire_shot_effect_on_directional(spy):
     network_spy = SpyNetworkControls()
     state, engine, timer = _make_state(spy, network_spy=network_spy)

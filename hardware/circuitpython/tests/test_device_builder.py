@@ -450,3 +450,36 @@ def test_build_hardware_ir_config_sets_ir_receiver() -> None:
         hw = build_hardware(config, board_module=board_mock)
 
     assert hw.ir_receiver is not None
+
+
+# ---------------------------------------------------------------------------
+# _setup_ir wires one IrTransmitGate into the receiver and every transmitter
+# ---------------------------------------------------------------------------
+
+
+def test_setup_ir_injects_same_gate_into_receiver_and_every_transmitter() -> None:
+    from hardware.shared.ir_transport import IrTransmitGate
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder.pulseio"))
+
+        from hardware.circuitpython.device_builder import _setup_ir
+
+        transmitters, receiver = _setup_ir(
+            rx_pin=MagicMock(),
+            line_pin=MagicMock(),
+            cone_pin=MagicMock(),
+            aoe_pin=MagicMock(),
+        )
+
+    receiver_gate = receiver._gate
+    assert isinstance(receiver_gate, IrTransmitGate)
+    for transmitter in transmitters.values():
+        assert transmitter._gate is receiver_gate
+
+
+def test_device_hardware_does_not_expose_the_ir_transmit_gate() -> None:
+    from hardware.circuitpython.device_builder import DeviceHardware
+
+    assert "gate" not in DeviceHardware.__slots__
+    assert not hasattr(DeviceHardware, "ir_transmit_gate")

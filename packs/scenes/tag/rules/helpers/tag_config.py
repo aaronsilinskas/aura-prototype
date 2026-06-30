@@ -32,7 +32,6 @@ class TagConfig:
     """
 
     __slots__ = (
-        "deafen_window",
         "expected_player",
         "expected_team",
         "max_ammo",
@@ -46,7 +45,6 @@ class TagConfig:
     def __init__(
         self,
         starting_hitpoints: int,
-        deafen_window: float,
         expected_team: int,
         expected_player: int,
         warning_pulse_count: int,
@@ -56,7 +54,6 @@ class TagConfig:
         reload_duration: float,
     ) -> None:
         self.starting_hitpoints = starting_hitpoints
-        self.deafen_window = deafen_window
         self.expected_team = expected_team
         self.expected_player = expected_player
         self.warning_pulse_count = warning_pulse_count
@@ -70,7 +67,6 @@ class TagConfig:
         """Build a config from the flat seeded ``tag_*`` keys, applying defaults."""
         return cls(
             starting_hitpoints=state.get("tag_starting_hitpoints", 10),
-            deafen_window=state.get("tag_deafen_window", 0.2),
             expected_team=state.get("tag_expected_team", 0),
             expected_player=state.get("tag_expected_player", 1),
             warning_pulse_count=state.get("tag_warning_pulse_count", 5),

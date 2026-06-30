@@ -9,13 +9,15 @@ applies the accuracy-rig gate order:
 1. Phase guard — the ``InPhaseRule`` only fires during the Playing phase.
 2. Identity gate — counts only packets matching the configured expected
    team/player; mismatches are logged and ignored.
-3. Deafen gate — packets received before ``TagState.deafen_until`` (the
-   player's own freshly-fired echo, which carries the expected identity) are
-   logged and suppressed.
-4. Hit — subtracts the decoded ``damage`` from hitpoints, re-issues the
+3. Hit — subtracts the decoded ``damage`` from hitpoints, re-issues the
    shared ``Scope.PERSONAL`` ``basic.progress`` bar (owned by the Playing rule)
    with the new fraction (clamped to ``[0, 1]`` by the layer), and plays the
    shared ``scene.hit`` effect on ``Scope.Global.MAIN``.
+
+A genuine self-echo (the device's own freshly-fired packet looping back into
+its own receiver) never reaches this rule — it is suppressed at the hardware
+boundary by the IR transmit gate (see ``hardware.shared.ir_transport``), not
+here. A matching incoming packet that does reach this rule always damages.
 """
 
 from __future__ import annotations
@@ -45,18 +47,6 @@ class TagHitRule(InPhaseRule):
         if tag_data.team != config.expected_team or tag_data.player != config.expected_player:
             print(
                 "[ignored team="
-                + str(tag_data.team)
-                + " player="
-                + str(tag_data.player)
-                + " margin="
-                + str(event.error_margin)
-                + "]"
-            )
-            return
-
-        if state.total < tag.deafen_until:
-            print(
-                "[deafened team="
                 + str(tag_data.team)
                 + " player="
                 + str(tag_data.player)
