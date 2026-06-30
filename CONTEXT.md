@@ -224,6 +224,14 @@ _Avoid_: conflating with **IR signal strength** (a normalized derivative, not th
 A normalized 0.0–1.0 quality metric derived from a packet's error margin (timing error ≤30% of threshold = full strength). A coarse proximity stand-in, inferred from timing accuracy — not measured power, and conveys no direction.
 _Avoid_: calling it "RSSI" as if measured; using it to derive hit direction
 
+### IR receive-path telemetry
+Monotonic-since-boot counters at each stage of the receive path, surfaced through the existing public API so `run_scene` and CPython tests read them without touching private state: `pulses_seen` and `buffer_full_on_poll` (the reader/`PulseIn` stage — the latter a proxy for buffer-overrun loss, since `pulseio.PulseIn` exposes no overflow signal), `packets_started`/`packets_completed`/`{preamble,mark,space}_reject` (the Tag decoder), and `packets_surfaced` (the receiver). The receiver delegates its decoder's counters the same way it delegates `last_signal_strength`/`last_error_margin`, so the whole path reads off one `ir_receiver` handle. `run_scene` prints a one-line summary once per second, only when a counter changed. A drop between adjacent counters names the lossy stage.
+_Avoid_: aggregating hit/gated counts in the scene (use the hit rule's existing per-event prints — `run_scene` must not reach into scene rules); per-tick allocation in the no-pulse path; auto-resetting counters (zero only via `reset_telemetry()`)
+
+### Inter-frame gap
+The idle period between two IR shots, delivered by `PulseIn` as a single over-long "space" pulse (closed when the next shot's first mark arrives). A pulse longer than the longest valid pulse (preamble space, 6000 µs) plus margin — ≈6500 µs — is treated as a frame terminator: it abandons any stalled partial decode and returns the decoder to idle without being decoded as data and without consuming the following pulse. The gap-detection recovery for overlapping/corrupt frames; needs no clock.
+_Avoid_: trying to "re-arm" or salvage a pulse from an overlapping frame (collisions are undecodable — recognise the gap and start the next frame clean instead)
+
 ### Deploy-watch
 The `scripts/deploy_watch.py` host tool that deploys an example and captures the resulting serial run, for unattended workflows (e.g. hardware profilers capturing measured metrics). Sibling to `deploy.py`: deploy flashes; deploy-watch flashes *and* captures. Always deploys — deploying is what produces the **reload boundary** the capture anchors to.
 _Avoid_: treating it as a read-only serial monitor (it overwrites `code.py` and reboots); a no-deploy "just watch" mode
