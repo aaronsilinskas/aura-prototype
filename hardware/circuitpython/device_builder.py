@@ -40,7 +40,7 @@ from hardware.shared.ir_protocol import (
     InfraredDecoder,
     InfraredEncoder,
 )
-from hardware.shared.ir_transport import InfraredSingleReceiver, InfraredTransmitter
+from hardware.shared.ir_transport import InfraredSingleReceiver, InfraredTransmitter, IrTransmitGate
 
 __all__ = [
     "DeviceHardware",
@@ -172,6 +172,11 @@ def _setup_ir(
 
     encoder and decoder must use the same wire protocol — a mismatched pair
     silently fails to decode received frames with no error raised.
+
+    Constructs one :class:`IrTransmitGate` and injects the same instance into
+    the receiver and every transmitter — the single assembly point for
+    self-echo suppression. The gate itself is not returned; it lives only as
+    a shared reference between the receiver and transmitters it wires here.
     """
     if line_pin is None:
         raise ValueError("line_pin is required — the LINE emitter must always be wired")
@@ -181,9 +186,11 @@ def _setup_ir(
     if decoder is None:
         decoder = AuraInfraredDecoder()
 
+    gate = IrTransmitGate()
+
     pulsein = pulseio.PulseIn(rx_pin, maxlen=256, idle_state=True)
     reader = PulseInReader(pulsein)
-    receiver = InfraredSingleReceiver(reader, decoder)
+    receiver = InfraredSingleReceiver(reader, decoder, gate=gate)
 
     transmitters: dict[str, InfraredTransmitter] = {}
     for emitter, pin in ((LINE, line_pin), (CONE, cone_pin), (AREA_OF_EFFECT, aoe_pin)):
@@ -191,7 +198,7 @@ def _setup_ir(
             continue
         pulseout = pulseio.PulseOut(pin, frequency=38000, duty_cycle=0x8000)
         writer = PulseOutWriter(pulseout)
-        transmitters[emitter] = InfraredTransmitter(writer, encoder)
+        transmitters[emitter] = InfraredTransmitter(writer, encoder, gate=gate)
 
     return transmitters, receiver
 

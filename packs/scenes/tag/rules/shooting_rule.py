@@ -2,10 +2,9 @@
 
 An :class:`InPhaseRule` active during the Playing phase that owns the
 Button-A fire path. On a fresh Button-A press, it encodes the player's own
-``TagData`` identity, sends it on the LINE IR emitter, logs the send, starts
-the self-deafen window so the player's own shot is not immediately registered
-as a hit, and plays the scene-local ``scene.fire_shot`` effect on
-``Scope.DIRECTIONAL`` for felt feedback.
+``TagData`` identity, sends it on the LINE IR emitter, logs the send, and
+plays the scene-local ``scene.fire_shot`` effect on ``Scope.DIRECTIONAL`` for
+felt feedback.
 
 Phase lifecycle (hitpoints, the ``PERSONAL`` hitpoint bar, and the game-over
 transition) remains owned by :class:`TagPlayingRule`.
@@ -98,8 +97,6 @@ class TagShootingRule(InPhaseRule):
         )
         state.network_controls.send_ir(payload, LINE)
         print("sending IR packet")
-
-        tag.deafen_until = state.total + config.deafen_window
 
         tag.shot.ammo -= 1
         tag.shot.last_shot_at = state.total

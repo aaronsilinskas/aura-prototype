@@ -4,8 +4,7 @@ Phase mechanics (the current phase, the first-tick entry flag, and the
 phase-start clock) now live in the scene's :class:`PhaseMachine`, reached via
 :func:`packs.scenes.tag.rules.helpers.phases.tag_phase`. What remains here is
 the flat gameplay bookkeeping that the phase machine deliberately does not
-own: hitpoints, the self-deafen deadline, and the in-flight per-phase
-``EffectReceipt``s.
+own: hitpoints and the in-flight per-phase ``EffectReceipt``s.
 
 Each owning rule clears the fields it owns in its ``on_exit``: the Playing rule
 owns ``hitpoints_receipt`` (shared with the hit reactor) and the Game Over rule
@@ -59,7 +58,6 @@ class TagState:
     """
 
     __slots__ = (
-        "deafen_until",
         "game_over_receipt",
         "hitpoints",
         "hitpoints_receipt",
@@ -68,7 +66,6 @@ class TagState:
 
     def __init__(self) -> None:
         self.hitpoints = 0
-        self.deafen_until = 0.0
         self.hitpoints_receipt: EffectReceipt | None = None
         self.game_over_receipt: EffectReceipt | None = None
         self.shot = ShotState()

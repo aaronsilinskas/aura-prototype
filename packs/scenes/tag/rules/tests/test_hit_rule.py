@@ -1,4 +1,4 @@
-"""Tests for TagHitRule — receive, identity gate, deafen gate, and damage."""
+"""Tests for TagHitRule — receive, identity gate, and damage."""
 
 from __future__ import annotations
 
@@ -110,17 +110,6 @@ def test_identity_mismatch_does_not_change_hitpoints(spy, capsys):
     assert "ignored" in out
     assert "team=1" in out
     assert "player=2" in out
-
-
-def test_within_deafen_window_does_not_change_hitpoints(spy, capsys):
-    state, engine, timer = _make_state(spy)
-    tag_state(state).deafen_until = 1.0
-
-    _receive(state, engine, timer, 0.5, TagData(team=0, player=1, damage=1))
-
-    assert tag_state(state).hitpoints == 10
-    assert spy.set_effect_calls == []
-    assert "deafened" in capsys.readouterr().out
 
 
 def test_counted_hit_logs_tag_data_signal_strength_and_error_margin(spy, capsys):

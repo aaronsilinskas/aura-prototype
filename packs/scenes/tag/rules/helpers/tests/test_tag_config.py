@@ -41,7 +41,6 @@ def test_from_state_applies_defaults_when_unseeded():
     config = TagConfig.from_state(state)
 
     assert config.starting_hitpoints == 10
-    assert config.deafen_window == pytest.approx(0.2)
     assert config.expected_team == 0
     assert config.expected_player == 1
     assert config.warning_pulse_count == 5
@@ -55,7 +54,6 @@ def test_from_state_reads_seeded_overrides():
     state = _make_state(
         initial_data={
             "tag_starting_hitpoints": 20,
-            "tag_deafen_window": 0.25,
             "tag_expected_team": 2,
             "tag_expected_player": 3,
             "tag_warning_pulse_count": 4,
@@ -69,7 +67,6 @@ def test_from_state_reads_seeded_overrides():
     config = TagConfig.from_state(state)
 
     assert config.starting_hitpoints == 20
-    assert config.deafen_window == pytest.approx(0.25)
     assert config.expected_team == 2
     assert config.expected_player == 3
     assert config.warning_pulse_count == 4
@@ -87,7 +84,6 @@ def test_from_state_reads_seeded_overrides():
 def test_warning_duration_is_count_times_pulse_duration():
     config = TagConfig(
         starting_hitpoints=10,
-        deafen_window=0.1,
         expected_team=0,
         expected_player=1,
         warning_pulse_count=5,
