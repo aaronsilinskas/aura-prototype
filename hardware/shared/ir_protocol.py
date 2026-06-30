@@ -127,11 +127,20 @@ class InfraredDecoder:
             Defaults to 0, as above.
     """
 
-    packets_started: int = 0
-    packets_completed: int = 0
-    preamble_reject: int = 0
-    mark_reject: int = 0
-    space_reject: int = 0
+    __slots__ = (
+        "_decoder_state",
+        "_error_threshold",
+        "_last_error_margin",
+        "_max_error_margin",
+        "_received_bit_index",
+        "_received_byte",
+        "_received_data",
+        "mark_reject",
+        "packets_completed",
+        "packets_started",
+        "preamble_reject",
+        "space_reject",
+    )
 
     def __init__(self, error_threshold: int) -> None:
         self._error_threshold = error_threshold
@@ -148,6 +157,13 @@ class InfraredDecoder:
         self._max_error_margin: int = 0
         # Timing-error result from the last completed packet (None = never decoded)
         self._last_error_margin: int | None = None
+
+        # Monotonic-since-boot telemetry counters
+        self.packets_started: int = 0
+        self.packets_completed: int = 0
+        self.preamble_reject: int = 0
+        self.mark_reject: int = 0
+        self.space_reject: int = 0
 
     # ------------------------------------------------------------------
     # Public API
@@ -213,13 +229,18 @@ class InfraredDecoder:
         self._max_error_margin = 0
         self._last_error_margin = error_margin
 
-    def _check_pulse(self, received: int, expected: int) -> bool:
+    def _check_pulse(
+        self, received: int, expected: int, error_threshold: int | None = None
+    ) -> bool:
         """Return ``True`` if *received* is within the error threshold of *expected*.
 
-        Tracks the worst-case deviation in ``_max_error_margin``.
+        Tracks the worst-case deviation in ``_max_error_margin``. Defaults to
+        ``self._error_threshold``; pass *error_threshold* to override it.
         """
+        if error_threshold is None:
+            error_threshold = self._error_threshold
         margin = abs(received - expected)
-        if margin < self._error_threshold:
+        if margin < error_threshold:
             if margin > self._max_error_margin:
                 self._max_error_margin = margin
             return True
@@ -317,6 +338,8 @@ class AuraInfraredDecoder(InfraredDecoder):
     The decoder silently discards unrecognised pulses while idle (searching
     for the header mark) and resets on any protocol violation during reception.
     """
+
+    __slots__ = ("_awaiting_space",)
 
     def __init__(self) -> None:
         super().__init__(_IR_ERROR_MARGIN)

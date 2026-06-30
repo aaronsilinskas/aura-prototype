@@ -38,6 +38,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 TAG_ERROR_MARGIN: Final = 500  # Maximum allowed timing deviation
+TAG_PREAMBLE_ERROR_MARGIN: Final = 1000  # Maximum timing deviation for preamble
 TAG_PREAMBLE: Final = [3000, 6000, 3000]  # Laser tag start sequence
 
 # Inter-frame idle gap: PulseIn reports the silence between frames as a single
@@ -194,17 +195,10 @@ class TagInfraredDecoder(InfraredDecoder):
     complete packet has been received, or ``None`` otherwise.
     """
 
+    __slots__ = ()
+
     def __init__(self) -> None:
         super().__init__(TAG_ERROR_MARGIN)
-
-        # Monotonic-since-boot telemetry counters. Instance attributes shadow
-        # the zero defaults on InfraredDecoder; reset_telemetry() (inherited
-        # from the base) zeroes them by name.
-        self.packets_started: int = 0
-        self.packets_completed: int = 0
-        self.preamble_reject: int = 0
-        self.mark_reject: int = 0
-        self.space_reject: int = 0
 
     def decode(self, pulse: int) -> bytearray | None:
         """Process one pulse and return the decoded byte when a packet completes.
@@ -237,7 +231,7 @@ class TagInfraredDecoder(InfraredDecoder):
         state = self._decoder_state
 
         if state < len(TAG_PREAMBLE):
-            if self._check_pulse(pulse, TAG_PREAMBLE[state]):
+            if self._check_pulse(pulse, TAG_PREAMBLE[state], TAG_PREAMBLE_ERROR_MARGIN):
                 self._decoder_state += 1
                 if self._decoder_state == len(TAG_PREAMBLE):
                     self.packets_started += 1

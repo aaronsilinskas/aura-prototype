@@ -11,9 +11,11 @@ import pytest
 
 from hardware.shared.tag_protocol import (
     TAG_DAMAGE_BITS,
+    TAG_ERROR_MARGIN,
     TAG_GAP_THRESHOLD,
     TAG_PLAYER_BITS,
     TAG_PREAMBLE,
+    TAG_PREAMBLE_ERROR_MARGIN,
     TAG_SPACE_ONE,
     TAG_SPACE_ZERO,
     TAG_TEAM_BITS,
@@ -216,6 +218,37 @@ def test_decoder_discards_unrecognised_pulses_before_preamble():
         if outcome is not None:
             result = outcome
     assert result == bytearray([0x33])
+
+
+# ---------------------------------------------------------------------------
+# Decoder: per-stage error margin (preamble looser than data bits)
+# ---------------------------------------------------------------------------
+
+_BETWEEN_MARGINS = (TAG_ERROR_MARGIN + TAG_PREAMBLE_ERROR_MARGIN) // 2
+
+
+def test_preamble_pulse_within_widened_margin_still_decodes():
+    decoder = TagInfraredDecoder()
+
+    decoder.decode(TAG_PREAMBLE[0] + _BETWEEN_MARGINS)
+    decoder.decode(TAG_PREAMBLE[1])
+    decoder.decode(TAG_PREAMBLE[2])
+
+    assert decoder.packets_started == 1
+    assert decoder.preamble_reject == 0
+
+
+def test_data_bit_pulse_outside_narrow_margin_still_rejects_despite_wider_preamble_margin():
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    pulses = list(encoder.encode(bytearray([0x10])))[: len(TAG_PREAMBLE) + 1]
+    pulses[-1] += _BETWEEN_MARGINS
+
+    for pulse in pulses:
+        decoder.decode(pulse)
+
+    assert decoder.mark_reject == 1
 
 
 # ---------------------------------------------------------------------------
