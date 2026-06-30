@@ -69,7 +69,7 @@ def test_matching_hit_reduces_hitpoints_and_reissues_progress_bar(spy):
     scope, _, options = progress_calls[0]
     assert scope is Scope.PERSONAL
     expected_fraction = (10 - 1) / 10
-    assert options == {"progress": pytest.approx(expected_fraction)}
+    assert options == {"progress": pytest.approx(expected_fraction), "color": 0x00FF00}
 
 
 def test_matching_hit_stores_hitpoints_receipt(spy):
