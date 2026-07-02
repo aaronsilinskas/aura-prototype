@@ -5,7 +5,7 @@
 - **Domain docs** — `docs/agents/domain.md` (module layout, key types, vocabulary, constraints). Extended design in Obsidian vault at `~/dev/aura/aura-docs/`.
 - **deploy-watch** — Deploy a CircuitPython example to the device and capture serial output. See `docs/agents/deploy-watch.md` before using `scripts/deploy_watch.py`.
 
-**When a workflow step names a skill, load its `SKILL.md` with `read_file` and follow it precisely before proceeding.**
+**When a workflow step names a skill, invoke it with the Skill tool and follow it precisely before proceeding.**
 
 ### PRD workflow
 
@@ -23,8 +23,4 @@
 
 ### Issue implementation workflow
 
-Follow: https://raw.githubusercontent.com/aaronsilinskas/ai-skills/main/as-work-on-issue/SKILL.md
-
-When assigned an issue via GitHub (not VS Code):
-- Skip Step 0 — the assigned issue number is already known
-- Skip the `runSubagent` call in Step 0.5 — execute the prompt inside it directly as your own instructions
+Invoke the `as-work-on-issue` skill via the Skill tool and follow it.
