@@ -6,8 +6,8 @@ Labels used on this repo's issue backlog. Most are **triage roles** the skills s
 
 The skills speak in terms of five canonical triage roles. This section maps those roles to the actual label strings used in this repo's backlog.
 
-| Label in mattpocock/skills | Label in our backlog | Meaning                                  |
-| -------------------------- | -------------------- | ---------------------------------------- |
+| Canonical role    | Label in our backlog | Meaning                                  |
+| ----------------- | -------------------- | ---------------------------------------- |
 | `needs-triage`             | `needs-triage`       | Maintainer needs to evaluate this issue  |
 | `needs-info`               | `needs-info`         | Waiting on reporter for more information |
 | `ready-for-agent`          | `ready-for-agent`    | Fully specified, ready for an AFK agent  |
