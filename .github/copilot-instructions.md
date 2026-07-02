@@ -1,14 +1,14 @@
 ## Issue implementation
 
-When assigned a GitHub issue — whether via "assign to agent" on GitHub or in VS Code — follow the `as-work-on-issue` skill:
+When assigned a GitHub issue — whether via "assign to agent" on GitHub or in VS Code — follow the `work-on-issue` skill:
 
 ```
-https://raw.githubusercontent.com/aaronsilinskas/ai-skills/main/as-work-on-issue/SKILL.md
+https://raw.githubusercontent.com/aaronsilinskas/ai-skills/main/skills/engineering/work-on-issue/SKILL.md
 ```
 
 Fetch and follow that skill precisely.
 
 Additional notes:
-- The `as-` skills live at `https://github.com/aaronsilinskas/ai-skills/tree/main`
-- Skip Step 0 — the assigned issue number is already known
-- Skip the `runSubagent` call in Step 0.5 — execute the prompt inside it directly as your own instructions
+- The skills live at `https://github.com/aaronsilinskas/ai-skills/tree/main/skills/engineering`
+- The assigned issue number is already known — skip the Step 1 lookup (`dispatch.sh`) and start from the known number.
+- You don't have a subagent-dispatch tool: for Step 3 (Implement) and Step 4 (Review), execute the prompt in that step directly as your own instructions instead of dispatching to a fresh subagent.
