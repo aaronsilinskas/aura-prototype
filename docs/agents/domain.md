@@ -122,13 +122,9 @@ scripts/          Deploy and maintenance scripts (CPython-only)
 
 ## Coding constraints (CircuitPython and MicroPython compatibility)
 
-All code in `effects/`, `engine/`, `magic/`, and `rules/` must run on CPython, CircuitPython 10.x, and MicroPython. Constraints:
+All code in `effects/`, `engine/`, `magic/`, and `rules/` must run on CPython, CircuitPython 10.x, and MicroPython. The general CircuitPython/MicroPython rules (no `dataclasses`, `typing.Protocol` unavailable, guarded `typing` imports, no per-frame hot-path allocation) live in the **code-quality skill's embedded-python guidance** (the `embedded-python.md` reference file) — follow it. If that skill isn't installed locally, look it up and copy that file's rules before working on device code. Project-specific deltas on top:
 
-- **No `dataclasses`** — use `__init__` + `__slots__` instead
-- **`list[X]` / `dict[K, V]` subscripts are fine** at runtime in CP 10.x
-- **`typing.Protocol` is NOT available** — use plain base classes with `raise NotImplementedError`; subclass explicitly for type-checker compatibility
-- **Wrap other `typing` imports** in `try/except ImportError` (coverage varies)
-- **No per-frame allocation in hot paths** — animation loops must not allocate lists, dicts, or objects on every frame; pre-allocate in `__init__` or use stack-local vars
+- **`typing.Protocol` substitute** — use plain base classes with `raise NotImplementedError`; subclass explicitly for type-checker compatibility
 - **`PaletteLUT256` is pre-computed** — never construct inside a render loop
 - **Line limit: 100 characters** — enforced by `ruff` pre-commit hook (also `ruff format`)
 
