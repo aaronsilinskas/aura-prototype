@@ -10,7 +10,7 @@
 ### PRD workflow
 
 1. `to-prd` — create PRD as a local document only (no GH issue yet).
-2. `grill-with-docs` — challenge the PRD against `CONTEXT.md`; update the local PRD and `CONTEXT.md` inline as decisions crystallise. **Do NOT create ADRs** — the design is still evolving and ADRs are premature.
+2. `grill-with-docs` — challenge the PRD against `CONTEXT.md`; update the local PRD and `CONTEXT.md` inline as decisions crystallise.
 3. Keep looping on grilling until no open questions remain.
 4. Move the PRD to a GH issue, delete the local file.
 5. `to-issues` — split PRD into independently-grabbable implementation issues.
