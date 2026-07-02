@@ -65,6 +65,8 @@ scripts/          Deploy and maintenance scripts (CPython-only)
 
 ## Key types and relationships
 
+A map of where the major types live. Authoritative term meanings are in [`domain-language.md`](domain-language.md), not restated here.
+
 | Type | Lives in | Role |
 |------|----------|------|
 | `EffectConfig` | `effects/effect.py` | Resolution, options, and listeners for one render pass |
@@ -104,19 +106,7 @@ scripts/          Deploy and maintenance scripts (CPython-only)
 
 ## Domain vocabulary
 
-| Term | Meaning |
-|------|---------|
-| **Level** | Effect intensity, integer 1–10. 1 = weakest, 10 = strongest. Passed via `options={"level": N}` when calling `set_effect` / `add_effect`. |
-| **Resolution** | Drives sample density and buffer size, it is not the pixel count of a strip. |
-| **Element** | One of ten named magical elements (Fire, Water, Earth, Ice, Air, Lightning, Light, Dark, Time, Gravity). Each has a buff and a debuff spell. |
-| **Effect pack** | An `EffectBuilder` that owns a named set of effects. `ElementBuilder` (from `registry.py`) is one pack; games compose multiple packs at startup. |
-| **Scope** | Routing key that maps effects to outputs. `PERSONAL` targets the caster's device; `ALL` targets every registered output. |
-| **Receipt** | An `EffectReceipt` returned by `set_effect` / `add_effect`; used to stop a specific running effect instance. |
-| **Aura** | A player or object's current magic state: magic pool + active spell list. |
-| **Spell power** | Amount of magic at cast time. 1 unit ≈ ambient magic gathered over 1 second in 1 m³. |
-| **DynamicValue** | `float | Callable[[], float]` — a value that may be constant or computed each sample. |
-| **EffectShapeFunc** | `Callable[[float], float]` — maps a normalized position [0,1] to an output value. |
-| **Fill-pointer queue** | `GameState`'s event buffer: a pre-allocated `list` plus an integer length (`_len`). `queue_event` writes into the next slot (no `append` in the normal case); dispatch reads by index via `event_count`/`event_at`; `reset_queue`/`clear_queue` null filled slots in place. Overflows by growing the list and keeping the larger capacity. Avoids per-frame list reallocation on-device. |
+Code-facing terms are defined in [`domain-language.md`](domain-language.md) — the single source for the project's vocabulary and the words to avoid. Magic-system vocabulary (elements, auras, spells) lives in the aura-docs vault (`Overview/Magic System.md`).
 
 ---
 

@@ -29,6 +29,16 @@ _Avoid_: using raw DRV2605L waveform IDs in a `VibrationConfig` sequence (use th
 ### EffectConfig
 Runtime configuration passed to effect builders at construction. Fields: `resolution` (sample detail, minimum 1), `options` (effect-specific parameters), `listeners` (callbacks invoked by name on significant rendering events).
 
+### Effect pack
+An `EffectBuilder` that owns a named set of effects. `ElementBuilder` is one pack; games compose multiple packs at startup.
+_Avoid_: calling a scene-local effect set a "pack" (a pack is shared, versioned, and cross-scene)
+
+### DynamicValue
+`float | Callable[[], float]` — a value that may be constant or computed fresh each sample.
+
+### EffectShapeFunc
+`Callable[[float], float]` — maps a normalized position in `[0, 1]` to an output value.
+
 ### Layer
 A composable simulation unit used by `EffectPixels` subclasses. Defines `update(elapsed)` and `sample(position, pixel_count) -> float`. Compositors combine layers into pixel output.
 _Avoid_: importing layer helpers from anywhere other than `effects.layers`
