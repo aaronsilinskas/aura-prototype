@@ -19,7 +19,7 @@ magic/       Spell and aura game logic (elements, buffs/debuffs, cast types)
 scripts/     Deploy and maintenance scripts (CPython-only)
 ```
 
-See [`docs/agents/domain.md`](docs/agents/domain.md) for key types, vocabulary, and constraints.
+See [`docs/domain.md`](docs/domain.md) for key types and constraints, and [`docs/domain-language.md`](docs/domain-language.md) for the domain glossary.
 
 ---
 

@@ -2,7 +2,7 @@
 
 - **Backlog** — GH issues in `aaronsilinskas/aura-prototype` via `gh` CLI. See `docs/agents/backlog.md`.
 - **Triage labels** — See `docs/agents/triage-labels.md`.
-- **Domain docs** — `docs/agents/domain.md` (module layout, key types, vocabulary, constraints). Extended design in Obsidian vault at `~/dev/aura/aura-docs/`.
+- **Domain docs** — `docs/domain.md` (the map: module layout, key types, constraints) and `docs/domain-language.md` (the glossary: canonical terms + what to avoid). Extended design in Obsidian vault at `~/dev/aura/aura-docs/`.
 - **deploy-watch** — Deploy a CircuitPython example to the device and capture serial output. See `docs/agents/deploy-watch.md` before using `scripts/deploy_watch.py`.
 
 **When a workflow step names a skill, invoke it with the Skill tool and follow it precisely before proceeding.**
@@ -10,7 +10,7 @@
 ### PRD workflow
 
 1. `to-prd` — create PRD as a local document only (no GH issue yet).
-2. `grill-with-docs` — challenge the PRD against `CONTEXT.md`; update the local PRD and `CONTEXT.md` inline as decisions crystallise.
+2. `grill-with-docs` — challenge the PRD against the domain docs; update the local PRD and the domain docs (`docs/domain.md` map + `docs/domain-language.md` glossary) inline as decisions crystallise.
 3. Keep looping on grilling until no open questions remain.
 4. Move the PRD to a GH issue, delete the local file.
 5. `to-issues` — split PRD into independently-grabbable implementation issues.
