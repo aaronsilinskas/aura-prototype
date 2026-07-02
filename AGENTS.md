@@ -1,7 +1,7 @@
 ## Agent skills
 
 - **Backlog** — GH issues in `aaronsilinskas/aura-prototype` via `gh` CLI. See `docs/agents/backlog.md`.
-- **Triage labels** — See `docs/agents/triage-labels.md`.
+- **Issue labels** — See `docs/agents/issue-labels.md`.
 - **Domain docs** — `docs/domain.md` (the map: module layout, key types, constraints) and `docs/domain-language.md` (the glossary: canonical terms + what to avoid). Extended design in Obsidian vault at `~/dev/aura/aura-docs/`.
 - **deploy-watch** — Deploy a CircuitPython example to the device and capture serial output. See `docs/agents/deploy-watch.md` before using `scripts/deploy_watch.py`.
 
