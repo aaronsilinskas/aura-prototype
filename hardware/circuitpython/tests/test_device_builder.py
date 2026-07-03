@@ -1,9 +1,9 @@
 """Tests for device_builder.build_hardware — matrix, NeoPixel, audio, motor, and IR branches.
 
 Verifies that build_hardware produces the correct EffectOutput for each
-pixels.type (matrix and neopixel) and that audio, DRV2605 motor, and IR
-paths wire up correctly.  All hardware modules (board, busio, pulseio,
-digitalio) are patched so this suite runs under CPython.
+pixels.type (matrix and neopixel) and that audio, DRV2605 motor, IR, and
+I2C bus injection paths wire up correctly.  All hardware modules (board,
+busio, pulseio, digitalio) are patched so this suite runs under CPython.
 """
 
 from __future__ import annotations
@@ -493,10 +493,7 @@ def test_build_hardware_does_not_construct_its_own_bus_when_i2c_supplied() -> No
     supplied_i2c = MagicMock(name="caller_i2c")
 
     with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        mock_setup_i2c = stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_i2c")
-        )
+        mock_setup_i2c = _enter_hw_patches(stack)
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_matrix_is31fl3741",
@@ -514,11 +511,10 @@ def test_build_hardware_does_not_construct_its_own_bus_when_i2c_supplied() -> No
 def test_build_hardware_constructs_its_own_bus_when_i2c_omitted() -> None:
     config = _matrix_config()
     board_mock = _mock_board(D9=MagicMock(), D10=MagicMock())
-    own_i2c = MagicMock(name="own_i2c")
 
     with ExitStack() as stack:
-        mock_setup_i2c = _enter_hw_patches(stack, own_i2c=own_i2c)
-        mock_setup_matrix = stack.enter_context(
+        mock_setup_i2c = _enter_hw_patches(stack)
+        stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_matrix_is31fl3741",
                 return_value=MagicMock(),
@@ -530,6 +526,26 @@ def test_build_hardware_constructs_its_own_bus_when_i2c_omitted() -> None:
         build_hardware(config, board_module=board_mock)
 
     mock_setup_i2c.assert_called_once()
+
+
+def test_build_hardware_uses_its_own_constructed_bus_for_matrix_when_i2c_omitted() -> None:
+    config = _matrix_config()
+    board_mock = _mock_board(D9=MagicMock(), D10=MagicMock())
+    own_i2c = MagicMock(name="own_i2c")
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack, own_i2c=own_i2c)
+        mock_setup_matrix = stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_matrix_is31fl3741",
+                return_value=MagicMock(),
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock)
+
     mock_setup_matrix.assert_called_once_with(own_i2c)
 
 
