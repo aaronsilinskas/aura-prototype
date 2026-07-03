@@ -26,6 +26,15 @@ The matrix flush (~60 ms) dominates the per-frame cost, so the prop cannot hold
 any IS31FL3741 scope). The profiler also reports its **measured** FPS so the
 chosen budget can be sanity-checked against reality.
 
+Hardware bring-up
+------------------
+The whole hardware bundle -- matrix, buttons, accelerometer/motor (probed by
+physical presence), audio, and IR -- is brought up through a single
+`build_hardware` call, from a `DeviceConfig` built in-file (see `_TAG_HARNESS`
+below) rather than read from an `aura-device.json` on the CIRCUITPY drive. This
+keeps the profiler self-contained: no separate config file to keep in sync with
+the wiring described here.
+
 Hardware
 --------
 - Adafruit RP2040 PropMaker Feather
@@ -77,11 +86,9 @@ import gc
 import time
 
 import board
-import hardware.circuitpython.propmaker as propmaker
 
 from effects.performance import PerformanceTracker
-from engine.audio import AudioRegistry
-from engine.effects.manager import EffectManager
+from engine.effects.manager import EffectManager, EffectOutput
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.network import HardwareNetworkControls, NetworkEvents
@@ -89,12 +96,9 @@ from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
 from hardware.circuitpython.audio_output import AudioEffectOutput
-from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
-from hardware.circuitpython.is31fl3741_output import (
-    IS31FL3741_COLS,
-    IS31FL3741_SCOPE_ROWS,
-    IS31FL3741EffectOutput,
-)
+from hardware.circuitpython.device_builder import DeviceHardware, build_hardware
+from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
+from hardware.shared.device_config import parse_device_config
 from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,
@@ -111,12 +115,12 @@ except ImportError:
 # Configuration -- adjust to match your wiring
 # ---------------------------------------------------------------------------
 
-BUTTON_A_PIN: Final = board.D9
-BUTTON_B_PIN: Final = board.D10
+BUTTON_A_PIN: Final = "D9"
+BUTTON_B_PIN: Final = "D10"
 
 # IR transceiver pins -- update these to match your board layout.
-IR_RX_PIN: Final = board.D11
-IR_LINE_PIN: Final = board.D12
+IR_RX_PIN: Final = "D11"
+IR_LINE_PIN: Final = "D12"
 
 # Frame budget basis. A prop with an IS31FL3741 scope cannot hold 24 FPS (the
 # ~60 ms matrix flush alone exceeds the 41.7 ms budget), so reservation/headroom
@@ -144,6 +148,58 @@ WARMUP_SECONDS: Final = 10.0
 
 LOG_INTERVAL_SECONDS: Final = 5.0
 
+# Self-contained aura-device.json-shaped mapping for the reference tag prop --
+# built in-file (rather than read from the CIRCUITPY drive) so the profiler
+# carries its own wiring and never drifts from an on-device config file. Mirrors
+# `examples/hardware/tag_demo.py`'s wiring: one IS31FL3741 matrix banded across
+# all scopes, two buttons, an IR LINE emitter + receiver, and 4 audio voices
+# covering the 7 clips the `tag` scene's rules reference.
+_TAG_HARNESS: Final = {
+    "pixels": [
+        {
+            "type": "matrix",
+            "cols": 13,
+            "scope_rows": {
+                "global.buff": [0, 1],
+                "global.debuff": [1, 2],
+                "global.main": [2, 5],
+                "personal": [5, 7],
+                "directional": [7, 8],
+                "ambient": [8, 9],
+            },
+        }
+    ],
+    "buttons": [BUTTON_A_PIN, BUTTON_B_PIN],
+    "ir": {"rx": IR_RX_PIN, "line": IR_LINE_PIN},
+    "audio": {
+        "voices": 4,
+        "max_volume": 0.1,
+        "clips": {
+            "warning_pulse_peak": "sounds/blip.wav",
+            "go_start": "sounds/blip.wav",
+            "game_over_sting_start": "sounds/game_over.wav",
+            "fire_shot_start": "sounds/blip.wav",
+            "scene.hit_start": "sounds/blip.wav",
+            "reload": "sounds/blip.wav",
+            "reload_complete": "sounds/blip.wav",
+        },
+    },
+}
+
+
+def _require_output(hardware: DeviceHardware, output_type: type[EffectOutput]) -> None:
+    """Raise loudly if no *output_type* instance is present in the built bundle.
+
+    `build_hardware` is config-gated for pixels/audio/IR, so a harness that
+    declares all three should always yield them -- a missing one signals the
+    harness and the bundle have drifted apart, which would otherwise show up
+    only as a silently incomplete measurement.
+    """
+    if not any(isinstance(output, output_type) for output in hardware.outputs):
+        raise RuntimeError(
+            f"expected a {output_type.__name__} in the built hardware bundle, found none"
+        )
+
 
 def _build_prop() -> tuple[
     SceneManager, EffectManager, Timer, object, object, object, HardwareNetworkControls, int
@@ -157,21 +213,21 @@ def _build_prop() -> tuple[
     gc.collect()
     free_before = gc.mem_free()
 
-    propmaker.setup_external_power()
-    i2c = propmaker.setup_i2c()
-    matrix = propmaker.setup_matrix_is31fl3741(i2c)
-    buttons = propmaker.setup_buttons(BUTTON_A_PIN, BUTTON_B_PIN)
-    accelerometer = propmaker.setup_accelerometer(i2c)
-    motor = propmaker.setup_drv2605(i2c)
-    ir_transmitters, ir_receiver = propmaker.setup_ir(
-        IR_RX_PIN,
-        IR_LINE_PIN,
-        encoder=TagInfraredEncoder(),
-        decoder=TagInfraredDecoder(),
+    config = parse_device_config(_TAG_HARNESS)
+    hardware = build_hardware(
+        config,
+        board,
+        ir_encoder=TagInfraredEncoder(),
+        ir_decoder=TagInfraredDecoder(),
     )
-    # Stage snapshot: hardware drivers (matrix/buttons/accel/motor/IR) on the heap.
+    _require_output(hardware, IS31FL3741EffectOutput)
+    _require_output(hardware, AudioEffectOutput)
+    if hardware.ir_receiver is None:
+        raise RuntimeError("expected an IR receiver in the built hardware bundle, found none")
+    # Stage snapshot: the whole hardware bundle (matrix, buttons, accelerometer,
+    # motor, audio, IR) brought up through the single build_hardware call.
     gc.collect()
-    free_after_peripherals = gc.mem_free()
+    free_after_hardware = gc.mem_free()
 
     effect_registry = PackRegistry(item_attr="BUILD")
     effect_registry.scan_dir("packs/effects", "packs.effects")
@@ -181,46 +237,23 @@ def _build_prop() -> tuple[
     gc.collect()
     free_after_registries = gc.mem_free()
 
-    audio_registry = AudioRegistry()
-    audio_registry.register("warning_pulse_peak", "sounds/blip.wav")
-    audio_registry.register("go_start", "sounds/blip.wav")
-    audio_registry.register("game_over_sting_start", "sounds/game_over.wav")
-    audio_registry.register("fire_shot_start", "sounds/blip.wav")
-    audio_registry.register("scene.hit_start", "sounds/blip.wav")
-    audio_registry.register("reload", "sounds/blip.wav")
-    audio_registry.register("reload_complete", "sounds/blip.wav")
-
-    audio_output = AudioEffectOutput(
-        audio_registry,
-        max_volume=0.1,
-        num_voices=4,
-        i2s_bit_clock=board.I2S_BIT_CLOCK,
-        i2s_word_select=board.I2S_WORD_SELECT,
-        i2s_data=board.I2S_DATA,
-    )
-    outputs = [
-        IS31FL3741EffectOutput(matrix, cols=IS31FL3741_COLS, scope_rows=IS31FL3741_SCOPE_ROWS),
-        audio_output,
-    ]
-    if motor is not None:
-        outputs.append(Drv2605EffectOutput(motor))
-
-    effect_manager = EffectManager(registry=effect_registry, outputs=outputs)
-    # Stage snapshot: audio (registry + output) + EffectOutput wrappers + EffectManager.
+    effect_manager = EffectManager(registry=effect_registry, outputs=hardware.outputs)
+    # Stage snapshot: EffectManager wrapping the bundle's outputs -- the one piece
+    # of construction downstream of build_hardware that the profiler still owns
+    # (the audio/matrix/motor hardware itself is now inside the bundle above).
     gc.collect()
-    free_after_audio = gc.mem_free()
+    free_after_effect_manager = gc.mem_free()
 
     # Own the Timer explicitly so the render phase can advance it without reaching
     # into GameEngine's internals (the engine advances this same instance in
     # update()). Passing it in keeps the profiler on the public API.
     timer = Timer()
-    network_controls = HardwareNetworkControls(ir_transmitters)
     engine = GameEngine(
         effect_controls=effect_manager,
         timer=timer,
-        network_controls=network_controls,
+        network_controls=hardware.network_controls,
     )
-    # Stage snapshot: Timer + GameEngine + HardwareNetworkControls.
+    # Stage snapshot: Timer + GameEngine.
     gc.collect()
     free_after_engine = gc.mem_free()
 
@@ -236,23 +269,26 @@ def _build_prop() -> tuple[
     footprint_bytes = free_before - free_after_scene
 
     # Decompose the total footprint into construction stages so the ~32 KB can be
-    # attributed (hardware components vs. the scanned pack registries vs. the loaded
-    # scene), and cross-checked against the per-component profiler figures (#448).
+    # attributed (the hardware bundle vs. the scanned pack registries vs. the
+    # EffectManager wrap vs. the engine vs. the loaded scene), and cross-checked
+    # against the per-component profiler figures (#448). The hardware bundle is
+    # now one delta -- build_hardware's single call is the coarsest boundary the
+    # profiler can measure across.
     print(
-        f"__PROP_BREAKDOWN peripherals={free_before - free_after_peripherals}, "
-        + f"registries={free_after_peripherals - free_after_registries}, "
-        + f"audio_outputs={free_after_registries - free_after_audio}, "
-        + f"engine={free_after_audio - free_after_engine}, "
+        f"__PROP_BREAKDOWN hardware={free_before - free_after_hardware}, "
+        + f"registries={free_after_hardware - free_after_registries}, "
+        + f"effect_manager={free_after_registries - free_after_effect_manager}, "
+        + f"engine={free_after_effect_manager - free_after_engine}, "
         + f"scene={free_after_engine - free_after_scene}"
     )
     return (
         manager,
         effect_manager,
         timer,
-        buttons,
-        accelerometer,
-        ir_receiver,
-        network_controls,
+        hardware.buttons,
+        hardware.accelerometer,
+        hardware.ir_receiver,
+        hardware.network_controls,
         footprint_bytes,
     )
 

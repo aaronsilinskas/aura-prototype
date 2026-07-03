@@ -164,12 +164,14 @@ This requires an **external IR packet source**; on a bare board no packets arriv
 
 ## `tag_prop_profiler.py` — whole-prop reference measurement
 
-Feeds the **Reference `tag` prop** table under *Whole-prop measurements*. Stands up the
-whole assembled reference `tag` prop on real hardware (IS31FL3741 matrix, I2S audio,
-DRV2605L vibration, IR LINE emitter + one IR receiver, two buttons) and emits a row with
-CPU reservation %, total heap footprint, headroom %, and peak frame time, plus a
-`__PROP_BREAKDOWN` of staged `gc.mem_free()` deltas (peripherals / registries /
-audio_outputs / engine / scene / total) for diagnostics. The matrix flush (~60 ms)
+Feeds the **Reference `tag` prop** table under *Whole-prop measurements*. Builds an
+in-file `TAG_HARNESS` device-config mapping (matrix + two buttons + IR + audio with 4
+voices and 7 clips) and stands up the whole assembled reference `tag` prop through
+`build_hardware` (the `TagInfrared*` codec is passed in), then emits a row with CPU
+reservation %, total heap footprint, headroom %, and peak frame time, plus a
+`__PROP_BREAKDOWN` of staged `gc.mem_free()` deltas re-shaped around the single
+`build_hardware` call (hardware / registries / effect_manager / engine / scene / total)
+for diagnostics. The matrix flush (~60 ms)
 dominates the per-frame cost, so the prop cannot hold 24 FPS — set `TARGET_FPS` to the
 rate the prop actually achieves (~7–13 FPS for any IS31FL3741 scope) so the recording is
 taken at one frame budget. The profiler also reports its **measured** FPS so the chosen
