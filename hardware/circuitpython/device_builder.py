@@ -83,9 +83,14 @@ def _setup_external_power() -> None:
     power.switch_to_output(value=True)
 
 
-def _setup_i2c() -> busio.I2C:
-    """Return an I2C bus on the board's default SDA/SCL pins."""
-    return busio.I2C(board.SCL, board.SDA)
+def _setup_i2c() -> busio.I2C | None:
+    """Return an I2C bus on the board's default SDA/SCL pins, or ``None`` if
+    no I2C devices are wired (``busio.I2C`` requires a pull-up from an
+    attached device to construct successfully)."""
+    try:
+        return busio.I2C(board.SCL, board.SDA)
+    except RuntimeError:
+        return None
 
 
 def _setup_matrix_is31fl3741(i2c: busio.I2C) -> Adafruit_RGBMatrixQT:
@@ -225,10 +230,14 @@ def build_hardware(
 
     *i2c*, if supplied, is used for every I2C peripheral (matrix,
     accelerometer, motor) instead of the bus this function would otherwise
-    construct itself.
+    construct itself. If no bus is supplied and none can be constructed (no
+    I2C devices wired to pull SDA/SCL high), the accelerometer and motor are
+    silently omitted — matrix pixels, being config-gated rather than
+    presence-probed, raise instead.
 
     Raises:
         ValueError: If a declared pin name does not exist on the board.
+        RuntimeError: If pixels.type is 'matrix' but no I2C bus is available.
     """
     _setup_external_power()
     if i2c is None:
@@ -238,6 +247,8 @@ def build_hardware(
 
     for pixels_cfg in config.pixels:
         if isinstance(pixels_cfg, MatrixPixelsConfig):
+            if i2c is None:
+                raise RuntimeError("pixels.type is 'matrix' but no I2C bus is available")
             matrix = _setup_matrix_is31fl3741(i2c)
             outputs.append(
                 IS31FL3741EffectOutput(
@@ -280,16 +291,18 @@ def build_hardware(
     buttons = _setup_buttons(*button_pins)
 
     accelerometer = None
-    try:
-        accelerometer = _setup_accelerometer(i2c)
-    except Exception:
-        print("accelerometer not reachable — omitting from hardware bundle")
+    if i2c is not None:
+        try:
+            accelerometer = _setup_accelerometer(i2c)
+        except Exception:
+            print("accelerometer not reachable — omitting from hardware bundle")
 
     motor = None
-    try:
-        motor = _setup_drv2605(i2c)
-    except Exception:
-        print("drv2605 not reachable — omitting from hardware bundle")
+    if i2c is not None:
+        try:
+            motor = _setup_drv2605(i2c)
+        except Exception:
+            print("drv2605 not reachable — omitting from hardware bundle")
 
     if config.audio is not None:
         audio_registry = AudioRegistry()
