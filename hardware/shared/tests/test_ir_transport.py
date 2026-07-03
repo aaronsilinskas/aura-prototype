@@ -268,11 +268,25 @@ def test_send_while_idle_starts_write_immediately():
     assert len(writer.calls) == 1
 
 
-def test_send_while_idle_returns_true():
-    writer = ControllableFakePulseWriter()
+def test_send_on_blocking_writer_returns_true_for_synchronous_completion():
+    """A blocking writer (FakePulseWriter) finishes inside write_pulses() —
+    is_busy() reports False the instant send() checks it back, so the
+    payload was fully sent synchronously."""
+    writer = FakePulseWriter()
     tx = InfraredTransmitter(writer, AuraInfraredEncoder())
 
     assert tx.send(b"\x01") is True
+
+
+def test_send_on_nonblocking_writer_returns_false_while_write_still_in_flight():
+    """A non-blocking (e.g. DMA-backed) writer goes busy the instant
+    write_pulses() is called and stays busy until the test releases it —
+    the write started but has not yet completed, so send() must report
+    False even though the writer was idle at entry."""
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder())
+
+    assert tx.send(b"\x01") is False
 
 
 def test_send_while_busy_buffers_and_does_not_start_a_write():

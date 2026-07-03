@@ -131,8 +131,10 @@ class NetworkControls:
         """Transmit an IR packet on the named emitter.
 
         Returns:
-            ``True`` if the write started immediately; ``False`` if it was
-            buffered because the transmitter was busy.
+            ``True`` only if the packet was fully transmitted synchronously
+            (a blocking writer completed within this call); ``False`` if it
+            was buffered because the transmitter was busy, or if the write
+            started but is still in flight on a non-blocking/DMA writer.
         """
         raise NotImplementedError
 

@@ -225,16 +225,20 @@ class InfraredTransmitter:
             data: Opaque payload bytes to transmit.
 
         Returns:
-            ``True`` if the write started immediately (writer was idle);
-            ``False`` if *data* was buffered as the pending payload (writer
-            was busy), whether or not it replaced a previously buffered
-            payload.
+            ``True`` only if *data* was fully transmitted synchronously —
+            the writer was idle at entry *and* reports idle again
+            immediately after :meth:`PulseWriter.write_pulses` returns (a
+            blocking writer). ``False`` in every other case: the writer was
+            busy at entry (*data* was buffered as the pending payload,
+            whether or not it replaced a previously buffered payload), or
+            the write started but is still outstanding on a non-blocking
+            (e.g. DMA-backed) writer — started, not yet sent.
         """
         if self._writer.is_busy():
             self._pending = data
             return False
         self._start_write(data)
-        return True
+        return not self._writer.is_busy()
 
     def poll(self) -> bool:
         """Per-tick pump: release a deferred gate and start any pending send.

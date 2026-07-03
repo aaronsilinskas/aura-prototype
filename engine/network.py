@@ -96,9 +96,10 @@ class HardwareNetworkControls(NetworkControls):
                 ``AREA_OF_EFFECT``.
 
         Returns:
-            ``True`` if the write started immediately (the transmitter was
-            idle); ``False`` if *data* was buffered because the transmitter
-            was busy.
+            ``True`` only if *data* was fully transmitted synchronously
+            (a blocking writer completed within this call); ``False`` if it
+            was buffered because the transmitter was busy, or if the write
+            started but is still in flight on a non-blocking/DMA writer.
 
         Raises:
             ValueError: If *emitter* is not in the transmitter map supplied at
