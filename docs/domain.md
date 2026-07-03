@@ -21,42 +21,50 @@ Full game and hardware design lives in `~/dev/aura/aura-docs/` (an Obsidian vaul
 
 ```
 effects/          Animation engine (CircuitPython-safe)
-  effect.py       EffectConfig, PixelBuffer, Effect
+  effect.py       EffectConfig, PixelBuffer, Effect, EffectPixels, EffectAudio, EffectVibration,
+                  AudioPlaybackConfig, VibrationConfig
   palette.py      Palette, PaletteLUT256 (pre-computed, immutable)
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
-  value.py        DynamicValue, Range, ValueGenerator, lerp
+  value.py        DynamicValue, ValueGenerator, lerp
   performance.py  PerformanceTracker
-  layers/         Layer base class + scroll, flame, drift_noise, sparkle, shape, and renderer compositors
-  elements/       One builder function per element + registry.py, ElementBuilder
+  layers/         Layer base class + scroll, flame, drift_noise, sparkle, shape, progress, pulse
+                  layers and the renderer compositors
 
 engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   engine.py       GameEngine, GameRule
   state.py        GameState, EffectControls, EffectReceipt, NetworkControls, Scope, ScopeValue
   scene.py        Scene, SceneRegistry, SceneLocalRegistry, SceneManager, SceneControls
-  events.py       Event, EventGroup
+  phase.py        PhaseKey, PhaseMachine, PhaseRule, InPhaseRule
+  events.py       Event, EventGroup, EffectEvent
   timer.py        Timer
+  lerp.py         Integer/float interpolation helpers
   packs.py        PackRegistry
+  version.py      Pack semver parsing and comparison
   input.py        ButtonData, AccelerationData, InputEvents
   audio.py        AudioRegistry
   network.py      NetworkEvents, HardwareNetworkControls
   effects/
-    manager.py    EffectManager, EffectOutput, EffectBuilder
+    manager.py    EffectManager, EffectOutput, EffectBuilder, EffectResolver
 
 magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
   aura.py         Aura, Spell, Spells, SpellTags, SpellLevelScaler, AuraEvent (+ subclasses), EventListener
   caster.py       Caster, CastType (LINE / CONE / AREA_OF_EFFECT)
   values.py       MinMaxValue, ValueWithModifiers, ValueModifier, ValueModifiers, Duration, Counter
-  spell/          Individual spell implementations (elemental/, combo/)
+  spell/          Individual spell implementations (elemental/, combo/, ambient_magic_regen)
 
 packs/            Game-specific packs loaded at runtime (CircuitPython/MicroPython-safe)
-  effects/        Effect packs (basic, elements, hw_test)
-  rules/          Rule packs (debug, hw_test)
-  scenes/         Scene definitions (hardware_test, red_light_green_light)
+  effects/        Shared, versioned effect packs (basic, elements) — each with a version.txt
+  rules/          Shared, versioned rule packs (debug)
+  scenes/         Scene definitions (element_browser, hardware_test, red_light_green_light, tag);
+                  each has a scene.json and optional scene-local effects/ and rules/ subdirs
 
 hardware/         Hardware abstraction layer
-  circuitpython/  CircuitPython drivers (device_builder, IS31FL3741, DRV2605, audio)
-  shared/         Shared hardware helpers (matrix_output, voice_pool, debounced_buttons)
+  circuitpython/  CircuitPython drivers (device_builder, is31fl3741_output, drv2605_output,
+                  neopixel_output, audio_output, infrared_io, counting_i2c)
+  shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
+                  device_config, scene_selection, scene_runtime, ir_transport, ir_protocol,
+                  tag_protocol, ir_telemetry, profiling_helpers)
 
 scripts/          Deploy and maintenance scripts (CPython-only)
 ```
@@ -91,6 +99,9 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
 | `SceneManager` | `engine/scene.py` | Activates/deactivates scenes; owns `SceneLocalRegistry` per scene |
+| `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
+| `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
+| `EffectResolver` | `engine/effects/manager.py` | Resolves a qualified effect name to a builder; owns the `scene.` prefix rule |
 | `PackRegistry` | `engine/packs.py` | Loads and looks up named packs (effects, rules, scenes) by entry point |
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
@@ -101,6 +112,8 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `MinMaxValue` | `magic/values.py` | Clamped float with dynamic max (via `ValueWithModifiers`) |
 | `ValueWithModifiers` | `magic/values.py` | Base value + temporary multiplier stack |
 | `Duration` | `magic/values.py` | Expiry tracker: `update(elapsed) → bool` |
+| `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; `pixels` is a list of `MatrixPixelsConfig` / `NeoPixelPixelsConfig` |
+| `DeviceHardware` | `hardware/circuitpython/device_builder.py` | Named bundle `build_hardware` returns (outputs, buttons, network_controls, …) |
 
 ---
 
@@ -124,4 +137,4 @@ All code in `effects/`, `engine/`, `magic/`, and `rules/` must run on CPython, C
 
 ## Tests
 
-1166 tests under `effects/tests/`, `engine/tests/`, `magic/tests/`, `packs/rules/`, and `scripts/tests/`. Run with `python -m pytest`. All must pass before commit. Pre-commit hooks run `python -m ruff` (lint) and `ruff format`.
+~2000 tests spread across `tests/` folders under `effects/`, `engine/`, `magic/`, `hardware/`, `packs/`, and `scripts/`. Run with `python -m pytest`. All must pass before commit. Pre-commit hooks run `python -m ruff` (lint) and `ruff format`.
