@@ -106,9 +106,9 @@ def _send_packet(network_controls: HardwareNetworkControls, payload: bytes) -> b
     """Transmit one packet via the LINE emitter.
 
     Returns:
-        `send_ir`'s own return value -- `True` only if *payload* was fully
-        transmitted synchronously within this call; `False` otherwise
-        (buffered, or still in flight on a non-blocking writer).
+        `send_ir`'s own return value, unmodified -- see
+        `HardwareNetworkControls.send_ir` for the exact `True`/`False`
+        semantics.
 
     Raises:
         RuntimeError: If the hardware bundle has no LINE transmitter wired --
