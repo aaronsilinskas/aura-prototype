@@ -151,9 +151,10 @@ LOG_INTERVAL_SECONDS: Final = 5.0
 # Self-contained aura-device.json-shaped mapping for the reference tag prop --
 # built in-file (rather than read from the CIRCUITPY drive) so the profiler
 # carries its own wiring and never drifts from an on-device config file. Mirrors
-# `examples/hardware/tag_demo.py`'s wiring: one IS31FL3741 matrix banded across
-# all scopes, two buttons, an IR LINE emitter + receiver, and 4 audio voices
-# covering the 7 clips the `tag` scene's rules reference.
+# `examples/hardware/tag_demo.py`'s pixel/button/IR wiring, plus 4 audio voices
+# covering the 7 clips this profiler has historically exercised (carried over
+# unchanged from the pre-migration setup) -- a subset of the `tag` scene's full
+# clip set; `dry_fire_start` and `ready_shots_start` are not included.
 _TAG_HARNESS: Final = {
     "pixels": [
         {
