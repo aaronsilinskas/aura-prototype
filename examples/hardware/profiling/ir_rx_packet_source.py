@@ -21,7 +21,14 @@ Raise `DELAY_MS` to throttle to a lower, rounder rate.
 Hardware
 --------
 - IR emitter (LINE) wired to `LINE_PIN_NAME`, driven via `pulseio.PulseOut` at
-  38kHz (see `propmaker.setup_ir`), aimed at the profiler board's IR receivers.
+  38kHz through `device_builder.build_hardware`, aimed at the profiler board's IR
+  receivers.
+- IR receiver wired to `RX_PIN_NAME` -- unused by this script, but `build_hardware`
+  always wires a receiver alongside the LINE emitter.
+- The in-file config also declares one placeholder NeoPixel pixel and one
+  placeholder button pin, satisfying `parse_device_config`'s non-empty `pixels` /
+  `buttons` requirements. Neither is driven by this script -- IR is the only
+  functionally relevant section.
 
 Installation
 ------------
@@ -34,8 +41,10 @@ Installation
 
 Configuration
 -------------
-- LINE_PIN_NAME: board pin for the LINE emitter's `pulseio.PulseOut`
-- RX_PIN_NAME: board pin for the (unused but required by `setup_ir`) IR receiver
+- LINE_PIN_NAME: board pin for the LINE emitter, passed as `ir.line` in the in-file
+  device config
+- RX_PIN_NAME: board pin for the (unused but required) IR receiver, passed as
+  `ir.rx`
 - PACKET_SIZE: bytes per transmitted packet (byte 0 is the sequence number);
   defaults to 4 to match the realistic AURA payload
 - DELAY_MS: delay inserted after each send to throttle the rate; defaults to 0
@@ -48,6 +57,7 @@ from __future__ import annotations
 import time
 
 from engine.network import LINE, HardwareNetworkControls
+from hardware.shared.device_config import parse_device_config
 from hardware.shared.profiling_helpers import board_id, runtime_id
 
 try:
@@ -61,15 +71,53 @@ PACKET_SIZE: Final = 4
 DELAY_MS: Final = 0.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
+# Placeholder pins for the pixels/buttons sections `parse_device_config` requires
+# to be non-empty. Neither output is driven by this script.
+_PLACEHOLDER_NEOPIXEL_PIN_NAME: Final = "D5"
+_PLACEHOLDER_BUTTON_PIN_NAME: Final = "D9"
+
+# In-file, IR-only device config -- `ir` is the only section this script drives.
+_DEVICE_CONFIG_MAPPING: Final = {
+    "pixels": [
+        {
+            "type": "neopixel",
+            "pin": _PLACEHOLDER_NEOPIXEL_PIN_NAME,
+            "count": 1,
+            "scope_pixels": {"personal": [0, 1]},
+        }
+    ],
+    "buttons": [_PLACEHOLDER_BUTTON_PIN_NAME],
+    "ir": {
+        "rx": RX_PIN_NAME,
+        "line": LINE_PIN_NAME,
+    },
+}
+
 
 def _build_network_controls() -> HardwareNetworkControls:
-    import board
-    from hardware.circuitpython.propmaker import setup_ir
+    from hardware.circuitpython.device_builder import build_hardware
 
-    line_pin = getattr(board, LINE_PIN_NAME)
-    rx_pin = getattr(board, RX_PIN_NAME)
-    transmitters, _receiver = setup_ir(rx_pin, line_pin)
-    return HardwareNetworkControls(transmitters)
+    config = parse_device_config(_DEVICE_CONFIG_MAPPING)
+    hw = build_hardware(config)
+    return hw.network_controls
+
+
+def _send_packet(network_controls: HardwareNetworkControls, payload: bytes) -> None:
+    """Transmit one packet via the LINE emitter.
+
+    Raises:
+        RuntimeError: If the hardware bundle has no LINE transmitter wired --
+            `send_ir` already raises `ValueError` for this, but names only the
+            emitter constant; re-raised here with a wiring hint pointing at
+            `ir.line` so a bring-up mistake is diagnosable from the message
+            alone.
+    """
+    try:
+        network_controls.send_ir(payload, LINE)
+    except ValueError as exc:
+        raise RuntimeError(
+            "no LINE transmitter in the built hardware bundle -- check ir.line wiring"
+        ) from exc
 
 
 def run() -> None:
@@ -97,7 +145,7 @@ def run() -> None:
 
     while True:
         payload[0] = sequence & 0xFF
-        network_controls.send_ir(payload, LINE)
+        _send_packet(network_controls, payload)
         network_controls.poll_transmits()
         sequence += 1
         packets_sent += 1
