@@ -40,7 +40,12 @@ from hardware.shared.ir_protocol import (
     InfraredDecoder,
     InfraredEncoder,
 )
-from hardware.shared.ir_transport import InfraredSingleReceiver, InfraredTransmitter, IrTransmitGate
+from hardware.shared.ir_transport import (
+    InfraredSingleReceiver,
+    InfraredTransmitter,
+    IrTransmitGate,
+    PulseWriter,
+)
 
 __all__ = [
     "DeviceHardware",
@@ -167,6 +172,37 @@ def _setup_drv2605(i2c: busio.I2C) -> object | None:
         return None
 
 
+def _make_writer(pin: microcontroller.Pin) -> PulseWriter:
+    """Return the best non-blocking IR writer the silicon supports for *pin*.
+
+    Selection is by import-probe: ``rp2pio`` is present only on RP2040/RP2350,
+    so an importable ``rp2pio`` means the board can clock the carrier out via
+    PIO/DMA — wire a :class:`PioPulseWriter` over its own state machine. On any
+    other board ``rp2pio`` is missing and the blocking ``pulseio``-backed
+    :class:`PulseOutWriter` is used. PIO availability is a property of the
+    silicon, so there is no config knob; the PIO-writer module is imported here
+    (not at module load) so it never executes on non-RP boards.
+
+    Args:
+        pin: The transmit pin the emitter is wired to.
+
+    Returns:
+        A :class:`PulseWriter` — a PIO-backed one on RP boards, else blocking.
+    """
+    try:
+        import rp2pio  # noqa: F401  # present only on RP2040/RP2350
+    except ImportError:
+        pulseout = pulseio.PulseOut(pin, frequency=38000, duty_cycle=0x8000)
+        return PulseOutWriter(pulseout)
+
+    from hardware.circuitpython.pio_pulse_writer import (
+        PioPulseWriter,
+        make_state_machine,
+    )
+
+    return PioPulseWriter(make_state_machine(pin))
+
+
 def _setup_ir(
     rx_pin: microcontroller.Pin,
     line_pin: microcontroller.Pin | None,
@@ -203,8 +239,7 @@ def _setup_ir(
     for emitter, pin in ((LINE, line_pin), (CONE, cone_pin), (AREA_OF_EFFECT, aoe_pin)):
         if pin is None:
             continue
-        pulseout = pulseio.PulseOut(pin, frequency=38000, duty_cycle=0x8000)
-        writer = PulseOutWriter(pulseout)
+        writer = _make_writer(pin)
         transmitters[emitter] = InfraredTransmitter(writer, encoder, gate=gate)
 
     return transmitters, receiver
