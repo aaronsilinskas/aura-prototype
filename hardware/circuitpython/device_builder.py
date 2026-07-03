@@ -223,10 +223,9 @@ def build_hardware(
 ) -> DeviceHardware:
     """Assemble DeviceHardware from a parsed DeviceConfig.
 
-    *i2c*, if supplied, is used for every I2C peripheral instead of the bus
-    this function would otherwise construct itself — the seam bandwidth
-    profilers use to wrap the bus in ``CountingI2C`` while still driving
-    production ``EffectOutput``s.
+    *i2c*, if supplied, is used for every I2C peripheral (matrix,
+    accelerometer, motor) instead of the bus this function would otherwise
+    construct itself.
 
     Raises:
         ValueError: If a declared pin name does not exist on the board.
