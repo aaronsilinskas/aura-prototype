@@ -108,9 +108,10 @@ def _send_packet(network_controls: HardwareNetworkControls, payload: bytes) -> N
 
     Raises:
         RuntimeError: If the hardware bundle has no LINE transmitter wired --
-            `send_ir` reports this as a `ValueError` naming the emitter, which is
-            re-raised here as a clear bring-up failure instead of a silent
-            per-packet no-op.
+            `send_ir` already raises `ValueError` for this, but names only the
+            emitter constant; re-raised here with a wiring hint pointing at
+            `ir.line` so a bring-up mistake is diagnosable from the message
+            alone.
     """
     try:
         network_controls.send_ir(payload, LINE)
