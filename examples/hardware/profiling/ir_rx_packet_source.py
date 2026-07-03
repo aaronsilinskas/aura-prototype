@@ -156,12 +156,14 @@ def run() -> None:
 
         if not line_busy:
             payload[0] = sequence & 0xFF
-            # Only a send_ir True return (synchronous completion) counts as
-            # an actual transmission -- advancing on the pre-check instead
-            # would count attempts, not sends, inflating send_rate_hz.
-            if _send_packet(network_controls, payload):
-                sequence += 1
-                packets_sent += 1
+            # An idle writer always starts the transmit immediately (it never
+            # buffers), so a send issued here is a real transmit start. On the
+            # non-blocking PIO writer send_ir returns False (started, still in
+            # flight), so the advance keys off this idle pre-check rather than
+            # send_ir's return, which only reports synchronous completion.
+            _send_packet(network_controls, payload)
+            sequence += 1
+            packets_sent += 1
 
         if DELAY_MS > 0:
             time.sleep(DELAY_MS / 1000.0)
