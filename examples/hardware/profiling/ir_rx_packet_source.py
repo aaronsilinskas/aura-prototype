@@ -145,7 +145,10 @@ def run() -> None:
 
     while True:
         payload[0] = sequence & 0xFF
-        _send_packet(network_controls, payload)
+        # Snapshot as immutable bytes -- a non-blocking writer may buffer this
+        # object as its pending payload and encode it on a later poll(), after
+        # this loop has already mutated `payload` for the next sequence number.
+        _send_packet(network_controls, bytes(payload))
         network_controls.poll_transmits()
         sequence += 1
         packets_sent += 1
