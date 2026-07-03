@@ -76,8 +76,7 @@ LOG_INTERVAL_SECONDS: Final = 5.0
 _PLACEHOLDER_NEOPIXEL_PIN_NAME: Final = "D5"
 _PLACEHOLDER_BUTTON_PIN_NAME: Final = "D9"
 
-# In-file, IR-only device config -- `ir` is the only section this script drives;
-# `pixels`/`buttons` exist solely to satisfy parse_device_config's non-empty checks.
+# In-file, IR-only device config -- `ir` is the only section this script drives.
 _DEVICE_CONFIG_MAPPING: Final = {
     "pixels": [
         {
