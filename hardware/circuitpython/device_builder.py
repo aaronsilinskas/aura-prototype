@@ -78,7 +78,9 @@ def _resolve_pin(board_module: object, field: str, name: str) -> microcontroller
 
 def _setup_external_power() -> None:
     """Enable the PropMaker's EXTERNAL_POWER rail (powers NeoPixels, audio amp, and other
-    peripherals)."""
+    peripherals), if the board has one."""
+    if not hasattr(board, "EXTERNAL_POWER"):
+        return
     power = digitalio.DigitalInOut(board.EXTERNAL_POWER)
     power.switch_to_output(value=True)
 

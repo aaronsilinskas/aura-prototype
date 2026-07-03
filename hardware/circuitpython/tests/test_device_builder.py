@@ -587,6 +587,49 @@ def test_setup_ir_injects_same_gate_into_receiver_and_every_transmitter() -> Non
 
 
 # ---------------------------------------------------------------------------
+# _setup_external_power only drives the rail on boards that have one
+# ---------------------------------------------------------------------------
+
+
+class _BoardWithoutExternalPower:
+    """A board stub with no EXTERNAL_POWER attribute, unlike MagicMock which
+    would fabricate one on access."""
+
+
+def test_setup_external_power_enables_rail_when_board_has_pin() -> None:
+    board_mock = _mock_board(EXTERNAL_POWER=MagicMock())
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder.board", board_mock))
+        mock_digitalio = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.digitalio")
+        )
+
+        from hardware.circuitpython.device_builder import _setup_external_power
+
+        _setup_external_power()
+
+    mock_digitalio.DigitalInOut.assert_called_once_with(board_mock.EXTERNAL_POWER)
+    mock_digitalio.DigitalInOut.return_value.switch_to_output.assert_called_once_with(value=True)
+
+
+def test_setup_external_power_is_noop_when_board_has_no_pin() -> None:
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder.board", _BoardWithoutExternalPower())
+        )
+        mock_digitalio = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.digitalio")
+        )
+
+        from hardware.circuitpython.device_builder import _setup_external_power
+
+        _setup_external_power()
+
+    mock_digitalio.DigitalInOut.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # _setup_i2c / build_hardware handle a board with no I2C devices wired
 # ---------------------------------------------------------------------------
 
