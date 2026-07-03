@@ -61,6 +61,7 @@ class _FakeProgram:
 # machine directly, exercising the writer without the hardware libraries.
 from hardware.circuitpython.pio_pulse_writer import (  # noqa: E402
     _CARRIER_PERIOD_US,
+    _INTERFRAME_GAP_US,
     PioPulseWriter,
     _duration_us_to_loops,
 )
@@ -144,20 +145,23 @@ def test_is_busy_reflects_state_machine_writing_flag():
 # ---------------------------------------------------------------------------
 
 
-def test_write_pulses_hands_the_same_buffer_to_the_dma():
-    """The exact pulse array is handed to background_write — not a copy."""
+def test_write_pulses_hands_the_built_buffer_to_the_dma():
+    """The exact buffer handed to background_write is the writer's in-flight one.
+
+    The writer builds its own even-length DMA buffer (converted + padded), so
+    the contract is that the buffer given to the DMA is the one it retains — not
+    that it reuses the caller's array.
+    """
     writer, sm = _make_writer()
-    buffer = array("H", [100, 200, 300])
-    writer.write_pulses(buffer)
-    assert sm.background_writes[0] is buffer
+    writer.write_pulses(array("H", [100, 200, 300]))
+    assert sm.background_writes[0] is writer._inflight
 
 
 def test_in_flight_buffer_is_held_until_write_completes():
-    """The pulse buffer is kept referenced while the write is outstanding."""
-    writer, _sm = _make_writer()
-    buffer = array("H", [100, 200, 300])
-    writer.write_pulses(buffer)
-    assert writer._inflight is buffer  # buffer ownership is the adapter's contract
+    """The DMA buffer is kept referenced while the write is outstanding."""
+    writer, sm = _make_writer()
+    writer.write_pulses(array("H", [100, 200, 300]))
+    assert writer._inflight is sm.background_writes[0]  # ownership is the contract
 
 
 def test_in_flight_buffer_reference_is_dropped_once_idle():
@@ -171,11 +175,10 @@ def test_in_flight_buffer_reference_is_dropped_once_idle():
 
 def test_busy_query_keeps_buffer_while_still_writing():
     """Polling is_busy() mid-write does not prematurely drop the buffer."""
-    writer, _sm = _make_writer()
-    buffer = array("H", [100, 200])
-    writer.write_pulses(buffer)
+    writer, sm = _make_writer()
+    writer.write_pulses(array("H", [100, 200]))
     assert writer.is_busy() is True
-    assert writer._inflight is buffer
+    assert writer._inflight is sm.background_writes[0]
 
 
 # ---------------------------------------------------------------------------
@@ -184,14 +187,29 @@ def test_busy_query_keeps_buffer_while_still_writing():
 
 
 def test_write_pulses_converts_us_durations_to_loop_counts():
-    """write_pulses rewrites the µs array in place as PIO loop counts.
+    """write_pulses hands the DMA carrier-period counts, not raw µs.
 
     The raw encoder values are microseconds; the DMA must receive carrier-period
-    counts, not the µs values fed straight through (the original defect).
+    counts, not the µs values fed straight through (the original defect). A
+    single (odd-length) input is padded with the gap, so the converted duration
+    is the buffer's first element.
     """
     writer, sm = _make_writer()
     writer.write_pulses(array("H", [IR_UNIT]))
-    assert list(sm.background_writes[0]) == [_duration_us_to_loops(IR_UNIT)]
+    assert sm.background_writes[0][0] == _duration_us_to_loops(IR_UNIT)
+
+
+def test_write_pulses_pads_odd_frames_to_even_with_a_trailing_gap():
+    """An odd-length frame is padded to even with the inter-frame gap appended.
+
+    Even length keeps the PIO program's pull-mark/pull-space phase aligned across
+    frames; an odd count would clock the next frame's header mark out as a space.
+    """
+    writer, sm = _make_writer()
+    writer.write_pulses(array("H", [IR_UNIT, IR_UNIT, IR_LEAD_OUT]))  # odd (3)
+    buffer = sm.background_writes[0]
+    assert len(buffer) == 4  # padded to even
+    assert buffer[-1] == _duration_us_to_loops(_INTERFRAME_GAP_US)
 
 
 def test_header_mark_round_trips_within_protocol_tolerance():
