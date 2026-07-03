@@ -586,6 +586,81 @@ def test_setup_ir_injects_same_gate_into_receiver_and_every_transmitter() -> Non
         assert _wired_gate(transmitter) is receiver_gate
 
 
+# ---------------------------------------------------------------------------
+# _setup_i2c / build_hardware handle a board with no I2C devices wired
+# ---------------------------------------------------------------------------
+
+
+def test_setup_i2c_returns_none_when_no_pullup_found() -> None:
+    with ExitStack() as stack:
+        mock_busio = stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+        mock_busio.I2C.side_effect = RuntimeError(
+            "No pull up found on SDA or SCL; check your wiring"
+        )
+        stack.enter_context(patch("hardware.circuitpython.device_builder.board", _mock_board()))
+
+        from hardware.circuitpython.device_builder import _setup_i2c
+
+        assert _setup_i2c() is None
+
+
+def test_build_hardware_omits_accelerometer_and_motor_when_i2c_unavailable() -> None:
+    config = _neopixel_config()
+    board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
+        )
+        mock_setup_accelerometer = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_accelerometer")
+        )
+        mock_setup_drv2605 = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_drv2605")
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
+        )
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
+        mock_neopixel.NeoPixel.return_value = MagicMock()
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    mock_setup_accelerometer.assert_not_called()
+    mock_setup_drv2605.assert_not_called()
+    assert hw.accelerometer is None
+
+
+def test_build_hardware_matrix_config_raises_when_i2c_unavailable() -> None:
+    """Matrix pixels are config-gated (declared, expected present) rather than
+    presence-probed like the accelerometer/motor — a missing I2C bus is a real
+    wiring fault, so this fails loud instead of silently skipping the matrix."""
+    config = _matrix_config()
+    board_mock = _mock_board(D9=MagicMock(), D10=MagicMock())
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
+        )
+        mock_setup_matrix = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_matrix_is31fl3741")
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(RuntimeError, match="matrix"):
+            build_hardware(config, board_module=board_mock)
+
+    mock_setup_matrix.assert_not_called()
+
+
 def test_device_hardware_does_not_expose_the_ir_transmit_gate() -> None:
     from hardware.circuitpython.device_builder import DeviceHardware
 
