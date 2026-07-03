@@ -127,8 +127,15 @@ class NetworkControls:
 
     __slots__ = ()
 
-    def send_ir(self, data: bytes, emitter: str) -> None:
-        """Transmit an IR packet on the named emitter."""
+    def send_ir(self, data: bytes, emitter: str) -> bool:
+        """Transmit an IR packet on the named emitter.
+
+        Returns:
+            ``True`` only if the packet was fully transmitted synchronously
+            (a blocking writer completed within this call); ``False`` if it
+            was buffered because the transmitter was busy, or if the write
+            started but is still in flight on a non-blocking/DMA writer.
+        """
         raise NotImplementedError
 
     def send_radio(self, data: bytes) -> None:
