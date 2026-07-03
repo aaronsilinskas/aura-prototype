@@ -219,14 +219,20 @@ def build_hardware(
     board_module: object = board,
     ir_encoder: InfraredEncoder | None = None,
     ir_decoder: InfraredDecoder | None = None,
+    i2c: busio.I2C | None = None,
 ) -> DeviceHardware:
     """Assemble DeviceHardware from a parsed DeviceConfig.
+
+    *i2c*, if supplied, is used for every I2C peripheral (matrix,
+    accelerometer, motor) instead of the bus this function would otherwise
+    construct itself.
 
     Raises:
         ValueError: If a declared pin name does not exist on the board.
     """
     _setup_external_power()
-    i2c = _setup_i2c()
+    if i2c is None:
+        i2c = _setup_i2c()
 
     outputs: list[EffectOutput] = []
 
