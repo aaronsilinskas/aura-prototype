@@ -204,6 +204,28 @@ def test_hardware_network_controls_send_ir_dispatches_correct_data() -> None:
     assert writer.calls[0] == [0xAB, 0xCD]
 
 
+def test_hardware_network_controls_send_ir_returns_true_when_idle() -> None:
+    tx, _ = _make_transmitter()  # writer's is_busy() always reports False
+    controls = HardwareNetworkControls({LINE: tx})
+
+    assert controls.send_ir(b"\x01", LINE) is True
+
+
+def test_hardware_network_controls_send_ir_returns_false_when_busy() -> None:
+    class _BusyTransmitter:
+        """Fake transmitter whose send() always reports buffered (busy)."""
+
+        def send(self, data: bytes) -> bool:
+            return False
+
+        def poll(self) -> bool:
+            return True
+
+    controls = HardwareNetworkControls({LINE: _BusyTransmitter()})
+
+    assert controls.send_ir(b"\x01", LINE) is False
+
+
 def test_hardware_network_controls_send_ir_routes_to_correct_transmitter() -> None:
     tx_line, writer_line = _make_transmitter()
     tx_cone, writer_cone = _make_transmitter()
@@ -235,14 +257,16 @@ class _PollCountingTransmitter:
     isolates HardwareNetworkControls.poll_transmits's fan-out from
     InfraredTransmitter's own poll() behaviour (covered separately)."""
 
-    def __init__(self) -> None:
+    def __init__(self, busy_after_poll: bool = False) -> None:
         self.poll_calls = 0
+        self._busy_after_poll = busy_after_poll
 
-    def poll(self) -> None:
+    def poll(self) -> bool:
         self.poll_calls += 1
+        return self._busy_after_poll
 
-    def send(self, data: bytes) -> None:
-        pass  # not exercised by these tests
+    def send(self, data: bytes) -> bool:
+        return True  # not exercised by these tests
 
 
 def test_poll_transmits_polls_every_wired_transmitter() -> None:
@@ -269,6 +293,33 @@ def test_poll_transmits_polls_each_transmitter_once_per_call() -> None:
 def test_poll_transmits_is_a_noop_with_no_wired_transmitters() -> None:
     controls = HardwareNetworkControls({})
     controls.poll_transmits()  # must not raise
+
+
+def test_poll_transmits_maps_each_emitter_to_its_own_busy_state() -> None:
+    tx_line = _PollCountingTransmitter(busy_after_poll=True)
+    tx_cone = _PollCountingTransmitter(busy_after_poll=False)
+    controls = HardwareNetworkControls({LINE: tx_line, CONE: tx_cone})
+
+    result = controls.poll_transmits()
+
+    assert result == {LINE: True, CONE: False}
+
+
+def test_poll_transmits_returns_the_same_dict_instance_across_calls() -> None:
+    """Pre-allocated at construction, mutated in place — no per-call allocation."""
+    tx = _PollCountingTransmitter()
+    controls = HardwareNetworkControls({LINE: tx})
+
+    first = controls.poll_transmits()
+    second = controls.poll_transmits()
+
+    assert first is second
+
+
+def test_poll_transmits_with_no_wired_transmitters_returns_empty_dict() -> None:
+    controls = HardwareNetworkControls({})
+
+    assert controls.poll_transmits() == {}
 
 
 def test_abstract_network_controls_has_no_poll_transmits() -> None:

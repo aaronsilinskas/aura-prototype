@@ -102,8 +102,13 @@ def _build_network_controls() -> HardwareNetworkControls:
     return hw.network_controls
 
 
-def _send_packet(network_controls: HardwareNetworkControls, payload: bytes) -> None:
+def _send_packet(network_controls: HardwareNetworkControls, payload: bytes) -> bool:
     """Transmit one packet via the LINE emitter.
+
+    Returns:
+        `send_ir`'s own return value, unmodified -- see
+        `HardwareNetworkControls.send_ir` for the exact `True`/`False`
+        semantics.
 
     Raises:
         RuntimeError: If the hardware bundle has no LINE transmitter wired --
@@ -113,7 +118,7 @@ def _send_packet(network_controls: HardwareNetworkControls, payload: bytes) -> N
             alone.
     """
     try:
-        network_controls.send_ir(payload, LINE)
+        return network_controls.send_ir(payload, LINE)
     except ValueError as exc:
         raise RuntimeError(
             "no LINE transmitter in the built hardware bundle -- check ir.line wiring"
@@ -144,14 +149,19 @@ def run() -> None:
     next_log_time = start_time + LOG_INTERVAL_SECONDS
 
     while True:
-        payload[0] = sequence & 0xFF
-        # Snapshot as immutable bytes -- a non-blocking writer may buffer this
-        # object as its pending payload and encode it on a later poll(), after
-        # this loop has already mutated `payload` for the next sequence number.
-        _send_packet(network_controls, bytes(payload))
-        network_controls.poll_transmits()
-        sequence += 1
-        packets_sent += 1
+        # Poll exactly once per iteration -- the LINE busy state it reports
+        # gates whether this iteration builds/sends a payload at all, so a
+        # transmit still in flight is never overwritten with a fresh one.
+        line_busy = network_controls.poll_transmits()[LINE]
+
+        if not line_busy:
+            payload[0] = sequence & 0xFF
+            # Only a send_ir True return (synchronous completion) counts as
+            # an actual transmission -- advancing on the pre-check instead
+            # would count attempts, not sends, inflating send_rate_hz.
+            if _send_packet(network_controls, payload):
+                sequence += 1
+                packets_sent += 1
 
         if DELAY_MS > 0:
             time.sleep(DELAY_MS / 1000.0)

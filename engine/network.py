@@ -78,18 +78,28 @@ class HardwareNetworkControls(NetworkControls):
     ``send_radio`` remains a no-op until a radio peripheral is wired.
     """
 
-    __slots__ = ("_transmitters",)
+    __slots__ = ("_poll_results", "_transmitters")
 
     def __init__(self, transmitters: dict[str, InfraredTransmitter]) -> None:
         self._transmitters = transmitters
+        # Pre-allocated once, mutated in place by poll_transmits — a fresh
+        # dict per call would be a hot-path allocation (poll_transmits runs
+        # every tick in the real runtime loop).
+        self._poll_results: dict[str, bool] = dict.fromkeys(transmitters, False)
 
-    def send_ir(self, data: bytes, emitter: str) -> None:
+    def send_ir(self, data: bytes, emitter: str) -> bool:
         """Transmit *data* via the :class:`InfraredTransmitter` for *emitter*.
 
         Args:
             data: Opaque payload bytes to transmit.
             emitter: One of the emitter constants: ``LINE``, ``CONE``, or
                 ``AREA_OF_EFFECT``.
+
+        Returns:
+            ``True`` only if *data* was fully transmitted synchronously
+            (a blocking writer completed within this call); ``False`` if it
+            was buffered because the transmitter was busy, or if the write
+            started but is still in flight on a non-blocking/DMA writer.
 
         Raises:
             ValueError: If *emitter* is not in the transmitter map supplied at
@@ -98,12 +108,12 @@ class HardwareNetworkControls(NetworkControls):
         tx = self._transmitters.get(emitter)
         if tx is None:
             raise ValueError("No transmitter wired for emitter: " + str(emitter))
-        tx.send(data)
+        return tx.send(data)
 
     def send_radio(self, data: bytes) -> None:
         pass  # TODO: wire to hardware peripheral
 
-    def poll_transmits(self) -> None:
+    def poll_transmits(self) -> dict[str, bool]:
         """Pump every wired :class:`InfraredTransmitter`'s ``poll()``.
 
         Runtime-facing — must be called every tick so a non-blocking write
@@ -111,6 +121,14 @@ class HardwareNetworkControls(NetworkControls):
         ``end_transmit`` and starts its pending send. Not part of the
         abstract ``NetworkControls`` interface: it is a lifecycle/runtime
         concern, not a game rule, so it stays off the seam game rules see.
+
+        Returns:
+            The same ``dict[str, bool]`` instance every call (pre-allocated
+            at construction, updated in place) mapping each wired emitter
+            constant to that transmitter's busy state after this poll. A
+            live view, not a snapshot — read it within the same tick.
         """
-        for tx in self._transmitters.values():
-            tx.poll()
+        results = self._poll_results
+        for emitter, tx in self._transmitters.items():
+            results[emitter] = tx.poll()
+        return results
