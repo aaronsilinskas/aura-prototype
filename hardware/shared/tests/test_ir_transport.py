@@ -268,6 +268,13 @@ def test_send_while_idle_starts_write_immediately():
     assert len(writer.calls) == 1
 
 
+def test_send_while_idle_returns_true():
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder())
+
+    assert tx.send(b"\x01") is True
+
+
 def test_send_while_busy_buffers_and_does_not_start_a_write():
     writer = ControllableFakePulseWriter()
     tx = InfraredTransmitter(writer, AuraInfraredEncoder())
@@ -278,6 +285,25 @@ def test_send_while_busy_buffers_and_does_not_start_a_write():
     tx.send(b"\x02")  # writer still busy — must buffer, not start a write
 
     assert len(writer.calls) == 0
+
+
+def test_send_while_busy_returns_false():
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder())
+
+    tx.send(b"\x01")  # starts the write; writer reports busy afterward
+
+    assert tx.send(b"\x02") is False
+
+
+def test_send_while_busy_returns_false_even_when_replacing_a_pending_payload():
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder())
+
+    tx.send(b"\x01")  # starts the write; writer reports busy afterward
+    tx.send(b"\x02")  # buffered
+
+    assert tx.send(b"\x03") is False  # replaces \x02 — still False
 
 
 def test_second_send_while_pending_replaces_the_pending_payload():
@@ -365,6 +391,50 @@ def test_encoder_runs_once_per_transmitted_payload_not_per_tick():
     tx.poll()  # writer now idle — starts pending \x02, encodes once
 
     assert encoder.encode_calls == 2
+
+
+# ---------------------------------------------------------------------------
+# InfraredTransmitter — poll() busy/idle return value
+# ---------------------------------------------------------------------------
+
+
+def test_poll_returns_false_when_writer_is_already_idle_and_nothing_pending():
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder())
+
+    assert tx.poll() is False
+
+
+def test_poll_returns_true_while_writer_still_has_a_write_in_flight():
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder())
+
+    tx.send(b"\x01")  # writer reports busy after write_pulses — DMA in flight
+
+    assert tx.poll() is True
+
+
+def test_poll_returns_true_after_promoting_a_pending_send_that_starts_busy():
+    """The freed writer immediately goes busy again for the promoted send —
+    poll() must reflect the writer's state after starting it, not before."""
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder())
+
+    tx.send(b"\x01")  # busy
+    tx.send(b"\x02")  # buffered
+
+    writer.set_busy(False)  # hardware signals the first write completed
+    assert tx.poll() is True  # started \x02, which goes busy again
+
+
+def test_poll_returns_false_once_writer_frees_up_with_nothing_pending():
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder())
+
+    tx.send(b"\x01")  # busy, nothing queued behind it
+
+    writer.set_busy(False)  # hardware signals completion
+    assert tx.poll() is False
 
 
 def test_gate_fires_end_transmit_synchronously_when_writer_finishes_inline():

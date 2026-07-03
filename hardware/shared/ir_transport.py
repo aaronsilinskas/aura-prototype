@@ -213,7 +213,7 @@ class InfraredTransmitter:
         self._pending: bytes | None = None
         self._gate_armed: bool = False
 
-    def send(self, data: bytes) -> None:
+    def send(self, data: bytes) -> bool:
         """Start transmitting *data* if idle, else buffer it as the pending send.
 
         While a write is outstanding (``PulseWriter.is_busy()`` is ``True``),
@@ -223,13 +223,20 @@ class InfraredTransmitter:
 
         Args:
             data: Opaque payload bytes to transmit.
+
+        Returns:
+            ``True`` if the write started immediately (writer was idle);
+            ``False`` if *data* was buffered as the pending payload (writer
+            was busy), whether or not it replaced a previously buffered
+            payload.
         """
         if self._writer.is_busy():
             self._pending = data
-            return
+            return False
         self._start_write(data)
+        return True
 
-    def poll(self) -> None:
+    def poll(self) -> bool:
         """Per-tick pump: release a deferred gate and start any pending send.
 
         Must be called every tick. Does nothing while the writer reports
@@ -237,13 +244,19 @@ class InfraredTransmitter:
         ``end_transmit`` if it was left armed by a non-blocking write, then
         starts the pending payload (if any) and clears the slot.
 
+        Returns:
+            The writer's busy state evaluated at the end of the call — after
+            any gate release and after starting a pending send, if one
+            existed.
+
         Raises:
             Exception: Whatever the encoder raises, if a payload was pending
                 and its encoding fails — surfaced here rather than at the
                 original ``send()`` call.
         """
-        if self._writer.is_busy():
-            return
+        writer = self._writer
+        if writer.is_busy():
+            return True
 
         if self._gate_armed:
             self._gate_armed = False
@@ -255,6 +268,8 @@ class InfraredTransmitter:
         if pending is not None:
             self._pending = None
             self._start_write(pending)
+
+        return writer.is_busy()
 
     def _start_write(self, data: bytes) -> None:
         """Encode *data* and kick off the write, bracketing it with the gate.
