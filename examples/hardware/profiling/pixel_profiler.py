@@ -141,7 +141,11 @@ def _build_pixel_config(driver: str, largest_count: int) -> DeviceConfig:
     prefix of the same physical strip. No audio/IR is wired.
     """
     if driver == "is31fl3741_matrix":
-        pixels = {"type": "matrix", "cols": IS31FL3741_COLS, "scope_rows": {"personal": [0, 9]}}
+        pixels = {
+            "type": "matrix",
+            "cols": IS31FL3741_COLS,
+            "scope_rows": {"personal": [0, MATRIX_ROWS]},
+        }
     elif driver == "neopixel_pwm":
         pixels = {
             "type": "neopixel",
