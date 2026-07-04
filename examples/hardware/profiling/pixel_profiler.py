@@ -197,9 +197,10 @@ def _measure_i2c_transaction_bytes(
 ) -> int:
     """Return I2C bytes written across one full render+flush tick.
 
-    Counts the whole ``update()`` tick, not just ``show()``: a no-buffer driver
-    emits bytes per pixel during the render pass, so a ``show()``-only count
-    would miss all traffic.
+    Counts the whole ``update()`` tick (render + flush), not just ``show()``, so
+    the figure captures all I2C traffic regardless of when the driver emits it.
+    The production IS31FL3741 driver is buffered, so in practice every byte lands
+    at ``show()``.
     """
     receipt = effect_manager.add_effect(
         Scope.PERSONAL, "elements." + element, {"level": SAMPLE_LEVEL}
