@@ -40,6 +40,16 @@ class NeoPixelEffectOutput(EffectOutput):
         self.scopes: list[ScopeValue] = [ScopeValue(key) for key in scope_pixels]
         self.min_resolution: int = max(len(r) for r in scope_pixels.values())
 
+    @property
+    def strip(self) -> object:
+        """The underlying hardware NeoPixel strip this output writes to.
+
+        Read-only. Lets a caller reach the one shared strip to build further
+        outputs around it (e.g. the pixel profiler sweeping segment lengths)
+        without re-constructing the strip or touching a private attribute.
+        """
+        return self._strip
+
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(len(self._scope_pixels[scope_key]))
 

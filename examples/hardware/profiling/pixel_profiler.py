@@ -5,7 +5,7 @@ render+flush path to find the worst-case per-pixel and flush costs for the
 
 Sweeps three axes in sequence:
 
-- **pixel count** — `PIXEL_COUNTS`, applied to the active output's strip/matrix size.
+- **pixel count** — `PIXEL_COUNTS`, applied to the swept output's segment/row-band size.
 - **effect identity** — cycles every registered element effect at a fixed level,
   to find the worst-case per-pixel cost across all real effects.
 - **stack depth** — `STACK_DEPTHS`, the number of concurrent ``add_effect`` layers
@@ -22,6 +22,36 @@ Sweeps three axes in sequence:
 This profiler drives the satellite path (an `EffectManager` with one registered
 `EffectOutput`, no rules) -- the same shape as `baseline_profiler.py`'s satellite
 mode, but with a real pixel-producing output.
+
+Hardware bring-up
+-----------------
+Hardware is brought up through a single `build_hardware` call from an in-file
+`DeviceConfig` (one matrix or one NeoPixel strip, no audio/IR) rather than the retired
+per-peripheral setup helpers. `build_hardware` cannot be called in a loop -- it claims
+board pins without deiniting them -- so the profiler builds once and sweeps `pixel_count`
+by constructing a fresh production `EffectOutput` around the **one shared driver** the
+bundle already built, pulled out via the read-only `matrix` / `strip` accessors. Each
+sweep wrapper is pure software and claims no pins:
+
+- **IS31FL3741 matrix:** per swept count, a new `IS31FL3741EffectOutput` whose `scope_rows`
+  addresses that many rows (capped at the panel's `MATRIX_ROWS`) around the shared matrix.
+  `MUST_BUFFER` makes `show()` write the full panel every flush, so flush cost is constant
+  and only the per-pixel render cost scales -- the model holds exactly.
+- **NeoPixel PWM:** the strip is built once at the largest swept count; per count a new
+  `NeoPixelEffectOutput` addressing `range(0, pixel_count)` around that shared strip.
+  `neopixel.show()` always clocks the full physical strip, so flush is a constant
+  worst-case (max-length) figure rather than scaling with count -- an accepted, conservative
+  approximation; the per-pixel render slope stays faithful.
+
+`build_hardware` also always probes the LIS3DH accelerometer and DRV2605 motor by physical
+presence, so the bundle may carry those too. They are never driven here -- the profiler
+builds its `EffectManager` around only the swept pixel output -- so they sit as a fixed heap
+offset and do not perturb the per-frame `cost_ms`. If no pixel output comes back (matrix or
+strip not wired/reachable), bring-up fails loud rather than reporting a zero-cost sweep.
+
+For the matrix driver, the board's default I2C bus is wrapped in `CountingI2C` and injected
+into `build_hardware` (the `i2c=` seam), so `bytes_written` measured across one render+flush
+tick gives the reported I2C bandwidth. NeoPixel PWM is off the I2C bus (bandwidth 0).
 
 Hardware
 --------
@@ -59,14 +89,19 @@ from __future__ import annotations
 import gc
 import time
 
-from effects.effect import PixelBuffer
+import board
+import busio
+
 from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager, EffectOutput
 from engine.packs import PackRegistry
 from engine.state import Scope
 from engine.timer import Timer
 from hardware.circuitpython.counting_i2c import CountingI2C
-from hardware.shared.matrix_output import MatrixEffectOutput
+from hardware.circuitpython.device_builder import DeviceHardware, build_hardware
+from hardware.circuitpython.is31fl3741_output import IS31FL3741_COLS, IS31FL3741EffectOutput
+from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
+from hardware.shared.device_config import DeviceConfig, parse_device_config
 from hardware.shared.profiling_helpers import (
     linear_fit,
     print_profile_header,
@@ -87,104 +122,75 @@ TARGET_FPS: Final = 24.0
 DISPLAY_SECONDS: Final = 10.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
+NEOPIXEL_PIN: Final = "D5"
+NEOPIXEL_BRIGHTNESS: Final = 0.5
+
+# The IS31FL3741 RGBMatrixQT is physically 13 columns by MATRIX_ROWS rows; a swept
+# row band cannot address beyond it, so per-count row counts are capped here.
+MATRIX_ROWS: Final = 9
+
 # IS31FL3741 matrix driver constant -- used only when DRIVER == "is31fl3741_matrix".
 # i2c_transaction_bytes is measured from one full update() tick (not declared here).
 I2C_FREQUENCY_HZ: Final = TARGET_FPS
 
 
-class NeoPixelPwmOutput(EffectOutput):
-    """Satellite output for a NeoPixel strip driven over PWM.
+def _build_pixel_config(driver: str, largest_count: int) -> DeviceConfig:
+    """Return a minimal `DeviceConfig` declaring only the profiled pixel output.
 
-    Buffers one frame per scope key and writes it to the underlying `neopixel`
-    object on ``flush``. Off the I2C bus -- ``i2c_bandwidth_bytes_per_sec`` is 0
-    for this driver.
+    NeoPixel builds one strip at *largest_count* so every swept count addresses a
+    prefix of the same physical strip. No audio/IR is wired.
     """
-
-    def __init__(self, pixel_count: int, strip) -> None:
-        super().__init__(receives_pixels=True)
-        self.min_resolution = pixel_count
-        self.scopes = [Scope.PERSONAL]
-        self._pixel_count = pixel_count
-        self._strip = strip
-
-    def create_buffer(self, scope_key: str) -> PixelBuffer:
-        return PixelBuffer(self._pixel_count)
-
-    def update_pixels(self, scope_key: str, buffers: list, receipts: list) -> None:
-        if not buffers:
-            return
-        buf = buffers[-1]
-        for i in range(self._pixel_count):
-            self._strip[i] = buf[i]
-
-    def clear_pixels(self, scope_key: str) -> None:
-        for i in range(self._pixel_count):
-            self._strip[i] = 0
-
-    def flush(self) -> None:
-        self._strip.show()
-
-    def deinit(self) -> None:
-        self._strip.deinit()
-
-
-class Is31fl3741MatrixOutput(MatrixEffectOutput):
-    """Satellite output for an IS31FL3741 matrix driven over I2C.
-
-    Subclasses ``MatrixEffectOutput`` (shared scope-to-row-band routing) and routes
-    `Scope.PERSONAL` to every row of the matrix so the profiler can sweep
-    `pixel_count` against `_cols`. ``flush`` calls the underlying matrix's
-    ``show()``, the dominant I2C consumer.
-    """
-
-    def __init__(self, cols: int, rows: int, matrix, counting_i2c: CountingI2C) -> None:
-        super().__init__(cols, {"personal": range(rows)})
-        self.scopes = [Scope.PERSONAL]
-        self._matrix = matrix
-        self._counting_i2c = counting_i2c
-
-    def _write_row(self, row: int, pixels) -> None:
-        for col in range(self._cols):
-            self._matrix.pixel(col, row, pixels[col])
-
-    def flush(self) -> None:
-        self._matrix.show()
-
-    def deinit(self) -> None:
-        self._counting_i2c.deinit()
-
-
-def _build_neopixel_output(pixel_count: int) -> NeoPixelPwmOutput | Is31fl3741MatrixOutput:
-    import board
-    import neopixel
-
-    strip = neopixel.NeoPixel(pin=board.D5, n=pixel_count, brightness=0.5, auto_write=False)
-    return NeoPixelPwmOutput(pixel_count, strip)
-
-
-def _build_matrix_output(
-    pixel_count: int,
-) -> tuple[Is31fl3741MatrixOutput, CountingI2C]:
-    import board
-    import busio
-    import hardware.circuitpython.propmaker as propmaker
-
-    i2c = busio.I2C(board.SCL, board.SDA)
-    counting_i2c = CountingI2C(i2c)
-    matrix = propmaker.setup_matrix_is31fl3741(counting_i2c)
-    cols = 13
-    rows = max(1, (pixel_count + cols - 1) // cols)
-    return Is31fl3741MatrixOutput(cols, rows, matrix, counting_i2c), counting_i2c
-
-
-def _build_output(
-    driver: str, pixel_count: int
-) -> tuple[NeoPixelPwmOutput | Is31fl3741MatrixOutput, CountingI2C | None]:
-    if driver == "neopixel_pwm":
-        return _build_neopixel_output(pixel_count), None
     if driver == "is31fl3741_matrix":
-        return _build_matrix_output(pixel_count)
-    raise ValueError(f"Unknown DRIVER: {driver!r}")
+        pixels = {
+            "type": "matrix",
+            "cols": IS31FL3741_COLS,
+            "scope_rows": {"personal": [0, MATRIX_ROWS]},
+        }
+    elif driver == "neopixel_pwm":
+        pixels = {
+            "type": "neopixel",
+            "pin": NEOPIXEL_PIN,
+            "count": largest_count,
+            "scope_pixels": {"personal": [0, largest_count]},
+        }
+    else:
+        raise ValueError(f"Unknown DRIVER: {driver!r}")
+    return parse_device_config({"pixels": [pixels], "buttons": ["D9"]})
+
+
+def _require_pixel_output(hardware: DeviceHardware, driver: str) -> EffectOutput:
+    """Return the bundle's profiled pixel output, raising loudly if none is present.
+
+    A missing output means the matrix or strip was not wired/reachable. Failing here
+    keeps that from surfacing as a silent zero-cost sweep.
+    """
+    wanted = IS31FL3741EffectOutput if driver == "is31fl3741_matrix" else NeoPixelEffectOutput
+    for output in hardware.outputs:
+        if isinstance(output, wanted):
+            return output
+    raise RuntimeError(f"no {wanted.__name__} in the built hardware bundle -- pixel output missing")
+
+
+def _build_sweep_output(
+    driver: str, pixel_output: EffectOutput, pixel_count: int
+) -> tuple[EffectOutput, int]:
+    """Build a fresh single-scope output for *pixel_count* around the shared driver.
+
+    Returns the output and the pixel count it actually addresses (the matrix row band
+    is capped at the physical panel, so the effective count can be lower than requested).
+    """
+    if driver == "is31fl3741_matrix":
+        rows = max(1, min((pixel_count + IS31FL3741_COLS - 1) // IS31FL3741_COLS, MATRIX_ROWS))
+        output = IS31FL3741EffectOutput(
+            pixel_output.matrix, cols=IS31FL3741_COLS, scope_rows={"personal": range(0, rows)}
+        )
+        output.scopes = [Scope.PERSONAL]
+        return output, rows * IS31FL3741_COLS
+
+    output = NeoPixelEffectOutput(
+        pixel_output.strip, {"personal": range(0, pixel_count)}, NEOPIXEL_BRIGHTNESS
+    )
+    return output, pixel_count
 
 
 def _measure_i2c_transaction_bytes(
@@ -195,9 +201,10 @@ def _measure_i2c_transaction_bytes(
 ) -> int:
     """Return I2C bytes written across one full render+flush tick.
 
-    Counts the whole ``update()`` tick, not just ``show()``: a no-buffer driver
-    emits bytes per pixel during the render pass, so a ``show()``-only count
-    would miss all traffic.
+    Counts the whole ``update()`` tick (render + flush), not just ``show()``, so
+    the figure captures all I2C traffic regardless of when the driver emits it.
+    The production IS31FL3741 driver is buffered, so in practice every byte lands
+    at ``show()``.
     """
     receipt = effect_manager.add_effect(
         Scope.PERSONAL, "elements." + element, {"level": SAMPLE_LEVEL}
@@ -268,11 +275,28 @@ def run() -> None:
     registry.scan_dir("packs/effects", "packs.effects")
     element_names = registry.items("elements")
 
-    # For the matrix driver, measure i2c_transaction_bytes at the largest
-    # (worst-case) pixel count so the bandwidth figure is conservative.
-    worst_pixel_count = PIXEL_COUNTS[-1]
+    # Build the device once: build_hardware claims pins without deiniting, so it cannot
+    # be re-called per swept count. The one shared driver is reused across the sweep.
+    counting_i2c = CountingI2C(busio.I2C(board.SCL, board.SDA))
+    config = _build_pixel_config(DRIVER, PIXEL_COUNTS[-1])
+    hardware = build_hardware(config, board, i2c=counting_i2c)
+    pixel_output = _require_pixel_output(hardware, DRIVER)
+
+    # I2C bandwidth is a single constant worst-case figure, so measure it once up
+    # front -- at the largest pixel count -- before the sweep. Measuring inside the
+    # loop would leave every stats line 0.0 until the final pixel-count batch (and
+    # entirely 0.0 if a long run is interrupted before reaching it). NeoPixel is off
+    # the I2C bus, so its bandwidth stays 0.0.
     i2c_bandwidth = 0.0
-    counting_i2c = None
+    if DRIVER == "is31fl3741_matrix":
+        worst_output, _ = _build_sweep_output(DRIVER, pixel_output, PIXEL_COUNTS[-1])
+        worst_manager = EffectManager(registry=registry, outputs=[worst_output])
+        i2c_transaction_bytes = _measure_i2c_transaction_bytes(
+            worst_manager, Timer(), element_names[0], counting_i2c
+        )
+        i2c_bandwidth = i2c_transaction_bytes * I2C_FREQUENCY_HZ
+        worst_output = worst_manager = None
+        gc.collect()
 
     print_profile_header(
         component=f"pixel.{DRIVER}",
@@ -288,26 +312,18 @@ def run() -> None:
     samples = {element: [] for element in element_names}
 
     for pixel_count in PIXEL_COUNTS:
-        output, counting_i2c = _build_output(DRIVER, pixel_count)
+        output, actual_count = _build_sweep_output(DRIVER, pixel_output, pixel_count)
         effect_manager = EffectManager(registry=registry, outputs=[output])
         timer = Timer()
-
-        # Measure I2C transaction bytes once at the largest pixel count.
-        if DRIVER == "is31fl3741_matrix" and pixel_count == worst_pixel_count:
-            i2c_transaction_bytes = _measure_i2c_transaction_bytes(
-                effect_manager, timer, element_names[0], counting_i2c
-            )
-            i2c_bandwidth = i2c_transaction_bytes * I2C_FREQUENCY_HZ
 
         for element in element_names:
             for stack_depth in STACK_DEPTHS:
                 update_ms = _measure_point(
-                    effect_manager, timer, element, stack_depth, pixel_count, i2c_bandwidth
+                    effect_manager, timer, element, stack_depth, actual_count, i2c_bandwidth
                 )
-                samples[element].append((stack_depth * pixel_count, update_ms))
+                samples[element].append((stack_depth * actual_count, update_ms))
 
-        output.deinit()
-        output = effect_manager = counting_i2c = timer = None
+        output = effect_manager = timer = None
         gc.collect()
 
     # Worst-case element drives worst_case_effect_per_pixel_ms; its fit's intercept

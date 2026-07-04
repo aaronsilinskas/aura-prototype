@@ -168,6 +168,35 @@ def test_build_hardware_matrix_output_can_create_buffer_for_configured_scope() -
     assert buf is not None
 
 
+def test_build_hardware_matrix_output_exposes_shared_matrix_driver() -> None:
+    """The matrix output's ``matrix`` accessor returns the one built driver.
+
+    The pixel profiler rebuilds sweep wrappers around this shared driver, so it
+    must reach it through the public accessor rather than a private attribute.
+    """
+    from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
+
+    config = _matrix_config()
+    board_mock = _mock_board(D9=MagicMock(), D10=MagicMock())
+    driver = MagicMock(name="is31fl3741_driver")
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_matrix_is31fl3741",
+                return_value=driver,
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    matrix_output = next(o for o in hw.outputs if isinstance(o, IS31FL3741EffectOutput))
+    assert matrix_output.matrix is driver
+
+
 # ---------------------------------------------------------------------------
 # build_hardware produces NeoPixelEffectOutput for neopixel config
 # ---------------------------------------------------------------------------
@@ -212,6 +241,31 @@ def test_build_hardware_neopixel_each_output_declares_one_scope() -> None:
     assert all_scope_keys == {"personal", "directional"}
     for o in pixel_outputs:
         assert len(o.scopes) == 1
+
+
+def test_build_hardware_neopixel_output_exposes_shared_strip() -> None:
+    """The NeoPixel output's ``strip`` accessor returns the built strip object.
+
+    The pixel profiler builds one max-length strip, then rebuilds sweep wrappers
+    around it, reaching it through this public accessor.
+    """
+    from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
+
+    config = _neopixel_config(scopes={"personal": {"pin": "D5", "count": 10}})
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    strip = MagicMock(name="neopixel_strip")
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
+        mock_neopixel.NeoPixel.return_value = strip
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    pixel_output = next(o for o in hw.outputs if isinstance(o, NeoPixelEffectOutput))
+    assert pixel_output.strip is strip
 
 
 def test_build_hardware_neopixel_output_resolves_pin_names() -> None:

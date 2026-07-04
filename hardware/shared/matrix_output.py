@@ -19,6 +19,17 @@ class MatrixEffectOutput(EffectOutput):
         self._scope_rows = scope_rows
         self._zero_buffer = PixelBuffer(cols)
 
+    @property
+    def matrix(self) -> object:
+        """The underlying hardware matrix driver this output writes to.
+
+        Read-only. Lets a caller reach the one shared driver to build further
+        outputs around it (e.g. the pixel profiler sweeping row bands) without
+        re-probing hardware or touching a private attribute. Subclasses set
+        ``self._matrix`` to the driver they own.
+        """
+        return self._matrix
+
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         """Return a PixelBuffer sized for one row of the matrix (``cols`` pixels)."""
         return PixelBuffer(self._cols)
