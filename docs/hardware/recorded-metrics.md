@@ -165,11 +165,15 @@ the bare framework loop with no engine.
 
 Per-scene heap measured **in situ** on the assembled prop by
 [`scene_load_profiler.py`](../../examples/hardware/profiling/scene_load_profiler.py): each
-scene loaded against the real prop's outputs (matrix + audio + motor + optional IR), split
-into a staged `load` Δ (the heap `SceneManager.load` retains) and a first-tick Δ (the heap
-the first `SceneManager.update` retains, when the scene's opening effects fire). The
-near-zero `load` Δ across all three scenes is expected: `load` only stages the transition;
-the scene graph is instantiated on the first tick.
+scene loaded against the real prop's outputs (matrix + audio + motor + optional IR),
+assembled in one `build_hardware` call from an in-file `DeviceConfig` built off the
+matching `HARNESSES` entry. The two columns below are split into a staged `load` Δ (the
+heap `SceneManager.load` retains) and a first-tick Δ (the heap the first
+`SceneManager.update` retains, when the scene's opening effects fire) — both measured
+*after* the coarser hardware-bundle / registry-scan / engine-construction stages the
+profiler's `__SCENE_STAGES` line reports separately. The near-zero `load` Δ across all
+three scenes is expected: `load` only stages the transition; the scene graph is
+instantiated on the first tick.
 
 Each row is a **standalone measurement of one `(scene, harness)` pair** — not an additive
 term, and not comparable across harnesses. Scene memory is output-coupled, so a figure is

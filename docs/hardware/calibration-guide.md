@@ -178,11 +178,21 @@ to drive the peak frame time.
 
 ## `scene_load_profiler.py` — per-scene in-situ baselines
 
-Feeds the **Per-scene in-situ baselines** table under *Whole-prop measurements*. Stands
-up the **real assembled prop's outputs** (matrix + audio + optional motor + optional
-IR/network controls) and loads one named scene against them, reporting the staged heap it
-retains:
+Feeds the **Per-scene in-situ baselines** table under *Whole-prop measurements*. Builds
+an in-file `DeviceConfig` from the selected `HARNESSES` entry (`parse_device_config`) and
+hands it to `build_hardware` — the same assembly path production demos use — to stand up
+the **real assembled prop's outputs** (matrix + audio + optional motor + optional
+IR/network controls), then loads one named scene against them, reporting the staged heap
+it retains. `build_hardware` imposes a coarser boundary than the old per-driver setup
+calls did, so the breakdown is one hardware-bundle delta followed by the stages the
+profiler still owns individually:
 
+- **`hardware` Δ** — the heap the single `build_hardware` call retains (matrix, audio,
+  optional motor, optional IR/network controls, plus buttons/accelerometer it always
+  wires but this profiler never reads).
+- **`registries` Δ** — the heap scanning the effect/rule/scene `PackRegistry`s retains.
+- **`engine` Δ** — the heap building `EffectManager` + `Timer` + `GameEngine` +
+  `SceneManager` retains.
 - **`load` Δ** — the heap `SceneManager.load(SCENE_NAME)` retains (the scene graph:
   phases, rules, effects).
 - **first-tick Δ** — the heap the first `SceneManager.update()` retains (opening effects
@@ -191,9 +201,13 @@ retains:
 Set `SCENE_NAME` to the scene you want and **confirm its `HARNESSES` entry matches the
 prop you are running** — the registered audio clips, voice count, and IR wiring. The
 harness is configured by hand, not derived from the scene; a recorded figure is valid
-**only for the `(scene, harness)` pair it was measured against**. A mismatched harness
-(missing clips or scopes) reproduces the headless-style artifact that motivated dropping
-`scene_content`. Read the `__SCENE_STAGES` line for the staged free-heap breakdown and the
-`__TABLE_ROW table=scene_in_situ_baselines` row to paste into `recorded-metrics.md`. Run
-it once per scene (`tag`, `red_light_green_light`, `hardware_test`), each on its matching
-harness — these are standalone measurements, not additive terms.
+**only for the `(scene, harness)` pair it was measured against**. A harness with
+`"ir": None` omits the `ir` key from the in-file config entirely, so `build_hardware`
+wires no IR receiver and no network controls; `"tag"` / `"default"` pass the matching
+wire-frame codec. A mismatched harness (missing clips or scopes) reproduces the
+headless-style artifact that motivated dropping `scene_content`. Read the
+`__SCENE_STAGES` line for the full staged free-heap breakdown and the
+`__TABLE_ROW table=scene_in_situ_baselines` row (still just `load` Δ and first-tick Δ —
+the two scene-specific figures) to paste into `recorded-metrics.md`. Run it once per
+scene (`tag`, `red_light_green_light`, `hardware_test`), each on its matching harness —
+these are standalone measurements, not additive terms.

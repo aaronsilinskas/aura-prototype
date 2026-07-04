@@ -4,7 +4,8 @@ This is the diagnostic half of the capacity teardown (#460): it stands up the
 **real assembled prop** (IS31FL3741 matrix, I2S audio, DRV2605L vibration, and --
 for scenes that use the network -- the IR LINE emitter + one IR receiver), loads a
 named scene against those **real outputs**, and reports the heap consumed in two
-stages:
+headline stages (see "Hardware bring-up" below for the finer breakdown the
+``__SCENE_STAGES`` line prints around them):
 
 - **`load` delta** -- the heap `SceneManager.load(SCENE_NAME)` retains: the scene
   graph (phases, rules, effects) instantiated against the prop's registered scopes.
@@ -41,17 +42,29 @@ wrong. If you add or change a scene's clips/scopes, update its ``HARNESSES`` ent
 to match, and re-record its baseline -- an old figure measured against a different
 harness is not comparable.
 
+Hardware bring-up
+------------------
+Each ``HARNESSES`` entry describes a ``DeviceConfig`` built **in-file** (not read
+from ``aura-device.json``) and handed to
+``hardware.circuitpython.device_builder.build_hardware`` -- the same assembly path
+production demos use, so this profiler measures the same hardware graph a prop
+actually runs. A harness with ``"ir": None`` omits the ``ir`` key from the mapping
+entirely, so ``build_hardware`` wires **no** IR receiver and no network controls --
+keeping them off the heap for scenes that never touch the network. ``"tag"`` and
+``"default"`` include an ``ir`` section and pass the matching wire-frame codec.
+
 Hardware
 --------
 This measures scene heap against the prop's **outputs** only; it does not read
-buttons or the accelerometer (inputs do not allocate scene heap).
+buttons or the accelerometer (inputs do not allocate scene heap), even though
+``build_hardware`` wires them up as part of the assembled bundle.
 
 - Adafruit RP2040 PropMaker Feather
 - Adafruit IS31FL3741 13x9 RGB LED Matrix Breakout (I2C on default SDA/SCL)
 - DRV2605L haptic motor driver on default SDA/SCL (optional -- the profiler runs
   without it, but the vibration output is then absent from the measurement)
-- For scenes whose harness sets ``"ir"``: IR receiver on IR_RX_PIN and IR LINE
-  emitter on IR_LINE_PIN
+- For scenes whose harness sets ``"ir"``: IR receiver on IR_RX_PIN_NAME and IR LINE
+  emitter on IR_LINE_PIN_NAME
 
 Installation
 ------------
@@ -88,24 +101,22 @@ from __future__ import annotations
 
 import gc
 
-import board
-import hardware.circuitpython.propmaker as propmaker
-
 from effects.performance import PerformanceTracker
-from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
-from engine.network import HardwareNetworkControls
 from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
 from hardware.circuitpython.audio_output import AudioEffectOutput
+from hardware.circuitpython.device_builder import DeviceHardware, build_hardware
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.circuitpython.is31fl3741_output import (
     IS31FL3741_COLS,
     IS31FL3741_SCOPE_ROWS,
     IS31FL3741EffectOutput,
 )
+from hardware.shared.device_config import DeviceConfig, parse_device_config
+from hardware.shared.ir_protocol import InfraredDecoder, InfraredEncoder
 from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,
@@ -122,10 +133,15 @@ except ImportError:
 # Configuration -- adjust to match your wiring
 # ---------------------------------------------------------------------------
 
-# IR transceiver pins -- update these to match your board layout. Only used for
-# scenes whose harness sets ``"ir"`` (tag, hardware_test); ignored otherwise.
-IR_RX_PIN: Final = board.D11
-IR_LINE_PIN: Final = board.D12
+# Button pins -- build_hardware always wires buttons, though this profiler never
+# reads them (inputs do not allocate scene heap). Match the production demo.
+BUTTON_A_PIN_NAME: Final = "D9"
+BUTTON_B_PIN_NAME: Final = "D10"
+
+# IR transceiver pin names -- update these to match your board layout. Only used
+# for harnesses whose "ir" is not None (tag, hardware_test); ignored otherwise.
+IR_RX_PIN_NAME: Final = "D11"
+IR_LINE_PIN_NAME: Final = "D12"
 
 LOG_INTERVAL_SECONDS: Final = 5.0
 
@@ -203,45 +219,95 @@ def _harness_label(harness: dict) -> str:
     return f"matrix+audio(v{harness['num_voices']})+motor+{ir_part}"
 
 
-def _setup_ir(harness: dict) -> tuple:  # (transmitters | None, receiver | None)
-    """Build the IR transmitters + receiver for `harness`, or ``(None, None)``.
+def _device_config_for(harness: dict) -> DeviceConfig:
+    """Build the in-file DeviceConfig for `harness` via parse_device_config.
 
-    Returns ``(None, None)`` for a harness with ``"ir": None`` so scenes that
-    never touch the network are measured without a receiver or network controls
-    on the heap -- part of keeping each figure faithful to its own harness.
+    Mirrors the matrix geometry every prop in this repo ships (IS31FL3741_COLS /
+    IS31FL3741_SCOPE_ROWS) and the harness's own audio clips/voice count. Omits
+    the ``ir`` key entirely when ``harness["ir"]`` is ``None`` so build_hardware
+    wires no IR receiver and no network controls for scenes that never touch the
+    network -- ``HARNESSES`` stays the single source of truth for what each scene
+    needs, not a static ``aura-device.json``.
     """
-    mode = harness["ir"]
-    if mode is None:
-        return None, None
-    if mode == "tag":
-        encoder = TagInfraredEncoder()
-        decoder = TagInfraredDecoder()
-    else:  # "default" -- the AuraInfrared* codec propmaker installs by default
-        encoder = None
-        decoder = None
-    return propmaker.setup_ir(
-        IR_RX_PIN,
-        IR_LINE_PIN,
-        encoder=encoder,
-        decoder=decoder,
-    )
+    mapping: dict = {
+        "pixels": [
+            {
+                "type": "matrix",
+                "cols": IS31FL3741_COLS,
+                "scope_rows": {
+                    key: [scope_range.start, scope_range.stop]
+                    for key, scope_range in IS31FL3741_SCOPE_ROWS.items()
+                },
+            }
+        ],
+        "buttons": [BUTTON_A_PIN_NAME, BUTTON_B_PIN_NAME],
+        "audio": {
+            "voices": harness["num_voices"],
+            "max_volume": 0.1,
+            "clips": harness["audio_clips"],
+        },
+    }
+    if harness["ir"] is not None:
+        mapping["ir"] = {"rx": IR_RX_PIN_NAME, "line": IR_LINE_PIN_NAME}
+    return parse_device_config(mapping)
+
+
+def _ir_codec_for(harness: dict) -> tuple[InfraredEncoder | None, InfraredDecoder | None]:
+    """Return the (encoder, decoder) pair build_hardware should use for `harness`.
+
+    ``"tag"`` measures against the TagInfrared* wire-frame; ``"default"`` returns
+    ``(None, None)`` so build_hardware falls back to its own Aura wire-frame
+    default. Harnesses with ``"ir": None`` never reach build_hardware's IR branch
+    (the config carries no ``ir`` section), so the codec choice is irrelevant and
+    also returns ``(None, None)``.
+    """
+    if harness["ir"] == "tag":
+        return TagInfraredEncoder(), TagInfraredDecoder()
+    return None, None
+
+
+def _verify_hardware(hw: DeviceHardware, harness: dict) -> None:
+    """Fail loud if the assembled bundle is missing an output this harness expects.
+
+    A silent gap here (e.g. build_hardware skipping the matrix because the I2C bus
+    misbehaved) would otherwise surface only as a confusing, wrong heap figure --
+    this raises immediately instead so a bad run is never mistaken for a valid
+    baseline.
+    """
+    if not any(isinstance(output, IS31FL3741EffectOutput) for output in hw.outputs):
+        raise RuntimeError("build_hardware bundle is missing the IS31FL3741 matrix output")
+    if not any(isinstance(output, AudioEffectOutput) for output in hw.outputs):
+        raise RuntimeError("build_hardware bundle is missing the audio output")
+    if harness["ir"] is None:
+        if hw.ir_receiver is not None:
+            raise RuntimeError("harness declares ir=None but build_hardware wired an IR receiver")
+    elif hw.ir_receiver is None:
+        raise RuntimeError(f"harness ir={harness['ir']!r} but build_hardware wired no IR receiver")
 
 
 def _build_prop(scene_name: str, harness: dict) -> tuple[SceneManager, EffectManager, Timer]:
     """Stand up the real prop for `harness` and load `scene_name` in situ.
 
     Mirrors the production demo for each scene (matrix + audio + optional motor +
-    optional IR/network controls), then loads the scene against those real
-    outputs and applies its first tick. Snapshots free heap around the `load` and
-    first-tick stages and prints the staged `__SCENE_STAGES` breakdown plus the
-    paste-ready `scene_in_situ_baselines` row. Returns the live driving objects so
-    the caller can keep ticking the scene for observation.
+    optional IR/network controls) via the single ``build_hardware`` call, then
+    loads the scene against those real outputs and applies its first tick.
+    build_hardware imposes a coarser boundary than the old per-driver setup calls
+    did, so the staged free-heap breakdown is now: one hardware-bundle delta
+    (the whole build_hardware call), then the stages this profiler still owns
+    individually -- registry scan, engine/manager construction, scene load, and
+    first tick. Prints the staged ``__SCENE_STAGES`` breakdown plus the
+    paste-ready ``scene_in_situ_baselines`` row. Returns the live driving objects
+    so the caller can keep ticking the scene for observation.
     """
-    propmaker.setup_external_power()
-    i2c = propmaker.setup_i2c()
-    matrix = propmaker.setup_matrix_is31fl3741(i2c)
-    motor = propmaker.setup_drv2605(i2c)
-    ir_transmitters, _ir_receiver = _setup_ir(harness)
+    config = _device_config_for(harness)
+    ir_encoder, ir_decoder = _ir_codec_for(harness)
+
+    gc.collect()
+    free_before_hardware = gc.mem_free()
+    hw = build_hardware(config, ir_encoder=ir_encoder, ir_decoder=ir_decoder)
+    gc.collect()
+    free_after_hardware = gc.mem_free()
+    _verify_hardware(hw, harness)
 
     effect_registry = PackRegistry(item_attr="BUILD")
     effect_registry.scan_dir("packs/effects", "packs.effects")
@@ -249,42 +315,19 @@ def _build_prop(scene_name: str, harness: dict) -> tuple[SceneManager, EffectMan
     rule_registry.scan_dir("packs/rules", "packs.rules")
     scene_registry = SceneRegistry()
     scene_registry.scan_dir("packs/scenes", "packs.scenes")
+    gc.collect()
+    free_after_registries = gc.mem_free()
 
-    audio_registry = AudioRegistry()
-    for effect_name, wav_path in harness["audio_clips"].items():
-        audio_registry.register(effect_name, wav_path)
-    audio_output = AudioEffectOutput(
-        audio_registry,
-        max_volume=0.1,
-        num_voices=harness["num_voices"],
-        i2s_bit_clock=board.I2S_BIT_CLOCK,
-        i2s_word_select=board.I2S_WORD_SELECT,
-        i2s_data=board.I2S_DATA,
-    )
-
-    outputs = [
-        IS31FL3741EffectOutput(matrix, cols=IS31FL3741_COLS, scope_rows=IS31FL3741_SCOPE_ROWS),
-        audio_output,
-    ]
-    if motor is not None:
-        outputs.append(Drv2605EffectOutput(motor))
-    effect_manager = EffectManager(registry=effect_registry, outputs=outputs)
-
+    effect_manager = EffectManager(registry=effect_registry, outputs=hw.outputs)
     timer = Timer()
-    network_controls = (
-        HardwareNetworkControls(ir_transmitters) if ir_transmitters is not None else None
-    )
     engine = GameEngine(
         effect_controls=effect_manager,
         timer=timer,
-        network_controls=network_controls,
+        network_controls=hw.network_controls,
     )
     manager = SceneManager(engine, effect_registry, rule_registry, scene_registry)
-
-    # Stage the two heap deltas the diagnostic reports. gc.collect on each side so
-    # the figures are retained heap, not transient construction litter.
     gc.collect()
-    free_before_load = gc.mem_free()
+    free_after_engine = gc.mem_free()
 
     manager.load(scene_name)
     gc.collect()
@@ -294,13 +337,17 @@ def _build_prop(scene_name: str, harness: dict) -> tuple[SceneManager, EffectMan
     gc.collect()
     free_after_tick = gc.mem_free()
 
-    load_bytes = free_before_load - free_after_load
+    hardware_bytes = free_before_hardware - free_after_hardware
+    registries_bytes = free_after_hardware - free_after_registries
+    engine_bytes = free_after_registries - free_after_engine
+    load_bytes = free_after_engine - free_after_load
     first_tick_bytes = free_after_load - free_after_tick
+    motor_present = any(isinstance(output, Drv2605EffectOutput) for output in hw.outputs)
 
     print(
-        f"__SCENE_STAGES scene={scene_name}, motor_present={motor is not None}, "
-        + f"free_before_load={free_before_load}, load={load_bytes}, "
-        + f"free_after_load={free_after_load}, first_tick={first_tick_bytes}, "
+        f"__SCENE_STAGES scene={scene_name}, motor_present={motor_present}, "
+        + f"hardware={hardware_bytes}, registries={registries_bytes}, "
+        + f"engine={engine_bytes}, load={load_bytes}, first_tick={first_tick_bytes}, "
         + f"free_after_tick={free_after_tick}"
     )
     # Per-scene in-situ baseline: the (scene, harness) pair, its staged `load`
