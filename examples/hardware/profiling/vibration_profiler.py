@@ -18,9 +18,25 @@ Each iteration:
 `PerformanceTracker` reports the per-event `handle_event` cost (the `cost_ms` term)
 alongside the uniform stats line.
 
-The I2C bus is wrapped in `CountingI2C` before `setup_drv2605`. The decorator is
-reset before a representative vibration event and `bytes_written` after that event
-gives the measured `i2c_transaction_bytes` -- no guessing required.
+Hardware bring-up
+-----------------
+The motor is brought up through a single `build_hardware` call from an in-file minimal
+`DeviceConfig` (no pixels/audio/IR) rather than the retired per-peripheral setup helpers.
+The DRV2605L is not config-gated: `build_hardware` probes it by physical presence and, when
+found, appends a `Drv2605EffectOutput` to the returned bundle's outputs -- which this
+profiler pulls out and drives, ignoring any other auto-attached output. If no
+`Drv2605EffectOutput` comes back (no DRV2605 wired/reachable), bring-up fails loud rather
+than reporting a zero-cost measurement.
+
+`build_hardware` also always probes the LIS3DH accelerometer alongside the motor. It is
+never driven here, so it contributes only a fixed heap offset (and its idle-motor I2C
+setup traffic happens before the measurement window) -- it does not perturb the per-event
+`cost_ms` or the reset-then-measure `i2c_transaction_bytes`.
+
+The board's default I2C bus is wrapped in `CountingI2C` and injected into
+`build_hardware` (the `i2c=` seam), so every peripheral shares the counted bus. The
+decorator is reset before a representative vibration event and `bytes_written` after that
+event gives the measured `i2c_transaction_bytes` -- no guessing required.
 
 Hardware
 --------
@@ -49,11 +65,17 @@ from __future__ import annotations
 
 import time
 
+import board
+import busio
+
 from effects.effect import Effect, EffectVibration, VibrationConfig
 from effects.performance import PerformanceTracker
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
 from hardware.circuitpython.counting_i2c import CountingI2C
+from hardware.circuitpython.device_builder import DeviceHardware, build_hardware
+from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
+from hardware.shared.device_config import DeviceConfig
 from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,
@@ -73,26 +95,27 @@ LOG_INTERVAL_SECONDS: Final = 5.0
 _EVENT_VERB: Final = "buzz"
 
 
-def _build_bus() -> CountingI2C:
-    import board
-    import busio
+def _require_drv2605_output(hardware: DeviceHardware) -> Drv2605EffectOutput:
+    """Return the bundle's `Drv2605EffectOutput`, raising loudly if none is present.
 
-    return CountingI2C(busio.I2C(board.SCL, board.SDA))
-
-
-def _build_output(i2c: CountingI2C):
-    from hardware.circuitpython.propmaker import setup_drv2605
-
-    from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
-
-    motor = setup_drv2605(i2c)
-    return Drv2605EffectOutput(motor)
+    `build_hardware` gates the DRV2605L on physical presence, so an absent output means
+    no motor was wired or reachable. Failing here keeps a missing motor from surfacing as
+    a silent zero-cost measurement.
+    """
+    for output in hardware.outputs:
+        if isinstance(output, Drv2605EffectOutput):
+            return output
+    raise RuntimeError("no Drv2605EffectOutput in the built hardware bundle -- no DRV2605 found")
 
 
 def run() -> None:
     """Drive `handle_event` once per `EVENT_INTERVAL_SECONDS`, reporting per-event cost."""
-    counting_bus = _build_bus()
-    output = _build_output(counting_bus)
+    counting_bus = CountingI2C(busio.I2C(board.SCL, board.SDA))
+    # Minimal config: no pixels/audio/IR. The motor (and accelerometer) are probed by
+    # physical presence, not config, so they still come up on the injected bus.
+    config = DeviceConfig(pixels=[], buttons=[], ir=None, audio=None)
+    hardware = build_hardware(config, board, i2c=counting_bus)
+    output = _require_drv2605_output(hardware)
 
     buzz_effect = Effect(
         "profiler.buzz",

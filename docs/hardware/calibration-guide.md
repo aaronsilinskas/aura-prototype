@@ -132,10 +132,13 @@ re-run to record the cost at each voice cap.
 ## `vibration_profiler.py` — vibration component costs
 
 Feeds the **Vibration component costs** table. `cost_ms` is the measured average
-per-event CPU cost of `handle_event` + `motor.play()`. `i2c_transaction_bytes` is
-measured on-device by wrapping the real `busio.I2C` bus in a `CountingI2C` decorator
-before `setup_drv2605`, resetting the counter before a representative vibration event,
-and reading `bytes_written` after.
+per-event CPU cost of `handle_event` + `motor.play()`. The DRV2605L is brought up through
+a single `build_hardware` call from an in-file minimal `DeviceConfig` (no pixels/audio/IR;
+the motor is probed by physical presence, not config). `i2c_transaction_bytes` is measured
+on-device by wrapping the real `busio.I2C` bus in a `CountingI2C` decorator and injecting
+it into `build_hardware` via the `i2c=` seam, resetting the counter before a
+representative vibration event, and reading `bytes_written` after. The always-probed
+accelerometer is never driven, so it contributes only a fixed heap offset.
 
 ## `ir_tx_profiler.py` — IR-transmit component costs
 
