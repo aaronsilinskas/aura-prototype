@@ -282,10 +282,21 @@ def run() -> None:
     hardware = build_hardware(config, board, i2c=counting_i2c)
     pixel_output = _require_pixel_output(hardware, DRIVER)
 
-    # For the matrix driver, measure i2c_transaction_bytes at the largest
-    # (worst-case) pixel count so the bandwidth figure is conservative.
-    worst_pixel_count = PIXEL_COUNTS[-1]
+    # I2C bandwidth is a single constant worst-case figure, so measure it once up
+    # front -- at the largest pixel count -- before the sweep. Measuring inside the
+    # loop would leave every stats line 0.0 until the final pixel-count batch (and
+    # entirely 0.0 if a long run is interrupted before reaching it). NeoPixel is off
+    # the I2C bus, so its bandwidth stays 0.0.
     i2c_bandwidth = 0.0
+    if DRIVER == "is31fl3741_matrix":
+        worst_output, _ = _build_sweep_output(DRIVER, pixel_output, PIXEL_COUNTS[-1])
+        worst_manager = EffectManager(registry=registry, outputs=[worst_output])
+        i2c_transaction_bytes = _measure_i2c_transaction_bytes(
+            worst_manager, Timer(), element_names[0], counting_i2c
+        )
+        i2c_bandwidth = i2c_transaction_bytes * I2C_FREQUENCY_HZ
+        worst_output = worst_manager = None
+        gc.collect()
 
     print_profile_header(
         component=f"pixel.{DRIVER}",
@@ -304,13 +315,6 @@ def run() -> None:
         output, actual_count = _build_sweep_output(DRIVER, pixel_output, pixel_count)
         effect_manager = EffectManager(registry=registry, outputs=[output])
         timer = Timer()
-
-        # Measure I2C transaction bytes once at the largest pixel count.
-        if DRIVER == "is31fl3741_matrix" and pixel_count == worst_pixel_count:
-            i2c_transaction_bytes = _measure_i2c_transaction_bytes(
-                effect_manager, timer, element_names[0], counting_i2c
-            )
-            i2c_bandwidth = i2c_transaction_bytes * I2C_FREQUENCY_HZ
 
         for element in element_names:
             for stack_depth in STACK_DEPTHS:
