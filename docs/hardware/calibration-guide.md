@@ -105,21 +105,25 @@ separate flush-timing seam is needed — `effect_manager.update` renders and flu
 one call). The profiler fits each effect element independently and reports the
 **worst-case element's** slope, with that element's intercept as `flush_ms`.
 
-### Matrix driver: buffered vs. no-buffer and the I2C transaction boundary
+Both drivers are the production outputs (`IS31FL3741EffectOutput` / `NeoPixelEffectOutput`)
+built through a single `build_hardware` call. `build_hardware` claims board pins without
+deiniting them, so it cannot be re-called per swept count; the profiler builds once and
+sweeps `pixel_count` by rebuilding only the software `EffectOutput` wrapper around the one
+shared driver, reached via its read-only `matrix` / `strip` accessor. For NeoPixel the
+strip is built once at the largest swept count, so `flush_ms` is the **constant max-length
+`show()` cost** and `worst_case_effect_per_pixel_ms` reflects render only.
 
-The IS31FL3741 driver runs **buffered** (`allocate=MUST_BUFFER`, the default in
-`device_builder._setup_matrix_is31fl3741`) or **no-buffer**:
+### Matrix driver: the buffered I2C transaction boundary
 
-- **Buffered**: accumulates pixel writes in RAM, flushes in a single I2C burst at
-  `show()`, so `flush_ms` dominates and `worst_case_effect_per_pixel_ms` is low.
-- **No-buffer**: each `pixel()` call sends a small I2C transaction immediately,
-  scattering traffic across the render pass before `show()`.
+The production IS31FL3741 driver runs **buffered** (`allocate=MUST_BUFFER`, set in
+`device_builder._setup_matrix_is31fl3741`): it accumulates pixel writes in RAM and flushes
+in a single I2C burst at `show()`, so `flush_ms` dominates and
+`worst_case_effect_per_pixel_ms` is low.
 
-To capture both, the profiler counts bytes across the **entire**
-`effect_manager.update()` tick (render + flush) via a `CountingI2C` decorator wrapping
-the real bus. The byte volume is independent of stack depth and effect identity, so no
-separate I2C sweep axis is needed. NeoPixel PWM is off the I2C bus and reports zero
-bandwidth.
+The profiler counts bytes across the **entire** `effect_manager.update()` tick (render +
+flush) via a `CountingI2C` decorator injected into `build_hardware` (the `i2c=` seam). The
+byte volume is independent of stack depth and effect identity, so no separate I2C sweep axis
+is needed. NeoPixel PWM is off the I2C bus and reports zero bandwidth.
 
 ## `sound_profiler.py` — sound component costs
 

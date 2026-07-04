@@ -85,6 +85,13 @@ NeoPixel PWM is off the I2C bus (reports 0); the buffered matrix flush is the do
 consumer. The matrix `flush_ms` (~60.69 ms) alone exceeds the 24 FPS budget (41.7 ms),
 which is why any IS31FL3741 scope tops out near 10–12 FPS regardless of pixel count.
 
+Provenance: both drivers are now the production outputs (`IS31FL3741EffectOutput` /
+`NeoPixelEffectOutput`) built through `build_hardware`, not the profiler's former local
+wrappers. The NeoPixel row's `flush_ms` is now the **constant max-length `show()` cost**:
+the strip is built once at the largest swept count and `neopixel.show()` always clocks the
+full physical strip, so `worst_case_effect_per_pixel_ms` reflects render only, not per-pixel
+clock-out (a conservative approximation that never under-reports flush).
+
 ### Sound component costs
 
 Per-frame mixer terms. The `linear_fit` intercept is `mixer_fixed_ms`; the slope is
