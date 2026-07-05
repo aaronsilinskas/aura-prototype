@@ -121,6 +121,18 @@ _Avoid_: confusing with `Event` (game-rule events); assuming only `"start"`/`"st
 Maps a qualified effect name to its `EffectBuilder`, owning the reserved `scene.` prefix rule: a `scene.`-prefixed name resolves against the active scene's scene-local effects, any other `pack.`-prefixed name against the shared effect packs. Held by `EffectManager`, which delegates all effect-name resolution to it.
 _Avoid_: putting qualified-effect-name parsing or the `scene.` rule in `EffectManager`; confusing with `EffectManager` (routing and rendering, not name resolution)
 
+### Merge strategy
+The per-scope policy that decides how a scope's stack of layered effect buffers becomes the pixels shown on that scope's region. Set on `EffectControls` (`set_merge_strategy`), defaults to **Split**, and is reset to the default when a scene loads — preserved across an `overlay` and restored on `pop`, so an overlay's change never leaks down to the scene beneath it. Two ship: **Split** and **Additive**. `EffectManager` applies it each tick and hands each `EffectOutput` a single already-composed region buffer, so an output never sees the layered stack.
+_Avoid_: making it a per-output construction parameter or an `aura-device.json` choice (it is a per-scope runtime setting on `EffectControls`); holding merge state on the output; a global (non-per-scope) strategy.
+
+### Split
+The default **merge strategy**: divides a scope's physical region into **N** near-equal contiguous parts, one per layered effect (bottom-to-top), so N effects render side-by-side; leftover pixels go to the first parts. A single effect fills the whole region unchanged (no regression versus a non-layered effect). With more effects than pixels, the surplus effects get zero-width parts and stay invisible until earlier ones fall away — still advancing so they animate correctly once they surface.
+_Avoid_: downsampling a full-width render into each part (each effect renders *directly* into its part at that part's size); "slice"/"partition" as competing names.
+
+### Additive
+The opt-in **merge strategy**: composites **all** N layered effect buffers into the full region by per-channel additive blend clamped to 255, each buffer scaled by its receipt brightness first, so layered effects overlap rather than share space. N == 1 is identical to Split and to a non-layered effect.
+_Avoid_: confusing with `AddColorsRenderer` (that blends a *single* effect's layers at the sample level; Additive blends already-rendered buffers *across* effects); "merge"/"blend"/"overlay" as competing names.
+
 ### Resolution
 The mathematical detail level at which an effect generates animation data. Independent of pixel count. Each `EffectOutput` declares a `min_resolution`; the engine uses the highest across all targeted outputs.
 _Avoid_: conflating resolution with pixel count

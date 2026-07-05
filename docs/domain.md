@@ -46,6 +46,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   network.py      NetworkEvents, HardwareNetworkControls
   effects/
     manager.py    EffectManager, EffectOutput, EffectBuilder, EffectResolver
+    merge.py      MergeStrategy, SplitMerge, AdditiveMerge (per-scope layered-buffer compositing)
 
 magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
   aura.py         Aura, Spell, Spells, SpellTags, SpellLevelScaler, AuraEvent (+ subclasses), EventListener
@@ -102,6 +103,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
 | `EffectResolver` | `engine/effects/manager.py` | Resolves a qualified effect name to a builder; owns the `scene.` prefix rule |
+| `MergeStrategy` | `engine/effects/merge.py` | Per-scope policy compositing a scope's layered effect buffers into one region buffer (`SplitMerge` / `AdditiveMerge`) |
 | `PackRegistry` | `engine/packs.py` | Loads and looks up named packs (effects, rules, scenes) by entry point |
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
