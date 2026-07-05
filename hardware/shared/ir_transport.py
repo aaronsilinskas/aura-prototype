@@ -167,11 +167,11 @@ class InfraredTransmitter:
 
     Send/poll model:
       - :meth:`send` starts the write immediately if the writer is idle; if
-        busy, the raw bytes replace any previously buffered pending payload
-        (latest wins, pending depth never exceeds one).
+        busy, *data* is appended to an unbounded FIFO queue of buffered
+        payloads instead of overwriting anything already queued.
       - :meth:`poll` must be called every tick. It does nothing while the
         writer is busy; once idle, it releases a deferred gate (see *Gate
-        timing* below) and starts any pending payload.
+        timing* below) and starts the oldest queued payload, if any.
       - Encoding happens exactly once per transmitted payload, at
         start-of-write — never per-tick.
 
@@ -183,15 +183,17 @@ class InfraredTransmitter:
         immediately — reproducing the original ``try``/``finally``
         byte-for-byte. If ``True`` (e.g. DMA in flight) the gate stays armed
         and the next :meth:`poll` that observes ``is_busy() == False`` fires
-        ``end_transmit`` before starting any pending send.
+        ``end_transmit`` before starting the oldest queued send.
 
     Error semantics:
       - An encode error raised while kicking off a write from :meth:`send`
         propagates immediately (the gate is still released via
         ``try``/``finally``).
-      - An encode error on a payload that was queued (buffered) surfaces
-        later, from the :meth:`poll` call that attempts to start it —
-        accepted for a fire-and-forget API.
+      - An encode error on a payload that was queued surfaces later, from
+        the :meth:`poll` call that attempts to start it — accepted for a
+        fire-and-forget API. The failing payload is removed from the queue
+        before the error propagates, so later polls keep draining the
+        payloads queued after it.
 
     Args:
         pulse_writer: Hardware port that physically transmits pulses.
@@ -210,16 +212,16 @@ class InfraredTransmitter:
         self._writer = pulse_writer
         self._encoder = encoder
         self._gate = gate
-        self._pending: bytes | None = None
+        self._pending_queue: list[bytes] = []
         self._gate_armed: bool = False
 
     def send(self, data: bytes) -> bool:
-        """Start transmitting *data* if idle, else buffer it as the pending send.
+        """Start transmitting *data* if idle, else append it to the FIFO queue.
 
         While a write is outstanding (``PulseWriter.is_busy()`` is ``True``),
-        *data* replaces any previously buffered pending payload — latest wins,
-        pending depth never exceeds one. No encoding happens for a buffered
-        payload until it is started (by :meth:`send` or :meth:`poll`).
+        *data* is appended to an unbounded FIFO queue of buffered payloads —
+        nothing already queued is overwritten. No encoding happens for a
+        queued payload until it is started (by :meth:`poll`, oldest first).
 
         Args:
             data: Opaque payload bytes to transmit.
@@ -229,34 +231,35 @@ class InfraredTransmitter:
             the writer was idle at entry *and* reports idle again
             immediately after :meth:`PulseWriter.write_pulses` returns (a
             blocking writer). ``False`` in every other case: the writer was
-            busy at entry (*data* was buffered as the pending payload,
-            whether or not it replaced a previously buffered payload), or
-            the write started but is still outstanding on a non-blocking
-            (e.g. DMA-backed) writer — started, not yet sent.
+            busy at entry (*data* was appended to the queue), or the write
+            started but is still outstanding on a non-blocking (e.g.
+            DMA-backed) writer — started, not yet sent.
         """
         if self._writer.is_busy():
-            self._pending = data
+            self._pending_queue.append(data)
             return False
         self._start_write(data)
         return not self._writer.is_busy()
 
     def poll(self) -> bool:
-        """Per-tick pump: release a deferred gate and start any pending send.
+        """Per-tick pump: release a deferred gate and start the oldest queued send.
 
         Must be called every tick. Does nothing while the writer reports
         busy. Once the writer reports idle, fires the transmit gate's
         ``end_transmit`` if it was left armed by a non-blocking write, then
-        starts the pending payload (if any) and clears the slot.
+        pops and starts the oldest queued payload, if any (a no-op when the
+        queue is empty).
 
         Returns:
             The writer's busy state evaluated at the end of the call — after
-            any gate release and after starting a pending send, if one
+            any gate release and after starting a queued send, if one
             existed.
 
         Raises:
-            Exception: Whatever the encoder raises, if a payload was pending
-                and its encoding fails — surfaced here rather than at the
-                original ``send()`` call.
+            Exception: Whatever the encoder raises, if a queued payload's
+                encoding fails — surfaced here rather than at the original
+                ``send()`` call. The failing payload is already popped from
+                the queue, so later polls keep draining what follows it.
         """
         writer = self._writer
         if writer.is_busy():
@@ -268,10 +271,9 @@ class InfraredTransmitter:
             if gate is not None:
                 gate.end_transmit()
 
-        pending = self._pending
-        if pending is not None:
-            self._pending = None
-            self._start_write(pending)
+        pending_queue = self._pending_queue
+        if pending_queue:
+            self._start_write(pending_queue.pop(0))
 
         return writer.is_busy()
 

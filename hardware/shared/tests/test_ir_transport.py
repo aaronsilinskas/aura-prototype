@@ -310,30 +310,37 @@ def test_send_while_busy_returns_false():
     assert tx.send(b"\x02") is False
 
 
-def test_send_while_busy_returns_false_even_when_replacing_a_pending_payload():
+def test_send_while_busy_returns_false_for_a_third_queued_payload():
     writer = ControllableFakePulseWriter()
     tx = InfraredTransmitter(writer, AuraInfraredEncoder())
 
     tx.send(b"\x01")  # starts the write; writer reports busy afterward
-    tx.send(b"\x02")  # buffered
+    tx.send(b"\x02")  # appended to the queue
 
-    assert tx.send(b"\x03") is False  # replaces \x02 — still False
+    assert tx.send(b"\x03") is False  # also appended — still False
 
 
-def test_second_send_while_pending_replaces_the_pending_payload():
+def test_queued_sends_drain_in_fifo_order_across_polls():
+    """A burst of sends behind a busy writer all transmit, oldest first,
+    none dropped and none skipped."""
     writer = ControllableFakePulseWriter()
     encoder = AuraInfraredEncoder()
     tx = InfraredTransmitter(writer, encoder)
 
-    tx.send(b"\x01")
-    tx.send(b"\x02")  # buffered — replaces nothing yet
-    tx.send(b"\x03")  # replaces the pending \x02 — latest wins
+    tx.send(b"\x01")  # starts the write; writer reports busy afterward
+    tx.send(b"\x02")  # queued
+    tx.send(b"\x03")  # queued after \x02 — FIFO, not a replacement
 
     writer.set_busy(False)
-    tx.poll()  # starts the pending payload
+    tx.poll()  # starts \x02, the oldest queued payload
+    assert writer.calls[-1] == list(encoder.encode(b"\x02"))
 
+    writer.set_busy(False)
+    tx.poll()  # starts \x03
     assert writer.calls[-1] == list(encoder.encode(b"\x03"))
-    assert len(writer.calls) == 2  # initial \x01 + the pending \x03 — \x02 never sent
+
+    # initial \x01 + \x02 + \x03 — every payload transmitted exactly once
+    assert len(writer.calls) == 3
 
 
 def test_poll_does_nothing_while_writer_is_busy():
@@ -365,7 +372,7 @@ def test_poll_starts_pending_payload_once_writer_reports_idle():
     assert writer.calls[0] == list(encoder.encode(b"\x02"))
 
 
-def test_poll_clears_pending_slot_after_starting_it():
+def test_poll_pops_queued_payload_after_starting_it():
     """A second poll with nothing newly queued must not re-send."""
     writer = ControllableFakePulseWriter()
     tx = InfraredTransmitter(writer, AuraInfraredEncoder())
@@ -395,16 +402,47 @@ def test_encoder_runs_once_per_transmitted_payload_not_per_tick():
     tx = InfraredTransmitter(writer, encoder)
 
     tx.send(b"\x01")  # encodes once, starts the write
-    tx.send(b"\x02")  # buffered raw bytes — no encode yet
+    tx.send(b"\x02")  # queued raw bytes — no encode yet
     tx.poll()  # writer still busy — no encode
     tx.poll()  # still busy — no encode
 
     assert encoder.encode_calls == 1
 
     writer.set_busy(False)
-    tx.poll()  # writer now idle — starts pending \x02, encodes once
+    tx.poll()  # writer now idle — starts queued \x02, encodes once
 
     assert encoder.encode_calls == 2
+
+
+def test_encoder_runs_once_per_payload_across_multiple_queued_payloads():
+    """Verified with more than one queued payload, not just one: each item's
+    encode fires exactly when its own write starts, never earlier or twice."""
+
+    class CountingEncoder(AuraInfraredEncoder):
+        def __init__(self):
+            self.encode_calls = 0
+
+        def encode(self, data):
+            self.encode_calls += 1
+            return super().encode(data)
+
+    writer = ControllableFakePulseWriter()
+    encoder = CountingEncoder()
+    tx = InfraredTransmitter(writer, encoder)
+
+    tx.send(b"\x01")  # encodes once, starts the write
+    tx.send(b"\x02")  # queued — no encode yet
+    tx.send(b"\x03")  # queued — no encode yet
+
+    assert encoder.encode_calls == 1
+
+    writer.set_busy(False)
+    tx.poll()  # starts \x02, encodes once
+    assert encoder.encode_calls == 2
+
+    writer.set_busy(False)
+    tx.poll()  # starts \x03, encodes once
+    assert encoder.encode_calls == 3
 
 
 # ---------------------------------------------------------------------------
@@ -522,11 +560,43 @@ def test_queued_send_encode_error_surfaces_in_poll_not_in_send():
     tx = InfraredTransmitter(writer, FlakyEncoder())
 
     tx.send(b"\x01")  # encodes fine, starts the write — writer now busy
-    tx.send(b"\x02")  # buffered — no encode attempted yet, so send() does not raise
+    tx.send(b"\x02")  # queued — no encode attempted yet, so send() does not raise
 
     writer.set_busy(False)
     with pytest.raises(ValueError):
         tx.poll()  # the queued send's encode now runs and raises
+
+
+def test_queued_send_encode_error_drops_only_the_failing_item_and_queue_keeps_draining():
+    """Items queued after a failing payload are untouched by its error and
+    are still attempted (and can still succeed) on later polls."""
+
+    class FlakyEncoder(AuraInfraredEncoder):
+        def __init__(self):
+            self.calls = 0
+
+        def encode(self, data):
+            self.calls += 1
+            if data == b"\x02":
+                raise ValueError("bad payload")
+            return super().encode(data)
+
+    writer = ControllableFakePulseWriter()
+    encoder = FlakyEncoder()
+    tx = InfraredTransmitter(writer, encoder)
+
+    tx.send(b"\x01")  # encodes fine, starts the write — writer now busy
+    tx.send(b"\x02")  # queued — will fail to encode
+    tx.send(b"\x03")  # queued after the failing payload
+
+    writer.set_busy(False)
+    with pytest.raises(ValueError):
+        tx.poll()  # \x02's encode raises; \x02 is dropped, not retried
+
+    writer.set_busy(False)
+    tx.poll()  # queue keeps draining — \x03 starts and succeeds
+
+    assert writer.calls[-1] == list(encoder.encode(b"\x03"))
 
 
 # ---------------------------------------------------------------------------
