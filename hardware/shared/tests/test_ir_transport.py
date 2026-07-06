@@ -1139,6 +1139,109 @@ def test_multi_receiver_reset_telemetry_zeroes_pulses_dropped_transmitting():
 
 
 # ---------------------------------------------------------------------------
+# InfraredMultiReceiver — receive-path telemetry (issue #600)
+# ---------------------------------------------------------------------------
+
+
+def test_multi_receiver_pulses_seen_accumulates_across_all_readers():
+    rx, readers = _make_multi_receiver(2)
+    readers[0].load([100, 200])
+    readers[1].load([300])
+
+    rx.receive()
+
+    assert rx.telemetry().pulses_seen == 3
+
+
+def test_multi_receiver_pulses_seen_accumulates_across_receive_calls():
+    rx, readers = _make_multi_receiver(1)
+    readers[0].load([100, 200])
+    rx.receive()
+    readers[0].load([300])
+    rx.receive()
+
+    assert rx.telemetry().pulses_seen == 3
+
+
+def test_multi_receiver_packets_surfaced_increments_on_winning_packet():
+    payload = b"\x01"
+    rx, readers = _make_multi_receiver(2)
+    readers[0].load(_encode_pulses(payload))
+
+    rx.receive()
+
+    assert rx.telemetry().packets_surfaced == 1
+
+
+def test_multi_receiver_packets_surfaced_does_not_increment_without_a_winner():
+    rx, readers = _make_multi_receiver(2)
+    readers[0].load([100, 200])
+
+    rx.receive()
+
+    assert rx.telemetry().packets_surfaced == 0
+
+
+def test_multi_receiver_reset_telemetry_zeroes_pulses_seen_and_packets_surfaced():
+    payload = b"\x01"
+    rx, readers = _make_multi_receiver(2)
+    readers[0].load(_encode_pulses(payload))
+    rx.receive()
+
+    rx.reset_telemetry()
+
+    snapshot = rx.telemetry()
+    assert snapshot.pulses_seen == 0
+    assert snapshot.packets_surfaced == 0
+
+
+def test_multi_receiver_telemetry_sums_buffer_full_on_poll_across_readers():
+    rx, readers = _make_multi_receiver(3)
+    readers[0].buffer_full_on_poll = 2
+    readers[1].buffer_full_on_poll = 0
+    readers[2].buffer_full_on_poll = 5
+
+    assert rx.telemetry().buffer_full_on_poll == 7
+
+
+def _make_tag_multi_receiver(num_readers):
+    """Build a MultiReceiver wired to ``TagInfraredDecoder``, which (unlike
+    ``AuraInfraredDecoder``) tracks packets_started/preamble_reject/etc., so
+    the sums below reflect real decoder state rather than fixed zeros."""
+    readers = [FakePulseReader() for _ in range(num_readers)]
+    rx = InfraredMultiReceiver(readers, TagInfraredDecoder)
+    return rx, readers
+
+
+def test_multi_receiver_telemetry_sums_preamble_reject_across_decoders():
+    bad_preamble = list(TAG_PREAMBLE)
+    bad_preamble[1] = 4000  # invalid but below the inter-frame gap threshold
+    rx, readers = _make_tag_multi_receiver(2)
+    readers[0].load(bad_preamble)
+    readers[1].load(bad_preamble)
+
+    rx.receive()
+
+    assert rx.telemetry().preamble_reject == 2
+
+
+def test_multi_receiver_packets_completed_can_exceed_surfaced_on_simultaneous_wins():
+    """Dedup, not loss: two decoders independently completing the same shot in
+    one tick both count toward (summed) packets_completed, but only the
+    lowest-error-margin winner surfaces from receive()."""
+    pulses = list(TagInfraredEncoder().encode(bytearray([0x10])))
+    rx, readers = _make_tag_multi_receiver(3)
+    readers[0].load(pulses)
+    readers[2].load(pulses)
+
+    rx.receive()
+
+    snapshot = rx.telemetry()
+    assert snapshot.packets_completed == 2
+    assert snapshot.packets_surfaced == 1
+
+
+# ---------------------------------------------------------------------------
 # InfraredMultiReceiver — no per-tick allocation in polled path
 # ---------------------------------------------------------------------------
 

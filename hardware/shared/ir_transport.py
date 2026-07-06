@@ -573,6 +573,14 @@ class InfraredMultiReceiver(InfraredReceiver):
     ``receive()`` is polled every tick and must not allocate in the hot path.
     All scratch structures are pre-allocated in ``__init__`` and reused.
 
+    Telemetry note — **dedup, not loss**: :meth:`telemetry`'s summed
+    ``packets_completed`` may exceed ``packets_surfaced`` even though nothing
+    was dropped. Multiple decoders can each independently complete the same
+    in-flight shot in one tick; only the lowest-error-margin winner surfaces
+    from :meth:`receive`, so the rest are discarded as duplicates, not lost.
+    This is unlike :class:`InfraredSingleReceiver`, where the two counters are
+    always 1:1.
+
     Args:
         pulse_readers: Sequence of :class:`PulseReader` instances to poll.
         decoder_factory: Callable (no arguments) that returns a new
@@ -614,6 +622,11 @@ class InfraredMultiReceiver(InfraredReceiver):
         self._last_error_margin: int | None = None
         self._last_best_receiver: PulseReader | None = None
 
+        # Monotonic-since-boot telemetry owned by this receiver. Decoder and
+        # reader counters are not copied — they are summed live in
+        # telemetry() so the whole path reads off this one handle.
+        self.pulses_seen: int = 0
+        self.packets_surfaced: int = 0
         self.pulses_dropped_transmitting: int = 0
 
     def receive(self) -> "bytearray | None":
@@ -658,6 +671,7 @@ class InfraredMultiReceiver(InfraredReceiver):
                 pulse = reader.read_pulse()
                 if pulse is None:
                     break
+                self.pulses_seen += 1
                 packet = decoder.decode(pulse)
                 if packet is not None:
                     scratch_fired[i] = True
@@ -685,6 +699,7 @@ class InfraredMultiReceiver(InfraredReceiver):
         self._last_error_margin = winning_decoder.last_error_margin
         self._last_signal_strength = winning_decoder.last_signal_strength
         self._last_best_receiver = readers[best_i]
+        self.packets_surfaced += 1
 
         return scratch_packets[best_i]
 
@@ -721,8 +736,50 @@ class InfraredMultiReceiver(InfraredReceiver):
         """The :class:`PulseReader` that produced the best packet last tick."""
         return self._last_best_receiver
 
+    def telemetry(self) -> IrTelemetrySnapshot:
+        """Build a snapshot, summing delegated counters across every decoder/reader.
+
+        ``buffer_full_on_poll`` sums across every reader;
+        ``packets_started``/``packets_completed``/``{preamble,mark,space}_reject``
+        sum across every decoder — each summed once per call (once per
+        second), so iterating N decoders/readers costs nothing.
+        ``pulses_seen``/``packets_surfaced``/``pulses_dropped_transmitting``
+        are receiver-owned and read directly off ``self``. See the class
+        docstring for why summed ``packets_completed`` may exceed
+        ``packets_surfaced`` (dedup, not loss).
+        """
+        buffer_full_on_poll = 0
+        for reader in self._readers:
+            buffer_full_on_poll += reader.buffer_full_on_poll
+
+        packets_started = 0
+        packets_completed = 0
+        preamble_reject = 0
+        mark_reject = 0
+        space_reject = 0
+        for decoder in self._decoders:
+            packets_started += decoder.packets_started
+            packets_completed += decoder.packets_completed
+            preamble_reject += decoder.preamble_reject
+            mark_reject += decoder.mark_reject
+            space_reject += decoder.space_reject
+
+        return IrTelemetrySnapshot(
+            self.pulses_seen,
+            buffer_full_on_poll,
+            packets_started,
+            preamble_reject,
+            mark_reject,
+            space_reject,
+            packets_completed,
+            self.packets_surfaced,
+            self.pulses_dropped_transmitting,
+        )
+
     def reset_telemetry(self) -> None:
-        """Zero this receiver's drop counter and reset every decoder's telemetry."""
+        """Zero this receiver's own counters and reset every decoder's telemetry."""
+        self.pulses_seen = 0
+        self.packets_surfaced = 0
         self.pulses_dropped_transmitting = 0
         for decoder in self._decoders:
             decoder.reset_telemetry()
