@@ -1,8 +1,8 @@
 """Tests for NeoPixelEffectOutput with multi-segment (scope_pixels) routing.
 
-Verifies that a single physical strip can be subdivided into scope segments,
-each segment acts on only its own pixel range, and receipt brightness scales
-correctly.  Uses in-memory fake strips to avoid hardware imports.
+Verifies that a single physical strip can be subdivided into scope segments
+and each segment acts on only its own pixel range.  Uses in-memory fake
+strips to avoid hardware imports.
 """
 
 from __future__ import annotations
@@ -23,12 +23,6 @@ def _make_strip(count: int) -> MagicMock:
     strip = MagicMock()
     strip.__len__ = MagicMock(return_value=count)
     return strip
-
-
-def _make_receipt(brightness: float = 1.0) -> MagicMock:
-    receipt = MagicMock()
-    receipt.brightness = brightness
-    return receipt
 
 
 def _make_segmented_output(
@@ -120,7 +114,7 @@ def test_update_pixels_writes_buffer_to_correct_strip_offsets() -> None:
     buf[1] = 0x00FF00
     buf[2] = 0x0000FF
 
-    output.update_pixels("personal", [buf], [_make_receipt()])
+    output.update_pixels("personal", buf)
 
     strip.__setitem__.assert_has_calls([call(0, 0xFF0000), call(1, 0x00FF00), call(2, 0x0000FF)])
 
@@ -133,7 +127,7 @@ def test_update_pixels_for_second_segment_writes_at_correct_offset() -> None:
     buf = PixelBuffer(10)
     buf[0] = 0xAABBCC
 
-    output.update_pixels("ambient", [buf], [_make_receipt()])
+    output.update_pixels("ambient", buf)
 
     # First write must be at strip index 10
     first_call = strip.__setitem__.call_args_list[0]
@@ -146,41 +140,11 @@ def test_update_pixels_does_not_write_outside_segment_range() -> None:
     output, strip = _make_segmented_output(scope_pixels, count=10)
 
     buf = PixelBuffer(5)
-    output.update_pixels("personal", [buf], [_make_receipt()])
+    output.update_pixels("personal", buf)
 
     written_indices = {c.args[0] for c in strip.__setitem__.call_args_list}
     # Must only write to 0..4 — not 5..9
     assert all(i < 5 for i in written_indices)
-
-
-def test_update_pixels_go_dark_writes_zeros_to_segment_only() -> None:
-    """update_pixels with empty buffers zeros only the segment's range."""
-    scope_pixels = {"personal": range(2, 5)}
-    output, strip = _make_segmented_output(scope_pixels, count=6)
-
-    output.update_pixels("personal", [], [])
-
-    strip.__setitem__.assert_has_calls([call(2, 0), call(3, 0), call(4, 0)])
-    written_indices = {c.args[0] for c in strip.__setitem__.call_args_list}
-    assert written_indices == {2, 3, 4}
-
-
-# ---------------------------------------------------------------------------
-# update_pixels: brightness
-# ---------------------------------------------------------------------------
-
-
-def test_update_pixels_applies_receipt_brightness() -> None:
-    """update_pixels scales each pixel by the receipt brightness."""
-    scope_pixels = {"personal": range(0, 1)}
-    output, strip = _make_segmented_output(scope_pixels, count=1)
-
-    buf = PixelBuffer(1)
-    buf[0] = 0xFF0000
-
-    output.update_pixels("personal", [buf], [_make_receipt(brightness=0.5)])
-
-    strip.__setitem__.assert_called_once_with(0, 0x7F0000)
 
 
 # ---------------------------------------------------------------------------
@@ -257,7 +221,7 @@ def test_single_full_strip_segment_update_pixels_writes_all_pixels() -> None:
     buf[1] = 0x222222
     buf[2] = 0x333333
 
-    output.update_pixels("personal", [buf], [_make_receipt()])
+    output.update_pixels("personal", buf)
 
     strip.__setitem__.assert_has_calls([call(0, 0x111111), call(1, 0x222222), call(2, 0x333333)])
 

@@ -1,7 +1,6 @@
 import pytest
 
 from effects.effect import PixelBuffer
-from engine.state import EffectReceipt
 from hardware.shared.matrix_output import MatrixEffectOutput
 
 # ---------------------------------------------------------------------------
@@ -68,14 +67,14 @@ def test_create_buffer_returns_new_instance_each_call(output: SpyMatrixOutput) -
 
 def test_update_pixels_calls_write_row_for_each_row_in_band(output: SpyMatrixOutput) -> None:
     buf = PixelBuffer(_COLS)
-    output.update_pixels("global.main", [buf], [None])
+    output.update_pixels("global.main", buf)
     rows_written = [r for r, _ in output.write_row_calls]
     assert rows_written == [2, 3, 4]
 
 
 def test_update_pixels_single_row_band(output: SpyMatrixOutput) -> None:
     buf = PixelBuffer(_COLS)
-    output.update_pixels("global.buff", [buf], [None])
+    output.update_pixels("global.buff", buf)
     rows_written = [r for r, _ in output.write_row_calls]
     assert rows_written == [0]
 
@@ -91,23 +90,18 @@ def test_update_pixels_routes_correct_band_for_each_scope_key(output: SpyMatrixO
     }
     for scope_key, expected_rows in expected.items():
         output.write_row_calls.clear()
-        output.update_pixels(scope_key, [buf], [None])
+        output.update_pixels(scope_key, buf)
         assert [r for r, _ in output.write_row_calls] == expected_rows
 
 
-def test_update_pixels_passes_buffer_to_write_row(output: SpyMatrixOutput) -> None:
+def test_update_pixels_writes_the_same_buffer_verbatim_to_every_row(
+    output: SpyMatrixOutput,
+) -> None:
     buf = PixelBuffer(_COLS)
     buf[0] = 0xFF0000
-    output.update_pixels("personal", [buf], [None])
+    output.update_pixels("personal", buf)
     for _, pixels in output.write_row_calls:
         assert pixels is buf
-
-
-def test_update_pixels_no_buffers_writes_zero_buffer(output: SpyMatrixOutput) -> None:
-    output.update_pixels("personal", [], [])
-    assert len(output.write_row_calls) == 2
-    for _, pixels in output.write_row_calls:
-        assert all(c == 0 for c in pixels)
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +118,7 @@ def test_clear_pixels_calls_write_row_for_each_row_in_band(output: SpyMatrixOutp
 def test_clear_pixels_writes_zeros(output: SpyMatrixOutput) -> None:
     buf = PixelBuffer(_COLS)
     buf[0] = 0xFF0000
-    output.update_pixels("personal", [buf], [None])
+    output.update_pixels("personal", buf)
     output.write_row_calls.clear()
     output.clear_pixels("personal")
     for _, pixels in output.write_row_calls:
@@ -138,48 +132,6 @@ def test_clear_pixels_reuses_same_zero_buffer(output: SpyMatrixOutput) -> None:
     output.clear_pixels("global.buff")
     second_call_pixels = output.write_row_calls[0][1]
     assert first_call_pixels is second_call_pixels
-
-
-# ---------------------------------------------------------------------------
-# update_pixels — brightness scaling
-# ---------------------------------------------------------------------------
-
-
-def test_update_pixels_brightness_one_passes_buffer_unchanged(output: SpyMatrixOutput) -> None:
-    buf = PixelBuffer(_COLS)
-    buf[0] = 0xFF8040
-    receipt = EffectReceipt(1)
-    receipt.brightness = 1.0
-    output.update_pixels("personal", [buf], [receipt])
-    for _, pixels in output.write_row_calls:
-        assert pixels is buf
-
-
-def test_update_pixels_brightness_scales_channels_correctly(output: SpyMatrixOutput) -> None:
-    buf = PixelBuffer(_COLS)
-    buf[0] = 0xFF8040  # R=255, G=128, B=64
-    receipt = EffectReceipt(1)
-    receipt.brightness = 0.5
-    output.update_pixels("personal", [buf], [receipt])
-    scaled = output.write_row_calls[0][1][0]
-    r = (scaled >> 16) & 0xFF
-    g = (scaled >> 8) & 0xFF
-    b = scaled & 0xFF
-    assert r == int(255 * 0.5)
-    assert g == int(128 * 0.5)
-    assert b == int(64 * 0.5)
-
-
-def test_update_pixels_brightness_applies_to_every_pixel(output: SpyMatrixOutput) -> None:
-    buf = PixelBuffer(_COLS)
-    for i in range(_COLS):
-        buf[i] = 0xFFFFFF
-    receipt = EffectReceipt(1)
-    receipt.brightness = 0.5
-    output.update_pixels("personal", [buf], [receipt])
-    for _, pixels in output.write_row_calls:
-        for i in range(_COLS):
-            assert pixels[i] < 0xFFFFFF
 
 
 # ---------------------------------------------------------------------------

@@ -65,9 +65,7 @@ def test_write_row_separates_rgb_channels_across_buffer_positions() -> None:
     buf[1] = 0x00FF00  # R=0x00, G=0xFF, B=0x00
     buf[2] = 0x0000FF  # R=0x00, G=0x00, B=0xFF
 
-    receipt = MagicMock()
-    receipt.brightness = 1.0
-    output.update_pixels("personal", [buf], [receipt])
+    output.update_pixels("personal", buf)
 
     written_values = [c.args[1] for c in mock_matrix.__setitem__.call_args_list]
     assert written_values.count(0xFF) == 3
@@ -78,9 +76,7 @@ def test_write_row_does_not_use_pixel_api() -> None:
     output, mock_matrix = _make_output(cols=2, scope_rows={"personal": range(0, 1)})
     buf = PixelBuffer(2)
 
-    receipt = MagicMock()
-    receipt.brightness = 1.0
-    output.update_pixels("personal", [buf], [receipt])
+    output.update_pixels("personal", buf)
 
     mock_matrix.pixel.assert_not_called()
 
@@ -91,9 +87,7 @@ def test_write_row_writes_each_channel_to_a_distinct_buffer_position() -> None:
     buf = PixelBuffer(cols)
     buf[0] = 0xFF0000  # R=0xFF, G=0x00, B=0x00
 
-    receipt = MagicMock()
-    receipt.brightness = 1.0
-    output.update_pixels("personal", [buf], [receipt])
+    output.update_pixels("personal", buf)
 
     written = {c.args[0]: c.args[1] for c in mock_matrix.__setitem__.call_args_list}
     assert len(written) == cols * 3

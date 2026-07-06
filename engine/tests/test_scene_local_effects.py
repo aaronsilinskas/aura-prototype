@@ -262,11 +262,10 @@ def test_scene_prefix_resolves_local_effect_when_scene_is_active(scene_env) -> N
     manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
     manager.set_local_effects(scene.local_effect_registry)
 
-    receipt = manager.set_effect(Scope.PERSONAL, "scene.flash", {})
+    manager.set_effect(Scope.PERSONAL, "scene.flash", {})
     manager.update(Timer())
 
-    assert len(output.update_pixels_calls[0][1]) == 1
-    assert output.update_pixels_calls[0][1][0][1] is receipt
+    assert output.update_pixels_calls == [("personal", output.created_buffers[0])]
 
 
 def test_scene_prefix_unknown_effect_raises_with_effect_name_in_message(scene_env) -> None:

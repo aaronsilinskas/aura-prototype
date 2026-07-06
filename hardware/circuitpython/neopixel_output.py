@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from effects.effect import PixelBuffer
 from engine.effects.manager import EffectOutput
-from engine.state import EffectReceipt, ScopeValue
+from engine.state import ScopeValue
 
 __all__ = ["NeoPixelEffectOutput"]
 
@@ -18,8 +18,10 @@ class NeoPixelEffectOutput(EffectOutput):
 
     Per-strip brightness is a hardware-init concern applied to the
     ``neopixel.NeoPixel`` object at construction (the library scales it at
-    ``show()``) — this output holds no brightness of its own and only applies
-    the per-effect receipt brightness.
+    ``show()``) — this output holds no brightness of its own and does no
+    brightness or layer-compositing math; ``update_pixels`` receives one
+    already-composed buffer from the active ``MergeStrategy`` and writes it
+    verbatim.
 
     Args:
         strip: Strip object supporting ``strip[i] = color`` (packed RGB int)
@@ -54,33 +56,12 @@ class NeoPixelEffectOutput(EffectOutput):
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(len(self._scope_pixels[scope_key]))
 
-    def update_pixels(
-        self, scope_key: str, buffers: list[PixelBuffer], receipts: list[EffectReceipt]
-    ) -> None:
+    def update_pixels(self, scope_key: str, buffer: PixelBuffer) -> None:
         strip = self._strip
         seg = self._scope_pixels[scope_key]
         start = seg.start
-        count = len(seg)
-
-        if not buffers:
-            for j in range(count):
-                strip[start + j] = 0
-            return
-
-        pixels = buffers[-1]
-        receipt = receipts[-1] if receipts else None
-        brightness = receipt.brightness if receipt is not None else 1.0
-
-        if brightness == 1.0:
-            for j in range(count):
-                strip[start + j] = pixels[j]
-        else:
-            for j in range(count):
-                c = pixels[j]
-                r = int(((c >> 16) & 0xFF) * brightness)
-                g = int(((c >> 8) & 0xFF) * brightness)
-                b = int((c & 0xFF) * brightness)
-                strip[start + j] = (r << 16) | (g << 8) | b
+        for j in range(len(seg)):
+            strip[start + j] = buffer[j]
 
     def clear_pixels(self, scope_key: str) -> None:
         strip = self._strip

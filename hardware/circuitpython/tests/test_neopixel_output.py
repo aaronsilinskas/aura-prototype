@@ -84,9 +84,7 @@ def test_update_pixels_writes_buffer_to_strip() -> None:
     buf[1] = 0x00FF00
     buf[2] = 0x0000FF
 
-    receipt = MagicMock()
-    receipt.brightness = 1.0
-    output.update_pixels("personal", [buf], [receipt])
+    output.update_pixels("personal", buf)
 
     strip.__setitem__.assert_has_calls([call(0, 0xFF0000), call(1, 0x00FF00), call(2, 0x0000FF)])
 
@@ -101,64 +99,22 @@ def test_update_pixels_does_not_write_to_unrelated_strip() -> None:
     NeoPixelEffectOutput(strip_b, {"directional": range(0, 2)})  # independent instance
 
     buf = PixelBuffer(3)
-    receipt = MagicMock()
-    receipt.brightness = 1.0
-    output_a.update_pixels("personal", [buf], [receipt])
+    output_a.update_pixels("personal", buf)
 
     strip_b.__setitem__.assert_not_called()
 
 
-def test_update_pixels_uses_last_buffer_when_multiple_buffers() -> None:
-    """update_pixels composites by using the last (topmost) buffer."""
+def test_update_pixels_writes_the_single_buffer_verbatim() -> None:
+    """update_pixels writes the single already-composed buffer verbatim (no picking/scaling)."""
     output, strip = _make_output(count=2)
 
-    buf1 = PixelBuffer(2)
-    buf1[0] = 0x111111
-    buf1[1] = 0x222222
+    buf = PixelBuffer(2)
+    buf[0] = 0xAAAAAA
+    buf[1] = 0xBBBBBB
 
-    buf2 = PixelBuffer(2)
-    buf2[0] = 0xAAAAAA
-    buf2[1] = 0xBBBBBB
-
-    receipt = MagicMock()
-    receipt.brightness = 1.0
-    output.update_pixels("personal", [buf1, buf2], [receipt, receipt])
+    output.update_pixels("personal", buf)
 
     strip.__setitem__.assert_has_calls([call(0, 0xAAAAAA), call(1, 0xBBBBBB)])
-
-
-def test_update_pixels_applies_receipt_brightness_scaling() -> None:
-    """update_pixels scales each pixel by the receipt brightness."""
-    output, strip = _make_output(count=1)
-
-    buf = PixelBuffer(1)
-    buf[0] = 0xFF0000  # pure red
-
-    receipt = MagicMock()
-    receipt.brightness = 0.5
-    output.update_pixels("personal", [buf], [receipt])
-
-    # 0xFF * 0.5 = 127 = 0x7F
-    strip.__setitem__.assert_called_once_with(0, 0x7F0000)
-
-
-def test_update_pixels_writes_verbatim_at_receipt_brightness_one() -> None:
-    """update_pixels writes buffer values unmodified when receipt brightness is 1.0.
-
-    NeoPixelEffectOutput holds no per-strip brightness of its own (that is a
-    hardware-init concern applied to the neopixel.NeoPixel object at
-    construction) -- only the receipt brightness fast path applies here.
-    """
-    output, strip = _make_output(count=1)
-
-    buf = PixelBuffer(1)
-    buf[0] = 0xFF0000  # pure red
-
-    receipt = MagicMock()
-    receipt.brightness = 1.0
-    output.update_pixels("personal", [buf], [receipt])
-
-    strip.__setitem__.assert_called_once_with(0, 0xFF0000)
 
 
 def test_neopixel_effect_output_constructs_without_brightness_argument() -> None:
@@ -169,15 +125,6 @@ def test_neopixel_effect_output_constructs_without_brightness_argument() -> None
 
     # Must not raise TypeError for a missing brightness argument.
     NeoPixelEffectOutput(strip, {"personal": range(0, 1)})
-
-
-def test_update_pixels_go_dark_writes_zeros() -> None:
-    """update_pixels with empty buffers writes zeros to the strip (go-dark signal)."""
-    output, strip = _make_output(count=2)
-
-    output.update_pixels("personal", [], [])
-
-    strip.__setitem__.assert_has_calls([call(0, 0), call(1, 0)])
 
 
 # ---------------------------------------------------------------------------
