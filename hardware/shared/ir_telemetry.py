@@ -21,8 +21,7 @@ class IrTelemetrySnapshot:
     ``__slots__``, ``format_ir_telemetry_line``, and ``IrTelemetryGate`` all
     iterate it rather than re-enumerating the counters: ``pulses_seen ->
     buffer_full_on_poll -> packets_started -> rejected{preamble,mark,space}
-    -> packets_completed -> packets_surfaced -> pulses_dropped_transmitting
-    -> events_queued``.
+    -> packets_completed -> packets_surfaced -> pulses_dropped_transmitting``.
     """
 
     FIELDS: Final = (
@@ -35,7 +34,6 @@ class IrTelemetrySnapshot:
         "packets_completed",
         "packets_surfaced",
         "pulses_dropped_transmitting",
-        "events_queued",
     )
 
     __slots__ = FIELDS
@@ -51,7 +49,6 @@ class IrTelemetrySnapshot:
         packets_completed: int,
         packets_surfaced: int,
         pulses_dropped_transmitting: int,
-        events_queued: int,
     ) -> None:
         self.pulses_seen = pulses_seen
         self.buffer_full_on_poll = buffer_full_on_poll
@@ -62,7 +59,6 @@ class IrTelemetrySnapshot:
         self.packets_completed = packets_completed
         self.packets_surfaced = packets_surfaced
         self.pulses_dropped_transmitting = pulses_dropped_transmitting
-        self.events_queued = events_queued
 
 
 def format_ir_telemetry_line(snapshot: IrTelemetrySnapshot) -> str:

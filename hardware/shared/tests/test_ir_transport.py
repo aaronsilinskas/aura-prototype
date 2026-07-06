@@ -610,18 +610,35 @@ def test_receiver_base_raises_not_implemented():
         rx.receive()
 
 
-def test_receiver_base_defaults_all_telemetry_counters_to_zero():
+def test_receiver_base_telemetry_defaults_every_counter_to_zero():
     rx = InfraredReceiver()
 
-    assert rx.pulses_seen == 0
-    assert rx.packets_surfaced == 0
-    assert rx.packets_started == 0
-    assert rx.packets_completed == 0
-    assert rx.preamble_reject == 0
-    assert rx.mark_reject == 0
-    assert rx.space_reject == 0
-    assert rx.buffer_full_on_poll == 0
-    assert rx.pulses_dropped_transmitting == 0
+    snapshot = rx.telemetry()
+
+    assert snapshot.pulses_seen == 0
+    assert snapshot.packets_surfaced == 0
+    assert snapshot.packets_started == 0
+    assert snapshot.packets_completed == 0
+    assert snapshot.preamble_reject == 0
+    assert snapshot.mark_reject == 0
+    assert snapshot.space_reject == 0
+    assert snapshot.buffer_full_on_poll == 0
+    assert snapshot.pulses_dropped_transmitting == 0
+
+
+def test_bare_receiver_subclass_satisfies_telemetry_contract_with_no_overrides():
+    """A fake receiver with no telemetry code still returns a real snapshot —
+    the base default reads counters generically off ``self``."""
+
+    class FakeReceiver(InfraredReceiver):
+        def receive(self):
+            return None
+
+    rx = FakeReceiver()
+    rx.pulses_seen = 5
+
+    assert rx.telemetry().pulses_seen == 5
+    assert rx.telemetry().packets_completed == 0
 
 
 # ---------------------------------------------------------------------------
@@ -698,7 +715,7 @@ def test_single_receiver_pulses_seen_counts_every_drained_pulse():
 
     rx.receive()
 
-    assert rx.pulses_seen == len(pulses)
+    assert rx.telemetry().pulses_seen == len(pulses)
 
 
 def test_single_receiver_pulses_seen_accumulates_across_receive_calls():
@@ -710,7 +727,7 @@ def test_single_receiver_pulses_seen_accumulates_across_receive_calls():
     reader.load([300])
     rx.receive()
 
-    assert rx.pulses_seen == 3
+    assert rx.telemetry().pulses_seen == 3
 
 
 def test_single_receiver_packets_surfaced_increments_on_successful_receive():
@@ -721,7 +738,7 @@ def test_single_receiver_packets_surfaced_increments_on_successful_receive():
     rx.receive()
     rx.receive()  # second call: no more pulses, no new packet
 
-    assert rx.packets_surfaced == 1
+    assert rx.telemetry().packets_surfaced == 1
 
 
 def test_single_receiver_delegates_decoder_counters_from_tag_decoder():
@@ -734,11 +751,12 @@ def test_single_receiver_delegates_decoder_counters_from_tag_decoder():
 
     rx.receive()
 
-    assert rx.preamble_reject == decoder.preamble_reject == 1
-    assert rx.packets_started == decoder.packets_started == 0
-    assert rx.packets_completed == decoder.packets_completed == 0
-    assert rx.mark_reject == decoder.mark_reject == 0
-    assert rx.space_reject == decoder.space_reject == 0
+    snapshot = rx.telemetry()
+    assert snapshot.preamble_reject == decoder.preamble_reject == 1
+    assert snapshot.packets_started == decoder.packets_started == 0
+    assert snapshot.packets_completed == decoder.packets_completed == 0
+    assert snapshot.mark_reject == decoder.mark_reject == 0
+    assert snapshot.space_reject == decoder.space_reject == 0
 
 
 def test_single_receiver_delegates_buffer_full_on_poll_from_reader():
@@ -746,7 +764,7 @@ def test_single_receiver_delegates_buffer_full_on_poll_from_reader():
     reader.buffer_full_on_poll = 3
     rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
 
-    assert rx.buffer_full_on_poll == 3
+    assert rx.telemetry().buffer_full_on_poll == 3
 
 
 def test_single_receiver_reset_telemetry_zeroes_whole_ir_path():
@@ -759,17 +777,64 @@ def test_single_receiver_reset_telemetry_zeroes_whole_ir_path():
 
     rx.reset_telemetry()
 
-    assert rx.pulses_seen == 0
-    assert rx.packets_surfaced == 0
-    assert rx.packets_started == 0
-    assert rx.packets_completed == 0
-    assert rx.preamble_reject == 0
-    assert rx.mark_reject == 0
-    assert rx.space_reject == 0
-    assert rx.buffer_full_on_poll == 0
+    snapshot = rx.telemetry()
+    assert snapshot.pulses_seen == 0
+    assert snapshot.packets_surfaced == 0
+    assert snapshot.packets_started == 0
+    assert snapshot.packets_completed == 0
+    assert snapshot.preamble_reject == 0
+    assert snapshot.mark_reject == 0
+    assert snapshot.space_reject == 0
+    assert snapshot.buffer_full_on_poll == 0
     assert decoder.packets_started == 0
     assert decoder.packets_completed == 0
     assert reader.buffer_full_on_poll == 0
+
+
+# ---------------------------------------------------------------------------
+# InfraredSingleReceiver — telemetry_line() change-gating
+# ---------------------------------------------------------------------------
+
+
+def test_single_receiver_telemetry_line_reports_on_first_call():
+    """The very first call has no prior baseline, so it always reports."""
+    rx = InfraredSingleReceiver(FakePulseReader(), AuraInfraredDecoder())
+
+    assert rx.telemetry_line() is not None
+
+
+def test_single_receiver_telemetry_line_is_none_when_nothing_changed():
+    rx = InfraredSingleReceiver(FakePulseReader(), AuraInfraredDecoder())
+    rx.telemetry_line()
+
+    assert rx.telemetry_line() is None
+
+
+def test_single_receiver_telemetry_line_reports_the_pipeline_format_after_a_packet():
+    payload = b"\x42"
+    pulses = _encode_pulses(payload)
+    reader = FakePulseReader(pulses)
+    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+
+    rx.receive()
+    line = rx.telemetry_line()
+
+    assert line == (
+        "ir: pulses_seen=" + str(len(pulses)) + " buffer_full_on_poll=0 "
+        "packets_started=0 preamble_reject=0 mark_reject=0 space_reject=0 "
+        "packets_completed=0 packets_surfaced=1 pulses_dropped_transmitting=0"
+    )
+
+
+def test_single_receiver_telemetry_line_reports_again_after_reset_telemetry():
+    """reset_telemetry() clears the change-gate baseline along with the counters."""
+    reader = FakePulseReader()
+    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+    rx.telemetry_line()
+
+    rx.reset_telemetry()
+
+    assert rx.telemetry_line() is not None
 
 
 # ---------------------------------------------------------------------------
@@ -805,8 +870,9 @@ def test_single_receiver_drop_increments_dropped_counter_not_pulses_seen():
 
     rx.receive()
 
-    assert rx.pulses_dropped_transmitting == len(pulses)
-    assert rx.pulses_seen == 0
+    snapshot = rx.telemetry()
+    assert snapshot.pulses_dropped_transmitting == len(pulses)
+    assert snapshot.pulses_seen == 0
 
 
 def test_single_receiver_partial_decode_in_progress_when_transmit_begins_is_reset():
@@ -858,7 +924,7 @@ def test_single_receiver_falling_edge_flushes_once_then_decodes_normally():
 
     # First poll after the falling edge: one flush, discards the echo tail.
     assert rx.receive() is None
-    assert rx.pulses_dropped_transmitting == 2
+    assert rx.telemetry().pulses_dropped_transmitting == 2
 
     # Next poll: gate is fully idle, a genuine packet decodes normally.
     payload = b"\x07"
@@ -887,11 +953,11 @@ def test_single_receiver_reset_telemetry_zeroes_pulses_dropped_transmitting():
     reader = FakePulseReader([100, 200])
     rx = InfraredSingleReceiver(reader, AuraInfraredDecoder(), gate)
     rx.receive()
-    assert rx.pulses_dropped_transmitting == 2
+    assert rx.telemetry().pulses_dropped_transmitting == 2
 
     rx.reset_telemetry()
 
-    assert rx.pulses_dropped_transmitting == 0
+    assert rx.telemetry().pulses_dropped_transmitting == 0
 
 
 # ---------------------------------------------------------------------------
@@ -1015,8 +1081,9 @@ def test_multi_receiver_drop_discards_pulses_from_every_reader():
 
     rx.receive()
 
-    assert rx.pulses_dropped_transmitting == 5
-    assert rx.pulses_seen == 0
+    snapshot = rx.telemetry()
+    assert snapshot.pulses_dropped_transmitting == 5
+    assert snapshot.pulses_seen == 0
 
 
 def test_multi_receiver_drop_resets_every_decoder():
@@ -1050,7 +1117,7 @@ def test_multi_receiver_falling_edge_flushes_once_then_decodes_normally():
     readers[0].load([111])  # buffered echo tail
 
     assert rx.receive() is None  # one-shot flush
-    assert rx.pulses_dropped_transmitting == 1
+    assert rx.telemetry().pulses_dropped_transmitting == 1
 
     payload = b"\x21"
     readers[1].load(_encode_pulses(payload))
@@ -1064,11 +1131,11 @@ def test_multi_receiver_reset_telemetry_zeroes_pulses_dropped_transmitting():
     readers[0].load([100])
 
     rx.receive()
-    assert rx.pulses_dropped_transmitting == 1
+    assert rx.telemetry().pulses_dropped_transmitting == 1
 
     rx.reset_telemetry()
 
-    assert rx.pulses_dropped_transmitting == 0
+    assert rx.telemetry().pulses_dropped_transmitting == 0
 
 
 # ---------------------------------------------------------------------------
