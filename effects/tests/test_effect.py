@@ -187,6 +187,15 @@ def test_resize_does_not_reallocate_the_backing_list() -> None:
     assert id(buf._pixels) == backing_list_id
 
 
+def test_indexing_still_reaches_positions_beyond_shrunken_logical_length() -> None:
+    buf = PixelBuffer(5)
+    buf[4] = 0xABCDEF
+
+    buf.resize(2)
+
+    assert buf[4] == 0xABCDEF
+
+
 # ---------------------------------------------------------------------------
 # Effect — capability container
 # ---------------------------------------------------------------------------
