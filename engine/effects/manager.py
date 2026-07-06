@@ -206,8 +206,9 @@ class EffectManager(EffectControls):
     Update model:
       - Call ``update(timer)`` once per frame. Each unique effect is
         advanced exactly once; outputs receive their frames in a second pass.
-      - Outputs always receive a call, with an empty list when no effects
-        are active (go-dark signal).
+      - Each registered key gets either one ``update_pixels`` call with a
+        single composed buffer, or a ``clear_pixels`` call when no effects
+        are active for that key (go-dark signal).
     State ownership:
       - Output buffers are created once per effect via ``EffectOutput.create_buffer``.
     """
