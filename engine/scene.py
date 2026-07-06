@@ -507,6 +507,7 @@ class SceneManager(SceneControls):
         state = self._engine.create_state(self, scene.initial_data)
         entry = (scene, state, combined_rules)
         self._stack.append(entry)
+        state.effect_controls.reset_merge_strategies()
         self._activate(entry)
 
     def _do_overlay(self, scene: Scene) -> None:
@@ -514,6 +515,7 @@ class SceneManager(SceneControls):
         combined_rules = self._resolve_rules(scene)
 
         self._deactivate(self._stack[-1])
+        self._stack[-1][1].effect_controls.save_merge_strategies()
 
         state = self._engine.create_state(self, scene.initial_data)
         entry = (scene, state, combined_rules)
@@ -523,6 +525,7 @@ class SceneManager(SceneControls):
     def _do_pop(self) -> None:
         """Remove the top entry and restore the entry below it."""
         self._deactivate(self._stack[-1])
+        self._stack[-1][1].effect_controls.restore_merge_strategies()
         self._stack.pop()
 
         self._activate(self._stack[-1])

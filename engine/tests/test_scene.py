@@ -6,11 +6,15 @@ import sys
 
 import pytest
 
+from engine.effects.manager import EffectManager
+from engine.effects.merge import ADDITIVE, SPLIT
 from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
 from engine.packs import PackRegistry, _PackEntry
 from engine.scene import Scene, SceneManager, SceneRegistry
 from engine.state import EffectControls, GameState, SceneControls, Scope
+from engine.tests.effects.helpers import SpyEffectOutput
+from engine.timer import Timer
 from engine.version import Version
 
 # ---------------------------------------------------------------------------
@@ -50,6 +54,21 @@ def _make_effect_pack(root, pack_name: str, version: str) -> None:
     pack_dir = root / pack_name
     pack_dir.mkdir(parents=True, exist_ok=True)
     (pack_dir / "version.txt").write_text(version + "\n")
+
+
+def _make_color_effect_pack(root, pack_name: str) -> None:
+    """Create an effect pack with solid-fill 'red' and 'blue' effects for merge-strategy tests."""
+    pack_dir = root / pack_name
+    pack_dir.mkdir(parents=True, exist_ok=True)
+    (pack_dir / "version.txt").write_text("1.0\n")
+    (pack_dir / "red.py").write_text(
+        "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+        "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+    )
+    (pack_dir / "blue.py").write_text(
+        "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+        "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
+    )
 
 
 def _make_registries(pack_env_path: str):
@@ -1204,3 +1223,141 @@ def test_suspended_scene_remains_on_stack_after_overlay() -> None:
 
     gc.collect()
     assert ref() is not None, "Suspended scene should remain on stack (not GC'd)"
+
+
+# ---------------------------------------------------------------------------
+# SceneManager — merge-strategy scene lifecycle (issue #587)
+# ---------------------------------------------------------------------------
+
+
+def _make_merge_strategy_scene_manager(pack_env, scene_names):
+    """Return (scene_manager, effect_manager, output).
+
+    Wires a real ``EffectManager`` (not the recording stub) as the engine's
+    effect controls, with a 'color' pack providing solid-fill 'red'/'blue'
+    effects, so merge-strategy behaviour can be observed on composed pixels.
+    """
+    _make_color_effect_pack(pack_env, "color")
+    effect_registry = PackRegistry(item_attr="BUILD")
+    effect_registry.scan_dir(str(pack_env), MODULE_PREFIX)
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    effect_manager = EffectManager(registry=effect_registry, outputs=[output])
+    engine = GameEngine(effect_controls=effect_manager)
+    scene_reg = _scene_registry(*[(name, _scene_factory()) for name in scene_names])
+    scene_manager = SceneManager(engine, effect_registry, PackRegistry(item_attr="RULE"), scene_reg)
+    return scene_manager, effect_manager, output
+
+
+def _fill_personal_and_tick(effect_manager, output) -> list:
+    """Add fresh red+blue effects to PERSONAL, tick once, and return the composed pixels."""
+    effect_manager.add_effect(Scope.PERSONAL, "color.red", {})
+    effect_manager.add_effect(Scope.PERSONAL, "color.blue", {})
+    effect_manager.update(Timer())
+    _, composed = output.update_pixels_calls[-1]
+    return list(composed)
+
+
+_SPLIT_RED_BLUE = [0xFF0000] * 5 + [0x0000FF] * 5
+_ADDITIVE_RED_BLUE = [0xFF00FF] * 10
+
+
+def test_scene_load_resets_merge_strategy_to_split(pack_env) -> None:
+    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
+        pack_env, ["base", "next"]
+    )
+    scene_manager.load("base")
+    scene_manager.update()
+    effect_manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+    assert _fill_personal_and_tick(effect_manager, output) == _ADDITIVE_RED_BLUE
+
+    scene_manager.load("next")
+    scene_manager.update()
+
+    assert _fill_personal_and_tick(effect_manager, output) == _SPLIT_RED_BLUE, (
+        "load must reset every scope key back to Split"
+    )
+
+
+def test_scene_overlay_inherits_the_underlying_scenes_live_merge_strategy(pack_env) -> None:
+    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
+        pack_env, ["base", "overlay_scene"]
+    )
+    scene_manager.load("base")
+    scene_manager.update()
+    effect_manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+
+    scene_manager.overlay("overlay_scene")
+    scene_manager.update()
+
+    assert _fill_personal_and_tick(effect_manager, output) == _ADDITIVE_RED_BLUE, (
+        "overlay must start seeing exactly the underlying scene's current choice"
+    )
+
+
+def test_scene_overlay_merge_strategy_change_is_visible_the_same_tick(pack_env) -> None:
+    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
+        pack_env, ["base", "overlay_scene"]
+    )
+    scene_manager.load("base")
+    scene_manager.update()
+    scene_manager.overlay("overlay_scene")
+    scene_manager.update()
+    assert _fill_personal_and_tick(effect_manager, output) == _SPLIT_RED_BLUE
+
+    effect_manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+    effect_manager.update(Timer())
+
+    _, composed = output.update_pixels_calls[-1]
+    assert list(composed) == _ADDITIVE_RED_BLUE, (
+        "a set_merge_strategy call during an overlay must apply from its very next tick"
+    )
+
+
+def test_scene_pop_restores_pre_overlay_merge_strategy_discarding_overlay_changes(
+    pack_env,
+) -> None:
+    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
+        pack_env, ["base", "overlay_scene"]
+    )
+    scene_manager.load("base")
+    scene_manager.update()  # base starts at the default Split
+    scene_manager.overlay("overlay_scene")
+    scene_manager.update()
+    effect_manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)  # overlay-only change
+
+    scene_manager.pop()
+    scene_manager.update()
+
+    assert _fill_personal_and_tick(effect_manager, output) == _SPLIT_RED_BLUE, (
+        "pop must restore base's pre-overlay Split choice, discarding the overlay's Additive"
+    )
+
+
+def test_nested_overlay_pop_merge_strategy_change_never_leaks_past_its_own_pop(
+    pack_env,
+) -> None:
+    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
+        pack_env, ["base", "mid", "top"]
+    )
+    scene_manager.load("base")
+    scene_manager.update()  # base: Split
+
+    scene_manager.overlay("mid")
+    scene_manager.update()
+    effect_manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)  # mid's own choice
+
+    scene_manager.overlay("top")
+    scene_manager.update()
+    effect_manager.set_merge_strategy(Scope.PERSONAL, SPLIT)  # top-only change
+
+    scene_manager.pop()  # leave top; discard top's change, restore mid's Additive
+    scene_manager.update()
+    assert _fill_personal_and_tick(effect_manager, output) == _ADDITIVE_RED_BLUE, (
+        "mid's Additive choice must survive popping the nested top overlay"
+    )
+
+    scene_manager.pop()  # leave mid; discard mid's change, restore base's original Split
+    scene_manager.update()
+    assert _fill_personal_and_tick(effect_manager, output) == _SPLIT_RED_BLUE, (
+        "base's original Split choice must be restored once every overlay above it is popped"
+    )
