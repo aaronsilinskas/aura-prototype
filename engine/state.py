@@ -4,6 +4,7 @@ __all__ = [
     "EffectControls",
     "EffectReceipt",
     "GameState",
+    "MergeStrategy",
     "NetworkControls",
     "SceneControls",
     "Scope",
@@ -13,18 +14,13 @@ __all__ = [
 
 try:
     from collections.abc import Callable
-    from typing import TYPE_CHECKING, Final, TypeVar
+    from typing import Final, TypeVar
 
     T = TypeVar("T")
 except ImportError:
-    TYPE_CHECKING = False  # Not available on CircuitPython
+    pass  # Not available on CircuitPython
 
-if TYPE_CHECKING:
-    # Import-time only: engine.effects.merge imports EffectReceipt from this module,
-    # so a runtime import here would be circular. Safe because `from __future__ import
-    # annotations` (above) means this name is never evaluated outside type-checking.
-    from engine.effects.merge import MergeStrategy
-
+from effects.effect import PixelBuffer
 from engine.events import Event
 
 
@@ -174,6 +170,32 @@ class EffectReceipt:
 
     def __repr__(self) -> str:
         return f"EffectReceipt(id={self.id})"
+
+
+class MergeStrategy:
+    """Per-scope policy compositing a scope's layered effect buffers into one region buffer.
+
+    This project's ``Protocol`` substitute: a plain base class whose methods
+    only raise ``NotImplementedError``. Subclasses hold no per-instance state,
+    so each ships as a module-level singleton (``SPLIT``, ``ADDITIVE`` in
+    ``engine.effects.merge``). Lives here rather than in ``engine.effects.merge``
+    because that module imports ``EffectReceipt`` from this one; defining the
+    base class in ``engine.effects.merge`` would make ``EffectControls.set_merge_strategy``
+    below need a circular import back into it.
+    """
+
+    def prepare_buffers(self, buffers: list[PixelBuffer]) -> None:
+        """Resize *buffers* to this strategy's layout ahead of the next ``merge`` call."""
+        raise NotImplementedError
+
+    def merge(
+        self, buffers: list[PixelBuffer], receipts: list[EffectReceipt | None]
+    ) -> PixelBuffer:
+        """Composite *buffers* (each scaled by its parallel receipt's brightness) into buffers[0].
+
+        Returns ``buffers[0]``, resized to the full region capacity.
+        """
+        raise NotImplementedError
 
 
 class EffectControls:
