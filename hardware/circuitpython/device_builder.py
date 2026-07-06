@@ -106,8 +106,7 @@ def _setup_matrix_is31fl3741(i2c: busio.I2C, brightness: float) -> Adafruit_RGBM
     Retries until the matrix responds (useful if the I2C bus is still
     settling at boot). Drives LED scaling from *brightness*
     (``round(brightness * 0xFF)``), leaves global current pinned at 0xFF, then
-    enables the matrix. Prints a boot-log line naming the resolved brightness
-    and scaling byte.
+    enables the matrix.
     """
     while True:
         try:
@@ -119,7 +118,6 @@ def _setup_matrix_is31fl3741(i2c: busio.I2C, brightness: float) -> Adafruit_RGBM
     matrix.set_led_scaling(scaling)
     matrix.global_current = 0xFF
     matrix.enable = True
-    print(f"matrix brightness {brightness} -> scaling 0x{scaling:02X}")
     return matrix
 
 
@@ -308,7 +306,6 @@ def build_hardware(
                     brightness=strip_cfg.brightness,
                     auto_write=False,
                 )
-                print(f"strip {strip_cfg.pin} brightness {strip_cfg.brightness}")
                 outputs.append(NeoPixelEffectOutput(hw_strip, strip_cfg.scope_pixels))
             for scope_key, scope_cfg in pixels_cfg.scopes.items():
                 pin = _resolve_pin(board_module, f"pixels.scopes.{scope_key}.pin", scope_cfg.pin)
@@ -319,7 +316,6 @@ def build_hardware(
                     brightness=scope_cfg.brightness,
                     auto_write=False,
                 )
-                print(f"strip {scope_cfg.pin} brightness {scope_cfg.brightness}")
                 outputs.append(
                     NeoPixelEffectOutput(hw_strip, {scope_key: range(0, scope_cfg.count)})
                 )
