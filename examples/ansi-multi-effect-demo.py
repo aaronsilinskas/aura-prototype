@@ -15,16 +15,13 @@ from engine.state import GameState, SceneControls, Scope
 from engine.timer import Timer
 
 _packs_dir = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "packs", "effects")
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packs", "effects")
 )
 _registry = PackRegistry(item_attr="BUILD")
 _registry.scan_dir(_packs_dir, "packs.effects")
 
 
-MAX_FRAMES = 4  # fixed display block height; add_effect can layer up to this many effects
-
-
-BLOCK_HEIGHT = MAX_FRAMES + 1  # frame lines + 1 event status line
+BLOCK_HEIGHT = 2  # 1 pixel line (layered effects already split/merged into it) + 1 event line
 
 
 class AnsiEffectOutput(EffectOutput):
@@ -40,29 +37,24 @@ class AnsiEffectOutput(EffectOutput):
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(self.PIXEL_COUNT)
 
-    def handle_event(self, event, scope, receipt) -> None:
+    def handle_event(self, event, scope, effect, receipt) -> None:
         self._last_event = str(event)
         self._event_count += 1
 
-    def update_pixels(self, scope_key: str, buffers: list, receipts: list) -> None:
-        empty_line = "\r" + "  " * self.PIXEL_COUNT
-        lines = []
-        for buf in buffers[:MAX_FRAMES]:
-            parts = []
-            for color in buf:
-                r = (color >> 16) & 0xFF
-                g = (color >> 8) & 0xFF
-                b = color & 0xFF
-                parts.append(f"\033[48;2;{r};{g};{b}m  \033[0m")
-            lines.append("\r" + "".join(parts))
-        while len(lines) < MAX_FRAMES:
-            lines.append(empty_line)
+    def update_pixels(self, scope_key: str, buffer: PixelBuffer) -> None:
+        parts = []
+        for color in buffer:
+            r = (color >> 16) & 0xFF
+            g = (color >> 8) & 0xFF
+            b = color & 0xFF
+            parts.append(f"\033[48;2;{r};{g};{b}m  \033[0m")
+        pixel_line = "\r" + "".join(parts)
         event_line = (
             f"\r[audio #{self._event_count}] {self._last_event}\033[K"
             if self._last_event
             else "\r\033[K"
         )
-        lines.append(event_line)
+        lines = [pixel_line, event_line]
         if self._initialized:
             print(f"\033[{BLOCK_HEIGHT}A", end="")
         else:

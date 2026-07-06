@@ -29,8 +29,8 @@ class SpyEffectOutput(EffectOutput):
         self.create_buffer_key_calls.append(scope_key)
         return buf
 
-    def update_pixels(self, scope_key: str, buffers: list, receipts: list) -> None:
-        self.update_pixels_calls.append((scope_key, list(zip(buffers, receipts))))
+    def update_pixels(self, scope_key: str, buffer: PixelBuffer) -> None:
+        self.update_pixels_calls.append((scope_key, buffer))
 
     def flush(self) -> None:
         self.flush_calls.append(True)
@@ -90,6 +90,54 @@ class CapturingEffectBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
         self.last_config = config
         return Effect(name=name, pixels=_StubPixels())
+
+
+class ColorFillEffectBuilder(EffectBuilder):
+    """Builder whose effect renders a solid color into whatever buffer it is given.
+
+    Fills every slot up to the buffer's current logical length, so it reflects
+    a `MergeStrategy`'s ``prepare_buffers`` sizing (e.g. Split's per-effect
+    partition) rather than the buffer's full allocated capacity.
+    """
+
+    def __init__(self, color: int) -> None:
+        self._color = color
+
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        color = self._color
+
+        class _ColorFillPixels(EffectPixels):
+            def update(self, elapsed: float) -> None:
+                pass
+
+            def render(self, buf: PixelBuffer) -> None:
+                for i in range(len(buf)):
+                    buf[i] = color
+
+        return Effect(name=name, pixels=_ColorFillPixels())
+
+
+class RenderLengthProbeEffectBuilder(EffectBuilder):
+    """Builder whose effect records the buffer length seen at each ``render`` call.
+
+    Used to confirm a `MergeStrategy`'s ``prepare_buffers`` sizing already
+    happened by the time ``render`` runs.
+    """
+
+    def __init__(self) -> None:
+        self.observed_lengths: list[int] = []
+
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        observed = self.observed_lengths
+
+        class _ProbePixels(EffectPixels):
+            def update(self, elapsed: float) -> None:
+                pass
+
+            def render(self, buf: PixelBuffer) -> None:
+                observed.append(len(buf))
+
+        return Effect(name=name, pixels=_ProbePixels())
 
 
 class EventFiringEffectBuilder(EffectBuilder):

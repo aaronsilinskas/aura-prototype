@@ -1,4 +1,5 @@
 from effects.effect import Effect, EffectConfig, PixelBuffer
+from engine.effects.merge import SPLIT, MergeStrategy
 from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.scene import SceneLocalRegistry
@@ -158,15 +159,14 @@ class EffectOutput:
         """Create a PixelBuffer sized for the given scope key's hardware region."""
         raise NotImplementedError
 
-    def update_pixels(
-        self, scope_key: str, buffers: list[PixelBuffer], receipts: list[EffectReceipt]
-    ) -> None:
-        """Receive rendered frames for this output for a single scope key.
+    def update_pixels(self, scope_key: str, buffer: PixelBuffer) -> None:
+        """Receive one already-composed frame for this output for a single scope key.
 
-        Called once per registered scope key per tick. ``buffers`` and
-        ``receipts`` are parallel lists ordered by effect start time (oldest
-        first). Both are empty when no effects are active for that key
-        (go-dark signal).
+        Called once per registered scope key per tick, with a single
+        full-region buffer already merged from that scope's layered effects
+        by the active ``MergeStrategy``. ``clear_pixels`` is the sole
+        go-dark path — this method is not called when no effects are active
+        for that key.
         """
         pass
 
@@ -206,8 +206,9 @@ class EffectManager(EffectControls):
     Update model:
       - Call ``update(timer)`` once per frame. Each unique effect is
         advanced exactly once; outputs receive their frames in a second pass.
-      - Outputs always receive a call, with an empty list when no effects
-        are active (go-dark signal).
+      - Each registered key gets either one ``update_pixels`` call with a
+        single composed buffer, or a ``clear_pixels`` call when no effects
+        are active for that key (go-dark signal).
     State ownership:
       - Output buffers are created once per effect via ``EffectOutput.create_buffer``.
     """
@@ -236,7 +237,9 @@ class EffectManager(EffectControls):
     __slots__ = (
         "_effects",
         "_frame_bufs",
+        "_frame_effects",
         "_frame_receipts",
+        "_merge_strategies",
         "_next_id",
         "_output_key_sets",
         "_outputs",
@@ -251,6 +254,11 @@ class EffectManager(EffectControls):
         self._output_key_sets: list[frozenset[str]] = [
             frozenset(k for s in o.scopes for k in s.keys) for o in outputs
         ]
+        # Every registered scope key defaults to the Split merge strategy.
+        # No setter exists yet — a future issue adds per-scope selection.
+        self._merge_strategies: dict[str, MergeStrategy] = {
+            k: SPLIT for key_set in self._output_key_sets for k in key_set
+        }
         # Pre-allocated per-output frame accumulators — cleared and reused each tick
         # to avoid dict/list allocation in the hot path.
         # Non-pixel outputs (receives_pixels=False) use None as a placeholder.
@@ -259,6 +267,10 @@ class EffectManager(EffectControls):
             for o, key_set in zip(outputs, self._output_key_sets)
         ]
         self._frame_receipts: list[dict[str, list[EffectReceipt]] | None] = [
+            {k: [] for k in key_set} if o.receives_pixels else None
+            for o, key_set in zip(outputs, self._output_key_sets)
+        ]
+        self._frame_effects: list[dict[str, list[Effect]] | None] = [
             {k: [] for k in key_set} if o.receives_pixels else None
             for o, key_set in zip(outputs, self._output_key_sets)
         ]
@@ -462,29 +474,43 @@ class EffectManager(EffectControls):
             if entry.effect.pixels is not None:
                 entry.effect.pixels.update(elapsed)
 
-        # Pass 2: render and deliver per-key frames to each output.
-        # Every registered key receives a call; empty lists signal go-dark.
-        # _frame_bufs and _frame_receipts are pre-allocated in __init__ and cleared
-        # here — no new objects in steady state after warmup.
+        # Pass 2: merge and deliver one composed frame per key to each output.
+        # Render must happen between prepare_buffers and merge — each buffer
+        # is only correctly sized (by the key's MergeStrategy) once
+        # prepare_buffers has run, and merge reads the rendered pixels.
+        # _frame_bufs, _frame_receipts, and _frame_effects are pre-allocated in
+        # __init__ and cleared here — no new objects in steady state after warmup.
         # Non-pixel outputs (receives_pixels=False) skip update_pixels entirely;
         # flush() is always called unconditionally.
         for i, output in enumerate(self._outputs):
             if output.receives_pixels:
                 frame_bufs = self._frame_bufs[i]
                 frame_receipts = self._frame_receipts[i]
+                frame_effects = self._frame_effects[i]
                 for buf_list in frame_bufs.values():
                     buf_list.clear()
                 for receipt_list in frame_receipts.values():
                     receipt_list.clear()
+                for effect_list in frame_effects.values():
+                    effect_list.clear()
                 for entry in self._effects:
                     buf_dict = entry.output_buffers[i]
                     if buf_dict is not None:
                         for k, buf in buf_dict.items():
-                            entry.effect.pixels.render(buf)
                             frame_bufs[k].append(buf)
                             frame_receipts[k].append(entry.receipt)
-                for key in frame_bufs:
-                    output.update_pixels(key, frame_bufs[key], frame_receipts[key])
+                            frame_effects[k].append(entry.effect)
+                for key, bufs in frame_bufs.items():
+                    if not bufs:
+                        output.clear_pixels(key)
+                        continue
+                    strategy = self._merge_strategies[key]
+                    strategy.prepare_buffers(bufs)
+                    effects = frame_effects[key]
+                    for j, buf in enumerate(bufs):
+                        effects[j].pixels.render(buf)
+                    composed = strategy.merge(bufs, frame_receipts[key])
+                    output.update_pixels(key, composed)
             output.flush()
 
     def __repr__(self) -> str:
