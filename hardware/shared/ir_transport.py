@@ -317,21 +317,24 @@ class InfraredReceiver:
     ``last_signal_strength``, ``last_error_margin``, and
     ``last_best_receiver``.
 
-    Defines the telemetry-counter contract for the whole IR receive path —
-    every counter below defaults to 0 so any receiver (including test fakes)
-    satisfies the contract. Concrete receivers (e.g.
-    :class:`InfraredSingleReceiver`) override these to report real,
-    monotonic-since-boot counts.
+    Defines the telemetry-counter contract for the whole IR receive path via
+    :meth:`telemetry`/:meth:`telemetry_line` — every counter below defaults
+    to 0 on the base class so any receiver (including test fakes) satisfies
+    the contract with no telemetry code. Concrete receivers (e.g.
+    :class:`InfraredSingleReceiver`) override :meth:`telemetry` to report
+    real, monotonic-since-boot counts; the attributes below are not
+    guaranteed to reflect those real counts directly — read them through
+    :meth:`telemetry` instead.
 
     Attributes:
         pulses_seen: Count of pulses drained from the reader.
         packets_surfaced: Count of decoded packets returned by :meth:`receive`.
-        packets_started: Decoder packets-started count (delegated).
-        packets_completed: Decoder packets-completed count (delegated).
-        preamble_reject: Decoder preamble-reject count (delegated).
-        mark_reject: Decoder mark-reject count (delegated).
-        space_reject: Decoder space-reject count (delegated).
-        buffer_full_on_poll: Reader buffer-full-on-poll count (delegated).
+        packets_started: Decoder packets-started count.
+        packets_completed: Decoder packets-completed count.
+        preamble_reject: Decoder preamble-reject count.
+        mark_reject: Decoder mark-reject count.
+        space_reject: Decoder space-reject count.
+        buffer_full_on_poll: Reader buffer-full-on-poll count.
         pulses_dropped_transmitting: Count of pulses drained and discarded
             under **drain-but-discard** while the :class:`IrTransmitGate` was
             transmitting or flushing. Kept out of ``pulses_seen``.
