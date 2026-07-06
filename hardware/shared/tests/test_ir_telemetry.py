@@ -27,7 +27,6 @@ def _snapshot(**overrides) -> IrTelemetrySnapshot:
         "packets_completed": 0,
         "packets_surfaced": 0,
         "pulses_dropped_transmitting": 0,
-        "events_queued": 0,
     }
     fields.update(overrides)
     return IrTelemetrySnapshot(**fields)
@@ -49,14 +48,13 @@ def test_format_line_includes_every_counter_in_pipeline_order():
         packets_completed=6,
         packets_surfaced=7,
         pulses_dropped_transmitting=9,
-        events_queued=8,
     )
 
     line = format_ir_telemetry_line(snapshot)
 
     # Pipeline order per the issue: pulses_seen -> buffer_full_on_poll ->
     # packets_started -> rejected{preamble,mark,space} -> packets_completed
-    # -> packets_surfaced -> pulses_dropped_transmitting -> events_queued.
+    # -> packets_surfaced -> pulses_dropped_transmitting.
     fields_in_order = [
         "pulses_seen=10",
         "buffer_full_on_poll=1",
@@ -67,7 +65,6 @@ def test_format_line_includes_every_counter_in_pipeline_order():
         "packets_completed=6",
         "packets_surfaced=7",
         "pulses_dropped_transmitting=9",
-        "events_queued=8",
     ]
     positions = [line.index(field) for field in fields_in_order]
     assert positions == sorted(positions)
@@ -86,7 +83,6 @@ def test_format_line_matches_the_exact_serial_summary_string():
         packets_completed=6,
         packets_surfaced=7,
         pulses_dropped_transmitting=9,
-        events_queued=8,
     )
 
     line = format_ir_telemetry_line(snapshot)
@@ -94,7 +90,7 @@ def test_format_line_matches_the_exact_serial_summary_string():
     assert line == (
         "ir: pulses_seen=10 buffer_full_on_poll=1 packets_started=2 "
         "preamble_reject=3 mark_reject=4 space_reject=5 packets_completed=6 "
-        "packets_surfaced=7 pulses_dropped_transmitting=9 events_queued=8"
+        "packets_surfaced=7 pulses_dropped_transmitting=9"
     )
 
 

@@ -19,6 +19,7 @@ Design notes
 from array import array
 
 from hardware.shared.ir_protocol import InfraredDecoder, InfraredEncoder
+from hardware.shared.ir_telemetry import IrTelemetryGate, IrTelemetrySnapshot
 
 # ---------------------------------------------------------------------------
 # Port abstractions
@@ -346,12 +347,18 @@ class InfraredReceiver:
     buffer_full_on_poll: int = 0
     pulses_dropped_transmitting: int = 0
 
+    def __init__(self) -> None:
+        # Owns the change-gate for telemetry_line(). Distinct from a
+        # transmit-gate-carrying subclass's self._gate (the IrTransmitGate).
+        self._telemetry_gate = IrTelemetryGate()
+
     def reset_telemetry(self) -> None:
         """Zero every counter in the IR-path telemetry contract.
 
-        No-op on the base — receivers that track real counters (e.g.
-        :class:`InfraredSingleReceiver`) override this to also reset their
-        decoder and reader.
+        Also resets :meth:`telemetry_line`'s change-gate baseline, so the
+        next call reports unconditionally. Receivers that track real
+        counters (e.g. :class:`InfraredSingleReceiver`) override this to
+        also reset their decoder and reader.
         """
         self.pulses_seen = 0
         self.packets_surfaced = 0
@@ -362,6 +369,34 @@ class InfraredReceiver:
         self.space_reject = 0
         self.buffer_full_on_poll = 0
         self.pulses_dropped_transmitting = 0
+        self._telemetry_gate = IrTelemetryGate()
+
+    def telemetry(self) -> IrTelemetrySnapshot:
+        """Build a snapshot of every counter in the IR-path telemetry contract.
+
+        Generic working default — iterates ``IrTelemetrySnapshot.FIELDS`` and
+        reads each counter off ``self`` via ``getattr(self, name, 0)``, so
+        bare/fake receivers satisfy the contract with no telemetry code.
+        Concrete receivers (e.g. :class:`InfraredSingleReceiver`) override
+        this to map each counter from its real source explicitly.
+
+        Returns:
+            The current tick's :class:`IrTelemetrySnapshot`.
+        """
+        return IrTelemetrySnapshot(*(getattr(self, name, 0) for name in IrTelemetrySnapshot.FIELDS))
+
+    def telemetry_line(self) -> "str | None":
+        """Return a change-gated one-line telemetry summary, or ``None``.
+
+        Polls :meth:`telemetry` through this receiver's own
+        :class:`IrTelemetryGate`, so callers (``run_scene``) only ever see a
+        line when a counter changed since the last call.
+
+        Returns:
+            A formatted summary line, or ``None`` when no counter changed
+            since the last call.
+        """
+        return self._telemetry_gate.poll(self.telemetry())
 
     def receive(self) -> "bytearray | None":
         """Poll for a complete received packet.
@@ -424,13 +459,14 @@ class InfraredSingleReceiver(InfraredReceiver):
         decoder: InfraredDecoder,
         gate: "IrTransmitGate | None" = None,
     ) -> None:
+        super().__init__()
         self._reader = pulse_reader
         self._decoder = decoder
         self._gate = gate
 
         # Monotonic-since-boot telemetry owned by this receiver. Decoder and
-        # reader counters are not copied — they are forwarded live via the
-        # properties below so the whole path reads off this one handle.
+        # reader counters are not copied — they are read live in
+        # telemetry() so the whole path reads off this one handle.
         self.pulses_seen: int = 0
         self.packets_surfaced: int = 0
         self.pulses_dropped_transmitting: int = 0
@@ -486,35 +522,26 @@ class InfraredSingleReceiver(InfraredReceiver):
         """Always ``None`` — a single receiver has no selection concept."""
         return None
 
-    @property
-    def packets_started(self) -> int:
-        """Decoder packets-started count, forwarded live."""
-        return self._decoder.packets_started
+    def telemetry(self) -> IrTelemetrySnapshot:
+        """Build a snapshot, mapping each counter from its real source.
 
-    @property
-    def packets_completed(self) -> int:
-        """Decoder packets-completed count, forwarded live."""
-        return self._decoder.packets_completed
-
-    @property
-    def preamble_reject(self) -> int:
-        """Decoder preamble-reject count, forwarded live."""
-        return self._decoder.preamble_reject
-
-    @property
-    def mark_reject(self) -> int:
-        """Decoder mark-reject count, forwarded live."""
-        return self._decoder.mark_reject
-
-    @property
-    def space_reject(self) -> int:
-        """Decoder space-reject count, forwarded live."""
-        return self._decoder.space_reject
-
-    @property
-    def buffer_full_on_poll(self) -> int:
-        """Reader buffer-full-on-poll count, forwarded live."""
-        return self._reader.buffer_full_on_poll
+        ``packets_started``/``packets_completed``/``{preamble,mark,space}_reject``
+        come from the decoder; ``buffer_full_on_poll`` comes from the reader;
+        ``pulses_seen``/``packets_surfaced``/``pulses_dropped_transmitting``
+        come from this receiver.
+        """
+        decoder = self._decoder
+        return IrTelemetrySnapshot(
+            self.pulses_seen,
+            self._reader.buffer_full_on_poll,
+            decoder.packets_started,
+            decoder.preamble_reject,
+            decoder.mark_reject,
+            decoder.space_reject,
+            decoder.packets_completed,
+            self.packets_surfaced,
+            self.pulses_dropped_transmitting,
+        )
 
     def reset_telemetry(self) -> None:
         """Zero the whole IR path: this receiver, its decoder, and its reader."""
@@ -523,6 +550,7 @@ class InfraredSingleReceiver(InfraredReceiver):
         self.pulses_dropped_transmitting = 0
         self._decoder.reset_telemetry()
         self._reader.reset_telemetry()
+        self._telemetry_gate = IrTelemetryGate()
 
 
 # ---------------------------------------------------------------------------
@@ -564,6 +592,7 @@ class InfraredMultiReceiver(InfraredReceiver):
         decoder_factory: "object",
         gate: "IrTransmitGate | None" = None,
     ) -> None:
+        super().__init__()
         # Freeze the reader list and create one decoder per reader
         self._readers = list(pulse_readers)
         self._decoders = [decoder_factory() for _ in self._readers]
@@ -694,3 +723,4 @@ class InfraredMultiReceiver(InfraredReceiver):
         self.pulses_dropped_transmitting = 0
         for decoder in self._decoders:
             decoder.reset_telemetry()
+        self._telemetry_gate = IrTelemetryGate()

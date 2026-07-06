@@ -19,7 +19,6 @@ from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
 from hardware.shared.ir_protocol import InfraredDecoder, InfraredEncoder
-from hardware.shared.ir_telemetry import IrTelemetryGate, IrTelemetrySnapshot
 from hardware.shared.scene_selection import DEFAULT_SCENE
 
 try:
@@ -63,13 +62,13 @@ def run_scene(
     → ``effect_manager.update(timer)`` loop on a single ``Timer``.  IR polling
     is skipped when no ``ir_receiver`` is present.
 
-    Once per second (gated on ``timer.total``), and only when at least one
-    IR receive-path counter changed since the last print, prints a single
-    summary line read off ``hw.ir_receiver`` (see
-    :mod:`hardware.shared.ir_telemetry`) plus a count of ``IRReceived``
-    events queued this run. Skipped entirely when no ``ir_receiver`` is
-    present. Not unit-testable — ``build_hardware`` requires CircuitPython
-    board imports; validate via deploy-watch.
+    Once per second (gated on ``timer.total``), prints the line from
+    ``hw.ir_receiver.telemetry_line()`` (see
+    :mod:`hardware.shared.ir_telemetry`) when it returns one — the receiver
+    itself gates on whether a counter changed since the last call. Skipped
+    entirely when no ``ir_receiver`` is present. Not unit-testable —
+    ``build_hardware`` requires CircuitPython board imports; validate via
+    deploy-watch.
 
     Args:
         scene_name: Name of the scene to load.
@@ -107,8 +106,6 @@ def run_scene(
     _acceleration = AccelerationData(0.0, 0.0, 0.0) if hw.accelerometer is not None else None
     _input_event = InputEvents.ButtonAndAcceleration(_button_data, _acceleration)
 
-    _ir_telemetry_gate = IrTelemetryGate() if hw.ir_receiver is not None else None
-    _events_queued = 0
     _last_telemetry_print_total = 0.0
 
     while True:
@@ -142,7 +139,6 @@ def run_scene(
                         best_receiver=None,
                     )
                 )
-                _events_queued += 1
 
         if active_state is not None:
             active_state.queue_event(_input_event)
@@ -151,25 +147,11 @@ def run_scene(
         effect_manager.update(timer)
 
         if (
-            _ir_telemetry_gate is not None
+            hw.ir_receiver is not None
             and timer.total - _last_telemetry_print_total >= _TELEMETRY_PRINT_INTERVAL
         ):
             _last_telemetry_print_total = timer.total
-            ir_receiver = hw.ir_receiver
-            line = _ir_telemetry_gate.poll(
-                IrTelemetrySnapshot(
-                    ir_receiver.pulses_seen,
-                    ir_receiver.buffer_full_on_poll,
-                    ir_receiver.packets_started,
-                    ir_receiver.preamble_reject,
-                    ir_receiver.mark_reject,
-                    ir_receiver.space_reject,
-                    ir_receiver.packets_completed,
-                    ir_receiver.packets_surfaced,
-                    ir_receiver.pulses_dropped_transmitting,
-                    _events_queued,
-                )
-            )
+            line = hw.ir_receiver.telemetry_line()
             if line is not None:
                 print(line)
 
