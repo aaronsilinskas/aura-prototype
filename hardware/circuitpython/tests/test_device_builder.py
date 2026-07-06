@@ -236,7 +236,8 @@ def test_setup_matrix_is31fl3741_drives_scaling_from_brightness() -> None:
         result = _setup_matrix_is31fl3741(MagicMock(), 0.2)
 
     assert result is driver
-    driver.set_led_scaling.assert_called_once_with(round(0.2 * 0xFF))
+    # 0.2 * 0xFF == 0x33 -- the old hard-coded calibration byte.
+    driver.set_led_scaling.assert_called_once_with(0x33)
     assert driver.global_current == 0xFF
 
 
