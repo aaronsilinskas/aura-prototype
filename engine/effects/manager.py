@@ -240,6 +240,7 @@ class EffectManager(EffectControls):
         "_frame_effects",
         "_frame_receipts",
         "_merge_strategies",
+        "_merge_strategy_snapshots",
         "_next_id",
         "_output_key_sets",
         "_outputs",
@@ -255,10 +256,14 @@ class EffectManager(EffectControls):
             frozenset(k for s in o.scopes for k in s.keys) for o in outputs
         ]
         # Every registered scope key defaults to the Split merge strategy.
-        # No setter exists yet — a future issue adds per-scope selection.
         self._merge_strategies: dict[str, MergeStrategy] = {
             k: SPLIT for key_set in self._output_key_sets for k in key_set
         }
+        # Stack of saved merge-strategy maps, one per active overlay — pushed by
+        # save_merge_strategies (SceneManager._do_overlay) and popped by
+        # restore_merge_strategies (SceneManager._do_pop). A small dict copy at a
+        # scene transition (rare), never per-tick.
+        self._merge_strategy_snapshots: list[dict[str, MergeStrategy]] = []
         # Pre-allocated per-output frame accumulators — cleared and reused each tick
         # to avoid dict/list allocation in the hot path.
         # Non-pixel outputs (receives_pixels=False) use None as a placeholder.
@@ -420,6 +425,42 @@ class EffectManager(EffectControls):
         Reserved for ``SceneManager`` — rules must not call this method.
         """
         self._resolver.set_local_effects(local_registry)
+
+    def set_merge_strategy(self, scope: ScopeValue, strategy: MergeStrategy) -> None:
+        """Set the merge strategy for every key in scope.keys.
+
+        Keys outside scope.keys are left unchanged. Takes effect starting with
+        the next tick's ``prepare_buffers`` call.
+        """
+        for key in scope.keys:
+            self._merge_strategies[key] = strategy
+
+    def reset_merge_strategies(self) -> None:
+        """Reset every registered scope key to SPLIT and discard saved snapshots.
+
+        Reserved for ``SceneManager`` — called from ``_do_load``.
+        """
+        for key in self._merge_strategies:
+            self._merge_strategies[key] = SPLIT
+        self._merge_strategy_snapshots.clear()
+
+    def save_merge_strategies(self) -> None:
+        """Push a copy of the current per-scope merge strategy map.
+
+        The live map is left in place, so an overlay starts by inheriting the
+        underlying scene's current choices. Reserved for ``SceneManager`` —
+        called from ``_do_overlay``.
+        """
+        self._merge_strategy_snapshots.append(dict(self._merge_strategies))
+
+    def restore_merge_strategies(self) -> None:
+        """Replace the live merge strategy map with the most recently saved snapshot.
+
+        Discards any ``set_merge_strategy`` calls made since the matching
+        ``save_merge_strategies`` call. Reserved for ``SceneManager`` — called
+        from ``_do_pop``.
+        """
+        self._merge_strategies = self._merge_strategy_snapshots.pop()
 
     def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
         """Replace any running effect(s) in scope and start this one."""

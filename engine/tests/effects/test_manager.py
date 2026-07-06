@@ -4,6 +4,7 @@ from unittest.mock import ANY
 import pytest
 
 from engine.effects.manager import EffectManager
+from engine.effects.merge import ADDITIVE
 from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.state import Scope
@@ -1338,6 +1339,79 @@ def test_add_effect_transfers_brightness_from_options(pack_env) -> None:
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {"brightness": 0.75})
 
     assert receipt.brightness == 0.75
+
+
+# ---------------------------------------------------------------------------
+# set_merge_strategy — issue #587
+# ---------------------------------------------------------------------------
+
+
+def test_set_merge_strategy_takes_effect_starting_next_tick(pack_env) -> None:
+    """Switching from Split to Additive mid-run blends from the very next tick onward."""
+    _make_pack(
+        pack_env,
+        "color",
+        {
+            "red": (
+                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+            ),
+            "blue": (
+                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
+            ),
+        },
+    )
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=registry, outputs=[output])
+    manager.add_effect(Scope.PERSONAL, "color.red", {})
+    manager.add_effect(Scope.PERSONAL, "color.blue", {})
+    manager.update(_make_timer())  # still the default Split strategy
+    # Composed buffers are mutated in place on the next tick, so snapshot the
+    # pixel values now rather than comparing PixelBuffer object identity later.
+    _, first_composed = output.update_pixels_calls[0]
+    split_snapshot = list(first_composed)
+
+    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+    manager.update(_make_timer())
+
+    _, second_composed = output.update_pixels_calls[1]
+    assert split_snapshot == [0xFF0000] * 5 + [0x0000FF] * 5
+    assert list(second_composed) == [0xFF00FF] * 10
+
+
+def test_set_merge_strategy_leaves_other_scopes_strategy_unchanged(pack_env) -> None:
+    _make_pack(
+        pack_env,
+        "color",
+        {
+            "red": (
+                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+            ),
+            "blue": (
+                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
+            ),
+        },
+    )
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = EffectManager(
+        registry=registry,
+        outputs=[SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL]), output_directional],
+    )
+    manager.add_effect(Scope.DIRECTIONAL, "color.red", {})
+    manager.add_effect(Scope.DIRECTIONAL, "color.blue", {})
+
+    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+    manager.update(_make_timer())
+
+    _, composed = output_directional.update_pixels_calls[0]
+    assert list(composed) == [0xFF0000] * 5 + [0x0000FF] * 5  # DIRECTIONAL still Split
 
 
 # ---------------------------------------------------------------------------
