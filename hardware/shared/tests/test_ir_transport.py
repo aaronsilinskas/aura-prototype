@@ -163,24 +163,35 @@ def test_gate_end_transmit_without_begin_does_not_go_negative():
     assert gate.transmitting is False
 
 
-def test_gate_consume_flush_is_false_before_any_emission():
+def test_gate_should_discard_is_false_before_any_emission():
     gate = IrTransmitGate()
-    assert gate.consume_flush() is False
+    assert gate.should_discard() is False
 
 
-def test_gate_consume_flush_is_true_once_after_end_transmit():
+def test_gate_should_discard_flushes_once_on_falling_edge_then_stops():
     gate = IrTransmitGate()
     gate.begin_transmit()
     gate.end_transmit()
 
-    assert gate.consume_flush() is True
-    assert gate.consume_flush() is False
+    assert gate.should_discard() is True
+    assert gate.should_discard() is False
 
 
-def test_gate_consume_flush_is_not_armed_while_still_transmitting():
+def test_gate_should_discard_is_true_while_transmitting():
     gate = IrTransmitGate()
     gate.begin_transmit()
-    assert gate.consume_flush() is False
+    assert gate.should_discard() is True
+
+
+def test_gate_should_discard_while_transmitting_preserves_the_falling_edge_flush():
+    gate = IrTransmitGate()
+    gate.begin_transmit()
+
+    assert gate.should_discard() is True  # short-circuits without touching the latch
+    gate.end_transmit()
+
+    assert gate.should_discard() is True  # falling-edge flush still fires
+    assert gate.should_discard() is False
 
 
 # ---------------------------------------------------------------------------
@@ -251,7 +262,7 @@ def test_transmitter_with_gate_releases_gate_after_send_completes():
     tx.send(b"\x01")
 
     assert gate.transmitting is False
-    assert gate.consume_flush() is True
+    assert gate.should_discard() is True
 
 
 # ---------------------------------------------------------------------------
@@ -499,7 +510,7 @@ def test_gate_fires_end_transmit_synchronously_when_writer_finishes_inline():
     tx.send(b"\x01")
 
     assert gate.transmitting is False
-    assert gate.consume_flush() is True  # already armed — fired during send()
+    assert gate.should_discard() is True  # already armed — fired during send()
 
 
 def test_gate_defers_end_transmit_to_the_poll_that_first_observes_idle():
@@ -510,18 +521,17 @@ def test_gate_defers_end_transmit_to_the_poll_that_first_observes_idle():
     tx.send(b"\x01")  # writer reports busy after write_pulses — DMA in flight
 
     assert gate.transmitting is True  # still armed — DMA in flight
-    assert gate.consume_flush() is False  # not yet fired
 
     tx.poll()  # writer still busy — gate stays armed
 
     assert gate.transmitting is True
-    assert gate.consume_flush() is False
 
     writer.set_busy(False)
     tx.poll()  # writer now idle — end_transmit fires here
 
     assert gate.transmitting is False
-    assert gate.consume_flush() is True
+    assert gate.should_discard() is True  # falling-edge flush fires, exactly once
+    assert gate.should_discard() is False
 
 
 def test_gate_released_when_writer_raises_on_kick_off_via_send():
@@ -539,7 +549,7 @@ def test_gate_released_when_writer_raises_on_kick_off_via_send():
         tx.send(b"\x01")
 
     assert gate.transmitting is False
-    assert gate.consume_flush() is True
+    assert gate.should_discard() is True
 
 
 def test_queued_send_encode_error_surfaces_in_poll_not_in_send():
@@ -932,8 +942,8 @@ def test_single_receiver_falling_edge_flushes_once_then_decodes_normally():
     assert rx.receive() == bytearray(payload)
 
 
-def test_single_receiver_gate_idle_does_not_consume_flush_repeatedly():
-    """consume_flush() is one-shot — a second idle poll must not re-drop."""
+def test_single_receiver_gate_idle_does_not_discard_repeatedly():
+    """The falling-edge flush is one-shot — a second idle poll must not re-drop."""
     gate = IrTransmitGate()
     gate.begin_transmit()
     gate.end_transmit()
