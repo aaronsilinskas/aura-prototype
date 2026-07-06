@@ -1,13 +1,15 @@
 """Tests for NeoPixelEffectOutput with multi-segment (scope_pixels) routing.
 
 Verifies that a single physical strip can be subdivided into scope segments,
-each segment acts on only its own pixel range, and brightness multiplies
+each segment acts on only its own pixel range, and receipt brightness scales
 correctly.  Uses in-memory fake strips to avoid hardware imports.
 """
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock, call
+
+import pytest
 
 from effects.effect import PixelBuffer
 
@@ -32,13 +34,12 @@ def _make_receipt(brightness: float = 1.0) -> MagicMock:
 def _make_segmented_output(
     scope_pixels: dict,
     count: int = 30,
-    brightness: float = 1.0,
 ):
     """Build a NeoPixelEffectOutput with a mock strip and given scope_pixels."""
     from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 
     strip = _make_strip(count)
-    output = NeoPixelEffectOutput(strip, scope_pixels, brightness)
+    output = NeoPixelEffectOutput(strip, scope_pixels)
     return output, strip
 
 
@@ -182,31 +183,20 @@ def test_update_pixels_applies_receipt_brightness() -> None:
     strip.__setitem__.assert_called_once_with(0, 0x7F0000)
 
 
-def test_update_pixels_applies_strip_brightness() -> None:
-    """update_pixels scales each pixel by the per-strip brightness config."""
-    scope_pixels = {"personal": range(0, 1)}
-    output, strip = _make_segmented_output(scope_pixels, count=1, brightness=0.5)
-
-    buf = PixelBuffer(1)
-    buf[0] = 0xFF0000
-
-    output.update_pixels("personal", [buf], [_make_receipt(brightness=1.0)])
-
-    strip.__setitem__.assert_called_once_with(0, 0x7F0000)
+# ---------------------------------------------------------------------------
+# Construction: no per-strip brightness argument
+# ---------------------------------------------------------------------------
 
 
-def test_update_pixels_multiplies_strip_and_receipt_brightness() -> None:
-    """update_pixels multiplies strip brightness by receipt brightness."""
-    scope_pixels = {"personal": range(0, 1)}
-    output, strip = _make_segmented_output(scope_pixels, count=1, brightness=0.5)
+def test_construction_rejects_a_strip_brightness_argument() -> None:
+    """NeoPixelEffectOutput no longer accepts a per-strip brightness -- brightness is
+    applied to the neopixel.NeoPixel object at hardware-init construction instead."""
+    from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 
-    buf = PixelBuffer(1)
-    buf[0] = 0xFF0000
+    strip = _make_strip(1)
 
-    output.update_pixels("personal", [buf], [_make_receipt(brightness=0.5)])
-
-    # 0xFF * 0.25 = 63 = 0x3F
-    strip.__setitem__.assert_called_once_with(0, 0x3F0000)
+    with pytest.raises(TypeError):
+        NeoPixelEffectOutput(strip, {"personal": range(0, 1)}, 0.5)
 
 
 # ---------------------------------------------------------------------------

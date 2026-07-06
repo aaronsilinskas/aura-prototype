@@ -123,7 +123,6 @@ DISPLAY_SECONDS: Final = 10.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
 NEOPIXEL_PIN: Final = "D5"
-NEOPIXEL_BRIGHTNESS: Final = 0.5
 
 # The IS31FL3741 RGBMatrixQT is physically 13 columns by MATRIX_ROWS rows; a swept
 # row band cannot address beyond it, so per-count row counts are capped here.
@@ -187,9 +186,7 @@ def _build_sweep_output(
         output.scopes = [Scope.PERSONAL]
         return output, rows * IS31FL3741_COLS
 
-    output = NeoPixelEffectOutput(
-        pixel_output.strip, {"personal": range(0, pixel_count)}, NEOPIXEL_BRIGHTNESS
-    )
+    output = NeoPixelEffectOutput(pixel_output.strip, {"personal": range(0, pixel_count)})
     return output, pixel_count
 
 

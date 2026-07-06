@@ -1,6 +1,6 @@
 """Tests for NeoPixelEffectOutput — single-scope NeoPixel strip routing.
 
-Uses the constructor: NeoPixelEffectOutput(strip, scope_pixels, brightness).
+Uses the constructor: NeoPixelEffectOutput(strip, scope_pixels).
 The single-scope case is the degenerate one-segment-covering-[0, count] shape.
 Uses in-memory fake strips to verify routing; no neopixel hardware import needed.
 """
@@ -23,13 +23,13 @@ def _make_strip(count: int) -> MagicMock:
     return strip
 
 
-def _make_output(scope_key: str = "personal", count: int = 5, brightness: float = 1.0):
+def _make_output(scope_key: str = "personal", count: int = 5):
     """Build a NeoPixelEffectOutput with a mock strip (single full-strip segment)."""
     from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 
     strip = _make_strip(count)
     scope_pixels = {scope_key: range(0, count)}
-    output = NeoPixelEffectOutput(strip, scope_pixels, brightness)
+    output = NeoPixelEffectOutput(strip, scope_pixels)
     return output, strip
 
 
@@ -142,9 +142,14 @@ def test_update_pixels_applies_receipt_brightness_scaling() -> None:
     strip.__setitem__.assert_called_once_with(0, 0x7F0000)
 
 
-def test_update_pixels_applies_scope_brightness() -> None:
-    """update_pixels scales each pixel by the per-scope brightness config."""
-    output, strip = _make_output(count=1, brightness=0.5)
+def test_update_pixels_writes_verbatim_at_receipt_brightness_one() -> None:
+    """update_pixels writes buffer values unmodified when receipt brightness is 1.0.
+
+    NeoPixelEffectOutput holds no per-strip brightness of its own (that is a
+    hardware-init concern applied to the neopixel.NeoPixel object at
+    construction) -- only the receipt brightness fast path applies here.
+    """
+    output, strip = _make_output(count=1)
 
     buf = PixelBuffer(1)
     buf[0] = 0xFF0000  # pure red
@@ -153,23 +158,17 @@ def test_update_pixels_applies_scope_brightness() -> None:
     receipt.brightness = 1.0
     output.update_pixels("personal", [buf], [receipt])
 
-    # 0xFF * 0.5 = 0x7F
-    strip.__setitem__.assert_called_once_with(0, 0x7F0000)
+    strip.__setitem__.assert_called_once_with(0, 0xFF0000)
 
 
-def test_update_pixels_multiplies_scope_and_receipt_brightness() -> None:
-    """update_pixels multiplies scope brightness by receipt brightness (not adds them)."""
-    output, strip = _make_output(count=1, brightness=0.5)
+def test_neopixel_effect_output_constructs_without_brightness_argument() -> None:
+    """NeoPixelEffectOutput takes only strip and scope_pixels -- no brightness param."""
+    from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 
-    buf = PixelBuffer(1)
-    buf[0] = 0xFF0000  # pure red
+    strip = _make_strip(1)
 
-    receipt = MagicMock()
-    receipt.brightness = 0.5
-    output.update_pixels("personal", [buf], [receipt])
-
-    # 0xFF * (0.5 * 0.5) = 0xFF * 0.25 = 63 = 0x3F
-    strip.__setitem__.assert_called_once_with(0, 0x3F0000)
+    # Must not raise TypeError for a missing brightness argument.
+    NeoPixelEffectOutput(strip, {"personal": range(0, 1)})
 
 
 def test_update_pixels_go_dark_writes_zeros() -> None:

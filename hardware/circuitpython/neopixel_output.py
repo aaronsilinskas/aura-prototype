@@ -16,26 +16,27 @@ __all__ = ["NeoPixelEffectOutput"]
 class NeoPixelEffectOutput(EffectOutput):
     """Routes scope-keyed pixel writes to the correct offset within a physical NeoPixel strip.
 
+    Per-strip brightness is a hardware-init concern applied to the
+    ``neopixel.NeoPixel`` object at construction (the library scales it at
+    ``show()``) — this output holds no brightness of its own and only applies
+    the per-effect receipt brightness.
+
     Args:
         strip: Strip object supporting ``strip[i] = color`` (packed RGB int)
             and ``strip.show()``.
         scope_pixels: Mapping of scope key to a ``range`` of pixel indices
             within the strip.  Must be non-empty.
-        brightness: Per-strip brightness in [0.0, 1.0], multiplied with the
-            per-effect receipt brightness.
     """
 
-    __slots__ = ("_brightness", "_scope_pixels", "_strip", "min_resolution", "scopes")
+    __slots__ = ("_scope_pixels", "_strip", "min_resolution", "scopes")
 
     def __init__(
         self,
         strip: object,
         scope_pixels: dict[str, range],
-        brightness: float = 1.0,
     ) -> None:
         super().__init__()
         self._strip = strip
-        self._brightness: float = brightness
         self._scope_pixels: dict[str, range] = scope_pixels
         self.scopes: list[ScopeValue] = [ScopeValue(key) for key in scope_pixels]
         self.min_resolution: int = max(len(r) for r in scope_pixels.values())
@@ -68,8 +69,7 @@ class NeoPixelEffectOutput(EffectOutput):
 
         pixels = buffers[-1]
         receipt = receipts[-1] if receipts else None
-        effect_brightness = receipt.brightness if receipt is not None else 1.0
-        brightness = effect_brightness * self._brightness
+        brightness = receipt.brightness if receipt is not None else 1.0
 
         if brightness == 1.0:
             for j in range(count):
