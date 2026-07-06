@@ -55,20 +55,11 @@ def run_scene(
 ) -> None:
     """Bring hardware up via ``build_hardware`` and run *scene_name* forever.
 
-    Builds the effect/rule ``PackRegistry``s, ``GameEngine``, ``SceneRegistry``,
-    and ``SceneManager``, loads the requested scene (falling back to
-    ``DEFAULT_SCENE`` with a console message when the name is not registered),
-    then drives the read-inputs → poll-IR → queue-events → ``manager.update()``
-    → ``effect_manager.update(timer)`` loop on a single ``Timer``.  IR polling
-    is skipped when no ``ir_receiver`` is present.
-
-    Once per second (gated on ``timer.total``), prints the line from
-    ``hw.ir_receiver.telemetry_line()`` (see
+    Prints the telemetry line from ``hw.ir_receiver.telemetry_line()`` (see
     :mod:`hardware.shared.ir_telemetry`) when it returns one — the receiver
-    itself gates on whether a counter changed since the last call. Skipped
-    entirely when no ``ir_receiver`` is present. Not unit-testable —
-    ``build_hardware`` requires CircuitPython board imports; validate via
-    deploy-watch.
+    itself gates on whether a counter changed since the last call. Not
+    unit-testable — ``build_hardware`` requires CircuitPython board imports;
+    validate via deploy-watch.
 
     Args:
         scene_name: Name of the scene to load.
