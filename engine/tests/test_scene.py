@@ -1294,7 +1294,7 @@ def test_scene_overlay_inherits_the_underlying_scenes_live_merge_strategy(pack_e
     )
 
 
-def test_scene_overlay_merge_strategy_change_is_visible_the_same_tick(pack_env) -> None:
+def test_scene_overlay_merge_strategy_change_takes_effect_the_next_tick(pack_env) -> None:
     scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
         pack_env, ["base", "overlay_scene"]
     )
