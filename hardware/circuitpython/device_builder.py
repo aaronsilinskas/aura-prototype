@@ -100,12 +100,13 @@ def _setup_i2c() -> busio.I2C | None:
         return None
 
 
-def _setup_matrix_is31fl3741(i2c: busio.I2C) -> Adafruit_RGBMatrixQT:
+def _setup_matrix_is31fl3741(i2c: busio.I2C, brightness: float) -> Adafruit_RGBMatrixQT:
     """Return a configured IS31FL3741 driver on *i2c*.
 
     Retries until the matrix responds (useful if the I2C bus is still
-    settling at boot).  Sets LED scaling to 0x33 and global current to 0xFF
-    then enables the matrix.
+    settling at boot). Drives LED scaling from *brightness*
+    (``round(brightness * 0xFF)``), leaves global current pinned at 0xFF, then
+    enables the matrix.
     """
     while True:
         try:
@@ -113,7 +114,8 @@ def _setup_matrix_is31fl3741(i2c: busio.I2C) -> Adafruit_RGBMatrixQT:
             break
         except Exception:
             time.sleep(1)
-    matrix.set_led_scaling(0x33)
+    scaling = round(brightness * 0xFF)
+    matrix.set_led_scaling(scaling)
     matrix.global_current = 0xFF
     matrix.enable = True
     return matrix
@@ -286,7 +288,7 @@ def build_hardware(
         if isinstance(pixels_cfg, MatrixPixelsConfig):
             if i2c is None:
                 raise RuntimeError("pixels.type is 'matrix' but no I2C bus is available")
-            matrix = _setup_matrix_is31fl3741(i2c)
+            matrix = _setup_matrix_is31fl3741(i2c, pixels_cfg.brightness)
             outputs.append(
                 IS31FL3741EffectOutput(
                     matrix,
@@ -301,25 +303,21 @@ def build_hardware(
                     pin,
                     strip_cfg.count,
                     pixel_order=strip_cfg.order,
+                    brightness=strip_cfg.brightness,
                     auto_write=False,
                 )
-                outputs.append(
-                    NeoPixelEffectOutput(hw_strip, strip_cfg.scope_pixels, strip_cfg.brightness)
-                )
+                outputs.append(NeoPixelEffectOutput(hw_strip, strip_cfg.scope_pixels))
             for scope_key, scope_cfg in pixels_cfg.scopes.items():
                 pin = _resolve_pin(board_module, f"pixels.scopes.{scope_key}.pin", scope_cfg.pin)
                 hw_strip = neopixel.NeoPixel(
                     pin,
                     scope_cfg.count,
                     pixel_order=scope_cfg.order,
+                    brightness=scope_cfg.brightness,
                     auto_write=False,
                 )
                 outputs.append(
-                    NeoPixelEffectOutput(
-                        hw_strip,
-                        {scope_key: range(0, scope_cfg.count)},
-                        scope_cfg.brightness,
-                    )
+                    NeoPixelEffectOutput(hw_strip, {scope_key: range(0, scope_cfg.count)})
                 )
 
     button_pins = [

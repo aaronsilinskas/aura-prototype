@@ -137,6 +137,84 @@ def test_parse_neopixel_strip_explicit_order_and_brightness():
 
 
 # ---------------------------------------------------------------------------
+# Validation: strip brightness
+# ---------------------------------------------------------------------------
+
+
+def test_parse_neopixel_strip_non_numeric_brightness_raises_value_error():
+    config = {
+        "pixels": [
+            {
+                "type": "neopixel",
+                "pin": "D5",
+                "count": 10,
+                "brightness": "bright",
+                "scope_pixels": {"personal": [0, 10]},
+            }
+        ],
+        "buttons": ["D9"],
+    }
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.brightness"):
+        parse_device_config(config)
+
+
+def test_parse_neopixel_strip_out_of_range_brightness_raises_value_error():
+    config = {
+        "pixels": [
+            {
+                "type": "neopixel",
+                "pin": "D5",
+                "count": 10,
+                "brightness": 1.5,
+                "scope_pixels": {"personal": [0, 10]},
+            }
+        ],
+        "buttons": ["D9"],
+    }
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.brightness"):
+        parse_device_config(config)
+
+
+def test_parse_neopixel_strip_negative_brightness_raises_value_error():
+    config = {
+        "pixels": [
+            {
+                "type": "neopixel",
+                "pin": "D5",
+                "count": 10,
+                "brightness": -0.5,
+                "scope_pixels": {"personal": [0, 10]},
+            }
+        ],
+        "buttons": ["D9"],
+    }
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.brightness"):
+        parse_device_config(config)
+
+
+def test_parse_neopixel_strip_brightness_boundary_zero_is_accepted():
+    config = {
+        "pixels": [
+            {
+                "type": "neopixel",
+                "pin": "D5",
+                "count": 10,
+                "brightness": 0.0,
+                "scope_pixels": {"personal": [0, 10]},
+            }
+        ],
+        "buttons": ["D9"],
+    }
+
+    result = parse_device_config(config)
+
+    assert result.pixels[0].strips[0].brightness == 0.0
+
+
+# ---------------------------------------------------------------------------
 # Happy path: two separate strip entries
 # ---------------------------------------------------------------------------
 

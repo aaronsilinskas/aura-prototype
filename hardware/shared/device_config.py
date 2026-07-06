@@ -70,11 +70,12 @@ DEFAULT_DEVICE_CONFIG: Final = {
 class MatrixPixelsConfig:
     """Parsed matrix pixels configuration."""
 
-    __slots__ = ("cols", "scope_rows")
+    __slots__ = ("brightness", "cols", "scope_rows")
 
-    def __init__(self, cols: int, scope_rows: dict[str, range]) -> None:
+    def __init__(self, cols: int, scope_rows: dict[str, range], brightness: float = 1.0) -> None:
         self.cols: int = cols
         self.scope_rows: dict[str, range] = scope_rows
+        self.brightness: float = brightness
 
 
 class NeoPixelScopeConfig:
@@ -205,6 +206,34 @@ def validate_band_map(bands: dict[str, range], context: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Brightness validator (shared across matrix, strip, and legacy scope entries)
+# ---------------------------------------------------------------------------
+
+
+def _parse_brightness(mapping: dict, key: str, field: str) -> float:
+    """Return the brightness value at *key* in *mapping*, defaulting to 1.0.
+
+    Args:
+        mapping: The raw config mapping to read *key* from.
+        key: The mapping key holding the brightness value (e.g. ``"brightness"``).
+        field: Label used in error messages (e.g. ``"pixels[0].brightness"``).
+
+    Raises:
+        ValueError: If present but non-numeric or outside the inclusive
+            ``[0.0, 1.0]`` range, naming *field*.
+    """
+    if key not in mapping:
+        return 1.0
+
+    value = mapping[key]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{field} must be a number in [0.0, 1.0], got {value!r}")
+    if not (0.0 <= value <= 1.0):
+        raise ValueError(f"{field} must be in [0.0, 1.0], got {value}")
+    return float(value)
+
+
+# ---------------------------------------------------------------------------
 # Parser
 # ---------------------------------------------------------------------------
 
@@ -218,6 +247,7 @@ def _parse_matrix_pixels(mapping: dict, entry_index: int) -> MatrixPixelsConfig:
 
     cols = mapping["cols"]
     raw_scope_rows = mapping["scope_rows"]
+    brightness = _parse_brightness(mapping, "brightness", f"{label}.brightness")
 
     scope_rows: dict[str, range] = {}
     for key, value in raw_scope_rows.items():
@@ -225,7 +255,7 @@ def _parse_matrix_pixels(mapping: dict, entry_index: int) -> MatrixPixelsConfig:
 
     validate_band_map(scope_rows, f"{label}.scope_rows")
 
-    return MatrixPixelsConfig(cols=cols, scope_rows=scope_rows)
+    return MatrixPixelsConfig(cols=cols, scope_rows=scope_rows, brightness=brightness)
 
 
 def _parse_neopixel_strip_entry(mapping: dict, entry_index: int) -> NeoPixelStripConfig:
@@ -239,7 +269,7 @@ def _parse_neopixel_strip_entry(mapping: dict, entry_index: int) -> NeoPixelStri
     pin: str = mapping["pin"]
     count: int = mapping["count"]
     order: str = mapping.get("order", "GRB")
-    brightness: float = mapping.get("brightness", 1.0)
+    brightness: float = _parse_brightness(mapping, "brightness", f"{label}.brightness")
 
     scope_pixels_raw = mapping.get("scope_pixels")
     if not scope_pixels_raw:
@@ -291,11 +321,12 @@ def _parse_neopixel_pixels(mapping: dict, entry_index: int) -> NeoPixelPixelsCon
             raise ValueError(f"pixels.scopes.{key}.pin must be a string pin name")
         if "count" not in scope_cfg:
             raise ValueError(f"pixels.scopes.{key}.count is required")
+        brightness = _parse_brightness(scope_cfg, "brightness", f"pixels.scopes.{key}.brightness")
         scopes[key] = NeoPixelScopeConfig(
             pin=scope_cfg["pin"],
             count=scope_cfg["count"],
             order=scope_cfg.get("order", "GRB"),
-            brightness=scope_cfg.get("brightness", 1.0),
+            brightness=brightness,
         )
 
     return NeoPixelPixelsConfig(scopes=scopes)

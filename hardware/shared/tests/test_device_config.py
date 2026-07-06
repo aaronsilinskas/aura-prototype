@@ -210,6 +210,87 @@ def test_parse_matrix_scope_rows_error_lists_valid_keys(matrix_config):
 
 
 # ---------------------------------------------------------------------------
+# Matrix brightness
+# ---------------------------------------------------------------------------
+
+
+def test_parse_matrix_without_brightness_defaults_to_one(matrix_config):
+    result = parse_device_config(matrix_config)
+
+    assert result.pixels[0].brightness == 1.0
+
+
+def test_parse_matrix_explicit_brightness_is_stored(matrix_config):
+    matrix_config["pixels"][0]["brightness"] = 0.2
+
+    result = parse_device_config(matrix_config)
+
+    assert result.pixels[0].brightness == 0.2
+
+
+def test_parse_matrix_brightness_boundary_zero_is_accepted(matrix_config):
+    matrix_config["pixels"][0]["brightness"] = 0.0
+
+    result = parse_device_config(matrix_config)
+
+    assert result.pixels[0].brightness == 0.0
+
+
+def test_parse_matrix_brightness_boundary_one_is_accepted(matrix_config):
+    matrix_config["pixels"][0]["brightness"] = 1.0
+
+    result = parse_device_config(matrix_config)
+
+    assert result.pixels[0].brightness == 1.0
+
+
+def test_parse_matrix_non_numeric_brightness_raises_value_error(matrix_config):
+    matrix_config["pixels"][0]["brightness"] = "bright"
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.brightness"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_matrix_out_of_range_brightness_raises_value_error(matrix_config):
+    matrix_config["pixels"][0]["brightness"] = 1.5
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.brightness"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_matrix_negative_brightness_raises_value_error(matrix_config):
+    matrix_config["pixels"][0]["brightness"] = -0.1
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.brightness"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_default_config_omits_explicit_matrix_brightness():
+    """The default/fallback config leaves matrix brightness unset so the stock
+    board boots at full brightness (1.0) rather than the old 0x33 calibration."""
+    assert "brightness" not in DEFAULT_DEVICE_CONFIG["pixels"][0]
+
+
+# ---------------------------------------------------------------------------
+# NeoPixel legacy scope brightness validation
+# ---------------------------------------------------------------------------
+
+
+def test_parse_neopixel_scope_non_numeric_brightness_raises_value_error(neopixel_config):
+    neopixel_config["pixels"][0]["scopes"]["personal"]["brightness"] = "bright"
+
+    with pytest.raises(ValueError, match=r"personal\.brightness"):
+        parse_device_config(neopixel_config)
+
+
+def test_parse_neopixel_scope_out_of_range_brightness_raises_value_error(neopixel_config):
+    neopixel_config["pixels"][0]["scopes"]["personal"]["brightness"] = 1.5
+
+    with pytest.raises(ValueError, match=r"personal\.brightness"):
+        parse_device_config(neopixel_config)
+
+
+# ---------------------------------------------------------------------------
 # Band-map validator: overlapping scope_rows
 # ---------------------------------------------------------------------------
 

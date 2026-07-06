@@ -22,23 +22,24 @@ from hardware.shared.device_config import (
 # ---------------------------------------------------------------------------
 
 
-def _matrix_config():
+def _matrix_config(brightness: float | None = None):
     """Return a DeviceConfig with pixels.type='matrix'."""
+    pixels_entry = {
+        "type": "matrix",
+        "cols": 13,
+        "scope_rows": {
+            "global.buff": [0, 1],
+            "global.debuff": [1, 2],
+            "global.main": [2, 5],
+            "personal": [5, 7],
+            "directional": [7, 8],
+            "ambient": [8, 9],
+        },
+    }
+    if brightness is not None:
+        pixels_entry["brightness"] = brightness
     mapping = {
-        "pixels": [
-            {
-                "type": "matrix",
-                "cols": 13,
-                "scope_rows": {
-                    "global.buff": [0, 1],
-                    "global.debuff": [1, 2],
-                    "global.main": [2, 5],
-                    "personal": [5, 7],
-                    "directional": [7, 8],
-                    "ambient": [8, 9],
-                },
-            }
-        ],
+        "pixels": [pixels_entry],
         "buttons": ["D9", "D10"],
     }
     return parse_device_config(mapping)
@@ -197,6 +198,65 @@ def test_build_hardware_matrix_output_exposes_shared_matrix_driver() -> None:
     assert matrix_output.matrix is driver
 
 
+def test_build_hardware_passes_configured_matrix_brightness_to_matrix_setup() -> None:
+    """build_hardware forwards the config's matrix brightness to hardware init,
+    which drives set_led_scaling from it (see #582)."""
+    config = _matrix_config(brightness=0.2)
+    board_mock = _mock_board(D9=MagicMock(), D10=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_setup_matrix = stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_matrix_is31fl3741",
+                return_value=MagicMock(),
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock)
+
+    mock_setup_matrix.assert_called_once()
+    assert mock_setup_matrix.call_args.args[1] == 0.2
+
+
+def test_setup_matrix_is31fl3741_drives_scaling_from_brightness() -> None:
+    """_setup_matrix_is31fl3741 sets LED scaling to round(brightness * 0xFF) and
+    leaves global_current pinned at 0xFF."""
+    with ExitStack() as stack:
+        mock_matrix_cls = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.Adafruit_RGBMatrixQT")
+        )
+        driver = MagicMock()
+        mock_matrix_cls.return_value = driver
+
+        from hardware.circuitpython.device_builder import _setup_matrix_is31fl3741
+
+        result = _setup_matrix_is31fl3741(MagicMock(), 0.2)
+
+    assert result is driver
+    # 0.2 * 0xFF == 0x33 -- the old hard-coded calibration byte.
+    driver.set_led_scaling.assert_called_once_with(0x33)
+    assert driver.global_current == 0xFF
+
+
+def test_setup_matrix_is31fl3741_full_brightness_drives_max_scaling() -> None:
+    """Brightness 1.0 drives the full 0xFF scaling byte (stock full-brightness boot)."""
+    with ExitStack() as stack:
+        mock_matrix_cls = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.Adafruit_RGBMatrixQT")
+        )
+        driver = MagicMock()
+        mock_matrix_cls.return_value = driver
+
+        from hardware.circuitpython.device_builder import _setup_matrix_is31fl3741
+
+        _setup_matrix_is31fl3741(MagicMock(), 1.0)
+
+    driver.set_led_scaling.assert_called_once_with(0xFF)
+
+
 # ---------------------------------------------------------------------------
 # build_hardware produces NeoPixelEffectOutput for neopixel config
 # ---------------------------------------------------------------------------
@@ -288,6 +348,30 @@ def test_build_hardware_neopixel_output_resolves_pin_names() -> None:
     called_pins = {c.args[0] for c in mock_neopixel.NeoPixel.call_args_list}
     assert d5_pin in called_pins
     assert d6_pin in called_pins
+
+
+def test_build_hardware_neopixel_strip_constructed_with_configured_brightness() -> None:
+    """build_hardware applies each strip's configured brightness to the
+    neopixel.NeoPixel object at construction (the library scales at show())."""
+    config = _neopixel_config(
+        scopes={
+            "personal": {"pin": "D5", "count": 10, "brightness": 0.5},
+            "directional": {"pin": "D6", "count": 4},
+        }
+    )
+    board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
+        mock_neopixel.NeoPixel.return_value = MagicMock()
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock)
+
+    brightness_kwargs = {c.kwargs.get("brightness") for c in mock_neopixel.NeoPixel.call_args_list}
+    assert brightness_kwargs == {0.5, 1.0}
 
 
 def test_build_hardware_neopixel_strips_constructed_with_auto_write_false() -> None:
@@ -538,7 +622,7 @@ def test_build_hardware_uses_caller_supplied_i2c_bus_for_matrix() -> None:
 
         build_hardware(config, board_module=board_mock, i2c=supplied_i2c)
 
-    mock_setup_matrix.assert_called_once_with(supplied_i2c)
+    mock_setup_matrix.assert_called_once_with(supplied_i2c, 1.0)
 
 
 def test_build_hardware_does_not_construct_its_own_bus_when_i2c_supplied() -> None:
@@ -600,7 +684,7 @@ def test_build_hardware_uses_its_own_constructed_bus_for_matrix_when_i2c_omitted
 
         build_hardware(config, board_module=board_mock)
 
-    mock_setup_matrix.assert_called_once_with(own_i2c)
+    mock_setup_matrix.assert_called_once_with(own_i2c, 1.0)
 
 
 # ---------------------------------------------------------------------------
