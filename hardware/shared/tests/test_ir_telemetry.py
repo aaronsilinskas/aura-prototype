@@ -73,6 +73,31 @@ def test_format_line_includes_every_counter_in_pipeline_order():
     assert positions == sorted(positions)
 
 
+def test_format_line_matches_the_exact_serial_summary_string():
+    """Regression pin: the FIELDS-driven rewrite must not change a single
+    byte of the line ``run_scene`` prints to the serial console."""
+    snapshot = _snapshot(
+        pulses_seen=10,
+        buffer_full_on_poll=1,
+        packets_started=2,
+        preamble_reject=3,
+        mark_reject=4,
+        space_reject=5,
+        packets_completed=6,
+        packets_surfaced=7,
+        pulses_dropped_transmitting=9,
+        events_queued=8,
+    )
+
+    line = format_ir_telemetry_line(snapshot)
+
+    assert line == (
+        "ir: pulses_seen=10 buffer_full_on_poll=1 packets_started=2 "
+        "preamble_reject=3 mark_reject=4 space_reject=5 packets_completed=6 "
+        "packets_surfaced=7 pulses_dropped_transmitting=9 events_queued=8"
+    )
+
+
 # ---------------------------------------------------------------------------
 # IrTelemetryGate — change detection
 # ---------------------------------------------------------------------------
