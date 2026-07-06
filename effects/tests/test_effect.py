@@ -118,6 +118,85 @@ def test_pixel_buffer_iterates_pixels_in_index_order() -> None:
 
 
 # ---------------------------------------------------------------------------
+# PixelBuffer — capacity vs. logical length
+# ---------------------------------------------------------------------------
+
+
+def test_pixel_buffer_capacity_matches_count_at_construction() -> None:
+    buf = PixelBuffer(5)
+
+    assert buf.capacity == 5
+
+
+def test_resize_shrinks_logical_length_reported_by_len() -> None:
+    buf = PixelBuffer(5)
+
+    buf.resize(2)
+
+    assert len(buf) == 2
+
+
+def test_resize_grows_logical_length_back_toward_capacity() -> None:
+    buf = PixelBuffer(5)
+    buf.resize(2)
+
+    buf.resize(4)
+
+    assert len(buf) == 4
+
+
+def test_resize_to_zero_yields_zero_length() -> None:
+    buf = PixelBuffer(5)
+
+    buf.resize(0)
+
+    assert len(buf) == 0
+
+
+def test_resize_above_capacity_raises_value_error() -> None:
+    buf = PixelBuffer(5)
+
+    with pytest.raises(ValueError):
+        buf.resize(6)
+
+
+def test_resize_with_negative_count_raises_value_error() -> None:
+    buf = PixelBuffer(5)
+
+    with pytest.raises(ValueError):
+        buf.resize(-1)
+
+
+def test_capacity_is_unchanged_after_resize_calls() -> None:
+    buf = PixelBuffer(5)
+
+    buf.resize(2)
+    buf.resize(5)
+    buf.resize(0)
+
+    assert buf.capacity == 5
+
+
+def test_resize_does_not_reallocate_the_backing_list() -> None:
+    buf = PixelBuffer(5)
+    backing_list_id = id(buf._pixels)
+
+    buf.resize(2)
+    buf.resize(5)
+
+    assert id(buf._pixels) == backing_list_id
+
+
+def test_indexing_still_reaches_positions_beyond_shrunken_logical_length() -> None:
+    buf = PixelBuffer(5)
+    buf[4] = 0xABCDEF
+
+    buf.resize(2)
+
+    assert buf[4] == 0xABCDEF
+
+
+# ---------------------------------------------------------------------------
 # Effect — capability container
 # ---------------------------------------------------------------------------
 
