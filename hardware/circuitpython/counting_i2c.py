@@ -21,6 +21,10 @@ class CountingI2C:
 
     Forwards the full ``adafruit_bus_device.I2CDevice`` surface.
     Lock/scan/deinit calls do not affect counters.
+
+    The full ``busio.I2C`` surface is intentional and load-bearing: a prior
+    version missing the ``scan``/``probe`` forwards deadlocked matrix init.
+    Do not narrow this surface without re-verifying that path.
     """
 
     def __init__(self, inner: busio.I2C) -> None:
