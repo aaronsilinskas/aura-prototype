@@ -66,8 +66,13 @@ hardware/         Hardware abstraction layer
                   neopixel_output, audio_output, infrared_io, counting_i2c)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
                   device_config, device_hardware, network_controls, scene_selection,
-                  scene_runtime, ir_transport, ir_protocol, tag_protocol, ir_telemetry,
+                  ir_transport, ir_protocol, tag_protocol, ir_telemetry,
                   profiling_helpers)
+
+app/              Composition layer — the one place allowed to import both the engine's
+                  runtime machinery and hardware.* together
+  scene_composition.py  build_scene_runtime (board-free, CPython-testable)
+  scene_runtime.py      run_scene (device-only)
 
 scripts/          Deploy and maintenance scripts (CPython-only)
 ```
@@ -120,6 +125,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; `pixels` is a list of `MatrixPixelsConfig` / `NeoPixelPixelsConfig` |
 | `DeviceHardware` | `hardware/shared/device_hardware.py` | Named bundle `build_hardware` returns (outputs, buttons, network_controls, transmit_pump, …); board-free, importable under CPython |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete `(NetworkControls, TransmitPump)` adapter over wired `InfraredTransmitter`s; constructed by `device_builder` |
+| `SceneRuntime` | `app/scene_composition.py` | `__slots__` bundle (`manager`, `effect_manager`, `timer`) returned by `build_scene_runtime`; the wiring `run_scene`'s per-tick loop drives |
 
 ---
 

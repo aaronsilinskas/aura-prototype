@@ -1,25 +1,20 @@
 """Device-only scene runtime — brings hardware up and runs any standard-IR scene.
 
 Deploy-watch only: ``build_hardware`` imports board, busio, pulseio, digitalio.
-Imported on-device under CircuitPython, never exercised by CPython pytest.  The
-pure scene-name resolver lives in ``hardware.shared.scene_selection`` so it can
-be unit-tested under CPython without the board imports this module pulls in.
+Imported on-device under CircuitPython, never exercised by CPython pytest. The
+board-free wiring lives in ``app.scene_composition`` so it can be
+unit-tested under CPython without the board imports this module pulls in.
 """
 
 from __future__ import annotations
 
 import gc
 
-from engine.effects.manager import EffectManager
-from engine.engine import GameEngine
+from app.scene_composition import build_scene_runtime
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.network import NetworkEvents
-from engine.packs import PackRegistry
-from engine.scene import SceneManager, SceneRegistry
-from engine.timer import Timer
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
 from hardware.shared.ir_protocol import InfraredDecoder, InfraredEncoder
-from hardware.shared.scene_selection import DEFAULT_SCENE
 
 try:
     from typing import Final
@@ -29,23 +24,6 @@ except ImportError:
 _TELEMETRY_PRINT_INTERVAL: Final = 1.0  # seconds
 
 __all__ = ["run_scene"]
-
-
-def _resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
-    """Return *scene_name* if registered, else warn and fall back to ``DEFAULT_SCENE``."""
-    names = scene_registry.names()
-    if scene_name in names:
-        return scene_name
-    print(
-        "unknown scene '"
-        + scene_name
-        + "'; known scenes: "
-        + ", ".join(names)
-        + " — falling back to '"
-        + DEFAULT_SCENE
-        + "'"
-    )
-    return DEFAULT_SCENE
 
 
 def run_scene(
@@ -71,27 +49,10 @@ def run_scene(
     config = load_device_config()
     hw = build_hardware(config, ir_encoder=ir_encoder, ir_decoder=ir_decoder)
 
-    effect_registry = PackRegistry(item_attr="BUILD")
-    effect_registry.scan_dir("packs/effects", "packs.effects")
-
-    rule_registry = PackRegistry(item_attr="RULE")
-    rule_registry.scan_dir("packs/rules", "packs.rules")
-
-    effect_manager = EffectManager(registry=effect_registry, outputs=hw.outputs)
-
-    timer = Timer()
-    engine = GameEngine(
-        effect_controls=effect_manager,
-        network_controls=hw.network_controls,
-        timer=timer,
-    )
-
-    scene_registry = SceneRegistry()
-    scene_registry.scan_dir("packs/scenes", "packs.scenes")
-
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_registry)
-    manager.load(_resolve_known_scene(scene_registry, scene_name))
-    manager.update()  # applies the load transition; the scene is now active
+    runtime = build_scene_runtime(hw, scene_name)
+    manager = runtime.manager
+    effect_manager = runtime.effect_manager
+    timer = runtime.timer
 
     _button_data = ButtonData({})
     _acceleration = AccelerationData(0.0, 0.0, 0.0) if hw.accelerometer is not None else None

@@ -33,6 +33,7 @@ except ImportError:
     pass
 
 MODULE_DIRS: Final = [
+    "app",
     "effects",
     "engine",
     "hardware/circuitpython",

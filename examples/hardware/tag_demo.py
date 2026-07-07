@@ -66,7 +66,7 @@ How to play
 - Press A in Playing to fire a tag shot via the LINE IR emitter.
 """
 
-from hardware.shared.scene_runtime import run_scene
+from app.scene_runtime import run_scene
 from hardware.shared.tag_protocol import TagInfraredDecoder, TagInfraredEncoder
 
 run_scene("tag", ir_encoder=TagInfraredEncoder(), ir_decoder=TagInfraredDecoder())
