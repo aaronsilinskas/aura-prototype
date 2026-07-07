@@ -65,8 +65,8 @@ hardware/         Hardware abstraction layer
   circuitpython/  CircuitPython drivers (device_builder, is31fl3741_output, drv2605_output,
                   neopixel_output, audio_output, infrared_io, counting_i2c)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
-                  device_config, scene_selection, scene_runtime, ir_transport, ir_protocol,
-                  tag_protocol, ir_telemetry, profiling_helpers)
+                  device_config, device_hardware, scene_selection, scene_runtime, ir_transport,
+                  ir_protocol, tag_protocol, ir_telemetry, profiling_helpers)
 
 scripts/          Deploy and maintenance scripts (CPython-only)
 ```
@@ -117,7 +117,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `ValueWithModifiers` | `magic/values.py` | Base value + temporary multiplier stack |
 | `Duration` | `magic/values.py` | Expiry tracker: `update(elapsed) → bool` |
 | `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; `pixels` is a list of `MatrixPixelsConfig` / `NeoPixelPixelsConfig` |
-| `DeviceHardware` | `hardware/circuitpython/device_builder.py` | Named bundle `build_hardware` returns (outputs, buttons, network_controls, transmit_pump, …) |
+| `DeviceHardware` | `hardware/shared/device_hardware.py` | Named bundle `build_hardware` returns (outputs, buttons, network_controls, transmit_pump, …); board-free, importable under CPython |
 
 ---
 

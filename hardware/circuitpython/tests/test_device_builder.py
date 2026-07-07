@@ -1105,7 +1105,7 @@ def test_build_hardware_omits_accelerometer_and_motor_when_i2c_unavailable() -> 
 
 
 def test_device_hardware_does_not_expose_the_ir_transmit_gate() -> None:
-    from hardware.circuitpython.device_builder import DeviceHardware
+    from hardware.shared.device_hardware import DeviceHardware
 
     assert "gate" not in DeviceHardware.__slots__
     assert not hasattr(DeviceHardware, "ir_transmit_gate")

@@ -99,10 +99,11 @@ from engine.packs import PackRegistry
 from engine.state import Scope
 from engine.timer import Timer
 from hardware.circuitpython.counting_i2c import CountingI2C
-from hardware.circuitpython.device_builder import DeviceHardware, build_hardware
+from hardware.circuitpython.device_builder import build_hardware
 from hardware.circuitpython.is31fl3741_output import IS31FL3741_COLS, IS31FL3741EffectOutput
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 from hardware.shared.device_config import DeviceConfig, parse_device_config
+from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.profiling_helpers import (
     linear_fit,
     print_profile_header,
