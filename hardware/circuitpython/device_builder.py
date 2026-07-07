@@ -154,6 +154,71 @@ def _setup_matrix_is31fl3741(i2c: busio.I2C, brightness: float) -> Adafruit_RGBM
     return matrix
 
 
+def _setup_neopixels(pixels_cfg: NeoPixelPixelsConfig, board_module: object) -> list[EffectOutput]:
+    """Return one NeoPixelEffectOutput per physical strip declared in *pixels_cfg*.
+
+    Covers both the modern ``strips`` list (each strip carrying its own
+    ``scope_pixels`` segments) and the legacy per-scope ``scopes`` map, where
+    each entry becomes a single strip spanning the whole scope.
+    """
+    outputs: list[EffectOutput] = []
+    for strip_cfg in pixels_cfg.strips:
+        pin = _resolve_pin(board_module, "pixels.pin", strip_cfg.pin)
+        hw_strip = neopixel.NeoPixel(
+            pin,
+            strip_cfg.count,
+            pixel_order=strip_cfg.order,
+            brightness=strip_cfg.brightness,
+            auto_write=False,
+        )
+        outputs.append(NeoPixelEffectOutput(hw_strip, strip_cfg.scope_pixels))
+    for scope_key, scope_cfg in pixels_cfg.scopes.items():
+        pin = _resolve_pin(board_module, f"pixels.scopes.{scope_key}.pin", scope_cfg.pin)
+        hw_strip = neopixel.NeoPixel(
+            pin,
+            scope_cfg.count,
+            pixel_order=scope_cfg.order,
+            brightness=scope_cfg.brightness,
+            auto_write=False,
+        )
+        outputs.append(NeoPixelEffectOutput(hw_strip, {scope_key: range(0, scope_cfg.count)}))
+    return outputs
+
+
+def _setup_pixels(
+    pixels_configs: list[MatrixPixelsConfig | NeoPixelPixelsConfig],
+    board_module: object,
+    i2c: busio.I2C | None,
+) -> list[EffectOutput]:
+    """Return one EffectOutput per pixel output declared across *pixels_configs*.
+
+    Dispatches each entry to the matrix or NeoPixel branch by type, in config
+    order, so a device driving both a matrix and NeoPixel strips gets outputs
+    for each in the order they were declared.
+
+    Raises:
+        RuntimeError: If a matrix entry is declared but *i2c* is None (matrix
+            pixels are config-gated, not presence-probed like the
+            accelerometer/motor, so a missing bus is a real wiring fault).
+    """
+    outputs: list[EffectOutput] = []
+    for pixels_cfg in pixels_configs:
+        if isinstance(pixels_cfg, MatrixPixelsConfig):
+            if i2c is None:
+                raise RuntimeError("pixels.type is 'matrix' but no I2C bus is available")
+            matrix = _setup_matrix_is31fl3741(i2c, pixels_cfg.brightness)
+            outputs.append(
+                IS31FL3741EffectOutput(
+                    matrix,
+                    cols=pixels_cfg.cols,
+                    scope_rows=pixels_cfg.scope_rows,
+                )
+            )
+        elif isinstance(pixels_cfg, NeoPixelPixelsConfig):
+            outputs.extend(_setup_neopixels(pixels_cfg, board_module))
+    return outputs
+
+
 def _setup_buttons(*pins: microcontroller.Pin) -> DebouncedButtons:
     """Return a ``DebouncedButtons`` instance for the given pins with pull-up resistors."""
     labels = [chr(ord("A") + i) for i in range(len(pins))]
@@ -316,42 +381,7 @@ def build_hardware(
         i2c = _setup_i2c()
 
     outputs: list[EffectOutput] = []
-
-    for pixels_cfg in config.pixels:
-        if isinstance(pixels_cfg, MatrixPixelsConfig):
-            if i2c is None:
-                raise RuntimeError("pixels.type is 'matrix' but no I2C bus is available")
-            matrix = _setup_matrix_is31fl3741(i2c, pixels_cfg.brightness)
-            outputs.append(
-                IS31FL3741EffectOutput(
-                    matrix,
-                    cols=pixels_cfg.cols,
-                    scope_rows=pixels_cfg.scope_rows,
-                )
-            )
-        elif isinstance(pixels_cfg, NeoPixelPixelsConfig):
-            for strip_cfg in pixels_cfg.strips:
-                pin = _resolve_pin(board_module, "pixels.pin", strip_cfg.pin)
-                hw_strip = neopixel.NeoPixel(
-                    pin,
-                    strip_cfg.count,
-                    pixel_order=strip_cfg.order,
-                    brightness=strip_cfg.brightness,
-                    auto_write=False,
-                )
-                outputs.append(NeoPixelEffectOutput(hw_strip, strip_cfg.scope_pixels))
-            for scope_key, scope_cfg in pixels_cfg.scopes.items():
-                pin = _resolve_pin(board_module, f"pixels.scopes.{scope_key}.pin", scope_cfg.pin)
-                hw_strip = neopixel.NeoPixel(
-                    pin,
-                    scope_cfg.count,
-                    pixel_order=scope_cfg.order,
-                    brightness=scope_cfg.brightness,
-                    auto_write=False,
-                )
-                outputs.append(
-                    NeoPixelEffectOutput(hw_strip, {scope_key: range(0, scope_cfg.count)})
-                )
+    outputs.extend(_setup_pixels(config.pixels, board_module, i2c))
 
     button_pins = [
         _resolve_pin(board_module, f"buttons[{i}]", name) for i, name in enumerate(config.buttons)
