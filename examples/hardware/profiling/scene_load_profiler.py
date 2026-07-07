@@ -108,7 +108,7 @@ from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
 from hardware.circuitpython.audio_output import AudioEffectOutput
-from hardware.circuitpython.device_builder import DeviceHardware, build_hardware
+from hardware.circuitpython.device_builder import build_hardware
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.circuitpython.is31fl3741_output import (
     IS31FL3741_COLS,
@@ -116,6 +116,7 @@ from hardware.circuitpython.is31fl3741_output import (
     IS31FL3741EffectOutput,
 )
 from hardware.shared.device_config import DeviceConfig, parse_device_config
+from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_protocol import InfraredDecoder, InfraredEncoder
 from hardware.shared.profiling_helpers import (
     print_profile_header,
