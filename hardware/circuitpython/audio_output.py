@@ -4,7 +4,7 @@ import audiomixer
 
 from effects.effect import Effect
 from engine.audio import AudioRegistry
-from engine.effects.manager import EffectOutput
+from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.state import EffectReceipt, Scope
 from hardware.shared.voice_pool import VoicePool, VoiceSink

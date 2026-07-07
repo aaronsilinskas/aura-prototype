@@ -114,8 +114,8 @@ Identifies what a game effect targets. Output-agnostic — routes to all outputs
 _Avoid_: `ScopeValue` (implementation artifact); using `AMBIENT` to mean idle effect (`AMBIENT` is a routing scope, not a synonym for idle)
 
 ### EffectOutput
-A hardware or software output registered with the effect system. `receives_pixels = False` for non-pixel outputs (audio, vibration) — `EffectManager` skips buffer allocation and render calls. Core methods: `update_pixels` (pixel outputs), `flush` (all outputs, once per tick), `clear_pixels`, `handle_event`.
-_Avoid_: "output" (ambiguous in multi-output contexts)
+A hardware or software output registered with the effect system, defined in `engine/effects/output.py` (a clean leaf with no `engine.packs`/`engine.scene`/`engine.timer` dependency — `EffectManager`, in `engine/effects/manager.py`, imports it from there). `receives_pixels = False` for non-pixel outputs (audio, vibration) — `EffectManager` skips buffer allocation and render calls. Core methods: `update_pixels` (pixel outputs), `flush` (all outputs, once per tick), `clear_pixels`, `handle_event`.
+_Avoid_: "output" (ambiguous in multi-output contexts); importing it from `engine.effects.manager` (that module re-exports nothing — import from `engine.effects.output`)
 
 ### EffectEvent
 A structured event payload routed to every `EffectOutput.handle_event` in scope. Three fields: `pack`, `name`, `verb`. Lifecycle verbs `"start"` and `"stop"` are emitted automatically; custom verbs (e.g. `"peak"`, `"strike"`) are emitted via `config.notify_listeners`.

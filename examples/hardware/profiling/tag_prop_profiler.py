@@ -88,7 +88,8 @@ import time
 import board
 
 from effects.performance import PerformanceTracker
-from engine.effects.manager import EffectManager, EffectOutput
+from engine.effects.manager import EffectManager
+from engine.effects.output import EffectOutput
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.network import HardwareNetworkControls, NetworkEvents

@@ -8,7 +8,7 @@ except ImportError:
 import adafruit_drv2605  # type: ignore[import]
 
 from effects.effect import Effect, VibrationConfig
-from engine.effects.manager import EffectOutput
+from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.state import EffectReceipt, Scope
 

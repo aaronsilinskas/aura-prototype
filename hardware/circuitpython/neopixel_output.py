@@ -7,7 +7,7 @@ already-initialised strip objects), keeping this module testable under CPython.
 from __future__ import annotations
 
 from effects.effect import PixelBuffer
-from engine.effects.manager import EffectOutput
+from engine.effects.output import EffectOutput
 from engine.state import ScopeValue
 
 __all__ = ["NeoPixelEffectOutput"]

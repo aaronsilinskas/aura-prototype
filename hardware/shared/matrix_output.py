@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from effects.effect import PixelBuffer
-from engine.effects.manager import EffectOutput
+from engine.effects.output import EffectOutput
 
 
 class MatrixEffectOutput(EffectOutput):

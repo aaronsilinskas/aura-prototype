@@ -6,7 +6,8 @@ import time
 import tty
 
 from effects.effect import PixelBuffer
-from engine.effects.manager import EffectManager, EffectOutput
+from engine.effects.manager import EffectManager
+from engine.effects.output import EffectOutput
 from engine.engine import GameEngine, GameRule
 from engine.events import Event
 from engine.input import AccelerationData, ButtonData, InputEvents

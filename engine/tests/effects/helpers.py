@@ -1,5 +1,6 @@
 from effects.effect import Effect, EffectConfig, EffectPixels, PixelBuffer
-from engine.effects.manager import EffectBuilder, EffectOutput
+from engine.effects.manager import EffectBuilder
+from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
 
