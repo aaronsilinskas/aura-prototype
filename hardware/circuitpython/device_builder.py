@@ -25,7 +25,7 @@ from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
 from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
-from engine.network import AREA_OF_EFFECT, CONE, LINE, HardwareNetworkControls
+from engine.network import AREA_OF_EFFECT, CONE, LINE
 from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
@@ -53,6 +53,7 @@ from hardware.shared.ir_transport import (
     IrTransmitGate,
     PulseWriter,
 )
+from hardware.shared.network_controls import HardwareNetworkControls
 
 __all__ = [
     "build_hardware",

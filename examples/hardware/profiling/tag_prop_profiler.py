@@ -92,7 +92,7 @@ from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
-from engine.network import HardwareNetworkControls, NetworkEvents
+from engine.network import NetworkEvents
 from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
@@ -101,6 +101,7 @@ from hardware.circuitpython.device_builder import build_hardware
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.shared.device_config import parse_device_config
 from hardware.shared.device_hardware import DeviceHardware
+from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,
