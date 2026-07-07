@@ -51,7 +51,8 @@ from __future__ import annotations
 import time
 
 from effects.performance import PerformanceTracker
-from engine.network import LINE, HardwareNetworkControls
+from engine.network import LINE
+from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiling_helpers import (
     print_profile_header,
     print_stats_line,

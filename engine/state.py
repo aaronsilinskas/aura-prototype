@@ -121,7 +121,8 @@ class NetworkControls:
     """Abstract interface for network transmit operations called from within game rules.
 
     All methods raise ``NotImplementedError`` by default.  ``HardwareNetworkControls``
-    in ``engine/network.py`` provides the live hardware-backed implementation.
+    in ``hardware/shared/network_controls.py`` provides the live hardware-backed
+    implementation.
 
     Transmits are always broadcast — no recipient parameter; player identity is
     encoded in the payload if needed.

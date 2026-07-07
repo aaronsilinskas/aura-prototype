@@ -56,8 +56,9 @@ from __future__ import annotations
 
 import time
 
-from engine.network import LINE, HardwareNetworkControls
+from engine.network import LINE
 from hardware.shared.device_config import parse_device_config
+from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiling_helpers import board_id, runtime_id
 
 try:
