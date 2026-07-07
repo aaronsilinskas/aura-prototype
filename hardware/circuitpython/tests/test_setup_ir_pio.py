@@ -1,14 +1,15 @@
-"""Tests for _setup_ir's import-probe writer selection.
+"""Tests for _make_writer's import-probe writer selection.
 
-PIO availability is a property of the silicon: ``_setup_ir`` probes for
-``rp2pio`` (present only on RP2040/RP2350) and, when it imports, wires every
-emitter with a PIO-backed :class:`PioPulseWriter` driving its own
-``rp2pio.StateMachine``. With no ``rp2pio`` (the CPython default) it falls back
-to the blocking :class:`PulseOutWriter`. There is no config knob.
+PIO availability is a property of the silicon: ``_make_writer`` probes for
+``rp2pio`` (present only on RP2040/RP2350) and, when it imports, returns a
+PIO-backed :class:`PioPulseWriter` driving its own ``rp2pio.StateMachine``.
+With no ``rp2pio`` (the CPython default) it falls back to the blocking
+:class:`PulseOutWriter`. There is no config knob.
 
 This module installs the same CircuitPython hardware stubs as ``test_setup_ir``
 and additionally stubs ``rp2pio`` / ``adafruit_pioasm`` so the PIO branch is
-exercisable on CPython.
+exercisable on CPython. Tests call ``_make_writer(pin)`` directly — selection
+is exercised in isolation, not routed through ``_setup_ir``'s assembly.
 """
 
 from __future__ import annotations
@@ -59,25 +60,6 @@ if not hasattr(_busio, "I2C"):
     _busio.I2C = type("I2C", (), {"__init__": lambda self, *a: None})  # type: ignore[attr-defined]
 
 
-class _FakePulseIn:
-    """Stub for pulseio.PulseIn."""
-
-    def __init__(self, pin, *, maxlen=256, idle_state=True) -> None:
-        self.pin = pin
-        self.maxlen = maxlen
-        self.idle_state = idle_state
-        self._data: list[int] = []
-
-    def __len__(self) -> int:
-        return len(self._data)
-
-    def __getitem__(self, index: int) -> int:
-        return self._data[index]
-
-    def __delitem__(self, index: int) -> None:
-        del self._data[index]
-
-
 class _FakePulseOut:
     """Stub for pulseio.PulseOut."""
 
@@ -91,7 +73,6 @@ class _FakePulseOut:
 
 
 _pulseio = sys.modules["pulseio"]
-_pulseio.PulseIn = _FakePulseIn  # type: ignore[attr-defined]
 _pulseio.PulseOut = _FakePulseOut  # type: ignore[attr-defined]
 
 
@@ -130,12 +111,12 @@ class _FakeProgram:
 
 import pytest  # noqa: E402
 
-from engine.network import AREA_OF_EFFECT, CONE, LINE  # noqa: E402
-from hardware.circuitpython.device_builder import _setup_ir  # noqa: E402
+from hardware.circuitpython.device_builder import _make_writer  # noqa: E402
 from hardware.circuitpython.infrared_io import PulseOutWriter  # noqa: E402
 from hardware.circuitpython.pio_pulse_writer import PioPulseWriter  # noqa: E402
+from hardware.shared.ir_protocol import AuraInfraredEncoder  # noqa: E402
+from hardware.shared.ir_transport import InfraredTransmitter  # noqa: E402
 
-_RX_PIN = object()
 _LINE_PIN = object()
 _CONE_PIN = object()
 _AOE_PIN = object()
@@ -171,11 +152,22 @@ def without_rp2pio_by_default():
 # ---------------------------------------------------------------------------
 
 
-def test_setup_ir_uses_pulse_out_writer_when_rp2pio_absent():
-    """Without rp2pio (the CPython default) every transmitter wraps PulseOutWriter."""
-    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN, cone_pin=_CONE_PIN, aoe_pin=_AOE_PIN)
-    for emitter in (LINE, CONE, AREA_OF_EFFECT):
-        assert isinstance(transmitters[emitter]._writer, PulseOutWriter)
+def test_make_writer_returns_pulse_out_writer_when_rp2pio_absent():
+    """Without rp2pio (the CPython default) _make_writer returns a PulseOutWriter."""
+    for pin in (_LINE_PIN, _CONE_PIN, _AOE_PIN):
+        assert isinstance(_make_writer(pin), PulseOutWriter)
+
+
+def test_make_writer_pulse_out_uses_38khz_carrier():
+    """The PulseOut backing the fallback writer is configured at 38 kHz carrier."""
+    writer = _make_writer(_LINE_PIN)
+    assert writer._pulseout.frequency == 38000
+
+
+def test_make_writer_wires_pulse_out_to_the_given_pin():
+    """The fallback writer's PulseOut is opened on the pin passed to _make_writer."""
+    writer = _make_writer(_LINE_PIN)
+    assert writer._pulseout.pin is _LINE_PIN
 
 
 # ---------------------------------------------------------------------------
@@ -183,30 +175,21 @@ def test_setup_ir_uses_pulse_out_writer_when_rp2pio_absent():
 # ---------------------------------------------------------------------------
 
 
-def test_setup_ir_uses_pio_writer_when_rp2pio_present(with_rp2pio):
-    """With rp2pio importable, the LINE transmitter wraps a PioPulseWriter."""
-    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN)
-    assert isinstance(transmitters[LINE]._writer, PioPulseWriter)
+def test_make_writer_returns_pio_writer_when_rp2pio_present(with_rp2pio):
+    """With rp2pio importable, _make_writer returns a PioPulseWriter."""
+    assert isinstance(_make_writer(_LINE_PIN), PioPulseWriter)
 
 
-def test_setup_ir_builds_one_state_machine_per_wired_emitter(with_rp2pio):
-    """One StateMachine is built per wired emitter, unconditionally."""
-    _setup_ir(_RX_PIN, _LINE_PIN, cone_pin=_CONE_PIN, aoe_pin=_AOE_PIN)
+def test_make_writer_builds_one_state_machine_per_call(with_rp2pio):
+    """Each _make_writer call builds its own StateMachine, unconditionally."""
+    for pin in (_LINE_PIN, _CONE_PIN, _AOE_PIN):
+        _make_writer(pin)
     assert len(_FakeStateMachine.instances) == 3
 
 
-def test_setup_ir_pio_writers_share_the_gate_with_receiver(with_rp2pio):
-    """The shared IrTransmitGate is injected into the receiver and every PIO transmitter."""
-    transmitters, receiver = _setup_ir(_RX_PIN, _LINE_PIN, cone_pin=_CONE_PIN, aoe_pin=_AOE_PIN)
-    gate = receiver._gate
-    assert gate is not None
-    for emitter in (LINE, CONE, AREA_OF_EFFECT):
-        assert transmitters[emitter]._gate is gate
-
-
-def test_setup_ir_pio_transmitter_send_returns_before_completion(with_rp2pio):
+def test_make_writer_pio_transmitter_send_returns_before_completion(with_rp2pio):
     """A PIO-wired transmitter's send starts the write and returns while still busy."""
-    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN)
-    transmitter = transmitters[LINE]
+    writer = _make_writer(_LINE_PIN)
+    transmitter = InfraredTransmitter(writer, AuraInfraredEncoder())
     transmitter.send(b"\x01\x02")
     assert transmitter._writer.is_busy() is True
