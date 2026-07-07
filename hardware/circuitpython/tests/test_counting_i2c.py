@@ -23,6 +23,7 @@ class FakeI2C:
         self._locked = False
         self._lock_result = True
         self._scan_result: list = [0x42]
+        self._probe_result: bool = True
 
     def try_lock(self) -> bool:
         self.calls.append(("try_lock",))
@@ -70,6 +71,10 @@ class FakeI2C:
     def scan(self) -> list:
         self.calls.append(("scan",))
         return self._scan_result
+
+    def probe(self, address) -> bool:
+        self.calls.append(("probe", address))
+        return self._probe_result
 
     def deinit(self) -> None:
         self.calls.append(("deinit",))
@@ -364,6 +369,30 @@ class TestScan:
 
     def test_scan_does_not_move_bytes_read(self, counting: CountingI2C, fake: FakeI2C) -> None:
         counting.scan()
+        assert counting.bytes_read == 0
+
+
+# ---------------------------------------------------------------------------
+# probe — return value passed through; no counter change
+# ---------------------------------------------------------------------------
+
+
+class TestProbe:
+    def test_probe_returns_inner_result(self, counting: CountingI2C, fake: FakeI2C) -> None:
+        fake._probe_result = False
+        result = counting.probe(0x42)
+        assert result is False
+
+    def test_probe_forwards_call_to_inner(self, counting: CountingI2C, fake: FakeI2C) -> None:
+        counting.probe(0x42)
+        assert ("probe", 0x42) in fake.calls
+
+    def test_probe_does_not_move_bytes_written(self, counting: CountingI2C, fake: FakeI2C) -> None:
+        counting.probe(0x42)
+        assert counting.bytes_written == 0
+
+    def test_probe_does_not_move_bytes_read(self, counting: CountingI2C, fake: FakeI2C) -> None:
+        counting.probe(0x42)
         assert counting.bytes_read == 0
 
 
