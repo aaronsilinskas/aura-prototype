@@ -183,13 +183,15 @@ class InfraredTransmitter:
 
     Gate timing:
       - Starting a write calls :meth:`IrTransmitGate.begin_transmit`, encodes,
-        calls :meth:`PulseWriter.write_pulses`, then checks
-        :meth:`PulseWriter.is_busy`. If already ``False`` (a blocking writer
-        finished synchronously) :meth:`IrTransmitGate.end_transmit` fires
-        immediately — reproducing the original ``try``/``finally``
-        byte-for-byte. If ``True`` (e.g. DMA in flight) the gate stays armed
-        and the next :meth:`poll` that observes ``is_busy() == False`` fires
-        ``end_transmit`` before starting the oldest queued send.
+        calls :meth:`PulseWriter.write_pulses`, arms the deferred-release
+        flag, then calls :meth:`_release_gate_when_idle`. If the writer is
+        already idle (a blocking writer finished synchronously)
+        :meth:`IrTransmitGate.end_transmit` fires immediately — reproducing
+        the original ``try``/``finally`` byte-for-byte. If the writer is
+        still busy (e.g. DMA in flight) the flag stays armed and the next
+        :meth:`poll` that observes idle releases it, via the same
+        :meth:`_release_gate_when_idle`, before starting the oldest queued
+        send.
 
     Error semantics:
       - An encode error raised while kicking off a write from :meth:`send`
@@ -251,8 +253,9 @@ class InfraredTransmitter:
         """Per-tick pump: release a deferred gate and start the oldest queued send.
 
         Must be called every tick. Does nothing while the writer reports
-        busy. Once the writer reports idle, fires the transmit gate's
-        ``end_transmit`` if it was left armed by a non-blocking write, then
+        busy. Once the writer reports idle, calls
+        :meth:`_release_gate_when_idle` (fires the transmit gate's
+        ``end_transmit`` if it was left armed by a non-blocking write), then
         pops and starts the oldest queued payload, if any (a no-op when the
         queue is empty).
 
@@ -271,11 +274,7 @@ class InfraredTransmitter:
         if writer.is_busy():
             return True
 
-        if self._gate_armed:
-            self._gate_armed = False
-            gate = self._gate
-            if gate is not None:
-                gate.end_transmit()
+        self._release_gate_when_idle()
 
         pending_queue = self._pending_queue
         if pending_queue:
@@ -303,9 +302,25 @@ class InfraredTransmitter:
             gate.end_transmit()
             raise
 
-        if self._writer.is_busy():
-            self._gate_armed = True
-        else:
+        self._gate_armed = True
+        self._release_gate_when_idle()
+
+    def _release_gate_when_idle(self) -> None:
+        """Fire the deferred ``end_transmit`` once the writer reports idle.
+
+        No-op unless :attr:`_gate_armed` is set. A blocking writer is already
+        idle by the time :meth:`_start_write` calls this, so the release
+        happens inline; a non-blocking (e.g. DMA-backed) writer stays busy
+        until a later :meth:`poll` observes idle and releases it there. Either
+        way this is the sole place ``_gate_armed`` is cleared and
+        ``end_transmit`` fires, so both writer kinds get identical self-echo
+        suppression.
+        """
+        if not self._gate_armed or self._writer.is_busy():
+            return
+        self._gate_armed = False
+        gate = self._gate
+        if gate is not None:
             gate.end_transmit()
 
 
