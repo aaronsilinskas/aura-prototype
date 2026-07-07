@@ -257,6 +257,45 @@ def test_setup_matrix_is31fl3741_full_brightness_drives_max_scaling() -> None:
     driver.set_led_scaling.assert_called_once_with(0xFF)
 
 
+def test_setup_matrix_is31fl3741_returns_driver_after_transient_failures() -> None:
+    """A matrix that only responds on a later attempt still returns the driver
+    once construction succeeds, within the retry window."""
+    with ExitStack() as stack:
+        mock_matrix_cls = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.Adafruit_RGBMatrixQT")
+        )
+        driver = MagicMock()
+        mock_matrix_cls.side_effect = [Exception("not ready"), Exception("not ready"), driver]
+        stack.enter_context(patch("hardware.circuitpython.device_builder.time.sleep"))
+
+        from hardware.circuitpython.device_builder import _setup_matrix_is31fl3741
+
+        result = _setup_matrix_is31fl3741(MagicMock(), 1.0)
+
+    assert result is driver
+
+
+def test_setup_matrix_is31fl3741_raises_runtime_error_past_deadline() -> None:
+    """A matrix that never responds raises RuntimeError naming the peripheral
+    and the timeout, instead of hanging forever."""
+    with ExitStack() as stack:
+        mock_matrix_cls = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.Adafruit_RGBMatrixQT")
+        )
+        mock_matrix_cls.side_effect = Exception("not ready")
+        stack.enter_context(patch("hardware.circuitpython.device_builder.time.sleep"))
+        # monotonic values: one initial read for the deadline, then reads at each
+        # retry check -- the second reported time is already past the 3s window.
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder.time.monotonic", side_effect=[0, 4, 4])
+        )
+
+        from hardware.circuitpython.device_builder import _setup_matrix_is31fl3741
+
+        with pytest.raises(RuntimeError, match="IS31FL3741 matrix did not respond within 3s"):
+            _setup_matrix_is31fl3741(MagicMock(), 1.0)
+
+
 # ---------------------------------------------------------------------------
 # build_hardware produces NeoPixelEffectOutput for neopixel config
 # ---------------------------------------------------------------------------
