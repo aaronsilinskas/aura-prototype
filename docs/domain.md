@@ -77,6 +77,19 @@ app/              Composition layer — the one place allowed to import both the
 scripts/          Deploy and maintenance scripts (CPython-only)
 ```
 
+### Module layering
+
+The `engine` ↔ `hardware` boundary is one-way and enforced by `import-linter`
+(`[tool.importlinter]` in `pyproject.toml`, run via the `lint-imports`
+pre-commit hook on every commit):
+
+- `engine` must never import `hardware` (total, one-way).
+- `hardware` must never import engine runtime machinery — `engine.engine`,
+  `engine.scene`, `engine.packs`, `engine.timer`, `engine.effects.manager`.
+- `app/` is the sole sanctioned crossing point: the one place allowed to
+  import both the engine's runtime machinery and `hardware.*` together (see
+  **Composition layer (app/)** in `domain-language.md`).
+
 ---
 
 ## Key types and relationships
