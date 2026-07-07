@@ -2,8 +2,8 @@
 
 Loads whichever scene ``aura-device.json`` names and runs it with the default
 (Aura) IR wire-frame.  This is a thin entry point: it resolves the scene name
-from config and hands off to ``hardware.shared.scene_runtime.run_scene``, which
-owns hardware bring-up and the main loop.
+from config and hands off to ``app.scene_runtime.run_scene``, which owns
+hardware bring-up and the main loop.
 
 Scene selection
 ---------------
@@ -48,8 +48,8 @@ Installation
 
 import json
 
+from app.scene_runtime import run_scene
 from hardware.shared.device_config import DEFAULT_DEVICE_CONFIG
-from hardware.shared.scene_runtime import run_scene
 from hardware.shared.scene_selection import resolve_scene_name
 
 
