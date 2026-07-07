@@ -13,6 +13,7 @@ __all__ = [
     "LINE",
     "HardwareNetworkControls",
     "NetworkEvents",
+    "TransmitPump",
 ]
 
 # ---------------------------------------------------------------------------
@@ -66,8 +67,32 @@ class NetworkEvents:
             self.sender = sender
 
 
-class HardwareNetworkControls(NetworkControls):
+class TransmitPump:
+    """Runtime-facing seam for pumping in-flight transmit lifecycle work.
+
+    A plain base class (not ``typing.Protocol``, which is unavailable on the
+    constrained runtimes) — the same substitute pattern as ``VoiceSink``.
+    Deliberately lives here rather than in ``engine/state.py``: that module
+    stays purely rule-facing, and ``NetworkControls`` never gains this
+    lifecycle method. The live adapter is ``HardwareNetworkControls``, reached
+    by the runtime loop through ``DeviceHardware.transmit_pump`` rather than
+    through the send-only ``NetworkControls`` handle.
+    """
+
+    def poll_transmits(self) -> dict[str, bool]:
+        """Pump every wired transmitter's in-flight write lifecycle forward."""
+        raise NotImplementedError
+
+
+class HardwareNetworkControls(NetworkControls, TransmitPump):
     """Concrete network controls for real hardware peripherals.
+
+    Two-faced by design, mirroring ``AudioEffectOutput(EffectOutput,
+    VoiceSink)``: a send-command surface through ``NetworkControls`` (what
+    rules see via ``GameState.network_controls``) and a runtime-facing
+    transmit-lifecycle pump through ``TransmitPump`` (what the runtime loop
+    reaches via ``DeviceHardware.transmit_pump``) — the same object, two
+    declared types, no downcast needed at either call site.
 
     Args:
         transmitters: Map from emitter constant (``LINE``, ``CONE``,
@@ -118,9 +143,10 @@ class HardwareNetworkControls(NetworkControls):
 
         Runtime-facing — must be called every tick so a non-blocking write
         in flight on any emitter eventually fires its deferred
-        ``end_transmit`` and starts its pending send. Not part of the
-        abstract ``NetworkControls`` interface: it is a lifecycle/runtime
-        concern, not a game rule, so it stays off the seam game rules see.
+        ``end_transmit`` and starts its pending send. Declared by
+        ``TransmitPump``, not the abstract ``NetworkControls``: it is a
+        lifecycle/runtime concern, not a game rule, so it stays off the seam
+        game rules see.
 
         Returns:
             The same ``dict[str, bool]`` instance every call (pre-allocated

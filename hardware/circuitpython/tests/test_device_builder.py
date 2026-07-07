@@ -847,3 +847,43 @@ def test_device_hardware_does_not_expose_the_ir_transmit_gate() -> None:
 
     assert "gate" not in DeviceHardware.__slots__
     assert not hasattr(DeviceHardware, "ir_transmit_gate")
+
+
+# ---------------------------------------------------------------------------
+# build_hardware wires transmit_pump and network_controls to the same
+# HardwareNetworkControls instance (issue #608)
+# ---------------------------------------------------------------------------
+
+
+def test_build_hardware_transmit_pump_is_same_object_as_network_controls() -> None:
+    config = _neopixel_config()
+    board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
+        mock_neopixel.NeoPixel.return_value = MagicMock()
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.transmit_pump is hw.network_controls
+
+
+def test_build_hardware_transmit_pump_satisfies_transmit_pump() -> None:
+    from engine.network import TransmitPump
+
+    config = _neopixel_config()
+    board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_neopixel = stack.enter_context(patch("hardware.circuitpython.device_builder.neopixel"))
+        mock_neopixel.NeoPixel.return_value = MagicMock()
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert isinstance(hw.transmit_pump, TransmitPump)
