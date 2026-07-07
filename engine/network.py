@@ -114,19 +114,17 @@ class HardwareNetworkControls(NetworkControls, TransmitPump):
         # every tick in the real runtime loop).
         self._poll_results: dict[str, bool] = dict.fromkeys(transmitters, False)
 
-    def send_ir(self, data: bytes, emitter: str) -> bool:
-        """Transmit *data* via the :class:`InfraredTransmitter` for *emitter*.
+    def send_ir(self, data: bytes, emitter: str) -> None:
+        """Broadcast *data* via the :class:`InfraredTransmitter` for *emitter*.
+
+        Fire-and-forget: whether the write completed synchronously or is
+        still in flight is a transmitter-level detail (see
+        :meth:`InfraredTransmitter.send`), not something this seam surfaces.
 
         Args:
             data: Opaque payload bytes to transmit.
             emitter: One of the emitter constants: ``LINE``, ``CONE``, or
                 ``AREA_OF_EFFECT``.
-
-        Returns:
-            ``True`` only if *data* was fully transmitted synchronously
-            (a blocking writer completed within this call); ``False`` if it
-            was buffered because the transmitter was busy, or if the write
-            started but is still in flight on a non-blocking/DMA writer.
 
         Raises:
             ValueError: If *emitter* is not in the transmitter map supplied at
@@ -135,7 +133,7 @@ class HardwareNetworkControls(NetworkControls, TransmitPump):
         tx = self._transmitters.get(emitter)
         if tx is None:
             raise ValueError("No transmitter wired for emitter: " + str(emitter))
-        return tx.send(data)
+        tx.send(data)
 
     def send_radio(self, data: bytes) -> None:
         pass  # TODO: wire to hardware peripheral
