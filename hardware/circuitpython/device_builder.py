@@ -5,6 +5,11 @@ Deploy-watch only: imports board, busio, pulseio, digitalio.
 
 from __future__ import annotations
 
+try:
+    from typing import Final
+except ImportError:
+    pass
+
 import json
 import time
 
@@ -117,19 +122,30 @@ def _setup_i2c() -> busio.I2C | None:
         return None
 
 
+_MATRIX_STARTUP_TIMEOUT_S: Final = 3
+
+
 def _setup_matrix_is31fl3741(i2c: busio.I2C, brightness: float) -> Adafruit_RGBMatrixQT:
     """Return a configured IS31FL3741 driver on *i2c*.
 
-    Retries until the matrix responds (useful if the I2C bus is still
-    settling at boot). Drives LED scaling from *brightness*
-    (``round(brightness * 0xFF)``), leaves global current pinned at 0xFF, then
-    enables the matrix.
+    Retries construction for up to :data:`_MATRIX_STARTUP_TIMEOUT_S` seconds
+    (useful if the I2C bus is still settling at boot), sleeping ~1s between
+    attempts. Drives LED scaling from *brightness* (``round(brightness *
+    0xFF)``), leaves global current pinned at 0xFF, then enables the matrix.
+
+    Raises:
+        RuntimeError: If the matrix has not responded within the timeout.
     """
-    while True:
+    deadline = time.monotonic() + _MATRIX_STARTUP_TIMEOUT_S
+    matrix = None
+    while matrix is None:
         try:
             matrix = Adafruit_RGBMatrixQT(i2c, allocate=adafruit_is31fl3741.MUST_BUFFER)
-            break
         except Exception:
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    f"IS31FL3741 matrix did not respond within {_MATRIX_STARTUP_TIMEOUT_S}s"
+                ) from None
             time.sleep(1)
     scaling = round(brightness * 0xFF)
     matrix.set_led_scaling(scaling)
