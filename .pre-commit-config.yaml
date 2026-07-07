@@ -5,3 +5,11 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+  - repo: local
+    hooks:
+      - id: lint-imports
+        name: import-linter
+        description: Enforce the module layering contracts declared in pyproject.toml.
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false

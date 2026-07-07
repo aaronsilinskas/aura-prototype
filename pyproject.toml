@@ -63,5 +63,29 @@ allow-multiline = false  # mpy-cross rejects implicit concatenation even inside 
 "**/tests/**" = ["ISC002"]
 
 [tool.importlinter]
-root_packages = ["effects", "engine", "magic", "packs"]
+root_packages = ["effects", "engine", "magic", "packs", "hardware", "app"]
 source_roots = ["."]
+
+[[tool.importlinter.contracts]]
+name = "engine must not import hardware"
+type = "forbidden"
+source_modules = ["engine"]
+forbidden_modules = ["hardware"]
+
+[[tool.importlinter.contracts]]
+name = "hardware must not import engine runtime machinery"
+type = "forbidden"
+source_modules = ["hardware"]
+forbidden_modules = [
+    "engine.engine",
+    "engine.scene",
+    "engine.packs",
+    "engine.timer",
+    "engine.effects.manager",
+]
+# hardware.shared.tests.test_network_controls verifies HardwareNetworkControls'
+# wiring into GameEngine.create_state (issue #608) — a legitimate cross-layer
+# integration test, not a production dependency from hardware on engine.
+ignore_imports = [
+    "hardware.shared.tests.test_network_controls -> engine.engine",
+]
