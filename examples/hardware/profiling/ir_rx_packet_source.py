@@ -102,13 +102,8 @@ def _build_network_controls() -> HardwareNetworkControls:
     return hw.network_controls
 
 
-def _send_packet(network_controls: HardwareNetworkControls, payload: bytes) -> bool:
+def _send_packet(network_controls: HardwareNetworkControls, payload: bytes) -> None:
     """Transmit one packet via the LINE emitter.
-
-    Returns:
-        `send_ir`'s own return value, unmodified -- see
-        `HardwareNetworkControls.send_ir` for the exact `True`/`False`
-        semantics.
 
     Raises:
         RuntimeError: If the hardware bundle has no LINE transmitter wired --
@@ -118,7 +113,7 @@ def _send_packet(network_controls: HardwareNetworkControls, payload: bytes) -> b
             alone.
     """
     try:
-        return network_controls.send_ir(payload, LINE)
+        network_controls.send_ir(payload, LINE)
     except ValueError as exc:
         raise RuntimeError(
             "no LINE transmitter in the built hardware bundle -- check ir.line wiring"
@@ -157,10 +152,8 @@ def run() -> None:
         if not line_busy:
             payload[0] = sequence & 0xFF
             # An idle writer always starts the transmit immediately (it never
-            # buffers), so a send issued here is a real transmit start. On the
-            # non-blocking PIO writer send_ir returns False (started, still in
-            # flight), so the advance keys off this idle pre-check rather than
-            # send_ir's return, which only reports synchronous completion.
+            # buffers), so a send issued here is a real transmit start -- the
+            # advance keys off this idle pre-check, not send_ir's return.
             _send_packet(network_controls, payload)
             sequence += 1
             packets_sent += 1

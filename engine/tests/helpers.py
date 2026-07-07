@@ -12,9 +12,8 @@ class SpyNetworkControls(NetworkControls):
         self.send_ir_calls: list[tuple[bytes, str]] = []
         self.send_radio_calls: list[bytes] = []
 
-    def send_ir(self, data: bytes, emitter: str) -> bool:
+    def send_ir(self, data: bytes, emitter: str) -> None:
         self.send_ir_calls.append((data, emitter))
-        return True  # always "sends" synchronously from the test's perspective
 
     def send_radio(self, data: bytes) -> None:
         self.send_radio_calls.append(data)
