@@ -5,6 +5,11 @@ Deploy-watch only: imports board, busio, pulseio, digitalio.
 
 from __future__ import annotations
 
+try:
+    from typing import Final
+except ImportError:
+    pass
+
 import json
 import time
 
@@ -117,7 +122,7 @@ def _setup_i2c() -> busio.I2C | None:
         return None
 
 
-_MATRIX_STARTUP_TIMEOUT_S = 3
+_MATRIX_STARTUP_TIMEOUT_S: Final = 3
 
 
 def _setup_matrix_is31fl3741(i2c: busio.I2C, brightness: float) -> Adafruit_RGBMatrixQT:

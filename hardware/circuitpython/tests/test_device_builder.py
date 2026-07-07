@@ -284,10 +284,10 @@ def test_setup_matrix_is31fl3741_raises_runtime_error_past_deadline() -> None:
         )
         mock_matrix_cls.side_effect = Exception("not ready")
         stack.enter_context(patch("hardware.circuitpython.device_builder.time.sleep"))
-        # monotonic values: one initial read for the deadline, then reads at each
-        # retry check -- the second reported time is already past the 3s window.
+        # monotonic values: one initial read for the deadline, then one read at
+        # the first retry check -- already past the 3s window.
         stack.enter_context(
-            patch("hardware.circuitpython.device_builder.time.monotonic", side_effect=[0, 4, 4])
+            patch("hardware.circuitpython.device_builder.time.monotonic", side_effect=[0, 4])
         )
 
         from hardware.circuitpython.device_builder import _setup_matrix_is31fl3741
