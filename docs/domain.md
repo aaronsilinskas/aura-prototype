@@ -43,7 +43,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   version.py      Pack semver parsing and comparison
   input.py        ButtonData, AccelerationData, InputEvents
   audio.py        AudioRegistry
-  network.py      NetworkEvents, HardwareNetworkControls
+  network.py      NetworkEvents, HardwareNetworkControls, TransmitPump
   effects/
     manager.py    EffectManager, EffectOutput, EffectBuilder, EffectResolver
     merge.py      MergeStrategy, SplitMerge, AdditiveMerge (per-scope layered-buffer compositing)
@@ -95,6 +95,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `EffectReceipt` | `engine/state.py` | Opaque handle for a running effect instance; used to stop by receipt |
 | `ScopeValue` / `Scope` | `engine/state.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN/BUFF/DEBUFF`, `ALL` |
 | `NetworkControls` | `engine/state.py` | Abstract interface for sending/receiving network messages |
+| `TransmitPump` | `engine/network.py` | Abstract runtime-facing seam declaring `poll_transmits()`; the type the runtime loop reaches through, distinct from the send-only `NetworkControls` |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update(timer)` tick |
 | `GameState` | `engine/state.py` | Passed to each rule: holds `engine`, `timer`, `effect_controls`, `network_controls` |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
@@ -115,7 +116,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `ValueWithModifiers` | `magic/values.py` | Base value + temporary multiplier stack |
 | `Duration` | `magic/values.py` | Expiry tracker: `update(elapsed) → bool` |
 | `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; `pixels` is a list of `MatrixPixelsConfig` / `NeoPixelPixelsConfig` |
-| `DeviceHardware` | `hardware/circuitpython/device_builder.py` | Named bundle `build_hardware` returns (outputs, buttons, network_controls, …) |
+| `DeviceHardware` | `hardware/circuitpython/device_builder.py` | Named bundle `build_hardware` returns (outputs, buttons, network_controls, transmit_pump, …) |
 
 ---
 

@@ -1,7 +1,14 @@
 import pytest
 
 from engine.engine import GameEngine
-from engine.network import AREA_OF_EFFECT, CONE, LINE, HardwareNetworkControls, NetworkEvents
+from engine.network import (
+    AREA_OF_EFFECT,
+    CONE,
+    LINE,
+    HardwareNetworkControls,
+    NetworkEvents,
+    TransmitPump,
+)
 from engine.state import EffectControls, GameState, NetworkControls, SceneControls
 from hardware.shared.ir_transport import InfraredTransmitter, PulseWriter
 
@@ -326,6 +333,38 @@ def test_abstract_network_controls_has_no_poll_transmits() -> None:
     """The lifecycle pump is HardwareNetworkControls-only — the abstract
     seam game rules see stays send-only."""
     assert not hasattr(NetworkControls(), "poll_transmits")
+
+
+# ---------------------------------------------------------------------------
+# TransmitPump — the runtime-facing declaring seam (issue #608)
+# ---------------------------------------------------------------------------
+
+
+def test_transmit_pump_poll_transmits_raises_not_implemented() -> None:
+    pump = TransmitPump()
+
+    with pytest.raises(NotImplementedError):
+        pump.poll_transmits()
+
+
+def test_hardware_network_controls_satisfies_both_network_controls_and_transmit_pump() -> None:
+    controls = HardwareNetworkControls({})
+
+    assert isinstance(controls, NetworkControls)
+    assert isinstance(controls, TransmitPump)
+
+
+def test_poll_transmits_through_declared_transmit_pump_type_mutates_dict_in_place() -> None:
+    """Guards the runtime's actual call shape: `hw.transmit_pump` is declared
+    as TransmitPump, never downcast to HardwareNetworkControls."""
+    tx = _PollCountingTransmitter()
+    pump: TransmitPump = HardwareNetworkControls({LINE: tx})
+
+    first = pump.poll_transmits()
+    second = pump.poll_transmits()
+
+    assert first is second
+    assert first == {LINE: False}
 
 
 def test_send_radio_is_a_noop_until_hardware_is_wired() -> None:

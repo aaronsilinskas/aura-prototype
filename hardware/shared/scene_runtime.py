@@ -116,8 +116,11 @@ def run_scene(
         # Outside the active_state guard and before receive(): a send can be
         # in flight across a scene transition, and end_transmit (fired here
         # when a deferred write completes) arms the flush latch this same
-        # tick's receive() must consume.
-        hw.network_controls.poll_transmits()
+        # tick's receive() must consume. Pumped through transmit_pump, not
+        # network_controls — poll_transmits is a runtime lifecycle concern,
+        # not a rule-facing send, so it is reached through the type that
+        # declares it rather than downcast through the send-only handle.
+        hw.transmit_pump.poll_transmits()
 
         if active_state is not None and hw.ir_receiver is not None:
             ir_data = hw.ir_receiver.receive()

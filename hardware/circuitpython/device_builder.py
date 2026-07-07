@@ -19,7 +19,7 @@ from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
 from engine.audio import AudioRegistry
 from engine.effects.manager import EffectOutput
-from engine.network import AREA_OF_EFFECT, CONE, LINE, HardwareNetworkControls
+from engine.network import AREA_OF_EFFECT, CONE, LINE, HardwareNetworkControls, TransmitPump
 from engine.state import NetworkControls
 from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
@@ -55,9 +55,24 @@ __all__ = [
 
 
 class DeviceHardware:
-    """Assembled hardware bundle produced by build_hardware."""
+    """Assembled hardware bundle produced by build_hardware.
 
-    __slots__ = ("accelerometer", "buttons", "ir_receiver", "network_controls", "outputs")
+    ``network_controls`` and ``transmit_pump`` are the same
+    ``HardwareNetworkControls`` instance seen through its two declared faces
+    — the builder constructs it once and assigns both slots from it. Rules
+    reach the send-only ``network_controls``; the runtime loop reaches the
+    lifecycle-pumping ``transmit_pump``. Neither call site downcasts to the
+    other's type.
+    """
+
+    __slots__ = (
+        "accelerometer",
+        "buttons",
+        "ir_receiver",
+        "network_controls",
+        "outputs",
+        "transmit_pump",
+    )
 
     def __init__(
         self,
@@ -65,12 +80,14 @@ class DeviceHardware:
         buttons: DebouncedButtons,
         accelerometer: object | None,
         network_controls: NetworkControls,
+        transmit_pump: TransmitPump,
         ir_receiver: InfraredSingleReceiver | None,
     ) -> None:
         self.outputs: list[EffectOutput] = outputs
         self.buttons: DebouncedButtons = buttons
         self.accelerometer: object | None = accelerometer
         self.network_controls: NetworkControls = network_controls
+        self.transmit_pump: TransmitPump = transmit_pump
         self.ir_receiver: InfraredSingleReceiver | None = ir_receiver
 
 
@@ -381,12 +398,16 @@ def build_hardware(
             decoder=decoder,
         )
 
-    network_controls = HardwareNetworkControls(transmitters)
+    # One HardwareNetworkControls instance, seen through two declared faces:
+    # rules reach it as the send-only NetworkControls; the runtime loop
+    # reaches the same object as TransmitPump to pump transmit lifecycle.
+    hardware_network_controls = HardwareNetworkControls(transmitters)
 
     return DeviceHardware(
         outputs=outputs,
         buttons=buttons,
         accelerometer=accelerometer,
-        network_controls=network_controls,
+        network_controls=hardware_network_controls,
+        transmit_pump=hardware_network_controls,
         ir_receiver=ir_receiver,
     )
