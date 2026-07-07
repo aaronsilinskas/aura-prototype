@@ -6,6 +6,7 @@ Deploy-watch only: imports board, busio, pulseio, digitalio.
 from __future__ import annotations
 
 try:
+    from collections.abc import Callable
     from typing import Final
 except ImportError:
     pass
@@ -332,6 +333,7 @@ def _setup_ir(
     aoe_pin: microcontroller.Pin | None = None,
     encoder: InfraredEncoder | None = None,
     decoder: InfraredDecoder | None = None,
+    writer_factory: Callable[[microcontroller.Pin], PulseWriter] = _make_writer,
 ) -> tuple[dict[str, InfraredTransmitter], InfraredSingleReceiver]:
     """Wire IR transceiver pins and return (transmitters, receiver).
 
@@ -342,6 +344,12 @@ def _setup_ir(
     the receiver and every transmitter — the single assembly point for
     self-echo suppression. The gate itself is not returned; it lives only as
     a shared reference between the receiver and transmitters it wires here.
+
+    *writer_factory* builds the :class:`PulseWriter` for each wired emitter
+    pin — defaults to :func:`_make_writer`. This is assembly's only seam onto
+    writer *selection*: swapping it in tests exercises transmitter wiring
+    (one per emitter, sharing the gate, codec defaulting) without touching
+    the silicon-coupled ``rp2pio`` probe in :func:`_make_writer`.
     """
     if line_pin is None:
         raise ValueError("line_pin is required — the LINE emitter must always be wired")
@@ -361,7 +369,7 @@ def _setup_ir(
     for emitter, pin in ((LINE, line_pin), (CONE, cone_pin), (AREA_OF_EFFECT, aoe_pin)):
         if pin is None:
             continue
-        writer = _make_writer(pin)
+        writer = writer_factory(pin)
         transmitters[emitter] = InfraredTransmitter(writer, encoder, gate=gate)
 
     return transmitters, receiver
