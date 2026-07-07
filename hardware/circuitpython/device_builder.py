@@ -34,6 +34,7 @@ from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
     DEFAULT_DEVICE_CONFIG,
+    AudioConfig,
     DeviceConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
@@ -272,6 +273,27 @@ def _setup_drv2605(i2c: busio.I2C) -> object | None:
         return None
 
 
+def _setup_audio(audio_cfg: AudioConfig, board_module: object) -> AudioEffectOutput:
+    """Return a configured AudioEffectOutput from *audio_cfg*.
+
+    Audio is config-gated rather than presence-probed, so unlike the
+    Optional-returning accelerometer/drv2605 helpers there is no absent case
+    — the caller's ``if config.audio is not None:`` guard is the only gate.
+    """
+    audio_registry = AudioRegistry()
+    for clip_name, clip_path in audio_cfg.clips.items():
+        audio_registry.register(clip_name, clip_path)
+
+    return AudioEffectOutput(
+        audio_registry,
+        max_volume=audio_cfg.max_volume,
+        num_voices=audio_cfg.voices,
+        i2s_bit_clock=board_module.I2S_BIT_CLOCK,
+        i2s_word_select=board_module.I2S_WORD_SELECT,
+        i2s_data=board_module.I2S_DATA,
+    )
+
+
 def _make_writer(pin: microcontroller.Pin) -> PulseWriter:
     """Return the best non-blocking IR writer the silicon supports for *pin*.
 
@@ -403,19 +425,7 @@ def build_hardware(
             print("drv2605 not reachable — omitting from hardware bundle")
 
     if config.audio is not None:
-        audio_registry = AudioRegistry()
-        for clip_name, clip_path in config.audio.clips.items():
-            audio_registry.register(clip_name, clip_path)
-
-        audio_output = AudioEffectOutput(
-            audio_registry,
-            max_volume=config.audio.max_volume,
-            num_voices=config.audio.voices,
-            i2s_bit_clock=board_module.I2S_BIT_CLOCK,
-            i2s_word_select=board_module.I2S_WORD_SELECT,
-            i2s_data=board_module.I2S_DATA,
-        )
-        outputs.append(audio_output)
+        outputs.append(_setup_audio(config.audio, board_module))
 
     if motor is not None:
         outputs.append(Drv2605EffectOutput(motor))

@@ -589,6 +589,138 @@ def test_build_hardware_mixed_matrix_and_neopixel_config_produces_outputs_in_con
 
 
 # ---------------------------------------------------------------------------
+# _setup_audio — construct AudioRegistry + AudioEffectOutput from AudioConfig
+# ---------------------------------------------------------------------------
+
+
+def _audio_config(**overrides):
+    """Return an AudioConfig, defaulting to one voice, half volume, one clip."""
+    mapping = {
+        "voices": 1,
+        "max_volume": 0.5,
+        "clips": {"hit": "/sounds/hit.wav"},
+    }
+    mapping.update(overrides)
+    return parse_device_config(
+        {
+            "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
+            "buttons": ["D9"],
+            "audio": mapping,
+        }
+    ).audio
+
+
+def test_setup_audio_returns_the_constructed_audio_effect_output() -> None:
+    from hardware.circuitpython.audio_output import AudioEffectOutput
+
+    audio_cfg = _audio_config()
+    board_mock = _mock_board()
+    board_mock.I2S_BIT_CLOCK = MagicMock()
+    board_mock.I2S_WORD_SELECT = MagicMock()
+    board_mock.I2S_DATA = MagicMock()
+
+    mock_audio_output = MagicMock(spec=AudioEffectOutput)
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder.AudioEffectOutput",
+                return_value=mock_audio_output,
+            )
+        )
+
+        from hardware.circuitpython.device_builder import _setup_audio
+
+        result = _setup_audio(audio_cfg, board_mock)
+
+    assert result is mock_audio_output
+
+
+def test_setup_audio_resolves_i2s_pins_from_board() -> None:
+    audio_cfg = _audio_config()
+    bit_clock = MagicMock(name="bit_clock")
+    word_select = MagicMock(name="word_select")
+    data = MagicMock(name="data")
+    board_mock = _mock_board()
+    board_mock.I2S_BIT_CLOCK = bit_clock
+    board_mock.I2S_WORD_SELECT = word_select
+    board_mock.I2S_DATA = data
+
+    with ExitStack() as stack:
+        mock_audio_cls = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.AudioEffectOutput")
+        )
+
+        from hardware.circuitpython.device_builder import _setup_audio
+
+        _setup_audio(audio_cfg, board_mock)
+
+    kwargs = mock_audio_cls.call_args.kwargs
+    assert kwargs["i2s_bit_clock"] is bit_clock
+    assert kwargs["i2s_word_select"] is word_select
+    assert kwargs["i2s_data"] is data
+
+
+def test_setup_audio_forwards_configured_max_volume() -> None:
+    audio_cfg = _audio_config(max_volume=0.75)
+    board_mock = _mock_board()
+    board_mock.I2S_BIT_CLOCK = MagicMock()
+    board_mock.I2S_WORD_SELECT = MagicMock()
+    board_mock.I2S_DATA = MagicMock()
+
+    with ExitStack() as stack:
+        mock_audio_cls = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.AudioEffectOutput")
+        )
+
+        from hardware.circuitpython.device_builder import _setup_audio
+
+        _setup_audio(audio_cfg, board_mock)
+
+    assert mock_audio_cls.call_args.kwargs["max_volume"] == 0.75
+
+
+def test_setup_audio_forwards_configured_voice_count() -> None:
+    audio_cfg = _audio_config(voices=3)
+    board_mock = _mock_board()
+    board_mock.I2S_BIT_CLOCK = MagicMock()
+    board_mock.I2S_WORD_SELECT = MagicMock()
+    board_mock.I2S_DATA = MagicMock()
+
+    with ExitStack() as stack:
+        mock_audio_cls = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.AudioEffectOutput")
+        )
+
+        from hardware.circuitpython.device_builder import _setup_audio
+
+        _setup_audio(audio_cfg, board_mock)
+
+    assert mock_audio_cls.call_args.kwargs["num_voices"] == 3
+
+
+def test_setup_audio_registers_configured_clips_on_audio_registry() -> None:
+    audio_cfg = _audio_config(clips={"hit": "/sounds/hit.wav", "miss": "/sounds/miss.wav"})
+    board_mock = _mock_board()
+    board_mock.I2S_BIT_CLOCK = MagicMock()
+    board_mock.I2S_WORD_SELECT = MagicMock()
+    board_mock.I2S_DATA = MagicMock()
+
+    with ExitStack() as stack:
+        mock_audio_cls = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.AudioEffectOutput")
+        )
+
+        from hardware.circuitpython.device_builder import _setup_audio
+
+        _setup_audio(audio_cfg, board_mock)
+
+    registry = mock_audio_cls.call_args.args[0]
+    assert registry.path("hit") == "/sounds/hit.wav"
+    assert registry.path("miss") == "/sounds/miss.wav"
+
+
+# ---------------------------------------------------------------------------
 # build_hardware wires audio output when config.audio is present
 # ---------------------------------------------------------------------------
 
@@ -608,6 +740,10 @@ def _neopixel_config_with_audio():
 
 
 def test_build_hardware_audio_config_adds_audio_effect_output() -> None:
+    """build_hardware's audio wiring is a single delegating call to
+    _setup_audio — construction details (registry, clips, I2S pins,
+    max_volume, voices) are covered directly on _setup_audio; this only
+    confirms the output reaches the bundle."""
     from hardware.circuitpython.audio_output import AudioEffectOutput
 
     config = _neopixel_config_with_audio()
