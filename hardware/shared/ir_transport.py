@@ -107,9 +107,10 @@ class IrTransmitGate:
 
     The single seam between an otherwise-decoupled transmitter and receiver:
     transmitters *drive* the gate (:meth:`begin_transmit` / :meth:`end_transmit`
-    bracketing emission), the receiver *reads* it (:attr:`transmitting` to drop
-    pulses captured mid-emission; :meth:`consume_flush` for one final
-    drain-and-discard on the falling edge). Neither side references the other.
+    bracketing emission), the receiver *reads* it through the single
+    :meth:`should_discard` query (:attr:`transmitting` stays exposed as a cheap,
+    side-effect-free "is the emitter lit?" window for tests and telemetry).
+    Neither side references the other.
 
     Tracks an active-emission depth (not a bare boolean) so suppression stays
     armed across concurrent or back-to-back emissions, falling to "not
@@ -143,13 +144,17 @@ class IrTransmitGate:
         """``True`` while at least one emission is active."""
         return self._depth > 0
 
-    def consume_flush(self) -> bool:
-        """Return ``True`` at most once per completed emission, then clear the latch.
+    def should_discard(self) -> bool:
+        """Return whether the receiver should drain-and-discard this tick.
 
-        Returns:
-            ``True`` exactly once after an emission ends (falling edge);
-            ``False`` otherwise, including while still transmitting.
+        The receiver's single self-echo query. Short-circuits ``True`` while
+        transmitting *without* touching the flush latch, so the falling-edge
+        one-shot is preserved for the tick after emission ends. Once idle,
+        consumes the one-shot latch: ``True`` exactly once on the falling edge,
+        then ``False``.
         """
+        if self._depth > 0:
+            return True
         if self._flush_pending:
             self._flush_pending = False
             return True
@@ -484,7 +489,7 @@ class InfraredSingleReceiver(InfraredReceiver):
             ``bytearray`` payload on a successful decode; ``None`` otherwise.
         """
         gate = self._gate
-        if gate is not None and (gate.transmitting or gate.consume_flush()):
+        if gate is not None and gate.should_discard():
             self._drain_discard()
             return None
 
@@ -644,7 +649,7 @@ class InfraredMultiReceiver(InfraredReceiver):
             ``bytearray`` payload from the best-signal receiver, or ``None``.
         """
         gate = self._gate
-        if gate is not None and (gate.transmitting or gate.consume_flush()):
+        if gate is not None and gate.should_discard():
             self._drain_discard_all()
             return None
 
