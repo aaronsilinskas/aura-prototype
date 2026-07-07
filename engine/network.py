@@ -79,6 +79,8 @@ class TransmitPump:
     through the send-only ``NetworkControls`` handle.
     """
 
+    __slots__ = ()
+
     def poll_transmits(self) -> dict[str, bool]:
         """Pump every wired transmitter's in-flight write lifecycle forward."""
         raise NotImplementedError
