@@ -93,7 +93,8 @@ import board
 import busio
 
 from effects.performance import PerformanceTracker
-from engine.effects.manager import EffectManager, EffectOutput
+from engine.effects.manager import EffectManager
+from engine.effects.output import EffectOutput
 from engine.packs import PackRegistry
 from engine.state import Scope
 from engine.timer import Timer

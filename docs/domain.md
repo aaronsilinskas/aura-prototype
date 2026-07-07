@@ -45,7 +45,8 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   audio.py        AudioRegistry
   network.py      NetworkEvents, HardwareNetworkControls, TransmitPump
   effects/
-    manager.py    EffectManager, EffectOutput, EffectBuilder, EffectResolver
+    manager.py    EffectManager, EffectBuilder, EffectResolver
+    output.py     EffectOutput (abstract hardware output port)
     merge.py      MergeStrategy, SplitMerge, AdditiveMerge (per-scope layered-buffer compositing)
 
 magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
@@ -90,7 +91,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
 | `EffectControls` | `engine/state.py` | Abstract interface: `set_effect`, `add_effect`, `stop_effect` |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls`; routes effects to outputs by scope |
-| `EffectOutput` | `engine/effects/manager.py` | Abstract hardware output: `create_buffer`, `update_pixels`, `handle_event` |
+| `EffectOutput` | `engine/effects/output.py` | Abstract hardware output: `create_buffer`, `update_pixels`, `handle_event` |
 | `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → Effect`; one per effect pack |
 | `EffectReceipt` | `engine/state.py` | Opaque handle for a running effect instance; used to stop by receipt |
 | `ScopeValue` / `Scope` | `engine/state.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN/BUFF/DEBUFF`, `ALL` |

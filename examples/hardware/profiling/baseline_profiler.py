@@ -52,7 +52,8 @@ from __future__ import annotations
 import gc
 
 from effects.performance import PerformanceTracker
-from engine.effects.manager import EffectManager, EffectOutput
+from engine.effects.manager import EffectManager
+from engine.effects.output import EffectOutput
 from engine.engine import GameEngine
 from engine.packs import PackRegistry
 from engine.state import GameState, SceneControls

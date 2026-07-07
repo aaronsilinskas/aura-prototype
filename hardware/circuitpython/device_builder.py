@@ -24,7 +24,7 @@ import pulseio
 from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
 from engine.audio import AudioRegistry
-from engine.effects.manager import EffectOutput
+from engine.effects.output import EffectOutput
 from engine.network import AREA_OF_EFFECT, CONE, LINE, HardwareNetworkControls, TransmitPump
 from engine.state import NetworkControls
 from hardware.circuitpython.audio_output import AudioEffectOutput
