@@ -211,7 +211,7 @@ def test_hardware_network_controls_send_ir_dispatches_correct_data() -> None:
     assert writer.calls[0] == [0xAB, 0xCD]
 
 
-def test_hardware_network_controls_send_ir_returns_none() -> None:
+def test_hardware_network_controls_send_ir_hides_writer_completion_state() -> None:
     """send_ir is honest fire-and-forget -- the writer-type distinction
     (blocking vs. DMA/PIO) stays below this seam, owned by
     InfraredTransmitter, and never leaks upward as a bool."""
@@ -221,7 +221,7 @@ def test_hardware_network_controls_send_ir_returns_none() -> None:
     assert controls.send_ir(b"\x01", LINE) is None
 
 
-def test_send_ir_through_declared_network_controls_type_returns_none() -> None:
+def test_send_ir_through_declared_network_controls_type_hides_writer_completion_state() -> None:
     """Guards the rule-facing call shape: a rule holds `state.network_controls`
     typed as `NetworkControls`, never `HardwareNetworkControls` or a pump --
     calling `send_ir` through that declared type is honest fire-and-forget."""
