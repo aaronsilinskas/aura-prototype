@@ -1,10 +1,10 @@
 from effects.effect import Effect, EffectConfig, PixelBuffer
-from engine.effects.merge import SPLIT, MergeStrategy
+from engine.effects.merge import SPLIT
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.scene import SceneLocalRegistry
-from engine.state import EffectAdmin, EffectControls, EffectReceipt, ScopeValue
+from engine.state import EffectAdmin, EffectControls, EffectReceipt, MergeStrategy, ScopeValue
 from engine.timer import Timer
 
 _DEFAULT_RESOLUTION = 16

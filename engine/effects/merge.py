@@ -6,7 +6,7 @@ except ImportError:
     pass  # Not available on CircuitPython
 
 from effects.effect import PixelBuffer
-from engine.state import EffectReceipt
+from engine.state import EffectReceipt, MergeStrategy
 
 _FULL_BRIGHTNESS: Final = 1.0
 
@@ -14,28 +14,6 @@ _FULL_BRIGHTNESS: Final = 1.0
 def _brightness_of(receipt: EffectReceipt | None) -> float:
     """Return *receipt*'s brightness, or full brightness for a missing receipt."""
     return _FULL_BRIGHTNESS if receipt is None else receipt.brightness
-
-
-class MergeStrategy:
-    """Per-scope policy compositing a scope's layered effect buffers into one region buffer.
-
-    This project's ``Protocol`` substitute: a plain base class whose methods
-    only raise ``NotImplementedError``. Subclasses hold no per-instance state,
-    so each ships as a module-level singleton (``SPLIT``, ``ADDITIVE`` below).
-    """
-
-    def prepare_buffers(self, buffers: list[PixelBuffer]) -> None:
-        """Resize *buffers* to this strategy's layout ahead of the next ``merge`` call."""
-        raise NotImplementedError
-
-    def merge(
-        self, buffers: list[PixelBuffer], receipts: list[EffectReceipt | None]
-    ) -> PixelBuffer:
-        """Composite *buffers* (each scaled by its parallel receipt's brightness) into buffers[0].
-
-        Returns ``buffers[0]``, resized to the full region capacity.
-        """
-        raise NotImplementedError
 
 
 def _scale_color(color: int, brightness: float) -> int:

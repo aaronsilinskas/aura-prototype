@@ -33,8 +33,8 @@ effects/          Animation engine (CircuitPython-safe)
 
 engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   engine.py       GameEngine, GameRule
-  state.py        GameState, EffectControls, EffectAdmin, EffectReceipt, NetworkControls, Scope,
-                  ScopeValue
+  state.py        GameState, EffectControls, EffectAdmin, EffectReceipt, MergeStrategy,
+                  NetworkControls, Scope, ScopeValue
   scene.py        Scene, SceneRegistry, SceneLocalRegistry, SceneManager, SceneControls
   phase.py        PhaseKey, PhaseMachine, PhaseRule, InPhaseRule
   events.py       Event, EventGroup, EffectEvent
@@ -48,7 +48,8 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   effects/
     manager.py    EffectManager, EffectBuilder, EffectResolver
     output.py     EffectOutput (abstract hardware output port)
-    merge.py      MergeStrategy, SplitMerge, AdditiveMerge (per-scope layered-buffer compositing)
+    merge.py      SplitMerge, AdditiveMerge (per-scope layered-buffer compositing;
+                  subclass state.py's MergeStrategy)
 
 magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
   aura.py         Aura, Spell, Spells, SpellTags, SpellLevelScaler, AuraEvent (+ subclasses), EventListener
@@ -126,7 +127,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
 | `EffectResolver` | `engine/effects/manager.py` | Resolves a qualified effect name to a builder; owns the `scene.` prefix rule |
-| `MergeStrategy` | `engine/effects/merge.py` | Per-scope policy compositing a scope's layered effect buffers into one region buffer (`SplitMerge` / `AdditiveMerge`) |
+| `MergeStrategy` | `engine/state.py` | Per-scope policy compositing a scope's layered effect buffers into one region buffer (subclasses `SplitMerge` / `AdditiveMerge` live in `engine/effects/merge.py`) |
 | `PackRegistry` | `engine/packs.py` | Loads and looks up named packs (effects, rules, scenes) by entry point |
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |

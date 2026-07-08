@@ -11,19 +11,16 @@ except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
 try:
-    from typing import TYPE_CHECKING, Literal, TypeVar
+    from typing import Literal, TypeVar
 
     T = TypeVar("T")
 except ImportError:
-    TYPE_CHECKING = False  # Not available on CircuitPython/MicroPython
-
-if TYPE_CHECKING:
-    from engine.effects.merge import MergeStrategy
+    pass  # Not available on CircuitPython/MicroPython
 
 import engine._path as _path
 from engine.engine import GameEngine, GameRule, Version
 from engine.packs import PackRegistry, load_item, scan_item_names
-from engine.state import EffectAdmin, GameState, SceneControls, Scope
+from engine.state import EffectAdmin, GameState, MergeStrategy, SceneControls, Scope
 
 _REQUIRED_KEYS = frozenset(("version", "effect_packs", "rule_packs"))
 
