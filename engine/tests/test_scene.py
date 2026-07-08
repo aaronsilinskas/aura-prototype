@@ -12,8 +12,9 @@ from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
 from engine.packs import PackRegistry, _PackEntry
 from engine.scene import Scene, SceneManager, SceneRegistry
-from engine.state import EffectControls, GameState, SceneControls, Scope
+from engine.state import EffectAdmin, EffectControls, GameState, SceneControls, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
+from engine.tests.helpers import SpyEffectAdmin
 from engine.timer import Timer
 from engine.version import Version
 
@@ -81,17 +82,17 @@ def _make_registries(pack_env_path: str):
 
 
 class _RecordingEffectControls(EffectControls):
-    """EffectControls that records stop_effect scopes and set_local_effects calls."""
+    """EffectControls that records stop_effect scopes.
+
+    Local-effects pushes and merge-strategy lifecycle calls no longer go
+    through ``EffectControls`` — see ``SpyEffectAdmin`` for those.
+    """
 
     def __init__(self) -> None:
         self.stopped_scopes: list = []
-        self.local_effects_history: list = []
 
     def stop_effect(self, scope) -> None:
         self.stopped_scopes.append(scope)
-
-    def set_local_effects(self, local_registry: object) -> None:
-        self.local_effects_history.append(local_registry)
 
 
 def _make_engine() -> GameEngine:
@@ -102,6 +103,28 @@ def _make_engine_with_controls():
     """Return (engine, recording_controls) so tests can inspect stopped scopes."""
     controls = _RecordingEffectControls()
     return GameEngine(effect_controls=controls), controls
+
+
+def _make_scene_manager(
+    engine: GameEngine,
+    effect_registry: PackRegistry | None = None,
+    rule_registry: PackRegistry | None = None,
+    scene_registry: SceneRegistry | None = None,
+    effect_admin: EffectAdmin | None = None,
+) -> SceneManager:
+    """Construct a SceneManager, defaulting any unspecified registry/effect_admin.
+
+    Absorbs SceneManager's injected-EffectAdmin constructor parameter so most
+    call sites only need to override the registries/effect_admin they actually
+    care about.
+    """
+    return SceneManager(
+        engine,
+        effect_registry if effect_registry is not None else PackRegistry(item_attr="BUILD"),
+        rule_registry if rule_registry is not None else PackRegistry(item_attr="RULE"),
+        scene_registry if scene_registry is not None else SceneRegistry(),
+        effect_admin if effect_admin is not None else SpyEffectAdmin(),
+    )
 
 
 class _TestPackRegistry(PackRegistry):
@@ -224,7 +247,12 @@ def test_scene_manager_satisfies_scene_controls_interface() -> None:
     rule_registry = PackRegistry(item_attr="RULE")
     scene_registry = SceneRegistry()
 
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_registry)
+    manager = _make_scene_manager(
+        engine,
+        effect_registry=effect_registry,
+        rule_registry=rule_registry,
+        scene_registry=scene_registry,
+    )
 
     assert isinstance(manager, SceneControls)
 
@@ -232,9 +260,7 @@ def test_scene_manager_satisfies_scene_controls_interface() -> None:
 def test_load_succeeds_when_scene_is_in_registry() -> None:
     engine = _make_engine()
     scene_reg = _scene_registry(("main", _scene_factory()))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
     manager.load("main")
     manager.update()  # should not raise
@@ -246,24 +272,14 @@ def test_load_succeeds_when_scene_is_in_registry() -> None:
 
 
 def test_active_state_is_none_before_any_scene_is_loaded() -> None:
-    manager = SceneManager(
-        _make_engine(),
-        PackRegistry(item_attr="BUILD"),
-        PackRegistry(item_attr="RULE"),
-        SceneRegistry(),
-    )
+    manager = _make_scene_manager(_make_engine())
 
     assert manager.active_state is None
 
 
 def test_active_state_returns_game_state_after_scene_loads() -> None:
     scene_reg = _scene_registry(("main", _scene_factory()))
-    manager = SceneManager(
-        _make_engine(),
-        PackRegistry(item_attr="BUILD"),
-        PackRegistry(item_attr="RULE"),
-        scene_reg,
-    )
+    manager = _make_scene_manager(_make_engine(), scene_registry=scene_reg)
     manager.load("main")
     manager.update()
 
@@ -272,12 +288,7 @@ def test_active_state_returns_game_state_after_scene_loads() -> None:
 
 def test_active_state_is_none_while_load_is_pending_but_not_yet_applied() -> None:
     scene_reg = _scene_registry(("main", _scene_factory()))
-    manager = SceneManager(
-        _make_engine(),
-        PackRegistry(item_attr="BUILD"),
-        PackRegistry(item_attr="RULE"),
-        scene_reg,
-    )
+    manager = _make_scene_manager(_make_engine(), scene_registry=scene_reg)
     manager.load("main")
 
     # Transition is recorded but update() has not been called yet
@@ -286,12 +297,7 @@ def test_active_state_is_none_while_load_is_pending_but_not_yet_applied() -> Non
 
 def test_active_state_changes_after_load_replaces_scene() -> None:
     scene_reg = _scene_registry(("first", _scene_factory()), ("second", _scene_factory()))
-    manager = SceneManager(
-        _make_engine(),
-        PackRegistry(item_attr="BUILD"),
-        PackRegistry(item_attr="RULE"),
-        scene_reg,
-    )
+    manager = _make_scene_manager(_make_engine(), scene_registry=scene_reg)
 
     manager.load("first")
     manager.update()
@@ -310,12 +316,7 @@ def test_active_state_changes_after_load_replaces_scene() -> None:
 
 def test_load_raises_immediately_for_unregistered_scene_name() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine,
-        PackRegistry(item_attr="BUILD"),
-        PackRegistry(item_attr="RULE"),
-        SceneRegistry(),
-    )
+    manager = _make_scene_manager(engine)
 
     with pytest.raises(ValueError, match="Unknown scene"):
         manager.load("nonexistent")
@@ -324,9 +325,7 @@ def test_load_raises_immediately_for_unregistered_scene_name() -> None:
 def test_overlay_raises_immediately_for_unregistered_scene_name() -> None:
     engine = _make_engine()
     scene_reg = _scene_registry(("base", _scene_factory()))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.load("base")
     manager.update()
 
@@ -337,9 +336,7 @@ def test_overlay_raises_immediately_for_unregistered_scene_name() -> None:
 def test_overlay_raises_immediately_when_stack_is_empty() -> None:
     engine = _make_engine()
     scene_reg = _scene_registry(("overlay_scene", _scene_factory()))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
     with pytest.raises(ValueError):
         manager.overlay("overlay_scene")
@@ -347,12 +344,7 @@ def test_overlay_raises_immediately_when_stack_is_empty() -> None:
 
 def test_pop_raises_immediately_with_zero_entries_on_stack() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine,
-        PackRegistry(item_attr="BUILD"),
-        PackRegistry(item_attr="RULE"),
-        SceneRegistry(),
-    )
+    manager = _make_scene_manager(engine)
 
     with pytest.raises(ValueError):
         manager.pop()
@@ -361,9 +353,7 @@ def test_pop_raises_immediately_with_zero_entries_on_stack() -> None:
 def test_pop_raises_immediately_with_exactly_one_entry_on_stack() -> None:
     engine = _make_engine()
     scene_reg = _scene_registry(("main", _scene_factory()))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.load("main")
     manager.update()  # apply the load
 
@@ -383,7 +373,12 @@ def test_load_raises_for_incompatible_effect_pack_version(pack_env) -> None:
     scene_reg = _scene_registry(
         ("main", _scene_factory(effect_packs=[("fx", "99.0")]))  # incompatible major version
     )
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_reg)
+    manager = _make_scene_manager(
+        engine,
+        effect_registry=effect_registry,
+        rule_registry=rule_registry,
+        scene_registry=scene_reg,
+    )
 
     with pytest.raises(ValueError):
         manager.load("main")
@@ -397,7 +392,12 @@ def test_load_leaves_stack_untouched_when_pack_version_is_incompatible(pack_env)
         ("initial", _scene_factory()),
         ("bad", _scene_factory(effect_packs=[("fx", "99.0")])),
     )
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_reg)
+    manager = _make_scene_manager(
+        engine,
+        effect_registry=effect_registry,
+        rule_registry=rule_registry,
+        scene_registry=scene_reg,
+    )
 
     # Load a valid initial scene first
     manager.load("initial")
@@ -424,7 +424,12 @@ def test_load_raises_for_incompatible_rule_pack_version(pack_env) -> None:
     scene_reg = _scene_registry(
         ("main", _scene_factory(rule_packs=[("rules", "99.0")]))  # incompatible major version
     )
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_reg)
+    manager = _make_scene_manager(
+        engine,
+        effect_registry=effect_registry,
+        rule_registry=rule_registry,
+        scene_registry=scene_reg,
+    )
 
     with pytest.raises(ValueError):
         manager.load("main")
@@ -443,7 +448,12 @@ def test_overlay_validates_packs_before_suspending_active_scene(pack_env) -> Non
         ("main", _scene_factory()),
         ("overlay_scene", _scene_factory(effect_packs=[("fx", "99.0")])),
     )
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_reg)
+    manager = _make_scene_manager(
+        engine,
+        effect_registry=effect_registry,
+        rule_registry=rule_registry,
+        scene_registry=scene_reg,
+    )
 
     manager.load("main")
     manager.update()
@@ -464,12 +474,7 @@ def test_overlay_validates_packs_before_suspending_active_scene(pack_env) -> Non
 
 def test_update_skips_engine_update_when_stack_is_empty() -> None:
     engine = _make_engine()
-    manager = SceneManager(
-        engine,
-        PackRegistry(item_attr="BUILD"),
-        PackRegistry(item_attr="RULE"),
-        SceneRegistry(),
-    )
+    manager = _make_scene_manager(engine)
 
     # No exception should be raised; engine.update would fail without a state
     manager.update()
@@ -478,9 +483,7 @@ def test_update_skips_engine_update_when_stack_is_empty() -> None:
 def test_update_calls_engine_update_with_active_state_on_each_tick() -> None:
     engine = _TrackingEngine(_RecordingEffectControls())
     scene_reg = _scene_registry(("main", _scene_factory()))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.load("main")
     manager.update()  # stack empty at start of tick; engine.update skipped; load fires
 
@@ -513,9 +516,7 @@ class _TrackingEngine(GameEngine):
 def test_transition_applies_after_engine_update_in_same_tick() -> None:
     engine = _TrackingEngine(_RecordingEffectControls())
     scene_reg = _scene_registry(("main", _scene_factory()))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
     manager.load("main")
     manager.update()
@@ -539,9 +540,7 @@ def test_last_pending_transition_wins_within_one_tick() -> None:
         ("scene_a", _scene_factory(initial_data={"which": "a"})),
         ("scene_b", _scene_factory(initial_data={"which": "b"})),
     )
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
     # Both recorded in one tick — last wins
     manager.load("scene_a")
@@ -561,9 +560,7 @@ def test_overlay_wins_when_load_and_overlay_both_called_in_same_tick() -> None:
         ("new", _scene_factory()),
         ("overlay_scene", _scene_factory(initial_data={"which": "overlay"})),
     )
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
     manager.load("base")
     manager.update()
@@ -593,9 +590,7 @@ def test_overlay_wins_when_load_and_overlay_both_called_in_same_tick() -> None:
 def test_load_passes_scene_manager_as_scene_controls_in_active_state() -> None:
     engine = _TrackingEngine(_RecordingEffectControls())
     scene_reg = _scene_registry(("main", _scene_factory()))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.load("main")
     manager.update()  # load fires; state created
     manager.update()  # engine.update(active_state)
@@ -606,9 +601,7 @@ def test_load_passes_scene_manager_as_scene_controls_in_active_state() -> None:
 def test_load_seeds_active_state_data_from_scene_initial_data() -> None:
     engine = _TrackingEngine(_RecordingEffectControls())
     scene_reg = _scene_registry(("main", _scene_factory(initial_data={"level": 5})))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.load("main")
     manager.update()  # load fires; state created with initial_data
     manager.update()  # engine.update(active_state); _last_state is now set
@@ -619,9 +612,7 @@ def test_load_seeds_active_state_data_from_scene_initial_data() -> None:
 def test_load_stops_all_effects_on_the_outgoing_scene() -> None:
     engine, controls = _make_engine_with_controls()
     scene_reg = _scene_registry(("main", _scene_factory()), ("next", _scene_factory()))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.load("main")
     manager.update()
     controls.stopped_scopes.clear()
@@ -635,9 +626,7 @@ def test_load_stops_all_effects_on_the_outgoing_scene() -> None:
 def test_first_load_does_not_stop_effects_with_empty_stack() -> None:
     engine, controls = _make_engine_with_controls()
     scene_reg = _scene_registry(("main", _scene_factory()))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.load("main")
     manager.update()
 
@@ -651,9 +640,7 @@ def test_load_stops_effects_on_every_stack_entry() -> None:
         ("top", _scene_factory()),
         ("new", _scene_factory()),
     )
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
     # Load base, then overlay top so stack has two entries
     manager.load("base")
@@ -672,9 +659,7 @@ def test_load_stops_effects_on_every_stack_entry() -> None:
 def test_overlay_stops_all_effects_on_the_suspended_scene() -> None:
     engine, controls = _make_engine_with_controls()
     scene_reg = _scene_registry(("main", _scene_factory()), ("overlay_scene", _scene_factory()))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.load("main")
     manager.update()
     controls.stopped_scopes.clear()
@@ -688,9 +673,7 @@ def test_overlay_stops_all_effects_on_the_suspended_scene() -> None:
 def test_pop_stops_all_effects_on_the_popped_scene() -> None:
     engine, controls = _make_engine_with_controls()
     scene_reg = _scene_registry(("main", _scene_factory()), ("overlay_scene", _scene_factory()))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.load("main")
     manager.update()
     manager.overlay("overlay_scene")
@@ -719,7 +702,7 @@ def test_load_clears_suspended_state_queues_so_stale_events_do_not_outlive_the_s
         ("overlay_scene", _scene_factory()),
         ("new", _scene_factory()),
     )
-    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), rule_registry, scene_reg)
+    manager = _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
 
     # Build a 2-layer stack
     manager.load("base")
@@ -766,7 +749,12 @@ def test_load_dispatches_events_to_scene_rules_on_following_ticks(pack_env) -> N
     scene_reg = _scene_registry(
         ("main", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")]))
     )
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_reg)
+    manager = _make_scene_manager(
+        engine,
+        effect_registry=effect_registry,
+        rule_registry=rule_registry,
+        scene_registry=scene_reg,
+    )
     manager.load("main")
     manager.update()  # load fires; state created
     manager.update()  # engine.update(active_state)
@@ -802,7 +790,12 @@ def test_scene_rules_fire_before_pack_rules(pack_env) -> None:
     scene_reg = _scene_registry(
         ("main", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")]))
     )
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_reg)
+    manager = _make_scene_manager(
+        engine,
+        effect_registry=effect_registry,
+        rule_registry=rule_registry,
+        scene_registry=scene_reg,
+    )
     manager.load("main")
     manager.update()
     manager.update()
@@ -824,9 +817,7 @@ def test_overlay_suspends_active_scene_and_pushes_without_clearing_stack() -> No
         ("base", _scene_factory(initial_data={"which": "base"})),
         ("overlay_scene", _scene_factory(initial_data={"which": "overlay"})),
     )
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
     manager.load("base")
     manager.update()
@@ -859,7 +850,7 @@ def test_overlay_clears_suspended_base_state_queue_before_pushing() -> None:
         ("base", _scene_factory(rule_packs=[("stubs", "1.0")])),
         ("overlay_scene", _scene_factory()),
     )
-    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), rule_registry, scene_reg)
+    manager = _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
 
     manager.load("base")
     manager.update()
@@ -913,7 +904,12 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_env
         ("base", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")])),
         ("overlay_scene", _scene_factory()),
     )
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_reg)
+    manager = _make_scene_manager(
+        engine,
+        effect_registry=effect_registry,
+        rule_registry=rule_registry,
+        scene_registry=scene_reg,
+    )
 
     manager.load("base")
     manager.update()  # load fires; stack empty at start so engine.update skipped
@@ -946,7 +942,7 @@ def test_pop_clears_restored_state_queue_so_suspended_events_do_not_replay() -> 
         ("base", _scene_factory(rule_packs=[("stubs", "1.0")])),
         ("overlay_scene", _scene_factory()),
     )
-    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), rule_registry, scene_reg)
+    manager = _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
 
     manager.load("base")
     manager.update()
@@ -975,9 +971,7 @@ def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
         ("mid", _scene_factory(initial_data={"which": "mid"})),
         ("top", _scene_factory(initial_data={"which": "top"})),
     )
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
     manager.load("base")
     manager.update()
@@ -1037,7 +1031,12 @@ def test_rule_pack_items_all_receive_events_after_load(pack_env) -> None:
     scene_reg = _scene_registry(
         ("main", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")]))
     )
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_reg)
+    manager = _make_scene_manager(
+        engine,
+        effect_registry=effect_registry,
+        rule_registry=rule_registry,
+        scene_registry=scene_reg,
+    )
     manager.load("main")
     manager.update()  # load fires
     manager.update()  # engine.update(active_state)
@@ -1089,9 +1088,7 @@ def test_unloaded_scene_is_not_retained_by_manager() -> None:
         return created_scene
 
     scene_reg = _scene_registry(("main", factory), ("other", _scene_factory()))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
     manager.load("main")
     manager.update()
@@ -1115,7 +1112,7 @@ def test_unloaded_scene_is_not_retained_by_manager() -> None:
 def test_pop_activates_revealed_entry_with_both_rules_and_local_effects() -> None:
     """After load → overlay → pop, the revealed entry has rules on the engine
     AND its local effect registry pushed to the effect controls (invariant: no half-activation)."""
-    engine, controls = _make_engine_with_controls()
+    engine = _make_engine()
     base_local_registry = Scene(effect_packs=[], rule_packs=[]).local_effect_registry
     base_rule = GameRule()
     rule_registry = _TestPackRegistry(item_attr="RULE")
@@ -1134,13 +1131,16 @@ def test_pop_activates_revealed_entry_with_both_rules_and_local_effects() -> Non
     scene_reg = SceneRegistry()
     scene_reg.register("base", base_factory)
     scene_reg.register("overlay_scene", _scene_factory())
-    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), rule_registry, scene_reg)
+    effect_admin = SpyEffectAdmin()
+    manager = _make_scene_manager(
+        engine, rule_registry=rule_registry, scene_registry=scene_reg, effect_admin=effect_admin
+    )
 
     manager.load("base")
     manager.update()
     manager.overlay("overlay_scene")
     manager.update()
-    controls.local_effects_history.clear()
+    effect_admin.local_effects_history.clear()
 
     manager.pop()
     manager.update()
@@ -1148,10 +1148,10 @@ def test_pop_activates_revealed_entry_with_both_rules_and_local_effects() -> Non
     manager.active_state.queue_event(Event(_GROUP, "check"))
     manager.update()
     assert base_events, "base rules must be active on the engine after pop"
-    assert controls.local_effects_history, (
+    assert effect_admin.local_effects_history, (
         "set_local_effects must be called when pop reveals the base entry"
     )
-    assert controls.local_effects_history[-1] is base_local_registry, (
+    assert effect_admin.local_effects_history[-1] is base_local_registry, (
         "pop must push the revealed entry's own local_effect_registry"
     )
 
@@ -1180,7 +1180,7 @@ def test_load_whose_rule_resolution_fails_does_not_stop_effects_on_active_scene(
     scene_reg = SceneRegistry()
     scene_reg.register("initial", _scene_factory(rule_packs=[("stubs", "1.0")]))
     scene_reg.register("bad", bad_factory)
-    manager = SceneManager(engine, PackRegistry(item_attr="BUILD"), rule_registry, scene_reg)
+    manager = _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
 
     manager.load("initial")
     manager.update()
@@ -1208,9 +1208,7 @@ def test_suspended_scene_remains_on_stack_after_overlay() -> None:
         return created_scene
 
     scene_reg = _scene_registry(("base", factory), ("overlay_scene", _scene_factory()))
-    manager = SceneManager(
-        engine, PackRegistry(item_attr="BUILD"), PackRegistry(item_attr="RULE"), scene_reg
-    )
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
     manager.load("base")
     manager.update()
@@ -1244,7 +1242,12 @@ def _make_merge_strategy_scene_manager(pack_env, scene_names):
     effect_manager = EffectManager(registry=effect_registry, outputs=[output])
     engine = GameEngine(effect_controls=effect_manager)
     scene_reg = _scene_registry(*[(name, _scene_factory()) for name in scene_names])
-    scene_manager = SceneManager(engine, effect_registry, PackRegistry(item_attr="RULE"), scene_reg)
+    scene_manager = _make_scene_manager(
+        engine,
+        effect_registry=effect_registry,
+        scene_registry=scene_reg,
+        effect_admin=effect_manager,
+    )
     return scene_manager, effect_manager, output
 
 

@@ -4,7 +4,7 @@ from unittest.mock import ANY
 import pytest
 
 from engine.effects.manager import EffectManager
-from engine.effects.merge import ADDITIVE
+from engine.effects.merge import ADDITIVE, SPLIT
 from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.state import Scope
@@ -1474,3 +1474,84 @@ def test_two_outputs_sharing_scope_both_reflect_the_same_receipts_brightness(pac
     _, buf_a = output_a.update_pixels_calls[0]
     _, buf_b = output_b.update_pixels_calls[0]
     assert list(buf_a) == list(buf_b) == [0x7F0000] * 4
+
+
+# ---------------------------------------------------------------------------
+# reset_merge_strategies / capture_merge_strategies / apply_merge_strategies
+# — the EffectAdmin face's pointwise merge-strategy operations (issue #638)
+# ---------------------------------------------------------------------------
+
+
+def test_capture_merge_strategies_defaults_every_registered_key_to_split() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL, Scope.DIRECTIONAL])
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+
+    assert manager.capture_merge_strategies() == {"personal": SPLIT, "directional": SPLIT}
+
+
+def test_capture_merge_strategies_returns_a_copy_independent_of_later_live_map_mutations() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+
+    snapshot = manager.capture_merge_strategies()
+    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+
+    assert snapshot["personal"] is SPLIT, "earlier snapshot must not see the later mutation"
+
+
+def test_reset_merge_strategies_sets_every_registered_key_back_to_split() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL, Scope.DIRECTIONAL])
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+    manager.set_merge_strategy(Scope.DIRECTIONAL, ADDITIVE)
+
+    manager.reset_merge_strategies()
+
+    assert manager.capture_merge_strategies() == {"personal": SPLIT, "directional": SPLIT}
+
+
+def test_apply_merge_strategies_installs_the_given_snapshot_as_the_live_map() -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+    snapshot = {"personal": SPLIT}
+
+    manager.apply_merge_strategies(snapshot)
+
+    assert manager.capture_merge_strategies() == snapshot
+
+
+def test_apply_merge_strategies_takes_effect_on_the_very_next_tick(pack_env) -> None:
+    """Direct-installing a captured Split snapshot over a live Additive choice
+    must change the composed pixels from the very next update()."""
+    _make_pack(
+        pack_env,
+        "color",
+        {
+            "red": (
+                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+            ),
+            "blue": (
+                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
+            ),
+        },
+    )
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = EffectManager(registry=registry, outputs=[output])
+    split_snapshot = manager.capture_merge_strategies()
+    manager.add_effect(Scope.PERSONAL, "color.red", {})
+    manager.add_effect(Scope.PERSONAL, "color.blue", {})
+    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+    manager.update(_make_timer())
+    _, additive_composed = output.update_pixels_calls[-1]
+    assert list(additive_composed) == [0xFF00FF] * 10
+
+    manager.apply_merge_strategies(split_snapshot)
+    manager.update(_make_timer())
+
+    _, split_composed = output.update_pixels_calls[-1]
+    assert list(split_composed) == [0xFF0000] * 5 + [0x0000FF] * 5

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 __all__ = [
+    "EffectAdmin",
     "EffectControls",
     "EffectReceipt",
     "GameState",
-    "MergeStrategy",
     "NetworkControls",
     "SceneControls",
     "Scope",
@@ -14,13 +14,15 @@ __all__ = [
 
 try:
     from collections.abc import Callable
-    from typing import Final, TypeVar
+    from typing import TYPE_CHECKING, Final, TypeVar
 
     T = TypeVar("T")
 except ImportError:
-    pass  # Not available on CircuitPython
+    TYPE_CHECKING = False  # Not available on CircuitPython
 
-from effects.effect import PixelBuffer
+if TYPE_CHECKING:
+    from engine.effects.merge import MergeStrategy
+
 from engine.events import Event
 
 
@@ -166,37 +168,14 @@ class EffectReceipt:
         return f"EffectReceipt(id={self.id})"
 
 
-class MergeStrategy:
-    """Per-scope policy compositing a scope's layered effect buffers into one region buffer.
-
-    This project's ``Protocol`` substitute: a plain base class whose methods
-    only raise ``NotImplementedError``. Subclasses hold no per-instance state,
-    so each ships as a module-level singleton (``SPLIT``, ``ADDITIVE`` in
-    ``engine.effects.merge``). Lives here rather than in ``engine.effects.merge``
-    because that module imports ``EffectReceipt`` from this one; defining the
-    base class in ``engine.effects.merge`` would make ``EffectControls.set_merge_strategy``
-    below need a circular import back into it.
-    """
-
-    def prepare_buffers(self, buffers: list[PixelBuffer]) -> None:
-        """Resize *buffers* to this strategy's layout ahead of the next ``merge`` call."""
-        raise NotImplementedError
-
-    def merge(
-        self, buffers: list[PixelBuffer], receipts: list[EffectReceipt | None]
-    ) -> PixelBuffer:
-        """Composite *buffers* (each scaled by its parallel receipt's brightness) into buffers[0].
-
-        Returns ``buffers[0]``, resized to the full region capacity.
-        """
-        raise NotImplementedError
-
-
 class EffectControls:
-    """Read-only effect-control interface exposed to game rules via GameState.
+    """Rule-facing effect-control interface exposed to game rules via GameState.
 
-    Provides effect start/stop operations only. The update() tick is
-    intentionally excluded so rules cannot advance the effect loop.
+    Provides effect start/stop and merge-strategy operations only. The update()
+    tick is intentionally excluded so rules cannot advance the effect loop.
+    Scene-transition operations (local effect registry swaps, merge-strategy
+    snapshot/reset/apply) live on the separate ``EffectAdmin`` face, reached
+    through ``SceneManager`` rather than through this interface.
     """
 
     def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
@@ -216,52 +195,63 @@ class EffectControls:
 
         Ticks after the next ``prepare_buffers`` call route through the new
         strategy. Defaults to ``SPLIT`` for every scope key; ``SceneManager``
-        resets the choice on ``load`` and saves/restores it across
-        ``overlay``/``pop`` (mirroring ``set_local_effects``).
+        resets the choice on ``load`` and captures/applies it across
+        ``overlay``/``pop`` through the separate ``EffectAdmin`` face.
+        """
+        raise NotImplementedError
+
+
+class EffectAdmin:
+    """Scene-transition-facing effect interface, reserved for ``SceneManager``.
+
+    Carries the operations ``EffectControls`` deliberately sheds so rules never
+    see them: swapping the active scene's local effect registry and
+    snapshotting/resetting/applying the per-scope merge strategy map.
+    ``SceneManager`` holds an injected ``EffectAdmin`` handle (wired to the same
+    instance as ``state.effect_controls``, e.g. the single ``EffectManager``)
+    and drives every transition call through it, never through
+    ``state.effect_controls``. All four methods raise ``NotImplementedError``
+    by default.
+    """
+
+    def reset_merge_strategies(self) -> None:
+        """Reset every registered scope key's merge strategy to ``SPLIT``.
+
+        Called by ``SceneManager._do_load`` so no strategy choice survives a
+        ``load``.
+        """
+        raise NotImplementedError
+
+    def capture_merge_strategies(self) -> dict[str, MergeStrategy]:
+        """Return an independent snapshot of the current per-scope merge strategy map.
+
+        The live map is left in place, so an overlay starts by inheriting the
+        underlying scene's current choices while remaining free to change
+        them. Called by ``SceneManager._do_overlay``; the returned snapshot
+        rides in the scene stack entry the overlay pushes, to be applied back
+        on the matching ``pop``.
+        """
+        raise NotImplementedError
+
+    def apply_merge_strategies(self, snapshot: dict[str, MergeStrategy]) -> None:
+        """Direct-install *snapshot* as the live per-scope merge strategy map.
+
+        Called by ``SceneManager._do_pop`` with the popped scene stack entry's
+        saved snapshot, discarding any ``set_merge_strategy`` calls made during
+        the popped overlay.
         """
         raise NotImplementedError
 
     def set_local_effects(self, local_registry: object) -> None:
         """Push the active scene's local effect registry into the effect system.
 
-        Reserved for ``SceneManager`` during scene transitions — rules must not
-        call this method (mirrors the ``GameState.clear_queue()`` precedent).
-        Pass ``None`` when the scene stack empties so that ``scene.`` lookups
-        fail immediately rather than resolving against a stale registry.
-
-        The base class is a no-op; ``EffectManager`` overrides it to store the
-        registry so that ``scene.<effect>`` names resolve at ``set_effect``
-        time.  Standalone test helpers that only stub ``stop_effect`` inherit
-        this no-op automatically.
+        Called by ``SceneManager`` on every transition so that
+        ``scene.<effect>`` names resolve against the top-of-stack scene's
+        local effects. Pass ``None`` when the scene stack empties so that
+        ``scene.`` lookups fail immediately rather than resolving against a
+        stale registry.
         """
-        pass
-
-    def reset_merge_strategies(self) -> None:
-        """Reset every scope key's merge strategy to ``SPLIT`` and drop any saved snapshots.
-
-        Reserved for ``SceneManager`` — called from ``_do_load`` so no strategy
-        choice survives a ``load`` (mirrors ``set_local_effects``). The base
-        class is a no-op.
-        """
-        pass
-
-    def save_merge_strategies(self) -> None:
-        """Snapshot the current per-scope merge strategy map without changing it.
-
-        Reserved for ``SceneManager`` — called from ``_do_overlay`` so the
-        overlay starts seeing exactly the underlying scene's current choices,
-        while still being free to change them. The base class is a no-op.
-        """
-        pass
-
-    def restore_merge_strategies(self) -> None:
-        """Restore the merge strategy map saved at the matching ``save_merge_strategies`` call.
-
-        Reserved for ``SceneManager`` — called from ``_do_pop`` so any
-        ``set_merge_strategy`` calls made during the popped overlay are
-        discarded. The base class is a no-op.
-        """
-        pass
+        raise NotImplementedError
 
 
 class StateSlot:

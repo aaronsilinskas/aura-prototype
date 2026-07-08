@@ -4,7 +4,7 @@ from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.scene import SceneLocalRegistry
-from engine.state import EffectControls, EffectReceipt, ScopeValue
+from engine.state import EffectAdmin, EffectControls, EffectReceipt, ScopeValue
 from engine.timer import Timer
 
 _DEFAULT_RESOLUTION = 16
@@ -131,7 +131,7 @@ class EffectResolver:
             raise
 
 
-class EffectManager(EffectControls):
+class EffectManager(EffectControls, EffectAdmin):
     """Manages running effects and routes rendered frames to registered outputs each tick.
 
     Update model:
@@ -171,7 +171,6 @@ class EffectManager(EffectControls):
         "_frame_effects",
         "_frame_receipts",
         "_merge_strategies",
-        "_merge_strategy_snapshots",
         "_next_id",
         "_output_key_sets",
         "_outputs",
@@ -190,11 +189,6 @@ class EffectManager(EffectControls):
         self._merge_strategies: dict[str, MergeStrategy] = {
             k: SPLIT for key_set in self._output_key_sets for k in key_set
         }
-        # Stack of saved merge-strategy maps, one per active overlay — pushed by
-        # save_merge_strategies (SceneManager._do_overlay) and popped by
-        # restore_merge_strategies (SceneManager._do_pop). A small dict copy at a
-        # scene transition (rare), never per-tick.
-        self._merge_strategy_snapshots: list[dict[str, MergeStrategy]] = []
         # Pre-allocated per-output frame accumulators — cleared and reused each tick
         # to avoid dict/list allocation in the hot path.
         # Non-pixel outputs (receives_pixels=False) use None as a placeholder.
@@ -353,7 +347,8 @@ class EffectManager(EffectControls):
         ``scene.<effect>`` names resolve against the top-of-stack scene's
         local effects.  Pass ``None`` when the stack empties.
 
-        Reserved for ``SceneManager`` — rules must not call this method.
+        Reserved for ``SceneManager`` (via the ``EffectAdmin`` face) — rules
+        must not call this method.
         """
         self._resolver.set_local_effects(local_registry)
 
@@ -367,31 +362,38 @@ class EffectManager(EffectControls):
             self._merge_strategies[key] = strategy
 
     def reset_merge_strategies(self) -> None:
-        """Reset every registered scope key to SPLIT and discard saved snapshots.
+        """Reset every registered scope key's merge strategy to SPLIT.
 
-        Reserved for ``SceneManager`` — called from ``_do_load``.
+        Reserved for ``SceneManager`` (via the ``EffectAdmin`` face) — called
+        from ``_do_load`` so no strategy choice survives a ``load``. The
+        snapshot stack that used to live here is gone — each overlay's
+        snapshot now rides in its own scene stack entry.
         """
         for key in self._merge_strategies:
             self._merge_strategies[key] = SPLIT
-        self._merge_strategy_snapshots.clear()
 
-    def save_merge_strategies(self) -> None:
-        """Push a copy of the current per-scope merge strategy map.
+    def capture_merge_strategies(self) -> dict[str, MergeStrategy]:
+        """Return an independent copy of the current per-scope merge strategy map.
 
         The live map is left in place, so an overlay starts by inheriting the
-        underlying scene's current choices. Reserved for ``SceneManager`` —
-        called from ``_do_overlay``.
+        underlying scene's current choices while remaining free to change
+        them. Reserved for ``SceneManager`` (via the ``EffectAdmin`` face) —
+        called from ``_do_overlay``; the returned copy rides in the scene
+        stack entry the overlay pushes.
         """
-        self._merge_strategy_snapshots.append(dict(self._merge_strategies))
+        return dict(self._merge_strategies)
 
-    def restore_merge_strategies(self) -> None:
-        """Replace the live merge strategy map with the most recently saved snapshot.
+    def apply_merge_strategies(self, snapshot: dict[str, MergeStrategy]) -> None:
+        """Direct-install *snapshot* as the live per-scope merge strategy map.
 
-        Discards any ``set_merge_strategy`` calls made since the matching
-        ``save_merge_strategies`` call. Reserved for ``SceneManager`` — called
-        from ``_do_pop``.
+        *snapshot* is installed by reference, not copied: ``capture_merge_strategies``
+        already unaliased it from the live map at capture time, and the caller
+        discards the scene stack entry that owned it immediately after this
+        call, so there is no reuse to protect against. Reserved for
+        ``SceneManager`` (via the ``EffectAdmin`` face) — called from
+        ``_do_pop`` with the popped entry's saved snapshot.
         """
-        self._merge_strategies = self._merge_strategy_snapshots.pop()
+        self._merge_strategies = snapshot
 
     def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
         """Replace any running effect(s) in scope and start this one."""
