@@ -563,6 +563,10 @@ class SceneManager(SceneControls):
         """Remove the top entry and restore the entry below it."""
         self._deactivate(self._stack[-1])
         popped = self._stack.pop()
+        # pop() rejects a stack of size <= 1, so the popped entry is always one
+        # overlay() pushed — never the base entry from load(), whose
+        # saved_merge is None. Narrows the type for apply_merge_strategies.
+        assert popped.saved_merge is not None
         self._effect_admin.apply_merge_strategies(popped.saved_merge)
 
         self._activate(self._stack[-1])
