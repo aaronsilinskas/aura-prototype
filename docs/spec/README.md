@@ -1,16 +1,16 @@
-# PRDs
+# Specs
 
-Product Requirements Documents for aura-prototype, organized as vertical slices of functionality.
+Specs (product requirements) for aura-prototype, organized as vertical slices of functionality.
 
 ## Workflow
 
-1. **Draft** — Use the `to-prd` skill to generate a PRD from the current conversation context, or `grill-me` to stress-test a plan before drafting. Save the draft here as `<slug>.md`.
+1. **Draft** — Use the `to-spec` skill to generate a spec from the current conversation context, or `grill-me` to stress-test a plan before drafting. Save the draft here as `<slug>.md`.
 2. **Review** — Iterate on the draft in this folder until approved.
-3. **Publish** — Once approved, publish to GitHub Issues using the `to-prd` skill. The issue becomes the source of truth; the local file can be deleted or kept as an archive.
+3. **Publish** — Once approved, publish to GitHub Issues using the `to-spec` skill. The issue becomes the source of truth; the local file can be deleted or kept as an archive.
 
 ## Format
 
-Each PRD follows the standard template:
+Each spec follows the standard template:
 
 - **Problem Statement** — the problem from the user's perspective
 - **Solution** — the solution from the user's perspective

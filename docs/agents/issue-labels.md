@@ -22,9 +22,9 @@ Edit the right-hand column to match whatever vocabulary you actually use.
 
 | Label   | Used by   | Meaning                                                                 |
 | ------- | --------- | ----------------------------------------------------------------------- |
-| `idea`  | `to-idea` | A discovery or idea captured to revisit later — a parking-lot stub, not a PRD or a triaged item. |
+| `idea`  | `to-idea` | A discovery or idea captured to revisit later — a parking-lot stub, not a spec or a triaged item. |
 
-The `idea` label is **not** part of the triage state machine, and `triage` ignores it. An `idea` issue is a placeholder you revisit deliberately (`gh issue list --label idea`); when you decide to act on it, it graduates through `to-prd` (or a grilling session) into a real PRD and implementation issues.
+The `idea` label is **not** part of the triage state machine, and `triage` ignores it. An `idea` issue is a placeholder you revisit deliberately (`gh issue list --label idea`); when you decide to act on it, it graduates through `to-spec` (or a grilling session) into a real spec and implementation tickets.
 
 ## Wayfinder labels
 
