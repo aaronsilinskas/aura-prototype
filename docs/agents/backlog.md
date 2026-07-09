@@ -21,30 +21,34 @@ Create a GitHub issue.
 
 Run `gh issue view <number> --comments`.
 
-## Wayfinding operations
+## Issue relationships
 
-Used by the `wayfinder` skill, which charts big work as a **map** issue with **ticket** child-issues. The generic ops above still apply; these are the extras it needs. (Labels — `wayfinder:map`, `wayfinder:<type>` — live in [issue-labels.md](issue-labels.md).)
+How issues express **hierarchy** and **blocking** on this repo. Used by any skill that links issues (`to-tickets`, `wayfinder`). The generic ops above still apply; these are the extras.
 
-- **Map** — one issue labelled `wayfinder:map`. Create as any issue (heredoc `--body`).
-
-- **Tickets** — each is a child issue of the map, attached as a **GitHub sub-issue**. Create the issue normally, then attach it under the map. `gh` has no sub-issue subcommand yet, so use the GraphQL API (node ids come from `gh issue view <n> --json id`):
+- **Hierarchy (parent/child)** — a child issue is attached under its parent as a **GitHub sub-issue**. Create the issue normally, then attach it. `gh` has no sub-issue subcommand yet, so use the GraphQL API (node ids come from `gh issue view <n> --json id`):
 
   ```bash
   gh api graphql -f query='
-    mutation($map:ID!, $child:ID!) {
-      addSubIssue(input:{issueId:$map, subIssueId:$child}) { subIssue { number } }
-    }' -f map="<map_node_id>" -f child="<child_node_id>"
+    mutation($parent:ID!, $child:ID!) {
+      addSubIssue(input:{issueId:$parent, subIssueId:$child}) { subIssue { number } }
+    }' -f parent="<parent_node_id>" -f child="<child_node_id>"
   ```
 
-  (The "Add sub-issue" control on the map issue's GitHub page does the same thing, if you prefer the UI.)
+  (The "Add sub-issue" control on the parent issue's GitHub page does the same thing, if you prefer the UI.)
 
-- **Blocking** — GitHub has no native dependency link, so a ticket names its blockers in its body:
+- **Blocking** — GitHub has no native issue-to-issue dependency, so an issue names its blockers in its body:
 
   ```
   Blocked by #42, #57
   ```
 
-  A ticket is **unblocked** when every issue it names is closed.
+  An issue is **unblocked** when every issue it names is closed.
+
+## Wayfinding operations
+
+Used by the `wayfinder` skill, which charts big work as a **map** issue with **ticket** child-issues. Hierarchy and blocking follow **Issue relationships** above; these are the wayfinder-specific extras. (Labels — `wayfinder:map`, `wayfinder:<type>` — live in [issue-labels.md](issue-labels.md).)
+
+- **Map** — one issue labelled `wayfinder:map`. Create as any issue (heredoc `--body`). Its tickets are child issues (sub-issues, per Issue relationships).
 
 - **Frontier** — the map's open sub-issues that are unassigned and unblocked, in number order. List the children via the map's `subIssues` connection, then drop the assigned ones and any whose `Blocked by #…` line still names an open issue:
 
