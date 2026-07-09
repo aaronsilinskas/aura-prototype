@@ -25,3 +25,17 @@ Edit the right-hand column to match whatever vocabulary you actually use.
 | `idea`  | `to-idea` | A discovery or idea captured to revisit later — a parking-lot stub, not a PRD or a triaged item. |
 
 The `idea` label is **not** part of the triage state machine, and `triage` ignores it. An `idea` issue is a placeholder you revisit deliberately (`gh issue list --label idea`); when you decide to act on it, it graduates through `to-prd` (or a grilling session) into a real PRD and implementation issues.
+
+## Wayfinder labels
+
+The `wayfinder` skill speaks in terms of these canonical role labels. This section maps them to the actual label strings used in this repo. See the "Wayfinding operations" section of [backlog.md](backlog.md) for how they're used.
+
+| Canonical role       | Label in our backlog   | Meaning                                                            |
+| -------------------- | ---------------------- | ----------------------------------------------------------------- |
+| `wayfinder:map`      | `wayfinder:map`        | Marks the map issue — the canonical artifact for a charted effort |
+| `wayfinder:research` | `wayfinder:research`   | Research ticket (AFK) — reads docs/APIs via the `research` skill   |
+| `wayfinder:prototype`| `wayfinder:prototype`  | Prototype ticket (HITL) — a rough artifact to react to            |
+| `wayfinder:grilling` | `wayfinder:grilling`   | Grilling ticket (HITL) — the default decision conversation        |
+| `wayfinder:task`     | `wayfinder:task`       | Task ticket — manual work that unblocks a decision                |
+
+These sit outside the triage state machine, like `idea`. Edit the right-hand column to match whatever vocabulary you actually use.
