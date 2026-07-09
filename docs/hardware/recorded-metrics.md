@@ -58,6 +58,7 @@ Per-tick cost terms scaling with rules, events, and remote MCUs.
 |-------|---------|--------|------------------|----------------|-----------------|------------------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.0694 | 0.0621 | 0.1177 | _TBD_ |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 0.1728 | 0.0565 | 0.1147 | _TBD_ |
+| pimoroni_pico_plus2w | circuitpython_10_2_1 | - | 0.1646 | 0.0390 | 0.1178 | _TBD_ |
 
 `tick_fixed_ms` is the `(0 rules, 0 events)` point — the same rule-less tick the
 engine-host baseline measures, so the two overlap. `router_overhead_ms` (per-remote-MCU
@@ -80,6 +81,8 @@ renders and flushes in one call, so `flush_ms` falls out as the fixed intercept.
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | is31fl3741_matrix | 0.103225 | 59.2329 | 8664.0 |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | neopixel_pwm | 0.551999 | 5.8358 | 0.0 |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | is31fl3741_matrix | 0.105998 | 60.6856 | 8664.0 |
+| pimoroni_pico_plus2w | circuitpython_10_2_1 | neopixel_pwm | 0.103039 | 12.8649 | 0.0 |
+| pimoroni_pico_plus2w | circuitpython_10_2_1 | is31fl3741_matrix | 0.022895 | 44.4505 | 8664.0 |
 
 NeoPixel PWM is off the I2C bus (reports 0); the buffered matrix flush is the dominant I2C
 consumer. The matrix `flush_ms` (~60.69 ms) alone exceeds the 24 FPS budget (41.7 ms),
@@ -110,6 +113,7 @@ Per-event cost for the shared DRV2605L haptic motor.
 |-------|---------|--------|-----------|-------------------------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 7.4870 | 1.80 |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 7.0801 | 1.80 |
+| pimoroni_pico_plus2w | circuitpython_10_2_1 | - | 5.8187 | 1.80 |
 
 `cost_ms` is the measured average per-event CPU cost of `handle_event` + `motor.play()`.
 The DRV2605L is called at a low rate (≤6 calls/min on the reference prop), so its amortized
@@ -144,14 +148,14 @@ source; on a bare board no packets arrive and `max_frame_ms` is `_TBD_`.
 ## Board profiles
 
 Per-board whole-board heap measurement. `total_free_heap_bytes` is the profiler's
-`gc.mem_free()` reading (the "Mem Free" stats line) on the bare framework. `target_fps`
-(24 ceiling) and `headroom_reserve_percent` (20% default) are config inputs, not
-recordings.
+`gc.mem_free()` reading on the bare framework. `target_fps` (24 ceiling) and
+`headroom_reserve_percent` (20% default) are config inputs, not recordings.
 
 | Board | Runtime | Driver | `target_fps` | `total_free_heap_bytes` | `headroom_reserve_percent` |
 |-------|---------|--------|--------------|-------------------------|------------------------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 24 | 130576 | 20% |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 24 | 129536 | 20% |
+| pimoroni_pico_plus2w | circuitpython_10_2_1 | - | 24 | 8277264 | 20% |
 
 ### Per-MCU baseline CPU
 
@@ -165,6 +169,8 @@ the bare framework loop with no engine.
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | satellite | 4.50% |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | engine-host | 5.65% |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | satellite | 5.21% |
+| pimoroni_pico_plus2w | circuitpython_10_2_1 | - | engine-host | 7.18% |
+| pimoroni_pico_plus2w | circuitpython_10_2_1 | - | satellite | 6.68% |
 
 ---
 

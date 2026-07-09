@@ -64,7 +64,7 @@ try:
 except ImportError:
     pass
 
-LINE_PIN_NAME: Final = "D9"
+LINE_PIN_NAME: Final = "GP17"
 PAYLOAD_LENGTHS: Final = [1, 4, 16, 64]
 ITERATIONS_PER_LENGTH: Final = 10
 TARGET_FPS: Final = 24.0

@@ -60,9 +60,11 @@ Copy the row into the matching table in [`recorded-metrics.md`](recorded-metrics
 
 Feeds the **Board profiles** and **Per-MCU baselines** tables.
 
-- `total_free_heap_bytes` is its `gc.mem_free()` reading (the "Mem Free" stats line) on
-  the **bare** framework (empty registry, no packs, no scene). A real prop also loads a
-  scene, which dominates its heap.
+- `total_free_heap_bytes` is a `gc.mem_free()` reading on the **bare** framework (empty
+  registry, no packs, no scene), taken right after `print_profile_header` and emitted as
+  its own `board_profiles` row (not eyeballed from the header's "Mem Free" field — some
+  boards' USB CDC connection is unreliable right at the reboot boundary and can lose that
+  line). A real prop also loads a scene, which dominates its heap.
 - `engine_host` mode profiles the rule-less `GameEngine.update(state)` tick; its
   `cpu_percent` is the engine-host baseline. `satellite` mode profiles the bare
   framework loop with no engine.

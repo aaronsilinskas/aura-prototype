@@ -220,13 +220,54 @@ def _open_serial_with_retry(
     raise OSError(f"Could not open {port} after {window}s: {last_exc}") from last_exc
 
 
-def iter_serial_lines(ser: object) -> Iterable[str | None]:
-    """Yield text lines from *ser*, or ``None`` when no data is available.
+class SerialHandle:
+    """Mutable holder for the live ``serial.Serial`` connection to *port*.
+
+    On some board/driver combinations (observed on an RP2350 CircuitPython
+    build over macOS's CDC-ACM driver), a read around the reboot boundary
+    raises ``SerialException`` ("device disconnected or multiple access on
+    port?") even though the device never actually leaves the USB bus --
+    reopening the same port immediately afterwards succeeds and the stream
+    resumes normally. ``iter_serial_lines`` swaps ``.ser`` out in place when
+    this happens, so both the pre-banner and post-banner reads in ``main``
+    observe the reconnected handle.
+    """
+
+    __slots__ = ("baud", "port", "ser")
+
+    def __init__(self, ser: object, port: str, baud: int) -> None:
+        self.ser = ser
+        self.port = port
+        self.baud = baud
+
+    def close(self) -> None:
+        self.ser.close()
+
+
+def iter_serial_lines(
+    handle: SerialHandle, *, reconnect_marker: str | None = None
+) -> Iterable[str | None]:
+    """Yield text lines from *handle*, or ``None`` when no data is available.
 
     Runs indefinitely; the caller (``watch_stream``) controls termination.
+    Reopens the connection (see ``SerialHandle``) if a read raises instead of
+    propagating the error -- the glitch this works around tends to land right
+    on the reboot boundary and can consume whatever the device was mid-write
+    on, which is often the very banner line a caller is scanning for. When
+    *reconnect_marker* is given, that text is yielded once right after a
+    successful reopen so such a caller doesn't stall waiting for a banner
+    line that was lost in the same glitch that triggered the reopen.
     """
+    import serial  # type: ignore[import-untyped]
+
     while True:
-        raw = ser.readline()
+        try:
+            raw = handle.ser.readline()
+        except serial.SerialException:
+            handle.ser.close()
+            handle.ser = _open_serial_with_retry(handle.port, handle.baud)
+            yield reconnect_marker
+            continue
         if raw:
             yield raw.decode("utf-8", errors="replace").rstrip("\r\n")
         else:
@@ -333,39 +374,53 @@ def main() -> None:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    handle = SerialHandle(ser, port, args.baud)
     output_file = open(args.output, "w") if args.output is not None else None  # noqa: SIM115
     try:
-        with ser:
-            rc = deploy(args.example_file, args.mount)
-            if rc != 0:
-                sys.exit(rc)
+        rc = deploy(args.example_file, args.mount)
+        if rc != 0:
+            sys.exit(rc)
 
-            ser.reset_input_buffer()
+        handle.ser.reset_input_buffer()
 
-            banner_deadline = time.monotonic() + args.reboot_timeout
-            found = discard_until(
-                iter_serial_lines(ser),
-                _CIRCUITPYTHON_BANNER,
-                deadline=banner_deadline,
-            )
-            if not found:
-                print(
-                    f"Error: soft-reboot banner not seen within {args.reboot_timeout}s. "
-                    "The device may have hung or missed the reload.",
-                    file=sys.stderr,
-                )
-                sys.exit(exit_code_for("banner_missing", until=args.until))
+        # A one-shot example that already finished leaves the board idling at
+        # CircuitPython's "Press any key to enter the REPL" prompt, where a
+        # plain code.py write does not trigger a fresh run. Ctrl-D forces a
+        # soft reload from that prompt; it is a harmless no-op if the board
+        # is instead already mid-run (unread stdin most user code never
+        # checks for).
+        import serial  # type: ignore[import-untyped]
 
-            watch_out: IO[str] = (
-                SplitWriter(sys.stdout, output_file) if output_file is not None else sys.stdout
+        try:
+            handle.ser.write(b"\x04")
+        except serial.SerialException:
+            pass  # the reconnect-on-read logic below recovers either way
+
+        banner_deadline = time.monotonic() + args.reboot_timeout
+        found = discard_until(
+            iter_serial_lines(handle, reconnect_marker=_CIRCUITPYTHON_BANNER),
+            _CIRCUITPYTHON_BANNER,
+            deadline=banner_deadline,
+        )
+        if not found:
+            print(
+                f"Error: soft-reboot banner not seen within {args.reboot_timeout}s. "
+                "The device may have hung or missed the reload.",
+                file=sys.stderr,
             )
-            result = watch_stream(
-                iter_serial_lines(ser),
-                until=args.until,
-                timeout=args.seconds,
-                out=watch_out,
-            )
+            sys.exit(exit_code_for("banner_missing", until=args.until))
+
+        watch_out: IO[str] = (
+            SplitWriter(sys.stdout, output_file) if output_file is not None else sys.stdout
+        )
+        result = watch_stream(
+            iter_serial_lines(handle, reconnect_marker=_CIRCUITPYTHON_BANNER),
+            until=args.until,
+            timeout=args.seconds,
+            out=watch_out,
+        )
     finally:
+        handle.close()
         if output_file is not None:
             output_file.close()
 

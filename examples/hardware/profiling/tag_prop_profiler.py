@@ -103,6 +103,7 @@ from hardware.shared.device_config import parse_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiling_helpers import (
+    board_module_with_i2s_pins,
     print_profile_header,
     print_stats_line,
     print_table_row,
@@ -118,12 +119,19 @@ except ImportError:
 # Configuration -- adjust to match your wiring
 # ---------------------------------------------------------------------------
 
-BUTTON_A_PIN: Final = "D9"
-BUTTON_B_PIN: Final = "D10"
+BUTTON_A_PIN: Final = "GP14"
+BUTTON_B_PIN: Final = "GP15"
 
 # IR transceiver pins -- update these to match your board layout.
-IR_RX_PIN: Final = "D11"
-IR_LINE_PIN: Final = "D12"
+IR_RX_PIN: Final = "GP16"
+IR_LINE_PIN: Final = "GP17"
+
+# I2S amp pins -- update these to match your board layout. Boards with
+# Feather-style board.I2S_* aliases don't need this; boards without them
+# (e.g. non-Feather form factors) need real pin names here instead.
+I2S_BIT_CLOCK_PIN_NAME: Final = "GP10"
+I2S_WORD_SELECT_PIN_NAME: Final = "GP11"
+I2S_DATA_PIN_NAME: Final = "GP12"
 
 # Frame budget basis. A prop with an IS31FL3741 scope cannot hold 24 FPS (the
 # ~60 ms matrix flush alone exceeds the 41.7 ms budget), so reservation/headroom
@@ -220,9 +228,12 @@ def _build_prop() -> tuple[
     config = parse_device_config(_TAG_HARNESS)
     hardware = build_hardware(
         config,
-        board,
+        board_module_with_i2s_pins(
+            I2S_BIT_CLOCK_PIN_NAME, I2S_WORD_SELECT_PIN_NAME, I2S_DATA_PIN_NAME
+        ),
         ir_encoder=TagInfraredEncoder(),
         ir_decoder=TagInfraredDecoder(),
+        i2c=board.STEMMA_I2C(),
     )
     _require_output(hardware, IS31FL3741EffectOutput)
     _require_output(hardware, AudioEffectOutput)

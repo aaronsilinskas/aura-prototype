@@ -101,6 +101,8 @@ from __future__ import annotations
 
 import gc
 
+import board
+
 from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
@@ -119,6 +121,7 @@ from hardware.shared.device_config import DeviceConfig, parse_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_protocol import InfraredDecoder, InfraredEncoder
 from hardware.shared.profiling_helpers import (
+    board_module_with_i2s_pins,
     print_profile_header,
     print_stats_line,
     print_table_row,
@@ -136,13 +139,20 @@ except ImportError:
 
 # Button pins -- build_hardware always wires buttons, though this profiler never
 # reads them (inputs do not allocate scene heap). Match the production demo.
-BUTTON_A_PIN_NAME: Final = "D9"
-BUTTON_B_PIN_NAME: Final = "D10"
+BUTTON_A_PIN_NAME: Final = "GP14"
+BUTTON_B_PIN_NAME: Final = "GP15"
 
 # IR transceiver pin names -- update these to match your board layout. Only used
 # for harnesses whose "ir" is not None (tag, hardware_test); ignored otherwise.
-IR_RX_PIN_NAME: Final = "D11"
-IR_LINE_PIN_NAME: Final = "D12"
+IR_RX_PIN_NAME: Final = "GP16"
+IR_LINE_PIN_NAME: Final = "GP17"
+
+# I2S amp pins -- update these to match your board layout. Boards with
+# Feather-style board.I2S_* aliases don't need this; boards without them
+# (e.g. non-Feather form factors) need real pin names here instead.
+I2S_BIT_CLOCK_PIN_NAME: Final = "GP10"
+I2S_WORD_SELECT_PIN_NAME: Final = "GP11"
+I2S_DATA_PIN_NAME: Final = "GP12"
 
 LOG_INTERVAL_SECONDS: Final = 5.0
 
@@ -305,7 +315,15 @@ def _build_prop(scene_name: str, harness: dict) -> tuple[SceneManager, EffectMan
 
     gc.collect()
     free_before_hardware = gc.mem_free()
-    hw = build_hardware(config, ir_encoder=ir_encoder, ir_decoder=ir_decoder)
+    hw = build_hardware(
+        config,
+        board_module_with_i2s_pins(
+            I2S_BIT_CLOCK_PIN_NAME, I2S_WORD_SELECT_PIN_NAME, I2S_DATA_PIN_NAME
+        ),
+        ir_encoder=ir_encoder,
+        ir_decoder=ir_decoder,
+        i2c=board.STEMMA_I2C(),
+    )
     gc.collect()
     free_after_hardware = gc.mem_free()
     _verify_hardware(hw, harness)

@@ -23,8 +23,8 @@ directly rather than through `EffectManager`.
 
 Hardware
 --------
-- PropMaker FeatherWing (or equivalent) I2S amp wired to `board.I2S_BIT_CLOCK`,
-  `board.I2S_WORD_SELECT`, `board.I2S_DATA`.
+- An I2S amp (e.g. PropMaker FeatherWing) wired to `I2S_BIT_CLOCK_PIN_NAME`,
+  `I2S_WORD_SELECT_PIN_NAME`, `I2S_DATA_PIN_NAME`.
 - A short looping WAV file at `CLIP_PATH` on the board's filesystem (mono, 11025 Hz,
   16-bit, matching `AudioEffectOutput`'s mixer configuration).
 
@@ -47,6 +47,8 @@ Configuration
   other profilers
 - DISPLAY_SECONDS: how long to spend on each concurrent-voice count before advancing
 - LOG_INTERVAL_SECONDS: how often the stats line is printed
+- I2S_BIT_CLOCK_PIN_NAME / I2S_WORD_SELECT_PIN_NAME / I2S_DATA_PIN_NAME: board pin
+  names for the I2S amp (defaults match Feather boards' `board.I2S_*` aliases)
 """
 
 from __future__ import annotations
@@ -80,6 +82,12 @@ TARGET_FPS: Final = 24.0
 DISPLAY_SECONDS: Final = 10.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
+# Boards without dedicated I2S_BIT_CLOCK/I2S_WORD_SELECT/I2S_DATA board-module
+# aliases (e.g. non-Feather form factors) need real pin names here instead.
+I2S_BIT_CLOCK_PIN_NAME: Final = "GP10"
+I2S_WORD_SELECT_PIN_NAME: Final = "GP11"
+I2S_DATA_PIN_NAME: Final = "GP12"
+
 _CLIP_NAME: Final = "profiler_loop"
 _EVENT_VERB: Final = "play"
 
@@ -91,9 +99,9 @@ def _build_output(audio_registry: AudioRegistry):
         audio_registry,
         max_volume=MAX_VOLUME,
         num_voices=NUM_VOICES,
-        i2s_bit_clock=board.I2S_BIT_CLOCK,
-        i2s_word_select=board.I2S_WORD_SELECT,
-        i2s_data=board.I2S_DATA,
+        i2s_bit_clock=getattr(board, I2S_BIT_CLOCK_PIN_NAME),
+        i2s_word_select=getattr(board, I2S_WORD_SELECT_PIN_NAME),
+        i2s_data=getattr(board, I2S_DATA_PIN_NAME),
     )
 
 

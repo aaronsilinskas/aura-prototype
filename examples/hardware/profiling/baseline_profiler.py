@@ -42,8 +42,10 @@ Installation
 Configuration
 -------------
 - MODE: "engine_host" or "satellite"
-- TARGET_FPS: informational only — included in the header for comparison
-  against component profilers with real per-frame work
+- TARGET_FPS: recorded as-is into the ``board_profiles`` row; also included in
+  the header for comparison against component profilers with real per-frame
+  work
+- HEADROOM_RESERVE_PERCENT: recorded as-is into the ``board_profiles`` row
 - LOG_INTERVAL_SECONDS: how often the stats line is printed
 """
 
@@ -71,6 +73,7 @@ except ImportError:
 
 MODE: Final = "engine_host"  # or "satellite"
 TARGET_FPS: Final = 24.0
+HEADROOM_RESERVE_PERCENT: Final = 20
 LOG_INTERVAL_SECONDS: Final = 5.0
 
 
@@ -122,6 +125,11 @@ def run_engine_host() -> None:
     effect_manager, game_engine, game_state, heap_bytes = _build_engine_host()
     timer = Timer()
     perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
+    # Bare-framework Mem Free, captured before the loop starts. Printed once
+    # per stats interval below (not immediately) -- some boards' USB CDC
+    # connection is unreliable right at the reboot boundary and can swallow a
+    # line printed at startup.
+    board_mem_free_bytes = gc.mem_free()
 
     print_profile_header(
         component="baseline.engine_host",
@@ -148,6 +156,10 @@ def run_engine_host() -> None:
                 "per_mcu_baselines",
                 ["engine-host", f"{cpu_percent:.2f}%", heap_bytes],
             )
+            print_table_row(
+                "board_profiles",
+                [f"{TARGET_FPS:.0f}", board_mem_free_bytes, f"{HEADROOM_RESERVE_PERCENT}%"],
+            )
 
 
 def run_satellite() -> None:
@@ -155,6 +167,11 @@ def run_satellite() -> None:
     effect_manager, heap_bytes = _build_satellite()
     timer = Timer()
     perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
+    # Bare-framework Mem Free, captured before the loop starts. Printed once
+    # per stats interval below (not immediately) -- some boards' USB CDC
+    # connection is unreliable right at the reboot boundary and can swallow a
+    # line printed at startup.
+    board_mem_free_bytes = gc.mem_free()
 
     print_profile_header(
         component="baseline.satellite",
@@ -179,6 +196,10 @@ def run_satellite() -> None:
             print_table_row(
                 "per_mcu_baselines",
                 ["satellite", f"{cpu_percent:.2f}%", heap_bytes],
+            )
+            print_table_row(
+                "board_profiles",
+                [f"{TARGET_FPS:.0f}", board_mem_free_bytes, f"{HEADROOM_RESERVE_PERCENT}%"],
             )
 
 

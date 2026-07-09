@@ -66,7 +66,6 @@ from __future__ import annotations
 import time
 
 import board
-import busio
 
 from effects.effect import Effect, EffectVibration, VibrationConfig
 from effects.performance import PerformanceTracker
@@ -111,7 +110,7 @@ def _require_drv2605_output(hardware: DeviceHardware) -> Drv2605EffectOutput:
 
 def run() -> None:
     """Drive `handle_event` once per `EVENT_INTERVAL_SECONDS`, reporting per-event cost."""
-    counting_bus = CountingI2C(busio.I2C(board.SCL, board.SDA))
+    counting_bus = CountingI2C(board.STEMMA_I2C())
     # Minimal config: no pixels/audio/IR. The motor (and accelerometer) are probed by
     # physical presence, not config, so they still come up on the injected bus.
     config = DeviceConfig(pixels=[], buttons=[], ir=None, audio=None)

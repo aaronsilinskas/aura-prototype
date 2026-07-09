@@ -66,7 +66,7 @@ except ImportError:
     pass
 
 # Fixed at 4 receivers -- not a deployment axis.
-RX_PIN_NAMES: Final = ("D11", "A1", "A2", "A3")
+RX_PIN_NAMES: Final = ("GP16", "A1", "A2", "A3")
 BUFFER_DEPTH: Final = 64
 INCOMING_RATE_HZ: Final = 13.91
 INJECTED_LOAD_SWEEP_MS: Final = [0.0, 5.0, 10.0, 20.0, 40.0, 80.0]

@@ -90,7 +90,6 @@ import gc
 import time
 
 import board
-import busio
 
 from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager
@@ -124,7 +123,8 @@ TARGET_FPS: Final = 24.0
 DISPLAY_SECONDS: Final = 10.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
-NEOPIXEL_PIN: Final = "D5"
+NEOPIXEL_PIN: Final = "GP6"
+BUTTON_A_PIN: Final = "GP14"
 
 # The IS31FL3741 RGBMatrixQT is physically 13 columns by MATRIX_ROWS rows; a swept
 # row band cannot address beyond it, so per-count row counts are capped here.
@@ -156,7 +156,7 @@ def _build_pixel_config(driver: str, largest_count: int) -> DeviceConfig:
         }
     else:
         raise ValueError(f"Unknown DRIVER: {driver!r}")
-    return parse_device_config({"pixels": [pixels], "buttons": ["D9"]})
+    return parse_device_config({"pixels": [pixels], "buttons": [BUTTON_A_PIN]})
 
 
 def _require_pixel_output(hardware: DeviceHardware, driver: str) -> EffectOutput:
@@ -276,7 +276,7 @@ def run() -> None:
 
     # Build the device once: build_hardware claims pins without deiniting, so it cannot
     # be re-called per swept count. The one shared driver is reused across the sweep.
-    counting_i2c = CountingI2C(busio.I2C(board.SCL, board.SDA))
+    counting_i2c = CountingI2C(board.STEMMA_I2C())
     config = _build_pixel_config(DRIVER, PIXEL_COUNTS[-1])
     hardware = build_hardware(config, board, i2c=counting_i2c)
     pixel_output = _require_pixel_output(hardware, DRIVER)
