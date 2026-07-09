@@ -20,11 +20,15 @@ Edit the right-hand column to match whatever vocabulary you actually use.
 
 ## Other labels
 
-| Label   | Used by   | Meaning                                                                 |
-| ------- | --------- | ----------------------------------------------------------------------- |
-| `idea`  | `to-idea` | A discovery or idea captured to revisit later — a parking-lot stub, not a spec or a triaged item. |
+These sit **outside** the triage state machine (`triage` ignores them); they mark stages of the idea → spec → tickets pipeline.
 
-The `idea` label is **not** part of the triage state machine, and `triage` ignores it. An `idea` issue is a placeholder you revisit deliberately (`gh issue list --label idea`); when you decide to act on it, it graduates through `to-spec` (or a grilling session) into a real spec and implementation tickets.
+| Label     | Used by           | Meaning                                                                                              |
+| --------- | ----------------- | ---------------------------------------------------------------------------------------------------- |
+| `idea`    | `to-idea`         | A discovery or idea captured to revisit later — a parking-lot stub, not a spec or a triaged item.     |
+| `spec`    | `to-spec`         | A published spec (product requirements) issue — the source of truth for a feature.                    |
+| `grilled` | `grill-with-docs` | A `spec` issue that has been grilled and is ready for `to-tickets` to break into implementation tickets. |
+
+An `idea` is a placeholder you revisit deliberately (`gh issue list --label idea`); when you act on it, it graduates through `to-spec` (or a grilling session) into a real `spec`. Once that spec has been grilled (`grilled`), `to-tickets` breaks it into implementation tickets.
 
 ## Wayfinder labels
 
