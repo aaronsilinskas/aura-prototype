@@ -115,7 +115,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin` — two faces of one instance, mirroring `NetworkControls`/`TransmitPump`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output: `create_buffer`, `update_pixels`, `handle_event` |
 | `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → Effect`; one per effect pack |
-| `EffectReceipt` | `engine/state.py` | Opaque handle for a running effect instance; used to stop by receipt |
+| `EffectReceipt` | `engine/state.py` | Identity + `stop()` handle for a running effect instance; also carries validating `brightness`/`loudness` runtime controls in `[0.0, 1.0]` |
 | `ScopeValue` / `Scope` | `engine/state.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN/BUFF/DEBUFF`, `ALL` |
 | `NetworkControls` | `engine/state.py` | Abstract interface for sending/receiving network messages |
 | `TransmitPump` | `engine/network.py` | Abstract runtime-facing seam declaring `poll_transmits()`; the type the runtime loop reaches through, distinct from the send-only `NetworkControls` |
