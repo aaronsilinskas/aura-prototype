@@ -43,7 +43,7 @@ def test_unknown_scene_name_falls_back_to_hardware_test():
 # ---------------------------------------------------------------------------
 
 
-class _RecordingTransmitPump(TransmitPump):
+class _CountingTransmitPump(TransmitPump):
     """Records how many times poll_transmits() was called."""
 
     def __init__(self) -> None:
@@ -73,7 +73,7 @@ def test_build_scene_runtime_exposes_an_infrared_manager_as_ir():
 
 def test_build_scene_runtime_wires_ir_to_the_hardware_bundles_transmit_pump():
     """runtime.ir.update() must drive hw.transmit_pump, not a copy of it."""
-    pump = _RecordingTransmitPump()
+    pump = _CountingTransmitPump()
     runtime = build_scene_runtime(_fake_hw(transmit_pump=pump), "tag")
 
     runtime.ir.update()
@@ -85,7 +85,7 @@ def test_build_scene_runtime_wires_ir_to_the_hardware_bundles_ir_receiver():
     """runtime.ir.update() must drive hw.ir_receiver, surfacing its packet as received."""
     payload = bytearray(b"\x01")
     runtime = build_scene_runtime(
-        _fake_hw(transmit_pump=_RecordingTransmitPump(), ir_receiver=_StubReceiver(payload)),
+        _fake_hw(transmit_pump=_CountingTransmitPump(), ir_receiver=_StubReceiver(payload)),
         "tag",
     )
 
