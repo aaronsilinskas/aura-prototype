@@ -30,6 +30,8 @@ _VALID_SCOPE_KEYS: Final = set(Scope.ALL.keys)
 
 _VALID_IR_EMITTER_KEYS: Final = {"line", "cone", "area_of_effect"}
 
+_I2S_PIN_FIELDS: Final = ("i2s_bit_clock", "i2s_word_select", "i2s_data")
+
 # ---------------------------------------------------------------------------
 # Config data classes
 # ---------------------------------------------------------------------------
@@ -105,12 +107,23 @@ class NeoPixelPixelsConfig:
 class AudioConfig:
     """Parsed audio configuration."""
 
-    __slots__ = ("clips", "max_volume", "voices")
+    __slots__ = ("clips", "i2s_bit_clock", "i2s_data", "i2s_word_select", "max_volume", "voices")
 
-    def __init__(self, voices: int, max_volume: float, clips: dict[str, str]) -> None:
+    def __init__(
+        self,
+        voices: int,
+        max_volume: float,
+        clips: dict[str, str],
+        i2s_bit_clock: str,
+        i2s_word_select: str,
+        i2s_data: str,
+    ) -> None:
         self.voices: int = voices
         self.max_volume: float = max_volume
         self.clips: dict[str, str] = clips
+        self.i2s_bit_clock: str = i2s_bit_clock
+        self.i2s_word_select: str = i2s_word_select
+        self.i2s_data: str = i2s_data
 
 
 class IRConfig:
@@ -354,7 +367,28 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
         raise ValueError("audio.voices must be a positive integer")
     max_volume = audio_raw.get("max_volume", 1.0)
     clips: dict[str, str] = dict(audio_raw.get("clips", {}))
-    return AudioConfig(voices=voices, max_volume=max_volume, clips=clips)
+
+    # The I2S bus pins are required-together (mirrors ir.rx/ir.line): a
+    # half-configured bus is exactly the case where two of three might be
+    # missing, so every missing field is named in one error instead of
+    # stopping at the first.
+    missing = [field for field in _I2S_PIN_FIELDS if field not in audio_raw]
+    if missing:
+        names = ", ".join(f"audio.{field}" for field in missing)
+        raise ValueError(f"{names} required together when audio section is present")
+
+    for field in _I2S_PIN_FIELDS:
+        if not isinstance(audio_raw[field], str):
+            raise ValueError(f"audio.{field} must be a string pin name")
+
+    return AudioConfig(
+        voices=voices,
+        max_volume=max_volume,
+        clips=clips,
+        i2s_bit_clock=audio_raw["i2s_bit_clock"],
+        i2s_word_select=audio_raw["i2s_word_select"],
+        i2s_data=audio_raw["i2s_data"],
+    )
 
 
 def parse_device_config(mapping: dict) -> DeviceConfig:

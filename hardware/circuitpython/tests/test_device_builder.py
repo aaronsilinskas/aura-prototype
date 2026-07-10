@@ -599,6 +599,9 @@ def _audio_config(**overrides):
         "voices": 1,
         "max_volume": 0.5,
         "clips": {"hit": "/sounds/hit.wav"},
+        "i2s_bit_clock": "I2S_BIT_CLOCK",
+        "i2s_word_select": "I2S_WORD_SELECT",
+        "i2s_data": "I2S_DATA",
     }
     mapping.update(overrides)
     return parse_device_config(
@@ -614,10 +617,9 @@ def test_setup_audio_returns_the_constructed_audio_effect_output() -> None:
     from hardware.circuitpython.audio_output import AudioEffectOutput
 
     audio_cfg = _audio_config()
-    board_mock = _mock_board()
-    board_mock.I2S_BIT_CLOCK = MagicMock()
-    board_mock.I2S_WORD_SELECT = MagicMock()
-    board_mock.I2S_DATA = MagicMock()
+    board_mock = _mock_board(
+        I2S_BIT_CLOCK=MagicMock(), I2S_WORD_SELECT=MagicMock(), I2S_DATA=MagicMock()
+    )
 
     mock_audio_output = MagicMock(spec=AudioEffectOutput)
 
@@ -636,15 +638,14 @@ def test_setup_audio_returns_the_constructed_audio_effect_output() -> None:
     assert result is mock_audio_output
 
 
-def test_setup_audio_resolves_i2s_pins_from_board() -> None:
-    audio_cfg = _audio_config()
+def test_setup_audio_resolves_i2s_pins_named_in_audio_config() -> None:
+    """I2S pins are sourced from AudioConfig's i2s_* fields, not a fixed
+    board.I2S_* attribute name — a board can name them anything."""
     bit_clock = MagicMock(name="bit_clock")
     word_select = MagicMock(name="word_select")
     data = MagicMock(name="data")
-    board_mock = _mock_board()
-    board_mock.I2S_BIT_CLOCK = bit_clock
-    board_mock.I2S_WORD_SELECT = word_select
-    board_mock.I2S_DATA = data
+    audio_cfg = _audio_config(i2s_bit_clock="GP10", i2s_word_select="GP11", i2s_data="GP12")
+    board_mock = _mock_board(GP10=bit_clock, GP11=word_select, GP12=data)
 
     with ExitStack() as stack:
         mock_audio_cls = stack.enter_context(
@@ -661,12 +662,21 @@ def test_setup_audio_resolves_i2s_pins_from_board() -> None:
     assert kwargs["i2s_data"] is data
 
 
+def test_setup_audio_unknown_i2s_pin_name_raises_pin_not_found_value_error() -> None:
+    audio_cfg = _audio_config(i2s_bit_clock="NONEXISTENT_PIN")
+    board_mock = MagicMock(spec=[])  # no attributes → AttributeError on getattr
+
+    from hardware.circuitpython.device_builder import _setup_audio
+
+    with pytest.raises(ValueError, match="NONEXISTENT_PIN"):
+        _setup_audio(audio_cfg, board_mock)
+
+
 def test_setup_audio_forwards_configured_max_volume() -> None:
     audio_cfg = _audio_config(max_volume=0.75)
-    board_mock = _mock_board()
-    board_mock.I2S_BIT_CLOCK = MagicMock()
-    board_mock.I2S_WORD_SELECT = MagicMock()
-    board_mock.I2S_DATA = MagicMock()
+    board_mock = _mock_board(
+        I2S_BIT_CLOCK=MagicMock(), I2S_WORD_SELECT=MagicMock(), I2S_DATA=MagicMock()
+    )
 
     with ExitStack() as stack:
         mock_audio_cls = stack.enter_context(
@@ -682,10 +692,9 @@ def test_setup_audio_forwards_configured_max_volume() -> None:
 
 def test_setup_audio_forwards_configured_voice_count() -> None:
     audio_cfg = _audio_config(voices=3)
-    board_mock = _mock_board()
-    board_mock.I2S_BIT_CLOCK = MagicMock()
-    board_mock.I2S_WORD_SELECT = MagicMock()
-    board_mock.I2S_DATA = MagicMock()
+    board_mock = _mock_board(
+        I2S_BIT_CLOCK=MagicMock(), I2S_WORD_SELECT=MagicMock(), I2S_DATA=MagicMock()
+    )
 
     with ExitStack() as stack:
         mock_audio_cls = stack.enter_context(
@@ -701,10 +710,9 @@ def test_setup_audio_forwards_configured_voice_count() -> None:
 
 def test_setup_audio_registers_configured_clips_on_audio_registry() -> None:
     audio_cfg = _audio_config(clips={"hit": "/sounds/hit.wav", "miss": "/sounds/miss.wav"})
-    board_mock = _mock_board()
-    board_mock.I2S_BIT_CLOCK = MagicMock()
-    board_mock.I2S_WORD_SELECT = MagicMock()
-    board_mock.I2S_DATA = MagicMock()
+    board_mock = _mock_board(
+        I2S_BIT_CLOCK=MagicMock(), I2S_WORD_SELECT=MagicMock(), I2S_DATA=MagicMock()
+    )
 
     with ExitStack() as stack:
         mock_audio_cls = stack.enter_context(
@@ -734,6 +742,9 @@ def _neopixel_config_with_audio():
             "voices": 1,
             "max_volume": 0.5,
             "clips": {"hit": "/sounds/hit.wav"},
+            "i2s_bit_clock": "I2S_BIT_CLOCK",
+            "i2s_word_select": "I2S_WORD_SELECT",
+            "i2s_data": "I2S_DATA",
         },
     }
     return parse_device_config(mapping)

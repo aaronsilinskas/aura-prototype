@@ -103,7 +103,6 @@ from hardware.shared.device_config import parse_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiling_helpers import (
-    board_module_with_i2s_pins,
     print_profile_header,
     print_stats_line,
     print_table_row,
@@ -126,9 +125,9 @@ BUTTON_B_PIN: Final = "GP15"
 IR_RX_PIN: Final = "GP16"
 IR_LINE_PIN: Final = "GP17"
 
-# I2S amp pins -- update these to match your board layout. Boards with
-# Feather-style board.I2S_* aliases don't need this; boards without them
-# (e.g. non-Feather form factors) need real pin names here instead.
+# I2S amp pins -- update these to match your board layout. Declared directly
+# in _TAG_HARNESS's audio section below, resolved against the real `board`
+# module by build_hardware the same way every other configured pin is.
 I2S_BIT_CLOCK_PIN_NAME: Final = "GP10"
 I2S_WORD_SELECT_PIN_NAME: Final = "GP11"
 I2S_DATA_PIN_NAME: Final = "GP12"
@@ -195,6 +194,9 @@ _TAG_HARNESS: Final = {
             "reload": "sounds/blip.wav",
             "reload_complete": "sounds/blip.wav",
         },
+        "i2s_bit_clock": I2S_BIT_CLOCK_PIN_NAME,
+        "i2s_word_select": I2S_WORD_SELECT_PIN_NAME,
+        "i2s_data": I2S_DATA_PIN_NAME,
     },
 }
 
@@ -228,9 +230,7 @@ def _build_prop() -> tuple[
     config = parse_device_config(_TAG_HARNESS)
     hardware = build_hardware(
         config,
-        board_module_with_i2s_pins(
-            I2S_BIT_CLOCK_PIN_NAME, I2S_WORD_SELECT_PIN_NAME, I2S_DATA_PIN_NAME
-        ),
+        board,
         ir_encoder=TagInfraredEncoder(),
         ir_decoder=TagInfraredDecoder(),
         i2c=board.STEMMA_I2C(),

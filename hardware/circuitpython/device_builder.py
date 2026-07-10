@@ -251,9 +251,11 @@ def _setup_audio(audio_cfg: AudioConfig, board_module: object) -> AudioEffectOut
         audio_registry,
         max_volume=audio_cfg.max_volume,
         num_voices=audio_cfg.voices,
-        i2s_bit_clock=board_module.I2S_BIT_CLOCK,
-        i2s_word_select=board_module.I2S_WORD_SELECT,
-        i2s_data=board_module.I2S_DATA,
+        i2s_bit_clock=_resolve_pin(board_module, "audio.i2s_bit_clock", audio_cfg.i2s_bit_clock),
+        i2s_word_select=_resolve_pin(
+            board_module, "audio.i2s_word_select", audio_cfg.i2s_word_select
+        ),
+        i2s_data=_resolve_pin(board_module, "audio.i2s_data", audio_cfg.i2s_data),
     )
 
 

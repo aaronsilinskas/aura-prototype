@@ -34,42 +34,6 @@ def board_id() -> str:
     return sys.platform
 
 
-class _AudioPinBoardProxy:
-    """Presents the real ``board`` module with I2S pin names substituted.
-
-    ``device_builder._setup_audio`` reads ``board_module.I2S_BIT_CLOCK`` /
-    ``I2S_WORD_SELECT`` / ``I2S_DATA`` directly and has no override parameter,
-    unlike the ``i2c=`` seam ``build_hardware`` offers for I2C peripherals.
-    Boards without those Feather-style aliases (e.g. non-Feather form
-    factors) need real pin names substituted here instead. Every other
-    attribute (buttons, IR pins, ...) passes through to the real ``board``
-    module unchanged, so ``build_hardware``'s pin resolution still works.
-    """
-
-    def __init__(
-        self, real_board: object, bit_clock_name: str, word_select_name: str, data_name: str
-    ):
-        self._board = real_board
-        self.I2S_BIT_CLOCK = getattr(real_board, bit_clock_name)
-        self.I2S_WORD_SELECT = getattr(real_board, word_select_name)
-        self.I2S_DATA = getattr(real_board, data_name)
-
-    def __getattr__(self, name: str) -> object:
-        return getattr(self._board, name)
-
-
-def board_module_with_i2s_pins(
-    bit_clock_name: str, word_select_name: str, data_name: str
-) -> object:
-    """Return a board-module-like object with I2S_* aliased to real pin names.
-
-    Pass the result as ``build_hardware``'s ``board_module`` argument on
-    boards that lack ``board.I2S_BIT_CLOCK`` / ``I2S_WORD_SELECT`` /
-    ``I2S_DATA`` (see ``_AudioPinBoardProxy``).
-    """
-    return _AudioPinBoardProxy(board, bit_clock_name, word_select_name, data_name)
-
-
 def print_table_row(table: str, cells: list[object], driver: str = "-") -> None:
     """Print a paste-ready ``recorded-metrics.md`` row for ``table``.
 
