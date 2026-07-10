@@ -210,8 +210,8 @@ The top-level `app/` package, split along the board-free / device-only seam: `sc
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### SceneRuntime / build_scene_runtime
-`build_scene_runtime(hw, scene_name)` builds the registries, `EffectManager`, `GameEngine`, and `SceneManager`, resolves the scene (falling back to `DEFAULT_SCENE`), loads it, and returns a `SceneRuntime` bundle of `manager`, `effect_manager`, and `timer`. `run_scene` is its only caller.
-_Avoid_: duplicating the wiring or scene-name fallback at a call site; reaching into `SceneRuntime` beyond its three named slots
+`build_scene_runtime(hw, scene_name)` builds the registries, `EffectManager`, `GameEngine`, `SceneManager`, and the `InfraredManager`, resolves the scene (falling back to `DEFAULT_SCENE`), loads it, and returns a `SceneRuntime` bundle of `manager`, `effect_manager`, `timer`, and `ir`. `run_scene` is its only caller.
+_Avoid_: duplicating the wiring or scene-name fallback at a call site; reaching into `SceneRuntime` beyond its four named slots; hand-sequencing `poll_transmits`/`receive` in `run_scene` (drive `ir.update()`)
 
 ### device_builder
 The device-only generic hardware builder. `build_hardware(config, board, …)` resolves pin names, constructs the configured outputs/buttons/accelerometer/haptics/audio/IR, and wraps IR transmitters in `HardwareNetworkControls`. **Single-call**: it claims pins without deiniting, so a second call raises "pin in use." Pixels/audio/IR are config-gated, but the accelerometer and DRV2605 haptics attach by **physical presence**, probed regardless of config.
@@ -240,6 +240,10 @@ _Avoid_: reading `_states` directly (use the query methods); assuming `is_down` 
 ### IR transport
 The hardware-agnostic infrared send/receive subsystem (no `pulseio`), reached through `PulseReader`/`PulseWriter` ports with CircuitPython adapters. Moves opaque `bytes` with no game semantics.
 _Avoid_: importing `pulseio` into shared IR code; encoding spell fields in the transport
+
+### InfraredManager
+The board-free per-tick owner of the IR sequence: `update()` runs `poll_transmits()` on its `TransmitPump` **then** `receive()` on its `InfraredReceiver`, making the pump-before-receive order code rather than a comment in `run_scene`. Constructed in `build_scene_runtime` from `DeviceHardware.transmit_pump` + `ir_receiver` (receiver may be `None`) and held as `SceneRuntime.ir`. Exposes results as attributes read after `update()` — `received` (this tick's packet or `None`, reset each tick) and forwarded `last_signal_strength`/`last_error_margin`/`telemetry_line()`. Always pumps; receives only when a receiver is wired. A packet decoded while no scene is active is drained-and-dropped (not left to overflow); `run_scene` builds the `NetworkEvents.IRReceived` and only queues it when a scene is active.
+_Avoid_: importing `NetworkEvents`/game-event vocabulary here (the event is built in `run_scene`); folding the 1-second telemetry wall-clock throttle or `print` in (those stay in `run_scene`, where the `Timer` lives); a value-returning `update()` (read `received`, matching the receiver's `last_*` pattern); calling it a hardware "driver" (it orchestrates, drives no peripheral)
 
 ### Wire-frame codec
 An encoder/decoder pair mapping an opaque payload ↔ IR pulse durations, injected into the (wire-frame-agnostic) IR transport. Two coexist — the **Aura wire-frame** and the **Tag protocol** — selected per scene.
