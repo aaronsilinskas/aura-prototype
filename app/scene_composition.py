@@ -13,6 +13,7 @@ from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
 from hardware.shared.device_hardware import DeviceHardware
+from hardware.shared.ir_manager import InfraredManager
 from hardware.shared.scene_selection import DEFAULT_SCENE
 
 __all__ = ["SceneRuntime", "build_scene_runtime"]
@@ -22,20 +23,23 @@ class SceneRuntime:
     """Bundle of the live objects a scene's per-tick loop drives.
 
     ``manager`` applies scene transitions, ``effect_manager`` renders the
-    active scene's effects, and ``timer`` tracks elapsed/total tick time.
+    active scene's effects, ``timer`` tracks elapsed/total tick time, and
+    ``ir`` owns the per-tick pump-before-receive IR sequence.
     """
 
-    __slots__ = ("effect_manager", "manager", "timer")
+    __slots__ = ("effect_manager", "ir", "manager", "timer")
 
     def __init__(
         self,
         manager: SceneManager,
         effect_manager: EffectManager,
         timer: Timer,
+        ir: InfraredManager,
     ) -> None:
         self.manager: SceneManager = manager
         self.effect_manager: EffectManager = effect_manager
         self.timer: Timer = timer
+        self.ir: InfraredManager = ir
 
 
 def _resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
@@ -87,4 +91,6 @@ def build_scene_runtime(hw: DeviceHardware, scene_name: str) -> SceneRuntime:
     manager.load(_resolve_known_scene(scene_registry, scene_name))
     manager.update()  # applies the load transition; the scene is now active
 
-    return SceneRuntime(manager=manager, effect_manager=effect_manager, timer=timer)
+    ir = InfraredManager(hw.transmit_pump, hw.ir_receiver)
+
+    return SceneRuntime(manager=manager, effect_manager=effect_manager, timer=timer, ir=ir)
