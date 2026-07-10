@@ -141,19 +141,47 @@ class NetworkControls:
 
 
 class EffectReceipt:
-    """Opaque handle returned when an effect is started.
+    """Identity and lifecycle handle for a single running effect instance.
 
-    Uniquely identifies a single running effect instance. Call ``stop()`` to
-    request that the effect be stopped on the next tick.
+    Call ``stop()`` to request removal on the next tick; ``is_stopped()``
+    reports whether that has happened.
+
+    ``brightness`` and ``loudness`` are runtime intensity controls in
+    ``[0.0, 1.0]`` (default ``1.0``) that rules set directly
+    (``receipt.brightness = x``) to vary an effect's intensity without
+    restarting it. Assigning a value outside that range raises
+    ``ValueError``. The pixel merge layer (``engine.effects.merge``) reads
+    ``brightness``; the voice pool (``hardware.shared.voice_pool``) reads
+    ``loudness``.
     """
 
-    __slots__ = ("_stopped", "brightness", "id", "loudness")
+    __slots__ = ("_brightness", "_loudness", "_stopped", "id")
 
     def __init__(self, effect_id: int) -> None:
         self.id: int = effect_id
         self._stopped: bool = False
-        self.brightness: float = 1.0
-        self.loudness: float = 1.0
+        self._brightness: float = 1.0
+        self._loudness: float = 1.0
+
+    @property
+    def brightness(self) -> float:
+        return self._brightness
+
+    @brightness.setter
+    def brightness(self, value: float) -> None:
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"brightness must be in [0.0, 1.0], got {value!r}")
+        self._brightness = value
+
+    @property
+    def loudness(self) -> float:
+        return self._loudness
+
+    @loudness.setter
+    def loudness(self, value: float) -> None:
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"loudness must be in [0.0, 1.0], got {value!r}")
+        self._loudness = value
 
     def stop(self) -> None:
         """Request that this effect be stopped on the next tick (idempotent)."""

@@ -230,6 +230,76 @@ def test_effect_receipt_constructor_accepts_only_effect_id() -> None:
     assert receipt.id == 42
 
 
+def test_effect_receipt_brightness_rejects_value_above_one() -> None:
+    receipt = EffectReceipt(1)
+
+    with pytest.raises(ValueError):
+        receipt.brightness = 1.5
+
+
+def test_effect_receipt_brightness_rejects_value_below_zero() -> None:
+    receipt = EffectReceipt(1)
+
+    with pytest.raises(ValueError):
+        receipt.brightness = -0.1
+
+
+def test_effect_receipt_brightness_accepts_lower_endpoint() -> None:
+    receipt = EffectReceipt(1)
+    receipt.brightness = 0.0
+
+    assert receipt.brightness == 0.0
+
+
+def test_effect_receipt_brightness_accepts_upper_endpoint() -> None:
+    receipt = EffectReceipt(1)
+    receipt.brightness = 1.0
+
+    assert receipt.brightness == 1.0
+
+
+def test_effect_receipt_brightness_rejects_nan() -> None:
+    receipt = EffectReceipt(1)
+
+    with pytest.raises(ValueError):
+        receipt.brightness = float("nan")
+
+
+def test_effect_receipt_loudness_rejects_value_above_one() -> None:
+    receipt = EffectReceipt(1)
+
+    with pytest.raises(ValueError):
+        receipt.loudness = 1.5
+
+
+def test_effect_receipt_loudness_rejects_value_below_zero() -> None:
+    receipt = EffectReceipt(1)
+
+    with pytest.raises(ValueError):
+        receipt.loudness = -0.1
+
+
+def test_effect_receipt_loudness_accepts_lower_endpoint() -> None:
+    receipt = EffectReceipt(1)
+    receipt.loudness = 0.0
+
+    assert receipt.loudness == 0.0
+
+
+def test_effect_receipt_loudness_accepts_upper_endpoint() -> None:
+    receipt = EffectReceipt(1)
+    receipt.loudness = 1.0
+
+    assert receipt.loudness == 1.0
+
+
+def test_effect_receipt_loudness_rejects_nan() -> None:
+    receipt = EffectReceipt(1)
+
+    with pytest.raises(ValueError):
+        receipt.loudness = float("nan")
+
+
 # ---------------------------------------------------------------------------
 # StateSlot
 # ---------------------------------------------------------------------------

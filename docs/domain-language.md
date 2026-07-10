@@ -150,8 +150,8 @@ The mathematical detail level at which an effect generates animation data — in
 _Avoid_: conflating resolution with pixel count
 
 ### EffectReceipt
-A handle returned when an effect starts. `stop()` marks it for removal next tick. Carries `brightness` and `loudness` (0.0–1.0, default 1.0) that rules set directly to vary intensity without restarting.
-_Avoid_: using `options["brightness"]` as a runtime control (change `receipt.brightness`); values outside [0.0, 1.0]
+A handle returned when an effect starts. `stop()` marks it for removal next tick. Carries `brightness` and `loudness` (validating properties, `[0.0, 1.0]`, default 1.0) that rules set directly (`receipt.brightness = x`) to vary intensity without restarting; assigning outside `[0.0, 1.0]` — including `NaN` — raises `ValueError`, at both rule-assignment and effect-manager build time.
+_Avoid_: using `options["brightness"]` as a runtime control (change `receipt.brightness`); values outside [0.0, 1.0] (now raises `ValueError`, was unenforced)
 
 ### Idle effect
 A low-level, looping effect on a scope when no active game logic requires a response. Replaced when an active effect starts; restored when it ends.
