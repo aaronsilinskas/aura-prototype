@@ -1,0 +1,46 @@
+{
+  "pixels": [
+    {
+      "type": "matrix",
+      "cols": 13,
+      "brightness": 1.0,
+      "scope_rows": {
+        "global.buff": [0, 1],
+        "global.debuff": [1, 2],
+        "global.main": [2, 5],
+        "personal": [5, 7],
+        "directional": [7, 8],
+        "ambient": [8, 9]
+      }
+    },
+    {
+      "type": "neopixel",
+      "pin": "D5",
+      "count": 24,
+      "order": "GRB",
+      "brightness": 1.0,
+      "scope_pixels": {
+        "global.buff": [0, 4],
+        "global.debuff": [4, 8],
+        "global.main": [8, 12],
+        "personal": [12, 16],
+        "directional": [16, 20],
+        "ambient": [20, 24]
+      }
+    }
+  ],
+  "buttons": ["D9", "D10"],
+  "ir": {
+    "rx": "D11",
+    "line": "D12",
+    "cone": "D13",
+    "area_of_effect": "D14"
+  },
+  "audio": {
+    "voices": 1,
+    "max_volume": 0.1,
+    "clips": {
+      "sfx_test_start": "sounds/blip.wav"
+    }
+  }
+}
