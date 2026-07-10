@@ -24,13 +24,15 @@ import shutil
 import sys
 from pathlib import Path
 
-from hardware.shared.device_config import DEFAULT_DEVICE_CONFIG
-
 try:
     from collections.abc import Callable
     from typing import Final
 except ImportError:
     pass
+
+# Starter config copied onto a board that has no aura-device.json yet, when
+# --scene is used. There is no built-in default; this sample is the seed.
+_SAMPLE_DEVICE_CONFIG: Final = Path("examples/aura-device.sample.json")
 
 MODULE_DIRS: Final = [
     "app",
@@ -139,13 +141,17 @@ def _sync_file(
         print(f"COPY  {label}")
 
 
-def _write_scene(mount: Path, scene: str) -> None:
-    """Set the ``"scene"`` key in ``aura-device.json``, seeding defaults if absent."""
+def _write_scene(mount: Path, scene: str, source_root: Path) -> None:
+    """Set the ``"scene"`` key in ``aura-device.json``, seeding from the sample if absent.
+
+    A board with no ``aura-device.json`` is seeded from the sample because there
+    is no built-in default config to fall back on.
+    """
     device_config_path = mount / "aura-device.json"
     if device_config_path.exists():
         config = json.loads(device_config_path.read_text())
     else:
-        config = dict(DEFAULT_DEVICE_CONFIG)
+        config = json.loads((source_root / _SAMPLE_DEVICE_CONFIG).read_text())
     config["scene"] = scene
     device_config_path.write_text(json.dumps(config, indent=2))
 
@@ -234,7 +240,7 @@ def deploy(
         sync_root = staging_root
 
     if scene is not None and not dry_run:
-        _write_scene(mount, scene)
+        _write_scene(mount, scene, source_root)
 
     copied: list[Path] = []
     skipped: list[Path] = []
