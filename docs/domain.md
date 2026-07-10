@@ -125,6 +125,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
 | `SceneManager` | `engine/scene.py` | Activates/deactivates scenes; owns `SceneLocalRegistry` per scene; holds an injected `EffectAdmin` handle and drives every local-effects/merge-strategy transition through it |
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
+| `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor owning a phase machine's `GameState` key + initial phase; the one object all of a scene's phase rules and its module-level phase reference share |
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
 | `EffectResolver` | `engine/effects/manager.py` | Resolves a qualified effect name to a builder; owns the `scene.` prefix rule |
 | `MergeStrategy` | `engine/state.py` | Per-scope policy compositing a scope's layered effect buffers into one region buffer (subclasses `SplitMerge` / `AdditiveMerge` live in `engine/effects/merge.py`) |

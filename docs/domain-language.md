@@ -61,8 +61,12 @@ An opaque, identity-typed constant naming one phase. Compared by identity, so a 
 _Avoid_: bare `str`/`int` phase values; comparing a phase against a string literal
 
 ### PhaseMachine
-The mutable per-scene object holding **only** the current `PhaseKey`, the once-per-entry flag, and the phase-start time — no receipts. Reached through a scene's typed accessor (e.g. `tag_phase`).
+The mutable per-scene object holding **only** the current `PhaseKey`, the once-per-entry flag, and the phase-start time — no receipts. Reached through a scene's `PhaseSlot` (e.g. `tag_phase`).
 _Avoid_: storing receipts or per-phase scratch on it; auto-stopping effects inside `enter()`
+
+### PhaseSlot
+The single per-scene typed accessor that owns a phase machine's `GameState` key and initial phase, in `engine/phase.py`. Every one of a scene's `PhaseRule`s and `InPhaseRule`s, and its module-level phase reference, is the *same* `PhaseSlot` instance — so "same key ⇒ same `PhaseMachine`" is enforced by construction, not re-supplied per rule. Callable `(state) -> PhaseMachine`, exposing `.key`; wraps a `StateSlot` internally (lazy get-or-create; the single `# type: ignore` cast stays there). A second `PhaseSlot` claiming an already-claimed machine key raises at scene load (checked across both `PhaseRule`s and `InPhaseRule`s).
+_Avoid_: constructing a fresh `PhaseSlot` per rule (import the scene's one instance); passing a raw machine-key string or initial phase to a phase rule; confusing it with the generic `StateSlot` (this is the phase-machine-specific one)
 
 ### PhaseRule
 A `GameRule` owning one phase's lifecycle: `on_enter`/`on_exit`, phase-gated handlers, and `transition_to`. Exactly one per `(machine, phase)`, enforced at scene load.
