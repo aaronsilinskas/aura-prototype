@@ -339,11 +339,12 @@ class InfraredReceiver:
 
     Defines the telemetry-counter contract for the whole IR receive path via
     :meth:`telemetry`/:meth:`telemetry_line` — every counter below defaults
-    to 0 on the base class so any receiver (including test fakes) satisfies
-    the contract with no telemetry code. Concrete receivers (e.g.
+    to 0 via :meth:`telemetry`'s ``getattr(self, name, 0)`` fallback, so any
+    receiver (including test fakes with no counter attributes at all)
+    satisfies the contract with no telemetry code. Concrete receivers (e.g.
     :class:`InfraredSingleReceiver`) override :meth:`telemetry` to report
-    real, monotonic-since-boot counts; the attributes below are not
-    guaranteed to reflect those real counts directly — read them through
+    real, monotonic-since-boot counts; the counters below are not guaranteed
+    to reflect those real counts directly — read them through
     :meth:`telemetry` instead.
 
     Attributes:
@@ -359,16 +360,6 @@ class InfraredReceiver:
             under **drain-but-discard** while the :class:`IrTransmitGate` was
             transmitting or flushing. Kept out of ``pulses_seen``.
     """
-
-    pulses_seen: int = 0
-    packets_surfaced: int = 0
-    packets_started: int = 0
-    packets_completed: int = 0
-    preamble_reject: int = 0
-    mark_reject: int = 0
-    space_reject: int = 0
-    buffer_full_on_poll: int = 0
-    pulses_dropped_transmitting: int = 0
 
     def __init__(self) -> None:
         # Owns the change-gate for telemetry_line(). Distinct from a
@@ -551,19 +542,21 @@ class InfraredSingleReceiver(InfraredReceiver):
         ``packets_started``/``packets_completed``/``{preamble,mark,space}_reject``
         come from the decoder; ``buffer_full_on_poll`` comes from the reader;
         ``pulses_seen``/``packets_surfaced``/``pulses_dropped_transmitting``
-        come from this receiver.
+        come from this receiver. Passed by keyword (not position) so a future
+        reorder of ``IrTelemetrySnapshot.FIELDS``/``__init__`` cannot silently
+        swap two counters into each other's slots.
         """
         decoder = self._decoder
         return IrTelemetrySnapshot(
-            self.pulses_seen,
-            self._reader.buffer_full_on_poll,
-            decoder.packets_started,
-            decoder.preamble_reject,
-            decoder.mark_reject,
-            decoder.space_reject,
-            decoder.packets_completed,
-            self.packets_surfaced,
-            self.pulses_dropped_transmitting,
+            pulses_seen=self.pulses_seen,
+            buffer_full_on_poll=self._reader.buffer_full_on_poll,
+            packets_started=decoder.packets_started,
+            preamble_reject=decoder.preamble_reject,
+            mark_reject=decoder.mark_reject,
+            space_reject=decoder.space_reject,
+            packets_completed=decoder.packets_completed,
+            packets_surfaced=self.packets_surfaced,
+            pulses_dropped_transmitting=self.pulses_dropped_transmitting,
         )
 
     def reset_telemetry(self) -> None:
@@ -766,7 +759,10 @@ class InfraredMultiReceiver(InfraredReceiver):
         ``pulses_seen``/``packets_surfaced``/``pulses_dropped_transmitting``
         are receiver-owned and read directly off ``self``. See the class
         docstring for why summed ``packets_completed`` may exceed
-        ``packets_surfaced`` (dedup, not loss).
+        ``packets_surfaced`` (dedup, not loss). Passed by keyword (not
+        position) so a future reorder of
+        ``IrTelemetrySnapshot.FIELDS``/``__init__`` cannot silently swap two
+        counters into each other's slots.
         """
         buffer_full_on_poll = 0
         for reader in self._readers:
@@ -785,15 +781,15 @@ class InfraredMultiReceiver(InfraredReceiver):
             space_reject += decoder.space_reject
 
         return IrTelemetrySnapshot(
-            self.pulses_seen,
-            buffer_full_on_poll,
-            packets_started,
-            preamble_reject,
-            mark_reject,
-            space_reject,
-            packets_completed,
-            self.packets_surfaced,
-            self.pulses_dropped_transmitting,
+            pulses_seen=self.pulses_seen,
+            buffer_full_on_poll=buffer_full_on_poll,
+            packets_started=packets_started,
+            preamble_reject=preamble_reject,
+            mark_reject=mark_reject,
+            space_reject=space_reject,
+            packets_completed=packets_completed,
+            packets_surfaced=self.packets_surfaced,
+            pulses_dropped_transmitting=self.pulses_dropped_transmitting,
         )
 
     def reset_telemetry(self) -> None:
