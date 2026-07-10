@@ -198,7 +198,7 @@ A CircuitPython `EffectOutput` driving a DRV2605L haptic motor on all scopes (`r
 _Avoid_: constructing with a `None` motor; subclassing for different haptic controllers (extract a base only when a second is needed); reading `receipt.loudness` (the DRV2605L has no volume control)
 
 ### aura-device.json
-The single on-device file holding **all** hardware configuration: buttons, IR pins/emitters, the `pixels` list, accelerometer/haptics presence, and audio. `pixels` is a **list** of pixel outputs (matrix and/or strips; at most one matrix). Pin references are name **strings**, resolved against `board` only in the device-only builder. A missing file falls back to `DEFAULT_DEVICE_CONFIG`. Also carries an optional top-level `"scene"` string — per-boot game selection, read separately and **not** part of `DeviceConfig`.
+The single on-device file holding **all** hardware configuration: buttons, IR pins/emitters, the `pixels` list, accelerometer/haptics presence, and audio (including the amp's I2S bus pins, required-together whenever an `audio` section is present). `pixels` is a **list** of pixel outputs (matrix and/or strips; at most one matrix). Pin references are name **strings**, resolved against `board` only in the device-only builder. The file is **required** — there is no built-in default, so a missing file raises. Also carries an optional top-level `"scene"` string — per-boot game selection, read separately and **not** part of `DeviceConfig`.
 _Avoid_: `settings.toml` (removed — CircuitPython-only, unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`
 
 ### DeviceConfig
