@@ -13,9 +13,7 @@ from engine.phase import PhaseRule
 from engine.state import GameState, Scope
 from packs.scenes.red_light_green_light.rules.helpers.phases import (
     PHASE_LEVEL_UP,
-    PHASE_READY,
     PHASE_RED_WARNING,
-    RLGL_MACHINE_KEY,
     rlgl_phase,
 )
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_config import rlgl_config
@@ -26,7 +24,7 @@ class RlglLevelUpRule(PhaseRule):
     """Drives the Level Up phase: increments Game Level, then back to Red Warning."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_LEVEL_UP, RLGL_MACHINE_KEY, PHASE_READY)
+        super().__init__(PHASE_LEVEL_UP, rlgl_phase)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_enter(self, state: GameState) -> None:

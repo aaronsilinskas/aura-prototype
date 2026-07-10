@@ -3,14 +3,16 @@
 The hardware_test scene cycles through five hardware-test modes — RGB,
 Accelerometer, IR, Radio, SFX — driven by the reusable phase-machine primitive
 in :mod:`engine.phase`. This module owns the scene's named :class:`PhaseKey`
-instances, the single :data:`hw_phase` :class:`~engine.state.StateSlot` that
-fixes the machine key and the initial phase, and the explicit :data:`MODE_ORDER`
-cycle plus :func:`next_in_cycle` helper that drives Button-B advancement.
+instances, the single :data:`hw_phase` :class:`~engine.phase.PhaseSlot` --
+see that class's docstring for how every hardware_test rule and this
+module-level reference come to share one :class:`~engine.phase.PhaseMachine`
+-- and the explicit :data:`MODE_ORDER` cycle plus :func:`next_in_cycle`
+helper that drives Button-B advancement.
 
 Because :class:`PhaseKey` compares by identity, these module-level singletons
 are the *only* tokens that match the machine's current phase; a bare string
-literal or integer never will. All five modes share the one machine cached
-under :data:`HW_MACHINE_KEY`.
+literal or integer never will. All five modes share the one machine held by
+:data:`hw_phase`.
 """
 
 from __future__ import annotations
@@ -20,8 +22,7 @@ try:
 except ImportError:
     pass  # typing not available on all embedded runtimes
 
-from engine.phase import PhaseKey, PhaseMachine
-from engine.state import StateSlot
+from engine.phase import PhaseKey, PhaseSlot
 
 # ---------------------------------------------------------------------------
 # Phase keys — identity-typed singletons owned by the scene
@@ -38,9 +39,7 @@ MODE_SFX: Final = PhaseKey("sfx")
 # next_in_cycle, rather than `(mode + 1) % NUM_MODES`.
 MODE_ORDER: Final = (MODE_RGB, MODE_ACCELEROMETER, MODE_IR, MODE_RADIO, MODE_SFX)
 
-HW_MACHINE_KEY: Final = "hw_phase"
-
-hw_phase: StateSlot = StateSlot(HW_MACHINE_KEY, lambda s: PhaseMachine(MODE_RGB), PhaseMachine)
+hw_phase: PhaseSlot = PhaseSlot("hw_phase", MODE_RGB)
 
 
 def next_in_cycle(order: tuple[PhaseKey, ...], current: PhaseKey) -> PhaseKey:

@@ -19,9 +19,7 @@ from packs.scenes.red_light_green_light.rules.helpers.motion_detector import (
 from packs.scenes.red_light_green_light.rules.helpers.phases import (
     PHASE_GAME_OVER,
     PHASE_GREEN_WARNING,
-    PHASE_READY,
     PHASE_RED,
-    RLGL_MACHINE_KEY,
     rlgl_phase,
 )
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_config import rlgl_config
@@ -33,7 +31,7 @@ class RlglRedRule(PhaseRule):
     """Drives the Red phase: solid red, music, and the motion gate."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_RED, RLGL_MACHINE_KEY, PHASE_READY)
+        super().__init__(PHASE_RED, rlgl_phase)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_enter(self, state: GameState) -> None:

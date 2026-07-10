@@ -14,9 +14,7 @@ from engine.phase import PhaseRule
 from engine.state import GameState, Scope
 from packs.scenes.tag.rules.helpers.phases import (
     PHASE_PLAYING,
-    PHASE_READY,
     PHASE_STARTING,
-    TAG_MACHINE_KEY,
     tag_phase,
 )
 from packs.scenes.tag.rules.helpers.tag_config import tag_config
@@ -26,7 +24,7 @@ class TagStartingRule(PhaseRule):
     """Drives the Starting phase: warning countdown into Playing."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_STARTING, TAG_MACHINE_KEY, PHASE_READY)
+        super().__init__(PHASE_STARTING, tag_phase)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_enter(self, state: GameState) -> None:

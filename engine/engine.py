@@ -45,14 +45,35 @@ class GameRule:
 
 
 def _check_phase_owners(rules: list[GameRule]) -> None:
-    """Raise ``ValueError`` if two rules claim the same ``(machine key, phase)``.
+    """Raise ``ValueError`` at scene load for either phase-owner contract violation.
 
-    Duck-typed on ``phase_ownership()`` so the engine stays decoupled from the
-    phase primitive: only ``PhaseRule`` exposes it.  ``InPhaseRule``s do not
-    own a phase and are skipped, so any number may share a phase.
+    Duck-typed on ``phase_ownership()`` and ``phase_accessor`` so the engine
+    stays decoupled from the phase primitive in ``engine/phase.py`` — neither
+    name is imported here, only read off each rule with ``getattr``.
+
+    Two independent checks:
+
+    1. Two rules claiming the same ``(machine key, phase)`` pair, via
+       ``phase_ownership()``.  Only ``PhaseRule`` exposes it; ``InPhaseRule``s
+       do not own a phase and are skipped, so any number may share a phase.
+    2. Two *distinct* phase-slot objects claiming the same machine key, via
+       ``phase_accessor``.  Both ``PhaseRule`` and ``InPhaseRule`` expose this,
+       since either could be holding a slot a scene rebuilt instead of reusing
+       — lazy get-or-create means there is no "unestablished key" failure, so
+       this identity check is the sole fail-loud mechanism for that mistake.
     """
     owners: dict = {}
+    slot_owners: dict = {}
     for rule in rules:
+        accessor = getattr(rule, "phase_accessor", None)
+        if accessor is not None:
+            existing_accessor = slot_owners.get(accessor.key)
+            if existing_accessor is not None and existing_accessor is not accessor:
+                raise ValueError(
+                    "Two distinct phase slots claim the same machine key: " + repr(accessor.key)
+                )
+            slot_owners[accessor.key] = accessor
+
         ownership = getattr(rule, "phase_ownership", None)
         if ownership is None:
             continue
@@ -99,9 +120,10 @@ class GameEngine:
         rules.  For incremental registration use ``add_rules()`` instead.
 
         Raises ``ValueError`` if two ``PhaseRule``s claim the same
-        ``(machine key, phase)`` pair, so a duplicate phase owner fails fast at
-        scene load rather than silently dropping one rule's ``on_enter`` at
-        runtime.
+        ``(machine key, phase)`` pair, or if two distinct phase-slot objects
+        claim the same machine key, so either mistake fails fast at scene load
+        rather than silently dropping a rule's ``on_enter`` or splitting one
+        machine's state across two caches at runtime.
         """
         _check_phase_owners(rules)
         self._rules = list(rules)

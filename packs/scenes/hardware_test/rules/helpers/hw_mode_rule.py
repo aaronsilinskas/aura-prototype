@@ -27,9 +27,8 @@ from engine.phase import PhaseKey, PhaseRule
 from engine.state import GameState, Scope, ScopeValue, StateSlot
 from packs.scenes.hardware_test.rules.helpers.flash import ir_flash, radio_flash
 from packs.scenes.hardware_test.rules.helpers.phases import (
-    HW_MACHINE_KEY,
     MODE_ORDER,
-    MODE_RGB,
+    hw_phase,
     next_in_cycle,
 )
 
@@ -72,7 +71,7 @@ class HwModeRule(PhaseRule):
     """
 
     def __init__(self, phase: PhaseKey) -> None:
-        super().__init__(phase, HW_MACHINE_KEY, MODE_RGB)
+        super().__init__(phase, hw_phase)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_input_event(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:

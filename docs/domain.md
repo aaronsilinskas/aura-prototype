@@ -36,7 +36,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   state.py        GameState, EffectControls, EffectAdmin, EffectReceipt, MergeStrategy,
                   NetworkControls, Scope, ScopeValue
   scene.py        Scene, SceneRegistry, SceneLocalRegistry, SceneManager, SceneControls
-  phase.py        PhaseKey, PhaseMachine, PhaseRule, InPhaseRule
+  phase.py        PhaseKey, PhaseMachine, PhaseSlot, PhaseRule, InPhaseRule
   events.py       Event, EventGroup, EffectEvent
   timer.py        Timer
   lerp.py         Integer/float interpolation helpers
