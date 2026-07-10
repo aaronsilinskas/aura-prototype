@@ -41,6 +41,9 @@
     "max_volume": 0.1,
     "clips": {
       "sfx_test_start": "sounds/blip.wav"
-    }
+    },
+    "i2s_bit_clock": "I2S_BIT_CLOCK",
+    "i2s_word_select": "I2S_WORD_SELECT",
+    "i2s_data": "I2S_DATA"
   }
 }

@@ -1,6 +1,7 @@
 """Behaviour-driven tests for hardware/shared/device_config.py."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -10,6 +11,9 @@ from hardware.shared.device_config import (
     read_device_config_mapping,
     validate_band_map,
 )
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_SAMPLE_CONFIG_PATH = _REPO_ROOT / "examples" / "aura-device.sample.json"
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -44,6 +48,9 @@ def matrix_config():
             "clips": {
                 "sfx_test_start": "sounds/blip.wav",
             },
+            "i2s_bit_clock": "I2S_BIT_CLOCK",
+            "i2s_word_select": "I2S_WORD_SELECT",
+            "i2s_data": "I2S_DATA",
         },
     }
 
@@ -82,6 +89,9 @@ def test_parse_full_matrix_config_maps_every_section(matrix_config):
     assert result.audio.voices == 1
     assert result.audio.max_volume == 0.1
     assert result.audio.clips == {"sfx_test_start": "sounds/blip.wav"}
+    assert result.audio.i2s_bit_clock == "I2S_BIT_CLOCK"
+    assert result.audio.i2s_word_select == "I2S_WORD_SELECT"
+    assert result.audio.i2s_data == "I2S_DATA"
 
 
 def test_parse_matrix_config_scope_rows_converted_to_ranges(matrix_config):
@@ -467,3 +477,72 @@ def test_parse_absent_audio_section_yields_none(matrix_config):
     result = parse_device_config(config)
 
     assert result.audio is None
+
+
+# ---------------------------------------------------------------------------
+# Audio I2S pin validation — required-together, single error naming all
+# missing fields, and string-type guards.
+# ---------------------------------------------------------------------------
+
+
+def test_parse_audio_missing_one_i2s_pin_raises_value_error(matrix_config):
+    del matrix_config["audio"]["i2s_data"]
+
+    with pytest.raises(ValueError, match=r"audio\.i2s_data"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_audio_missing_two_i2s_pins_names_both_in_one_error(matrix_config):
+    del matrix_config["audio"]["i2s_word_select"]
+    del matrix_config["audio"]["i2s_data"]
+
+    with pytest.raises(ValueError, match=r"audio\.i2s_word_select.*audio\.i2s_data"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_audio_missing_all_i2s_pins_names_all_three_in_one_error(matrix_config):
+    del matrix_config["audio"]["i2s_bit_clock"]
+    del matrix_config["audio"]["i2s_word_select"]
+    del matrix_config["audio"]["i2s_data"]
+
+    with pytest.raises(
+        ValueError, match=r"audio\.i2s_bit_clock.*audio\.i2s_word_select.*audio\.i2s_data"
+    ):
+        parse_device_config(matrix_config)
+
+
+def test_parse_audio_i2s_bit_clock_non_string_raises_value_error(matrix_config):
+    matrix_config["audio"]["i2s_bit_clock"] = 11
+
+    with pytest.raises(ValueError, match=r"audio\.i2s_bit_clock must be a string pin name"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_audio_i2s_word_select_non_string_raises_value_error(matrix_config):
+    matrix_config["audio"]["i2s_word_select"] = 12
+
+    with pytest.raises(ValueError, match=r"audio\.i2s_word_select must be a string pin name"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_audio_i2s_data_non_string_raises_value_error(matrix_config):
+    matrix_config["audio"]["i2s_data"] = 13
+
+    with pytest.raises(ValueError, match=r"audio\.i2s_data must be a string pin name"):
+        parse_device_config(matrix_config)
+
+
+# ---------------------------------------------------------------------------
+# Committed sample config — examples/aura-device.sample.json parses as-is
+# ---------------------------------------------------------------------------
+
+
+def test_committed_sample_device_config_parses():
+    mapping = read_device_config_mapping(str(_SAMPLE_CONFIG_PATH))
+
+    result = parse_device_config(mapping)
+
+    assert result.audio is not None
+    assert result.audio.i2s_bit_clock == "I2S_BIT_CLOCK"
+    assert result.audio.i2s_word_select == "I2S_WORD_SELECT"
+    assert result.audio.i2s_data == "I2S_DATA"
