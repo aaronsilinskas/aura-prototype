@@ -68,7 +68,7 @@ hardware/         Hardware abstraction layer
                   neopixel_output, audio_output, infrared_io, counting_i2c)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
                   device_config, device_hardware, network_controls, scene_selection,
-                  ir_transport, ir_protocol, tag_protocol, ir_telemetry,
+                  ir_transport, ir_protocol, tag_protocol, ir_telemetry, ir_manager,
                   profiling_helpers)
 
 app/              Composition layer — the one place allowed to import both the engine's
@@ -141,7 +141,8 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; `pixels` is a list of `MatrixPixelsConfig` / `NeoPixelPixelsConfig` |
 | `DeviceHardware` | `hardware/shared/device_hardware.py` | Named bundle `build_hardware` returns (outputs, buttons, network_controls, transmit_pump, …); board-free, importable under CPython |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete `(NetworkControls, TransmitPump)` adapter over wired `InfraredTransmitter`s; constructed by `device_builder` |
-| `SceneRuntime` | `app/scene_composition.py` | `__slots__` bundle (`manager`, `effect_manager`, `timer`) returned by `build_scene_runtime`; the wiring `run_scene`'s per-tick loop drives |
+| `InfraredManager` | `hardware/shared/ir_manager.py` | Board-free per-tick IR orchestrator: `update()` pumps transmits then receives, owning the pump-before-receive order; exposes `received` + forwarded `last_signal_strength`/`last_error_margin`/`telemetry_line()` |
+| `SceneRuntime` | `app/scene_composition.py` | `__slots__` bundle (`manager`, `effect_manager`, `timer`, `ir`) returned by `build_scene_runtime`; the wiring `run_scene`'s per-tick loop drives |
 
 ---
 
