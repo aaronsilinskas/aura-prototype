@@ -11,7 +11,14 @@ import sys
 import pytest
 
 from engine.events import EffectEvent
-from engine.packs import PackRegistry, scan_item_names
+from engine.packs import (
+    ItemTypeError,
+    MissingItemAttributeError,
+    PackRegistry,
+    UnknownItemError,
+    UnknownPackError,
+    scan_item_names,
+)
 from engine.version import Version
 
 # ---------------------------------------------------------------------------
@@ -75,8 +82,9 @@ def test_scan_dir_on_empty_directory_registers_no_packs(pack_env) -> None:
 
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    with pytest.raises(ValueError, match="Unknown pack"):
+    with pytest.raises(UnknownPackError) as excinfo:
         registry.get("anything", "item", object)
+    assert excinfo.value.pack_name == "anything"
 
 
 def test_scan_dir_ignores_subdirectory_without_version_txt(pack_env) -> None:
@@ -86,8 +94,9 @@ def test_scan_dir_ignores_subdirectory_without_version_txt(pack_env) -> None:
 
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    with pytest.raises(ValueError, match="Unknown pack"):
+    with pytest.raises(UnknownPackError) as excinfo:
         registry.get("notapack", "item_a", object)
+    assert excinfo.value.pack_name == "notapack"
 
 
 def test_scan_dir_ignores_plain_files_at_top_level(pack_env) -> None:
@@ -183,8 +192,9 @@ def test_get_raises_for_unknown_pack(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    with pytest.raises(ValueError, match="Unknown pack"):
+    with pytest.raises(UnknownPackError) as excinfo:
         registry.get("nonexistent", "item_a", object)
+    assert excinfo.value.pack_name == "nonexistent"
 
 
 def test_get_raises_for_unknown_item_name_before_any_import(pack_env) -> None:
@@ -193,8 +203,11 @@ def test_get_raises_for_unknown_item_name_before_any_import(pack_env) -> None:
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
     known_before = set(sys.modules)
 
-    with pytest.raises(ValueError, match="Unknown item"):
+    with pytest.raises(UnknownItemError) as excinfo:
         registry.get("mypack", "ghost_item", object)
+    assert excinfo.value.item_name == "ghost_item"
+    assert excinfo.value.pack_name == "mypack"
+    assert excinfo.value.available == ["item_a"]
 
     # No new modules should have been imported.
     new_modules = set(sys.modules) - known_before
@@ -211,8 +224,9 @@ def test_get_excludes_init_py_from_valid_item_names(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    with pytest.raises(ValueError, match="Unknown item"):
+    with pytest.raises(UnknownItemError) as excinfo:
         registry.get("mypack", "__init__", object)
+    assert excinfo.value.item_name == "__init__"
 
 
 def test_get_returns_value_from_sibling_of_init_py(pack_env) -> None:
@@ -286,8 +300,10 @@ def test_get_raises_value_error_when_attribute_is_missing_from_module(pack_env) 
     registry = PackRegistry(item_attr="VALUE")
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    with pytest.raises(ValueError, match="has no attribute 'VALUE'"):
+    with pytest.raises(MissingItemAttributeError) as excinfo:
         registry.get("mypack", "item_a", object)
+    assert excinfo.value.attr == "VALUE"
+    assert excinfo.value.context == "Pack 'mypack' item 'item_a'"
 
 
 def test_get_raises_value_error_when_attribute_has_wrong_type(pack_env) -> None:
@@ -295,8 +311,11 @@ def test_get_raises_value_error_when_attribute_has_wrong_type(pack_env) -> None:
     registry = PackRegistry(item_attr="VALUE")
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    with pytest.raises(ValueError, match="is not an instance of int"):
+    with pytest.raises(ItemTypeError) as excinfo:
         registry.get("mypack", "item_a", int)
+    assert excinfo.value.attr == "VALUE"
+    assert excinfo.value.expected_class is int
+    assert excinfo.value.context == "Pack 'mypack' item 'item_a'"
 
 
 # ---------------------------------------------------------------------------
@@ -367,8 +386,9 @@ def test_check_version_raises_for_unknown_pack(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    with pytest.raises(ValueError, match="Unknown pack"):
+    with pytest.raises(UnknownPackError) as excinfo:
         registry.check_version("ghost", Version(1, 0))
+    assert excinfo.value.pack_name == "ghost"
 
 
 # ---------------------------------------------------------------------------
@@ -430,8 +450,9 @@ def test_items_raises_for_unknown_pack(pack_env) -> None:
     registry = _make_registry()
     registry.scan_dir(str(pack_env), MODULE_PREFIX)
 
-    with pytest.raises(ValueError, match="Unknown pack"):
+    with pytest.raises(UnknownPackError) as excinfo:
         registry.items("nonexistent")
+    assert excinfo.value.pack_name == "nonexistent"
 
 
 # ---------------------------------------------------------------------------

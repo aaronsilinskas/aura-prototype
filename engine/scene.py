@@ -19,7 +19,7 @@ except ImportError:
 
 import engine._path as _path
 from engine.engine import GameEngine, GameRule, Version
-from engine.packs import PackRegistry, load_item, scan_item_names
+from engine.packs import PackRegistry, UnknownItemError, load_item, scan_item_names
 from engine.state import EffectAdmin, GameState, MergeStrategy, SceneControls, Scope
 
 _REQUIRED_KEYS = frozenset(("version", "effect_packs", "rule_packs"))
@@ -63,17 +63,14 @@ class SceneLocalRegistry:
         The item is imported on first access and the result is cached.
 
         Raises:
-            ValueError: if *item_name* is not in the recorded set.
-            ValueError: if the module has no attribute named *item_attr*.
-            ValueError: if the attribute value is not an instance of *expected_class*.
+            UnknownItemError: if *item_name* is not in the recorded set.
+            MissingItemAttributeError: if the module has no attribute named
+                *item_attr*.
+            ItemTypeError: if the attribute value is not an instance of
+                *expected_class*.
         """
         if item_name not in self._item_names:
-            raise ValueError(
-                "Unknown item '"
-                + item_name
-                + "'. Available: "
-                + ", ".join(sorted(self._item_names))
-            )
+            raise UnknownItemError(item_name, sorted(self._item_names))
 
         if item_name in self._cache:
             return self._cache[item_name]  # type: ignore[return-value]

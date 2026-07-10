@@ -11,6 +11,7 @@ import sys
 
 import pytest
 
+from engine.packs import ItemTypeError, MissingItemAttributeError, UnknownItemError
 from engine.scene import SceneLocalRegistry
 
 # ---------------------------------------------------------------------------
@@ -135,8 +136,11 @@ def test_get_raises_for_unknown_item_name(local_env) -> None:
     registry.scan_dir(str(local_env), MODULE_PREFIX)
     from engine.engine import GameRule
 
-    with pytest.raises(ValueError, match="Unknown item"):
+    with pytest.raises(UnknownItemError) as excinfo:
         registry.get("ghost", GameRule)
+    assert excinfo.value.item_name == "ghost"
+    assert excinfo.value.pack_name is None
+    assert excinfo.value.available == []
 
 
 def test_get_raises_when_item_module_has_no_rule_attribute(local_env) -> None:
@@ -146,8 +150,9 @@ def test_get_raises_when_item_module_has_no_rule_attribute(local_env) -> None:
     registry = SceneLocalRegistry(item_attr="RULE")
     registry.scan_dir(str(local_env), MODULE_PREFIX)
 
-    with pytest.raises(ValueError, match="no attribute 'RULE'"):
+    with pytest.raises(MissingItemAttributeError) as excinfo:
         registry.get("bad_rule", GameRule)
+    assert excinfo.value.attr == "RULE"
 
 
 def test_get_raises_when_rule_attribute_is_not_a_game_rule(local_env) -> None:
@@ -157,8 +162,9 @@ def test_get_raises_when_rule_attribute_is_not_a_game_rule(local_env) -> None:
     registry = SceneLocalRegistry(item_attr="RULE")
     registry.scan_dir(str(local_env), MODULE_PREFIX)
 
-    with pytest.raises(ValueError, match="is not an instance of"):
+    with pytest.raises(ItemTypeError) as excinfo:
         registry.get("bad_rule", GameRule)
+    assert excinfo.value.expected_class is GameRule
 
 
 # ---------------------------------------------------------------------------

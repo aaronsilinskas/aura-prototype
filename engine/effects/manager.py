@@ -2,7 +2,13 @@ from effects.effect import Effect, EffectConfig, PixelBuffer
 from engine.effects.merge import SPLIT
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
-from engine.packs import PackRegistry
+from engine.packs import (
+    ItemTypeError,
+    MissingItemAttributeError,
+    PackRegistry,
+    UnknownItemError,
+    UnknownPackError,
+)
 from engine.scene import SceneLocalRegistry
 from engine.state import EffectAdmin, EffectControls, EffectReceipt, MergeStrategy, ScopeValue
 from engine.timer import Timer
@@ -37,9 +43,9 @@ class EffectResolver:
     """Maps a qualified effect name to an (builder, pack_name, effect_name) tuple.
 
     Owns the ``scene.`` reserved-prefix rule, the choice of registry for each
-    name, and the translation of registry ``ValueError``\\s into effect-facing
-    messages.  ``EffectManager`` holds one resolver and calls ``resolve`` once
-    per effect start.
+    name, and the translation of typed registry errors (from ``engine.packs``)
+    into effect-facing messages.  ``EffectManager`` holds one resolver and
+    calls ``resolve`` once per effect start.
 
     CircuitPython/MicroPython safe: no per-call allocations beyond what the
     underlying registries already do; ``__slots__`` prevents ``__dict__``.
@@ -90,45 +96,47 @@ class EffectResolver:
             )
         try:
             return self._local_effects.get(effect_name, EffectBuilder)
-        except ValueError as exc:
-            msg = str(exc)
-            if msg.startswith("Unknown item '"):
-                raise ValueError(
-                    "Unknown scene-local effect '"
-                    + effect_name
-                    + "'. Available: "
-                    + ", ".join(self._local_effects.items())
-                ) from exc
-            raise
+        except UnknownItemError as exc:
+            raise ValueError(
+                "Unknown scene-local effect '"
+                + effect_name
+                + "'. Available: "
+                + ", ".join(self._local_effects.items())
+            ) from exc
+        except ItemTypeError as exc:
+            raise ValueError(
+                "Scene-local effect '" + effect_name + "' has an invalid BUILD attribute"
+            ) from exc
+        except MissingItemAttributeError as exc:
+            raise ValueError(
+                "Scene-local effect '" + effect_name + "' is missing a BUILD attribute"
+            ) from exc
 
     def _resolve_pack(self, pack_name: str, effect_name: str) -> EffectBuilder:
         try:
             return self._registry.get(pack_name, effect_name, EffectBuilder)
-        except ValueError as exc:
-            msg = str(exc)
-            if msg.startswith("Unknown pack '"):
-                raise ValueError("Unknown effect pack '" + pack_name + "'") from exc
-            if msg.startswith("Unknown item '"):
-                raise ValueError(
-                    "Unknown effect '" + effect_name + "' in pack '" + pack_name + "'"
-                ) from exc
-            if "is not an instance of" in msg:
-                raise ValueError(
-                    "Effect '"
-                    + effect_name
-                    + "' in pack '"
-                    + pack_name
-                    + "' has an invalid BUILD attribute"
-                ) from exc
-            if msg.startswith("Pack '"):
-                raise ValueError(
-                    "Effect pack '"
-                    + pack_name
-                    + "' item '"
-                    + effect_name
-                    + "' is missing a BUILD attribute"
-                ) from exc
-            raise
+        except UnknownPackError as exc:
+            raise ValueError("Unknown effect pack '" + pack_name + "'") from exc
+        except UnknownItemError as exc:
+            raise ValueError(
+                "Unknown effect '" + effect_name + "' in pack '" + pack_name + "'"
+            ) from exc
+        except ItemTypeError as exc:
+            raise ValueError(
+                "Effect '"
+                + effect_name
+                + "' in pack '"
+                + pack_name
+                + "' has an invalid BUILD attribute"
+            ) from exc
+        except MissingItemAttributeError as exc:
+            raise ValueError(
+                "Effect pack '"
+                + pack_name
+                + "' item '"
+                + effect_name
+                + "' is missing a BUILD attribute"
+            ) from exc
 
 
 class EffectManager(EffectControls, EffectAdmin):
