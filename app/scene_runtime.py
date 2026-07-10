@@ -33,11 +33,14 @@ def run_scene(
 ) -> None:
     """Bring hardware up via ``build_hardware`` and run *scene_name* forever.
 
-    Prints the telemetry line from ``hw.ir_receiver.telemetry_line()`` (see
-    :mod:`hardware.shared.ir_telemetry`) when it returns one — the receiver
-    itself gates on whether a counter changed since the last call. Not
-    unit-testable — ``build_hardware`` requires CircuitPython board imports;
-    validate via deploy-watch.
+    Drives ``runtime.ir.update()`` every tick (see
+    :class:`~hardware.shared.ir_manager.InfraredManager`), which owns the
+    pump-before-receive order and always runs regardless of whether a scene
+    is active. Prints the telemetry line from ``runtime.ir.telemetry_line()``
+    (see :mod:`hardware.shared.ir_telemetry`) when it returns one — the
+    receiver itself gates on whether a counter changed since the last call.
+    Not unit-testable — ``build_hardware`` requires CircuitPython board
+    imports; validate via deploy-watch.
 
     Args:
         scene_name: Name of the scene to load.
@@ -53,6 +56,7 @@ def run_scene(
     manager = runtime.manager
     effect_manager = runtime.effect_manager
     timer = runtime.timer
+    ir = runtime.ir
 
     _button_data = ButtonData({})
     _acceleration = AccelerationData(0.0, 0.0, 0.0) if hw.accelerometer is not None else None
@@ -72,41 +76,35 @@ def run_scene(
             except Exception:
                 pass  # keep last good values; None signals missing hardware, not read failure
 
+        # Unconditional, before the active_state check: a send can be in
+        # flight across a scene transition, and ir.update() always pumps so
+        # a deferred end_transmit still arms the flush latch its own receive
+        # consumes this same tick. It also always receives when a receiver
+        # is wired, so a packet decoded while no scene is active is
+        # drained-and-dropped here rather than left to overflow — only the
+        # queuing below is conditional on a scene being active.
+        ir.update()
+
         active_state = manager.active_state
 
-        # Outside the active_state guard and before receive(): a send can be
-        # in flight across a scene transition, and end_transmit (fired here
-        # when a deferred write completes) arms the flush latch this same
-        # tick's receive() must consume. Pumped through transmit_pump, not
-        # network_controls — poll_transmits is a runtime lifecycle concern,
-        # not a rule-facing send, so it is reached through the type that
-        # declares it rather than downcast through the send-only handle.
-        hw.transmit_pump.poll_transmits()
-
-        if active_state is not None and hw.ir_receiver is not None:
-            ir_data = hw.ir_receiver.receive()
-            if ir_data is not None:
+        if active_state is not None:
+            if ir.received is not None:
                 active_state.queue_event(
                     NetworkEvents.IRReceived(
-                        ir_data,
-                        hw.ir_receiver.last_signal_strength,
-                        hw.ir_receiver.last_error_margin,
+                        ir.received,
+                        ir.last_signal_strength,
+                        ir.last_error_margin,
                         best_receiver=None,
                     )
                 )
-
-        if active_state is not None:
             active_state.queue_event(_input_event)
 
         manager.update()
         effect_manager.update(timer)
 
-        if (
-            hw.ir_receiver is not None
-            and timer.total - _last_telemetry_print_total >= _TELEMETRY_PRINT_INTERVAL
-        ):
+        if timer.total - _last_telemetry_print_total >= _TELEMETRY_PRINT_INTERVAL:
             _last_telemetry_print_total = timer.total
-            line = hw.ir_receiver.telemetry_line()
+            line = ir.telemetry_line()
             if line is not None:
                 print(line)
 
