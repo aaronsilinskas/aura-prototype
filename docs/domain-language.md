@@ -90,6 +90,10 @@ _Avoid_: "private pack" (no version, no pack-name layer); putting scene-only cod
 A single-namespace registry for one scene's local effects (or rules), exposing the same `get`/`items` surface as `PackRegistry` but with no version concept.
 _Avoid_: modelling scene-local items as a synthetic single-pack `PackRegistry`
 
+### Registry lookup errors
+The typed `ValueError` subclasses (`RegistryError` base; `UnknownPackError`, `UnknownItemError`, `MissingItemAttributeError`, `ItemTypeError`, in `engine/packs.py`) that `PackRegistry` and `SceneLocalRegistry` raise for lookup failures. `EffectResolver` dispatches on the exception **type** to build effect-facing messages, so registry message wording stays a free display detail. Subclassing `ValueError` keeps existing `except ValueError` callers working.
+_Avoid_: classifying a registry failure by `str(exc)`/`startswith` on the message; treating a registry error's wording as an interface
+
 ### NetworkControls
 The **game-facing**, send-only network seam a rule holds via `GameState.network_controls` (`send_ir`, `send_radio`). Deliberately never gains per-tick lifecycle methods — the transmit pump lives on the separate `TransmitPump` face — so a rule author never sees transmit machinery. `send_ir` is fire-and-forget (returns `None`).
 _Avoid_: putting `poll_transmits()` or any per-tick pump on `NetworkControls` (it reads as a player command — keep the seam send-only); calling `poll_transmits()` through a `NetworkControls`-typed handle (reach it via `TransmitPump`)
