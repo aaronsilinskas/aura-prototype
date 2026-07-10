@@ -81,7 +81,9 @@ def build_scene_runtime(hw: DeviceHardware, scene_name: str) -> SceneRuntime:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir("packs/scenes", "packs.scenes")
 
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_registry)
+    manager = SceneManager(
+        engine, effect_registry, rule_registry, scene_registry, effect_admin=effect_manager
+    )
     manager.load(_resolve_known_scene(scene_registry, scene_name))
     manager.update()  # applies the load transition; the scene is now active
 

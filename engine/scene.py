@@ -20,7 +20,7 @@ except ImportError:
 import engine._path as _path
 from engine.engine import GameEngine, GameRule, Version
 from engine.packs import PackRegistry, load_item, scan_item_names
-from engine.state import GameState, SceneControls, Scope
+from engine.state import EffectAdmin, GameState, MergeStrategy, SceneControls, Scope
 
 _REQUIRED_KEYS = frozenset(("version", "effect_packs", "rule_packs"))
 
@@ -356,12 +356,38 @@ class SceneRegistry:
         self._factories[name] = factory
 
 
+class _SceneStackEntry:
+    """One entry in ``SceneManager``'s scene stack.  Internal use only.
+
+    ``saved_merge`` is the merge-strategy snapshot to restore via
+    ``EffectAdmin.apply_merge_strategies`` when this entry is popped — ``None``
+    for the base entry a ``load`` creates (nothing to restore), and the
+    captured live map for an entry pushed by ``overlay``.  Folding the
+    snapshot into the same entry as the scene stack means the two stacks
+    can never desync.
+    """
+
+    __slots__ = ("rules", "saved_merge", "scene", "state")
+
+    def __init__(
+        self,
+        scene: Scene,
+        state: GameState,
+        rules: list[GameRule],
+        saved_merge: dict[str, MergeStrategy] | None,
+    ) -> None:
+        self.scene = scene
+        self.state = state
+        self.rules = rules
+        self.saved_merge = saved_merge
+
+
 class SceneManager(SceneControls):
     """Manages a stack of active scenes, driving the game engine each tick.
 
     Construction::
 
-        manager = SceneManager(engine, effect_registry, rule_registry, scene_registry)
+        manager = SceneManager(engine, effect_registry, rule_registry, scene_registry, effect_admin)
 
     Driving the game loop::
 
@@ -376,9 +402,17 @@ class SceneManager(SceneControls):
     Scene lookup delegates entirely to *scene_registry*: ``load`` and
     ``overlay`` call ``scene_registry.get(name)``; ``load`` raises
     ``ValueError`` for unknown names because ``SceneRegistry.get`` does.
+
+    *effect_admin* is the scene-transition face of the same effect system
+    ``engine`` was built with (its ``EffectControls`` and ``EffectAdmin`` are
+    two faces of one ``EffectManager`` instance, mirroring the
+    ``NetworkControls``/``TransmitPump`` split). Every local-effects push and
+    merge-strategy reset/capture/apply routes through *effect_admin*, never
+    through a stack entry's ``state.effect_controls``.
     """
 
     __slots__ = (
+        "_effect_admin",
         "_effect_registry",
         "_engine",
         "_pending",
@@ -393,12 +427,14 @@ class SceneManager(SceneControls):
         effect_registry: PackRegistry,
         rule_registry: PackRegistry,
         scene_registry: SceneRegistry,
+        effect_admin: EffectAdmin,
     ) -> None:
         self._engine = engine
         self._effect_registry = effect_registry
         self._rule_registry = rule_registry
         self._scene_registry = scene_registry
-        self._stack: list[tuple[Scene, GameState, list[GameRule]]] = []
+        self._effect_admin = effect_admin
+        self._stack: list[_SceneStackEntry] = []
         self._pending: (
             tuple[Literal["load"], Scene]
             | tuple[Literal["overlay"], Scene]
@@ -429,7 +465,7 @@ class SceneManager(SceneControls):
         """The ``GameState`` for the top-most active scene, or ``None`` if the stack is empty."""
         if not self._stack:
             return None
-        return self._stack[-1][1]
+        return self._stack[-1].state
 
     def pop(self) -> None:
         """Record a pop transition; raises immediately if stack has ≤ 1 entry."""
@@ -452,7 +488,7 @@ class SceneManager(SceneControls):
         call within a tick wins.
         """
         if self._stack:
-            self._engine.update(self._stack[-1][1])
+            self._engine.update(self._stack[-1].state)
 
         if self._pending is not None:
             pending = self._pending
@@ -485,16 +521,14 @@ class SceneManager(SceneControls):
             combined.append(scene.local_rule_registry.get(item_name, GameRule))
         return combined
 
-    def _deactivate(self, entry: tuple[Scene, GameState, list[GameRule]]) -> None:
-        _, state, _ = entry
-        state.effect_controls.stop_effect(Scope.ALL)
-        state.clear_queue()
+    def _deactivate(self, entry: _SceneStackEntry) -> None:
+        entry.state.effect_controls.stop_effect(Scope.ALL)
+        entry.state.clear_queue()
 
-    def _activate(self, entry: tuple[Scene, GameState, list[GameRule]]) -> None:
-        scene, state, rules = entry
-        self._engine.set_rules(rules)
-        state.clear_queue()
-        state.effect_controls.set_local_effects(scene.local_effect_registry)
+    def _activate(self, entry: _SceneStackEntry) -> None:
+        self._engine.set_rules(entry.rules)
+        entry.state.clear_queue()
+        self._effect_admin.set_local_effects(entry.scene.local_effect_registry)
 
     def _do_load(self, scene: Scene) -> None:
         """Replace the entire stack with a single fresh entry for *scene*."""
@@ -505,9 +539,9 @@ class SceneManager(SceneControls):
 
         self._stack = []
         state = self._engine.create_state(self, scene.initial_data)
-        entry = (scene, state, combined_rules)
+        entry = _SceneStackEntry(scene, state, combined_rules, saved_merge=None)
         self._stack.append(entry)
-        state.effect_controls.reset_merge_strategies()
+        self._effect_admin.reset_merge_strategies()
         self._activate(entry)
 
     def _do_overlay(self, scene: Scene) -> None:
@@ -515,17 +549,21 @@ class SceneManager(SceneControls):
         combined_rules = self._resolve_rules(scene)
 
         self._deactivate(self._stack[-1])
-        self._stack[-1][1].effect_controls.save_merge_strategies()
+        saved_merge = self._effect_admin.capture_merge_strategies()
 
         state = self._engine.create_state(self, scene.initial_data)
-        entry = (scene, state, combined_rules)
+        entry = _SceneStackEntry(scene, state, combined_rules, saved_merge=saved_merge)
         self._stack.append(entry)
         self._activate(entry)
 
     def _do_pop(self) -> None:
         """Remove the top entry and restore the entry below it."""
         self._deactivate(self._stack[-1])
-        self._stack[-1][1].effect_controls.restore_merge_strategies()
-        self._stack.pop()
+        popped = self._stack.pop()
+        # pop() rejects a stack of size <= 1, so the popped entry is always one
+        # overlay() pushed — never the base entry from load(), whose
+        # saved_merge is None. Narrows the type for apply_merge_strategies.
+        assert popped.saved_merge is not None
+        self._effect_admin.apply_merge_strategies(popped.saved_merge)
 
         self._activate(self._stack[-1])

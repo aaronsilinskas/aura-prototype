@@ -344,7 +344,9 @@ def _build_prop(scene_name: str, harness: dict) -> tuple[SceneManager, EffectMan
         timer=timer,
         network_controls=hw.network_controls,
     )
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_registry)
+    manager = SceneManager(
+        engine, effect_registry, rule_registry, scene_registry, effect_admin=effect_manager
+    )
     gc.collect()
     free_after_engine = gc.mem_free()
 

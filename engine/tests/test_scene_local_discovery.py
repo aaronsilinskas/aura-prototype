@@ -14,6 +14,7 @@ from engine.events import Event, EventGroup
 from engine.packs import PackRegistry
 from engine.scene import Scene, SceneManager, SceneRegistry
 from engine.state import EffectControls
+from engine.tests.helpers import SpyEffectAdmin
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -221,12 +222,20 @@ class _RecordingEffectControls(EffectControls):
     def stop_effect(self, scope) -> None:
         pass
 
-    def set_local_effects(self, local_registry: object) -> None:
-        pass  # no-op for scene-local rule discovery tests
-
 
 def _make_engine() -> GameEngine:
     return GameEngine(effect_controls=_RecordingEffectControls())
+
+
+def _make_scene_manager(
+    engine: GameEngine,
+    effect_registry: PackRegistry,
+    rule_registry: PackRegistry,
+    scene_registry: SceneRegistry,
+) -> SceneManager:
+    """Construct a SceneManager with a SpyEffectAdmin — these tests only cover
+    scene-local rule discovery, not local-effects/merge-strategy transitions."""
+    return SceneManager(engine, effect_registry, rule_registry, scene_registry, SpyEffectAdmin())
 
 
 def test_scene_manager_load_includes_scene_local_rules_in_engine(scene_env) -> None:
@@ -238,7 +247,7 @@ def test_scene_manager_load_includes_scene_local_rules_in_engine(scene_env) -> N
     scene_registry.scan_dir(str(scene_env), MODULE_PREFIX)
 
     engine = _make_engine()
-    manager = SceneManager(
+    manager = _make_scene_manager(
         engine,
         PackRegistry(item_attr="BUILD"),
         PackRegistry(item_attr="RULE"),
@@ -283,7 +292,7 @@ def test_scene_manager_load_appends_local_rules_after_pack_rules(scene_env) -> N
     scene_registry.scan_dir(str(scene_env), MODULE_PREFIX)
 
     engine = _make_engine()
-    manager = SceneManager(
+    manager = _make_scene_manager(
         engine,
         PackRegistry(item_attr="BUILD"),
         rule_registry,
@@ -311,7 +320,7 @@ def test_scene_manager_local_rule_missing_rule_attr_fails_at_scene_load(
     scene_registry.scan_dir(str(scene_env), MODULE_PREFIX)
 
     engine = _make_engine()
-    manager = SceneManager(
+    manager = _make_scene_manager(
         engine,
         PackRegistry(item_attr="BUILD"),
         PackRegistry(item_attr="RULE"),
@@ -335,7 +344,7 @@ def test_scene_manager_local_rules_are_not_active_for_other_loaded_scene(
     scene_registry.scan_dir(str(scene_env), MODULE_PREFIX)
 
     engine = _make_engine()
-    manager = SceneManager(
+    manager = _make_scene_manager(
         engine,
         PackRegistry(item_attr="BUILD"),
         PackRegistry(item_attr="RULE"),
@@ -373,7 +382,7 @@ def test_local_rule_receives_events_after_scene_load(scene_env) -> None:
     scene_registry.scan_dir(str(scene_env), MODULE_PREFIX)
 
     engine = _make_engine()
-    manager = SceneManager(
+    manager = _make_scene_manager(
         engine,
         PackRegistry(item_attr="BUILD"),
         PackRegistry(item_attr="RULE"),

@@ -15,8 +15,9 @@ from engine.engine import GameEngine
 from engine.events import EffectEvent
 from engine.packs import PackRegistry
 from engine.scene import Scene, SceneLocalRegistry, SceneManager, SceneRegistry
-from engine.state import EffectControls, Scope
+from engine.state import EffectAdmin, EffectControls, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
+from engine.tests.helpers import SpyEffectAdmin
 from engine.timer import Timer
 
 # ---------------------------------------------------------------------------
@@ -73,17 +74,17 @@ def _make_effects_subdir(scene_dir, items: dict[str, str]) -> None:
 
 
 class _RecordingEffectControls(EffectControls):
-    """Records stop_effect calls and local registry pushes."""
+    """Records stop_effect calls.
+
+    Local-effects pushes no longer go through ``EffectControls`` — see
+    ``SpyEffectAdmin`` for those.
+    """
 
     def __init__(self) -> None:
         self.stopped_scopes: list = []
-        self.local_effects_history: list = []
 
     def stop_effect(self, scope) -> None:
         self.stopped_scopes.append(scope)
-
-    def set_local_effects(self, local_registry: object) -> None:
-        self.local_effects_history.append(local_registry)
 
 
 def _make_engine(controls=None) -> GameEngine:
@@ -185,15 +186,15 @@ def test_scene_constructed_directly_has_empty_local_effect_registry() -> None:
 
 
 # ---------------------------------------------------------------------------
-# EffectControls.set_local_effects — base class no-op, documented reserved
+# EffectAdmin — base class raises, documented reserved for SceneManager
 # ---------------------------------------------------------------------------
 
 
-def test_effect_controls_base_class_set_local_effects_is_noop() -> None:
-    controls = EffectControls()
-    # Must not raise — base class is a no-op
-    controls.set_local_effects(None)
-    controls.set_local_effects(SceneLocalRegistry(item_attr="BUILD"))
+def test_effect_admin_base_class_set_local_effects_raises_not_implemented_error() -> None:
+    admin = EffectAdmin()
+
+    with pytest.raises(NotImplementedError):
+        admin.set_local_effects(SceneLocalRegistry(item_attr="BUILD"))
 
 
 # ---------------------------------------------------------------------------
@@ -314,19 +315,20 @@ def test_scene_manager_pushes_local_effects_on_load(scene_env) -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(str(scene_env), MODULE_PREFIX)
 
-    controls = _RecordingEffectControls()
-    engine = GameEngine(effect_controls=controls)
+    engine = GameEngine(effect_controls=_RecordingEffectControls())
+    effect_admin = SpyEffectAdmin()
     manager = SceneManager(
         engine,
         PackRegistry(item_attr="BUILD"),
         PackRegistry(item_attr="RULE"),
         scene_registry,
+        effect_admin,
     )
     manager.load("forest")
     manager.update()
 
-    assert len(controls.local_effects_history) == 1
-    pushed = controls.local_effects_history[0]
+    assert len(effect_admin.local_effects_history) == 1
+    pushed = effect_admin.local_effects_history[0]
     assert isinstance(pushed, SceneLocalRegistry)
     assert "flash" in pushed.items()
 
@@ -339,24 +341,25 @@ def test_scene_manager_load_replaces_active_scene_registry_with_new_scenes(scene
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(str(scene_env), MODULE_PREFIX)
 
-    controls = _RecordingEffectControls()
-    engine = GameEngine(effect_controls=controls)
+    engine = GameEngine(effect_controls=_RecordingEffectControls())
+    effect_admin = SpyEffectAdmin()
     manager = SceneManager(
         engine,
         PackRegistry(item_attr="BUILD"),
         PackRegistry(item_attr="RULE"),
         scene_registry,
+        effect_admin,
     )
 
     manager.load("a")
     manager.update()
-    controls.local_effects_history.clear()
+    effect_admin.local_effects_history.clear()
 
     manager.load("b")
     manager.update()
 
     # One push: the new scene b's (empty) local effect registry
-    assert len(controls.local_effects_history) == 1
+    assert len(effect_admin.local_effects_history) == 1
 
 
 def test_scene_manager_pushes_overlay_scene_local_effects_on_overlay(scene_env) -> None:
@@ -367,24 +370,25 @@ def test_scene_manager_pushes_overlay_scene_local_effects_on_overlay(scene_env) 
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(str(scene_env), MODULE_PREFIX)
 
-    controls = _RecordingEffectControls()
-    engine = GameEngine(effect_controls=controls)
+    engine = GameEngine(effect_controls=_RecordingEffectControls())
+    effect_admin = SpyEffectAdmin()
     manager = SceneManager(
         engine,
         PackRegistry(item_attr="BUILD"),
         PackRegistry(item_attr="RULE"),
         scene_registry,
+        effect_admin,
     )
 
     manager.load("scene_a")
     manager.update()
-    controls.local_effects_history.clear()
+    effect_admin.local_effects_history.clear()
 
     manager.overlay("scene_b")
     manager.update()
 
-    assert len(controls.local_effects_history) == 1
-    pushed = controls.local_effects_history[0]
+    assert len(effect_admin.local_effects_history) == 1
+    pushed = effect_admin.local_effects_history[0]
     assert "b_flash" in pushed.items()
 
 
@@ -397,26 +401,27 @@ def test_scene_manager_restores_base_local_effects_on_pop(scene_env) -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(str(scene_env), MODULE_PREFIX)
 
-    controls = _RecordingEffectControls()
-    engine = GameEngine(effect_controls=controls)
+    engine = GameEngine(effect_controls=_RecordingEffectControls())
+    effect_admin = SpyEffectAdmin()
     manager = SceneManager(
         engine,
         PackRegistry(item_attr="BUILD"),
         PackRegistry(item_attr="RULE"),
         scene_registry,
+        effect_admin,
     )
 
     manager.load("scene_a")
     manager.update()
     manager.overlay("scene_b")
     manager.update()
-    controls.local_effects_history.clear()
+    effect_admin.local_effects_history.clear()
 
     manager.pop()
     manager.update()
 
-    assert len(controls.local_effects_history) == 1
-    pushed = controls.local_effects_history[0]
+    assert len(effect_admin.local_effects_history) == 1
+    pushed = effect_admin.local_effects_history[0]
     assert "a_flash" in pushed.items()
     assert "b_flash" not in pushed.items()
 

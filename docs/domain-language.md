@@ -106,8 +106,16 @@ _Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()
 The rule-facing scene-transition seam: `load`, `overlay`, `pop`, each recording a pending transition applied after the current tick. `SceneManager` is the live implementation.
 
 ### SceneManager
-Owns the scene stack and drives transitions: `load` clears the stack, `overlay` suspends the active scene and pushes a new one, `pop` restores the previous. Every unloaded or suspended scene has its effects stopped on `Scope.ALL`, and each transition republishes the now-active scene's local effects so the `scene.` prefix resolves against the top of the stack.
-_Avoid_: calling `register()` on it (removed — add scenes to `SceneRegistry`)
+Owns the scene stack and drives transitions: `load` clears the stack, `overlay` suspends the active scene and pushes a new one, `pop` restores the previous. Every unloaded or suspended scene has its effects stopped on `Scope.ALL`, and each transition republishes the now-active scene's local effects so the `scene.` prefix resolves against the top of the stack. Holds an injected `EffectAdmin` handle and drives every local-effects push and merge-strategy reset/capture/apply through it — never through a stack entry's `state.effect_controls`.
+_Avoid_: calling `register()` on it (removed — add scenes to `SceneRegistry`); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`)
+
+### EffectControls
+The **rule-facing** effect seam a rule holds via `GameState.effect_controls`: `set_effect`, `add_effect`, `stop_effect`, `set_merge_strategy`. Deliberately sheds the scene-transition operations — those live on the separate `EffectAdmin` face — so a rule author never sees them.
+_Avoid_: adding `set_local_effects` or the merge-strategy snapshot lifecycle back onto this interface (they belong on `EffectAdmin`)
+
+### EffectAdmin
+The **scene-transition-facing** counterpart to `EffectControls`, declaring `reset_merge_strategies`, `capture_merge_strategies`, `apply_merge_strategies`, and `set_local_effects`. `EffectManager` implements both faces (mirroring `NetworkControls`/`TransmitPump`); `SceneManager` holds an injected `EffectAdmin` handle and reaches it exclusively through that seam, never through `state.effect_controls`.
+_Avoid_: calling any `EffectAdmin` method from a `GameRule`; putting `EffectAdmin` in the rule-facing `EffectControls` interface
 
 ### Scope
 Identifies what a game effect targets, output-agnostically. Leaf scopes: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN/BUFF/DEBUFF`, `AMBIENT`. Composite scopes: `Global.ALL`, `NON_AMBIENT`, `Scope.ALL` (everything — use for teardown).
@@ -126,8 +134,8 @@ Maps a qualified effect name to its `EffectBuilder`, owning the reserved `scene.
 _Avoid_: putting the `scene.` rule in `EffectManager`; confusing with `EffectManager` (routing/rendering, not name resolution)
 
 ### Merge strategy
-The per-scope policy deciding how a scope's stack of layered effect buffers becomes shown pixels. A runtime setting on `EffectControls`, defaulting to **Split**, reset on scene load and preserved across an `overlay`/`pop`. Two ship: **Split** and **Additive**.
-_Avoid_: making it a per-output or `aura-device.json` choice; holding merge state on the output; a global (non-per-scope) strategy
+The per-scope policy deciding how a scope's stack of layered effect buffers becomes shown pixels. Set per rule via `EffectControls.set_merge_strategy`, defaulting to **Split**, reset on scene load and preserved across an `overlay`/`pop`. Two ship: **Split** and **Additive**. The per-overlay snapshot used to restore the pre-overlay choice on `pop` rides in `SceneManager`'s own scene stack entry (`_SceneStackEntry.saved_merge`), not inside `EffectManager` — the scene stack and the snapshot stack are one, so desync is unrepresentable.
+_Avoid_: making it a per-output or `aura-device.json` choice; holding merge state on the output; a global (non-per-scope) strategy; a separate snapshot stack inside `EffectManager` (the scene stack entry owns it)
 
 ### Split
 The default **merge strategy**: divides a scope's region into N near-equal contiguous parts, one per layered effect (bottom-to-top), so effects render side-by-side. A single effect fills the whole region unchanged; surplus effects beyond the pixel count get zero-width parts and stay invisible until earlier ones fall away.

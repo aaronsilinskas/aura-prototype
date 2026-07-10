@@ -7,11 +7,10 @@ import os
 import pytest
 
 from effects.effect import EffectConfig
-from engine.effects.manager import EffectBuilder
+from engine.effects.manager import EffectBuilder, EffectManager
 from engine.engine import GameEngine, GameRule
 from engine.packs import PackRegistry
 from engine.scene import Scene, SceneManager, SceneRegistry
-from engine.state import EffectControls
 from packs.rules.debug.event_logger import EventLoggerRule
 
 _PACKS_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
@@ -196,13 +195,16 @@ def loaded_debug_engine():
     rule_registry = PackRegistry(item_attr="RULE")
     rule_registry.scan_dir(_packs_path("rules"), "packs.rules")
     effect_registry = PackRegistry(item_attr="BUILD")
-    engine = GameEngine(EffectControls())
+    effect_manager = EffectManager(registry=effect_registry, outputs=[])
+    engine = GameEngine(effect_manager)
     scene_registry = SceneRegistry()
     scene_registry.register(
         "test_scene",
         lambda: Scene(effect_packs=[], rule_packs=[("debug", "1.0")]),
     )
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_registry)
+    manager = SceneManager(
+        engine, effect_registry, rule_registry, scene_registry, effect_admin=effect_manager
+    )
     manager.load("test_scene")
     manager.update()
     return engine, rule_registry
@@ -231,13 +233,16 @@ def test_scene_manager_load_raises_for_incompatible_pack_version() -> None:
     rule_registry = PackRegistry(item_attr="RULE")
     rule_registry.scan_dir(_packs_path("rules"), "packs.rules")
     effect_registry = PackRegistry(item_attr="BUILD")
-    engine = GameEngine(EffectControls())
+    effect_manager = EffectManager(registry=effect_registry, outputs=[])
+    engine = GameEngine(effect_manager)
     scene_registry = SceneRegistry()
     scene_registry.register(
         "test_scene",
         lambda: Scene(effect_packs=[], rule_packs=[("debug", "99.0")]),
     )
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_registry)
+    manager = SceneManager(
+        engine, effect_registry, rule_registry, scene_registry, effect_admin=effect_manager
+    )
 
     with pytest.raises(ValueError):
         manager.load("test_scene")

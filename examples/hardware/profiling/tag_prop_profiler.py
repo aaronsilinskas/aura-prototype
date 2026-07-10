@@ -275,7 +275,9 @@ def _build_prop() -> tuple[
     scene_registry = SceneRegistry()
     scene_registry.scan_dir("packs/scenes", "packs.scenes")
 
-    manager = SceneManager(engine, effect_registry, rule_registry, scene_registry)
+    manager = SceneManager(
+        engine, effect_registry, rule_registry, scene_registry, effect_admin=effect_manager
+    )
     manager.load("tag")
     manager.update()  # applies the load transition; tag scene is now active
 
