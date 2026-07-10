@@ -1,11 +1,13 @@
 """Behaviour-driven tests for hardware/shared/device_config.py."""
 
+import json
+
 import pytest
 
 from hardware.shared.device_config import (
-    DEFAULT_DEVICE_CONFIG,
     DeviceConfig,
     parse_device_config,
+    read_device_config_mapping,
     validate_band_map,
 )
 
@@ -63,30 +65,27 @@ def neopixel_config():
 
 
 # ---------------------------------------------------------------------------
-# Happy path: DEFAULT_DEVICE_CONFIG
+# Happy path: full matrix config
 # ---------------------------------------------------------------------------
 
 
-def test_parse_default_config_returns_device_config():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
-
-    assert isinstance(result, DeviceConfig)
-
-
-def test_parse_default_config_pixels_contains_one_entry():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
+def test_parse_full_matrix_config_maps_every_section(matrix_config):
+    result = parse_device_config(matrix_config)
 
     assert len(result.pixels) == 1
-
-
-def test_parse_default_config_matrix_cols_matches():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
-
     assert result.pixels[0].cols == 13
+    assert result.buttons == ["D9", "D10"]
+    assert result.ir is not None
+    assert result.ir.rx == "D11"
+    assert result.ir.emitters["line"] == "D12"
+    assert result.audio is not None
+    assert result.audio.voices == 1
+    assert result.audio.max_volume == 0.1
+    assert result.audio.clips == {"sfx_test_start": "sounds/blip.wav"}
 
 
-def test_parse_default_config_scope_rows_converted_to_ranges():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
+def test_parse_matrix_config_scope_rows_converted_to_ranges(matrix_config):
+    result = parse_device_config(matrix_config)
 
     scope_rows = result.pixels[0].scope_rows
     assert scope_rows["global.buff"] == range(0, 1)
@@ -94,52 +93,23 @@ def test_parse_default_config_scope_rows_converted_to_ranges():
     assert scope_rows["ambient"] == range(8, 9)
 
 
-def test_parse_default_config_buttons_match():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
-
-    assert result.buttons == ["D9", "D10"]
-
-
-def test_parse_default_config_buttons_are_strings():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
-
-    for pin in result.buttons:
-        assert isinstance(pin, str)
+# ---------------------------------------------------------------------------
+# read_device_config_mapping — loading from disk
+# ---------------------------------------------------------------------------
 
 
-def test_parse_default_config_ir_rx_pin_matches():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
+def test_read_device_config_mapping_preserves_keys_the_parser_ignores(tmp_path):
+    path = tmp_path / "aura-device.json"
+    path.write_text(json.dumps({"buttons": ["D9"], "scene": "tag"}))
 
-    assert result.ir is not None
-    assert result.ir.rx == "D11"
+    result = read_device_config_mapping(str(path))
 
-
-def test_parse_default_config_ir_line_emitter_matches():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
-
-    assert result.ir is not None
-    assert result.ir.emitters["line"] == "D12"
+    assert result == {"buttons": ["D9"], "scene": "tag"}
 
 
-def test_parse_default_config_audio_voices_match():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
-
-    assert result.audio is not None
-    assert result.audio.voices == 1
-
-
-def test_parse_default_config_audio_max_volume_matches():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
-
-    assert result.audio is not None
-    assert result.audio.max_volume == 0.1
-
-
-def test_parse_default_config_audio_clips_match():
-    result = parse_device_config(DEFAULT_DEVICE_CONFIG)
-
-    assert result.audio is not None
-    assert result.audio.clips == {"sfx_test_start": "sounds/blip.wav"}
+def test_read_device_config_mapping_raises_when_file_absent(tmp_path):
+    with pytest.raises(RuntimeError, match="not found"):
+        read_device_config_mapping(str(tmp_path / "missing.json"))
 
 
 # ---------------------------------------------------------------------------
@@ -263,12 +233,6 @@ def test_parse_matrix_negative_brightness_raises_value_error(matrix_config):
 
     with pytest.raises(ValueError, match=r"pixels\[0\]\.brightness"):
         parse_device_config(matrix_config)
-
-
-def test_parse_default_config_omits_explicit_matrix_brightness():
-    """The default/fallback config leaves matrix brightness unset so the stock
-    board boots at full brightness (1.0) rather than the old 0x33 calibration."""
-    assert "brightness" not in DEFAULT_DEVICE_CONFIG["pixels"][0]
 
 
 # ---------------------------------------------------------------------------
@@ -470,8 +434,8 @@ def test_parse_ir_unknown_emitter_error_lists_valid_keys(matrix_config):
         parse_device_config(matrix_config)
 
 
-def test_parse_absent_ir_section_yields_none():
-    config = {"pixels": DEFAULT_DEVICE_CONFIG["pixels"], "buttons": ["D9"]}
+def test_parse_absent_ir_section_yields_none(matrix_config):
+    config = {"pixels": matrix_config["pixels"], "buttons": ["D9"]}
 
     result = parse_device_config(config)
 
@@ -497,8 +461,8 @@ def test_parse_audio_non_integer_voices_raises_value_error(matrix_config):
         parse_device_config(matrix_config)
 
 
-def test_parse_absent_audio_section_yields_none():
-    config = {"pixels": DEFAULT_DEVICE_CONFIG["pixels"], "buttons": ["D9"]}
+def test_parse_absent_audio_section_yields_none(matrix_config):
+    config = {"pixels": matrix_config["pixels"], "buttons": ["D9"]}
 
     result = parse_device_config(config)
 

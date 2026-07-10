@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from hardware.shared.device_config import DEFAULT_DEVICE_CONFIG, parse_device_config
+from hardware.shared.device_config import parse_device_config
 from scripts.deploy import deploy
 
 
@@ -44,6 +44,16 @@ def make_source_tree(root: Path) -> None:
     (root / "hardware" / "shared").mkdir()
     (root / "hardware" / "shared" / "__init__.py").write_text("")
     (root / "hardware" / "shared" / "matrix_output.py").write_text("# matrix_output")
+
+    (root / "examples").mkdir()
+    (root / "examples" / "aura-device.sample.json").write_text(
+        json.dumps(
+            {
+                "pixels": [{"type": "matrix", "cols": 13, "scope_rows": {"personal": [0, 2]}}],
+                "buttons": ["D9", "D10"],
+            }
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -687,7 +697,7 @@ def test_scene_flag_preserves_other_keys_in_existing_device_config(tmp_path: Pat
     assert result["pixels"] == existing_config["pixels"]
 
 
-def test_scene_flag_seeds_default_device_config_when_file_is_absent(tmp_path: Path) -> None:
+def test_scene_flag_seeds_config_from_sample_when_file_is_absent(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
@@ -698,8 +708,8 @@ def test_scene_flag_seeds_default_device_config_when_file_is_absent(tmp_path: Pa
 
     result = json.loads((mount / "aura-device.json").read_text())
     assert result["scene"] == "hardware_test"
-    for key in DEFAULT_DEVICE_CONFIG:
-        assert key in result
+    assert result["pixels"]
+    assert result["buttons"] == ["D9", "D10"]
     parse_device_config(result)
 
 

@@ -11,7 +11,6 @@ try:
 except ImportError:
     pass
 
-import json
 import time
 
 import adafruit_is31fl3741
@@ -33,12 +32,12 @@ from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
-    DEFAULT_DEVICE_CONFIG,
     AudioConfig,
     DeviceConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
     parse_device_config,
+    read_device_config_mapping,
 )
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_protocol import (
@@ -339,14 +338,8 @@ def _setup_ir(
 
 
 def load_device_config() -> DeviceConfig:
-    """Load config from aura-device.json, falling back to DEFAULT_DEVICE_CONFIG."""
-    try:
-        with open("aura-device.json") as f:
-            mapping = json.load(f)
-        return parse_device_config(mapping)
-    except OSError:
-        print("aura-device.json not found — using default device config")
-        return parse_device_config(DEFAULT_DEVICE_CONFIG)
+    """Load and parse aura-device.json from the device root."""
+    return parse_device_config(read_device_config_mapping())
 
 
 def build_hardware(

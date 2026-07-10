@@ -26,7 +26,7 @@ Hardware
 - Adafruit RP2040 PropMaker Feather
 - Adafruit IS31FL3741 13×9 RGB LED Matrix Breakout (I2C on default SDA/SCL)
 - Buttons, LIS3DH accelerometer, IR transceiver, DRV2605L haptics — all wired
-  per ``aura-device.json`` (or defaults when the file is absent)
+  per ``aura-device.json`` (required; the device has no built-in default)
 
 Installation
 ------------
@@ -38,29 +38,17 @@ Installation
      adafruit_lis3dh.mpy
      adafruit_drv2605.mpy  (optional)
 
-3. Optionally place ``aura-device.json`` in CIRCUITPY/ to override pin/geometry
-   defaults and select a scene via the ``"scene"`` key.
+3. Place ``aura-device.json`` in CIRCUITPY/ to declare pin/geometry and select
+   a scene via the ``"scene"`` key. It is required — the device has no built-in
+   default. Copy ``examples/aura-device.sample.json`` as a starting point.
 
 4. Run the deploy script to copy all source files and set code.py:
      python scripts/deploy.py examples/hardware/scene_demo.py
    The board reboots and starts running automatically.
 """
 
-import json
-
 from app.scene_runtime import run_scene
-from hardware.shared.device_config import DEFAULT_DEVICE_CONFIG
+from hardware.shared.device_config import read_device_config_mapping
 from hardware.shared.scene_selection import resolve_scene_name
 
-
-def _load_config_mapping() -> dict:
-    """Return the raw ``aura-device.json`` mapping, or the default when absent."""
-    try:
-        with open("aura-device.json") as f:
-            return json.load(f)
-    except OSError:
-        print("aura-device.json not found — using default device config")
-        return DEFAULT_DEVICE_CONFIG
-
-
-run_scene(resolve_scene_name(_load_config_mapping()))
+run_scene(resolve_scene_name(read_device_config_mapping()))

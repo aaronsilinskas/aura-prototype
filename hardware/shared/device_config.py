@@ -1,6 +1,8 @@
-"""Pure config parser for aura-device.json — no board imports, CPython-testable."""
+"""Config loader and parser for aura-device.json — no board imports, CPython-testable."""
 
 from __future__ import annotations
+
+import json
 
 try:
     from typing import Final
@@ -10,13 +12,13 @@ except ImportError:
 from engine.state import Scope
 
 __all__ = [
-    "DEFAULT_DEVICE_CONFIG",
     "DeviceConfig",
     "MatrixPixelsConfig",
     "NeoPixelPixelsConfig",
     "NeoPixelScopeConfig",
     "NeoPixelStripConfig",
     "parse_device_config",
+    "read_device_config_mapping",
     "validate_band_map",
 ]
 
@@ -27,40 +29,6 @@ __all__ = [
 _VALID_SCOPE_KEYS: Final = set(Scope.ALL.keys)
 
 _VALID_IR_EMITTER_KEYS: Final = {"line", "cone", "area_of_effect"}
-
-# ---------------------------------------------------------------------------
-# Default mapping — stock PropMaker + IS31FL3741 matrix
-# ---------------------------------------------------------------------------
-
-DEFAULT_DEVICE_CONFIG: Final = {
-    "pixels": [
-        {
-            "type": "matrix",
-            "cols": 13,
-            "scope_rows": {
-                "global.buff": [0, 1],
-                "global.debuff": [1, 2],
-                "global.main": [2, 5],
-                "personal": [5, 7],
-                "directional": [7, 8],
-                "ambient": [8, 9],
-            },
-        }
-    ],
-    "buttons": ["D9", "D10"],
-    "ir": {
-        "rx": "D11",
-        "line": "D12",
-    },
-    "audio": {
-        "voices": 1,
-        "max_volume": 0.1,
-        "clips": {
-            "sfx_test_start": "sounds/blip.wav",
-        },
-    },
-}
-
 
 # ---------------------------------------------------------------------------
 # Config data classes
@@ -454,3 +422,20 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
         audio = _parse_audio(mapping["audio"])
 
     return DeviceConfig(pixels=pixels, buttons=buttons, ir=ir, audio=audio)
+
+
+def read_device_config_mapping(path: str = "aura-device.json") -> dict:
+    """Return the raw config mapping from the JSON file at *path*.
+
+    Returns the raw mapping, not a parsed :class:`DeviceConfig`, so callers can
+    read keys ``parse_device_config`` ignores (e.g. the ``"scene"`` selector).
+
+    Raises:
+        RuntimeError: If *path* does not exist. The device has no built-in
+            default config, so a config file must be deployed to the board.
+    """
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except OSError:
+        raise RuntimeError(f"{path} not found — deploy a device config to the board") from None
