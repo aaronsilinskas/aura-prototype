@@ -14,6 +14,85 @@ except ImportError:
     pass
 
 
+class RegistryError(ValueError):
+    """Base class for typed registry lookup/load errors.
+
+    Subclasses ``ValueError`` so existing ``except ValueError`` callers (rule
+    loading, etc.) keep working unchanged.
+    """
+
+
+class UnknownPackError(RegistryError):
+    """A ``pack_name`` has no registered pack.
+
+    Raised by ``PackRegistry.get``, ``items``, and ``check_version``.
+    """
+
+    def __init__(self, pack_name: str) -> None:
+        self.pack_name = pack_name
+        super().__init__("Unknown pack '" + pack_name + "'")
+
+
+class UnknownItemError(RegistryError):
+    """An ``item_name`` is not registered.
+
+    Shared by ``PackRegistry.get`` (where *pack_name* names the owning pack)
+    and ``SceneLocalRegistry.get`` (where *pack_name* is ``None`` — scene-local
+    items have no pack namespace).
+    """
+
+    def __init__(
+        self,
+        item_name: str,
+        available: "list[str]",
+        pack_name: "str | None" = None,
+    ) -> None:
+        self.item_name = item_name
+        self.pack_name = pack_name
+        self.available = available
+        if pack_name is None:
+            message = "Unknown item '" + item_name + "'. Available: " + ", ".join(available)
+        else:
+            message = (
+                "Unknown item '"
+                + item_name
+                + "' in pack '"
+                + pack_name
+                + "'. Available: "
+                + ", ".join(available)
+            )
+        super().__init__(message)
+
+
+class MissingItemAttributeError(RegistryError):
+    """A loaded item module has no attribute named *attr*.
+
+    Raised by ``load_item``. *context* is the human-readable description of
+    the owning registry entry (see ``load_item``).
+    """
+
+    def __init__(self, context: str, attr: str) -> None:
+        self.context = context
+        self.attr = attr
+        super().__init__(context + " has no attribute '" + attr + "'")
+
+
+class ItemTypeError(RegistryError):
+    """A loaded item's attribute value is not an instance of *expected_class*.
+
+    Raised by ``load_item``. *context* is the human-readable description of
+    the owning registry entry (see ``load_item``).
+    """
+
+    def __init__(self, context: str, attr: str, expected_class: "type") -> None:
+        self.context = context
+        self.attr = attr
+        self.expected_class = expected_class
+        super().__init__(
+            context + " attribute '" + attr + "' is not an instance of " + expected_class.__name__
+        )
+
+
 def scan_item_names(dir: str) -> set[str]:
     """Return item names found in *dir* under the canonical pack-item rule.
 
@@ -50,22 +129,16 @@ def load_item(
     import path; *item_attr* is the attribute name to read from the module.
 
     Raises:
-        ValueError: if the module has no attribute named *item_attr*.
-        ValueError: if the attribute value is not an instance of *expected_class*.
+        MissingItemAttributeError: if the module has no attribute named *item_attr*.
+        ItemTypeError: if the attribute value is not an instance of *expected_class*.
     """
     module = __import__(full_module, None, None, [""])
     try:
         value = getattr(module, item_attr)
     except AttributeError:
-        raise ValueError(context + " has no attribute '" + item_attr + "'") from None
+        raise MissingItemAttributeError(context, item_attr) from None
     if not isinstance(value, expected_class):
-        raise ValueError(
-            context
-            + " attribute '"
-            + item_attr
-            + "' is not an instance of "
-            + expected_class.__name__
-        )
+        raise ItemTypeError(context, item_attr, expected_class)
     return value  # type: ignore[return-value]
 
 
@@ -186,26 +259,20 @@ class PackRegistry:
         expected_class)``; cache hits skip the check.
 
         Raises:
-            ValueError: if *pack_name* is unknown.
-            ValueError: if *item_name* is not in the recorded set for the pack
-                (raised before any import attempt).
-            ValueError: if the module has no attribute named *item_attr*.
-            ValueError: if the attribute value is not an instance of
+            UnknownPackError: if *pack_name* is unknown.
+            UnknownItemError: if *item_name* is not in the recorded set for the
+                pack (raised before any import attempt).
+            MissingItemAttributeError: if the module has no attribute named
+                *item_attr*.
+            ItemTypeError: if the attribute value is not an instance of
                 *expected_class*.
         """
         meta = self._packs.get(pack_name)
         if meta is None:
-            raise ValueError("Unknown pack '" + pack_name + "'")
+            raise UnknownPackError(pack_name)
 
         if item_name not in meta.item_names:
-            raise ValueError(
-                "Unknown item '"
-                + item_name
-                + "' in pack '"
-                + pack_name
-                + "'. Available: "
-                + ", ".join(sorted(meta.item_names))
-            )
+            raise UnknownItemError(item_name, sorted(meta.item_names), pack_name=pack_name)
 
         cache_key = (pack_name, item_name)
         if cache_key in self._cache:
@@ -221,11 +288,11 @@ class PackRegistry:
         """Return item names for *pack_name* in alphabetical order.
 
         Raises:
-            ValueError: if *pack_name* is unknown.
+            UnknownPackError: if *pack_name* is unknown.
         """
         meta = self._packs.get(pack_name)
         if meta is None:
-            raise ValueError("Unknown pack '" + pack_name + "'")
+            raise UnknownPackError(pack_name)
         return sorted(meta.item_names)
 
     def sound_path(self, event: EffectEvent) -> "str | None":
@@ -258,11 +325,11 @@ class PackRegistry:
         * Different major → ``ValueError`` containing "incompatible".
 
         Raises:
-            ValueError: if *pack_name* is unknown.
+            UnknownPackError: if *pack_name* is unknown.
             ValueError: if the installed version is not compatible.
         """
         meta = self._packs.get(pack_name)
         if meta is None:
-            raise ValueError("Unknown pack '" + pack_name + "'")
+            raise UnknownPackError(pack_name)
 
         meta.version.check_compatible(pack_name, required.major, required.minor)

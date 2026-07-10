@@ -10,7 +10,7 @@ import sys
 import pytest
 
 from engine.effects.manager import EffectBuilder, EffectResolver
-from engine.packs import PackRegistry
+from engine.packs import PackRegistry, UnknownItemError
 from engine.scene import SceneLocalRegistry
 
 # ---------------------------------------------------------------------------
@@ -227,6 +227,28 @@ def test_resolve_error_includes_full_effect_name_when_no_scene(pack_env) -> None
 # ---------------------------------------------------------------------------
 
 
+def test_resolve_raises_for_scene_local_invalid_build_attribute(pack_env) -> None:
+    registry = PackRegistry(item_attr="BUILD")
+    local_reg = _make_local_registry(pack_env, "scene_j", {"bad": _invalid_build_source()})
+    resolver = EffectResolver(registry)
+    resolver.set_local_effects(local_reg)
+
+    with pytest.raises(ValueError, match="Scene-local effect 'bad' has an invalid BUILD attribute"):
+        resolver.resolve("scene.bad")
+
+
+def test_resolve_raises_for_scene_local_missing_build_attribute(pack_env) -> None:
+    registry = PackRegistry(item_attr="BUILD")
+    local_reg = _make_local_registry(pack_env, "scene_k", {"nobuild": _no_build_source()})
+    resolver = EffectResolver(registry)
+    resolver.set_local_effects(local_reg)
+
+    with pytest.raises(
+        ValueError, match="Scene-local effect 'nobuild' is missing a BUILD attribute"
+    ):
+        resolver.resolve("scene.nobuild")
+
+
 def test_resolve_raises_for_unknown_scene_local_effect(pack_env) -> None:
     registry = PackRegistry(item_attr="BUILD")
     local_reg = _make_local_registry(pack_env, "scene_c", {"flash": _stub_item_source()})
@@ -290,3 +312,31 @@ def test_set_local_effects_replaces_previous_registry_old_effects_no_longer_reso
 
     with pytest.raises(ValueError, match="a_flash"):
         resolver.resolve("scene.a_flash")
+
+
+# ---------------------------------------------------------------------------
+# Anti-regression — dispatch is by exception type, never by message text
+# ---------------------------------------------------------------------------
+
+
+class _WrongWordingRegistry:
+    """Stub registry whose ``.get`` raises a typed error with deliberately
+    wrong wording, to prove the resolver dispatches on exception type rather
+    than parsing ``str(exc)``.
+    """
+
+    def __init__(self, error: Exception) -> None:
+        self._error = error
+
+    def get(self, pack_name: str, item_name: str, expected_class: type) -> object:
+        raise self._error
+
+
+def test_resolve_pack_error_message_is_canonical_even_when_typed_error_wording_is_wrong() -> None:
+    stub_registry = _WrongWordingRegistry(
+        UnknownItemError("totally different name", ["nope"], pack_name="totally different pack")
+    )
+    resolver = EffectResolver(stub_registry)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="Unknown effect 'fireball' in pack 'spells'"):
+        resolver.resolve("spells.fireball")
