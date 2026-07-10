@@ -13,6 +13,7 @@ import tracemalloc
 import pytest
 
 from hardware.shared.ir_protocol import AuraInfraredDecoder, AuraInfraredEncoder
+from hardware.shared.ir_telemetry import IrTelemetrySnapshot
 from hardware.shared.ir_transport import (
     InfraredMultiReceiver,
     InfraredReceiver,
@@ -609,6 +610,36 @@ def test_queued_send_encode_error_drops_only_the_failing_item_and_queue_keeps_dr
     assert writer.calls[-1] == list(encoder.encode(b"\x03"))
 
 
+def _reordered_snapshot_init(
+    self,
+    packets_surfaced,
+    pulses_seen,
+    buffer_full_on_poll,
+    packets_started,
+    preamble_reject,
+    mark_reject,
+    space_reject,
+    packets_completed,
+    pulses_dropped_transmitting,
+):
+    """A stand-in ``IrTelemetrySnapshot.__init__`` with two parameters
+    (``pulses_seen``/``packets_surfaced``) swapped relative to ``FIELDS``.
+
+    Used to simulate a future ``FIELDS`` reorder without touching the real
+    class. A ``telemetry()`` that still builds positional arguments in the
+    old order would silently swap these two counters; one that builds by
+    keyword is unaffected."""
+    self.pulses_seen = pulses_seen
+    self.packets_surfaced = packets_surfaced
+    self.buffer_full_on_poll = buffer_full_on_poll
+    self.packets_started = packets_started
+    self.preamble_reject = preamble_reject
+    self.mark_reject = mark_reject
+    self.space_reject = space_reject
+    self.packets_completed = packets_completed
+    self.pulses_dropped_transmitting = pulses_dropped_transmitting
+
+
 # ---------------------------------------------------------------------------
 # InfraredReceiver base contract
 # ---------------------------------------------------------------------------
@@ -799,6 +830,22 @@ def test_single_receiver_reset_telemetry_zeroes_whole_ir_path():
     assert decoder.packets_started == 0
     assert decoder.packets_completed == 0
     assert reader.buffer_full_on_poll == 0
+
+
+def test_single_receiver_telemetry_survives_a_fields_reorder(monkeypatch):
+    """A ``FIELDS`` reorder (simulated here by an ``IrTelemetrySnapshot``
+    constructor with two parameters swapped) must not swap counters — proves
+    ``telemetry()`` builds the snapshot by keyword, not position."""
+    monkeypatch.setattr(IrTelemetrySnapshot, "__init__", _reordered_snapshot_init)
+    payload = b"\xde\xad"
+    reader = FakePulseReader(_encode_pulses(payload))
+    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+
+    rx.receive()
+    snapshot = rx.telemetry()
+
+    assert snapshot.pulses_seen == rx.pulses_seen
+    assert snapshot.packets_surfaced == rx.packets_surfaced
 
 
 # ---------------------------------------------------------------------------
@@ -1212,6 +1259,22 @@ def test_multi_receiver_telemetry_sums_buffer_full_on_poll_across_readers():
     readers[2].buffer_full_on_poll = 5
 
     assert rx.telemetry().buffer_full_on_poll == 7
+
+
+def test_multi_receiver_telemetry_survives_a_fields_reorder(monkeypatch):
+    """A ``FIELDS`` reorder (simulated here by an ``IrTelemetrySnapshot``
+    constructor with two parameters swapped) must not swap counters — proves
+    ``telemetry()`` builds the snapshot by keyword, not position."""
+    monkeypatch.setattr(IrTelemetrySnapshot, "__init__", _reordered_snapshot_init)
+    payload = b"\x01"
+    rx, readers = _make_multi_receiver(2)
+    readers[0].load(_encode_pulses(payload))
+
+    rx.receive()
+    snapshot = rx.telemetry()
+
+    assert snapshot.pulses_seen == rx.pulses_seen
+    assert snapshot.packets_surfaced == rx.packets_surfaced
 
 
 def _make_tag_multi_receiver(num_readers):
