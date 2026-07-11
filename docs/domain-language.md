@@ -202,7 +202,7 @@ A CircuitPython `EffectOutput` driving a DRV2605L haptic motor on all scopes (`r
 _Avoid_: constructing with a `None` motor; subclassing for different haptic controllers (extract a base only when a second is needed); reading `receipt.loudness` (the DRV2605L has no volume control)
 
 ### aura-device.json
-The single on-device file holding **all** hardware configuration: buttons, IR pins/emitters, the `pixels` list, accelerometer/haptics presence, and audio (including the amp's I2S bus pins, required-together whenever an `audio` section is present). `pixels` is an **optional, possibly-empty list** of pixel outputs (matrix and/or strips; at most one matrix) — absent or `[]` means the device declares zero pixel outputs and the runtime comes up silently with none. Pin references are name **strings**, resolved against `board` only in the device-only builder. The file is **required** — there is no built-in default, so a missing file raises. Also carries an optional top-level `"scene"` string — per-boot game selection, read separately and **not** part of `DeviceConfig`.
+The single on-device file holding **all** hardware configuration: buttons, IR pins/emitters, the `pixels` list, accelerometer/haptics presence, and audio (including the amp's I2S bus pins, required-together whenever an `audio` section is present). `pixels` is an **optional, possibly-empty list** of pixel outputs (matrix and/or strips; at most one matrix) — absent or `[]` means the device declares zero pixel outputs and the runtime comes up silently with none. Pin references are name **strings**, resolved against `board` only in the device-only builder. `ir.rx` accepts **either a single pin string or a list of pin strings** — the receiver class is chosen by pin count (one → `InfraredSingleReceiver`, two or more → `InfraredMultiReceiver`), never by a separate flag. The file is **required** — there is no built-in default, so a missing file raises. Also carries an optional top-level `"scene"` string — per-boot game selection, read separately and **not** part of `DeviceConfig`.
 _Avoid_: `settings.toml` (removed — CircuitPython-only, unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`
 
 ### DeviceConfig
@@ -270,8 +270,8 @@ A directed infrared transmit channel. Constants `LINE`, `CONE`, `AREA_OF_EFFECT`
 _Avoid_: importing `magic.CastType` for IR emitters; a default emitter on `send_ir`
 
 ### IR multi-receiver
-Several IR receivers, each on its own data line, returning the packet with the lowest **error margin**. Improves reception reliability only — it does not yield hit direction.
-_Avoid_: treating the array as a direction finder (abandoned in field testing); sharing one data line across receivers
+Several IR receivers, each on its own data line, returning the packet with the lowest **error margin**. Improves reception reliability only — it does not yield hit direction. Selected declaratively by listing **two or more `rx` pins** in `aura-device.json`; `build_hardware` wires one `PulseInReader` per pin and each receiver gets its own fresh decoder (the multi-receiver builds them from the decoder *class*).
+_Avoid_: treating the array as a direction finder (abandoned in field testing); sharing one data line across receivers; a separate config flag to opt into it (pin count is the switch)
 
 ### IR error margin
 The worst-case pulse-timing deviation (µs) tolerated while still decoding a packet. Lower is better; the key the multi-receiver uses to pick the best receiver.
