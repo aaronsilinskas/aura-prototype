@@ -34,6 +34,7 @@ from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
     AudioConfig,
     DeviceConfig,
+    I2CConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
 )
@@ -75,12 +76,27 @@ def _setup_external_power() -> None:
     power.switch_to_output(value=True)
 
 
-def _setup_i2c() -> busio.I2C | None:
-    """Return an I2C bus on the board's default SDA/SCL pins, or ``None`` if
-    no I2C devices are wired (``busio.I2C`` requires a pull-up from an
-    attached device to construct successfully)."""
+def _setup_i2c(i2c_config: I2CConfig | None, board_module: object) -> busio.I2C | None:
+    """Return an I2C bus on the configured (or board-default) SDA/SCL pins,
+    or ``None`` if no I2C devices are wired (``busio.I2C`` requires a
+    pull-up from an attached device to construct successfully).
+
+    When *i2c_config* is present, ``sda``/``scl`` are resolved by name
+    against *board_module* — for boards (e.g. the Pimoroni Pico 2W) whose
+    ``board`` module lacks the ``SCL``/``SDA`` aliases. When absent, falls
+    back to ``board_module.SCL``/``board_module.SDA`` as before. A board
+    missing those aliases that also omits the config section raises
+    ``AttributeError`` uncaught — the intended nudge to add an ``i2c``
+    section to aura-device.json.
+    """
+    if i2c_config is not None:
+        scl = _resolve_pin(board_module, "i2c.scl", i2c_config.scl)
+        sda = _resolve_pin(board_module, "i2c.sda", i2c_config.sda)
+    else:
+        scl = board_module.SCL
+        sda = board_module.SDA
     try:
-        return busio.I2C(board.SCL, board.SDA)
+        return busio.I2C(scl, sda)
     except RuntimeError:
         return None
 
@@ -362,7 +378,7 @@ def build_hardware(
     """
     _setup_external_power()
     if i2c is None:
-        i2c = _setup_i2c()
+        i2c = _setup_i2c(config.i2c, board_module)
 
     outputs: list[EffectOutput] = []
     outputs.extend(_setup_pixels(config.pixels, board_module, i2c))

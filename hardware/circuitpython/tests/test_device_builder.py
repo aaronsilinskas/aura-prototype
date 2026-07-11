@@ -1072,17 +1072,102 @@ def test_setup_external_power_is_noop_when_board_has_no_pin() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _i2c_config(sda: str = "GP4", scl: str = "GP5"):
+    """Return an I2CConfig for testing _setup_i2c's named-pin branch."""
+    mapping = {
+        "buttons": ["D9"],
+        "i2c": {"sda": sda, "scl": scl},
+    }
+    return parse_device_config(mapping).i2c
+
+
 def test_setup_i2c_returns_none_when_no_pullup_found() -> None:
     with ExitStack() as stack:
         mock_busio = stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
         mock_busio.I2C.side_effect = RuntimeError(
             "No pull up found on SDA or SCL; check your wiring"
         )
-        stack.enter_context(patch("hardware.circuitpython.device_builder.board", _mock_board()))
+        board_mock = _mock_board(SCL=MagicMock(), SDA=MagicMock())
 
         from hardware.circuitpython.device_builder import _setup_i2c
 
-        assert _setup_i2c() is None
+        assert _setup_i2c(None, board_mock) is None
+
+
+def test_setup_i2c_uses_board_default_pins_when_no_config_present() -> None:
+    """Absent an i2c config, _setup_i2c falls back to board.SCL/board.SDA,
+    matching pre-#679 behaviour for boards whose ``board`` module already
+    aliases the bus pins."""
+    board_mock = _mock_board(SCL=MagicMock(name="SCL"), SDA=MagicMock(name="SDA"))
+
+    with ExitStack() as stack:
+        mock_busio = stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+        mock_bus = MagicMock(name="bus")
+        mock_busio.I2C.return_value = mock_bus
+
+        from hardware.circuitpython.device_builder import _setup_i2c
+
+        result = _setup_i2c(None, board_mock)
+
+    mock_busio.I2C.assert_called_once_with(board_mock.SCL, board_mock.SDA)
+    assert result is mock_bus
+
+
+def test_setup_i2c_resolves_named_pins_and_constructs_bus_in_scl_sda_order() -> None:
+    """With an i2c config present, _setup_i2c resolves sda/scl by name against
+    board (for boards lacking SCL/SDA aliases) and preserves busio.I2C's
+    existing (scl, sda) positional argument order."""
+    scl_pin = MagicMock(name="scl_pin")
+    sda_pin = MagicMock(name="sda_pin")
+    board_mock = _mock_board(GP5=scl_pin, GP4=sda_pin)
+    i2c_config = _i2c_config(sda="GP4", scl="GP5")
+
+    with ExitStack() as stack:
+        mock_busio = stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+        mock_bus = MagicMock(name="bus")
+        mock_busio.I2C.return_value = mock_bus
+
+        from hardware.circuitpython.device_builder import _setup_i2c
+
+        result = _setup_i2c(i2c_config, board_mock)
+
+    mock_busio.I2C.assert_called_once_with(scl_pin, sda_pin)
+    assert result is mock_bus
+
+
+def test_setup_i2c_bad_pin_name_raises_value_error() -> None:
+    board_mock = MagicMock(spec=["GP5"])  # only scl resolves, sda has no attribute
+    board_mock.GP5 = MagicMock(name="GP5")
+    i2c_config = _i2c_config(sda="NONEXISTENT_PIN", scl="GP5")
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+
+        from hardware.circuitpython.device_builder import _setup_i2c
+
+        with pytest.raises(ValueError, match="NONEXISTENT_PIN"):
+            _setup_i2c(i2c_config, board_mock)
+
+
+def test_build_hardware_passes_i2c_config_and_board_to_setup_i2c() -> None:
+    """build_hardware threads config.i2c and the board module into the
+    self-constructed-bus branch, so a bad-alias board with an i2c section
+    resolves named pins rather than falling back to board.SCL/board.SDA."""
+    mapping = {
+        "buttons": ["D9"],
+        "i2c": {"sda": "GP4", "scl": "GP5"},
+    }
+    config = parse_device_config(mapping)
+    board_mock = _mock_board(D9=MagicMock())
+
+    with ExitStack() as stack:
+        mock_setup_i2c = _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock)
+
+    mock_setup_i2c.assert_called_once_with(config.i2c, board_mock)
 
 
 def test_build_hardware_omits_accelerometer_and_motor_when_i2c_unavailable() -> None:
