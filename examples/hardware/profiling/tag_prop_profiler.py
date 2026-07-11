@@ -30,17 +30,24 @@ Hardware bring-up
 ------------------
 The whole hardware bundle -- matrix, buttons, accelerometer/motor (probed by
 physical presence), audio, and IR -- is brought up through a single
-`build_hardware` call, from a `DeviceConfig` built in-file (see `_TAG_HARNESS`
-below) rather than read from an `aura-device.json` on the CIRCUITPY drive. This
-keeps the profiler self-contained: no separate config file to keep in sync with
-the wiring described here.
+`build_hardware` call, from a `DeviceConfig` built in-file (see
+`_build_tag_harness` below). Button and IR wiring pins (`buttons[0]`,
+`buttons[1]`, `ir.rx`, `ir.line`) are sourced from the real `aura-device.json`
+on the CIRCUITPY drive via `load_device_config()`/`require_pin`, so the
+profiler's button/IR wiring never drifts from the on-device config; a pin
+absent from `aura-device.json` fails loudly with a "not declared" error rather
+than falling back to a guessed pin. The pixel/audio harness sections
+(clips/voices/codec) stay profiler-owned and hardcoded, as do the I2S bus pins
+(they have no schema field here -- see the Handoff in #646).
 
 Hardware
 --------
 - Adafruit RP2040 PropMaker Feather
 - Adafruit IS31FL3741 13x9 RGB LED Matrix Breakout (I2C on default SDA/SCL)
-- Two buttons (pull-up) on BUTTON_A_PIN / BUTTON_B_PIN (default: D9 / D10)
-- IR receiver on IR_RX_PIN; IR LINE emitter on IR_LINE_PIN
+- Two buttons (pull-up), wired to the pins declared as `buttons[0]` /
+  `buttons[1]` in `aura-device.json`
+- IR receiver and IR LINE emitter, wired to the pins declared as `ir.rx` /
+  `ir.line` in `aura-device.json`
 - DRV2605L haptic motor driver on default SDA/SCL (optional -- profiler runs
   without it, but the vibration component is then absent from the measurement)
 
@@ -72,6 +79,9 @@ How to use
 
 Configuration
 -------------
+- buttons[0] / buttons[1] / ir.rx / ir.line: read from `aura-device.json` (via
+  `require_pin`) -- the button and IR wiring pins for the reference prop. A
+  missing pin fails loudly.
 - TARGET_FPS: frame budget basis for reservation/headroom (the prop's achievable
   rate, NOT the 24 FPS ceiling for any prop with a matrix scope).
 - ENGINE_HOST_BASELINE_CPU_PERCENT / HEADROOM_RESERVE_PERCENT: the engine-host
@@ -99,7 +109,7 @@ from engine.timer import Timer
 from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.device_builder import build_hardware
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
-from hardware.shared.device_config import parse_device_config
+from hardware.shared.device_config import load_device_config, parse_device_config, require_pin
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiling_helpers import (
@@ -118,16 +128,11 @@ except ImportError:
 # Configuration -- adjust to match your wiring
 # ---------------------------------------------------------------------------
 
-BUTTON_A_PIN: Final = "GP14"
-BUTTON_B_PIN: Final = "GP15"
-
-# IR transceiver pins -- update these to match your board layout.
-IR_RX_PIN: Final = "GP16"
-IR_LINE_PIN: Final = "GP17"
-
 # I2S amp pins -- update these to match your board layout. Declared directly
-# in _TAG_HARNESS's audio section below, resolved against the real `board`
-# module by build_hardware the same way every other configured pin is.
+# in _build_tag_harness's audio section below, resolved against the real
+# `board` module by build_hardware the same way every other configured pin
+# is. No aura-device.json schema field owns these here -- see the Handoff
+# in #646.
 I2S_BIT_CLOCK_PIN_NAME: Final = "GP10"
 I2S_WORD_SELECT_PIN_NAME: Final = "GP11"
 I2S_DATA_PIN_NAME: Final = "GP12"
@@ -158,47 +163,59 @@ WARMUP_SECONDS: Final = 10.0
 
 LOG_INTERVAL_SECONDS: Final = 5.0
 
-# Self-contained aura-device.json-shaped mapping for the reference tag prop --
-# built in-file (rather than read from the CIRCUITPY drive) so the profiler
-# carries its own wiring and never drifts from an on-device config file. Mirrors
-# `examples/hardware/tag_demo.py`'s pixel/button/IR wiring, plus 4 audio voices
-# covering the 7 clips this profiler has historically exercised (carried over
-# unchanged from the pre-migration setup) -- a subset of the `tag` scene's full
-# clip set; `dry_fire_start` and `ready_shots_start` are not included.
-_TAG_HARNESS: Final = {
-    "pixels": [
-        {
-            "type": "matrix",
-            "cols": 13,
-            "scope_rows": {
-                "global.buff": [0, 1],
-                "global.debuff": [1, 2],
-                "global.main": [2, 5],
-                "personal": [5, 7],
-                "directional": [7, 8],
-                "ambient": [8, 9],
+
+def _build_tag_harness(
+    button_a_pin: str, button_b_pin: str, ir_rx_pin: str, ir_line_pin: str
+) -> dict:
+    """Return the aura-device.json-shaped mapping for the reference tag prop.
+
+    *button_a_pin*, *button_b_pin*, *ir_rx_pin*, and *ir_line_pin* are real pin
+    names harvested from `aura-device.json` by `_build_prop()` via `require_pin`
+    (`buttons[0]`, `buttons[1]`, `ir.rx`, `ir.line`) -- a missing one fails
+    loudly there rather than falling back to a guessed pin.
+
+    The pixels/audio sections stay profiler-owned and hardcoded here, mirroring
+    `examples/hardware/tag_demo.py`'s pixel wiring, plus 4 audio voices covering
+    the 7 clips this profiler has historically exercised (carried over unchanged
+    from the pre-migration setup) -- a subset of the `tag` scene's full clip
+    set; `dry_fire_start` and `ready_shots_start` are not included. The I2S bus
+    pins likewise stay hardcoded -- they have no schema field here and are owned
+    by the I2S spec (see the Handoff in #646).
+    """
+    return {
+        "pixels": [
+            {
+                "type": "matrix",
+                "cols": 13,
+                "scope_rows": {
+                    "global.buff": [0, 1],
+                    "global.debuff": [1, 2],
+                    "global.main": [2, 5],
+                    "personal": [5, 7],
+                    "directional": [7, 8],
+                    "ambient": [8, 9],
+                },
+            }
+        ],
+        "buttons": [button_a_pin, button_b_pin],
+        "ir": {"rx": ir_rx_pin, "line": ir_line_pin},
+        "audio": {
+            "voices": 4,
+            "max_volume": 0.1,
+            "clips": {
+                "warning_pulse_peak": "sounds/blip.wav",
+                "go_start": "sounds/blip.wav",
+                "game_over_sting_start": "sounds/game_over.wav",
+                "fire_shot_start": "sounds/blip.wav",
+                "scene.hit_start": "sounds/blip.wav",
+                "reload": "sounds/blip.wav",
+                "reload_complete": "sounds/blip.wav",
             },
-        }
-    ],
-    "buttons": [BUTTON_A_PIN, BUTTON_B_PIN],
-    "ir": {"rx": IR_RX_PIN, "line": IR_LINE_PIN},
-    "audio": {
-        "voices": 4,
-        "max_volume": 0.1,
-        "clips": {
-            "warning_pulse_peak": "sounds/blip.wav",
-            "go_start": "sounds/blip.wav",
-            "game_over_sting_start": "sounds/game_over.wav",
-            "fire_shot_start": "sounds/blip.wav",
-            "scene.hit_start": "sounds/blip.wav",
-            "reload": "sounds/blip.wav",
-            "reload_complete": "sounds/blip.wav",
+            "i2s_bit_clock": I2S_BIT_CLOCK_PIN_NAME,
+            "i2s_word_select": I2S_WORD_SELECT_PIN_NAME,
+            "i2s_data": I2S_DATA_PIN_NAME,
         },
-        "i2s_bit_clock": I2S_BIT_CLOCK_PIN_NAME,
-        "i2s_word_select": I2S_WORD_SELECT_PIN_NAME,
-        "i2s_data": I2S_DATA_PIN_NAME,
-    },
-}
+    }
 
 
 def _require_output(hardware: DeviceHardware, output_type: type[EffectOutput]) -> None:
@@ -227,7 +244,19 @@ def _build_prop() -> tuple[
     gc.collect()
     free_before = gc.mem_free()
 
-    config = parse_device_config(_TAG_HARNESS)
+    # Harvest button/IR wiring pins from the real aura-device.json -- never fed
+    # wholesale to build_hardware below, only used as a pin-name source for the
+    # in-file _build_tag_harness mapping (pixels/audio sections stay
+    # profiler-owned). A pin absent from aura-device.json fails loudly here.
+    device_config = load_device_config()
+    button_a_pin = require_pin(device_config, lambda c: c.buttons[0], "buttons[0]")
+    button_b_pin = require_pin(device_config, lambda c: c.buttons[1], "buttons[1]")
+    ir_rx_pin = require_pin(device_config, lambda c: c.ir.rx, "ir.rx")
+    ir_line_pin = require_pin(device_config, lambda c: c.ir.emitters["line"], "ir.line")
+
+    config = parse_device_config(
+        _build_tag_harness(button_a_pin, button_b_pin, ir_rx_pin, ir_line_pin)
+    )
     hardware = build_hardware(
         config,
         board,
