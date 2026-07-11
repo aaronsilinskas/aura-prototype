@@ -394,10 +394,11 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
 def parse_device_config(mapping: dict) -> DeviceConfig:
     """Parse a device config mapping into a DeviceConfig.
 
-    The ``pixels`` key must be a list of pixel-output entries.  Each entry
-    must have a ``type`` field of ``"matrix"`` or ``"neopixel"``.  The list
-    must contain at least one entry, and at most one entry of type
-    ``"matrix"``.
+    The ``pixels`` key is optional; when absent or an empty list, the device
+    declares zero pixel outputs and ``DeviceConfig.pixels`` is ``[]``. When
+    present and non-empty, ``pixels`` must be a list of pixel-output entries,
+    each with a ``type`` field of ``"matrix"`` or ``"neopixel"``, with at
+    most one entry of type ``"matrix"``.
 
     Example ``aura-device.json`` snippet::
 
@@ -422,9 +423,6 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
 
     if not isinstance(pixels_raw, list):
         raise ValueError("pixels must be a list of pixel-output entries")
-
-    if len(pixels_raw) == 0:
-        raise ValueError("pixels must contain at least one entry")
 
     pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = []
     matrix_count = 0
