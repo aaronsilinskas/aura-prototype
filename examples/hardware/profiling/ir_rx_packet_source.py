@@ -82,7 +82,18 @@ def _build_network_controls() -> HardwareNetworkControls:
     rx_pin = require_pin(device_config, lambda c: c.ir.rx, "ir.rx")
     line_pin = require_pin(device_config, lambda c: c.ir.emitters["line"], "ir.line")
 
-    config = parse_device_config({"ir": {"rx": rx_pin, "line": line_pin}})
+    # Forward the I2C bus pins too: build_hardware always constructs the bus to
+    # probe for the accelerometer/motor, so on a board whose `board` module
+    # lacks SCL/SDA aliases (e.g. the Pimoroni Pico 2W) the minimal config must
+    # carry the i2c section or bus construction raises AttributeError.
+    minimal_mapping = {"ir": {"rx": rx_pin, "line": line_pin}}
+    if device_config.i2c is not None:
+        minimal_mapping["i2c"] = {
+            "sda": device_config.i2c.sda,
+            "scl": device_config.i2c.scl,
+        }
+
+    config = parse_device_config(minimal_mapping)
     hw = build_hardware(config)
     return hw.network_controls
 
