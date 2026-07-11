@@ -20,14 +20,14 @@ Raise `DELAY_MS` to throttle to a lower, rounder rate.
 
 Hardware
 --------
-- IR emitter (LINE) wired to `LINE_PIN_NAME`, driven via `pulseio.PulseOut` at
-  38kHz through `device_builder.build_hardware`, aimed at the profiler board's IR
-  receivers.
-- IR receiver wired to `RX_PIN_NAME` -- unused by this script, but `build_hardware`
-  always wires a receiver alongside the LINE emitter.
-- The in-file config also declares one placeholder NeoPixel pixel and one
-  placeholder button pin, satisfying `parse_device_config`'s non-empty `pixels` /
-  `buttons` requirements. Neither is driven by this script -- IR is the only
+- IR emitter (LINE) wired to the pin declared by `ir.line` in the real
+  `aura-device.json`, driven via `pulseio.PulseOut` at 38kHz through
+  `device_builder.build_hardware`, aimed at the profiler board's IR receivers.
+- IR receiver wired to the pin declared by `ir.rx` -- unused by this script, but
+  `build_hardware` always wires a receiver alongside the LINE emitter.
+- The in-file config declares empty `pixels`/`buttons` sections -- both are
+  valid empty lists (`parse_device_config` no longer requires either to be
+  non-empty), and neither is driven by this script. IR is the only
   functionally relevant section.
 
 Installation
@@ -41,10 +41,11 @@ Installation
 
 Configuration
 -------------
-- LINE_PIN_NAME: board pin for the LINE emitter, passed as `ir.line` in the in-file
-  device config
-- RX_PIN_NAME: board pin for the (unused but required) IR receiver, passed as
-  `ir.rx`
+- Wiring pins come from the real `aura-device.json` on the CIRCUITPY drive, via
+  `load_device_config()`: `ir.line` for the LINE emitter and `ir.rx` for the
+  (unused but required) IR receiver. A pin absent from `aura-device.json` fails
+  loudly with a "not declared" error via `require_pin` rather than falling back
+  to a guessed pin.
 - PACKET_SIZE: bytes per transmitted packet (byte 0 is the sequence number);
   defaults to 4 to match the realistic AURA payload
 - DELAY_MS: delay inserted after each send to throttle the rate; defaults to 0
@@ -57,7 +58,7 @@ from __future__ import annotations
 import time
 
 from engine.network import LINE
-from hardware.shared.device_config import parse_device_config
+from hardware.shared.device_config import load_device_config, parse_device_config, require_pin
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiling_helpers import board_id, runtime_id
 
@@ -66,39 +67,22 @@ try:
 except ImportError:
     pass
 
-LINE_PIN_NAME: Final = "D12"
-RX_PIN_NAME: Final = "D11"
 PACKET_SIZE: Final = 4
 DELAY_MS: Final = 0.0
 LOG_INTERVAL_SECONDS: Final = 5.0
-
-# Placeholder pins for the pixels/buttons sections `parse_device_config` requires
-# to be non-empty. Neither output is driven by this script.
-_PLACEHOLDER_NEOPIXEL_PIN_NAME: Final = "D5"
-_PLACEHOLDER_BUTTON_PIN_NAME: Final = "D9"
-
-# In-file, IR-only device config -- `ir` is the only section this script drives.
-_DEVICE_CONFIG_MAPPING: Final = {
-    "pixels": [
-        {
-            "type": "neopixel",
-            "pin": _PLACEHOLDER_NEOPIXEL_PIN_NAME,
-            "count": 1,
-            "scope_pixels": {"personal": [0, 1]},
-        }
-    ],
-    "buttons": [_PLACEHOLDER_BUTTON_PIN_NAME],
-    "ir": {
-        "rx": RX_PIN_NAME,
-        "line": LINE_PIN_NAME,
-    },
-}
 
 
 def _build_network_controls() -> HardwareNetworkControls:
     from hardware.circuitpython.device_builder import build_hardware
 
-    config = parse_device_config(_DEVICE_CONFIG_MAPPING)
+    # The real aura-device.json is a pin-name source only -- it is never fed
+    # wholesale to build_hardware, which is handed the minimal, IR-only config
+    # built below instead.
+    device_config = load_device_config()
+    rx_pin = require_pin(device_config, lambda c: c.ir.rx, "ir.rx")
+    line_pin = require_pin(device_config, lambda c: c.ir.emitters["line"], "ir.line")
+
+    config = parse_device_config({"ir": {"rx": rx_pin, "line": line_pin}})
     hw = build_hardware(config)
     return hw.network_controls
 
