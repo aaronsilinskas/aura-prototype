@@ -419,11 +419,13 @@ def test_parse_ir_without_rx_raises_value_error(matrix_config):
         parse_device_config(matrix_config)
 
 
-def test_parse_ir_without_line_raises_value_error(matrix_config):
+def test_parse_ir_without_line_omits_line_emitter(matrix_config):
     del matrix_config["ir"]["line"]
 
-    with pytest.raises(ValueError, match=r"ir\.line"):
-        parse_device_config(matrix_config)
+    result = parse_device_config(matrix_config)
+
+    assert result.ir is not None
+    assert "line" not in result.ir.emitters
 
 
 def test_parse_ir_rx_non_string_raises_value_error(matrix_config):

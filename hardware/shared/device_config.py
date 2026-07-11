@@ -346,11 +346,11 @@ def _parse_ir(ir_raw: dict) -> IRConfig:
         raise ValueError("ir.rx is required")
     if not isinstance(ir_raw["rx"], str):
         raise ValueError("ir.rx must be a string pin name")
-    if "line" not in ir_raw:
-        raise ValueError("ir.line is required")
-    if not isinstance(ir_raw["line"], str):
-        raise ValueError("ir.line must be a string pin name")
 
+    # rx is the only required IR pin; every emitter (line/cone/area_of_effect)
+    # is optional and validated uniformly by the loop below. A prop that
+    # cannot transmit on a given emitter simply omits it; usage sites guard
+    # the absence via require_pin.
     emitters: dict[str, str] = {}
     for key, pin in ir_raw.items():
         if key == "rx":
@@ -372,10 +372,9 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
     max_volume = audio_raw.get("max_volume", 1.0)
     clips: dict[str, str] = dict(audio_raw.get("clips", {}))
 
-    # The I2S bus pins are required-together (mirrors ir.rx/ir.line): a
-    # half-configured bus is exactly the case where two of three might be
-    # missing, so every missing field is named in one error instead of
-    # stopping at the first.
+    # The I2S bus pins are required-together: a half-configured bus is exactly
+    # the case where two of three might be missing, so every missing field is
+    # named in one error instead of stopping at the first.
     missing = [field for field in _I2S_PIN_FIELDS if field not in audio_raw]
     if missing:
         names = ", ".join(f"audio.{field}" for field in missing)
