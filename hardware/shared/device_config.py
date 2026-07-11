@@ -346,8 +346,6 @@ def _parse_pixels_entry(
 
 
 def _parse_buttons(buttons_raw: list) -> list[str]:
-    if not buttons_raw:
-        raise ValueError("buttons requires at least one pin")
     result: list[str] = []
     for i, pin in enumerate(buttons_raw):
         if not isinstance(pin, str):
@@ -434,6 +432,9 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     present and non-empty, ``pixels`` must be a list of pixel-output entries,
     each with a ``type`` field of ``"matrix"`` or ``"neopixel"``, with at
     most one entry of type ``"matrix"``.
+
+    The ``buttons`` key is likewise optional; when absent or an empty list,
+    the device declares zero buttons and ``DeviceConfig.buttons`` is ``[]``.
 
     Example ``aura-device.json`` snippet::
 

@@ -389,15 +389,22 @@ def test_parse_unknown_pixels_type_raises_value_error(matrix_config):
 
 
 # ---------------------------------------------------------------------------
-# Button validation
+# Button validation: optional/empty
 # ---------------------------------------------------------------------------
 
 
-def test_parse_no_buttons_raises_value_error(matrix_config):
+def test_parse_absent_buttons_key_yields_empty_list():
+    result = parse_device_config({})
+
+    assert result.buttons == []
+
+
+def test_parse_empty_buttons_list_yields_empty_list(matrix_config):
     matrix_config["buttons"] = []
 
-    with pytest.raises(ValueError, match="buttons"):
-        parse_device_config(matrix_config)
+    result = parse_device_config(matrix_config)
+
+    assert result.buttons == []
 
 
 def test_parse_non_string_button_pin_raises_value_error(matrix_config):
