@@ -43,6 +43,15 @@ sweep wrapper is pure software and claims no pins:
   worst-case (max-length) figure rather than scaling with count -- an accepted, conservative
   approximation; the per-pixel render slope stays faithful.
 
+Wiring pins come from the real `aura-device.json` on the CIRCUITPY drive, via
+`load_device_config()`: `buttons[0]` for the profiler's button, and -- only in
+`"neopixel_pwm"` mode -- the strip pin via `first_neopixel_pin` (matrix mode sources only
+the button; the matrix has no GPIO pin in the schema). A pin absent from `aura-device.json`
+fails loudly with a "not declared" error via `require_pin` rather than falling back to a
+guessed pin. The real config is a pin-name source only -- it is never fed wholesale to
+`build_hardware`, which is still handed the profiler's own tailored, minimal `DeviceConfig`
+built below.
+
 `build_hardware` also always probes the LIS3DH accelerometer and DRV2605 motor by physical
 presence, so the bundle may carry those too. They are never driven here -- the profiler
 builds its `EffectManager` around only the swept pixel output -- so they sit as a fixed heap
@@ -55,9 +64,12 @@ tick gives the reported I2C bandwidth. NeoPixel PWM is off the I2C bus (bandwidt
 
 Hardware
 --------
-- ``"neopixel_pwm"``: a NeoPixel-compatible LED strip/ring on `NEOPIXEL_PIN`.
+- ``"neopixel_pwm"``: a NeoPixel-compatible LED strip/ring, wired to the pin declared by
+  the first NeoPixel entry in ``aura-device.json``.
 - ``"is31fl3741_matrix"``: an IS31FL3741-based RGB matrix (e.g. Adafruit
   RGBMatrixQT) on the board's I2C bus.
+
+Both modes read the profiler's button from ``buttons[0]`` in ``aura-device.json``.
 
 Installation
 ------------
@@ -101,7 +113,13 @@ from hardware.circuitpython.counting_i2c import CountingI2C
 from hardware.circuitpython.device_builder import build_hardware
 from hardware.circuitpython.is31fl3741_output import IS31FL3741_COLS, IS31FL3741EffectOutput
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
-from hardware.shared.device_config import DeviceConfig, parse_device_config
+from hardware.shared.device_config import (
+    DeviceConfig,
+    first_neopixel_pin,
+    load_device_config,
+    parse_device_config,
+    require_pin,
+)
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.profiling_helpers import (
     linear_fit,
@@ -123,9 +141,6 @@ TARGET_FPS: Final = 24.0
 DISPLAY_SECONDS: Final = 10.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
-NEOPIXEL_PIN: Final = "GP6"
-BUTTON_A_PIN: Final = "GP14"
-
 # The IS31FL3741 RGBMatrixQT is physically 13 columns by MATRIX_ROWS rows; a swept
 # row band cannot address beyond it, so per-count row counts are capped here.
 MATRIX_ROWS: Final = 9
@@ -135,11 +150,17 @@ MATRIX_ROWS: Final = 9
 I2C_FREQUENCY_HZ: Final = TARGET_FPS
 
 
-def _build_pixel_config(driver: str, largest_count: int) -> DeviceConfig:
+def _build_pixel_config(
+    driver: str, largest_count: int, button_pin: str, neopixel_pin: str | None
+) -> DeviceConfig:
     """Return a minimal `DeviceConfig` declaring only the profiled pixel output.
 
-    NeoPixel builds one strip at *largest_count* so every swept count addresses a
-    prefix of the same physical strip. No audio/IR is wired.
+    *button_pin* and *neopixel_pin* are real pin names harvested from
+    `aura-device.json` by `run()` (`neopixel_pin` is only sourced, and only needed,
+    for the `"neopixel_pwm"` driver) -- this still builds its own minimal, tailored
+    config for the swept pixel counts rather than passing the real config to
+    `build_hardware` wholesale. NeoPixel builds one strip at *largest_count* so every
+    swept count addresses a prefix of the same physical strip. No audio/IR is wired.
     """
     if driver == "is31fl3741_matrix":
         pixels = {
@@ -150,13 +171,13 @@ def _build_pixel_config(driver: str, largest_count: int) -> DeviceConfig:
     elif driver == "neopixel_pwm":
         pixels = {
             "type": "neopixel",
-            "pin": NEOPIXEL_PIN,
+            "pin": neopixel_pin,
             "count": largest_count,
             "scope_pixels": {"personal": [0, largest_count]},
         }
     else:
         raise ValueError(f"Unknown DRIVER: {driver!r}")
-    return parse_device_config({"pixels": [pixels], "buttons": [BUTTON_A_PIN]})
+    return parse_device_config({"pixels": [pixels], "buttons": [button_pin]})
 
 
 def _require_pixel_output(hardware: DeviceHardware, driver: str) -> EffectOutput:
@@ -274,10 +295,19 @@ def run() -> None:
     registry.scan_dir("packs/effects", "packs.effects")
     element_names = registry.items("elements")
 
+    # Harvest wiring pins from the real aura-device.json -- never fed wholesale to
+    # build_hardware below, only used as a pin-name source for the profiler's own
+    # tailored config. A pin absent from aura-device.json fails loudly here.
+    device_config = load_device_config()
+    button_pin = require_pin(device_config, lambda c: c.buttons[0], "buttons[0]")
+    neopixel_pin = None
+    if DRIVER == "neopixel_pwm":
+        neopixel_pin = require_pin(device_config, first_neopixel_pin, "neopixel.pin")
+
     # Build the device once: build_hardware claims pins without deiniting, so it cannot
     # be re-called per swept count. The one shared driver is reused across the sweep.
     counting_i2c = CountingI2C(board.STEMMA_I2C())
-    config = _build_pixel_config(DRIVER, PIXEL_COUNTS[-1])
+    config = _build_pixel_config(DRIVER, PIXEL_COUNTS[-1], button_pin, neopixel_pin)
     hardware = build_hardware(config, board, i2c=counting_i2c)
     pixel_output = _require_pixel_output(hardware, DRIVER)
 
