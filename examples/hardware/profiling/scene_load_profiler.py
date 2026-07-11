@@ -279,6 +279,11 @@ def _device_config_for(harness: dict) -> DeviceConfig:
     }
     if harness["ir"] is not None:
         mapping["ir"] = {"rx": IR_RX_PIN_NAME, "line": IR_LINE_PIN_NAME}
+    # Forward the real device's I2C bus pins so build_hardware constructs the
+    # matrix/accelerometer/motor bus on the configured SDA/SCL (build_hardware
+    # falls back to board.SCL/SDA when the section is absent).
+    if _device_config.i2c is not None:
+        mapping["i2c"] = {"sda": _device_config.i2c.sda, "scl": _device_config.i2c.scl}
     return parse_device_config(mapping)
 
 
@@ -339,7 +344,6 @@ def _build_prop(scene_name: str, harness: dict) -> tuple[SceneManager, EffectMan
         board,
         ir_encoder=ir_encoder,
         ir_decoder=ir_decoder,
-        i2c=board.STEMMA_I2C(),
     )
     gc.collect()
     free_after_hardware = gc.mem_free()

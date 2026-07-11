@@ -74,9 +74,10 @@ from engine.state import EffectReceipt
 from hardware.circuitpython.counting_i2c import CountingI2C
 from hardware.circuitpython.device_builder import build_hardware
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
-from hardware.shared.device_config import DeviceConfig
+from hardware.shared.device_config import DeviceConfig, load_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.profiling_helpers import (
+    open_config_i2c,
     print_profile_header,
     print_stats_line,
     print_table_row,
@@ -110,10 +111,12 @@ def _require_drv2605_output(hardware: DeviceHardware) -> Drv2605EffectOutput:
 
 def run() -> None:
     """Drive `handle_event` once per `EVENT_INTERVAL_SECONDS`, reporting per-event cost."""
-    counting_bus = CountingI2C(board.STEMMA_I2C())
+    # Source the I2C bus pins from the real aura-device.json so the injected
+    # (byte-counting) bus lands on the configured SDA/SCL.
+    counting_bus = CountingI2C(open_config_i2c(load_device_config()))
     # Minimal config: no pixels/audio/IR. The motor (and accelerometer) are probed by
     # physical presence, not config, so they still come up on the injected bus.
-    config = DeviceConfig(pixels=[], buttons=[], ir=None, audio=None)
+    config = DeviceConfig(pixels=[], buttons=[], ir=None, audio=None, i2c=None)
     hardware = build_hardware(config, board, i2c=counting_bus)
     output = _require_drv2605_output(hardware)
 

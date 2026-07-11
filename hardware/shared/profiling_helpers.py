@@ -21,6 +21,11 @@ try:
 except ImportError:
     board = None
 
+try:
+    import busio
+except ImportError:
+    busio = None
+
 
 def board_id() -> str:
     """Return a best-effort board identifier.
@@ -90,6 +95,25 @@ def runtime_id() -> str:
     """Return this interpreter's runtime key (e.g. ``circuitpython_10_0_3``)."""
     impl = sys.implementation
     return format_runtime_id(impl.name, impl.version)
+
+
+def open_config_i2c(device_config):
+    """Open a fresh ``busio.I2C`` on *device_config*'s declared SDA/SCL pins.
+
+    Mirrors ``device_builder._setup_i2c``: uses the ``i2c`` section's named
+    pins when present, else falls back to ``board.SCL``/``board.SDA`` -- so an
+    injected bus (e.g. one a profiler wraps in ``CountingI2C`` to meter bytes)
+    lands on exactly the pins ``build_hardware`` would have chosen itself.
+
+    Unlike ``board.STEMMA_I2C()``, the returned bus is a plain ``busio.I2C``
+    that CircuitPython tears down on reload rather than holding ``never_reset``
+    -- so a profiler run never leaves the I2C peripheral claimed for the next
+    program (e.g. a demo) that constructs its own bus on the same pins.
+    """
+    i2c = device_config.i2c
+    if i2c is not None:
+        return busio.I2C(getattr(board, i2c.scl), getattr(board, i2c.sda))
+    return busio.I2C(board.SCL, board.SDA)
 
 
 def linear_fit(xs: list[float], ys: list[float]) -> tuple[float, float]:
