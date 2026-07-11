@@ -123,6 +123,7 @@ from hardware.shared.device_config import (
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.profiling_helpers import (
     linear_fit,
+    open_config_i2c,
     print_profile_header,
     print_stats_line,
     print_table_row,
@@ -306,7 +307,7 @@ def run() -> None:
 
     # Build the device once: build_hardware claims pins without deiniting, so it cannot
     # be re-called per swept count. The one shared driver is reused across the sweep.
-    counting_i2c = CountingI2C(board.STEMMA_I2C())
+    counting_i2c = CountingI2C(open_config_i2c(device_config))
     config = _build_pixel_config(DRIVER, PIXEL_COUNTS[-1], button_pin, neopixel_pin)
     hardware = build_hardware(config, board, i2c=counting_i2c)
     pixel_output = _require_pixel_output(hardware, DRIVER)

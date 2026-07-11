@@ -254,15 +254,18 @@ def _build_prop() -> tuple[
     ir_rx_pin = require_pin(device_config, lambda c: c.ir.rx[0], "ir.rx")
     ir_line_pin = require_pin(device_config, lambda c: c.ir.emitters["line"], "ir.line")
 
-    config = parse_device_config(
-        _build_tag_harness(button_a_pin, button_b_pin, ir_rx_pin, ir_line_pin)
-    )
+    harness = _build_tag_harness(button_a_pin, button_b_pin, ir_rx_pin, ir_line_pin)
+    # Forward the real device's I2C bus pins so build_hardware constructs the
+    # matrix/accelerometer/motor bus on the configured SDA/SCL (build_hardware
+    # falls back to board.SCL/SDA when the section is absent).
+    if device_config.i2c is not None:
+        harness["i2c"] = {"sda": device_config.i2c.sda, "scl": device_config.i2c.scl}
+    config = parse_device_config(harness)
     hardware = build_hardware(
         config,
         board,
         ir_encoder=TagInfraredEncoder(),
         ir_decoder=TagInfraredDecoder(),
-        i2c=board.STEMMA_I2C(),
     )
     _require_output(hardware, IS31FL3741EffectOutput)
     _require_output(hardware, AudioEffectOutput)
