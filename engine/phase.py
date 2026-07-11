@@ -130,10 +130,7 @@ class PhaseSlot:
     scene's own module-level phase reference. Because they all hold the one
     object, they resolve the *same* cached :class:`PhaseMachine` structurally
     — sharing is guaranteed by construction, not by a key string happening to
-    match. The load-time guard in ``GameEngine.set_rules`` (via
-    ``_check_phase_owners``) is the fail-loud backstop: it raises if two
-    *distinct* ``PhaseSlot`` objects ever claim the same key, which would mean
-    a rule stopped reusing the scene's shared instance and rebuilt its own.
+    match.
     """
 
     __slots__ = ("_slot",)
@@ -159,8 +156,8 @@ class _PhaseGuardedRule(GameRule):
     machine through :meth:`_machine`, returns immediately unless the machine is
     in this rule's phase, then defers to subclass behaviour.
 
-    Takes the scene's one :class:`PhaseSlot` for the machine it guards — see
-    that class's docstring for the identity contract this relies on.
+    Takes the scene's one :class:`PhaseSlot` for the machine it guards, through
+    which it reaches the shared :class:`PhaseMachine`.
     """
 
     def __init__(self, phase: PhaseKey, phase_slot: PhaseSlot) -> None:
@@ -177,16 +174,6 @@ class _PhaseGuardedRule(GameRule):
         """
         self._phase_handlers[event_type] = handler
         super().on(event_type, self._phase_dispatch)
-
-    @property
-    def phase_accessor(self) -> PhaseSlot:
-        """Duck-typed seam exposing this rule's :class:`PhaseSlot` to the engine.
-
-        ``GameEngine``'s load-time guard reads ``.key`` off the returned
-        object to check for two distinct ``PhaseSlot``s claiming one machine
-        key, without ``engine/engine.py`` importing this module.
-        """
-        return self._phase_slot
 
     def _machine(self, state: GameState) -> PhaseMachine:
         """Return this rule's :class:`PhaseMachine` via its :class:`PhaseSlot`."""

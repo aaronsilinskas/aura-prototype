@@ -347,35 +347,6 @@ def test_in_phase_rule_sharing_a_phase_with_its_owner_is_not_a_duplicate() -> No
 
 
 # ---------------------------------------------------------------------------
-# Distinct-PhaseSlot-same-key fail-fast at scene load (GameEngine.set_rules)
-# ---------------------------------------------------------------------------
-
-
-def test_two_distinct_phase_slots_claiming_one_key_fail_at_load_via_two_phase_rules() -> None:
-    # Different phases, so the (machine key, phase) dup-owner check alone
-    # would not catch this -- only PhaseSlot identity does.
-    engine = GameEngine(effect_controls=SpyEffectControls())
-    stray_slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)  # distinct instance, same key string
-    one = _LifecycleRule(_PHASE_A, "one")  # holds the module-level _DEFAULT_SLOT
-    two = _LifecycleRule(_PHASE_B, "two", phase_slot=stray_slot)
-
-    with pytest.raises(ValueError):
-        engine.set_rules([one, two])
-
-
-def test_two_distinct_phase_slots_claiming_one_key_fail_at_load_via_in_phase_rule() -> None:
-    # The stray slot is held by an InPhaseRule this time, not a PhaseRule --
-    # phase_ownership() alone would never see it, only phase_accessor does.
-    engine = GameEngine(effect_controls=SpyEffectControls())
-    stray_slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)  # distinct instance, same key string
-    owner = _LifecycleRule(_PHASE_A, "owner")  # holds the module-level _DEFAULT_SLOT
-    stray = _InPhaseEmitter(_PHASE_B, "stray", phase_slot=stray_slot)
-
-    with pytest.raises(ValueError):
-        engine.set_rules([owner, stray])
-
-
-# ---------------------------------------------------------------------------
 # PhaseRule per-instance PhaseSlot — slot identity and phase_ownership
 # ---------------------------------------------------------------------------
 

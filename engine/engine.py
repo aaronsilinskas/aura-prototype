@@ -45,35 +45,21 @@ class GameRule:
 
 
 def _check_phase_owners(rules: list[GameRule]) -> None:
-    """Raise ``ValueError`` at scene load for either phase-owner contract violation.
+    """Raise ``ValueError`` at scene load if two ``PhaseRule``s own one phase.
 
-    Duck-typed on ``phase_ownership()`` and ``phase_accessor`` so the engine
-    stays decoupled from the phase primitive in ``engine/phase.py`` — neither
-    name is imported here, only read off each rule with ``getattr``.
+    Duck-typed on ``phase_ownership()`` so the engine stays decoupled from the
+    phase primitive in ``engine/phase.py`` — the name is not imported here,
+    only read off each rule with ``getattr``.  Only ``PhaseRule`` exposes it;
+    ``InPhaseRule``s do not own a phase and are skipped, so any number may
+    share a phase.
 
-    Two independent checks:
-
-    1. Two rules claiming the same ``(machine key, phase)`` pair, via
-       ``phase_ownership()``.  Only ``PhaseRule`` exposes it; ``InPhaseRule``s
-       do not own a phase and are skipped, so any number may share a phase.
-    2. Two *distinct* phase-slot objects claiming the same machine key, via
-       ``phase_accessor``.  Both ``PhaseRule`` and ``InPhaseRule`` expose this,
-       since either could be holding a slot a scene rebuilt instead of reusing
-       — lazy get-or-create means there is no "unestablished key" failure, so
-       this identity check is the sole fail-loud mechanism for that mistake.
+    Catches two rules claiming the same ``(machine key, phase)`` pair, which
+    would silently drop one rule's ``on_enter``: the entry flag is consumed
+    atomically by whichever ``PhaseRule`` dispatches first, so the second's
+    ``on_enter`` would never fire with nothing to signal the mistake.
     """
     owners: dict = {}
-    slot_owners: dict = {}
     for rule in rules:
-        accessor = getattr(rule, "phase_accessor", None)
-        if accessor is not None:
-            existing_accessor = slot_owners.get(accessor.key)
-            if existing_accessor is not None and existing_accessor is not accessor:
-                raise ValueError(
-                    "Two distinct phase slots claim the same machine key: " + repr(accessor.key)
-                )
-            slot_owners[accessor.key] = accessor
-
         ownership = getattr(rule, "phase_ownership", None)
         if ownership is None:
             continue
@@ -120,10 +106,8 @@ class GameEngine:
         rules.  For incremental registration use ``add_rules()`` instead.
 
         Raises ``ValueError`` if two ``PhaseRule``s claim the same
-        ``(machine key, phase)`` pair, or if two distinct phase-slot objects
-        claim the same machine key, so either mistake fails fast at scene load
-        rather than silently dropping a rule's ``on_enter`` or splitting one
-        machine's state across two caches at runtime.
+        ``(machine key, phase)`` pair, so the mistake fails fast at scene load
+        rather than silently dropping a rule's ``on_enter`` at runtime.
         """
         _check_phase_owners(rules)
         self._rules = list(rules)
