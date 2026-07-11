@@ -79,7 +79,7 @@ def _build_network_controls() -> HardwareNetworkControls:
     # wholesale to build_hardware, which is handed the minimal, IR-only config
     # built below instead.
     device_config = load_device_config()
-    rx_pin = require_pin(device_config, lambda c: c.ir.rx, "ir.rx")
+    rx_pin = require_pin(device_config, lambda c: c.ir.rx[0], "ir.rx")
     line_pin = require_pin(device_config, lambda c: c.ir.emitters["line"], "ir.line")
 
     # Forward the I2C bus pins too: build_hardware always constructs the bus to

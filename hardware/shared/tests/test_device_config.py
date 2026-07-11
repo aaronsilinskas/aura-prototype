@@ -86,7 +86,7 @@ def test_parse_full_matrix_config_maps_every_section(matrix_config):
     assert result.pixels[0].cols == 13
     assert result.buttons == ["D9", "D10"]
     assert result.ir is not None
-    assert result.ir.rx == "D11"
+    assert result.ir.rx == ["D11"]
     assert result.ir.emitters["line"] == "D12"
     assert result.audio is not None
     assert result.audio.voices == 1
@@ -469,6 +469,28 @@ def test_parse_absent_ir_section_yields_none(matrix_config):
     result = parse_device_config(config)
 
     assert result.ir is None
+
+
+def test_parse_ir_rx_list_of_pins_preserves_declared_order(matrix_config):
+    matrix_config["ir"]["rx"] = ["D11", "D13", "D15"]
+
+    result = parse_device_config(matrix_config)
+
+    assert result.ir.rx == ["D11", "D13", "D15"]
+
+
+def test_parse_ir_rx_empty_list_raises_value_error(matrix_config):
+    matrix_config["ir"]["rx"] = []
+
+    with pytest.raises(ValueError, match=r"ir\.rx"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_ir_rx_list_with_non_string_entry_names_its_index(matrix_config):
+    matrix_config["ir"]["rx"] = ["D11", 13]
+
+    with pytest.raises(ValueError, match=r"ir\.rx\[1\]"):
+        parse_device_config(matrix_config)
 
 
 # ---------------------------------------------------------------------------

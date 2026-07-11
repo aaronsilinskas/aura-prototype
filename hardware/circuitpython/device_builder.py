@@ -47,6 +47,8 @@ from hardware.shared.ir_protocol import (
     InfraredEncoder,
 )
 from hardware.shared.ir_transport import (
+    InfraredMultiReceiver,
+    InfraredReceiver,
     InfraredSingleReceiver,
     InfraredTransmitter,
     IrTransmitGate,
@@ -306,18 +308,27 @@ def _make_writer(pin: microcontroller.Pin) -> PulseWriter:
 
 
 def _setup_ir(
-    rx_pin: microcontroller.Pin,
+    rx_pins: list[microcontroller.Pin],
     line_pin: microcontroller.Pin | None,
     cone_pin: microcontroller.Pin | None = None,
     aoe_pin: microcontroller.Pin | None = None,
     encoder: InfraredEncoder | None = None,
     decoder: InfraredDecoder | None = None,
     writer_factory: Callable[[microcontroller.Pin], PulseWriter] = _make_writer,
-) -> tuple[dict[str, InfraredTransmitter], InfraredSingleReceiver]:
+) -> tuple[dict[str, InfraredTransmitter], InfraredReceiver]:
     """Wire IR transceiver pins and return (transmitters, receiver).
 
     encoder and decoder must use the same wire protocol — a mismatched pair
     silently fails to decode received frames with no error raised.
+
+    One :class:`~hardware.circuitpython.infrared_io.PulseInReader` is built
+    per entry in *rx_pins*. A single rx pin builds an
+    :class:`~hardware.shared.ir_transport.InfraredSingleReceiver` wired with
+    *decoder* directly — today's unchanged path. Two or more build an
+    :class:`~hardware.shared.ir_transport.InfraredMultiReceiver`, passing
+    ``type(decoder)`` as its ``decoder_factory`` so every reader gets its own
+    fresh, symmetric decoder instance (the *decoder* instance itself is not
+    reused across readers in that case).
 
     Constructs one :class:`IrTransmitGate` and injects the same instance into
     the receiver and every transmitter — the single assembly point for
@@ -337,9 +348,15 @@ def _setup_ir(
 
     gate = IrTransmitGate()
 
-    pulsein = pulseio.PulseIn(rx_pin, maxlen=256, idle_state=True)
-    reader = PulseInReader(pulsein)
-    receiver = InfraredSingleReceiver(reader, decoder, gate=gate)
+    readers = [
+        PulseInReader(pulseio.PulseIn(rx_pin, maxlen=256, idle_state=True)) for rx_pin in rx_pins
+    ]
+
+    receiver: InfraredReceiver
+    if len(readers) == 1:
+        receiver = InfraredSingleReceiver(readers[0], decoder, gate=gate)
+    else:
+        receiver = InfraredMultiReceiver(readers, type(decoder), gate=gate)
 
     transmitters: dict[str, InfraredTransmitter] = {}
     for emitter, pin in ((LINE, line_pin), (CONE, cone_pin), (AREA_OF_EFFECT, aoe_pin)):
@@ -414,7 +431,15 @@ def build_hardware(
         encoder = ir_encoder if ir_encoder is not None else AuraInfraredEncoder()
         decoder = ir_decoder if ir_decoder is not None else AuraInfraredDecoder()
 
-        rx_pin = _resolve_pin(board_module, "ir.rx", config.ir.rx)
+        rx_pin_names = config.ir.rx
+        if len(rx_pin_names) == 1:
+            rx_pins = [_resolve_pin(board_module, "ir.rx", rx_pin_names[0])]
+        else:
+            rx_pins = [
+                _resolve_pin(board_module, f"ir.rx[{i}]", name)
+                for i, name in enumerate(rx_pin_names)
+            ]
+
         emitter_pins: dict[str, microcontroller.Pin] = {}
         for emitter_key, pin_name in config.ir.emitters.items():
             emitter_pins[emitter_key] = _resolve_pin(board_module, f"ir.{emitter_key}", pin_name)
@@ -424,7 +449,7 @@ def build_hardware(
         aoe_pin = emitter_pins.get("area_of_effect")
 
         transmitters, ir_receiver = _setup_ir(
-            rx_pin,
+            rx_pins,
             line_pin,
             cone_pin=cone_pin,
             aoe_pin=aoe_pin,

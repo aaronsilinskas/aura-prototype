@@ -162,7 +162,7 @@ def test_setup_ir_calls_writer_factory_once_per_wired_emitter_with_its_own_pin()
         return _FakeWriter(pin)
 
     _setup_ir(
-        _RX_PIN,
+        [_RX_PIN],
         _LINE_PIN,
         cone_pin=_CONE_PIN,
         aoe_pin=_AOE_PIN,
@@ -173,7 +173,7 @@ def test_setup_ir_calls_writer_factory_once_per_wired_emitter_with_its_own_pin()
 
 def test_setup_ir_uses_writer_returned_by_writer_factory():
     """Each transmitter's writer is exactly what writer_factory returned for its pin."""
-    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN, writer_factory=_fake_writer_factory)
+    transmitters, _receiver = _setup_ir([_RX_PIN], _LINE_PIN, writer_factory=_fake_writer_factory)
     assert transmitters[LINE]._writer.pin is _LINE_PIN
 
 
@@ -184,26 +184,26 @@ def test_setup_ir_uses_writer_returned_by_writer_factory():
 
 def test_setup_ir_includes_line_transmitter_when_line_pin_provided():
     """_setup_ir wires the LINE emitter from line_pin when it is supplied."""
-    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN, writer_factory=_fake_writer_factory)
+    transmitters, _receiver = _setup_ir([_RX_PIN], _LINE_PIN, writer_factory=_fake_writer_factory)
     assert LINE in transmitters
 
 
 def test_setup_ir_omits_cone_when_cone_pin_is_none():
     """No CONE entry in transmitter map when cone_pin is not supplied."""
-    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN, writer_factory=_fake_writer_factory)
+    transmitters, _receiver = _setup_ir([_RX_PIN], _LINE_PIN, writer_factory=_fake_writer_factory)
     assert CONE not in transmitters
 
 
 def test_setup_ir_omits_aoe_when_aoe_pin_is_none():
     """No AREA_OF_EFFECT entry when aoe_pin is not supplied."""
-    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN, writer_factory=_fake_writer_factory)
+    transmitters, _receiver = _setup_ir([_RX_PIN], _LINE_PIN, writer_factory=_fake_writer_factory)
     assert AREA_OF_EFFECT not in transmitters
 
 
 def test_setup_ir_includes_cone_transmitter_when_cone_pin_provided():
     """CONE transmitter is present when cone_pin is given."""
     transmitters, _receiver = _setup_ir(
-        _RX_PIN, _LINE_PIN, cone_pin=_CONE_PIN, writer_factory=_fake_writer_factory
+        [_RX_PIN], _LINE_PIN, cone_pin=_CONE_PIN, writer_factory=_fake_writer_factory
     )
     assert CONE in transmitters
 
@@ -211,7 +211,7 @@ def test_setup_ir_includes_cone_transmitter_when_cone_pin_provided():
 def test_setup_ir_includes_aoe_transmitter_when_aoe_pin_provided():
     """AREA_OF_EFFECT transmitter is present when aoe_pin is given."""
     transmitters, _receiver = _setup_ir(
-        _RX_PIN, _LINE_PIN, aoe_pin=_AOE_PIN, writer_factory=_fake_writer_factory
+        [_RX_PIN], _LINE_PIN, aoe_pin=_AOE_PIN, writer_factory=_fake_writer_factory
     )
     assert AREA_OF_EFFECT in transmitters
 
@@ -219,7 +219,7 @@ def test_setup_ir_includes_aoe_transmitter_when_aoe_pin_provided():
 def test_setup_ir_all_pins_returns_three_transmitters():
     """All three emitter keys are present when all optional pins are given."""
     transmitters, _receiver = _setup_ir(
-        _RX_PIN,
+        [_RX_PIN],
         _LINE_PIN,
         cone_pin=_CONE_PIN,
         aoe_pin=_AOE_PIN,
@@ -231,7 +231,7 @@ def test_setup_ir_all_pins_returns_three_transmitters():
 def test_setup_ir_transmitters_share_the_gate_with_receiver():
     """The shared IrTransmitGate is injected into the receiver and every transmitter."""
     transmitters, receiver = _setup_ir(
-        _RX_PIN,
+        [_RX_PIN],
         _LINE_PIN,
         cone_pin=_CONE_PIN,
         aoe_pin=_AOE_PIN,
@@ -250,14 +250,14 @@ def test_setup_ir_transmitters_share_the_gate_with_receiver():
 
 def test_setup_ir_receiver_is_wired_to_rx_pin():
     """The returned receiver reads pulses from the rx_pin PulseIn buffer."""
-    _transmitters, receiver = _setup_ir(_RX_PIN, _LINE_PIN, writer_factory=_fake_writer_factory)
+    _transmitters, receiver = _setup_ir([_RX_PIN], _LINE_PIN, writer_factory=_fake_writer_factory)
     pulsein = receiver._reader._pulsein
     assert pulsein.pin is _RX_PIN
 
 
 def test_setup_ir_receiver_pulsein_uses_active_low_idle_state():
     """PulseIn is constructed with idle_state=True for active-low IR receivers."""
-    _transmitters, receiver = _setup_ir(_RX_PIN, _LINE_PIN, writer_factory=_fake_writer_factory)
+    _transmitters, receiver = _setup_ir([_RX_PIN], _LINE_PIN, writer_factory=_fake_writer_factory)
     pulsein = receiver._reader._pulsein
     assert pulsein.idle_state is True
 
@@ -265,7 +265,7 @@ def test_setup_ir_receiver_pulsein_uses_active_low_idle_state():
 def test_setup_ir_omits_line_when_line_pin_is_none():
     """No LINE entry in transmitter map when line_pin is None — LINE is optional,
     like cone/area_of_effect."""
-    transmitters, _receiver = _setup_ir(_RX_PIN, None, writer_factory=_fake_writer_factory)
+    transmitters, _receiver = _setup_ir([_RX_PIN], None, writer_factory=_fake_writer_factory)
     assert LINE not in transmitters
 
 
@@ -276,13 +276,13 @@ def test_setup_ir_omits_line_when_line_pin_is_none():
 
 def test_setup_ir_defaults_to_aura_encoder_for_transmitters():
     """Omitting encoder wires transmitters with AuraInfraredEncoder."""
-    transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN, writer_factory=_fake_writer_factory)
+    transmitters, _receiver = _setup_ir([_RX_PIN], _LINE_PIN, writer_factory=_fake_writer_factory)
     assert isinstance(transmitters[LINE]._encoder, AuraInfraredEncoder)
 
 
 def test_setup_ir_defaults_to_aura_decoder_for_receiver():
     """Omitting decoder wires the receiver with AuraInfraredDecoder."""
-    _transmitters, receiver = _setup_ir(_RX_PIN, _LINE_PIN, writer_factory=_fake_writer_factory)
+    _transmitters, receiver = _setup_ir([_RX_PIN], _LINE_PIN, writer_factory=_fake_writer_factory)
     assert isinstance(receiver._decoder, AuraInfraredDecoder)
 
 
@@ -290,7 +290,7 @@ def test_setup_ir_wires_provided_encoder_into_transmitters():
     """A passed-in encoder is used by the wired transmitters."""
     encoder = TagInfraredEncoder()
     transmitters, _receiver = _setup_ir(
-        _RX_PIN,
+        [_RX_PIN],
         _LINE_PIN,
         cone_pin=_CONE_PIN,
         aoe_pin=_AOE_PIN,
@@ -306,6 +306,6 @@ def test_setup_ir_wires_provided_decoder_into_receiver():
     """A passed-in decoder is used by the receiver."""
     decoder = TagInfraredDecoder()
     _transmitters, receiver = _setup_ir(
-        _RX_PIN, _LINE_PIN, decoder=decoder, writer_factory=_fake_writer_factory
+        [_RX_PIN], _LINE_PIN, decoder=decoder, writer_factory=_fake_writer_factory
     )
     assert receiver._decoder is decoder

@@ -251,7 +251,7 @@ def _build_prop() -> tuple[
     device_config = load_device_config()
     button_a_pin = require_pin(device_config, lambda c: c.buttons[0], "buttons[0]")
     button_b_pin = require_pin(device_config, lambda c: c.buttons[1], "buttons[1]")
-    ir_rx_pin = require_pin(device_config, lambda c: c.ir.rx, "ir.rx")
+    ir_rx_pin = require_pin(device_config, lambda c: c.ir.rx[0], "ir.rx")
     ir_line_pin = require_pin(device_config, lambda c: c.ir.emitters["line"], "ir.line")
 
     config = parse_device_config(

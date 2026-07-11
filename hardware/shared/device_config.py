@@ -134,12 +134,18 @@ class AudioConfig:
 
 
 class IRConfig:
-    """Parsed IR configuration."""
+    """Parsed IR configuration.
+
+    ``rx`` is always a non-empty list of one or more pin names, regardless of
+    whether ``aura-device.json`` declared ``ir.rx`` as a single string (the
+    single-receiver shape) or a list of strings (the multi-receiver shape) —
+    callers deal with one representation either way.
+    """
 
     __slots__ = ("emitters", "rx")
 
-    def __init__(self, rx: str, emitters: dict[str, str]) -> None:
-        self.rx: str = rx
+    def __init__(self, rx: list[str], emitters: dict[str, str]) -> None:
+        self.rx: list[str] = rx
         self.emitters: dict[str, str] = emitters
 
 
@@ -354,11 +360,39 @@ def _parse_buttons(buttons_raw: list) -> list[str]:
     return result
 
 
+def _parse_ir_rx(rx_raw: object) -> list[str]:
+    """Normalize ``ir.rx`` to a non-empty list of pin names.
+
+    Accepts either shape declared in ``aura-device.json``: a single pin-name
+    string (today's single-receiver shape, normalized to a one-element list)
+    or a non-empty list of pin-name strings (the multi-receiver shape,
+    order preserved).
+
+    Raises:
+        ValueError: If *rx_raw* is an empty list, a list containing a
+            non-string entry (naming its index), or neither a string nor a
+            list.
+    """
+    if isinstance(rx_raw, str):
+        return [rx_raw]
+
+    if isinstance(rx_raw, list):
+        if not rx_raw:
+            raise ValueError("ir.rx must not be an empty list")
+        result: list[str] = []
+        for i, pin in enumerate(rx_raw):
+            if not isinstance(pin, str):
+                raise ValueError(f"ir.rx[{i}] must be a string pin name, got {type(pin).__name__}")
+            result.append(pin)
+        return result
+
+    raise ValueError("ir.rx must be a string pin name or a list of string pin names")
+
+
 def _parse_ir(ir_raw: dict) -> IRConfig:
     if "rx" not in ir_raw:
         raise ValueError("ir.rx is required")
-    if not isinstance(ir_raw["rx"], str):
-        raise ValueError("ir.rx must be a string pin name")
+    rx = _parse_ir_rx(ir_raw["rx"])
 
     # rx is the only required IR pin; every emitter (line/cone/area_of_effect)
     # is optional and validated uniformly by the loop below. A prop that
@@ -375,7 +409,7 @@ def _parse_ir(ir_raw: dict) -> IRConfig:
             raise ValueError(f"ir.{key} must be a string pin name")
         emitters[key] = pin
 
-    return IRConfig(rx=ir_raw["rx"], emitters=emitters)
+    return IRConfig(rx=rx, emitters=emitters)
 
 
 def _parse_audio(audio_raw: dict) -> AudioConfig:

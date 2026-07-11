@@ -157,7 +157,7 @@ except ImportError:
 _device_config: Final = load_device_config()
 BUTTON_A_PIN_NAME: Final = require_pin(_device_config, lambda c: c.buttons[0], "buttons[0]")
 BUTTON_B_PIN_NAME: Final = require_pin(_device_config, lambda c: c.buttons[1], "buttons[1]")
-IR_RX_PIN_NAME: Final = require_pin(_device_config, lambda c: c.ir.rx, "ir.rx")
+IR_RX_PIN_NAME: Final = require_pin(_device_config, lambda c: c.ir.rx[0], "ir.rx")
 IR_LINE_PIN_NAME: Final = require_pin(_device_config, lambda c: c.ir.emitters["line"], "ir.line")
 
 # I2S amp pins -- update these to match your board layout. Declared directly

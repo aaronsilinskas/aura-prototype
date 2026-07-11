@@ -6,7 +6,7 @@ from engine.effects.output import EffectOutput
 from engine.network import TransmitPump
 from engine.state import NetworkControls
 from hardware.shared.debounced_buttons import DebouncedButtons
-from hardware.shared.ir_transport import InfraredSingleReceiver
+from hardware.shared.ir_transport import InfraredReceiver
 
 __all__ = ["DeviceHardware"]
 
@@ -38,11 +38,11 @@ class DeviceHardware:
         accelerometer: object | None,
         network_controls: NetworkControls,
         transmit_pump: TransmitPump,
-        ir_receiver: InfraredSingleReceiver | None,
+        ir_receiver: InfraredReceiver | None,
     ) -> None:
         self.outputs: list[EffectOutput] = outputs
         self.buttons: DebouncedButtons = buttons
         self.accelerometer: object | None = accelerometer
         self.network_controls: NetworkControls = network_controls
         self.transmit_pump: TransmitPump = transmit_pump
-        self.ir_receiver: InfraredSingleReceiver | None = ir_receiver
+        self.ir_receiver: InfraredReceiver | None = ir_receiver

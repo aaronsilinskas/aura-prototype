@@ -1012,7 +1012,7 @@ def test_setup_ir_injects_same_gate_into_receiver_and_every_transmitter() -> Non
         from hardware.circuitpython.device_builder import _setup_ir
 
         transmitters, receiver = _setup_ir(
-            rx_pin=MagicMock(),
+            rx_pins=[MagicMock()],
             line_pin=MagicMock(),
             cone_pin=MagicMock(),
             aoe_pin=MagicMock(),
@@ -1022,6 +1022,117 @@ def test_setup_ir_injects_same_gate_into_receiver_and_every_transmitter() -> Non
     assert isinstance(receiver_gate, IrTransmitGate)
     for transmitter in transmitters.values():
         assert _wired_gate(transmitter) is receiver_gate
+
+
+# ---------------------------------------------------------------------------
+# _setup_ir chooses the receiver class by resolved rx pin count (#672)
+# ---------------------------------------------------------------------------
+
+
+def _wired_decoder(receiver: object) -> object:
+    """Return the private ``_decoder`` wired onto a single receiver.
+
+    See :func:`_wired_gate` above — no public API exposes which decoder
+    instance a receiver holds, and the tests below exist specifically to pin
+    that internal contract.
+    """
+    return receiver._decoder
+
+
+def _wired_decoders(receiver: object) -> list:
+    """Return the private ``_decoders`` list wired onto a multi-receiver.
+
+    See :func:`_wired_decoder`.
+    """
+    return receiver._decoders
+
+
+def _wired_readers(receiver: object) -> list:
+    """Return the private ``_readers`` list wired onto a multi-receiver.
+
+    See :func:`_wired_decoder`.
+    """
+    return receiver._readers
+
+
+def test_setup_ir_single_rx_pin_builds_single_receiver_wired_with_passed_decoder() -> None:
+    from hardware.shared.ir_transport import InfraredSingleReceiver
+
+    decoder = MagicMock()
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder.pulseio"))
+
+        from hardware.circuitpython.device_builder import _setup_ir
+
+        _, receiver = _setup_ir(rx_pins=[MagicMock()], line_pin=None, decoder=decoder)
+
+    assert isinstance(receiver, InfraredSingleReceiver)
+    assert _wired_decoder(receiver) is decoder
+
+
+def test_setup_ir_multiple_rx_pins_builds_multi_receiver_with_one_reader_per_pin() -> None:
+    from hardware.circuitpython.infrared_io import PulseInReader
+    from hardware.shared.ir_transport import InfraredMultiReceiver
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder.pulseio"))
+
+        from hardware.circuitpython.device_builder import _setup_ir
+
+        _, receiver = _setup_ir(rx_pins=[MagicMock(), MagicMock(), MagicMock()], line_pin=None)
+
+    assert isinstance(receiver, InfraredMultiReceiver)
+    readers = _wired_readers(receiver)
+    assert len(readers) == 3
+    assert all(isinstance(reader, PulseInReader) for reader in readers)
+
+
+def test_setup_ir_multiple_rx_pins_gives_each_reader_a_fresh_decoder_of_the_same_class() -> None:
+    from hardware.shared.ir_protocol import AuraInfraredDecoder
+
+    decoder = AuraInfraredDecoder()
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder.pulseio"))
+
+        from hardware.circuitpython.device_builder import _setup_ir
+
+        _, receiver = _setup_ir(rx_pins=[MagicMock(), MagicMock()], line_pin=None, decoder=decoder)
+
+    decoders = _wired_decoders(receiver)
+    assert len(decoders) == 2
+    for wired_decoder in decoders:
+        assert type(wired_decoder) is type(decoder)
+        assert wired_decoder is not decoder
+
+
+def test_build_hardware_multi_pin_ir_rx_unknown_pin_raises_same_error_as_any_other_pin() -> None:
+    mapping = {"buttons": ["D9"], "ir": {"rx": ["D11", "NOPE"]}}
+    config = parse_device_config(mapping)
+    board_mock = MagicMock(spec=["D9", "D11"])  # NOPE deliberately absent
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ValueError, match=r"ir\.rx\[1\].*NOPE"):
+            build_hardware(config, board_module=board_mock)
+
+
+def test_build_hardware_single_pin_ir_rx_unknown_pin_raises_unindexed_error() -> None:
+    mapping = {"buttons": ["D9"], "ir": {"rx": "NOPE"}}
+    config = parse_device_config(mapping)
+    board_mock = MagicMock(spec=["D9"])  # NOPE deliberately absent
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ValueError, match=r"ir\.rx(?!\[).*NOPE"):
+            build_hardware(config, board_module=board_mock)
 
 
 # ---------------------------------------------------------------------------
