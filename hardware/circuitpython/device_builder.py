@@ -36,9 +36,8 @@ from hardware.shared.device_config import (
     DeviceConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
-    parse_device_config,
-    read_device_config_mapping,
 )
+from hardware.shared.device_config import load_device_config as _load_shared_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_protocol import (
     AuraInfraredDecoder,
@@ -341,7 +340,7 @@ def _setup_ir(
 
 def load_device_config() -> DeviceConfig:
     """Load and parse aura-device.json from the device root."""
-    return parse_device_config(read_device_config_mapping())
+    return _load_shared_device_config()
 
 
 def build_hardware(
