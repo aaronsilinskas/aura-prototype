@@ -150,13 +150,10 @@ except ImportError:
 # Configuration -- adjust to match your wiring
 # ---------------------------------------------------------------------------
 
-# Button and IR pins are sourced from the real aura-device.json -- the same file
-# a deployed prop reads -- rather than hardcoded here, so bring-up on a new
-# board only requires editing that one file. A missing required pin fails
-# loudly (ValueError naming the field) at import time via require_pin.
-# build_hardware always wires buttons, though this profiler never reads them
-# (inputs do not allocate scene heap). ir.rx/ir.line are only used for
-# harnesses whose "ir" is not None (tag, hardware_test); ignored otherwise.
+# Sourced from aura-device.json -- see "Hardware bring-up" above. build_hardware
+# always wires buttons, though this profiler never reads them (inputs do not
+# allocate scene heap). ir.rx/ir.line are only used for harnesses whose "ir" is
+# not None (tag, hardware_test); ignored otherwise.
 _device_config: Final = load_device_config()
 BUTTON_A_PIN_NAME: Final = require_pin(_device_config, lambda c: c.buttons[0], "buttons[0]")
 BUTTON_B_PIN_NAME: Final = require_pin(_device_config, lambda c: c.buttons[1], "buttons[1]")
@@ -252,13 +249,12 @@ def _device_config_for(harness: dict) -> DeviceConfig:
 
     Mirrors the matrix geometry every prop in this repo ships (IS31FL3741_COLS /
     IS31FL3741_SCOPE_ROWS) and the harness's own audio clips/voice count -- those
-    stay profiler-owned. The button and IR pin *values* plugged in below come
-    from the real ``aura-device.json`` (``BUTTON_A_PIN_NAME`` etc., sourced at
-    module scope via ``require_pin``); only *whether* IR is wired at all is a
-    harness decision. Omits the ``ir`` key entirely when ``harness["ir"]`` is
-    ``None`` so build_hardware wires no IR receiver and no network controls for
-    scenes that never touch the network -- ``HARNESSES`` stays the single source
-    of truth for what each scene needs.
+    stay profiler-owned. Button/IR pin values come from the module-scope
+    constants (see "Hardware bring-up" above); only *whether* IR is wired at all
+    is a harness decision. Omits the ``ir`` key entirely when ``harness["ir"]``
+    is ``None`` so build_hardware wires no IR receiver and no network controls
+    for scenes that never touch the network -- ``HARNESSES`` stays the single
+    source of truth for what each scene needs.
     """
     mapping: dict = {
         "pixels": [
