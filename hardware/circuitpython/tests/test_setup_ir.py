@@ -9,11 +9,11 @@ without stubbing ``rp2pio``/``pulseio`` for the writer path.
 Covers:
 - _setup_ir defaults writer_factory to _make_writer
 - _setup_ir calls writer_factory once per wired emitter, with that emitter's pin
-- _setup_ir with only required pins returns a LINE transmitter and receiver
+- _setup_ir with a line_pin returns a LINE transmitter and receiver
 - _setup_ir with cone_pin returns LINE and CONE transmitters
 - _setup_ir with aoe_pin returns LINE and AREA_OF_EFFECT transmitters
 - _setup_ir with all pins returns all three transmitters
-- _setup_ir omits optional emitters when their pin is None
+- _setup_ir omits any emitter (line/cone/area_of_effect) when its pin is None
 - _setup_ir wires every transmitter and the receiver to the same gate
 - _setup_ir receiver is wired to rx_pin
 - _setup_ir defaults to Aura codecs when encoder/decoder are omitted
@@ -120,7 +120,6 @@ _pulseio.PulseIn = _FakePulseIn  # type: ignore[attr-defined]
 # Now import what we're testing
 # ---------------------------------------------------------------------------
 
-import pytest  # noqa: E402
 
 from engine.network import AREA_OF_EFFECT, CONE, LINE  # noqa: E402
 from hardware.circuitpython.device_builder import _make_writer, _setup_ir  # noqa: E402
@@ -183,8 +182,8 @@ def test_setup_ir_uses_writer_returned_by_writer_factory():
 # ---------------------------------------------------------------------------
 
 
-def test_setup_ir_returns_line_transmitter_when_only_required_pins_given():
-    """_setup_ir always wires the LINE emitter from line_pin."""
+def test_setup_ir_includes_line_transmitter_when_line_pin_provided():
+    """_setup_ir wires the LINE emitter from line_pin when it is supplied."""
     transmitters, _receiver = _setup_ir(_RX_PIN, _LINE_PIN, writer_factory=_fake_writer_factory)
     assert LINE in transmitters
 
@@ -263,10 +262,11 @@ def test_setup_ir_receiver_pulsein_uses_active_low_idle_state():
     assert pulsein.idle_state is True
 
 
-def test_setup_ir_raises_when_line_pin_is_none():
-    """_setup_ir raises ValueError when line_pin is None — LINE is always required."""
-    with pytest.raises(ValueError, match="line_pin is required"):
-        _setup_ir(_RX_PIN, None, writer_factory=_fake_writer_factory)
+def test_setup_ir_omits_line_when_line_pin_is_none():
+    """No LINE entry in transmitter map when line_pin is None — LINE is optional,
+    like cone/area_of_effect."""
+    transmitters, _receiver = _setup_ir(_RX_PIN, None, writer_factory=_fake_writer_factory)
+    assert LINE not in transmitters
 
 
 # ---------------------------------------------------------------------------

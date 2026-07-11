@@ -314,9 +314,6 @@ def _setup_ir(
     (one per emitter, sharing the gate, codec defaulting) without touching
     the silicon-coupled ``rp2pio`` probe in :func:`_make_writer`.
     """
-    if line_pin is None:
-        raise ValueError("line_pin is required — the LINE emitter must always be wired")
-
     if encoder is None:
         encoder = AuraInfraredEncoder()
     if decoder is None:
