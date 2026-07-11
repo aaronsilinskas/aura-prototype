@@ -123,7 +123,7 @@ def test_read_device_config_mapping_raises_when_file_absent(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# pixels list shape: empty and duplicate matrix
+# pixels list shape: optional/empty, and duplicate matrix
 # ---------------------------------------------------------------------------
 
 
@@ -134,11 +134,18 @@ def test_parse_pixels_given_as_dict_raises_value_error(matrix_config):
         parse_device_config(matrix_config)
 
 
-def test_parse_empty_pixels_list_raises_value_error(matrix_config):
+def test_parse_absent_pixels_key_yields_empty_list():
+    result = parse_device_config({"buttons": ["D9"]})
+
+    assert result.pixels == []
+
+
+def test_parse_empty_pixels_list_yields_empty_list(matrix_config):
     matrix_config["pixels"] = []
 
-    with pytest.raises(ValueError, match="at least one"):
-        parse_device_config(matrix_config)
+    result = parse_device_config(matrix_config)
+
+    assert result.pixels == []
 
 
 def test_parse_second_matrix_entry_raises_value_error(matrix_config):
