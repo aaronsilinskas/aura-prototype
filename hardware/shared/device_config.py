@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 try:
+    from collections.abc import Callable
     from typing import Final
 except ImportError:
     pass
@@ -17,8 +18,11 @@ __all__ = [
     "NeoPixelPixelsConfig",
     "NeoPixelScopeConfig",
     "NeoPixelStripConfig",
+    "first_neopixel_pin",
+    "load_device_config",
     "parse_device_config",
     "read_device_config_mapping",
+    "require_pin",
     "validate_band_map",
 ]
 
@@ -473,3 +477,71 @@ def read_device_config_mapping(path: str = "aura-device.json") -> dict:
             return json.load(f)
     except OSError:
         raise RuntimeError(f"{path} not found — deploy a device config to the board") from None
+
+
+def load_device_config(path: str = "aura-device.json") -> DeviceConfig:
+    """Read and parse *path* into a :class:`DeviceConfig`.
+
+    Board-free pair of :func:`read_device_config_mapping` and
+    :func:`parse_device_config`, so profilers and other CPython-side callers
+    don't each duplicate it.
+
+    Raises:
+        RuntimeError: If *path* does not exist.
+        ValueError: If *path*'s contents fail validation.
+    """
+    return parse_device_config(read_device_config_mapping(path))
+
+
+# ---------------------------------------------------------------------------
+# Pin-sourcing helpers — on-device profilers read individual pin names out of
+# a parsed DeviceConfig, failing loudly when a pin they need isn't declared.
+# ---------------------------------------------------------------------------
+
+
+def require_pin(
+    config: DeviceConfig, getter: Callable[[DeviceConfig], str], field_label: str
+) -> str:
+    """Return ``getter(config)``, raising a uniform error when it isn't declared.
+
+    *config* is always a real, already-parsed :class:`DeviceConfig` — callers
+    load it via a raising loader (:func:`load_device_config`), so there is no
+    ``None`` case to handle here. Only the narrow tuple of "field absent"
+    exceptions (``AttributeError``, ``IndexError``, ``KeyError``) is caught, so
+    a real bug inside *getter* still propagates instead of being swallowed.
+
+    Args:
+        config: The parsed device config to read from.
+        getter: Callable extracting one field, e.g. ``lambda c: c.ir.emitters["line"]``.
+        field_label: Dotted config path used in the error message, e.g.
+            ``"ir.line"`` or ``"buttons[0]"``.
+
+    Raises:
+        ValueError: If *getter* raises for an absent field or section.
+    """
+    try:
+        return getter(config)
+    except (AttributeError, IndexError, KeyError):
+        raise ValueError(f"{field_label} not declared in aura-device.json") from None
+
+
+def first_neopixel_pin(config: DeviceConfig) -> str:
+    """Return the pin of the first NeoPixel-type entry in ``config.pixels``.
+
+    Prefers the modern ``strips`` shape (``strips[0].pin``) over the legacy
+    one-strip-per-scope ``scopes`` shape within each NeoPixel entry, and
+    returns the first entry that has a pin either way.
+
+    Raises:
+        KeyError: If ``config.pixels`` has no NeoPixel entry with a pin, so
+            this composes as the *getter* passed to :func:`require_pin` and
+            surfaces the same "not declared" message as any other field.
+    """
+    for entry in config.pixels:
+        if not isinstance(entry, NeoPixelPixelsConfig):
+            continue
+        if entry.strips:
+            return entry.strips[0].pin
+        if entry.scopes:
+            return next(iter(entry.scopes.values())).pin
+    raise KeyError("no NeoPixel pixel entry declared")

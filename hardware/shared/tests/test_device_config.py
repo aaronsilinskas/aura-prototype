@@ -7,8 +7,11 @@ import pytest
 
 from hardware.shared.device_config import (
     DeviceConfig,
+    first_neopixel_pin,
+    load_device_config,
     parse_device_config,
     read_device_config_mapping,
+    require_pin,
     validate_band_map,
 )
 
@@ -546,3 +549,111 @@ def test_committed_sample_device_config_parses():
     assert result.audio.i2s_bit_clock == "I2S_BIT_CLOCK"
     assert result.audio.i2s_word_select == "I2S_WORD_SELECT"
     assert result.audio.i2s_data == "I2S_DATA"
+
+
+# ---------------------------------------------------------------------------
+# require_pin — narrow catch surfacing a uniform "not declared" ValueError
+# ---------------------------------------------------------------------------
+
+
+def test_require_pin_returns_configured_value_when_field_present(matrix_config):
+    config = parse_device_config(matrix_config)
+
+    result = require_pin(config, lambda c: c.ir.emitters["line"], "ir.line")
+
+    assert result == "D12"
+
+
+def test_require_pin_raises_value_error_naming_field_label_on_missing_section(matrix_config):
+    del matrix_config["ir"]
+    config = parse_device_config(matrix_config)
+
+    with pytest.raises(ValueError, match=r"ir\.line not declared in aura-device\.json"):
+        require_pin(config, lambda c: c.ir.emitters["line"], "ir.line")
+
+
+def test_require_pin_raises_value_error_naming_field_label_on_missing_dict_key(matrix_config):
+    config = parse_device_config(matrix_config)
+
+    with pytest.raises(ValueError, match=r"ir\.cone not declared in aura-device\.json"):
+        require_pin(config, lambda c: c.ir.emitters["cone"], "ir.cone")
+
+
+def test_require_pin_raises_value_error_naming_field_label_on_missing_list_index(matrix_config):
+    config = parse_device_config(matrix_config)
+
+    with pytest.raises(ValueError, match=r"buttons\[5\] not declared in aura-device\.json"):
+        require_pin(config, lambda c: c.buttons[5], "buttons[5]")
+
+
+def test_require_pin_does_not_swallow_unrelated_getter_exception(matrix_config):
+    config = parse_device_config(matrix_config)
+
+    def _broken_getter(_config):
+        raise TypeError("bug inside getter")
+
+    with pytest.raises(TypeError, match="bug inside getter"):
+        require_pin(config, _broken_getter, "ir.line")
+
+
+# ---------------------------------------------------------------------------
+# first_neopixel_pin — modern strips shape wins over legacy scopes
+# ---------------------------------------------------------------------------
+
+
+def test_first_neopixel_pin_returns_pin_from_strips_entry():
+    config = parse_device_config(
+        {
+            "pixels": [
+                {
+                    "type": "neopixel",
+                    "pin": "D5",
+                    "count": 30,
+                    "scope_pixels": {"personal": [0, 10]},
+                }
+            ],
+            "buttons": ["D9"],
+        }
+    )
+
+    assert first_neopixel_pin(config) == "D5"
+
+
+def test_first_neopixel_pin_returns_pin_from_legacy_scopes_entry(neopixel_config):
+    config = parse_device_config(neopixel_config)
+
+    assert first_neopixel_pin(config) == "D5"
+
+
+def test_first_neopixel_pin_raises_key_error_for_matrix_only_config(matrix_config):
+    config = parse_device_config(matrix_config)
+
+    with pytest.raises(KeyError):
+        first_neopixel_pin(config)
+
+
+def test_first_neopixel_pin_composes_with_require_pin_for_uniform_message(matrix_config):
+    config = parse_device_config(matrix_config)
+
+    with pytest.raises(ValueError, match=r"neopixel\.pin not declared in aura-device\.json"):
+        require_pin(config, first_neopixel_pin, "neopixel.pin")
+
+
+# ---------------------------------------------------------------------------
+# load_device_config — board-free parse-and-load pair
+# ---------------------------------------------------------------------------
+
+
+def test_load_device_config_parses_valid_file(tmp_path, matrix_config):
+    path = tmp_path / "aura-device.json"
+    path.write_text(json.dumps(matrix_config))
+
+    result = load_device_config(str(path))
+
+    assert isinstance(result, DeviceConfig)
+    assert result.buttons == ["D9", "D10"]
+
+
+def test_load_device_config_raises_when_file_missing(tmp_path):
+    with pytest.raises(RuntimeError, match="not found"):
+        load_device_config(str(tmp_path / "missing.json"))
