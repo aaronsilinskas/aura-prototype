@@ -426,11 +426,13 @@ def test_parse_ir_without_rx_raises_value_error(matrix_config):
         parse_device_config(matrix_config)
 
 
-def test_parse_ir_without_line_raises_value_error(matrix_config):
+def test_parse_ir_without_line_omits_line_emitter(matrix_config):
     del matrix_config["ir"]["line"]
 
-    with pytest.raises(ValueError, match=r"ir\.line"):
-        parse_device_config(matrix_config)
+    result = parse_device_config(matrix_config)
+
+    assert result.ir is not None
+    assert "line" not in result.ir.emitters
 
 
 def test_parse_ir_rx_non_string_raises_value_error(matrix_config):
@@ -467,6 +469,62 @@ def test_parse_absent_ir_section_yields_none(matrix_config):
     result = parse_device_config(config)
 
     assert result.ir is None
+
+
+# ---------------------------------------------------------------------------
+# I2C validation
+# ---------------------------------------------------------------------------
+
+
+def test_parse_i2c_section_maps_sda_and_scl_pins(matrix_config):
+    matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5"}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.i2c is not None
+    assert result.i2c.sda == "GP4"
+    assert result.i2c.scl == "GP5"
+
+
+def test_parse_absent_i2c_section_yields_none(matrix_config):
+    result = parse_device_config(matrix_config)
+
+    assert result.i2c is None
+
+
+def test_parse_i2c_missing_sda_raises_value_error_naming_field(matrix_config):
+    matrix_config["i2c"] = {"scl": "GP5"}
+
+    with pytest.raises(ValueError, match=r"i2c\.sda"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_i2c_missing_scl_raises_value_error_naming_field(matrix_config):
+    matrix_config["i2c"] = {"sda": "GP4"}
+
+    with pytest.raises(ValueError, match=r"i2c\.scl"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_i2c_missing_both_pins_names_both_in_one_error(matrix_config):
+    matrix_config["i2c"] = {}
+
+    with pytest.raises(ValueError, match=r"i2c\.sda.*i2c\.scl"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_i2c_sda_non_string_raises_value_error(matrix_config):
+    matrix_config["i2c"] = {"sda": 4, "scl": "GP5"}
+
+    with pytest.raises(ValueError, match=r"i2c\.sda must be a string pin name"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_i2c_scl_non_string_raises_value_error(matrix_config):
+    matrix_config["i2c"] = {"sda": "GP4", "scl": 5}
+
+    with pytest.raises(ValueError, match=r"i2c\.scl must be a string pin name"):
+        parse_device_config(matrix_config)
 
 
 # ---------------------------------------------------------------------------

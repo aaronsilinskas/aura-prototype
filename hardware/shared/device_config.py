@@ -14,6 +14,7 @@ from engine.state import Scope
 
 __all__ = [
     "DeviceConfig",
+    "I2CConfig",
     "MatrixPixelsConfig",
     "NeoPixelPixelsConfig",
     "NeoPixelScopeConfig",
@@ -35,6 +36,8 @@ _VALID_SCOPE_KEYS: Final = set(Scope.ALL.keys)
 _VALID_IR_EMITTER_KEYS: Final = {"line", "cone", "area_of_effect"}
 
 _I2S_PIN_FIELDS: Final = ("i2s_bit_clock", "i2s_word_select", "i2s_data")
+
+_I2C_PIN_FIELDS: Final = ("sda", "scl")
 
 # ---------------------------------------------------------------------------
 # Config data classes
@@ -140,10 +143,20 @@ class IRConfig:
         self.emitters: dict[str, str] = emitters
 
 
+class I2CConfig:
+    """Parsed I2C bus configuration."""
+
+    __slots__ = ("scl", "sda")
+
+    def __init__(self, sda: str, scl: str) -> None:
+        self.sda: str = sda
+        self.scl: str = scl
+
+
 class DeviceConfig:
     """Parsed device configuration produced by parse_device_config."""
 
-    __slots__ = ("audio", "buttons", "ir", "pixels")
+    __slots__ = ("audio", "buttons", "i2c", "ir", "pixels")
 
     def __init__(
         self,
@@ -151,11 +164,13 @@ class DeviceConfig:
         buttons: list[str],
         ir: IRConfig | None,
         audio: AudioConfig | None,
+        i2c: I2CConfig | None,
     ) -> None:
         self.pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = pixels
         self.buttons: list[str] = buttons
         self.ir: IRConfig | None = ir
         self.audio: AudioConfig | None = audio
+        self.i2c: I2CConfig | None = i2c
 
 
 # ---------------------------------------------------------------------------
@@ -344,11 +359,11 @@ def _parse_ir(ir_raw: dict) -> IRConfig:
         raise ValueError("ir.rx is required")
     if not isinstance(ir_raw["rx"], str):
         raise ValueError("ir.rx must be a string pin name")
-    if "line" not in ir_raw:
-        raise ValueError("ir.line is required")
-    if not isinstance(ir_raw["line"], str):
-        raise ValueError("ir.line must be a string pin name")
 
+    # rx is the only required IR pin; every emitter (line/cone/area_of_effect)
+    # is optional and validated uniformly by the loop below. A prop that
+    # cannot transmit on a given emitter simply omits it; usage sites guard
+    # the absence via require_pin.
     emitters: dict[str, str] = {}
     for key, pin in ir_raw.items():
         if key == "rx":
@@ -370,10 +385,9 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
     max_volume = audio_raw.get("max_volume", 1.0)
     clips: dict[str, str] = dict(audio_raw.get("clips", {}))
 
-    # The I2S bus pins are required-together (mirrors ir.rx/ir.line): a
-    # half-configured bus is exactly the case where two of three might be
-    # missing, so every missing field is named in one error instead of
-    # stopping at the first.
+    # The I2S bus pins are required-together: a half-configured bus is exactly
+    # the case where two of three might be missing, so every missing field is
+    # named in one error instead of stopping at the first.
     missing = [field for field in _I2S_PIN_FIELDS if field not in audio_raw]
     if missing:
         names = ", ".join(f"audio.{field}" for field in missing)
@@ -391,6 +405,23 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
         i2s_word_select=audio_raw["i2s_word_select"],
         i2s_data=audio_raw["i2s_data"],
     )
+
+
+def _parse_i2c(i2c_raw: dict) -> I2CConfig:
+    # sda/scl are required-together, mirroring the audio I2S bus pins: a
+    # half-configured bus is exactly the case where one might be missing, so
+    # every missing field is named in one error instead of stopping at the
+    # first.
+    missing = [field for field in _I2C_PIN_FIELDS if field not in i2c_raw]
+    if missing:
+        names = ", ".join(f"i2c.{field}" for field in missing)
+        raise ValueError(f"{names} required together when i2c section is present")
+
+    for field in _I2C_PIN_FIELDS:
+        if not isinstance(i2c_raw[field], str):
+            raise ValueError(f"i2c.{field} must be a string pin name")
+
+    return I2CConfig(sda=i2c_raw["sda"], scl=i2c_raw["scl"])
 
 
 def parse_device_config(mapping: dict) -> DeviceConfig:
@@ -458,7 +489,11 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     if "audio" in mapping:
         audio = _parse_audio(mapping["audio"])
 
-    return DeviceConfig(pixels=pixels, buttons=buttons, ir=ir, audio=audio)
+    i2c: I2CConfig | None = None
+    if "i2c" in mapping:
+        i2c = _parse_i2c(mapping["i2c"])
+
+    return DeviceConfig(pixels=pixels, buttons=buttons, ir=ir, audio=audio, i2c=i2c)
 
 
 def read_device_config_mapping(path: str = "aura-device.json") -> dict:

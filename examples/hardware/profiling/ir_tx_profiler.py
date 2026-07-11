@@ -24,7 +24,8 @@ duration alongside the uniform stats line.
 
 Hardware
 --------
-- IR emitter (LINE) wired to `LINE_PIN`, driven via `pulseio.PulseOut` at 38kHz.
+- IR emitter (LINE) wired to the pin declared as `ir.line` in `aura-device.json`,
+  driven via `pulseio.PulseOut` at 38kHz.
 
 Installation
 ------------
@@ -37,7 +38,8 @@ Installation
 
 Configuration
 -------------
-- LINE_PIN: board pin for the LINE emitter's `pulseio.PulseOut`
+- ir.line: read from `aura-device.json` (via `require_pin`) -- the board pin for
+  the LINE emitter's `pulseio.PulseOut`. A missing `ir.line` fails loudly.
 - RX_PIN: board pin for the (unused but required by `setup_ir`) IR receiver
 - PAYLOAD_LENGTHS: payload byte-lengths to sweep, in order
 - ITERATIONS_PER_LENGTH: number of `send_ir` calls per payload length
@@ -52,6 +54,7 @@ import time
 
 from effects.performance import PerformanceTracker
 from engine.network import LINE
+from hardware.shared.device_config import load_device_config, require_pin
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiling_helpers import (
     print_profile_header,
@@ -64,7 +67,6 @@ try:
 except ImportError:
     pass
 
-LINE_PIN_NAME: Final = "GP17"
 PAYLOAD_LENGTHS: Final = [1, 4, 16, 64]
 ITERATIONS_PER_LENGTH: Final = 10
 TARGET_FPS: Final = 24.0
@@ -74,7 +76,11 @@ LOG_INTERVAL_SECONDS: Final = 5.0
 def _build_network_controls() -> HardwareNetworkControls:
     """Build the LINE transmitter directly (the same PulseOut + wrapper `setup_ir`
     constructs), but *without* the receiver -- the receiver's `PulseIn(maxlen=256)`
-    belongs to the separate IR-rx component (`ir_rx_profiler.py`), not IR-tx.
+    belongs to the separate IR-rx component (`ir_rx_profiler.py`), not IR-tx. The
+    LINE pin is sourced from the real `aura-device.json` via `require_pin`, which
+    fails loudly with a "not declared" error if `ir.line` is absent -- this does
+    NOT go through `build_hardware`, which would also allocate the receiver's
+    `PulseIn(maxlen=256)` and pollute the transmit measurement.
     """
     import board
     import pulseio
@@ -83,7 +89,9 @@ def _build_network_controls() -> HardwareNetworkControls:
     from hardware.shared.ir_protocol import AuraInfraredEncoder
     from hardware.shared.ir_transport import InfraredTransmitter
 
-    line_pin = getattr(board, LINE_PIN_NAME)
+    config = load_device_config()
+    line_pin_name = require_pin(config, lambda c: c.ir.emitters["line"], "ir.line")
+    line_pin = getattr(board, line_pin_name)
     pulseout = pulseio.PulseOut(line_pin, frequency=38000, duty_cycle=0x8000)
     transmitter = InfraredTransmitter(PulseOutWriter(pulseout), AuraInfraredEncoder())
     return HardwareNetworkControls({LINE: transmitter})
