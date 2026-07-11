@@ -44,14 +44,18 @@ harness is not comparable.
 
 Hardware bring-up
 ------------------
-Each ``HARNESSES`` entry describes a ``DeviceConfig`` built **in-file** (not read
-from ``aura-device.json``) and handed to
-``hardware.circuitpython.device_builder.build_hardware`` -- the same assembly path
-production demos use, so this profiler measures the same hardware graph a prop
-actually runs. A harness with ``"ir": None`` omits the ``ir`` key from the mapping
-entirely, so ``build_hardware`` wires **no** IR receiver and no network controls --
-keeping them off the heap for scenes that never touch the network. ``"tag"`` and
-``"default"`` include an ``ir`` section and pass the matching wire-frame codec.
+Each ``HARNESSES`` entry describes a ``DeviceConfig`` built **in-file** and handed
+to ``hardware.circuitpython.device_builder.build_hardware`` -- the same assembly
+path production demos use, so this profiler measures the same hardware graph a
+prop actually runs. The matrix geometry and each harness's own audio clips/voice
+count are profiler-owned (edited by hand in ``HARNESSES``/``_device_config_for``
+below); the button and IR pins are instead harvested from the real
+``aura-device.json`` on the board (via ``load_device_config``/``require_pin``) so
+this profiler never carries its own private copy of that wiring. A harness with
+``"ir": None`` omits the ``ir`` key from the mapping entirely, so ``build_hardware``
+wires **no** IR receiver and no network controls -- keeping them off the heap for
+scenes that never touch the network. ``"tag"`` and ``"default"`` include an ``ir``
+section and pass the matching wire-frame codec.
 
 Hardware
 --------
@@ -63,8 +67,9 @@ buttons or the accelerometer (inputs do not allocate scene heap), even though
 - Adafruit IS31FL3741 13x9 RGB LED Matrix Breakout (I2C on default SDA/SCL)
 - DRV2605L haptic motor driver on default SDA/SCL (optional -- the profiler runs
   without it, but the vibration output is then absent from the measurement)
-- For scenes whose harness sets ``"ir"``: IR receiver on IR_RX_PIN_NAME and IR LINE
-  emitter on IR_LINE_PIN_NAME
+- Buttons and IR pins are read from ``aura-device.json`` on the board (``buttons[0]``,
+  ``buttons[1]``, ``ir.rx``, ``ir.line``) -- for scenes whose harness sets ``"ir"``,
+  that means an IR receiver on ``ir.rx`` and an IR LINE emitter on ``ir.line``
 
 Installation
 ------------
@@ -76,7 +81,11 @@ Installation
      adafruit_lis3dh.mpy
      adafruit_drv2605.mpy  (optional - required only when a DRV2605L is wired up)
 
-3. Run the deploy script to copy all source files and set code.py:
+3. Deploy an ``aura-device.json`` declaring at least ``buttons[0]``, ``buttons[1]``,
+   ``ir.rx``, and ``ir.line`` to the board -- see ``examples/aura-device.sample.json``.
+   A missing required pin fails loudly at import time.
+
+4. Run the deploy script to copy all source files and set code.py:
      python scripts/deploy.py examples/hardware/profiling/scene_load_profiler.py
    The board reboots and starts running automatically.
 
@@ -117,7 +126,12 @@ from hardware.circuitpython.is31fl3741_output import (
     IS31FL3741_SCOPE_ROWS,
     IS31FL3741EffectOutput,
 )
-from hardware.shared.device_config import DeviceConfig, parse_device_config
+from hardware.shared.device_config import (
+    DeviceConfig,
+    load_device_config,
+    parse_device_config,
+    require_pin,
+)
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_protocol import InfraredDecoder, InfraredEncoder
 from hardware.shared.profiling_helpers import (
@@ -136,15 +150,18 @@ except ImportError:
 # Configuration -- adjust to match your wiring
 # ---------------------------------------------------------------------------
 
-# Button pins -- build_hardware always wires buttons, though this profiler never
-# reads them (inputs do not allocate scene heap). Match the production demo.
-BUTTON_A_PIN_NAME: Final = "GP14"
-BUTTON_B_PIN_NAME: Final = "GP15"
-
-# IR transceiver pin names -- update these to match your board layout. Only used
-# for harnesses whose "ir" is not None (tag, hardware_test); ignored otherwise.
-IR_RX_PIN_NAME: Final = "GP16"
-IR_LINE_PIN_NAME: Final = "GP17"
+# Button and IR pins are sourced from the real aura-device.json -- the same file
+# a deployed prop reads -- rather than hardcoded here, so bring-up on a new
+# board only requires editing that one file. A missing required pin fails
+# loudly (ValueError naming the field) at import time via require_pin.
+# build_hardware always wires buttons, though this profiler never reads them
+# (inputs do not allocate scene heap). ir.rx/ir.line are only used for
+# harnesses whose "ir" is not None (tag, hardware_test); ignored otherwise.
+_device_config: Final = load_device_config()
+BUTTON_A_PIN_NAME: Final = require_pin(_device_config, lambda c: c.buttons[0], "buttons[0]")
+BUTTON_B_PIN_NAME: Final = require_pin(_device_config, lambda c: c.buttons[1], "buttons[1]")
+IR_RX_PIN_NAME: Final = require_pin(_device_config, lambda c: c.ir.rx, "ir.rx")
+IR_LINE_PIN_NAME: Final = require_pin(_device_config, lambda c: c.ir.emitters["line"], "ir.line")
 
 # I2S amp pins -- update these to match your board layout. Declared directly
 # in each harness's audio section (see _device_config_for), resolved against
@@ -234,11 +251,14 @@ def _device_config_for(harness: dict) -> DeviceConfig:
     """Build the in-file DeviceConfig for `harness` via parse_device_config.
 
     Mirrors the matrix geometry every prop in this repo ships (IS31FL3741_COLS /
-    IS31FL3741_SCOPE_ROWS) and the harness's own audio clips/voice count. Omits
-    the ``ir`` key entirely when ``harness["ir"]`` is ``None`` so build_hardware
-    wires no IR receiver and no network controls for scenes that never touch the
-    network -- ``HARNESSES`` stays the single source of truth for what each scene
-    needs, not a static ``aura-device.json``.
+    IS31FL3741_SCOPE_ROWS) and the harness's own audio clips/voice count -- those
+    stay profiler-owned. The button and IR pin *values* plugged in below come
+    from the real ``aura-device.json`` (``BUTTON_A_PIN_NAME`` etc., sourced at
+    module scope via ``require_pin``); only *whether* IR is wired at all is a
+    harness decision. Omits the ``ir`` key entirely when ``harness["ir"]`` is
+    ``None`` so build_hardware wires no IR receiver and no network controls for
+    scenes that never touch the network -- ``HARNESSES`` stays the single source
+    of truth for what each scene needs.
     """
     mapping: dict = {
         "pixels": [
