@@ -22,7 +22,7 @@ from engine.network import LINE
 from engine.phase import InPhaseRule
 from engine.state import GameState, Scope
 from hardware.shared.tag_protocol import TagData, encode_tag_data
-from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, PHASE_READY, TAG_MACHINE_KEY
+from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, tag_phase
 from packs.scenes.tag.rules.helpers.tag_config import TagConfig, tag_config
 from packs.scenes.tag.rules.helpers.tag_state import TagState, tag_state
 from packs.scenes.tag.rules.playing_rule import AMMO_COLOR
@@ -34,7 +34,7 @@ class TagShootingRule(InPhaseRule):
     """Drives Button-A shot firing and felt feedback during the Playing phase."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_PLAYING, TAG_MACHINE_KEY, PHASE_READY)
+        super().__init__(PHASE_PLAYING, tag_phase)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:

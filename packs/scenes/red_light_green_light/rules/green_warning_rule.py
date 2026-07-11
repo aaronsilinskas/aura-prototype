@@ -13,8 +13,6 @@ from engine.state import GameState, Scope
 from packs.scenes.red_light_green_light.rules.helpers.phases import (
     PHASE_GREEN,
     PHASE_GREEN_WARNING,
-    PHASE_READY,
-    RLGL_MACHINE_KEY,
     rlgl_phase,
 )
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_config import rlgl_config
@@ -25,7 +23,7 @@ class RlglGreenWarningRule(PhaseRule):
     """Drives the Green Warning phase: warning sting, then into Green."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_GREEN_WARNING, RLGL_MACHINE_KEY, PHASE_READY)
+        super().__init__(PHASE_GREEN_WARNING, rlgl_phase)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_enter(self, state: GameState) -> None:

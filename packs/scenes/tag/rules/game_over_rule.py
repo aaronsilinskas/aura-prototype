@@ -16,7 +16,7 @@ from engine.state import GameState, Scope
 from packs.scenes.tag.rules.helpers.phases import (
     PHASE_GAME_OVER,
     PHASE_READY,
-    TAG_MACHINE_KEY,
+    tag_phase,
 )
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 
@@ -25,7 +25,7 @@ class TagGameOverRule(PhaseRule):
     """Drives the Game Over phase: fire + sting, then back to Ready."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_GAME_OVER, TAG_MACHINE_KEY, PHASE_READY)
+        super().__init__(PHASE_GAME_OVER, tag_phase)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_enter(self, state: GameState) -> None:

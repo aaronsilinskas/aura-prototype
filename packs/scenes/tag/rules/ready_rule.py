@@ -10,14 +10,14 @@ from __future__ import annotations
 from engine.input import InputEvents
 from engine.phase import PhaseRule
 from engine.state import GameState, Scope
-from packs.scenes.tag.rules.helpers.phases import PHASE_READY, PHASE_STARTING, TAG_MACHINE_KEY
+from packs.scenes.tag.rules.helpers.phases import PHASE_READY, PHASE_STARTING, tag_phase
 
 
 class TagReadyRule(PhaseRule):
     """Drives the Ready phase: plays the ready effect and shot sting, waits for a button press."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_READY, TAG_MACHINE_KEY, PHASE_READY)
+        super().__init__(PHASE_READY, tag_phase)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_enter(self, state: GameState) -> None:

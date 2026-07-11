@@ -19,7 +19,7 @@ from engine.state import GameState, Scope
 from packs.scenes.red_light_green_light.rules.helpers.phases import (
     PHASE_READY,
     PHASE_RED_WARNING,
-    RLGL_MACHINE_KEY,
+    rlgl_phase,
 )
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_config import rlgl_config
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_phase_state import rlgl_phase_state
@@ -31,7 +31,7 @@ class RlglReadyRule(PhaseRule):
     """Drives the Ready phase: plays the ready effect, waits for a button press."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_READY, RLGL_MACHINE_KEY, PHASE_READY)
+        super().__init__(PHASE_READY, rlgl_phase)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_enter(self, state: GameState) -> None:

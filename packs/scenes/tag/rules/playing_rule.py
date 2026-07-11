@@ -30,8 +30,7 @@ from engine.state import GameState, Scope
 from packs.scenes.tag.rules.helpers.phases import (
     PHASE_GAME_OVER,
     PHASE_PLAYING,
-    PHASE_READY,
-    TAG_MACHINE_KEY,
+    tag_phase,
 )
 from packs.scenes.tag.rules.helpers.tag_config import tag_config
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
@@ -43,7 +42,7 @@ class TagPlayingRule(PhaseRule):
     """Drives the Playing phase: hitpoints, ammo bar, and game-over transition."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_PLAYING, TAG_MACHINE_KEY, PHASE_READY)
+        super().__init__(PHASE_PLAYING, tag_phase)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_enter(self, state: GameState) -> None:

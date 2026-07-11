@@ -12,7 +12,6 @@ from engine.state import GameState, Scope
 from packs.scenes.red_light_green_light.rules.helpers.phases import (
     PHASE_GAME_OVER,
     PHASE_READY,
-    RLGL_MACHINE_KEY,
     rlgl_phase,
 )
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_config import rlgl_config
@@ -22,7 +21,7 @@ class RlglGameOverRule(PhaseRule):
     """Drives the Game Over phase: fire + sting, then back to Ready."""
 
     def __init__(self) -> None:
-        super().__init__(PHASE_GAME_OVER, RLGL_MACHINE_KEY, PHASE_READY)
+        super().__init__(PHASE_GAME_OVER, rlgl_phase)
         self.on(InputEvents.ButtonAndAcceleration, self._handle)
 
     def on_enter(self, state: GameState) -> None:

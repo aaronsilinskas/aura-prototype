@@ -18,8 +18,9 @@ from engine.phase import (
     PhaseKey,
     PhaseMachine,
     PhaseRule,
+    PhaseSlot,
 )
-from engine.state import GameState, SceneControls, Scope, StateSlot
+from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
 
 _GROUP = EventGroup("phase_test")
@@ -35,6 +36,7 @@ class _TickEvent(Event):
 _PHASE_A = PhaseKey("a")
 _PHASE_B = PhaseKey("b")
 _MACHINE_KEY = "test_machine"
+_DEFAULT_SLOT = PhaseSlot(_MACHINE_KEY, _PHASE_A)
 
 
 # ---------------------------------------------------------------------------
@@ -49,11 +51,10 @@ class _LifecycleRule(PhaseRule):
         self,
         phase: PhaseKey,
         label: str,
-        machine_key: str = _MACHINE_KEY,
-        initial: PhaseKey = _PHASE_A,
+        phase_slot: PhaseSlot = _DEFAULT_SLOT,
         transitions_to: PhaseKey | None = None,
     ) -> None:
-        super().__init__(phase, machine_key, initial)
+        super().__init__(phase, phase_slot)
         self._label = label
         self._transitions_to = transitions_to
         self.on(_TickEvent, self._tick)
@@ -78,10 +79,9 @@ class _InPhaseEmitter(InPhaseRule):
         self,
         phase: PhaseKey,
         label: str,
-        machine_key: str = _MACHINE_KEY,
-        initial: PhaseKey = _PHASE_A,
+        phase_slot: PhaseSlot = _DEFAULT_SLOT,
     ) -> None:
-        super().__init__(phase, machine_key, initial)
+        super().__init__(phase, phase_slot)
         self._label = label
         self.on(_TickEvent, self._tick)
 
@@ -153,6 +153,48 @@ def test_take_just_entered_returns_true_once_then_false() -> None:
 
 
 # ---------------------------------------------------------------------------
+# PhaseSlot — lazy get-or-create accessor, shared by construction
+# ---------------------------------------------------------------------------
+
+
+def test_phase_slot_creates_a_machine_at_the_initial_phase_on_first_call() -> None:
+    slot = PhaseSlot("some_machine", _PHASE_A)
+    state = GameState(SpyEffectControls(), SceneControls())
+
+    machine = slot(state)
+
+    assert machine.phase is _PHASE_A
+
+
+def test_phase_slot_returns_the_same_cached_machine_on_repeated_calls() -> None:
+    slot = PhaseSlot("some_machine", _PHASE_A)
+    state = GameState(SpyEffectControls(), SceneControls())
+
+    first = slot(state)
+    second = slot(state)
+
+    assert first is second
+
+
+def test_phase_slot_exposes_its_key() -> None:
+    slot = PhaseSlot("some_machine", _PHASE_A)
+
+    assert slot.key == "some_machine"
+
+
+def test_two_phase_slots_with_the_same_key_still_resolve_the_same_cached_machine() -> None:
+    # Lazy get-or-create means any two PhaseSlots keyed alike reach the one
+    # cached PhaseMachine already stored under that key in GameState -- there
+    # is no "unestablished key" failure. Identity divergence is instead caught
+    # at scene load by _check_phase_owners (see the engine.py tests below).
+    state = GameState(SpyEffectControls(), SceneControls())
+    first = PhaseSlot("shared_machine", _PHASE_A)
+    second = PhaseSlot("shared_machine", _PHASE_A)
+
+    assert first(state) is second(state)
+
+
+# ---------------------------------------------------------------------------
 # PhaseRule lifecycle through the engine seam
 # ---------------------------------------------------------------------------
 
@@ -166,8 +208,9 @@ def test_on_enter_fires_once_while_the_gated_handler_fires_every_tick() -> None:
 
 
 def test_on_exit_fires_on_transition_and_the_next_phase_enters() -> None:
-    leaving = _LifecycleRule(_PHASE_A, "a", transitions_to=_PHASE_B)
-    arriving = _LifecycleRule(_PHASE_B, "b")
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+    arriving = _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
 
     names = _run([leaving, arriving], ticks=2)
 
@@ -178,8 +221,9 @@ def test_on_exit_fires_on_transition_and_the_next_phase_enters() -> None:
 
 
 def test_handler_does_not_fire_after_its_phase_is_left() -> None:
-    leaving = _LifecycleRule(_PHASE_A, "a", transitions_to=_PHASE_B)
-    arriving = _LifecycleRule(_PHASE_B, "b")
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+    arriving = _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
 
     names = _run([leaving, arriving], ticks=4)
 
@@ -194,8 +238,9 @@ def test_on_enter_fires_exactly_once_regardless_of_dispatch_order(
     # Whether the arriving owner sorts before or after the transitioning rule,
     # its on_enter must fire exactly once: same tick if it dispatches after the
     # transition, otherwise the following tick (the entry flag persists).
-    leaving = _LifecycleRule(_PHASE_A, "a", transitions_to=_PHASE_B)
-    arriving = _LifecycleRule(_PHASE_B, "b")
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+    arriving = _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
     rules = [arriving, leaving] if owner_dispatches_first else [leaving, arriving]
 
     names = _run(rules, ticks=4)
@@ -211,8 +256,9 @@ def test_on_enter_fires_exactly_once_regardless_of_dispatch_order(
 def test_in_phase_rule_handler_fires_only_while_its_phase_is_active() -> None:
     # bystander registered first so it dispatches before the transition each
     # tick: it must not catch the same-tick switch into B on the transition tick.
-    bystander = _InPhaseEmitter(_PHASE_B, "bystander")
-    leaving = _LifecycleRule(_PHASE_A, "a", transitions_to=_PHASE_B)
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    bystander = _InPhaseEmitter(_PHASE_B, "bystander", phase_slot=slot)
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
 
     names = _run([bystander, leaving], ticks=4)
 
@@ -225,8 +271,9 @@ def test_in_phase_rule_handler_fires_only_while_its_phase_is_active() -> None:
 def test_in_phase_rule_does_not_consume_the_entry_flag_for_a_phase_owner() -> None:
     # InPhaseRule registered first so it dispatches before the owner each tick;
     # if it consumed the entry flag, the owner's on_enter would never fire.
-    bystander = _InPhaseEmitter(_PHASE_A, "bystander", initial=_PHASE_A)
-    owner = _LifecycleRule(_PHASE_A, "owner", initial=_PHASE_A)
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    bystander = _InPhaseEmitter(_PHASE_A, "bystander", phase_slot=slot)
+    owner = _LifecycleRule(_PHASE_A, "owner", phase_slot=slot)
 
     names = _run([bystander, owner], ticks=2)
 
@@ -234,8 +281,9 @@ def test_in_phase_rule_does_not_consume_the_entry_flag_for_a_phase_owner() -> No
 
 
 def test_multiple_in_phase_rules_share_one_phase() -> None:
-    first = _InPhaseEmitter(_PHASE_A, "first", initial=_PHASE_A)
-    second = _InPhaseEmitter(_PHASE_A, "second", initial=_PHASE_A)
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    first = _InPhaseEmitter(_PHASE_A, "first", phase_slot=slot)
+    second = _InPhaseEmitter(_PHASE_A, "second", phase_slot=slot)
 
     names = _run([first, second], ticks=1)
 
@@ -244,8 +292,9 @@ def test_multiple_in_phase_rules_share_one_phase() -> None:
 
 
 def test_in_phase_rule_and_phase_rule_coexist_on_one_phase() -> None:
-    owner = _LifecycleRule(_PHASE_A, "owner", initial=_PHASE_A)
-    bystander = _InPhaseEmitter(_PHASE_A, "bystander", initial=_PHASE_A)
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    owner = _LifecycleRule(_PHASE_A, "owner", phase_slot=slot)
+    bystander = _InPhaseEmitter(_PHASE_A, "bystander", phase_slot=slot)
 
     names = _run([owner, bystander], ticks=1)
 
@@ -276,10 +325,10 @@ def test_phase_rules_on_different_phases_load_cleanly() -> None:
     assert len(engine.rules) == 2
 
 
-def test_same_phase_under_different_machine_keys_loads_cleanly() -> None:
+def test_same_phase_under_different_phase_slots_loads_cleanly() -> None:
     engine = GameEngine(effect_controls=SpyEffectControls())
-    one = _LifecycleRule(_PHASE_A, "one", machine_key="machine_one")
-    two = _LifecycleRule(_PHASE_A, "two", machine_key="machine_two")
+    one = _LifecycleRule(_PHASE_A, "one", phase_slot=PhaseSlot("machine_one", _PHASE_A))
+    two = _LifecycleRule(_PHASE_A, "two", phase_slot=PhaseSlot("machine_two", _PHASE_A))
 
     engine.set_rules([one, two])  # does not raise
 
@@ -288,8 +337,9 @@ def test_same_phase_under_different_machine_keys_loads_cleanly() -> None:
 
 def test_in_phase_rule_sharing_a_phase_with_its_owner_is_not_a_duplicate() -> None:
     engine = GameEngine(effect_controls=SpyEffectControls())
-    owner = _LifecycleRule(_PHASE_A, "owner")
-    bystander = _InPhaseEmitter(_PHASE_A, "bystander")
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    owner = _LifecycleRule(_PHASE_A, "owner", phase_slot=slot)
+    bystander = _InPhaseEmitter(_PHASE_A, "bystander", phase_slot=slot)
 
     engine.set_rules([owner, bystander])  # does not raise
 
@@ -297,12 +347,13 @@ def test_in_phase_rule_sharing_a_phase_with_its_owner_is_not_a_duplicate() -> No
 
 
 # ---------------------------------------------------------------------------
-# PhaseRule per-instance StateSlot — slot identity and phase_ownership
+# PhaseRule per-instance PhaseSlot — slot identity and phase_ownership
 # ---------------------------------------------------------------------------
 
 
 def test_phase_rule_phase_ownership_returns_slot_key_and_phase() -> None:
-    rule = _LifecycleRule(_PHASE_A, "owner", machine_key=_MACHINE_KEY)
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    rule = _LifecycleRule(_PHASE_A, "owner", phase_slot=slot)
 
     key, phase = rule.phase_ownership()
 
@@ -310,16 +361,20 @@ def test_phase_rule_phase_ownership_returns_slot_key_and_phase() -> None:
     assert phase is _PHASE_A
 
 
-def test_module_level_slot_and_rule_per_instance_slot_same_key_resolve_same_machine() -> None:
-    # A module-level StateSlot (simulating tag_phase / rlgl_phase) and the rule's
-    # own per-instance slot both keyed to _MACHINE_KEY must resolve the identical
-    # cached PhaseMachine from the same GameState.
-    module_slot: StateSlot = StateSlot(_MACHINE_KEY, lambda s: PhaseMachine(_PHASE_A), PhaseMachine)
-    rule = _LifecycleRule(_PHASE_A, "owner", machine_key=_MACHINE_KEY)
+def test_shared_phase_slot_resolves_the_same_machine_for_phase_rule_and_in_phase_rule() -> None:
+    # A scene constructs exactly one PhaseSlot per machine (e.g. tag_phase) and
+    # passes that same instance to every PhaseRule/InPhaseRule plus its own
+    # module-level phase reference. All three must resolve the identical
+    # cached PhaseMachine.
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    owner = _LifecycleRule(_PHASE_A, "owner", phase_slot=slot)
+    bystander = _InPhaseEmitter(_PHASE_A, "bystander", phase_slot=slot)
 
     state = GameState(SpyEffectControls(), SceneControls())
 
-    via_module_slot = module_slot(state)
-    via_rule = _rule_machine(rule, state)
+    via_module_level_reference = slot(state)
+    via_phase_rule = _rule_machine(owner, state)
+    via_in_phase_rule = _rule_machine(bystander, state)
 
-    assert via_module_slot is via_rule
+    assert via_module_level_reference is via_phase_rule
+    assert via_module_level_reference is via_in_phase_rule

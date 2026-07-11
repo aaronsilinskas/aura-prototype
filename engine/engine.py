@@ -45,11 +45,18 @@ class GameRule:
 
 
 def _check_phase_owners(rules: list[GameRule]) -> None:
-    """Raise ``ValueError`` if two rules claim the same ``(machine key, phase)``.
+    """Raise ``ValueError`` at scene load if two ``PhaseRule``s own one phase.
 
     Duck-typed on ``phase_ownership()`` so the engine stays decoupled from the
-    phase primitive: only ``PhaseRule`` exposes it.  ``InPhaseRule``s do not
-    own a phase and are skipped, so any number may share a phase.
+    phase primitive in ``engine/phase.py`` — the name is not imported here,
+    only read off each rule with ``getattr``.  Only ``PhaseRule`` exposes it;
+    ``InPhaseRule``s do not own a phase and are skipped, so any number may
+    share a phase.
+
+    Catches two rules claiming the same ``(machine key, phase)`` pair, which
+    would silently drop one rule's ``on_enter``: the entry flag is consumed
+    atomically by whichever ``PhaseRule`` dispatches first, so the second's
+    ``on_enter`` would never fire with nothing to signal the mistake.
     """
     owners: dict = {}
     for rule in rules:
@@ -99,9 +106,8 @@ class GameEngine:
         rules.  For incremental registration use ``add_rules()`` instead.
 
         Raises ``ValueError`` if two ``PhaseRule``s claim the same
-        ``(machine key, phase)`` pair, so a duplicate phase owner fails fast at
-        scene load rather than silently dropping one rule's ``on_enter`` at
-        runtime.
+        ``(machine key, phase)`` pair, so the mistake fails fast at scene load
+        rather than silently dropping a rule's ``on_enter`` at runtime.
         """
         _check_phase_owners(rules)
         self._rules = list(rules)
