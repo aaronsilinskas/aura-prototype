@@ -1121,6 +1121,20 @@ def test_build_hardware_multi_pin_ir_rx_unknown_pin_raises_same_error_as_any_oth
             build_hardware(config, board_module=board_mock)
 
 
+def test_build_hardware_single_pin_ir_rx_unknown_pin_raises_unindexed_error() -> None:
+    mapping = {"buttons": ["D9"], "ir": {"rx": "NOPE"}}
+    config = parse_device_config(mapping)
+    board_mock = MagicMock(spec=["D9"])  # NOPE deliberately absent
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ValueError, match=r"ir\.rx(?!\[).*NOPE"):
+            build_hardware(config, board_module=board_mock)
+
+
 # ---------------------------------------------------------------------------
 # _setup_external_power only drives the rail on boards that have one
 # ---------------------------------------------------------------------------
