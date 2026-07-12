@@ -144,7 +144,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `DeviceHardware` | `hardware/shared/device_hardware.py` | Named bundle `build_hardware` returns (outputs, buttons, network_controls, transmit_pump, …); board-free, importable under CPython |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete `(NetworkControls, TransmitPump)` adapter over wired `InfraredTransmitter`s; constructed by `device_builder` |
 | `InfraredManager` | `hardware/shared/ir_manager.py` | Board-free per-tick IR orchestrator: `update()` pumps transmits then receives, owning the pump-before-receive order; exposes `received` + forwarded `last_signal_strength`/`last_error_margin`/`telemetry_line()` |
-| `SceneRuntime` | `app/scene_composition.py` | `__slots__` bundle (`manager`, `effect_manager`, `timer`, `ir`) returned by `build_scene_runtime`; the wiring `run_scene`'s per-tick loop drives |
+| `SceneRuntime` | `app/scene_composition.py` | `__slots__` bundle (`manager`, `effect_manager`, `timer`, `ir`, `radio`) returned by `build_scene_runtime`; the wiring `run_scene`'s per-tick loop drives |
 
 ---
 

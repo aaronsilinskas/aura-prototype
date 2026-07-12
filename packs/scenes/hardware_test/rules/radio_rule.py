@@ -12,11 +12,12 @@ from packs.scenes.hardware_test.rules.helpers.phases import MODE_RADIO
 class HwTestRadioRule(HwModeRule):
     """Drives the Radio mode: white idle entry effect, send + receive flash.
 
-    On entry, shows a white solid on ``Scope.ALL``. Button A queues a
-    simulated ``RadioReceived`` so the receive path can be exercised on a
-    single board. Receiving a radio packet flashes ``Scope.Global.ALL`` with
-    a white solid and records the receipt/timestamp so the shared
-    ``HwModeRule`` flash-expiry can restore the idle effect.
+    On entry, shows a white solid on ``Scope.ALL``. Button A transmits
+    ``HW_TEST_PAYLOAD`` via ``state.network_controls.send_radio`` — a real
+    over-the-air packet, not a local simulation. Receiving a genuine radio
+    packet flashes ``Scope.Global.ALL`` with a white solid and records the
+    receipt/timestamp so the shared ``HwModeRule`` flash-expiry can restore
+    the idle effect.
     """
 
     def __init__(self) -> None:
@@ -30,7 +31,7 @@ class HwTestRadioRule(HwModeRule):
         if not event.buttons.is_pressed("A"):
             return
 
-        state.queue_event(NetworkEvents.RadioReceived(HW_TEST_PAYLOAD, "local"))
+        state.network_controls.send_radio(HW_TEST_PAYLOAD)
         print("sending radio packet")
 
     def _handle_radio_received(self, event: NetworkEvents.RadioReceived, state: GameState) -> None:
