@@ -256,6 +256,99 @@ def test_parse_matrix_negative_brightness_raises_value_error(matrix_config):
 
 
 # ---------------------------------------------------------------------------
+# Pixels entry enabled toggle
+# ---------------------------------------------------------------------------
+
+
+def test_parse_matrix_pixels_absent_enabled_key_defaults_to_true(matrix_config):
+    result = parse_device_config(matrix_config)
+
+    assert result.pixels[0].enabled is True
+
+
+def test_parse_matrix_pixels_enabled_false_retains_entry_in_list(matrix_config):
+    matrix_config["pixels"][0]["enabled"] = False
+
+    result = parse_device_config(matrix_config)
+
+    assert len(result.pixels) == 1
+    assert result.pixels[0].enabled is False
+
+
+def test_parse_matrix_pixels_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
+    matrix_config["pixels"][0]["enabled"] = "yes"
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.enabled"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_disabled_matrix_pixels_entry_missing_cols_still_raises(matrix_config):
+    matrix_config["pixels"][0]["enabled"] = False
+    del matrix_config["pixels"][0]["cols"]
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.cols"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_disabled_matrix_pixels_entry_overlapping_scope_rows_still_raises(matrix_config):
+    matrix_config["pixels"][0]["enabled"] = False
+    matrix_config["pixels"][0]["scope_rows"] = {
+        "global.main": [0, 5],
+        "personal": [3, 7],  # overlaps global.main at rows 3-4
+    }
+
+    with pytest.raises(ValueError, match="overlap"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_neopixel_pixels_absent_enabled_key_defaults_to_true(neopixel_config):
+    result = parse_device_config(neopixel_config)
+
+    assert result.pixels[0].enabled is True
+
+
+def test_parse_neopixel_pixels_enabled_false_retains_entry_in_list(neopixel_config):
+    neopixel_config["pixels"][0]["enabled"] = False
+
+    result = parse_device_config(neopixel_config)
+
+    assert len(result.pixels) == 1
+    assert result.pixels[0].enabled is False
+
+
+def test_parse_neopixel_pixels_non_boolean_enabled_raises_value_error_naming_field(
+    neopixel_config,
+):
+    neopixel_config["pixels"][0]["enabled"] = "yes"
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.enabled"):
+        parse_device_config(neopixel_config)
+
+
+def test_parse_disabled_neopixel_pixels_entry_reusing_pin_still_raises_value_error():
+    mapping = {
+        "pixels": [
+            {
+                "type": "neopixel",
+                "pin": "D5",
+                "count": 10,
+                "scope_pixels": {"personal": [0, 10]},
+                "enabled": False,
+            },
+            {
+                "type": "neopixel",
+                "pin": "D5",
+                "count": 5,
+                "scope_pixels": {"directional": [0, 5]},
+            },
+        ],
+    }
+
+    with pytest.raises(ValueError, match=r"pin 'D5' is already used"):
+        parse_device_config(mapping)
+
+
+# ---------------------------------------------------------------------------
 # NeoPixel legacy scope brightness validation
 # ---------------------------------------------------------------------------
 
@@ -493,6 +586,28 @@ def test_parse_ir_rx_list_with_non_string_entry_names_its_index(matrix_config):
         parse_device_config(matrix_config)
 
 
+def test_parse_ir_absent_enabled_key_defaults_to_true(matrix_config):
+    result = parse_device_config(matrix_config)
+
+    assert result.ir.enabled is True
+
+
+def test_parse_ir_enabled_false_retains_object_not_none(matrix_config):
+    matrix_config["ir"]["enabled"] = False
+
+    result = parse_device_config(matrix_config)
+
+    assert result.ir is not None
+    assert result.ir.enabled is False
+
+
+def test_parse_ir_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
+    matrix_config["ir"]["enabled"] = "yes"
+
+    with pytest.raises(ValueError, match=r"ir\.enabled"):
+        parse_device_config(matrix_config)
+
+
 # ---------------------------------------------------------------------------
 # Accelerometer validation
 # ---------------------------------------------------------------------------
@@ -519,6 +634,30 @@ def test_parse_accelerometer_unknown_key_raises_value_error_naming_field(matrix_
         parse_device_config(matrix_config)
 
 
+def test_parse_accelerometer_absent_enabled_key_defaults_to_true(matrix_config):
+    matrix_config["accelerometer"] = {}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.accelerometer.enabled is True
+
+
+def test_parse_accelerometer_enabled_false_retains_object_not_none(matrix_config):
+    matrix_config["accelerometer"] = {"enabled": False}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.accelerometer is not None
+    assert result.accelerometer.enabled is False
+
+
+def test_parse_accelerometer_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
+    matrix_config["accelerometer"] = {"enabled": "yes"}
+
+    with pytest.raises(ValueError, match=r"accelerometer\.enabled"):
+        parse_device_config(matrix_config)
+
+
 # ---------------------------------------------------------------------------
 # Haptics validation
 # ---------------------------------------------------------------------------
@@ -542,6 +681,30 @@ def test_parse_haptics_unknown_key_raises_value_error_naming_field(matrix_config
     matrix_config["haptics"] = {"intensity": 5}
 
     with pytest.raises(ValueError, match=r"haptics\.intensity"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_haptics_absent_enabled_key_defaults_to_true(matrix_config):
+    matrix_config["haptics"] = {}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.haptics.enabled is True
+
+
+def test_parse_haptics_enabled_false_retains_object_not_none(matrix_config):
+    matrix_config["haptics"] = {"enabled": False}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.haptics is not None
+    assert result.haptics.enabled is False
+
+
+def test_parse_haptics_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
+    matrix_config["haptics"] = {"enabled": "yes"}
+
+    with pytest.raises(ValueError, match=r"haptics\.enabled"):
         parse_device_config(matrix_config)
 
 
@@ -601,6 +764,30 @@ def test_parse_i2c_scl_non_string_raises_value_error(matrix_config):
         parse_device_config(matrix_config)
 
 
+def test_parse_i2c_absent_enabled_key_defaults_to_true(matrix_config):
+    matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5"}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.i2c.enabled is True
+
+
+def test_parse_i2c_enabled_false_retains_object_not_none(matrix_config):
+    matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5", "enabled": False}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.i2c is not None
+    assert result.i2c.enabled is False
+
+
+def test_parse_i2c_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
+    matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5", "enabled": "yes"}
+
+    with pytest.raises(ValueError, match=r"i2c\.enabled"):
+        parse_device_config(matrix_config)
+
+
 # ---------------------------------------------------------------------------
 # Audio validation
 # ---------------------------------------------------------------------------
@@ -626,6 +813,28 @@ def test_parse_absent_audio_section_yields_none(matrix_config):
     result = parse_device_config(config)
 
     assert result.audio is None
+
+
+def test_parse_audio_absent_enabled_key_defaults_to_true(matrix_config):
+    result = parse_device_config(matrix_config)
+
+    assert result.audio.enabled is True
+
+
+def test_parse_audio_enabled_false_retains_object_not_none(matrix_config):
+    matrix_config["audio"]["enabled"] = False
+
+    result = parse_device_config(matrix_config)
+
+    assert result.audio is not None
+    assert result.audio.enabled is False
+
+
+def test_parse_audio_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
+    matrix_config["audio"]["enabled"] = "yes"
+
+    with pytest.raises(ValueError, match=r"audio\.enabled"):
+        parse_device_config(matrix_config)
 
 
 # ---------------------------------------------------------------------------

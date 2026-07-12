@@ -22,6 +22,13 @@ doesn't declare the section never imports the section's driver library,
 mirroring the matrix/neopixel/audio/IR coverage below. A *declared* section
 whose driver library is missing is a hard error -- covered separately below,
 distinct from the "never touched when undeclared" cases.
+
+Issue #692 adds a retained ``enabled`` flag to every component section, so
+"declared but disabled" is a third case distinct from both "undeclared" and
+"declared and enabled": the section object is no longer ``None``, but the
+component must still be skipped without touching its driver library. The
+``*_disabled_*`` tests below cover that case per component, alongside the
+existing "undeclared" ones.
 """
 
 from __future__ import annotations
@@ -110,6 +117,37 @@ def test_build_hardware_without_matrix_entry_succeeds_when_is31fl3741_uninstalle
     assert hw.outputs == []
 
 
+def test_build_hardware_disabled_matrix_entry_succeeds_when_is31fl3741_uninstalled() -> None:
+    """A *disabled* matrix entry (#692) is skipped the same as an undeclared
+    one -- unlike undeclared, the pixels list entry is a retained, non-None
+    object with ``enabled=False``, so this exercises a distinct code path."""
+    mapping = {
+        "pixels": [
+            {
+                "type": "matrix",
+                "cols": 13,
+                "scope_rows": {"global.main": [0, 5]},
+                "enabled": False,
+            }
+        ],
+        "buttons": [],
+    }
+    config = parse_device_config(mapping)
+    board_mock = _mock_board()
+
+    with (
+        _library_absent("adafruit_is31fl3741", "adafruit_is31fl3741.adafruit_rgbmatrixqt"),
+        ExitStack() as stack,
+    ):
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.outputs == []
+
+
 # ---------------------------------------------------------------------------
 # NeoPixel branch: neopixel stays uninstalled with no NeoPixel entry
 # ---------------------------------------------------------------------------
@@ -117,6 +155,32 @@ def test_build_hardware_without_matrix_entry_succeeds_when_is31fl3741_uninstalle
 
 def test_build_hardware_without_neopixel_entry_succeeds_when_neopixel_uninstalled() -> None:
     config = _bare_config()
+    board_mock = _mock_board()
+
+    with _library_absent("neopixel"), ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.outputs == []
+
+
+def test_build_hardware_disabled_neopixel_entry_succeeds_when_neopixel_uninstalled() -> None:
+    """A *disabled* neopixel entry (#692) is skipped the same as an
+    undeclared one -- a retained, non-None object with ``enabled=False``."""
+    mapping = {
+        "pixels": [
+            {
+                "type": "neopixel",
+                "scopes": {"personal": {"pin": "D5", "count": 10}},
+                "enabled": False,
+            }
+        ],
+        "buttons": [],
+    }
+    config = parse_device_config(mapping)
     board_mock = _mock_board()
 
     with _library_absent("neopixel"), ExitStack() as stack:
@@ -149,6 +213,33 @@ def test_build_hardware_without_audio_section_succeeds_when_audio_stack_uninstal
     assert hw.outputs == []
 
 
+def test_build_hardware_disabled_audio_section_succeeds_when_audio_stack_uninstalled() -> None:
+    """A *disabled* audio section (#692) is skipped the same as an
+    undeclared one -- a retained, non-None object with ``enabled=False``."""
+    mapping = {
+        "pixels": [],
+        "buttons": [],
+        "audio": {
+            "enabled": False,
+            "i2s_bit_clock": "I2S_BIT_CLOCK",
+            "i2s_word_select": "I2S_WORD_SELECT",
+            "i2s_data": "I2S_DATA",
+        },
+    }
+    config = parse_device_config(mapping)
+    assert config.audio is not None
+    board_mock = _mock_board()
+
+    with _library_absent("audiobusio", "audiocore", "audiomixer"), ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.outputs == []
+
+
 # ---------------------------------------------------------------------------
 # IR branch: pulseio stays uninstalled with no ir section
 # ---------------------------------------------------------------------------
@@ -157,6 +248,24 @@ def test_build_hardware_without_audio_section_succeeds_when_audio_stack_uninstal
 def test_build_hardware_without_ir_section_succeeds_when_pulseio_uninstalled() -> None:
     config = _bare_config()
     assert config.ir is None
+    board_mock = _mock_board()
+
+    with _library_absent("pulseio"), ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.ir_receiver is None
+
+
+def test_build_hardware_disabled_ir_section_succeeds_when_pulseio_uninstalled() -> None:
+    """A *disabled* ir section (#692) is skipped the same as an undeclared
+    one -- a retained, non-None object with ``enabled=False``."""
+    mapping = {"pixels": [], "buttons": [], "ir": {"rx": "D11", "enabled": False}}
+    config = parse_device_config(mapping)
+    assert config.ir is not None
     board_mock = _mock_board()
 
     with _library_absent("pulseio"), ExitStack() as stack:
@@ -178,6 +287,24 @@ def test_build_hardware_without_ir_section_succeeds_when_pulseio_uninstalled() -
 def test_build_hardware_without_accelerometer_section_succeeds_when_lis3dh_uninstalled() -> None:
     config = _bare_config()
     assert config.accelerometer is None
+    board_mock = _mock_board()
+
+    with _library_absent("adafruit_lis3dh"), ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.accelerometer is None
+
+
+def test_build_hardware_disabled_accelerometer_section_succeeds_when_lis3dh_uninstalled() -> None:
+    """A *disabled* accelerometer section (#692) is skipped the same as an
+    undeclared one -- a retained, non-None object with ``enabled=False``."""
+    mapping = dict(_bare_config_mapping, accelerometer={"enabled": False})
+    config = parse_device_config(mapping)
+    assert config.accelerometer is not None
     board_mock = _mock_board()
 
     with _library_absent("adafruit_lis3dh"), ExitStack() as stack:
@@ -220,6 +347,24 @@ def test_build_hardware_declared_accelerometer_raises_when_lis3dh_uninstalled() 
 def test_build_hardware_without_haptics_section_succeeds_when_drv2605_uninstalled() -> None:
     config = _bare_config()
     assert config.haptics is None
+    board_mock = _mock_board()
+
+    with _library_absent("adafruit_drv2605"), ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.outputs == []
+
+
+def test_build_hardware_disabled_haptics_section_succeeds_when_drv2605_uninstalled() -> None:
+    """A *disabled* haptics section (#692) is skipped the same as an
+    undeclared one -- a retained, non-None object with ``enabled=False``."""
+    mapping = dict(_bare_config_mapping, haptics={"enabled": False})
+    config = parse_device_config(mapping)
+    assert config.haptics is not None
     board_mock = _mock_board()
 
     with _library_absent("adafruit_drv2605"), ExitStack() as stack:

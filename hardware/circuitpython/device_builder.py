@@ -99,7 +99,14 @@ def _setup_i2c(i2c_config: I2CConfig | None, board_module: object) -> busio.I2C 
     missing those aliases that also omits the config section raises
     ``AttributeError`` uncaught — the intended nudge to add an ``i2c``
     section to aura-device.json.
+
+    *i2c_config* with ``enabled=False`` builds no bus at all — distinct from
+    an absent *i2c_config*, which still falls back to the board's default
+    pins. This is the only place that distinction is made; every other
+    caller sees ``i2c=None`` either way.
     """
+    if i2c_config is not None and not i2c_config.enabled:
+        return None
     if i2c_config is not None:
         scl = _resolve_pin(board_module, "i2c.scl", i2c_config.scl)
         sda = _resolve_pin(board_module, "i2c.sda", i2c_config.sda)
@@ -196,14 +203,19 @@ def _setup_pixels(
 
     Dispatches each entry to the matrix or NeoPixel branch by type, in config
     order, so a device driving both a matrix and NeoPixel strips gets outputs
-    for each in the order they were declared.
+    for each in the order they were declared. An entry with ``enabled=False``
+    is skipped outright — neither built nor probed, so a disabled matrix
+    entry doesn't even trigger the missing-I2C-bus check below.
 
     Raises:
-        RuntimeError: If a matrix entry is declared but *i2c* is None (matrix
-            pixels are config-gated, so a missing bus is a real wiring fault).
+        RuntimeError: If an enabled matrix entry is declared but *i2c* is
+            None (matrix pixels are config-gated, so a missing bus is a real
+            wiring fault).
     """
     outputs: list[EffectOutput] = []
     for pixels_cfg in pixels_configs:
+        if not pixels_cfg.enabled:
+            continue
         if isinstance(pixels_cfg, MatrixPixelsConfig):
             if i2c is None:
                 raise RuntimeError("pixels.type is 'matrix' but no I2C bus is available")
@@ -243,9 +255,9 @@ def _setup_accelerometer(i2c: busio.I2C) -> object:
     installed.
 
     Accelerometer is config-gated, not presence-probed: the caller only
-    reaches this once ``config.accelerometer is not None``, so a declared
-    accelerometer that can't be built here is a wiring fault, not a normal
-    "not present" case.
+    reaches this once ``config.accelerometer`` is declared and enabled, so a
+    declared accelerometer that can't be built here is a wiring fault, not a
+    normal "not present" case.
 
     Raises:
         ImportError: If ``adafruit_lis3dh`` is not installed.
@@ -264,8 +276,9 @@ def _setup_drv2605(i2c: busio.I2C) -> object:
     with no ``haptics`` section never requires the library to be installed.
 
     Haptics is config-gated, not presence-probed: the caller only reaches
-    this once ``config.haptics is not None``, so a declared motor that can't
-    be built here is a wiring fault, not a normal "not present" case.
+    this once ``config.haptics`` is declared and enabled, so a declared motor
+    that can't be built here is a wiring fault, not a normal "not present"
+    case.
 
     Raises:
         ImportError: If ``adafruit_drv2605`` is not installed.
@@ -289,7 +302,8 @@ def _setup_audio(audio_cfg: AudioConfig, board_module: object) -> AudioEffectOut
 
     Audio is config-gated rather than presence-probed, so unlike the
     Optional-returning accelerometer/drv2605 helpers there is no absent case
-    — the caller's ``if config.audio is not None:`` guard is the only gate.
+    — the caller's ``config.audio is not None and config.audio.enabled``
+    guard is the only gate.
 
     ``AudioEffectOutput`` is imported here, not at module load — its module
     pulls in ``audiobusio``/``audiocore``/``audiomixer`` at import time, so a
@@ -435,10 +449,13 @@ def build_hardware(
 
     Every component this builder attaches — pixels, audio, IR, the
     accelerometer, and haptics — is config-gated: it is built only when its
-    section is declared in *config*, and none is ever probed by physical
-    presence. A declared accelerometer or haptics section whose chip can't
-    be constructed (including no I2C bus being available) raises, mirroring
-    how a declared matrix with no I2C bus raises.
+    section is declared *and* enabled in *config*, and none is ever probed
+    by physical presence. A section with ``enabled=False`` is retained by
+    the parser but treated the same as absent here — neither built nor
+    probed, and its driver library is never imported. A declared-and-enabled
+    accelerometer or haptics section whose chip can't be constructed
+    (including no I2C bus being available — e.g. a disabled ``i2c`` section)
+    raises, mirroring how a declared matrix with no I2C bus raises.
 
     Raises:
         ValueError: If a declared pin name does not exist on the board.
@@ -459,13 +476,13 @@ def build_hardware(
     buttons = _setup_buttons(*button_pins)
 
     accelerometer = None
-    if config.accelerometer is not None:
+    if config.accelerometer is not None and config.accelerometer.enabled:
         accelerometer = _setup_accelerometer(_require_i2c(i2c, "accelerometer"))
 
-    if config.audio is not None:
+    if config.audio is not None and config.audio.enabled:
         outputs.append(_setup_audio(config.audio, board_module))
 
-    if config.haptics is not None:
+    if config.haptics is not None and config.haptics.enabled:
         motor = _setup_drv2605(_require_i2c(i2c, "haptics"))
         # Drv2605EffectOutput's own module imports adafruit_drv2605 at load
         # time, so this import is deferred here — reached only once
@@ -476,7 +493,7 @@ def build_hardware(
 
     transmitters: dict[str, InfraredTransmitter] = {}
     ir_receiver = None
-    if config.ir is not None:
+    if config.ir is not None and config.ir.enabled:
         encoder = ir_encoder if ir_encoder is not None else AuraInfraredEncoder()
         decoder = ir_decoder if ir_decoder is not None else AuraInfraredDecoder()
 
