@@ -176,23 +176,29 @@ the bare framework loop with no engine.
 
 ## Per-scene in-situ baselines
 
-Per-scene heap measured **in situ** on the assembled prop by
-[`scene_load_profiler.py`](../../examples/hardware/profiling/scene_load_profiler.py): each
-scene loaded against the real prop's outputs (matrix + audio + motor + optional IR),
-assembled in one `build_hardware` call from an in-file `DeviceConfig` built off the
-matching `HARNESSES` entry. The two columns below are split into a staged `load` Δ (the
-heap `SceneManager.load` retains) and a first-tick Δ (the heap the first
+Per-scene heap measured **in situ** on the deployed prop by
+[`scene_load_profiler.py`](../../examples/hardware/profiling/scene_load_profiler.py): the
+profiler builds its prop entirely from the deployed `aura-device.json` (via
+`read_device_config_mapping` → `parse_device_config` → `build_hardware`, the same
+config-driven seam `run_scene` uses), loads the scene named by the config's `"scene"` key
+against those real outputs (whichever pixels/audio/IR sections the config declares), and
+reports the staged heap it retains. The two columns below are split into a staged `load` Δ
+(the heap `SceneManager.load` retains) and a first-tick Δ (the heap the first
 `SceneManager.update` retains, when the scene's opening effects fire) — both measured
 *after* the coarser hardware-bundle / registry-scan / engine-construction stages the
 profiler's `__SCENE_STAGES` line reports separately. The near-zero `load` Δ across all
 three scenes is expected: `load` only stages the transition; the scene graph is
 instantiated on the first tick.
 
-Each row is a **standalone measurement of one `(scene, harness)` pair** — not an additive
-term, and not comparable across harnesses. Scene memory is output-coupled, so a figure is
-valid only for the harness it was measured against (recorded in the `Harness` column). The
-harness is configured by hand in the profiler's `HARNESSES` table to mirror each scene's
-production demo; a mismatched harness reproduces the discredited ~2x headless artifact.
+Each row is a **standalone measurement of one `(scene, config)` pair** — not an additive
+term, and not comparable across differently-configured props. Scene memory is
+output-coupled, so a figure is valid only for the deployed `aura-device.json` it was
+measured against (recorded in the `Harness` column, derived from the config via
+`metrics_harness_label`). There is no in-file harness table to hand-edit: to compare a
+scene under a different config, deploy a different `aura-device.json` that registers the
+scene's clips and wires its scopes — a mismatched or under-configured deploy reproduces the
+discredited ~2x headless artifact. Disabling a hardware section (e.g. dropping `audio` or
+`ir`) and re-running is the intended way to see that section's heap impact.
 
 | Board | Runtime | Driver | Scene | Harness | `load` Δ (B) | First-tick Δ (B) |
 |-------|---------|--------|-------|---------|--------------|-------------------|
@@ -200,7 +206,13 @@ production demo; a mismatched harness reproduces the discredited ~2x headless ar
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | red_light_green_light | matrix+audio(v2)+motor+no-ir | 80 | 20,080 |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | hardware_test | matrix+audio(v1)+motor+ir(default) | 112 | 13,936 |
 
-The `Harness` column records what each scene was measured against: the matrix scope, the
-audio voice count (`v4`/`v2`/`v1`), the haptic motor, and the IR codec (`ir(tag)` /
-`ir(default)` / `no-ir`). These are the in-situ comparison anchors for future before/after
-scene-change checks — re-record a scene's row only against the same harness.
+The `Harness` column records what each scene was measured against. New rows are formatted
+by `metrics_harness_label` from the deployed config as pixel-count/audio-voices/motor/IR-rx-
+count parts (e.g. `matrix(117px)+audio(v4)+motor+ir(rx1)`); the wire-frame codec (Aura vs.
+Tag) is a per-scene choice, not a `DeviceConfig` fact, so it plays no part in the label. The
+rows below predate this profiler's config-driven rewrite (#686) and still show the older
+hand-maintained `HARNESSES`-table format (matrix scope name, voice count, motor, and IR
+codec) — kept as-recorded rather than reformatted, since re-labelling without re-measuring
+would misrepresent them as config-derived. These are the in-situ comparison anchors for
+future before/after scene-change checks — re-record a scene's row only against the same
+deployed config.
