@@ -39,8 +39,10 @@ def run_scene(
     is active. Prints the telemetry line from ``runtime.ir.telemetry_line()``
     (see :mod:`hardware.shared.ir_telemetry`) when it returns one — the
     receiver itself gates on whether a counter changed since the last call.
-    Not unit-testable — ``build_hardware`` requires CircuitPython board
-    imports; validate via deploy-watch.
+    Also drives ``runtime.radio.update()`` every tick (see
+    :class:`~hardware.shared.radio_manager.RadioManager`), the radio parallel
+    to the IR receive block. Not unit-testable — ``build_hardware`` requires
+    CircuitPython board imports; validate via deploy-watch.
 
     Args:
         scene_name: Name of the scene to load.
@@ -57,6 +59,7 @@ def run_scene(
     effect_manager = runtime.effect_manager
     timer = runtime.timer
     ir = runtime.ir
+    radio = runtime.radio
 
     _button_data = ButtonData({})
     _acceleration = AccelerationData(0.0, 0.0, 0.0) if hw.accelerometer is not None else None
@@ -85,6 +88,12 @@ def run_scene(
         # queuing below is conditional on a scene being active.
         ir.update()
 
+        # Same unconditional rationale as ir.update() above: radio.update()
+        # always polls for a waiting packet regardless of whether a scene is
+        # active, so a packet decoded with no active scene is simply never
+        # queued below rather than left to build up in the transport.
+        radio.update()
+
         active_state = manager.active_state
 
         if active_state is not None:
@@ -97,6 +106,8 @@ def run_scene(
                         best_receiver=None,
                     )
                 )
+            if radio.received is not None:
+                active_state.queue_event(radio.received)
             active_state.queue_event(_input_event)
 
         manager.update()

@@ -14,6 +14,7 @@ from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_manager import InfraredManager
+from hardware.shared.radio_manager import RadioManager
 
 __all__ = ["SceneRuntime", "build_scene_runtime"]
 
@@ -22,11 +23,12 @@ class SceneRuntime:
     """Bundle of the live objects a scene's per-tick loop drives.
 
     ``manager`` applies scene transitions, ``effect_manager`` renders the
-    active scene's effects, ``timer`` tracks elapsed/total tick time, and
-    ``ir`` owns the per-tick pump-before-receive IR sequence.
+    active scene's effects, ``timer`` tracks elapsed/total tick time, ``ir``
+    owns the per-tick pump-before-receive IR sequence, and ``radio`` owns the
+    per-tick radio receive poll.
     """
 
-    __slots__ = ("effect_manager", "ir", "manager", "timer")
+    __slots__ = ("effect_manager", "ir", "manager", "radio", "timer")
 
     def __init__(
         self,
@@ -34,11 +36,13 @@ class SceneRuntime:
         effect_manager: EffectManager,
         timer: Timer,
         ir: InfraredManager,
+        radio: RadioManager,
     ) -> None:
         self.manager: SceneManager = manager
         self.effect_manager: EffectManager = effect_manager
         self.timer: Timer = timer
         self.ir: InfraredManager = ir
+        self.radio: RadioManager = radio
 
 
 def _resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
@@ -81,5 +85,8 @@ def build_scene_runtime(hw: DeviceHardware, scene_name: str) -> SceneRuntime:
     manager.update()  # applies the load transition; the scene is now active
 
     ir = InfraredManager(hw.transmit_pump, hw.ir_receiver)
+    radio = RadioManager(hw.radio)
 
-    return SceneRuntime(manager=manager, effect_manager=effect_manager, timer=timer, ir=ir)
+    return SceneRuntime(
+        manager=manager, effect_manager=effect_manager, timer=timer, ir=ir, radio=radio
+    )

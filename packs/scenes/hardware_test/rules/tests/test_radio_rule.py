@@ -8,7 +8,7 @@ from engine.engine import GameEngine, GameRule
 from engine.input import ButtonData, InputEvents
 from engine.network import NetworkEvents
 from engine.state import GameState, SceneControls, Scope
-from engine.tests.helpers import SpyEffectControls
+from engine.tests.helpers import SpyEffectControls, SpyNetworkControls
 from packs.scenes.hardware_test.rules.helpers.flash import radio_flash
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_RADIO, MODE_RGB
 from packs.scenes.hardware_test.rules.radio_rule import HW_TEST_PAYLOAD, HwTestRadioRule
@@ -24,8 +24,12 @@ def spy() -> SpyEffectControls:
     return SpyEffectControls()
 
 
-def _make_state(spy: SpyEffectControls, mode=MODE_RADIO) -> tuple[GameState, GameEngine]:
-    engine = GameEngine(spy)
+def _make_state(
+    spy: SpyEffectControls,
+    mode=MODE_RADIO,
+    network_spy: SpyNetworkControls | None = None,
+) -> tuple[GameState, GameEngine]:
+    engine = GameEngine(spy, network_controls=network_spy)
     rule = HwTestRadioRule()
     engine.add_rules(rule)
     state = engine.create_state(SceneControls(), initial_data={})
@@ -111,12 +115,22 @@ def test_radio_received_logs_payload_and_sender(spy, capsys):
 
 
 # ---------------------------------------------------------------------------
-# Button A (Radio mode) — queues a simulated radio receive
+# Button A (Radio mode) — sends a real radio packet
 # ---------------------------------------------------------------------------
 
 
-def test_button_a_in_radio_mode_queues_radio_received_event(spy):
-    state, engine = _make_state(spy)
+def test_button_a_in_radio_mode_sends_hw_test_payload_via_radio(spy):
+    network_spy = SpyNetworkControls()
+    state, engine = _make_state(spy, network_spy=network_spy)
+
+    _press_a(state, engine)
+
+    assert network_spy.send_radio_calls == [HW_TEST_PAYLOAD]
+
+
+def test_button_a_in_radio_mode_does_not_queue_fake_radio_received_event(spy):
+    network_spy = SpyNetworkControls()
+    state, engine = _make_state(spy, network_spy=network_spy)
 
     captured_events = []
 
@@ -129,13 +143,12 @@ def test_button_a_in_radio_mode_queues_radio_received_event(spy):
     _press_a(state, engine)
 
     radio_events = [e for e in captured_events if isinstance(e, NetworkEvents.RadioReceived)]
-    assert len(radio_events) == 1
-    assert radio_events[0].data == HW_TEST_PAYLOAD
-    assert radio_events[0].sender == "local"
+    assert radio_events == []
 
 
 def test_button_a_in_radio_mode_logs_sending_radio_packet(spy, capsys):
-    state, engine = _make_state(spy)
+    network_spy = SpyNetworkControls()
+    state, engine = _make_state(spy, network_spy=network_spy)
 
     _press_a(state, engine)
 

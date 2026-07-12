@@ -8,9 +8,11 @@ from engine.state import Scope
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_manager import InfraredManager
 from hardware.shared.ir_transport import InfraredReceiver
+from hardware.shared.radio_manager import RadioManager
+from hardware.shared.radio_transport import RadioTransport
 
 
-def _fake_hw(transmit_pump=None, ir_receiver=None) -> DeviceHardware:
+def _fake_hw(transmit_pump=None, ir_receiver=None, radio=None) -> DeviceHardware:
     """Return a DeviceHardware built entirely from CPython-safe fakes."""
     return DeviceHardware(
         outputs=[],
@@ -19,7 +21,7 @@ def _fake_hw(transmit_pump=None, ir_receiver=None) -> DeviceHardware:
         network_controls="fake-network-controls",
         transmit_pump=transmit_pump if transmit_pump is not None else "fake-transmit-pump",
         ir_receiver=ir_receiver,
-        radio=None,
+        radio=radio,
     )
 
 
@@ -92,3 +94,40 @@ def test_build_scene_runtime_wires_ir_to_the_hardware_bundles_ir_receiver():
     runtime.ir.update()
 
     assert runtime.ir.received is payload
+
+
+# ---------------------------------------------------------------------------
+# SceneRuntime.radio wiring (issue #704)
+# ---------------------------------------------------------------------------
+
+
+class _StubRadioTransport(RadioTransport):
+    """Returns a fixed (from_byte, data) pair from every receive() call."""
+
+    def __init__(self, from_byte: int, data: bytes) -> None:
+        self._packet = (from_byte, data)
+
+    def send(self, data: bytes) -> None:
+        pass  # unused by these tests
+
+    def receive(self) -> "tuple[int, bytes] | None":
+        return self._packet
+
+
+def test_build_scene_runtime_exposes_a_radio_manager_as_radio():
+    runtime = build_scene_runtime(_fake_hw(), "tag")
+
+    assert isinstance(runtime.radio, RadioManager)
+
+
+def test_build_scene_runtime_wires_radio_to_the_hardware_bundles_radio_transport():
+    """runtime.radio.update() must drive hw.radio, surfacing its packet as received."""
+    runtime = build_scene_runtime(
+        _fake_hw(radio=_StubRadioTransport(3, b"\xab\xcd")),
+        "tag",
+    )
+
+    runtime.radio.update()
+
+    assert runtime.radio.received.data == b"\xab\xcd"
+    assert runtime.radio.received.sender == "3"
