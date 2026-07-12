@@ -494,6 +494,58 @@ def test_parse_ir_rx_list_with_non_string_entry_names_its_index(matrix_config):
 
 
 # ---------------------------------------------------------------------------
+# Accelerometer validation
+# ---------------------------------------------------------------------------
+
+
+def test_parse_absent_accelerometer_section_yields_none(matrix_config):
+    result = parse_device_config(matrix_config)
+
+    assert result.accelerometer is None
+
+
+def test_parse_accelerometer_section_present_yields_non_none(matrix_config):
+    matrix_config["accelerometer"] = {}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.accelerometer is not None
+
+
+def test_parse_accelerometer_unknown_key_raises_value_error_naming_field(matrix_config):
+    matrix_config["accelerometer"] = {"sensitivity": "high"}
+
+    with pytest.raises(ValueError, match=r"accelerometer\.sensitivity"):
+        parse_device_config(matrix_config)
+
+
+# ---------------------------------------------------------------------------
+# Haptics validation
+# ---------------------------------------------------------------------------
+
+
+def test_parse_absent_haptics_section_yields_none(matrix_config):
+    result = parse_device_config(matrix_config)
+
+    assert result.haptics is None
+
+
+def test_parse_haptics_section_present_yields_non_none(matrix_config):
+    matrix_config["haptics"] = {}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.haptics is not None
+
+
+def test_parse_haptics_unknown_key_raises_value_error_naming_field(matrix_config):
+    matrix_config["haptics"] = {"intensity": 5}
+
+    with pytest.raises(ValueError, match=r"haptics\.intensity"):
+        parse_device_config(matrix_config)
+
+
+# ---------------------------------------------------------------------------
 # I2C validation
 # ---------------------------------------------------------------------------
 
@@ -643,6 +695,8 @@ def test_committed_sample_device_config_parses():
     assert result.audio.i2s_bit_clock == "I2S_BIT_CLOCK"
     assert result.audio.i2s_word_select == "I2S_WORD_SELECT"
     assert result.audio.i2s_data == "I2S_DATA"
+    assert result.accelerometer is not None
+    assert result.haptics is not None
 
 
 # ---------------------------------------------------------------------------

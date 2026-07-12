@@ -64,11 +64,12 @@ Hardware
 --------
 This measures scene heap against whatever outputs the deployed ``aura-device.json``
 declares; it does not read buttons or the accelerometer (inputs do not allocate scene
-heap), even though ``build_hardware`` wires them up as part of the assembled bundle.
+heap), even though ``build_hardware`` wires them up when their sections are declared.
 Hardware present in practice: an Adafruit RP2040 PropMaker Feather, an Adafruit
 IS31FL3741 13x9 RGB LED Matrix Breakout (I2C on default or configured SDA/SCL), and
-optionally a DRV2605L haptic motor driver (probed by physical presence -- the profiler
-runs without it, but the vibration output is then absent from the measurement).
+optionally a DRV2605L haptic motor driver (config-gated by a ``haptics`` section -- the
+profiler runs without one declared, but the vibration output is then absent from the
+measurement).
 
 Installation
 ------------
