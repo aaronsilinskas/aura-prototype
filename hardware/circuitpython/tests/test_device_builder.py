@@ -95,12 +95,16 @@ def _mock_board(**pins):
     return mock
 
 
-def _enter_hw_patches(stack: ExitStack, own_i2c: object | None = None) -> MagicMock:
+def _enter_hw_patches(
+    stack: ExitStack, own_i2c: object | None = None, patch_drv2605: bool = True
+) -> MagicMock:
     """Enter patches for all CircuitPython hardware setup helpers.
 
     Returns the patched ``_setup_i2c`` mock so callers can assert on it (e.g.
     whether it was invoked at all). *own_i2c* is the bus it returns when
-    build_hardware constructs one itself.
+    build_hardware constructs one itself. *patch_drv2605* is False for tests
+    that need ``_setup_drv2605`` to run for real (e.g. hitting its own
+    ImportError probe).
     """
     stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
     mock_setup_i2c = stack.enter_context(
@@ -115,10 +119,22 @@ def _enter_hw_patches(stack: ExitStack, own_i2c: object | None = None) -> MagicM
     stack.enter_context(
         patch("hardware.circuitpython.device_builder._setup_accelerometer", return_value=None)
     )
-    stack.enter_context(
-        patch("hardware.circuitpython.device_builder._setup_drv2605", return_value=None)
-    )
+    if patch_drv2605:
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_drv2605", return_value=None)
+        )
     return mock_setup_i2c
+
+
+def _patch_neopixel(stack: ExitStack) -> MagicMock:
+    """Patch the lazily-imported ``neopixel`` module and stub ``NeoPixel()``.
+
+    Returns the mock module so callers can assert on ``NeoPixel`` calls.
+    """
+    mock_neopixel = MagicMock()
+    stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
+    mock_neopixel.NeoPixel.return_value = MagicMock()
+    return mock_neopixel
 
 
 # ---------------------------------------------------------------------------
@@ -259,9 +275,7 @@ def test_setup_neopixels_produces_one_output_per_legacy_scope() -> None:
     board_mock = _mock_board(D5=MagicMock(), D6=MagicMock())
 
     with ExitStack() as stack:
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import _setup_neopixels
 
@@ -276,9 +290,7 @@ def test_setup_neopixels_each_legacy_scope_output_declares_its_own_scope() -> No
     board_mock = _mock_board(D5=MagicMock(), D6=MagicMock())
 
     with ExitStack() as stack:
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import _setup_neopixels
 
@@ -319,9 +331,7 @@ def test_setup_neopixels_resolves_each_strip_pin_from_board() -> None:
     pixels_cfg = _neopixel_config().pixels[0]
 
     with ExitStack() as stack:
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        mock_neopixel = _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import _setup_neopixels
 
@@ -336,9 +346,7 @@ def test_setup_neopixels_constructs_strip_with_configured_count() -> None:
     board_mock = _mock_board(D5=MagicMock())
 
     with ExitStack() as stack:
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        mock_neopixel = _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import _setup_neopixels
 
@@ -359,9 +367,7 @@ def test_setup_neopixels_applies_configured_brightness_at_construction() -> None
     board_mock = _mock_board(D5=MagicMock(), D6=MagicMock())
 
     with ExitStack() as stack:
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        mock_neopixel = _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import _setup_neopixels
 
@@ -378,9 +384,7 @@ def test_setup_neopixels_constructs_every_strip_with_auto_write_false() -> None:
     board_mock = _mock_board(D5=MagicMock(), D6=MagicMock())
 
     with ExitStack() as stack:
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        mock_neopixel = _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import _setup_neopixels
 
@@ -414,9 +418,7 @@ def test_setup_neopixels_produces_one_output_for_a_segmented_strip() -> None:
     board_mock = _mock_board(D5=MagicMock())
 
     with ExitStack() as stack:
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import _setup_neopixels
 
@@ -431,9 +433,7 @@ def test_setup_neopixels_segmented_strip_output_serves_all_segment_scopes() -> N
     board_mock = _mock_board(D5=MagicMock())
 
     with ExitStack() as stack:
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import _setup_neopixels
 
@@ -481,9 +481,7 @@ def test_setup_pixels_dispatches_neopixel_config_to_neopixel_branch() -> None:
     board_mock = _mock_board(D5=MagicMock(), D6=MagicMock())
 
     with ExitStack() as stack:
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import _setup_pixels
 
@@ -528,9 +526,7 @@ def test_setup_pixels_mixed_matrix_and_neopixel_list_produces_outputs_in_config_
                 return_value=MagicMock(),
             )
         )
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import _setup_pixels
 
@@ -558,9 +554,7 @@ def test_build_hardware_neopixel_only_config_includes_all_strip_outputs_in_bundl
 
     with ExitStack() as stack:
         _enter_hw_patches(stack)
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import build_hardware
 
@@ -588,9 +582,7 @@ def test_build_hardware_mixed_matrix_and_neopixel_config_produces_outputs_in_con
                 return_value=MagicMock(),
             )
         )
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import build_hardware
 
@@ -781,9 +773,7 @@ def test_build_hardware_audio_config_adds_audio_effect_output() -> None:
 
     with ExitStack() as stack:
         _enter_hw_patches(stack)
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
         stack.enter_context(
             patch(
                 "hardware.circuitpython.audio_output.AudioEffectOutput",
@@ -820,9 +810,7 @@ def test_build_hardware_drv2605_motor_adds_drv2605_effect_output() -> None:
                 return_value=mock_motor,
             )
         )
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import build_hardware
 
@@ -855,9 +843,7 @@ def test_build_hardware_pixels_outputs_precede_audio_and_motor_outputs() -> None
                 return_value=mock_motor,
             )
         )
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
         stack.enter_context(
             patch(
                 "hardware.circuitpython.audio_output.AudioEffectOutput",
@@ -900,9 +886,7 @@ def test_build_hardware_ir_config_sets_ir_receiver() -> None:
 
     with ExitStack() as stack:
         _enter_hw_patches(stack)
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_ir",
@@ -1317,9 +1301,7 @@ def test_build_hardware_omits_accelerometer_and_motor_when_i2c_unavailable() -> 
         stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
         )
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import build_hardware
 
@@ -1349,9 +1331,7 @@ def test_build_hardware_transmit_pump_is_same_object_as_network_controls() -> No
 
     with ExitStack() as stack:
         _enter_hw_patches(stack)
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import build_hardware
 
@@ -1368,9 +1348,7 @@ def test_build_hardware_transmit_pump_satisfies_transmit_pump() -> None:
 
     with ExitStack() as stack:
         _enter_hw_patches(stack)
-        mock_neopixel = MagicMock()
-        stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
-        mock_neopixel.NeoPixel.return_value = MagicMock()
+        _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import build_hardware
 

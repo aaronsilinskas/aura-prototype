@@ -21,8 +21,8 @@ from __future__ import annotations
 
 import sys
 from contextlib import ExitStack, contextmanager
-from unittest.mock import MagicMock, patch
 
+from hardware.circuitpython.tests.test_device_builder import _enter_hw_patches, _mock_board
 from hardware.shared.device_config import parse_device_config
 
 
@@ -40,32 +40,6 @@ def _library_absent(*module_names: str):
         for name in module_names:
             sys.modules.pop(name, None)
         sys.modules.update(saved)
-
-
-def _mock_board(**pins):
-    """Return a mock board module with the given pin attributes."""
-    mock = MagicMock()
-    for name, pin in pins.items():
-        setattr(mock, name, pin)
-    return mock
-
-
-def _enter_baseline_patches(stack: ExitStack) -> None:
-    """Patch every hardware setup helper not under test, so a bare config
-    (no matrix, no NeoPixel, no audio, no ir) builds cleanly."""
-    stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
-    stack.enter_context(
-        patch("hardware.circuitpython.device_builder._setup_i2c", return_value=MagicMock())
-    )
-    stack.enter_context(
-        patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
-    )
-    stack.enter_context(
-        patch("hardware.circuitpython.device_builder._setup_accelerometer", return_value=None)
-    )
-    stack.enter_context(
-        patch("hardware.circuitpython.device_builder._setup_drv2605", return_value=None)
-    )
 
 
 def _bare_config():
@@ -114,7 +88,7 @@ def test_build_hardware_without_matrix_entry_succeeds_when_is31fl3741_uninstalle
         _library_absent("adafruit_is31fl3741", "adafruit_is31fl3741.adafruit_rgbmatrixqt"),
         ExitStack() as stack,
     ):
-        _enter_baseline_patches(stack)
+        _enter_hw_patches(stack)
 
         from hardware.circuitpython.device_builder import build_hardware
 
@@ -133,7 +107,7 @@ def test_build_hardware_without_neopixel_entry_succeeds_when_neopixel_uninstalle
     board_mock = _mock_board()
 
     with _library_absent("neopixel"), ExitStack() as stack:
-        _enter_baseline_patches(stack)
+        _enter_hw_patches(stack)
 
         from hardware.circuitpython.device_builder import build_hardware
 
@@ -153,7 +127,7 @@ def test_build_hardware_without_audio_section_succeeds_when_audio_stack_uninstal
     board_mock = _mock_board()
 
     with _library_absent("audiobusio", "audiocore", "audiomixer"), ExitStack() as stack:
-        _enter_baseline_patches(stack)
+        _enter_hw_patches(stack)
 
         from hardware.circuitpython.device_builder import build_hardware
 
@@ -173,7 +147,7 @@ def test_build_hardware_without_ir_section_succeeds_when_pulseio_uninstalled() -
     board_mock = _mock_board()
 
     with _library_absent("pulseio"), ExitStack() as stack:
-        _enter_baseline_patches(stack)
+        _enter_hw_patches(stack)
 
         from hardware.circuitpython.device_builder import build_hardware
 
@@ -195,27 +169,9 @@ def test_build_hardware_succeeds_when_drv2605_uninstalled() -> None:
     board_mock = _mock_board()
 
     with _library_absent("adafruit_drv2605"), ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
-        stack.enter_context(
-            patch(
-                "hardware.circuitpython.device_builder._setup_i2c",
-                return_value=MagicMock(),
-            )
-        )
-        stack.enter_context(
-            patch(
-                "hardware.circuitpython.device_builder._setup_buttons",
-                return_value=MagicMock(),
-            )
-        )
-        stack.enter_context(
-            patch(
-                "hardware.circuitpython.device_builder._setup_accelerometer",
-                return_value=None,
-            )
-        )
         # _setup_drv2605 itself is intentionally left unpatched -- it must
         # run for real and hit its own internal ImportError probe.
+        _enter_hw_patches(stack, patch_drv2605=False)
 
         from hardware.circuitpython.device_builder import build_hardware
 
