@@ -7,7 +7,7 @@ hardware bring-up and the main loop.
 
 Scene selection
 ---------------
-Add an optional top-level ``"scene"`` string to ``aura-device.json``::
+Add a top-level ``"scene"`` string to ``aura-device.json``::
 
     {
       "scene": "red_light_green_light",
@@ -15,11 +15,11 @@ Add an optional top-level ``"scene"`` string to ``aura-device.json``::
       "buttons": ["D9", "D10"]
     }
 
-A missing, empty, or non-string ``"scene"`` value falls back to the
-``hardware_test`` scene.  An unknown name (not in the scene registry) logs the
-known scenes to the console and also falls back to ``hardware_test`` rather than
-crashing.  ``DeviceConfig`` carries no ``scene`` field — the key is read from the
-raw mapping here and ignored by ``parse_device_config``.
+There is no code-level default scene: a missing, empty, or non-string
+``"scene"`` value raises and stops the boot.  An unknown name (not in the
+scene registry) also raises, naming the known scenes, rather than silently
+running a fallback scene.  ``DeviceConfig`` carries no ``scene`` field — the
+key is read from the raw mapping here and ignored by ``parse_device_config``.
 
 Hardware
 --------
