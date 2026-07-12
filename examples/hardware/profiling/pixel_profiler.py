@@ -25,13 +25,26 @@ mode, but with a real pixel-producing output.
 
 Hardware bring-up
 -----------------
-Hardware is brought up through a single `build_hardware` call from an in-file
-`DeviceConfig` (one matrix or one NeoPixel strip, no audio/IR) rather than the retired
-per-peripheral setup helpers. `build_hardware` cannot be called in a loop -- it claims
-board pins without deiniting them -- so the profiler builds once and sweeps `pixel_count`
-by constructing a fresh production `EffectOutput` around the **one shared driver** the
-bundle already built, pulled out via the read-only `matrix` / `strip` accessors. Each
-sweep wrapper is pure software and claims no pins:
+Hardware is brought up through a single `build_hardware` call from the **real**,
+deployed `aura-device.json` (`load_device_config()`) -- the same config-driven model
+`scene_load_profiler.py` established (#686) -- rather than an in-file, hand-built
+`DeviceConfig`. The profiler drives exactly one pixel output, so every pixels-list
+entry that isn't the profiled `DRIVER`'s entry is set `enabled = False` on the parsed
+config (a config declaring both a matrix and a NeoPixel strip has the other muted),
+along with `audio`/`ir`/`accelerometer`/`haptics` if declared -- this profiler never
+drives them, so they are isolated out rather than left to perturb the measurement as a
+fixed heap/I2C offset. The **one** synthesized override layered on top of the loaded
+config is the NeoPixel driver's swept max-length strip: the found strip entry's `count`
+is bumped to the largest swept `PIXEL_COUNTS` value so every swept count addresses a
+prefix of the same physical strip; everything else (pin, order, brightness,
+scope_pixels, and for the matrix driver, `cols`) is the real prop's declared geometry,
+never hand-built here.
+
+`build_hardware` cannot be called in a loop -- it claims board pins without deiniting
+them -- so the profiler builds once and sweeps `pixel_count` by constructing a fresh
+production `EffectOutput` around the **one shared driver** the bundle already built,
+pulled out via the read-only `matrix` / `strip` accessors. Each sweep wrapper is pure
+software and claims no pins:
 
 - **IS31FL3741 matrix:** per swept count, a new `IS31FL3741EffectOutput` whose `scope_rows`
   addresses that many rows (capped at the panel's `MATRIX_ROWS`) around the shared matrix.
@@ -43,20 +56,9 @@ sweep wrapper is pure software and claims no pins:
   worst-case (max-length) figure rather than scaling with count -- an accepted, conservative
   approximation; the per-pixel render slope stays faithful.
 
-Wiring pins come from the real `aura-device.json` on the CIRCUITPY drive, via
-`load_device_config()`: `buttons[0]` for the profiler's button, and -- only in
-`"neopixel_pwm"` mode -- the strip pin via `first_neopixel_pin` (matrix mode sources only
-the button; the matrix has no GPIO pin in the schema). A pin absent from `aura-device.json`
-fails loudly with a "not declared" error via `require_pin` rather than falling back to a
-guessed pin. The real config is a pin-name source only -- it is never fed wholesale to
-`build_hardware`, which is still handed the profiler's own tailored, minimal `DeviceConfig`
-built below.
-
-`build_hardware` also always probes the LIS3DH accelerometer and DRV2605 motor by physical
-presence, so the bundle may carry those too. They are never driven here -- the profiler
-builds its `EffectManager` around only the swept pixel output -- so they sit as a fixed heap
-offset and do not perturb the per-frame `cost_ms`. If no pixel output comes back (matrix or
-strip not wired/reachable), bring-up fails loud rather than reporting a zero-cost sweep.
+If aura-device.json declares no pixel entry matching `DRIVER`, bring-up fails loud
+(naming the missing kind) rather than reporting a zero-cost sweep -- the same rule
+applies if the built bundle somehow comes back with no matching pixel output.
 
 For the matrix driver, the board's default I2C bus is wrapped in `CountingI2C` and injected
 into `build_hardware` (the `i2c=` seam), so `bytes_written` measured across one render+flush
@@ -69,7 +71,8 @@ Hardware
 - ``"is31fl3741_matrix"``: an IS31FL3741-based RGB matrix (e.g. Adafruit
   RGBMatrixQT) on the board's I2C bus.
 
-Both modes read the profiler's button from ``buttons[0]`` in ``aura-device.json``.
+Both modes read the profiler's button from ``buttons[0]`` in ``aura-device.json`` --
+sourced from the real config's ``buttons`` list, which is not gated by ``enabled``.
 
 Installation
 ------------
@@ -111,18 +114,18 @@ from engine.state import Scope
 from engine.timer import Timer
 from hardware.circuitpython.counting_i2c import CountingI2C
 from hardware.circuitpython.device_builder import build_hardware
-from hardware.circuitpython.is31fl3741_output import IS31FL3741_COLS, IS31FL3741EffectOutput
+from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 from hardware.shared.device_config import (
     DeviceConfig,
-    first_neopixel_pin,
+    MatrixPixelsConfig,
+    NeoPixelPixelsConfig,
     load_device_config,
-    parse_device_config,
-    require_pin,
 )
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.profiling_helpers import (
     linear_fit,
+    mute_other_components,
     open_config_i2c,
     print_profile_header,
     print_stats_line,
@@ -151,34 +154,46 @@ MATRIX_ROWS: Final = 9
 I2C_FREQUENCY_HZ: Final = TARGET_FPS
 
 
-def _build_pixel_config(
-    driver: str, largest_count: int, button_pin: str, neopixel_pin: str | None
-) -> DeviceConfig:
-    """Return a minimal `DeviceConfig` declaring only the profiled pixel output.
+def _select_pixel_entry(
+    config: DeviceConfig, driver: str, largest_count: int
+) -> MatrixPixelsConfig | NeoPixelPixelsConfig:
+    """Return the real pixel entry *driver* profiles, muting every other component.
 
-    *button_pin* and *neopixel_pin* are real pin names harvested from
-    `aura-device.json` by `run()` (`neopixel_pin` is only sourced, and only needed,
-    for the `"neopixel_pwm"` driver) -- this still builds its own minimal, tailored
-    config for the swept pixel counts rather than passing the real config to
-    `build_hardware` wholesale. NeoPixel builds one strip at *largest_count* so every
-    swept count addresses a prefix of the same physical strip. No audio/IR is wired.
+    Mutates *config* in place: every ``pixels``-list entry that isn't the profiled
+    driver's own entry is set ``enabled = False`` (a config declaring both a matrix and
+    a NeoPixel strip has the other muted); everything outside `pixels` is muted via
+    `mute_other_components` -- this profiler drives one pixel output and nothing else,
+    so everything it doesn't exercise is isolated out via the config's non-destructive
+    ``enabled`` toggle rather than left to perturb the measurement.
+
+    For the NeoPixel driver the found strip's ``count`` is overridden to *largest_count*
+    -- the swept max-length strip, the one synthesized parameter this profiler layers on
+    top of the loaded config. Everything else (pin, order, brightness, scope_pixels, and
+    for the matrix driver, ``cols``) stays the real prop's declared geometry.
+
+    Raises:
+        ValueError: If *driver* names a pixel kind aura-device.json declares no entry
+            for.
     """
-    if driver == "is31fl3741_matrix":
-        pixels = {
-            "type": "matrix",
-            "cols": IS31FL3741_COLS,
-            "scope_rows": {"personal": [0, MATRIX_ROWS]},
-        }
-    elif driver == "neopixel_pwm":
-        pixels = {
-            "type": "neopixel",
-            "pin": neopixel_pin,
-            "count": largest_count,
-            "scope_pixels": {"personal": [0, largest_count]},
-        }
-    else:
-        raise ValueError(f"Unknown DRIVER: {driver!r}")
-    return parse_device_config({"pixels": [pixels], "buttons": [button_pin]})
+    wanted = MatrixPixelsConfig if driver == "is31fl3741_matrix" else NeoPixelPixelsConfig
+    target: MatrixPixelsConfig | NeoPixelPixelsConfig | None = None
+    for entry in config.pixels:
+        is_candidate = isinstance(entry, wanted) and (wanted is MatrixPixelsConfig or entry.strips)
+        if target is None and is_candidate:
+            target = entry
+        else:
+            entry.enabled = False
+    if target is None:
+        kind = "matrix" if driver == "is31fl3741_matrix" else "neopixel"
+        raise ValueError(
+            f"no {kind} pixels entry declared in aura-device.json for DRIVER={driver!r}"
+        )
+    target.enabled = True
+    if isinstance(target, NeoPixelPixelsConfig):
+        target.strips[0].count = largest_count
+
+    mute_other_components(config, keep="pixels")
+    return target
 
 
 def _require_pixel_output(hardware: DeviceHardware, driver: str) -> EffectOutput:
@@ -195,20 +210,24 @@ def _require_pixel_output(hardware: DeviceHardware, driver: str) -> EffectOutput
 
 
 def _build_sweep_output(
-    driver: str, pixel_output: EffectOutput, pixel_count: int
+    driver: str, pixel_output: EffectOutput, pixel_count: int, matrix_cols: int
 ) -> tuple[EffectOutput, int]:
     """Build a fresh single-scope output for *pixel_count* around the shared driver.
+
+    *matrix_cols* is the real matrix entry's declared ``cols`` (unused for the NeoPixel
+    driver) -- the panel's physical column count comes from aura-device.json rather than
+    a private constant, so it can never drift from the config actually built.
 
     Returns the output and the pixel count it actually addresses (the matrix row band
     is capped at the physical panel, so the effective count can be lower than requested).
     """
     if driver == "is31fl3741_matrix":
-        rows = max(1, min((pixel_count + IS31FL3741_COLS - 1) // IS31FL3741_COLS, MATRIX_ROWS))
+        rows = max(1, min((pixel_count + matrix_cols - 1) // matrix_cols, MATRIX_ROWS))
         output = IS31FL3741EffectOutput(
-            pixel_output.matrix, cols=IS31FL3741_COLS, scope_rows={"personal": range(0, rows)}
+            pixel_output.matrix, cols=matrix_cols, scope_rows={"personal": range(0, rows)}
         )
         output.scopes = [Scope.PERSONAL]
-        return output, rows * IS31FL3741_COLS
+        return output, rows * matrix_cols
 
     output = NeoPixelEffectOutput(pixel_output.strip, {"personal": range(0, pixel_count)})
     return output, pixel_count
@@ -296,20 +315,18 @@ def run() -> None:
     registry.scan_dir("packs/effects", "packs.effects")
     element_names = registry.items("elements")
 
-    # Harvest wiring pins from the real aura-device.json -- never fed wholesale to
-    # build_hardware below, only used as a pin-name source for the profiler's own
-    # tailored config. A pin absent from aura-device.json fails loudly here.
+    # Load the real, deployed aura-device.json and mute every component this profiler
+    # doesn't drive -- the config-driven model #686 established for the scene-load
+    # profiler. buttons[0] (not gated by `enabled`) is read straight off the same
+    # config build_hardware below consumes -- no separate pin harvest.
     device_config = load_device_config()
-    button_pin = require_pin(device_config, lambda c: c.buttons[0], "buttons[0]")
-    neopixel_pin = None
-    if DRIVER == "neopixel_pwm":
-        neopixel_pin = require_pin(device_config, first_neopixel_pin, "neopixel.pin")
+    pixel_entry = _select_pixel_entry(device_config, DRIVER, PIXEL_COUNTS[-1])
+    matrix_cols = pixel_entry.cols if isinstance(pixel_entry, MatrixPixelsConfig) else 0
 
     # Build the device once: build_hardware claims pins without deiniting, so it cannot
     # be re-called per swept count. The one shared driver is reused across the sweep.
     counting_i2c = CountingI2C(open_config_i2c(device_config))
-    config = _build_pixel_config(DRIVER, PIXEL_COUNTS[-1], button_pin, neopixel_pin)
-    hardware = build_hardware(config, board, i2c=counting_i2c)
+    hardware = build_hardware(device_config, board, i2c=counting_i2c)
     pixel_output = _require_pixel_output(hardware, DRIVER)
 
     # I2C bandwidth is a single constant worst-case figure, so measure it once up
@@ -319,7 +336,7 @@ def run() -> None:
     # the I2C bus, so its bandwidth stays 0.0.
     i2c_bandwidth = 0.0
     if DRIVER == "is31fl3741_matrix":
-        worst_output, _ = _build_sweep_output(DRIVER, pixel_output, PIXEL_COUNTS[-1])
+        worst_output, _ = _build_sweep_output(DRIVER, pixel_output, PIXEL_COUNTS[-1], matrix_cols)
         worst_manager = EffectManager(registry=registry, outputs=[worst_output])
         i2c_transaction_bytes = _measure_i2c_transaction_bytes(
             worst_manager, Timer(), element_names[0], counting_i2c
@@ -342,7 +359,7 @@ def run() -> None:
     samples = {element: [] for element in element_names}
 
     for pixel_count in PIXEL_COUNTS:
-        output, actual_count = _build_sweep_output(DRIVER, pixel_output, pixel_count)
+        output, actual_count = _build_sweep_output(DRIVER, pixel_output, pixel_count, matrix_cols)
         effect_manager = EffectManager(registry=registry, outputs=[output])
         timer = Timer()
 

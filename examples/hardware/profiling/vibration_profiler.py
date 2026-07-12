@@ -20,18 +20,18 @@ alongside the uniform stats line.
 
 Hardware bring-up
 -----------------
-The motor is brought up through a single `build_hardware` call from an in-file minimal
-`DeviceConfig` (no pixels/audio/IR, `haptics={}` only) rather than the retired
-per-peripheral setup helpers. The DRV2605L is config-gated like every other component
-(issue #691): declaring `haptics` in the config makes `build_hardware` construct it and
-append a `Drv2605EffectOutput` to the returned bundle's outputs -- which this profiler
-pulls out and drives, ignoring any other auto-attached output. If the DRV2605L isn't
-wired/reachable, `build_hardware` itself raises (a declared-but-unreachable component is
-a hard error, not a silent omission), so bring-up still fails loud rather than reporting
-a zero-cost measurement.
-
-The accelerometer stays undeclared in this profiler's in-file config, so `build_hardware`
-never builds or probes it -- it contributes no heap offset or I2C setup traffic here.
+The motor is brought up through a single `build_hardware` call from the **real**,
+deployed `aura-device.json` (`load_device_config()`) -- the config-driven model #686
+established for the scene-load profiler -- rather than an in-file, hand-built minimal
+`DeviceConfig`. This profiler drives the DRV2605L and nothing else, so every declared
+`pixels` entry plus `audio`/`ir`/`accelerometer` (if present) is set `enabled = False` on
+the parsed config; `haptics` is force-enabled the same way. A config declaring no
+`haptics` section at all fails loudly here -- there is no minimal stand-in section to
+fall back on, since the real motor is what this profiler measures (the #691 stop-gap
+`haptics={}` in-file section is gone). If the DRV2605L isn't wired/reachable,
+`build_hardware` itself raises (a declared-but-unreachable component is a hard error, not
+a silent omission), so bring-up still fails loud rather than reporting a zero-cost
+measurement.
 
 The board's default I2C bus is wrapped in `CountingI2C` and injected into
 `build_hardware` (the `i2c=` seam), so every peripheral shares the counted bus. The
@@ -40,7 +40,8 @@ event gives the measured `i2c_transaction_bytes` -- no guessing required.
 
 Hardware
 --------
-- DRV2605L haptic motor driver on the board's default I2C bus (SDA/SCL).
+- DRV2605L haptic motor driver on the board's default I2C bus (SDA/SCL), wired per the
+  real, deployed `aura-device.json`'s `haptics` section.
 
 Installation
 ------------
@@ -74,9 +75,10 @@ from engine.state import EffectReceipt
 from hardware.circuitpython.counting_i2c import CountingI2C
 from hardware.circuitpython.device_builder import build_hardware
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
-from hardware.shared.device_config import DeviceConfig, HapticsConfig, load_device_config
+from hardware.shared.device_config import DeviceConfig, load_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.profiling_helpers import (
+    mute_other_components,
     open_config_i2c,
     print_profile_header,
     print_stats_line,
@@ -109,25 +111,39 @@ def _require_drv2605_output(hardware: DeviceHardware) -> Drv2605EffectOutput:
     raise RuntimeError("no Drv2605EffectOutput in the built hardware bundle -- no DRV2605 found")
 
 
+def _isolate_haptics_config(config: DeviceConfig) -> None:
+    """Mute every component but `haptics` on *config*, in place.
+
+    This profiler drives the DRV2605L and nothing else, so everything but `haptics`
+    is muted via `mute_other_components` -- the non-destructive isolation knob
+    alongside dropping a section from aura-device.json outright. `haptics` itself is
+    force-enabled: it is the real motor section this profiler exists to exercise, so
+    a config that merely declared it disabled would otherwise silently defeat the
+    measurement.
+
+    Raises:
+        ValueError: If *config* declares no `haptics` section at all -- there is no
+            minimal stand-in section to fall back on (the #691 `haptics={}` stop-gap
+            is gone); the real prop must declare its motor.
+    """
+    if config.haptics is None:
+        raise ValueError(
+            "haptics not declared in aura-device.json -- the vibration profiler measures"
+            + " the real motor, not a synthesized stand-in"
+        )
+    config.haptics.enabled = True
+    mute_other_components(config, keep="haptics")
+
+
 def run() -> None:
     """Drive `handle_event` once per `EVENT_INTERVAL_SECONDS`, reporting per-event cost."""
+    device_config = load_device_config()
+    _isolate_haptics_config(device_config)
+
     # Source the I2C bus pins from the real aura-device.json so the injected
     # (byte-counting) bus lands on the configured SDA/SCL.
-    counting_bus = CountingI2C(open_config_i2c(load_device_config()))
-    # Minimal config: no pixels/audio/IR/accelerometer. `haptics={}` is the stop-gap
-    # (#691) that keeps this profiler building the motor now that build_hardware no
-    # longer probes it by physical presence -- the accelerometer stays undeclared since
-    # this profiler never drives it.
-    config = DeviceConfig(
-        pixels=[],
-        buttons=[],
-        ir=None,
-        audio=None,
-        i2c=None,
-        accelerometer=None,
-        haptics=HapticsConfig(),
-    )
-    hardware = build_hardware(config, board, i2c=counting_bus)
+    counting_bus = CountingI2C(open_config_i2c(device_config))
+    hardware = build_hardware(device_config, board, i2c=counting_bus)
     output = _require_drv2605_output(hardware)
 
     buzz_effect = Effect(

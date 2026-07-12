@@ -29,19 +29,23 @@ chosen budget can be sanity-checked against reality.
 Hardware bring-up
 ------------------
 The whole hardware bundle -- matrix, buttons, accelerometer, motor, audio, and
-IR -- is brought up through a single `build_hardware` call, from a
-`DeviceConfig` built in-file (see `_build_tag_harness` below). `accelerometer`
-and `haptics` are declared (minimal `{}` sections) so `build_hardware` builds
-them the same way every other component is config-gated (#691): a declared
-section whose chip can't be found on the bus raises rather than silently
-degrading the measurement. Button and IR wiring pins (`buttons[0]`,
-`buttons[1]`, `ir.rx`, `ir.line`) are sourced from the real `aura-device.json`
-on the CIRCUITPY drive via `load_device_config()`/`require_pin`, so the
-profiler's button/IR wiring never drifts from the on-device config; a pin
-absent from `aura-device.json` fails loudly with a "not declared" error rather
-than falling back to a guessed pin. The pixel/audio harness sections
-(clips/voices/codec) stay profiler-owned and hardcoded, as do the I2S bus pins
-(they have no schema field here -- see the Handoff in #646).
+IR -- is brought up through a single `build_hardware` call from the **real**,
+deployed `aura-device.json` (`load_device_config()`) -- the config-driven model
+#686 established for the scene-load profiler, and the same file
+`examples/hardware/tag_demo.py` runs against. Unlike the per-component
+profilers under this directory, nothing is muted here: this profiler validates
+the **assembled** reference prop end to end, so every section the deployed
+config declares (pixels, buttons, `ir`, `audio`, `accelerometer`, `haptics`) is
+left exactly as declared and enabled -- there is no private harness mapping,
+no hardcoded pixel/audio geometry or I2S pins, and no pins harvested and
+re-assembled by hand. A declared `accelerometer`/`haptics` section whose chip
+can't be found on the bus raises (config-gated, not presence-probed, per
+#691) rather than silently degrading the measurement -- so, as with
+`scene_load_profiler.py`, **the deployed config must actually describe the
+reference `tag` prop**: `_build_prop` asserts the matrix, audio, motor,
+accelerometer, and IR receiver all came back in the built bundle, so a config
+missing (or disabling) one of those sections fails loudly at bring-up rather
+than reporting an incomplete measurement.
 
 Hardware
 --------
@@ -52,8 +56,8 @@ Hardware
 - IR receiver and IR LINE emitter, wired to the pins declared as `ir.rx` /
   `ir.line` in `aura-device.json`
 - DRV2605L haptic motor driver on default SDA/SCL -- required, since the
-  harness declares a `haptics` section; a missing motor now makes the build
-  raise instead of silently dropping vibration from the measurement
+  deployed config must declare a `haptics` section; a missing motor makes the
+  build raise instead of silently dropping vibration from the measurement
 
 Installation
 ------------
@@ -84,9 +88,10 @@ How to use
 
 Configuration
 -------------
-- buttons[0] / buttons[1] / ir.rx / ir.line: read from `aura-device.json` (via
-  `require_pin`) -- the button and IR wiring pins for the reference prop. A
-  missing pin fails loudly.
+- aura-device.json: the single source of truth for the whole assembled reference prop
+  -- pixels, buttons, IR, audio, accelerometer, and haptics. Edit it, not this file, to
+  change the prop's wiring; a section this profiler expects to find missing or disabled
+  fails loudly at bring-up.
 - TARGET_FPS: frame budget basis for reservation/headroom (the prop's achievable
   rate, NOT the 24 FPS ceiling for any prop with a matrix scope).
 - ENGINE_HOST_BASELINE_CPU_PERCENT / HEADROOM_RESERVE_PERCENT: the engine-host
@@ -115,7 +120,7 @@ from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.device_builder import build_hardware
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
-from hardware.shared.device_config import load_device_config, parse_device_config, require_pin
+from hardware.shared.device_config import load_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiling_helpers import (
@@ -133,15 +138,6 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Configuration -- adjust to match your wiring
 # ---------------------------------------------------------------------------
-
-# I2S amp pins -- update these to match your board layout. Declared directly
-# in _build_tag_harness's audio section below, resolved against the real
-# `board` module by build_hardware the same way every other configured pin
-# is. No aura-device.json schema field owns these here -- see the Handoff
-# in #646.
-I2S_BIT_CLOCK_PIN_NAME: Final = "GP10"
-I2S_WORD_SELECT_PIN_NAME: Final = "GP11"
-I2S_DATA_PIN_NAME: Final = "GP12"
 
 # Frame budget basis. A prop with an IS31FL3741 scope cannot hold 24 FPS (the
 # ~60 ms matrix flush alone exceeds the 41.7 ms budget), so reservation/headroom
@@ -170,75 +166,14 @@ WARMUP_SECONDS: Final = 10.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
 
-def _build_tag_harness(
-    button_a_pin: str, button_b_pin: str, ir_rx_pin: str, ir_line_pin: str
-) -> dict:
-    """Return the aura-device.json-shaped mapping for the reference tag prop.
-
-    *button_a_pin*, *button_b_pin*, *ir_rx_pin*, and *ir_line_pin* are real pin
-    names harvested from `aura-device.json` by `_build_prop()` via `require_pin`
-    (`buttons[0]`, `buttons[1]`, `ir.rx`, `ir.line`) -- a missing one fails
-    loudly there rather than falling back to a guessed pin.
-
-    The pixels/audio sections stay profiler-owned and hardcoded here, mirroring
-    `examples/hardware/tag_demo.py`'s pixel wiring, plus 4 audio voices covering
-    the 7 clips this profiler has historically exercised (carried over unchanged
-    from the pre-migration setup) -- a subset of the `tag` scene's full clip
-    set; `dry_fire_start` and `ready_shots_start` are not included. The I2S bus
-    pins likewise stay hardcoded -- they have no schema field here and are owned
-    by the I2S spec (see the Handoff in #646).
-
-    `accelerometer` and `haptics` are declared with minimal `{}` sections so
-    `build_hardware` builds the onboard LIS3DH and the DRV2605L motor now that
-    physical-presence probing for them is gone (#691); a chip that can't be
-    found on the bus makes the build raise rather than silently measuring a
-    prop missing part of its bundle.
-    """
-    return {
-        "pixels": [
-            {
-                "type": "matrix",
-                "cols": 13,
-                "scope_rows": {
-                    "global.buff": [0, 1],
-                    "global.debuff": [1, 2],
-                    "global.main": [2, 5],
-                    "personal": [5, 7],
-                    "directional": [7, 8],
-                    "ambient": [8, 9],
-                },
-            }
-        ],
-        "buttons": [button_a_pin, button_b_pin],
-        "ir": {"rx": ir_rx_pin, "line": ir_line_pin},
-        "accelerometer": {},
-        "haptics": {},
-        "audio": {
-            "voices": 4,
-            "max_volume": 0.1,
-            "clips": {
-                "warning_pulse_peak": "sounds/blip.wav",
-                "go_start": "sounds/blip.wav",
-                "game_over_sting_start": "sounds/game_over.wav",
-                "fire_shot_start": "sounds/blip.wav",
-                "scene.hit_start": "sounds/blip.wav",
-                "reload": "sounds/blip.wav",
-                "reload_complete": "sounds/blip.wav",
-            },
-            "i2s_bit_clock": I2S_BIT_CLOCK_PIN_NAME,
-            "i2s_word_select": I2S_WORD_SELECT_PIN_NAME,
-            "i2s_data": I2S_DATA_PIN_NAME,
-        },
-    }
-
-
 def _require_output(hardware: DeviceHardware, output_type: type[EffectOutput]) -> None:
     """Raise loudly if no *output_type* instance is present in the built bundle.
 
-    `build_hardware` is config-gated for pixels/audio/IR, so a harness that
-    declares all three should always yield them -- a missing one signals the
-    harness and the bundle have drifted apart, which would otherwise show up
-    only as a silently incomplete measurement.
+    `build_hardware` is config-gated for pixels/audio/IR, so a deployed config
+    declaring all three should always yield them -- a missing one signals the
+    deployed `aura-device.json` doesn't actually describe the reference `tag`
+    prop this profiler measures, which would otherwise show up only as a
+    silently incomplete measurement.
     """
     if not any(isinstance(output, output_type) for output in hardware.outputs):
         raise RuntimeError(
@@ -258,25 +193,14 @@ def _build_prop() -> tuple[
     gc.collect()
     free_before = gc.mem_free()
 
-    # Harvest button/IR wiring pins from the real aura-device.json -- never fed
-    # wholesale to build_hardware below, only used as a pin-name source for the
-    # in-file _build_tag_harness mapping (pixels/audio sections stay
-    # profiler-owned). A pin absent from aura-device.json fails loudly here.
+    # Stand up the whole prop from the real, deployed aura-device.json -- no private
+    # harness mapping, no harvested pins re-assembled by hand. Whatever the config
+    # declares (pixels, buttons, ir, audio, accelerometer, haptics) is exactly what
+    # gets built; the assertions below fail loudly if the deployed config doesn't
+    # actually describe the reference tag prop this profiler measures.
     device_config = load_device_config()
-    button_a_pin = require_pin(device_config, lambda c: c.buttons[0], "buttons[0]")
-    button_b_pin = require_pin(device_config, lambda c: c.buttons[1], "buttons[1]")
-    ir_rx_pin = require_pin(device_config, lambda c: c.ir.rx[0], "ir.rx")
-    ir_line_pin = require_pin(device_config, lambda c: c.ir.emitters["line"], "ir.line")
-
-    harness = _build_tag_harness(button_a_pin, button_b_pin, ir_rx_pin, ir_line_pin)
-    # Forward the real device's I2C bus pins so build_hardware constructs the
-    # matrix/accelerometer/motor bus on the configured SDA/SCL (build_hardware
-    # falls back to board.SCL/SDA when the section is absent).
-    if device_config.i2c is not None:
-        harness["i2c"] = {"sda": device_config.i2c.sda, "scl": device_config.i2c.scl}
-    config = parse_device_config(harness)
     hardware = build_hardware(
-        config,
+        device_config,
         board,
         ir_encoder=TagInfraredEncoder(),
         ir_decoder=TagInfraredDecoder(),

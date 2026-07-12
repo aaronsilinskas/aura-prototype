@@ -24,11 +24,10 @@ Hardware
   `aura-device.json`, driven via `pulseio.PulseOut` at 38kHz through
   `device_builder.build_hardware`, aimed at the profiler board's IR receivers.
 - IR receiver wired to the pin declared by `ir.rx` -- unused by this script, but
-  `build_hardware` always wires a receiver alongside the LINE emitter.
-- The in-file config declares empty `pixels`/`buttons` sections -- both are
-  valid empty lists (`parse_device_config` no longer requires either to be
-  non-empty), and neither is driven by this script. IR is the only
-  functionally relevant section.
+  `build_hardware` wires a receiver alongside the LINE emitter whenever the `ir`
+  section is declared and enabled.
+- `pixels`/`audio`/`accelerometer`/`haptics` -- whatever the real config declares
+  for them -- are muted via `enabled = False`, since this script drives IR only.
 
 Installation
 ------------
@@ -41,11 +40,11 @@ Installation
 
 Configuration
 -------------
-- Wiring pins come from the real `aura-device.json` on the CIRCUITPY drive, via
-  `load_device_config()`: `ir.line` for the LINE emitter and `ir.rx` for the
-  (unused but required) IR receiver. A pin absent from `aura-device.json` fails
-  loudly with a "not declared" error via `require_pin` rather than falling back
-  to a guessed pin.
+- The real, deployed `aura-device.json` on the CIRCUITPY drive is loaded via
+  `load_device_config()` and handed to `build_hardware` wholesale (after muting
+  the sections this script doesn't drive) -- the `ir.line` / `ir.rx` pins are
+  whatever the config declares, not harvested and re-assembled into a private
+  mapping. A config declaring no `ir` section fails loudly at bring-up.
 - PACKET_SIZE: bytes per transmitted packet (byte 0 is the sequence number);
   defaults to 4 to match the realistic AURA payload
 - DELAY_MS: delay inserted after each send to throttle the rate; defaults to 0
@@ -58,9 +57,9 @@ from __future__ import annotations
 import time
 
 from engine.network import LINE
-from hardware.shared.device_config import load_device_config, parse_device_config, require_pin
+from hardware.shared.device_config import DeviceConfig, load_device_config
 from hardware.shared.network_controls import HardwareNetworkControls
-from hardware.shared.profiling_helpers import board_id, runtime_id
+from hardware.shared.profiling_helpers import board_id, mute_other_components, runtime_id
 
 try:
     from typing import Final
@@ -72,29 +71,29 @@ DELAY_MS: Final = 0.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
 
+def _isolate_ir_config(config: DeviceConfig) -> None:
+    """Mute every component but `ir` on *config*, in place.
+
+    This script drives the LINE emitter only, so everything but `ir` is muted via
+    `mute_other_components` -- the non-destructive isolation knob alongside
+    dropping a section from aura-device.json outright. `ir` itself is left
+    exactly as declared: its `rx`/`line`/`cone`/`area_of_effect` pins are the real
+    prop's wiring, not a hand-harvested-and-rebuilt mapping.
+
+    Raises:
+        ValueError: If *config* declares no `ir` section at all.
+    """
+    if config.ir is None:
+        raise ValueError("ir not declared in aura-device.json -- required to transmit on LINE")
+    mute_other_components(config, keep="ir")
+
+
 def _build_network_controls() -> HardwareNetworkControls:
     from hardware.circuitpython.device_builder import build_hardware
 
-    # The real aura-device.json is a pin-name source only -- it is never fed
-    # wholesale to build_hardware, which is handed the minimal, IR-only config
-    # built below instead.
     device_config = load_device_config()
-    rx_pin = require_pin(device_config, lambda c: c.ir.rx[0], "ir.rx")
-    line_pin = require_pin(device_config, lambda c: c.ir.emitters["line"], "ir.line")
-
-    # Forward the I2C bus pins too: build_hardware always constructs the bus to
-    # probe for the accelerometer/motor, so on a board whose `board` module
-    # lacks SCL/SDA aliases (e.g. the Pimoroni Pico 2W) the minimal config must
-    # carry the i2c section or bus construction raises AttributeError.
-    minimal_mapping = {"ir": {"rx": rx_pin, "line": line_pin}}
-    if device_config.i2c is not None:
-        minimal_mapping["i2c"] = {
-            "sda": device_config.i2c.sda,
-            "scl": device_config.i2c.scl,
-        }
-
-    config = parse_device_config(minimal_mapping)
-    hw = build_hardware(config)
+    _isolate_ir_config(device_config)
+    hw = build_hardware(device_config)
     return hw.network_controls
 
 

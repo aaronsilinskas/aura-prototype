@@ -109,12 +109,24 @@ one call). The profiler fits each effect element independently and reports the
 **worst-case element's** slope, with that element's intercept as `flush_ms`.
 
 Both drivers are the production outputs (`IS31FL3741EffectOutput` / `NeoPixelEffectOutput`)
-built through a single `build_hardware` call. `build_hardware` claims board pins without
-deiniting them, so it cannot be re-called per swept count; the profiler builds once and
-sweeps `pixel_count` by rebuilding only the software `EffectOutput` wrapper around the one
-shared driver, reached via its read-only `matrix` / `strip` accessor. For NeoPixel the
-strip is built once at the largest swept count, so `flush_ms` is the **constant max-length
-`show()` cost** and `worst_case_effect_per_pixel_ms` reflects render only.
+built through a single `build_hardware` call against the **real, deployed**
+`aura-device.json` (`load_device_config()`) — the config-driven model #686 established
+for the scene-load profiler. Every `pixels` entry that isn't `DRIVER`'s own, plus any
+declared `audio`/`ir`/`accelerometer`/`haptics`, is muted via `enabled = False` before
+the build, since this profiler drives one pixel output and nothing else. The one
+synthesized override layered on top of the loaded config is the NeoPixel driver's swept
+max-length strip — the found strip entry's `count` is bumped to the largest swept
+`PIXEL_COUNTS` value; everything else (pin, order, brightness, scope_pixels, and the
+matrix driver's `cols`) is the real prop's declared geometry, never hand-built. A config
+declaring no pixel entry matching `DRIVER` fails loudly rather than reporting a
+zero-cost sweep.
+
+`build_hardware` claims board pins without deiniting them, so it cannot be re-called per
+swept count; the profiler builds once and sweeps `pixel_count` by rebuilding only the
+software `EffectOutput` wrapper around the one shared driver, reached via its read-only
+`matrix` / `strip` accessor. For NeoPixel the strip is built once at the largest swept
+count, so `flush_ms` is the **constant max-length `show()` cost** and
+`worst_case_effect_per_pixel_ms` reflects render only.
 
 ### Matrix driver: the buffered I2C transaction boundary
 
@@ -140,9 +152,12 @@ re-run to record the cost at each voice cap.
 
 Feeds the **Vibration component costs** table. `cost_ms` is the measured average
 per-event CPU cost of `handle_event` + `motor.play()`. The DRV2605L is brought up through
-a single `build_hardware` call from an in-file minimal `DeviceConfig` (no pixels/audio/IR;
-a declared `haptics={}` section is what makes `build_hardware` construct the motor, per
-#691 — the accelerometer stays undeclared and is never built). `i2c_transaction_bytes` is
+a single `build_hardware` call from the **real, deployed** `aura-device.json`
+(`load_device_config()`) rather than an in-file minimal `DeviceConfig` — every declared
+`pixels` entry plus `audio`/`ir`/`accelerometer` is muted via `enabled = False`, and
+`haptics` is force-enabled, since this profiler drives the motor and nothing else. A
+config declaring no `haptics` section fails loudly (the #691 `haptics={}` in-file
+stop-gap is gone — the real prop must declare its motor). `i2c_transaction_bytes` is
 measured on-device by wrapping the real `busio.I2C` bus in a `CountingI2C` decorator and
 injecting it into `build_hardware` via the `i2c=` seam, resetting the counter before a
 representative vibration event, and reading `bytes_written` after.
@@ -174,15 +189,20 @@ This requires an **external IR packet source**; on a bare board no packets arriv
 
 ## `tag_prop_profiler.py` — whole-prop reference measurement
 
-Feeds the **Reference `tag` prop** table under *Whole-prop measurements*. Builds an
-in-file `TAG_HARNESS` device-config mapping (matrix + two buttons + IR + audio with 4
-voices and 7 clips + accelerometer + haptics) and stands up the whole assembled
-reference `tag` prop through
-`build_hardware` (the `TagInfrared*` codec is passed in), then emits a row with CPU
-reservation %, total heap footprint, headroom %, and peak frame time, plus a
-`__PROP_BREAKDOWN` of staged `gc.mem_free()` deltas re-shaped around the single
-`build_hardware` call (hardware / registries / effect_manager / engine / scene / total)
-for diagnostics. The matrix flush (~60 ms)
+Feeds the **Reference `tag` prop** table under *Whole-prop measurements*. Loads the
+**real, deployed** `aura-device.json` (`load_device_config()`) wholesale — no in-file
+harness mapping, no hardcoded pixel/audio geometry or I2S pins, no harvested-and-rebuilt
+pins — and stands up the whole assembled reference `tag` prop through `build_hardware`
+(the `TagInfrared*` codec is passed in). Unlike the per-component profilers, nothing is
+muted here: this is the one profiler that measures the **assembled** prop end to end, so
+every section the deployed config declares (pixels, buttons, IR, audio, accelerometer,
+haptics) is left enabled. `_build_prop` asserts the matrix, audio, motor, accelerometer,
+and IR receiver all came back in the built bundle, so a deployed config that doesn't
+actually describe the reference `tag` prop fails loudly at bring-up. The profiler then
+emits a row with CPU reservation %, total heap footprint, headroom %, and peak frame
+time, plus a `__PROP_BREAKDOWN` of staged `gc.mem_free()` deltas re-shaped around the
+single `build_hardware` call (hardware / registries / effect_manager / engine / scene /
+total) for diagnostics. The matrix flush (~60 ms)
 dominates the per-frame cost, so the prop cannot hold 24 FPS — set `TARGET_FPS` to the
 rate the prop actually achieves (~7–13 FPS for any IS31FL3741 scope) so the recording is
 taken at one frame budget. The profiler also reports its **measured** FPS so the chosen
