@@ -461,19 +461,20 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
     )
 
 
-def _parse_accelerometer(accelerometer_raw: dict) -> AccelerometerConfig:
+def _reject_unknown_keys(raw: dict, section: str) -> None:
     # Minimal shape is {} -- there are no configurable keys yet, so any key
     # present is unknown.
-    for key in accelerometer_raw:
-        raise ValueError(f"accelerometer.{key} is not a valid key; accelerometer has no keys")
+    for key in raw:
+        raise ValueError(f"{section}.{key} is not a valid key; {section} has no keys")
+
+
+def _parse_accelerometer(accelerometer_raw: dict) -> AccelerometerConfig:
+    _reject_unknown_keys(accelerometer_raw, "accelerometer")
     return AccelerometerConfig()
 
 
 def _parse_haptics(haptics_raw: dict) -> HapticsConfig:
-    # Minimal shape is {} -- there are no configurable keys yet, so any key
-    # present is unknown.
-    for key in haptics_raw:
-        raise ValueError(f"haptics.{key} is not a valid key; haptics has no keys")
+    _reject_unknown_keys(haptics_raw, "haptics")
     return HapticsConfig()
 
 

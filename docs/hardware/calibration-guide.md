@@ -141,11 +141,11 @@ re-run to record the cost at each voice cap.
 Feeds the **Vibration component costs** table. `cost_ms` is the measured average
 per-event CPU cost of `handle_event` + `motor.play()`. The DRV2605L is brought up through
 a single `build_hardware` call from an in-file minimal `DeviceConfig` (no pixels/audio/IR;
-the motor is probed by physical presence, not config). `i2c_transaction_bytes` is measured
-on-device by wrapping the real `busio.I2C` bus in a `CountingI2C` decorator and injecting
-it into `build_hardware` via the `i2c=` seam, resetting the counter before a
-representative vibration event, and reading `bytes_written` after. The always-probed
-accelerometer is never driven, so it contributes only a fixed heap offset.
+a declared `haptics={}` section is what makes `build_hardware` construct the motor, per
+#691 — the accelerometer stays undeclared and is never built). `i2c_transaction_bytes` is
+measured on-device by wrapping the real `busio.I2C` bus in a `CountingI2C` decorator and
+injecting it into `build_hardware` via the `i2c=` seam, resetting the counter before a
+representative vibration event, and reading `bytes_written` after.
 
 ## `ir_tx_profiler.py` — IR-transmit component costs
 
@@ -176,7 +176,8 @@ This requires an **external IR packet source**; on a bare board no packets arriv
 
 Feeds the **Reference `tag` prop** table under *Whole-prop measurements*. Builds an
 in-file `TAG_HARNESS` device-config mapping (matrix + two buttons + IR + audio with 4
-voices and 7 clips) and stands up the whole assembled reference `tag` prop through
+voices and 7 clips + accelerometer + haptics) and stands up the whole assembled
+reference `tag` prop through
 `build_hardware` (the `TagInfrared*` codec is passed in), then emits a row with CPU
 reservation %, total heap footprint, headroom %, and peak frame time, plus a
 `__PROP_BREAKDOWN` of staged `gc.mem_free()` deltas re-shaped around the single
@@ -197,7 +198,7 @@ config's top-level `"scene"` key) from that one mapping — the same config-driv
 of truth `examples/hardware/scene_demo.py` / `run_scene` use, not an in-file table. It
 hands the parsed config to `build_hardware` with no codec argument (the default Aura
 wire-frame, the same seam `run_scene` uses) to stand up **whatever outputs the deployed
-config declares** (pixels, audio, IR, motor by physical presence), then loads the
+config declares** (pixels, audio, IR, motor -- all config-gated per #691), then loads the
 configured scene against them, reporting the staged heap it retains. The profiler
 asserts nothing about which outputs the bundle contains — this is what lets you disable
 a hardware section in the config and re-run to see its heap impact. `build_hardware`

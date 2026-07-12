@@ -96,15 +96,19 @@ def _mock_board(**pins):
 
 
 def _enter_hw_patches(
-    stack: ExitStack, own_i2c: object | None = None, patch_drv2605: bool = True
+    stack: ExitStack,
+    own_i2c: object | None = None,
+    patch_drv2605: bool = True,
+    patch_accelerometer: bool = True,
 ) -> MagicMock:
     """Enter patches for all CircuitPython hardware setup helpers.
 
     Returns the patched ``_setup_i2c`` mock so callers can assert on it (e.g.
     whether it was invoked at all). *own_i2c* is the bus it returns when
-    build_hardware constructs one itself. *patch_drv2605* is False for tests
-    that need ``_setup_drv2605`` to run for real (e.g. hitting its own
-    ImportError probe).
+    build_hardware constructs one itself. *patch_drv2605* and
+    *patch_accelerometer* are False for tests that need ``_setup_drv2605`` or
+    ``_setup_accelerometer`` to run for real (e.g. hitting their own
+    ImportError probes).
     """
     stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
     mock_setup_i2c = stack.enter_context(
@@ -116,9 +120,10 @@ def _enter_hw_patches(
     stack.enter_context(
         patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
     )
-    stack.enter_context(
-        patch("hardware.circuitpython.device_builder._setup_accelerometer", return_value=None)
-    )
+    if patch_accelerometer:
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_accelerometer", return_value=None)
+        )
     if patch_drv2605:
         stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_drv2605", return_value=None)
@@ -854,6 +859,28 @@ def test_build_hardware_declared_accelerometer_with_no_i2c_bus_raises_runtime_er
     mock_setup_accelerometer.assert_not_called()
 
 
+def test_build_hardware_declared_accelerometer_raises_when_chip_not_found() -> None:
+    """A declared accelerometer whose chip can't be constructed on an available
+    bus is a hard error too -- not just the no-I2C-bus case."""
+    config = _neopixel_config_with_accelerometer()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack, patch_accelerometer=False)
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_accelerometer",
+                side_effect=ValueError("no LIS3DH found"),
+            )
+        )
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ValueError, match="no LIS3DH found"):
+            build_hardware(config, board_module=board_mock)
+
+
 # ---------------------------------------------------------------------------
 # build_hardware — haptics is config-gated, not presence-probed (#691)
 # ---------------------------------------------------------------------------
@@ -920,6 +947,28 @@ def test_build_hardware_declared_haptics_with_no_i2c_bus_raises_runtime_error() 
             build_hardware(config, board_module=board_mock)
 
     mock_setup_drv2605.assert_not_called()
+
+
+def test_build_hardware_declared_haptics_raises_when_chip_not_found() -> None:
+    """A declared haptics section whose chip can't be constructed on an
+    available bus is a hard error too -- not just the no-I2C-bus case."""
+    config = _neopixel_config_with_haptics()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack, patch_drv2605=False)
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_drv2605",
+                side_effect=ValueError("no DRV2605 found"),
+            )
+        )
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ValueError, match="no DRV2605 found"):
+            build_hardware(config, board_module=board_mock)
 
 
 def test_build_hardware_pixels_outputs_precede_audio_and_motor_outputs() -> None:

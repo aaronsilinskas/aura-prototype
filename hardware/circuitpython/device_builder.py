@@ -200,8 +200,7 @@ def _setup_pixels(
 
     Raises:
         RuntimeError: If a matrix entry is declared but *i2c* is None (matrix
-            pixels are config-gated, not presence-probed like the
-            accelerometer/motor, so a missing bus is a real wiring fault).
+            pixels are config-gated, so a missing bus is a real wiring fault).
     """
     outputs: list[EffectOutput] = []
     for pixels_cfg in pixels_configs:
@@ -276,6 +275,13 @@ def _setup_drv2605(i2c: busio.I2C) -> object:
     import adafruit_drv2605
 
     return adafruit_drv2605.DRV2605(i2c)
+
+
+def _require_i2c(i2c: busio.I2C | None, section: str) -> busio.I2C:
+    """Return *i2c*, raising if a declared *section* has no bus to build its chip on."""
+    if i2c is None:
+        raise RuntimeError(f"{section} section is declared but no I2C bus is available")
+    return i2c
 
 
 def _setup_audio(audio_cfg: AudioConfig, board_module: object) -> AudioEffectOutput:
@@ -454,17 +460,13 @@ def build_hardware(
 
     accelerometer = None
     if config.accelerometer is not None:
-        if i2c is None:
-            raise RuntimeError("accelerometer section is declared but no I2C bus is available")
-        accelerometer = _setup_accelerometer(i2c)
+        accelerometer = _setup_accelerometer(_require_i2c(i2c, "accelerometer"))
 
     if config.audio is not None:
         outputs.append(_setup_audio(config.audio, board_module))
 
     if config.haptics is not None:
-        if i2c is None:
-            raise RuntimeError("haptics section is declared but no I2C bus is available")
-        motor = _setup_drv2605(i2c)
+        motor = _setup_drv2605(_require_i2c(i2c, "haptics"))
         # Drv2605EffectOutput's own module imports adafruit_drv2605 at load
         # time, so this import is deferred here — reached only once
         # _setup_drv2605 has already confirmed the library is importable.

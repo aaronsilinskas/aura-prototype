@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import sys
 from contextlib import ExitStack, contextmanager
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -202,13 +201,7 @@ def test_build_hardware_declared_accelerometer_raises_when_lis3dh_uninstalled() 
     with _library_absent("adafruit_lis3dh"), ExitStack() as stack:
         # _setup_accelerometer itself is intentionally left unpatched -- it
         # must run for real and hit the missing import.
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=MagicMock())
-        )
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
-        )
+        _enter_hw_patches(stack, patch_accelerometer=False)
 
         from hardware.circuitpython.device_builder import build_hardware
 

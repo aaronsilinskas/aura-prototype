@@ -28,10 +28,13 @@ chosen budget can be sanity-checked against reality.
 
 Hardware bring-up
 ------------------
-The whole hardware bundle -- matrix, buttons, accelerometer/motor (probed by
-physical presence), audio, and IR -- is brought up through a single
-`build_hardware` call, from a `DeviceConfig` built in-file (see
-`_build_tag_harness` below). Button and IR wiring pins (`buttons[0]`,
+The whole hardware bundle -- matrix, buttons, accelerometer, motor, audio, and
+IR -- is brought up through a single `build_hardware` call, from a
+`DeviceConfig` built in-file (see `_build_tag_harness` below). `accelerometer`
+and `haptics` are declared (minimal `{}` sections) so `build_hardware` builds
+them the same way every other component is config-gated (#691): a declared
+section whose chip can't be found on the bus raises rather than silently
+degrading the measurement. Button and IR wiring pins (`buttons[0]`,
 `buttons[1]`, `ir.rx`, `ir.line`) are sourced from the real `aura-device.json`
 on the CIRCUITPY drive via `load_device_config()`/`require_pin`, so the
 profiler's button/IR wiring never drifts from the on-device config; a pin
@@ -42,14 +45,15 @@ than falling back to a guessed pin. The pixel/audio harness sections
 
 Hardware
 --------
-- Adafruit RP2040 PropMaker Feather
+- Adafruit RP2040 PropMaker Feather (onboard LIS3DH accelerometer)
 - Adafruit IS31FL3741 13x9 RGB LED Matrix Breakout (I2C on default SDA/SCL)
 - Two buttons (pull-up), wired to the pins declared as `buttons[0]` /
   `buttons[1]` in `aura-device.json`
 - IR receiver and IR LINE emitter, wired to the pins declared as `ir.rx` /
   `ir.line` in `aura-device.json`
-- DRV2605L haptic motor driver on default SDA/SCL (optional -- profiler runs
-  without it, but the vibration component is then absent from the measurement)
+- DRV2605L haptic motor driver on default SDA/SCL -- required, since the
+  harness declares a `haptics` section; a missing motor now makes the build
+  raise instead of silently dropping vibration from the measurement
 
 Installation
 ------------
@@ -58,7 +62,8 @@ Installation
 
 2. Copy required libraries to CIRCUITPY/lib/:
      adafruit_is31fl3741/
-     adafruit_drv2605.mpy  (optional - required only when a DRV2605L is wired up)
+     adafruit_lis3dh.mpy
+     adafruit_drv2605.mpy
 
 3. Run the deploy script to copy all source files and set code.py:
      python scripts/deploy.py examples/hardware/profiling/tag_prop_profiler.py
@@ -108,6 +113,7 @@ from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
 from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.device_builder import build_hardware
+from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.shared.device_config import load_device_config, parse_device_config, require_pin
 from hardware.shared.device_hardware import DeviceHardware
@@ -181,6 +187,12 @@ def _build_tag_harness(
     set; `dry_fire_start` and `ready_shots_start` are not included. The I2S bus
     pins likewise stay hardcoded -- they have no schema field here and are owned
     by the I2S spec (see the Handoff in #646).
+
+    `accelerometer` and `haptics` are declared with minimal `{}` sections so
+    `build_hardware` builds the onboard LIS3DH and the DRV2605L motor now that
+    physical-presence probing for them is gone (#691); a chip that can't be
+    found on the bus makes the build raise rather than silently measuring a
+    prop missing part of its bundle.
     """
     return {
         "pixels": [
@@ -199,6 +211,8 @@ def _build_tag_harness(
         ],
         "buttons": [button_a_pin, button_b_pin],
         "ir": {"rx": ir_rx_pin, "line": ir_line_pin},
+        "accelerometer": {},
+        "haptics": {},
         "audio": {
             "voices": 4,
             "max_volume": 0.1,
@@ -269,8 +283,11 @@ def _build_prop() -> tuple[
     )
     _require_output(hardware, IS31FL3741EffectOutput)
     _require_output(hardware, AudioEffectOutput)
+    _require_output(hardware, Drv2605EffectOutput)
     if hardware.ir_receiver is None:
         raise RuntimeError("expected an IR receiver in the built hardware bundle, found none")
+    if hardware.accelerometer is None:
+        raise RuntimeError("expected an accelerometer in the built hardware bundle, found none")
     # Stage snapshot: the whole hardware bundle (matrix, buttons, accelerometer,
     # motor, audio, IR) brought up through the single build_hardware call.
     gc.collect()
