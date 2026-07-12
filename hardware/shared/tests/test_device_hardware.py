@@ -13,6 +13,7 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
     network_controls = "fake-network-controls"
     transmit_pump = "fake-transmit-pump"
     ir_receiver = "fake-ir-receiver"
+    radio = "fake-radio"
 
     hardware = DeviceHardware(
         outputs=outputs,
@@ -21,6 +22,7 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
         network_controls=network_controls,
         transmit_pump=transmit_pump,
         ir_receiver=ir_receiver,
+        radio=radio,
     )
 
     assert hardware.outputs is outputs
@@ -29,6 +31,21 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
     assert hardware.network_controls is network_controls
     assert hardware.transmit_pump is transmit_pump
     assert hardware.ir_receiver is ir_receiver
+    assert hardware.radio is radio
+
+
+def test_device_hardware_radio_defaults_to_none_when_no_radio_peripheral_is_wired():
+    hardware = DeviceHardware(
+        outputs=[],
+        buttons="fake-buttons",
+        accelerometer=None,
+        network_controls="fake-network-controls",
+        transmit_pump="fake-transmit-pump",
+        ir_receiver=None,
+        radio=None,
+    )
+
+    assert hardware.radio is None
 
 
 def test_device_hardware_rejects_attributes_outside_its_slots():
@@ -39,6 +56,7 @@ def test_device_hardware_rejects_attributes_outside_its_slots():
         network_controls="fake-network-controls",
         transmit_pump="fake-transmit-pump",
         ir_receiver=None,
+        radio=None,
     )
 
     with pytest.raises(AttributeError):

@@ -1166,6 +1166,8 @@ def test_committed_sample_device_config_parses():
     assert result.audio.i2s_data == "I2S_DATA"
     assert result.accelerometer is not None
     assert result.haptics is not None
+    assert result.spi is not None
+    assert result.radio is not None
 
 
 # ---------------------------------------------------------------------------

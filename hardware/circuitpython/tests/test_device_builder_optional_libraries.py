@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import sys
 from contextlib import ExitStack, contextmanager
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -86,6 +87,7 @@ def test_importing_device_builder_does_not_import_any_driver_library() -> None:
         "audiomixer",
         "adafruit_lis3dh",
         "adafruit_drv2605",
+        "adafruit_rfm69",
     )
 
     with _library_absent("hardware.circuitpython.device_builder", *driver_libraries):
@@ -389,6 +391,76 @@ def test_build_hardware_declared_haptics_raises_when_drv2605_uninstalled() -> No
         # _setup_drv2605 itself is intentionally left unpatched -- it must
         # run for real and hit the missing import.
         _enter_hw_patches(stack, patch_drv2605=False)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ImportError):
+            build_hardware(config, board_module=board_mock)
+
+
+# ---------------------------------------------------------------------------
+# Radio branch: adafruit_rfm69 stays uninstalled with no radio section (#703)
+# -- rfm69_radio_transport.py is the only module that ever imports it, and
+# device_builder reaches that module through a deferred import, mirroring
+# the accelerometer/haptics driver-library deferral above.
+# ---------------------------------------------------------------------------
+
+
+def test_build_hardware_without_radio_section_succeeds_when_rfm69_uninstalled() -> None:
+    config = _bare_config()
+    assert config.radio is None
+    board_mock = _mock_board()
+
+    with _library_absent("adafruit_rfm69"), ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.radio is None
+
+
+def test_build_hardware_disabled_radio_section_succeeds_when_rfm69_uninstalled() -> None:
+    """A *disabled* radio section is skipped the same as an undeclared one --
+    a retained, non-None object with ``enabled=False``."""
+    mapping = dict(
+        _bare_config_mapping,
+        radio={"cs": "D24", "reset": "D25", "frequency": 915.0, "node": 1, "enabled": False},
+    )
+    config = parse_device_config(mapping)
+    assert config.radio is not None
+    board_mock = _mock_board()
+
+    with _library_absent("adafruit_rfm69"), ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.radio is None
+
+
+def test_build_hardware_declared_radio_raises_when_rfm69_uninstalled() -> None:
+    """A declared radio section whose driver library is missing is a hard
+    error -- unlike the undeclared case above, this must reach the real
+    `import adafruit_rfm69` inside rfm69_radio_transport and let its
+    ImportError propagate."""
+    mapping = dict(
+        _bare_config_mapping,
+        radio={"cs": "D24", "reset": "D25", "frequency": 915.0, "node": 1},
+    )
+    config = parse_device_config(mapping)
+    board_mock = _mock_board(D24=MagicMock(), D25=MagicMock())
+
+    with (
+        _library_absent("adafruit_rfm69", "hardware.circuitpython.rfm69_radio_transport"),
+        ExitStack() as stack,
+    ):
+        # _setup_radio itself is intentionally left unpatched -- it must run
+        # for real and hit the missing import inside rfm69_radio_transport.
+        _enter_hw_patches(stack, patch_radio=False)
 
         from hardware.circuitpython.device_builder import build_hardware
 

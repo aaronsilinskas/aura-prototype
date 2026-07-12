@@ -79,3 +79,12 @@ _drv2605_mod = types.ModuleType("adafruit_drv2605")
 _drv2605_mod.Effect = _Effect  # type: ignore[attr-defined]
 _drv2605_mod.Pause = _Pause  # type: ignore[attr-defined]
 sys.modules["adafruit_drv2605"] = _drv2605_mod
+
+
+# ---------------------------------------------------------------------------
+# adafruit_rfm69 stub — minimal RFM69 placeholder for Rfm69RadioTransport tests
+# ---------------------------------------------------------------------------
+
+_rfm69_mod = types.ModuleType("adafruit_rfm69")
+_rfm69_mod.RFM69 = type("RFM69", (), {})  # type: ignore[attr-defined]
+sys.modules.setdefault("adafruit_rfm69", _rfm69_mod)

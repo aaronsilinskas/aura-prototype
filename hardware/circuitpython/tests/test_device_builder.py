@@ -100,30 +100,41 @@ class _HwPatchMocks(NamedTuple):
     """The mocks `_enter_hw_patches` installed, so callers can assert on any of them."""
 
     i2c: MagicMock
+    spi: MagicMock
     accelerometer: MagicMock | None
     drv2605: MagicMock | None
+    radio: MagicMock | None
 
 
 def _enter_hw_patches(
     stack: ExitStack,
     own_i2c: object | None = None,
+    own_spi: object | None = None,
     patch_drv2605: bool = True,
     patch_accelerometer: bool = True,
+    patch_radio: bool = True,
 ) -> _HwPatchMocks:
     """Enter patches for all CircuitPython hardware setup helpers.
 
     Returns the patched mocks so callers can assert on them (e.g. whether
-    ``_setup_i2c`` was invoked at all). *own_i2c* is the bus it returns when
-    build_hardware constructs one itself. *patch_drv2605* and
-    *patch_accelerometer* are False for tests that need ``_setup_drv2605`` or
-    ``_setup_accelerometer`` to run for real (e.g. hitting their own
-    ImportError probes) — their mock is then `None`.
+    ``_setup_i2c`` was invoked at all). *own_i2c*/*own_spi* are the buses
+    they return when build_hardware constructs them itself. *patch_drv2605*,
+    *patch_accelerometer*, and *patch_radio* are False for tests that need
+    ``_setup_drv2605``, ``_setup_accelerometer``, or ``_setup_radio`` to run
+    for real (e.g. hitting their own ImportError probes) — their mock is
+    then `None`.
     """
     stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
     mock_setup_i2c = stack.enter_context(
         patch(
             "hardware.circuitpython.device_builder._setup_i2c",
             return_value=own_i2c if own_i2c is not None else MagicMock(),
+        )
+    )
+    mock_setup_spi = stack.enter_context(
+        patch(
+            "hardware.circuitpython.device_builder._setup_spi",
+            return_value=own_spi if own_spi is not None else MagicMock(),
         )
     )
     stack.enter_context(
@@ -139,7 +150,18 @@ def _enter_hw_patches(
         mock_setup_drv2605 = stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_drv2605", return_value=None)
         )
-    return _HwPatchMocks(mock_setup_i2c, mock_setup_accelerometer, mock_setup_drv2605)
+    mock_setup_radio = None
+    if patch_radio:
+        mock_setup_radio = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_radio", return_value=None)
+        )
+    return _HwPatchMocks(
+        mock_setup_i2c,
+        mock_setup_spi,
+        mock_setup_accelerometer,
+        mock_setup_drv2605,
+        mock_setup_radio,
+    )
 
 
 def _patch_neopixel(stack: ExitStack) -> MagicMock:
@@ -1129,6 +1151,176 @@ def test_build_hardware_disabled_haptics_section_omits_motor_output() -> None:
     mocks.drv2605.assert_not_called()
 
 
+# ---------------------------------------------------------------------------
+# build_hardware -- radio is config-gated on spi, mirroring how the matrix,
+# accelerometer, and haptics are config-gated on i2c (#703)
+# ---------------------------------------------------------------------------
+
+
+def _neopixel_config_with_radio():
+    """Return a DeviceConfig with a neopixel pixels section, an spi section,
+    and a radio section."""
+    mapping = {
+        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
+        "buttons": ["D9"],
+        "spi": {"sck": "SCK", "mosi": "MOSI", "miso": "MISO"},
+        "radio": {"cs": "D24", "reset": "D25", "frequency": 915.0, "node": 1},
+    }
+    return parse_device_config(mapping)
+
+
+def test_build_hardware_radio_section_builds_radio_transport_onto_bundle() -> None:
+    config = _neopixel_config_with_radio()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    mock_transport = MagicMock(name="radio_transport")
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack, patch_radio=False)
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_radio",
+                return_value=mock_transport,
+            )
+        )
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.radio is mock_transport
+
+
+def test_build_hardware_declared_radio_with_no_spi_bus_raises_runtime_error() -> None:
+    """A declared radio whose SPI bus can't be reached is a hard error,
+    mirroring the matrix-with-no-I2C-bus case -- absence must be expressed by
+    omitting the section, not a silent probe failure."""
+    config = _neopixel_config_with_radio()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=MagicMock())
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_spi", return_value=None)
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
+        )
+        mock_setup_radio = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_radio")
+        )
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(RuntimeError, match="radio"):
+            build_hardware(config, board_module=board_mock)
+
+    mock_setup_radio.assert_not_called()
+
+
+def test_build_hardware_declared_radio_raises_when_chip_not_found() -> None:
+    """A declared radio whose chip can't be constructed on an available bus
+    is a hard error too -- not just the no-SPI-bus case."""
+    config = _neopixel_config_with_radio()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack, patch_radio=False)
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_radio",
+                side_effect=ValueError("no RFM69 found"),
+            )
+        )
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ValueError, match="no RFM69 found"):
+            build_hardware(config, board_module=board_mock)
+
+
+def test_build_hardware_disabled_radio_section_omits_radio_from_bundle() -> None:
+    """``radio: {enabled: false}`` is neither built nor probed, mirroring
+    every other component's enabled toggle."""
+    config = _neopixel_config_with_radio()
+    config.radio.enabled = False
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        mocks = _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.radio is None
+    mocks.radio.assert_not_called()
+
+
+def test_build_hardware_without_radio_section_leaves_radio_none() -> None:
+    config = _neopixel_config()
+    board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        mocks = _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.radio is None
+    mocks.radio.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# _setup_radio -- resolves radio pins and delegates to Rfm69RadioTransport
+# ---------------------------------------------------------------------------
+
+
+def test_setup_radio_wraps_resolved_pins_into_digitalinout_and_delegates_to_transport() -> None:
+    radio_cfg = parse_device_config(
+        {
+            "buttons": [],
+            "radio": {"cs": "D24", "reset": "D25", "frequency": 915.0, "node": 3},
+        }
+    ).radio
+    cs_pin = MagicMock(name="cs_pin")
+    reset_pin = MagicMock(name="reset_pin")
+    board_mock = _mock_board(D24=cs_pin, D25=reset_pin)
+    spi = MagicMock(name="spi")
+    mock_transport = MagicMock(name="transport")
+
+    with ExitStack() as stack:
+        mock_digitalio = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.digitalio")
+        )
+        cs_dio = MagicMock(name="cs_dio")
+        reset_dio = MagicMock(name="reset_dio")
+        mock_digitalio.DigitalInOut.side_effect = [cs_dio, reset_dio]
+        mock_transport_cls = stack.enter_context(
+            patch(
+                "hardware.circuitpython.rfm69_radio_transport.Rfm69RadioTransport",
+                return_value=mock_transport,
+            )
+        )
+
+        from hardware.circuitpython.device_builder import _setup_radio
+
+        result = _setup_radio(spi, radio_cfg, board_mock)
+
+    mock_digitalio.DigitalInOut.assert_any_call(cs_pin)
+    mock_digitalio.DigitalInOut.assert_any_call(reset_pin)
+    mock_transport_cls.assert_called_once_with(spi, cs_dio, reset_dio, 915.0, 3)
+    assert result is mock_transport
+
+
 def test_build_hardware_pixels_outputs_precede_audio_and_motor_outputs() -> None:
     """build_hardware appends pixels outputs before audio and motor outputs,
     regardless of how many pixel outputs _setup_pixels returns — ordering
@@ -1791,6 +1983,91 @@ def test_setup_i2c_disabled_config_builds_no_bus() -> None:
 
     assert result is None
     mock_busio.I2C.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# _setup_spi -- the shared SPI bus radio (and future SPI peripherals) reach
+# through, mirroring _setup_i2c's configured-pins-or-board-default shape
+# ---------------------------------------------------------------------------
+
+
+def _spi_config(sck: str = "GP2", mosi: str = "GP3", miso: str = "GP4"):
+    """Return an SPIConfig for testing _setup_spi's named-pin branch."""
+    mapping = {
+        "buttons": ["D9"],
+        "spi": {"sck": sck, "mosi": mosi, "miso": miso},
+    }
+    return parse_device_config(mapping).spi
+
+
+def test_setup_spi_uses_board_default_bus_when_no_config_present() -> None:
+    """Absent an spi config, _setup_spi falls back to board.SPI() -- mirrors
+    _setup_i2c's board.SCL/board.SDA fallback."""
+    board_mock = _mock_board()
+    own_bus = MagicMock(name="board_spi_bus")
+    board_mock.SPI.return_value = own_bus
+
+    from hardware.circuitpython.device_builder import _setup_spi
+
+    result = _setup_spi(None, board_mock)
+
+    board_mock.SPI.assert_called_once_with()
+    assert result is own_bus
+
+
+def test_setup_spi_resolves_named_pins_and_constructs_bus_in_sck_mosi_miso_order() -> None:
+    """With an spi config present, _setup_spi resolves sck/mosi/miso by name
+    against board and constructs busio.SPI from them, instead of falling
+    back to board.SPI()."""
+    sck_pin = MagicMock(name="sck_pin")
+    mosi_pin = MagicMock(name="mosi_pin")
+    miso_pin = MagicMock(name="miso_pin")
+    board_mock = _mock_board(GP2=sck_pin, GP3=mosi_pin, GP4=miso_pin)
+    spi_config = _spi_config(sck="GP2", mosi="GP3", miso="GP4")
+
+    with ExitStack() as stack:
+        mock_busio = stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+        mock_bus = MagicMock(name="bus")
+        mock_busio.SPI.return_value = mock_bus
+
+        from hardware.circuitpython.device_builder import _setup_spi
+
+        result = _setup_spi(spi_config, board_mock)
+
+    mock_busio.SPI.assert_called_once_with(sck_pin, MOSI=mosi_pin, MISO=miso_pin)
+    assert result is mock_bus
+
+
+def test_setup_spi_bad_pin_name_raises_value_error() -> None:
+    board_mock = MagicMock(spec=["GP2", "GP3"])  # miso has no attribute
+    spi_config = _spi_config(sck="GP2", mosi="GP3", miso="NONEXISTENT_PIN")
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+
+        from hardware.circuitpython.device_builder import _setup_spi
+
+        with pytest.raises(ValueError, match="NONEXISTENT_PIN"):
+            _setup_spi(spi_config, board_mock)
+
+
+def test_setup_spi_disabled_config_builds_no_bus() -> None:
+    """``enabled: false`` on spi builds no bus at all -- not a fall back to
+    board.SPI(), mirroring _setup_i2c's disabled behaviour."""
+    board_mock = _mock_board()
+    spi_config = _spi_config()
+    spi_config.enabled = False
+
+    with ExitStack() as stack:
+        mock_busio = stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+
+        from hardware.circuitpython.device_builder import _setup_spi
+
+        result = _setup_spi(spi_config, board_mock)
+
+    assert result is None
+    mock_busio.SPI.assert_not_called()
+    board_mock.SPI.assert_not_called()
 
 
 def test_build_hardware_passes_i2c_config_and_board_to_setup_i2c() -> None:
