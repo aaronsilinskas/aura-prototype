@@ -14,7 +14,6 @@ from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_manager import InfraredManager
-from hardware.shared.scene_selection import DEFAULT_SCENE
 
 __all__ = ["SceneRuntime", "build_scene_runtime"]
 
@@ -43,29 +42,19 @@ class SceneRuntime:
 
 
 def _resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
-    """Return *scene_name* if registered, else warn and fall back to ``DEFAULT_SCENE``."""
+    """Return *scene_name* if registered, else raise naming the known scenes."""
     names = scene_registry.names()
     if scene_name in names:
         return scene_name
-    print(
-        "unknown scene '"
-        + scene_name
-        + "'; known scenes: "
-        + ", ".join(names)
-        + " — falling back to '"
-        + DEFAULT_SCENE
-        + "'"
-    )
-    return DEFAULT_SCENE
+    raise ValueError("unknown scene '" + scene_name + "'; known scenes: " + ", ".join(names))
 
 
 def build_scene_runtime(hw: DeviceHardware, scene_name: str) -> SceneRuntime:
     """Wire up the effect/rule/scene registries and load *scene_name*.
 
-    Falls back to ``DEFAULT_SCENE`` with a console message when *scene_name*
-    is not in the scanned scene registry. The returned ``SceneRuntime`` has
-    the resolved scene already active — the caller only needs to drive the
-    per-tick loop.
+    Raises ``ValueError`` naming the known scenes when *scene_name* is not in
+    the scanned scene registry. The returned ``SceneRuntime`` has the resolved
+    scene already active — the caller only needs to drive the per-tick loop.
     """
     effect_registry = PackRegistry(item_attr="BUILD")
     effect_registry.scan_dir("packs/effects", "packs.effects")

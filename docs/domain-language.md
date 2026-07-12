@@ -214,7 +214,7 @@ The top-level `app/` package, split along the board-free / device-only seam: `sc
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### SceneRuntime / build_scene_runtime
-`build_scene_runtime(hw, scene_name)` builds the registries, `EffectManager`, `GameEngine`, `SceneManager`, and the `InfraredManager`, resolves the scene (falling back to `DEFAULT_SCENE`), loads it, and returns a `SceneRuntime` bundle of `manager`, `effect_manager`, `timer`, and `ir`. `run_scene` is its only caller.
+`build_scene_runtime(hw, scene_name)` builds the registries, `EffectManager`, `GameEngine`, `SceneManager`, and the `InfraredManager`, resolves the scene (raising `ValueError` naming the known scenes when *scene_name* isn't registered — no code-level default), loads it, and returns a `SceneRuntime` bundle of `manager`, `effect_manager`, `timer`, and `ir`. `run_scene` is its only caller.
 _Avoid_: duplicating the wiring or scene-name fallback at a call site; reaching into `SceneRuntime` beyond its four named slots; hand-sequencing `poll_transmits`/`receive` in `run_scene` (drive `ir.update()`)
 
 ### device_builder

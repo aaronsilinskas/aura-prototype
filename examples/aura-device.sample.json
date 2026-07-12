@@ -1,4 +1,5 @@
 {
+  "scene": "hardware_test",
   "i2c": {
     "sda": "SDA",
     "scl": "SCL"
