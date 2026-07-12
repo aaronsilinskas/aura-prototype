@@ -21,8 +21,9 @@ Several profilers have **config constants at the top of the module** that select
 measured — edit them in the file before deploying:
 
 - `baseline_profiler.py`: `MODE` (`"engine_host"` / `"satellite"`).
-- `scene_load_profiler.py`: `SCENE_NAME` (which scene's `(scene, harness)` baseline to
-  measure; must be a key of its `HARNESSES` table).
+- `scene_load_profiler.py`: has no in-file config constant — it measures whatever the
+  deployed `aura-device.json`'s top-level `"scene"` key names, so select the scene by
+  editing that file, not this module.
 - `pixel_profiler.py`: `DRIVER` (`"neopixel_pwm"` / `"is31fl3741_matrix"`).
 - `sound_profiler.py`: `NUM_VOICES` (re-run per voice count to record the scaling).
 - The sweep arrays (`PIXEL_COUNTS`, `RULE_COUNTS`, `PAYLOAD_LENGTHS`, …) can be widened
@@ -189,36 +190,41 @@ to drive the peak frame time.
 
 ## `scene_load_profiler.py` — per-scene in-situ baselines
 
-Feeds the **Per-scene in-situ baselines** table under *Whole-prop measurements*. Builds
-an in-file `DeviceConfig` from the selected `HARNESSES` entry (`parse_device_config`) and
-hands it to `build_hardware` — the same assembly path production demos use — to stand up
-the **real assembled prop's outputs** (matrix + audio + optional motor + optional
-IR/network controls), then loads one named scene against them, reporting the staged heap
-it retains. `build_hardware` imposes a coarser boundary than the old per-driver setup
-calls did, so the breakdown is one hardware-bundle delta followed by the stages the
-profiler still owns individually:
+Feeds the **Per-scene in-situ baselines** table under *Whole-prop measurements*. Reads
+the deployed `aura-device.json` once (`read_device_config_mapping`), then derives both
+the prop (`parse_device_config`) and the scene to measure (`resolve_scene_name`, the
+config's top-level `"scene"` key) from that one mapping — the same config-driven source
+of truth `examples/hardware/scene_demo.py` / `run_scene` use, not an in-file table. It
+hands the parsed config to `build_hardware` with no codec argument (the default Aura
+wire-frame, the same seam `run_scene` uses) to stand up **whatever outputs the deployed
+config declares** (pixels, audio, IR, motor by physical presence), then loads the
+configured scene against them, reporting the staged heap it retains. The profiler
+asserts nothing about which outputs the bundle contains — this is what lets you disable
+a hardware section in the config and re-run to see its heap impact. `build_hardware`
+imposes a coarser boundary than the old per-driver setup calls did, so the breakdown is
+one hardware-bundle delta followed by the stages the profiler still owns individually:
 
-- **`hardware` Δ** — the heap the single `build_hardware` call retains (matrix, audio,
-  optional motor, optional IR/network controls, plus buttons/accelerometer it always
-  wires but this profiler never reads).
+- **`hardware` Δ** — the heap the single `build_hardware` call retains (whichever
+  pixels/audio/motor/IR sections the config declares, plus buttons/accelerometer it
+  always wires but this profiler never reads).
 - **`registries` Δ** — the heap scanning the effect/rule/scene `PackRegistry`s retains.
 - **`engine` Δ** — the heap building `EffectManager` + `Timer` + `GameEngine` +
   `SceneManager` retains.
-- **`load` Δ** — the heap `SceneManager.load(SCENE_NAME)` retains (the scene graph:
+- **`load` Δ** — the heap `SceneManager.load(scene_name)` retains (the scene graph:
   phases, rules, effects).
 - **first-tick Δ** — the heap the first `SceneManager.update()` retains (opening effects
   fire for the first time: palettes/LUTs/buffers built, WAV files opened).
 
-Set `SCENE_NAME` to the scene you want and **confirm its `HARNESSES` entry matches the
-prop you are running** — the registered audio clips, voice count, and IR wiring. The
-harness is configured by hand, not derived from the scene; a recorded figure is valid
-**only for the `(scene, harness)` pair it was measured against**. A harness with
-`"ir": None` omits the `ir` key from the in-file config entirely, so `build_hardware`
-wires no IR receiver and no network controls; `"tag"` / `"default"` pass the matching
-wire-frame codec. A mismatched harness (missing clips or scopes) reproduces the
+Edit the deployed `aura-device.json`'s `"scene"` key to select the scene, and **confirm
+the deployed config matches the scene** — the registered audio clips, voice count, and
+wired scopes/emitters it needs. There is no in-file harness table: the config is the
+single source of truth, and a recorded figure is valid **only for the `(scene, config)`
+pair it was measured against**. An unregistered scene name fails loudly, naming the known
+scenes. A mismatched or under-configured deploy (missing clips or scopes) reproduces the
 headless-style artifact that motivated dropping `scene_content`. Read the
 `__SCENE_STAGES` line for the full staged free-heap breakdown and the
-`__TABLE_ROW table=scene_in_situ_baselines` row (still just `load` Δ and first-tick Δ —
-the two scene-specific figures) to paste into `recorded-metrics.md`. Run it once per
-scene (`tag`, `red_light_green_light`, `hardware_test`), each on its matching harness —
-these are standalone measurements, not additive terms.
+`__TABLE_ROW table=scene_in_situ_baselines` row (`load` Δ, first-tick Δ, and a
+`metrics_harness_label`-derived `Harness` cell) to paste into `recorded-metrics.md`. Run
+it once per scene (`tag`, `red_light_green_light`, `hardware_test`), redeploying the
+matching `aura-device.json` each time — these are standalone measurements, not additive
+terms.
