@@ -301,6 +301,12 @@ def test_parse_disabled_matrix_pixels_entry_overlapping_scope_rows_still_raises(
         parse_device_config(matrix_config)
 
 
+def test_parse_neopixel_pixels_absent_enabled_key_defaults_to_true(neopixel_config):
+    result = parse_device_config(neopixel_config)
+
+    assert result.pixels[0].enabled is True
+
+
 def test_parse_neopixel_pixels_enabled_false_retains_entry_in_list(neopixel_config):
     neopixel_config["pixels"][0]["enabled"] = False
 
@@ -308,6 +314,15 @@ def test_parse_neopixel_pixels_enabled_false_retains_entry_in_list(neopixel_conf
 
     assert len(result.pixels) == 1
     assert result.pixels[0].enabled is False
+
+
+def test_parse_neopixel_pixels_non_boolean_enabled_raises_value_error_naming_field(
+    neopixel_config,
+):
+    neopixel_config["pixels"][0]["enabled"] = "yes"
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.enabled"):
+        parse_device_config(neopixel_config)
 
 
 def test_parse_disabled_neopixel_pixels_entry_reusing_pin_still_raises_value_error():
@@ -669,6 +684,14 @@ def test_parse_haptics_unknown_key_raises_value_error_naming_field(matrix_config
         parse_device_config(matrix_config)
 
 
+def test_parse_haptics_absent_enabled_key_defaults_to_true(matrix_config):
+    matrix_config["haptics"] = {}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.haptics.enabled is True
+
+
 def test_parse_haptics_enabled_false_retains_object_not_none(matrix_config):
     matrix_config["haptics"] = {"enabled": False}
 
@@ -676,6 +699,13 @@ def test_parse_haptics_enabled_false_retains_object_not_none(matrix_config):
 
     assert result.haptics is not None
     assert result.haptics.enabled is False
+
+
+def test_parse_haptics_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
+    matrix_config["haptics"] = {"enabled": "yes"}
+
+    with pytest.raises(ValueError, match=r"haptics\.enabled"):
+        parse_device_config(matrix_config)
 
 
 # ---------------------------------------------------------------------------

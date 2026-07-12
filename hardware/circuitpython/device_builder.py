@@ -255,9 +255,9 @@ def _setup_accelerometer(i2c: busio.I2C) -> object:
     installed.
 
     Accelerometer is config-gated, not presence-probed: the caller only
-    reaches this once ``config.accelerometer is not None``, so a declared
-    accelerometer that can't be built here is a wiring fault, not a normal
-    "not present" case.
+    reaches this once ``config.accelerometer`` is declared and enabled, so a
+    declared accelerometer that can't be built here is a wiring fault, not a
+    normal "not present" case.
 
     Raises:
         ImportError: If ``adafruit_lis3dh`` is not installed.
@@ -276,8 +276,9 @@ def _setup_drv2605(i2c: busio.I2C) -> object:
     with no ``haptics`` section never requires the library to be installed.
 
     Haptics is config-gated, not presence-probed: the caller only reaches
-    this once ``config.haptics is not None``, so a declared motor that can't
-    be built here is a wiring fault, not a normal "not present" case.
+    this once ``config.haptics`` is declared and enabled, so a declared motor
+    that can't be built here is a wiring fault, not a normal "not present"
+    case.
 
     Raises:
         ImportError: If ``adafruit_drv2605`` is not installed.
@@ -301,7 +302,8 @@ def _setup_audio(audio_cfg: AudioConfig, board_module: object) -> AudioEffectOut
 
     Audio is config-gated rather than presence-probed, so unlike the
     Optional-returning accelerometer/drv2605 helpers there is no absent case
-    — the caller's ``if config.audio is not None:`` guard is the only gate.
+    — the caller's ``config.audio is not None and config.audio.enabled``
+    guard is the only gate.
 
     ``AudioEffectOutput`` is imported here, not at module load — its module
     pulls in ``audiobusio``/``audiocore``/``audiomixer`` at import time, so a
