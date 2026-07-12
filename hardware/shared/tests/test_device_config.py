@@ -789,6 +789,261 @@ def test_parse_i2c_non_boolean_enabled_raises_value_error_naming_field(matrix_co
 
 
 # ---------------------------------------------------------------------------
+# SPI validation
+# ---------------------------------------------------------------------------
+
+
+def test_parse_spi_section_maps_sck_mosi_miso_pins(matrix_config):
+    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8"}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.spi is not None
+    assert result.spi.sck == "GP6"
+    assert result.spi.mosi == "GP7"
+    assert result.spi.miso == "GP8"
+
+
+def test_parse_absent_spi_section_yields_none(matrix_config):
+    result = parse_device_config(matrix_config)
+
+    assert result.spi is None
+
+
+def test_parse_spi_missing_sck_raises_value_error_naming_field(matrix_config):
+    matrix_config["spi"] = {"mosi": "GP7", "miso": "GP8"}
+
+    with pytest.raises(ValueError, match=r"spi\.sck"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_spi_missing_mosi_raises_value_error_naming_field(matrix_config):
+    matrix_config["spi"] = {"sck": "GP6", "miso": "GP8"}
+
+    with pytest.raises(ValueError, match=r"spi\.mosi"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_spi_missing_miso_raises_value_error_naming_field(matrix_config):
+    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7"}
+
+    with pytest.raises(ValueError, match=r"spi\.miso"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_spi_missing_all_three_pins_names_all_in_one_error(matrix_config):
+    matrix_config["spi"] = {}
+
+    with pytest.raises(ValueError, match=r"spi\.sck.*spi\.mosi.*spi\.miso"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_spi_sck_non_string_raises_value_error(matrix_config):
+    matrix_config["spi"] = {"sck": 6, "mosi": "GP7", "miso": "GP8"}
+
+    with pytest.raises(ValueError, match=r"spi\.sck must be a string pin name"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_spi_mosi_non_string_raises_value_error(matrix_config):
+    matrix_config["spi"] = {"sck": "GP6", "mosi": 7, "miso": "GP8"}
+
+    with pytest.raises(ValueError, match=r"spi\.mosi must be a string pin name"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_spi_miso_non_string_raises_value_error(matrix_config):
+    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": 8}
+
+    with pytest.raises(ValueError, match=r"spi\.miso must be a string pin name"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_spi_absent_enabled_key_defaults_to_true(matrix_config):
+    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8"}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.spi.enabled is True
+
+
+def test_parse_spi_enabled_false_retains_object_not_none(matrix_config):
+    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8", "enabled": False}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.spi is not None
+    assert result.spi.enabled is False
+
+
+def test_parse_spi_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
+    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8", "enabled": "yes"}
+
+    with pytest.raises(ValueError, match=r"spi\.enabled"):
+        parse_device_config(matrix_config)
+
+
+# ---------------------------------------------------------------------------
+# Radio validation
+# ---------------------------------------------------------------------------
+
+
+def test_parse_radio_section_maps_cs_reset_frequency_node(matrix_config):
+    matrix_config["radio"] = {"cs": "GP9", "reset": "GP10", "frequency": 915.0, "node": 42}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.radio is not None
+    assert result.radio.cs == "GP9"
+    assert result.radio.reset == "GP10"
+    assert result.radio.frequency == 915.0
+    assert result.radio.node == 42
+
+
+def test_parse_absent_radio_section_yields_none(matrix_config):
+    result = parse_device_config(matrix_config)
+
+    assert result.radio is None
+
+
+def test_parse_radio_missing_cs_raises_value_error_naming_field(matrix_config):
+    matrix_config["radio"] = {"reset": "GP10", "frequency": 915.0, "node": 42}
+
+    with pytest.raises(ValueError, match=r"radio\.cs"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_radio_missing_reset_raises_value_error_naming_field(matrix_config):
+    matrix_config["radio"] = {"cs": "GP9", "frequency": 915.0, "node": 42}
+
+    with pytest.raises(ValueError, match=r"radio\.reset"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_radio_missing_frequency_raises_value_error_naming_field(matrix_config):
+    matrix_config["radio"] = {"cs": "GP9", "reset": "GP10", "node": 42}
+
+    with pytest.raises(ValueError, match=r"radio\.frequency"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_radio_missing_node_raises_value_error_naming_field(matrix_config):
+    matrix_config["radio"] = {"cs": "GP9", "reset": "GP10", "frequency": 915.0}
+
+    with pytest.raises(ValueError, match=r"radio\.node"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_radio_cs_non_string_raises_value_error(matrix_config):
+    matrix_config["radio"] = {"cs": 9, "reset": "GP10", "frequency": 915.0, "node": 42}
+
+    with pytest.raises(ValueError, match=r"radio\.cs must be a string pin name"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_radio_reset_non_string_raises_value_error(matrix_config):
+    matrix_config["radio"] = {"cs": "GP9", "reset": 10, "frequency": 915.0, "node": 42}
+
+    with pytest.raises(ValueError, match=r"radio\.reset must be a string pin name"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_radio_non_numeric_frequency_raises_value_error(matrix_config):
+    matrix_config["radio"] = {"cs": "GP9", "reset": "GP10", "frequency": "915", "node": 42}
+
+    with pytest.raises(ValueError, match=r"radio\.frequency must be a number"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_radio_non_integer_node_raises_value_error(matrix_config):
+    matrix_config["radio"] = {"cs": "GP9", "reset": "GP10", "frequency": 915.0, "node": "42"}
+
+    with pytest.raises(ValueError, match=r"radio\.node must be an integer"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_radio_float_node_raises_value_error(matrix_config):
+    matrix_config["radio"] = {"cs": "GP9", "reset": "GP10", "frequency": 915.0, "node": 42.5}
+
+    with pytest.raises(ValueError, match=r"radio\.node must be an integer"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_radio_negative_node_raises_value_error(matrix_config):
+    matrix_config["radio"] = {"cs": "GP9", "reset": "GP10", "frequency": 915.0, "node": -1}
+
+    with pytest.raises(ValueError, match=r"radio\.node must be in \[0, 254\]"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_radio_node_above_254_raises_value_error(matrix_config):
+    matrix_config["radio"] = {"cs": "GP9", "reset": "GP10", "frequency": 915.0, "node": 255}
+
+    with pytest.raises(ValueError, match=r"radio\.node must be in \[0, 254\]"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_radio_node_boundary_values_are_accepted(matrix_config):
+    matrix_config["radio"] = {"cs": "GP9", "reset": "GP10", "frequency": 915.0, "node": 0}
+    result_low = parse_device_config(matrix_config)
+
+    matrix_config["radio"]["node"] = 254
+    result_high = parse_device_config(matrix_config)
+
+    assert result_low.radio.node == 0
+    assert result_high.radio.node == 254
+
+
+def test_parse_radio_unknown_key_raises_value_error_naming_field(matrix_config):
+    matrix_config["radio"] = {
+        "cs": "GP9",
+        "reset": "GP10",
+        "frequency": 915.0,
+        "node": 42,
+        "power": "high",
+    }
+
+    with pytest.raises(ValueError, match=r"radio\.power"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_radio_absent_enabled_key_defaults_to_true(matrix_config):
+    matrix_config["radio"] = {"cs": "GP9", "reset": "GP10", "frequency": 915.0, "node": 42}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.radio.enabled is True
+
+
+def test_parse_radio_enabled_false_retains_object_not_none(matrix_config):
+    matrix_config["radio"] = {
+        "cs": "GP9",
+        "reset": "GP10",
+        "frequency": 915.0,
+        "node": 42,
+        "enabled": False,
+    }
+
+    result = parse_device_config(matrix_config)
+
+    assert result.radio is not None
+    assert result.radio.enabled is False
+
+
+def test_parse_radio_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
+    matrix_config["radio"] = {
+        "cs": "GP9",
+        "reset": "GP10",
+        "frequency": 915.0,
+        "node": 42,
+        "enabled": "yes",
+    }
+
+    with pytest.raises(ValueError, match=r"radio\.enabled"):
+        parse_device_config(matrix_config)
+
+
+# ---------------------------------------------------------------------------
 # Audio validation
 # ---------------------------------------------------------------------------
 

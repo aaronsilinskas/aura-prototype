@@ -21,6 +21,8 @@ __all__ = [
     "NeoPixelPixelsConfig",
     "NeoPixelScopeConfig",
     "NeoPixelStripConfig",
+    "RadioConfig",
+    "SPIConfig",
     "first_neopixel_pin",
     "load_device_config",
     "parse_device_config",
@@ -40,6 +42,10 @@ _VALID_IR_EMITTER_KEYS: Final = {"line", "cone", "area_of_effect"}
 _I2S_PIN_FIELDS: Final = ("i2s_bit_clock", "i2s_word_select", "i2s_data")
 
 _I2C_PIN_FIELDS: Final = ("sda", "scl")
+
+_SPI_PIN_FIELDS: Final = ("sck", "mosi", "miso")
+
+_RADIO_ALLOWED_KEYS: Final = ("cs", "reset", "frequency", "node", "enabled")
 
 # ---------------------------------------------------------------------------
 # Config data classes
@@ -188,6 +194,25 @@ class I2CConfig:
         self.enabled: bool = enabled
 
 
+class SPIConfig:
+    """Parsed shared SPI bus configuration.
+
+    Mirrors ``I2CConfig``: ``sck``/``mosi``/``miso`` are required together
+    when the ``spi`` section is present. ``enabled`` is mutable so a profiler
+    can flip it on an already-parsed config to isolate hardware without
+    re-parsing. Absent ``spi`` section means ``device_builder`` falls back to
+    ``board.SPI()`` later; ``enabled=False`` builds no bus at all.
+    """
+
+    __slots__ = ("enabled", "miso", "mosi", "sck")
+
+    def __init__(self, sck: str, mosi: str, miso: str, enabled: bool = True) -> None:
+        self.sck: str = sck
+        self.mosi: str = mosi
+        self.miso: str = miso
+        self.enabled: bool = enabled
+
+
 class AccelerometerConfig:
     """Parsed accelerometer configuration. Presence alone gates the LIS3DH build
     (see ``device_builder``) — there are no configurable keys yet besides
@@ -200,6 +225,32 @@ class AccelerometerConfig:
     __slots__ = ("enabled",)
 
     def __init__(self, enabled: bool = True) -> None:
+        self.enabled: bool = enabled
+
+
+class RadioConfig:
+    """Parsed RFM69 radio peripheral configuration.
+
+    Consumes the shared SPI bus (see ``SPIConfig``). ``frequency`` (MHz) is
+    board-variant-specific, so the parser only type-checks it — no fixed
+    valid range. ``node`` is this device's id on the radio network, ``0``
+    to ``254`` inclusive (``255`` is the RadioHead broadcast address).
+
+    ``enabled`` is mutable so a profiler can flip it on an already-parsed
+    config to isolate hardware without re-parsing. A radio declared and
+    enabled while ``spi`` is disabled is a *builder*-time hard error, not
+    checked here.
+    """
+
+    __slots__ = ("cs", "enabled", "frequency", "node", "reset")
+
+    def __init__(
+        self, cs: str, reset: str, frequency: float, node: int, enabled: bool = True
+    ) -> None:
+        self.cs: str = cs
+        self.reset: str = reset
+        self.frequency: float = frequency
+        self.node: int = node
         self.enabled: bool = enabled
 
 
@@ -221,7 +272,17 @@ class HapticsConfig:
 class DeviceConfig:
     """Parsed device configuration produced by parse_device_config."""
 
-    __slots__ = ("accelerometer", "audio", "buttons", "haptics", "i2c", "ir", "pixels")
+    __slots__ = (
+        "accelerometer",
+        "audio",
+        "buttons",
+        "haptics",
+        "i2c",
+        "ir",
+        "pixels",
+        "radio",
+        "spi",
+    )
 
     def __init__(
         self,
@@ -232,6 +293,8 @@ class DeviceConfig:
         i2c: I2CConfig | None,
         accelerometer: AccelerometerConfig | None,
         haptics: HapticsConfig | None,
+        spi: SPIConfig | None = None,
+        radio: RadioConfig | None = None,
     ) -> None:
         self.pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = pixels
         self.buttons: list[str] = buttons
@@ -240,6 +303,8 @@ class DeviceConfig:
         self.i2c: I2CConfig | None = i2c
         self.accelerometer: AccelerometerConfig | None = accelerometer
         self.haptics: HapticsConfig | None = haptics
+        self.spi: SPIConfig | None = spi
+        self.radio: RadioConfig | None = radio
 
 
 # ---------------------------------------------------------------------------
@@ -579,6 +644,59 @@ def _parse_i2c(i2c_raw: dict) -> I2CConfig:
     return I2CConfig(sda=i2c_raw["sda"], scl=i2c_raw["scl"], enabled=enabled)
 
 
+def _parse_spi(spi_raw: dict) -> SPIConfig:
+    # sck/mosi/miso are required-together, mirroring the i2c sda/scl pins: a
+    # half-configured bus is exactly the case where one or two might be
+    # missing, so every missing field is named in one error instead of
+    # stopping at the first.
+    missing = [field for field in _SPI_PIN_FIELDS if field not in spi_raw]
+    if missing:
+        names = ", ".join(f"spi.{field}" for field in missing)
+        raise ValueError(f"{names} required together when spi section is present")
+
+    for field in _SPI_PIN_FIELDS:
+        if not isinstance(spi_raw[field], str):
+            raise ValueError(f"spi.{field} must be a string pin name")
+
+    enabled = _parse_enabled(spi_raw, "spi.enabled")
+    return SPIConfig(
+        sck=spi_raw["sck"], mosi=spi_raw["mosi"], miso=spi_raw["miso"], enabled=enabled
+    )
+
+
+def _parse_radio(radio_raw: dict) -> RadioConfig:
+    _reject_unknown_keys(radio_raw, "radio", allowed=_RADIO_ALLOWED_KEYS)
+
+    if "cs" not in radio_raw:
+        raise ValueError("radio.cs is required")
+    cs = radio_raw["cs"]
+    if not isinstance(cs, str):
+        raise ValueError("radio.cs must be a string pin name")
+
+    if "reset" not in radio_raw:
+        raise ValueError("radio.reset is required")
+    reset = radio_raw["reset"]
+    if not isinstance(reset, str):
+        raise ValueError("radio.reset must be a string pin name")
+
+    if "frequency" not in radio_raw:
+        raise ValueError("radio.frequency is required")
+    frequency = radio_raw["frequency"]
+    if isinstance(frequency, bool) or not isinstance(frequency, (int, float)):
+        raise ValueError(f"radio.frequency must be a number (MHz), got {frequency!r}")
+
+    if "node" not in radio_raw:
+        raise ValueError("radio.node is required")
+    node = radio_raw["node"]
+    if isinstance(node, bool) or not isinstance(node, int):
+        raise ValueError(f"radio.node must be an integer in [0, 254], got {node!r}")
+    if not (0 <= node <= 254):
+        raise ValueError(f"radio.node must be in [0, 254], got {node}")
+
+    enabled = _parse_enabled(radio_raw, "radio.enabled")
+    return RadioConfig(cs=cs, reset=reset, frequency=float(frequency), node=node, enabled=enabled)
+
+
 def parse_device_config(mapping: dict) -> DeviceConfig:
     """Parse a device config mapping into a DeviceConfig.
 
@@ -648,6 +766,14 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     if "i2c" in mapping:
         i2c = _parse_i2c(mapping["i2c"])
 
+    spi: SPIConfig | None = None
+    if "spi" in mapping:
+        spi = _parse_spi(mapping["spi"])
+
+    radio: RadioConfig | None = None
+    if "radio" in mapping:
+        radio = _parse_radio(mapping["radio"])
+
     accelerometer: AccelerometerConfig | None = None
     if "accelerometer" in mapping:
         accelerometer = _parse_accelerometer(mapping["accelerometer"])
@@ -664,6 +790,8 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
         i2c=i2c,
         accelerometer=accelerometer,
         haptics=haptics,
+        spi=spi,
+        radio=radio,
     )
 
 
