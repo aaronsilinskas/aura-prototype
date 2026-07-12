@@ -46,7 +46,7 @@ def _resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
     names = scene_registry.names()
     if scene_name in names:
         return scene_name
-    raise ValueError("unknown scene '" + scene_name + "'; known scenes: " + ", ".join(names))
+    raise ValueError(f"unknown scene {scene_name!r}; known scenes: {', '.join(names)}")
 
 
 def build_scene_runtime(hw: DeviceHardware, scene_name: str) -> SceneRuntime:
