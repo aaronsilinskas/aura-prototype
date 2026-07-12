@@ -7,6 +7,7 @@ from engine.network import TransmitPump
 from engine.state import NetworkControls
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.ir_transport import InfraredReceiver
+from hardware.shared.radio_transport import RadioTransport
 
 __all__ = ["DeviceHardware"]
 
@@ -20,6 +21,9 @@ class DeviceHardware:
     reach the send-only ``network_controls``; the runtime loop reaches the
     lifecycle-pumping ``transmit_pump``. Neither call site downcasts to the
     other's type.
+
+    ``radio`` is the same seam ``HardwareNetworkControls.send_radio`` reaches
+    through — ``None`` on a device with no radio peripheral declared.
     """
 
     __slots__ = (
@@ -28,6 +32,7 @@ class DeviceHardware:
         "ir_receiver",
         "network_controls",
         "outputs",
+        "radio",
         "transmit_pump",
     )
 
@@ -39,6 +44,7 @@ class DeviceHardware:
         network_controls: NetworkControls,
         transmit_pump: TransmitPump,
         ir_receiver: InfraredReceiver | None,
+        radio: RadioTransport | None,
     ) -> None:
         self.outputs: list[EffectOutput] = outputs
         self.buttons: DebouncedButtons = buttons
@@ -46,3 +52,4 @@ class DeviceHardware:
         self.network_controls: NetworkControls = network_controls
         self.transmit_pump: TransmitPump = transmit_pump
         self.ir_receiver: InfraredReceiver | None = ir_receiver
+        self.radio: RadioTransport | None = radio

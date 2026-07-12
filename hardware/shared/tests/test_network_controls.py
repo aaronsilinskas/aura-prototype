@@ -5,6 +5,7 @@ from engine.network import CONE, LINE, TransmitPump
 from engine.state import EffectControls, NetworkControls, SceneControls
 from hardware.shared.ir_transport import InfraredTransmitter, PulseWriter
 from hardware.shared.network_controls import HardwareNetworkControls
+from hardware.shared.radio_transport import RadioTransport
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -194,9 +195,33 @@ def test_poll_transmits_through_declared_transmit_pump_type_mutates_dict_in_plac
     assert first == {LINE: False}
 
 
-def test_send_radio_is_a_noop_until_hardware_is_wired() -> None:
+class _RecordingRadioTransport(RadioTransport):
+    """Records every payload sent, in call order -- send_radio's only
+    observable effect (see hardware/shared/tests/test_radio_transport.py's
+    RecordingRadioTransport for the full recording fake)."""
+
+    def __init__(self) -> None:
+        self.sent: list[bytes] = []
+
+    def send(self, data: bytes) -> None:
+        self.sent.append(data)
+
+    def receive(self) -> "tuple[int, bytes] | None":
+        return None  # unused by HardwareNetworkControls.send_radio
+
+
+def test_hardware_network_controls_send_radio_is_a_noop_with_no_radio_wired() -> None:
     controls = HardwareNetworkControls({})
     controls.send_radio(b"x")  # must not raise
+
+
+def test_hardware_network_controls_send_radio_delegates_to_the_wired_transport() -> None:
+    transport = _RecordingRadioTransport()
+    controls = HardwareNetworkControls({}, radio=transport)
+
+    controls.send_radio(b"\xab\xcd")
+
+    assert transport.sent == [b"\xab\xcd"]
 
 
 # ---------------------------------------------------------------------------

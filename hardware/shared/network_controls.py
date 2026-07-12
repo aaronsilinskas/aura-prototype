@@ -5,6 +5,7 @@ from __future__ import annotations
 from engine.network import TransmitPump
 from engine.state import NetworkControls
 from hardware.shared.ir_transport import InfraredTransmitter
+from hardware.shared.radio_transport import RadioTransport
 
 __all__ = ["HardwareNetworkControls"]
 
@@ -24,14 +25,26 @@ class HardwareNetworkControls(NetworkControls, TransmitPump):
             ``AREA_OF_EFFECT``) to the :class:`InfraredTransmitter` wired to
             that physical emitter.  Pass an empty dict when no IR emitters are
             connected; ``send_ir`` will raise ``ValueError`` for any emitter.
+        radio: The wired :class:`RadioTransport`, or ``None`` on a device
+            with no radio peripheral declared — in which case ``send_radio``
+            is a no-op rather than raising, unlike ``send_ir``'s per-emitter
+            map (radio has no name to look up; the whole capability is either
+            present or absent).
 
-    ``send_radio`` remains a no-op until a radio peripheral is wired.
+    Radio never contributes to ``poll_transmits()`` — a single RFM69-class
+    chip is half-duplex and ``send_radio`` is fire-and-forget, so there is no
+    transmit lifecycle to pump.
     """
 
-    __slots__ = ("_poll_results", "_transmitters")
+    __slots__ = ("_poll_results", "_radio", "_transmitters")
 
-    def __init__(self, transmitters: dict[str, InfraredTransmitter]) -> None:
+    def __init__(
+        self,
+        transmitters: dict[str, InfraredTransmitter],
+        radio: RadioTransport | None = None,
+    ) -> None:
         self._transmitters = transmitters
+        self._radio = radio
         # Pre-allocated once, mutated in place by poll_transmits — a fresh
         # dict per call would be a hot-path allocation (poll_transmits runs
         # every tick in the real runtime loop).
@@ -59,7 +72,16 @@ class HardwareNetworkControls(NetworkControls, TransmitPump):
         tx.send(data)
 
     def send_radio(self, data: bytes) -> None:
-        pass  # TODO: wire to hardware peripheral
+        """Transmit *data* via the wired :class:`RadioTransport`.
+
+        Fire-and-forget, matching ``send_ir``. A no-op when no radio
+        peripheral is wired (``radio=None`` at construction).
+
+        Args:
+            data: Opaque payload bytes to transmit.
+        """
+        if self._radio is not None:
+            self._radio.send(data)
 
     def poll_transmits(self) -> dict[str, bool]:
         """Pump every wired :class:`InfraredTransmitter`'s ``poll()``.

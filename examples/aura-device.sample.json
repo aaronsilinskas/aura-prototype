@@ -52,5 +52,16 @@
     "i2s_bit_clock": "I2S_BIT_CLOCK",
     "i2s_word_select": "I2S_WORD_SELECT",
     "i2s_data": "I2S_DATA"
+  },
+  "spi": {
+    "sck": "SCK",
+    "mosi": "MOSI",
+    "miso": "MISO"
+  },
+  "radio": {
+    "cs": "D24",
+    "reset": "D25",
+    "frequency": 915.0,
+    "node": 1
   }
 }

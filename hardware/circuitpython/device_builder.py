@@ -3,11 +3,13 @@
 Deploy-watch only: imports board, busio, digitalio, microcontroller.
 
 Every per-component driver library (``adafruit_is31fl3741``, ``neopixel``,
-``pulseio``, the audio stack, ``adafruit_lis3dh``, ``adafruit_drv2605``) is
-imported inside the setup helper or branch that builds that component, not
-here at module scope — so importing this module, or building a config that
-doesn't need a component, never requires that component's library to be
-installed.
+``pulseio``, the audio stack, ``adafruit_lis3dh``, ``adafruit_drv2605``,
+``adafruit_rfm69``) is imported inside the setup helper or branch that builds
+that component, not here at module scope — so importing this module, or
+building a config that doesn't need a component, never requires that
+component's library to be installed. ``adafruit_rfm69`` itself is only ever
+imported by ``hardware.circuitpython.rfm69_radio_transport``, reached here
+through a deferred import in ``_setup_radio``.
 """
 
 from __future__ import annotations
@@ -46,6 +48,8 @@ from hardware.shared.device_config import (
     I2CConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
+    RadioConfig,
+    SPIConfig,
 )
 from hardware.shared.device_config import load_device_config as _load_shared_device_config
 from hardware.shared.device_hardware import DeviceHardware
@@ -64,6 +68,7 @@ from hardware.shared.ir_transport import (
     PulseWriter,
 )
 from hardware.shared.network_controls import HardwareNetworkControls
+from hardware.shared.radio_transport import RadioTransport
 
 __all__ = [
     "build_hardware",
@@ -117,6 +122,28 @@ def _setup_i2c(i2c_config: I2CConfig | None, board_module: object) -> busio.I2C 
         return busio.I2C(scl, sda)
     except RuntimeError:
         return None
+
+
+def _setup_spi(spi_config: SPIConfig | None, board_module: object) -> busio.SPI | None:
+    """Return the shared SPI bus the radio (and any future SPI peripheral)
+    is built on, or ``None`` when *spi_config* is disabled.
+
+    Mirrors ``_setup_i2c``'s shape: with *spi_config* present, ``sck``/
+    ``mosi``/``miso`` are resolved by name against *board_module*; absent
+    falls back to ``board_module.SPI()``. ``enabled=False`` builds no bus at
+    all — distinct from an absent *spi_config*, which still falls back to
+    the board's default SPI bus. Unlike ``busio.I2C``, ``busio.SPI`` does not
+    probe for an attached device at construction time, so there is no
+    analogous "no pull-up" fallback to catch here.
+    """
+    if spi_config is not None and not spi_config.enabled:
+        return None
+    if spi_config is not None:
+        sck = _resolve_pin(board_module, "spi.sck", spi_config.sck)
+        mosi = _resolve_pin(board_module, "spi.mosi", spi_config.mosi)
+        miso = _resolve_pin(board_module, "spi.miso", spi_config.miso)
+        return busio.SPI(sck, MOSI=mosi, MISO=miso)
+    return board_module.SPI()
 
 
 _MATRIX_STARTUP_TIMEOUT_S: Final = 3
@@ -297,6 +324,28 @@ def _require_i2c(i2c: busio.I2C | None, section: str) -> busio.I2C:
     return i2c
 
 
+def _require_spi(spi: busio.SPI | None, section: str) -> busio.SPI:
+    """Return *spi*, raising if a declared *section* has no bus to build its chip on."""
+    if spi is None:
+        raise RuntimeError(f"{section} section is declared but no SPI bus is available")
+    return spi
+
+
+def _setup_radio(spi: busio.SPI, radio_cfg: RadioConfig, board_module: object) -> RadioTransport:
+    """Return a configured Rfm69RadioTransport from *radio_cfg* on *spi*.
+
+    ``Rfm69RadioTransport`` (``hardware.circuitpython.rfm69_radio_transport``)
+    is imported here, not at module load, so a config with no ``radio``
+    section never requires ``adafruit_rfm69`` to be installed — that module
+    is the only place ``adafruit_rfm69`` itself is imported.
+    """
+    from hardware.circuitpython.rfm69_radio_transport import Rfm69RadioTransport
+
+    cs = digitalio.DigitalInOut(_resolve_pin(board_module, "radio.cs", radio_cfg.cs))
+    reset = digitalio.DigitalInOut(_resolve_pin(board_module, "radio.reset", radio_cfg.reset))
+    return Rfm69RadioTransport(spi, cs, reset, radio_cfg.frequency, radio_cfg.node)
+
+
 def _setup_audio(audio_cfg: AudioConfig, board_module: object) -> AudioEffectOutput:
     """Return a configured AudioEffectOutput from *audio_cfg*.
 
@@ -448,24 +497,31 @@ def build_hardware(
     construct itself.
 
     Every component this builder attaches — pixels, audio, IR, the
-    accelerometer, and haptics — is config-gated: it is built only when its
-    section is declared *and* enabled in *config*, and none is ever probed
-    by physical presence. A section with ``enabled=False`` is retained by
-    the parser but treated the same as absent here — neither built nor
-    probed, and its driver library is never imported. A declared-and-enabled
-    accelerometer or haptics section whose chip can't be constructed
-    (including no I2C bus being available — e.g. a disabled ``i2c`` section)
-    raises, mirroring how a declared matrix with no I2C bus raises.
+    accelerometer, haptics, and the RFM69 radio — is config-gated: it is
+    built only when its section is declared *and* enabled in *config*, and
+    none is ever probed by physical presence. A section with
+    ``enabled=False`` is retained by the parser but treated the same as
+    absent here — neither built nor probed, and its driver library is never
+    imported. A declared-and-enabled accelerometer or haptics section whose
+    chip can't be constructed (including no I2C bus being available — e.g. a
+    disabled ``i2c`` section) raises, mirroring how a declared matrix with no
+    I2C bus raises. A declared-and-enabled radio section whose SPI bus can't
+    be reached (disabled or unbuildable) raises the same way, against the
+    shared SPI bus this builder constructs once (configured ``sck``/``mosi``/
+    ``miso`` pins, or ``board.SPI()`` when the ``spi`` section is absent; no
+    bus when ``spi`` is disabled — see ``_setup_spi``).
 
     Raises:
         ValueError: If a declared pin name does not exist on the board.
         RuntimeError: If pixels.type is 'matrix' but no I2C bus is available,
-            or an accelerometer/haptics section is declared but no I2C bus is
+            an accelerometer/haptics section is declared but no I2C bus is
+            available, or a radio section is declared but no SPI bus is
             available.
     """
     _setup_external_power()
     if i2c is None:
         i2c = _setup_i2c(config.i2c, board_module)
+    spi = _setup_spi(config.spi, board_module)
 
     outputs: list[EffectOutput] = []
     outputs.extend(_setup_pixels(config.pixels, board_module, i2c))
@@ -490,6 +546,10 @@ def build_hardware(
         from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 
         outputs.append(Drv2605EffectOutput(motor))
+
+    radio = None
+    if config.radio is not None and config.radio.enabled:
+        radio = _setup_radio(_require_spi(spi, "radio"), config.radio, board_module)
 
     transmitters: dict[str, InfraredTransmitter] = {}
     ir_receiver = None
@@ -526,7 +586,7 @@ def build_hardware(
     # One HardwareNetworkControls instance, seen through two declared faces:
     # rules reach it as the send-only NetworkControls; the runtime loop
     # reaches the same object as TransmitPump to pump transmit lifecycle.
-    hardware_network_controls = HardwareNetworkControls(transmitters)
+    hardware_network_controls = HardwareNetworkControls(transmitters, radio=radio)
 
     return DeviceHardware(
         outputs=outputs,
@@ -535,4 +595,5 @@ def build_hardware(
         network_controls=hardware_network_controls,
         transmit_pump=hardware_network_controls,
         ir_receiver=ir_receiver,
+        radio=radio,
     )

@@ -65,11 +65,12 @@ packs/            Game-specific packs loaded at runtime (CircuitPython/MicroPyth
 
 hardware/         Hardware abstraction layer
   circuitpython/  CircuitPython drivers (device_builder, is31fl3741_output, drv2605_output,
-                  neopixel_output, audio_output, infrared_io, counting_i2c)
+                  neopixel_output, audio_output, infrared_io, counting_i2c,
+                  rfm69_radio_transport)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
                   device_config, device_hardware, network_controls, scene_selection,
                   ir_transport, ir_protocol, tag_protocol, ir_telemetry, ir_manager,
-                  profiling_helpers)
+                  radio_transport, radio_manager, profiling_helpers)
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together
