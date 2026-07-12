@@ -1,34 +1,42 @@
 """Device-only builder — resolves pin strings and assembles DeviceHardware.
 
-Deploy-watch only: imports board, busio, pulseio, digitalio.
+Deploy-watch only: imports board, busio, digitalio, microcontroller.
+
+Every per-component driver library (``adafruit_is31fl3741``, ``neopixel``,
+``pulseio``, the audio stack, ``adafruit_drv2605``) is imported inside the
+setup helper or branch that builds that component, not here at module scope —
+so importing this module, or building a config that doesn't need a component,
+never requires that component's library to be installed.
 """
 
 from __future__ import annotations
 
 try:
     from collections.abc import Callable
-    from typing import Final
+    from typing import TYPE_CHECKING, Final
 except ImportError:
-    pass
+    TYPE_CHECKING = False
+
+# Type-checker-only imports for driver types used solely as annotations —
+# real imports of these libraries stay deferred to the branch that builds
+# the corresponding component (see module docstring), so this block never
+# runs, and never requires the libraries, outside a type checker.
+if TYPE_CHECKING:
+    from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
+
+    from hardware.circuitpython.audio_output import AudioEffectOutput
 
 import time
 
-import adafruit_is31fl3741
 import board
 import busio
 import digitalio
 import microcontroller
-import neopixel
-import pulseio
-from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
 from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.network import AREA_OF_EFFECT, CONE, LINE
-from hardware.circuitpython.audio_output import AudioEffectOutput
-from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
-from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
@@ -114,9 +122,16 @@ def _setup_matrix_is31fl3741(i2c: busio.I2C, brightness: float) -> Adafruit_RGBM
     attempts. Drives LED scaling from *brightness* (``round(brightness *
     0xFF)``), leaves global current pinned at 0xFF, then enables the matrix.
 
+    ``adafruit_is31fl3741`` and ``Adafruit_RGBMatrixQT`` are imported here,
+    not at module load, so a config with no matrix entry never requires the
+    library to be installed.
+
     Raises:
         RuntimeError: If the matrix has not responded within the timeout.
     """
+    import adafruit_is31fl3741
+    from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
+
     deadline = time.monotonic() + _MATRIX_STARTUP_TIMEOUT_S
     matrix = None
     while matrix is None:
@@ -141,7 +156,12 @@ def _setup_neopixels(pixels_cfg: NeoPixelPixelsConfig, board_module: object) -> 
     Covers both the modern ``strips`` list (each strip carrying its own
     ``scope_pixels`` segments) and the legacy per-scope ``scopes`` map, where
     each entry becomes a single strip spanning the whole scope.
+
+    ``neopixel`` is imported here, not at module load, so a config with no
+    NeoPixel entry never requires the library to be installed.
     """
+    import neopixel
+
     outputs: list[EffectOutput] = []
     for strip_cfg in pixels_cfg.strips:
         pin = _resolve_pin(board_module, "pixels.pin", strip_cfg.pin)
@@ -187,6 +207,10 @@ def _setup_pixels(
         if isinstance(pixels_cfg, MatrixPixelsConfig):
             if i2c is None:
                 raise RuntimeError("pixels.type is 'matrix' but no I2C bus is available")
+            # IS31FL3741EffectOutput's own module imports adafruit_is31fl3741 at load
+            # time, so this import is deferred here alongside _setup_matrix_is31fl3741's.
+            from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
+
             matrix = _setup_matrix_is31fl3741(i2c, pixels_cfg.brightness)
             outputs.append(
                 IS31FL3741EffectOutput(
@@ -259,7 +283,13 @@ def _setup_audio(audio_cfg: AudioConfig, board_module: object) -> AudioEffectOut
     Audio is config-gated rather than presence-probed, so unlike the
     Optional-returning accelerometer/drv2605 helpers there is no absent case
     — the caller's ``if config.audio is not None:`` guard is the only gate.
+
+    ``AudioEffectOutput`` is imported here, not at module load — its module
+    pulls in ``audiobusio``/``audiocore``/``audiomixer`` at import time, so a
+    config with no audio section never requires the audio stack installed.
     """
+    from hardware.circuitpython.audio_output import AudioEffectOutput
+
     audio_registry = AudioRegistry()
     for clip_name, clip_path in audio_cfg.clips.items():
         audio_registry.register(clip_name, clip_path)
@@ -285,7 +315,10 @@ def _make_writer(pin: microcontroller.Pin) -> PulseWriter:
     other board ``rp2pio`` is missing and the blocking ``pulseio``-backed
     :class:`PulseOutWriter` is used. PIO availability is a property of the
     silicon, so there is no config knob; the PIO-writer module is imported here
-    (not at module load) so it never executes on non-RP boards.
+    (not at module load) so it never executes on non-RP boards. The ``pulseio``
+    fallback import is deferred the same way, so a board that never reaches
+    this function (no IR section configured) never requires ``pulseio`` to be
+    installed.
 
     Args:
         pin: The transmit pin the emitter is wired to.
@@ -296,6 +329,8 @@ def _make_writer(pin: microcontroller.Pin) -> PulseWriter:
     try:
         import rp2pio  # noqa: F401  # present only on RP2040/RP2350
     except ImportError:
+        import pulseio
+
         pulseout = pulseio.PulseOut(pin, frequency=38000, duty_cycle=0x8000)
         return PulseOutWriter(pulseout)
 
@@ -340,7 +375,12 @@ def _setup_ir(
     writer *selection*: swapping it in tests exercises transmitter wiring
     (one per emitter, sharing the gate, codec defaulting) without touching
     the silicon-coupled ``rp2pio`` probe in :func:`_make_writer`.
+
+    ``pulseio`` is imported here, not at module load, so a config with no
+    ``ir`` section never requires the library to be installed.
     """
+    import pulseio
+
     if encoder is None:
         encoder = AuraInfraredEncoder()
     if decoder is None:
@@ -423,6 +463,12 @@ def build_hardware(
         outputs.append(_setup_audio(config.audio, board_module))
 
     if motor is not None:
+        # Drv2605EffectOutput's own module imports adafruit_drv2605 at load
+        # time, so this import is deferred here — reached only once
+        # _setup_drv2605's own presence probe has already confirmed the
+        # library is importable.
+        from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
+
         outputs.append(Drv2605EffectOutput(motor))
 
     transmitters: dict[str, InfraredTransmitter] = {}
