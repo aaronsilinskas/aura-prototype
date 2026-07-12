@@ -49,12 +49,19 @@ _I2C_PIN_FIELDS: Final = ("sda", "scl")
 class MatrixPixelsConfig:
     """Parsed matrix pixels configuration."""
 
-    __slots__ = ("brightness", "cols", "scope_rows")
+    __slots__ = ("brightness", "cols", "enabled", "scope_rows")
 
-    def __init__(self, cols: int, scope_rows: dict[str, range], brightness: float = 1.0) -> None:
+    def __init__(
+        self,
+        cols: int,
+        scope_rows: dict[str, range],
+        brightness: float = 1.0,
+        enabled: bool = True,
+    ) -> None:
         self.cols: int = cols
         self.scope_rows: dict[str, range] = scope_rows
         self.brightness: float = brightness
+        self.enabled: bool = enabled
 
 
 class NeoPixelScopeConfig:
@@ -102,21 +109,31 @@ class NeoPixelPixelsConfig:
     mapping and is populated only when parsing old-shape entries.
     """
 
-    __slots__ = ("scopes", "strips")
+    __slots__ = ("enabled", "scopes", "strips")
 
     def __init__(
         self,
         scopes: dict[str, NeoPixelScopeConfig] | None = None,
         strips: list[NeoPixelStripConfig] | None = None,
+        enabled: bool = True,
     ) -> None:
         self.scopes: dict[str, NeoPixelScopeConfig] = scopes if scopes is not None else {}
         self.strips: list[NeoPixelStripConfig] = strips if strips is not None else []
+        self.enabled: bool = enabled
 
 
 class AudioConfig:
     """Parsed audio configuration."""
 
-    __slots__ = ("clips", "i2s_bit_clock", "i2s_data", "i2s_word_select", "max_volume", "voices")
+    __slots__ = (
+        "clips",
+        "enabled",
+        "i2s_bit_clock",
+        "i2s_data",
+        "i2s_word_select",
+        "max_volume",
+        "voices",
+    )
 
     def __init__(
         self,
@@ -126,6 +143,7 @@ class AudioConfig:
         i2s_bit_clock: str,
         i2s_word_select: str,
         i2s_data: str,
+        enabled: bool = True,
     ) -> None:
         self.voices: int = voices
         self.max_volume: float = max_volume
@@ -133,6 +151,7 @@ class AudioConfig:
         self.i2s_bit_clock: str = i2s_bit_clock
         self.i2s_word_select: str = i2s_word_select
         self.i2s_data: str = i2s_data
+        self.enabled: bool = enabled
 
 
 class IRConfig:
@@ -144,35 +163,59 @@ class IRConfig:
     callers deal with one representation either way.
     """
 
-    __slots__ = ("emitters", "rx")
+    __slots__ = ("emitters", "enabled", "rx")
 
-    def __init__(self, rx: list[str], emitters: dict[str, str]) -> None:
+    def __init__(self, rx: list[str], emitters: dict[str, str], enabled: bool = True) -> None:
         self.rx: list[str] = rx
         self.emitters: dict[str, str] = emitters
+        self.enabled: bool = enabled
 
 
 class I2CConfig:
-    """Parsed I2C bus configuration."""
+    """Parsed I2C bus configuration.
 
-    __slots__ = ("scl", "sda")
+    ``enabled`` is mutable so a profiler can flip it on an already-parsed
+    config to isolate hardware without re-parsing. ``enabled=False`` means
+    ``device_builder`` builds no I2C bus at all — distinct from an absent
+    ``i2c`` section, which still defaults to the board's SCL/SDA pins.
+    """
 
-    def __init__(self, sda: str, scl: str) -> None:
+    __slots__ = ("enabled", "scl", "sda")
+
+    def __init__(self, sda: str, scl: str, enabled: bool = True) -> None:
         self.sda: str = sda
         self.scl: str = scl
+        self.enabled: bool = enabled
 
 
 class AccelerometerConfig:
     """Parsed accelerometer configuration. Presence alone gates the LIS3DH build
-    (see ``device_builder``) — there are no configurable keys yet."""
+    (see ``device_builder``) — there are no configurable keys yet besides
+    ``enabled``.
 
-    __slots__ = ()
+    ``enabled`` is mutable so a profiler can flip it on an already-parsed
+    config to isolate hardware without re-parsing.
+    """
+
+    __slots__ = ("enabled",)
+
+    def __init__(self, enabled: bool = True) -> None:
+        self.enabled: bool = enabled
 
 
 class HapticsConfig:
     """Parsed haptics configuration. Presence alone gates the DRV2605 build
-    (see ``device_builder``) — there are no configurable keys yet."""
+    (see ``device_builder``) — there are no configurable keys yet besides
+    ``enabled``.
 
-    __slots__ = ()
+    ``enabled`` is mutable so a profiler can flip it on an already-parsed
+    config to isolate hardware without re-parsing.
+    """
+
+    __slots__ = ("enabled",)
+
+    def __init__(self, enabled: bool = True) -> None:
+        self.enabled: bool = enabled
 
 
 class DeviceConfig:
@@ -260,6 +303,30 @@ def _parse_brightness(mapping: dict, key: str, field: str) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Enabled validator (shared across ir, audio, i2c, accelerometer, haptics,
+# and every pixels-list entry)
+# ---------------------------------------------------------------------------
+
+
+def _parse_enabled(mapping: dict, field: str) -> bool:
+    """Return ``mapping["enabled"]``, defaulting to ``True`` when absent.
+
+    Args:
+        mapping: The raw config mapping to read the ``enabled`` key from.
+        field: Label used in error messages (e.g. ``"accelerometer.enabled"``).
+
+    Raises:
+        ValueError: If present but not a ``bool``, naming *field*.
+    """
+    if "enabled" not in mapping:
+        return True
+    value = mapping["enabled"]
+    if not isinstance(value, bool):
+        raise ValueError(f"{field} must be a boolean, got {value!r}")
+    return value
+
+
+# ---------------------------------------------------------------------------
 # Parser
 # ---------------------------------------------------------------------------
 
@@ -274,6 +341,7 @@ def _parse_matrix_pixels(mapping: dict, entry_index: int) -> MatrixPixelsConfig:
     cols = mapping["cols"]
     raw_scope_rows = mapping["scope_rows"]
     brightness = _parse_brightness(mapping, "brightness", f"{label}.brightness")
+    enabled = _parse_enabled(mapping, f"{label}.enabled")
 
     scope_rows: dict[str, range] = {}
     for key, value in raw_scope_rows.items():
@@ -281,7 +349,9 @@ def _parse_matrix_pixels(mapping: dict, entry_index: int) -> MatrixPixelsConfig:
 
     validate_band_map(scope_rows, f"{label}.scope_rows")
 
-    return MatrixPixelsConfig(cols=cols, scope_rows=scope_rows, brightness=brightness)
+    return MatrixPixelsConfig(
+        cols=cols, scope_rows=scope_rows, brightness=brightness, enabled=enabled
+    )
 
 
 def _parse_neopixel_strip_entry(mapping: dict, entry_index: int) -> NeoPixelStripConfig:
@@ -329,9 +399,12 @@ def _parse_neopixel_strip_entry(mapping: dict, entry_index: int) -> NeoPixelStri
 
 
 def _parse_neopixel_pixels(mapping: dict, entry_index: int) -> NeoPixelPixelsConfig:
+    label = f"pixels[{entry_index}]"
+    enabled = _parse_enabled(mapping, f"{label}.enabled")
+
     if "scope_pixels" in mapping or "pin" in mapping:
         strip = _parse_neopixel_strip_entry(mapping, entry_index)
-        return NeoPixelPixelsConfig(strips=[strip])
+        return NeoPixelPixelsConfig(strips=[strip], enabled=enabled)
 
     # Legacy shape: scopes dict
     scopes_raw = mapping.get("scopes", {})
@@ -355,7 +428,7 @@ def _parse_neopixel_pixels(mapping: dict, entry_index: int) -> NeoPixelPixelsCon
             brightness=brightness,
         )
 
-    return NeoPixelPixelsConfig(scopes=scopes)
+    return NeoPixelPixelsConfig(scopes=scopes, enabled=enabled)
 
 
 def _parse_pixels_entry(
@@ -420,7 +493,7 @@ def _parse_ir(ir_raw: dict) -> IRConfig:
     # the absence via require_pin.
     emitters: dict[str, str] = {}
     for key, pin in ir_raw.items():
-        if key == "rx":
+        if key in ("rx", "enabled"):
             continue
         if key not in _VALID_IR_EMITTER_KEYS:
             valid = ", ".join(sorted(_VALID_IR_EMITTER_KEYS))
@@ -429,7 +502,8 @@ def _parse_ir(ir_raw: dict) -> IRConfig:
             raise ValueError(f"ir.{key} must be a string pin name")
         emitters[key] = pin
 
-    return IRConfig(rx=rx, emitters=emitters)
+    enabled = _parse_enabled(ir_raw, "ir.enabled")
+    return IRConfig(rx=rx, emitters=emitters, enabled=enabled)
 
 
 def _parse_audio(audio_raw: dict) -> AudioConfig:
@@ -451,6 +525,7 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
         if not isinstance(audio_raw[field], str):
             raise ValueError(f"audio.{field} must be a string pin name")
 
+    enabled = _parse_enabled(audio_raw, "audio.enabled")
     return AudioConfig(
         voices=voices,
         max_volume=max_volume,
@@ -458,24 +533,32 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
         i2s_bit_clock=audio_raw["i2s_bit_clock"],
         i2s_word_select=audio_raw["i2s_word_select"],
         i2s_data=audio_raw["i2s_data"],
+        enabled=enabled,
     )
 
 
-def _reject_unknown_keys(raw: dict, section: str) -> None:
-    # Minimal shape is {} -- there are no configurable keys yet, so any key
-    # present is unknown.
+def _reject_unknown_keys(raw: dict, section: str, allowed: tuple[str, ...] = ()) -> None:
+    # Minimal shape is {} plus whatever *allowed* names (e.g. "enabled") --
+    # any other key present is unknown.
     for key in raw:
+        if key in allowed:
+            continue
+        if allowed:
+            valid = ", ".join(allowed)
+            raise ValueError(f"{section}.{key} is not a valid key; {section} allows: {valid}")
         raise ValueError(f"{section}.{key} is not a valid key; {section} has no keys")
 
 
 def _parse_accelerometer(accelerometer_raw: dict) -> AccelerometerConfig:
-    _reject_unknown_keys(accelerometer_raw, "accelerometer")
-    return AccelerometerConfig()
+    _reject_unknown_keys(accelerometer_raw, "accelerometer", allowed=("enabled",))
+    enabled = _parse_enabled(accelerometer_raw, "accelerometer.enabled")
+    return AccelerometerConfig(enabled=enabled)
 
 
 def _parse_haptics(haptics_raw: dict) -> HapticsConfig:
-    _reject_unknown_keys(haptics_raw, "haptics")
-    return HapticsConfig()
+    _reject_unknown_keys(haptics_raw, "haptics", allowed=("enabled",))
+    enabled = _parse_enabled(haptics_raw, "haptics.enabled")
+    return HapticsConfig(enabled=enabled)
 
 
 def _parse_i2c(i2c_raw: dict) -> I2CConfig:
@@ -492,7 +575,8 @@ def _parse_i2c(i2c_raw: dict) -> I2CConfig:
         if not isinstance(i2c_raw[field], str):
             raise ValueError(f"i2c.{field} must be a string pin name")
 
-    return I2CConfig(sda=i2c_raw["sda"], scl=i2c_raw["scl"])
+    enabled = _parse_enabled(i2c_raw, "i2c.enabled")
+    return I2CConfig(sda=i2c_raw["sda"], scl=i2c_raw["scl"], enabled=enabled)
 
 
 def parse_device_config(mapping: dict) -> DeviceConfig:

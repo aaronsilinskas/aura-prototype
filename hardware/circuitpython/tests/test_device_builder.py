@@ -516,6 +516,61 @@ def test_setup_pixels_matrix_config_with_no_i2c_raises_runtime_error() -> None:
     mock_setup_matrix.assert_not_called()
 
 
+def test_setup_pixels_skips_disabled_matrix_entry() -> None:
+    """A disabled matrix entry is neither built nor probed -- not even the
+    no-I2C-bus check runs, since the entry is skipped outright (#692)."""
+    mapping = {
+        "pixels": [
+            {
+                "type": "matrix",
+                "cols": 13,
+                "scope_rows": {"global.main": [0, 5]},
+                "enabled": False,
+            }
+        ],
+        "buttons": ["D9"],
+    }
+    config = parse_device_config(mapping)
+    board_mock = _mock_board()
+
+    with ExitStack() as stack:
+        mock_setup_matrix = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_matrix_is31fl3741")
+        )
+
+        from hardware.circuitpython.device_builder import _setup_pixels
+
+        outputs = _setup_pixels(config.pixels, board_mock, i2c=None)
+
+    assert outputs == []
+    mock_setup_matrix.assert_not_called()
+
+
+def test_setup_pixels_skips_disabled_neopixel_entry() -> None:
+    mapping = {
+        "pixels": [
+            {
+                "type": "neopixel",
+                "scopes": {"personal": {"pin": "D5", "count": 10}},
+                "enabled": False,
+            }
+        ],
+        "buttons": ["D9"],
+    }
+    config = parse_device_config(mapping)
+    board_mock = _mock_board(D5=MagicMock())
+
+    with ExitStack() as stack:
+        mock_neopixel = _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import _setup_pixels
+
+        outputs = _setup_pixels(config.pixels, board_mock, i2c=None)
+
+    assert outputs == []
+    mock_neopixel.NeoPixel.assert_not_called()
+
+
 def test_setup_pixels_mixed_matrix_and_neopixel_list_produces_outputs_in_config_order() -> None:
     from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
     from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
@@ -794,6 +849,29 @@ def test_build_hardware_audio_config_adds_audio_effect_output() -> None:
     assert len(audio_outputs) == 1
 
 
+def test_build_hardware_disabled_audio_section_omits_audio_output() -> None:
+    """``audio: {enabled: false}`` is neither built nor probed (#692) --
+    the config's neopixel pixels entry still builds, proving only audio
+    was gated off."""
+    from hardware.circuitpython.audio_output import AudioEffectOutput
+    from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
+
+    config = _neopixel_config_with_audio()
+    config.audio.enabled = False
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert not any(isinstance(o, AudioEffectOutput) for o in hw.outputs)
+    assert any(isinstance(o, NeoPixelEffectOutput) for o in hw.outputs)
+
+
 # ---------------------------------------------------------------------------
 # build_hardware — accelerometer is config-gated, not presence-probed (#691)
 # ---------------------------------------------------------------------------
@@ -879,6 +957,67 @@ def test_build_hardware_declared_accelerometer_raises_when_chip_not_found() -> N
 
         with pytest.raises(ValueError, match="no LIS3DH found"):
             build_hardware(config, board_module=board_mock)
+
+
+def test_build_hardware_disabled_accelerometer_section_omits_accelerometer_from_bundle() -> None:
+    """``accelerometer: {enabled: false}`` is neither built nor probed (#692)."""
+    config = _neopixel_config_with_accelerometer()
+    config.accelerometer.enabled = False
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=MagicMock())
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
+        )
+        mock_setup_accelerometer = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_accelerometer")
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_drv2605", return_value=None)
+        )
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.accelerometer is None
+    mock_setup_accelerometer.assert_not_called()
+
+
+def test_build_hardware_enabled_accelerometer_with_disabled_i2c_raises_runtime_error() -> None:
+    """``i2c: {enabled: false}`` builds no bus at all, so an accelerometer
+    left enabled hits the same declared-and-enabled-but-unreachable hard
+    error as a missing i2c section (#692)."""
+    mapping = {
+        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
+        "buttons": ["D9"],
+        "i2c": {"sda": "GP4", "scl": "GP5", "enabled": False},
+        "accelerometer": {},
+    }
+    config = parse_device_config(mapping)
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
+        )
+        mock_setup_accelerometer = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_accelerometer")
+        )
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(RuntimeError, match="accelerometer"):
+            build_hardware(config, board_module=board_mock)
+
+    mock_setup_accelerometer.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -969,6 +1108,29 @@ def test_build_hardware_declared_haptics_raises_when_chip_not_found() -> None:
 
         with pytest.raises(ValueError, match="no DRV2605 found"):
             build_hardware(config, board_module=board_mock)
+
+
+def test_build_hardware_disabled_haptics_section_omits_motor_output() -> None:
+    """``haptics: {enabled: false}`` is neither built nor probed (#692)."""
+    from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
+
+    config = _neopixel_config_with_haptics()
+    config.haptics.enabled = False
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_setup_drv2605 = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_drv2605")
+        )
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert not any(isinstance(o, Drv2605EffectOutput) for o in hw.outputs)
+    mock_setup_drv2605.assert_not_called()
 
 
 def test_build_hardware_pixels_outputs_precede_audio_and_motor_outputs() -> None:
@@ -1233,6 +1395,27 @@ def test_build_hardware_ir_config_sets_ir_receiver() -> None:
         hw = build_hardware(config, board_module=board_mock)
 
     assert hw.ir_receiver is not None
+
+
+def test_build_hardware_disabled_ir_section_leaves_ir_receiver_none() -> None:
+    """``ir: {enabled: false}`` is neither built nor probed (#692)."""
+    config = _neopixel_config_with_ir()
+    config.ir.enabled = False
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock(), D11=MagicMock(), D12=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+        mock_setup_ir = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_ir")
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.ir_receiver is None
+    mock_setup_ir.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -1594,6 +1777,24 @@ def test_setup_i2c_bad_pin_name_raises_value_error() -> None:
 
         with pytest.raises(ValueError, match="NONEXISTENT_PIN"):
             _setup_i2c(i2c_config, board_mock)
+
+
+def test_setup_i2c_disabled_config_builds_no_bus() -> None:
+    """``enabled: false`` on i2c builds no bus at all -- not a fall back to
+    the board's default SCL/SDA pins (#692)."""
+    board_mock = _mock_board(SCL=MagicMock(), SDA=MagicMock())
+    i2c_config = _i2c_config(sda="GP4", scl="GP5")
+    i2c_config.enabled = False
+
+    with ExitStack() as stack:
+        mock_busio = stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+
+        from hardware.circuitpython.device_builder import _setup_i2c
+
+        result = _setup_i2c(i2c_config, board_mock)
+
+    assert result is None
+    mock_busio.I2C.assert_not_called()
 
 
 def test_build_hardware_passes_i2c_config_and_board_to_setup_i2c() -> None:
