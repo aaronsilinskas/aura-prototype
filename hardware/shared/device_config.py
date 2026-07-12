@@ -47,6 +47,8 @@ _SPI_PIN_FIELDS: Final = ("sck", "mosi", "miso")
 
 _RADIO_ALLOWED_KEYS: Final = ("cs", "reset", "frequency", "node", "enabled")
 
+_RADIO_PIN_FIELDS: Final = ("cs", "reset")
+
 # ---------------------------------------------------------------------------
 # Config data classes
 # ---------------------------------------------------------------------------
@@ -293,8 +295,8 @@ class DeviceConfig:
         i2c: I2CConfig | None,
         accelerometer: AccelerometerConfig | None,
         haptics: HapticsConfig | None,
-        spi: SPIConfig | None = None,
-        radio: RadioConfig | None = None,
+        spi: SPIConfig | None,
+        radio: RadioConfig | None,
     ) -> None:
         self.pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = pixels
         self.buttons: list[str] = buttons
@@ -667,17 +669,13 @@ def _parse_spi(spi_raw: dict) -> SPIConfig:
 def _parse_radio(radio_raw: dict) -> RadioConfig:
     _reject_unknown_keys(radio_raw, "radio", allowed=_RADIO_ALLOWED_KEYS)
 
-    if "cs" not in radio_raw:
-        raise ValueError("radio.cs is required")
+    for field in _RADIO_PIN_FIELDS:
+        if field not in radio_raw:
+            raise ValueError(f"radio.{field} is required")
+        if not isinstance(radio_raw[field], str):
+            raise ValueError(f"radio.{field} must be a string pin name")
     cs = radio_raw["cs"]
-    if not isinstance(cs, str):
-        raise ValueError("radio.cs must be a string pin name")
-
-    if "reset" not in radio_raw:
-        raise ValueError("radio.reset is required")
     reset = radio_raw["reset"]
-    if not isinstance(reset, str):
-        raise ValueError("radio.reset must be a string pin name")
 
     if "frequency" not in radio_raw:
         raise ValueError("radio.frequency is required")

@@ -983,15 +983,20 @@ def test_parse_radio_node_above_254_raises_value_error(matrix_config):
         parse_device_config(matrix_config)
 
 
-def test_parse_radio_node_boundary_values_are_accepted(matrix_config):
+def test_parse_radio_node_boundary_zero_is_accepted(matrix_config):
     matrix_config["radio"] = {"cs": "GP9", "reset": "GP10", "frequency": 915.0, "node": 0}
-    result_low = parse_device_config(matrix_config)
 
-    matrix_config["radio"]["node"] = 254
-    result_high = parse_device_config(matrix_config)
+    result = parse_device_config(matrix_config)
 
-    assert result_low.radio.node == 0
-    assert result_high.radio.node == 254
+    assert result.radio.node == 0
+
+
+def test_parse_radio_node_boundary_254_is_accepted(matrix_config):
+    matrix_config["radio"] = {"cs": "GP9", "reset": "GP10", "frequency": 915.0, "node": 254}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.radio.node == 254
 
 
 def test_parse_radio_unknown_key_raises_value_error_naming_field(matrix_config):
