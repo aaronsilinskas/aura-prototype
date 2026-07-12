@@ -3,8 +3,8 @@ from effects.effect import (
     Effect,
     EffectAudio,
     EffectConfig,
-    EffectVibration,
-    VibrationConfig,
+    EffectHaptic,
+    HapticPattern,
 )
 from engine.effects.manager import EffectBuilder
 
@@ -12,9 +12,7 @@ _SFX_TEST_AUDIO = EffectAudio(
     clips={"start": AudioPlaybackConfig(name="sfx_test_start", loop=False)}
 )
 
-_SFX_TEST_VIBRATION = EffectVibration(
-    patterns={"start": VibrationConfig([VibrationConfig.STRONG_CLICK])}
-)
+_SFX_TEST_HAPTIC = EffectHaptic(patterns={"start": HapticPattern([HapticPattern.STRONG_CLICK])})
 
 
 class _Builder(EffectBuilder):
@@ -23,7 +21,7 @@ class _Builder(EffectBuilder):
             name=name,
             pixels=None,
             audio=_SFX_TEST_AUDIO,
-            vibration=_SFX_TEST_VIBRATION,
+            haptic=_SFX_TEST_HAPTIC,
         )
 
 

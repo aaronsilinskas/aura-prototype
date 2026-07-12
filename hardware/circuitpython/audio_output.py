@@ -74,7 +74,7 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
         config = effect.audio.clips.get(event.verb)
         if config is None:
             return
-        audio_only = effect.pixels is None and effect.vibration is None
+        audio_only = effect.pixels is None and effect.haptic is None
         stops_receipt = audio_only or config.stops_effect
         path = self._audio_registry.path(config.name)
         if path is None:

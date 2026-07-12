@@ -34,8 +34,8 @@ def test_reload_complete_clip_stops_the_effect() -> None:
     assert effect.audio.clips["start"].stops_effect is True
 
 
-def test_reload_complete_emits_vibration() -> None:
+def test_reload_complete_emits_haptic() -> None:
     effect = _build()
 
-    assert effect.vibration is not None
-    assert "start" in effect.vibration.patterns
+    assert effect.haptic is not None
+    assert "start" in effect.haptic.patterns

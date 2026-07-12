@@ -27,7 +27,7 @@ assembled prop as measured.
 
 The reference prop is the **Adafruit RP2040 PropMaker Feather running the `tag` scene**:
 an IS31FL3741 matrix with all scopes composited on the one matrix, I2S audio, DRV2605L
-vibration, one IR LINE emitter + one IR receiver, two buttons, and an LIS3DH accelerometer
+haptic, one IR LINE emitter + one IR receiver, two buttons, and an LIS3DH accelerometer
 — a single-MCU prop.
 
 The matrix `flush_ms` (~60.69 ms, see pixel-scope costs below) alone busts the 24 FPS
@@ -105,9 +105,9 @@ Per-frame mixer terms. The `linear_fit` intercept is `mixer_fixed_ms`; the slope
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 0.1834 | 0.0521 |
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 0.1929 | 0.0425 |
 
-### Vibration component costs
+### Haptic component costs
 
-Per-event cost for the shared DRV2605L haptic motor.
+Per-event cost for the shared DRV2605L haptic driver.
 
 | Board | Runtime | Driver | `cost_ms` | `i2c_bandwidth_bytes_per_sec` |
 |-------|---------|--------|-----------|-------------------------------|
@@ -115,7 +115,7 @@ Per-event cost for the shared DRV2605L haptic motor.
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | 7.0801 | 1.80 |
 | pimoroni_pico_plus2w | circuitpython_10_2_1 | - | 5.8187 | 1.80 |
 
-`cost_ms` is the measured average per-event CPU cost of `handle_event` + `motor.play()`.
+`cost_ms` is the measured average per-event CPU cost of `handle_event` + `driver.play()`.
 The DRV2605L is called at a low rate (≤6 calls/min on the reference prop), so its amortized
 per-frame share is well under this per-event figure.
 
@@ -202,19 +202,20 @@ discredited ~2x headless artifact. Disabling a hardware section (e.g. dropping `
 
 | Board | Runtime | Driver | Scene | Harness | `load` Δ (B) | First-tick Δ (B) |
 |-------|---------|--------|-------|---------|--------------|-------------------|
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | tag | matrix+audio(v4)+motor+ir(tag) | 80 | 15,072 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | red_light_green_light | matrix+audio(v2)+motor+no-ir | 80 | 20,080 |
-| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | hardware_test | matrix+audio(v1)+motor+ir(default) | 112 | 13,936 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | tag | matrix+audio(v4)+haptic+ir(tag) | 80 | 15,072 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | red_light_green_light | matrix+audio(v2)+haptic+no-ir | 80 | 20,080 |
+| adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | hardware_test | matrix+audio(v1)+haptic+ir(default) | 112 | 13,936 |
 
 The `Harness` column records what each scene was measured against. New rows are formatted
-by `metrics_harness_label` from the deployed config as pixel-count/audio-voices/motor/accel/
-IR-rx-count parts (e.g. `matrix(117px)+audio(v4)+motor+accel+ir(rx1)`); the motor and accel
+by `metrics_harness_label` from the deployed config as pixel-count/audio-voices/haptic/accel/
+IR-rx-count parts (e.g. `matrix(117px)+audio(v4)+haptic+accel+ir(rx1)`); the haptic and accel
 parts reflect whether `haptics`/`accelerometer` are declared in the config (#691
 config-gates both -- no runtime presence probe). The wire-frame codec (Aura vs. Tag) is a
 per-scene choice, not a `DeviceConfig` fact, so it plays no part in the label. The
 rows below predate this profiler's config-driven rewrite (#686) and still show the older
-hand-maintained `HARNESSES`-table format (matrix scope name, voice count, motor, and IR
+hand-maintained `HARNESSES`-table format (matrix scope name, voice count, haptic, and IR
 codec) — kept as-recorded rather than reformatted, since re-labelling without re-measuring
-would misrepresent them as config-derived. These are the in-situ comparison anchors for
-future before/after scene-change checks — re-record a scene's row only against the same
-deployed config.
+would misrepresent them as config-derived; the `haptic`/`no-haptic` token itself is
+normalized to current vocabulary (#710) — the measured numbers are untouched. These are the
+in-situ comparison anchors for future before/after scene-change checks — re-record a
+scene's row only against the same deployed config.

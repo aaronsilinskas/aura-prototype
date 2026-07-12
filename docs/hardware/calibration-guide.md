@@ -148,19 +148,19 @@ Feeds the **Sound component costs** table. Sweeps `concurrent_voices`. Because
 deinit (it owns the I2S pins) so it is built exactly once per run; set `NUM_VOICES` and
 re-run to record the cost at each voice cap.
 
-## `vibration_profiler.py` — vibration component costs
+## `haptic_profiler.py` — haptic component costs
 
-Feeds the **Vibration component costs** table. `cost_ms` is the measured average
-per-event CPU cost of `handle_event` + `motor.play()`. The DRV2605L is brought up through
+Feeds the **Haptic component costs** table. `cost_ms` is the measured average
+per-event CPU cost of `handle_event` + `driver.play()`. The DRV2605L is brought up through
 a single `build_hardware` call from the **real, deployed** `aura-device.json`
 (`load_device_config()`) rather than an in-file minimal `DeviceConfig` — every declared
 `pixels` entry plus `audio`/`ir`/`accelerometer` is muted via `enabled = False`, and
-`haptics` is force-enabled, since this profiler drives the motor and nothing else. A
-config declaring no `haptics` section fails loudly (the #691 `haptics={}` in-file
-stop-gap is gone — the real prop must declare its motor). `i2c_transaction_bytes` is
-measured on-device by wrapping the real `busio.I2C` bus in a `CountingI2C` decorator and
+`haptics` is force-enabled, since this profiler drives the haptic driver and nothing else.
+A config declaring no `haptics` section fails loudly (the #691 `haptics={}` in-file
+stop-gap is gone — the real prop must declare its haptics driver). `i2c_transaction_bytes`
+is measured on-device by wrapping the real `busio.I2C` bus in a `CountingI2C` decorator and
 injecting it into `build_hardware` via the `i2c=` seam, resetting the counter before a
-representative vibration event, and reading `bytes_written` after.
+representative haptic event, and reading `bytes_written` after.
 
 ## `ir_tx_profiler.py` — IR-transmit component costs
 
@@ -196,8 +196,8 @@ pins — and stands up the whole assembled reference `tag` prop through `build_h
 (the `TagInfrared*` codec is passed in). Unlike the per-component profilers, nothing is
 muted here: this is the one profiler that measures the **assembled** prop end to end, so
 every section the deployed config declares (pixels, buttons, IR, audio, accelerometer,
-haptics) is left enabled. `_build_prop` asserts the matrix, audio, motor, accelerometer,
-and IR receiver all came back in the built bundle, so a deployed config that doesn't
+haptics) is left enabled. `_build_prop` asserts the matrix, audio, haptic driver,
+accelerometer, and IR receiver all came back in the built bundle, so a deployed config that doesn't
 actually describe the reference `tag` prop fails loudly at bring-up. The profiler then
 emits a row with CPU reservation %, total heap footprint, headroom %, and peak frame
 time, plus a `__PROP_BREAKDOWN` of staged `gc.mem_free()` deltas re-shaped around the
@@ -218,7 +218,7 @@ config's top-level `"scene"` key) from that one mapping — the same config-driv
 of truth `examples/hardware/scene_demo.py` / `run_scene` use, not an in-file table. It
 hands the parsed config to `build_hardware` with no codec argument (the default Aura
 wire-frame, the same seam `run_scene` uses) to stand up **whatever outputs the deployed
-config declares** (pixels, audio, IR, motor -- all config-gated per #691), then loads the
+config declares** (pixels, audio, IR, haptics driver -- all config-gated per #691), then loads the
 configured scene against them, reporting the staged heap it retains. The profiler
 asserts nothing about which outputs the bundle contains — this is what lets you disable
 a hardware section in the config and re-run to see its heap impact. `build_hardware`
@@ -226,8 +226,8 @@ imposes a coarser boundary than the old per-driver setup calls did, so the break
 one hardware-bundle delta followed by the stages the profiler still owns individually:
 
 - **`hardware` Δ** — the heap the single `build_hardware` call retains (whichever
-  pixels/audio/motor/IR sections the config declares, plus buttons/accelerometer it
-  always wires but this profiler never reads).
+  pixels/audio/haptics-driver/IR sections the config declares, plus buttons/accelerometer
+  it always wires but this profiler never reads).
 - **`registries` Δ** — the heap scanning the effect/rule/scene `PackRegistry`s retains.
 - **`engine` Δ** — the heap building `EffectManager` + `Timer` + `GameEngine` +
   `SceneManager` retains.

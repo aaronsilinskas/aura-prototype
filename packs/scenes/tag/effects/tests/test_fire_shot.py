@@ -55,15 +55,15 @@ def test_fire_shot_audio_start_clip_stops_effect() -> None:
     assert effect.audio.clips["start"].stops_effect is True
 
 
-def test_fire_shot_emits_vibration_on_start() -> None:
+def test_fire_shot_emits_haptic_on_start() -> None:
     effect = _build()
 
-    assert "start" in effect.vibration.patterns
+    assert "start" in effect.haptic.patterns
 
 
-def test_fire_shot_vibration_start_uses_strong_click() -> None:
-    from effects.effect import VibrationConfig
+def test_fire_shot_haptic_start_uses_strong_click() -> None:
+    from effects.effect import HapticPattern
 
     effect = _build()
 
-    assert VibrationConfig.STRONG_CLICK in effect.vibration.patterns["start"].sequence
+    assert HapticPattern.STRONG_CLICK in effect.haptic.patterns["start"].sequence

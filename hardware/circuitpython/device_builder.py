@@ -297,15 +297,15 @@ def _setup_accelerometer(i2c: busio.I2C) -> object:
 
 
 def _setup_drv2605(i2c: busio.I2C) -> object:
-    """Return a configured DRV2605 haptic motor driver on *i2c*.
+    """Return a configured DRV2605 haptic driver on *i2c*.
 
     ``adafruit_drv2605`` is imported here, not at module load, so a config
     with no ``haptics`` section never requires the library to be installed.
 
     Haptics is config-gated, not presence-probed: the caller only reaches
-    this once ``config.haptics`` is declared and enabled, so a declared motor
-    that can't be built here is a wiring fault, not a normal "not present"
-    case.
+    this once ``config.haptics`` is declared and enabled, so a declared
+    driver that can't be built here is a wiring fault, not a normal "not
+    present" case.
 
     Raises:
         ImportError: If ``adafruit_drv2605`` is not installed.
@@ -493,8 +493,8 @@ def build_hardware(
     """Assemble DeviceHardware from a parsed DeviceConfig.
 
     *i2c*, if supplied, is used for every I2C peripheral (matrix,
-    accelerometer, motor) instead of the bus this function would otherwise
-    construct itself.
+    accelerometer, haptics driver) instead of the bus this function would
+    otherwise construct itself.
 
     Every component this builder attaches — pixels, audio, IR, the
     accelerometer, haptics, and the RFM69 radio — is config-gated: it is
@@ -539,13 +539,13 @@ def build_hardware(
         outputs.append(_setup_audio(config.audio, board_module))
 
     if config.haptics is not None and config.haptics.enabled:
-        motor = _setup_drv2605(_require_i2c(i2c, "haptics"))
+        driver = _setup_drv2605(_require_i2c(i2c, "haptics"))
         # Drv2605EffectOutput's own module imports adafruit_drv2605 at load
         # time, so this import is deferred here — reached only once
         # _setup_drv2605 has already confirmed the library is importable.
         from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 
-        outputs.append(Drv2605EffectOutput(motor))
+        outputs.append(Drv2605EffectOutput(driver))
 
     radio = None
     if config.radio is not None and config.radio.enabled:

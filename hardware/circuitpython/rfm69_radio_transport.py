@@ -3,7 +3,7 @@
 The only module that imports ``adafruit_rfm69`` — ``hardware.shared.radio_transport``
 and ``hardware.shared.radio_manager`` stay chip-agnostic, and ``device_builder``
 reaches this module only through a deferred import inside its radio setup helper
-(mirroring the audio/matrix/motor driver-library deferral pattern), so a config
+(mirroring the audio/matrix/haptics driver-library deferral pattern), so a config
 with no ``radio`` section never requires ``adafruit_rfm69`` to be installed.
 """
 

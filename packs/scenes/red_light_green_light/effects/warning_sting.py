@@ -3,17 +3,15 @@ from effects.effect import (
     Effect,
     EffectAudio,
     EffectConfig,
-    EffectVibration,
-    VibrationConfig,
+    EffectHaptic,
+    HapticPattern,
 )
 from engine.effects.manager import EffectBuilder
 from packs.effects.basic.pulse import PulseBuilder
 
 _pulse = PulseBuilder()
 
-_WARNING_STING_VIBRATION = EffectVibration(
-    patterns={"peak": VibrationConfig([VibrationConfig.STRONG_CLICK])}
-)
+_WARNING_STING_HAPTIC = EffectHaptic(patterns={"peak": HapticPattern([HapticPattern.STRONG_CLICK])})
 
 
 class _Builder(EffectBuilder):
@@ -23,7 +21,7 @@ class _Builder(EffectBuilder):
             name=base.name,
             pixels=base.pixels,
             audio=EffectAudio(clips={"peak": AudioPlaybackConfig(name=name + "_peak", loop=False)}),
-            vibration=_WARNING_STING_VIBRATION,
+            haptic=_WARNING_STING_HAPTIC,
         )
 
 

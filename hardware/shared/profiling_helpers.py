@@ -154,20 +154,20 @@ def _ir_harness_part(ir: IRConfig | None) -> str:
     return f"ir(rx{len(ir.rx)})"
 
 
-def _motor_harness_part(haptics: HapticsConfig | None) -> str:
-    """Return the ``motor`` part of a harness label for ``config.haptics``.
+def _haptic_harness_part(haptics: HapticsConfig | None) -> str:
+    """Return the ``haptic`` part of a harness label for ``config.haptics``.
 
-    ``device_builder`` (#691) builds the DRV2605 haptics motor only when
+    ``device_builder`` (#691) builds the DRV2605 haptics driver only when
     ``config.haptics`` is declared, so declared-ness of the section is itself
     the built/absent fact -- no separate runtime presence check is needed.
     """
-    return "motor" if haptics is not None else "no-motor"
+    return "haptic" if haptics is not None else "no-haptic"
 
 
 def _accel_harness_part(accelerometer: AccelerometerConfig | None) -> str:
     """Return the ``accel`` part of a harness label for ``config.accelerometer``.
 
-    Mirrors ``_motor_harness_part``: ``device_builder`` (#691) builds the
+    Mirrors ``_haptic_harness_part``: ``device_builder`` (#691) builds the
     LIS3DH accelerometer only when ``config.accelerometer`` is declared.
     """
     return "accel" if accelerometer is not None else "no-accel"
@@ -188,25 +188,25 @@ def metrics_harness_label(config: DeviceConfig) -> str:
     label from the config actually assembled rather than a parallel
     hand-edited table.
 
-    The motor part originally (#685) came from a caller-supplied
-    ``motor_present`` runtime flag, since at the time nothing in
-    ``DeviceConfig`` declared the motor. #691 config-gated the DRV2605 motor
-    (and the LIS3DH accelerometer) behind their own declared sections, so
-    both parts are now read straight off ``config`` like every other part --
-    the runtime flag is gone.
+    The haptic part originally (#685) came from a caller-supplied
+    ``haptic_present`` runtime flag, since at the time nothing in
+    ``DeviceConfig`` declared the haptics driver. #691 config-gated the
+    DRV2605 driver (and the LIS3DH accelerometer) behind their own declared
+    sections, so both parts are now read straight off ``config`` like every
+    other part -- the runtime flag is gone.
 
     Args:
         config: The parsed device config the prop was built from.
 
     Returns:
         Parts joined with ``+``, e.g.
-        ``"matrix(117px)+audio(v4)+motor+accel+ir(rx1)"``.
+        ``"matrix(117px)+audio(v4)+haptic+accel+ir(rx1)"``.
     """
     return "+".join(
         [
             _pixels_harness_part(config.pixels),
             _audio_harness_part(config.audio),
-            _motor_harness_part(config.haptics),
+            _haptic_harness_part(config.haptics),
             _accel_harness_part(config.accelerometer),
             _ir_harness_part(config.ir),
         ]

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from effects.effect import EffectConfig, VibrationConfig
+from effects.effect import EffectConfig, HapticPattern
 
 
 def _config() -> EffectConfig:
@@ -42,17 +42,17 @@ def test_hit_audio_start_clip_is_one_shot_and_stops_effect() -> None:
     assert clip.stops_effect is True
 
 
-def test_hit_emits_vibration_on_start() -> None:
+def test_hit_emits_haptic_on_start() -> None:
     effect = _build()
 
-    assert "start" in effect.vibration.patterns
+    assert "start" in effect.haptic.patterns
 
 
-def test_hit_vibration_start_uses_buzz_pause_click_sequence() -> None:
+def test_hit_haptic_start_uses_buzz_pause_click_sequence() -> None:
     effect = _build()
 
-    assert effect.vibration.patterns["start"].sequence == [
-        VibrationConfig.STRONG_BUZZ,
-        VibrationConfig.PAUSE_250,
-        VibrationConfig.STRONG_CLICK,
+    assert effect.haptic.patterns["start"].sequence == [
+        HapticPattern.STRONG_BUZZ,
+        HapticPattern.PAUSE_250,
+        HapticPattern.STRONG_CLICK,
     ]

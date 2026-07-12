@@ -1,7 +1,7 @@
 """End-to-end reference-prop profiler -- the real `tag` prop on an RP2040 PropMaker.
 
 This is the measurement half of #401: it stands up the **whole** reference prop
-(IS31FL3741 matrix, I2S audio, DRV2605L vibration, IR LINE emitter + one IR
+(IS31FL3741 matrix, I2S audio, DRV2605L haptic, IR LINE emitter + one IR
 receiver, two buttons) running the production `tag` scene -- the same wiring as
 `examples/hardware/tag_demo.py` -- and reports the measured cost of running the
 assembled prop on a single MCU (engine-host).
@@ -10,7 +10,7 @@ Unlike the per-component profilers under this directory (which isolate one cost
 term each), this profiler measures the **assembled** prop end to end and reports:
 
 - **CPU reservation %** -- the measured per-frame busy time (engine update +
-  effect render+flush, sound, vibration) expressed as a percentage of the frame
+  effect render+flush, sound, haptic) expressed as a percentage of the frame
   budget at `TARGET_FPS`.
 - **Headroom %** -- the engine-host's usable budget
   (`100 - baseline_cpu_percent - headroom_reserve_percent`) minus the measured
@@ -28,8 +28,8 @@ chosen budget can be sanity-checked against reality.
 
 Hardware bring-up
 ------------------
-The whole hardware bundle -- matrix, buttons, accelerometer, motor, audio, and
-IR -- is brought up through a single `build_hardware` call from the **real**,
+The whole hardware bundle -- matrix, buttons, accelerometer, haptic driver, audio,
+and IR -- is brought up through a single `build_hardware` call from the **real**,
 deployed `aura-device.json` (`load_device_config()`) -- the config-driven model
 #686 established for the scene-load profiler, and the same file
 `examples/hardware/tag_demo.py` runs against. Unlike the per-component
@@ -42,7 +42,7 @@ re-assembled by hand. A declared `accelerometer`/`haptics` section whose chip
 can't be found on the bus raises (config-gated, not presence-probed, per
 #691) rather than silently degrading the measurement -- so, as with
 `scene_load_profiler.py`, **the deployed config must actually describe the
-reference `tag` prop**: `_build_prop` asserts the matrix, audio, motor,
+reference `tag` prop**: `_build_prop` asserts the matrix, audio, haptic driver,
 accelerometer, and IR receiver all came back in the built bundle, so a config
 missing (or disabling) one of those sections fails loudly at bring-up rather
 than reporting an incomplete measurement.
@@ -55,9 +55,9 @@ Hardware
   `buttons[1]` in `aura-device.json`
 - IR receiver and IR LINE emitter, wired to the pins declared as `ir.rx` /
   `ir.line` in `aura-device.json`
-- DRV2605L haptic motor driver on default SDA/SCL -- required, since the
-  deployed config must declare a `haptics` section; a missing motor makes the
-  build raise instead of silently dropping vibration from the measurement
+- DRV2605L haptic driver on default SDA/SCL -- required, since the
+  deployed config must declare a `haptics` section; a missing driver makes the
+  build raise instead of silently dropping haptic output from the measurement
 
 Installation
 ------------
@@ -213,7 +213,7 @@ def _build_prop() -> tuple[
     if hardware.accelerometer is None:
         raise RuntimeError("expected an accelerometer in the built hardware bundle, found none")
     # Stage snapshot: the whole hardware bundle (matrix, buttons, accelerometer,
-    # motor, audio, IR) brought up through the single build_hardware call.
+    # haptic driver, audio, IR) brought up through the single build_hardware call.
     gc.collect()
     free_after_hardware = gc.mem_free()
 
@@ -228,7 +228,7 @@ def _build_prop() -> tuple[
     effect_manager = EffectManager(registry=effect_registry, outputs=hardware.outputs)
     # Stage snapshot: EffectManager wrapping the bundle's outputs -- the one piece
     # of construction downstream of build_hardware that the profiler still owns
-    # (the audio/matrix/motor hardware itself is now inside the bundle above).
+    # (the audio/matrix/haptic driver hardware itself is now inside the bundle above).
     gc.collect()
     free_after_effect_manager = gc.mem_free()
 

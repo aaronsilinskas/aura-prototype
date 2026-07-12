@@ -11,7 +11,7 @@ Hardware
 - Adafruit IS31FL3741 13x9 RGB LED Matrix Breakout (I2C on default SDA/SCL)
 - Two buttons (pull-up) — default: D9 / D10 (set via aura-device.json)
 - IR receiver and LINE IR emitter (set via aura-device.json)
-- DRV2605L haptic motor driver on default SDA/SCL (optional - demo runs without it)
+- DRV2605L haptic driver on default SDA/SCL (optional - demo runs without it)
 
 Configuration
 -------------

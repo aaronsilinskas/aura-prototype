@@ -5,10 +5,10 @@ from effects.effect import (
     Effect,
     EffectAudio,
     EffectConfig,
+    EffectHaptic,
     EffectPixels,
-    EffectVibration,
+    HapticPattern,
     PixelBuffer,
-    VibrationConfig,
 )
 
 # ---------------------------------------------------------------------------
@@ -233,19 +233,19 @@ def test_effect_audio_defaults_to_none() -> None:
     assert effect.audio is None
 
 
-def test_effect_vibration_defaults_to_none() -> None:
+def test_effect_haptic_defaults_to_none() -> None:
     effect = Effect(name="test")
 
-    assert effect.vibration is None
+    assert effect.haptic is None
 
 
-def test_effect_stores_audio_and_vibration_passed_at_construction() -> None:
+def test_effect_stores_audio_and_haptic_passed_at_construction() -> None:
     audio = EffectAudio(clips={})
-    vibration = EffectVibration(patterns={})
-    effect = Effect(name="test", audio=audio, vibration=vibration)
+    haptic = EffectHaptic(patterns={})
+    effect = Effect(name="test", audio=audio, haptic=haptic)
 
     assert effect.audio is audio
-    assert effect.vibration is vibration
+    assert effect.haptic is haptic
 
 
 # ---------------------------------------------------------------------------
@@ -313,60 +313,60 @@ def test_effect_audio_stores_clips_dict() -> None:
 
 
 # ---------------------------------------------------------------------------
-# EffectVibration — patterns
+# EffectHaptic — patterns
 # ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
-# VibrationConfig — sequence field
+# HapticPattern — sequence field
 # ---------------------------------------------------------------------------
 
 
-def test_vibration_config_stores_sequence_passed_at_construction() -> None:
-    cfg = VibrationConfig(sequence=[VibrationConfig.STRONG_CLICK])
+def test_haptic_pattern_stores_sequence_passed_at_construction() -> None:
+    cfg = HapticPattern(sequence=[HapticPattern.STRONG_CLICK])
 
-    assert cfg.sequence == [VibrationConfig.STRONG_CLICK]
+    assert cfg.sequence == [HapticPattern.STRONG_CLICK]
 
 
-def test_vibration_config_preserves_multi_step_sequence_in_order() -> None:
-    steps = [VibrationConfig.STRONG_CLICK, VibrationConfig.PAUSE_250, VibrationConfig.SOFT_BUMP]
-    cfg = VibrationConfig(sequence=steps)
+def test_haptic_pattern_preserves_multi_step_sequence_in_order() -> None:
+    steps = [HapticPattern.STRONG_CLICK, HapticPattern.PAUSE_250, HapticPattern.SOFT_BUMP]
+    cfg = HapticPattern(sequence=steps)
 
     assert cfg.sequence == steps
 
 
 # ---------------------------------------------------------------------------
-# VibrationConfig — constants do not overlap with DRV2605L hardware IDs
+# HapticPattern — constants do not overlap with DRV2605L hardware IDs
 # ---------------------------------------------------------------------------
 
 _DRV2605L_HARDWARE_IDS = {1, 4, 7, 10, 12, 14}
-_ALL_VIBRATION_CONSTANTS = [
-    VibrationConfig.STRONG_CLICK,
-    VibrationConfig.SHARP_CLICK,
-    VibrationConfig.SOFT_BUMP,
-    VibrationConfig.DOUBLE_CLICK,
-    VibrationConfig.TRIPLE_CLICK,
-    VibrationConfig.STRONG_BUZZ,
-    VibrationConfig.PAUSE_250,
-    VibrationConfig.PAUSE_500,
-    VibrationConfig.PAUSE_1000,
+_ALL_HAPTIC_CONSTANTS = [
+    HapticPattern.STRONG_CLICK,
+    HapticPattern.SHARP_CLICK,
+    HapticPattern.SOFT_BUMP,
+    HapticPattern.DOUBLE_CLICK,
+    HapticPattern.TRIPLE_CLICK,
+    HapticPattern.STRONG_BUZZ,
+    HapticPattern.PAUSE_250,
+    HapticPattern.PAUSE_500,
+    HapticPattern.PAUSE_1000,
 ]
 
 
-def test_no_vibration_constant_overlaps_with_drv2605l_hardware_waveform_ids() -> None:
-    for constant in _ALL_VIBRATION_CONSTANTS:
+def test_no_haptic_constant_overlaps_with_drv2605l_hardware_waveform_ids() -> None:
+    for constant in _ALL_HAPTIC_CONSTANTS:
         assert constant not in _DRV2605L_HARDWARE_IDS, (
-            f"VibrationConfig constant {constant} collides with a DRV2605L hardware waveform ID"
+            f"HapticPattern constant {constant} collides with a DRV2605L hardware waveform ID"
         )
 
 
 # ---------------------------------------------------------------------------
-# EffectVibration — typed patterns dict
+# EffectHaptic — typed patterns dict
 # ---------------------------------------------------------------------------
 
 
-def test_effect_vibration_accepts_vibration_config_as_pattern_value() -> None:
-    cfg = VibrationConfig(sequence=[VibrationConfig.STRONG_CLICK])
-    vibration = EffectVibration(patterns={"cast": cfg})
+def test_effect_haptic_accepts_haptic_pattern_as_pattern_value() -> None:
+    cfg = HapticPattern(sequence=[HapticPattern.STRONG_CLICK])
+    haptic = EffectHaptic(patterns={"cast": cfg})
 
-    assert vibration.patterns["cast"] is cfg
+    assert haptic.patterns["cast"] is cfg
