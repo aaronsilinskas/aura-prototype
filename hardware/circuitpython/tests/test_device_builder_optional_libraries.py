@@ -9,18 +9,28 @@ actually pip-installed in this CPython test environment -- the sibling
 conftest.py stubs them into ``sys.modules`` once per session so every *other*
 test in this directory can import the hardware-adjacent modules that still
 need them unconditionally at their own module scope (audio_output.py,
-drv2605_output.py, is31fl3741_output.py). The tests here instead pop those
-stubs for the duration of a single test -- simulating the library being
-genuinely absent from a prop -- and restore them afterward so later tests in
-the session are unaffected. "Library present" coverage for the same branches
-lives in test_device_builder.py, unchanged apart from patch targets moving to
-match the now-lazy imports.
+drv2605_output.py, is31fl3741_output.py). ``adafruit_lis3dh`` is never stubbed
+at all -- nothing in this repo imports it unconditionally. The tests here
+instead pop the stubbed libraries for the duration of a single test --
+simulating the library being genuinely absent from a prop -- and restore them
+afterward so later tests in the session are unaffected. "Library present"
+coverage for the same branches lives in test_device_builder.py, unchanged
+apart from patch targets moving to match the now-lazy imports.
+
+Accelerometer and haptics are config-gated (issue #691): a config that
+doesn't declare the section never imports the section's driver library,
+mirroring the matrix/neopixel/audio/IR coverage below. A *declared* section
+whose driver library is missing is a hard error -- covered separately below,
+distinct from the "never touched when undeclared" cases.
 """
 
 from __future__ import annotations
 
 import sys
 from contextlib import ExitStack, contextmanager
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from hardware.circuitpython.tests.test_device_builder import _enter_hw_patches, _mock_board
 from hardware.shared.device_config import parse_device_config
@@ -42,10 +52,13 @@ def _library_absent(*module_names: str):
         sys.modules.update(saved)
 
 
+_bare_config_mapping = {"pixels": [], "buttons": []}
+
+
 def _bare_config():
     """A DeviceConfig with no pixels, no audio, and no ir -- every optional
     hardware section absent."""
-    return parse_device_config({"pixels": [], "buttons": []})
+    return parse_device_config(_bare_config_mapping)
 
 
 # ---------------------------------------------------------------------------
@@ -65,6 +78,7 @@ def test_importing_device_builder_does_not_import_any_driver_library() -> None:
         "audiobusio",
         "audiocore",
         "audiomixer",
+        "adafruit_lis3dh",
         "adafruit_drv2605",
     )
 
@@ -157,24 +171,88 @@ def test_build_hardware_without_ir_section_succeeds_when_pulseio_uninstalled() -
 
 
 # ---------------------------------------------------------------------------
-# Haptics-motor branch: _setup_drv2605's own presence probe already
-# tolerates adafruit_drv2605 being absent (issue #690's "stays lazy"
-# carve-out); Drv2605EffectOutput's import must move too, otherwise
-# build_hardware would require the library just to run regardless.
+# Accelerometer branch: adafruit_lis3dh stays uninstalled with no
+# accelerometer section (issue #691's config-gating)
 # ---------------------------------------------------------------------------
 
 
-def test_build_hardware_succeeds_when_drv2605_uninstalled() -> None:
+def test_build_hardware_without_accelerometer_section_succeeds_when_lis3dh_uninstalled() -> None:
     config = _bare_config()
+    assert config.accelerometer is None
+    board_mock = _mock_board()
+
+    with _library_absent("adafruit_lis3dh"), ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.accelerometer is None
+
+
+def test_build_hardware_declared_accelerometer_raises_when_lis3dh_uninstalled() -> None:
+    """A declared accelerometer whose driver library is missing is a hard
+    error (issue #691) -- unlike the undeclared case above, this must reach
+    the real `import adafruit_lis3dh` and let its ImportError propagate."""
+    mapping = dict(_bare_config_mapping, accelerometer={})
+    config = parse_device_config(mapping)
+    board_mock = _mock_board()
+
+    with _library_absent("adafruit_lis3dh"), ExitStack() as stack:
+        # _setup_accelerometer itself is intentionally left unpatched -- it
+        # must run for real and hit the missing import.
+        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=MagicMock())
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ImportError):
+            build_hardware(config, board_module=board_mock)
+
+
+# ---------------------------------------------------------------------------
+# Haptics-motor branch: adafruit_drv2605 stays uninstalled with no haptics
+# section (issue #691's config-gating); Drv2605EffectOutput's import must
+# move too, otherwise build_hardware would require the library just to run
+# regardless.
+# ---------------------------------------------------------------------------
+
+
+def test_build_hardware_without_haptics_section_succeeds_when_drv2605_uninstalled() -> None:
+    config = _bare_config()
+    assert config.haptics is None
     board_mock = _mock_board()
 
     with _library_absent("adafruit_drv2605"), ExitStack() as stack:
-        # _setup_drv2605 itself is intentionally left unpatched -- it must
-        # run for real and hit its own internal ImportError probe.
-        _enter_hw_patches(stack, patch_drv2605=False)
+        _enter_hw_patches(stack)
 
         from hardware.circuitpython.device_builder import build_hardware
 
         hw = build_hardware(config, board_module=board_mock)
 
     assert hw.outputs == []
+
+
+def test_build_hardware_declared_haptics_raises_when_drv2605_uninstalled() -> None:
+    """A declared haptics section whose driver library is missing is a hard
+    error (issue #691) -- unlike the undeclared case above, this must reach
+    the real `import adafruit_drv2605` and let its ImportError propagate."""
+    mapping = dict(_bare_config_mapping, haptics={})
+    config = parse_device_config(mapping)
+    board_mock = _mock_board()
+
+    with _library_absent("adafruit_drv2605"), ExitStack() as stack:
+        # _setup_drv2605 itself is intentionally left unpatched -- it must
+        # run for real and hit the missing import.
+        _enter_hw_patches(stack, patch_drv2605=False)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ImportError):
+            build_hardware(config, board_module=board_mock)

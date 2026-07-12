@@ -21,17 +21,17 @@ alongside the uniform stats line.
 Hardware bring-up
 -----------------
 The motor is brought up through a single `build_hardware` call from an in-file minimal
-`DeviceConfig` (no pixels/audio/IR) rather than the retired per-peripheral setup helpers.
-The DRV2605L is not config-gated: `build_hardware` probes it by physical presence and, when
-found, appends a `Drv2605EffectOutput` to the returned bundle's outputs -- which this
-profiler pulls out and drives, ignoring any other auto-attached output. If no
-`Drv2605EffectOutput` comes back (no DRV2605 wired/reachable), bring-up fails loud rather
-than reporting a zero-cost measurement.
+`DeviceConfig` (no pixels/audio/IR, `haptics={}` only) rather than the retired
+per-peripheral setup helpers. The DRV2605L is config-gated like every other component
+(issue #691): declaring `haptics` in the config makes `build_hardware` construct it and
+append a `Drv2605EffectOutput` to the returned bundle's outputs -- which this profiler
+pulls out and drives, ignoring any other auto-attached output. If the DRV2605L isn't
+wired/reachable, `build_hardware` itself raises (a declared-but-unreachable component is
+a hard error, not a silent omission), so bring-up still fails loud rather than reporting
+a zero-cost measurement.
 
-`build_hardware` also always probes the LIS3DH accelerometer alongside the motor. It is
-never driven here, so it contributes only a fixed heap offset (and its idle-motor I2C
-setup traffic happens before the measurement window) -- it does not perturb the per-event
-`cost_ms` or the reset-then-measure `i2c_transaction_bytes`.
+The accelerometer stays undeclared in this profiler's in-file config, so `build_hardware`
+never builds or probes it -- it contributes no heap offset or I2C setup traffic here.
 
 The board's default I2C bus is wrapped in `CountingI2C` and injected into
 `build_hardware` (the `i2c=` seam), so every peripheral shares the counted bus. The
@@ -74,7 +74,7 @@ from engine.state import EffectReceipt
 from hardware.circuitpython.counting_i2c import CountingI2C
 from hardware.circuitpython.device_builder import build_hardware
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
-from hardware.shared.device_config import DeviceConfig, load_device_config
+from hardware.shared.device_config import DeviceConfig, HapticsConfig, load_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.profiling_helpers import (
     open_config_i2c,
@@ -99,9 +99,9 @@ _EVENT_VERB: Final = "buzz"
 def _require_drv2605_output(hardware: DeviceHardware) -> Drv2605EffectOutput:
     """Return the bundle's `Drv2605EffectOutput`, raising loudly if none is present.
 
-    `build_hardware` gates the DRV2605L on physical presence, so an absent output means
-    no motor was wired or reachable. Failing here keeps a missing motor from surfacing as
-    a silent zero-cost measurement.
+    `build_hardware` itself raises if a declared `haptics` section's motor can't be
+    constructed, so this only guards against a caller mistake -- e.g. `run()`'s config
+    ending up without a `haptics` section -- rather than a normal "not present" case.
     """
     for output in hardware.outputs:
         if isinstance(output, Drv2605EffectOutput):
@@ -114,9 +114,19 @@ def run() -> None:
     # Source the I2C bus pins from the real aura-device.json so the injected
     # (byte-counting) bus lands on the configured SDA/SCL.
     counting_bus = CountingI2C(open_config_i2c(load_device_config()))
-    # Minimal config: no pixels/audio/IR. The motor (and accelerometer) are probed by
-    # physical presence, not config, so they still come up on the injected bus.
-    config = DeviceConfig(pixels=[], buttons=[], ir=None, audio=None, i2c=None)
+    # Minimal config: no pixels/audio/IR/accelerometer. `haptics={}` is the stop-gap
+    # (#691) that keeps this profiler building the motor now that build_hardware no
+    # longer probes it by physical presence -- the accelerometer stays undeclared since
+    # this profiler never drives it.
+    config = DeviceConfig(
+        pixels=[],
+        buttons=[],
+        ir=None,
+        audio=None,
+        i2c=None,
+        accelerometer=None,
+        haptics=HapticsConfig(),
+    )
     hardware = build_hardware(config, board, i2c=counting_bus)
     output = _require_drv2605_output(hardware)
 

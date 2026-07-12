@@ -35,6 +35,8 @@
     }
   ],
   "buttons": ["D9", "D10"],
+  "accelerometer": {},
+  "haptics": {},
   "ir": {
     "rx": "D11",
     "line": "D12",

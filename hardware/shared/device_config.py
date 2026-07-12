@@ -13,7 +13,9 @@ except ImportError:
 from engine.state import Scope
 
 __all__ = [
+    "AccelerometerConfig",
     "DeviceConfig",
+    "HapticsConfig",
     "I2CConfig",
     "MatrixPixelsConfig",
     "NeoPixelPixelsConfig",
@@ -159,10 +161,24 @@ class I2CConfig:
         self.scl: str = scl
 
 
+class AccelerometerConfig:
+    """Parsed accelerometer configuration. Presence alone gates the LIS3DH build
+    (see ``device_builder``) — there are no configurable keys yet."""
+
+    __slots__ = ()
+
+
+class HapticsConfig:
+    """Parsed haptics configuration. Presence alone gates the DRV2605 build
+    (see ``device_builder``) — there are no configurable keys yet."""
+
+    __slots__ = ()
+
+
 class DeviceConfig:
     """Parsed device configuration produced by parse_device_config."""
 
-    __slots__ = ("audio", "buttons", "i2c", "ir", "pixels")
+    __slots__ = ("accelerometer", "audio", "buttons", "haptics", "i2c", "ir", "pixels")
 
     def __init__(
         self,
@@ -171,12 +187,16 @@ class DeviceConfig:
         ir: IRConfig | None,
         audio: AudioConfig | None,
         i2c: I2CConfig | None,
+        accelerometer: AccelerometerConfig | None,
+        haptics: HapticsConfig | None,
     ) -> None:
         self.pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = pixels
         self.buttons: list[str] = buttons
         self.ir: IRConfig | None = ir
         self.audio: AudioConfig | None = audio
         self.i2c: I2CConfig | None = i2c
+        self.accelerometer: AccelerometerConfig | None = accelerometer
+        self.haptics: HapticsConfig | None = haptics
 
 
 # ---------------------------------------------------------------------------
@@ -441,6 +461,22 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
     )
 
 
+def _parse_accelerometer(accelerometer_raw: dict) -> AccelerometerConfig:
+    # Minimal shape is {} -- there are no configurable keys yet, so any key
+    # present is unknown.
+    for key in accelerometer_raw:
+        raise ValueError(f"accelerometer.{key} is not a valid key; accelerometer has no keys")
+    return AccelerometerConfig()
+
+
+def _parse_haptics(haptics_raw: dict) -> HapticsConfig:
+    # Minimal shape is {} -- there are no configurable keys yet, so any key
+    # present is unknown.
+    for key in haptics_raw:
+        raise ValueError(f"haptics.{key} is not a valid key; haptics has no keys")
+    return HapticsConfig()
+
+
 def _parse_i2c(i2c_raw: dict) -> I2CConfig:
     # sda/scl are required-together, mirroring the audio I2S bus pins: a
     # half-configured bus is exactly the case where one might be missing, so
@@ -527,7 +563,23 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     if "i2c" in mapping:
         i2c = _parse_i2c(mapping["i2c"])
 
-    return DeviceConfig(pixels=pixels, buttons=buttons, ir=ir, audio=audio, i2c=i2c)
+    accelerometer: AccelerometerConfig | None = None
+    if "accelerometer" in mapping:
+        accelerometer = _parse_accelerometer(mapping["accelerometer"])
+
+    haptics: HapticsConfig | None = None
+    if "haptics" in mapping:
+        haptics = _parse_haptics(mapping["haptics"])
+
+    return DeviceConfig(
+        pixels=pixels,
+        buttons=buttons,
+        ir=ir,
+        audio=audio,
+        i2c=i2c,
+        accelerometer=accelerometer,
+        haptics=haptics,
+    )
 
 
 def read_device_config_mapping(path: str = "aura-device.json") -> dict:

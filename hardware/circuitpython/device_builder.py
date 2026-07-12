@@ -3,10 +3,11 @@
 Deploy-watch only: imports board, busio, digitalio, microcontroller.
 
 Every per-component driver library (``adafruit_is31fl3741``, ``neopixel``,
-``pulseio``, the audio stack, ``adafruit_drv2605``) is imported inside the
-setup helper or branch that builds that component, not here at module scope —
-so importing this module, or building a config that doesn't need a component,
-never requires that component's library to be installed.
+``pulseio``, the audio stack, ``adafruit_lis3dh``, ``adafruit_drv2605``) is
+imported inside the setup helper or branch that builds that component, not
+here at module scope — so importing this module, or building a config that
+doesn't need a component, never requires that component's library to be
+installed.
 """
 
 from __future__ import annotations
@@ -235,46 +236,46 @@ def _setup_buttons(*pins: microcontroller.Pin) -> DebouncedButtons:
     return DebouncedButtons(pairs)
 
 
-def _setup_accelerometer(i2c: busio.I2C) -> object | None:
-    """Return a configured LIS3DH accelerometer on *i2c*, or ``None`` if absent.
+def _setup_accelerometer(i2c: busio.I2C) -> object:
+    """Return a configured LIS3DH accelerometer on *i2c*.
 
-    Prints a distinct warning depending on the failure mode:
-    - ``"accelerometer library not installed"`` when ``adafruit_lis3dh`` cannot
-      be imported.
-    - ``"accelerometer not found on I2C bus"`` when the library is present but
-      the sensor cannot be reached.
+    ``adafruit_lis3dh`` is imported here, not at module load, so a config
+    with no ``accelerometer`` section never requires the library to be
+    installed.
+
+    Accelerometer is config-gated, not presence-probed: the caller only
+    reaches this once ``config.accelerometer is not None``, so a declared
+    accelerometer that can't be built here is a wiring fault, not a normal
+    "not present" case.
+
+    Raises:
+        ImportError: If ``adafruit_lis3dh`` is not installed.
+        Exception: Whatever ``adafruit_lis3dh.LIS3DH_I2C`` raises if the
+            sensor cannot be reached on *i2c*.
     """
-    try:
-        import adafruit_lis3dh
-    except ImportError:
-        print("accelerometer library not installed")
-        return None
-    try:
-        return adafruit_lis3dh.LIS3DH_I2C(i2c)
-    except Exception:
-        print("accelerometer not found on I2C bus")
-        return None
+    import adafruit_lis3dh
+
+    return adafruit_lis3dh.LIS3DH_I2C(i2c)
 
 
-def _setup_drv2605(i2c: busio.I2C) -> object | None:
-    """Return a configured DRV2605 haptic motor driver on *i2c*, or ``None`` if absent.
+def _setup_drv2605(i2c: busio.I2C) -> object:
+    """Return a configured DRV2605 haptic motor driver on *i2c*.
 
-    Prints a distinct warning depending on the failure mode:
-    - ``"drv2605 library not installed"`` when ``adafruit_drv2605`` cannot
-      be imported.
-    - ``"drv2605 not found on I2C bus"`` when the library is present but
-      the driver cannot be reached.
+    ``adafruit_drv2605`` is imported here, not at module load, so a config
+    with no ``haptics`` section never requires the library to be installed.
+
+    Haptics is config-gated, not presence-probed: the caller only reaches
+    this once ``config.haptics is not None``, so a declared motor that can't
+    be built here is a wiring fault, not a normal "not present" case.
+
+    Raises:
+        ImportError: If ``adafruit_drv2605`` is not installed.
+        Exception: Whatever ``adafruit_drv2605.DRV2605`` raises if the
+            driver cannot be reached on *i2c*.
     """
-    try:
-        import adafruit_drv2605
-    except ImportError:
-        print("drv2605 library not installed")
-        return None
-    try:
-        return adafruit_drv2605.DRV2605(i2c)
-    except Exception:
-        print("drv2605 not found on I2C bus")
-        return None
+    import adafruit_drv2605
+
+    return adafruit_drv2605.DRV2605(i2c)
 
 
 def _setup_audio(audio_cfg: AudioConfig, board_module: object) -> AudioEffectOutput:
@@ -424,14 +425,20 @@ def build_hardware(
 
     *i2c*, if supplied, is used for every I2C peripheral (matrix,
     accelerometer, motor) instead of the bus this function would otherwise
-    construct itself. If no bus is supplied and none can be constructed (no
-    I2C devices wired to pull SDA/SCL high), the accelerometer and motor are
-    silently omitted — matrix pixels, being config-gated rather than
-    presence-probed, raise instead.
+    construct itself.
+
+    Every component this builder attaches — pixels, audio, IR, the
+    accelerometer, and haptics — is config-gated: it is built only when its
+    section is declared in *config*, and none is ever probed by physical
+    presence. A declared accelerometer or haptics section whose chip can't
+    be constructed (including no I2C bus being available) raises, mirroring
+    how a declared matrix with no I2C bus raises.
 
     Raises:
         ValueError: If a declared pin name does not exist on the board.
-        RuntimeError: If pixels.type is 'matrix' but no I2C bus is available.
+        RuntimeError: If pixels.type is 'matrix' but no I2C bus is available,
+            or an accelerometer/haptics section is declared but no I2C bus is
+            available.
     """
     _setup_external_power()
     if i2c is None:
@@ -446,27 +453,21 @@ def build_hardware(
     buttons = _setup_buttons(*button_pins)
 
     accelerometer = None
-    if i2c is not None:
-        try:
-            accelerometer = _setup_accelerometer(i2c)
-        except Exception:
-            print("accelerometer not reachable — omitting from hardware bundle")
-
-    motor = None
-    if i2c is not None:
-        try:
-            motor = _setup_drv2605(i2c)
-        except Exception:
-            print("drv2605 not reachable — omitting from hardware bundle")
+    if config.accelerometer is not None:
+        if i2c is None:
+            raise RuntimeError("accelerometer section is declared but no I2C bus is available")
+        accelerometer = _setup_accelerometer(i2c)
 
     if config.audio is not None:
         outputs.append(_setup_audio(config.audio, board_module))
 
-    if motor is not None:
+    if config.haptics is not None:
+        if i2c is None:
+            raise RuntimeError("haptics section is declared but no I2C bus is available")
+        motor = _setup_drv2605(i2c)
         # Drv2605EffectOutput's own module imports adafruit_drv2605 at load
         # time, so this import is deferred here — reached only once
-        # _setup_drv2605's own presence probe has already confirmed the
-        # library is importable.
+        # _setup_drv2605 has already confirmed the library is importable.
         from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 
         outputs.append(Drv2605EffectOutput(motor))
