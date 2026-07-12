@@ -207,9 +207,11 @@ discredited ~2x headless artifact. Disabling a hardware section (e.g. dropping `
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_2_1 | - | hardware_test | matrix+audio(v1)+motor+ir(default) | 112 | 13,936 |
 
 The `Harness` column records what each scene was measured against. New rows are formatted
-by `metrics_harness_label` from the deployed config as pixel-count/audio-voices/motor/IR-rx-
-count parts (e.g. `matrix(117px)+audio(v4)+motor+ir(rx1)`); the wire-frame codec (Aura vs.
-Tag) is a per-scene choice, not a `DeviceConfig` fact, so it plays no part in the label. The
+by `metrics_harness_label` from the deployed config as pixel-count/audio-voices/motor/accel/
+IR-rx-count parts (e.g. `matrix(117px)+audio(v4)+motor+accel+ir(rx1)`); the motor and accel
+parts reflect whether `haptics`/`accelerometer` are declared in the config (#691
+config-gates both -- no runtime presence probe). The wire-frame codec (Aura vs. Tag) is a
+per-scene choice, not a `DeviceConfig` fact, so it plays no part in the label. The
 rows below predate this profiler's config-driven rewrite (#686) and still show the older
 hand-maintained `HARNESSES`-table format (matrix scope name, voice count, motor, and IR
 codec) — kept as-recorded rather than reformatted, since re-labelling without re-measuring
