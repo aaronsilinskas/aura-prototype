@@ -164,6 +164,31 @@ class TestMetricsHarnessLabel:
 
         assert label.startswith("matrix(32px)+")
 
+    def test_matrix_wins_the_pixels_label_when_pixels_mixes_matrix_and_neopixel(self):
+        # Real props never mix the two, but the label still must pick one
+        # deterministically if a config does.
+        config = parse_device_config(
+            {
+                "pixels": [
+                    {
+                        "type": "matrix",
+                        "cols": 8,
+                        "scope_rows": {"personal": [0, 4]},
+                    },
+                    {
+                        "type": "neopixel",
+                        "pin": "D5",
+                        "count": 30,
+                        "scope_pixels": {"ambient": [0, 30]},
+                    },
+                ]
+            }
+        )
+
+        label = metrics_harness_label(config, motor_present=False)
+
+        assert label.startswith("matrix(32px)+")
+
     def test_neopixel_pixel_count_sums_counts_across_multiple_strip_entries(self):
         config = parse_device_config(
             {

@@ -15,7 +15,13 @@ import gc
 import sys
 
 from effects.performance import PerformanceTracker
-from hardware.shared.device_config import MatrixPixelsConfig
+from hardware.shared.device_config import (
+    AudioConfig,
+    DeviceConfig,
+    IRConfig,
+    MatrixPixelsConfig,
+    NeoPixelPixelsConfig,
+)
 
 try:
     import board
@@ -98,7 +104,7 @@ def runtime_id() -> str:
     return format_runtime_id(impl.name, impl.version)
 
 
-def _pixels_harness_part(pixels: list) -> str:
+def _pixels_harness_part(pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig]) -> str:
     """Return the ``pixels`` part of a harness label for ``config.pixels``.
 
     ``pixels`` mirrors ``DeviceConfig.pixels``: a possibly-empty list holding
@@ -127,14 +133,14 @@ def _pixels_harness_part(pixels: list) -> str:
     return f"neopixel({total}px)"
 
 
-def _audio_harness_part(audio) -> str:
+def _audio_harness_part(audio: AudioConfig | None) -> str:
     """Return the ``audio`` part of a harness label for ``config.audio``."""
     if audio is None:
         return "no-audio"
     return f"audio(v{audio.voices})"
 
 
-def _ir_harness_part(ir) -> str:
+def _ir_harness_part(ir: IRConfig | None) -> str:
     """Return the ``ir`` part of a harness label for ``config.ir``.
 
     Encodes only the receiver count -- the wire-frame (Aura vs. Tag) is a
@@ -146,7 +152,7 @@ def _ir_harness_part(ir) -> str:
     return f"ir(rx{len(ir.rx)})"
 
 
-def metrics_harness_label(config, motor_present: bool) -> str:
+def metrics_harness_label(config: DeviceConfig, motor_present: bool) -> str:
     """Build the paste-ready harness label for a ``scene_in_situ_baselines`` row.
 
     Derives a short descriptor of the deployed prop from ``config`` (a
