@@ -86,13 +86,13 @@ def test_level_up_audio_clip_is_one_shot_not_looping() -> None:
     assert effect.audio.clips["start"].loop is False
 
 
-# --- Vibration ---
+# --- Haptic ---
 
 
 def test_level_up_triggers_double_click_haptic_on_start_event() -> None:
-    from effects.effect import VibrationConfig
+    from effects.effect import HapticPattern
 
     effect = _build()
 
-    assert effect.vibration is not None
-    assert effect.vibration.patterns["start"].sequence == [VibrationConfig.DOUBLE_CLICK]
+    assert effect.haptic is not None
+    assert effect.haptic.patterns["start"].sequence == [HapticPattern.DOUBLE_CLICK]

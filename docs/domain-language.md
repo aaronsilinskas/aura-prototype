@@ -5,7 +5,7 @@ The canonical code-facing vocabulary for the Aura animation and game-logic engin
 ## Glossary
 
 ### Effect
-A descriptor declaring what capabilities an effect has (pixels, audio, vibration). Builders return plain `Effect` instances — subclass only when there is genuine logic to add.
+A descriptor declaring what capabilities an effect has (pixels, audio, haptic). Builders return plain `Effect` instances — subclass only when there is genuine logic to add.
 _Avoid_: `renders_pixels` (use `effect.pixels is not None`); calling `effect.update()`/`render()` directly; an `Effect` subclass that only holds a name
 
 ### EffectPixels
@@ -20,13 +20,13 @@ _Avoid_: a `"stop"` clips key (teardown is handled by `flush()`, not `handle_eve
 A value object declaring how one audio clip plays: which clip, whether it loops, and whether finishing it stops the whole owning effect (`stops_effect`). `stops_effect` names the *effect's* end, not the sound's (the sound always stops on finish); combining it with `loop=True` is rejected.
 _Avoid_: `stop_on_finish`, `end_effect`/`ends_effect`; reading `stops_effect` as "the sound stops"
 
-### EffectVibration
-A capability object declaring an effect's vibration behaviour, mapping event verbs to vibration configs. `None` means no vibration.
-_Avoid_: raw DRV2605L waveform IDs as pattern values (hardware IDs live in the output, not the descriptor)
+### EffectHaptic
+A capability object declaring an effect's haptic behaviour, mapping event verbs to `HapticPattern`s. `None` means no haptic output.
+_Avoid_: raw DRV2605L waveform IDs as pattern values (hardware IDs live in the output, not the descriptor); "vibration" (the concept-level term is `haptic` — `vibration` described the sensation, not the capability)
 
-### VibrationConfig
-A value object holding an ordered sequence of abstract vibration constants — effect constants (`STRONG_CLICK`, `SHARP_CLICK`, …) and pause constants (`PAUSE_250`, …). Constants are deliberately offset from DRV2605L hardware IDs so any unmapped value raises at the output layer.
-_Avoid_: raw DRV2605L waveform IDs in a sequence (use the named constants)
+### HapticPattern
+A value object holding an ordered sequence of abstract haptic constants — effect constants (`STRONG_CLICK`, `SHARP_CLICK`, …) and pause constants (`PAUSE_250`, …). Constants are deliberately offset from DRV2605L hardware IDs so any unmapped value raises at the output layer. Named `HapticPattern`, not `HapticConfig` — deliberately, so it doesn't sit one letter from the unrelated device-config `HapticsConfig` (`aura-device.json`'s `haptics` section, gating whether the driver is built at all — a different axis from what sequence it plays).
+_Avoid_: raw DRV2605L waveform IDs in a sequence (use the named constants); `HapticConfig` (collides visually with `HapticsConfig`); confusing with `HapticsConfig` (that gates hardware presence; this describes a playback sequence)
 
 ### EffectConfig
 Runtime configuration passed to effect builders at construction: `resolution`, effect-specific `options`, and `listeners`.
@@ -130,7 +130,7 @@ Identifies what a game effect targets, output-agnostically. Leaf scopes: `PERSON
 _Avoid_: `ScopeValue` (implementation artifact); using `AMBIENT` to mean idle effect (it is a routing scope)
 
 ### EffectOutput
-A hardware or software output registered with the effect system. `receives_pixels = False` for non-pixel outputs (audio, vibration), which skip buffer allocation and render.
+A hardware or software output registered with the effect system. `receives_pixels = False` for non-pixel outputs (audio, haptic), which skip buffer allocation and render.
 _Avoid_: "output" (ambiguous in multi-output contexts); importing it from `engine.effects.manager` (import from `engine.effects.output`)
 
 ### EffectEvent
@@ -198,8 +198,8 @@ The port through which `VoicePool` reaches audio hardware, with two adapters (th
 _Avoid_: passing a pre-multiplied hardware level across this seam (pass `0..1` loudness); leaking receipts through the port
 
 ### Drv2605EffectOutput
-A CircuitPython `EffectOutput` driving a DRV2605L haptic motor on all scopes (`receives_pixels = False`). Translates `VibrationConfig` constants to DRV2605L waveforms; a new event interrupts the current sequence.
-_Avoid_: constructing with a `None` motor; subclassing for different haptic controllers (extract a base only when a second is needed); reading `receipt.loudness` (the DRV2605L has no volume control)
+A CircuitPython `EffectOutput` driving a DRV2605L haptic driver on all scopes (`receives_pixels = False`). Translates `HapticPattern` constants to DRV2605L waveforms; a new event interrupts the current sequence. The class name stays chip-named (matching `NeoPixelEffectOutput`/`IS31FL3741EffectOutput`) even though the concrete chip instance it wraps is called `driver`.
+_Avoid_: constructing with a `None` driver; subclassing for different haptic controllers (extract a base only when a second is needed); reading `receipt.loudness` (the DRV2605L has no volume control); "motor" for the injected instance (use `driver`)
 
 ### aura-device.json
 The single on-device file holding **all** hardware configuration: buttons, IR pins/emitters, the `pixels` list, optional `accelerometer`/`haptics` sections, and audio (including the amp's I2S bus pins, required-together whenever an `audio` section is present), an optional `i2c` section naming the bus `sda`/`scl` pins (required-together when present), an optional `spi` section naming the shared bus `sck`/`mosi`/`miso` pins (required-together when present, mirroring `i2c`), and an optional `radio` section naming the RFM69's `cs`/`reset` pins, `frequency` (MHz, board-variant-specific), and `node` (this device's id on the radio network, `0`–`254`). `pixels` and `buttons` are each an **optional, possibly-empty list** — absent or `[]` for `pixels` means the device declares zero pixel outputs (matrix and/or strips; at most one matrix) and the runtime comes up silently with none; absent or `[]` for `buttons` means the device declares zero buttons. `accelerometer`/`haptics` are each an **optional object** (minimal shape `{}`) — presence gates whether `device_builder` builds that component, alongside the **Component enabled toggle**; an unknown key inside either raises a field-named `ValueError`. Every carrying section — `ir`, `audio`, `i2c`, `spi`, `radio`, `accelerometer`, `haptics`, and each `pixels` entry — accepts the optional `enabled` boolean; see **Component enabled toggle**. Pin references are name **strings**, resolved against `board` only in the device-only builder. `ir.rx` accepts **either a single pin string or a list of pin strings** — the receiver class is chosen by pin count (one → `InfraredSingleReceiver`, two or more → `InfraredMultiReceiver`), never by a separate flag. Within an `ir` section only `rx` is required; every emitter (`line`, `cone`, `area_of_effect`) is **optional** — an omitted emitter simply isn't wired, and usage sites guard its absence via `require_pin`. The file is **required** — there is no built-in default, so a missing file raises. Also carries a top-level `"scene"` string — per-boot game selection, read separately and **not** part of `DeviceConfig`; optional as far as `DeviceConfig` parsing is concerned, but `resolve_scene_name` raises if it's absent, empty, or non-string, since there is no code-level default scene.
@@ -222,7 +222,7 @@ _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; 
 _Avoid_: duplicating the wiring or scene-name resolution at a call site; reaching into `SceneRuntime` beyond its five named slots; hand-sequencing `poll_transmits`/`receive` in `run_scene` (drive `ir.update()`); hand-sequencing radio receive in `run_scene` (drive `radio.update()`)
 
 ### device_builder
-The device-only generic hardware builder. `build_hardware(config, board, …)` resolves pin names, constructs the configured outputs/buttons/accelerometer/haptics/audio/IR/radio, and wraps IR transmitters and the radio transport in `HardwareNetworkControls`. **Single-call**: it claims pins without deiniting, so a second call raises "pin in use." Every component — pixels, audio, IR, the LIS3DH accelerometer, the DRV2605 haptics motor, and the RFM69 radio — is **config-gated**: built only when its section is declared *and* enabled (see **Component enabled toggle**), never probed by physical presence. A declared-and-enabled accelerometer or haptics section whose chip can't be constructed (including no I2C bus available) raises, mirroring how a declared matrix with no I2C bus raises; a declared-and-enabled radio whose chip can't be constructed (including no SPI bus available) raises the same way. Builds the shared I2C and SPI buses once each, regardless of which declared components consume them — configured pins, or the board's default bus when the section is absent; `enabled: false` on either builds no bus at all (see **Component enabled toggle**).
+The device-only generic hardware builder. `build_hardware(config, board, …)` resolves pin names, constructs the configured outputs/buttons/accelerometer/haptics/audio/IR/radio, and wraps IR transmitters and the radio transport in `HardwareNetworkControls`. **Single-call**: it claims pins without deiniting, so a second call raises "pin in use." Every component — pixels, audio, IR, the LIS3DH accelerometer, the DRV2605 haptics driver, and the RFM69 radio — is **config-gated**: built only when its section is declared *and* enabled (see **Component enabled toggle**), never probed by physical presence. A declared-and-enabled accelerometer or haptics section whose chip can't be constructed (including no I2C bus available) raises, mirroring how a declared matrix with no I2C bus raises; a declared-and-enabled radio whose chip can't be constructed (including no SPI bus available) raises the same way. Builds the shared I2C and SPI buses once each, regardless of which declared components consume them — configured pins, or the board's default bus when the section is absent; `enabled: false` on either builds no bus at all (see **Component enabled toggle**).
 _Avoid_: returning a bare tuple/dict (return `DeviceHardware`); putting config parsing here (lives in the pure parser); calling it twice in one process; assuming a minimal config yields a minimal bundle; presence-probing the accelerometer/haptics/radio (removed — absence is expressed by omitting the section)
 
 ### DeviceHardware

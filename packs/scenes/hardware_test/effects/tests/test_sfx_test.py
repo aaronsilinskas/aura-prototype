@@ -52,21 +52,21 @@ def test_sfx_test_audio_start_clip_is_non_looping() -> None:
     assert effect.audio.clips["start"].loop is False
 
 
-def test_sfx_test_has_vibration_capability() -> None:
+def test_sfx_test_has_haptic_capability() -> None:
     effect = _build()
 
-    assert effect.vibration is not None
+    assert effect.haptic is not None
 
 
-def test_sfx_test_vibration_responds_to_start_verb() -> None:
+def test_sfx_test_haptic_responds_to_start_verb() -> None:
     effect = _build()
 
-    assert "start" in effect.vibration.patterns
+    assert "start" in effect.haptic.patterns
 
 
-def test_sfx_test_vibration_start_pattern_is_strong_click() -> None:
-    from effects.effect import VibrationConfig
+def test_sfx_test_haptic_start_pattern_is_strong_click() -> None:
+    from effects.effect import HapticPattern
 
     effect = _build()
 
-    assert effect.vibration.patterns["start"].sequence == [VibrationConfig.STRONG_CLICK]
+    assert effect.haptic.patterns["start"].sequence == [HapticPattern.STRONG_CLICK]

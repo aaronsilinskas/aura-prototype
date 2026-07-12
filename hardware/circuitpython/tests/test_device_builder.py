@@ -1,8 +1,8 @@
-"""Tests for device_builder.build_hardware — matrix, NeoPixel, audio, motor, and IR branches.
+"""Tests for device_builder.build_hardware — matrix, NeoPixel, audio, haptic, and IR branches.
 
 Verifies that build_hardware produces the correct EffectOutput for each
-pixels.type (matrix and neopixel) and that audio, DRV2605 motor, IR, and
-I2C bus injection paths wire up correctly.  All hardware modules (board,
+pixels.type (matrix and neopixel) and that audio, DRV2605 haptic driver, IR,
+and I2C bus injection paths wire up correctly.  All hardware modules (board,
 busio, pulseio, digitalio) are patched so this suite runs under CPython.
 """
 
@@ -531,8 +531,8 @@ def test_setup_pixels_dispatches_neopixel_config_to_neopixel_branch() -> None:
 
 def test_setup_pixels_matrix_config_with_no_i2c_raises_runtime_error() -> None:
     """Matrix pixels are config-gated (declared, expected present) rather than
-    presence-probed like the accelerometer/motor, so a missing I2C bus fails
-    loud instead of silently skipping the matrix."""
+    presence-probed like the accelerometer/haptics driver, so a missing I2C
+    bus fails loud instead of silently skipping the matrix."""
     config = _matrix_config()
     board_mock = _mock_board()
 
@@ -1061,15 +1061,15 @@ def test_build_hardware_haptics_section_adds_drv2605_effect_output() -> None:
 
     config = _neopixel_config_with_haptics()
     board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    mock_motor = MagicMock()
+    mock_driver = MagicMock()
 
     with ExitStack() as stack:
         _enter_hw_patches(stack)
-        # Override the drv2605 patch set in _enter_hw_patches to return a mock motor
+        # Override the drv2605 patch set in _enter_hw_patches to return a mock driver
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_drv2605",
-                return_value=mock_motor,
+                return_value=mock_driver,
             )
         )
         _patch_neopixel(stack)
@@ -1078,8 +1078,8 @@ def test_build_hardware_haptics_section_adds_drv2605_effect_output() -> None:
 
         hw = build_hardware(config, board_module=board_mock)
 
-    motor_outputs = [o for o in hw.outputs if isinstance(o, Drv2605EffectOutput)]
-    assert len(motor_outputs) == 1
+    driver_outputs = [o for o in hw.outputs if isinstance(o, Drv2605EffectOutput)]
+    assert len(driver_outputs) == 1
 
 
 def test_build_hardware_declared_haptics_with_no_i2c_bus_raises_runtime_error() -> None:
@@ -1131,7 +1131,7 @@ def test_build_hardware_declared_haptics_raises_when_chip_not_found() -> None:
             build_hardware(config, board_module=board_mock)
 
 
-def test_build_hardware_disabled_haptics_section_omits_motor_output() -> None:
+def test_build_hardware_disabled_haptics_section_omits_haptic_output() -> None:
     """``haptics: {enabled: false}`` is neither built nor probed (#692)."""
     from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 
@@ -1321,8 +1321,8 @@ def test_setup_radio_wraps_resolved_pins_into_digitalinout_and_delegates_to_tran
     assert result is mock_transport
 
 
-def test_build_hardware_pixels_outputs_precede_audio_and_motor_outputs() -> None:
-    """build_hardware appends pixels outputs before audio and motor outputs,
+def test_build_hardware_pixels_outputs_precede_audio_and_haptic_outputs() -> None:
+    """build_hardware appends pixels outputs before audio and haptic outputs,
     regardless of how many pixel outputs _setup_pixels returns — ordering
     that scene_runtime and the pixel profiler rely on staying stable."""
     from hardware.circuitpython.audio_output import AudioEffectOutput
@@ -1347,14 +1347,14 @@ def test_build_hardware_pixels_outputs_precede_audio_and_motor_outputs() -> None
     board_mock.I2S_BIT_CLOCK = MagicMock()
     board_mock.I2S_WORD_SELECT = MagicMock()
     board_mock.I2S_DATA = MagicMock()
-    mock_motor = MagicMock()
+    mock_driver = MagicMock()
 
     with ExitStack() as stack:
         _enter_hw_patches(stack)
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_drv2605",
-                return_value=mock_motor,
+                return_value=mock_driver,
             )
         )
         _patch_neopixel(stack)
@@ -1371,8 +1371,8 @@ def test_build_hardware_pixels_outputs_precede_audio_and_motor_outputs() -> None
 
     pixels_index = next(i for i, o in enumerate(hw.outputs) if isinstance(o, NeoPixelEffectOutput))
     audio_index = next(i for i, o in enumerate(hw.outputs) if isinstance(o, AudioEffectOutput))
-    motor_index = next(i for i, o in enumerate(hw.outputs) if isinstance(o, Drv2605EffectOutput))
-    assert pixels_index < audio_index < motor_index
+    haptic_index = next(i for i, o in enumerate(hw.outputs) if isinstance(o, Drv2605EffectOutput))
+    assert pixels_index < audio_index < haptic_index
 
 
 # ---------------------------------------------------------------------------
@@ -1428,7 +1428,7 @@ def _fully_loaded_board_mock() -> MagicMock:
     )
 
 
-def test_build_hardware_fully_loaded_config_builds_accelerometer_and_motor_output() -> None:
+def test_build_hardware_fully_loaded_config_builds_accelerometer_and_haptic_output() -> None:
     """A prop declaring every optional section — including accelerometer and
     haptics — builds an accelerometer and a Drv2605EffectOutput alongside its
     other outputs."""
@@ -1490,7 +1490,7 @@ def test_build_hardware_fully_loaded_config_builds_accelerometer_and_motor_outpu
 def test_build_hardware_accelerometer_and_haptics_less_config_omits_both() -> None:
     """The accelerometer/haptics-less counterpart to the fully-loaded prop
     above: every other section stays declared, but omitting accelerometer
-    and haptics yields hw.accelerometer is None and no motor output,
+    and haptics yields hw.accelerometer is None and no haptic output,
     without either being probed."""
     from hardware.circuitpython.audio_output import AudioEffectOutput
     from hardware.circuitpython.drv2605_output import Drv2605EffectOutput

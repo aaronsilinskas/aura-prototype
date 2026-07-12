@@ -3,20 +3,20 @@ from effects.effect import (
     Effect,
     EffectAudio,
     EffectConfig,
-    EffectVibration,
-    VibrationConfig,
+    EffectHaptic,
+    HapticPattern,
 )
 from engine.effects.manager import EffectBuilder
 
-_GAME_OVER_VIBRATION = EffectVibration(
+_GAME_OVER_HAPTIC = EffectHaptic(
     patterns={
-        "start": VibrationConfig(
+        "start": HapticPattern(
             [
-                VibrationConfig.STRONG_BUZZ,
-                VibrationConfig.PAUSE_250,
-                VibrationConfig.STRONG_BUZZ,
-                VibrationConfig.PAUSE_250,
-                VibrationConfig.STRONG_BUZZ,
+                HapticPattern.STRONG_BUZZ,
+                HapticPattern.PAUSE_250,
+                HapticPattern.STRONG_BUZZ,
+                HapticPattern.PAUSE_250,
+                HapticPattern.STRONG_BUZZ,
             ]
         )
     }
@@ -34,7 +34,7 @@ class _Builder(EffectBuilder):
                     )
                 }
             ),
-            vibration=_GAME_OVER_VIBRATION,
+            haptic=_GAME_OVER_HAPTIC,
         )
 
 

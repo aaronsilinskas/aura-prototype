@@ -8,8 +8,8 @@ from effects.effect import (
     Effect,
     EffectAudio,
     EffectConfig,
-    EffectVibration,
-    VibrationConfig,
+    EffectHaptic,
+    HapticPattern,
 )
 from effects.layers.pulse_layer import PulseLayer
 from effects.palette import PaletteLUT256
@@ -29,8 +29,8 @@ _LEVEL_UP_AUDIO: Final = EffectAudio(
     clips={"start": AudioPlaybackConfig(name="level_up_start", loop=False)}
 )
 
-_LEVEL_UP_VIBRATION: Final = EffectVibration(
-    patterns={"start": VibrationConfig([VibrationConfig.DOUBLE_CLICK])}
+_LEVEL_UP_HAPTIC: Final = EffectHaptic(
+    patterns={"start": HapticPattern([HapticPattern.DOUBLE_CLICK])}
 )
 
 
@@ -41,7 +41,7 @@ class _Builder(EffectBuilder):
             name=name,
             pixels=PulseEffect(layer, _GOLD_PALETTE, config),
             audio=_LEVEL_UP_AUDIO,
-            vibration=_LEVEL_UP_VIBRATION,
+            haptic=_LEVEL_UP_HAPTIC,
         )
 
 

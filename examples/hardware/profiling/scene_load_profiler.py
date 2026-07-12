@@ -67,8 +67,8 @@ declares; it does not read buttons or the accelerometer (inputs do not allocate 
 heap), even though ``build_hardware`` wires them up when their sections are declared.
 Hardware present in practice: an Adafruit RP2040 PropMaker Feather, an Adafruit
 IS31FL3741 13x9 RGB LED Matrix Breakout (I2C on default or configured SDA/SCL), and
-optionally a DRV2605L haptic motor driver (config-gated by a ``haptics`` section -- the
-profiler runs without one declared, but the vibration output is then absent from the
+optionally a DRV2605L haptic driver (config-gated by a ``haptics`` section -- the
+profiler runs without one declared, but the haptic output is then absent from the
 measurement).
 
 Installation
@@ -215,10 +215,10 @@ def _build_prop(scene_name: str, config: DeviceConfig) -> tuple[SceneManager, Ef
     engine_bytes = free_after_registries - free_after_engine
     load_bytes = free_after_engine - free_after_load
     first_tick_bytes = free_after_load - free_after_tick
-    motor_present = any(isinstance(output, Drv2605EffectOutput) for output in hw.outputs)
+    haptic_present = any(isinstance(output, Drv2605EffectOutput) for output in hw.outputs)
 
     print(
-        f"__SCENE_STAGES scene={scene_name}, motor_present={motor_present}, "
+        f"__SCENE_STAGES scene={scene_name}, haptic_present={haptic_present}, "
         + f"hardware={hardware_bytes}, registries={registries_bytes}, "
         + f"engine={engine_bytes}, load={load_bytes}, first_tick={first_tick_bytes}, "
         + f"free_after_tick={free_after_tick}"

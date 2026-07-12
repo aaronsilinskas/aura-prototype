@@ -21,8 +21,8 @@ Full game and hardware design lives in `~/dev/aura/aura-docs/` (an Obsidian vaul
 
 ```
 effects/          Animation engine (CircuitPython-safe)
-  effect.py       EffectConfig, PixelBuffer, Effect, EffectPixels, EffectAudio, EffectVibration,
-                  AudioPlaybackConfig, VibrationConfig
+  effect.py       EffectConfig, PixelBuffer, Effect, EffectPixels, EffectAudio, EffectHaptic,
+                  AudioPlaybackConfig, HapticPattern
   palette.py      Palette, PaletteLUT256 (pre-computed, immutable)
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int

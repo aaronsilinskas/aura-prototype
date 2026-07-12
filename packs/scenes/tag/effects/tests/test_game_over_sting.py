@@ -52,15 +52,15 @@ def test_game_over_sting_audio_start_clip_stops_effect() -> None:
     assert effect.audio.clips["start"].stops_effect is True
 
 
-def test_game_over_sting_emits_vibration_on_start() -> None:
+def test_game_over_sting_emits_haptic_on_start() -> None:
     effect = _build()
 
-    assert "start" in effect.vibration.patterns
+    assert "start" in effect.haptic.patterns
 
 
-def test_game_over_sting_vibration_start_uses_strong_buzz() -> None:
-    from effects.effect import VibrationConfig
+def test_game_over_sting_haptic_start_uses_strong_buzz() -> None:
+    from effects.effect import HapticPattern
 
     effect = _build()
 
-    assert VibrationConfig.STRONG_BUZZ in effect.vibration.patterns["start"].sequence
+    assert HapticPattern.STRONG_BUZZ in effect.haptic.patterns["start"].sequence

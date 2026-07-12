@@ -339,7 +339,7 @@ def test_build_hardware_declared_accelerometer_raises_when_lis3dh_uninstalled() 
 
 
 # ---------------------------------------------------------------------------
-# Haptics-motor branch: adafruit_drv2605 stays uninstalled with no haptics
+# Haptics-driver branch: adafruit_drv2605 stays uninstalled with no haptics
 # section (issue #691's config-gating); Drv2605EffectOutput's import must
 # move too, otherwise build_hardware would require the library just to run
 # regardless.

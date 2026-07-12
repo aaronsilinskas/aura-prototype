@@ -118,7 +118,7 @@ class TestMetricsHarnessLabel:
 
         label = metrics_harness_label(config)
 
-        assert label == "matrix(117px)+audio(v4)+motor+accel+ir(rx1)"
+        assert label == "matrix(117px)+audio(v4)+haptic+accel+ir(rx1)"
 
     def test_disabling_audio_swaps_in_no_audio_leaving_other_parts_unchanged(self):
         config = parse_device_config(
@@ -144,7 +144,7 @@ class TestMetricsHarnessLabel:
 
         label = metrics_harness_label(config)
 
-        assert label == "matrix(117px)+no-audio+motor+no-accel+ir(rx1)"
+        assert label == "matrix(117px)+no-audio+haptic+no-accel+ir(rx1)"
 
     def test_matrix_pixel_count_is_cols_times_rows_covered_by_scope_rows(self):
         # A narrower 8x4 matrix using only two of the six scopes: 8 x 4 = 32.
@@ -263,19 +263,19 @@ class TestMetricsHarnessLabel:
 
         assert label.endswith("+no-ir")
 
-    def test_declared_haptics_section_reports_motor(self):
+    def test_declared_haptics_section_reports_haptic(self):
         config = parse_device_config({"haptics": {}})
 
         label = metrics_harness_label(config)
 
-        assert "+motor+" in label
+        assert "+haptic+" in label
 
-    def test_absent_haptics_section_reports_no_motor(self):
+    def test_absent_haptics_section_reports_no_haptic(self):
         config = parse_device_config({})
 
         label = metrics_harness_label(config)
 
-        assert "+no-motor+" in label
+        assert "+no-haptic+" in label
 
     def test_declared_accelerometer_section_reports_accel(self):
         config = parse_device_config({"accelerometer": {}})

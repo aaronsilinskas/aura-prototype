@@ -1,11 +1,11 @@
-"""Tests for Drv2605EffectOutput — VibrationConfig-based haptic sequence playback."""
+"""Tests for Drv2605EffectOutput — HapticPattern-based haptic sequence playback."""
 
 from __future__ import annotations
 
 import adafruit_drv2605  # type: ignore[import]
 import pytest
 
-from effects.effect import Effect, EffectVibration, VibrationConfig
+from effects.effect import Effect, EffectHaptic, HapticPattern
 from engine.events import EffectEvent
 from engine.state import EffectReceipt, Scope
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
@@ -17,7 +17,7 @@ from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 _SEQ_LEN = 8
 
 
-class StubMotor:
+class StubDriver:
     """Minimal adafruit_drv2605.DRV2605 stand-in."""
 
     def __init__(self) -> None:
@@ -37,16 +37,16 @@ def _make_receipt() -> EffectReceipt:
     return r
 
 
-def _make_output() -> tuple[Drv2605EffectOutput, StubMotor]:
-    motor = StubMotor()
-    output = Drv2605EffectOutput(motor=motor)
-    return output, motor
+def _make_output() -> tuple[Drv2605EffectOutput, StubDriver]:
+    driver = StubDriver()
+    output = Drv2605EffectOutput(driver=driver)
+    return output, driver
 
 
 def _effect_with_sequence(verb: str, sequence: list[int]) -> Effect:
     return Effect(
         name="test",
-        vibration=EffectVibration(patterns={verb: VibrationConfig(sequence=sequence)}),
+        haptic=EffectHaptic(patterns={verb: HapticPattern(sequence=sequence)}),
     )
 
 
@@ -70,16 +70,16 @@ def test_construction_sets_scopes_to_all() -> None:
 
 
 # ---------------------------------------------------------------------------
-# handle_event — correct sequence written and motor plays
+# handle_event — correct sequence written and driver plays
 # ---------------------------------------------------------------------------
 
 
-def test_known_verb_writes_effect_to_motor_sequence() -> None:
-    """A known event verb writes the correct Effect objects into motor.sequence."""
-    output, motor = _make_output()
+def test_known_verb_writes_effect_to_driver_sequence() -> None:
+    """A known event verb writes the correct Effect objects into driver.sequence."""
+    output, driver = _make_output()
     effect = _effect_with_sequence(
         "strike",
-        [VibrationConfig.STRONG_CLICK, VibrationConfig.SHARP_CLICK, VibrationConfig.SOFT_BUMP],
+        [HapticPattern.STRONG_CLICK, HapticPattern.SHARP_CLICK, HapticPattern.SOFT_BUMP],
     )
     receipt = _make_receipt()
 
@@ -87,51 +87,49 @@ def test_known_verb_writes_effect_to_motor_sequence() -> None:
         EffectEvent("rlgl", "haptic", "strike"), frozenset({"all"}), effect, receipt
     )
 
-    assert motor.sequence[0] == adafruit_drv2605.Effect(1)
-    assert motor.sequence[1] == adafruit_drv2605.Effect(4)
-    assert motor.sequence[2] == adafruit_drv2605.Effect(7)
+    assert driver.sequence[0] == adafruit_drv2605.Effect(1)
+    assert driver.sequence[1] == adafruit_drv2605.Effect(4)
+    assert driver.sequence[2] == adafruit_drv2605.Effect(7)
 
 
 def test_pause_constant_writes_pause_object_to_correct_slot() -> None:
-    """PAUSE_250 constant is translated to Pause(0.25) in motor.sequence."""
-    output, motor = _make_output()
-    effect = _effect_with_sequence("strike", [VibrationConfig.PAUSE_250])
+    """PAUSE_250 constant is translated to Pause(0.25) in driver.sequence."""
+    output, driver = _make_output()
+    effect = _effect_with_sequence("strike", [HapticPattern.PAUSE_250])
     receipt = _make_receipt()
 
     output.handle_event(
         EffectEvent("rlgl", "haptic", "strike"), frozenset({"all"}), effect, receipt
     )
 
-    assert motor.sequence[0] == adafruit_drv2605.Pause(0.25)
+    assert driver.sequence[0] == adafruit_drv2605.Pause(0.25)
 
 
 def test_all_pause_constants_write_correct_durations() -> None:
     """PAUSE_500 and PAUSE_1000 map to Pause(0.5) and Pause(1.0) respectively."""
-    output, motor = _make_output()
-    effect = _effect_with_sequence(
-        "strike", [VibrationConfig.PAUSE_500, VibrationConfig.PAUSE_1000]
-    )
+    output, driver = _make_output()
+    effect = _effect_with_sequence("strike", [HapticPattern.PAUSE_500, HapticPattern.PAUSE_1000])
     receipt = _make_receipt()
 
     output.handle_event(
         EffectEvent("rlgl", "haptic", "strike"), frozenset({"all"}), effect, receipt
     )
 
-    assert motor.sequence[0] == adafruit_drv2605.Pause(0.5)
-    assert motor.sequence[1] == adafruit_drv2605.Pause(1.0)
+    assert driver.sequence[0] == adafruit_drv2605.Pause(0.5)
+    assert driver.sequence[1] == adafruit_drv2605.Pause(1.0)
 
 
-def test_known_verb_calls_motor_play() -> None:
-    """A known event verb causes motor.play() to be called."""
-    output, motor = _make_output()
-    effect = _effect_with_sequence("strike", [VibrationConfig.STRONG_CLICK])
+def test_known_verb_calls_driver_play() -> None:
+    """A known event verb causes driver.play() to be called."""
+    output, driver = _make_output()
+    effect = _effect_with_sequence("strike", [HapticPattern.STRONG_CLICK])
     receipt = _make_receipt()
 
     output.handle_event(
         EffectEvent("rlgl", "haptic", "strike"), frozenset({"all"}), effect, receipt
     )
 
-    assert motor.play_calls == 1
+    assert driver.play_calls == 1
 
 
 # ---------------------------------------------------------------------------
@@ -141,8 +139,8 @@ def test_known_verb_calls_motor_play() -> None:
 
 def test_shorter_sequence_clears_remaining_slots_to_effect_zero() -> None:
     """A sequence shorter than 8 clears all remaining slots with Effect(0)."""
-    output, motor = _make_output()
-    effect = _effect_with_sequence("strike", [VibrationConfig.STRONG_CLICK])
+    output, driver = _make_output()
+    effect = _effect_with_sequence("strike", [HapticPattern.STRONG_CLICK])
     receipt = _make_receipt()
 
     output.handle_event(
@@ -150,21 +148,21 @@ def test_shorter_sequence_clears_remaining_slots_to_effect_zero() -> None:
     )
 
     for i in range(1, _SEQ_LEN):
-        assert motor.sequence[i] == adafruit_drv2605.Effect(0)
+        assert driver.sequence[i] == adafruit_drv2605.Effect(0)
 
 
 def test_second_event_with_shorter_sequence_clears_stale_slots() -> None:
     """A shorter follow-up sequence overwrites stale slots from a longer previous sequence."""
-    output, motor = _make_output()
+    output, driver = _make_output()
     long_effect = _effect_with_sequence(
         "strike",
         [
-            VibrationConfig.STRONG_CLICK,
-            VibrationConfig.SHARP_CLICK,
-            VibrationConfig.SOFT_BUMP,
+            HapticPattern.STRONG_CLICK,
+            HapticPattern.SHARP_CLICK,
+            HapticPattern.SOFT_BUMP,
         ],
     )
-    short_effect = _effect_with_sequence("strike", [VibrationConfig.STRONG_BUZZ])
+    short_effect = _effect_with_sequence("strike", [HapticPattern.STRONG_BUZZ])
 
     output.handle_event(
         EffectEvent("rlgl", "haptic", "strike"), frozenset({"all"}), long_effect, _make_receipt()
@@ -173,9 +171,9 @@ def test_second_event_with_shorter_sequence_clears_stale_slots() -> None:
         EffectEvent("rlgl", "haptic", "strike"), frozenset({"all"}), short_effect, _make_receipt()
     )
 
-    assert motor.sequence[0] == adafruit_drv2605.Effect(14)
+    assert driver.sequence[0] == adafruit_drv2605.Effect(14)
     for i in range(1, _SEQ_LEN):
-        assert motor.sequence[i] == adafruit_drv2605.Effect(0)
+        assert driver.sequence[i] == adafruit_drv2605.Effect(0)
 
 
 # ---------------------------------------------------------------------------
@@ -184,9 +182,9 @@ def test_second_event_with_shorter_sequence_clears_stale_slots() -> None:
 
 
 def test_second_event_calls_play_again_without_stop() -> None:
-    """A second event writes a new sequence and calls motor.play() again without stop()."""
-    output, motor = _make_output()
-    effect = _effect_with_sequence("strike", [VibrationConfig.STRONG_CLICK])
+    """A second event writes a new sequence and calls driver.play() again without stop()."""
+    output, driver = _make_output()
+    effect = _effect_with_sequence("strike", [HapticPattern.STRONG_CLICK])
     receipt1 = _make_receipt()
     receipt2 = _make_receipt()
 
@@ -197,8 +195,8 @@ def test_second_event_calls_play_again_without_stop() -> None:
         EffectEvent("rlgl", "haptic", "strike"), frozenset({"all"}), effect, receipt2
     )
 
-    assert motor.play_calls == 2
-    assert motor.stop_calls == 0
+    assert driver.play_calls == 2
+    assert driver.stop_calls == 0
 
 
 # ---------------------------------------------------------------------------
@@ -206,9 +204,9 @@ def test_second_event_calls_play_again_without_stop() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_handle_event_ignores_effect_with_no_vibration() -> None:
-    """effect.vibration is None → motor is not touched."""
-    output, motor = _make_output()
+def test_handle_event_ignores_effect_with_no_haptic() -> None:
+    """effect.haptic is None → driver is not touched."""
+    output, driver = _make_output()
     effect = Effect(name="silent")
     receipt = _make_receipt()
 
@@ -216,18 +214,18 @@ def test_handle_event_ignores_effect_with_no_vibration() -> None:
         EffectEvent("rlgl", "silent", "strike"), frozenset({"all"}), effect, receipt
     )
 
-    assert motor.play_calls == 0
+    assert driver.play_calls == 0
 
 
 def test_handle_event_ignores_unknown_verb() -> None:
-    """Verb not in vibration.patterns → motor is not touched."""
-    output, motor = _make_output()
-    effect = _effect_with_sequence("strike", [VibrationConfig.STRONG_CLICK])
+    """Verb not in haptic.patterns → driver is not touched."""
+    output, driver = _make_output()
+    effect = _effect_with_sequence("strike", [HapticPattern.STRONG_CLICK])
     receipt = _make_receipt()
 
     output.handle_event(EffectEvent("rlgl", "haptic", "stop"), frozenset({"all"}), effect, receipt)
 
-    assert motor.play_calls == 0
+    assert driver.play_calls == 0
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +238,7 @@ def test_sequence_longer_than_8_raises() -> None:
     output, _ = _make_output()
     effect = _effect_with_sequence(
         "strike",
-        [VibrationConfig.STRONG_CLICK] * 9,
+        [HapticPattern.STRONG_CLICK] * 9,
     )
     receipt = _make_receipt()
 
@@ -267,10 +265,10 @@ def test_unknown_constant_in_sequence_raises() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_flush_calls_motor_stop_when_active_receipt_is_externally_stopped() -> None:
-    """flush() calls motor.stop() when the active receipt is externally stopped."""
-    output, motor = _make_output()
-    effect = _effect_with_sequence("strike", [VibrationConfig.STRONG_CLICK])
+def test_flush_calls_driver_stop_when_active_receipt_is_externally_stopped() -> None:
+    """flush() calls driver.stop() when the active receipt is externally stopped."""
+    output, driver = _make_output()
+    effect = _effect_with_sequence("strike", [HapticPattern.STRONG_CLICK])
     receipt = _make_receipt()
 
     output.handle_event(
@@ -279,13 +277,13 @@ def test_flush_calls_motor_stop_when_active_receipt_is_externally_stopped() -> N
     receipt.stop()
     output.flush()
 
-    assert motor.stop_calls == 1
+    assert driver.stop_calls == 1
 
 
-def test_flush_clears_receipt_after_stopping_motor() -> None:
+def test_flush_clears_receipt_after_stopping_driver() -> None:
     """flush() clears the active receipt so a subsequent flush() does not call stop() again."""
-    output, motor = _make_output()
-    effect = _effect_with_sequence("strike", [VibrationConfig.STRONG_CLICK])
+    output, driver = _make_output()
+    effect = _effect_with_sequence("strike", [HapticPattern.STRONG_CLICK])
     receipt = _make_receipt()
 
     output.handle_event(
@@ -295,22 +293,22 @@ def test_flush_clears_receipt_after_stopping_motor() -> None:
     output.flush()
     output.flush()
 
-    assert motor.stop_calls == 1
+    assert driver.stop_calls == 1
 
 
 def test_flush_does_nothing_when_no_active_receipt() -> None:
     """flush() is a no-op when no effect is playing."""
-    output, motor = _make_output()
+    output, driver = _make_output()
 
     output.flush()
 
-    assert motor.stop_calls == 0
+    assert driver.stop_calls == 0
 
 
 def test_flush_does_nothing_when_receipt_is_still_active() -> None:
-    """flush() leaves the motor running when the receipt is not stopped."""
-    output, motor = _make_output()
-    effect = _effect_with_sequence("strike", [VibrationConfig.STRONG_CLICK])
+    """flush() leaves the driver running when the receipt is not stopped."""
+    output, driver = _make_output()
+    effect = _effect_with_sequence("strike", [HapticPattern.STRONG_CLICK])
     receipt = _make_receipt()
 
     output.handle_event(
@@ -318,4 +316,4 @@ def test_flush_does_nothing_when_receipt_is_still_active() -> None:
     )
     output.flush()
 
-    assert motor.stop_calls == 0
+    assert driver.stop_calls == 0

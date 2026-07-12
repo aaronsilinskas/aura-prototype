@@ -41,7 +41,7 @@ See [`docs/domain.md`](docs/domain.md) for key types and constraints, and [`docs
    EffectManager          routes effects to EffectOutput by scope
         │
         ▼
-   EffectOutput           hardware: RGB strip, audio, vibration
+   EffectOutput           hardware: RGB strip, audio, haptic
 ```
 
 Rules are stateless — all mutable game data lives in `GameState.data`. Rules

@@ -2,8 +2,8 @@
 
 No pixel output (``Effect.pixels = None``) — issued with ``add_effect`` so it
 layers over the freshly-issued HP/ammo bars without a pixel conflict.
-One-shot with ``stops_effect=True`` so the effect (and its vibration) ends
-when the clip finishes — a vibration-only one-shot has nothing of its own to
+One-shot with ``stops_effect=True`` so the effect (and its haptic) ends
+when the clip finishes — a haptic-only one-shot has nothing of its own to
 terminate it, so the audio clip's natural end is what tears it down.
 """
 
@@ -14,8 +14,8 @@ from effects.effect import (
     Effect,
     EffectAudio,
     EffectConfig,
-    EffectVibration,
-    VibrationConfig,
+    EffectHaptic,
+    HapticPattern,
 )
 from engine.effects.manager import EffectBuilder
 
@@ -23,7 +23,7 @@ _GO_AUDIO = EffectAudio(
     clips={"start": AudioPlaybackConfig(name="go_start", loop=False, stops_effect=True)}
 )
 
-_GO_VIBRATION = EffectVibration(patterns={"start": VibrationConfig([VibrationConfig.STRONG_BUZZ])})
+_GO_HAPTIC = EffectHaptic(patterns={"start": HapticPattern([HapticPattern.STRONG_BUZZ])})
 
 
 class _Builder(EffectBuilder):
@@ -32,7 +32,7 @@ class _Builder(EffectBuilder):
             name=name,
             pixels=None,
             audio=_GO_AUDIO,
-            vibration=_GO_VIBRATION,
+            haptic=_GO_HAPTIC,
         )
 
 

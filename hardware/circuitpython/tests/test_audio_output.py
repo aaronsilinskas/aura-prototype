@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectPixels, EffectVibration
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectHaptic, EffectPixels
 from engine.audio import AudioRegistry
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
@@ -85,7 +85,7 @@ def _effect_loop(verb: str, clip_name: str) -> Effect:
 
 
 def _effect_audio_only(verb: str, clip_name: str) -> Effect:
-    """One-shot effect with audio only (no pixels, no vibration)."""
+    """One-shot effect with audio only (no pixels, no haptic)."""
     return Effect(
         name="audio_only",
         audio=EffectAudio(clips={verb: AudioPlaybackConfig(name=clip_name, loop=False)}),
@@ -103,12 +103,12 @@ def _effect_oneshot_stops_effect(verb: str, clip_name: str) -> Effect:
     )
 
 
-def _effect_oneshot_with_vibration_stops_effect(verb: str, clip_name: str) -> Effect:
-    """One-shot effect with pixels, vibration, and stops_effect=True."""
+def _effect_oneshot_with_haptic_stops_effect(verb: str, clip_name: str) -> Effect:
+    """One-shot effect with pixels, haptic, and stops_effect=True."""
     return Effect(
         name="test",
         pixels=MagicMock(spec=EffectPixels),
-        vibration=MagicMock(spec=EffectVibration),
+        haptic=MagicMock(spec=EffectHaptic),
         audio=EffectAudio(
             clips={verb: AudioPlaybackConfig(name=clip_name, loop=False, stops_effect=True)}
         ),
@@ -287,7 +287,7 @@ def test_valid_clip_plays_on_an_idle_voice(tmp_path) -> None:
 
 
 def test_audio_only_effect_implicitly_stops_receipt_on_finish(tmp_path) -> None:
-    """An effect with no pixels/vibration implicitly sets stops_receipt=True: its
+    """An effect with no pixels/haptic implicitly sets stops_receipt=True: its
 
     receipt is stopped when the clip finishes naturally (audio is the whole effect)."""
     registry = AudioRegistry()
@@ -375,8 +375,8 @@ def test_clip_with_pixels_and_stops_effect_stops_receipt_on_eviction(tmp_path) -
     evicted_receipt.stop.assert_called_once()
 
 
-def test_clip_with_pixels_vibration_and_stops_effect_stops_receipt_on_finish(tmp_path) -> None:
-    """A pixels+vibration effect with stops_effect=True stops its receipt on natural finish."""
+def test_clip_with_pixels_haptic_and_stops_effect_stops_receipt_on_finish(tmp_path) -> None:
+    """A pixels+haptic effect with stops_effect=True stops its receipt on natural finish."""
     registry = AudioRegistry()
     _register_wav(tmp_path, registry, "sting")
     output, mixer = _make_output(registry)
@@ -385,7 +385,7 @@ def test_clip_with_pixels_vibration_and_stops_effect_stops_receipt_on_finish(tmp
     output.handle_event(
         EffectEvent("rlgl", "sting", "start"),
         frozenset({"personal"}),
-        _effect_oneshot_with_vibration_stops_effect("start", "sting"),
+        _effect_oneshot_with_haptic_stops_effect("start", "sting"),
         receipt,
     )
 

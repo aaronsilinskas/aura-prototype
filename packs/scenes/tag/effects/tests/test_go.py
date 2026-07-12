@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from effects.effect import EffectConfig, VibrationConfig
+from effects.effect import EffectConfig, HapticPattern
 from packs.scenes.tag.effects.go import BUILD
 
 
@@ -37,5 +37,5 @@ def test_go_clip_stops_the_effect() -> None:
 def test_go_buzzes_strongly_on_start() -> None:
     effect = _build()
 
-    assert effect.vibration is not None
-    assert effect.vibration.patterns["start"].sequence == [VibrationConfig.STRONG_BUZZ]
+    assert effect.haptic is not None
+    assert effect.haptic.patterns["start"].sequence == [HapticPattern.STRONG_BUZZ]

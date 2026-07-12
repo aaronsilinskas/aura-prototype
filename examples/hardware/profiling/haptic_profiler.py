@@ -1,16 +1,16 @@
-"""CircuitPython vibration profiler -- drives `Drv2605EffectOutput.handle_event` over
+"""CircuitPython haptic profiler -- drives `Drv2605EffectOutput.handle_event` over
 real I2C against a DRV2605L to find the per-event cost for the
-`vibration_component_costs` table in `docs/hardware/recorded-metrics.md` (see also
+`haptic_component_costs` table in `docs/hardware/recorded-metrics.md` (see also
 `docs/hardware/calibration-guide.md`).
 
 `Drv2605EffectOutput` is registered on `Scope.ALL` -- there is exactly one shared
-vibration component per prop (one DRV2605L haptic motor), so this profiler drives it
+haptic component per prop (one DRV2605L haptic driver), so this profiler drives it
 directly.
 
 Each iteration:
 
-1. Calls `handle_event` with a short vibration pattern -- this writes the sequence to
-   the DRV2605L over I2C and calls `motor.play()`.
+1. Calls `handle_event` with a short haptic pattern -- this writes the sequence to
+   the DRV2605L over I2C and calls `driver.play()`.
 2. Calls `flush()` -- a no-op unless the receipt was externally stopped.
 3. Sleeps for `EVENT_INTERVAL_SECONDS` between events, at a low event rate -- the I2C
    bus share is negligible but still counted.
@@ -20,14 +20,14 @@ alongside the uniform stats line.
 
 Hardware bring-up
 -----------------
-The motor is brought up through a single `build_hardware` call from the **real**,
+The driver is brought up through a single `build_hardware` call from the **real**,
 deployed `aura-device.json` (`load_device_config()`) -- the config-driven model #686
 established for the scene-load profiler -- rather than an in-file, hand-built minimal
 `DeviceConfig`. This profiler drives the DRV2605L and nothing else, so every declared
 `pixels` entry plus `audio`/`ir`/`accelerometer` (if present) is set `enabled = False` on
 the parsed config; `haptics` is force-enabled the same way. A config declaring no
 `haptics` section at all fails loudly here -- there is no minimal stand-in section to
-fall back on, since the real motor is what this profiler measures (the #691 stop-gap
+fall back on, since the real driver is what this profiler measures (the #691 stop-gap
 `haptics={}` in-file section is gone). If the DRV2605L isn't wired/reachable,
 `build_hardware` itself raises (a declared-but-unreachable component is a hard error, not
 a silent omission), so bring-up still fails loud rather than reporting a zero-cost
@@ -35,12 +35,12 @@ measurement.
 
 The board's default I2C bus is wrapped in `CountingI2C` and injected into
 `build_hardware` (the `i2c=` seam), so every peripheral shares the counted bus. The
-decorator is reset before a representative vibration event and `bytes_written` after that
+decorator is reset before a representative haptic event and `bytes_written` after that
 event gives the measured `i2c_transaction_bytes` -- no guessing required.
 
 Hardware
 --------
-- DRV2605L haptic motor driver on the board's default I2C bus (SDA/SCL), wired per the
+- DRV2605L haptic driver on the board's default I2C bus (SDA/SCL), wired per the
   real, deployed `aura-device.json`'s `haptics` section.
 
 Installation
@@ -49,14 +49,14 @@ Installation
    https://learn.adafruit.com/welcome-to-circuitpython/installing-circuitpython
 
 2. Run the deploy script to copy all source files and set code.py:
-     python scripts/deploy.py examples/hardware/profiling/vibration_profiler.py
+     python scripts/deploy.py examples/hardware/profiling/haptic_profiler.py
    The board reboots and starts running automatically.
 
 Configuration
 -------------
 - EVENT_INTERVAL_SECONDS: delay between events -- sets the event rate
   (e.g. 10.0s -> 6 calls/minute)
-- ITERATIONS: number of vibration events to drive before exiting
+- ITERATIONS: number of haptic events to drive before exiting
 - TARGET_FPS: informational only -- included in the header for comparison against
   other profilers
 - LOG_INTERVAL_SECONDS: how often the stats line is printed
@@ -68,7 +68,7 @@ import time
 
 import board
 
-from effects.effect import Effect, EffectVibration, VibrationConfig
+from effects.effect import Effect, EffectHaptic, HapticPattern
 from effects.performance import PerformanceTracker
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
@@ -101,7 +101,7 @@ _EVENT_VERB: Final = "buzz"
 def _require_drv2605_output(hardware: DeviceHardware) -> Drv2605EffectOutput:
     """Return the bundle's `Drv2605EffectOutput`, raising loudly if none is present.
 
-    `build_hardware` itself raises if a declared `haptics` section's motor can't be
+    `build_hardware` itself raises if a declared `haptics` section's driver can't be
     constructed, so this only guards against a caller mistake -- e.g. `run()`'s config
     ending up without a `haptics` section -- rather than a normal "not present" case.
     """
@@ -117,19 +117,19 @@ def _isolate_haptics_config(config: DeviceConfig) -> None:
     This profiler drives the DRV2605L and nothing else, so everything but `haptics`
     is muted via `mute_other_components` -- the non-destructive isolation knob
     alongside dropping a section from aura-device.json outright. `haptics` itself is
-    force-enabled: it is the real motor section this profiler exists to exercise, so
+    force-enabled: it is the real driver section this profiler exists to exercise, so
     a config that merely declared it disabled would otherwise silently defeat the
     measurement.
 
     Raises:
         ValueError: If *config* declares no `haptics` section at all -- there is no
             minimal stand-in section to fall back on (the #691 `haptics={}` stop-gap
-            is gone); the real prop must declare its motor.
+            is gone); the real prop must declare its haptics driver.
     """
     if config.haptics is None:
         raise ValueError(
-            "haptics not declared in aura-device.json -- the vibration profiler measures"
-            + " the real motor, not a synthesized stand-in"
+            "haptics not declared in aura-device.json -- the haptic profiler measures"
+            + " the real driver, not a synthesized stand-in"
         )
     config.haptics.enabled = True
     mute_other_components(config, keep="haptics")
@@ -148,7 +148,7 @@ def run() -> None:
 
     buzz_effect = Effect(
         "profiler.buzz",
-        vibration=EffectVibration({_EVENT_VERB: VibrationConfig([VibrationConfig.STRONG_CLICK])}),
+        haptic=EffectHaptic({_EVENT_VERB: HapticPattern([HapticPattern.STRONG_CLICK])}),
     )
     buzz_event = EffectEvent("profiler", "buzz", _EVENT_VERB)
 
@@ -156,7 +156,7 @@ def run() -> None:
     max_calls_per_minute = 60.0 / EVENT_INTERVAL_SECONDS
 
     print_profile_header(
-        component="vibration",
+        component="haptic",
         sweep_axes=["max_calls_per_minute"],
         sweep_values=[max_calls_per_minute],
         target_fps=TARGET_FPS,
@@ -187,7 +187,7 @@ def run() -> None:
     cost_ms = perf.update_time_total / perf.frame_count * 1000.0
     i2c_bandwidth = i2c_transaction_bytes * (max_calls_per_minute / 60.0)
     print_table_row(
-        "vibration_component_costs",
+        "haptic_component_costs",
         [f"{cost_ms:.4f}", f"{i2c_bandwidth:.2f}"],
     )
 

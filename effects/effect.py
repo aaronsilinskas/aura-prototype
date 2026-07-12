@@ -44,7 +44,7 @@ class AudioPlaybackConfig:
       - ``stops_effect``: ``False`` (default) → receipt lifecycle stays with rules;
         ``True`` → when this one-shot is released (natural finish or eviction) the
         owning ``EffectReceipt`` is stopped, ending the whole effect (pixels and
-        vibration included).  Combining ``stops_effect=True`` with ``loop=True`` is
+        haptic included).  Combining ``stops_effect=True`` with ``loop=True`` is
         a contradiction (a loop never finishes) and raises ``ValueError``.
     """
 
@@ -73,8 +73,8 @@ class EffectAudio:
         self.clips = clips
 
 
-class VibrationConfig:
-    """Declares a vibration playback sequence as an ordered list of steps.
+class HapticPattern:
+    """Declares a haptic playback sequence as an ordered list of steps.
 
     Each step is one of the named class-level constants (effect or pause).
     Constants are deliberately offset from DRV2605L hardware waveform IDs
@@ -109,16 +109,16 @@ class VibrationConfig:
         self.sequence = sequence
 
 
-class EffectVibration:
-    """Capability object declaring the vibration behaviour of an effect.
+class EffectHaptic:
+    """Capability object declaring the haptic behaviour of an effect.
 
-    ``patterns`` maps event verbs to ``VibrationConfig`` instances.
-    Set on ``Effect.vibration``; if ``None``, the effect produces no vibration.
+    ``patterns`` maps event verbs to ``HapticPattern`` instances.
+    Set on ``Effect.haptic``; if ``None``, the effect produces no haptic output.
     """
 
     __slots__ = ["patterns"]
 
-    def __init__(self, patterns: dict[str, VibrationConfig]) -> None:
+    def __init__(self, patterns: dict[str, HapticPattern]) -> None:
         self.patterns = patterns
 
 
@@ -209,24 +209,24 @@ class PixelBuffer:
 class Effect:
     """A descriptor declaring what capabilities an effect has.
 
-    Constructor: ``Effect(name, pixels=None, audio=None, vibration=None)``.
+    Constructor: ``Effect(name, pixels=None, audio=None, haptic=None)``.
     ``EffectManager`` inspects each capability field each tick:
       - ``pixels is None`` → no pixel buffer allocated, no render pass.
-      - ``audio``/``vibration`` are passed to outputs via ``handle_event``.
+      - ``audio``/``haptic`` are passed to outputs via ``handle_event``.
     Builders return plain ``Effect`` instances — subclassing is only appropriate
     when there is genuine logic to add.
     """
 
-    __slots__ = ["audio", "name", "pixels", "vibration"]
+    __slots__ = ["audio", "haptic", "name", "pixels"]
 
     def __init__(
         self,
         name: str,
         pixels: EffectPixels | None = None,
         audio: EffectAudio | None = None,
-        vibration: EffectVibration | None = None,
+        haptic: EffectHaptic | None = None,
     ) -> None:
         self.name = name
         self.pixels = pixels
         self.audio = audio
-        self.vibration = vibration
+        self.haptic = haptic

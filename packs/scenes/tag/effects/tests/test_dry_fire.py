@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from effects.effect import EffectConfig, VibrationConfig
+from effects.effect import EffectConfig, HapticPattern
 from packs.scenes.tag.effects.dry_fire import BUILD
 
 
@@ -34,8 +34,8 @@ def test_dry_fire_clip_stops_the_effect() -> None:
     assert effect.audio.clips["start"].stops_effect is True
 
 
-def test_dry_fire_emits_a_soft_vibration_bump() -> None:
+def test_dry_fire_emits_a_soft_haptic_bump() -> None:
     effect = _build()
 
-    assert effect.vibration is not None
-    assert effect.vibration.patterns["start"].sequence == [VibrationConfig.SOFT_BUMP]
+    assert effect.haptic is not None
+    assert effect.haptic.patterns["start"].sequence == [HapticPattern.SOFT_BUMP]

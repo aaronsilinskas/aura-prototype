@@ -1,8 +1,8 @@
-"""Tag scene "reload_complete" effect — audio + vibration sting for a finished reload.
+"""Tag scene "reload_complete" effect — audio + haptic sting for a finished reload.
 
 No pixel output (``Effect.pixels = None``) — issued with ``add_effect`` so it
 layers over the restored ``GLOBAL.BUFF`` ammo bar without a pixel conflict.
-One-shot with ``stops_effect=True`` so the effect (and its vibration) ends
+One-shot with ``stops_effect=True`` so the effect (and its haptic) ends
 when the clip finishes.
 """
 
@@ -13,8 +13,8 @@ from effects.effect import (
     Effect,
     EffectAudio,
     EffectConfig,
-    EffectVibration,
-    VibrationConfig,
+    EffectHaptic,
+    HapticPattern,
 )
 from engine.effects.manager import EffectBuilder
 
@@ -24,8 +24,8 @@ _RELOAD_COMPLETE_AUDIO = EffectAudio(
     }
 )
 
-_RELOAD_COMPLETE_VIBRATION = EffectVibration(
-    patterns={"start": VibrationConfig([VibrationConfig.DOUBLE_CLICK])}
+_RELOAD_COMPLETE_HAPTIC = EffectHaptic(
+    patterns={"start": HapticPattern([HapticPattern.DOUBLE_CLICK])}
 )
 
 
@@ -35,7 +35,7 @@ class _Builder(EffectBuilder):
             name=name,
             pixels=None,
             audio=_RELOAD_COMPLETE_AUDIO,
-            vibration=_RELOAD_COMPLETE_VIBRATION,
+            haptic=_RELOAD_COMPLETE_HAPTIC,
         )
 
 

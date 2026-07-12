@@ -3,16 +3,16 @@ from effects.effect import (
     Effect,
     EffectAudio,
     EffectConfig,
-    EffectVibration,
-    VibrationConfig,
+    EffectHaptic,
+    HapticPattern,
 )
 from engine.effects.manager import EffectBuilder
 
-_WIN_STING_VIBRATION = EffectVibration(
+_WIN_STING_HAPTIC = EffectHaptic(
     patterns={
-        "start": VibrationConfig(
+        "start": HapticPattern(
             [
-                VibrationConfig.TRIPLE_CLICK,
+                HapticPattern.TRIPLE_CLICK,
             ]
         )
     }
@@ -30,7 +30,7 @@ class _Builder(EffectBuilder):
                     )
                 }
             ),
-            vibration=_WIN_STING_VIBRATION,
+            haptic=_WIN_STING_HAPTIC,
         )
 
 
