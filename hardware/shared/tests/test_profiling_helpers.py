@@ -85,7 +85,7 @@ class TestPrintTableRow:
 
 
 class TestMetricsHarnessLabel:
-    def test_full_harness_joins_all_four_parts_with_plus(self):
+    def test_full_harness_joins_all_five_parts_with_plus(self):
         # The sample IS31FL3741 matrix: 13 cols x 9 scoped rows = 117px.
         config = parse_device_config(
             {
@@ -110,13 +110,15 @@ class TestMetricsHarnessLabel:
                     "i2s_word_select": "GP11",
                     "i2s_data": "GP12",
                 },
+                "haptics": {},
+                "accelerometer": {},
                 "ir": {"rx": "D11"},
             }
         )
 
-        label = metrics_harness_label(config, motor_present=True)
+        label = metrics_harness_label(config)
 
-        assert label == "matrix(117px)+audio(v4)+motor+ir(rx1)"
+        assert label == "matrix(117px)+audio(v4)+motor+accel+ir(rx1)"
 
     def test_disabling_audio_swaps_in_no_audio_leaving_other_parts_unchanged(self):
         config = parse_device_config(
@@ -135,13 +137,14 @@ class TestMetricsHarnessLabel:
                         },
                     }
                 ],
+                "haptics": {},
                 "ir": {"rx": "D11"},
             }
         )
 
-        label = metrics_harness_label(config, motor_present=True)
+        label = metrics_harness_label(config)
 
-        assert label == "matrix(117px)+no-audio+motor+ir(rx1)"
+        assert label == "matrix(117px)+no-audio+motor+no-accel+ir(rx1)"
 
     def test_matrix_pixel_count_is_cols_times_rows_covered_by_scope_rows(self):
         # A narrower 8x4 matrix using only two of the six scopes: 8 x 4 = 32.
@@ -160,7 +163,7 @@ class TestMetricsHarnessLabel:
             }
         )
 
-        label = metrics_harness_label(config, motor_present=False)
+        label = metrics_harness_label(config)
 
         assert label.startswith("matrix(32px)+")
 
@@ -185,7 +188,7 @@ class TestMetricsHarnessLabel:
             }
         )
 
-        label = metrics_harness_label(config, motor_present=False)
+        label = metrics_harness_label(config)
 
         assert label.startswith("matrix(32px)+")
 
@@ -209,7 +212,7 @@ class TestMetricsHarnessLabel:
             }
         )
 
-        label = metrics_harness_label(config, motor_present=False)
+        label = metrics_harness_label(config)
 
         assert label.startswith("neopixel(40px)+")
 
@@ -228,48 +231,62 @@ class TestMetricsHarnessLabel:
             }
         )
 
-        label = metrics_harness_label(config, motor_present=False)
+        label = metrics_harness_label(config)
 
         assert label.startswith("neopixel(40px)+")
 
     def test_no_pixels_label_when_pixels_list_is_empty(self):
         config = parse_device_config({})
 
-        label = metrics_harness_label(config, motor_present=False)
+        label = metrics_harness_label(config)
 
         assert label.startswith("no-pixels+")
 
     def test_ir_part_reports_receiver_count_for_a_single_pin_rx(self):
         config = parse_device_config({"ir": {"rx": "D11"}})
 
-        label = metrics_harness_label(config, motor_present=False)
+        label = metrics_harness_label(config)
 
         assert label.endswith("+ir(rx1)")
 
     def test_ir_part_reports_receiver_count_for_a_multi_pin_rx(self):
         config = parse_device_config({"ir": {"rx": ["D11", "D12", "D13"]}})
 
-        label = metrics_harness_label(config, motor_present=False)
+        label = metrics_harness_label(config)
 
         assert label.endswith("+ir(rx3)")
 
     def test_no_ir_label_when_ir_section_is_absent(self):
         config = parse_device_config({})
 
-        label = metrics_harness_label(config, motor_present=False)
+        label = metrics_harness_label(config)
 
         assert label.endswith("+no-ir")
 
-    def test_motor_present_true_reports_motor(self):
-        config = parse_device_config({})
+    def test_declared_haptics_section_reports_motor(self):
+        config = parse_device_config({"haptics": {}})
 
-        label = metrics_harness_label(config, motor_present=True)
+        label = metrics_harness_label(config)
 
         assert "+motor+" in label
 
-    def test_motor_present_false_reports_no_motor(self):
+    def test_absent_haptics_section_reports_no_motor(self):
         config = parse_device_config({})
 
-        label = metrics_harness_label(config, motor_present=False)
+        label = metrics_harness_label(config)
 
         assert "+no-motor+" in label
+
+    def test_declared_accelerometer_section_reports_accel(self):
+        config = parse_device_config({"accelerometer": {}})
+
+        label = metrics_harness_label(config)
+
+        assert "+accel+" in label
+
+    def test_absent_accelerometer_section_reports_no_accel(self):
+        config = parse_device_config({})
+
+        label = metrics_harness_label(config)
+
+        assert "+no-accel+" in label

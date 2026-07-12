@@ -16,8 +16,10 @@ import sys
 
 from effects.performance import PerformanceTracker
 from hardware.shared.device_config import (
+    AccelerometerConfig,
     AudioConfig,
     DeviceConfig,
+    HapticsConfig,
     IRConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
@@ -152,33 +154,60 @@ def _ir_harness_part(ir: IRConfig | None) -> str:
     return f"ir(rx{len(ir.rx)})"
 
 
-def metrics_harness_label(config: DeviceConfig, motor_present: bool) -> str:
+def _motor_harness_part(haptics: HapticsConfig | None) -> str:
+    """Return the ``motor`` part of a harness label for ``config.haptics``.
+
+    ``device_builder`` (#691) builds the DRV2605 haptics motor only when
+    ``config.haptics`` is declared, so declared-ness of the section is itself
+    the built/absent fact -- no separate runtime presence check is needed.
+    """
+    return "motor" if haptics is not None else "no-motor"
+
+
+def _accel_harness_part(accelerometer: AccelerometerConfig | None) -> str:
+    """Return the ``accel`` part of a harness label for ``config.accelerometer``.
+
+    Mirrors ``_motor_harness_part``: ``device_builder`` (#691) builds the
+    LIS3DH accelerometer only when ``config.accelerometer`` is declared.
+    """
+    return "accel" if accelerometer is not None else "no-accel"
+
+
+def metrics_harness_label(config: DeviceConfig) -> str:
     """Build the paste-ready harness label for a ``scene_in_situ_baselines`` row.
 
-    Derives a short descriptor of the deployed prop from ``config`` (a
-    :class:`~hardware.shared.device_config.DeviceConfig`) plus the runtime
-    ``motor_present`` flag, so two runs of the same scene against different
-    prop configs (e.g. audio on vs. off) produce distinguishable rows. Counts,
-    not just presence, are encoded for each part. Board-free: takes an
-    already-parsed ``DeviceConfig``, not a board or file path.
+    Derives a short descriptor of the deployed prop entirely from ``config``
+    (a :class:`~hardware.shared.device_config.DeviceConfig`), so two runs of
+    the same scene against configs differing only in, say, a declared
+    ``haptics``/``accelerometer`` section produce distinguishable rows.
+    Counts, not just presence, are encoded for each part. Board-free: takes
+    an already-parsed ``DeviceConfig``, not a board or file path.
 
     Replaces the old hand-maintained ``HARNESSES``-derived ``_harness_label``
     in ``examples/hardware/profiling/scene_load_profiler.py``, deriving the
     label from the config actually assembled rather than a parallel
     hand-edited table.
 
+    The motor part originally (#685) came from a caller-supplied
+    ``motor_present`` runtime flag, since at the time nothing in
+    ``DeviceConfig`` declared the motor. #691 config-gated the DRV2605 motor
+    (and the LIS3DH accelerometer) behind their own declared sections, so
+    both parts are now read straight off ``config`` like every other part --
+    the runtime flag is gone.
+
     Args:
         config: The parsed device config the prop was built from.
-        motor_present: Whether a DRV2605L haptic motor was found on this run.
 
     Returns:
-        Parts joined with ``+``, e.g. ``"matrix(117px)+audio(v4)+motor+ir(rx1)"``.
+        Parts joined with ``+``, e.g.
+        ``"matrix(117px)+audio(v4)+motor+accel+ir(rx1)"``.
     """
     return "+".join(
         [
             _pixels_harness_part(config.pixels),
             _audio_harness_part(config.audio),
-            "motor" if motor_present else "no-motor",
+            _motor_harness_part(config.haptics),
+            _accel_harness_part(config.accelerometer),
             _ir_harness_part(config.ir),
         ]
     )

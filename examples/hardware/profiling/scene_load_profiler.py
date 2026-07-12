@@ -228,7 +228,7 @@ def _build_prop(scene_name: str, config: DeviceConfig) -> tuple[SceneManager, Ef
     # term, valid only for this pairing.
     print_table_row(
         "scene_in_situ_baselines",
-        [scene_name, metrics_harness_label(config, motor_present), load_bytes, first_tick_bytes],
+        [scene_name, metrics_harness_label(config), load_bytes, first_tick_bytes],
     )
     return manager, effect_manager, timer
 
