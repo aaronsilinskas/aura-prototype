@@ -125,6 +125,7 @@ from hardware.shared.device_config import (
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.profiling_helpers import (
     linear_fit,
+    mute_other_components,
     open_config_i2c,
     print_profile_header,
     print_stats_line,
@@ -160,9 +161,9 @@ def _select_pixel_entry(
 
     Mutates *config* in place: every ``pixels``-list entry that isn't the profiled
     driver's own entry is set ``enabled = False`` (a config declaring both a matrix and
-    a NeoPixel strip has the other muted), and so are ``audio``/``ir``/``accelerometer``/
-    ``haptics`` if declared -- this profiler drives one pixel output and nothing else, so
-    everything it doesn't exercise is isolated out via the config's non-destructive
+    a NeoPixel strip has the other muted); everything outside `pixels` is muted via
+    `mute_other_components` -- this profiler drives one pixel output and nothing else,
+    so everything it doesn't exercise is isolated out via the config's non-destructive
     ``enabled`` toggle rather than left to perturb the measurement.
 
     For the NeoPixel driver the found strip's ``count`` is overridden to *largest_count*
@@ -191,14 +192,7 @@ def _select_pixel_entry(
     if isinstance(target, NeoPixelPixelsConfig):
         target.strips[0].count = largest_count
 
-    if config.audio is not None:
-        config.audio.enabled = False
-    if config.ir is not None:
-        config.ir.enabled = False
-    if config.accelerometer is not None:
-        config.accelerometer.enabled = False
-    if config.haptics is not None:
-        config.haptics.enabled = False
+    mute_other_components(config, keep="pixels")
     return target
 
 

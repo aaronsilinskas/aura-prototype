@@ -59,7 +59,7 @@ import time
 from engine.network import LINE
 from hardware.shared.device_config import DeviceConfig, load_device_config
 from hardware.shared.network_controls import HardwareNetworkControls
-from hardware.shared.profiling_helpers import board_id, runtime_id
+from hardware.shared.profiling_helpers import board_id, mute_other_components, runtime_id
 
 try:
     from typing import Final
@@ -74,26 +74,18 @@ LOG_INTERVAL_SECONDS: Final = 5.0
 def _isolate_ir_config(config: DeviceConfig) -> None:
     """Mute every component but `ir` on *config*, in place.
 
-    This script drives the LINE emitter only, so every `pixels` entry and any
-    declared `audio`/`accelerometer`/`haptics` section is set `enabled = False`
-    -- the non-destructive isolation knob alongside dropping a section from
-    aura-device.json outright. `ir` itself is left exactly as declared: its
-    `rx`/`line`/`cone`/`area_of_effect` pins are the real prop's wiring, not a
-    hand-harvested-and-rebuilt mapping.
+    This script drives the LINE emitter only, so everything but `ir` is muted via
+    `mute_other_components` -- the non-destructive isolation knob alongside
+    dropping a section from aura-device.json outright. `ir` itself is left
+    exactly as declared: its `rx`/`line`/`cone`/`area_of_effect` pins are the real
+    prop's wiring, not a hand-harvested-and-rebuilt mapping.
 
     Raises:
         ValueError: If *config* declares no `ir` section at all.
     """
     if config.ir is None:
         raise ValueError("ir not declared in aura-device.json -- required to transmit on LINE")
-    for pixels_cfg in config.pixels:
-        pixels_cfg.enabled = False
-    if config.audio is not None:
-        config.audio.enabled = False
-    if config.accelerometer is not None:
-        config.accelerometer.enabled = False
-    if config.haptics is not None:
-        config.haptics.enabled = False
+    mute_other_components(config, keep="ir")
 
 
 def _build_network_controls() -> HardwareNetworkControls:

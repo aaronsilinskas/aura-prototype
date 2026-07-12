@@ -78,6 +78,7 @@ from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.shared.device_config import DeviceConfig, load_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.profiling_helpers import (
+    mute_other_components,
     open_config_i2c,
     print_profile_header,
     print_stats_line,
@@ -113,12 +114,12 @@ def _require_drv2605_output(hardware: DeviceHardware) -> Drv2605EffectOutput:
 def _isolate_haptics_config(config: DeviceConfig) -> None:
     """Mute every component but `haptics` on *config*, in place.
 
-    This profiler drives the DRV2605L and nothing else, so every declared `pixels`
-    entry plus `audio`/`ir`/`accelerometer` (if present) is set `enabled = False` -- the
-    non-destructive isolation knob alongside dropping a section from aura-device.json
-    outright. `haptics` itself is force-enabled: it is the real motor section this
-    profiler exists to exercise, so a config that merely declared it disabled would
-    otherwise silently defeat the measurement.
+    This profiler drives the DRV2605L and nothing else, so everything but `haptics`
+    is muted via `mute_other_components` -- the non-destructive isolation knob
+    alongside dropping a section from aura-device.json outright. `haptics` itself is
+    force-enabled: it is the real motor section this profiler exists to exercise, so
+    a config that merely declared it disabled would otherwise silently defeat the
+    measurement.
 
     Raises:
         ValueError: If *config* declares no `haptics` section at all -- there is no
@@ -131,14 +132,7 @@ def _isolate_haptics_config(config: DeviceConfig) -> None:
             + " the real motor, not a synthesized stand-in"
         )
     config.haptics.enabled = True
-    for pixels_cfg in config.pixels:
-        pixels_cfg.enabled = False
-    if config.audio is not None:
-        config.audio.enabled = False
-    if config.ir is not None:
-        config.ir.enabled = False
-    if config.accelerometer is not None:
-        config.accelerometer.enabled = False
+    mute_other_components(config, keep="haptics")
 
 
 def run() -> None:
