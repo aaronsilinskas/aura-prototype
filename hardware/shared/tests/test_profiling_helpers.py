@@ -3,14 +3,17 @@
 The profiler scripts themselves run forever on-device and are not unit-tested,
 but the pure logic they rely on to turn a sweep into a paste-ready
 ``recorded-metrics.md`` table row -- least-squares slope fitting, runtime-id
-formatting, and markdown row formatting -- lives here and is.
+formatting, markdown row formatting, and the scene-load profiler's harness
+label -- lives here and is.
 """
 
+from hardware.shared.device_config import parse_device_config
 from hardware.shared.profiling_helpers import (
     board_id,
     format_runtime_id,
     format_table_row,
     linear_fit,
+    metrics_harness_label,
     print_table_row,
     runtime_id,
 )
@@ -79,3 +82,169 @@ class TestPrintTableRow:
         print_table_row("per_mcu_baselines", ["engine-host", "4.57%", "450"])
         out = capsys.readouterr().out
         assert "per_mcu_baselines" in out
+
+
+class TestMetricsHarnessLabel:
+    def test_full_harness_joins_all_four_parts_with_plus(self):
+        # The sample IS31FL3741 matrix: 13 cols x 9 scoped rows = 117px.
+        config = parse_device_config(
+            {
+                "pixels": [
+                    {
+                        "type": "matrix",
+                        "cols": 13,
+                        "scope_rows": {
+                            "global.buff": [0, 1],
+                            "global.debuff": [1, 2],
+                            "global.main": [2, 5],
+                            "personal": [5, 7],
+                            "directional": [7, 8],
+                            "ambient": [8, 9],
+                        },
+                    }
+                ],
+                "audio": {
+                    "voices": 4,
+                    "clips": {},
+                    "i2s_bit_clock": "GP10",
+                    "i2s_word_select": "GP11",
+                    "i2s_data": "GP12",
+                },
+                "ir": {"rx": "D11"},
+            }
+        )
+
+        label = metrics_harness_label(config, motor_present=True)
+
+        assert label == "matrix(117px)+audio(v4)+motor+ir(rx1)"
+
+    def test_disabling_audio_swaps_in_no_audio_leaving_other_parts_unchanged(self):
+        config = parse_device_config(
+            {
+                "pixels": [
+                    {
+                        "type": "matrix",
+                        "cols": 13,
+                        "scope_rows": {
+                            "global.buff": [0, 1],
+                            "global.debuff": [1, 2],
+                            "global.main": [2, 5],
+                            "personal": [5, 7],
+                            "directional": [7, 8],
+                            "ambient": [8, 9],
+                        },
+                    }
+                ],
+                "ir": {"rx": "D11"},
+            }
+        )
+
+        label = metrics_harness_label(config, motor_present=True)
+
+        assert label == "matrix(117px)+no-audio+motor+ir(rx1)"
+
+    def test_matrix_pixel_count_is_cols_times_rows_covered_by_scope_rows(self):
+        # A narrower 8x4 matrix using only two of the six scopes: 8 x 4 = 32.
+        config = parse_device_config(
+            {
+                "pixels": [
+                    {
+                        "type": "matrix",
+                        "cols": 8,
+                        "scope_rows": {
+                            "global.main": [0, 3],
+                            "personal": [3, 4],
+                        },
+                    }
+                ]
+            }
+        )
+
+        label = metrics_harness_label(config, motor_present=False)
+
+        assert label.startswith("matrix(32px)+")
+
+    def test_neopixel_pixel_count_sums_counts_across_multiple_strip_entries(self):
+        config = parse_device_config(
+            {
+                "pixels": [
+                    {
+                        "type": "neopixel",
+                        "pin": "D5",
+                        "count": 30,
+                        "scope_pixels": {"personal": [0, 30]},
+                    },
+                    {
+                        "type": "neopixel",
+                        "pin": "D6",
+                        "count": 10,
+                        "scope_pixels": {"ambient": [0, 10]},
+                    },
+                ]
+            }
+        )
+
+        label = metrics_harness_label(config, motor_present=False)
+
+        assert label.startswith("neopixel(40px)+")
+
+    def test_neopixel_pixel_count_sums_counts_across_legacy_scope_entries(self):
+        config = parse_device_config(
+            {
+                "pixels": [
+                    {
+                        "type": "neopixel",
+                        "scopes": {
+                            "personal": {"pin": "D5", "count": 30},
+                            "ambient": {"pin": "D6", "count": 10},
+                        },
+                    }
+                ]
+            }
+        )
+
+        label = metrics_harness_label(config, motor_present=False)
+
+        assert label.startswith("neopixel(40px)+")
+
+    def test_no_pixels_label_when_pixels_list_is_empty(self):
+        config = parse_device_config({})
+
+        label = metrics_harness_label(config, motor_present=False)
+
+        assert label.startswith("no-pixels+")
+
+    def test_ir_part_reports_receiver_count_for_a_single_pin_rx(self):
+        config = parse_device_config({"ir": {"rx": "D11"}})
+
+        label = metrics_harness_label(config, motor_present=False)
+
+        assert label.endswith("+ir(rx1)")
+
+    def test_ir_part_reports_receiver_count_for_a_multi_pin_rx(self):
+        config = parse_device_config({"ir": {"rx": ["D11", "D12", "D13"]}})
+
+        label = metrics_harness_label(config, motor_present=False)
+
+        assert label.endswith("+ir(rx3)")
+
+    def test_no_ir_label_when_ir_section_is_absent(self):
+        config = parse_device_config({})
+
+        label = metrics_harness_label(config, motor_present=False)
+
+        assert label.endswith("+no-ir")
+
+    def test_motor_present_true_reports_motor(self):
+        config = parse_device_config({})
+
+        label = metrics_harness_label(config, motor_present=True)
+
+        assert "+motor+" in label
+
+    def test_motor_present_false_reports_no_motor(self):
+        config = parse_device_config({})
+
+        label = metrics_harness_label(config, motor_present=False)
+
+        assert "+no-motor+" in label

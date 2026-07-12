@@ -15,6 +15,7 @@ import gc
 import sys
 
 from effects.performance import PerformanceTracker
+from hardware.shared.device_config import MatrixPixelsConfig
 
 try:
     import board
@@ -95,6 +96,86 @@ def runtime_id() -> str:
     """Return this interpreter's runtime key (e.g. ``circuitpython_10_0_3``)."""
     impl = sys.implementation
     return format_runtime_id(impl.name, impl.version)
+
+
+def _pixels_harness_part(pixels: list) -> str:
+    """Return the ``pixels`` part of a harness label for ``config.pixels``.
+
+    ``pixels`` mirrors ``DeviceConfig.pixels``: a possibly-empty list holding
+    at most one ``MatrixPixelsConfig`` and any number of ``NeoPixelPixelsConfig``
+    entries. A matrix wins when present (a config never mixes the two on real
+    props) and its pixel count is ``cols`` times the rows covered by
+    ``scope_rows`` -- the bands are non-overlapping, so summing each band's
+    length gives the total scoped rows. Otherwise every NeoPixel entry's strip
+    counts are summed, covering both the current ``strips`` shape and the
+    legacy one-strip-per-scope ``scopes`` shape.
+    """
+    if not pixels:
+        return "no-pixels"
+
+    for entry in pixels:
+        if isinstance(entry, MatrixPixelsConfig):
+            rows = sum(len(scope_range) for scope_range in entry.scope_rows.values())
+            return f"matrix({entry.cols * rows}px)"
+
+    total = 0
+    for entry in pixels:
+        for strip in entry.strips:
+            total += strip.count
+        for scope in entry.scopes.values():
+            total += scope.count
+    return f"neopixel({total}px)"
+
+
+def _audio_harness_part(audio) -> str:
+    """Return the ``audio`` part of a harness label for ``config.audio``."""
+    if audio is None:
+        return "no-audio"
+    return f"audio(v{audio.voices})"
+
+
+def _ir_harness_part(ir) -> str:
+    """Return the ``ir`` part of a harness label for ``config.ir``.
+
+    Encodes only the receiver count -- the wire-frame (Aura vs. Tag) is a
+    per-scene codec choice, not a `DeviceConfig` fact, so it plays no part in
+    this device-derived label.
+    """
+    if ir is None:
+        return "no-ir"
+    return f"ir(rx{len(ir.rx)})"
+
+
+def metrics_harness_label(config, motor_present: bool) -> str:
+    """Build the paste-ready harness label for a ``scene_in_situ_baselines`` row.
+
+    Derives a short descriptor of the deployed prop from ``config`` (a
+    :class:`~hardware.shared.device_config.DeviceConfig`) plus the runtime
+    ``motor_present`` flag, so two runs of the same scene against different
+    prop configs (e.g. audio on vs. off) produce distinguishable rows. Counts,
+    not just presence, are encoded for each part. Board-free: takes an
+    already-parsed ``DeviceConfig``, not a board or file path.
+
+    Replaces the old hand-maintained ``HARNESSES``-derived ``_harness_label``
+    in ``examples/hardware/profiling/scene_load_profiler.py``, deriving the
+    label from the config actually assembled rather than a parallel
+    hand-edited table.
+
+    Args:
+        config: The parsed device config the prop was built from.
+        motor_present: Whether a DRV2605L haptic motor was found on this run.
+
+    Returns:
+        Parts joined with ``+``, e.g. ``"matrix(117px)+audio(v4)+motor+ir(rx1)"``.
+    """
+    return "+".join(
+        [
+            _pixels_harness_part(config.pixels),
+            _audio_harness_part(config.audio),
+            "motor" if motor_present else "no-motor",
+            _ir_harness_part(config.ir),
+        ]
+    )
 
 
 def open_config_i2c(device_config):
