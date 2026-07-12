@@ -2,8 +2,8 @@
 
 Covers:
 - RadioTransport base-class contract (send / receive raise NotImplementedError)
-- RecordingRadioTransport: the recording fake other tests (e.g.
-  test_radio_manager.py) drive to back both directions of the port
+- RecordingRadioTransport: the recording fake this file's own tests drive to
+  back both directions of the port
 """
 
 import pytest

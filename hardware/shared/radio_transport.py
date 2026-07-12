@@ -1,9 +1,10 @@
 """RadioTransport — the board-free half-duplex radio port.
 
-Provides the ``RadioTransport`` port abstraction that ``RadioManager`` and
-``HardwareNetworkControls.send_radio`` reach the physical radio peripheral
-through. One port serves both directions because a single RFM69-class chip
-is half-duplex — there is no separate send/receive pair the way IR has
+Provides the ``RadioTransport`` port abstraction that ``RadioManager`` reaches
+the physical radio peripheral through, and that ``HardwareNetworkControls.send_radio``
+is intended to reach through once wired (still a stub as of this module).
+One port serves both directions because a single RFM69-class chip is
+half-duplex — there is no separate send/receive pair the way IR has
 ``PulseWriter``/``PulseReader``.
 
 No ``adafruit_rfm69`` import — safe on CPython, CircuitPython 10.x, and
