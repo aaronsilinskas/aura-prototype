@@ -36,6 +36,19 @@ def _build_transport(mock_radio: MagicMock):
 
 
 # ---------------------------------------------------------------------------
+# construction — configures the driver for non-blocking reads
+# ---------------------------------------------------------------------------
+
+
+def test_construction_disables_receive_timeout_so_driver_reads_never_block() -> None:
+    mock_radio = MagicMock(name="radio")
+
+    _build_transport(mock_radio)
+
+    assert mock_radio.receive_timeout is None
+
+
+# ---------------------------------------------------------------------------
 # send() — transmits with keep_listening=True
 # ---------------------------------------------------------------------------
 
