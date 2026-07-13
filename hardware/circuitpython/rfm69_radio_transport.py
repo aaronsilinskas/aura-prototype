@@ -41,6 +41,9 @@ class Rfm69RadioTransport(RadioTransport):
     ) -> None:
         radio = adafruit_rfm69.RFM69(spi, cs, reset, frequency)
         radio.node = node
+        # Keep receive() non-blocking; the driver otherwise waits up to its
+        # default 0.5s receive_timeout for a packet.
+        radio.receive_timeout = None
         self._radio = radio
 
     def send(self, data: bytes) -> None:
