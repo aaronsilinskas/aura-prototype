@@ -111,23 +111,27 @@ def _pixels_harness_part(pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig]
 
     ``pixels`` mirrors ``DeviceConfig.pixels``: a possibly-empty list holding
     at most one ``MatrixPixelsConfig`` and any number of ``NeoPixelPixelsConfig``
-    entries. A matrix wins when present (a config never mixes the two on real
-    props) and its pixel count is ``cols`` times the rows covered by
-    ``scope_rows`` -- the bands are non-overlapping, so summing each band's
-    length gives the total scoped rows. Otherwise every NeoPixel entry's strip
-    counts are summed, covering both the current ``strips`` shape and the
-    legacy one-strip-per-scope ``scopes`` shape.
+    entries. Entries with ``enabled: False`` did not get built, so they are
+    filtered out before either check below -- a disabled entry counts the
+    same as an absent one. A matrix wins when present and enabled (a config
+    never mixes the two on real props) and its pixel count is ``cols`` times
+    the rows covered by ``scope_rows`` -- the bands are non-overlapping, so
+    summing each band's length gives the total scoped rows. Otherwise every
+    enabled NeoPixel entry's strip counts are summed, covering both the
+    current ``strips`` shape and the legacy one-strip-per-scope ``scopes``
+    shape.
     """
-    if not pixels:
+    enabled_pixels = [entry for entry in pixels if entry.enabled]
+    if not enabled_pixels:
         return "no-pixels"
 
-    for entry in pixels:
+    for entry in enabled_pixels:
         if isinstance(entry, MatrixPixelsConfig):
             rows = sum(len(scope_range) for scope_range in entry.scope_rows.values())
             return f"matrix({entry.cols * rows}px)"
 
     total = 0
-    for entry in pixels:
+    for entry in enabled_pixels:
         for strip in entry.strips:
             total += strip.count
         for scope in entry.scopes.values():
@@ -136,8 +140,12 @@ def _pixels_harness_part(pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig]
 
 
 def _audio_harness_part(audio: AudioConfig | None) -> str:
-    """Return the ``audio`` part of a harness label for ``config.audio``."""
-    if audio is None:
+    """Return the ``audio`` part of a harness label for ``config.audio``.
+
+    A present-but-``enabled: False`` section labels identically to an
+    absent one -- neither built the audio driver.
+    """
+    if audio is None or not audio.enabled:
         return "no-audio"
     return f"audio(v{audio.voices})"
 
@@ -147,9 +155,10 @@ def _ir_harness_part(ir: IRConfig | None) -> str:
 
     Encodes only the receiver count -- the wire-frame (Aura vs. Tag) is a
     per-scene codec choice, not a `DeviceConfig` fact, so it plays no part in
-    this device-derived label.
+    this device-derived label. A present-but-``enabled: False`` section
+    labels identically to an absent one -- neither built the IR receiver.
     """
-    if ir is None:
+    if ir is None or not ir.enabled:
         return "no-ir"
     return f"ir(rx{len(ir.rx)})"
 
@@ -158,19 +167,21 @@ def _haptic_harness_part(haptics: HapticsConfig | None) -> str:
     """Return the ``haptic`` part of a harness label for ``config.haptics``.
 
     ``device_builder`` (#691) builds the DRV2605 haptics driver only when
-    ``config.haptics`` is declared, so declared-ness of the section is itself
-    the built/absent fact -- no separate runtime presence check is needed.
+    ``config.haptics`` is declared *and* enabled (the **Component enabled
+    toggle**, #715) -- a section that is present but ``enabled: False`` is
+    not built, so it labels identically to an absent one.
     """
-    return "haptic" if haptics is not None else "no-haptic"
+    return "haptic" if haptics is not None and haptics.enabled else "no-haptic"
 
 
 def _accel_harness_part(accelerometer: AccelerometerConfig | None) -> str:
     """Return the ``accel`` part of a harness label for ``config.accelerometer``.
 
     Mirrors ``_haptic_harness_part``: ``device_builder`` (#691) builds the
-    LIS3DH accelerometer only when ``config.accelerometer`` is declared.
+    LIS3DH accelerometer only when ``config.accelerometer`` is declared *and*
+    enabled (#715); present-but-disabled labels identically to absent.
     """
-    return "accel" if accelerometer is not None else "no-accel"
+    return "accel" if accelerometer is not None and accelerometer.enabled else "no-accel"
 
 
 def metrics_harness_label(config: DeviceConfig) -> str:
