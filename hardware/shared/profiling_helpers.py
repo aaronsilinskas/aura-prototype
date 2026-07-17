@@ -106,6 +106,18 @@ def runtime_id() -> str:
     return format_runtime_id(impl.name, impl.version)
 
 
+def _section_active(
+    section: AudioConfig | IRConfig | HapticsConfig | AccelerometerConfig | None,
+) -> bool:
+    """Return whether an optional config section was actually built.
+
+    A section counts as built only when declared *and* ``enabled`` -- a
+    present-but-disabled section (the **Component enabled toggle**, #715)
+    labels identically to an absent one everywhere in this module.
+    """
+    return section is not None and section.enabled
+
+
 def _pixels_harness_part(pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig]) -> str:
     """Return the ``pixels`` part of a harness label for ``config.pixels``.
 
@@ -145,7 +157,7 @@ def _audio_harness_part(audio: AudioConfig | None) -> str:
     A present-but-``enabled: False`` section labels identically to an
     absent one -- neither built the audio driver.
     """
-    if audio is None or not audio.enabled:
+    if not _section_active(audio):
         return "no-audio"
     return f"audio(v{audio.voices})"
 
@@ -158,7 +170,7 @@ def _ir_harness_part(ir: IRConfig | None) -> str:
     this device-derived label. A present-but-``enabled: False`` section
     labels identically to an absent one -- neither built the IR receiver.
     """
-    if ir is None or not ir.enabled:
+    if not _section_active(ir):
         return "no-ir"
     return f"ir(rx{len(ir.rx)})"
 
@@ -171,7 +183,7 @@ def _haptic_harness_part(haptics: HapticsConfig | None) -> str:
     toggle**, #715) -- a section that is present but ``enabled: False`` is
     not built, so it labels identically to an absent one.
     """
-    return "haptic" if haptics is not None and haptics.enabled else "no-haptic"
+    return "haptic" if _section_active(haptics) else "no-haptic"
 
 
 def _accel_harness_part(accelerometer: AccelerometerConfig | None) -> str:
@@ -181,7 +193,7 @@ def _accel_harness_part(accelerometer: AccelerometerConfig | None) -> str:
     LIS3DH accelerometer only when ``config.accelerometer`` is declared *and*
     enabled (#715); present-but-disabled labels identically to absent.
     """
-    return "accel" if accelerometer is not None and accelerometer.enabled else "no-accel"
+    return "accel" if _section_active(accelerometer) else "no-accel"
 
 
 def metrics_harness_label(config: DeviceConfig) -> str:
