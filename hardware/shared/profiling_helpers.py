@@ -256,7 +256,9 @@ def copy_with_enabled(section: object, enabled: bool) -> object:
 
     Returns:
         A new instance of ``type(section)`` equal to *section* on every slot
-        except ``enabled``.
+        except ``enabled``. The copy is shallow: any slot holding a mutable
+        value (e.g. a pixel entry's ``strips`` list) still shares that value
+        with *section*.
     """
     kwargs = {name: getattr(section, name) for name in section.__slots__}
     kwargs["enabled"] = enabled
