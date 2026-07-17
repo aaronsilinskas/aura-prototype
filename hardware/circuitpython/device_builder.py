@@ -38,7 +38,7 @@ import microcontroller
 
 from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
-from engine.network import AREA_OF_EFFECT, CONE, LINE
+from engine.network import IR_EMITTERS
 from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 from hardware.shared.debounced_buttons import DebouncedButtons
@@ -414,9 +414,7 @@ def _make_writer(pin: microcontroller.Pin) -> PulseWriter:
 
 def _setup_ir(
     rx_pins: list[microcontroller.Pin],
-    line_pin: microcontroller.Pin | None,
-    cone_pin: microcontroller.Pin | None = None,
-    aoe_pin: microcontroller.Pin | None = None,
+    emitter_pins: dict[str, microcontroller.Pin],
     encoder: InfraredEncoder | None = None,
     decoder: InfraredDecoder | None = None,
     writer_factory: Callable[[microcontroller.Pin], PulseWriter] = _make_writer,
@@ -439,6 +437,11 @@ def _setup_ir(
     the receiver and every transmitter — the single assembly point for
     self-echo suppression. The gate itself is not returned; it lives only as
     a shared reference between the receiver and transmitters it wires here.
+
+    *emitter_pins* maps an emitter constant (a key of ``engine.network.
+    IR_EMITTERS``) to the pin it is wired to; an emitter absent from the
+    mapping is skipped. Transmitters are wired in ``IR_EMITTERS`` order,
+    independent of *emitter_pins*' own key order.
 
     *writer_factory* builds the :class:`PulseWriter` for each wired emitter
     pin — defaults to :func:`_make_writer`. This is assembly's only seam onto
@@ -469,7 +472,8 @@ def _setup_ir(
         receiver = InfraredMultiReceiver(readers, type(decoder), gate=gate)
 
     transmitters: dict[str, InfraredTransmitter] = {}
-    for emitter, pin in ((LINE, line_pin), (CONE, cone_pin), (AREA_OF_EFFECT, aoe_pin)):
+    for emitter in IR_EMITTERS:
+        pin = emitter_pins.get(emitter)
         if pin is None:
             continue
         writer = writer_factory(pin)
@@ -570,15 +574,9 @@ def build_hardware(
         for emitter_key, pin_name in config.ir.emitters.items():
             emitter_pins[emitter_key] = _resolve_pin(board_module, f"ir.{emitter_key}", pin_name)
 
-        line_pin = emitter_pins.get("line")
-        cone_pin = emitter_pins.get("cone")
-        aoe_pin = emitter_pins.get("area_of_effect")
-
         transmitters, ir_receiver = _setup_ir(
             rx_pins,
-            line_pin,
-            cone_pin=cone_pin,
-            aoe_pin=aoe_pin,
+            emitter_pins,
             encoder=encoder,
             decoder=decoder,
         )

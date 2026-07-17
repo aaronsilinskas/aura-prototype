@@ -10,6 +10,7 @@ try:
 except ImportError:
     pass
 
+from engine.network import IR_EMITTERS
 from engine.state import Scope
 
 __all__ = [
@@ -37,7 +38,7 @@ __all__ = [
 
 _VALID_SCOPE_KEYS: Final = set(Scope.ALL.keys)
 
-_VALID_IR_EMITTER_KEYS: Final = {"line", "cone", "area_of_effect"}
+_VALID_IR_EMITTER_KEYS: Final = set(IR_EMITTERS)
 
 _I2S_PIN_FIELDS: Final = ("i2s_bit_clock", "i2s_word_select", "i2s_data")
 

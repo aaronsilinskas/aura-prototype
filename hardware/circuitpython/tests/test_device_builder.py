@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from engine.network import AREA_OF_EFFECT, CONE, LINE
 from hardware.shared.device_config import (
     parse_device_config,
 )
@@ -1606,6 +1607,34 @@ def test_build_hardware_disabled_ir_section_leaves_ir_receiver_none() -> None:
     mock_setup_ir.assert_not_called()
 
 
+def test_build_hardware_cone_only_ir_config_wires_only_cone_transmitter() -> None:
+    """A config declaring only ir.cone (no ir.line/ir.area_of_effect) wires a
+    transmitter under CONE and nothing under LINE/AREA_OF_EFFECT.
+
+    Runs the real _setup_ir (only pulseio is stubbed) so this exercises
+    build_hardware's config-key-to-emitter mapping end to end — the mapping
+    that previously had no direct test (#720)."""
+    mapping = {
+        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
+        "buttons": ["D9"],
+        "ir": {"rx": "D11", "cone": "D13"},
+    }
+    config = parse_device_config(mapping)
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock(), D11=MagicMock(), D13=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+        stack.enter_context(patch.dict(sys.modules, {"pulseio": MagicMock()}))
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    wired_emitters = set(hw.transmit_pump.poll_transmits().keys())
+    assert wired_emitters == {CONE}
+
+
 # ---------------------------------------------------------------------------
 # build_hardware's I2C bus: caller-supplied vs. self-constructed
 # ---------------------------------------------------------------------------
@@ -1720,9 +1749,7 @@ def test_setup_ir_injects_same_gate_into_receiver_and_every_transmitter() -> Non
 
         transmitters, receiver = _setup_ir(
             rx_pins=[MagicMock()],
-            line_pin=MagicMock(),
-            cone_pin=MagicMock(),
-            aoe_pin=MagicMock(),
+            emitter_pins={LINE: MagicMock(), CONE: MagicMock(), AREA_OF_EFFECT: MagicMock()},
         )
 
     receiver_gate = _wired_gate(receiver)
@@ -1772,7 +1799,7 @@ def test_setup_ir_single_rx_pin_builds_single_receiver_wired_with_passed_decoder
 
         from hardware.circuitpython.device_builder import _setup_ir
 
-        _, receiver = _setup_ir(rx_pins=[MagicMock()], line_pin=None, decoder=decoder)
+        _, receiver = _setup_ir(rx_pins=[MagicMock()], emitter_pins={}, decoder=decoder)
 
     assert isinstance(receiver, InfraredSingleReceiver)
     assert _wired_decoder(receiver) is decoder
@@ -1787,7 +1814,7 @@ def test_setup_ir_multiple_rx_pins_builds_multi_receiver_with_one_reader_per_pin
 
         from hardware.circuitpython.device_builder import _setup_ir
 
-        _, receiver = _setup_ir(rx_pins=[MagicMock(), MagicMock(), MagicMock()], line_pin=None)
+        _, receiver = _setup_ir(rx_pins=[MagicMock(), MagicMock(), MagicMock()], emitter_pins={})
 
     assert isinstance(receiver, InfraredMultiReceiver)
     readers = _wired_readers(receiver)
@@ -1805,7 +1832,9 @@ def test_setup_ir_multiple_rx_pins_gives_each_reader_a_fresh_decoder_of_the_same
 
         from hardware.circuitpython.device_builder import _setup_ir
 
-        _, receiver = _setup_ir(rx_pins=[MagicMock(), MagicMock()], line_pin=None, decoder=decoder)
+        _, receiver = _setup_ir(
+            rx_pins=[MagicMock(), MagicMock()], emitter_pins={}, decoder=decoder
+        )
 
     decoders = _wired_decoders(receiver)
     assert len(decoders) == 2
