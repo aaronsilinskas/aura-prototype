@@ -74,6 +74,20 @@ def neopixel_config():
     }
 
 
+@pytest.fixture
+def full_isolatable_config(matrix_config):
+    # Adds every section `matrix_config` lacks (i2c, spi, radio, accelerometer,
+    # haptics) so every isolatable component -- plus both excluded buses -- is
+    # declared and enabled, giving `isolate` tests a config where "disabled"
+    # and "absent" can never be confused for one another.
+    matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5"}
+    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8"}
+    matrix_config["radio"] = {"cs": "GP13", "reset": "GP14", "frequency": 915.0, "node": 5}
+    matrix_config["accelerometer"] = {}
+    matrix_config["haptics"] = {}
+    return matrix_config
+
+
 # ---------------------------------------------------------------------------
 # Happy path: full matrix config
 # ---------------------------------------------------------------------------
@@ -1276,3 +1290,143 @@ def test_load_device_config_parses_valid_file(tmp_path, matrix_config):
 def test_load_device_config_raises_when_file_missing(tmp_path):
     with pytest.raises(RuntimeError, match="not found"):
         load_device_config(str(tmp_path / "missing.json"))
+
+
+# ---------------------------------------------------------------------------
+# DeviceConfig.isolate — derived, non-reparsing single-component isolation
+# ---------------------------------------------------------------------------
+
+
+def test_isolate_returns_a_new_device_config_distinct_from_the_original(full_isolatable_config):
+    config = parse_device_config(full_isolatable_config)
+
+    isolated = config.isolate(keep="audio")
+
+    assert isinstance(isolated, DeviceConfig)
+    assert isolated is not config
+
+
+def test_isolate_leaves_the_original_config_unchanged(full_isolatable_config):
+    config = parse_device_config(full_isolatable_config)
+
+    config.isolate(keep="audio")
+
+    assert config.ir.enabled is True
+    assert config.accelerometer.enabled is True
+    assert config.haptics.enabled is True
+    assert config.radio.enabled is True
+    assert all(entry.enabled for entry in config.pixels)
+
+
+_ISOLATABLE_COMPONENTS = ("pixels", "audio", "ir", "accelerometer", "haptics", "radio")
+
+
+@pytest.mark.parametrize("keep", _ISOLATABLE_COMPONENTS)
+def test_isolate_leaves_kept_component_declared_and_disables_the_other_five(
+    full_isolatable_config, keep
+):
+    config = parse_device_config(full_isolatable_config)
+
+    isolated = config.isolate(keep=keep)
+
+    for name in _ISOLATABLE_COMPONENTS:
+        value = getattr(isolated, name)
+        expect_enabled = name == keep
+        if name == "pixels":
+            assert value, "pixels section must be retained, not dropped"
+            assert all(entry.enabled is expect_enabled for entry in value)
+        else:
+            assert value is not None, f"{name} section must be retained, not None"
+            assert value.enabled is expect_enabled
+
+
+def test_isolate_does_not_force_enable_a_kept_component_declared_disabled(full_isolatable_config):
+    full_isolatable_config["audio"]["enabled"] = False
+    config = parse_device_config(full_isolatable_config)
+
+    isolated = config.isolate(keep="audio")
+
+    assert isolated.audio.enabled is False
+
+
+@pytest.mark.parametrize("keep", _ISOLATABLE_COMPONENTS)
+def test_isolate_never_touches_i2c_spi_or_buttons(full_isolatable_config, keep):
+    config = parse_device_config(full_isolatable_config)
+
+    isolated = config.isolate(keep=keep)
+
+    assert isolated.i2c.sda == config.i2c.sda
+    assert isolated.i2c.scl == config.i2c.scl
+    assert isolated.i2c.enabled == config.i2c.enabled
+    assert isolated.spi.sck == config.spi.sck
+    assert isolated.spi.mosi == config.spi.mosi
+    assert isolated.spi.miso == config.spi.miso
+    assert isolated.spi.enabled == config.spi.enabled
+    assert isolated.buttons == config.buttons
+
+
+def _assert_same_fields_except_enabled(original, copy):
+    for name in type(original).__slots__:
+        if name == "enabled":
+            continue
+        assert getattr(copy, name) == getattr(original, name), (
+            f"{type(original).__name__}.{name} was not preserved by the disabled copy"
+        )
+
+
+def test_isolate_disabled_copy_preserves_every_field_of_each_isolatable_section(
+    full_isolatable_config,
+):
+    config = parse_device_config(full_isolatable_config)
+
+    isolated_keeping_pixels = config.isolate(keep="pixels")
+    _assert_same_fields_except_enabled(config.audio, isolated_keeping_pixels.audio)
+    _assert_same_fields_except_enabled(config.ir, isolated_keeping_pixels.ir)
+    _assert_same_fields_except_enabled(config.accelerometer, isolated_keeping_pixels.accelerometer)
+    _assert_same_fields_except_enabled(config.haptics, isolated_keeping_pixels.haptics)
+    _assert_same_fields_except_enabled(config.radio, isolated_keeping_pixels.radio)
+
+    isolated_keeping_audio = config.isolate(keep="audio")
+    for original_entry, isolated_entry in zip(config.pixels, isolated_keeping_audio.pixels):
+        _assert_same_fields_except_enabled(original_entry, isolated_entry)
+
+
+def test_isolate_disabled_copy_preserves_matrix_pixels_fields(matrix_config):
+    config = parse_device_config(matrix_config)
+
+    isolated = config.isolate(keep="audio")
+
+    _assert_same_fields_except_enabled(config.pixels[0], isolated.pixels[0])
+    assert isolated.pixels[0].enabled is False
+
+
+def test_isolate_disabled_copy_preserves_neopixel_pixels_fields(neopixel_config):
+    # A distinct entry type from `matrix_config`'s pixels[0] -- the generic
+    # copy helper must serve NeoPixelPixelsConfig too, not just MatrixPixelsConfig.
+    config = parse_device_config(neopixel_config)
+
+    isolated = config.isolate(keep="audio")
+
+    _assert_same_fields_except_enabled(config.pixels[0], isolated.pixels[0])
+    assert isolated.pixels[0].enabled is False
+
+
+def test_isolate_on_minimal_config_is_a_no_op_for_absent_components():
+    config = parse_device_config({})
+
+    isolated = config.isolate(keep="audio")
+
+    assert isolated.audio is None
+    assert isolated.ir is None
+    assert isolated.accelerometer is None
+    assert isolated.haptics is None
+    assert isolated.radio is None
+    assert isolated.pixels == []
+
+
+def test_isolate_unknown_keep_raises_value_error_naming_valid_choices_sorted():
+    config = parse_device_config({})
+    expected_choices = sorted(set(DeviceConfig.__slots__) - {"buttons", "i2c", "spi"})
+
+    with pytest.raises(ValueError, match=", ".join(expected_choices)):
+        config.isolate(keep="bogus")

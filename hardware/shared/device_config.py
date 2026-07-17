@@ -49,6 +49,11 @@ _RADIO_ALLOWED_KEYS: Final = ("cs", "reset", "frequency", "node", "enabled")
 
 _RADIO_PIN_FIELDS: Final = ("cs", "reset")
 
+# `DeviceConfig.isolate` derives its isolatable set from `DeviceConfig.__slots__`
+# minus these -- i2c/spi are buses (infrastructure for the kept component, not
+# competition with it) and buttons carries no `enabled` flag to isolate.
+_ISOLATE_EXCLUDED_COMPONENTS: Final = ("i2c", "spi", "buttons")
+
 # ---------------------------------------------------------------------------
 # Config data classes
 # ---------------------------------------------------------------------------
@@ -271,6 +276,33 @@ class HapticsConfig:
         self.enabled: bool = enabled
 
 
+def _disabled_copy(section: object) -> object:
+    """Return a copy of *section* with ``enabled`` forced to ``False``.
+
+    Reads every name in *section*'s ``__slots__`` off the instance via
+    ``getattr`` and passes them back as constructor keyword arguments,
+    overriding only ``enabled``. One implementation serves every isolatable
+    section class today because each of their ``__slots__`` tuples names
+    exactly its constructor's keyword arguments; a future class that breaks
+    that correspondence raises ``TypeError`` here instead of silently
+    dropping a field, which a per-class copy method would risk. Precedent:
+    ``ir_transport`` builds ``IrTelemetrySnapshot`` the same way, by
+    splatting slot-driven ``getattr`` reads.
+
+    Args:
+        section: A parsed, non-``None`` section instance (e.g. an
+            ``AudioConfig`` or a ``MatrixPixelsConfig``/``NeoPixelPixelsConfig``
+            pixels-list entry).
+
+    Returns:
+        A new instance of ``type(section)`` equal to *section* on every
+        slot except ``enabled``, which is ``False``.
+    """
+    kwargs = {name: getattr(section, name) for name in section.__slots__}
+    kwargs["enabled"] = False
+    return type(section)(**kwargs)
+
+
 class DeviceConfig:
     """Parsed device configuration produced by parse_device_config."""
 
@@ -307,6 +339,52 @@ class DeviceConfig:
         self.haptics: HapticsConfig | None = haptics
         self.spi: SPIConfig | None = spi
         self.radio: RadioConfig | None = radio
+
+    def isolate(self, keep: str) -> DeviceConfig:
+        """Return a derived config with every isolatable component but *keep* disabled.
+
+        Nothing re-parses: the returned config is built entirely from this
+        already-parsed one. *keep* is left exactly as declared, including its
+        own ``enabled`` value -- isolating a component declared
+        ``enabled: false`` yields a config that builds nothing; ``isolate``
+        is a way to narrow, never to force something on. Every other
+        isolatable component is retained, not dropped: its section stays
+        present with ``enabled`` forced to ``False``, the same shape
+        ``parse_device_config`` already produces for a declared-but-disabled
+        section. A component that is absent on this config is a no-op --
+        it stays absent. ``i2c``, ``spi``, and ``buttons`` are never touched:
+        buses are infrastructure for the kept component, not competition
+        with it.
+
+        The isolatable set is ``DeviceConfig.__slots__`` minus
+        ``_ISOLATE_EXCLUDED_COMPONENTS``, so a component section added later
+        is isolatable with no edit here.
+
+        Args:
+            keep: The one isolatable component to leave untouched, e.g.
+                ``"audio"``.
+
+        Raises:
+            ValueError: If *keep* is not one of the isolatable components,
+                naming the valid choices, sorted.
+        """
+        isolatable = sorted(set(self.__slots__) - set(_ISOLATE_EXCLUDED_COMPONENTS))
+        if keep not in isolatable:
+            valid = ", ".join(isolatable)
+            raise ValueError(f"isolate keep '{keep}' is not valid; valid choices: {valid}")
+
+        kwargs = {}
+        for name in self.__slots__:
+            value = getattr(self, name)
+            if name in _ISOLATE_EXCLUDED_COMPONENTS or name == keep:
+                kwargs[name] = value
+            elif name == "pixels":
+                kwargs[name] = [_disabled_copy(entry) for entry in value]
+            elif value is None:
+                kwargs[name] = None
+            else:
+                kwargs[name] = _disabled_copy(value)
+        return DeviceConfig(**kwargs)
 
 
 # ---------------------------------------------------------------------------
