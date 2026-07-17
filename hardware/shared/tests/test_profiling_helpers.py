@@ -120,6 +120,24 @@ class TestMetricsHarnessLabel:
 
         assert label == "matrix(117px)+audio(v4)+haptic+accel+ir(rx1)"
 
+    def test_declared_but_disabled_audio_section_reports_no_audio(self):
+        config = parse_device_config(
+            {
+                "audio": {
+                    "enabled": False,
+                    "voices": 4,
+                    "clips": {},
+                    "i2s_bit_clock": "GP10",
+                    "i2s_word_select": "GP11",
+                    "i2s_data": "GP12",
+                }
+            }
+        )
+
+        label = metrics_harness_label(config)
+
+        assert "+no-audio+" in label
+
     def test_disabling_audio_swaps_in_no_audio_leaving_other_parts_unchanged(self):
         config = parse_device_config(
             {
@@ -192,6 +210,32 @@ class TestMetricsHarnessLabel:
 
         assert label.startswith("matrix(32px)+")
 
+    def test_disabled_matrix_does_not_shadow_an_enabled_neopixel_entry(self):
+        # A disabled matrix did not get built, so a co-declared enabled
+        # NeoPixel entry -- not the matrix -- decides the label.
+        config = parse_device_config(
+            {
+                "pixels": [
+                    {
+                        "type": "matrix",
+                        "cols": 13,
+                        "scope_rows": {"personal": [0, 9]},
+                        "enabled": False,
+                    },
+                    {
+                        "type": "neopixel",
+                        "pin": "D5",
+                        "count": 30,
+                        "scope_pixels": {"ambient": [0, 30]},
+                    },
+                ]
+            }
+        )
+
+        label = metrics_harness_label(config)
+
+        assert label.startswith("neopixel(30px)+")
+
     def test_neopixel_pixel_count_sums_counts_across_multiple_strip_entries(self):
         config = parse_device_config(
             {
@@ -215,6 +259,31 @@ class TestMetricsHarnessLabel:
         label = metrics_harness_label(config)
 
         assert label.startswith("neopixel(40px)+")
+
+    def test_disabled_neopixel_entry_does_not_inflate_the_pixel_count(self):
+        config = parse_device_config(
+            {
+                "pixels": [
+                    {
+                        "type": "neopixel",
+                        "pin": "D5",
+                        "count": 30,
+                        "scope_pixels": {"personal": [0, 30]},
+                    },
+                    {
+                        "type": "neopixel",
+                        "pin": "D6",
+                        "count": 10,
+                        "scope_pixels": {"ambient": [0, 10]},
+                        "enabled": False,
+                    },
+                ]
+            }
+        )
+
+        label = metrics_harness_label(config)
+
+        assert label.startswith("neopixel(30px)+")
 
     def test_neopixel_pixel_count_sums_counts_across_legacy_scope_entries(self):
         config = parse_device_config(
@@ -242,6 +311,52 @@ class TestMetricsHarnessLabel:
 
         assert label.startswith("no-pixels+")
 
+    def test_declared_but_disabled_matrix_reports_no_pixels(self):
+        # A matrix present but not enabled did not get built -- it must
+        # label identically to no pixels section at all.
+        config = parse_device_config(
+            {
+                "pixels": [
+                    {
+                        "type": "matrix",
+                        "cols": 13,
+                        "scope_rows": {"personal": [0, 9]},
+                        "enabled": False,
+                    }
+                ]
+            }
+        )
+
+        label = metrics_harness_label(config)
+
+        assert label.startswith("no-pixels+")
+
+    def test_all_disabled_pixels_list_reports_no_pixels(self):
+        config = parse_device_config(
+            {
+                "pixels": [
+                    {
+                        "type": "neopixel",
+                        "pin": "D5",
+                        "count": 30,
+                        "scope_pixels": {"personal": [0, 30]},
+                        "enabled": False,
+                    },
+                    {
+                        "type": "neopixel",
+                        "pin": "D6",
+                        "count": 10,
+                        "scope_pixels": {"ambient": [0, 10]},
+                        "enabled": False,
+                    },
+                ]
+            }
+        )
+
+        label = metrics_harness_label(config)
+
+        assert label.startswith("no-pixels+")
+
     def test_ir_part_reports_receiver_count_for_a_single_pin_rx(self):
         config = parse_device_config({"ir": {"rx": "D11"}})
 
@@ -263,6 +378,13 @@ class TestMetricsHarnessLabel:
 
         assert label.endswith("+no-ir")
 
+    def test_declared_but_disabled_ir_section_reports_no_ir(self):
+        config = parse_device_config({"ir": {"rx": "D11", "enabled": False}})
+
+        label = metrics_harness_label(config)
+
+        assert label.endswith("+no-ir")
+
     def test_declared_haptics_section_reports_haptic(self):
         config = parse_device_config({"haptics": {}})
 
@@ -277,6 +399,15 @@ class TestMetricsHarnessLabel:
 
         assert "+no-haptic+" in label
 
+    def test_declared_but_disabled_haptics_section_reports_no_haptic(self):
+        # A declared-and-disabled section must label identically to an
+        # absent one -- the label describes what ran, not why it didn't.
+        config = parse_device_config({"haptics": {"enabled": False}})
+
+        label = metrics_harness_label(config)
+
+        assert "+no-haptic+" in label
+
     def test_declared_accelerometer_section_reports_accel(self):
         config = parse_device_config({"accelerometer": {}})
 
@@ -286,6 +417,13 @@ class TestMetricsHarnessLabel:
 
     def test_absent_accelerometer_section_reports_no_accel(self):
         config = parse_device_config({})
+
+        label = metrics_harness_label(config)
+
+        assert "+no-accel+" in label
+
+    def test_declared_but_disabled_accelerometer_section_reports_no_accel(self):
+        config = parse_device_config({"accelerometer": {"enabled": False}})
 
         label = metrics_harness_label(config)
 
