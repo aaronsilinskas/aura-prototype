@@ -236,33 +236,31 @@ def metrics_harness_label(config: DeviceConfig) -> str:
     )
 
 
-def mute_other_components(config: DeviceConfig, keep: str) -> None:
-    """Mute every top-level component but *keep* on *config*, in place.
+def copy_with_enabled(section: object, enabled: bool) -> object:
+    """Return a copy of *section* with ``enabled`` forced to *enabled*.
 
-    Sets ``enabled = False`` on every declared ``audio``/``ir``/``accelerometer``/
-    ``haptics`` section and every ``pixels`` entry, skipping whichever one *keep*
-    names -- the shape every single-component profiler repeats to isolate the one
-    piece of hardware it drives via the non-destructive ``enabled`` toggle, rather
-    than hand-building a private minimal config. *keep* itself is left exactly as
-    declared (including its ``enabled`` value); force-enabling it, if needed, is
-    the caller's job.
+    Constructs a fresh instance from *section*'s own ``__slots__`` values via
+    ``getattr``, overriding only ``enabled`` -- a profiler reaches for this instead
+    of flipping ``.enabled`` on an already-parsed section, which stopped being how a
+    profiler isolates hardware once ``DeviceConfig.isolate`` shipped (#715, #717);
+    ``enabled`` reads as an ordinary field now, mutable only at construction.
+    Mirrors ``DeviceConfig``'s internal ``_disabled_copy`` (the helper ``isolate``
+    uses), generalized to force either direction since a profiler sometimes needs a
+    component forced *on* (e.g. the haptic profiler's DRV2605 section) rather than
+    off.
 
     Args:
-        config: The parsed device config to mutate.
-        keep: The component name to leave untouched -- one of ``"pixels"``,
-            ``"audio"``, ``"ir"``, ``"accelerometer"``, ``"haptics"``.
+        section: A parsed, non-``None`` section instance (e.g. a ``HapticsConfig``
+            or a ``MatrixPixelsConfig``/``NeoPixelPixelsConfig`` pixels-list entry).
+        enabled: The ``enabled`` value the returned copy carries.
+
+    Returns:
+        A new instance of ``type(section)`` equal to *section* on every slot
+        except ``enabled``.
     """
-    if keep != "pixels":
-        for pixels_cfg in config.pixels:
-            pixels_cfg.enabled = False
-    if keep != "audio" and config.audio is not None:
-        config.audio.enabled = False
-    if keep != "ir" and config.ir is not None:
-        config.ir.enabled = False
-    if keep != "accelerometer" and config.accelerometer is not None:
-        config.accelerometer.enabled = False
-    if keep != "haptics" and config.haptics is not None:
-        config.haptics.enabled = False
+    kwargs = {name: getattr(section, name) for name in section.__slots__}
+    kwargs["enabled"] = enabled
+    return type(section)(**kwargs)
 
 
 def open_config_i2c(device_config):

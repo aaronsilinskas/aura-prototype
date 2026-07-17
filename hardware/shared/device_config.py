@@ -187,10 +187,9 @@ class IRConfig:
 class I2CConfig:
     """Parsed I2C bus configuration.
 
-    ``enabled`` is mutable so a profiler can flip it on an already-parsed
-    config to isolate hardware without re-parsing. ``enabled=False`` means
-    ``device_builder`` builds no I2C bus at all — distinct from an absent
-    ``i2c`` section, which still defaults to the board's SCL/SDA pins.
+    ``enabled=False`` means ``device_builder`` builds no I2C bus at all —
+    distinct from an absent ``i2c`` section, which still defaults to the
+    board's SCL/SDA pins.
     """
 
     __slots__ = ("enabled", "scl", "sda")
@@ -205,10 +204,9 @@ class SPIConfig:
     """Parsed shared SPI bus configuration.
 
     Mirrors ``I2CConfig``: ``sck``/``mosi``/``miso`` are required together
-    when the ``spi`` section is present. ``enabled`` is mutable so a profiler
-    can flip it on an already-parsed config to isolate hardware without
-    re-parsing. Absent ``spi`` section means ``device_builder`` falls back to
-    ``board.SPI()`` later; ``enabled=False`` builds no bus at all.
+    when the ``spi`` section is present. Absent ``spi`` section means
+    ``device_builder`` falls back to ``board.SPI()`` later; ``enabled=False``
+    builds no bus at all.
     """
 
     __slots__ = ("enabled", "miso", "mosi", "sck")
@@ -224,9 +222,6 @@ class AccelerometerConfig:
     """Parsed accelerometer configuration. Presence alone gates the LIS3DH build
     (see ``device_builder``) — there are no configurable keys yet besides
     ``enabled``.
-
-    ``enabled`` is mutable so a profiler can flip it on an already-parsed
-    config to isolate hardware without re-parsing.
     """
 
     __slots__ = ("enabled",)
@@ -243,10 +238,8 @@ class RadioConfig:
     valid range. ``node`` is this device's id on the radio network, ``0``
     to ``254`` inclusive (``255`` is the RadioHead broadcast address).
 
-    ``enabled`` is mutable so a profiler can flip it on an already-parsed
-    config to isolate hardware without re-parsing. A radio declared and
-    enabled while ``spi`` is disabled is a *builder*-time hard error, not
-    checked here.
+    A radio declared and enabled while ``spi`` is disabled is a *builder*-time
+    hard error, not checked here.
     """
 
     __slots__ = ("cs", "enabled", "frequency", "node", "reset")
@@ -265,9 +258,6 @@ class HapticsConfig:
     """Parsed haptics configuration. Presence alone gates the DRV2605 build
     (see ``device_builder``) — there are no configurable keys yet besides
     ``enabled``.
-
-    ``enabled`` is mutable so a profiler can flip it on an already-parsed
-    config to isolate hardware without re-parsing.
     """
 
     __slots__ = ("enabled",)

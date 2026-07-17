@@ -26,8 +26,9 @@ Hardware
 - IR receiver wired to the pin declared by `ir.rx` -- unused by this script, but
   `build_hardware` wires a receiver alongside the LINE emitter whenever the `ir`
   section is declared and enabled.
-- `pixels`/`audio`/`accelerometer`/`haptics` -- whatever the real config declares
-  for them -- are muted via `enabled = False`, since this script drives IR only.
+- `pixels`/`audio`/`accelerometer`/`haptics`/`radio` -- whatever the real config
+  declares for them -- are disabled via `config.isolate(keep="ir")` (#715, #717),
+  since this script drives IR only.
 
 Installation
 ------------
@@ -41,8 +42,8 @@ Installation
 Configuration
 -------------
 - The real, deployed `aura-device.json` on the CIRCUITPY drive is loaded via
-  `load_device_config()` and handed to `build_hardware` wholesale (after muting
-  the sections this script doesn't drive) -- the `ir.line` / `ir.rx` pins are
+  `load_device_config()` and handed to `build_hardware` wholesale (after isolating
+  the one section this script drives) -- the `ir.line` / `ir.rx` pins are
   whatever the config declares, not harvested and re-assembled into a private
   mapping. A config declaring no `ir` section fails loudly at bring-up.
 - PACKET_SIZE: bytes per transmitted packet (byte 0 is the sequence number);
@@ -59,7 +60,7 @@ import time
 from engine.network import LINE
 from hardware.shared.device_config import DeviceConfig, load_device_config
 from hardware.shared.network_controls import HardwareNetworkControls
-from hardware.shared.profiling_helpers import board_id, mute_other_components, runtime_id
+from hardware.shared.profiling_helpers import board_id, runtime_id
 
 try:
     from typing import Final
@@ -71,11 +72,11 @@ DELAY_MS: Final = 0.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
 
-def _isolate_ir_config(config: DeviceConfig) -> None:
-    """Mute every component but `ir` on *config*, in place.
+def _isolate_ir_config(config: DeviceConfig) -> DeviceConfig:
+    """Return a derived config isolating `ir` on *config*.
 
-    This script drives the LINE emitter only, so everything but `ir` is muted via
-    `mute_other_components` -- the non-destructive isolation knob alongside
+    This script drives the LINE emitter only, so everything but `ir` is disabled via
+    `config.isolate(keep="ir")` -- the non-destructive isolation knob alongside
     dropping a section from aura-device.json outright. `ir` itself is left
     exactly as declared: its `rx`/`line`/`cone`/`area_of_effect` pins are the real
     prop's wiring, not a hand-harvested-and-rebuilt mapping.
@@ -85,14 +86,14 @@ def _isolate_ir_config(config: DeviceConfig) -> None:
     """
     if config.ir is None:
         raise ValueError("ir not declared in aura-device.json -- required to transmit on LINE")
-    mute_other_components(config, keep="ir")
+    return config.isolate(keep="ir")
 
 
 def _build_network_controls() -> HardwareNetworkControls:
     from hardware.circuitpython.device_builder import build_hardware
 
     device_config = load_device_config()
-    _isolate_ir_config(device_config)
+    device_config = _isolate_ir_config(device_config)
     hw = build_hardware(device_config)
     return hw.network_controls
 

@@ -24,14 +24,15 @@ The driver is brought up through a single `build_hardware` call from the **real*
 deployed `aura-device.json` (`load_device_config()`) -- the config-driven model #686
 established for the scene-load profiler -- rather than an in-file, hand-built minimal
 `DeviceConfig`. This profiler drives the DRV2605L and nothing else, so every declared
-`pixels` entry plus `audio`/`ir`/`accelerometer` (if present) is set `enabled = False` on
-the parsed config; `haptics` is force-enabled the same way. A config declaring no
-`haptics` section at all fails loudly here -- there is no minimal stand-in section to
-fall back on, since the real driver is what this profiler measures (the #691 stop-gap
-`haptics={}` in-file section is gone). If the DRV2605L isn't wired/reachable,
-`build_hardware` itself raises (a declared-but-unreachable component is a hard error, not
-a silent omission), so bring-up still fails loud rather than reporting a zero-cost
-measurement.
+`pixels` entry plus `audio`/`ir`/`accelerometer`/`radio` (if present) is disabled via
+`config.isolate(keep="haptics")` (#715, #717); `haptics` is force-enabled first, since
+`isolate` leaves the kept component exactly as declared and never forces it on. A
+config declaring no `haptics` section at all fails loudly here -- there is no minimal
+stand-in section to fall back on, since the real driver is what this profiler
+measures (the #691 stop-gap `haptics={}` in-file section is gone). If the DRV2605L
+isn't wired/reachable, `build_hardware` itself raises (a declared-but-unreachable
+component is a hard error, not a silent omission), so bring-up still fails loud
+rather than reporting a zero-cost measurement.
 
 The board's default I2C bus is wrapped in `CountingI2C` and injected into
 `build_hardware` (the `i2c=` seam), so every peripheral shares the counted bus. The
@@ -78,7 +79,7 @@ from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.shared.device_config import DeviceConfig, load_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.profiling_helpers import (
-    mute_other_components,
+    copy_with_enabled,
     open_config_i2c,
     print_profile_header,
     print_stats_line,
@@ -111,15 +112,17 @@ def _require_drv2605_output(hardware: DeviceHardware) -> Drv2605EffectOutput:
     raise RuntimeError("no Drv2605EffectOutput in the built hardware bundle -- no DRV2605 found")
 
 
-def _isolate_haptics_config(config: DeviceConfig) -> None:
-    """Mute every component but `haptics` on *config*, in place.
+def _isolate_haptics_config(config: DeviceConfig) -> DeviceConfig:
+    """Return a derived config isolating `haptics` on *config*, force-enabled.
 
     This profiler drives the DRV2605L and nothing else, so everything but `haptics`
-    is muted via `mute_other_components` -- the non-destructive isolation knob
-    alongside dropping a section from aura-device.json outright. `haptics` itself is
-    force-enabled: it is the real driver section this profiler exists to exercise, so
-    a config that merely declared it disabled would otherwise silently defeat the
-    measurement.
+    is disabled via `config.isolate(keep="haptics")` -- the non-destructive isolation
+    knob alongside dropping a section from aura-device.json outright. `haptics` itself
+    is force-enabled first, via `copy_with_enabled` rather than flipping `.enabled` on
+    the parsed section (`enabled` is an ordinary, construction-only field once parsed,
+    #717): it is the real driver section this profiler exists to exercise, so a
+    config that merely declared it disabled would otherwise silently defeat the
+    measurement -- and `isolate` itself never forces the kept component on.
 
     Raises:
         ValueError: If *config* declares no `haptics` section at all -- there is no
@@ -131,14 +134,14 @@ def _isolate_haptics_config(config: DeviceConfig) -> None:
             "haptics not declared in aura-device.json -- the haptic profiler measures"
             + " the real driver, not a synthesized stand-in"
         )
-    config.haptics.enabled = True
-    mute_other_components(config, keep="haptics")
+    config.haptics = copy_with_enabled(config.haptics, enabled=True)
+    return config.isolate(keep="haptics")
 
 
 def run() -> None:
     """Drive `handle_event` once per `EVENT_INTERVAL_SECONDS`, reporting per-event cost."""
     device_config = load_device_config()
-    _isolate_haptics_config(device_config)
+    device_config = _isolate_haptics_config(device_config)
 
     # Source the I2C bus pins from the real aura-device.json so the injected
     # (byte-counting) bus lands on the configured SDA/SCL.

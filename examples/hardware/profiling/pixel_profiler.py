@@ -29,11 +29,12 @@ Hardware is brought up through a single `build_hardware` call from the **real**,
 deployed `aura-device.json` (`load_device_config()`) -- the same config-driven model
 `scene_load_profiler.py` established (#686) -- rather than an in-file, hand-built
 `DeviceConfig`. The profiler drives exactly one pixel output, so every pixels-list
-entry that isn't the profiled `DRIVER`'s entry is set `enabled = False` on the parsed
-config (a config declaring both a matrix and a NeoPixel strip has the other muted),
-along with `audio`/`ir`/`accelerometer`/`haptics` if declared -- this profiler never
-drives them, so they are isolated out rather than left to perturb the measurement as a
-fixed heap/I2C offset. The **one** synthesized override layered on top of the loaded
+entry that isn't the profiled `DRIVER`'s entry is disabled on the parsed config (a
+config declaring both a matrix and a NeoPixel strip has the other disabled), and
+`config.isolate(keep="pixels")` (#715, #717) disables `audio`/`ir`/`accelerometer`/
+`haptics`/`radio` if declared -- this profiler never drives them, so they are
+isolated out rather than left to perturb the measurement as a fixed heap/I2C offset.
+The **one** synthesized override layered on top of the loaded
 config is the NeoPixel driver's swept max-length strip: the found strip entry's `count`
 is bumped to the largest swept `PIXEL_COUNTS` value so every swept count addresses a
 prefix of the same physical strip; everything else (pin, order, brightness,
@@ -124,8 +125,8 @@ from hardware.shared.device_config import (
 )
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.profiling_helpers import (
+    copy_with_enabled,
     linear_fit,
-    mute_other_components,
     open_config_i2c,
     print_profile_header,
     print_stats_line,
@@ -157,14 +158,17 @@ I2C_FREQUENCY_HZ: Final = TARGET_FPS
 def _select_pixel_entry(
     config: DeviceConfig, driver: str, largest_count: int
 ) -> MatrixPixelsConfig | NeoPixelPixelsConfig:
-    """Return the real pixel entry *driver* profiles, muting every other component.
+    """Return the real pixel entry *driver* profiles, disabling every other one.
 
-    Mutates *config* in place: every ``pixels``-list entry that isn't the profiled
-    driver's own entry is set ``enabled = False`` (a config declaring both a matrix and
-    a NeoPixel strip has the other muted); everything outside `pixels` is muted via
-    `mute_other_components` -- this profiler drives one pixel output and nothing else,
-    so everything it doesn't exercise is isolated out via the config's non-destructive
-    ``enabled`` toggle rather than left to perturb the measurement.
+    Rebuilds *config*'s ``pixels`` list in place: every entry that isn't the profiled
+    driver's own entry becomes a disabled copy (a config declaring both a matrix and a
+    NeoPixel strip has the other disabled), and the target entry becomes an enabled
+    copy -- entries are derived via `copy_with_enabled` rather than flipped in place,
+    since `enabled` reads as an ordinary, construction-only field once parsed (#717).
+    Isolating everything outside `pixels` (`audio`/`ir`/`accelerometer`/`haptics`/
+    `radio`) is the caller's job via `config.isolate(keep="pixels")` -- `isolate`
+    isolates one top-level component, not one entry among several sharing the
+    `pixels` list, so picking among those stays this function's job.
 
     For the NeoPixel driver the found strip's ``count`` is overridden to *largest_count*
     -- the swept max-length strip, the one synthesized parameter this profiler layers on
@@ -176,23 +180,25 @@ def _select_pixel_entry(
             for.
     """
     wanted = MatrixPixelsConfig if driver == "is31fl3741_matrix" else NeoPixelPixelsConfig
-    target: MatrixPixelsConfig | NeoPixelPixelsConfig | None = None
-    for entry in config.pixels:
+    target_index: int | None = None
+    for i, entry in enumerate(config.pixels):
         is_candidate = isinstance(entry, wanted) and (wanted is MatrixPixelsConfig or entry.strips)
-        if target is None and is_candidate:
-            target = entry
-        else:
-            entry.enabled = False
-    if target is None:
+        if target_index is None and is_candidate:
+            target_index = i
+    if target_index is None:
         kind = "matrix" if driver == "is31fl3741_matrix" else "neopixel"
         raise ValueError(
             f"no {kind} pixels entry declared in aura-device.json for DRIVER={driver!r}"
         )
-    target.enabled = True
+
+    target = copy_with_enabled(config.pixels[target_index], enabled=True)
     if isinstance(target, NeoPixelPixelsConfig):
         target.strips[0].count = largest_count
 
-    mute_other_components(config, keep="pixels")
+    config.pixels = [
+        target if i == target_index else copy_with_enabled(entry, enabled=False)
+        for i, entry in enumerate(config.pixels)
+    ]
     return target
 
 
@@ -315,12 +321,13 @@ def run() -> None:
     registry.scan_dir("packs/effects", "packs.effects")
     element_names = registry.items("elements")
 
-    # Load the real, deployed aura-device.json and mute every component this profiler
-    # doesn't drive -- the config-driven model #686 established for the scene-load
+    # Load the real, deployed aura-device.json and isolate the one component this
+    # profiler drives -- the config-driven model #686 established for the scene-load
     # profiler. buttons[0] (not gated by `enabled`) is read straight off the same
     # config build_hardware below consumes -- no separate pin harvest.
     device_config = load_device_config()
     pixel_entry = _select_pixel_entry(device_config, DRIVER, PIXEL_COUNTS[-1])
+    device_config = device_config.isolate(keep="pixels")
     matrix_cols = pixel_entry.cols if isinstance(pixel_entry, MatrixPixelsConfig) else 0
 
     # Build the device once: build_hardware claims pins without deiniting, so it cannot
