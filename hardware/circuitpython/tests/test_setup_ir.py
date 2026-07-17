@@ -183,7 +183,7 @@ def test_setup_ir_uses_writer_returned_by_writer_factory():
 # ---------------------------------------------------------------------------
 
 
-def test_setup_ir_includes_line_transmitter_when_line_pin_provided():
+def test_setup_ir_includes_line_transmitter_when_line_in_emitter_pins():
     """_setup_ir wires the LINE emitter when its pin is in emitter_pins."""
     transmitters, _receiver = _setup_ir(
         [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
@@ -191,7 +191,7 @@ def test_setup_ir_includes_line_transmitter_when_line_pin_provided():
     assert LINE in transmitters
 
 
-def test_setup_ir_omits_cone_when_cone_pin_is_none():
+def test_setup_ir_omits_cone_when_cone_is_absent_from_emitter_pins():
     """No CONE entry in transmitter map when cone is absent from emitter_pins."""
     transmitters, _receiver = _setup_ir(
         [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
@@ -199,7 +199,7 @@ def test_setup_ir_omits_cone_when_cone_pin_is_none():
     assert CONE not in transmitters
 
 
-def test_setup_ir_omits_aoe_when_aoe_pin_is_none():
+def test_setup_ir_omits_aoe_when_aoe_is_absent_from_emitter_pins():
     """No AREA_OF_EFFECT entry when it is absent from emitter_pins."""
     transmitters, _receiver = _setup_ir(
         [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
@@ -207,7 +207,7 @@ def test_setup_ir_omits_aoe_when_aoe_pin_is_none():
     assert AREA_OF_EFFECT not in transmitters
 
 
-def test_setup_ir_includes_cone_transmitter_when_cone_pin_provided():
+def test_setup_ir_includes_cone_transmitter_when_cone_in_emitter_pins():
     """CONE transmitter is present when cone is in emitter_pins."""
     transmitters, _receiver = _setup_ir(
         [_RX_PIN], {LINE: _LINE_PIN, CONE: _CONE_PIN}, writer_factory=_fake_writer_factory
@@ -215,7 +215,7 @@ def test_setup_ir_includes_cone_transmitter_when_cone_pin_provided():
     assert CONE in transmitters
 
 
-def test_setup_ir_includes_aoe_transmitter_when_aoe_pin_provided():
+def test_setup_ir_includes_aoe_transmitter_when_aoe_in_emitter_pins():
     """AREA_OF_EFFECT transmitter is present when it is in emitter_pins."""
     transmitters, _receiver = _setup_ir(
         [_RX_PIN], {LINE: _LINE_PIN, AREA_OF_EFFECT: _AOE_PIN}, writer_factory=_fake_writer_factory
