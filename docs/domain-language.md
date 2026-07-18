@@ -282,8 +282,8 @@ The game-layer payload of a tag shot — `team`, `player`, `damage` packed into 
 _Avoid_: reading tag fields off the wire-frame; conflating the data codec (`TagData` ↔ byte) with the wire-frame codec (byte ↔ pulses)
 
 ### IR emitter
-A directed infrared transmit channel. Constants `LINE`, `CONE`, `AREA_OF_EFFECT` are the `send_ir` vocabulary, each mapped to its own `InfraredTransmitter`. The caller must name the emitter; sending to an unwired one is a programming error.
-_Avoid_: importing `magic.CastType` for IR emitters; a default emitter on `send_ir`
+A directed infrared transmit channel. Constants `LINE`, `CONE`, `AREA_OF_EFFECT` are the `send_ir` vocabulary, each mapped to its own `InfraredTransmitter`. The caller must name the emitter; sending to an unwired one is a programming error. `engine.network.IR_EMITTERS` is the single source of the emitter set — an ordered tuple of the three constants — that the parser's valid-key check and `device_builder`'s wiring loop both derive from, so a key the parser accepts is by construction a key the builder wires.
+_Avoid_: importing `magic.CastType` for IR emitters; a default emitter on `send_ir`; restating the emitter key set (derive from `IR_EMITTERS`); an emitter-per-parameter signature
 
 ### IR multi-receiver
 Several IR receivers, each on its own data line, returning the packet with the lowest **error margin**. Improves reception reliability only — it does not yield hit direction. Selected declaratively by listing **two or more `rx` pins** in `aura-device.json`; `build_hardware` wires one `PulseInReader` per pin and each receiver gets its own fresh decoder (the multi-receiver builds them from the decoder *class*).

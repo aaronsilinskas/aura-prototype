@@ -1,6 +1,6 @@
 import pytest
 
-from engine.network import AREA_OF_EFFECT, CONE, LINE, NetworkEvents, TransmitPump
+from engine.network import AREA_OF_EFFECT, CONE, IR_EMITTERS, LINE, NetworkEvents, TransmitPump
 from engine.state import EffectControls, GameState, NetworkControls, SceneControls
 
 # ---------------------------------------------------------------------------
@@ -12,6 +12,13 @@ def test_emitter_constants_are_distinct_so_routing_is_unambiguous() -> None:
     assert LINE != CONE
     assert LINE != AREA_OF_EFFECT
     assert CONE != AREA_OF_EFFECT
+
+
+def test_ir_emitters_contains_exactly_the_three_emitter_constants_in_order() -> None:
+    """IR_EMITTERS is the single source every derived valid-key set and wiring
+    loop reads from — it must name exactly LINE, CONE, AREA_OF_EFFECT, in that
+    order (#720)."""
+    assert IR_EMITTERS == (LINE, CONE, AREA_OF_EFFECT)
 
 
 # ---------------------------------------------------------------------------
