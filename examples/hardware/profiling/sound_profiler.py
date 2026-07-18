@@ -70,9 +70,14 @@ from hardware.shared.profiler_report import (
 )
 
 try:
-    from typing import Final
+    from typing import TYPE_CHECKING, Final
 except ImportError:
-    pass
+    TYPE_CHECKING = False
+
+# Type-checker-only: the real import stays deferred into `_build_output`, so
+# importing this module never requires the device-only audio stack.
+if TYPE_CHECKING:
+    from hardware.circuitpython.audio_output import AudioEffectOutput
 
 NUM_VOICES: Final = 4
 CONCURRENT_VOICES: Final = [1, 2, 4]
@@ -92,7 +97,7 @@ _CLIP_NAME: Final = "profiler_loop"
 _EVENT_VERB: Final = "play"
 
 
-def _build_output(audio_registry: AudioRegistry):
+def _build_output(audio_registry: AudioRegistry) -> AudioEffectOutput:
     from hardware.circuitpython.audio_output import AudioEffectOutput
 
     return AudioEffectOutput(

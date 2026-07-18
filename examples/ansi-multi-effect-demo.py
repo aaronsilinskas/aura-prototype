@@ -5,14 +5,14 @@ import termios
 import time
 import tty
 
-from effects.effect import PixelBuffer
+from effects.effect import Effect, PixelBuffer
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
 from engine.engine import GameEngine, GameRule
-from engine.events import Event
+from engine.events import EffectEvent, Event
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.packs import PackRegistry
-from engine.state import GameState, SceneControls, Scope
+from engine.state import EffectReceipt, GameState, SceneControls, Scope, ScopeValue
 from engine.timer import Timer
 
 _packs_dir = os.path.normpath(
@@ -28,7 +28,8 @@ BLOCK_HEIGHT = 2  # 1 pixel line (layered effects already split/merged into it) 
 class AnsiEffectOutput(EffectOutput):
     PIXEL_COUNT = 36
 
-    def __init__(self, scopes: list) -> None:
+    def __init__(self, scopes: list[ScopeValue]) -> None:
+        super().__init__()
         self.min_resolution = self.PIXEL_COUNT
         self.scopes = scopes
         self._initialized = False
@@ -38,7 +39,13 @@ class AnsiEffectOutput(EffectOutput):
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(self.PIXEL_COUNT)
 
-    def handle_event(self, event, scope, effect, receipt) -> None:
+    def handle_event(
+        self,
+        event: EffectEvent,
+        scope_keys: frozenset[str],
+        effect: Effect,
+        receipt: EffectReceipt,
+    ) -> None:
         self._last_event = str(event)
         self._event_count += 1
 
@@ -93,36 +100,11 @@ _default_acceleration = AccelerationData(x=0.0, y=9.8, z=0.0)
 
 
 def _make_event(key: str | None) -> InputEvents.ButtonAndAcceleration:
-    if key in ("a", "A"):
-        states = {
-            "A": ButtonData.PRESSED,
-            "B": ButtonData.UP,
-            "C": ButtonData.UP,
-            "D": ButtonData.UP,
-        }
-    elif key in ("b", "B"):
-        states = {
-            "A": ButtonData.UP,
-            "B": ButtonData.PRESSED,
-            "C": ButtonData.UP,
-            "D": ButtonData.UP,
-        }
-    elif key in ("c", "C"):
-        states = {
-            "A": ButtonData.UP,
-            "B": ButtonData.UP,
-            "C": ButtonData.PRESSED,
-            "D": ButtonData.UP,
-        }
-    elif key in ("d", "D"):
-        states = {
-            "A": ButtonData.UP,
-            "B": ButtonData.UP,
-            "C": ButtonData.UP,
-            "D": ButtonData.PRESSED,
-        }
-    else:
-        states = {"A": ButtonData.UP, "B": ButtonData.UP, "C": ButtonData.UP, "D": ButtonData.UP}
+    pressed = key.upper() if key else None
+    states = {
+        button: ButtonData.PRESSED if button == pressed else ButtonData.UP
+        for button in ("A", "B", "C", "D")
+    }
     return InputEvents.ButtonAndAcceleration(ButtonData(states=states), _default_acceleration)
 
 

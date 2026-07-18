@@ -61,9 +61,14 @@ from hardware.shared.profiler_report import (
 )
 
 try:
-    from typing import Final
+    from typing import TYPE_CHECKING, Final
 except ImportError:
-    pass
+    TYPE_CHECKING = False
+
+# Type-checker-only: the real import stays deferred into `_build_readers`, so
+# importing this module never requires the device-only pulseio stack.
+if TYPE_CHECKING:
+    from hardware.circuitpython.infrared_io import PulseInReader
 
 # Fixed at 4 receivers -- not a deployment axis.
 RX_PIN_NAMES: Final = ("GP16", "A1", "A2", "A3")
@@ -75,7 +80,7 @@ LOG_INTERVAL_SECONDS: Final = 5.0
 TARGET_FPS: Final = 24.0
 
 
-def _build_readers() -> list:
+def _build_readers() -> list[PulseInReader]:
     import board
     import pulseio
 
