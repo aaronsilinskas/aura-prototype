@@ -117,7 +117,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output: `create_buffer`, `update_pixels`, `handle_event` |
 | `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → Effect`; one per effect pack |
 | `EffectReceipt` | `engine/state.py` | Identity + `stop()` handle for a running effect instance; also carries validating `brightness`/`loudness` runtime controls in `[0.0, 1.0]` |
-| `ScopeValue` / `Scope` | `engine/state.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN/BUFF/DEBUFF`, `ALL` |
+| `ScopeValue` / `Scope` | `engine/state.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `AMBIENT`, `Global.MAIN/BUFF/DEBUFF`, and composites `Global.ALL` / `NON_AMBIENT` / `Scope.ALL` |
 | `NetworkControls` | `engine/state.py` | Abstract interface for sending/receiving network messages |
 | `TransmitPump` | `engine/network.py` | Abstract runtime-facing seam declaring `poll_transmits()`; the type the runtime loop reaches through, distinct from the send-only `NetworkControls` |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update(timer)` tick |
