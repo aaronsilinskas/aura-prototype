@@ -26,6 +26,8 @@ IS31FL3741_SCOPE_ROWS: Final = {
 class IS31FL3741EffectOutput(MatrixEffectOutput):
     """EffectOutput for the IS31FL3741 13×9 RGB LED matrix."""
 
+    # Logical row -> physical driver row: the panel's rows are not wired in
+    # natural top-to-bottom order.
     _rowmap: Final = [8, 5, 4, 3, 2, 1, 0, 7, 6]
 
     def __init__(
@@ -35,6 +37,12 @@ class IS31FL3741EffectOutput(MatrixEffectOutput):
         self.scopes = [Scope.ALL]
         self._matrix = matrix
         num_rows = len(self._rowmap)
+        # The IS31FL3741 does not map the 13x9 grid to contiguous, uniformly
+        # ordered driver registers: columns 0-9 and 10-12 occupy separate
+        # address banks (the x < 10 vs x >= 10 split below), and each LED's
+        # R/B channel order flips with column parity (and again at column 12).
+        # Precompute every pixel-channel's register offset once here so the
+        # per-frame _write_row is a flat indexed copy with no addressing math.
         offsets: array[int] = array("H", [0] * (num_rows * cols * 3))
         for row in range(num_rows):
             y = self._rowmap[row]
