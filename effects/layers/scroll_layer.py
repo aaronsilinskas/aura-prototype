@@ -3,11 +3,7 @@ from effects.layers.scroll import Scroll
 
 
 class ScrollLayer(Layer):
-    """Wraps any Layer with a Scroll, shifting the sample position each frame.
-
-    Delegates ``update(elapsed)`` to both the scroll and the inner layer.
-    On each ``sample`` call, applies the scroll to the position before
-    forwarding to the inner layer.
+    """Wraps any ``Layer`` with a ``Scroll``, shifting the sample position each frame.
 
     Stacking two ``ScrollLayer`` wrappers applies two independent position
     transforms, which is intentional and explicit.

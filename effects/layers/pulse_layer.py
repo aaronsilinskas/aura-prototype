@@ -11,9 +11,10 @@ class PulseLayer(Layer):
     to an end color.
 
     Update model:
-      - Call ``update(elapsed)`` once per frame. ``_elapsed`` is a raw
-        monotonically increasing accumulator; modulo is applied only inside
-        ``sample()`` for visual calculations.
+      - Call ``update(elapsed)`` once per frame. ``_elapsed`` is a raw,
+        monotonically increasing accumulator, never reduced modulo the cycle,
+        so the interval-crossing detection below stays correct across cycle
+        boundaries; ``update`` applies the modulo locally to pick the phase.
       - ``at_peak`` is set to ``True`` on the tick when the cursor crosses the
         ``_b_on`` boundary (via interval-crossing detection).
     Sampling model:

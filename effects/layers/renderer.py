@@ -4,15 +4,10 @@ from effects.palette import Palette
 
 
 class LayerRenderer(EffectPixels):
-    """Maps a single Layer's sample values to colors via a Palette.
+    """Maps a single ``Layer``'s sample values to colors via a ``Palette``.
 
-    Per pixel, samples the layer at the normalised position and maps the result
-    through the palette to produce a packed RGB color.
-
-    Update model:
-      - ``update(elapsed)`` forwards elapsed time to the inner layer.
-    Rendering model:
-      - ``render(output)`` writes one palette-mapped color per pixel.
+    Per pixel, samples the layer at its normalised position and maps the
+    result through the palette to a packed RGB color.
     """
 
     __slots__ = ["_layer", "_palette"]
