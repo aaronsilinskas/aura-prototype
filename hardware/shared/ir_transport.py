@@ -73,6 +73,11 @@ class PulseReader:
             test fakes) still satisfy the telemetry contract.
     """
 
+    # The IR receive-path telemetry counter this class owns — the read
+    # source ``InfraredSourceReceiver.telemetry()`` sums across every reader
+    # and the reset source ``reset_telemetry()`` zeroes on every reader.
+    OWNED_TELEMETRY_FIELDS = ("buffer_full_on_poll",)
+
     buffer_full_on_poll: int = 0
 
     def read_pulse(self) -> "int | None":
@@ -361,6 +366,13 @@ class InfraredReceiver:
             transmitting or flushing. Kept out of ``pulses_seen``.
     """
 
+    # The IR receive-path telemetry counters this class owns — read directly
+    # off a receiver instance by :class:`InfraredSourceReceiver`'s
+    # ``telemetry()``/``reset_telemetry()``, which sum/reset the
+    # decoder-owned and reader-owned counters from the decoder and reader
+    # lists instead.
+    OWNED_TELEMETRY_FIELDS = ("pulses_seen", "packets_surfaced", "pulses_dropped_transmitting")
+
     def __init__(self) -> None:
         # Owns the change-gate for telemetry_line(). Distinct from a
         # transmit-gate-carrying subclass's self._gate (the IrTransmitGate).
@@ -450,15 +462,113 @@ class InfraredReceiver:
 
 
 # ---------------------------------------------------------------------------
+# Source receiver — shared decoder/reader-list telemetry machinery
+# ---------------------------------------------------------------------------
+
+
+class InfraredSourceReceiver(InfraredReceiver):
+    """Intermediate base owning the decoder/reader lists behind a receiver.
+
+    :class:`InfraredSingleReceiver` and :class:`InfraredMultiReceiver` differ
+    genuinely in how :meth:`receive` picks a packet (one reader vs. N picking
+    the lowest-error-margin winner), so that stays on the concrete
+    subclasses. What they share is the telemetry cross-cut: both read and
+    reset walk the same *decoders* and *readers* lists, so a single receiver
+    is simply the N=1 case of the same machinery.
+
+    :meth:`telemetry` and :meth:`reset_telemetry` walk ``OWNED_TELEMETRY_FIELDS``
+    declared on :class:`~hardware.shared.ir_protocol.InfraredDecoder`,
+    :class:`PulseReader`, and :class:`InfraredReceiver` — decoder-owned
+    fields are summed across ``decoders``, reader-owned fields summed across
+    ``readers``, and receiver-owned fields read (and reset) directly off
+    ``self``. Because every field name is walked from its declared owner,
+    there is no hand-maintained field list here to drift out of sync with a
+    new counter or a receiver that forgets to reset one of its sources.
+
+    Args:
+        readers: One :class:`PulseReader` per source (length 1 for a single
+            receiver, N for a multi-receiver).
+        decoders: One :class:`~hardware.shared.ir_protocol.InfraredDecoder`
+            per source, matching *readers* one-to-one.
+        gate: :class:`IrTransmitGate` read for self-echo suppression.
+    """
+
+    def __init__(
+        self,
+        readers: "list[PulseReader]",
+        decoders: "list[InfraredDecoder]",
+        gate: "IrTransmitGate | None" = None,
+    ) -> None:
+        super().__init__()
+        self._readers = readers
+        self._decoders = decoders
+        self._gate = gate
+
+        # Monotonic-since-boot telemetry owned by this receiver. Decoder and
+        # reader counters are not copied — they are summed/reset live from
+        # the lists above so the whole path reads off this one handle.
+        self.pulses_seen: int = 0
+        self.packets_surfaced: int = 0
+        self.pulses_dropped_transmitting: int = 0
+
+    def telemetry(self) -> IrTelemetrySnapshot:
+        """Build a snapshot by walking each counter's declared owner.
+
+        Decoder-owned fields (``packets_started``, ``packets_completed``,
+        ``preamble_reject``, ``mark_reject``, ``space_reject``) are summed
+        across every decoder; the reader-owned field (``buffer_full_on_poll``)
+        is summed across every reader; the three receiver-owned fields are
+        read off ``self``. Built entirely from keyword arguments assembled
+        from each owner's declared field tuple, so the mapping cannot drift
+        from ``IrTelemetrySnapshot.FIELDS`` regardless of field order.
+
+        Returns:
+            The current tick's :class:`IrTelemetrySnapshot`.
+        """
+        fields: dict[str, int] = {}
+
+        for name in InfraredReceiver.OWNED_TELEMETRY_FIELDS:
+            fields[name] = getattr(self, name)
+
+        for name in InfraredDecoder.OWNED_TELEMETRY_FIELDS:
+            fields[name] = sum(getattr(decoder, name) for decoder in self._decoders)
+
+        for name in PulseReader.OWNED_TELEMETRY_FIELDS:
+            fields[name] = sum(getattr(reader, name) for reader in self._readers)
+
+        return IrTelemetrySnapshot(**fields)
+
+    def reset_telemetry(self) -> None:
+        """Zero this receiver's own counters, then every decoder and reader.
+
+        Resetting every source that :meth:`telemetry` reads from means a
+        counter can never go stale after a reset the way
+        ``buffer_full_on_poll`` used to on a multi-receiver — reading and
+        resetting walk the same lists, so there is nothing left to forget.
+        Also rebuilds :meth:`telemetry_line`'s change-gate baseline, so the
+        next call reports unconditionally.
+        """
+        for name in InfraredReceiver.OWNED_TELEMETRY_FIELDS:
+            setattr(self, name, 0)
+        for decoder in self._decoders:
+            decoder.reset_telemetry()
+        for reader in self._readers:
+            reader.reset_telemetry()
+        self._telemetry_gate = IrTelemetryGate()
+
+
+# ---------------------------------------------------------------------------
 # Single receiver
 # ---------------------------------------------------------------------------
 
 
-class InfraredSingleReceiver(InfraredReceiver):
+class InfraredSingleReceiver(InfraredSourceReceiver):
     """Polls one :class:`PulseReader` and decodes with one decoder instance.
 
     ``last_best_receiver`` is always ``None`` — there is only one reader, so
-    there is no selection to report.
+    there is no selection to report. The N=1 case of
+    :class:`InfraredSourceReceiver` — its telemetry/reset walk a one-element
+    decoder/reader list.
 
     Args:
         pulse_reader: Hardware port supplying pulse durations.
@@ -473,17 +583,9 @@ class InfraredSingleReceiver(InfraredReceiver):
         decoder: InfraredDecoder,
         gate: "IrTransmitGate | None" = None,
     ) -> None:
-        super().__init__()
+        super().__init__([pulse_reader], [decoder], gate)
         self._reader = pulse_reader
         self._decoder = decoder
-        self._gate = gate
-
-        # Monotonic-since-boot telemetry owned by this receiver. Decoder and
-        # reader counters are not copied — they are read live in
-        # telemetry() so the whole path reads off this one handle.
-        self.pulses_seen: int = 0
-        self.packets_surfaced: int = 0
-        self.pulses_dropped_transmitting: int = 0
 
     def receive(self) -> "bytearray | None":
         """Drain available pulses from the reader and return a packet if complete.
@@ -536,45 +638,13 @@ class InfraredSingleReceiver(InfraredReceiver):
         """Always ``None`` — a single receiver has no selection concept."""
         return None
 
-    def telemetry(self) -> IrTelemetrySnapshot:
-        """Build a snapshot, mapping each counter from its real source.
-
-        ``packets_started``/``packets_completed``/``{preamble,mark,space}_reject``
-        come from the decoder; ``buffer_full_on_poll`` comes from the reader;
-        ``pulses_seen``/``packets_surfaced``/``pulses_dropped_transmitting``
-        come from this receiver. Passed by keyword (not position) so a future
-        reorder of ``IrTelemetrySnapshot.FIELDS``/``__init__`` cannot silently
-        swap two counters into each other's slots.
-        """
-        decoder = self._decoder
-        return IrTelemetrySnapshot(
-            pulses_seen=self.pulses_seen,
-            buffer_full_on_poll=self._reader.buffer_full_on_poll,
-            packets_started=decoder.packets_started,
-            preamble_reject=decoder.preamble_reject,
-            mark_reject=decoder.mark_reject,
-            space_reject=decoder.space_reject,
-            packets_completed=decoder.packets_completed,
-            packets_surfaced=self.packets_surfaced,
-            pulses_dropped_transmitting=self.pulses_dropped_transmitting,
-        )
-
-    def reset_telemetry(self) -> None:
-        """Zero the whole IR path: this receiver, its decoder, and its reader."""
-        self.pulses_seen = 0
-        self.packets_surfaced = 0
-        self.pulses_dropped_transmitting = 0
-        self._decoder.reset_telemetry()
-        self._reader.reset_telemetry()
-        self._telemetry_gate = IrTelemetryGate()
-
 
 # ---------------------------------------------------------------------------
 # Multi-receiver
 # ---------------------------------------------------------------------------
 
 
-class InfraredMultiReceiver(InfraredReceiver):
+class InfraredMultiReceiver(InfraredSourceReceiver):
     """Polls multiple :class:`PulseReader` instances and picks the best packet.
 
     Each reader is paired with an independent decoder instance created by
@@ -616,12 +686,11 @@ class InfraredMultiReceiver(InfraredReceiver):
         decoder_factory: "object",
         gate: "IrTransmitGate | None" = None,
     ) -> None:
-        super().__init__()
         # Freeze the reader list and create one decoder per reader
-        self._readers = list(pulse_readers)
-        self._decoders = [decoder_factory() for _ in self._readers]
-        self._count = len(self._readers)
-        self._gate = gate
+        readers = list(pulse_readers)
+        decoders = [decoder_factory() for _ in readers]
+        super().__init__(readers, decoders, gate)
+        self._count = len(readers)
 
         # Pre-allocate per-receiver scratch: one slot per reader for (margin, index)
         # _scratch_margins[i] holds the error_margin from reader i when it fires
@@ -634,13 +703,6 @@ class InfraredMultiReceiver(InfraredReceiver):
         self._last_signal_strength: float | None = None
         self._last_error_margin: int | None = None
         self._last_best_receiver: PulseReader | None = None
-
-        # Monotonic-since-boot telemetry owned by this receiver. Decoder and
-        # reader counters are not copied — they are summed live in
-        # telemetry() so the whole path reads off this one handle.
-        self.pulses_seen: int = 0
-        self.packets_surfaced: int = 0
-        self.pulses_dropped_transmitting: int = 0
 
     def receive(self) -> "bytearray | None":
         """Poll all readers and return the best packet this tick, or ``None``.
@@ -748,55 +810,3 @@ class InfraredMultiReceiver(InfraredReceiver):
     def last_best_receiver(self) -> "PulseReader | None":
         """The :class:`PulseReader` that produced the best packet last tick."""
         return self._last_best_receiver
-
-    def telemetry(self) -> IrTelemetrySnapshot:
-        """Build a snapshot, summing delegated counters across every decoder/reader.
-
-        ``buffer_full_on_poll`` sums across every reader;
-        ``packets_started``/``packets_completed``/``{preamble,mark,space}_reject``
-        sum across every decoder — each summed once per call (once per
-        second), so iterating N decoders/readers costs nothing.
-        ``pulses_seen``/``packets_surfaced``/``pulses_dropped_transmitting``
-        are receiver-owned and read directly off ``self``. See the class
-        docstring for why summed ``packets_completed`` may exceed
-        ``packets_surfaced`` (dedup, not loss). Passed by keyword (not
-        position) so a future reorder of
-        ``IrTelemetrySnapshot.FIELDS``/``__init__`` cannot silently swap two
-        counters into each other's slots.
-        """
-        buffer_full_on_poll = 0
-        for reader in self._readers:
-            buffer_full_on_poll += reader.buffer_full_on_poll
-
-        packets_started = 0
-        packets_completed = 0
-        preamble_reject = 0
-        mark_reject = 0
-        space_reject = 0
-        for decoder in self._decoders:
-            packets_started += decoder.packets_started
-            packets_completed += decoder.packets_completed
-            preamble_reject += decoder.preamble_reject
-            mark_reject += decoder.mark_reject
-            space_reject += decoder.space_reject
-
-        return IrTelemetrySnapshot(
-            pulses_seen=self.pulses_seen,
-            buffer_full_on_poll=buffer_full_on_poll,
-            packets_started=packets_started,
-            preamble_reject=preamble_reject,
-            mark_reject=mark_reject,
-            space_reject=space_reject,
-            packets_completed=packets_completed,
-            packets_surfaced=self.packets_surfaced,
-            pulses_dropped_transmitting=self.pulses_dropped_transmitting,
-        )
-
-    def reset_telemetry(self) -> None:
-        """Zero this receiver's own counters and reset every decoder's telemetry."""
-        self.pulses_seen = 0
-        self.packets_surfaced = 0
-        self.pulses_dropped_transmitting = 0
-        for decoder in self._decoders:
-            decoder.reset_telemetry()
-        self._telemetry_gate = IrTelemetryGate()
