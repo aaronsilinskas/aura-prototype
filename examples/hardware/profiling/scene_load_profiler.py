@@ -129,7 +129,7 @@ from hardware.shared.device_config import (
     parse_device_config,
     read_device_config_mapping,
 )
-from hardware.shared.profiling_helpers import (
+from hardware.shared.profiler_report import (
     metrics_harness_label,
     print_profile_header,
     print_stats_line,

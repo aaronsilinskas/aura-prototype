@@ -12,7 +12,7 @@ name), so it cannot express this seam. This module parses every top-level
 ``scripts/tests/test_profiler_import_guard.py``'s approach, and asserts none
 of them imports ``board``, ``busio``, ``pulseio``, ``digitalio``,
 ``microcontroller``, or any ``adafruit_*`` package -- except
-``profiling_helpers.board_id``'s own defensive ``board`` import, which reads
+``profiler_report.board_id``'s own defensive ``board`` import, which reads
 board identity for a report header, not to construct hardware (#725).
 """
 
@@ -28,7 +28,7 @@ _HARDWARE_SHARED_DIR = _REPO_ROOT / "hardware" / "shared"
 
 _FORBIDDEN_ROOTS = frozenset({"board", "busio", "pulseio", "digitalio", "microcontroller"})
 
-_CARVE_OUT_MODULE = "profiling_helpers.py"
+_CARVE_OUT_MODULE = "profiler_report.py"
 _CARVE_OUT_FUNCTION = "board_id"
 
 
@@ -48,7 +48,7 @@ def board_id_carve_out_lines(source: str) -> set[int]:
 
     The only carve-out this guard grants: a module's ``board_id`` function is
     allowed its own defensive ``board`` import. Callers apply this only to
-    ``profiling_helpers.py`` -- every other module gets no carve-out even if
+    ``profiler_report.py`` -- every other module gets no carve-out even if
     it happened to define a same-named function.
     """
     lines: set[int] = set()
@@ -165,7 +165,7 @@ def test_forbidden_imports_still_flags_a_forbidden_import_outside_carve_out_line
 
 # ---------------------------------------------------------------------------
 # Guard: no hardware/shared module imports a device-only library, except
-# profiling_helpers.board_id's own board import
+# profiler_report.board_id's own board import
 # ---------------------------------------------------------------------------
 
 
@@ -186,13 +186,13 @@ def test_hardware_shared_module_has_no_forbidden_import(path: Path) -> None:
 
     assert not violations, (
         f"{path.name} imports device-only module(s) {violations} -- hardware/shared must stay "
-        "board-free except profiling_helpers.board_id's own board import"
+        "board-free except profiler_report.board_id's own board import"
     )
 
 
-def test_profiling_helpers_board_import_outside_board_id_is_still_flagged() -> None:
+def test_profiler_report_board_import_outside_board_id_is_still_flagged() -> None:
     """The carve-out is scoped to board_id's own body -- a hypothetical board
-    import elsewhere in profiling_helpers.py is not swept in with it."""
+    import elsewhere in profiler_report.py is not swept in with it."""
     source = "def board_id():\n    import board\n    return board\n\nimport board\n"
     carve_out = frozenset(board_id_carve_out_lines(source))
 

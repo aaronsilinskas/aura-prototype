@@ -60,7 +60,7 @@ import time
 from engine.network import LINE
 from hardware.shared.device_config import DeviceConfig, load_device_config
 from hardware.shared.network_controls import HardwareNetworkControls
-from hardware.shared.profiling_helpers import board_id, runtime_id
+from hardware.shared.profiler_report import board_id, runtime_id
 
 try:
     from typing import Final

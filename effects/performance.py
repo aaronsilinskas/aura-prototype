@@ -59,7 +59,7 @@ class PerformanceTracker:
         Returns:
             ``True`` if this frame crossed the ``log_interval`` boundary -- the
             caller should emit its stats line via
-            :func:`~hardware.shared.profiling_helpers.print_stats_line`;
+            :func:`~hardware.shared.profiler_report.print_stats_line`;
             ``False`` otherwise.
         """
         now = time.monotonic()

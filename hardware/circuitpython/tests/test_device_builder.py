@@ -2019,7 +2019,7 @@ def test_setup_i2c_disabled_config_builds_no_bus() -> None:
 # ---------------------------------------------------------------------------
 # open_config_i2c -- public bus entry point, a thin wrapper over _setup_i2c
 # reachable without a full build_hardware call (#725, moved from the
-# profiler-output module profiling_helpers, where it had drifted from
+# profiler-output module profiler_report, where it had drifted from
 # _setup_i2c: this is _setup_i2c's own behaviour, reached publicly)
 # ---------------------------------------------------------------------------
 
@@ -2123,7 +2123,7 @@ def test_open_config_i2c_never_returns_a_never_reset_stemma_bus() -> None:
     """The returned bus must be a fresh busio.I2C -- CircuitPython tears it
     down on reload -- never board.STEMMA_I2C(), which holds never_reset and
     would leave the I2C peripheral claimed for the next program on the same
-    pins. This is the one behavioural fact the old profiling_helpers
+    pins. This is the one behavioural fact the old profiler_report
     docstring recorded that the #725 merge into _setup_i2c had to preserve."""
     config = _device_config_with_i2c()
     board_mock = _mock_board(GP4=MagicMock(), GP5=MagicMock())

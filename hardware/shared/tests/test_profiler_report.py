@@ -8,7 +8,7 @@ label -- lives here and is.
 """
 
 from hardware.shared.device_config import parse_device_config
-from hardware.shared.profiling_helpers import (
+from hardware.shared.profiler_report import (
     board_id,
     format_runtime_id,
     format_table_row,

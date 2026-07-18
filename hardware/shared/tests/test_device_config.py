@@ -1295,7 +1295,7 @@ def test_load_device_config_raises_when_file_missing(tmp_path):
 
 # ---------------------------------------------------------------------------
 # copy_with_enabled — the single copy primitive (isolate's _disabled_copy,
-# generalized to force either direction; moved from profiling_helpers, #725)
+# generalized to force either direction; moved from profiler_report, #725)
 # ---------------------------------------------------------------------------
 
 

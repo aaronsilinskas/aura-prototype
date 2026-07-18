@@ -54,7 +54,7 @@ import time
 from effects.performance import PerformanceTracker
 from hardware.shared.ir_protocol import AuraInfraredDecoder
 from hardware.shared.ir_transport import InfraredMultiReceiver
-from hardware.shared.profiling_helpers import (
+from hardware.shared.profiler_report import (
     print_profile_header,
     print_stats_line,
     print_table_row,

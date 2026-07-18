@@ -62,7 +62,7 @@ from effects.performance import PerformanceTracker
 from engine.audio import AudioRegistry
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
-from hardware.shared.profiling_helpers import (
+from hardware.shared.profiler_report import (
     linear_fit,
     print_profile_header,
     print_stats_line,

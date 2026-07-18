@@ -125,7 +125,7 @@ from hardware.shared.device_config import (
     load_device_config,
 )
 from hardware.shared.device_hardware import DeviceHardware
-from hardware.shared.profiling_helpers import (
+from hardware.shared.profiler_report import (
     linear_fit,
     print_profile_header,
     print_stats_line,

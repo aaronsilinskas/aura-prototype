@@ -78,7 +78,7 @@ from hardware.circuitpython.device_builder import build_hardware, open_config_i2
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.shared.device_config import DeviceConfig, copy_with_enabled, load_device_config
 from hardware.shared.device_hardware import DeviceHardware
-from hardware.shared.profiling_helpers import (
+from hardware.shared.profiler_report import (
     print_profile_header,
     print_stats_line,
     print_table_row,

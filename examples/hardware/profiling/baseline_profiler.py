@@ -60,7 +60,7 @@ from engine.engine import GameEngine
 from engine.packs import PackRegistry
 from engine.state import GameState, SceneControls
 from engine.timer import Timer
-from hardware.shared.profiling_helpers import (
+from hardware.shared.profiler_report import (
     print_profile_header,
     print_stats_line,
     print_table_row,

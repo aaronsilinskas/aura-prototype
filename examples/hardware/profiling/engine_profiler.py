@@ -79,7 +79,7 @@ from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
 from engine.packs import PackRegistry
 from engine.state import GameState, SceneControls
-from hardware.shared.profiling_helpers import (
+from hardware.shared.profiler_report import (
     linear_fit,
     print_profile_header,
     print_stats_line,
