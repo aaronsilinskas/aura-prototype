@@ -33,7 +33,7 @@ measured — edit them in the file before deploying:
 
 Every profiler computes its target table's constants on-device and prints a
 **paste-ready markdown row** via the shared `print_table_row` helper
-(`hardware/shared/profiling_helpers.py`), so values are never eyeballed from raw stats
+(`hardware/shared/profiler_report.py`), so values are never eyeballed from raw stats
 lines. Each row is preceded by a greppable marker naming its target table:
 
 ```

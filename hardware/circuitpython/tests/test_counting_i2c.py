@@ -3,7 +3,7 @@
 Drives CountingI2C against a fake recording inner bus and asserts observable
 totals and forwarded calls, not private attributes.
 
-Prior art: test_matrix_output.py, test_profiling_helpers.py.
+Prior art: test_matrix_output.py, test_profiler_report.py.
 """
 
 import pytest

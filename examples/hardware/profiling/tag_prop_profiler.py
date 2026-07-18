@@ -123,7 +123,7 @@ from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.shared.device_config import load_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.network_controls import HardwareNetworkControls
-from hardware.shared.profiling_helpers import (
+from hardware.shared.profiler_report import (
     print_profile_header,
     print_stats_line,
     print_table_row,
