@@ -74,13 +74,11 @@ from effects.performance import PerformanceTracker
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
 from hardware.circuitpython.counting_i2c import CountingI2C
-from hardware.circuitpython.device_builder import build_hardware
+from hardware.circuitpython.device_builder import build_hardware, open_config_i2c
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
-from hardware.shared.device_config import DeviceConfig, load_device_config
+from hardware.shared.device_config import DeviceConfig, copy_with_enabled, load_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.profiling_helpers import (
-    copy_with_enabled,
-    open_config_i2c,
     print_profile_header,
     print_stats_line,
     print_table_row,

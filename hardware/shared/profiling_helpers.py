@@ -25,27 +25,23 @@ from hardware.shared.device_config import (
     NeoPixelPixelsConfig,
 )
 
-try:
-    import board
-except ImportError:
-    board = None
-
-try:
-    import busio
-except ImportError:
-    busio = None
-
 
 def board_id() -> str:
     """Return a best-effort board identifier.
 
     Prefers ``board.board_id`` (CircuitPython). Falls back to
     ``sys.platform`` when running off-device (e.g. CPython during
-    development).
+    development). ``board`` is imported here, defensively and locally --
+    this is the one place in the module that still touches a device-only
+    library, to read board identity for report output, never to construct
+    hardware (the `hardware/shared` import guard, #725, carves out exactly
+    this import).
     """
-    if board is not None:
-        return getattr(board, "board_id", "unknown-board")
-    return sys.platform
+    try:
+        import board
+    except ImportError:
+        return sys.platform
+    return getattr(board, "board_id", "unknown-board")
 
 
 def print_table_row(table: str, cells: list[object], driver: str = "-") -> None:
@@ -234,54 +230,6 @@ def metrics_harness_label(config: DeviceConfig) -> str:
             _ir_harness_part(config.ir),
         ]
     )
-
-
-def copy_with_enabled(section: object, enabled: bool) -> object:
-    """Return a copy of *section* with ``enabled`` forced to *enabled*.
-
-    Constructs a fresh instance from *section*'s own ``__slots__`` values via
-    ``getattr``, overriding only ``enabled`` -- a profiler reaches for this instead
-    of flipping ``.enabled`` on an already-parsed section, which stopped being how a
-    profiler isolates hardware once ``DeviceConfig.isolate`` shipped (#715, #717);
-    ``enabled`` reads as an ordinary field now, mutable only at construction.
-    Mirrors ``DeviceConfig``'s internal ``_disabled_copy`` (the helper ``isolate``
-    uses), generalized to force either direction since a profiler sometimes needs a
-    component forced *on* (e.g. the haptic profiler's DRV2605 section) rather than
-    off.
-
-    Args:
-        section: A parsed, non-``None`` section instance (e.g. a ``HapticsConfig``
-            or a ``MatrixPixelsConfig``/``NeoPixelPixelsConfig`` pixels-list entry).
-        enabled: The ``enabled`` value the returned copy carries.
-
-    Returns:
-        A new instance of ``type(section)`` equal to *section* on every slot
-        except ``enabled``. The copy is shallow: any slot holding a mutable
-        value (e.g. a pixel entry's ``strips`` list) still shares that value
-        with *section*.
-    """
-    kwargs = {name: getattr(section, name) for name in section.__slots__}
-    kwargs["enabled"] = enabled
-    return type(section)(**kwargs)
-
-
-def open_config_i2c(device_config):
-    """Open a fresh ``busio.I2C`` on *device_config*'s declared SDA/SCL pins.
-
-    Mirrors ``device_builder._setup_i2c``: uses the ``i2c`` section's named
-    pins when present, else falls back to ``board.SCL``/``board.SDA`` -- so an
-    injected bus (e.g. one a profiler wraps in ``CountingI2C`` to meter bytes)
-    lands on exactly the pins ``build_hardware`` would have chosen itself.
-
-    Unlike ``board.STEMMA_I2C()``, the returned bus is a plain ``busio.I2C``
-    that CircuitPython tears down on reload rather than holding ``never_reset``
-    -- so a profiler run never leaves the I2C peripheral claimed for the next
-    program (e.g. a demo) that constructs its own bus on the same pins.
-    """
-    i2c = device_config.i2c
-    if i2c is not None:
-        return busio.I2C(getattr(board, i2c.scl), getattr(board, i2c.sda))
-    return busio.I2C(board.SCL, board.SDA)
 
 
 def linear_fit(xs: list[float], ys: list[float]) -> tuple[float, float]:

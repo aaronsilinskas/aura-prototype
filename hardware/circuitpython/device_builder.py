@@ -73,6 +73,7 @@ from hardware.shared.radio_transport import RadioTransport
 __all__ = [
     "build_hardware",
     "load_device_config",
+    "open_config_i2c",
 ]
 
 
@@ -122,6 +123,29 @@ def _setup_i2c(i2c_config: I2CConfig | None, board_module: object) -> busio.I2C 
         return busio.I2C(scl, sda)
     except RuntimeError:
         return None
+
+
+def open_config_i2c(device_config: DeviceConfig, board_module: object = board) -> busio.I2C | None:
+    """Return an I2C bus on *device_config*'s declared (or board-default) SDA/SCL pins.
+
+    A public entry point onto :func:`_setup_i2c` for callers that need a bus
+    without a full :func:`build_hardware` call -- e.g. a profiler that wraps
+    the returned bus in ``CountingI2C`` before injecting it back into
+    ``build_hardware``'s ``i2c=`` seam, so the injected bus lands on exactly
+    the pins ``build_hardware`` would have chosen itself. Honours
+    *device_config*'s ``i2c`` section: ``enabled=False`` builds no bus at
+    all, named pins are resolved via ``_resolve_pin`` (raising a field-named
+    ``ValueError`` for an unknown pin), and a ``RuntimeError`` from
+    ``busio.I2C`` (no pull-up found) is caught and returns ``None`` rather
+    than propagating.
+
+    Unlike ``board.STEMMA_I2C()``, the returned bus is a plain ``busio.I2C``
+    that CircuitPython tears down on reload rather than holding
+    ``never_reset`` -- so a profiler run never leaves the I2C peripheral
+    claimed for the next program (e.g. a demo) that constructs its own bus
+    on the same pins.
+    """
+    return _setup_i2c(device_config.i2c, board_module)
 
 
 def _setup_spi(spi_config: SPIConfig | None, board_module: object) -> busio.SPI | None:

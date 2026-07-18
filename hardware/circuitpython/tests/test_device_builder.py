@@ -2,8 +2,10 @@
 
 Verifies that build_hardware produces the correct EffectOutput for each
 pixels.type (matrix and neopixel) and that audio, DRV2605 haptic driver, IR,
-and I2C bus injection paths wire up correctly.  All hardware modules (board,
-busio, pulseio, digitalio) are patched so this suite runs under CPython.
+and I2C bus injection paths wire up correctly. Also covers open_config_i2c,
+the public bus entry point onto _setup_i2c reachable without a full
+build_hardware call. All hardware modules (board, busio, pulseio, digitalio)
+are patched so this suite runs under CPython.
 """
 
 from __future__ import annotations
@@ -2012,6 +2014,133 @@ def test_setup_i2c_disabled_config_builds_no_bus() -> None:
 
     assert result is None
     mock_busio.I2C.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# open_config_i2c -- public bus entry point, a thin wrapper over _setup_i2c
+# reachable without a full build_hardware call (#725, moved from the
+# profiler-output module profiling_helpers, where it had drifted from
+# _setup_i2c: this is _setup_i2c's own behaviour, reached publicly)
+# ---------------------------------------------------------------------------
+
+
+def _device_config_with_i2c(sda: str = "GP4", scl: str = "GP5"):
+    """Return a DeviceConfig for testing open_config_i2c's named-pin branch."""
+    mapping = {
+        "buttons": ["D9"],
+        "i2c": {"sda": sda, "scl": scl},
+    }
+    return parse_device_config(mapping)
+
+
+def test_open_config_i2c_resolves_named_pins_and_constructs_bus_in_scl_sda_order() -> None:
+    scl_pin = MagicMock(name="scl_pin")
+    sda_pin = MagicMock(name="sda_pin")
+    board_mock = _mock_board(GP5=scl_pin, GP4=sda_pin)
+    config = _device_config_with_i2c(sda="GP4", scl="GP5")
+
+    with ExitStack() as stack:
+        mock_busio = stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+        mock_bus = MagicMock(name="bus")
+        mock_busio.I2C.return_value = mock_bus
+
+        from hardware.circuitpython.device_builder import open_config_i2c
+
+        result = open_config_i2c(config, board_mock)
+
+    mock_busio.I2C.assert_called_once_with(scl_pin, sda_pin)
+    assert result is mock_bus
+
+
+def test_open_config_i2c_uses_board_default_pins_when_no_config_present() -> None:
+    board_mock = _mock_board(SCL=MagicMock(name="SCL"), SDA=MagicMock(name="SDA"))
+    config = parse_device_config({"buttons": ["D9"]})
+
+    with ExitStack() as stack:
+        mock_busio = stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+        mock_bus = MagicMock(name="bus")
+        mock_busio.I2C.return_value = mock_bus
+
+        from hardware.circuitpython.device_builder import open_config_i2c
+
+        result = open_config_i2c(config, board_mock)
+
+    mock_busio.I2C.assert_called_once_with(board_mock.SCL, board_mock.SDA)
+    assert result is mock_bus
+
+
+def test_open_config_i2c_bad_pin_name_raises_field_named_value_error() -> None:
+    board_mock = MagicMock(spec=["GP5"])  # only scl resolves, sda has no attribute
+    board_mock.GP5 = MagicMock(name="GP5")
+    config = _device_config_with_i2c(sda="NONEXISTENT_PIN", scl="GP5")
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+
+        from hardware.circuitpython.device_builder import open_config_i2c
+
+        with pytest.raises(ValueError, match=r"i2c\.sda.*NONEXISTENT_PIN"):
+            open_config_i2c(config, board_mock)
+
+
+def test_open_config_i2c_disabled_section_builds_no_bus() -> None:
+    """``enabled: false`` on i2c builds no bus at all, honoured the same way
+    _setup_i2c honours it -- not a fall back to the board's default pins."""
+    config = _device_config_with_i2c()
+    config.i2c.enabled = False
+    board_mock = _mock_board(SCL=MagicMock(), SDA=MagicMock())
+
+    with ExitStack() as stack:
+        mock_busio = stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+
+        from hardware.circuitpython.device_builder import open_config_i2c
+
+        result = open_config_i2c(config, board_mock)
+
+    assert result is None
+    mock_busio.I2C.assert_not_called()
+
+
+def test_open_config_i2c_returns_none_when_no_pullup_found() -> None:
+    """A RuntimeError from busio.I2C (no pull-up wired) is caught and
+    reported as None, not propagated -- open_config_i2c honours this the
+    same way _setup_i2c does."""
+    config = parse_device_config({"buttons": ["D9"]})
+    board_mock = _mock_board(SCL=MagicMock(), SDA=MagicMock())
+
+    with ExitStack() as stack:
+        mock_busio = stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+        mock_busio.I2C.side_effect = RuntimeError(
+            "No pull up found on SDA or SCL; check your wiring"
+        )
+
+        from hardware.circuitpython.device_builder import open_config_i2c
+
+        assert open_config_i2c(config, board_mock) is None
+
+
+def test_open_config_i2c_never_returns_a_never_reset_stemma_bus() -> None:
+    """The returned bus must be a fresh busio.I2C -- CircuitPython tears it
+    down on reload -- never board.STEMMA_I2C(), which holds never_reset and
+    would leave the I2C peripheral claimed for the next program on the same
+    pins. This is the one behavioural fact the old profiling_helpers
+    docstring recorded that the #725 merge into _setup_i2c had to preserve."""
+    config = _device_config_with_i2c()
+    board_mock = _mock_board(GP4=MagicMock(), GP5=MagicMock())
+    board_mock.STEMMA_I2C = MagicMock(side_effect=AssertionError("must not call STEMMA_I2C"))
+
+    with ExitStack() as stack:
+        mock_busio = stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+        mock_bus = MagicMock(name="bus")
+        mock_busio.I2C.return_value = mock_bus
+
+        from hardware.circuitpython.device_builder import open_config_i2c
+
+        result = open_config_i2c(config, board_mock)
+
+    board_mock.STEMMA_I2C.assert_not_called()
+    mock_busio.I2C.assert_called_once()
+    assert result is mock_bus
 
 
 # ---------------------------------------------------------------------------
