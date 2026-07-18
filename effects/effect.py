@@ -24,11 +24,8 @@ EffectListenerFunc: TypeAlias = "Callable[[str], None]"
 class EffectPixels:
     """Abstract base class for pixel simulation and rendering.
 
-    Owns the per-frame ``update``/``render`` contract that was previously on
-    ``Effect``. Concrete subclasses: ``LayerRenderer``, ``AddColorsRenderer``,
-    ``AddSamplesRenderer``, ``Solid``, ``PulseEffect``, ``LightningEffect``.
-    ``EffectManager`` calls these methods directly on ``effect.pixels``; the
-    ``Effect`` shell is not involved.
+    ``EffectManager`` drives the per-frame ``update``/``render`` contract
+    directly on ``effect.pixels``; the ``Effect`` shell is not involved.
     """
 
     def update(self, elapsed: float) -> None:
@@ -81,23 +78,15 @@ class EffectAudio:
 class HapticPattern:
     """Declares a haptic playback sequence as an ordered list of steps.
 
-    Each step is one of the named class-level constants (effect or pause).
-    Constants are deliberately offset from DRV2605L hardware waveform IDs
-    (1, 4, 7, 10, 12, 14) so that passing a raw hardware ID to the output
-    layer raises an error.  The mapping from these constants to actual
-    DRV2605L waveform IDs lives inside ``Drv2605EffectOutput``.
-
-    Effect constants:
-      ``STRONG_CLICK``, ``SHARP_CLICK``, ``SOFT_BUMP``,
-      ``DOUBLE_CLICK``, ``TRIPLE_CLICK``, ``STRONG_BUZZ``
-
-    Pause constants:
-      ``PAUSE_250``, ``PAUSE_500``, ``PAUSE_1000``
+    Each step is one of the named class-level constants (an effect or a pause).
+    The constants are deliberately kept clear of the DRV2605L hardware waveform
+    IDs (1, 4, 7, 10, 12, 14) so that passing a raw hardware ID to the output
+    layer raises an error. ``Drv2605EffectOutput`` maps these constants to the
+    actual DRV2605L waveform IDs.
     """
 
     __slots__ = ["sequence"]
 
-    # Effect constants — offset from DRV2605L IDs {1, 4, 7, 10, 12, 14}
     STRONG_CLICK: Final = 101
     SHARP_CLICK: Final = 104
     SOFT_BUMP: Final = 107
@@ -105,7 +94,6 @@ class HapticPattern:
     TRIPLE_CLICK: Final = 112
     STRONG_BUZZ: Final = 114
 
-    # Pause constants — offset from DRV2605L IDs {1, 4, 7, 10, 12, 14}
     PAUSE_250: Final = 201
     PAUSE_500: Final = 202
     PAUSE_1000: Final = 203
@@ -214,7 +202,6 @@ class PixelBuffer:
 class Effect:
     """A descriptor declaring what capabilities an effect has.
 
-    Constructor: ``Effect(name, pixels=None, audio=None, haptic=None)``.
     ``EffectManager`` inspects each capability field each tick:
       - ``pixels is None`` → no pixel buffer allocated, no render pass.
       - ``audio``/``haptic`` are passed to outputs via ``handle_event``.

@@ -9,9 +9,6 @@ class AddColorsRenderer(EffectPixels):
     Each layer is a ``(buffer, palette)`` pair. Per-pixel: each layer maps its
     buffer sample to a color via its own palette, then all colors are combined
     by per-channel addition (clamped to 255).
-
-    Layers are rendered in order: the first writes directly to ``output``; each
-    subsequent layer samples its color directly and blends additively per pixel.
     """
 
     __slots__ = ["_layers"]

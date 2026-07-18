@@ -49,9 +49,8 @@ class PaletteLUT256(Palette):
 
         lookup_palette: list[int] = [0] * 256
 
-        # Iterate through each pair of adjacent stops and fill in the LUT between them
+        # Each stop is 4 bytes; walk adjacent stops and fill the LUT between them
         for anchor_index in range(0, len(anchored_stops) - 4, 4):
-            # get the next two stops, which anchor a segment of the LUT
             start_index = anchored_stops[anchor_index]
             start_r = anchored_stops[anchor_index + 1]
             start_g = anchored_stops[anchor_index + 2]
@@ -62,10 +61,8 @@ class PaletteLUT256(Palette):
             end_g = anchored_stops[anchor_index + 6]
             end_b = anchored_stops[anchor_index + 7]
 
-            # set the start color
             lookup_palette[start_index] = Palette.pack_rgb(start_r, start_g, start_b)
 
-            # set all colors between start and end to a weighted blend of the two
             for i in range(start_index + 1, end_index):
                 weight = (i - start_index) / (end_index - start_index)
                 r = int(start_r + weight * (end_r - start_r))
@@ -73,7 +70,7 @@ class PaletteLUT256(Palette):
                 b = int(start_b + weight * (end_b - start_b))
                 lookup_palette[i] = Palette.pack_rgb(r, g, b)
 
-        # make sure the final stop is set, the loop will only set the start color of each segment
+        # The loop only writes each segment's start color, so set the final stop here
         lookup_palette[255] = Palette.pack_rgb(
             anchored_stops[-3], anchored_stops[-2], anchored_stops[-1]
         )
