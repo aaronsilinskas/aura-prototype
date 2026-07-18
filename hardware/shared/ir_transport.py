@@ -21,6 +21,11 @@ from array import array
 from hardware.shared.ir_protocol import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_telemetry import IrTelemetryGate, IrTelemetrySnapshot
 
+try:
+    from collections.abc import Callable
+except ImportError:
+    pass  # Not available on all embedded runtimes
+
 # ---------------------------------------------------------------------------
 # Port abstractions
 # ---------------------------------------------------------------------------
@@ -666,9 +671,9 @@ class InfraredMultiReceiver(InfraredSourceReceiver):
 
     Args:
         pulse_readers: Sequence of :class:`PulseReader` instances to poll.
-        decoder_factory: Callable (no arguments) that returns a new
-            :class:`~hardware.shared.ir_protocol.InfraredDecoder` instance.
-            Called once per reader at construction time.
+        decoder_factory: Called once per reader at construction; must return a
+            fresh :class:`~hardware.shared.ir_protocol.InfraredDecoder` each
+            call so readers never share decode state.
         gate: :class:`IrTransmitGate` read for self-echo suppression.
 
     Attributes:
@@ -683,7 +688,7 @@ class InfraredMultiReceiver(InfraredSourceReceiver):
     def __init__(
         self,
         pulse_readers: "list[PulseReader]",
-        decoder_factory: "object",
+        decoder_factory: "Callable[[], InfraredDecoder]",
         gate: "IrTransmitGate | None" = None,
     ) -> None:
         # Freeze the reader list and create one decoder per reader

@@ -30,7 +30,7 @@ class NeoPixelEffectOutput(EffectOutput):
             within the strip.  Must be non-empty.
     """
 
-    __slots__ = ("_scope_pixels", "_strip", "min_resolution", "scopes")
+    __slots__ = ("_scope_pixels", "_strip")
 
     def __init__(
         self,

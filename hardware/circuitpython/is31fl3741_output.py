@@ -26,6 +26,8 @@ IS31FL3741_SCOPE_ROWS: Final = {
 class IS31FL3741EffectOutput(MatrixEffectOutput):
     """EffectOutput for the IS31FL3741 13×9 RGB LED matrix."""
 
+    __slots__ = ("_offsets",)
+
     # Logical row -> physical driver row: the panel's rows are not wired in
     # natural top-to-bottom order.
     _rowmap: Final = [8, 5, 4, 3, 2, 1, 0, 7, 6]
