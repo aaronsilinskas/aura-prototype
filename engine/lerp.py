@@ -6,8 +6,7 @@ from __future__ import annotations
 def level_lerp(level: int, max_val: float, min_val: float, max_level: int) -> float:
     """Interpolate between ``max_val`` (level 1, easiest) and ``min_val`` (hardest).
 
-    ``fraction = (level - 1) / (max_level - 1)`` clamped to ``[0.0, 1.0]``.
-    When ``max_level <= 1`` the guard returns ``max_val`` (fraction = 0).
+    A ``max_level`` of 1 or less yields ``max_val``.
     """
     fraction = 0.0 if max_level <= 1 else (level - 1) / (max_level - 1)
     if fraction < 0.0:
