@@ -424,14 +424,22 @@ class EffectManager(EffectControls, EffectAdmin):
         # the last tick.  This runs before Pass 1 so that stop events and
         # clear_pixels fire before the new frame is rendered, and so that calling
         # receipt.stop() from within output.flush() during Pass 2 is safe.
-        stopped: list[tuple[EffectManager._EffectEntry, set[str]]] = []
-        new_effects: list[EffectManager._EffectEntry] = []
+        # The detection scan is allocation-free; the partition lists are built
+        # only when something actually stopped, so the steady-state tick (nothing
+        # stopping) never allocates here.
+        any_stopped = False
         for entry in self._effects:
             if entry.receipt.is_stopped():
-                stopped.append((entry, set(entry.keys)))
-            else:
-                new_effects.append(entry)
-        if stopped:
+                any_stopped = True
+                break
+        if any_stopped:
+            stopped: list[tuple[EffectManager._EffectEntry, set[str]]] = []
+            new_effects: list[EffectManager._EffectEntry] = []
+            for entry in self._effects:
+                if entry.receipt.is_stopped():
+                    stopped.append((entry, set(entry.keys)))
+                else:
+                    new_effects.append(entry)
             self._stop_entries(stopped, new_effects)
             self._effects = new_effects
 
