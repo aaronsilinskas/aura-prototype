@@ -24,10 +24,10 @@ class ButtonData:
 
     __slots__ = ("_states",)
 
-    UP: "Final" = 0
-    DOWN: "Final" = 1
-    PRESSED: "Final" = 2
-    RELEASED: "Final" = 3
+    UP: Final = 0
+    DOWN: Final = 1
+    PRESSED: Final = 2
+    RELEASED: Final = 3
 
     def __init__(self, states: dict[str, int]) -> None:
         self._states = states
@@ -91,7 +91,7 @@ class AccelerationData:
 
     __slots__ = ("x", "y", "z")
 
-    GRAVITY: "Final" = 9.81  # m/s²
+    GRAVITY: Final = 9.81  # m/s²
 
     def __init__(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> None:
         self.x = x
@@ -105,7 +105,7 @@ class AccelerationData:
 class InputEvents:
     """Namespace for input-layer event types."""
 
-    GROUP: "Final" = EventGroup("in")
+    GROUP: Final = EventGroup("in")
 
     class ButtonAndAcceleration(Event):
         """Event carrying button state and optional acceleration data.

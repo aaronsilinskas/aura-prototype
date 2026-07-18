@@ -1,5 +1,7 @@
 """PackRegistry — auto-discovers named packs from a directory and lazily loads items."""
 
+from __future__ import annotations
+
 import os
 
 import engine._path as _path
@@ -30,7 +32,7 @@ class UnknownPackError(RegistryError):
 
     def __init__(self, pack_name: str) -> None:
         self.pack_name = pack_name
-        super().__init__("Unknown pack '" + pack_name + "'")
+        super().__init__(f"Unknown pack '{pack_name}'")
 
 
 class UnknownItemError(RegistryError):
@@ -44,22 +46,18 @@ class UnknownItemError(RegistryError):
     def __init__(
         self,
         item_name: str,
-        available: "list[str]",
-        pack_name: "str | None" = None,
+        available: list[str],
+        pack_name: str | None = None,
     ) -> None:
         self.item_name = item_name
         self.pack_name = pack_name
         self.available = available
         if pack_name is None:
-            message = "Unknown item '" + item_name + "'. Available: " + ", ".join(available)
+            message = f"Unknown item '{item_name}'. Available: {', '.join(available)}"
         else:
             message = (
-                "Unknown item '"
-                + item_name
-                + "' in pack '"
-                + pack_name
-                + "'. Available: "
-                + ", ".join(available)
+                f"Unknown item '{item_name}' in pack '{pack_name}'. "
+                + f"Available: {', '.join(available)}"
             )
         super().__init__(message)
 
@@ -74,7 +72,7 @@ class MissingItemAttributeError(RegistryError):
     def __init__(self, context: str, attr: str) -> None:
         self.context = context
         self.attr = attr
-        super().__init__(context + " has no attribute '" + attr + "'")
+        super().__init__(f"{context} has no attribute '{attr}'")
 
 
 class ItemTypeError(RegistryError):
@@ -84,22 +82,22 @@ class ItemTypeError(RegistryError):
     the owning registry entry (see ``load_item``).
     """
 
-    def __init__(self, context: str, attr: str, expected_class: "type") -> None:
+    def __init__(self, context: str, attr: str, expected_class: type) -> None:
         self.context = context
         self.attr = attr
         self.expected_class = expected_class
         super().__init__(
-            context + " attribute '" + attr + "' is not an instance of " + expected_class.__name__
+            f"{context} attribute '{attr}' is not an instance of {expected_class.__name__}"
         )
 
 
-def scan_item_names(dir: str) -> set[str]:
-    """Return item names found in *dir* under the canonical pack-item rule.
+def scan_item_names(path: str) -> set[str]:
+    """Return item names found in *path* under the canonical pack-item rule.
 
     Recognises ``.py`` and ``.mpy`` files; excludes ``__init__`` and directories.
     """
     names: set[str] = set()
-    for fname in os.listdir(dir):
+    for fname in os.listdir(path):
         if fname.endswith(".mpy"):
             stem = fname[:-4]
         elif fname.endswith(".py"):
@@ -108,7 +106,7 @@ def scan_item_names(dir: str) -> set[str]:
             continue
         if stem == "__init__":
             continue
-        if _path.isdir(_path.join(dir, fname)):
+        if _path.isdir(_path.join(path, fname)):
             continue
         names.add(stem)
     return names
@@ -118,8 +116,8 @@ def load_item(
     full_module: str,
     item_attr: str,
     context: str,
-    expected_class: "type[T]",
-) -> "T":
+    expected_class: type[T],
+) -> T:
     """Import *full_module*, extract *item_attr*, and verify it is an instance of
     *expected_class*.
 
@@ -217,23 +215,17 @@ class PackRegistry:
 
             if pack_name == "scene":
                 raise ValueError(
-                    "'scene' is a reserved system-wide name and cannot be used as a pack name"
-                    + " (found at '"
-                    + pack_dir
-                    + "')"
+                    "'scene' is a reserved system-wide name and cannot be used as a "
+                    + f"pack name (found at '{pack_dir}')"
                 )
 
             if pack_name in self._packs:
                 existing = self._packs[pack_name]
                 if existing.source_path != norm_path:
                     raise ValueError(
-                        "Pack '"
-                        + pack_name
-                        + "' already registered from '"
-                        + existing.source_path
-                        + "'; cannot register the same pack name from '"
-                        + norm_path
-                        + "'"
+                        f"Pack '{pack_name}' already registered from "
+                        + f"'{existing.source_path}'; cannot register the same pack name "
+                        + f"from '{norm_path}'"
                     )
                 continue
 
@@ -251,7 +243,7 @@ class PackRegistry:
                 source_path=norm_path,
             )
 
-    def get(self, pack_name: str, item_name: str, expected_class: "type[T]") -> "T":
+    def get(self, pack_name: str, item_name: str, expected_class: type[T]) -> T:
         """Return the *item_attr* attribute of *item_name* from *pack_name*.
 
         The item is imported on first access and the result is cached.  On
@@ -279,12 +271,12 @@ class PackRegistry:
             return self._cache[cache_key]  # type: ignore[return-value]
 
         full_module = meta.module_prefix + "." + item_name
-        context = "Pack '" + pack_name + "' item '" + item_name + "'"
+        context = f"Pack '{pack_name}' item '{item_name}'"
         value = load_item(full_module, self._item_attr, context, expected_class)
         self._cache[cache_key] = value
         return value  # type: ignore[return-value]
 
-    def items(self, pack_name: str) -> "list[str]":
+    def items(self, pack_name: str) -> list[str]:
         """Return item names for *pack_name* in alphabetical order.
 
         Raises:
@@ -295,7 +287,7 @@ class PackRegistry:
             raise UnknownPackError(pack_name)
         return sorted(meta.item_names)
 
-    def sound_path(self, event: EffectEvent) -> "str | None":
+    def sound_path(self, event: EffectEvent) -> str | None:
         """Return the WAV file path for *event*.
 
         The lookup key is ``{event.name}_{event.verb}.wav`` inside the
