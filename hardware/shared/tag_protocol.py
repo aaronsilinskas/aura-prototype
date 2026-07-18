@@ -76,13 +76,6 @@ class TagData:
     __slots__ = ("damage", "player", "team")
 
     def __init__(self, team: int, player: int, damage: int) -> None:
-        """Initialize tag data.
-
-        Args:
-            team: Team identifier (0-3).
-            player: Player identifier (1-8).
-            damage: Damage value (1-4).
-        """
         self.team = team
         self.player = player
         self.damage = damage

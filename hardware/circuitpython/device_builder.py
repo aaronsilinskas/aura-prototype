@@ -178,8 +178,7 @@ def _setup_matrix_is31fl3741(i2c: busio.I2C, brightness: float) -> Adafruit_RGBM
 
     Retries construction for up to :data:`_MATRIX_STARTUP_TIMEOUT_S` seconds
     (useful if the I2C bus is still settling at boot), sleeping ~1s between
-    attempts. Drives LED scaling from *brightness* (``round(brightness *
-    0xFF)``), leaves global current pinned at 0xFF, then enables the matrix.
+    attempts.
 
     ``adafruit_is31fl3741`` and ``Adafruit_RGBMatrixQT`` are imported here,
     not at module load, so a config with no matrix entry never requires the
