@@ -93,11 +93,10 @@ class HardwareNetworkControls(NetworkControls, TransmitPump):
         lifecycle/runtime concern, not a game rule, so it stays off the seam
         game rules see.
 
-        Returns:
-            The same ``dict[str, bool]`` instance every call (pre-allocated
-            at construction, updated in place) mapping each wired emitter
-            constant to that transmitter's busy state after this poll. A
-            live view, not a snapshot — read it within the same tick.
+        Returns the map declared by :meth:`TransmitPump.poll_transmits` as the
+        same ``dict`` instance every call — pre-allocated at construction and
+        updated in place, so it is a live view, not a snapshot; read it within
+        the same tick.
         """
         results = self._poll_results
         for emitter, tx in self._transmitters.items():

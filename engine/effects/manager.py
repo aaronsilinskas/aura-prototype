@@ -359,9 +359,7 @@ class EffectManager(EffectControls, EffectAdmin):
         """Reset every registered scope key's merge strategy to SPLIT.
 
         Reserved for ``SceneManager`` (via the ``EffectAdmin`` face) — called
-        from ``_do_load`` so no strategy choice survives a ``load``. The
-        snapshot stack that used to live here is gone — each overlay's
-        snapshot now rides in its own scene stack entry.
+        from ``_do_load`` so no strategy choice survives a ``load``.
         """
         for key in self._merge_strategies:
             self._merge_strategies[key] = SPLIT

@@ -452,7 +452,6 @@ class GameState:
         return key in self._data
 
     def __contains__(self, key: object) -> bool:
-        """Support ``"key" in state`` membership tests."""
         return key in self._data
 
     @property

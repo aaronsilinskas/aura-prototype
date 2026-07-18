@@ -86,5 +86,10 @@ class TransmitPump:
     __slots__ = ()
 
     def poll_transmits(self) -> dict[str, bool]:
-        """Pump every wired transmitter's in-flight write lifecycle forward."""
+        """Pump every wired transmitter's in-flight write lifecycle forward.
+
+        Returns:
+            A map of each wired emitter constant to that transmitter's busy
+            state after this poll.
+        """
         raise NotImplementedError

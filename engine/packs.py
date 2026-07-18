@@ -309,12 +309,8 @@ class PackRegistry:
     def check_version(self, pack_name: str, required: Version) -> None:
         """Verify that the installed pack version satisfies the minimum required.
 
-        Compatibility rules (MAJOR.MINOR semantics):
-
-        * Same major **and** installed minor >= required minor → compatible (no-op).
-        * Same major **and** installed minor < required minor →
-          ``ValueError`` containing "upgrade the pack".
-        * Different major → ``ValueError`` containing "incompatible".
+        Delegates the MAJOR.MINOR compatibility check to
+        :meth:`Version.check_compatible`.
 
         Raises:
             UnknownPackError: if *pack_name* is unknown.
