@@ -24,6 +24,7 @@ __all__ = [
     "NeoPixelStripConfig",
     "RadioConfig",
     "SPIConfig",
+    "copy_with_enabled",
     "first_neopixel_pin",
     "load_device_config",
     "parse_device_config",
@@ -267,8 +268,8 @@ class HapticsConfig:
         self.enabled: bool = enabled
 
 
-def _disabled_copy(section: object) -> object:
-    """Return a copy of *section* with ``enabled`` forced to ``False``.
+def copy_with_enabled(section: object, enabled: bool) -> object:
+    """Return a copy of *section* with ``enabled`` forced to *enabled*.
 
     Reads every name in *section*'s ``__slots__`` off the instance via
     ``getattr`` and passes them back as constructor keyword arguments,
@@ -280,17 +281,28 @@ def _disabled_copy(section: object) -> object:
     ``ir_transport`` builds ``IrTelemetrySnapshot`` the same way, by
     splatting slot-driven ``getattr`` reads.
 
+    ``isolate`` calls this with ``enabled=False`` to disable every component
+    but the one it keeps -- the internal use this started as (#715). A
+    profiler reaches for it directly too, generalized to force either
+    direction, since a profiler sometimes needs a component forced *on*
+    (e.g. the haptic profiler's DRV2605 section) rather than off (#717):
+    ``enabled`` reads as an ordinary field once parsed, mutable only at
+    construction.
+
     Args:
         section: A parsed, non-``None`` section instance (e.g. an
             ``AudioConfig`` or a ``MatrixPixelsConfig``/``NeoPixelPixelsConfig``
             pixels-list entry).
+        enabled: The ``enabled`` value the returned copy carries.
 
     Returns:
-        A new instance of ``type(section)`` equal to *section* on every
-        slot except ``enabled``, which is ``False``.
+        A new instance of ``type(section)`` equal to *section* on every slot
+        except ``enabled``. The copy is shallow: any slot holding a mutable
+        value (e.g. a pixel entry's ``strips`` list) still shares that value
+        with *section*.
     """
     kwargs = {name: getattr(section, name) for name in section.__slots__}
-    kwargs["enabled"] = False
+    kwargs["enabled"] = enabled
     return type(section)(**kwargs)
 
 
@@ -370,11 +382,11 @@ class DeviceConfig:
             if name in _ISOLATE_EXCLUDED_COMPONENTS or name == keep:
                 kwargs[name] = value
             elif name == "pixels":
-                kwargs[name] = [_disabled_copy(entry) for entry in value]
+                kwargs[name] = [copy_with_enabled(entry, enabled=False) for entry in value]
             elif value is None:
                 kwargs[name] = None
             else:
-                kwargs[name] = _disabled_copy(value)
+                kwargs[name] = copy_with_enabled(value, enabled=False)
         return DeviceConfig(**kwargs)
 
 

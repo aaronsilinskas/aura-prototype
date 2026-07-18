@@ -7,6 +7,7 @@ import pytest
 
 from hardware.shared.device_config import (
     DeviceConfig,
+    copy_with_enabled,
     first_neopixel_pin,
     load_device_config,
     parse_device_config,
@@ -1290,6 +1291,75 @@ def test_load_device_config_parses_valid_file(tmp_path, matrix_config):
 def test_load_device_config_raises_when_file_missing(tmp_path):
     with pytest.raises(RuntimeError, match="not found"):
         load_device_config(str(tmp_path / "missing.json"))
+
+
+# ---------------------------------------------------------------------------
+# copy_with_enabled — the single copy primitive (isolate's _disabled_copy,
+# generalized to force either direction; moved from profiling_helpers, #725)
+# ---------------------------------------------------------------------------
+
+
+def test_copy_with_enabled_returns_a_distinct_instance_with_enabled_forced():
+    config = parse_device_config({"haptics": {}})
+
+    copy = copy_with_enabled(config.haptics, enabled=False)
+
+    assert copy is not config.haptics
+    assert copy.enabled is False
+    assert config.haptics.enabled is True
+
+
+def test_copy_with_enabled_can_force_enabled_true_on_a_declared_disabled_section():
+    config = parse_device_config({"haptics": {"enabled": False}})
+
+    copy = copy_with_enabled(config.haptics, enabled=True)
+
+    assert copy.enabled is True
+    assert config.haptics.enabled is False
+
+
+def test_copy_with_enabled_preserves_every_other_field_of_a_pixels_entry():
+    config = parse_device_config(
+        {
+            "pixels": [
+                {
+                    "type": "matrix",
+                    "cols": 13,
+                    "scope_rows": {"personal": [0, 9]},
+                    "brightness": 0.5,
+                }
+            ]
+        }
+    )
+    original = config.pixels[0]
+
+    copy = copy_with_enabled(original, enabled=False)
+
+    assert copy.cols == original.cols
+    assert copy.scope_rows == original.scope_rows
+    assert copy.brightness == original.brightness
+    assert copy.enabled is False
+
+
+def test_copy_with_enabled_shares_mutable_slot_values_with_the_original():
+    # The copy is shallow -- a mutable slot (scope_rows) is the *same* dict
+    # object on both, not a deep copy of it.
+    config = parse_device_config(
+        {
+            "pixels": [
+                {
+                    "type": "matrix",
+                    "cols": 13,
+                    "scope_rows": {"personal": [0, 9]},
+                }
+            ]
+        }
+    )
+    original = config.pixels[0]
+
+    copy = copy_with_enabled(original, enabled=False)
+
+    assert copy.scope_rows is original.scope_rows
 
 
 # ---------------------------------------------------------------------------
