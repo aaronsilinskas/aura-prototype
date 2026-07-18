@@ -26,9 +26,9 @@ class SparkleLayer(Layer):
     comparison between the two design approaches.
     """
 
-    PHASE_IDLE: "Final" = 0
-    PHASE_FADE_IN: "Final" = 1
-    PHASE_FADE_OUT: "Final" = 2
+    PHASE_IDLE: Final = 0
+    PHASE_FADE_IN: Final = 1
+    PHASE_FADE_OUT: Final = 2
 
     __slots__ = [
         "_fade_in_rate",
