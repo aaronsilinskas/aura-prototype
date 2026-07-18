@@ -13,6 +13,11 @@ try:
 except ImportError:
     pass  # Not available on CircuitPython
 
+try:
+    from typing import Final
+except ImportError:
+    pass  # Not available on CircuitPython
+
 EffectListenerFunc: TypeAlias = "Callable[[str], None]"
 
 
@@ -93,17 +98,17 @@ class HapticPattern:
     __slots__ = ["sequence"]
 
     # Effect constants — offset from DRV2605L IDs {1, 4, 7, 10, 12, 14}
-    STRONG_CLICK: int = 101
-    SHARP_CLICK: int = 104
-    SOFT_BUMP: int = 107
-    DOUBLE_CLICK: int = 110
-    TRIPLE_CLICK: int = 112
-    STRONG_BUZZ: int = 114
+    STRONG_CLICK: Final = 101
+    SHARP_CLICK: Final = 104
+    SOFT_BUMP: Final = 107
+    DOUBLE_CLICK: Final = 110
+    TRIPLE_CLICK: Final = 112
+    STRONG_BUZZ: Final = 114
 
     # Pause constants — offset from DRV2605L IDs {1, 4, 7, 10, 12, 14}
-    PAUSE_250: int = 201
-    PAUSE_500: int = 202
-    PAUSE_1000: int = 203
+    PAUSE_250: Final = 201
+    PAUSE_500: Final = 202
+    PAUSE_1000: Final = 203
 
     def __init__(self, sequence: list[int]) -> None:
         self.sequence = sequence
