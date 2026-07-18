@@ -11,6 +11,8 @@ class EffectOutput:
       - scopes: list         — list of ScopeValue this output serves.
     """
 
+    __slots__ = ("_receives_pixels", "min_resolution", "scopes")
+
     min_resolution: int
     scopes: list[ScopeValue]
 

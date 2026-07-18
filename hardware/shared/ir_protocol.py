@@ -221,8 +221,11 @@ class InfraredDecoder:
         return min(1.0, 1.3 - error_ratio)
 
     def reset_telemetry(self) -> None:
-        """Zero the decoder's telemetry counters. No-op on the base — decoders
-        that track real counters (e.g. ``TagInfraredDecoder``) override this."""
+        """Zero the shared telemetry counters.
+
+        The base implementation serves every decoder, including
+        ``TagInfraredDecoder``: they all increment these same base-declared
+        counters, so none needs to override this."""
         self.packets_started = 0
         self.packets_completed = 0
         self.preamble_reject = 0
