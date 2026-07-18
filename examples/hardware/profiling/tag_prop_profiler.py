@@ -328,7 +328,6 @@ def run() -> None:
         elapsed = timer.elapsed
 
         buttons.update(elapsed, _button_data)
-        # One-time synthetic press to leave Ready without a human button press.
         if not start_injected:
             _inject_press("A", _button_data)
             start_injected = True
@@ -371,10 +370,7 @@ def run() -> None:
         if not perf.complete_frame():
             continue
 
-        # Drop the warm-up window: boot + scene transitions construct effects and
-        # open WAV files for the first time, spiking single frames into the
-        # hundreds of ms / ~1 s range. Reset the tracker once so averages and the
-        # peak reflect only steady-state frames, not one-time construction cost.
+        # Reset the tracker at the warm-up boundary — measure only steady state.
         if not warmup_done and time.monotonic() >= warmup_until:
             warmup_done = True
             perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
