@@ -65,7 +65,7 @@ def _check_phase_owners(rules: list[GameRule]) -> None:
             continue
         key = ownership()
         if key in owners:
-            raise ValueError("Two PhaseRules own the same (machine key, phase): " + repr(key))
+            raise ValueError(f"Two PhaseRules own the same (machine key, phase): {key!r}")
         owners[key] = rule
 
 

@@ -43,7 +43,6 @@ class EffectOutput:
         go-dark path — this method is not called when no effects are active
         for that key.
         """
-        pass
 
     def flush(self) -> None:
         """Commit staged pixel data to hardware or other sinks.
@@ -53,7 +52,6 @@ class EffectOutput:
         buffer (e.g. ``strip.show()`` for NeoPixels). Audio and event outputs
         may leave this as a no-op.
         """
-        pass
 
     def clear_pixels(self, scope_key: str) -> None:
         """Signal that the given scope key should go dark.
@@ -62,7 +60,6 @@ class EffectOutput:
         can override this to explicitly clear their buffer (e.g. write zeros to
         LEDs). Default is a no-op.
         """
-        pass
 
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
@@ -72,4 +69,3 @@ class EffectOutput:
         Lifecycle events (start/stop) and effect-triggered signals all deliver
         an ``EffectEvent`` instance.
         """
-        pass

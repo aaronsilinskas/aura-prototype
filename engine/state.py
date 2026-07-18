@@ -420,9 +420,7 @@ class GameState:
             return None
         value = self._data[key]
         if not isinstance(value, expected_class):
-            raise ValueError(
-                "Key '" + key + "' value is not an instance of " + expected_class.__name__
-            )
+            raise ValueError(f"Key '{key}' value is not an instance of {expected_class.__name__}")
         return value
 
     def set(self, key: str, value: object) -> None:
@@ -441,7 +439,7 @@ class GameState:
             raise KeyError(key)
         value = self._data[key]
         if not isinstance(value, type_):
-            raise ValueError("Key '" + key + "' value is not an instance of " + type_.__name__)
+            raise ValueError(f"Key '{key}' value is not an instance of {type_.__name__}")
         del self._data[key]
         return value  # type: ignore[return-value]
 

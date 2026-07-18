@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from effects.effect import Effect, EffectConfig, PixelBuffer
 from engine.effects.merge import SPLIT
 from engine.effects.output import EffectOutput
@@ -75,9 +77,7 @@ class EffectResolver:
                 unknown scene-local effect).
         """
         if "." not in name:
-            raise ValueError(
-                "Effect name '" + name + "' missing pack prefix (expected 'pack.effect')"
-            )
+            raise ValueError(f"Effect name '{name}' missing pack prefix (expected 'pack.effect')")
         pack_name, effect_name = name.split(".", 1)
 
         if pack_name == "scene":
@@ -90,52 +90,38 @@ class EffectResolver:
     def _resolve_scene(self, name: str, effect_name: str) -> EffectBuilder:
         if self._local_effects is None:
             raise ValueError(
-                "Effect name '"
-                + name
-                + "' uses the reserved 'scene.' prefix but no scene is active"
+                f"Effect name '{name}' uses the reserved 'scene.' prefix but no scene is active"
             )
         try:
             return self._local_effects.get(effect_name, EffectBuilder)
         except UnknownItemError as exc:
             raise ValueError(
-                "Unknown scene-local effect '"
-                + effect_name
-                + "'. Available: "
-                + ", ".join(self._local_effects.items())
+                f"Unknown scene-local effect '{effect_name}'. "
+                + f"Available: {', '.join(self._local_effects.items())}"
             ) from exc
         except ItemTypeError as exc:
             raise ValueError(
-                "Scene-local effect '" + effect_name + "' has an invalid BUILD attribute"
+                f"Scene-local effect '{effect_name}' has an invalid BUILD attribute"
             ) from exc
         except MissingItemAttributeError as exc:
             raise ValueError(
-                "Scene-local effect '" + effect_name + "' is missing a BUILD attribute"
+                f"Scene-local effect '{effect_name}' is missing a BUILD attribute"
             ) from exc
 
     def _resolve_pack(self, pack_name: str, effect_name: str) -> EffectBuilder:
         try:
             return self._registry.get(pack_name, effect_name, EffectBuilder)
         except UnknownPackError as exc:
-            raise ValueError("Unknown effect pack '" + pack_name + "'") from exc
+            raise ValueError(f"Unknown effect pack '{pack_name}'") from exc
         except UnknownItemError as exc:
-            raise ValueError(
-                "Unknown effect '" + effect_name + "' in pack '" + pack_name + "'"
-            ) from exc
+            raise ValueError(f"Unknown effect '{effect_name}' in pack '{pack_name}'") from exc
         except ItemTypeError as exc:
             raise ValueError(
-                "Effect '"
-                + effect_name
-                + "' in pack '"
-                + pack_name
-                + "' has an invalid BUILD attribute"
+                f"Effect '{effect_name}' in pack '{pack_name}' has an invalid BUILD attribute"
             ) from exc
         except MissingItemAttributeError as exc:
             raise ValueError(
-                "Effect pack '"
-                + pack_name
-                + "' item '"
-                + effect_name
-                + "' is missing a BUILD attribute"
+                f"Effect pack '{pack_name}' item '{effect_name}' is missing a BUILD attribute"
             ) from exc
 
 
@@ -231,7 +217,7 @@ class EffectManager(EffectControls, EffectAdmin):
         scope_key_set: set[str],
         name: str,
         options: dict[str, object],
-    ) -> "EffectManager._EffectEntry":
+    ) -> EffectManager._EffectEntry:
         """Construct an Effect for the named effect."""
         builder, pack_name, effect_name = self._resolver.resolve(name)
 
@@ -277,13 +263,13 @@ class EffectManager(EffectControls, EffectAdmin):
         scope_key_set: set[str],
         name: str,
         options: dict[str, object],
-    ) -> "EffectManager._EffectEntry":
+    ) -> EffectManager._EffectEntry:
         """Build, append, and return the new effect entry."""
         entry = self._build_effect(scope_key_set, name, options)
         self._effects.append(entry)
         return entry
 
-    def _update_output_buffers(self, entry: "_EffectEntry") -> None:
+    def _update_output_buffers(self, entry: EffectManager._EffectEntry) -> None:
         """Remove keys no longer in entry.keys from per-output buffer dicts."""
         key_set = set(entry.keys)
         for i in range(len(self._outputs)):
@@ -298,8 +284,8 @@ class EffectManager(EffectControls, EffectAdmin):
 
     def _stop_entries(
         self,
-        stopped: "list[tuple[EffectManager._EffectEntry, set[str]]]",
-        remaining: "list[EffectManager._EffectEntry]",
+        stopped: list[tuple[EffectManager._EffectEntry, set[str]]],
+        remaining: list[EffectManager._EffectEntry],
     ) -> None:
         """Fire stop events and clear_pixels for entries that have stopped or been narrowed.
 

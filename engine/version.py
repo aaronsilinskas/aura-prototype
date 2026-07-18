@@ -37,26 +37,18 @@ class Version:
           ``ValueError`` containing "upgrade the pack".
         * Different major → ``ValueError`` containing "incompatible".
         """
-        version_display = str(self.major) + "." + str(self.minor)
-        required_display = str(required_major) + "." + str(required_minor)
+        version_display = f"{self.major}.{self.minor}"
+        required_display = f"{required_major}.{required_minor}"
         if self.major != required_major:
             raise ValueError(
-                "Pack '"
-                + name
-                + "' version "
-                + version_display
-                + " is incompatible with required "
-                + required_display
+                f"Pack '{name}' version {version_display} is incompatible with "
+                + f"required {required_display}"
             )
         if self.minor < required_minor:
             raise ValueError(
-                "Pack '"
-                + name
-                + "' version "
-                + version_display
-                + " is too old; upgrade the pack to at least "
-                + required_display
+                f"Pack '{name}' version {version_display} is too old; upgrade the pack "
+                + f"to at least {required_display}"
             )
 
     def __str__(self) -> str:
-        return str(self.major) + "." + str(self.minor)
+        return f"{self.major}.{self.minor}"

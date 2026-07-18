@@ -6,7 +6,7 @@ import json
 import os
 
 try:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
@@ -76,7 +76,7 @@ class SceneLocalRegistry:
             return self._cache[item_name]  # type: ignore[return-value]
 
         full_module = self._module_prefix + "." + item_name
-        context = "Local item '" + item_name + "'"
+        context = f"Local item '{item_name}'"
         value = load_item(full_module, self._item_attr, context, expected_class)
         self._cache[item_name] = value
         return value  # type: ignore[return-value]
@@ -93,8 +93,10 @@ class Scene:
     fresh ``Scene`` to ``SceneManager.register``; ``SceneManager`` calls the
     factory when the scene is first loaded so each load gets a clean instance.
 
-    ``effect_packs`` and ``rule_packs`` are lists of ``(pack_name, "MAJOR.MINOR")``
-    tuples referencing packs registered in the respective ``PackRegistry``.
+    ``effect_packs`` and ``rule_packs`` are sequences of ``(pack_name, "MAJOR.MINOR")``
+    pairs referencing packs registered in the respective ``PackRegistry``.  JSON
+    discovery yields lists-of-lists; factory-built scenes may pass tuples — hence
+    the ``Sequence[Sequence[str]]`` typing.
 
     ``version`` is the scene's own declared version, parsed from ``scene.json`` at
     discovery time.  It is informational for now — format-validated and stored, but
@@ -122,8 +124,8 @@ class Scene:
 
     def __init__(
         self,
-        effect_packs: list[tuple[str, str]],
-        rule_packs: list[tuple[str, str]],
+        effect_packs: Sequence[Sequence[str]],
+        rule_packs: Sequence[Sequence[str]],
         initial_data: dict[str, object] | None = None,
         version: Version | None = None,
         local_rule_registry: SceneLocalRegistry | None = None,
@@ -161,9 +163,9 @@ class _SceneEntry:
     def __init__(
         self,
         version: Version,
-        effect_packs: list[list],
-        rule_packs: list[list],
-        initial_data: dict | None,
+        effect_packs: Sequence[Sequence[str]],
+        rule_packs: Sequence[Sequence[str]],
+        initial_data: dict[str, object] | None,
         source_path: str,
         local_rule_registry: SceneLocalRegistry,
         local_effect_registry: SceneLocalRegistry,
@@ -248,13 +250,9 @@ class SceneRegistry:
                 existing = self._scenes[scene_name]
                 if existing.source_path != norm_path:
                     raise ValueError(
-                        "Scene '"
-                        + scene_name
-                        + "' already registered from '"
-                        + existing.source_path
-                        + "'; cannot register the same scene name from '"
-                        + norm_path
-                        + "'"
+                        f"Scene '{scene_name}' already registered from "
+                        + f"'{existing.source_path}'; cannot register the same scene name "
+                        + f"from '{norm_path}'"
                     )
                 continue
 
@@ -264,27 +262,16 @@ class SceneRegistry:
             for key in _REQUIRED_KEYS:
                 if key not in data:
                     raise ValueError(
-                        "Scene '"
-                        + scene_name
-                        + "' in '"
-                        + norm_path
-                        + "' is missing required key '"
-                        + key
-                        + "' in scene.json"
+                        f"Scene '{scene_name}' in '{norm_path}' is missing required key "
+                        + f"'{key}' in scene.json"
                     )
 
             try:
                 version = Version.parse(data["version"])
             except (ValueError, IndexError, TypeError) as exc:
                 raise ValueError(
-                    "Scene '"
-                    + scene_name
-                    + "' in '"
-                    + norm_path
-                    + "' has malformed version '"
-                    + str(data["version"])
-                    + "': "
-                    + str(exc)
+                    f"Scene '{scene_name}' in '{norm_path}' has malformed version "
+                    + f"'{data['version']}': {exc}"
                 ) from exc
 
             initial_data = data.get("initial_data")
@@ -327,7 +314,7 @@ class SceneRegistry:
 
         entry = self._scenes.get(name)
         if entry is None:
-            raise ValueError("Unknown scene '" + name + "'")
+            raise ValueError(f"Unknown scene '{name}'")
 
         initial_data = dict(entry.initial_data) if entry.initial_data is not None else None
         return Scene(
@@ -468,9 +455,7 @@ class SceneManager(SceneControls):
         """Record a pop transition; raises immediately if stack has ≤ 1 entry."""
         n = len(self._stack)
         if n <= 1:
-            raise ValueError(
-                "Cannot pop: stack has " + str(n) + " entr" + ("y" if n == 1 else "ies")
-            )
+            raise ValueError(f"Cannot pop: stack has {n} entr{'y' if n == 1 else 'ies'}")
         self._pending = ("pop",)
 
     # ------------------------------------------------------------------

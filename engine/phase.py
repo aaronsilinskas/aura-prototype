@@ -63,7 +63,7 @@ class PhaseKey:
         self._name = name
 
     def __repr__(self) -> str:
-        return "PhaseKey(" + repr(self._name) + ")"
+        return f"PhaseKey({self._name!r})"
 
 
 class PhaseMachine:
