@@ -127,6 +127,19 @@ class InfraredDecoder:
             Defaults to 0, as above.
     """
 
+    # The IR receive-path telemetry counters this class owns — the read
+    # source ``InfraredSourceReceiver.telemetry()`` sums across every decoder
+    # and the reset source ``reset_telemetry()`` zeroes on every decoder. An
+    # explicit tuple, not derived from ``__slots__``, which also carries this
+    # class's seven private decode-state slots.
+    OWNED_TELEMETRY_FIELDS = (
+        "packets_started",
+        "packets_completed",
+        "preamble_reject",
+        "mark_reject",
+        "space_reject",
+    )
+
     __slots__ = (
         "_decoder_state",
         "_error_threshold",

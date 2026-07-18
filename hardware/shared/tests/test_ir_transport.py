@@ -12,7 +12,7 @@ import tracemalloc
 
 import pytest
 
-from hardware.shared.ir_protocol import AuraInfraredDecoder, AuraInfraredEncoder
+from hardware.shared.ir_protocol import AuraInfraredDecoder, AuraInfraredEncoder, InfraredDecoder
 from hardware.shared.ir_telemetry import IrTelemetrySnapshot
 from hardware.shared.ir_transport import (
     InfraredMultiReceiver,
@@ -1384,3 +1384,95 @@ def test_multi_receiver_drop_path_allocates_nothing_per_tick():
         if stat.traceback[0].filename.endswith("/ir_transport.py") and stat.size_diff > 0
     ]
     assert not diff, f"Unexpected allocations in ir_transport.py during drop receive: {diff}"
+
+
+# ---------------------------------------------------------------------------
+# IR telemetry field ownership (issue #730) — the reset bug is unrepresentable
+# ---------------------------------------------------------------------------
+
+
+def test_multi_receiver_reset_telemetry_zeroes_buffer_full_on_poll_across_readers():
+    """Regression: a multi-receiver reset must not leave buffer_full_on_poll
+    stale. Reading (telemetry()) and resetting (reset_telemetry()) both walk
+    every reader now, so a reset can no longer zero the decoders while
+    leaving the readers' counts to be reported as fresh."""
+    rx, readers = _make_multi_receiver(2)
+    readers[0].buffer_full_on_poll = 3
+    readers[1].buffer_full_on_poll = 4
+
+    rx.reset_telemetry()
+
+    assert rx.telemetry().buffer_full_on_poll == 0
+
+
+def test_ir_telemetry_field_ownership_partitions_every_snapshot_field_with_no_overlap():
+    """Each IrTelemetrySnapshot field has exactly one declared owner —
+    InfraredDecoder, PulseReader, or InfraredReceiver. A counter with no
+    owner (missing from the union) or two owners (present in more than one
+    tuple) fails this test."""
+    owned_field_tuples = [
+        InfraredDecoder.OWNED_TELEMETRY_FIELDS,
+        PulseReader.OWNED_TELEMETRY_FIELDS,
+        InfraredReceiver.OWNED_TELEMETRY_FIELDS,
+    ]
+
+    union: set[str] = set()
+    for fields in owned_field_tuples:
+        assert union.isdisjoint(fields), f"{fields} overlaps an already-claimed field"
+        union.update(fields)
+
+    assert union == set(IrTelemetrySnapshot.FIELDS)
+
+
+def _set_every_owned_counter_to(value, decoder, reader, receiver):
+    """Set every declared IR telemetry counter — across all three declared
+    owners — to *value*, without hand-listing the nine counter names."""
+    for name in InfraredDecoder.OWNED_TELEMETRY_FIELDS:
+        setattr(decoder, name, value)
+    for name in PulseReader.OWNED_TELEMETRY_FIELDS:
+        setattr(reader, name, value)
+    for name in InfraredReceiver.OWNED_TELEMETRY_FIELDS:
+        setattr(receiver, name, value)
+
+
+def test_single_receiver_reset_telemetry_zeroes_every_counter_telemetry_reports():
+    """Read/reset symmetry: whatever telemetry() reports, reset_telemetry()
+    zeroes — checked generically across every declared counter rather than
+    hand-listing them, so a newly added counter is covered automatically."""
+    reader = FakePulseReader()
+    decoder = TagInfraredDecoder()
+    rx = InfraredSingleReceiver(reader, decoder)
+    _set_every_owned_counter_to(7, decoder, reader, rx)
+
+    before = rx.telemetry()
+    assert all(getattr(before, field) == 7 for field in IrTelemetrySnapshot.FIELDS)
+
+    rx.reset_telemetry()
+
+    after = rx.telemetry()
+    assert all(getattr(after, field) == 0 for field in IrTelemetrySnapshot.FIELDS)
+
+
+def test_multi_receiver_with_one_source_reset_telemetry_zeroes_every_counter_telemetry_reports():
+    """The same read/reset symmetry check, run with N=1 — a one-source
+    multi-receiver is the same machinery as a single receiver, so the
+    guarantee must hold there too."""
+    reader = FakePulseReader()
+    decoders_built = []
+
+    def decoder_factory():
+        decoder = TagInfraredDecoder()
+        decoders_built.append(decoder)
+        return decoder
+
+    rx = InfraredMultiReceiver([reader], decoder_factory)
+    decoder = decoders_built[0]
+    _set_every_owned_counter_to(7, decoder, reader, rx)
+
+    before = rx.telemetry()
+    assert all(getattr(before, field) == 7 for field in IrTelemetrySnapshot.FIELDS)
+
+    rx.reset_telemetry()
+
+    after = rx.telemetry()
+    assert all(getattr(after, field) == 0 for field in IrTelemetrySnapshot.FIELDS)
