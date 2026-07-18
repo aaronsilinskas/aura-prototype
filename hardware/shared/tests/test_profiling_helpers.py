@@ -10,6 +10,7 @@ label -- lives here and is.
 from hardware.shared.device_config import parse_device_config
 from hardware.shared.profiling_helpers import (
     board_id,
+    copy_with_enabled,
     format_runtime_id,
     format_table_row,
     linear_fit,
@@ -82,6 +83,47 @@ class TestPrintTableRow:
         print_table_row("per_mcu_baselines", ["engine-host", "4.57%", "450"])
         out = capsys.readouterr().out
         assert "per_mcu_baselines" in out
+
+
+class TestCopyWithEnabled:
+    def test_returns_a_distinct_instance_with_enabled_forced(self):
+        config = parse_device_config({"haptics": {}})
+
+        copy = copy_with_enabled(config.haptics, enabled=False)
+
+        assert copy is not config.haptics
+        assert copy.enabled is False
+        assert config.haptics.enabled is True
+
+    def test_can_force_enabled_true_on_a_declared_disabled_section(self):
+        config = parse_device_config({"haptics": {"enabled": False}})
+
+        copy = copy_with_enabled(config.haptics, enabled=True)
+
+        assert copy.enabled is True
+        assert config.haptics.enabled is False
+
+    def test_preserves_every_other_field_of_a_pixels_entry(self):
+        config = parse_device_config(
+            {
+                "pixels": [
+                    {
+                        "type": "matrix",
+                        "cols": 13,
+                        "scope_rows": {"personal": [0, 9]},
+                        "brightness": 0.5,
+                    }
+                ]
+            }
+        )
+        original = config.pixels[0]
+
+        copy = copy_with_enabled(original, enabled=False)
+
+        assert copy.cols == original.cols
+        assert copy.scope_rows == original.scope_rows
+        assert copy.brightness == original.brightness
+        assert copy.enabled is False
 
 
 class TestMetricsHarnessLabel:
@@ -428,3 +470,35 @@ class TestMetricsHarnessLabel:
         label = metrics_harness_label(config)
 
         assert "+no-accel+" in label
+
+    def test_isolating_audio_reports_audio_alone_with_every_other_part_not_built(self):
+        # The one test spanning both halves of the spec (#717): `DeviceConfig.isolate`
+        # (#715) feeding straight into the enabled-driven harness label (#716). This
+        # is what would have caught the label bug had the two ever been used
+        # together -- every part but the kept one must read as its "not built" label,
+        # not merely "disabled".
+        config = parse_device_config(
+            {
+                "pixels": [
+                    {
+                        "type": "matrix",
+                        "cols": 13,
+                        "scope_rows": {"personal": [0, 9]},
+                    }
+                ],
+                "audio": {
+                    "voices": 4,
+                    "clips": {},
+                    "i2s_bit_clock": "GP10",
+                    "i2s_word_select": "GP11",
+                    "i2s_data": "GP12",
+                },
+                "haptics": {},
+                "accelerometer": {},
+                "ir": {"rx": "D11"},
+            }
+        )
+
+        label = metrics_harness_label(config.isolate(keep="audio"))
+
+        assert label == "no-pixels+audio(v4)+no-haptic+no-accel+no-ir"
