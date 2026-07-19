@@ -1,9 +1,8 @@
 """``RlglPhaseState`` -- mutable Game Level and receipt state for Red Light Green Light.
 
 Groups the Game Level and the three in-flight effect receipts (music, level,
-win sting) that previously lived as loose ``rlgl_*`` keys in ``GameState`` into
-a single mutable object, mirroring the ``RlglConfig`` (``rlgl_config``) and
-``RlglMotion`` (``rlgl_motion``) accessors introduced for #354 and #356.
+win sting) into a single mutable object, mirroring the ``RlglConfig``
+(``rlgl_config``) and ``RlglMotion`` (``rlgl_motion``) accessors.
 
 Phase and phase-start bookkeeping now live on the shared ``PhaseMachine``
 (``rlgl_phase``, see ``phases.py``); this object holds only the state that

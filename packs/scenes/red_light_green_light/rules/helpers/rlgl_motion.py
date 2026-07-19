@@ -1,8 +1,7 @@
 """``RlglMotion`` — mutable per-tick motion-tracking state for Red Light Green Light.
 
 Groups the gravity estimate, motion EMA, and green-still-timeout bookkeeping
-that previously lived as loose ``rlgl_*`` keys in ``GameState`` into a single
-mutable object. The gravity estimate is held as three float fields plus a
+into a single mutable object. The gravity estimate is held as three float fields plus a
 ``_seeded`` flag rather than a tuple, so :meth:`update` can advance it without
 allocating on every accelerometer sample.
 
