@@ -9,13 +9,7 @@ class RegenSpell(Spell):
     Level scaling: Increases the regeneration rate per second.
     """
 
-    def __init__(self, regen_rate: float, duration: float):
-        """Initialize a RegenSpell.
-
-        Args:
-            regen_rate: The rate of magic regeneration per second.
-            duration: The duration of the spell in seconds.
-        """
+    def __init__(self, regen_rate: float, duration: float) -> None:
         super().__init__(tags=[SpellTags.BUFF, ElementTags.WATER])
         self._base_regen_rate = regen_rate
         self.regen_rate = regen_rate

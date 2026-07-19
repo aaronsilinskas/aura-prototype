@@ -1,12 +1,17 @@
+try:
+    from typing import Final
+except ImportError:
+    pass
+
 from magic.aura import Spell
 
 
 class CastType:
     """Enumeration of cast types."""
 
-    LINE = "line"
-    CONE = "cone"
-    AREA_OF_EFFECT = "aoe"
+    LINE: Final = "line"
+    CONE: Final = "cone"
+    AREA_OF_EFFECT: Final = "aoe"
 
 
 class Caster:

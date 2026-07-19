@@ -17,68 +17,34 @@ class PauseSpell(Spell):
     """
 
     def __init__(self, duration: float) -> None:
-        """Initialize a PauseSpell.
-
-        Args:
-            duration: How long the pause lasts and the cast delay multiplier.
-        """
         super().__init__(tags=[SpellTags.DEBUFF, ElementTags.TIME])
         self._base_duration = duration
         self.duration = Duration(duration)
         self._modifier = ValueModifier(multiplier=duration, duration=duration)
 
     def start(self, aura: Aura) -> None:
-        """Apply the cast delay modifier.
-
-        Args:
-            aura: The aura being affected.
-        """
         aura.cast_delay.modifiers.add(self._modifier)
 
     def update(self, aura: Aura, elapsed_time: float) -> bool:
-        """Updates the pause duration.
-
-        Args:
-            aura: The aura being affected.
-            elapsed_time: The time passed since the last update.
-
-        Returns:
-            True if the pause has expired, False otherwise.
-        """
         return self.duration.update(elapsed_time)
 
     def stop(self, aura: Aura) -> None:
-        """Remove the cast delay modifier.
-
-        Args:
-            aura: The aura being released.
-        """
         aura.cast_delay.modifiers.remove(self._modifier)
 
     def modify_event(self, aura: Aura, event: AuraEvent) -> None:
-        """Cancel spell casts while paused. If not yet paused,
-        allow the first pause cast to pass but also pause this Aura
-
-        Args:
-            aura: The aura processing the event.
-            event: The event to potentially cancel.
-        """
+        """Cancels casts while paused; the first pause cast passes and also pauses this Aura."""
         if not isinstance(event, CastEvent):
             return
 
         event_spell = event.spell
         if isinstance(event_spell, PauseSpell):
-            # Check if a pause is already active
             already_paused = aura.spells.get_by_class(PauseSpell) != []
             if not already_paused:
-                # No pause active, add a new one with the same duration as this spell
                 aura.add_spell(PauseSpell(self.duration.length))
 
-            # Cancel the cast if already paused (prevent stacking)
-            # Allow the cast if not already paused (first pause)
+            # Cancel a stacking pause; let the first pause through to pause this Aura.
             event.is_canceled = already_paused
         else:
-            # Cancel all non-pause spell casts while paused
             event.is_canceled = True
 
     def on_level_changed(self, level: int) -> None:
