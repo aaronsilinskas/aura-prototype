@@ -35,7 +35,6 @@ class IceShieldSpell(Spell):
         if self.duration.update(elapsed_time):
             return True
 
-        # Cast Freeze spell when max hits exceeded
         if self.hits.is_max:
             self._cast_freeze()
             return True
@@ -52,7 +51,7 @@ class IceShieldSpell(Spell):
 
     def _cast_freeze(self) -> None:
         if self._freeze_cast:
-            return  # Already cast
+            return
         self._freeze_cast = True
 
         self._caster.cast_spell(

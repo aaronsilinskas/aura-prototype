@@ -18,7 +18,7 @@ class WarmthSpell(Spell):
         for spell in water_debuffs + ice_debuffs:
             aura.remove_spell(spell)
 
-        return True  # Remove immediately after application
+        return True
 
     def on_level_changed(self, level: int) -> None:
-        pass  # No scaling for instant removal spell
+        pass

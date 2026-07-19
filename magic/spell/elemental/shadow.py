@@ -14,7 +14,7 @@ class ShadowSpell(Spell):
     def __init__(self, duration: float) -> None:
         super().__init__([SpellTags.DEBUFF, ElementTags.DARK])
         self._base_duration = duration
-        self.duration = Duration(duration)  # in seconds
+        self.duration = Duration(duration)
 
     def update(self, aura: Aura, elapsed_time: float) -> bool:
         return self.duration.update(elapsed_time)

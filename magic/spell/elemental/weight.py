@@ -1,10 +1,15 @@
 import math
 
+try:
+    from typing import Final
+except ImportError:
+    pass
+
 from magic.aura import Aura, AuraEvent, DamageEvent, Spell, SpellTags
 from magic.spell.elemental.elements import ElementTags
 from magic.values import Duration
 
-GRAVITY: float = 9.81  # m/s²
+GRAVITY: Final = 9.81  # m/s²
 
 
 class AccelerationEvent(AuraEvent):
@@ -24,7 +29,6 @@ class AccelerationEvent(AuraEvent):
 
         self._accel_magnitude = math.sqrt(x_accel**2 + y_accel**2 + z_accel**2)
         if remove_gravity:
-            # Subtract gravity
             self._accel_magnitude = max(0.0, self._accel_magnitude - GRAVITY)
 
     @property
@@ -49,14 +53,13 @@ class WeightSpell(Spell):
         self.movement_detected = False
 
     def update(self, aura: Aura, elapsed_time: float) -> bool:
-        # if movement was detected above threshold, apply damage
         if self.movement_detected:
             damage = self.damage_per_second * min(elapsed_time, self.duration.remaining)
             aura.process_event(DamageEvent(damage))
 
         return self.duration.update(elapsed_time)
 
-    def modify_event(self, aura: "Aura", event: AuraEvent) -> None:
+    def modify_event(self, aura: Aura, event: AuraEvent) -> None:
         if isinstance(event, AccelerationEvent):
             self.movement_detected = event.accel_magnitude > self.acceleration_threshold
 

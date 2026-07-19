@@ -16,7 +16,7 @@ class HealSpell(Spell):
     def update(self, aura: Aura, elapsed_time: float) -> bool:
         aura.process_event(HealEvent(self.healing))
 
-        return True  # Remove after one application
+        return True
 
     def on_level_changed(self, level: int) -> None:
         self.healing = Spell.LEVEL_SCALER.scale_value(self._base_healing, level)

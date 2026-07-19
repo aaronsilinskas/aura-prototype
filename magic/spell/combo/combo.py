@@ -1,83 +1,45 @@
-"""Spell combination system for detecting and replacing spell combinations in an Aura.
+"""Detects sets of spells on an Aura and replaces them with a combined spell."""
 
-This module provides the framework for creating spell combinations that can detect
-specific sets of spells on an Aura and replace them with combined spells.
-"""
+try:
+    from collections.abc import Iterator
+except ImportError:
+    pass
 
 from magic.aura import AddSpellEvent, Aura, AuraEvent, EventListener
 
 
 class SpellCombination:
-    """Base class for spell combinations.
-
-    Looks for a specific set of spells on an Aura and replaces them with a new
-    combined spell if found. Subclasses should implement the check method to define
-    their specific combination logic.
-    """
+    """Looks for a specific set of spells on an Aura and replaces them with a
+    new combined spell if found."""
 
     def check(self, aura: Aura) -> bool:
-        """Check if the spell combination exists on the aura and apply it if found.
-
-        Args:
-            aura: The Aura instance to check for spell combinations.
-
-        Returns:
-            True if the combination was found and applied, False otherwise.
-        """
+        """Applies the combination if its spells are present, returning whether it fired."""
         raise NotImplementedError("This method should be implemented by subclasses.")
 
 
 class SpellCombinations(EventListener):
-    """Manager for spell combinations that listens to spell events.
+    """Checks its registered combinations whenever a spell is added to the Aura."""
 
-    This class manages a collection of SpellCombination instances and automatically
-    checks them whenever a spell is added to the Aura.
-    """
-
-    def __init__(self):
-        """Initialize a new SpellCombinations manager with an empty combination list."""
+    def __init__(self) -> None:
         self._combinations: list[SpellCombination] = []
 
     def on_spell_event(self, aura: "Aura", event: AuraEvent) -> None:
-        """Check for combinations when spells are added.
-
-        Args:
-            aura: The Aura instance where the event occurred.
-            event: The event that was triggered.
-        """
+        """Runs every registered combination check when a spell is added."""
         if isinstance(event, AddSpellEvent):
             for combo in self._combinations:
                 combo.check(aura)
 
     def add(self, combination: SpellCombination) -> None:
-        """Add a spell combination to the manager.
-
-        Args:
-            combination: The SpellCombination instance to register.
-        """
+        """Registers ``combination``."""
         self._combinations.append(combination)
 
     def remove(self, combination: SpellCombination) -> None:
-        """Remove a spell combination from the manager.
-
-        Args:
-            combination: The SpellCombination instance to unregister.
-        """
+        """Unregisters ``combination`` if present."""
         if combination in self._combinations:
             self._combinations.remove(combination)
 
     def __len__(self) -> int:
-        """Return the number of registered spell combinations.
-
-        Returns:
-            The count of spell combinations currently registered.
-        """
         return len(self._combinations)
 
-    def __iter__(self):
-        """Return an iterator over the registered spell combinations.
-
-        Returns:
-            An iterator over the list of spell combinations.
-        """
+    def __iter__(self) -> "Iterator[SpellCombination]":
         return iter(self._combinations)

@@ -16,7 +16,7 @@ class AmbientMagicRegenSpell(Spell):
         heal_amount = self.amount_per_second * elapsed_time
         aura.process_event(HealEvent(heal_amount))
 
-        return False  # Don't remove this spell
+        return False
 
     def on_level_changed(self, level: int) -> None:
         self.amount_per_second = Spell.LEVEL_SCALER.scale_value(self._base_amount_per_second, level)

@@ -1,5 +1,6 @@
 try:
-    from typing import TypeVar
+    from collections.abc import Iterator
+    from typing import Final, TypeVar
 
     T = TypeVar("T")
 except ImportError:
@@ -14,27 +15,15 @@ class SpellLevelScaler:
     def __init__(
         self, value_coefficient: float = 0.25, percentage_coefficient: float = 0.05
     ) -> None:
-        """Initializes the coefficients for this level scaler.
-
-        Args:
-            value_coefficient (float, optional): The coefficient for scaling values.
-                Defaults to 0.25.
-            percentage_coefficient (float, optional): The coefficient for scaling percentages.
-                Defaults to 0.05.
-        """
         self._value_coefficient = max(value_coefficient, 0)
         self._percentage_coefficient = max(percentage_coefficient, 0)
 
     def scale_value(self, value: float, level: int) -> float:
-        """Scales a value based on the spell's level and the value coefficient.
-        Increases the base value by the value coefficient per level.
-        """
+        """Scales a value based on the spell's level and the value coefficient."""
         return value * (1 + self._value_coefficient * (level - 1))
 
     def scale_percentage(self, base_percentage: float, level: int) -> float:
-        """Scales a percentage value based on the spell's level and the percentage coefficient.
-        Adds the percentage coefficient to the base percentage per level.
-        Clamps the value between 0 and 1."""
+        """Scales a percentage by the spell's level, clamped to a maximum of 1."""
         return min(base_percentage + self._percentage_coefficient * (level - 1), 1)
 
 
@@ -57,7 +46,7 @@ class Spell:
         pass
 
     def update(self, aura: "Aura", elapsed_time: float) -> bool:
-        """Update the spell. Return True if the spell should be removed from the aura."""
+        """Advances the spell; returns ``True`` when it should be removed from the aura."""
         raise NotImplementedError()
 
     def stop(self, aura: "Aura") -> None:
@@ -69,21 +58,19 @@ class Spell:
         pass
 
     def on_level_changed(self, level: int) -> None:
-        """Called when the spell's level is changed, allowing for adjustments based on level."""
+        """Called when the spell's level changes so subclasses can rescale."""
         raise NotImplementedError()
 
     @property
-    def tags(self):
+    def tags(self) -> "Iterator[str]":
         return iter(self._tags)
 
     @property
     def level(self) -> int:
-        """Returns the current level of the spell."""
         return self._level
 
     @level.setter
     def level(self, value: int) -> None:
-        """Sets the level of the spell, affecting its potency."""
         self._level = max(1, value)
         self.on_level_changed(self._level)
 
@@ -91,9 +78,9 @@ class Spell:
 class SpellTags:
     """String constants for categorising spells by role."""
 
-    SHIELD = "SHIELD"
-    BUFF = "BUFF"
-    DEBUFF = "DEBUFF"
+    SHIELD: Final = "SHIELD"
+    BUFF: Final = "BUFF"
+    DEBUFF: Final = "DEBUFF"
 
 
 class AuraEvent:
@@ -115,7 +102,6 @@ class DamageEvent(AuraEvent):
     """Event representing damage taken."""
 
     def __init__(self, amount: float) -> None:
-        """Initializes a damage event with a specific amount."""
         super().__init__()
         self.amount = max(0, amount)
 
@@ -124,7 +110,6 @@ class HealEvent(AuraEvent):
     """Event representing healing received."""
 
     def __init__(self, amount: float) -> None:
-        """Initializes a heal event with a specific amount."""
         super().__init__()
         self.amount = max(0, amount)
 
@@ -133,7 +118,6 @@ class CastEvent(AuraEvent):
     """Event representing a spell cast attempt."""
 
     def __init__(self, spell: Spell) -> None:
-        """Initializes a cast event."""
         super().__init__()
         self.spell = spell
 
@@ -142,7 +126,6 @@ class AddSpellEvent(AuraEvent):
     """Event representing a spell being added to the aura."""
 
     def __init__(self, spell: Spell) -> None:
-        """Initializes an adding spell event."""
         super().__init__()
         self.spell = spell
 
@@ -151,7 +134,6 @@ class RemoveSpellEvent(AuraEvent):
     """Event representing a spell being removed from the aura."""
 
     def __init__(self, spell: Spell) -> None:
-        """Initializes a removing spell event."""
         super().__init__()
         self.spell = spell
 
@@ -171,7 +153,7 @@ class Spells:
         self._spells: list[Spell] = spells
 
     def get_by_name(self, name: str) -> list[Spell]:
-        """Finds a spell by its name."""
+        """Returns every spell named ``name``."""
         return [spell for spell in self._spells if spell.name == name]
 
     def get_by_tag(self, *tags: str) -> list[Spell]:
@@ -192,7 +174,7 @@ class Spells:
     def __len__(self) -> int:
         return len(self._spells)
 
-    def __iter__(self):
+    def __iter__(self) -> "Iterator[Spell]":
         return iter(self._spells)
 
 
@@ -203,13 +185,6 @@ class Aura:
     """
 
     def __init__(self, min_magic: float, max_magic: float, cast_delay: float) -> None:
-        """Initialize the Aura with magic bounds and cast delay.
-
-        Args:
-            min_magic: The minimum value the magic attribute can reach.
-            max_magic: The maximum value the magic attribute can reach.
-            cast_delay: The base cast delay in seconds.
-        """
         self.magic = MinMaxValue(value=max_magic, min=min_magic, max=max_magic)
         self._spell_list: list[Spell] = []
         self._spells = Spells(self._spell_list)
@@ -217,37 +192,20 @@ class Aura:
         self._event_listeners: list[EventListener] = []
 
     def add_spell(self, spell: Spell) -> None:
-        """Adds a spell to the aura and starts it.
-
-        Args:
-            spell: The spell to add.
-        """
+        """Adds ``spell`` to the aura and starts it."""
         self.process_event(AddSpellEvent(spell))
 
     def remove_spell(self, spell: Spell) -> None:
-        """Removes a spell from the aura and stops it.
-
-        Args:
-            spell: The spell to remove.
-        """
+        """Removes ``spell`` from the aura and stops it."""
         self.process_event(RemoveSpellEvent(spell))
 
     def cast_spell(self, spell: Spell) -> None:
-        """Attempts to cast a spell, allow the spell and other active spells to react to it.
-
-        Args:
-            spell: The spell to cast.
-        """
+        """Casts ``spell``, letting it and other active spells react to the cast."""
         self.process_event(CastEvent(spell))
 
     def process_event(self, event: AuraEvent) -> None:
-        """Processes an incoming event through all active spells.
-
-        If an event is canceled by a spell, it is not applied to the magic value.
-
-        Args:
-            event: The incoming event to process.
-        """
+        """Passes ``event`` to each active spell; if one cancels it, it is neither
+        applied nor sent to listeners."""
         for spell in self.spells:
             spell.modify_event(self, event)
             if event.is_canceled:
@@ -258,11 +216,7 @@ class Aura:
             listener.on_spell_event(self, event)
 
     def _apply_event(self, event: AuraEvent) -> None:
-        """Applies the event to the magic value.
-
-        Args:
-            event: The event to apply.
-        """
+        """Applies ``event``: adjusts the magic value, or adds/removes the spell."""
         if isinstance(event, DamageEvent):
             self.magic.value -= event.amount
         elif isinstance(event, HealEvent):
@@ -275,11 +229,7 @@ class Aura:
             event.spell.stop(self)
 
     def update(self, elapsed_time: float) -> None:
-        """Updates the aura state, magic, and spells.
-
-        Args:
-            elapsed_time: The time passed since the last update.
-        """
+        """Advances magic, cast delay, and all spells, removing any that expire."""
         self.magic.update(elapsed_time)
         self._cast_delay.update(elapsed_time)
 
@@ -293,19 +243,15 @@ class Aura:
 
     @property
     def spells(self) -> Spells:
-        """Returns the active spells collection."""
         return self._spells
 
     @property
     def cast_delay(self) -> ValueWithModifiers:
-        """Returns the current cast delay including modifiers."""
+        """The current cast delay, including active modifiers."""
         return self._cast_delay
 
     @property
     def event_listeners(self) -> list[EventListener]:
-        """Returns the list of event listeners.
-
-        These listeners will be notified on events after the event is processed
-        by active spells and the Aura.
-        """
+        """The registered listeners, notified after each event is processed by
+        active spells and the Aura."""
         return self._event_listeners

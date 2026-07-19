@@ -17,7 +17,7 @@ class UnpauseSpell(Spell):
         for spell in pause_spells:
             aura.remove_spell(spell)
 
-        return True  # Remove immediately after application
+        return True
 
     def on_level_changed(self, level: int) -> None:
-        pass  # No scaling for instant removal spell
+        pass

@@ -16,7 +16,7 @@ class SliceSpell(Spell):
     def update(self, aura: Aura, elapsed_time: float) -> bool:
         aura.process_event(DamageEvent(self.damage))
 
-        return True  # Remove after one application
+        return True
 
     def on_level_changed(self, level: int) -> None:
         self.damage = Spell.LEVEL_SCALER.scale_value(self._base_damage, level)
