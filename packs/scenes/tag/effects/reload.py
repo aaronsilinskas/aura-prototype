@@ -1,7 +1,7 @@
 """Tag scene "reload" effect — self-animating hold-to-reload fill on ``GLOBAL.BUFF``.
 
-Built on :class:`ProgressFillEffect` (the self-animating fill component from
-#381): a 0->1 fill over the ``duration`` option, paired with a looping reload
+Built on :class:`ProgressFillEffect` (the self-animating fill component): a
+0->1 fill over the ``duration`` option, paired with a looping reload
 sound. Issued with ``set_effect`` once at the start of a reload — the fill
 animates on its own clock, so no per-tick re-issue is needed and the audio
 loop stays intact.

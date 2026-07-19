@@ -5,7 +5,7 @@ from effects.layers.add_samples_renderer import AddSamplesRenderer
 from effects.layers.layer import Layer
 from effects.level import clamp_level, level_lerp
 from effects.palette import PaletteLUT256
-from effects.shape import Shape
+from effects.shape import EffectShapeFunc, Shape
 from effects.value import lerp
 from engine.effects.manager import EffectBuilder
 
@@ -54,7 +54,7 @@ class _AirBreeze(Layer):
 
     def __init__(
         self,
-        shape,
+        shape: EffectShapeFunc,
         multiplier_end: float,
         hide_dur_min: float,
         hide_dur_max: float,
@@ -145,9 +145,11 @@ class _AirBreeze(Layer):
 
 class AirBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """Sweeping green-white breezes prototype.
+        """Sweeping green-white breezes that drift across the strip, each fading
+        in as it accelerates and fading out again as it slows.
 
-        Each breeze runs its own IDLE/SWEEP/FADE FSM directly on the effect.
+        Level: more breezes sweep at once, each brighter and wider, with shorter
+        gaps between sweeps.
         """
         level = clamp_level(config.get_option("level", 1))
 

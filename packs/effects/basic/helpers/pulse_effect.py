@@ -4,13 +4,7 @@ from effects.palette import Palette
 
 
 class PulseEffect(EffectPixels):
-    """Wraps a :class:`PulseLayer` with peak-event notification.
-
-    On each ``update()`` call, if the layer's ``at_peak`` flag is set,
-    ``config.notify_listeners("peak")`` is called exactly once. Pixel
-    rendering delegates to the same per-pixel palette lookup as
-    :class:`~effects.layers.renderer.LayerRenderer`.
-    """
+    """Wraps a :class:`PulseLayer`, firing a ``"peak"`` listener event on each peak."""
 
     __slots__ = ("_config", "_layer", "_palette")
 
@@ -31,7 +25,6 @@ class PulseEffect(EffectPixels):
             self._config.notify_listeners("peak")
 
     def render(self, output: PixelBuffer) -> None:
-        """Sample the layer at each pixel position and write palette-mapped colors."""
         count = len(output)
         inv_count = 1.0 / count
         layer = self._layer

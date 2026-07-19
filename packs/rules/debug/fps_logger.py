@@ -16,7 +16,11 @@ _DEFAULT_ENABLED_KEY = "fps_logging_enabled"
 
 
 class FpsLoggerRule(GameRule):
-    """Prints FPS to the console once per second."""
+    """Prints the average frame rate to the console every few seconds.
+
+    Set the state key (default ``"fps_logging_enabled"``) to ``True`` in a
+    scene's ``initial_data`` to enable logging for that scene.
+    """
 
     __slots__ = ["_clock", "_enabled_key", "_frames", "_output", "_window_start"]
 

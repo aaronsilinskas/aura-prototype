@@ -22,9 +22,10 @@ _TIME_SAND_PALETTE = bytes([  0,   0,   0,   0,
 
 class TimeBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """A drifting amber-brown sand prototype overlaid with rotating gray tickers.
+        """A drifting amber-brown sand field overlaid with rotating gray tickers.
 
-        simulation state lives directly on the effect.
+        Level: the sand drifts faster and more tickers sweep more quickly around
+        the strip.
         """
         level = clamp_level(config.get_option("level", 1))
 

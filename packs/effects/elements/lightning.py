@@ -17,11 +17,7 @@ _PHASE_STRIKE = 1
 
 
 class _LightningBolt(Layer):
-    """One independent bolt: alternates between idle (dark) and strike (flash+fade).
-
-    All values are resolved at construction / on each IDLE→STRIKE transition,
-    so this class has no dependency on DynamicValue or VG.
-    """
+    """One independent bolt: alternates between idle (dark) and strike (flash+fade)."""
 
     __slots__ = [
         "_bolt_offset",
@@ -112,7 +108,6 @@ class LightningEffect(EffectPixels):
             self._config.notify_listeners("strike")
 
     def render(self, output: PixelBuffer) -> None:
-        """Sum bolt samples per pixel, clamp to 1.0, and write palette-mapped colors."""
         count = len(output)
         inv_count = 1.0 / count
         palette = self._palette
@@ -129,9 +124,9 @@ class LightningEffect(EffectPixels):
 
 class LightningBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """Blinding orange flashes at random positions, prototype version.
+        """Blinding orange flashes striking at random positions and fading out.
 
-        runs its own IDLE/STRIKE FSM directly on the effect.
+        Level: more bolts strike at once, and each strikes more often.
         """
         level = clamp_level(config.get_option("level", 1))
 

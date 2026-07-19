@@ -19,9 +19,10 @@ _GRAVITY_PALETTE = bytes([  0,   0,   0,   0,
 
 class GravityBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """A drift-noise nebula prototype with additive star sparkles.
+        """A slow, drifting nebula in deep blues, sprinkled with additive white
+        star sparkles.
 
-        simulation state lives directly on the effect.
+        Level: a denser, wider nebula with more stars winking in and out.
         """
         level = clamp_level(config.get_option("level", 1))
 
