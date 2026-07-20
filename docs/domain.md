@@ -78,6 +78,12 @@ app/              Composition layer — the one place allowed to import both the
   scene_runtime.py      run_scene (device-only)
 
 scripts/          Deploy and maintenance scripts (CPython-only)
+
+electronics/      PCB design source (KiCad) — scratch/, pcbs/, libraries/, each with
+                  its own README.md. Distinct from the hardware/ firmware package
+                  above: electronics/ is design source, not Python, contains no
+                  package, and carries no import-linter contracts — it sits outside
+                  the engine ↔ hardware layering described below entirely.
 ```
 
 ### Module layering

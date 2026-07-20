@@ -24,3 +24,12 @@ tools/mpy-cross
 libArchive/
 stubArchive/
 lib/
+
+# KiCad clutter
+*-backups/
+*.kicad_pro-bak
+*.bak
+*~
+_autosave-*
+fp-info-cache
+*.kicad_prl
