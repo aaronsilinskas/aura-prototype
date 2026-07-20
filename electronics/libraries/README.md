@@ -10,6 +10,3 @@ so a correction or improvement only has to happen once.
 Parts used by only a single PCB can stay local to that PCB's own project
 libraries under `../pcbs/<pcb>/rev<X>/`; promote them here only once a second
 board needs the same part.
-
-No shared library files exist yet — this folder is intentionally empty until a
-part is actually reused across boards.
