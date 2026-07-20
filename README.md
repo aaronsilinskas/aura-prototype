@@ -147,3 +147,18 @@ python scripts/deploy_watch.py examples/hardware/scene_demo.py
 python scripts/deploy_watch.py examples/hardware/tag_demo.py
 ```
 
+---
+
+## Licensing
+
+This repo splits licensing by area:
+
+- **Software** (`effects/`, `engine/`, `magic/`, `packs/`, `hardware/`, `app/`, `scripts/`, …) —
+  [MIT](LICENSE).
+- **Hardware designs** (`electronics/`) — CERN-OHL-P-2.0, governed by
+  `electronics/LICENSE`.
+- **Documentation** (`docs/`) — [CC-BY-4.0](docs/LICENSE).
+
+Each area's `LICENSE` file is authoritative for its scope; `pyproject.toml` declares the
+software license for tooling. No per-file license headers are used.
+

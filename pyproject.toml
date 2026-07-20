@@ -3,6 +3,7 @@ name = "aura-prototype"
 version = "0.1.0"
 description = "Aura Game Engine core features protoype"
 readme = "README.md"
+license = "MIT"
 authors = [
     { name = "Aaron Silinskas", email = "aaron@mindwidgets.com" }
 ]
