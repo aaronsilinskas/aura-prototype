@@ -34,7 +34,7 @@
       }
     }
   ],
-  "buttons": ["GP26", "GP27"],
+  "buttons": ["GP27", "GP28"],
   "accelerometer": {
     "enabled": true
   },
@@ -68,7 +68,7 @@
   },
   "radio": {
     "cs": "GP1",
-    "reset": "GP22",
+    "reset": "GP9",
     "frequency": 915.0,
     "node": 1
   }
