@@ -40,7 +40,7 @@ Installation
 
 3. Place ``aura-device.json`` in CIRCUITPY/ to declare pin/geometry and select
    a scene via the ``"scene"`` key. It is required — the device has no built-in
-   default. Copy ``examples/aura-device.sample.json`` as a starting point.
+   default. Copy ``examples/aura-device.rasppi-pico-2.json`` as a starting point.
 
 4. Run the deploy script to copy all source files and set code.py:
      python scripts/deploy.py examples/hardware/scene_demo.py

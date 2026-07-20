@@ -84,7 +84,7 @@ Installation
 
 3. Deploy an ``aura-device.json`` naming the scene to measure (top-level ``"scene"``
    key) and registering that scene's clips/scopes -- see
-   ``examples/aura-device.sample.json``. The file is required; a missing, invalid, or
+   ``examples/aura-device.rasppi-pico-2.json``. The file is required; a missing, invalid, or
    unregistered-scene config fails loudly at import time, naming the known scenes.
 
 4. Run the deploy script to copy all source files and set code.py:

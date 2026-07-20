@@ -17,7 +17,7 @@ from hardware.shared.device_config import (
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_SAMPLE_CONFIG_PATH = _REPO_ROOT / "examples" / "aura-device.sample.json"
+_SAMPLE_CONFIG_PATH = _REPO_ROOT / "examples" / "aura-device.rasppi-pico-2.json"
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -1166,7 +1166,7 @@ def test_parse_audio_i2s_data_non_string_raises_value_error(matrix_config):
 
 
 # ---------------------------------------------------------------------------
-# Committed sample config — examples/aura-device.sample.json parses as-is
+# Committed sample config — examples/aura-device.rasppi-pico-2.json parses as-is
 # ---------------------------------------------------------------------------
 
 
@@ -1176,9 +1176,9 @@ def test_committed_sample_device_config_parses():
     result = parse_device_config(mapping)
 
     assert result.audio is not None
-    assert result.audio.i2s_bit_clock == "I2S_BIT_CLOCK"
-    assert result.audio.i2s_word_select == "I2S_WORD_SELECT"
-    assert result.audio.i2s_data == "I2S_DATA"
+    assert result.audio.i2s_bit_clock == "GP7"
+    assert result.audio.i2s_word_select == "GP8"
+    assert result.audio.i2s_data == "GP6"
     assert result.accelerometer is not None
     assert result.haptics is not None
     assert result.spi is not None

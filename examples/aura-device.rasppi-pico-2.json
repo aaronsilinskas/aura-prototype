@@ -1,8 +1,8 @@
 {
   "scene": "hardware_test",
   "i2c": {
-    "sda": "SDA",
-    "scl": "SCL"
+    "sda": "GP4",
+    "scl": "GP5"
   },
   "pixels": [
     {
@@ -20,7 +20,7 @@
     },
     {
       "type": "neopixel",
-      "pin": "D5",
+      "pin": "GP16",
       "count": 24,
       "order": "GRB",
       "brightness": 1.0,
@@ -34,33 +34,41 @@
       }
     }
   ],
-  "buttons": ["D9", "D10"],
-  "accelerometer": {},
-  "haptics": {},
+  "buttons": ["GP26", "GP27"],
+  "accelerometer": {
+    "enabled": true
+  },
+  "haptics": {
+    "enabled": true
+  },
   "ir": {
-    "rx": "D11",
-    "line": "D12",
-    "cone": "D13",
-    "area_of_effect": "D14"
+    "rx": [
+      "GP13",
+      "GP14",
+      "GP15"
+    ],
+    "line": "GP10",
+    "cone": "GP11",
+    "area_of_effect": "GP12"
   },
   "audio": {
-    "voices": 1,
-    "max_volume": 0.1,
+    "voices": 2,
+    "max_volume": 0.2,
     "clips": {
       "sfx_test_start": "sounds/blip.wav"
     },
-    "i2s_bit_clock": "I2S_BIT_CLOCK",
-    "i2s_word_select": "I2S_WORD_SELECT",
-    "i2s_data": "I2S_DATA"
+    "i2s_bit_clock": "GP7",
+    "i2s_word_select": "GP8",
+    "i2s_data": "GP6"
   },
   "spi": {
-    "sck": "SCK",
-    "mosi": "MOSI",
-    "miso": "MISO"
+    "sck": "GP2",
+    "mosi": "GP3",
+    "miso": "GP0"
   },
   "radio": {
-    "cs": "D24",
-    "reset": "D25",
+    "cs": "GP1",
+    "reset": "GP22",
     "frequency": 915.0,
     "node": 1
   }
