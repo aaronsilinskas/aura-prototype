@@ -11,7 +11,11 @@ from:
 
 `electronics/` contains no Python and is not a package. It carries no import
 contracts, isn't touched by `ruff` or `import-linter`, and the Python-only
-pre-commit hooks never rewrite the KiCad text files in here.
+pre-commit hooks never rewrite the PCB-tool files in here.
+
+Boards are drawn in one of two tools, used as peers: **KiCad** and
+**EasyEDA Pro**. Each PCB is committed to a single tool (never mixed within one
+board); see `pcbs/README.md`.
 
 ---
 
@@ -23,7 +27,8 @@ electronics/
   LICENSE        CERN-OHL-P-2.0 (governs everything under electronics/)
   scratch/       freeform, non-authoritative experimentation (see scratch/README.md)
   pcbs/          one subfolder per physical board (see pcbs/README.md)
-  libraries/     shared symbols, footprints, and 3D models used across PCBs
+  libraries/     shared symbols, footprints, and 3D models used across PCBs,
+                 split per tool (see libraries/README.md)
 ```
 
 - **`scratch/`** — sketches and one-off experiments. Nothing in here is
@@ -31,9 +36,11 @@ electronics/
 - **`pcbs/`** — the design source of record for every fabricated board, one
   subfolder per PCB. See `pcbs/README.md` for the rev-lifecycle, promotion,
   naming, and fab-tag conventions.
-- **`libraries/`** — shared KiCad symbol libraries, footprint libraries, and 3D
+- **`libraries/`** — shared symbol libraries, footprint libraries, and 3D
   models referenced by more than one PCB, so a shared part is edited in one
-  place rather than duplicated per board.
+  place rather than duplicated per board. Split into per-tool subfolders
+  (`kicad/`, `easyeda/`) since the two tools' library formats aren't
+  interchangeable.
 
 No `<pcb>/` design folders or library files exist yet — this scaffold is
 intentionally empty of actual designs.
@@ -64,14 +71,17 @@ Full detail lives in `pcbs/README.md`; the short version:
 
 ## How to open
 
-This project's KiCad design files are pinned to **KiCad 10.0.4** (the latest
-stable KiCad 10.x release as of this writing). Install that specific version
-to open any files in this tree without triggering an on-open project upgrade.
+Which tool a board opens in follows its file extensions (`.kicad_*` vs
+`.epro`); a board's own folder is drawn in exactly one tool. Tool versions are
+pinned so files open without an on-open project upgrade:
+
+- **KiCad** — pinned to **10.0.4** (the latest stable KiCad 10.x release as of
+  this writing). Open `pcbs/<pcb>/rev<X>/<pcb>.kicad_pro` in KiCad; schematic
+  and PCB editors are reached from there.
+- **EasyEDA Pro** — pinned to **3.2**. Open the board's `pcbs/<pcb>/rev<X>/`
+  EasyEDA Pro project (`.epro`) in EasyEDA Pro.
 
 > **Note:** no maintainer input was available when this scaffold was created —
-> confirm 10.0.4 against the KiCad version the maintainer actually runs, and
-> bump this line deliberately (with a comment on why) whenever the project
+> confirm both pinned versions against what the maintainer actually runs, and
+> bump these lines deliberately (with a comment on why) whenever the project
 > upgrades.
-
-Once a board exists, open its `pcbs/<pcb>/rev<X>/<pcb>.kicad_pro` project file
-in KiCad — schematic and PCB editors are reached from there.
