@@ -12,13 +12,22 @@ several boards, and the same board design can be reused across several props.
 Because of that, PCBs never nest under a prop folder — they're siblings under
 `pcbs/`, addressed by board name only.
 
+## Design tool
+
+Each board is drawn in **one** PCB tool — either **KiCad** or **EasyEDA Pro**,
+used as peers across the project — and stays in that tool for the life of the
+board (all revs). Tools are never mixed within a single `<pcb>/` folder; the
+native source files below differ by tool, but everything else in this README
+(rev lifecycle, promotion, fab tags, exports) is tool-agnostic.
+
 ## Layout
 
 ```
 pcbs/
   <pcb>/
     rev<X>/
-      <pcb>.kicad_pro
+      # KiCad boards:                  # EasyEDA Pro boards:
+      <pcb>.kicad_pro                  <pcb>.epro
       <pcb>.kicad_sch
       <pcb>.kicad_pcb
       exports/
@@ -30,10 +39,13 @@ pcbs/
 
 - `<pcb>/` — one per physical board, named for the board.
 - `rev<X>/` — one per physical spin of that board (`rev1`, `rev2`, …).
-- `<pcb>.kicad_pro` / `.kicad_sch` / `.kicad_pcb` — the KiCad project,
-  schematic, and board layout files for that revision.
+- Native source — for a KiCad board, the `<pcb>.kicad_pro` / `.kicad_sch` /
+  `.kicad_pcb` project, schematic, and board files; for an EasyEDA Pro board,
+  the exported `<pcb>.epro` project. Either way it's the design source of
+  record for that revision.
 - `exports/` — hand-generated, human-facing artifacts derived from the design:
-  schematic PDF, board render PNG, BOM CSV, and gerbers for fab.
+  schematic PDF, board render PNG, BOM CSV, and gerbers for fab. These are
+  tool-neutral output formats, identical in spirit regardless of source tool.
 
 ## Revision lifecycle
 
