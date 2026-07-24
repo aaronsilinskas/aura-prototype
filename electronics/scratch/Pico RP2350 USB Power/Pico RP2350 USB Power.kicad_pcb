@@ -96,6 +96,7 @@
 		(property "Reference" "J17"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "856e53e8-c74e-42dc-91ed-2727cab68f7a")
 			(effects
 				(font
@@ -342,12 +343,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "139d033a-573b-4640-b5a4-3d24495232e0")
-		(at 117.745 62.59 90)
+		(at 117.655 64 90)
 		(descr "Through hole straight pin header, 1x04, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x04 2.54mm single row")
 		(property "Reference" "J4"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "bbc348ef-ef71-46fc-bdea-79818be51817")
 			(effects
 				(font
@@ -605,12 +607,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "14e41892-18c0-4aa8-ba04-3fd8028a48f6")
-		(at 118 84 90)
+		(at 117.655 84 90)
 		(descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x02 2.54mm single row")
 		(property "Reference" "J8"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "493139e4-263a-4a63-85d1-16e4da185bc3")
 			(effects
 				(font
@@ -852,6 +855,7 @@
 		(property "Reference" "J18"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "7b8db6c7-79ec-4549-92db-57ecca8473ab")
 			(effects
 				(font
@@ -1954,12 +1958,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "2d28a618-502b-4a62-9603-098e94951933")
-		(at 117.745 53 90)
+		(at 117.655 53 90)
 		(descr "Through hole straight pin header, 1x05, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x05 2.54mm single row")
 		(property "Reference" "J7"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "b2a528c3-ba8e-461c-884d-7312f507c1d6")
 			(effects
 				(font
@@ -2386,12 +2391,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "3cc6d834-85c5-439d-ae50-f0f7fb0359f5")
-		(at 117.745 58 90)
+		(at 117.655 60 90)
 		(descr "Through hole straight pin header, 1x04, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x04 2.54mm single row")
 		(property "Reference" "J5"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "28c9deb1-f4ed-4edb-a595-e3c9228f6285")
 			(effects
 				(font
@@ -2813,6 +2819,7 @@
 		(property "Reference" "J21"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "c6e54edd-3876-4b6a-a4d5-4e8c9dfb9c72")
 			(effects
 				(font
@@ -3065,6 +3072,7 @@
 		(property "Reference" "J19"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "c8d4f083-9673-4503-9f6d-745637b8490d")
 			(effects
 				(font
@@ -5105,12 +5113,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "6880a833-2d3e-4352-a07b-4d1dac094e55")
-		(at 117.665 49 90)
+		(at 117.655 49 90)
 		(descr "Through hole straight pin header, 1x06, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x06 2.54mm single row")
 		(property "Reference" "J2"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "532abf5c-3730-45b9-b76b-e0cdcc333b55")
 			(effects
 				(font
@@ -5390,12 +5399,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "6cfc78ab-c7c7-4328-8808-373370eabf9e")
-		(at 130 101 90)
+		(at 127.92 101 90)
 		(descr "Through hole straight pin header, 1x03, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x03 2.54mm single row")
 		(property "Reference" "J12"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "8edc0bcb-32f7-4ede-8681-96f1601e46e1")
 			(effects
 				(font
@@ -5599,7 +5609,7 @@
 			(drill 1)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "+3.3V")
+			(net "GND")
 			(pinfunction "Pin_1_1")
 			(pintype "passive")
 			(uuid "5eef3587-992e-4823-a084-7589b0a4f524")
@@ -5621,7 +5631,7 @@
 			(drill 1)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "GND")
+			(net "+3.3V")
 			(pinfunction "Pin_3_3")
 			(pintype "passive")
 			(uuid "6c278b3a-0ee7-43ab-bacd-17d0a90b393a")
@@ -5642,12 +5652,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "75864abb-4e27-43a6-913f-3720573305a6")
-		(at 186.54 56 -90)
+		(at 187.08 56 -90)
 		(descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x02 2.54mm single row")
 		(property "Reference" "J22"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "810a3edc-91b4-4848-bc71-16a1cf5732ae")
 			(effects
 				(font
@@ -5889,6 +5900,7 @@
 		(property "Reference" "J16"
 			(at 0 -2.38 270)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "b26efb80-0c92-4751-97e9-34b16f945448")
 			(effects
 				(font
@@ -6135,12 +6147,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "7fec97fb-3423-4d78-b702-7b2b64e0278e")
-		(at 118 88 90)
+		(at 117.655 88 90)
 		(descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x02 2.54mm single row")
 		(property "Reference" "J9"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "0b5af491-08dc-46f5-b86e-e0c0e32a96a0")
 			(effects
 				(font
@@ -6376,11 +6389,11 @@
 	(footprint "Resistor_SMD:R_0805_2012Metric"
 		(layer "F.Cu")
 		(uuid "859793d6-b197-4f2c-afa2-a99a74fa901d")
-		(at 170 45 180)
+		(at 170 44 180)
 		(descr "Resistor SMD 0805 (2012 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: IPC-SM-782 page 72, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf)")
 		(tags "resistor")
 		(property "Reference" "R9"
-			(at 0 -1.65 0)
+			(at 0 -2 0)
 			(layer "F.SilkS")
 			(uuid "7c69daf2-2de4-465e-8e2b-6dce96c8a2dd")
 			(effects
@@ -6856,6 +6869,7 @@
 		(property "Reference" "J1"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "4aca0d32-45d4-4635-a1a9-d913aed61572")
 			(effects
 				(font
@@ -7528,12 +7542,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "98d89e62-147a-4a82-ae8d-ec98dbfa1950")
-		(at 186.54 65 -90)
+		(at 187.08 65 -90)
 		(descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x02 2.54mm single row")
 		(property "Reference" "J15"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "f4edd254-853d-4209-9a51-1f6335117688")
 			(effects
 				(font
@@ -7769,12 +7784,13 @@
 	(footprint "LED_SMD:LED_0805_2012Metric"
 		(layer "F.Cu")
 		(uuid "b0898619-4b6b-4b37-a3b7-720fdfd4a46e")
-		(at 165.975 45 180)
+		(at 165.975 44 180)
 		(descr "LED SMD 0805 (2012 Metric), square (rectangular) end terminal, IPC-7351 nominal, (Body size source: https://docs.google.com/spreadsheets/d/1BsfQQcO9C6DZCsRaXUlFlo91Tg2WpOkGARC1WS5S8t0/edit?usp=sharing)")
 		(tags "LED")
 		(property "Reference" "D2"
 			(at 0 -1.65 0)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "0e825da5-16e7-4342-9ca2-c45fc4fd6144")
 			(effects
 				(font
@@ -7991,12 +8007,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "b8ff3dc0-e9cd-4a93-98aa-0554e53fbdf8")
-		(at 117.745 67.18 90)
+		(at 117.655 68 90)
 		(descr "Through hole straight pin header, 1x04, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x04 2.54mm single row")
 		(property "Reference" "J3"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "4ec8a5b9-3b32-48a9-9fa2-2e9ab39b0496")
 			(effects
 				(font
@@ -8412,12 +8429,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "c2ff370f-e0af-4391-b1db-6fad5baa30a4")
-		(at 117.92 101 90)
+		(at 117.655 101 90)
 		(descr "Through hole straight pin header, 1x03, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x03 2.54mm single row")
 		(property "Reference" "J11"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "ec698a1c-098e-484c-8ba2-24ce15367a15")
 			(effects
 				(font
@@ -8621,7 +8639,7 @@
 			(drill 1)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "+3.3V")
+			(net "GND")
 			(pinfunction "Pin_1_1")
 			(pintype "passive")
 			(uuid "3eb2cfd5-565c-49d8-84c9-843af19eeac5")
@@ -8643,7 +8661,7 @@
 			(drill 1)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "GND")
+			(net "+3.3V")
 			(pinfunction "Pin_3_3")
 			(pintype "passive")
 			(uuid "bf78daee-f185-4150-9fde-d669669c6d96")
@@ -9204,12 +9222,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "c9d0002e-1e68-4ea9-8f95-772b587c2185")
-		(at 186.54 70 -90)
+		(at 187.08 70 -90)
 		(descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x02 2.54mm single row")
 		(property "Reference" "J14"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "cdeb8be2-cfde-44f9-a674-1864c320af2d")
 			(effects
 				(font
@@ -11171,6 +11190,7 @@
 		(property "Reference" "J20"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "1e439c30-7192-4ab5-8d3a-9e5290cd96ba")
 			(effects
 				(font
@@ -11417,11 +11437,11 @@
 	(footprint "Button_Switch_THT:SW_DIP_SPSTx01_Slide_9.78x4.72mm_W7.62mm_P2.54mm"
 		(layer "F.Cu")
 		(uuid "d3b6c2be-47c4-4933-8a96-d4a92a668cc3")
-		(at 180 45)
+		(at 179.9 45)
 		(descr "1x-dip-switch SPST , Slide, row spacing 7.62 mm (300 mils), body size 9.78x4.72mm (see e.g. https://www.ctscorp.com/wp-content/uploads/206-208.pdf)")
 		(tags "DIP Switch SPST Slide 7.62mm 300mil")
-		(property "Reference" "SW1"
-			(at 3.81 -3.42 0)
+		(property "Reference" "ON/OFF"
+			(at 3.62 4 0)
 			(layer "F.SilkS")
 			(uuid "de4bc85f-b06b-4a15-a27d-88d011163819")
 			(effects
@@ -11476,7 +11496,6 @@
 				)
 			)
 		)
-		(path "/e63d7969-e942-4d49-8716-175b67ae5b5b")
 		(sheetname "/")
 		(sheetfile "Pico RP2350 USB Power.kicad_sch")
 		(units
@@ -11695,7 +11714,7 @@
 			)
 		)
 		(point
-			(at 183.81 45)
+			(at 183.71 45)
 			(size 1.27)
 			(layer "F.Fab")
 			(uuid "36b1c006-b7e0-4d48-92b0-88ba2675de5a")
@@ -11739,12 +11758,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "dfa7d172-74ae-45a5-8bf0-f141108288a4")
-		(at 118 92 90)
+		(at 117.655 92 90)
 		(descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x02 2.54mm single row")
 		(property "Reference" "J10"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "a2ebbdc9-5de2-473a-bdd5-c7928866299e")
 			(effects
 				(font
@@ -11980,12 +12000,13 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "ecf5b833-bf46-4a17-94a0-d73f52472d19")
-		(at 141.46 101 90)
+		(at 138 101 90)
 		(descr "Through hole straight pin header, 1x03, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x03 2.54mm single row")
 		(property "Reference" "J13"
 			(at 0 -2.38 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "799e1b54-e20a-4cc6-a438-137fccb8f378")
 			(effects
 				(font
@@ -12189,7 +12210,7 @@
 			(drill 1)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "+3.3V")
+			(net "GND")
 			(pinfunction "Pin_1_1")
 			(pintype "passive")
 			(uuid "49bec3e5-4175-4715-9a6b-ae0cf82cf31b")
@@ -12211,7 +12232,7 @@
 			(drill 1)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net "GND")
+			(net "+3.3V")
 			(pinfunction "Pin_3_3")
 			(pintype "passive")
 			(uuid "4e60a180-d69d-4ede-a888-6e2f31000255")
@@ -12614,12 +12635,13 @@
 	(footprint "Connector_JST:JST_SH_BM04B-SRSS-TB_1x04-1MP_P1.00mm_Vertical"
 		(layer "F.Cu")
 		(uuid "fecd302f-09ee-4c6b-9563-a6441f74fcd6")
-		(at 118.5 74.5 90)
+		(at 118.485 74.5 90)
 		(descr "JST SH series connector, BM04B-SRSS-TB (http://www.jst-mfg.com/product/pdf/eng/eSH.pdf)")
 		(tags "connector JST SH vertical")
 		(property "Reference" "J6"
 			(at 0 -3.3 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "d6a86d2e-a587-4c1c-9c4f-bc41763debe7")
 			(effects
 				(font
@@ -12628,7 +12650,7 @@
 				)
 			)
 		)
-		(property "Value" "I2C_STEMMA"
+		(property "Value" "STEMMA"
 			(at 0.54 -10.125 180)
 			(layer "F.Fab")
 			(uuid "99820661-46ce-4f4d-9e47-02a58a4fea45")
@@ -12650,7 +12672,7 @@
 				)
 			)
 		)
-		(property "Description" "Generic connector, single row, 01x04, script generated"
+		(property "Description" "Generic connectable mounting pin connector, single row, 01x04, script generated (kicad-library-utils/schlib/autogen/connector/)"
 			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -12673,14 +12695,14 @@
 				)
 			)
 		)
-		(property ki_fp_filters "Connector*:*_1x??_*")
-		(path "/14b267ee-7da3-4a6c-b8e9-9fde0b2826d3")
+		(property ki_fp_filters "Connector*:*_1x??-1MP*")
+		(path "/63ae2bf4-de52-4f11-90c5-99c2bca2a997")
 		(sheetname "/")
 		(sheetfile "Pico RP2350 USB Power.kicad_sch")
 		(units
 			(unit
 				(name "A")
-				(pins "1" "2" "3" "4")
+				(pins "1" "2" "3" "4" "MP")
 			)
 		)
 		(attr smd)
@@ -13065,6 +13087,9 @@
 			(size 1.2 1.8)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.208333)
+			(net "GND")
+			(pinfunction "MountPin_MP")
+			(pintype "passive")
 			(uuid "e97d649b-3fe1-4627-9929-8c514f501400")
 		)
 		(pad "MP" smd roundrect
@@ -13072,6 +13097,9 @@
 			(size 1.2 1.8)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.208333)
+			(net "GND")
+			(pinfunction "MountPin_MP")
+			(pintype "passive")
 			(uuid "7143f3fe-db5b-414b-81fb-5cf8493b6834")
 		)
 		(embedded_fonts no)
@@ -13088,8 +13116,8 @@
 		)
 	)
 	(gr_line
-		(start 114 40)
-		(end 114 104)
+		(start 115 40)
+		(end 115 104)
 		(stroke
 			(width 0.05)
 			(type default)
@@ -13098,8 +13126,8 @@
 		(uuid "46476ef4-9f2b-4175-9f6c-fedf1f699ba9")
 	)
 	(gr_line
-		(start 114 40)
-		(end 191 40)
+		(start 115 40)
+		(end 190 40)
 		(stroke
 			(width 0.05)
 			(type default)
@@ -13108,8 +13136,8 @@
 		(uuid "1dcb9684-d568-481d-99a9-b86134595e6e")
 	)
 	(gr_line
-		(start 114 104)
-		(end 191 104)
+		(start 115 104)
+		(end 190 104)
 		(stroke
 			(width 0.05)
 			(type default)
@@ -13118,8 +13146,8 @@
 		(uuid "eba8d22a-9789-4071-9ffd-7fc7fdc4fd46")
 	)
 	(gr_line
-		(start 191 40)
-		(end 191 104)
+		(start 190 40)
+		(end 190 104)
 		(stroke
 			(width 0.05)
 			(type default)
@@ -13175,8 +13203,20 @@
 			(justify left bottom)
 		)
 	)
+	(gr_text "IR RX 2"
+		(at 127 99 0)
+		(layer "F.SilkS")
+		(uuid "8268497c-8673-42b4-a1cc-ceb413397aa7")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+			(justify left bottom)
+		)
+	)
 	(gr_text "I2C 3"
-		(at 127.825 59.18 0)
+		(at 127.825 60 0)
 		(layer "F.SilkS")
 		(uuid "924827c1-7961-458b-9e23-84f1f700955f")
 		(effects
@@ -13188,7 +13228,7 @@
 		)
 	)
 	(gr_text "I2C 2"
-		(at 127.825 63.18 0)
+		(at 127.825 64 0)
 		(layer "F.SilkS")
 		(uuid "af87f0e1-4fc6-4f37-9c6f-301d2555c9b6")
 		(effects
@@ -13200,21 +13240,9 @@
 		)
 	)
 	(gr_text "I2C 1"
-		(at 127.825 67.18 0)
+		(at 127.825 68.18 0)
 		(layer "F.SilkS")
 		(uuid "8da37e9d-7020-4cc0-bba7-fc848b6f3865")
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.15)
-			)
-			(justify left bottom)
-		)
-	)
-	(gr_text "IR RX 2"
-		(at 129 99 0)
-		(layer "F.SilkS")
-		(uuid "8268497c-8673-42b4-a1cc-ceb413397aa7")
 		(effects
 			(font
 				(size 1 1)
@@ -13248,7 +13276,7 @@
 		)
 	)
 	(gr_text "IR RX 3"
-		(at 141 99 0)
+		(at 137 99 0)
 		(layer "F.SilkS")
 		(uuid "fb0cc98b-b2f7-49f0-ac90-9e1cc3dc588a")
 		(effects
@@ -13260,7 +13288,7 @@
 		)
 	)
 	(gr_text "PWR"
-		(at 164.0375 43 0)
+		(at 164 47 0)
 		(layer "F.SilkS")
 		(uuid "28b0604d-89d7-4f17-a847-b09c415a1841")
 		(effects
@@ -13379,10 +13407,118 @@
 			(justify left bottom)
 		)
 	)
+	(gr_text "+5v"
+		(at 180 74 0)
+		(layer "F.SilkS")
+		(uuid "634cdcfd-8a6e-4fcd-ae76-e82da33e8fc0")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "D"
+		(at 184 74 0)
+		(layer "F.SilkS")
+		(uuid "24ce0c5c-6ce9-41c5-ba19-7af0aef65bfc")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "GND"
+		(at 186 74 0)
+		(layer "F.SilkS")
+		(uuid "93583149-4a3e-413e-9aad-08c4cdc519b6")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "GND"
+		(at 117 55 270)
+		(layer "F.SilkS")
+		(uuid "e034576a-cf91-4368-85ec-bd0fb51fdf3e")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "GND\n"
+		(at 117 79 270)
+		(layer "F.SilkS")
+		(uuid "e857ce59-bee1-4a8b-8d15-067b1222bece")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "+3v"
+		(at 120 55 270)
+		(layer "F.SilkS")
+		(uuid "de11e712-48ab-4b45-a277-6e00e974a496")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "+3v"
+		(at 120 79 270)
+		(layer "F.SilkS")
+		(uuid "eb5ad3dc-2ecb-42ad-b365-0643544eac8a")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "SDA"
+		(at 122 55 270)
+		(layer "F.SilkS")
+		(uuid "7ed26694-a402-4036-9f3a-5df1bbd5804d")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+			(justify left bottom)
+		)
+	)
 	(gr_text "STEMMA/QT"
-		(at 122.825 69.88 270)
+		(at 122 70 270)
 		(layer "F.SilkS")
 		(uuid "1dd0d4b1-ddce-444b-a9ba-ceabc732f613")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "SCL"
+		(at 125 55 270)
+		(layer "F.SilkS")
+		(uuid "98c20429-7000-4a34-b946-49fc0750e7a7")
 		(effects
 			(font
 				(size 1 1)
