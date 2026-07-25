@@ -5488,6 +5488,32 @@
 		)
 	)
 	(rectangle
+		(start 229.87 88.9)
+		(end 252.73 92.71)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "04f9ed89-35a1-4f80-8983-1f2a3ca50269")
+	)
+	(rectangle
+		(start 104.14 12.7)
+		(end 127 16.51)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "1b62e709-e91f-4064-bae3-dcfe3ff82fdf")
+	)
+	(rectangle
 		(start 229.87 63.5)
 		(end 266.7 87.63)
 		(stroke
@@ -5512,6 +5538,58 @@
 			(type none)
 		)
 		(uuid "2630a5f1-2770-458e-a44e-8981d26abbc9")
+	)
+	(rectangle
+		(start 229.87 38.1)
+		(end 252.73 41.91)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "2ce2f8e9-0be7-4a59-a93a-98f0442f3724")
+	)
+	(rectangle
+		(start 138.43 77.47)
+		(end 161.29 81.28)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "2ff07122-7506-436b-b134-5ad8e8ea8f5f")
+	)
+	(rectangle
+		(start 104.14 48.26)
+		(end 127 52.07)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "3adbc859-1937-48a1-a259-47f9e385498d")
+	)
+	(rectangle
+		(start 172.72 48.26)
+		(end 195.58 52.07)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "42bcfadf-b990-4622-9113-bf2294a59cd9")
 	)
 	(rectangle
 		(start 172.72 119.38)
@@ -5540,6 +5618,19 @@
 		(uuid "47e02dd0-513b-48e3-bf42-59de3d7be6c9")
 	)
 	(rectangle
+		(start 138.43 34.29)
+		(end 161.29 38.1)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "4b16e622-ce1b-4941-a134-5765fd4317d5")
+	)
+	(rectangle
 		(start 172.72 12.7)
 		(end 228.6 46.99)
 		(stroke
@@ -5551,6 +5642,45 @@
 			(type none)
 		)
 		(uuid "4cab790f-4525-48e4-a975-00ed7bc65acd")
+	)
+	(rectangle
+		(start 229.87 63.5)
+		(end 252.73 67.31)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "4e802687-ee44-41c0-9408-ad18cd6edd2e")
+	)
+	(rectangle
+		(start 172.72 119.38)
+		(end 195.58 123.19)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "5d240380-0501-4e17-b7da-579a7eb922d8")
+	)
+	(rectangle
+		(start 12.7 114.3)
+		(end 35.56 118.11)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "5f3a1862-f433-473e-8407-a6b0fff89736")
 	)
 	(rectangle
 		(start 138.43 77.47)
@@ -5605,6 +5735,19 @@
 		(uuid "7a0bcd0d-e41c-4710-beda-18ff34c6fa6f")
 	)
 	(rectangle
+		(start 138.43 12.7)
+		(end 161.29 16.51)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "7cf45e85-dacb-40f6-94ec-7c0afa6e6ef3")
+	)
+	(rectangle
 		(start 172.72 83.82)
 		(end 228.6 118.11)
 		(stroke
@@ -5629,6 +5772,19 @@
 			(type none)
 		)
 		(uuid "8a4af8f3-801e-4d9f-83f4-175928e58bbf")
+	)
+	(rectangle
+		(start 12.7 12.7)
+		(end 35.56 16.51)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "9220dac2-053d-430f-900d-e7a90d6d0a88")
 	)
 	(rectangle
 		(start 104.14 81.28)
@@ -5657,6 +5813,32 @@
 		(uuid "a2cf5391-e805-457f-912b-472d2f364546")
 	)
 	(rectangle
+		(start 229.87 12.7)
+		(end 252.73 16.51)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "c164e381-23b5-4ceb-aaa0-8c98dc5d9400")
+	)
+	(rectangle
+		(start 172.72 83.82)
+		(end 195.58 87.63)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "c4778549-aaab-42ce-9f92-a2c92cbf71e6")
+	)
+	(rectangle
 		(start 229.87 38.1)
 		(end 266.7 62.23)
 		(stroke
@@ -5681,6 +5863,19 @@
 			(type none)
 		)
 		(uuid "ce9c7abe-05c5-448d-ab2a-7a89267e5968")
+	)
+	(rectangle
+		(start 172.72 12.7)
+		(end 195.58 16.51)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "d0de684b-06bc-45ed-9122-41cd5e18e490")
 	)
 	(rectangle
 		(start 229.87 12.7)
@@ -5721,9 +5916,48 @@
 		)
 		(uuid "df89346f-9f0f-4160-9506-1aa771cbd67a")
 	)
+	(rectangle
+		(start 104.14 81.28)
+		(end 127 85.09)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "e7352fde-9fc5-450c-a5b0-403430d157eb")
+	)
+	(rectangle
+		(start 138.43 55.88)
+		(end 161.29 59.69)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "fc4d7568-8729-406c-84f0-b8b29e01ad4d")
+	)
+	(rectangle
+		(start 213.36 119.38)
+		(end 236.22 123.19)
+		(stroke
+			(width 0)
+			(type default)
+			(color 194 0 0 1)
+		)
+		(fill
+			(type none)
+		)
+		(uuid "fd78552d-506e-454e-bd4b-43a9bdab0f4b")
+	)
 	(text "IR TX AOE"
 		(exclude_from_sim no)
-		(at 179.578 86.36 0)
+		(at 178.816 86.106 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5734,7 +5968,7 @@
 	)
 	(text "IR RX 2"
 		(exclude_from_sim no)
-		(at 235.458 40.64 0)
+		(at 234.696 40.386 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5745,7 +5979,7 @@
 	)
 	(text "I2C HEADER 2"
 		(exclude_from_sim no)
-		(at 146.304 36.83 0)
+		(at 146.05 36.576 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5756,7 +5990,7 @@
 	)
 	(text "SD CARD READER"
 		(exclude_from_sim no)
-		(at 113.792 51.054 0)
+		(at 113.538 50.546 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5767,7 +6001,7 @@
 	)
 	(text "I2C STEMMA"
 		(exclude_from_sim no)
-		(at 145.034 80.01 0)
+		(at 145.034 79.502 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5778,7 +6012,7 @@
 	)
 	(text "IR TX LINE"
 		(exclude_from_sim no)
-		(at 179.578 15.24 0)
+		(at 179.07 14.986 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5789,7 +6023,7 @@
 	)
 	(text "LED STRIPS"
 		(exclude_from_sim no)
-		(at 19.05 116.84 0)
+		(at 19.304 116.586 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5800,7 +6034,7 @@
 	)
 	(text "IR RX 1"
 		(exclude_from_sim no)
-		(at 235.458 15.24 0)
+		(at 234.696 14.986 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5811,7 +6045,7 @@
 	)
 	(text "IR TX CONE"
 		(exclude_from_sim no)
-		(at 179.578 50.8 0)
+		(at 179.324 50.546 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5822,7 +6056,7 @@
 	)
 	(text "BUTTONS"
 		(exclude_from_sim no)
-		(at 235.458 91.44 0)
+		(at 235.204 91.186 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5833,7 +6067,7 @@
 	)
 	(text "POWER SWITCH"
 		(exclude_from_sim no)
-		(at 180.848 122.428 0)
+		(at 180.848 121.666 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5844,7 +6078,7 @@
 	)
 	(text "5V POWER ENABLE"
 		(exclude_from_sim no)
-		(at 223.774 122.682 0)
+		(at 223.52 121.666 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5855,7 +6089,7 @@
 	)
 	(text "I2S AMP"
 		(exclude_from_sim no)
-		(at 109.728 86.614 0)
+		(at 109.22 83.566 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5866,7 +6100,7 @@
 	)
 	(text "IR RX 3"
 		(exclude_from_sim no)
-		(at 235.458 66.04 0)
+		(at 234.696 65.786 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5877,7 +6111,7 @@
 	)
 	(text "I2C HEADER 3"
 		(exclude_from_sim no)
-		(at 146.304 58.42 0)
+		(at 146.304 58.166 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5888,7 +6122,7 @@
 	)
 	(text "RFM69HCW RADIO"
 		(exclude_from_sim no)
-		(at 113.792 19.304 0)
+		(at 113.538 14.986 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5899,7 +6133,7 @@
 	)
 	(text "I2C HEADER 1"
 		(exclude_from_sim no)
-		(at 146.304 15.24 0)
+		(at 146.05 14.986 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5910,7 +6144,7 @@
 	)
 	(text "DEV BOARD"
 		(exclude_from_sim no)
-		(at 19.05 15.24 0)
+		(at 19.05 14.986 0)
 		(effects
 			(font
 				(size 1.27 1.27)
