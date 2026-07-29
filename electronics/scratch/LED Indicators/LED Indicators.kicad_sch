@@ -7956,6 +7956,17 @@
 				)
 			)
 		)
+		(property "LCSC Part" "C17724"
+			(at 41.91 86.36 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "47f51b1f-ccbe-4e69-b42f-29f31f81d6fd")
 		)
@@ -10807,10 +10818,10 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "d0eee627-5951-49cd-a5f6-f05f0463d6cb")
 		(property "Reference" "TP1"
 			(at 32.766 76.454 0)
@@ -11343,10 +11354,10 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "db60107b-7156-4c61-810c-06654784131e")
 		(property "Reference" "TP2"
 			(at 74.93 45.466 0)
