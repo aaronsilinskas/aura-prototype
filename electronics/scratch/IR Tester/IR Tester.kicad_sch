@@ -408,6 +408,351 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "Connector:Conn_01x06_Pin"
+			(pin_names
+				(offset 1.016)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "J"
+				(at 0 7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "Conn_01x06_Pin"
+				(at 0 -10.16 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" "Generic connector, single row, 01x06, script generated"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_locked" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "connector"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_fp_filters" "Connector*:*_1x??_*"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "Conn_01x06_Pin_1_1"
+				(rectangle
+					(start 0.8636 5.207)
+					(end 0 4.953)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(rectangle
+					(start 0.8636 2.667)
+					(end 0 2.413)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(rectangle
+					(start 0.8636 0.127)
+					(end 0 -0.127)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(rectangle
+					(start 0.8636 -2.413)
+					(end 0 -2.667)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(rectangle
+					(start 0.8636 -4.953)
+					(end 0 -5.207)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(rectangle
+					(start 0.8636 -7.493)
+					(end 0 -7.747)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.27 5.08) (xy 0.8636 5.08)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.27 2.54) (xy 0.8636 2.54)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.27 0) (xy 0.8636 0)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.27 -2.54) (xy 0.8636 -2.54)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.27 -5.08) (xy 0.8636 -5.08)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.27 -7.62) (xy 0.8636 -7.62)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin passive line
+					(at 5.08 5.08 180)
+					(length 3.81)
+					(name "Pin_1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 2.54 180)
+					(length 3.81)
+					(name "Pin_2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 0 180)
+					(length 3.81)
+					(name "Pin_3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 -2.54 180)
+					(length 3.81)
+					(name "Pin_4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 -5.08 180)
+					(length 3.81)
+					(name "Pin_5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 -7.62 180)
+					(length 3.81)
+					(name "Pin_6"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "6"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Device:R"
 			(pin_numbers
 				(hide yes)
@@ -1052,400 +1397,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "easyeda2kicad:3314J-1-103E"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "R"
-				(at 0 10.16 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "3314J-1-103E"
-				(at 0 -10.16 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" "easyeda2kicad:RES-ADJ-SMD_3314J"
-				(at 0 -12.7 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" "https://lcsc.com/product-detail/Variable-Resistors_BOURNS_3314J-1-103E_10KR_C36376.html"
-				(at 0 -15.24 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" "10KΩ"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Manufacturer" "BOURNS"
-				(at 0 -17.78 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "MPN" "3314J-1-103E"
-				(at 0 -20.32 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "LCSC Part" "C36376"
-				(at 0 -22.86 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "Variable Resistors/Potentiometers"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "3314J-1-103E_0_1"
-				(polyline
-					(pts
-						(xy -0.51 0) (xy -1.78 0)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 0 0) (xy -1.27 -0.51) (xy -1.27 0.51) (xy 0 0)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy 0 -2.54) (xy 0 2.54) (xy 2.54 2.54) (xy 2.54 -2.54) (xy 0 -2.54)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(pin input line
-					(at 1.27 5.08 270)
-					(length 2.54)
-					(name "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin input line
-					(at -2.54 0 0)
-					(length 2.54)
-					(name "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin input line
-					(at 1.27 -5.08 90)
-					(length 2.54)
-					(name "3"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "3"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
-		(symbol "easyeda2kicad:3314J-1-203E"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "VR"
-				(at 0 10.16 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "3314J-1-203E"
-				(at 0 -10.16 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" "easyeda2kicad:RES-ADJ-SMD_3P-L4.5-W4.5-P2.30-BL-FS"
-				(at 0 -12.7 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" "https://lcsc.com/product-detail/Variable-Resistors_BOURNS_3314J-1-203E_3314J-1-203E_C55069.html"
-				(at 0 -15.24 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" "3314J-1-203E"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Manufacturer" "BOURNS"
-				(at 0 -17.78 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "MPN" "3314J-1-203E"
-				(at 0 -20.32 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "LCSC Part" "C55069"
-				(at 0 -22.86 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "Variable Resistors/Potentiometers"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "3314J-1-203E_0_1"
-				(polyline
-					(pts
-						(xy 0.76 0) (xy -0.51 0)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 0) (xy 0 -0.51) (xy 0 0.51) (xy 1.27 0)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 -2.54) (xy 1.27 2.54) (xy 3.81 2.54) (xy 3.81 -2.54) (xy 1.27 -2.54)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(pin input line
-					(at 2.54 5.08 270)
-					(length 2.54)
-					(name "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin input line
-					(at -2.54 0 0)
-					(length 2.54)
-					(name "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin input line
-					(at 2.54 -5.08 90)
-					(length 2.54)
-					(name "3"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "3"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "easyeda2kicad:APA3010F3C-GX"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -1715,245 +1666,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "easyeda2kicad:F.0603.00025_P2-0603G1TS2-06T-002"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "LED"
-				(at 0 3.81 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "F.0603.00025/P2-0603G1TS2-06T-002"
-				(at 0 -6.35 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" "easyeda2kicad:LED0603-RD_GREEN"
-				(at 0 -8.89 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" "https://www.lcsc.com/datasheet/C7496818.pdf"
-				(at 0 -11.43 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Manufacturer" "TUOZHAN(拓展光电)"
-				(at 0 -13.97 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "MPN" "F.0603.00025/P2-0603G1TS2-06T-002"
-				(at 0 -16.51 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "LCSC Part" "C7496818"
-				(at 0 -19.05 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "Light Emitting Diodes (LED)"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "F.0603.00025_P2-0603G1TS2-06T-002_0_1"
-				(polyline
-					(pts
-						(xy -4.06 2.03) (xy -3.05 1.52) (xy -3.56 1.02) (xy -4.06 2.03)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy -3.05 3.05) (xy -2.03 2.54) (xy -2.54 2.03) (xy -3.05 3.05)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy -2.29 0.25) (xy -3.3 1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 1.27) (xy -2.29 2.29)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 0.51) (xy -1.27 -3.05)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 -1.27) (xy -2.54 -1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 0.51) (xy -1.27 -1.27) (xy 1.27 -3.05) (xy 1.27 0.51)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy 2.54 -1.27) (xy 1.27 -1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(pin unspecified line
-					(at -5.08 -1.27 0)
-					(length 2.54)
-					(name "C"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin unspecified line
-					(at 5.08 -1.27 180)
-					(length 2.54)
-					(name "A"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "easyeda2kicad:VSMB10940"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -2137,245 +1849,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "easyeda2kicad:XL-1608PGC-06"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "U"
-				(at 0 3.81 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "XL-1608PGC-06"
-				(at 0 -6.35 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" "easyeda2kicad:LED0603-RD_GREEN"
-				(at 0 -8.89 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" "https://www.lcsc.com/datasheet/C7371905.pdf"
-				(at 0 -11.43 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Manufacturer" "XINGLIGHT(成兴光)"
-				(at 0 -13.97 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "MPN" "XL-1608PGC-06"
-				(at 0 -16.51 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "LCSC Part" "C7371905"
-				(at 0 -19.05 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "Light Emitting Diodes (LED)"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "XL-1608PGC-06_0_1"
-				(polyline
-					(pts
-						(xy -4.06 2.03) (xy -3.05 1.52) (xy -3.56 1.02) (xy -4.06 2.03)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy -3.05 3.05) (xy -2.03 2.54) (xy -2.54 2.03) (xy -3.05 3.05)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy -2.29 0.25) (xy -3.3 1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 1.27) (xy -2.29 2.29)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 0.51) (xy -1.27 -3.05)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 -1.27) (xy -2.54 -1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 0.51) (xy -1.27 -1.27) (xy 1.27 -3.05) (xy 1.27 0.51)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy 2.54 -1.27) (xy 1.27 -1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(pin unspecified line
-					(at -5.08 -1.27 0)
-					(length 2.54)
-					(name "K"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin unspecified line
-					(at 5.08 -1.27 180)
-					(length 2.54)
-					(name "A"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "easyeda2kicad:XL-1608SURC-06"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -2480,962 +1953,6 @@
 				)
 			)
 			(symbol "XL-1608SURC-06_0_1"
-				(polyline
-					(pts
-						(xy -4.06 2.03) (xy -3.05 1.52) (xy -3.56 1.02) (xy -4.06 2.03)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy -3.05 3.05) (xy -2.03 2.54) (xy -2.54 2.03) (xy -3.05 3.05)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy -2.29 0.25) (xy -3.3 1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 1.27) (xy -2.29 2.29)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 0.51) (xy -1.27 -3.05)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 -1.27) (xy -2.54 -1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 0.51) (xy -1.27 -1.27) (xy 1.27 -3.05) (xy 1.27 0.51)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy 2.54 -1.27) (xy 1.27 -1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(pin unspecified line
-					(at -5.08 -1.27 0)
-					(length 2.54)
-					(name "K"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin unspecified line
-					(at 5.08 -1.27 180)
-					(length 2.54)
-					(name "A"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
-		(symbol "easyeda2kicad:XL-1608UBC-06A"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "U"
-				(at 0 3.81 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "XL-1608UBC-06A"
-				(at 0 -6.35 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" "easyeda2kicad:LED0603-R-RD"
-				(at 0 -8.89 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" "https://www.lcsc.com/datasheet/C7371904.pdf"
-				(at 0 -11.43 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Manufacturer" "XINGLIGHT(成兴光)"
-				(at 0 -13.97 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "MPN" "XL-1608UBC-06A"
-				(at 0 -16.51 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "LCSC Part" "C7371904"
-				(at 0 -19.05 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "Light Emitting Diodes (LED)"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "XL-1608UBC-06A_0_1"
-				(polyline
-					(pts
-						(xy -4.06 2.03) (xy -3.05 1.52) (xy -3.56 1.02) (xy -4.06 2.03)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy -3.05 3.05) (xy -2.03 2.54) (xy -2.54 2.03) (xy -3.05 3.05)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy -2.29 0.25) (xy -3.3 1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 1.27) (xy -2.29 2.29)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 0.51) (xy -1.27 -3.05)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 -1.27) (xy -2.54 -1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 0.51) (xy -1.27 -1.27) (xy 1.27 -3.05) (xy 1.27 0.51)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy 2.54 -1.27) (xy 1.27 -1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(pin unspecified line
-					(at 5.08 -1.27 180)
-					(length 2.54)
-					(name "A"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin unspecified line
-					(at -5.08 -1.27 0)
-					(length 2.54)
-					(name "K"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
-		(symbol "easyeda2kicad:XL-1608UGC-04"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "LED"
-				(at 0 3.81 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "XL-1608UGC-04"
-				(at 0 -6.35 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" "easyeda2kicad:LED0603-RD_GREEN"
-				(at 0 -8.89 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" "https://www.lcsc.com/datasheet/C965804.pdf"
-				(at 0 -11.43 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Manufacturer" "XINGLIGHT(成兴光)"
-				(at 0 -13.97 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "MPN" "XL-1608UGC-04"
-				(at 0 -16.51 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "LCSC Part" "C965804"
-				(at 0 -19.05 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "Light Emitting Diodes (LED)"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "XL-1608UGC-04_0_1"
-				(polyline
-					(pts
-						(xy -4.06 2.03) (xy -3.05 1.52) (xy -3.56 1.02) (xy -4.06 2.03)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy -3.05 3.05) (xy -2.03 2.54) (xy -2.54 2.03) (xy -3.05 3.05)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy -2.29 0.25) (xy -3.3 1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 1.27) (xy -2.29 2.29)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 0.51) (xy -1.27 -3.05)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 -1.27) (xy -2.54 -1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 0.51) (xy -1.27 -1.27) (xy 1.27 -3.05) (xy 1.27 0.51)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy 2.54 -1.27) (xy 1.27 -1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(pin unspecified line
-					(at -5.08 -1.27 0)
-					(length 2.54)
-					(name "K"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin unspecified line
-					(at 5.08 -1.27 180)
-					(length 2.54)
-					(name "A"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
-		(symbol "easyeda2kicad:XL-1608UOC-06"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "LED"
-				(at 0 3.81 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "XL-1608UOC-06"
-				(at 0 -6.35 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" "easyeda2kicad:LED0603-R-RD_ORANGE"
-				(at 0 -8.89 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" "https://www.lcsc.com/datasheet/C965800.pdf"
-				(at 0 -11.43 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Manufacturer" "XINGLIGHT(成兴光)"
-				(at 0 -13.97 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "MPN" "XL-1608UOC-06"
-				(at 0 -16.51 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "LCSC Part" "C965800"
-				(at 0 -19.05 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "Light Emitting Diodes (LED)"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "XL-1608UOC-06_0_1"
-				(polyline
-					(pts
-						(xy -4.06 2.03) (xy -3.05 1.52) (xy -3.56 1.02) (xy -4.06 2.03)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy -3.05 3.05) (xy -2.03 2.54) (xy -2.54 2.03) (xy -3.05 3.05)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy -2.29 0.25) (xy -3.3 1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 1.27) (xy -2.29 2.29)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 0.51) (xy -1.27 -3.05)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.27 -1.27) (xy -2.54 -1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 0.51) (xy -1.27 -1.27) (xy 1.27 -3.05) (xy 1.27 0.51)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy 2.54 -1.27) (xy 1.27 -1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(pin unspecified line
-					(at 5.08 -1.27 180)
-					(length 2.54)
-					(name "K"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin unspecified line
-					(at -5.08 -1.27 0)
-					(length 2.54)
-					(name "A"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
-		(symbol "easyeda2kicad:XL-1608VRC-06"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "LED"
-				(at 0 3.81 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "XL-1608VRC-06"
-				(at 0 -6.35 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" "easyeda2kicad:LED0603-RD_PINK"
-				(at 0 -8.89 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" "https://www.lcsc.com/datasheet/C7371906.pdf"
-				(at 0 -11.43 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Manufacturer" "XINGLIGHT(成兴光)"
-				(at 0 -13.97 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "MPN" "XL-1608VRC-06"
-				(at 0 -16.51 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "LCSC Part" "C7371906"
-				(at 0 -19.05 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "LED Indication - Discrete"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "XL-1608VRC-06_0_1"
 				(polyline
 					(pts
 						(xy -4.06 2.03) (xy -3.05 1.52) (xy -3.56 1.02) (xy -4.06 2.03)
@@ -3919,6 +2436,121 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "power:PWR_FLAG"
+			(power global)
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "#FLG"
+				(at 0 1.905 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "PWR_FLAG"
+				(at 0 3.81 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" "Special symbol for telling ERC where power comes from"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "flag power"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "PWR_FLAG_0_0"
+				(pin power_out line
+					(at 0 0 90)
+					(length 0)
+					(name ""
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(symbol "PWR_FLAG_0_1"
+				(polyline
+					(pts
+						(xy 0 0) (xy 0 1.27) (xy -1.016 1.905) (xy 0 2.54) (xy 1.016 1.905) (xy 0 1.27)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "power:VCC"
 			(power global)
 			(pin_numbers
@@ -4060,21 +2692,8 @@
 		)
 	)
 	(rectangle
-		(start 203.2 20.32)
-		(end 266.7 148.59)
-		(stroke
-			(width 0)
-			(type default)
-			(color 194 0 0 1)
-		)
-		(fill
-			(type none)
-		)
-		(uuid "1860d0f5-538c-46d0-bfa6-81dece457b2b")
-	)
-	(rectangle
-		(start 128.27 24.13)
-		(end 184.15 58.42)
+		(start 80.01 13.97)
+		(end 116.84 48.26)
 		(stroke
 			(width 0)
 			(type default)
@@ -4084,32 +2703,6 @@
 			(type none)
 		)
 		(uuid "4bc10f28-b65d-4ef6-90c2-428c5c1a4af9")
-	)
-	(rectangle
-		(start 117.856 139.954)
-		(end 140.716 143.764)
-		(stroke
-			(width 0)
-			(type default)
-			(color 194 0 0 1)
-		)
-		(fill
-			(type none)
-		)
-		(uuid "6636795c-4e4b-4134-b983-0078919d1e12")
-	)
-	(rectangle
-		(start 117.856 139.954)
-		(end 173.736 174.244)
-		(stroke
-			(width 0)
-			(type default)
-			(color 194 0 0 1)
-		)
-		(fill
-			(type none)
-		)
-		(uuid "687ec1d9-e53c-45d1-9bb2-84f036ba6e24")
 	)
 	(rectangle
 		(start 80.01 49.53)
@@ -4125,19 +2718,6 @@
 		(uuid "6ad36092-7cdb-42df-ad27-34606b1570fa")
 	)
 	(rectangle
-		(start 203.2 20.32)
-		(end 226.06 24.13)
-		(stroke
-			(width 0)
-			(type default)
-			(color 194 0 0 1)
-		)
-		(fill
-			(type none)
-		)
-		(uuid "6f5a5270-2a50-45ad-9450-b4a1cf994559")
-	)
-	(rectangle
 		(start 80.01 130.81)
 		(end 109.22 134.62)
 		(stroke
@@ -4151,8 +2731,8 @@
 		(uuid "76be5c02-b34d-4181-96ff-1bb2a4ed8820")
 	)
 	(rectangle
-		(start 125.73 60.96)
-		(end 193.04 132.08)
+		(start 110.49 49.53)
+		(end 177.8 113.03)
 		(stroke
 			(width 0)
 			(type default)
@@ -4281,8 +2861,8 @@
 		(uuid "d7f2fc47-930d-48f0-afba-6df2afb0f96c")
 	)
 	(rectangle
-		(start 128.27 24.13)
-		(end 151.13 27.94)
+		(start 80.01 13.97)
+		(end 102.87 17.78)
 		(stroke
 			(width 0)
 			(type default)
@@ -4307,8 +2887,8 @@
 		(uuid "de647f41-96ae-4a10-850a-37a8b91dbb0c")
 	)
 	(rectangle
-		(start 125.73 60.96)
-		(end 148.59 64.77)
+		(start 110.49 49.53)
+		(end 133.35 53.34)
 		(stroke
 			(width 0)
 			(type default)
@@ -4355,17 +2935,6 @@
 			)
 		)
 		(uuid "0bf790f3-7662-496a-929a-f5f84d16ac65")
-	)
-	(text "PUSH BUTTONS"
-		(exclude_from_sim no)
-		(at 129.54 142.24 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-				(color 194 0 0 1)
-			)
-		)
-		(uuid "118c4a39-ae82-4898-b79a-142b7a1799bd")
 	)
 	(text "APA3010F3C-GX 50ma"
 		(exclude_from_sim no)
@@ -4424,7 +2993,7 @@
 	)
 	(text "SIGNALS"
 		(exclude_from_sim no)
-		(at 137.414 63.246 0)
+		(at 122.174 51.816 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4444,20 +3013,9 @@
 		)
 		(uuid "d13d36b8-0d82-4914-9adf-affecf413c42")
 	)
-	(text "XINGLIGHT"
-		(exclude_from_sim no)
-		(at 214.884 22.606 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-				(color 194 0 0 1)
-			)
-		)
-		(uuid "d707cf52-77da-46a4-8fa9-8974fe4ccff5")
-	)
 	(text "CONNECTOR"
 		(exclude_from_sim no)
-		(at 139.954 26.416 0)
+		(at 91.694 16.256 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4565,10 +3123,10 @@
 		(uuid "88e1b9d9-5876-4bff-9b8b-424604916215")
 	)
 	(junction
-		(at 232.41 68.58)
+		(at 93.98 39.37)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "a98987f5-6f7d-4293-9a69-457a43f3c9c8")
+		(uuid "d0d19614-5858-4ad9-9395-df42ae6648f7")
 	)
 	(junction
 		(at 31.75 148.59)
@@ -4618,7 +3176,7 @@
 	)
 	(wire
 		(pts
-			(xy 128.27 76.2) (xy 139.7 76.2)
+			(xy 113.03 64.77) (xy 124.46 64.77)
 		)
 		(stroke
 			(width 0)
@@ -4628,7 +3186,7 @@
 	)
 	(wire
 		(pts
-			(xy 149.86 114.3) (xy 158.75 114.3)
+			(xy 134.62 102.87) (xy 143.51 102.87)
 		)
 		(stroke
 			(width 0)
@@ -4678,16 +3236,6 @@
 	)
 	(wire
 		(pts
-			(xy 243.84 95.25) (xy 246.38 95.25)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "185829f4-4827-4f70-8a9f-7e2bdfa92045")
-	)
-	(wire
-		(pts
 			(xy 95.25 147.32) (xy 101.6 147.32)
 		)
 		(stroke
@@ -4698,16 +3246,6 @@
 	)
 	(wire
 		(pts
-			(xy 224.79 33.02) (xy 227.33 33.02)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "192cc6f4-1c92-454e-a047-a57dc7d0d405")
-	)
-	(wire
-		(pts
 			(xy 73.66 144.78) (xy 73.66 148.59)
 		)
 		(stroke
@@ -4715,26 +3253,6 @@
 			(type default)
 		)
 		(uuid "1b1c991a-0fa6-4617-9c0b-ad96ab57a2c2")
-	)
-	(wire
-		(pts
-			(xy 256.54 95.25) (xy 260.35 95.25)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1b74fe2b-6c3c-4506-a4fc-e68f4e063c0f")
-	)
-	(wire
-		(pts
-			(xy 232.41 97.79) (xy 232.41 99.06)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1bbec7bb-10d6-4336-b854-0a4bf8f3f390")
 	)
 	(wire
 		(pts
@@ -4758,43 +3276,13 @@
 	)
 	(wire
 		(pts
-			(xy 243.84 38.1) (xy 243.84 34.29)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "243a4e53-68a9-4c61-b527-1b10acc04681")
-	)
-	(wire
-		(pts
-			(xy 128.27 101.6) (xy 139.7 101.6)
+			(xy 113.03 90.17) (xy 124.46 90.17)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "24855635-6077-401d-81b0-159814c64696")
-	)
-	(wire
-		(pts
-			(xy 240.03 48.26) (xy 240.03 45.72)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "24e41bca-a247-49d9-90f3-310f35d0913a")
-	)
-	(wire
-		(pts
-			(xy 208.28 63.5) (xy 214.63 63.5)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "25ec99ce-c7a6-49be-943f-3ba2bde9f961")
 	)
 	(wire
 		(pts
@@ -4818,13 +3306,13 @@
 	)
 	(wire
 		(pts
-			(xy 237.49 33.02) (xy 240.03 33.02)
+			(xy 104.14 39.37) (xy 104.14 40.64)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "2fb08026-953b-4d85-97ca-b0c1e4aaabee")
+		(uuid "2e14f06c-f175-462a-a24c-e6e2328f1379")
 	)
 	(wire
 		(pts
@@ -4838,16 +3326,6 @@
 	)
 	(wire
 		(pts
-			(xy 243.84 49.53) (xy 246.38 49.53)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "2ffee423-0181-475d-900b-de8361f7921c")
-	)
-	(wire
-		(pts
 			(xy 46.99 107.95) (xy 59.69 107.95)
 		)
 		(stroke
@@ -4858,23 +3336,13 @@
 	)
 	(wire
 		(pts
-			(xy 181.61 101.6) (xy 186.69 101.6)
+			(xy 166.37 90.17) (xy 171.45 90.17)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "3445e99a-a880-44dc-ac66-ab8fb537ee90")
-	)
-	(wire
-		(pts
-			(xy 243.84 34.29) (xy 246.38 34.29)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "34c58738-aeb4-4220-a2ac-970c4c1c6019")
 	)
 	(wire
 		(pts
@@ -4888,23 +3356,13 @@
 	)
 	(wire
 		(pts
-			(xy 237.49 93.98) (xy 240.03 93.98)
+			(xy 93.98 36.83) (xy 104.14 36.83)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "3aca3646-572f-49f1-ac9d-5c2acfbc9627")
-	)
-	(wire
-		(pts
-			(xy 208.28 93.98) (xy 214.63 93.98)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "3e0a1dc1-ecea-48e2-a1a5-b91f8fe9fa11")
+		(uuid "408eba66-f4a7-46c8-b296-d2180bf8d4b2")
 	)
 	(wire
 		(pts
@@ -4938,16 +3396,6 @@
 	)
 	(wire
 		(pts
-			(xy 243.84 99.06) (xy 243.84 95.25)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "45c9b1e6-9ac9-46ac-8b8b-bc371ad854ac")
-	)
-	(wire
-		(pts
 			(xy 59.69 107.95) (xy 59.69 110.49)
 		)
 		(stroke
@@ -4955,16 +3403,6 @@
 			(type default)
 		)
 		(uuid "461c20a6-5de2-43e9-872d-25cd6f003f78")
-	)
-	(wire
-		(pts
-			(xy 243.84 64.77) (xy 246.38 64.77)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "46e6b2af-9167-421a-bf0b-76f14ee0492a")
 	)
 	(wire
 		(pts
@@ -4988,26 +3426,6 @@
 	)
 	(wire
 		(pts
-			(xy 256.54 49.53) (xy 260.35 49.53)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4893d0ee-6e30-4fae-939a-ab9a74b16c0a")
-	)
-	(wire
-		(pts
-			(xy 232.41 114.3) (xy 243.84 114.3)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4a374bd0-aac3-4b9a-a952-81e7321f53fc")
-	)
-	(wire
-		(pts
 			(xy 87.63 154.94) (xy 91.44 154.94)
 		)
 		(stroke
@@ -5018,43 +3436,13 @@
 	)
 	(wire
 		(pts
-			(xy 237.49 48.26) (xy 240.03 48.26)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4be3771d-aaa2-4818-90cd-6876d535134d")
-	)
-	(wire
-		(pts
-			(xy 256.54 110.49) (xy 260.35 110.49)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4ca3fc65-9a8e-4826-b8f4-de8facb6b92d")
-	)
-	(wire
-		(pts
-			(xy 149.86 88.9) (xy 158.75 88.9)
+			(xy 134.62 77.47) (xy 143.51 77.47)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "4d23bb04-4184-490b-a2f6-4bd07bfe77e4")
-	)
-	(wire
-		(pts
-			(xy 237.49 63.5) (xy 240.03 63.5)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4eda0966-1b88-428e-bff4-804d9d1d145b")
 	)
 	(wire
 		(pts
@@ -5068,33 +3456,13 @@
 	)
 	(wire
 		(pts
-			(xy 166.37 114.3) (xy 171.45 114.3)
+			(xy 151.13 102.87) (xy 156.21 102.87)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "4ef1270e-70fb-40e2-8a6b-557bcfd101bc")
-	)
-	(wire
-		(pts
-			(xy 256.54 34.29) (xy 260.35 34.29)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4f615c55-b641-48b5-b124-a34ac109e187")
-	)
-	(wire
-		(pts
-			(xy 240.03 63.5) (xy 240.03 60.96)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4fb88df9-64a1-44df-972b-2f00e18a60a0")
 	)
 	(wire
 		(pts
@@ -5105,26 +3473,6 @@
 			(type default)
 		)
 		(uuid "50027042-99d9-44a6-a6bb-a209ceacb9f4")
-	)
-	(wire
-		(pts
-			(xy 208.28 33.02) (xy 214.63 33.02)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5120cc9f-0637-4331-b81e-86b8827ea8b2")
-	)
-	(wire
-		(pts
-			(xy 240.03 78.74) (xy 240.03 76.2)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "51bd0f73-24cc-48be-bbe9-db52ec831dab")
 	)
 	(wire
 		(pts
@@ -5148,36 +3496,6 @@
 	)
 	(wire
 		(pts
-			(xy 243.84 80.01) (xy 246.38 80.01)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "54a5f9a3-153c-44e3-be25-3794716fd961")
-	)
-	(wire
-		(pts
-			(xy 232.41 38.1) (xy 243.84 38.1)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "58a4aa70-a7b8-4327-9ee1-28d9bc99985f")
-	)
-	(wire
-		(pts
-			(xy 224.79 109.22) (xy 227.33 109.22)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5a19224e-55ae-44e4-ad9c-4d016173c5f4")
-	)
-	(wire
-		(pts
 			(xy 87.63 114.3) (xy 95.25 114.3)
 		)
 		(stroke
@@ -5185,26 +3503,6 @@
 			(type default)
 		)
 		(uuid "5b99f399-ca4a-4457-9b5a-f9d9a6a458a0")
-	)
-	(wire
-		(pts
-			(xy 237.49 78.74) (xy 240.03 78.74)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5cf2b868-cb60-42b4-a6a3-39b489b38ea6")
-	)
-	(wire
-		(pts
-			(xy 208.28 78.74) (xy 214.63 78.74)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "6004e4e3-eb62-446f-93ec-40bbe1862c58")
 	)
 	(wire
 		(pts
@@ -5225,6 +3523,16 @@
 			(type default)
 		)
 		(uuid "62625676-4695-413c-8762-bc09c253866d")
+	)
+	(wire
+		(pts
+			(xy 93.98 39.37) (xy 104.14 39.37)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "644cf318-c18a-476d-9234-ceae4a446cb9")
 	)
 	(wire
 		(pts
@@ -5278,7 +3586,7 @@
 	)
 	(wire
 		(pts
-			(xy 181.61 88.9) (xy 186.69 88.9)
+			(xy 166.37 77.47) (xy 171.45 77.47)
 		)
 		(stroke
 			(width 0)
@@ -5298,17 +3606,17 @@
 	)
 	(wire
 		(pts
-			(xy 224.79 48.26) (xy 227.33 48.26)
+			(xy 93.98 29.21) (xy 104.14 29.21)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "7b063ef2-dfec-4013-b0ab-a72de580d248")
+		(uuid "7add3669-d0fd-4b1b-bc92-89fb86a29c03")
 	)
 	(wire
 		(pts
-			(xy 166.37 101.6) (xy 171.45 101.6)
+			(xy 151.13 90.17) (xy 156.21 90.17)
 		)
 		(stroke
 			(width 0)
@@ -5328,17 +3636,7 @@
 	)
 	(wire
 		(pts
-			(xy 232.41 82.55) (xy 232.41 83.82)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "8188ae4b-eb86-4246-bb52-d6b9e311973f")
-	)
-	(wire
-		(pts
-			(xy 181.61 76.2) (xy 186.69 76.2)
+			(xy 166.37 64.77) (xy 171.45 64.77)
 		)
 		(stroke
 			(width 0)
@@ -5355,16 +3653,6 @@
 			(type default)
 		)
 		(uuid "8a808a59-7b13-4844-a930-5c87f4534a89")
-	)
-	(wire
-		(pts
-			(xy 232.41 67.31) (xy 232.41 68.58)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "8ba15709-75f5-4dae-bd21-c1311339d89f")
 	)
 	(wire
 		(pts
@@ -5398,7 +3686,7 @@
 	)
 	(wire
 		(pts
-			(xy 128.27 114.3) (xy 139.7 114.3)
+			(xy 113.03 102.87) (xy 124.46 102.87)
 		)
 		(stroke
 			(width 0)
@@ -5418,7 +3706,7 @@
 	)
 	(wire
 		(pts
-			(xy 128.27 88.9) (xy 139.7 88.9)
+			(xy 113.03 77.47) (xy 124.46 77.47)
 		)
 		(stroke
 			(width 0)
@@ -5438,33 +3726,13 @@
 	)
 	(wire
 		(pts
-			(xy 240.03 93.98) (xy 240.03 91.44)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9cd04061-4cec-446b-a409-fc2a7adb3452")
-	)
-	(wire
-		(pts
-			(xy 166.37 76.2) (xy 171.45 76.2)
+			(xy 151.13 64.77) (xy 156.21 64.77)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "9fa20865-e4c4-4455-bb53-3a61a7df974f")
-	)
-	(wire
-		(pts
-			(xy 232.41 99.06) (xy 243.84 99.06)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9fb1aaae-fd71-4981-a7c4-02710c5ed778")
 	)
 	(wire
 		(pts
@@ -5488,23 +3756,13 @@
 	)
 	(wire
 		(pts
-			(xy 237.49 109.22) (xy 240.03 109.22)
+			(xy 93.98 26.67) (xy 104.14 26.67)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "a406961d-746c-4773-91d7-3252707f9734")
-	)
-	(wire
-		(pts
-			(xy 232.41 83.82) (xy 243.84 83.82)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a5e53483-0b15-4e76-908f-7f1a5abb90f7")
+		(uuid "a6829420-31b6-4d55-bfd4-6cbc223c41bf")
 	)
 	(wire
 		(pts
@@ -5548,16 +3806,6 @@
 	)
 	(wire
 		(pts
-			(xy 224.79 93.98) (xy 227.33 93.98)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a83cb794-3b9c-4fd8-9e40-ade4c2f44100")
-	)
-	(wire
-		(pts
 			(xy 36.83 144.78) (xy 33.02 144.78)
 		)
 		(stroke
@@ -5565,26 +3813,6 @@
 			(type default)
 		)
 		(uuid "a91feb47-e768-409e-960a-b7079b57afd9")
-	)
-	(wire
-		(pts
-			(xy 232.41 113.03) (xy 232.41 114.3)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "aa57217f-dda4-4973-a724-e003f4406e5f")
-	)
-	(wire
-		(pts
-			(xy 232.41 68.58) (xy 243.84 68.58)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ab61e537-b058-41cf-9b3d-bb89c32fb7f0")
 	)
 	(wire
 		(pts
@@ -5608,16 +3836,6 @@
 	)
 	(wire
 		(pts
-			(xy 243.84 110.49) (xy 246.38 110.49)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ac69d35c-6bca-4253-be05-bc68155fd07d")
-	)
-	(wire
-		(pts
 			(xy 59.69 99.06) (xy 63.5 99.06)
 		)
 		(stroke
@@ -5625,16 +3843,6 @@
 			(type default)
 		)
 		(uuid "ad6876cf-f262-4bfa-8954-ca538b1c2302")
-	)
-	(wire
-		(pts
-			(xy 224.79 63.5) (xy 227.33 63.5)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ae6818ef-e179-4fda-bdc9-8986db9dad30")
 	)
 	(wire
 		(pts
@@ -5648,16 +3856,6 @@
 	)
 	(wire
 		(pts
-			(xy 240.03 109.22) (xy 240.03 106.68)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b36035e4-aafa-4d68-95d3-b95ccc671b61")
-	)
-	(wire
-		(pts
 			(xy 87.63 67.31) (xy 92.71 67.31)
 		)
 		(stroke
@@ -5665,26 +3863,6 @@
 			(type default)
 		)
 		(uuid "b3ea3d33-7278-45bf-ac4e-0656e5ebd7fc")
-	)
-	(wire
-		(pts
-			(xy 240.03 33.02) (xy 240.03 30.48)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b5a666f7-433f-4260-893c-d52d18115b25")
-	)
-	(wire
-		(pts
-			(xy 256.54 64.77) (xy 260.35 64.77)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b5b323d7-178d-41d7-9ef4-5c9449605fb4")
 	)
 	(wire
 		(pts
@@ -5698,36 +3876,6 @@
 	)
 	(wire
 		(pts
-			(xy 243.84 68.58) (xy 243.84 64.77)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b7ef7926-0d30-451e-b5bb-6cbe73de8861")
-	)
-	(wire
-		(pts
-			(xy 208.28 109.22) (xy 214.63 109.22)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "bac2309d-424c-4136-b509-dc2ebc401eb6")
-	)
-	(wire
-		(pts
-			(xy 224.79 78.74) (xy 227.33 78.74)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "bb5f762e-3351-4579-b14b-f2f70ea0ef56")
-	)
-	(wire
-		(pts
 			(xy 87.63 72.39) (xy 87.63 78.74)
 		)
 		(stroke
@@ -5738,26 +3886,6 @@
 	)
 	(wire
 		(pts
-			(xy 243.84 53.34) (xy 243.84 49.53)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "be3f1e9a-4c1d-4630-8ec7-2292ed1cad75")
-	)
-	(wire
-		(pts
-			(xy 232.41 52.07) (xy 232.41 53.34)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c2a726b9-6887-4e9b-879d-24c77718fd19")
-	)
-	(wire
-		(pts
 			(xy 105.41 64.77) (xy 105.41 72.39)
 		)
 		(stroke
@@ -5765,16 +3893,6 @@
 			(type default)
 		)
 		(uuid "c37fa9d5-823d-47cb-9bb8-63628f563299")
-	)
-	(wire
-		(pts
-			(xy 232.41 53.34) (xy 243.84 53.34)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c49332bc-be8e-4f1f-bd2d-cf2a6465ace2")
 	)
 	(wire
 		(pts
@@ -5798,7 +3916,7 @@
 	)
 	(wire
 		(pts
-			(xy 166.37 88.9) (xy 171.45 88.9)
+			(xy 151.13 77.47) (xy 156.21 77.47)
 		)
 		(stroke
 			(width 0)
@@ -5838,6 +3956,16 @@
 	)
 	(wire
 		(pts
+			(xy 93.98 34.29) (xy 104.14 34.29)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d215e565-0668-4321-889a-770380324f55")
+	)
+	(wire
+		(pts
 			(xy 39.37 107.95) (xy 39.37 113.03)
 		)
 		(stroke
@@ -5858,16 +3986,6 @@
 	)
 	(wire
 		(pts
-			(xy 208.28 48.26) (xy 214.63 48.26)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d5c25bcc-aa5f-4780-9464-44e849fb14e8")
-	)
-	(wire
-		(pts
 			(xy 17.78 107.95) (xy 31.75 107.95)
 		)
 		(stroke
@@ -5878,7 +3996,7 @@
 	)
 	(wire
 		(pts
-			(xy 149.86 76.2) (xy 158.75 76.2)
+			(xy 134.62 64.77) (xy 143.51 64.77)
 		)
 		(stroke
 			(width 0)
@@ -5938,16 +4056,6 @@
 	)
 	(wire
 		(pts
-			(xy 243.84 83.82) (xy 243.84 80.01)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "e28c8de9-6196-40da-bd95-a0471b9ad267")
-	)
-	(wire
-		(pts
 			(xy 40.64 27.94) (xy 40.64 33.02)
 		)
 		(stroke
@@ -5958,7 +4066,7 @@
 	)
 	(wire
 		(pts
-			(xy 181.61 114.3) (xy 186.69 114.3)
+			(xy 166.37 102.87) (xy 171.45 102.87)
 		)
 		(stroke
 			(width 0)
@@ -5988,7 +4096,7 @@
 	)
 	(wire
 		(pts
-			(xy 149.86 101.6) (xy 158.75 101.6)
+			(xy 134.62 90.17) (xy 143.51 90.17)
 		)
 		(stroke
 			(width 0)
@@ -6008,13 +4116,13 @@
 	)
 	(wire
 		(pts
-			(xy 243.84 114.3) (xy 243.84 110.49)
+			(xy 104.14 26.67) (xy 104.14 25.4)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "f977ed2f-5fb8-417c-8f05-113b98682f99")
+		(uuid "f84104ae-5a24-4a9d-bda4-8cff6257edec")
 	)
 	(wire
 		(pts
@@ -6028,13 +4136,13 @@
 	)
 	(wire
 		(pts
-			(xy 256.54 80.01) (xy 260.35 80.01)
+			(xy 93.98 31.75) (xy 104.14 31.75)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "fe064c27-8eae-4e89-8a59-7ed7754e3781")
+		(uuid "fe0c26e1-1f0e-4573-bb1a-9667d74b2d11")
 	)
 	(wire
 		(pts
@@ -6047,7 +4155,7 @@
 		(uuid "fe5fa0bd-7c6b-4b8f-b7af-e4e068353bc8")
 	)
 	(label "VS 65"
-		(at 128.27 101.6 0)
+		(at 113.03 90.17 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -6067,7 +4175,7 @@
 		(uuid "20eb71c9-2e46-4a07-9832-7110fef29719")
 	)
 	(label "VS 65"
-		(at 158.75 45.72 0)
+		(at 104.14 34.29 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -6077,7 +4185,7 @@
 		(uuid "302b1498-d02f-4681-af38-1226704f5c60")
 	)
 	(label "IR TX"
-		(at 158.75 35.56 0)
+		(at 104.14 29.21 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -6097,7 +4205,7 @@
 		(uuid "3b33b32e-059d-4047-aeb5-348e451d607e")
 	)
 	(label "XL 21"
-		(at 128.27 114.3 0)
+		(at 113.03 102.87 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -6127,7 +4235,7 @@
 		(uuid "ba20324b-b31f-44b4-9714-55e6bb7a18cf")
 	)
 	(label "APA 50"
-		(at 158.75 40.64 0)
+		(at 104.14 31.75 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -6137,7 +4245,7 @@
 		(uuid "d476df3f-410a-4b92-9b34-bdf09288c944")
 	)
 	(label "IR TX"
-		(at 128.27 76.2 0)
+		(at 113.03 64.77 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -6147,7 +4255,7 @@
 		(uuid "e655e338-72cf-4aae-ae7a-385ad273fda7")
 	)
 	(label "APA 50"
-		(at 128.27 88.9 0)
+		(at 113.03 77.47 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -6157,7 +4265,7 @@
 		(uuid "f9cb1665-fd41-4b3b-8c96-5aa8cdb25bad")
 	)
 	(label "XL 21"
-		(at 158.75 50.8 0)
+		(at 104.14 36.83 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -6233,6 +4341,39 @@
 				)
 			)
 		)
+		(property "LCSC Part" "C25612"
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8J0103T5E"
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL"
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "2"
 			(uuid "fc23a33e-8a0c-4a3e-bedd-5796b0783486")
 		)
@@ -6250,7 +4391,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 162.56 101.6 90)
+		(at 147.32 90.17 90)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -6260,7 +4401,7 @@
 		(dnp no)
 		(uuid "06efbacf-10b0-4b04-ac16-eb3ff424505f")
 		(property "Reference" "R13"
-			(at 162.56 96.012 90)
+			(at 147.32 84.582 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6270,7 +4411,7 @@
 			)
 		)
 		(property "Value" "10K"
-			(at 162.56 98.552 90)
+			(at 147.32 87.122 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6280,7 +4421,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-			(at 162.56 103.378 90)
+			(at 147.32 91.948 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6291,7 +4432,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 162.56 101.6 0)
+			(at 147.32 90.17 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6302,7 +4443,40 @@
 			)
 		)
 		(property "Description" "Resistor"
-			(at 162.56 101.6 0)
+			(at 147.32 90.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C25612"
+			(at 57.15 237.49 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8J0103T5E"
+			(at 57.15 237.49 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL"
+			(at 57.15 237.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6405,276 +4579,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:VCC")
-		(at 208.28 93.98 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "0bfb2c4c-4999-452f-8b2f-820a217ee591")
-		(property "Reference" "#PWR064"
-			(at 208.28 97.79 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3.3V"
-			(at 208.28 90.17 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 208.28 93.98 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 208.28 93.98 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"VCC\""
-			(at 208.28 93.98 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "ee0377d1-95bf-45bf-8b08-7a38929d9477")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR064")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:VCC")
-		(at 208.28 48.26 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "1385d385-cda7-45bd-a236-203a3c5be1bd")
-		(property "Reference" "#PWR061"
-			(at 208.28 52.07 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3.3V"
-			(at 208.28 44.45 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 208.28 48.26 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 208.28 48.26 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"VCC\""
-			(at 208.28 48.26 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "abad8e3e-285f-4be6-8f13-c5beea880d6e")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR061")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "easyeda2kicad:3314J-1-103E")
-		(at 232.41 49.53 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "16df8cf2-00ef-42e3-89ed-e1fb61aadd9b")
-		(property "Reference" "VR2"
-			(at 232.41 41.91 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "10K POT"
-			(at 232.41 44.45 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "easyeda2kicad:RES-ADJ-SMD_3314J"
-			(at 245.11 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://lcsc.com/product-detail/Variable-Resistors_BOURNS_3314J-1-103E_10KR_C36376.html"
-			(at 247.65 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "10KΩ"
-			(at 232.41 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "BOURNS"
-			(at 250.19 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "3314J-1-103E"
-			(at 252.73 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C36376"
-			(at 255.27 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "3"
-			(uuid "cadc1313-f7e0-4e08-ab89-149cd9a90cc3")
-		)
-		(pin "1"
-			(uuid "4f5d98d5-efdf-484d-8e28-331f85c0fed9")
-		)
-		(pin "2"
-			(uuid "6d8022ff-b22d-4694-8749-645d637aed4e")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "VR2")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Transistor_FET:AO3400A")
 		(at 44.45 72.39 0)
 		(unit 1)
@@ -6734,6 +4638,39 @@
 			)
 		)
 		(property "Description" "30V Vds, 5.7A Id, N-Channel MOSFET, SOT-23"
+			(at 44.45 72.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C42434120"
+			(at 44.45 72.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "AO3406(ES)"
+			(at 44.45 72.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "ElecSuper"
 			(at 44.45 72.39 0)
 			(hide yes)
 			(show_name no)
@@ -6818,6 +4755,39 @@
 		)
 		(property "Description" "Resistor"
 			(at 40.64 63.5 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C17679"
+			(at 40.64 63.5 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL"
+			(at -22.86 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8F402JT5E"
+			(at 40.64 63.5 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7159,10 +5129,10 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "27edf21d-8fc0-4542-a979-89b0ad2d6b4c")
 		(property "Reference" "J2"
 			(at 85.09 60.198 0)
@@ -7236,392 +5206,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:GND")
-		(at 260.35 49.53 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "28255d9a-f5f6-4688-b65a-bcfe14fdfb28")
-		(property "Reference" "#PWR034"
-			(at 260.35 55.88 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 260.35 53.34 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 260.35 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 260.35 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 260.35 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "eb81ebaa-45fd-446b-953b-963418ed98f0")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR034")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "easyeda2kicad:3314J-1-203E")
-		(at 232.41 66.04 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "29b9cf3b-95f8-4338-9c43-39920ee63c1a")
-		(property "Reference" "VR3"
-			(at 232.41 57.15 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "20K POT"
-			(at 232.41 59.69 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "easyeda2kicad:RES-ADJ-SMD_3P-L4.5-W4.5-P2.30-BL-FS"
-			(at 245.11 66.04 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://lcsc.com/product-detail/Variable-Resistors_BOURNS_3314J-1-203E_3314J-1-203E_C55069.html"
-			(at 247.65 66.04 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "3314J-1-203E"
-			(at 232.41 66.04 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "BOURNS"
-			(at 250.19 66.04 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "3314J-1-203E"
-			(at 252.73 66.04 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C55069"
-			(at 255.27 66.04 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "3"
-			(uuid "f1bcf9fe-ea2e-4804-a5df-01d130f85d1a")
-		)
-		(pin "2"
-			(uuid "0071976a-a1b5-43fe-9f34-aa0b86466186")
-		)
-		(pin "1"
-			(uuid "59c3bde8-4f7a-4989-9724-d3562990076a")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "VR3")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:VCC")
-		(at 208.28 63.5 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "2b5cede9-732a-46d4-99db-f6342a587476")
-		(property "Reference" "#PWR062"
-			(at 208.28 67.31 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3.3V"
-			(at 208.28 59.69 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 208.28 63.5 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 208.28 63.5 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"VCC\""
-			(at 208.28 63.5 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "d24683a9-5bab-462c-ab88-64dd2b0d061f")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR062")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "easyeda2kicad:3314J-1-103E")
-		(at 232.41 95.25 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "2c73a5e7-ed7d-4687-b26c-5e3c88c9113c")
-		(property "Reference" "VR5"
-			(at 232.41 87.63 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "10K POT"
-			(at 232.41 90.17 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "easyeda2kicad:RES-ADJ-SMD_3314J"
-			(at 245.11 95.25 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://lcsc.com/product-detail/Variable-Resistors_BOURNS_3314J-1-103E_10KR_C36376.html"
-			(at 247.65 95.25 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "10KΩ"
-			(at 232.41 95.25 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "BOURNS"
-			(at 250.19 95.25 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "3314J-1-103E"
-			(at 252.73 95.25 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C36376"
-			(at 255.27 95.25 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "3"
-			(uuid "f253aca2-76b4-4141-893f-154af01370b3")
-		)
-		(pin "1"
-			(uuid "e703d781-f288-4022-91d5-d594ef0d3016")
-		)
-		(pin "2"
-			(uuid "1829e215-d28a-416c-a77f-75dbf0a7c4c6")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "VR5")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Transistor_FET:AO3400A")
 		(at 44.45 113.03 0)
 		(unit 1)
@@ -7681,6 +5265,39 @@
 			)
 		)
 		(property "Description" "30V Vds, 5.7A Id, N-Channel MOSFET, SOT-23"
+			(at 44.45 113.03 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C42434120"
+			(at 44.45 113.03 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "AO3406(ES)"
+			(at 44.45 113.03 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "ElecSuper"
 			(at 44.45 113.03 0)
 			(hide yes)
 			(show_name no)
@@ -7765,6 +5382,39 @@
 		)
 		(property "Description" "Resistor"
 			(at 41.91 24.13 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C17561"
+			(at 41.91 24.13 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL"
+			(at 17.78 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8F220JT5E"
+			(at 41.91 24.13 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7867,124 +5517,8 @@
 		)
 	)
 	(symbol
-		(lib_id "easyeda2kicad:3314J-1-103E")
-		(at 232.41 80.01 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "3ca9bc74-af0c-419c-9a0f-39b3fbbd3605")
-		(property "Reference" "VR4"
-			(at 232.41 72.39 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "10K POT"
-			(at 232.41 74.93 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "easyeda2kicad:RES-ADJ-SMD_3314J"
-			(at 245.11 80.01 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://lcsc.com/product-detail/Variable-Resistors_BOURNS_3314J-1-103E_10KR_C36376.html"
-			(at 247.65 80.01 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "10KΩ"
-			(at 232.41 80.01 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "BOURNS"
-			(at 250.19 80.01 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "3314J-1-103E"
-			(at 252.73 80.01 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C36376"
-			(at 255.27 80.01 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "3"
-			(uuid "bfe0a2d5-5cf1-47a0-9c02-aab568961279")
-		)
-		(pin "1"
-			(uuid "f0aaf03b-f200-4a51-b610-80ef053bcd3e")
-		)
-		(pin "2"
-			(uuid "6d3c75f6-2467-4570-81a3-80f7d563c306")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "VR4")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R")
-		(at 162.56 88.9 90)
+		(at 147.32 77.47 90)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -7994,7 +5528,7 @@
 		(dnp no)
 		(uuid "3e8c7034-9278-40b2-84ad-c0061c5700f6")
 		(property "Reference" "R12"
-			(at 162.56 83.312 90)
+			(at 147.32 71.882 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8004,7 +5538,7 @@
 			)
 		)
 		(property "Value" "10K"
-			(at 162.56 85.852 90)
+			(at 147.32 74.422 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8014,7 +5548,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-			(at 162.56 90.678 90)
+			(at 147.32 79.248 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8025,7 +5559,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 162.56 88.9 0)
+			(at 147.32 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8036,7 +5570,40 @@
 			)
 		)
 		(property "Description" "Resistor"
-			(at 162.56 88.9 0)
+			(at 147.32 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C25612"
+			(at 69.85 224.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8J0103T5E"
+			(at 69.85 224.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL"
+			(at 69.85 224.79 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8056,83 +5623,6 @@
 			(project "IR Tester"
 				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
 					(reference "R12")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:VCC")
-		(at 208.28 33.02 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "41ced313-85a4-465c-acc7-a7808eb65717")
-		(property "Reference" "#PWR060"
-			(at 208.28 36.83 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3.3V"
-			(at 208.28 29.21 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 208.28 33.02 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 208.28 33.02 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"VCC\""
-			(at 208.28 33.02 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "cf167ce4-8a84-4813-9d9d-ea4247113963")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR060")
 					(unit 1)
 				)
 			)
@@ -8217,7 +5707,7 @@
 	)
 	(symbol
 		(lib_id "easyeda2kicad:XL-1608SURC-06")
-		(at 176.53 102.87 180)
+		(at 161.29 91.44 180)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -8228,7 +5718,7 @@
 		(fields_autoplaced yes)
 		(uuid "471f3c5a-26f3-4d6f-9440-4db28322aaa0")
 		(property "Reference" "LED5"
-			(at 177.29 95.25 0)
+			(at 162.05 83.82 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8238,7 +5728,7 @@
 			)
 		)
 		(property "Value" "VS 65 Signal"
-			(at 177.29 97.79 0)
+			(at 162.05 86.36 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8248,7 +5738,7 @@
 			)
 		)
 		(property "Footprint" "easyeda2kicad:LED0603-RD_RED"
-			(at 176.53 93.98 0)
+			(at 161.29 82.55 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8259,7 +5749,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/C965799.pdf"
-			(at 176.53 91.44 0)
+			(at 161.29 80.01 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8270,7 +5760,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 176.53 102.87 0)
+			(at 161.29 91.44 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8281,7 +5771,7 @@
 			)
 		)
 		(property "Manufacturer" "XINGLIGHT(成兴光)"
-			(at 176.53 88.9 0)
+			(at 161.29 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8292,7 +5782,7 @@
 			)
 		)
 		(property "MPN" "XL-1608SURC-06"
-			(at 176.53 86.36 0)
+			(at 161.29 74.93 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8303,7 +5793,7 @@
 			)
 		)
 		(property "LCSC Part" "C965799"
-			(at 176.53 83.82 0)
+			(at 161.29 72.39 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8329,239 +5819,8 @@
 		)
 	)
 	(symbol
-		(lib_id "power:GND")
-		(at 260.35 80.01 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "48c02ac1-053f-4995-8aa8-88d0cff477e1")
-		(property "Reference" "#PWR038"
-			(at 260.35 86.36 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 260.35 83.82 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 260.35 80.01 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 260.35 80.01 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 260.35 80.01 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "4534e270-be9c-43ad-b633-edb090e810fa")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR038")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 260.35 34.29 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "48d1db02-0b5d-4d3d-9b83-e5051e31b70d")
-		(property "Reference" "#PWR031"
-			(at 260.35 40.64 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 260.35 38.1 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 260.35 34.29 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 260.35 34.29 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 260.35 34.29 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "771a08f5-4585-4e8f-b112-55afc0161da0")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR031")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 240.03 30.48 180)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "4be86998-535b-4b5d-b991-d19e0483996d")
-		(property "Reference" "#PWR032"
-			(at 240.03 24.13 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 240.03 26.67 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 240.03 30.48 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 240.03 30.48 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 240.03 30.48 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "371a6b54-68f5-4a92-b9a1-0e919b9d58f1")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR032")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "easyeda2kicad:XL-1608SURC-06")
-		(at 176.53 77.47 180)
+		(at 161.29 66.04 180)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -8572,7 +5831,7 @@
 		(fields_autoplaced yes)
 		(uuid "4dc5f79c-6e43-4974-8dee-d9db37a9e9aa")
 		(property "Reference" "LED2"
-			(at 177.29 69.85 0)
+			(at 162.05 58.42 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8582,7 +5841,7 @@
 			)
 		)
 		(property "Value" "IR TX Signal"
-			(at 177.29 72.39 0)
+			(at 162.05 60.96 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8592,7 +5851,7 @@
 			)
 		)
 		(property "Footprint" "easyeda2kicad:LED0603-RD_RED"
-			(at 176.53 68.58 0)
+			(at 161.29 57.15 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8603,7 +5862,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/C965799.pdf"
-			(at 176.53 66.04 0)
+			(at 161.29 54.61 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8614,7 +5873,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 176.53 77.47 0)
+			(at 161.29 66.04 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8625,7 +5884,7 @@
 			)
 		)
 		(property "Manufacturer" "XINGLIGHT(成兴光)"
-			(at 176.53 63.5 0)
+			(at 161.29 52.07 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8636,7 +5895,7 @@
 			)
 		)
 		(property "MPN" "XL-1608SURC-06"
-			(at 176.53 60.96 0)
+			(at 161.29 49.53 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8647,7 +5906,7 @@
 			)
 		)
 		(property "LCSC Part" "C965799"
-			(at 176.53 58.42 0)
+			(at 161.29 46.99 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8674,7 +5933,7 @@
 	)
 	(symbol
 		(lib_id "power:VCC")
-		(at 148.59 35.56 0)
+		(at 104.14 40.64 180)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -8684,7 +5943,7 @@
 		(dnp no)
 		(uuid "54136f30-f420-40d7-a197-d96c39c7dea0")
 		(property "Reference" "#PWR056"
-			(at 148.59 39.37 0)
+			(at 104.14 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8695,7 +5954,7 @@
 			)
 		)
 		(property "Value" "+3.3V"
-			(at 148.59 31.75 0)
+			(at 104.14 44.45 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8705,7 +5964,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 148.59 35.56 0)
+			(at 104.14 40.64 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8716,7 +5975,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 148.59 35.56 0)
+			(at 104.14 40.64 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8727,7 +5986,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"VCC\""
-			(at 148.59 35.56 0)
+			(at 104.14 40.64 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8744,83 +6003,6 @@
 			(project "IR Tester"
 				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
 					(reference "#PWR056")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:VCC")
-		(at 208.28 109.22 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "54326fb0-dda6-4cfc-b343-59a0c90b0d2a")
-		(property "Reference" "#PWR065"
-			(at 208.28 113.03 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3.3V"
-			(at 208.28 105.41 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 208.28 109.22 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 208.28 109.22 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"VCC\""
-			(at 208.28 109.22 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "15991c93-e1c9-4403-ae00-12b5a755db52")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR065")
 					(unit 1)
 				)
 			)
@@ -8898,119 +6080,6 @@
 			(project "IR Tester"
 				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
 					(reference "#PWR058")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "easyeda2kicad:XL-1608SURC-06")
-		(at 251.46 35.56 180)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "5a890b76-bc0b-4892-8bf0-10058cc29bd7")
-		(property "Reference" "LED7"
-			(at 252.22 27.94 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "XL-1608SURC-06"
-			(at 252.22 30.48 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "easyeda2kicad:LED0603-RD_RED"
-			(at 251.46 26.67 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://www.lcsc.com/datasheet/C965799.pdf"
-			(at 251.46 24.13 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 251.46 35.56 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "XINGLIGHT(成兴光)"
-			(at 251.46 21.59 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "XL-1608SURC-06"
-			(at 251.46 19.05 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C965799"
-			(at 251.46 16.51 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "011c6ee8-9bc4-49d9-8071-6bcd32286442")
-		)
-		(pin "2"
-			(uuid "c343b798-1d38-4722-b8d9-cf4a0b93c730")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "LED7")
 					(unit 1)
 				)
 			)
@@ -9316,6 +6385,39 @@
 				)
 			)
 		)
+		(property "LCSC Part" "C25612"
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8J0103T5E"
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL"
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "2"
 			(uuid "7d7c8042-a7ef-42e8-a1e2-c0b96969062d")
 		)
@@ -9333,238 +6435,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 240.03 45.72 180)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "5ea4f6bc-c95f-4859-8faa-e471d513f805")
-		(property "Reference" "#PWR033"
-			(at 240.03 39.37 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 240.03 41.91 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 240.03 45.72 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 240.03 45.72 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 240.03 45.72 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "3bb1dc94-1771-4c5c-8475-6a1ce173bdf7")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR033")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 260.35 64.77 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "5f4fb3f4-6093-4127-84e1-b42de35d9481")
-		(property "Reference" "#PWR036"
-			(at 260.35 71.12 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 260.35 68.58 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 260.35 64.77 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 260.35 64.77 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 260.35 64.77 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "6289d22d-7ca0-43c3-b504-ea58cc56f66f")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR036")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 240.03 91.44 180)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "633e99bc-9465-43f5-ab7d-82848a61a97b")
-		(property "Reference" "#PWR039"
-			(at 240.03 85.09 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 240.03 87.63 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 240.03 91.44 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 240.03 91.44 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 240.03 91.44 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "1d68b63b-370d-49a9-9c71-89659655ff1f")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR039")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 186.69 88.9 0)
+		(at 171.45 77.47 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -9574,7 +6445,7 @@
 		(dnp no)
 		(uuid "653080aa-f2d8-47fa-b3ef-b244a5f4ba0f")
 		(property "Reference" "#PWR025"
-			(at 186.69 95.25 0)
+			(at 171.45 83.82 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9585,7 +6456,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 186.69 92.71 0)
+			(at 171.45 81.28 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9595,7 +6466,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 186.69 88.9 0)
+			(at 171.45 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9606,7 +6477,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 186.69 88.9 0)
+			(at 171.45 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9617,7 +6488,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 186.69 88.9 0)
+			(at 171.45 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9641,7 +6512,7 @@
 	)
 	(symbol
 		(lib_id "Jumper:SolderJumper_2_Bridged")
-		(at 144.78 88.9 0)
+		(at 129.54 77.47 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -9652,7 +6523,7 @@
 		(fields_autoplaced yes)
 		(uuid "6abb22af-e7b3-4863-9b08-33468c7ea637")
 		(property "Reference" "JP2"
-			(at 144.78 82.55 0)
+			(at 129.54 71.12 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9662,7 +6533,7 @@
 			)
 		)
 		(property "Value" "APA 50 Signal JP"
-			(at 144.78 85.09 0)
+			(at 129.54 73.66 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9672,7 +6543,7 @@
 			)
 		)
 		(property "Footprint" "Jumper:SolderJumper-2_P1.3mm_Bridged_Pad1.0x1.5mm"
-			(at 144.78 88.9 0)
+			(at 129.54 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9683,7 +6554,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 144.78 95.25 0)
+			(at 129.54 83.82 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9694,7 +6565,7 @@
 			)
 		)
 		(property "Description" "Solder Jumper, 2-pole, closed/bridged"
-			(at 144.78 93.98 0)
+			(at 129.54 82.55 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9721,87 +6592,7 @@
 	)
 	(symbol
 		(lib_id "Jumper:SolderJumper_2_Bridged")
-		(at 219.71 93.98 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "6ac3265c-a66a-47d1-952a-0a9700c48a72")
-		(property "Reference" "JP9"
-			(at 219.71 90.678 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "XL 21 T"
-			(at 219.71 90.17 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Jumper:SolderJumper-2_P1.3mm_Bridged_Pad1.0x1.5mm"
-			(at 219.71 93.98 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 219.71 100.33 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Solder Jumper, 2-pole, closed/bridged"
-			(at 219.71 99.06 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "ff53b9c6-52cc-41eb-9827-99143d5d7ddb")
-		)
-		(pin "1"
-			(uuid "5026cb76-ed42-4ee2-a1da-d9612f384055")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "JP9")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Jumper:SolderJumper_2_Bridged")
-		(at 144.78 114.3 0)
+		(at 129.54 102.87 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -9812,7 +6603,7 @@
 		(fields_autoplaced yes)
 		(uuid "6fd3e596-7d34-4c0a-983a-5ac9add21be9")
 		(property "Reference" "JP4"
-			(at 144.78 107.95 0)
+			(at 129.54 96.52 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9822,7 +6613,7 @@
 			)
 		)
 		(property "Value" "XL 21 Signal JP"
-			(at 144.78 110.49 0)
+			(at 129.54 99.06 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9832,7 +6623,7 @@
 			)
 		)
 		(property "Footprint" "Jumper:SolderJumper-2_P1.3mm_Bridged_Pad1.0x1.5mm"
-			(at 144.78 114.3 0)
+			(at 129.54 102.87 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9843,7 +6634,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 144.78 120.65 0)
+			(at 129.54 109.22 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9854,7 +6645,7 @@
 			)
 		)
 		(property "Description" "Solder Jumper, 2-pole, closed/bridged"
-			(at 144.78 119.38 0)
+			(at 129.54 107.95 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9881,7 +6672,7 @@
 	)
 	(symbol
 		(lib_id "Jumper:SolderJumper_2_Bridged")
-		(at 144.78 101.6 0)
+		(at 129.54 90.17 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -9892,7 +6683,7 @@
 		(fields_autoplaced yes)
 		(uuid "70c537f8-d46a-4678-8127-0cc2d8627885")
 		(property "Reference" "JP3"
-			(at 144.78 95.25 0)
+			(at 129.54 83.82 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9902,7 +6693,7 @@
 			)
 		)
 		(property "Value" "VS 65 Signal JP"
-			(at 144.78 97.79 0)
+			(at 129.54 86.36 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9912,7 +6703,7 @@
 			)
 		)
 		(property "Footprint" "Jumper:SolderJumper-2_P1.3mm_Bridged_Pad1.0x1.5mm"
-			(at 144.78 101.6 0)
+			(at 129.54 90.17 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9923,7 +6714,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 144.78 107.95 0)
+			(at 129.54 96.52 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9934,7 +6725,7 @@
 			)
 		)
 		(property "Description" "Solder Jumper, 2-pole, closed/bridged"
-			(at 144.78 106.68 0)
+			(at 129.54 95.25 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9954,235 +6745,6 @@
 			(project "IR Tester"
 				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
 					(reference "JP3")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "easyeda2kicad:3314J-1-103E")
-		(at 232.41 110.49 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "76c87963-53fd-41ff-b448-3714a57db5db")
-		(property "Reference" "VR6"
-			(at 232.41 102.87 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "10K POT"
-			(at 232.41 105.41 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "easyeda2kicad:RES-ADJ-SMD_3314J"
-			(at 245.11 110.49 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://lcsc.com/product-detail/Variable-Resistors_BOURNS_3314J-1-103E_10KR_C36376.html"
-			(at 247.65 110.49 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "10KΩ"
-			(at 232.41 110.49 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "BOURNS"
-			(at 250.19 110.49 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "3314J-1-103E"
-			(at 252.73 110.49 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C36376"
-			(at 255.27 110.49 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "3"
-			(uuid "b2fa7a34-09d0-40e7-976a-9e0c237164b5")
-		)
-		(pin "1"
-			(uuid "b87b3a8a-7937-44ef-9e20-d5abae94353c")
-		)
-		(pin "2"
-			(uuid "53ffe337-e88d-42a6-be75-03ed479b1369")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "VR6")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "easyeda2kicad:XL-1608UBC-06A")
-		(at 251.46 78.74 0)
-		(mirror y)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "776c1d79-16f9-4389-a01d-2ab8cbe50121")
-		(property "Reference" "U5"
-			(at 252.22 71.12 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "XL-1608UBC-06A"
-			(at 252.22 73.66 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "easyeda2kicad:LED0603-R-RD"
-			(at 251.46 87.63 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://www.lcsc.com/datasheet/C7371904.pdf"
-			(at 251.46 90.17 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 251.46 78.74 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "XINGLIGHT(成兴光)"
-			(at 251.46 92.71 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "XL-1608UBC-06A"
-			(at 251.46 95.25 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C7371904"
-			(at 251.46 97.79 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "985f9055-2242-4fa9-88cb-24bb0a580ab4")
-		)
-		(pin "1"
-			(uuid "ce835a80-b065-48d8-9255-de75ebf1efda")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "U5")
 					(unit 1)
 				)
 			)
@@ -10267,7 +6829,7 @@
 	)
 	(symbol
 		(lib_id "easyeda2kicad:XL-1608SURC-06")
-		(at 176.53 115.57 180)
+		(at 161.29 104.14 180)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -10278,7 +6840,7 @@
 		(fields_autoplaced yes)
 		(uuid "7df01f67-a28a-489c-8e11-939668438cb0")
 		(property "Reference" "LED6"
-			(at 177.29 107.95 0)
+			(at 162.05 96.52 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -10288,7 +6850,7 @@
 			)
 		)
 		(property "Value" "XL 21 Signal"
-			(at 177.29 110.49 0)
+			(at 162.05 99.06 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -10298,7 +6860,7 @@
 			)
 		)
 		(property "Footprint" "easyeda2kicad:LED0603-RD_RED"
-			(at 176.53 106.68 0)
+			(at 161.29 95.25 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10309,7 +6871,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/C965799.pdf"
-			(at 176.53 104.14 0)
+			(at 161.29 92.71 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10320,7 +6882,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 176.53 115.57 0)
+			(at 161.29 104.14 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10331,7 +6893,7 @@
 			)
 		)
 		(property "Manufacturer" "XINGLIGHT(成兴光)"
-			(at 176.53 101.6 0)
+			(at 161.29 90.17 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10342,7 +6904,7 @@
 			)
 		)
 		(property "MPN" "XL-1608SURC-06"
-			(at 176.53 99.06 0)
+			(at 161.29 87.63 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10353,7 +6915,7 @@
 			)
 		)
 		(property "LCSC Part" "C965799"
-			(at 176.53 96.52 0)
+			(at 161.29 85.09 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10373,312 +6935,6 @@
 			(project "IR Tester"
 				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
 					(reference "LED6")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Jumper:SolderJumper_2_Bridged")
-		(at 219.71 48.26 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "7e72b2e3-2c15-4ec6-bc28-9278a4524b65")
-		(property "Reference" "JP6"
-			(at 219.71 44.958 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "XL 21 T"
-			(at 219.71 44.45 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Jumper:SolderJumper-2_P1.3mm_Bridged_Pad1.0x1.5mm"
-			(at 219.71 48.26 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 219.71 54.61 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Solder Jumper, 2-pole, closed/bridged"
-			(at 219.71 53.34 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "a97b40e0-ee34-40ed-8b7d-d161e00ff4ff")
-		)
-		(pin "1"
-			(uuid "d8835d93-b444-4c75-bea1-1fb3f4296636")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "JP6")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "easyeda2kicad:XL-1608UOC-06")
-		(at 251.46 63.5 0)
-		(mirror y)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "81f1a46d-4ae3-4bea-95be-40310c2c4773")
-		(property "Reference" "LED9"
-			(at 252.22 55.88 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "XL-1608UOC-06"
-			(at 252.22 58.42 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "easyeda2kicad:LED0603-R-RD_ORANGE"
-			(at 251.46 72.39 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://www.lcsc.com/datasheet/C965800.pdf"
-			(at 251.46 74.93 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 251.46 63.5 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "XINGLIGHT(成兴光)"
-			(at 251.46 77.47 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "XL-1608UOC-06"
-			(at 251.46 80.01 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C965800"
-			(at 251.46 82.55 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "b7352ba2-d8a9-4bb7-95da-8e807ed7e1e7")
-		)
-		(pin "2"
-			(uuid "03cc2d50-62ff-4a36-ae59-2fb46abe04a7")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "LED9")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "easyeda2kicad:XL-1608UGC-04")
-		(at 251.46 109.22 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "824d635d-4457-4c1b-9426-63c6594c0329")
-		(property "Reference" "LED8"
-			(at 250.7 101.6 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "XL-1608UGC-04"
-			(at 250.7 104.14 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "easyeda2kicad:LED0603-RD_GREEN"
-			(at 251.46 118.11 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://www.lcsc.com/datasheet/C965804.pdf"
-			(at 251.46 120.65 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 251.46 109.22 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "XINGLIGHT(成兴光)"
-			(at 251.46 123.19 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "XL-1608UGC-04"
-			(at 251.46 125.73 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C965804"
-			(at 251.46 128.27 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "03b96902-72d1-4ecd-8073-820345c464de")
-		)
-		(pin "1"
-			(uuid "1645a116-5320-46ae-a8d6-75ca1782d02b")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "LED8")
 					(unit 1)
 				)
 			)
@@ -10751,6 +7007,39 @@
 				)
 			)
 		)
+		(property "LCSC Part" "C25612"
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8J0103T5E"
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL"
+			(at 0 0 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "2"
 			(uuid "96ee9e00-4703-4a95-bd1d-e60a091a9013")
 		)
@@ -10767,120 +7056,8 @@
 		)
 	)
 	(symbol
-		(lib_id "easyeda2kicad:XL-1608PGC-06")
-		(at 251.46 93.98 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "900cd257-c657-4dda-ae5e-36d9f7de1efd")
-		(property "Reference" "U6"
-			(at 252.222 86.36 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "XL-1608PGC-06"
-			(at 252.222 88.9 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "easyeda2kicad:LED0603-RD_GREEN"
-			(at 251.46 102.87 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://www.lcsc.com/datasheet/C7371905.pdf"
-			(at 251.46 105.41 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 251.46 93.98 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "XINGLIGHT(成兴光)"
-			(at 251.46 107.95 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "XL-1608PGC-06"
-			(at 251.46 110.49 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C7371905"
-			(at 251.46 113.03 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "e397933e-42c8-49c9-952a-3f14b92d1966")
-		)
-		(pin "1"
-			(uuid "d6190fc6-b40a-483c-b1fd-07083f360e7c")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "U6")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:GND")
-		(at 186.69 114.3 0)
+		(at 171.45 102.87 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -10890,7 +7067,7 @@
 		(dnp no)
 		(uuid "9700cfb3-33a8-476e-a4b8-83875c4f02dd")
 		(property "Reference" "#PWR030"
-			(at 186.69 120.65 0)
+			(at 171.45 109.22 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10901,7 +7078,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 186.69 118.11 0)
+			(at 171.45 106.68 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -10911,7 +7088,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 186.69 114.3 0)
+			(at 171.45 102.87 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10922,7 +7099,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 186.69 114.3 0)
+			(at 171.45 102.87 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10933,7 +7110,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 186.69 114.3 0)
+			(at 171.45 102.87 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10950,83 +7127,6 @@
 			(project "IR Tester"
 				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
 					(reference "#PWR030")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 240.03 76.2 180)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "97c6a12b-009e-4425-9b63-3d9c1c4606e6")
-		(property "Reference" "#PWR037"
-			(at 240.03 69.85 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 240.03 72.39 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 240.03 76.2 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 240.03 76.2 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 240.03 76.2 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "5f808ce9-5e31-4096-ba0b-a5d715b66d4c")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR037")
 					(unit 1)
 				)
 			)
@@ -11304,86 +7404,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Jumper:SolderJumper_2_Bridged")
-		(at 219.71 78.74 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "a3e7afbb-c1bf-493b-a71b-7eb33b3cc33c")
-		(property "Reference" "JP8"
-			(at 219.71 75.438 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "XL 21 T"
-			(at 219.71 74.93 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Jumper:SolderJumper-2_P1.3mm_Bridged_Pad1.0x1.5mm"
-			(at 219.71 78.74 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 219.71 85.09 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Solder Jumper, 2-pole, closed/bridged"
-			(at 219.71 83.82 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "516960b2-d3d8-4969-80fa-0f98cecbaa55")
-		)
-		(pin "1"
-			(uuid "1e42184c-301d-412c-a516-af48a2fbf980")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "JP8")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:GND")
 		(at 48.26 41.91 0)
 		(unit 1)
@@ -11462,7 +7482,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 147.32 43.18 0)
+		(at 104.14 25.4 180)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -11472,7 +7492,7 @@
 		(dnp no)
 		(uuid "abb532e6-2ac1-4bef-9877-296873b0336a")
 		(property "Reference" "#PWR017"
-			(at 147.32 49.53 0)
+			(at 104.14 19.05 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11483,7 +7503,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 147.32 46.99 0)
+			(at 104.14 21.59 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -11493,7 +7513,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 147.32 43.18 0)
+			(at 104.14 25.4 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11504,7 +7524,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 147.32 43.18 0)
+			(at 104.14 25.4 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11515,7 +7535,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 147.32 43.18 0)
+			(at 104.14 25.4 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11607,6 +7627,39 @@
 				)
 			)
 		)
+		(property "LCSC Part" "C42434120"
+			(at 44.45 153.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "AO3406(ES)"
+			(at 44.45 153.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "ElecSuper"
+			(at 44.45 153.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "2"
 			(uuid "fc7603a9-b933-4d78-969f-51b02d052e52")
 		)
@@ -11626,124 +7679,8 @@
 		)
 	)
 	(symbol
-		(lib_id "easyeda2kicad:3314J-1-203E")
-		(at 232.41 35.56 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "b2305c8b-0b5e-414e-b27a-105b79924061")
-		(property "Reference" "VR1"
-			(at 232.41 26.67 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "20K POT"
-			(at 232.41 29.21 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "easyeda2kicad:RES-ADJ-SMD_3P-L4.5-W4.5-P2.30-BL-FS"
-			(at 245.11 35.56 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://lcsc.com/product-detail/Variable-Resistors_BOURNS_3314J-1-203E_3314J-1-203E_C55069.html"
-			(at 247.65 35.56 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "3314J-1-203E"
-			(at 232.41 35.56 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "BOURNS"
-			(at 250.19 35.56 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "3314J-1-203E"
-			(at 252.73 35.56 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C55069"
-			(at 255.27 35.56 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "3"
-			(uuid "3a440cf0-4e8c-4ead-9042-f35d89fe8923")
-		)
-		(pin "2"
-			(uuid "6cce9a39-eedc-4b5e-8cbc-0c9d599413e9")
-		)
-		(pin "1"
-			(uuid "44e4ebb1-aac3-47a7-9b1a-9a68ca3598ab")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "VR1")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R")
-		(at 162.56 76.2 90)
+		(at 147.32 64.77 90)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -11753,7 +7690,7 @@
 		(dnp no)
 		(uuid "b53fa331-6207-4156-99fa-c707a68b4b15")
 		(property "Reference" "R9"
-			(at 162.56 70.612 90)
+			(at 147.32 59.182 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -11763,7 +7700,7 @@
 			)
 		)
 		(property "Value" "10K"
-			(at 162.56 73.152 90)
+			(at 147.32 61.722 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -11773,7 +7710,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-			(at 162.56 77.978 90)
+			(at 147.32 66.548 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11784,7 +7721,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 162.56 76.2 0)
+			(at 147.32 64.77 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11795,7 +7732,40 @@
 			)
 		)
 		(property "Description" "Resistor"
-			(at 162.56 76.2 0)
+			(at 147.32 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C25612"
+			(at 82.55 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8J0103T5E"
+			(at 82.55 212.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL"
+			(at 82.55 212.09 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11975,88 +7945,8 @@
 		)
 	)
 	(symbol
-		(lib_id "Jumper:SolderJumper_2_Bridged")
-		(at 219.71 109.22 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "be1ca8eb-f533-4c35-831a-24bc5c08f120")
-		(property "Reference" "JP10"
-			(at 219.71 105.918 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "XL 21 T"
-			(at 219.71 105.41 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Jumper:SolderJumper-2_P1.3mm_Bridged_Pad1.0x1.5mm"
-			(at 219.71 109.22 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 219.71 115.57 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Solder Jumper, 2-pole, closed/bridged"
-			(at 219.71 114.3 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "e9948b54-40ce-4a2f-88c4-c553f37d7bc5")
-		)
-		(pin "1"
-			(uuid "be507b03-91b5-45e3-889b-46506760a009")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "JP10")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:VCC")
-		(at 208.28 78.74 0)
+		(lib_id "power:PWR_FLAG")
+		(at 93.98 39.37 180)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -12064,9 +7954,10 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "bfb5fcc5-aab0-41b6-9570-bd871b29e78f")
-		(property "Reference" "#PWR063"
-			(at 208.28 82.55 0)
+		(fields_autoplaced yes)
+		(uuid "be83e251-00e3-400d-90f0-5a68662227b4")
+		(property "Reference" "#FLG01"
+			(at 93.98 41.275 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12076,8 +7967,8 @@
 				)
 			)
 		)
-		(property "Value" "+3.3V"
-			(at 208.28 74.93 0)
+		(property "Value" "PWR_FLAG"
+			(at 93.98 44.45 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -12087,7 +7978,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 208.28 78.74 0)
+			(at 93.98 39.37 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12098,7 +7989,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 208.28 78.74 0)
+			(at 93.98 39.37 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12108,8 +7999,8 @@
 				)
 			)
 		)
-		(property "Description" "Power symbol creates a global label with name \"VCC\""
-			(at 208.28 78.74 0)
+		(property "Description" "Special symbol for telling ERC where power comes from"
+			(at 93.98 39.37 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12120,12 +8011,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "75a54905-e7cf-4a39-8a2a-4196a68fed8a")
+			(uuid "ee3f0d37-0f35-47c1-90b0-a11718e5de4d")
 		)
 		(instances
 			(project "IR Tester"
 				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR063")
+					(reference "#FLG01")
 					(unit 1)
 				)
 			)
@@ -12133,7 +8024,7 @@
 	)
 	(symbol
 		(lib_id "Jumper:SolderJumper_2_Bridged")
-		(at 144.78 76.2 0)
+		(at 129.54 64.77 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -12144,7 +8035,7 @@
 		(fields_autoplaced yes)
 		(uuid "c02329a9-a09e-434c-a801-051ac4a7f9c3")
 		(property "Reference" "JP1"
-			(at 144.78 69.85 0)
+			(at 129.54 58.42 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -12154,7 +8045,7 @@
 			)
 		)
 		(property "Value" "IR TX Signal JP"
-			(at 144.78 72.39 0)
+			(at 129.54 60.96 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -12164,7 +8055,7 @@
 			)
 		)
 		(property "Footprint" "Jumper:SolderJumper-2_P1.3mm_Bridged_Pad1.0x1.5mm"
-			(at 144.78 76.2 0)
+			(at 129.54 64.77 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12175,7 +8066,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 144.78 82.55 0)
+			(at 129.54 71.12 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12186,7 +8077,7 @@
 			)
 		)
 		(property "Description" "Solder Jumper, 2-pole, closed/bridged"
-			(at 144.78 81.28 0)
+			(at 129.54 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12213,7 +8104,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 186.69 76.2 0)
+		(at 171.45 64.77 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -12223,7 +8114,7 @@
 		(dnp no)
 		(uuid "c0489e6d-d694-4c24-ba46-cbbc6612df42")
 		(property "Reference" "#PWR021"
-			(at 186.69 82.55 0)
+			(at 171.45 71.12 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12234,7 +8125,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 186.69 80.01 0)
+			(at 171.45 68.58 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -12244,7 +8135,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 186.69 76.2 0)
+			(at 171.45 64.77 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12255,7 +8146,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 186.69 76.2 0)
+			(at 171.45 64.77 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12266,7 +8157,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 186.69 76.2 0)
+			(at 171.45 64.77 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12353,6 +8244,39 @@
 				)
 			)
 		)
+		(property "LCSC Part" "C17408"
+			(at 40.64 144.78 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL"
+			(at -104.14 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8F1000T5E"
+			(at 40.64 144.78 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "988b63db-d4cb-4f06-aa97-9e97afaf7545")
 		)
@@ -12374,10 +8298,10 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "c41a1a97-0f66-4968-8f4f-37f6d51e9f43")
 		(property "Reference" "J3"
 			(at 84.836 142.494 0)
@@ -12451,86 +8375,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Jumper:SolderJumper_2_Bridged")
-		(at 219.71 63.5 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "cafd31ea-87a0-44c9-bb1c-4474281c4bd4")
-		(property "Reference" "JP7"
-			(at 219.71 60.198 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "XL 21 T"
-			(at 219.71 59.69 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Jumper:SolderJumper-2_P1.3mm_Bridged_Pad1.0x1.5mm"
-			(at 219.71 63.5 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 219.71 69.85 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Solder Jumper, 2-pole, closed/bridged"
-			(at 219.71 68.58 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "8ebec236-d057-4f47-a483-2a64351cce54")
-		)
-		(pin "1"
-			(uuid "d6f1b376-3efe-4cc7-8ef3-76bc7f32f89e")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "JP7")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R")
 		(at 33.02 35.56 0)
 		(unit 1)
@@ -12597,6 +8441,39 @@
 				)
 			)
 		)
+		(property "LCSC Part" "C25612"
+			(at 33.02 35.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL"
+			(at 33.02 35.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8J0103T5E"
+			(at 33.02 35.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "2"
 			(uuid "e1d09640-15df-459f-9490-02cce5d702dc")
 		)
@@ -12614,7 +8491,7 @@
 	)
 	(symbol
 		(lib_id "easyeda2kicad:XL-1608SURC-06")
-		(at 176.53 90.17 180)
+		(at 161.29 78.74 180)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -12625,7 +8502,7 @@
 		(fields_autoplaced yes)
 		(uuid "d152f81a-b664-4aa1-a482-562a841646f8")
 		(property "Reference" "LED4"
-			(at 177.29 82.55 0)
+			(at 162.05 71.12 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -12635,7 +8512,7 @@
 			)
 		)
 		(property "Value" "APA 50 Signal"
-			(at 177.29 85.09 0)
+			(at 162.05 73.66 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -12645,7 +8522,7 @@
 			)
 		)
 		(property "Footprint" "easyeda2kicad:LED0603-RD_RED"
-			(at 176.53 81.28 0)
+			(at 161.29 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12656,7 +8533,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/C965799.pdf"
-			(at 176.53 78.74 0)
+			(at 161.29 67.31 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12667,7 +8544,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 176.53 90.17 0)
+			(at 161.29 78.74 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12678,7 +8555,7 @@
 			)
 		)
 		(property "Manufacturer" "XINGLIGHT(成兴光)"
-			(at 176.53 76.2 0)
+			(at 161.29 64.77 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12689,7 +8566,7 @@
 			)
 		)
 		(property "MPN" "XL-1608SURC-06"
-			(at 176.53 73.66 0)
+			(at 161.29 62.23 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12700,7 +8577,7 @@
 			)
 		)
 		(property "LCSC Part" "C965799"
-			(at 176.53 71.12 0)
+			(at 161.29 59.69 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12785,6 +8662,39 @@
 			)
 		)
 		(property "Description" "30V Vds, 5.7A Id, N-Channel MOSFET, SOT-23"
+			(at 45.72 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C42434120"
+			(at 45.72 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "ElecSuper"
+			(at 45.72 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "AO3406(ES)"
 			(at 45.72 33.02 0)
 			(hide yes)
 			(show_name no)
@@ -12973,10 +8883,10 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "d4fa8acd-8f88-4e10-b119-7b3a62077c51")
 		(property "Reference" "J1"
 			(at 85.09 101.6 0)
@@ -13128,7 +9038,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 162.56 114.3 90)
+		(at 147.32 102.87 90)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -13138,7 +9048,7 @@
 		(dnp no)
 		(uuid "d9184db1-195e-49ba-ba68-0c5ff64edf23")
 		(property "Reference" "R16"
-			(at 162.56 108.712 90)
+			(at 147.32 97.282 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -13148,7 +9058,7 @@
 			)
 		)
 		(property "Value" "10K"
-			(at 162.56 111.252 90)
+			(at 147.32 99.822 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -13158,7 +9068,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-			(at 162.56 116.078 90)
+			(at 147.32 104.648 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13169,7 +9079,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 162.56 114.3 0)
+			(at 147.32 102.87 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13180,7 +9090,40 @@
 			)
 		)
 		(property "Description" "Resistor"
-			(at 162.56 114.3 0)
+			(at 147.32 102.87 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C25612"
+			(at 44.45 250.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8J0103T5E"
+			(at 44.45 250.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL"
+			(at 44.45 250.19 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13200,160 +9143,6 @@
 			(project "IR Tester"
 				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
 					(reference "R16")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 260.35 110.49 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "d9761f47-485f-45ba-806f-a3471f16ccda")
-		(property "Reference" "#PWR042"
-			(at 260.35 116.84 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 260.35 114.3 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 260.35 110.49 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 260.35 110.49 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 260.35 110.49 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "96943b8d-9e8a-459d-bedf-2832ee4929c5")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR042")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 240.03 106.68 180)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "d9effc8d-0d88-4510-8313-cb36081105d1")
-		(property "Reference" "#PWR041"
-			(at 240.03 100.33 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 240.03 102.87 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 240.03 106.68 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 240.03 106.68 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 240.03 106.68 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "6a98846c-295f-41a4-9127-91e54d99187a")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR041")
 					(unit 1)
 				)
 			)
@@ -13415,6 +9204,39 @@
 		)
 		(property "Description" "Resistor"
 			(at 40.64 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC Part" "C17622"
+			(at 40.64 104.14 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL"
+			(at -63.5 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8F300JT5E"
+			(at 40.64 104.14 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13517,282 +9339,15 @@
 		)
 	)
 	(symbol
-		(lib_id "easyeda2kicad:F.0603.00025_P2-0603G1TS2-06T-002")
-		(at 229.87 138.43 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "e543d308-8039-46bc-8cc8-9ff85dbd2462")
-		(property "Reference" "LED11"
-			(at 229.11 130.81 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "P2-0603G1TS2-06T-002"
-			(at 229.11 133.35 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "easyeda2kicad:LED0603-RD_GREEN"
-			(at 229.87 147.32 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://www.lcsc.com/datasheet/C7496818.pdf"
-			(at 229.87 149.86 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 229.87 138.43 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "TUOZHAN(拓展光电)"
-			(at 229.87 152.4 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "F.0603.00025/P2-0603G1TS2-06T-002"
-			(at 229.87 154.94 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C7496818"
-			(at 229.87 157.48 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "ec59977f-3651-490a-b034-e2fc064b78e9")
-		)
-		(pin "1"
-			(uuid "a7b4a8b0-622d-4a6d-ab6f-ae6890a46919")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "LED11")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 240.03 60.96 180)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "e820c8a1-4ad4-4109-b655-6dca9d53a9e7")
-		(property "Reference" "#PWR035"
-			(at 240.03 54.61 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 240.03 57.15 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 240.03 60.96 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 240.03 60.96 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 240.03 60.96 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "a868aeee-47e8-42d9-9533-389ab70d6f98")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR035")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 260.35 95.25 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "ec5af813-a5ca-4d0e-a3a0-63acae77c9e4")
-		(property "Reference" "#PWR040"
-			(at 260.35 101.6 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 260.35 99.06 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 260.35 95.25 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 260.35 95.25 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 260.35 95.25 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "cc4f0778-d468-404c-a217-4e39b5e2f35f")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "#PWR040")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Connector:Conn_01x02_Pin")
 		(at 55.88 26.67 180)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "ec9b6453-f4d9-46bf-b3f1-983d344baab7")
 		(property "Reference" "J10"
 			(at 57.15 26.6701 0)
@@ -13865,19 +9420,19 @@
 		)
 	)
 	(symbol
-		(lib_id "power:GND")
-		(at 186.69 101.6 0)
+		(lib_id "Connector:Conn_01x06_Pin")
+		(at 88.9 31.75 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp no)
-		(uuid "edf20d6c-5ce7-415d-aeba-a3a4259e8bdd")
-		(property "Reference" "#PWR026"
-			(at 186.69 107.95 0)
-			(hide yes)
+		(dnp yes)
+		(fields_autoplaced yes)
+		(uuid "eced4c0b-acb6-4b1f-99cb-095a5c9e80fa")
+		(property "Reference" "J4"
+			(at 89.535 21.59 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -13886,8 +9441,8 @@
 				)
 			)
 		)
-		(property "Value" "GND"
-			(at 186.69 105.41 0)
+		(property "Value" "Breakout Pins"
+			(at 89.535 24.13 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -13896,8 +9451,8 @@
 				)
 			)
 		)
-		(property "Footprint" ""
-			(at 186.69 101.6 0)
+		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical"
+			(at 88.9 31.75 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13908,7 +9463,99 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 186.69 101.6 0)
+			(at 88.9 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x06, script generated"
+			(at 88.9 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "5"
+			(uuid "1793f2c6-9211-4051-98a5-3caf677b5dc4")
+		)
+		(pin "4"
+			(uuid "74448a4e-1270-4ea2-8a29-31cb04cde65f")
+		)
+		(pin "1"
+			(uuid "996e5fcc-3ded-4c36-9894-a97ddd00d59a")
+		)
+		(pin "2"
+			(uuid "347da129-8391-4fb1-a804-a637dd63bf7b")
+		)
+		(pin "3"
+			(uuid "24ef18f2-ec5e-4b4a-b80b-a628574e4a44")
+		)
+		(pin "6"
+			(uuid "b6d38d3e-d4d7-4e48-bacd-c62c33513e08")
+		)
+		(instances
+			(project "IR Tester"
+				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
+					(reference "J4")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 171.45 90.17 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "edf20d6c-5ce7-415d-aeba-a3a4259e8bdd")
+		(property "Reference" "#PWR026"
+			(at 171.45 96.52 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 171.45 93.98 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 171.45 90.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 171.45 90.17 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13919,7 +9566,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 186.69 101.6 0)
+			(at 171.45 90.17 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14053,199 +9700,6 @@
 			(project "IR Tester"
 				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
 					(reference "LED3")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "easyeda2kicad:XL-1608VRC-06")
-		(at 251.46 48.26 0)
-		(mirror y)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "f156d1ea-f2bf-4150-be5c-31f338d32c56")
-		(property "Reference" "LED10"
-			(at 252.22 40.64 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "XL-1608VRC-06"
-			(at 252.22 43.18 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "easyeda2kicad:LED0603-RD_PINK"
-			(at 251.46 57.15 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "https://www.lcsc.com/datasheet/C7371906.pdf"
-			(at 251.46 59.69 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 251.46 48.26 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Manufacturer" "XINGLIGHT(成兴光)"
-			(at 251.46 62.23 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "MPN" "XL-1608VRC-06"
-			(at 251.46 64.77 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "LCSC Part" "C7371906"
-			(at 251.46 67.31 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "6ab5f183-bb23-4e59-88e7-7988aed20eac")
-		)
-		(pin "1"
-			(uuid "7677a47c-cb6a-4cf3-8cf2-00a12a14ba54")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "LED10")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Jumper:SolderJumper_2_Bridged")
-		(at 219.71 33.02 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "fc4b9399-5a23-4d2d-8501-4ca64d1b40f1")
-		(property "Reference" "JP5"
-			(at 219.71 29.718 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "XL 21 T"
-			(at 219.71 29.21 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Jumper:SolderJumper-2_P1.3mm_Bridged_Pad1.0x1.5mm"
-			(at 219.71 33.02 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 219.71 39.37 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Solder Jumper, 2-pole, closed/bridged"
-			(at 219.71 38.1 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "4e6c13a3-4cc6-4af7-996e-c7e163dd7603")
-		)
-		(pin "1"
-			(uuid "10bbe615-e925-4017-a073-864a66bc42d2")
-		)
-		(instances
-			(project "IR Tester"
-				(path "/c38f086c-163b-4591-a131-a759f2a1c31e"
-					(reference "JP5")
 					(unit 1)
 				)
 			)
