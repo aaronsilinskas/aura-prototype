@@ -2859,3 +2859,161 @@ def test_build_hardware_matrix_with_no_i2c_marks_its_own_pixels_line_failed() ->
         "scope_rows=[global.buff:0-1 global.debuff:1-2 global.main:2-5 "
         "personal:5-7 directional:7-8 ambient:8-9] brightness=1.00 FAILED\n"
     )
+
+
+# ---------------------------------------------------------------------------
+# build_hardware — accelerometer and haptics narration (#760)
+# ---------------------------------------------------------------------------
+
+
+def test_build_hardware_logs_accelerometer_ok_line_when_enabled_and_built() -> None:
+    config = _neopixel_config_with_accelerometer()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] accelerometer lis3dh ok\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_accelerometer_disabled_line_when_section_disabled() -> None:
+    config = _neopixel_config_with_accelerometer()
+    config.accelerometer.enabled = False
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] accelerometer lis3dh disabled\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_no_accelerometer_line_when_section_absent() -> None:
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "accelerometer" not in "".join(fragments)
+
+
+def test_build_hardware_accelerometer_no_i2c_bus_marks_its_own_line_failed_and_propagates() -> None:
+    """A declared-and-enabled accelerometer with no I2C bus available raises via
+    _require_i2c -- the failure must close the accelerometer's own open line,
+    not whichever line closed just before it (mirrors the buttons/i2c FAILED
+    tests for the #758 spine)."""
+    config = _neopixel_config_with_accelerometer()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
+        )
+        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_accelerometer"))
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(RuntimeError, match="accelerometer"):
+            build_hardware(config, board_module=board_mock, logger=logger)
+
+    lines = "".join(fragments).splitlines(keepends=True)
+    assert lines[-1] == "[hw] accelerometer lis3dh FAILED\n"
+
+
+def test_build_hardware_logs_haptics_ok_line_when_enabled_and_built() -> None:
+    config = _neopixel_config_with_haptics()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] haptics drv2605 ok\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_haptics_disabled_line_when_section_disabled() -> None:
+    config = _neopixel_config_with_haptics()
+    config.haptics.enabled = False
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] haptics drv2605 disabled\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_no_haptics_line_when_section_absent() -> None:
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "haptics" not in "".join(fragments)
+
+
+def test_build_hardware_haptics_no_i2c_bus_marks_its_own_line_failed_and_propagates() -> None:
+    """A declared-and-enabled haptics section with no I2C bus available raises
+    via _require_i2c -- the failure must close the haptics line itself, not
+    whichever line closed just before it."""
+    config = _neopixel_config_with_haptics()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
+        )
+        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_drv2605"))
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(RuntimeError, match="haptics"):
+            build_hardware(config, board_module=board_mock, logger=logger)
+
+    lines = "".join(fragments).splitlines(keepends=True)
+    assert lines[-1] == "[hw] haptics drv2605 FAILED\n"
