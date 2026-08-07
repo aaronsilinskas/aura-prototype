@@ -254,45 +254,40 @@ def _setup_neopixels(pixels_cfg: NeoPixelPixelsConfig, board_module: object) -> 
 
 
 def _setup_pixels(
-    pixels_configs: list[MatrixPixelsConfig | NeoPixelPixelsConfig],
+    pixels_cfg: MatrixPixelsConfig | NeoPixelPixelsConfig,
     board_module: object,
     i2c: busio.I2C | None,
 ) -> list[EffectOutput]:
-    """Return one EffectOutput per pixel output declared across *pixels_configs*.
-
-    Dispatches each entry to the matrix or NeoPixel branch by type, in config
-    order, so a device driving both a matrix and NeoPixel strips gets outputs
-    for each in the order they were declared. An entry with ``enabled=False``
-    is skipped outright — neither built nor probed, so a disabled matrix
-    entry doesn't even trigger the missing-I2C-bus check below.
+    """Return the EffectOutputs for *pixels_cfg*, dispatching to the matrix or
+    NeoPixel branch by type. An entry with ``enabled=False`` produces no
+    outputs — neither built nor probed, so a disabled matrix entry doesn't
+    even trigger the missing-I2C-bus check below. (The caller, ``build_hardware``,
+    already filters out disabled entries before calling this, but the check
+    stays here too since this is also called directly in tests.)
 
     Raises:
         RuntimeError: If an enabled matrix entry is declared but *i2c* is
             None (matrix pixels are config-gated, so a missing bus is a real
             wiring fault).
     """
-    outputs: list[EffectOutput] = []
-    for pixels_cfg in pixels_configs:
-        if not pixels_cfg.enabled:
-            continue
-        if isinstance(pixels_cfg, MatrixPixelsConfig):
-            if i2c is None:
-                raise RuntimeError("pixels.type is 'matrix' but no I2C bus is available")
-            # IS31FL3741EffectOutput's own module imports adafruit_is31fl3741 at load
-            # time, so this import is deferred here alongside _setup_matrix_is31fl3741's.
-            from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
+    if not pixels_cfg.enabled:
+        return []
+    if isinstance(pixels_cfg, MatrixPixelsConfig):
+        if i2c is None:
+            raise RuntimeError("pixels.type is 'matrix' but no I2C bus is available")
+        # IS31FL3741EffectOutput's own module imports adafruit_is31fl3741 at load
+        # time, so this import is deferred here alongside _setup_matrix_is31fl3741's.
+        from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 
-            matrix = _setup_matrix_is31fl3741(i2c, pixels_cfg.brightness)
-            outputs.append(
-                IS31FL3741EffectOutput(
-                    matrix,
-                    cols=pixels_cfg.cols,
-                    scope_rows=pixels_cfg.scope_rows,
-                )
+        matrix = _setup_matrix_is31fl3741(i2c, pixels_cfg.brightness)
+        return [
+            IS31FL3741EffectOutput(
+                matrix,
+                cols=pixels_cfg.cols,
+                scope_rows=pixels_cfg.scope_rows,
             )
-        elif isinstance(pixels_cfg, NeoPixelPixelsConfig):
-            outputs.extend(_setup_neopixels(pixels_cfg, board_module))
-    return outputs
+        ]
+    return _setup_neopixels(pixels_cfg, board_module)
 
 
 def _format_ranges(ranges: dict[str, range]) -> str:
@@ -688,7 +683,7 @@ def build_hardware(
                 logger.log(description)
                 continue
             logger.begin(description)
-            outputs.extend(_setup_pixels([pixels_cfg], board_module, i2c))
+            outputs.extend(_setup_pixels(pixels_cfg, board_module, i2c))
             logger.end()
 
         button_desc = _describe_buttons(config.buttons)

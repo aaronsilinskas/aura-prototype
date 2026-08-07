@@ -526,7 +526,7 @@ def test_setup_pixels_dispatches_matrix_config_to_matrix_branch() -> None:
 
         from hardware.circuitpython.device_builder import _setup_pixels
 
-        outputs = _setup_pixels(config.pixels, board_mock, i2c)
+        outputs = _setup_pixels(config.pixels[0], board_mock, i2c)
 
     assert len(outputs) == 1
     assert isinstance(outputs[0], IS31FL3741EffectOutput)
@@ -545,7 +545,7 @@ def test_setup_pixels_dispatches_neopixel_config_to_neopixel_branch() -> None:
 
         from hardware.circuitpython.device_builder import _setup_pixels
 
-        outputs = _setup_pixels(config.pixels, board_mock, i2c=None)
+        outputs = _setup_pixels(config.pixels[0], board_mock, i2c=None)
 
     assert len(outputs) == 2
     assert all(isinstance(o, NeoPixelEffectOutput) for o in outputs)
@@ -566,7 +566,7 @@ def test_setup_pixels_matrix_config_with_no_i2c_raises_runtime_error() -> None:
         from hardware.circuitpython.device_builder import _setup_pixels
 
         with pytest.raises(RuntimeError, match="matrix"):
-            _setup_pixels(config.pixels, board_mock, i2c=None)
+            _setup_pixels(config.pixels[0], board_mock, i2c=None)
 
     mock_setup_matrix.assert_not_called()
 
@@ -595,7 +595,7 @@ def test_setup_pixels_skips_disabled_matrix_entry() -> None:
 
         from hardware.circuitpython.device_builder import _setup_pixels
 
-        outputs = _setup_pixels(config.pixels, board_mock, i2c=None)
+        outputs = _setup_pixels(config.pixels[0], board_mock, i2c=None)
 
     assert outputs == []
     mock_setup_matrix.assert_not_called()
@@ -620,34 +620,10 @@ def test_setup_pixels_skips_disabled_neopixel_entry() -> None:
 
         from hardware.circuitpython.device_builder import _setup_pixels
 
-        outputs = _setup_pixels(config.pixels, board_mock, i2c=None)
+        outputs = _setup_pixels(config.pixels[0], board_mock, i2c=None)
 
     assert outputs == []
     mock_neopixel.NeoPixel.assert_not_called()
-
-
-def test_setup_pixels_mixed_matrix_and_neopixel_list_produces_outputs_in_config_order() -> None:
-    from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
-    from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
-
-    config = _mixed_matrix_and_neopixel_config()
-    board_mock = _mock_board(D5=MagicMock())
-    i2c = MagicMock(name="i2c")
-
-    with ExitStack() as stack:
-        stack.enter_context(
-            patch(
-                "hardware.circuitpython.device_builder._setup_matrix_is31fl3741",
-                return_value=MagicMock(),
-            )
-        )
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import _setup_pixels
-
-        outputs = _setup_pixels(config.pixels, board_mock, i2c)
-
-    assert [type(o) for o in outputs] == [IS31FL3741EffectOutput, NeoPixelEffectOutput]
 
 
 # ---------------------------------------------------------------------------
@@ -762,7 +738,7 @@ def test_build_hardware_neopixel_only_config_includes_all_strip_outputs_in_bundl
 def test_build_hardware_mixed_matrix_and_neopixel_config_produces_outputs_in_config_order() -> None:
     """A device driving both a matrix and NeoPixel strips in one
     config.pixels list dispatches correctly, with outputs following config
-    order (#613) — dispatch detail itself is covered directly on
+    order (#613) — per-entry dispatch itself is covered directly on
     _setup_pixels."""
     from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
     from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
