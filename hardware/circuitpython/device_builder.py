@@ -617,13 +617,17 @@ def build_hardware(
     probed; an enabled entry opens via ``logger.begin()`` before
     ``_setup_pixels`` resolves any of its pins, so an unknown-pin
     ``ValueError`` or (matrix, no I2C bus) ``RuntimeError`` closes that
-    entry's own line with ``FAILED`` rather than a neighboring one.
-    Remaining optional/config-gated components (accelerometer, haptics,
-    audio, radio, ir) are not narrated yet — that lands in their own
-    follow-on tickets. The whole body runs under one try/except: any
-    exception closes whatever log line is currently open with a ``FAILED``
-    marker (a no-op if none is open) before re-raising, so a failure is
-    never left attributed to the wrong, already-closed line.
+    entry's own line with ``FAILED`` rather than a neighboring one. Declared
+    accelerometer and haptics sections are narrated on their own line each
+    (``"accelerometer lis3dh"`` / ``"haptics drv2605"``): ``ok`` when built,
+    ``disabled`` for an explicit ``enabled: false``, no line at all when the
+    section is absent, and ``FAILED`` (via the whole-function except below)
+    when ``_require_i2c`` raises for a missing bus. Remaining optional/
+    config-gated components (audio, radio, ir) are not narrated yet — that
+    lands in their own follow-on tickets. The whole body runs under one
+    try/except: any exception closes whatever log line is currently open
+    with a ``FAILED`` marker (a no-op if none is open) before re-raising, so
+    a failure is never left attributed to the wrong, already-closed line.
 
     Raises:
         ValueError: If a declared pin name does not exist on the board.
@@ -696,20 +700,30 @@ def build_hardware(
         logger.end()
 
         accelerometer = None
-        if config.accelerometer is not None and config.accelerometer.enabled:
-            accelerometer = _setup_accelerometer(_require_i2c(i2c, "accelerometer"))
+        if config.accelerometer is not None:
+            logger.begin("accelerometer lis3dh")
+            if config.accelerometer.enabled:
+                accelerometer = _setup_accelerometer(_require_i2c(i2c, "accelerometer"))
+                logger.end()
+            else:
+                logger.end("disabled")
 
         if config.audio is not None and config.audio.enabled:
             outputs.append(_setup_audio(config.audio, board_module))
 
-        if config.haptics is not None and config.haptics.enabled:
-            driver = _setup_drv2605(_require_i2c(i2c, "haptics"))
-            # Drv2605EffectOutput's own module imports adafruit_drv2605 at load
-            # time, so this import is deferred here — reached only once
-            # _setup_drv2605 has already confirmed the library is importable.
-            from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
+        if config.haptics is not None:
+            logger.begin("haptics drv2605")
+            if config.haptics.enabled:
+                driver = _setup_drv2605(_require_i2c(i2c, "haptics"))
+                # Drv2605EffectOutput's own module imports adafruit_drv2605 at load
+                # time, so this import is deferred here — reached only once
+                # _setup_drv2605 has already confirmed the library is importable.
+                from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 
-            outputs.append(Drv2605EffectOutput(driver))
+                outputs.append(Drv2605EffectOutput(driver))
+                logger.end()
+            else:
+                logger.end("disabled")
 
         radio = None
         if config.radio is not None and config.radio.enabled:
