@@ -38,6 +38,7 @@ import microcontroller
 
 from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
+from engine.log import Logger
 from engine.network import IR_EMITTERS
 from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
@@ -68,6 +69,7 @@ from hardware.shared.ir_transport import (
     PulseWriter,
 )
 from hardware.shared.network_controls import HardwareNetworkControls
+from hardware.shared.profiler_report import board_id
 from hardware.shared.radio_transport import RadioTransport
 
 __all__ = [
@@ -84,13 +86,20 @@ def _resolve_pin(board_module: object, field: str, name: str) -> microcontroller
         raise ValueError(f"{field}: pin '{name}' not found on board") from None
 
 
-def _setup_external_power() -> None:
+def _setup_external_power() -> bool:
     """Enable the PropMaker's EXTERNAL_POWER rail (powers NeoPixels, audio amp, and other
-    peripherals), if the board has one."""
+    peripherals), if the board has one.
+
+    Returns:
+        Whether the board declares an ``EXTERNAL_POWER`` rail (and therefore
+        switched it on) -- ``build_hardware`` uses this to log ``ok`` vs.
+        ``no rail``.
+    """
     if not hasattr(board, "EXTERNAL_POWER"):
-        return
+        return False
     power = digitalio.DigitalInOut(board.EXTERNAL_POWER)
     power.switch_to_output(value=True)
+    return True
 
 
 def _setup_i2c(i2c_config: I2CConfig | None, board_module: object) -> busio.I2C | None:
@@ -295,6 +304,17 @@ def _setup_buttons(*pins: microcontroller.Pin) -> DebouncedButtons:
         btn.switch_to_input(pull=digitalio.Pull.UP)
         pairs.append((label, lambda p=btn: p.value))
     return DebouncedButtons(pairs)
+
+
+def _describe_buttons(pin_names: list[str]) -> str:
+    """Return each button's label paired with its declared pin name, e.g. ``"A=GP2 B=GP3"``.
+
+    Uses the same A, B, C, ... label scheme :func:`_setup_buttons` assigns,
+    but works from the raw config pin-name strings rather than resolved
+    ``microcontroller.Pin`` objects -- so ``build_hardware`` can log this
+    description *before* calling :func:`_resolve_pin`, which may raise.
+    """
+    return " ".join(f"{chr(ord('A') + i)}={name}" for i, name in enumerate(pin_names))
 
 
 def _setup_accelerometer(i2c: busio.I2C) -> object:
@@ -516,6 +536,7 @@ def build_hardware(
     ir_encoder: InfraredEncoder | None = None,
     ir_decoder: InfraredDecoder | None = None,
     i2c: busio.I2C | None = None,
+    logger: Logger | None = None,
 ) -> DeviceHardware:
     """Assemble DeviceHardware from a parsed DeviceConfig.
 
@@ -538,6 +559,18 @@ def build_hardware(
     ``miso`` pins, or ``board.SPI()`` when the ``spi`` section is absent; no
     bus when ``spi`` is disabled — see ``_setup_spi``).
 
+    *logger*, if supplied, narrates every step that runs unconditionally
+    (the opening banner, external power, i2c, spi, and buttons) plus a
+    closing summary line; omitted or ``None`` normalizes to
+    :data:`~engine.log.Logger.SILENT` here, so every call below logs
+    unconditionally and an uninstrumented caller sees no output at all.
+    Optional/config-gated components (pixels, accelerometer, haptics, audio,
+    radio, ir) are not narrated yet — that lands in their own follow-on
+    tickets. The whole body runs under one try/except: any exception closes
+    whatever log line is currently open with a ``FAILED`` marker (a no-op if
+    none is open) before re-raising, so a failure is never left attributed to
+    the wrong, already-closed line.
+
     Raises:
         ValueError: If a declared pin name does not exist on the board.
         RuntimeError: If pixels.type is 'matrix' but no I2C bus is available,
@@ -545,76 +578,129 @@ def build_hardware(
             available, or a radio section is declared but no SPI bus is
             available.
     """
-    _setup_external_power()
-    if i2c is None:
-        i2c = _setup_i2c(config.i2c, board_module)
-    spi = _setup_spi(config.spi, board_module)
+    if logger is None:
+        logger = Logger.SILENT
 
-    outputs: list[EffectOutput] = []
-    outputs.extend(_setup_pixels(config.pixels, board_module, i2c))
+    try:
+        start = time.monotonic()
+        logger.log(f"begin board={board_id()}")
 
-    button_pins = [
-        _resolve_pin(board_module, f"buttons[{i}]", name) for i, name in enumerate(config.buttons)
-    ]
-    buttons = _setup_buttons(*button_pins)
-
-    accelerometer = None
-    if config.accelerometer is not None and config.accelerometer.enabled:
-        accelerometer = _setup_accelerometer(_require_i2c(i2c, "accelerometer"))
-
-    if config.audio is not None and config.audio.enabled:
-        outputs.append(_setup_audio(config.audio, board_module))
-
-    if config.haptics is not None and config.haptics.enabled:
-        driver = _setup_drv2605(_require_i2c(i2c, "haptics"))
-        # Drv2605EffectOutput's own module imports adafruit_drv2605 at load
-        # time, so this import is deferred here — reached only once
-        # _setup_drv2605 has already confirmed the library is importable.
-        from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
-
-        outputs.append(Drv2605EffectOutput(driver))
-
-    radio = None
-    if config.radio is not None and config.radio.enabled:
-        radio = _setup_radio(_require_spi(spi, "radio"), config.radio, board_module)
-
-    transmitters: dict[str, InfraredTransmitter] = {}
-    ir_receiver = None
-    if config.ir is not None and config.ir.enabled:
-        encoder = ir_encoder if ir_encoder is not None else AuraInfraredEncoder()
-        decoder = ir_decoder if ir_decoder is not None else AuraInfraredDecoder()
-
-        rx_pin_names = config.ir.rx
-        if len(rx_pin_names) == 1:
-            rx_pins = [_resolve_pin(board_module, "ir.rx", rx_pin_names[0])]
+        logger.begin("external_power")
+        if _setup_external_power():
+            logger.end()
         else:
-            rx_pins = [
-                _resolve_pin(board_module, f"ir.rx[{i}]", name)
-                for i, name in enumerate(rx_pin_names)
-            ]
+            logger.end("no rail")
 
-        emitter_pins: dict[str, microcontroller.Pin] = {}
-        for emitter_key, pin_name in config.ir.emitters.items():
-            emitter_pins[emitter_key] = _resolve_pin(board_module, f"ir.{emitter_key}", pin_name)
+        i2c_cfg = config.i2c
+        if i2c is None:
+            if i2c_cfg is not None and not i2c_cfg.enabled:
+                logger.begin("i2c")
+                logger.end("disabled")
+            else:
+                i2c_pins = (
+                    f"scl={i2c_cfg.scl} sda={i2c_cfg.sda}" if i2c_cfg is not None else "default"
+                )
+                logger.begin(f"i2c {i2c_pins}")
+                i2c = _setup_i2c(i2c_cfg, board_module)
+                if i2c is None:
+                    logger.end("no bus")
+                else:
+                    logger.end()
 
-        transmitters, ir_receiver = _setup_ir(
-            rx_pins,
-            emitter_pins,
-            encoder=encoder,
-            decoder=decoder,
+        spi_cfg = config.spi
+        if spi_cfg is not None and not spi_cfg.enabled:
+            logger.begin("spi")
+            logger.end("disabled")
+            spi = None
+        else:
+            spi_pins = (
+                f"sck={spi_cfg.sck} mosi={spi_cfg.mosi} miso={spi_cfg.miso}"
+                if spi_cfg is not None
+                else "default"
+            )
+            logger.begin(f"spi {spi_pins}")
+            spi = _setup_spi(spi_cfg, board_module)
+            logger.end()
+
+        outputs: list[EffectOutput] = []
+        outputs.extend(_setup_pixels(config.pixels, board_module, i2c))
+
+        button_desc = _describe_buttons(config.buttons)
+        logger.begin(f"buttons {button_desc}" if button_desc else "buttons")
+        button_pins = [
+            _resolve_pin(board_module, f"buttons[{i}]", name)
+            for i, name in enumerate(config.buttons)
+        ]
+        buttons = _setup_buttons(*button_pins)
+        logger.end()
+
+        accelerometer = None
+        if config.accelerometer is not None and config.accelerometer.enabled:
+            accelerometer = _setup_accelerometer(_require_i2c(i2c, "accelerometer"))
+
+        if config.audio is not None and config.audio.enabled:
+            outputs.append(_setup_audio(config.audio, board_module))
+
+        if config.haptics is not None and config.haptics.enabled:
+            driver = _setup_drv2605(_require_i2c(i2c, "haptics"))
+            # Drv2605EffectOutput's own module imports adafruit_drv2605 at load
+            # time, so this import is deferred here — reached only once
+            # _setup_drv2605 has already confirmed the library is importable.
+            from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
+
+            outputs.append(Drv2605EffectOutput(driver))
+
+        radio = None
+        if config.radio is not None and config.radio.enabled:
+            radio = _setup_radio(_require_spi(spi, "radio"), config.radio, board_module)
+
+        transmitters: dict[str, InfraredTransmitter] = {}
+        ir_receiver = None
+        if config.ir is not None and config.ir.enabled:
+            encoder = ir_encoder if ir_encoder is not None else AuraInfraredEncoder()
+            decoder = ir_decoder if ir_decoder is not None else AuraInfraredDecoder()
+
+            rx_pin_names = config.ir.rx
+            if len(rx_pin_names) == 1:
+                rx_pins = [_resolve_pin(board_module, "ir.rx", rx_pin_names[0])]
+            else:
+                rx_pins = [
+                    _resolve_pin(board_module, f"ir.rx[{i}]", name)
+                    for i, name in enumerate(rx_pin_names)
+                ]
+
+            emitter_pins: dict[str, microcontroller.Pin] = {}
+            for emitter_key, pin_name in config.ir.emitters.items():
+                emitter_pins[emitter_key] = _resolve_pin(
+                    board_module, f"ir.{emitter_key}", pin_name
+                )
+
+            transmitters, ir_receiver = _setup_ir(
+                rx_pins,
+                emitter_pins,
+                encoder=encoder,
+                decoder=decoder,
+            )
+
+        # One HardwareNetworkControls instance, seen through two declared faces:
+        # rules reach it as the send-only NetworkControls; the runtime loop
+        # reaches the same object as TransmitPump to pump transmit lifecycle.
+        hardware_network_controls = HardwareNetworkControls(transmitters, radio=radio)
+
+        elapsed = time.monotonic() - start
+        logger.log(
+            f"ready outputs={len(outputs)} buttons={len(button_pins)} elapsed_s={elapsed:.3f}"
         )
 
-    # One HardwareNetworkControls instance, seen through two declared faces:
-    # rules reach it as the send-only NetworkControls; the runtime loop
-    # reaches the same object as TransmitPump to pump transmit lifecycle.
-    hardware_network_controls = HardwareNetworkControls(transmitters, radio=radio)
-
-    return DeviceHardware(
-        outputs=outputs,
-        buttons=buttons,
-        accelerometer=accelerometer,
-        network_controls=hardware_network_controls,
-        transmit_pump=hardware_network_controls,
-        ir_receiver=ir_receiver,
-        radio=radio,
-    )
+        return DeviceHardware(
+            outputs=outputs,
+            buttons=buttons,
+            accelerometer=accelerometer,
+            network_controls=hardware_network_controls,
+            transmit_pump=hardware_network_controls,
+            ir_receiver=ir_receiver,
+            radio=radio,
+        )
+    except Exception:
+        logger.fail()
+        raise

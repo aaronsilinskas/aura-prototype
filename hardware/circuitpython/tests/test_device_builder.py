@@ -10,13 +10,16 @@ are patched so this suite runs under CPython.
 
 from __future__ import annotations
 
+import io
+import re
 import sys
-from contextlib import ExitStack
+from contextlib import ExitStack, redirect_stdout
 from typing import NamedTuple
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from engine.log import Logger
 from engine.network import AREA_OF_EFFECT, CONE, LINE
 from hardware.shared.device_config import (
     parse_device_config,
@@ -97,6 +100,22 @@ def _mock_board(**pins):
     for name, pin in pins.items():
         setattr(mock, name, pin)
     return mock
+
+
+def _recording_logger(tag: str = "[hw]") -> tuple[Logger, list[str]]:
+    """Return a Logger wired to an in-memory sink, plus the fragments it records.
+
+    Mirrors ``engine.tests.test_log``'s own helper -- the recording-sink
+    pattern established there for asserting a logger's exact emitted line
+    sequence.
+    """
+    fragments: list[str] = []
+    return Logger(tag=tag, sink=fragments.append), fragments
+
+
+def _minimal_config():
+    """Return a DeviceConfig declaring buttons but no optional sections at all."""
+    return parse_device_config({"buttons": ["D9"]})
 
 
 class _HwPatchMocks(NamedTuple):
@@ -2328,3 +2347,308 @@ def test_build_hardware_transmit_pump_satisfies_transmit_pump() -> None:
         hw = build_hardware(config, board_module=board_mock)
 
     assert isinstance(hw.transmit_pump, TransmitPump)
+
+
+# ---------------------------------------------------------------------------
+# _describe_buttons -- pairs each button label with its declared pin name
+# ---------------------------------------------------------------------------
+
+
+def test_describe_buttons_pairs_each_label_with_its_declared_pin_in_order() -> None:
+    from hardware.circuitpython.device_builder import _describe_buttons
+
+    assert _describe_buttons(["GP2", "GP3", "GP4"]) == "A=GP2 B=GP3 C=GP4"
+
+
+def test_describe_buttons_returns_empty_string_for_no_buttons_declared() -> None:
+    from hardware.circuitpython.device_builder import _describe_buttons
+
+    assert _describe_buttons([]) == ""
+
+
+# ---------------------------------------------------------------------------
+# _setup_external_power -- return value drives build_hardware's ok/no-rail line
+# ---------------------------------------------------------------------------
+
+
+def test_setup_external_power_returns_true_when_board_has_pin() -> None:
+    board_mock = _mock_board(EXTERNAL_POWER=MagicMock())
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder.board", board_mock))
+        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
+
+        from hardware.circuitpython.device_builder import _setup_external_power
+
+        assert _setup_external_power() is True
+
+
+def test_setup_external_power_returns_false_when_board_has_no_pin() -> None:
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder.board", _BoardWithoutExternalPower())
+        )
+        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
+
+        from hardware.circuitpython.device_builder import _setup_external_power
+
+        assert _setup_external_power() is False
+
+
+# ---------------------------------------------------------------------------
+# build_hardware — logger spine: banner, external power, i2c, spi, buttons,
+# and the closing summary line (#758)
+# ---------------------------------------------------------------------------
+
+
+def test_build_hardware_minimal_config_narrates_exactly_the_unconditional_steps() -> None:
+    """A config with no optional sections logs exactly six lines: the opening
+    banner, external power, i2c, spi, buttons, and the closing summary --
+    nothing else, since pixels/accelerometer/audio/haptics/radio/ir are all
+    absent and out of scope for narration in this ticket."""
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    lines = "".join(fragments).splitlines(keepends=True)
+    assert len(lines) == 6
+    assert lines[0] == "[hw] begin board=unknown-board\n"
+    assert lines[1] == "[hw] external_power ok\n"
+    assert lines[2] == "[hw] i2c default ok\n"
+    assert lines[3] == "[hw] spi default ok\n"
+    assert lines[4] == "[hw] buttons A=D9 ok\n"
+    assert re.fullmatch(r"\[hw\] ready outputs=0 buttons=1 elapsed_s=\d+\.\d{3}\n", lines[5])
+
+
+def test_build_hardware_without_logger_injected_produces_no_output_at_all() -> None:
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+    captured = io.StringIO()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with redirect_stdout(captured):
+            build_hardware(config, board_module=board_mock)
+
+    assert captured.getvalue() == ""
+
+
+def test_build_hardware_logs_no_rail_when_board_has_no_external_power() -> None:
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_external_power",
+                return_value=False,
+            )
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=MagicMock())
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_spi", return_value=MagicMock())
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] external_power no rail\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_configured_i2c_pins() -> None:
+    config = parse_device_config({"buttons": ["D9"], "i2c": {"sda": "GP4", "scl": "GP5"}})
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] i2c scl=GP5 sda=GP4 ok\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_i2c_disabled_line_when_section_explicitly_disabled() -> None:
+    config = parse_device_config(
+        {"buttons": ["D9"], "i2c": {"sda": "GP4", "scl": "GP5", "enabled": False}}
+    )
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] i2c disabled\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_i2c_no_bus_outcome_when_no_pullup_found() -> None:
+    """An absent i2c section still builds a real bus on default pins -- when
+    that construction finds no pull-up (busio.I2C's RuntimeError, caught
+    inside _setup_i2c), the line reports "no bus", distinct from "disabled"."""
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_spi", return_value=MagicMock())
+        )
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] i2c default no bus\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_configured_spi_pins() -> None:
+    config = parse_device_config(
+        {"buttons": ["D9"], "spi": {"sck": "GP2", "mosi": "GP3", "miso": "GP4"}}
+    )
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] spi sck=GP2 mosi=GP3 miso=GP4 ok\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_spi_disabled_line_when_section_explicitly_disabled() -> None:
+    config = parse_device_config(
+        {
+            "buttons": ["D9"],
+            "spi": {"sck": "GP2", "mosi": "GP3", "miso": "GP4", "enabled": False},
+        }
+    )
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] spi disabled\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_each_button_label_and_pin() -> None:
+    config = parse_device_config({"buttons": ["GP2", "GP3"]})
+    board_mock = _mock_board(GP2=MagicMock(), GP3=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] buttons A=GP2 B=GP3 ok\n" in "".join(fragments)
+
+
+def test_build_hardware_unknown_button_pin_marks_buttons_line_failed_not_prior_line() -> None:
+    """The begin-before-_resolve_pin reorder (#758) means an unknown button
+    pin name attributes its failure to the still-open buttons line, not to
+    whichever line closed just before it -- proving the earlier bug (raising
+    before begin() ever opened the line) is fixed."""
+    config = parse_device_config({"buttons": ["NOPE"]})
+    board_mock = MagicMock(spec=[])  # no attributes -> AttributeError on resolve
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ValueError, match="NOPE"):
+            build_hardware(config, board_module=board_mock, logger=logger)
+
+    lines = "".join(fragments).splitlines(keepends=True)
+    assert lines[-2] == "[hw] spi default ok\n"
+    assert lines[-1] == "[hw] buttons A=NOPE FAILED\n"
+
+
+def test_build_hardware_i2c_setup_failure_marks_i2c_line_failed_and_propagates() -> None:
+    """A component that raises something other than the RuntimeError
+    _setup_i2c itself catches (e.g. a wedged bus) still closes its own line
+    with FAILED, and the exception still propagates -- the single
+    whole-function try/except (#758), not a per-component one."""
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_i2c",
+                side_effect=OSError("i2c bus wedged"),
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(OSError, match="i2c bus wedged"):
+            build_hardware(config, board_module=board_mock, logger=logger)
+
+    lines = "".join(fragments).splitlines(keepends=True)
+    assert lines[-2] == "[hw] external_power ok\n"
+    assert lines[-1] == "[hw] i2c default FAILED\n"
+
+
+def test_build_hardware_summary_counts_reflect_actually_built_outputs_and_buttons() -> None:
+    """The summary line's outputs=/buttons= counts are read off build_hardware's
+    own local state (the outputs list and resolved button pins), not off
+    logging state -- this ties the counts to a config building two NeoPixel
+    outputs and one button, independent of the log lines that led there."""
+    config = _neopixel_config()
+    board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    summary = "".join(fragments).splitlines()[-1]
+    assert summary.startswith("[hw] ready outputs=2 buttons=1 elapsed_s=")
