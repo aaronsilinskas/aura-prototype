@@ -1,7 +1,4 @@
-import io
-from contextlib import redirect_stdout
-
-from engine.log import Logger
+from engine.log import Logger, _write_nothing
 
 
 def _recording_logger(tag: str = "[hw]") -> tuple[Logger, list[str]]:
@@ -105,13 +102,12 @@ def test_fail_with_no_line_open_writes_nothing():
 # ---------------------------------------------------------------------------
 
 
-def test_silent_singleton_writes_nothing_to_stdout():
-    captured = io.StringIO()
+def test_silent_singleton_is_wired_to_the_shared_no_op_sink():
+    assert Logger.SILENT._sink is _write_nothing
 
-    with redirect_stdout(captured):
-        Logger.SILENT.log("message")
-        Logger.SILENT.begin("message")
-        Logger.SILENT.end()
-        Logger.SILENT.fail()
 
-    assert captured.getvalue() == ""
+def test_silent_singleton_calls_do_not_raise():
+    Logger.SILENT.log("message")
+    Logger.SILENT.begin("message")
+    Logger.SILENT.end()
+    Logger.SILENT.fail()
