@@ -560,16 +560,19 @@ def build_hardware(
     bus when ``spi`` is disabled — see ``_setup_spi``).
 
     *logger*, if supplied, narrates every step that runs unconditionally
-    (the opening banner, external power, i2c, spi, and buttons) plus a
-    closing summary line; omitted or ``None`` normalizes to
+    (the opening banner, external power, spi, and buttons) plus a closing
+    summary line; omitted or ``None`` normalizes to
     :data:`~engine.log.Logger.SILENT` here, so every call below logs
-    unconditionally and an uninstrumented caller sees no output at all.
-    Optional/config-gated components (pixels, accelerometer, haptics, audio,
-    radio, ir) are not narrated yet — that lands in their own follow-on
-    tickets. The whole body runs under one try/except: any exception closes
-    whatever log line is currently open with a ``FAILED`` marker (a no-op if
-    none is open) before re-raising, so a failure is never left attributed to
-    the wrong, already-closed line.
+    unconditionally and an uninstrumented caller sees no output at all. i2c
+    is narrated the same way, but only when this function builds the bus
+    itself (i.e. *i2c* is not supplied) — a caller-injected *i2c* bypasses
+    that setup, and its logging, entirely. Optional/config-gated components
+    (pixels, accelerometer, haptics, audio, radio, ir) are not narrated yet
+    — that lands in their own follow-on tickets. The whole body runs under
+    one try/except: any exception closes whatever log line is currently
+    open with a ``FAILED`` marker (a no-op if none is open) before
+    re-raising, so a failure is never left attributed to the wrong,
+    already-closed line.
 
     Raises:
         ValueError: If a declared pin name does not exist on the board.
