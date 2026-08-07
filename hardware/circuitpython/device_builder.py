@@ -622,12 +622,19 @@ def build_hardware(
     (``"accelerometer lis3dh"`` / ``"haptics drv2605"``): ``ok`` when built,
     ``disabled`` for an explicit ``enabled: false``, no line at all when the
     section is absent, and ``FAILED`` (via the whole-function except below)
-    when ``_require_i2c`` raises for a missing bus. Remaining optional/
-    config-gated components (audio, radio, ir) are not narrated yet — that
-    lands in their own follow-on tickets. The whole body runs under one
-    try/except: any exception closes whatever log line is currently open
-    with a ``FAILED`` marker (a no-op if none is open) before re-raising, so
-    a failure is never left attributed to the wrong, already-closed line.
+    when ``_require_i2c`` raises for a missing bus. Audio is narrated the
+    same begin-before-pin-resolution way: an absent ``config.audio`` logs
+    nothing, ``enabled=False`` logs its own disabled line, and an enabled
+    section opens via ``logger.begin()`` -- carrying voice count,
+    ``max_volume``, registered clip count, and the raw I2S pin names
+    straight off ``AudioConfig`` -- before ``_setup_audio`` resolves any of
+    those three pins, so an unknown I2S pin name's ``ValueError`` closes the
+    audio line itself with ``FAILED``. Remaining optional/config-gated
+    components (radio, ir) are not narrated yet — that lands in their own
+    follow-on tickets. The whole body runs under one try/except: any
+    exception closes whatever log line is currently open with a ``FAILED``
+    marker (a no-op if none is open) before re-raising, so a failure is
+    never left attributed to the wrong, already-closed line.
 
     Raises:
         ValueError: If a declared pin name does not exist on the board.
@@ -708,8 +715,18 @@ def build_hardware(
             else:
                 logger.end("disabled")
 
-        if config.audio is not None and config.audio.enabled:
-            outputs.append(_setup_audio(config.audio, board_module))
+        audio_cfg = config.audio
+        if audio_cfg is not None and not audio_cfg.enabled:
+            logger.begin("audio")
+            logger.end("disabled")
+        elif audio_cfg is not None:
+            logger.begin(
+                f"audio voices={audio_cfg.voices} max_volume={audio_cfg.max_volume:.2f} "
+                + f"clips={len(audio_cfg.clips)} i2s_bit_clock={audio_cfg.i2s_bit_clock} "
+                + f"i2s_word_select={audio_cfg.i2s_word_select} i2s_data={audio_cfg.i2s_data}"
+            )
+            outputs.append(_setup_audio(audio_cfg, board_module))
+            logger.end()
 
         if config.haptics is not None:
             logger.begin("haptics drv2605")
