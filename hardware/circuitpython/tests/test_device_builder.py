@@ -911,19 +911,26 @@ def test_setup_audio_registers_configured_clips_on_audio_registry() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _neopixel_config_with_audio():
-    """Return a DeviceConfig with a neopixel pixels section and audio config."""
+def _neopixel_config_with_audio(**audio_overrides):
+    """Return a DeviceConfig with a neopixel pixels section and audio config.
+
+    *audio_overrides* replace individual keys of the default audio mapping
+    (one voice, half volume, one clip, ``I2S_*``-named pins) -- e.g. an
+    unknown I2S pin name for narration-failure tests.
+    """
+    audio = {
+        "voices": 1,
+        "max_volume": 0.5,
+        "clips": {"hit": "/sounds/hit.wav"},
+        "i2s_bit_clock": "I2S_BIT_CLOCK",
+        "i2s_word_select": "I2S_WORD_SELECT",
+        "i2s_data": "I2S_DATA",
+    }
+    audio.update(audio_overrides)
     mapping = {
         "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
         "buttons": ["D9"],
-        "audio": {
-            "voices": 1,
-            "max_volume": 0.5,
-            "clips": {"hit": "/sounds/hit.wav"},
-            "i2s_bit_clock": "I2S_BIT_CLOCK",
-            "i2s_word_select": "I2S_WORD_SELECT",
-            "i2s_data": "I2S_DATA",
-        },
+        "audio": audio,
     }
     return parse_device_config(mapping)
 
@@ -3017,3 +3024,103 @@ def test_build_hardware_haptics_no_i2c_bus_marks_its_own_line_failed_and_propaga
 
     lines = "".join(fragments).splitlines(keepends=True)
     assert lines[-1] == "[hw] haptics drv2605 FAILED\n"
+
+
+# ---------------------------------------------------------------------------
+# build_hardware — audio narration: inline scalar detail, config-gated (#761)
+# ---------------------------------------------------------------------------
+
+
+def test_build_hardware_audio_config_narrates_voices_max_volume_clips_and_i2s_pins() -> None:
+    """An enabled, present audio config opens via logger.begin() carrying
+    voice count, max_volume, registered clip count, and the raw I2S pin
+    names -- all inline, no _describe_* helper needed for a handful of
+    scalars -- and closes with the default ok suffix."""
+    from hardware.circuitpython.audio_output import AudioEffectOutput
+
+    config = _neopixel_config_with_audio()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    board_mock.I2S_BIT_CLOCK = MagicMock()
+    board_mock.I2S_WORD_SELECT = MagicMock()
+    board_mock.I2S_DATA = MagicMock()
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.audio_output.AudioEffectOutput",
+                return_value=MagicMock(spec=AudioEffectOutput),
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert (
+        "[hw] audio voices=1 max_volume=0.50 clips=1 i2s_bit_clock=I2S_BIT_CLOCK "
+        "i2s_word_select=I2S_WORD_SELECT i2s_data=I2S_DATA ok\n"
+    ) in "".join(fragments)
+
+
+def test_build_hardware_logs_audio_disabled_line_when_section_disabled() -> None:
+    """``audio: {enabled: false}`` logs its own disabled line -- not silence."""
+    config = _neopixel_config_with_audio()
+    config.audio.enabled = False
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] audio disabled\n" in "".join(fragments)
+
+
+def test_build_hardware_absent_audio_section_produces_no_audio_line() -> None:
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "audio" not in "".join(fragments)
+
+
+def test_build_hardware_unknown_i2s_pin_marks_audio_line_failed_not_neighboring_line() -> None:
+    """The begin-before-pin-resolution ordering means an unknown I2S pin name
+    attributes FAILED to the audio line itself, not the buttons line that
+    closed just before it (mirrors #758's buttons case and #759's pixels
+    case)."""
+    config = _neopixel_config_with_audio(i2s_bit_clock="NOPE")
+    board_mock = MagicMock(spec=["D5", "D9"])
+    board_mock.D5 = MagicMock()
+    board_mock.D9 = MagicMock()
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ValueError, match="NOPE"):
+            build_hardware(config, board_module=board_mock, logger=logger)
+
+    lines = "".join(fragments).splitlines(keepends=True)
+    assert lines[-2] == "[hw] buttons A=D9 ok\n"
+    assert lines[-1] == (
+        "[hw] audio voices=1 max_volume=0.50 clips=1 i2s_bit_clock=NOPE "
+        "i2s_word_select=I2S_WORD_SELECT i2s_data=I2S_DATA FAILED\n"
+    )
