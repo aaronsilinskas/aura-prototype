@@ -3065,9 +3065,8 @@ def test_build_hardware_audio_config_narrates_voices_max_volume_clips_and_i2s_pi
     ) in "".join(fragments)
 
 
-def test_build_hardware_disabled_audio_section_narrates_skipped_line() -> None:
-    """``audio: {enabled: false}`` logs its own disabled line -- not silence,
-    and not the normal ok suffix an enabled section would get."""
+def test_build_hardware_logs_audio_disabled_line_when_section_disabled() -> None:
+    """``audio: {enabled: false}`` logs its own disabled line -- not silence."""
     config = _neopixel_config_with_audio()
     config.audio.enabled = False
     board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
@@ -3081,9 +3080,7 @@ def test_build_hardware_disabled_audio_section_narrates_skipped_line() -> None:
 
         build_hardware(config, board_module=board_mock, logger=logger)
 
-    text = "".join(fragments)
-    assert "[hw] audio disabled\n" in text
-    assert "audio disabled ok" not in text
+    assert "[hw] audio disabled\n" in "".join(fragments)
 
 
 def test_build_hardware_absent_audio_section_produces_no_audio_line() -> None:

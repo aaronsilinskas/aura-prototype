@@ -716,17 +716,18 @@ def build_hardware(
                 logger.end("disabled")
 
         audio_cfg = config.audio
-        if audio_cfg is not None and not audio_cfg.enabled:
-            logger.begin("audio")
-            logger.end("disabled")
-        elif audio_cfg is not None:
-            logger.begin(
-                f"audio voices={audio_cfg.voices} max_volume={audio_cfg.max_volume:.2f} "
-                + f"clips={len(audio_cfg.clips)} i2s_bit_clock={audio_cfg.i2s_bit_clock} "
-                + f"i2s_word_select={audio_cfg.i2s_word_select} i2s_data={audio_cfg.i2s_data}"
-            )
-            outputs.append(_setup_audio(audio_cfg, board_module))
-            logger.end()
+        if audio_cfg is not None:
+            if not audio_cfg.enabled:
+                logger.begin("audio")
+                logger.end("disabled")
+            else:
+                logger.begin(
+                    f"audio voices={audio_cfg.voices} max_volume={audio_cfg.max_volume:.2f} "
+                    + f"clips={len(audio_cfg.clips)} i2s_bit_clock={audio_cfg.i2s_bit_clock} "
+                    + f"i2s_word_select={audio_cfg.i2s_word_select} i2s_data={audio_cfg.i2s_data}"
+                )
+                outputs.append(_setup_audio(audio_cfg, board_module))
+                logger.end()
 
         if config.haptics is not None:
             logger.begin("haptics drv2605")
