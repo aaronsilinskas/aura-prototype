@@ -12,6 +12,7 @@ import gc
 
 from app.scene_composition import build_scene_runtime
 from engine.input import AccelerationData, ButtonData, InputEvents
+from engine.log import Logger
 from engine.network import NetworkEvents
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
 from hardware.shared.ir_protocol import InfraredDecoder, InfraredEncoder
@@ -41,7 +42,10 @@ def run_scene(
     receiver itself gates on whether a counter changed since the last call.
     Also drives ``runtime.radio.update()`` every tick (see
     :class:`~hardware.shared.radio_manager.RadioManager`), the radio parallel
-    to the IR receive block. Not unit-testable — ``build_hardware`` requires
+    to the IR receive block. Constructs a live ``[hw]``-tagged
+    :class:`~engine.log.Logger` and passes it to ``build_hardware`` so the
+    on-device path always gets hardware setup narration on stdout, with no
+    opt-in required. Not unit-testable — ``build_hardware`` requires
     CircuitPython board imports; validate via deploy-watch.
 
     Args:
@@ -52,7 +56,8 @@ def run_scene(
             ``build_hardware``; defaults to the Aura wire-frame when omitted.
     """
     config = load_device_config()
-    hw = build_hardware(config, ir_encoder=ir_encoder, ir_decoder=ir_decoder)
+    hw_logger = Logger("[hw]")
+    hw = build_hardware(config, ir_encoder=ir_encoder, ir_decoder=ir_decoder, logger=hw_logger)
 
     runtime = build_scene_runtime(hw, scene_name)
     manager = runtime.manager
