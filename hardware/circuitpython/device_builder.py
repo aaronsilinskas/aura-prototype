@@ -254,45 +254,89 @@ def _setup_neopixels(pixels_cfg: NeoPixelPixelsConfig, board_module: object) -> 
 
 
 def _setup_pixels(
-    pixels_configs: list[MatrixPixelsConfig | NeoPixelPixelsConfig],
+    pixels_cfg: MatrixPixelsConfig | NeoPixelPixelsConfig,
     board_module: object,
     i2c: busio.I2C | None,
 ) -> list[EffectOutput]:
-    """Return one EffectOutput per pixel output declared across *pixels_configs*.
-
-    Dispatches each entry to the matrix or NeoPixel branch by type, in config
-    order, so a device driving both a matrix and NeoPixel strips gets outputs
-    for each in the order they were declared. An entry with ``enabled=False``
-    is skipped outright — neither built nor probed, so a disabled matrix
-    entry doesn't even trigger the missing-I2C-bus check below.
+    """Return the EffectOutputs for *pixels_cfg*, dispatching to the matrix or
+    NeoPixel branch by type. An entry with ``enabled=False`` produces no
+    outputs — neither built nor probed, so a disabled matrix entry doesn't
+    even trigger the missing-I2C-bus check below. (The caller, ``build_hardware``,
+    already filters out disabled entries before calling this, but the check
+    stays here too since this is also called directly in tests.)
 
     Raises:
         RuntimeError: If an enabled matrix entry is declared but *i2c* is
             None (matrix pixels are config-gated, so a missing bus is a real
             wiring fault).
     """
-    outputs: list[EffectOutput] = []
-    for pixels_cfg in pixels_configs:
-        if not pixels_cfg.enabled:
-            continue
-        if isinstance(pixels_cfg, MatrixPixelsConfig):
-            if i2c is None:
-                raise RuntimeError("pixels.type is 'matrix' but no I2C bus is available")
-            # IS31FL3741EffectOutput's own module imports adafruit_is31fl3741 at load
-            # time, so this import is deferred here alongside _setup_matrix_is31fl3741's.
-            from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
+    if not pixels_cfg.enabled:
+        return []
+    if isinstance(pixels_cfg, MatrixPixelsConfig):
+        if i2c is None:
+            raise RuntimeError("pixels.type is 'matrix' but no I2C bus is available")
+        # IS31FL3741EffectOutput's own module imports adafruit_is31fl3741 at load
+        # time, so this import is deferred here alongside _setup_matrix_is31fl3741's.
+        from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 
-            matrix = _setup_matrix_is31fl3741(i2c, pixels_cfg.brightness)
-            outputs.append(
-                IS31FL3741EffectOutput(
-                    matrix,
-                    cols=pixels_cfg.cols,
-                    scope_rows=pixels_cfg.scope_rows,
-                )
+        matrix = _setup_matrix_is31fl3741(i2c, pixels_cfg.brightness)
+        return [
+            IS31FL3741EffectOutput(
+                matrix,
+                cols=pixels_cfg.cols,
+                scope_rows=pixels_cfg.scope_rows,
             )
-        elif isinstance(pixels_cfg, NeoPixelPixelsConfig):
-            outputs.extend(_setup_neopixels(pixels_cfg, board_module))
-    return outputs
+        ]
+    return _setup_neopixels(pixels_cfg, board_module)
+
+
+def _format_ranges(ranges: dict[str, range]) -> str:
+    """Format a scope-key -> range mapping as ``"key:start-stop"`` pairs, e.g.
+    a matrix's ``scope_rows`` or a NeoPixel strip's ``scope_pixels``."""
+    return " ".join(f"{key}:{r.start}-{r.stop}" for key, r in ranges.items())
+
+
+def _describe_neopixel_pixels(pixels_cfg: NeoPixelPixelsConfig) -> str:
+    """Return the pin/count/order/segmentation detail for an enabled NeoPixel
+    entry -- the ``strips`` form (one physical strip, segmented by
+    ``scope_pixels``) or the legacy ``scopes`` map form (one physical strip
+    per scope key, joined with ``" | "`` when more than one shares the entry).
+    """
+    if pixels_cfg.strips:
+        strip = pixels_cfg.strips[0]
+        return (
+            f"pin={strip.pin} count={strip.count} order={strip.order} "
+            + f"scope_pixels=[{_format_ranges(strip.scope_pixels)}]"
+        )
+    return " | ".join(
+        f"pin={scope.pin} count={scope.count} order={scope.order} scope={key}"
+        for key, scope in pixels_cfg.scopes.items()
+    )
+
+
+def _describe_pixel_entry(index: int, pixels_cfg: MatrixPixelsConfig | NeoPixelPixelsConfig) -> str:
+    """Return the ``pixels[index]`` narration line for *pixels_cfg*.
+
+    For a disabled entry this is the full skipped line (``build_hardware``
+    logs it whole via ``logger.log()``, since a disabled entry is never
+    built). For an enabled entry it is the ``logger.begin()`` message --
+    detail comes entirely from the parsed config structures (indexed entry,
+    per-strip scope ranges), not resolved pins, so it can be computed and
+    logged before ``_setup_pixels`` resolves any pin, matching the
+    begin-before-pin-resolution ordering the rest of ``build_hardware``
+    follows.
+    """
+    kind = "matrix" if isinstance(pixels_cfg, MatrixPixelsConfig) else "neopixel"
+    if not pixels_cfg.enabled:
+        return f"pixels[{index}] {kind} disabled — skipped"
+    if isinstance(pixels_cfg, MatrixPixelsConfig):
+        detail = (
+            f"cols={pixels_cfg.cols} scope_rows=[{_format_ranges(pixels_cfg.scope_rows)}] "
+            + f"brightness={pixels_cfg.brightness:.2f}"
+        )
+    else:
+        detail = _describe_neopixel_pixels(pixels_cfg)
+    return f"pixels[{index}] {kind} {detail}"
 
 
 def _setup_buttons(*pins: microcontroller.Pin) -> DebouncedButtons:
@@ -566,13 +610,20 @@ def build_hardware(
     unconditionally and an uninstrumented caller sees no output at all. i2c
     is narrated the same way, but only when this function builds the bus
     itself (i.e. *i2c* is not supplied) — a caller-injected *i2c* bypasses
-    that setup, and its logging, entirely. Optional/config-gated components
-    (pixels, accelerometer, haptics, audio, radio, ir) are not narrated yet
-    — that lands in their own follow-on tickets. The whole body runs under
-    one try/except: any exception closes whatever log line is currently
-    open with a ``FAILED`` marker (a no-op if none is open) before
-    re-raising, so a failure is never left attributed to the wrong,
-    already-closed line.
+    that setup, and its logging, entirely. Pixels are narrated per
+    ``config.pixels`` entry, indexed by list position (``pixels[0]``,
+    ``pixels[1]``, ...) via :func:`_describe_pixel_entry`: a disabled entry
+    logs its own skipped line via ``logger.log()`` and is never built or
+    probed; an enabled entry opens via ``logger.begin()`` before
+    ``_setup_pixels`` resolves any of its pins, so an unknown-pin
+    ``ValueError`` or (matrix, no I2C bus) ``RuntimeError`` closes that
+    entry's own line with ``FAILED`` rather than a neighboring one.
+    Remaining optional/config-gated components (accelerometer, haptics,
+    audio, radio, ir) are not narrated yet — that lands in their own
+    follow-on tickets. The whole body runs under one try/except: any
+    exception closes whatever log line is currently open with a ``FAILED``
+    marker (a no-op if none is open) before re-raising, so a failure is
+    never left attributed to the wrong, already-closed line.
 
     Raises:
         ValueError: If a declared pin name does not exist on the board.
@@ -626,7 +677,14 @@ def build_hardware(
             logger.end()
 
         outputs: list[EffectOutput] = []
-        outputs.extend(_setup_pixels(config.pixels, board_module, i2c))
+        for index, pixels_cfg in enumerate(config.pixels):
+            description = _describe_pixel_entry(index, pixels_cfg)
+            if not pixels_cfg.enabled:
+                logger.log(description)
+                continue
+            logger.begin(description)
+            outputs.extend(_setup_pixels(pixels_cfg, board_module, i2c))
+            logger.end()
 
         button_desc = _describe_buttons(config.buttons)
         logger.begin(f"buttons {button_desc}" if button_desc else "buttons")
