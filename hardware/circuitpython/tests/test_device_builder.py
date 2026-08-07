@@ -3124,3 +3124,167 @@ def test_build_hardware_unknown_i2s_pin_marks_audio_line_failed_not_neighboring_
         "[hw] audio voices=1 max_volume=0.50 clips=1 i2s_bit_clock=NOPE "
         "i2s_word_select=I2S_WORD_SELECT i2s_data=I2S_DATA FAILED\n"
     )
+
+
+# ---------------------------------------------------------------------------
+# build_hardware — radio narration (#762)
+# ---------------------------------------------------------------------------
+
+
+def test_build_hardware_logs_radio_ok_line_when_enabled_and_built() -> None:
+    config = _neopixel_config_with_radio()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack, patch_radio=False)
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_radio",
+                return_value=MagicMock(),
+            )
+        )
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] radio frequency=915.0 node=1 cs=D24 reset=D25 ok\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_radio_disabled_line_when_section_disabled() -> None:
+    config = _neopixel_config_with_radio()
+    config.radio.enabled = False
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] radio frequency=915.0 node=1 cs=D24 reset=D25 disabled\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_no_radio_line_when_section_absent() -> None:
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "radio" not in "".join(fragments)
+
+
+def test_build_hardware_radio_no_spi_bus_marks_its_own_line_failed_and_propagates() -> None:
+    """A declared-and-enabled radio section with no SPI bus available raises via
+    _require_spi -- the failure must close the radio's own open line, leaving
+    the earlier spi line's own outcome (whatever it already logged) untouched
+    (mirrors the accelerometer/haptics no-I2C-bus FAILED tests)."""
+    config = _neopixel_config_with_radio()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack, patch_radio=False)
+        stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_spi", return_value=None)
+        )
+        mock_setup_radio = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_radio")
+        )
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(RuntimeError, match="radio"):
+            build_hardware(config, board_module=board_mock, logger=logger)
+
+    mock_setup_radio.assert_not_called()
+    text = "".join(fragments)
+    lines = text.splitlines(keepends=True)
+    assert "[hw] spi sck=SCK mosi=MOSI miso=MISO ok\n" in text
+    assert lines[-1] == "[hw] radio frequency=915.0 node=1 cs=D24 reset=D25 FAILED\n"
+
+
+def test_build_hardware_radio_with_disabled_spi_marks_radio_line_failed() -> None:
+    """When the spi section itself is disabled, its line already reads
+    "disabled" -- an enabled radio section on top of that still raises via
+    _require_spi and closes its own line with FAILED, leaving the earlier spi
+    "disabled" line untouched."""
+    mapping = {
+        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
+        "buttons": ["D9"],
+        "spi": {"sck": "SCK", "mosi": "MOSI", "miso": "MISO", "enabled": False},
+        "radio": {"cs": "D24", "reset": "D25", "frequency": 915.0, "node": 1},
+    }
+    config = parse_device_config(mapping)
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack, patch_radio=False)
+        mock_setup_radio = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_radio")
+        )
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(RuntimeError, match="radio"):
+            build_hardware(config, board_module=board_mock, logger=logger)
+
+    mock_setup_radio.assert_not_called()
+    text = "".join(fragments)
+    lines = text.splitlines(keepends=True)
+    assert "[hw] spi disabled\n" in text
+    assert lines[-1] == "[hw] radio frequency=915.0 node=1 cs=D24 reset=D25 FAILED\n"
+
+
+def test_build_hardware_unknown_radio_cs_pin_marks_its_own_line_failed() -> None:
+    """The begin-before-pin-resolution ordering means an unknown radio ``cs``
+    pin name attributes FAILED to the radio line itself -- _resolve_pin runs
+    inside _setup_radio, reached only after logger.begin() has already opened
+    the line with the raw, unresolved cs/reset strings (mirrors #758's
+    buttons case and #759's pixels case)."""
+    mapping = {
+        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
+        "buttons": ["D9"],
+        "spi": {"sck": "SCK", "mosi": "MOSI", "miso": "MISO"},
+        "radio": {"cs": "NOPE", "reset": "D25", "frequency": 915.0, "node": 1},
+    }
+    config = parse_device_config(mapping)
+    board_mock = MagicMock(spec=["D5", "D9", "SCK", "MOSI", "MISO"])
+    board_mock.D5 = MagicMock()
+    board_mock.D9 = MagicMock()
+    board_mock.SCK = MagicMock()
+    board_mock.MOSI = MagicMock()
+    board_mock.MISO = MagicMock()
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack, patch_radio=False)
+        _patch_neopixel(stack)
+        # _setup_radio wraps each resolved pin as digitalio.DigitalInOut(...) --
+        # the callee is evaluated before _resolve_pin's argument, so digitalio
+        # needs a real-shaped DigitalInOut for the unknown-pin ValueError
+        # (raised while evaluating that argument) to surface at all, mirroring
+        # test_setup_radio_wraps_resolved_pins_into_digitalinout_and_delegates_to_transport.
+        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ValueError, match="NOPE"):
+            build_hardware(config, board_module=board_mock, logger=logger)
+
+    lines = "".join(fragments).splitlines(keepends=True)
+    assert lines[-1] == "[hw] radio frequency=915.0 node=1 cs=NOPE reset=D25 FAILED\n"

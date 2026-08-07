@@ -629,9 +629,17 @@ def build_hardware(
     ``max_volume``, registered clip count, and the raw I2S pin names
     straight off ``AudioConfig`` -- before ``_setup_audio`` resolves any of
     those three pins, so an unknown I2S pin name's ``ValueError`` closes the
-    audio line itself with ``FAILED``. Remaining optional/config-gated
-    components (radio, ir) are not narrated yet — that lands in their own
-    follow-on tickets. The whole body runs under one try/except: any
+    audio line itself with ``FAILED``. A declared radio section is narrated
+    the same way, on one ``"radio frequency=... node=... cs=... reset=..."``
+    line built entirely from the raw config scalars (``cs``/``reset`` are
+    still unresolved pin-name strings at that point): ``ok`` when built,
+    ``disabled`` for an explicit ``enabled: false``, no line at all when the
+    section is absent, and ``FAILED`` when ``_require_spi`` raises for a
+    missing bus or ``_setup_radio``'s own pin resolution raises
+    ``ValueError`` for an unknown ``cs``/``reset`` name — the spi line logged
+    earlier is never touched by a radio failure. The remaining optional/
+    config-gated component (ir) is not narrated yet — that lands in its own
+    follow-on ticket. The whole body runs under one try/except: any
     exception closes whatever log line is currently open with a ``FAILED``
     marker (a no-op if none is open) before re-raising, so a failure is
     never left attributed to the wrong, already-closed line.
@@ -744,8 +752,17 @@ def build_hardware(
                 logger.end("disabled")
 
         radio = None
-        if config.radio is not None and config.radio.enabled:
-            radio = _setup_radio(_require_spi(spi, "radio"), config.radio, board_module)
+        if config.radio is not None:
+            radio_cfg = config.radio
+            logger.begin(
+                f"radio frequency={radio_cfg.frequency} node={radio_cfg.node} "
+                + f"cs={radio_cfg.cs} reset={radio_cfg.reset}"
+            )
+            if radio_cfg.enabled:
+                radio = _setup_radio(_require_spi(spi, "radio"), radio_cfg, board_module)
+                logger.end()
+            else:
+                logger.end("disabled")
 
         transmitters: dict[str, InfraredTransmitter] = {}
         ir_receiver = None
