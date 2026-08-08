@@ -155,18 +155,26 @@ def without_rp2pio_by_default():
 def test_make_writer_returns_pulse_out_writer_when_rp2pio_absent():
     """Without rp2pio (the CPython default) _make_writer returns a PulseOutWriter."""
     for pin in (_LINE_PIN, _CONE_PIN, _AOE_PIN):
-        assert isinstance(_make_writer(pin), PulseOutWriter)
+        writer, _kind = _make_writer(pin)
+        assert isinstance(writer, PulseOutWriter)
+
+
+def test_make_writer_reports_pulseio_kind_when_rp2pio_absent():
+    """Without rp2pio, the reported kind is "pulseio" -- what build_hardware's
+    ir narration logs as writer=pulseio (#763)."""
+    _writer, kind = _make_writer(_LINE_PIN)
+    assert kind == "pulseio"
 
 
 def test_make_writer_pulse_out_uses_38khz_carrier():
     """The PulseOut backing the fallback writer is configured at 38 kHz carrier."""
-    writer = _make_writer(_LINE_PIN)
+    writer, _kind = _make_writer(_LINE_PIN)
     assert writer._pulseout.frequency == 38000
 
 
 def test_make_writer_wires_pulse_out_to_the_given_pin():
     """The fallback writer's PulseOut is opened on the pin passed to _make_writer."""
-    writer = _make_writer(_LINE_PIN)
+    writer, _kind = _make_writer(_LINE_PIN)
     assert writer._pulseout.pin is _LINE_PIN
 
 
@@ -177,7 +185,15 @@ def test_make_writer_wires_pulse_out_to_the_given_pin():
 
 def test_make_writer_returns_pio_writer_when_rp2pio_present(with_rp2pio):
     """With rp2pio importable, _make_writer returns a PioPulseWriter."""
-    assert isinstance(_make_writer(_LINE_PIN), PioPulseWriter)
+    writer, _kind = _make_writer(_LINE_PIN)
+    assert isinstance(writer, PioPulseWriter)
+
+
+def test_make_writer_reports_pio_kind_when_rp2pio_present(with_rp2pio):
+    """With rp2pio importable, the reported kind is "pio" -- what
+    build_hardware's ir narration logs as writer=pio (#763)."""
+    _writer, kind = _make_writer(_LINE_PIN)
+    assert kind == "pio"
 
 
 def test_make_writer_builds_one_state_machine_per_call(with_rp2pio):
@@ -189,7 +205,7 @@ def test_make_writer_builds_one_state_machine_per_call(with_rp2pio):
 
 def test_make_writer_pio_transmitter_send_returns_before_completion(with_rp2pio):
     """A PIO-wired transmitter's send starts the write and returns while still busy."""
-    writer = _make_writer(_LINE_PIN)
+    writer, _kind = _make_writer(_LINE_PIN)
     transmitter = InfraredTransmitter(writer, AuraInfraredEncoder())
     transmitter.send(b"\x01\x02")
     assert transmitter._writer.is_busy() is True
