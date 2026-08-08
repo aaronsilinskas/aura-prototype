@@ -3806,156 +3806,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "Switch:SW_SPST"
-			(pin_names
-				(offset 0)
-				(hide yes)
-			)
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "SW"
-				(at 0 3.175 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "SW_SPST"
-				(at 0 -2.54 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" "Single Pole Single Throw (SPST) switch"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "switch lever"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "SW_SPST_0_0"
-				(circle
-					(center -2.032 0)
-					(radius 0.508)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.524 0.254) (xy 1.524 1.778)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(circle
-					(center 2.032 0)
-					(radius 0.508)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-			)
-			(symbol "SW_SPST_1_1"
-				(pin passive line
-					(at -5.08 0 0)
-					(length 2.54)
-					(name "A"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 5.08 0 180)
-					(length 2.54)
-					(name "B"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "Transistor_FET:AO3400A"
 			(pin_names
 				(offset 0)
@@ -6154,12 +6004,6 @@
 		(uuid "f3cbc3e8-4f96-46ce-8719-69f92b1c2a16")
 	)
 	(junction
-		(at 184.15 133.35)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "10405a16-553c-46b6-a674-fcaa33104ba5")
-	)
-	(junction
 		(at 261.62 148.59)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -6224,12 +6068,6 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "f1a130b8-c3c9-47ba-9d76-fdbd22901322")
-	)
-	(junction
-		(at 199.39 133.35)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "f44bdc5b-2628-471d-8de8-b39b3cc25450")
 	)
 	(junction
 		(at 191.77 62.23)
@@ -6869,16 +6707,6 @@
 	)
 	(wire
 		(pts
-			(xy 199.39 133.35) (xy 204.47 133.35)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4777d03a-30f5-4055-9ce2-50f4323766c9")
-	)
-	(wire
-		(pts
 			(xy 115.57 99.06) (xy 125.73 99.06)
 		)
 		(stroke
@@ -7109,16 +6937,6 @@
 	)
 	(wire
 		(pts
-			(xy 184.15 137.16) (xy 184.15 133.35)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5f463e43-83df-4df7-9ba7-b05776fef78a")
-	)
-	(wire
-		(pts
 			(xy 33.02 187.96) (xy 33.02 189.23)
 		)
 		(stroke
@@ -7249,7 +7067,7 @@
 	)
 	(wire
 		(pts
-			(xy 184.15 133.35) (xy 176.53 133.35)
+			(xy 176.53 133.35) (xy 190.5 133.35)
 		)
 		(stroke
 			(width 0)
@@ -7259,7 +7077,7 @@
 	)
 	(wire
 		(pts
-			(xy 193.04 137.16) (xy 199.39 137.16)
+			(xy 193.04 133.35) (xy 204.47 133.35)
 		)
 		(stroke
 			(width 0)
@@ -7569,26 +7387,6 @@
 	)
 	(wire
 		(pts
-			(xy 196.85 133.35) (xy 199.39 133.35)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "8a5030eb-065c-4d98-bc7f-4a5f3c1c6b4f")
-	)
-	(wire
-		(pts
-			(xy 190.5 137.16) (xy 184.15 137.16)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "8e399cff-373f-4742-a874-06b14d67f61a")
-	)
-	(wire
-		(pts
 			(xy 207.01 25.4) (xy 209.55 25.4)
 		)
 		(stroke
@@ -7636,16 +7434,6 @@
 			(type default)
 		)
 		(uuid "9236dd53-e096-43e5-a9d0-ba287f2e75c6")
-	)
-	(wire
-		(pts
-			(xy 186.69 133.35) (xy 184.15 133.35)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "947f9d72-c708-42f2-83c1-9bafff52ad31")
 	)
 	(wire
 		(pts
@@ -7866,16 +7654,6 @@
 			(type default)
 		)
 		(uuid "af01c15d-b416-4a93-be95-02d39eb8a41a")
-	)
-	(wire
-		(pts
-			(xy 199.39 137.16) (xy 199.39 133.35)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b2bd5c20-77ea-4963-bcaa-3c06617be977")
 	)
 	(wire
 		(pts
@@ -16378,7 +16156,7 @@
 	)
 	(symbol
 		(lib_id "Connector:Conn_01x02_Pin")
-		(at 193.04 142.24 270)
+		(at 193.04 138.43 270)
 		(mirror x)
 		(unit 1)
 		(body_style 1)
@@ -16389,7 +16167,7 @@
 		(dnp yes)
 		(uuid "d142d0e5-a4bc-42f0-b941-4aaf40637d77")
 		(property "Reference" "J22"
-			(at 194.818 148.082 90)
+			(at 194.818 144.272 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -16400,7 +16178,7 @@
 			)
 		)
 		(property "Value" "POWER"
-			(at 194.818 145.542 90)
+			(at 194.818 141.732 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -16411,7 +16189,7 @@
 			)
 		)
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
-			(at 193.04 142.24 0)
+			(at 193.04 138.43 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16422,7 +16200,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 193.04 142.24 0)
+			(at 193.04 138.43 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16433,7 +16211,7 @@
 			)
 		)
 		(property "Description" "Generic connector, single row, 01x02, script generated"
-			(at 193.04 142.24 0)
+			(at 193.04 138.43 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17152,86 +16930,6 @@
 			(project "Pico RP2350 USB Power"
 				(path "/f607a6cb-1f81-4ea5-ae65-67dd06ab9fb6"
 					(reference "#PWR022")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Switch:SW_SPST")
-		(at 191.77 133.35 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp yes)
-		(fields_autoplaced yes)
-		(uuid "e63d7969-e942-4d49-8716-175b67ae5b5b")
-		(property "Reference" "SW1"
-			(at 191.77 127 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "POWER"
-			(at 191.77 129.54 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Button_Switch_THT:SW_DIP_SPSTx01_Slide_9.78x4.72mm_W7.62mm_P2.54mm"
-			(at 191.77 133.35 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 191.77 133.35 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Single Pole Single Throw (SPST) switch"
-			(at 191.77 133.35 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "7c624fc9-3b9f-4f57-b987-23214a85722d")
-		)
-		(pin "1"
-			(uuid "678cda67-8560-414e-9217-8e28a7798caf")
-		)
-		(instances
-			(project "Pico RP2350 USB Power"
-				(path "/f607a6cb-1f81-4ea5-ae65-67dd06ab9fb6"
-					(reference "SW1")
 					(unit 1)
 				)
 			)
