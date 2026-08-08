@@ -10,14 +10,17 @@ when a config drives both a matrix and NeoPixel strips in one
 ``build_hardware`` emits during a full build. Split out of
 test_device_builder.py (#776, part of #767) to keep that suite from growing
 without bound as device_builder gains more hardware subsystems -- non-pixel
-build_hardware coverage (audio, haptics, accelerometer, radio, ir, i2c/spi bus
-setup, the logger spine) stays there. Config-shape helpers used by both files
-(``_matrix_config``, ``_neopixel_config``, ``_mock_board``,
-``_recording_logger``, ``_minimal_config``) are imported from
-test_device_builder rather than duplicated; the shared ExitStack-based
-hardware patch helpers (``_enter_hw_patches``/``_patch_neopixel``) come from
-_hw_patch_mocks.py (#775). All hardware modules (board, busio, pulseio,
-digitalio) are patched so this suite runs under CPython.
+build_hardware coverage (audio, haptics, accelerometer, radio, ir, buttons,
+i2c/spi bus setup, the logger spine) stays there. Config-shape helpers used
+by several split files (``_matrix_config``, ``_neopixel_config``,
+``_mock_board``) are imported from test_device_builder rather than
+duplicated; ``_minimal_config`` and ``_recording_logger`` are imported from
+test_device_builder_buttons_logging.py (#780), where they moved alongside
+the buttons/logging-spine tests that are their only callers there. The
+shared ExitStack-based hardware patch helpers (``_enter_hw_patches``/
+``_patch_neopixel``) come from _hw_patch_mocks.py (#775). All hardware
+modules (board, busio, pulseio, digitalio) are patched so this suite runs
+under CPython.
 """
 
 from __future__ import annotations
@@ -34,9 +37,11 @@ from hardware.circuitpython.tests._hw_patch_mocks import (
 )
 from hardware.circuitpython.tests.test_device_builder import (
     _matrix_config,
-    _minimal_config,
     _mock_board,
     _neopixel_config,
+)
+from hardware.circuitpython.tests.test_device_builder_buttons_logging import (
+    _minimal_config,
     _recording_logger,
 )
 from hardware.shared.device_config import (

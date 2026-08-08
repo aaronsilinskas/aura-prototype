@@ -24,14 +24,17 @@ which already owns ``_setup_ir``'s unit-level assembly coverage.
 Split out of test_device_builder.py (#779, part of #767) to keep that suite
 from growing without bound as device_builder gains more hardware subsystems
 -- non-radio/IR build_hardware coverage (pixels, audio, haptics,
-accelerometer, i2c/spi/external-power bus setup, the general logger spine,
-and the pixels-before-audio-haptic-outputs ordering test) stays there.
-Config-shape helpers used by both files (``_mock_board``, ``_minimal_config``,
-``_neopixel_config``, ``_recording_logger``) are imported from
-test_device_builder rather than duplicated; the shared ExitStack-based
-hardware patch helpers (``_enter_hw_patches``/``_patch_neopixel``) come from
-_hw_patch_mocks.py (#775). All hardware modules (board, busio, pulseio,
-digitalio) are patched so this suite runs under CPython.
+accelerometer, buttons, i2c/spi/external-power bus setup, the general logger
+spine, and the pixels-before-audio-haptic-outputs ordering test) stays
+there. Config-shape helpers used by several split files (``_mock_board``,
+``_neopixel_config``) are imported from test_device_builder rather than
+duplicated; ``_minimal_config`` and ``_recording_logger`` are imported from
+test_device_builder_buttons_logging.py (#780), where they moved alongside
+the buttons/logging-spine tests that are their only callers there. The
+shared ExitStack-based hardware patch helpers (``_enter_hw_patches``/
+``_patch_neopixel``) come from _hw_patch_mocks.py (#775). All hardware
+modules (board, busio, pulseio, digitalio) are patched so this suite runs
+under CPython.
 """
 
 from __future__ import annotations
@@ -48,9 +51,11 @@ from hardware.circuitpython.tests._hw_patch_mocks import (
     _patch_neopixel,
 )
 from hardware.circuitpython.tests.test_device_builder import (
-    _minimal_config,
     _mock_board,
     _neopixel_config,
+)
+from hardware.circuitpython.tests.test_device_builder_buttons_logging import (
+    _minimal_config,
     _recording_logger,
 )
 from hardware.shared.device_config import (
