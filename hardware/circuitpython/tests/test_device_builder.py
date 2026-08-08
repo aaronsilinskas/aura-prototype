@@ -1550,7 +1550,7 @@ def test_build_hardware_fully_loaded_config_builds_accelerometer_and_haptic_outp
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_ir",
-                return_value=({}, MagicMock()),
+                return_value=({}, MagicMock(), "pio"),
             )
         )
         _patch_neopixel(stack)
@@ -1606,7 +1606,7 @@ def test_build_hardware_accelerometer_and_haptics_less_config_omits_both() -> No
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_ir",
-                return_value=({}, MagicMock()),
+                return_value=({}, MagicMock(), "pio"),
             )
         )
         _patch_neopixel(stack)
@@ -1629,6 +1629,48 @@ def test_build_hardware_accelerometer_and_haptics_less_config_omits_both() -> No
     assert any(isinstance(o, NeoPixelEffectOutput) for o in hw.outputs)
     assert any(isinstance(o, AudioEffectOutput) for o in hw.outputs)
     assert hw.ir_receiver is not None
+
+
+# ---------------------------------------------------------------------------
+# _describe_ir -- ir line's rx/emitter detail formatting, independent of a
+# full build (#763)
+# ---------------------------------------------------------------------------
+
+
+def test_describe_ir_single_rx_pin_names_it_without_multi_receiver_wording() -> None:
+    from hardware.circuitpython.device_builder import _describe_ir
+
+    description = _describe_ir(["D11"], {LINE: "D12"})
+
+    assert description == "rx=[D11] emitters=line:D12"
+
+
+def test_describe_ir_two_rx_pins_names_them_as_ir_multi_receiver() -> None:
+    from hardware.circuitpython.device_builder import _describe_ir
+
+    description = _describe_ir(["D11", "D13"], {LINE: "D12"})
+
+    assert description == "rx=[D11 D13] (IR multi-receiver) emitters=line:D12"
+
+
+def test_describe_ir_lists_every_wired_emitter_in_ir_emitters_order() -> None:
+    from hardware.circuitpython.device_builder import _describe_ir
+
+    # Insertion order deliberately reversed from IR_EMITTERS (line, cone,
+    # area_of_effect) to confirm the description follows the canonical
+    # order, not emitter_pins' own key order -- matching _setup_ir's own
+    # wiring order.
+    description = _describe_ir(["D11"], {AREA_OF_EFFECT: "D14", CONE: "D13", LINE: "D12"})
+
+    assert description == "rx=[D11] emitters=line:D12 cone:D13 area_of_effect:D14"
+
+
+def test_describe_ir_no_emitters_notes_none() -> None:
+    from hardware.circuitpython.device_builder import _describe_ir
+
+    description = _describe_ir(["D11"], {})
+
+    assert description == "rx=[D11] emitters=(none)"
 
 
 # ---------------------------------------------------------------------------
@@ -1660,7 +1702,7 @@ def test_build_hardware_ir_config_sets_ir_receiver() -> None:
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_ir",
-                return_value=({}, mock_receiver),
+                return_value=({}, mock_receiver, "pio"),
             )
         )
 
@@ -1832,7 +1874,7 @@ def test_setup_ir_injects_same_gate_into_receiver_and_every_transmitter() -> Non
 
         from hardware.circuitpython.device_builder import _setup_ir
 
-        transmitters, receiver = _setup_ir(
+        transmitters, receiver, _writer_kind = _setup_ir(
             rx_pins=[MagicMock()],
             emitter_pins={LINE: MagicMock(), CONE: MagicMock(), AREA_OF_EFFECT: MagicMock()},
         )
@@ -1884,7 +1926,9 @@ def test_setup_ir_single_rx_pin_builds_single_receiver_wired_with_passed_decoder
 
         from hardware.circuitpython.device_builder import _setup_ir
 
-        _, receiver = _setup_ir(rx_pins=[MagicMock()], emitter_pins={}, decoder=decoder)
+        _, receiver, _writer_kind = _setup_ir(
+            rx_pins=[MagicMock()], emitter_pins={}, decoder=decoder
+        )
 
     assert isinstance(receiver, InfraredSingleReceiver)
     assert _wired_decoder(receiver) is decoder
@@ -1899,7 +1943,9 @@ def test_setup_ir_multiple_rx_pins_builds_multi_receiver_with_one_reader_per_pin
 
         from hardware.circuitpython.device_builder import _setup_ir
 
-        _, receiver = _setup_ir(rx_pins=[MagicMock(), MagicMock(), MagicMock()], emitter_pins={})
+        _, receiver, _writer_kind = _setup_ir(
+            rx_pins=[MagicMock(), MagicMock(), MagicMock()], emitter_pins={}
+        )
 
     assert isinstance(receiver, InfraredMultiReceiver)
     readers = _wired_readers(receiver)
@@ -1917,7 +1963,7 @@ def test_setup_ir_multiple_rx_pins_gives_each_reader_a_fresh_decoder_of_the_same
 
         from hardware.circuitpython.device_builder import _setup_ir
 
-        _, receiver = _setup_ir(
+        _, receiver, _writer_kind = _setup_ir(
             rx_pins=[MagicMock(), MagicMock()], emitter_pins={}, decoder=decoder
         )
 
@@ -1953,6 +1999,20 @@ def test_build_hardware_single_pin_ir_rx_unknown_pin_raises_unindexed_error() ->
         from hardware.circuitpython.device_builder import build_hardware
 
         with pytest.raises(ValueError, match=r"ir\.rx(?!\[).*NOPE"):
+            build_hardware(config, board_module=board_mock)
+
+
+def test_build_hardware_unknown_ir_emitter_pin_name_raises_value_error() -> None:
+    mapping = {"buttons": ["D9"], "ir": {"rx": "D11", "line": "NOPE"}}
+    config = parse_device_config(mapping)
+    board_mock = MagicMock(spec=["D9", "D11"])  # NOPE deliberately absent
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ValueError, match=r"ir\.line.*NOPE"):
             build_hardware(config, board_module=board_mock)
 
 
@@ -3288,3 +3348,213 @@ def test_build_hardware_unknown_radio_cs_pin_marks_its_own_line_failed() -> None
 
     lines = "".join(fragments).splitlines(keepends=True)
     assert lines[-1] == "[hw] radio frequency=915.0 node=1 cs=NOPE reset=D25 FAILED\n"
+
+
+# ---------------------------------------------------------------------------
+# build_hardware — ir narration (#763)
+# ---------------------------------------------------------------------------
+
+
+def test_build_hardware_logs_ir_ok_line_naming_rx_emitters_and_writer_kind() -> None:
+    config = _neopixel_config_with_ir()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock(), D11=MagicMock(), D12=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_ir",
+                return_value=({LINE: MagicMock()}, MagicMock(), "pio"),
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] ir rx=[D11] emitters=line:D12 writer=pio ok\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_ir_writer_kind_matches_what_setup_ir_selected() -> None:
+    """The narrated writer= value is exactly what _setup_ir's return surfaced
+    -- not re-derived by build_hardware -- so swapping what _setup_ir reports
+    (standing in for a writer_factory swap, per #763's own writer_kind
+    hand-off tested directly in test_setup_ir.py) changes the logged kind."""
+    config = _neopixel_config_with_ir()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock(), D11=MagicMock(), D12=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_ir",
+                return_value=({LINE: MagicMock()}, MagicMock(), "pulseio"),
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] ir rx=[D11] emitters=line:D12 writer=pulseio ok\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_ir_multi_receiver_wording_for_two_rx_pins() -> None:
+    mapping = {
+        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
+        "buttons": ["D9"],
+        "ir": {"rx": ["D11", "D13"], "line": "D12"},
+    }
+    config = parse_device_config(mapping)
+    board_mock = _mock_board(
+        D5=MagicMock(), D9=MagicMock(), D11=MagicMock(), D12=MagicMock(), D13=MagicMock()
+    )
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+        stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_ir",
+                return_value=({LINE: MagicMock()}, MagicMock(), "pio"),
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] ir rx=[D11 D13] (IR multi-receiver) emitters=line:D12 writer=pio ok\n" in "".join(
+        fragments
+    )
+
+
+def test_build_hardware_logs_ir_disabled_line_when_section_disabled() -> None:
+    config = _neopixel_config_with_ir()
+    config.ir.enabled = False
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock(), D11=MagicMock(), D12=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+        mock_setup_ir = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_ir")
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    mock_setup_ir.assert_not_called()
+    assert "[hw] ir rx=[D11] emitters=line:D12 disabled\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_no_ir_line_when_section_absent() -> None:
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "ir" not in "".join(fragments)
+
+
+def test_build_hardware_unknown_ir_rx_pin_marks_its_own_line_failed_not_prior_line() -> None:
+    """The begin-before-pin-resolution ordering means an unknown ir rx pin name
+    attributes FAILED to the ir line itself, leaving the earlier buttons line's
+    own ok outcome untouched (mirrors #758's buttons case and #762's radio
+    case)."""
+    mapping = {
+        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
+        "buttons": ["D9"],
+        "ir": {"rx": "NOPE", "line": "D12"},
+    }
+    config = parse_device_config(mapping)
+    # spec= so an unlisted attribute (NOPE) raises AttributeError, like a real
+    # board module -- a bare MagicMock would fabricate one instead.
+    board_mock = MagicMock(spec=["D5", "D9", "D12"])
+    board_mock.D5 = MagicMock()
+    board_mock.D9 = MagicMock()
+    board_mock.D12 = MagicMock()
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ValueError, match="NOPE"):
+            build_hardware(config, board_module=board_mock, logger=logger)
+
+    text = "".join(fragments)
+    lines = text.splitlines(keepends=True)
+    assert "[hw] buttons A=D9 ok\n" in text
+    assert lines[-1] == "[hw] ir rx=[NOPE] emitters=line:D12 FAILED\n"
+
+
+def test_build_hardware_unknown_ir_emitter_pin_marks_its_own_line_failed() -> None:
+    """Same begin-before-pin-resolution attribution, for an unknown emitter
+    pin name -- _resolve_pin for ir.line raises after the ir line is already
+    open with the raw rx=... emitters=... detail."""
+    mapping = {
+        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
+        "buttons": ["D9"],
+        "ir": {"rx": "D11", "line": "NOPE"},
+    }
+    config = parse_device_config(mapping)
+    # spec= so an unlisted attribute (NOPE) raises AttributeError, like a real
+    # board module -- a bare MagicMock would fabricate one instead.
+    board_mock = MagicMock(spec=["D5", "D9", "D11"])
+    board_mock.D5 = MagicMock()
+    board_mock.D9 = MagicMock()
+    board_mock.D11 = MagicMock()
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ValueError, match="NOPE"):
+            build_hardware(config, board_module=board_mock, logger=logger)
+
+    lines = "".join(fragments).splitlines(keepends=True)
+    assert lines[-1] == "[hw] ir rx=[D11] emitters=line:NOPE FAILED\n"
+
+
+def test_build_hardware_ir_rx_only_config_omits_writer_from_ok_line() -> None:
+    """An ir section declaring rx but no emitters wires no transmitter, so
+    _setup_ir never selects a writer -- the ok line has nothing to report and
+    omits the writer= field entirely rather than printing a stale/fake kind."""
+    mapping = {
+        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
+        "buttons": ["D9"],
+        "ir": {"rx": "D11"},
+    }
+    config = parse_device_config(mapping)
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock(), D11=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+        stack.enter_context(patch.dict(sys.modules, {"pulseio": MagicMock()}))
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] ir rx=[D11] emitters=(none) ok\n" in "".join(fragments)

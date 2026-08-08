@@ -463,8 +463,9 @@ def _setup_audio(audio_cfg: AudioConfig, board_module: object) -> AudioEffectOut
     )
 
 
-def _make_writer(pin: microcontroller.Pin) -> PulseWriter:
-    """Return the best non-blocking IR writer the silicon supports for *pin*.
+def _make_writer(pin: microcontroller.Pin) -> tuple[PulseWriter, str]:
+    """Return the best non-blocking IR writer the silicon supports for *pin*,
+    paired with a short string naming which kind was chosen.
 
     Selection is by import-probe: ``rp2pio`` is present only on RP2040/RP2350,
     so an importable ``rp2pio`` means the board can clock the carrier out via
@@ -477,11 +478,19 @@ def _make_writer(pin: microcontroller.Pin) -> PulseWriter:
     this function (no IR section configured) never requires ``pulseio`` to be
     installed.
 
+    The kind string (``"pio"``/``"pulseio"``) is returned alongside the writer
+    rather than left for a caller to re-derive: ``build_hardware`` narrates it
+    on the ``ir`` line, and re-running this same import-probe a second time
+    just for logging could theoretically diverge from what was actually
+    built. Asking the writer that was actually constructed is exact, not
+    theoretical.
+
     Args:
         pin: The transmit pin the emitter is wired to.
 
     Returns:
-        A :class:`PulseWriter` — a PIO-backed one on RP boards, else blocking.
+        A tuple of a :class:`PulseWriter` — a PIO-backed one on RP boards,
+        else blocking — and the kind string naming which one.
     """
     try:
         import rp2pio  # noqa: F401  # present only on RP2040/RP2350
@@ -489,14 +498,45 @@ def _make_writer(pin: microcontroller.Pin) -> PulseWriter:
         import pulseio
 
         pulseout = pulseio.PulseOut(pin, frequency=38000, duty_cycle=0x8000)
-        return PulseOutWriter(pulseout)
+        return PulseOutWriter(pulseout), "pulseio"
 
     from hardware.circuitpython.pio_pulse_writer import (
         PioPulseWriter,
         make_state_machine,
     )
 
-    return PioPulseWriter(make_state_machine(pin))
+    return PioPulseWriter(make_state_machine(pin)), "pio"
+
+
+def _describe_ir(rx_pin_names: list[str], emitter_pins: dict[str, str]) -> str:
+    """Return the ``ir`` line's rx/emitter detail, built entirely from the raw
+    config pin-name strings already on ``IRConfig`` -- no pin resolution, so
+    ``build_hardware`` can log this *before* calling :func:`_resolve_pin` for
+    any rx/emitter pin, which may raise.
+
+    ``rx=[<pin>]`` for a single rx pin; two or more append the domain's **IR
+    multi-receiver** label (see docs/domain-language.md), e.g.
+    ``rx=[GP7 GP9] (IR multi-receiver)`` -- selected purely by pin count, not
+    a separate config flag. Emitters are listed ``key:pin`` in
+    ``IR_EMITTERS`` order (independent of *emitter_pins*' own key order,
+    matching :func:`_setup_ir`'s own wiring order), or ``emitters=(none)``
+    when no emitter is wired.
+
+    The selected :class:`PulseWriter` implementation (``writer=pio`` vs.
+    ``writer=pulseio``) is not part of this description -- it is only known
+    once :func:`_setup_ir` has actually run, so ``build_hardware`` appends it
+    separately via ``logger.end()``'s suffix once construction succeeds.
+    """
+    rx_desc = f"rx=[{' '.join(rx_pin_names)}]"
+    if len(rx_pin_names) > 1:
+        rx_desc += " (IR multi-receiver)"
+    if emitter_pins:
+        emitters_desc = "emitters=" + " ".join(
+            f"{key}:{emitter_pins[key]}" for key in IR_EMITTERS if key in emitter_pins
+        )
+    else:
+        emitters_desc = "emitters=(none)"
+    return f"{rx_desc} {emitters_desc}"
 
 
 def _setup_ir(
@@ -504,9 +544,9 @@ def _setup_ir(
     emitter_pins: dict[str, microcontroller.Pin],
     encoder: InfraredEncoder | None = None,
     decoder: InfraredDecoder | None = None,
-    writer_factory: Callable[[microcontroller.Pin], PulseWriter] = _make_writer,
-) -> tuple[dict[str, InfraredTransmitter], InfraredReceiver]:
-    """Wire IR transceiver pins and return (transmitters, receiver).
+    writer_factory: Callable[[microcontroller.Pin], tuple[PulseWriter, str]] = _make_writer,
+) -> tuple[dict[str, InfraredTransmitter], InfraredReceiver, str | None]:
+    """Wire IR transceiver pins and return (transmitters, receiver, writer_kind).
 
     encoder and decoder must use the same wire protocol — a mismatched pair
     silently fails to decode received frames with no error raised.
@@ -531,10 +571,16 @@ def _setup_ir(
     independent of *emitter_pins*' own key order.
 
     *writer_factory* builds the :class:`PulseWriter` for each wired emitter
-    pin — defaults to :func:`_make_writer`. This is assembly's only seam onto
-    writer *selection*: swapping it in tests exercises transmitter wiring
-    (one per emitter, sharing the gate, codec defaulting) without touching
-    the silicon-coupled ``rp2pio`` probe in :func:`_make_writer`.
+    pin, paired with a kind string (``"pio"``/``"pulseio"`` from the default
+    :func:`_make_writer`, or whatever a test double reports) — this is
+    assembly's only seam onto writer *selection*: swapping it in tests
+    exercises transmitter wiring (one per emitter, sharing the gate, codec
+    defaulting) and the writer-kind hand-off without touching the
+    silicon-coupled ``rp2pio`` probe in :func:`_make_writer`. The returned
+    *writer_kind* is whatever the last-called *writer_factory* invocation
+    reported — every wired emitter shares one board, so one kind describes
+    all of them — or ``None`` when *emitter_pins* wired nothing, so no
+    writer was ever built.
 
     ``pulseio`` is imported here, not at module load, so a config with no
     ``ir`` section never requires the library to be installed.
@@ -559,14 +605,15 @@ def _setup_ir(
         receiver = InfraredMultiReceiver(readers, type(decoder), gate=gate)
 
     transmitters: dict[str, InfraredTransmitter] = {}
+    writer_kind: str | None = None
     for emitter in IR_EMITTERS:
         pin = emitter_pins.get(emitter)
         if pin is None:
             continue
-        writer = writer_factory(pin)
+        writer, writer_kind = writer_factory(pin)
         transmitters[emitter] = InfraredTransmitter(writer, encoder, gate=gate)
 
-    return transmitters, receiver
+    return transmitters, receiver, writer_kind
 
 
 def load_device_config() -> DeviceConfig:
@@ -637,9 +684,21 @@ def build_hardware(
     section is absent, and ``FAILED`` when ``_require_spi`` raises for a
     missing bus or ``_setup_radio``'s own pin resolution raises
     ``ValueError`` for an unknown ``cs``/``reset`` name — the spi line logged
-    earlier is never touched by a radio failure. The remaining optional/
-    config-gated component (ir) is not narrated yet — that lands in its own
-    follow-on ticket. The whole body runs under one try/except: any
+    earlier is never touched by a radio failure. A declared ir section is
+    narrated the same begin-before-pin-resolution way, on one
+    ``"ir rx=... emitters=..."`` line built by :func:`_describe_ir` from the
+    raw ``config.ir.rx``/``config.ir.emitters`` pin-name strings: ``disabled``
+    for an explicit ``enabled: false``, no line at all when the section is
+    absent, and (for an enabled section) ``FAILED`` when resolving an unknown
+    rx or emitter pin name raises ``ValueError``. Unlike the other sections,
+    the ir line's outcome is not a plain ``ok`` — the selected
+    :class:`~hardware.shared.ir_transport.PulseWriter` implementation
+    (``writer=pio`` vs. ``writer=pulseio``) is only known once
+    :func:`_setup_ir` (via :func:`_make_writer`) has actually chosen one, so
+    it is appended as ``logger.end()``'s suffix (``"writer=pio ok"``) rather
+    than re-probed here; ``_setup_ir`` surfaces its choice back on its return
+    value instead of build_hardware re-running the ``rp2pio`` import-probe a
+    second time just to log it. The whole body runs under one try/except: any
     exception closes whatever log line is currently open with a ``FAILED``
     marker (a no-op if none is open) before re-raising, so a failure is
     never left attributed to the wrong, already-closed line.
@@ -766,31 +825,37 @@ def build_hardware(
 
         transmitters: dict[str, InfraredTransmitter] = {}
         ir_receiver = None
-        if config.ir is not None and config.ir.enabled:
-            encoder = ir_encoder if ir_encoder is not None else AuraInfraredEncoder()
-            decoder = ir_decoder if ir_decoder is not None else AuraInfraredDecoder()
+        if config.ir is not None:
+            ir_cfg = config.ir
+            logger.begin(f"ir {_describe_ir(ir_cfg.rx, ir_cfg.emitters)}")
+            if ir_cfg.enabled:
+                encoder = ir_encoder if ir_encoder is not None else AuraInfraredEncoder()
+                decoder = ir_decoder if ir_decoder is not None else AuraInfraredDecoder()
 
-            rx_pin_names = config.ir.rx
-            if len(rx_pin_names) == 1:
-                rx_pins = [_resolve_pin(board_module, "ir.rx", rx_pin_names[0])]
-            else:
-                rx_pins = [
-                    _resolve_pin(board_module, f"ir.rx[{i}]", name)
-                    for i, name in enumerate(rx_pin_names)
-                ]
+                rx_pin_names = ir_cfg.rx
+                if len(rx_pin_names) == 1:
+                    rx_pins = [_resolve_pin(board_module, "ir.rx", rx_pin_names[0])]
+                else:
+                    rx_pins = [
+                        _resolve_pin(board_module, f"ir.rx[{i}]", name)
+                        for i, name in enumerate(rx_pin_names)
+                    ]
 
-            emitter_pins: dict[str, microcontroller.Pin] = {}
-            for emitter_key, pin_name in config.ir.emitters.items():
-                emitter_pins[emitter_key] = _resolve_pin(
-                    board_module, f"ir.{emitter_key}", pin_name
+                emitter_pins: dict[str, microcontroller.Pin] = {}
+                for emitter_key, pin_name in ir_cfg.emitters.items():
+                    emitter_pins[emitter_key] = _resolve_pin(
+                        board_module, f"ir.{emitter_key}", pin_name
+                    )
+
+                transmitters, ir_receiver, writer_kind = _setup_ir(
+                    rx_pins,
+                    emitter_pins,
+                    encoder=encoder,
+                    decoder=decoder,
                 )
-
-            transmitters, ir_receiver = _setup_ir(
-                rx_pins,
-                emitter_pins,
-                encoder=encoder,
-                decoder=decoder,
-            )
+                logger.end(f"writer={writer_kind} ok" if writer_kind is not None else "ok")
+            else:
+                logger.end("disabled")
 
         # One HardwareNetworkControls instance, seen through two declared faces:
         # rules reach it as the send-only NetworkControls; the runtime loop
