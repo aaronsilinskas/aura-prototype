@@ -4,7 +4,14 @@ the transmitter map + single receiver for injection into HardwareNetworkControls
 Assembly only: writer *selection* (the ``rp2pio`` import-probe inside
 ``_make_writer``) is exercised separately in ``test_setup_ir_pio.py``. These
 tests inject a trivial fake ``writer_factory`` so assembly is CPython-testable
-without stubbing ``rp2pio``/``pulseio`` for the writer path.
+without stubbing ``rp2pio``/``pulseio`` for the writer path. This file also
+owns _setup_ir's receiver-class selection by resolved rx pin count (#672) --
+the one piece of assembly behavior that runs _setup_ir for real (via its
+default writer_factory) rather than through the fake, since none of those
+tests wire an emitter and so never reach the writer path at all.
+build_hardware-level radio and IR integration/narration coverage (config
+gating, hard-error and disabled/absent-section narration, and the ir/radio
+narration lines) lives in test_device_builder_radio_ir.py (#779) instead.
 
 Covers:
 - _setup_ir defaults writer_factory to _make_writer
@@ -19,6 +26,12 @@ Covers:
 - _setup_ir defaults to Aura codecs when encoder/decoder are omitted
 - _setup_ir wires a provided encoder/decoder pair into transmitters/receiver
 - _setup_ir reuses the same encoder instance across all wired transmitters
+- _setup_ir chooses InfraredSingleReceiver for one rx pin, wired with the
+  given decoder
+- _setup_ir chooses InfraredMultiReceiver with one PulseInReader per rx pin
+  for multiple rx pins
+- _setup_ir gives each multi-receiver reader its own decoder instance of the
+  same class
 """
 
 from __future__ import annotations
@@ -26,6 +39,8 @@ from __future__ import annotations
 import inspect
 import sys
 import types
+from contextlib import ExitStack
+from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
 # Stub out CircuitPython-only hardware modules before importing device_builder.
@@ -342,3 +357,92 @@ def test_setup_ir_wires_provided_decoder_into_receiver():
         [_RX_PIN], {LINE: _LINE_PIN}, decoder=decoder, writer_factory=_fake_writer_factory
     )
     assert receiver._decoder is decoder
+
+
+# ---------------------------------------------------------------------------
+# _setup_ir chooses the receiver class by resolved rx pin count (#672)
+# ---------------------------------------------------------------------------
+
+
+def _wired_decoder(receiver: object) -> object:
+    """Return the private ``_decoder`` wired onto a single receiver.
+
+    No public API exposes which decoder instance a receiver holds -- the
+    tests below exist specifically to pin that internal contract (see
+    AGENTS.md's no-internal-state-access exception).
+    """
+    return receiver._decoder
+
+
+def _wired_decoders(receiver: object) -> list:
+    """Return the private ``_decoders`` list wired onto a multi-receiver.
+
+    See :func:`_wired_decoder`.
+    """
+    return receiver._decoders
+
+
+def _wired_readers(receiver: object) -> list:
+    """Return the private ``_readers`` list wired onto a multi-receiver.
+
+    See :func:`_wired_decoder`.
+    """
+    return receiver._readers
+
+
+def test_setup_ir_single_rx_pin_builds_single_receiver_wired_with_passed_decoder() -> None:
+    from hardware.shared.ir_transport import InfraredSingleReceiver
+
+    decoder = MagicMock()
+
+    with ExitStack() as stack:
+        stack.enter_context(patch.dict(sys.modules, {"pulseio": MagicMock()}))
+
+        from hardware.circuitpython.device_builder import _setup_ir
+
+        _, receiver, _writer_kind = _setup_ir(
+            rx_pins=[MagicMock()], emitter_pins={}, decoder=decoder
+        )
+
+    assert isinstance(receiver, InfraredSingleReceiver)
+    assert _wired_decoder(receiver) is decoder
+
+
+def test_setup_ir_multiple_rx_pins_builds_multi_receiver_with_one_reader_per_pin() -> None:
+    from hardware.circuitpython.infrared_io import PulseInReader
+    from hardware.shared.ir_transport import InfraredMultiReceiver
+
+    with ExitStack() as stack:
+        stack.enter_context(patch.dict(sys.modules, {"pulseio": MagicMock()}))
+
+        from hardware.circuitpython.device_builder import _setup_ir
+
+        _, receiver, _writer_kind = _setup_ir(
+            rx_pins=[MagicMock(), MagicMock(), MagicMock()], emitter_pins={}
+        )
+
+    assert isinstance(receiver, InfraredMultiReceiver)
+    readers = _wired_readers(receiver)
+    assert len(readers) == 3
+    assert all(isinstance(reader, PulseInReader) for reader in readers)
+
+
+def test_setup_ir_multiple_rx_pins_gives_each_reader_a_fresh_decoder_of_the_same_class() -> None:
+    from hardware.shared.ir_protocol import AuraInfraredDecoder
+
+    decoder = AuraInfraredDecoder()
+
+    with ExitStack() as stack:
+        stack.enter_context(patch.dict(sys.modules, {"pulseio": MagicMock()}))
+
+        from hardware.circuitpython.device_builder import _setup_ir
+
+        _, receiver, _writer_kind = _setup_ir(
+            rx_pins=[MagicMock(), MagicMock()], emitter_pins={}, decoder=decoder
+        )
+
+    decoders = _wired_decoders(receiver)
+    assert len(decoders) == 2
+    for wired_decoder in decoders:
+        assert type(wired_decoder) is type(decoder)
+        assert wired_decoder is not decoder
