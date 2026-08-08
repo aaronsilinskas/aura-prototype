@@ -3,12 +3,14 @@
 	(generator "pcbnew")
 	(generator_version "10.0")
 	(general
-		(thickness 1.6)
+		(thickness 1.6062)
 		(legacy_teardrops no)
 	)
 	(paper "A4")
 	(layers
 		(0 "F.Cu" signal)
+		(4 "In1.Cu" signal)
+		(6 "In2.Cu" signal)
 		(2 "B.Cu" signal)
 		(9 "F.Adhes" user "F.Adhesive")
 		(11 "B.Adhes" user "B.Adhesive")
@@ -50,10 +52,32 @@
 				(thickness 0.035)
 			)
 			(layer "dielectric 1"
-				(type "core")
-				(thickness 1.51)
+				(type "prepreg")
+				(thickness 0.2104)
 				(material "FR4")
-				(epsilon_r 4.5)
+				(epsilon_r 4.4)
+				(loss_tangent 0.02)
+			)
+			(layer "In1.Cu"
+				(type "copper")
+				(thickness 0.0152)
+			)
+			(layer "dielectric 2"
+				(type "core")
+				(thickness 1.065)
+				(material "FR4")
+				(epsilon_r 4.6)
+				(loss_tangent 0.02)
+			)
+			(layer "In2.Cu"
+				(type "copper")
+				(thickness 0.0152)
+			)
+			(layer "dielectric 3"
+				(type "prepreg")
+				(thickness 0.2104)
+				(material "FR4")
+				(epsilon_r 4.4)
 				(loss_tangent 0.02)
 			)
 			(layer "B.Cu"
@@ -14172,13 +14196,12 @@
 		)
 	)
 	(zone
-		(net "+3.3V")
-		(locked yes)
-		(layer "F.Cu")
-		(uuid "a7c8640a-37ff-4fa3-9ab8-7978372e259c")
+		(net "GND")
+		(layer "In1.Cu")
+		(uuid "8149f437-3046-4f4f-acaa-b448805c82dd")
 		(hatch edge 0.5)
 		(connect_pads
-			(clearance 0.5)
+			(clearance 0)
 		)
 		(min_thickness 0.25)
 		(fill
@@ -14188,31 +14211,28 @@
 		)
 		(polygon
 			(pts
-				(xy 114 40) (xy 191 40) (xy 191 105) (xy 114 105)
+				(xy 114.25 40.25) (xy 190.75 40.25) (xy 190.75 104.75) (xy 114 104.75)
 			)
 		)
 	)
 	(zone
-		(net "GND")
-		(locked yes)
-		(layer "B.Cu")
-		(uuid "6d2b3778-fc1f-4f4a-8509-f58fdc88fd4d")
+		(net "+3.3V")
+		(layer "In2.Cu")
+		(uuid "351eb472-cd7d-4ce8-b524-be211ccb06a8")
 		(hatch edge 0.5)
 		(priority 2)
 		(connect_pads
-			(clearance 0.5)
+			(clearance 0)
 		)
 		(min_thickness 0.25)
 		(fill
 			(thermal_gap 0.5)
 			(thermal_bridge_width 0.5)
-			(smoothing fillet)
-			(radius 1)
 			(island_removal_mode 1)
 		)
 		(polygon
 			(pts
-				(xy 192 39) (xy 192 106) (xy 113 106) (xy 113 39)
+				(xy 114.25 40.25) (xy 190.75 40.25) (xy 190.75 104.75) (xy 114 104.75)
 			)
 		)
 	)
