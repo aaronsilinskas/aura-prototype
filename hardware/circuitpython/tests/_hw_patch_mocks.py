@@ -1,8 +1,10 @@
-"""Shared hardware-patch mock helpers for hardware/circuitpython test modules.
+"""Shared test helpers for hardware/circuitpython test modules.
 
 Extracted from test_device_builder.py so the subsystem-cluster test modules
-that split off from it can import the same ExitStack-based patch helpers
-instead of each re-deriving where they should live.
+that split off from it can import the same ExitStack-based patch helpers,
+config builders, and recording-logger factory from one place instead of
+each re-deriving (or cross-importing from each other) where they should
+live.
 """
 
 from __future__ import annotations
@@ -11,6 +13,9 @@ import sys
 from contextlib import ExitStack
 from typing import NamedTuple
 from unittest.mock import MagicMock, patch
+
+from engine.log import Logger
+from hardware.shared.device_config import parse_device_config
 
 
 class _HwPatchMocks(NamedTuple):
@@ -90,3 +95,64 @@ def _patch_neopixel(stack: ExitStack) -> MagicMock:
     stack.enter_context(patch.dict(sys.modules, {"neopixel": mock_neopixel}))
     mock_neopixel.NeoPixel.return_value = MagicMock()
     return mock_neopixel
+
+
+def _mock_board(**pins):
+    """Return a mock board module with the given pin attributes."""
+    mock = MagicMock()
+    for name, pin in pins.items():
+        setattr(mock, name, pin)
+    return mock
+
+
+def _matrix_config(brightness: float | None = None):
+    """Return a DeviceConfig with pixels.type='matrix'."""
+    pixels_entry = {
+        "type": "matrix",
+        "cols": 13,
+        "scope_rows": {
+            "global.buff": [0, 1],
+            "global.debuff": [1, 2],
+            "global.main": [2, 5],
+            "personal": [5, 7],
+            "directional": [7, 8],
+            "ambient": [8, 9],
+        },
+    }
+    if brightness is not None:
+        pixels_entry["brightness"] = brightness
+    mapping = {
+        "pixels": [pixels_entry],
+        "buttons": ["D9", "D10"],
+    }
+    return parse_device_config(mapping)
+
+
+def _neopixel_config(scopes: dict | None = None):
+    """Return a DeviceConfig with pixels.type='neopixel'."""
+    if scopes is None:
+        scopes = {
+            "personal": {"pin": "D5", "count": 10},
+            "directional": {"pin": "D6", "count": 4},
+        }
+    mapping = {
+        "pixels": [{"type": "neopixel", "scopes": scopes}],
+        "buttons": ["D9"],
+    }
+    return parse_device_config(mapping)
+
+
+def _minimal_config():
+    """Return a DeviceConfig declaring buttons but no optional sections at all."""
+    return parse_device_config({"buttons": ["D9"]})
+
+
+def _recording_logger(tag: str = "[hw]") -> tuple[Logger, list[str]]:
+    """Return a Logger wired to an in-memory sink, plus the fragments it records.
+
+    Mirrors ``engine.tests.test_log``'s own helper -- the recording-sink
+    pattern established there for asserting a logger's exact emitted line
+    sequence.
+    """
+    fragments: list[str] = []
+    return Logger(tag=tag, sink=fragments.append), fragments
