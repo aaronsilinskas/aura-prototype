@@ -39,7 +39,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hardware.circuitpython.tests.test_device_builder import _enter_hw_patches, _mock_board
+from hardware.circuitpython.tests._hw_patch_mocks import _enter_hw_patches, _mock_board
 from hardware.shared.device_config import parse_device_config
 
 

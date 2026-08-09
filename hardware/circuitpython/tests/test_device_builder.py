@@ -34,6 +34,8 @@ from unittest.mock import MagicMock, patch
 
 from hardware.circuitpython.tests._hw_patch_mocks import (
     _enter_hw_patches,
+    _mock_board,
+    _neopixel_config,
     _patch_neopixel,
 )
 from hardware.shared.device_config import (
@@ -43,51 +45,6 @@ from hardware.shared.device_config import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _matrix_config(brightness: float | None = None):
-    """Return a DeviceConfig with pixels.type='matrix'."""
-    pixels_entry = {
-        "type": "matrix",
-        "cols": 13,
-        "scope_rows": {
-            "global.buff": [0, 1],
-            "global.debuff": [1, 2],
-            "global.main": [2, 5],
-            "personal": [5, 7],
-            "directional": [7, 8],
-            "ambient": [8, 9],
-        },
-    }
-    if brightness is not None:
-        pixels_entry["brightness"] = brightness
-    mapping = {
-        "pixels": [pixels_entry],
-        "buttons": ["D9", "D10"],
-    }
-    return parse_device_config(mapping)
-
-
-def _neopixel_config(scopes: dict | None = None):
-    """Return a DeviceConfig with pixels.type='neopixel'."""
-    if scopes is None:
-        scopes = {
-            "personal": {"pin": "D5", "count": 10},
-            "directional": {"pin": "D6", "count": 4},
-        }
-    mapping = {
-        "pixels": [{"type": "neopixel", "scopes": scopes}],
-        "buttons": ["D9"],
-    }
-    return parse_device_config(mapping)
-
-
-def _mock_board(**pins):
-    """Return a mock board module with the given pin attributes."""
-    mock = MagicMock()
-    for name, pin in pins.items():
-        setattr(mock, name, pin)
-    return mock
 
 
 def test_build_hardware_pixels_outputs_precede_audio_and_haptic_outputs() -> None:

@@ -20,13 +20,12 @@ the config-agnostic narration spine. Split out of test_device_builder.py
 device_builder gains more hardware subsystems -- core, cross-subsystem
 build_hardware wiring/integration tests (output ordering across multiple
 components, transmit-pump identity, etc.) stay there. Config-shape helpers
-still shared with other split files (``_mock_board``, ``_neopixel_config``)
-are imported from test_device_builder rather than duplicated;
-``_recording_logger`` and ``_minimal_config`` move here since every test
-that calls them moved here too -- the other split files now import both
-from this module instead. The shared ExitStack-based hardware patch helpers
-(``_enter_hw_patches``/``_patch_neopixel``) come from _hw_patch_mocks.py
-(#775). All hardware modules (board, busio, pulseio, digitalio) are patched
+(``_mock_board``, ``_neopixel_config``, ``_minimal_config``) and the
+recording-logger factory (``_recording_logger``), along with the shared
+ExitStack-based hardware patch helpers (``_enter_hw_patches``/
+``_patch_neopixel``), all come from _hw_patch_mocks.py (#775) so every split
+file imports them from one place instead of cross-importing from each
+other. All hardware modules (board, busio, pulseio, digitalio) are patched
 so this suite runs under CPython.
 """
 
@@ -39,39 +38,17 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from engine.log import Logger
 from hardware.circuitpython.tests._hw_patch_mocks import (
     _enter_hw_patches,
-    _patch_neopixel,
-)
-from hardware.circuitpython.tests.test_device_builder import (
+    _minimal_config,
     _mock_board,
     _neopixel_config,
+    _patch_neopixel,
+    _recording_logger,
 )
 from hardware.shared.device_config import (
     parse_device_config,
 )
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _recording_logger(tag: str = "[hw]") -> tuple[Logger, list[str]]:
-    """Return a Logger wired to an in-memory sink, plus the fragments it records.
-
-    Mirrors ``engine.tests.test_log``'s own helper -- the recording-sink
-    pattern established there for asserting a logger's exact emitted line
-    sequence.
-    """
-    fragments: list[str] = []
-    return Logger(tag=tag, sink=fragments.append), fragments
-
-
-def _minimal_config():
-    """Return a DeviceConfig declaring buttons but no optional sections at all."""
-    return parse_device_config({"buttons": ["D9"]})
-
 
 # ---------------------------------------------------------------------------
 # _describe_buttons -- pairs each button label with its declared pin name

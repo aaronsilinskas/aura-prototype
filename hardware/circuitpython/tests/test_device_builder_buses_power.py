@@ -20,14 +20,11 @@ that suite from growing without bound as device_builder gains more hardware
 subsystems -- non-bus/power build_hardware coverage (pixels, audio, haptics,
 accelerometer, radio, ir, buttons, and the general banner/summary
 logger-spine lines) stays there. Config-shape helpers used by several split
-files (``_matrix_config``, ``_mock_board``) are imported from
-test_device_builder rather than duplicated; ``_minimal_config`` and
-``_recording_logger`` are imported from test_device_builder_buttons_logging.py
-(#780), where they moved alongside the buttons/logging-spine tests that are
-their only callers there. The shared ExitStack-based hardware patch helper
-(``_enter_hw_patches``) comes from _hw_patch_mocks.py (#775). All hardware
-modules (board, busio, pulseio, digitalio) are patched so this suite runs
-under CPython.
+files (``_matrix_config``, ``_mock_board``, ``_minimal_config``), the
+recording-logger factory (``_recording_logger``), and the shared
+ExitStack-based hardware patch helper (``_enter_hw_patches``) all come from
+_hw_patch_mocks.py (#775). All hardware modules (board, busio, pulseio,
+digitalio) are patched so this suite runs under CPython.
 """
 
 from __future__ import annotations
@@ -37,13 +34,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hardware.circuitpython.tests._hw_patch_mocks import _enter_hw_patches
-from hardware.circuitpython.tests.test_device_builder import (
+from hardware.circuitpython.tests._hw_patch_mocks import (
+    _enter_hw_patches,
     _matrix_config,
-    _mock_board,
-)
-from hardware.circuitpython.tests.test_device_builder_buttons_logging import (
     _minimal_config,
+    _mock_board,
     _recording_logger,
 )
 from hardware.shared.device_config import (
