@@ -257,21 +257,37 @@ def iter_serial_lines(
     *reconnect_marker* is given, that text is yielded once right after a
     successful reopen so such a caller doesn't stall waiting for a banner
     line that was lost in the same glitch that triggered the reopen.
+
+    Reads with ``.read()`` and splits lines itself rather than using
+    ``pyserial``'s inherited ``readline()``: ``Serial`` subclasses
+    ``io.RawIOBase``, which has no internal buffer, so its default
+    ``readline()`` can silently discard whatever bytes follow a newline
+    within the same underlying OS read -- observed as dropped characters
+    (e.g. a swallowed space or bracket) right at a line boundary when two
+    writes on the device arrive close together. Buffering locally guarantees
+    every byte read is either emitted in a line or held over for the next
+    one.
     """
     import serial  # type: ignore[import-untyped]
 
+    buffer = bytearray()
     while True:
         try:
-            raw = handle.ser.readline()
+            chunk = handle.ser.read(handle.ser.in_waiting or 1)
         except serial.SerialException:
             handle.ser.close()
             handle.ser = _open_serial_with_retry(handle.port, handle.baud)
+            buffer.clear()
             yield reconnect_marker
             continue
-        if raw:
-            yield raw.decode("utf-8", errors="replace").rstrip("\r\n")
-        else:
+        if not chunk:
             yield None
+            continue
+        buffer.extend(chunk)
+        while b"\n" in buffer:
+            raw, _, rest = buffer.partition(b"\n")
+            buffer = bytearray(rest)
+            yield raw.decode("utf-8", errors="replace").rstrip("\r")
 
 
 # ---------------------------------------------------------------------------
