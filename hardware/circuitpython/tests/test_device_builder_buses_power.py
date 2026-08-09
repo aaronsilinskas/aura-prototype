@@ -1,30 +1,12 @@
-"""Tests for device_builder's bus/power subsystem -- I2C, SPI, and external
-power rail setup.
+"""Tests for device_builder's bus/power subsystem: ``_setup_i2c``,
+``open_config_i2c``, ``_setup_spi``, ``_setup_external_power``, and the
+matching i2c/spi/external-power slices of ``build_hardware``.
 
-Covers ``_setup_i2c`` (config-driven bus construction, board-default-pin
-fallback, no-pullup handling, disabled sections), ``open_config_i2c`` (the
-public bus entry point onto _setup_i2c reachable without a full
-build_hardware call, #725), ``_setup_spi`` (mirrors _setup_i2c's
-configured-pins-or-board-default shape), and ``_setup_external_power``
-(drives the external-power rail only on boards that have one), plus the
-i2c/spi/external-power slices of ``build_hardware`` itself: the
-caller-supplied-vs-self-constructed I2C bus tests (using a matrix config only
-as a vehicle to observe which bus reaches a downstream I2C consumer), wiring
-config.i2c into _setup_i2c, and the i2c/spi/external-power narration lines
-build_hardware emits (#758) -- ``logs_configured_i2c_pins``,
-``logs_i2c_disabled_line``, ``logs_i2c_no_bus_outcome``,
-``logs_configured_spi_pins``, ``logs_spi_disabled_line``,
-``logs_no_rail_when_board_has_no_external_power``, and the i2c-setup-failure
-FAILED line. Split out of test_device_builder.py (#777, part of #767) to keep
-that suite from growing without bound as device_builder gains more hardware
-subsystems -- non-bus/power build_hardware coverage (pixels, audio, haptics,
-accelerometer, radio, ir, buttons, and the general banner/summary
-logger-spine lines) stays there. Config-shape helpers used by several split
-files (``_matrix_config``, ``_mock_board``, ``_minimal_config``), the
-recording-logger factory (``_recording_logger``), and the shared
-ExitStack-based hardware patch helper (``_enter_hw_patches``) all come from
-_hw_patch_mocks.py (#775). All hardware modules (board, busio, pulseio,
-digitalio) are patched so this suite runs under CPython.
+Split out of test_device_builder.py (#777) to keep that suite from growing
+unbounded; other hardware subsystems stay there. Shared config-shape helpers,
+``_recording_logger``, and ``_enter_hw_patches`` live in _hw_patch_mocks.py
+(#775). Hardware modules (board, busio, pulseio, digitalio) are patched so
+this suite runs under CPython.
 """
 
 from __future__ import annotations
@@ -182,7 +164,6 @@ def test_setup_external_power_is_noop_when_board_has_no_pin() -> None:
 
 
 def _i2c_config(sda: str = "GP4", scl: str = "GP5"):
-    """Return an I2CConfig for testing _setup_i2c's named-pin branch."""
     mapping = {
         "buttons": ["D9"],
         "i2c": {"sda": sda, "scl": scl},
@@ -204,8 +185,7 @@ def test_setup_i2c_returns_none_when_no_pullup_found() -> None:
 
 
 def test_setup_i2c_uses_board_default_pins_when_no_config_present() -> None:
-    """Absent an i2c config, _setup_i2c falls back to board.SCL/board.SDA,
-    matching pre-#679 behaviour for boards whose ``board`` module already
+    """Matches pre-#679 behaviour for boards whose ``board`` module already
     aliases the bus pins."""
     board_mock = _mock_board(SCL=MagicMock(name="SCL"), SDA=MagicMock(name="SDA"))
 
@@ -223,9 +203,6 @@ def test_setup_i2c_uses_board_default_pins_when_no_config_present() -> None:
 
 
 def test_setup_i2c_resolves_named_pins_and_constructs_bus_in_scl_sda_order() -> None:
-    """With an i2c config present, _setup_i2c resolves sda/scl by name against
-    board (for boards lacking SCL/SDA aliases) and preserves busio.I2C's
-    existing (scl, sda) positional argument order."""
     scl_pin = MagicMock(name="scl_pin")
     sda_pin = MagicMock(name="sda_pin")
     board_mock = _mock_board(GP5=scl_pin, GP4=sda_pin)
@@ -285,7 +262,6 @@ def test_setup_i2c_disabled_config_builds_no_bus() -> None:
 
 
 def _device_config_with_i2c(sda: str = "GP4", scl: str = "GP5"):
-    """Return a DeviceConfig for testing open_config_i2c's named-pin branch."""
     mapping = {
         "buttons": ["D9"],
         "i2c": {"sda": sda, "scl": scl},
@@ -410,7 +386,6 @@ def test_open_config_i2c_never_returns_a_never_reset_stemma_bus() -> None:
 
 
 def _spi_config(sck: str = "GP2", mosi: str = "GP3", miso: str = "GP4"):
-    """Return an SPIConfig for testing _setup_spi's named-pin branch."""
     mapping = {
         "buttons": ["D9"],
         "spi": {"sck": sck, "mosi": mosi, "miso": miso},
@@ -419,8 +394,7 @@ def _spi_config(sck: str = "GP2", mosi: str = "GP3", miso: str = "GP4"):
 
 
 def test_setup_spi_uses_board_default_bus_when_no_config_present() -> None:
-    """Absent an spi config, _setup_spi falls back to board.SPI() -- mirrors
-    _setup_i2c's board.SCL/board.SDA fallback."""
+    """Mirrors _setup_i2c's board.SCL/board.SDA fallback."""
     board_mock = _mock_board()
     own_bus = MagicMock(name="board_spi_bus")
     board_mock.SPI.return_value = own_bus
@@ -434,9 +408,6 @@ def test_setup_spi_uses_board_default_bus_when_no_config_present() -> None:
 
 
 def test_setup_spi_resolves_named_pins_and_constructs_bus_in_sck_mosi_miso_order() -> None:
-    """With an spi config present, _setup_spi resolves sck/mosi/miso by name
-    against board and constructs busio.SPI from them, instead of falling
-    back to board.SPI()."""
     sck_pin = MagicMock(name="sck_pin")
     mosi_pin = MagicMock(name="mosi_pin")
     miso_pin = MagicMock(name="miso_pin")

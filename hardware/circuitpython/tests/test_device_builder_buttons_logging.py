@@ -1,32 +1,10 @@
-"""Tests for device_builder's buttons subsystem and build_hardware's
-cross-cutting narration spine.
-
-Covers ``_setup_buttons`` (through build_hardware's button-pin-resolution and
-button-narration coverage -- ``_setup_buttons`` has no dedicated unit tests
-of its own) and ``_describe_buttons`` (the button label/pin line-formatting
-helper), plus the cross-cutting slice of build_hardware's own narration: the
-minimal-config unconditional-steps narration (opening banner, external
-power, i2c, spi, buttons, and the closing summary, #758), the
-no-logger-injected silent-no-op case, the per-button-label narration and its
-resolution-failure attribution (#758), and the summary line's
-outputs=/buttons= counts. Each other subsystem's own narration tests (radio,
-ir, pixels, audio, haptics, accelerometer, i2c, spi) stay in that
-subsystem's own split file -- test_device_builder_pixels.py (#776),
-test_device_builder_buses_power.py (#777),
-test_device_builder_audio_haptics.py (#778), and
-test_device_builder_radio_ir.py (#779) -- this file owns only buttons and
-the config-agnostic narration spine. Split out of test_device_builder.py
-(#780, closing out #767) to keep that suite from growing without bound as
-device_builder gains more hardware subsystems -- core, cross-subsystem
-build_hardware wiring/integration tests (output ordering across multiple
-components, transmit-pump identity, etc.) stay there. Config-shape helpers
-(``_mock_board``, ``_neopixel_config``, ``_minimal_config``) and the
-recording-logger factory (``_recording_logger``), along with the shared
-ExitStack-based hardware patch helpers (``_enter_hw_patches``/
-``_patch_neopixel``), all come from _hw_patch_mocks.py (#775) so every split
-file imports them from one place instead of cross-importing from each
-other. All hardware modules (board, busio, pulseio, digitalio) are patched
-so this suite runs under CPython.
+"""Tests for device_builder's buttons subsystem (``_setup_buttons`` via
+build_hardware, ``_describe_buttons``) and build_hardware's cross-cutting
+narration spine (banner, external power, i2c, spi, buttons, closing
+summary). Other subsystems' narration tests live in their own split files
+(pixels, buses_power, audio_haptics, radio_ir); core/cross-subsystem
+build_hardware integration tests stay in test_device_builder.py. Config-shape
+and logging helpers come from _hw_patch_mocks.py (#775).
 """
 
 from __future__ import annotations
@@ -74,10 +52,6 @@ def test_describe_buttons_returns_empty_string_for_no_buttons_declared() -> None
 
 
 def test_build_hardware_minimal_config_narrates_exactly_the_unconditional_steps() -> None:
-    """A config with no optional sections logs exactly six lines: the opening
-    banner, external power, i2c, spi, buttons, and the closing summary --
-    nothing else, since pixels/accelerometer/audio/haptics/radio/ir are all
-    absent and out of scope for narration in this ticket."""
     config = _minimal_config()
     board_mock = _mock_board(D9=MagicMock())
     logger, fragments = _recording_logger()

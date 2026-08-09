@@ -1,23 +1,14 @@
 """Tests for device_builder's pixel subsystem -- the matrix (IS31FL3741) and
 NeoPixel branches of ``pixels`` config entries.
 
-Covers ``_setup_matrix_is31fl3741``, ``_setup_neopixels``, ``_setup_pixels``
-(the per-entry dispatch across the matrix/neopixel branches), and
-``_describe_pixel_entry`` (the ``pixels[n]`` narration line formatter, #759),
-plus the pixel-related slices of ``build_hardware`` itself: output ordering
-when a config drives both a matrix and NeoPixel strips in one
-``config.pixels`` list (#613), and the ``pixels[n]`` narration lines
-``build_hardware`` emits during a full build. Split out of
-test_device_builder.py (#776, part of #767) to keep that suite from growing
-without bound as device_builder gains more hardware subsystems -- non-pixel
-build_hardware coverage (audio, haptics, accelerometer, radio, ir, buttons,
-i2c/spi bus setup, the logger spine) stays there. Config-shape helpers used
-by several split files (``_matrix_config``, ``_neopixel_config``,
-``_mock_board``, ``_minimal_config``), the recording-logger factory
-(``_recording_logger``), and the shared ExitStack-based hardware patch
-helpers (``_enter_hw_patches``/``_patch_neopixel``) all come from
-_hw_patch_mocks.py (#775). All hardware modules (board, busio, pulseio,
-digitalio) are patched so this suite runs under CPython.
+Covers ``_setup_matrix_is31fl3741``, ``_setup_neopixels``, ``_setup_pixels``,
+and ``_describe_pixel_entry`` (the ``pixels[n]`` narration line formatter),
+plus the pixel-related slices of ``build_hardware``: output ordering when a
+config drives both a matrix and NeoPixel strips in one ``config.pixels``
+list (#613), and the ``pixels[n]`` narration lines emitted during a full
+build (#759). Split out of test_device_builder.py (#776) to keep that suite
+from growing without bound; non-pixel build_hardware coverage stays there.
+Config-shape and hardware-patch helpers come from _hw_patch_mocks.py.
 """
 
 from __future__ import annotations
@@ -106,8 +97,6 @@ def test_build_hardware_matrix_only_config_includes_matrix_output_in_bundle() ->
 
 
 def test_setup_matrix_is31fl3741_drives_scaling_from_brightness() -> None:
-    """_setup_matrix_is31fl3741 sets LED scaling to round(brightness * 0xFF) and
-    leaves global_current pinned at 0xFF."""
     with ExitStack() as stack:
         mock_matrix_cls = stack.enter_context(
             patch("adafruit_is31fl3741.adafruit_rgbmatrixqt.Adafruit_RGBMatrixQT")
@@ -126,7 +115,6 @@ def test_setup_matrix_is31fl3741_drives_scaling_from_brightness() -> None:
 
 
 def test_setup_matrix_is31fl3741_full_brightness_drives_max_scaling() -> None:
-    """Brightness 1.0 drives the full 0xFF scaling byte (stock full-brightness boot)."""
     with ExitStack() as stack:
         mock_matrix_cls = stack.enter_context(
             patch("adafruit_is31fl3741.adafruit_rgbmatrixqt.Adafruit_RGBMatrixQT")
@@ -142,8 +130,6 @@ def test_setup_matrix_is31fl3741_full_brightness_drives_max_scaling() -> None:
 
 
 def test_setup_matrix_is31fl3741_returns_driver_after_transient_failures() -> None:
-    """A matrix that only responds on a later attempt still returns the driver
-    once construction succeeds, within the retry window."""
     with ExitStack() as stack:
         mock_matrix_cls = stack.enter_context(
             patch("adafruit_is31fl3741.adafruit_rgbmatrixqt.Adafruit_RGBMatrixQT")
@@ -160,8 +146,6 @@ def test_setup_matrix_is31fl3741_returns_driver_after_transient_failures() -> No
 
 
 def test_setup_matrix_is31fl3741_raises_runtime_error_past_deadline() -> None:
-    """A matrix that never responds raises RuntimeError naming the peripheral
-    and the timeout, instead of hanging forever."""
     with ExitStack() as stack:
         mock_matrix_cls = stack.enter_context(
             patch("adafruit_is31fl3741.adafruit_rgbmatrixqt.Adafruit_RGBMatrixQT")
@@ -648,9 +632,6 @@ def test_build_hardware_mixed_matrix_and_neopixel_config_produces_outputs_in_con
 
 
 def test_build_hardware_mixed_pixels_config_narrates_indexed_lines_in_config_order() -> None:
-    """A config mixing a matrix entry and a NeoPixel entry produces one
-    pixels[n] line per entry, indexed and ordered to match config.pixels --
-    each carrying its own type-specific detail."""
     config = _mixed_matrix_and_neopixel_config()
     board_mock = _mock_board(D5=MagicMock())
     logger, fragments = _recording_logger()
@@ -680,8 +661,6 @@ def test_build_hardware_mixed_pixels_config_narrates_indexed_lines_in_config_ord
 
 
 def test_build_hardware_disabled_pixel_entry_narrates_skipped_line_not_ok() -> None:
-    """A disabled pixels entry logs its own skipped line -- not silence, and
-    not the normal ok suffix an enabled entry would get."""
     mapping = {
         "pixels": [
             {

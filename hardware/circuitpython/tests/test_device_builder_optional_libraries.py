@@ -63,8 +63,6 @@ _bare_config_mapping = {"pixels": [], "buttons": []}
 
 
 def _bare_config():
-    """A DeviceConfig with no pixels, no audio, and no ir -- every optional
-    hardware section absent."""
     return parse_device_config(_bare_config_mapping)
 
 
@@ -75,8 +73,7 @@ def _bare_config():
 
 def test_importing_device_builder_does_not_import_any_driver_library() -> None:
     """A fresh import of device_builder -- the scenario a prop's boot code
-    hits -- never touches a per-component driver library, only board, busio,
-    digitalio, and microcontroller."""
+    hits -- never touches a per-component driver library."""
     driver_libraries = (
         "adafruit_is31fl3741",
         "adafruit_is31fl3741.adafruit_rgbmatrixqt",

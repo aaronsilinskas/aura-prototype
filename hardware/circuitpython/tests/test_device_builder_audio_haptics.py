@@ -1,26 +1,12 @@
 """Tests for device_builder's audio, accelerometer, and haptics subsystems.
 
-Covers ``_setup_audio`` (AudioRegistry + AudioEffectOutput construction from
-AudioConfig -- I2S pin resolution, max_volume/voice-count forwarding, clip
-registration), the audio/accelerometer/haptics slices of ``build_hardware``
-itself (config-gated wiring, the declared-but-bus-unreachable and
-chip-not-found hard-error cases, the disabled/undeclared-section omission
-cases, and the fully-loaded-prop vs. accelerometer/haptics-less-prop
-scenarios), plus their build_hardware narration lines (#760 for
-accelerometer/haptics, #761 for audio) -- ``logs_audio_disabled_line``,
-``logs_accelerometer_ok_line``, ``logs_haptics_ok_line``, and the
-corresponding ``no_i2c_bus``/``chip_not_found`` failure-narration tests.
-Split out of test_device_builder.py (#778, part of #767) to keep that suite
-from growing without bound as device_builder gains more hardware subsystems
--- non-audio/accelerometer/haptics build_hardware coverage (pixels, radio,
-ir, buttons, i2c/spi bus setup, the general logger spine, and output-ordering
-coverage that merely uses audio/haptics as a vehicle) stays there.
-Config-shape helpers used by several split files (``_mock_board``,
-``_neopixel_config``, ``_minimal_config``), the recording-logger factory
-(``_recording_logger``), and the shared ExitStack-based hardware patch
-helpers (``_enter_hw_patches``/``_patch_neopixel``) all come from
-_hw_patch_mocks.py (#775). All hardware modules (board, busio, pulseio,
-digitalio) are patched so this suite runs under CPython.
+Covers ``_setup_audio`` and the audio/accelerometer/haptics slices of
+``build_hardware`` (config-gated wiring, hard-error cases, disabled/undeclared
+omission, and fully-loaded vs. accelerometer/haptics-less prop scenarios),
+plus their build_hardware narration lines. Split out of test_device_builder.py
+(#778, part of #767) to keep that suite from growing unbounded; other
+build_hardware coverage stays there. Shared config-shape/logging/patch
+helpers come from _hw_patch_mocks.py (#775).
 """
 
 from __future__ import annotations
@@ -273,7 +259,6 @@ def test_build_hardware_disabled_audio_section_omits_audio_output() -> None:
 
 
 def _neopixel_config_with_accelerometer():
-    """Return a DeviceConfig with a neopixel pixels section and an accelerometer section."""
     mapping = {
         "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
         "buttons": ["D9"],
@@ -409,7 +394,6 @@ def test_build_hardware_enabled_accelerometer_with_disabled_i2c_raises_runtime_e
 
 
 def _neopixel_config_with_haptics():
-    """Return a DeviceConfig with a neopixel pixels section and a haptics section."""
     mapping = {
         "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
         "buttons": ["D9"],
@@ -567,9 +551,6 @@ def _fully_loaded_board_mock() -> MagicMock:
 
 
 def test_build_hardware_fully_loaded_config_builds_accelerometer_and_haptic_output() -> None:
-    """A prop declaring every optional section — including accelerometer and
-    haptics — builds an accelerometer and a Drv2605EffectOutput alongside its
-    other outputs."""
     from hardware.circuitpython.audio_output import AudioEffectOutput
     from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
     from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
@@ -917,7 +898,6 @@ def test_build_hardware_audio_config_narrates_voices_max_volume_clips_and_i2s_pi
 
 
 def test_build_hardware_logs_audio_disabled_line_when_section_disabled() -> None:
-    """``audio: {enabled: false}`` logs its own disabled line -- not silence."""
     config = _neopixel_config_with_audio()
     config.audio.enabled = False
     board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())

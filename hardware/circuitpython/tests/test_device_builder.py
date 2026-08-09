@@ -1,30 +1,10 @@
 """Tests for device_builder.build_hardware — the core, cross-subsystem tests
-that don't belong to any one subsystem cluster.
-
-Covers output ordering across multiple components (pixels outputs preceding
-audio/haptic outputs) and that ``transmit_pump``/``network_controls`` are
-the same HardwareNetworkControls instance (#608). Matrix (IS31FL3741) and
-NeoPixel pixel-branch coverage (_setup_matrix_is31fl3741, _setup_neopixels,
-_setup_pixels, _describe_pixel_entry, and the pixels-specific build_hardware
-ordering/narration tests) lives in test_device_builder_pixels.py (#776). I2C/
-SPI/external-power bus setup (_setup_i2c, open_config_i2c, _setup_spi,
-_setup_external_power, the caller-supplied-vs-self-constructed I2C bus tests,
-and their build_hardware narration) lives in test_device_builder_buses_power.py
-(#777). Audio (_setup_audio), haptics (_setup_drv2605), and accelerometer
-build_hardware coverage -- including their "declared but bus unreachable" and
-chip-not-found hard-error cases and their narration -- lives in
-test_device_builder_audio_haptics.py (#778). Radio (_setup_radio) and the
-build_hardware-level slice of IR (_describe_ir, hw.ir_receiver wiring, and
-their narration) live in test_device_builder_radio_ir.py (#779). Buttons
-(_setup_buttons, _describe_buttons) and build_hardware's cross-cutting
-narration spine (the opening banner/external-power/i2c/spi/buttons/closing-
-summary lines, minimal-config narration, and the no-logger-injected case)
-live in test_device_builder_buttons_logging.py (#780); this file still uses a
-neopixel-plus-audio-plus-haptics config as a vehicle for one piece of
-non-pixel/non-bus/non-audio-haptics/non-radio/non-ir/non-buttons coverage
-that spans pixels, audio, and haptics (pixels outputs preceding audio/haptic
-outputs). All hardware modules (board, busio, pulseio, digitalio) are patched
-so this suite runs under CPython.
+that don't belong to any one subsystem cluster: output ordering across
+multiple components, and that ``transmit_pump``/``network_controls`` are the
+same HardwareNetworkControls instance (#608). Per-subsystem coverage (pixels,
+buses/power, audio/haptics, radio/ir, buttons/logging) lives in the sibling
+test_device_builder_*.py files split out under #767; shared config/patch
+helpers come from _hw_patch_mocks.py.
 """
 
 from __future__ import annotations

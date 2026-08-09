@@ -1,37 +1,12 @@
-"""Tests for device_builder's radio and IR subsystems.
+"""Tests for device_builder's radio and IR subsystems: ``_setup_radio`` and
+the radio slice of ``build_hardware``, plus ``_describe_ir`` and the ir
+slice of ``build_hardware``. Unit-level ``_setup_ir`` assembly tests
+(pin/emitter wiring, codec injection, writer_factory hand-off, receiver-class
+selection) live in test_setup_ir.py instead.
 
-Covers ``_setup_radio`` (pin resolution, DigitalInOut wrapping, and
-delegation to Rfm69RadioTransport) and the radio slice of ``build_hardware``
-itself: config-gated wiring onto the bundle, the declared-but-no-SPI-bus and
-chip-not-found hard-error cases, the disabled/undeclared-section omission
-cases, and the radio narration lines (#762) -- ``logs_radio_ok_line``,
-``logs_radio_disabled_line``, the no-SPI-bus and unknown-cs-pin FAILED
-narration, and the absent-section silence case.
-
-Also covers the build_hardware-level slice of IR: ``_describe_ir`` (the ir
-narration line's rx/emitter detail formatting, #763), build_hardware setting
-``hw.ir_receiver`` from a declared ``ir`` section, the disabled/undeclared-
-section omission cases, the cone-only config-key-to-emitter mapping (#720),
-the unknown rx/emitter pin hard errors, DeviceHardware's non-exposure of the
-internal IR transmit gate, and the ir narration lines (#763) --
-``logs_ir_ok_line_naming_rx_emitters_and_writer_kind``, the multi-receiver
-wording, disabled/absent-section narration, and the unknown-pin FAILED
-narration. This file does *not* get unit-level ``_setup_ir`` assembly tests
-(pin/emitter wiring, codec injection, writer_factory hand-off, and
-receiver-class selection by rx pin count) -- those live in test_setup_ir.py,
-which already owns ``_setup_ir``'s unit-level assembly coverage.
-
-Split out of test_device_builder.py (#779, part of #767) to keep that suite
-from growing without bound as device_builder gains more hardware subsystems
--- non-radio/IR build_hardware coverage (pixels, audio, haptics,
-accelerometer, buttons, i2c/spi/external-power bus setup, the general logger
-spine, and the pixels-before-audio-haptic-outputs ordering test) stays
-there. Config-shape helpers used by several split files (``_mock_board``,
-``_neopixel_config``, ``_minimal_config``), the recording-logger factory
-(``_recording_logger``), and the shared ExitStack-based hardware patch
-helpers (``_enter_hw_patches``/``_patch_neopixel``) all come from
-_hw_patch_mocks.py (#775). All hardware modules (board, busio, pulseio,
-digitalio) are patched so this suite runs under CPython.
+Split out of test_device_builder.py (#779) to keep that suite from growing
+without bound; shared config-shape helpers and hardware patches come from
+_hw_patch_mocks.py (#775).
 """
 
 from __future__ import annotations
@@ -62,8 +37,6 @@ from hardware.shared.device_config import (
 
 
 def _neopixel_config_with_radio():
-    """Return a DeviceConfig with a neopixel pixels section, an spi section,
-    and a radio section."""
     mapping = {
         "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
         "buttons": ["D9"],
@@ -273,7 +246,6 @@ def test_describe_ir_no_emitters_notes_none() -> None:
 
 
 def _neopixel_config_with_ir():
-    """Return a DeviceConfig with a neopixel pixels section and IR config."""
     mapping = {
         "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
         "buttons": ["D9"],
@@ -329,10 +301,7 @@ def test_build_hardware_disabled_ir_section_leaves_ir_receiver_none() -> None:
 
 
 def test_build_hardware_cone_only_ir_config_wires_only_cone_transmitter() -> None:
-    """A config declaring only ir.cone (no ir.line/ir.area_of_effect) wires a
-    transmitter under CONE and nothing under LINE/AREA_OF_EFFECT.
-
-    Runs the real _setup_ir (only pulseio is stubbed) so this exercises
+    """Runs the real _setup_ir (only pulseio is stubbed) so this exercises
     build_hardware's config-key-to-emitter mapping end to end — the mapping
     that previously had no direct test (#720)."""
     mapping = {
@@ -359,7 +328,7 @@ def test_build_hardware_cone_only_ir_config_wires_only_cone_transmitter() -> Non
 def test_build_hardware_multi_pin_ir_rx_unknown_pin_raises_same_error_as_any_other_pin() -> None:
     mapping = {"buttons": ["D9"], "ir": {"rx": ["D11", "NOPE"]}}
     config = parse_device_config(mapping)
-    board_mock = MagicMock(spec=["D9", "D11"])  # NOPE deliberately absent
+    board_mock = MagicMock(spec=["D9", "D11"])
 
     with ExitStack() as stack:
         _enter_hw_patches(stack)
@@ -373,7 +342,7 @@ def test_build_hardware_multi_pin_ir_rx_unknown_pin_raises_same_error_as_any_oth
 def test_build_hardware_single_pin_ir_rx_unknown_pin_raises_unindexed_error() -> None:
     mapping = {"buttons": ["D9"], "ir": {"rx": "NOPE"}}
     config = parse_device_config(mapping)
-    board_mock = MagicMock(spec=["D9"])  # NOPE deliberately absent
+    board_mock = MagicMock(spec=["D9"])
 
     with ExitStack() as stack:
         _enter_hw_patches(stack)
@@ -387,7 +356,7 @@ def test_build_hardware_single_pin_ir_rx_unknown_pin_raises_unindexed_error() ->
 def test_build_hardware_unknown_ir_emitter_pin_name_raises_value_error() -> None:
     mapping = {"buttons": ["D9"], "ir": {"rx": "D11", "line": "NOPE"}}
     config = parse_device_config(mapping)
-    board_mock = MagicMock(spec=["D9", "D11"])  # NOPE deliberately absent
+    board_mock = MagicMock(spec=["D9", "D11"])
 
     with ExitStack() as stack:
         _enter_hw_patches(stack)
