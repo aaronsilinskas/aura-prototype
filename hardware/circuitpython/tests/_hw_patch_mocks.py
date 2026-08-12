@@ -26,6 +26,7 @@ class _HwPatchMocks(NamedTuple):
     accelerometer: MagicMock | None
     drv2605: MagicMock | None
     radio: MagicMock | None
+    sdcard: MagicMock | None
 
 
 def _enter_hw_patches(
@@ -35,16 +36,17 @@ def _enter_hw_patches(
     patch_drv2605: bool = True,
     patch_accelerometer: bool = True,
     patch_radio: bool = True,
+    patch_sdcard: bool = True,
 ) -> _HwPatchMocks:
     """Enter patches for all CircuitPython hardware setup helpers.
 
     Returns the patched mocks so callers can assert on them (e.g. whether
     ``_setup_i2c`` was invoked at all). *own_i2c*/*own_spi* are the buses
     they return when build_hardware constructs them itself. *patch_drv2605*,
-    *patch_accelerometer*, and *patch_radio* are False for tests that need
-    ``_setup_drv2605``, ``_setup_accelerometer``, or ``_setup_radio`` to run
-    for real (e.g. hitting their own ImportError probes) — their mock is
-    then `None`.
+    *patch_accelerometer*, *patch_radio*, and *patch_sdcard* are False for
+    tests that need ``_setup_drv2605``, ``_setup_accelerometer``,
+    ``_setup_radio``, or ``_setup_sdcard`` to run for real (e.g. hitting
+    their own ImportError probes) — their mock is then `None`.
     """
     stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
     mock_setup_i2c = stack.enter_context(
@@ -77,12 +79,18 @@ def _enter_hw_patches(
         mock_setup_radio = stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_radio", return_value=None)
         )
+    mock_setup_sdcard = None
+    if patch_sdcard:
+        mock_setup_sdcard = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_sdcard", return_value=None)
+        )
     return _HwPatchMocks(
         mock_setup_i2c,
         mock_setup_spi,
         mock_setup_accelerometer,
         mock_setup_drv2605,
         mock_setup_radio,
+        mock_setup_sdcard,
     )
 
 

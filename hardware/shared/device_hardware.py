@@ -6,6 +6,7 @@ from engine.effects.output import EffectOutput
 from engine.network import TransmitPump
 from engine.state import NetworkControls
 from hardware.shared.debounced_buttons import DebouncedButtons
+from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transport import InfraredReceiver
 from hardware.shared.radio_transport import RadioTransport
 
@@ -24,6 +25,10 @@ class DeviceHardware:
 
     ``radio`` is the same seam ``HardwareNetworkControls.send_radio`` reaches
     through — ``None`` on a device with no radio peripheral declared.
+
+    ``storage`` is typed as the port (``DeviceStorage``), never the concrete
+    ``SdCardStorage`` adapter — ``None`` on a device with no ``sdcard``
+    section declared and enabled.
     """
 
     __slots__ = (
@@ -33,6 +38,7 @@ class DeviceHardware:
         "network_controls",
         "outputs",
         "radio",
+        "storage",
         "transmit_pump",
     )
 
@@ -45,6 +51,7 @@ class DeviceHardware:
         transmit_pump: TransmitPump,
         ir_receiver: InfraredReceiver | None,
         radio: RadioTransport | None,
+        storage: DeviceStorage | None,
     ) -> None:
         self.outputs: list[EffectOutput] = outputs
         self.buttons: DebouncedButtons = buttons
@@ -53,3 +60,4 @@ class DeviceHardware:
         self.transmit_pump: TransmitPump = transmit_pump
         self.ir_receiver: InfraredReceiver | None = ir_receiver
         self.radio: RadioTransport | None = radio
+        self.storage: DeviceStorage | None = storage

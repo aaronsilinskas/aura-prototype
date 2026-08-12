@@ -14,6 +14,7 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
     transmit_pump = "fake-transmit-pump"
     ir_receiver = "fake-ir-receiver"
     radio = "fake-radio"
+    storage = "fake-storage"
 
     hardware = DeviceHardware(
         outputs=outputs,
@@ -23,6 +24,7 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
         transmit_pump=transmit_pump,
         ir_receiver=ir_receiver,
         radio=radio,
+        storage=storage,
     )
 
     assert hardware.outputs is outputs
@@ -32,6 +34,7 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
     assert hardware.transmit_pump is transmit_pump
     assert hardware.ir_receiver is ir_receiver
     assert hardware.radio is radio
+    assert hardware.storage is storage
 
 
 def test_device_hardware_radio_defaults_to_none_when_no_radio_peripheral_is_wired():
@@ -43,9 +46,25 @@ def test_device_hardware_radio_defaults_to_none_when_no_radio_peripheral_is_wire
         transmit_pump="fake-transmit-pump",
         ir_receiver=None,
         radio=None,
+        storage=None,
     )
 
     assert hardware.radio is None
+
+
+def test_device_hardware_storage_defaults_to_none_when_no_sdcard_is_wired():
+    hardware = DeviceHardware(
+        outputs=[],
+        buttons="fake-buttons",
+        accelerometer=None,
+        network_controls="fake-network-controls",
+        transmit_pump="fake-transmit-pump",
+        ir_receiver=None,
+        radio=None,
+        storage=None,
+    )
+
+    assert hardware.storage is None
 
 
 def test_device_hardware_rejects_attributes_outside_its_slots():
@@ -57,6 +76,7 @@ def test_device_hardware_rejects_attributes_outside_its_slots():
         transmit_pump="fake-transmit-pump",
         ir_receiver=None,
         radio=None,
+        storage=None,
     )
 
     with pytest.raises(AttributeError):

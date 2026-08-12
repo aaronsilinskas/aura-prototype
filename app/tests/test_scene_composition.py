@@ -22,6 +22,7 @@ def _fake_hw(transmit_pump=None, ir_receiver=None, radio=None) -> DeviceHardware
         transmit_pump=transmit_pump if transmit_pump is not None else "fake-transmit-pump",
         ir_receiver=ir_receiver,
         radio=radio,
+        storage=None,
     )
 
 
