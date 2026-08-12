@@ -4,6 +4,11 @@
     "sda": "GP4",
     "scl": "GP5"
   },
+  "spi": {
+    "sck": "GP2",
+    "mosi": "GP3",
+    "miso": "GP0"
+  },
   "pixels": [
     {
       "type": "matrix",
@@ -34,7 +39,7 @@
       }
     }
   ],
-  "buttons": ["GP27", "GP28"],
+  "buttons": ["GP26", "GP27"],
   "accelerometer": {
     "enabled": true
   },
@@ -60,11 +65,6 @@
     "i2s_bit_clock": "GP7",
     "i2s_word_select": "GP8",
     "i2s_data": "GP6"
-  },
-  "spi": {
-    "sck": "GP2",
-    "mosi": "GP3",
-    "miso": "GP0"
   },
   "radio": {
     "cs": "GP1",
