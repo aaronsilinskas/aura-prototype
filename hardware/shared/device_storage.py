@@ -22,9 +22,31 @@ deferred to a later ticket.
 import errno
 import os
 
-__all__ = ["DeviceStorage"]
+try:
+    from typing import Final
+except ImportError:
+    pass
 
-_TEMP_SUFFIX = ".tmp"
+__all__ = ["DeviceStorage", "reject_escaping_path"]
+
+_TEMP_SUFFIX: Final = ".tmp"
+
+
+def reject_escaping_path(relative_path: str) -> None:
+    """Raise ``ValueError`` if *relative_path* escapes a mount root.
+
+    Pure string logic shared by :meth:`DeviceStorage._resolve` and
+    ``FakeDeviceStorage``'s guard so the escape-rejection rule can't drift
+    between the real and fake implementations. Rejects an absolute
+    *relative_path* (a leading ``"/"``) and any ``..`` path segment,
+    wherever it appears, even one that would net out to a location still
+    under the root — simple and conservatively safe rather than clever.
+    """
+    if relative_path.startswith("/"):
+        raise ValueError(f"path escapes mount root: {relative_path!r}")
+    for segment in relative_path.split("/"):
+        if segment == "..":
+            raise ValueError(f"path escapes mount root: {relative_path!r}")
 
 
 class DeviceStorage:
@@ -56,7 +78,9 @@ class DeviceStorage:
         try:
             with open(resolved, "rb") as f:
                 return f.read()
-        except OSError:
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise  # Anything but "not written yet" is a real failure.
             return None
 
     def write_bytes(self, name: str, data: bytes) -> None:
@@ -120,16 +144,10 @@ class DeviceStorage:
         because that helper is identity on CircuitPython/MicroPython (no
         ``os.path`` to fall back to) and so does not collapse ``..`` there,
         even though it does on CPython — relying on it would make escape
-        rejection platform-dependent. Rejects an absolute *relative_path*
-        (a leading ``"/"``) and any ``..`` path segment, wherever it
-        appears, even one that would net out to a location still under the
-        root — simple and conservatively safe rather than clever.
+        rejection platform-dependent. See :func:`reject_escaping_path` for
+        the guard rule itself.
         """
-        if relative_path.startswith("/"):
-            raise ValueError(f"path escapes mount root: {relative_path!r}")
-        for segment in relative_path.split("/"):
-            if segment == "..":
-                raise ValueError(f"path escapes mount root: {relative_path!r}")
+        reject_escaping_path(relative_path)
         return self._mount_root + "/" + relative_path
 
     def _ensure_parent_dirs(self, relative_path: str) -> None:

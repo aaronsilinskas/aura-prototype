@@ -14,7 +14,7 @@ import os
 
 import pytest
 
-from hardware.shared.device_storage import DeviceStorage
+from hardware.shared.device_storage import DeviceStorage, reject_escaping_path
 
 # ---------------------------------------------------------------------------
 # DeviceStorage — read_bytes / write_bytes round-trip
@@ -42,6 +42,18 @@ def test_write_bytes_replaces_prior_content_entirely(tmp_path):
     storage.write_bytes("state.json", b"new")
 
     assert storage.read_bytes("state.json") == b"new"
+
+
+def test_read_bytes_propagates_an_open_error_other_than_missing_file(tmp_path, monkeypatch):
+    storage = DeviceStorage(str(tmp_path))
+
+    def flaky_open(path, mode="rb", *args, **kwargs):
+        raise OSError(errno.EACCES, "permission denied")
+
+    monkeypatch.setattr(builtins, "open", flaky_open)
+
+    with pytest.raises(OSError):
+        storage.read_bytes("state.json")
 
 
 # ---------------------------------------------------------------------------
@@ -231,11 +243,7 @@ class FakeDeviceStorage:
         return "/fake-mount/" + subpath
 
     def _guard(self, relative_path: str) -> None:
-        if relative_path.startswith("/"):
-            raise ValueError(f"path escapes mount root: {relative_path!r}")
-        for segment in relative_path.split("/"):
-            if segment == "..":
-                raise ValueError(f"path escapes mount root: {relative_path!r}")
+        reject_escaping_path(relative_path)
 
 
 def test_fake_read_bytes_returns_none_for_a_never_written_name():
