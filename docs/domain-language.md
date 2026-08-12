@@ -202,7 +202,7 @@ A CircuitPython `EffectOutput` driving a DRV2605L haptic driver on all scopes (`
 _Avoid_: constructing with a `None` driver; reading `receipt.loudness` (the DRV2605L has no volume control); "motor" for the injected instance (use `driver`)
 
 ### aura-device.json
-The single **required** on-device file holding all hardware configuration; a missing file raises. Sections: `buttons`, `ir`, `pixels`, `audio`, `i2c`, `spi`, `radio`, `accelerometer`, `haptics`, plus a top-level `"scene"` string (read separately, **not** part of `DeviceConfig`). `pixels` and `buttons` are each an optional, possibly-empty list.
+The single **required** on-device file holding all hardware configuration; a missing file raises. Sections: `buttons`, `ir`, `pixels`, `audio`, `i2c`, `spi`, `radio`, `sdcard`, `accelerometer`, `haptics`, plus a top-level `"scene"` string (read separately, **not** part of `DeviceConfig`). `pixels` and `buttons` are each an optional, possibly-empty list.
 _Avoid_: `settings.toml` (removed — unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`
 
 ### DeviceConfig

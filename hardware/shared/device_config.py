@@ -23,6 +23,7 @@ __all__ = [
     "NeoPixelScopeConfig",
     "NeoPixelStripConfig",
     "RadioConfig",
+    "SDCardConfig",
     "SPIConfig",
     "copy_with_enabled",
     "first_neopixel_pin",
@@ -50,6 +51,8 @@ _SPI_PIN_FIELDS: Final = ("sck", "mosi", "miso")
 _RADIO_ALLOWED_KEYS: Final = ("cs", "reset", "frequency", "node", "enabled")
 
 _RADIO_PIN_FIELDS: Final = ("cs", "reset")
+
+_SDCARD_ALLOWED_KEYS: Final = ("cs", "mount", "enabled")
 
 # `DeviceConfig.isolate` derives its isolatable set from `DeviceConfig.__slots__`
 # minus these -- i2c/spi are buses (infrastructure for the kept component, not
@@ -268,6 +271,24 @@ class HapticsConfig:
         self.enabled: bool = enabled
 
 
+class SDCardConfig:
+    """Parsed SD card peripheral configuration.
+
+    Consumes the shared SPI bus (see ``SPIConfig``), like ``RadioConfig``.
+    ``mount`` is the on-device mount point, defaulting to ``"/sd"``.
+
+    An SD card declared and enabled while ``spi`` is disabled is a
+    *builder*-time hard error, not checked here.
+    """
+
+    __slots__ = ("cs", "enabled", "mount")
+
+    def __init__(self, cs: str, mount: str = "/sd", enabled: bool = True) -> None:
+        self.cs: str = cs
+        self.mount: str = mount
+        self.enabled: bool = enabled
+
+
 def copy_with_enabled(section: object, enabled: bool) -> object:
     """Return a copy of *section* with ``enabled`` forced to *enabled*.
 
@@ -318,6 +339,7 @@ class DeviceConfig:
         "ir",
         "pixels",
         "radio",
+        "sdcard",
         "spi",
     )
 
@@ -332,6 +354,7 @@ class DeviceConfig:
         haptics: HapticsConfig | None,
         spi: SPIConfig | None,
         radio: RadioConfig | None,
+        sdcard: SDCardConfig | None,
     ) -> None:
         self.pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = pixels
         self.buttons: list[str] = buttons
@@ -342,6 +365,7 @@ class DeviceConfig:
         self.haptics: HapticsConfig | None = haptics
         self.spi: SPIConfig | None = spi
         self.radio: RadioConfig | None = radio
+        self.sdcard: SDCardConfig | None = sdcard
 
     def isolate(self, keep: str) -> DeviceConfig:
         """Return a derived config with every isolatable component but *keep* disabled.
@@ -776,6 +800,25 @@ def _parse_radio(radio_raw: dict) -> RadioConfig:
     return RadioConfig(cs=cs, reset=reset, frequency=float(frequency), node=node, enabled=enabled)
 
 
+def _parse_sdcard(sdcard_raw: dict) -> SDCardConfig:
+    _reject_unknown_keys(sdcard_raw, "sdcard", allowed=_SDCARD_ALLOWED_KEYS)
+
+    if "cs" not in sdcard_raw:
+        raise ValueError("sdcard.cs is required")
+    cs = sdcard_raw["cs"]
+    if not isinstance(cs, str):
+        raise ValueError("sdcard.cs must be a string pin name")
+
+    mount = sdcard_raw.get("mount", "/sd")
+    if not isinstance(mount, str) or not mount.startswith("/"):
+        raise ValueError(
+            f"sdcard.mount must be a non-empty string starting with '/', got {mount!r}"
+        )
+
+    enabled = _parse_enabled(sdcard_raw, "sdcard.enabled")
+    return SDCardConfig(cs=cs, mount=mount, enabled=enabled)
+
+
 def parse_device_config(mapping: dict) -> DeviceConfig:
     """Parse a device config mapping into a DeviceConfig.
 
@@ -853,6 +896,10 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     if "radio" in mapping:
         radio = _parse_radio(mapping["radio"])
 
+    sdcard: SDCardConfig | None = None
+    if "sdcard" in mapping:
+        sdcard = _parse_sdcard(mapping["sdcard"])
+
     accelerometer: AccelerometerConfig | None = None
     if "accelerometer" in mapping:
         accelerometer = _parse_accelerometer(mapping["accelerometer"])
@@ -871,6 +918,7 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
         haptics=haptics,
         spi=spi,
         radio=radio,
+        sdcard=sdcard,
     )
 
 

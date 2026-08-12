@@ -77,13 +77,15 @@ def neopixel_config():
 
 @pytest.fixture
 def full_isolatable_config(matrix_config):
-    # Adds every section `matrix_config` lacks (i2c, spi, radio, accelerometer,
-    # haptics) so every isolatable component -- plus both excluded buses -- is
-    # declared and enabled, giving `isolate` tests a config where "disabled"
-    # and "absent" can never be confused for one another.
+    # Adds every section `matrix_config` lacks (i2c, spi, radio, sdcard,
+    # accelerometer, haptics) so every isolatable component -- plus both
+    # excluded buses -- is declared and enabled, giving `isolate` tests a
+    # config where "disabled" and "absent" can never be confused for one
+    # another.
     matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5"}
     matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8"}
     matrix_config["radio"] = {"cs": "GP13", "reset": "GP14", "frequency": 915.0, "node": 5}
+    matrix_config["sdcard"] = {"cs": "GP15"}
     matrix_config["accelerometer"] = {}
     matrix_config["haptics"] = {}
     return matrix_config
@@ -1064,6 +1066,116 @@ def test_parse_radio_non_boolean_enabled_raises_value_error_naming_field(matrix_
 
 
 # ---------------------------------------------------------------------------
+# SD card validation
+# ---------------------------------------------------------------------------
+
+
+def test_parse_sdcard_section_maps_cs_mount_and_enabled(matrix_config):
+    matrix_config["sdcard"] = {"cs": "GP9", "mount": "/data", "enabled": False}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.sdcard is not None
+    assert result.sdcard.cs == "GP9"
+    assert result.sdcard.mount == "/data"
+    assert result.sdcard.enabled is False
+
+
+def test_parse_sdcard_without_mount_defaults_to_slash_sd(matrix_config):
+    matrix_config["sdcard"] = {"cs": "GP9"}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.sdcard.mount == "/sd"
+
+
+def test_parse_absent_sdcard_section_yields_none(matrix_config):
+    result = parse_device_config(matrix_config)
+
+    assert result.sdcard is None
+
+
+def test_parse_sdcard_missing_cs_raises_value_error_naming_field(matrix_config):
+    matrix_config["sdcard"] = {}
+
+    with pytest.raises(ValueError, match=r"sdcard\.cs"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_sdcard_cs_non_string_raises_value_error(matrix_config):
+    matrix_config["sdcard"] = {"cs": 9}
+
+    with pytest.raises(ValueError, match=r"sdcard\.cs must be a string pin name"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_sdcard_non_string_mount_raises_value_error_naming_field(matrix_config):
+    matrix_config["sdcard"] = {"cs": "GP9", "mount": 5}
+
+    with pytest.raises(ValueError, match=r"sdcard\.mount"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_sdcard_mount_without_leading_slash_raises_value_error_naming_field(matrix_config):
+    matrix_config["sdcard"] = {"cs": "GP9", "mount": "data"}
+
+    with pytest.raises(ValueError, match=r"sdcard\.mount"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_sdcard_empty_mount_raises_value_error_naming_field(matrix_config):
+    matrix_config["sdcard"] = {"cs": "GP9", "mount": ""}
+
+    with pytest.raises(ValueError, match=r"sdcard\.mount"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_sdcard_unknown_key_raises_value_error_naming_allowed_keys(matrix_config):
+    matrix_config["sdcard"] = {"cs": "GP9", "speed": "fast"}
+
+    with pytest.raises(ValueError, match=r"sdcard\.speed.*cs, mount, enabled"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_sdcard_absent_enabled_key_defaults_to_true(matrix_config):
+    matrix_config["sdcard"] = {"cs": "GP9"}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.sdcard.enabled is True
+
+
+def test_parse_sdcard_enabled_false_retains_object_not_none(matrix_config):
+    matrix_config["sdcard"] = {"cs": "GP9", "enabled": False}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.sdcard is not None
+    assert result.sdcard.enabled is False
+
+
+def test_parse_sdcard_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
+    matrix_config["sdcard"] = {"cs": "GP9", "enabled": "yes"}
+
+    with pytest.raises(ValueError, match=r"sdcard\.enabled"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_sdcard_enabled_false_missing_cs_still_raises_value_error(matrix_config):
+    matrix_config["sdcard"] = {"enabled": False}
+
+    with pytest.raises(ValueError, match=r"sdcard\.cs"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_sdcard_enabled_false_invalid_mount_still_raises_value_error(matrix_config):
+    matrix_config["sdcard"] = {"cs": "GP9", "mount": "data", "enabled": False}
+
+    with pytest.raises(ValueError, match=r"sdcard\.mount"):
+        parse_device_config(matrix_config)
+
+
+# ---------------------------------------------------------------------------
 # Audio validation
 # ---------------------------------------------------------------------------
 
@@ -1385,10 +1497,19 @@ def test_isolate_leaves_the_original_config_unchanged(full_isolatable_config):
     assert config.accelerometer.enabled is True
     assert config.haptics.enabled is True
     assert config.radio.enabled is True
+    assert config.sdcard.enabled is True
     assert all(entry.enabled for entry in config.pixels)
 
 
-_ISOLATABLE_COMPONENTS = ("pixels", "audio", "ir", "accelerometer", "haptics", "radio")
+_ISOLATABLE_COMPONENTS = (
+    "pixels",
+    "audio",
+    "ir",
+    "accelerometer",
+    "haptics",
+    "radio",
+    "sdcard",
+)
 
 
 @pytest.mark.parametrize("keep", _ISOLATABLE_COMPONENTS)
@@ -1455,6 +1576,7 @@ def test_isolate_disabled_copy_preserves_every_field_of_each_isolatable_section(
     _assert_same_fields_except_enabled(config.accelerometer, isolated_keeping_pixels.accelerometer)
     _assert_same_fields_except_enabled(config.haptics, isolated_keeping_pixels.haptics)
     _assert_same_fields_except_enabled(config.radio, isolated_keeping_pixels.radio)
+    _assert_same_fields_except_enabled(config.sdcard, isolated_keeping_pixels.sdcard)
 
     isolated_keeping_audio = config.isolate(keep="audio")
     for original_entry, isolated_entry in zip(config.pixels, isolated_keeping_audio.pixels):
@@ -1491,6 +1613,7 @@ def test_isolate_on_minimal_config_is_a_no_op_for_absent_components():
     assert isolated.accelerometer is None
     assert isolated.haptics is None
     assert isolated.radio is None
+    assert isolated.sdcard is None
     assert isolated.pixels == []
 
 
