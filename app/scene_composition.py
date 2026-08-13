@@ -7,8 +7,6 @@ because ``DeviceHardware`` itself carries no board imports.
 
 from __future__ import annotations
 
-import os
-
 import engine._path as _path
 from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
@@ -52,24 +50,17 @@ class SceneRuntime:
 _EFFECT_PACKS_DIR = "packs/effects"
 
 
-def _scan_effect_pack_sounds(audio_registry: AudioRegistry) -> None:
-    """Scan every ``packs/effects/<pack>/sounds`` folder into *audio_registry*'s base.
+def _scan_effect_pack_sounds(audio_registry: AudioRegistry, pack_names: list[str]) -> None:
+    """Scan each named effect pack's ``sounds`` folder into *audio_registry*'s base.
 
-    Mirrors ``PackRegistry.scan_dir``'s pack-detection rule: only an immediate
-    ``packs/effects`` subdirectory carrying a ``version.txt`` counts as a pack,
-    so a non-pack entry there is skipped entirely -- its own subdirectories
-    (a pack's ``tests/``/``helpers/``, which never sit directly under
-    ``packs/effects``) are never reached by this scan either way. A pack with
-    no ``sounds/`` folder scans to an empty merge — ``AudioRegistry.scan_pack_sounds``
-    tolerates a missing directory.
+    *pack_names* is the already-scanned effect-pack list (``effect_registry.names()``)
+    so this reuses the pack-detection *build_scene_runtime* already did instead of
+    re-walking ``packs/effects``. A pack with no ``sounds/`` folder scans to an
+    empty merge — ``AudioRegistry.scan_pack_sounds`` tolerates a missing directory.
     """
-    if not _path.isdir(_EFFECT_PACKS_DIR):
-        return
-    for entry in os.listdir(_EFFECT_PACKS_DIR):
-        pack_dir = _path.join(_EFFECT_PACKS_DIR, entry)
-        if not _path.isdir(pack_dir) or not _path.isfile(_path.join(pack_dir, "version.txt")):
-            continue
-        audio_registry.scan_pack_sounds(entry, _path.join(pack_dir, "sounds"))
+    for pack_name in pack_names:
+        sounds_dir = _path.join(_EFFECT_PACKS_DIR, pack_name, "sounds")
+        audio_registry.scan_pack_sounds(pack_name, sounds_dir)
 
 
 def _resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
@@ -114,7 +105,7 @@ def build_scene_runtime(hw: DeviceHardware, scene_name: str) -> SceneRuntime:
     # without pretending sound resolution works.
     audio_registry = hw.audio_registry
     if audio_registry is not None:
-        _scan_effect_pack_sounds(audio_registry)
+        _scan_effect_pack_sounds(audio_registry, effect_registry.names())
     else:
         audio_registry = AudioRegistry()
 

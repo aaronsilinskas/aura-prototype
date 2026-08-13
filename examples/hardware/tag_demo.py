@@ -31,18 +31,7 @@ Deploy an ``aura-device.json`` to the CIRCUITPY drive root.  Example::
       "ir": {"rx": "D11", "line": "D12"},
       "audio": {
         "voices": 4,
-        "max_volume": 0.1,
-        "clips": {
-          "warning_pulse_peak": "sounds/blip.wav",
-          "go_start": "sounds/blip.wav",
-          "game_over_sting_start": "sounds/game_over.wav",
-          "fire_shot_start": "sounds/blip.wav",
-          "scene.hit_start": "sounds/blip.wav",
-          "reload": "sounds/blip.wav",
-          "reload_complete": "sounds/blip.wav",
-          "dry_fire_start": "sounds/blip.wav",
-          "ready_shots_start": "sounds/blip.wav"
-        }
+        "max_volume": 0.1
       }
     }
 
