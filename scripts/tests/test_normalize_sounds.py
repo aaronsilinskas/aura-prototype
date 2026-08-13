@@ -23,6 +23,19 @@ class _Result:
         self.stderr = stderr
 
 
+def _with_version_probe(handler):
+    """Wrap *handler* so the ``ffmpeg -version`` availability probe always
+    succeeds, letting callers fake only the volumedetect/normalize calls
+    ``normalize`` actually cares about."""
+
+    def _run(args, **kwargs):
+        if "-version" in args:
+            return _Result(returncode=0)
+        return handler(args, **kwargs)
+
+    return _run
+
+
 def _fake_ffmpeg(peak_db: "float | dict[str, float]" = -6.0, fail_normalize_for=()):
     """Build a fake for ``subprocess.run`` covering every ffmpeg invocation
     ``normalize`` makes: the ``-version`` availability probe, the
@@ -34,10 +47,7 @@ def _fake_ffmpeg(peak_db: "float | dict[str, float]" = -6.0, fail_normalize_for=
     real ffmpeg crash mid-write).
     """
 
-    def _run(args, **kwargs):
-        if "-version" in args:
-            return _Result(returncode=0)
-
+    def _handle(args, **kwargs):
         if "volumedetect" in args:
             src = Path(args[args.index("-i") + 1])
             db = peak_db.get(src.name, -6.0) if isinstance(peak_db, dict) else peak_db
@@ -52,7 +62,7 @@ def _fake_ffmpeg(peak_db: "float | dict[str, float]" = -6.0, fail_normalize_for=
         out.write_bytes(b"NORMALIZED")
         return _Result(returncode=0)
 
-    return _run
+    return _with_version_probe(_handle)
 
 
 def _make_wav(path: Path, content: bytes = b"ORIGINAL") -> None:
@@ -182,10 +192,9 @@ def test_normalize_reports_done_summary_on_success(tmp_path: Path, capsys) -> No
 def test_normalize_reports_error_when_peak_cannot_be_measured(tmp_path: Path, capsys) -> None:
     _make_wav(tmp_path / "packs" / "effects" / "basic" / "sounds" / "blip.wav")
 
-    def _no_match_run(args, **kwargs):
-        if "-version" in args:
-            return _Result(returncode=0)
-        return _Result(stderr="no volume info here")
+    _no_match_run = _with_version_probe(
+        lambda args, **kwargs: _Result(stderr="no volume info here")
+    )
 
     with patch("subprocess.run", side_effect=_no_match_run):
         result = normalize(tmp_path, dry_run=True)
@@ -216,9 +225,7 @@ def test_normalize_continues_past_a_failing_file_to_normalize_the_rest(
     _make_wav(good)
     _make_wav(bad)
 
-    def _run(args, **kwargs):
-        if "-version" in args:
-            return _Result(returncode=0)
+    def _handle(args, **kwargs):
         if "volumedetect" in args:
             src = Path(args[args.index("-i") + 1])
             if src.name == "unmeasurable.wav":
@@ -227,7 +234,7 @@ def test_normalize_continues_past_a_failing_file_to_normalize_the_rest(
         Path(args[-1]).write_bytes(b"NORMALIZED")
         return _Result(returncode=0)
 
-    with patch("subprocess.run", side_effect=_run):
+    with patch("subprocess.run", side_effect=_with_version_probe(_handle)):
         result = normalize(tmp_path, dry_run=False)
 
     assert result == 1
