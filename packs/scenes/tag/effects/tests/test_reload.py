@@ -53,5 +53,5 @@ def test_reload_plays_a_looping_reload_clip() -> None:
     effect = _build(duration=2.0)
 
     assert effect.audio is not None
-    assert effect.audio.clips["start"].name == "reload"
+    assert effect.audio.clips["start"].name == "scene.reload"
     assert effect.audio.clips["start"].loop is True

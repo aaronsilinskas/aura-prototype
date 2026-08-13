@@ -20,7 +20,7 @@ from effects.effect import (
 from engine.effects.manager import EffectBuilder
 
 _GO_AUDIO = EffectAudio(
-    clips={"start": AudioPlaybackConfig(name="go_start", loop=False, stops_effect=True)}
+    clips={"start": AudioPlaybackConfig(name="scene.go_start", loop=False, stops_effect=True)}
 )
 
 _GO_HAPTIC = EffectHaptic(patterns={"start": HapticPattern([HapticPattern.STRONG_BUZZ])})

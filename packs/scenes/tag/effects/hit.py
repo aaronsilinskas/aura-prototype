@@ -1,10 +1,9 @@
 """Tag scene "hit" effect — shared, unmistakable hit moment on ``Scope.Global.MAIN``.
 
 Built on ``basic.pulse`` for pixels: a quick red flash. Layers on a one-shot
-``start`` audio clip (the ``game_over_sting`` composition pattern) with
-``stops_effect=True`` so the effect ends — and the scope returns to dark —
-the moment the clip finishes, plus a strong-buzz/pause/strong-click
-haptic sequence for a punchier hit feel.
+``scene.hit_start`` audio clip with ``stops_effect=True`` so the effect ends —
+and the scope returns to dark — the moment the clip finishes, plus a
+strong-buzz/pause/strong-click haptic sequence for a punchier hit feel.
 """
 
 from __future__ import annotations
@@ -34,6 +33,10 @@ _HIT_HAPTIC = EffectHaptic(
     }
 )
 
+_HIT_AUDIO = EffectAudio(
+    clips={"start": AudioPlaybackConfig(name="scene.hit_start", loop=False, stops_effect=True)}
+)
+
 
 class _Builder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
@@ -41,13 +44,7 @@ class _Builder(EffectBuilder):
         return Effect(
             name=base.name,
             pixels=base.pixels,
-            audio=EffectAudio(
-                clips={
-                    "start": AudioPlaybackConfig(
-                        name=name + "_start", loop=False, stops_effect=True
-                    )
-                }
-            ),
+            audio=_HIT_AUDIO,
             haptic=_HIT_HAPTIC,
         )
 

@@ -22,7 +22,7 @@ from engine.effects.manager import EffectBuilder
 
 _DRY_FIRE_AUDIO = EffectAudio(
     clips={
-        "start": AudioPlaybackConfig(name="dry_fire_start", loop=False, stops_effect=True),
+        "start": AudioPlaybackConfig(name="scene.dry_fire_start", loop=False, stops_effect=True),
     }
 )
 

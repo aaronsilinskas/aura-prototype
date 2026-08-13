@@ -20,7 +20,7 @@ from engine.effects.manager import EffectBuilder
 
 _RELOAD_COMPLETE_AUDIO = EffectAudio(
     clips={
-        "start": AudioPlaybackConfig(name="reload_complete", loop=False, stops_effect=True),
+        "start": AudioPlaybackConfig(name="scene.reload_complete", loop=False, stops_effect=True),
     }
 )
 
