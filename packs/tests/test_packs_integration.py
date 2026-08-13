@@ -7,6 +7,7 @@ import os
 import pytest
 
 from effects.effect import EffectConfig
+from engine.audio import AudioRegistry
 from engine.effects.manager import EffectBuilder, EffectManager
 from engine.engine import GameEngine, GameRule
 from engine.packs import PackRegistry
@@ -203,7 +204,12 @@ def loaded_debug_engine():
         lambda: Scene(effect_packs=[], rule_packs=[("debug", "1.0")]),
     )
     manager = SceneManager(
-        engine, effect_registry, rule_registry, scene_registry, effect_admin=effect_manager
+        engine,
+        effect_registry,
+        rule_registry,
+        scene_registry,
+        effect_admin=effect_manager,
+        audio_overlay_admin=AudioRegistry(),
     )
     manager.load("test_scene")
     manager.update()
@@ -241,7 +247,12 @@ def test_scene_manager_load_raises_for_incompatible_pack_version() -> None:
         lambda: Scene(effect_packs=[], rule_packs=[("debug", "99.0")]),
     )
     manager = SceneManager(
-        engine, effect_registry, rule_registry, scene_registry, effect_admin=effect_manager
+        engine,
+        effect_registry,
+        rule_registry,
+        scene_registry,
+        effect_admin=effect_manager,
+        audio_overlay_admin=AudioRegistry(),
     )
 
     with pytest.raises(ValueError):

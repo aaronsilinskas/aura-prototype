@@ -91,8 +91,8 @@ An effect or rule loaded from an `effects/` or `rules/` subdirectory inside a sc
 _Avoid_: "private pack"; putting scene-only code under `packs/`
 
 ### Scene-local sound
-A bare `{stem: path}` map of `*.wav` files discovered from a `sounds/` subdirectory inside a scene's own folder, carried on `Scene.local_sound_map`. Unlike scene-local effects/rules it is not loaded through a `SceneLocalRegistry` (no module import, no `scene.` prefix) — just a stem-keyed path lookup. Purely additive as of its introduction; no consumer resolves it yet.
-_Avoid_: assuming it is mounted as the active-scene overlay already — that is a later ticket
+A bare `{stem: path}` map of `*.wav` files discovered from a `sounds/` subdirectory inside a scene's own folder, carried on `Scene.local_sound_map`. Unlike scene-local effects/rules it is not loaded through a `SceneLocalRegistry` (no module import, no `scene.` prefix) — just a stem-keyed path lookup. `SceneManager` installs it as the active scene's `AudioRegistry` overlay (via `AudioOverlayAdmin.set_scene_sounds`) on every transition, resolved through the `scene.<stem>` prefix.
+_Avoid_: confusing the bare stem key here with the `scene.`-prefixed name a clip is referenced by (the prefix is added at resolution, not stored on the map)
 
 ### SceneLocalRegistry
 A single-namespace registry for one scene's local effects (or rules), with the same `get`/`items` surface as `PackRegistry` but no version concept.
@@ -118,8 +118,8 @@ _Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()
 The rule-facing scene-transition seam: `load`, `overlay`, `pop`, each recording a pending transition applied after the current tick. `SceneManager` is the live implementation.
 
 ### SceneManager
-Owns the scene stack and drives transitions (`load` clears, `overlay` suspends and pushes, `pop` restores), stopping unloaded/suspended scenes' effects on `Scope.ALL` and republishing the active scene's local effects. Routes every local-effects push and merge-strategy admin through an injected `EffectAdmin`.
-_Avoid_: calling `register()` on it (removed); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`)
+Owns the scene stack and drives transitions (`load` clears, `overlay` suspends and pushes, `pop` restores), stopping unloaded/suspended scenes' effects on `Scope.ALL` and republishing the active scene's local effects and sounds. Routes every local-effects push and merge-strategy admin through an injected `EffectAdmin`, and every sound-overlay push through an injected `AudioOverlayAdmin`.
+_Avoid_: calling `register()` on it (removed); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); routing scene-transition sound calls through anything but the injected `AudioOverlayAdmin`
 
 ### EffectControls
 The **rule-facing** effect seam a rule holds via `GameState.effect_controls`: `set_effect`, `add_effect`, `stop_effect`, `set_merge_strategy`; scene-transition operations live on `EffectAdmin`.
@@ -186,8 +186,12 @@ One red→green cycle at a single Game Level (red warning → red → green warn
 _Avoid_: "phase" (a Round spans several); "level-up" (the celebratory beat between Rounds)
 
 ### AudioRegistry
-Maps clip names to WAV file paths, populated explicitly via `register(name, path)` — no naming-convention magic.
-_Avoid_: `PackRegistry.sound_path` for new audio effects (deprecated)
+Resolves a qualified clip name to a WAV path via **prefix routing**, exactly mirroring `EffectResolver`: `scene.<stem>` resolves against the active scene's swappable **overlay** (installed via the `AudioOverlayAdmin` face it implements); `<pack>.<stem>` resolves against a shared **base** (`<pack>.<stem>` → path), populated by scanning a pack's `sounds/` folder via `scan_pack_sounds`. An unprefixed name, or a name absent from its routed map, **raises** rather than returning `None`.
+_Avoid_: `PackRegistry.sound_path` for new audio effects (deprecated); returning `None` on a resolution miss (raise instead); a bare, unqualified base key (qualify with the pack name so two packs can share a stem)
+
+### AudioOverlayAdmin
+The scene-transition-facing seam for swapping the active scene's sound overlay — `set_scene_sounds(sounds | None)` — mirroring `EffectAdmin.set_local_effects`. `AudioRegistry` implements it; `SceneManager` holds an injected handle and installs the active scene's sounds in `_activate`, right beside the `EffectAdmin.set_local_effects` push.
+_Avoid_: calling it from a `GameRule` (reserved for `SceneManager`); conflating with `EffectAdmin` (separate seam, separate concern)
 
 ### AudioEffectOutput
 A CircuitPython `EffectOutput` driving audio via I2S and the live `VoiceSink` adapter; owns the hardware (amp, mixer, WAV sources) but delegates voice-slot bookkeeping to a `VoicePool`.

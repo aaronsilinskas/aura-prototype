@@ -117,6 +117,7 @@ from __future__ import annotations
 import gc
 
 from effects.performance import PerformanceTracker
+from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.packs import PackRegistry
@@ -197,7 +198,12 @@ def _build_prop(scene_name: str, config: DeviceConfig) -> tuple[SceneManager, Ef
         network_controls=hw.network_controls,
     )
     manager = SceneManager(
-        engine, effect_registry, rule_registry, scene_registry, effect_admin=effect_manager
+        engine,
+        effect_registry,
+        rule_registry,
+        scene_registry,
+        effect_admin=effect_manager,
+        audio_overlay_admin=AudioRegistry(),
     )
     gc.collect()
     free_after_engine = gc.mem_free()

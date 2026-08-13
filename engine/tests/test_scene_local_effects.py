@@ -17,7 +17,7 @@ from engine.packs import PackRegistry
 from engine.scene import Scene, SceneLocalRegistry, SceneManager, SceneRegistry
 from engine.state import EffectAdmin, EffectControls, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
-from engine.tests.helpers import SpyEffectAdmin
+from engine.tests.helpers import SpyAudioOverlayAdmin, SpyEffectAdmin
 from engine.timer import Timer
 
 # ---------------------------------------------------------------------------
@@ -71,6 +71,14 @@ def _make_effects_subdir(scene_dir, items: dict[str, str]) -> None:
     effects_dir.mkdir(exist_ok=True)
     for name, content in items.items():
         (effects_dir / (name + ".py")).write_text(content)
+
+
+def _make_sounds_subdir(scene_dir, stems: list[str]) -> None:
+    """Create a sounds/ subdir under *scene_dir* with one empty .wav per stem."""
+    sounds_dir = scene_dir / "sounds"
+    sounds_dir.mkdir(exist_ok=True)
+    for stem in stems:
+        (sounds_dir / (stem + ".wav")).write_bytes(b"")
 
 
 class _RecordingEffectControls(EffectControls):
@@ -323,6 +331,7 @@ def test_scene_manager_pushes_local_effects_on_load(scene_env) -> None:
         PackRegistry(item_attr="RULE"),
         scene_registry,
         effect_admin,
+        SpyAudioOverlayAdmin(),
     )
     manager.load("forest")
     manager.update()
@@ -349,6 +358,7 @@ def test_scene_manager_load_replaces_active_scene_registry_with_new_scenes(scene
         PackRegistry(item_attr="RULE"),
         scene_registry,
         effect_admin,
+        SpyAudioOverlayAdmin(),
     )
 
     manager.load("a")
@@ -378,6 +388,7 @@ def test_scene_manager_pushes_overlay_scene_local_effects_on_overlay(scene_env) 
         PackRegistry(item_attr="RULE"),
         scene_registry,
         effect_admin,
+        SpyAudioOverlayAdmin(),
     )
 
     manager.load("scene_a")
@@ -409,6 +420,7 @@ def test_scene_manager_restores_base_local_effects_on_pop(scene_env) -> None:
         PackRegistry(item_attr="RULE"),
         scene_registry,
         effect_admin,
+        SpyAudioOverlayAdmin(),
     )
 
     manager.load("scene_a")
@@ -424,6 +436,124 @@ def test_scene_manager_restores_base_local_effects_on_pop(scene_env) -> None:
     pushed = effect_admin.local_effects_history[0]
     assert "a_flash" in pushed.items()
     assert "b_flash" not in pushed.items()
+
+
+# ---------------------------------------------------------------------------
+# SceneManager installs the active scene's sound overlay on transitions
+# ---------------------------------------------------------------------------
+
+
+def test_scene_manager_installs_scene_sound_overlay_on_load(scene_env) -> None:
+    scene_dir = _make_scene_dir(scene_env, "forest")
+    _make_sounds_subdir(scene_dir, ["victory_sting"])
+
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(str(scene_env), MODULE_PREFIX)
+
+    engine = GameEngine(effect_controls=_RecordingEffectControls())
+    audio_overlay_admin = SpyAudioOverlayAdmin()
+    manager = SceneManager(
+        engine,
+        PackRegistry(item_attr="BUILD"),
+        PackRegistry(item_attr="RULE"),
+        scene_registry,
+        SpyEffectAdmin(),
+        audio_overlay_admin,
+    )
+    manager.load("forest")
+    manager.update()
+
+    assert len(audio_overlay_admin.scene_sounds_history) == 1
+    pushed = audio_overlay_admin.scene_sounds_history[0]
+    assert "victory_sting" in pushed
+
+
+def test_scene_manager_load_installs_none_overlay_for_scene_with_no_sounds(scene_env) -> None:
+    _make_scene_dir(scene_env, "bare_scene")
+
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(str(scene_env), MODULE_PREFIX)
+
+    engine = GameEngine(effect_controls=_RecordingEffectControls())
+    audio_overlay_admin = SpyAudioOverlayAdmin()
+    manager = SceneManager(
+        engine,
+        PackRegistry(item_attr="BUILD"),
+        PackRegistry(item_attr="RULE"),
+        scene_registry,
+        SpyEffectAdmin(),
+        audio_overlay_admin,
+    )
+    manager.load("bare_scene")
+    manager.update()
+
+    assert audio_overlay_admin.scene_sounds_history == [None]
+
+
+def test_scene_manager_installs_overlay_scene_sounds_on_overlay(scene_env) -> None:
+    scene_dir_b = _make_scene_dir(scene_env, "scene_b")
+    _make_sounds_subdir(scene_dir_b, ["b_sting"])
+    _make_scene_dir(scene_env, "scene_a")
+
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(str(scene_env), MODULE_PREFIX)
+
+    engine = GameEngine(effect_controls=_RecordingEffectControls())
+    audio_overlay_admin = SpyAudioOverlayAdmin()
+    manager = SceneManager(
+        engine,
+        PackRegistry(item_attr="BUILD"),
+        PackRegistry(item_attr="RULE"),
+        scene_registry,
+        SpyEffectAdmin(),
+        audio_overlay_admin,
+    )
+
+    manager.load("scene_a")
+    manager.update()
+    audio_overlay_admin.scene_sounds_history.clear()
+
+    manager.overlay("scene_b")
+    manager.update()
+
+    assert len(audio_overlay_admin.scene_sounds_history) == 1
+    pushed = audio_overlay_admin.scene_sounds_history[0]
+    assert "b_sting" in pushed
+
+
+def test_scene_manager_restores_base_scene_sounds_on_pop(scene_env) -> None:
+    scene_dir_a = _make_scene_dir(scene_env, "scene_a")
+    _make_sounds_subdir(scene_dir_a, ["a_sting"])
+    scene_dir_b = _make_scene_dir(scene_env, "scene_b")
+    _make_sounds_subdir(scene_dir_b, ["b_sting"])
+
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(str(scene_env), MODULE_PREFIX)
+
+    engine = GameEngine(effect_controls=_RecordingEffectControls())
+    audio_overlay_admin = SpyAudioOverlayAdmin()
+    manager = SceneManager(
+        engine,
+        PackRegistry(item_attr="BUILD"),
+        PackRegistry(item_attr="RULE"),
+        scene_registry,
+        SpyEffectAdmin(),
+        audio_overlay_admin,
+    )
+
+    manager.load("scene_a")
+    manager.update()
+    manager.overlay("scene_b")
+    manager.update()
+    audio_overlay_admin.scene_sounds_history.clear()
+
+    manager.pop()
+    manager.update()
+
+    assert len(audio_overlay_admin.scene_sounds_history) == 1
+    pushed = audio_overlay_admin.scene_sounds_history[0]
+    assert "a_sting" in pushed
+    assert "b_sting" not in pushed
 
 
 # ---------------------------------------------------------------------------
