@@ -34,10 +34,11 @@ def test_game_over_sting_emits_audio_on_start() -> None:
     assert "start" in effect.audio.clips
 
 
-def test_game_over_sting_audio_start_clip_name_is_scene_prefixed() -> None:
+def test_game_over_sting_audio_start_clip_name_points_at_shared_basic_clip() -> None:
+    """tag's game_over_sting reuses basic's shared sting rather than shipping its own."""
     effect = _build()
 
-    assert effect.audio.clips["start"].name == "scene.game_over_sting_start"
+    assert effect.audio.clips["start"].name == "basic.game_over_sting_start"
 
 
 def test_game_over_sting_audio_start_clip_is_non_looping() -> None:

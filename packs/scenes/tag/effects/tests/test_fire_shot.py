@@ -43,6 +43,12 @@ def test_fire_shot_emits_audio_on_start() -> None:
     assert "start" in effect.audio.clips
 
 
+def test_fire_shot_audio_start_clip_name_is_scene_prefixed() -> None:
+    effect = _build()
+
+    assert effect.audio.clips["start"].name == "scene.fire_shot_start"
+
+
 def test_fire_shot_audio_start_clip_is_one_shot_not_looping() -> None:
     effect = _build()
 

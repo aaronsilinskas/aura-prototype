@@ -24,7 +24,7 @@ def test_go_plays_a_one_shot_clip() -> None:
     effect = _build()
 
     assert effect.audio is not None
-    assert effect.audio.clips["start"].name == "go_start"
+    assert effect.audio.clips["start"].name == "scene.go_start"
     assert effect.audio.clips["start"].loop is False
 
 

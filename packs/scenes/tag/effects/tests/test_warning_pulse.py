@@ -18,7 +18,7 @@ def test_warning_pulse_plays_blip_clip_on_peak_event() -> None:
     effect = _build()
 
     assert effect.audio is not None
-    assert effect.audio.clips["peak"].name == "warning_pulse_peak"
+    assert effect.audio.clips["peak"].name == "scene.warning_pulse_peak"
 
 
 def test_warning_pulse_blip_clip_is_one_shot_not_looping() -> None:

@@ -14,7 +14,7 @@ from effects.layers.progress_layer import ProgressLayer
 from engine.effects.manager import EffectBuilder
 from packs.scenes.tag.effects.helpers.progress_fill_effect import ProgressFillEffect
 
-_RELOAD_AUDIO = EffectAudio(clips={"start": AudioPlaybackConfig(name="reload", loop=True)})
+_RELOAD_AUDIO = EffectAudio(clips={"start": AudioPlaybackConfig(name="scene.reload", loop=True)})
 
 _DEFAULT_COLOR = 0xFF0000
 _DEFAULT_DURATION = 3.0

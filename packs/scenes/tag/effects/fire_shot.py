@@ -1,7 +1,7 @@
 """Tag scene "fire_shot" effect — one-shot felt feedback for a Button-A shot.
 
 Built on ``basic.solid``: a bright flash of color, layered with a one-shot
-``fire_shot_start`` audio clip (``stops_effect=True`` so the whole effect —
+``scene.fire_shot_start`` audio clip (``stops_effect=True`` so the whole effect —
 pixels and haptic included — ends when the clip finishes, returning
 ``Scope.DIRECTIONAL`` to dark) and a strong haptic pulse.
 """
@@ -22,7 +22,9 @@ from packs.effects.basic.solid import SolidBuilder
 _solid = SolidBuilder()
 
 _FIRE_SHOT_AUDIO = EffectAudio(
-    clips={"start": AudioPlaybackConfig(name="fire_shot_start", loop=False, stops_effect=True)}
+    clips={
+        "start": AudioPlaybackConfig(name="scene.fire_shot_start", loop=False, stops_effect=True)
+    }
 )
 
 _FIRE_SHOT_HAPTIC = EffectHaptic(patterns={"start": HapticPattern([HapticPattern.STRONG_CLICK])})

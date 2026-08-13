@@ -184,3 +184,42 @@ def test_build_scene_runtime_with_no_audio_registry_skips_scan_and_still_activat
     assert hw.audio_registry is None
     receipt = runtime.effect_manager.set_effect(Scope.PERSONAL, "scene.sfx_test", {})
     assert receipt is not None
+
+
+# ---------------------------------------------------------------------------
+# Audio registry wiring: tag scene discovery (issue #805)
+# ---------------------------------------------------------------------------
+
+
+def test_build_scene_runtime_installs_tag_scenes_sounds_as_the_active_overlay():
+    """Activating tag installs its sounds/ folder as the AudioRegistry overlay, so
+    every scene.<stem> clip a tag effect references resolves through the same
+    registry AudioEffectOutput would use on real hardware."""
+    hw = _fake_hw(audio_registry=AudioRegistry())
+
+    build_scene_runtime(hw, "tag")
+
+    for stem in (
+        "fire_shot_start",
+        "reload",
+        "reload_complete",
+        "dry_fire_start",
+        "ready_shots_start",
+        "go_start",
+        "warning_pulse_peak",
+        "hit_start",
+    ):
+        assert hw.audio_registry.path(f"scene.{stem}") == f"packs/scenes/tag/sounds/{stem}.wav"
+
+
+def test_build_scene_runtime_resolves_tags_shared_game_over_sting_via_the_basic_pack():
+    """tag's game_over_sting effect points at basic's shared clip rather than its
+    own -- it must resolve from the base scan, not from tag's sounds/ overlay."""
+    hw = _fake_hw(audio_registry=AudioRegistry())
+
+    build_scene_runtime(hw, "tag")
+
+    assert (
+        hw.audio_registry.path("basic.game_over_sting_start")
+        == "packs/effects/basic/sounds/game_over_sting_start.wav"
+    )

@@ -20,7 +20,7 @@ from engine.effects.manager import EffectBuilder
 
 _READY_SHOTS_AUDIO = EffectAudio(
     clips={
-        "start": AudioPlaybackConfig(name="ready_shots_start", loop=False, stops_effect=True),
+        "start": AudioPlaybackConfig(name="scene.ready_shots_start", loop=False, stops_effect=True),
     }
 )
 

@@ -34,6 +34,17 @@ def test_hit_emits_audio_on_start() -> None:
     assert "start" in effect.audio.clips
 
 
+def test_hit_audio_start_clip_name_is_scene_prefixed() -> None:
+    from packs.scenes.tag.effects.hit import BUILD
+
+    # Built with the unqualified effect name EffectManager actually passes
+    # (see EffectManager._build_effect) to prove the clip name is a fixed
+    # literal, not derived from the builder's `name` argument.
+    effect = BUILD("hit", _config())
+
+    assert effect.audio.clips["start"].name == "scene.hit_start"
+
+
 def test_hit_audio_start_clip_is_one_shot_and_stops_effect() -> None:
     effect = _build()
 
