@@ -7,11 +7,11 @@ routes through :meth:`DeviceStorage._resolve`, the one place that joins a
 *name*/*subpath* onto the mount root and rejects any attempt to escape it.
 
 No ``board``/``busio``/CircuitPython-only import — safe on CPython,
-CircuitPython 10.x, and MicroPython. Unlike ``RadioTransport`` or
-``PulseWriter``, this is not an abstract port with a separate hardware
-adapter: mounting the card is someone else's job, and once mounted, plain
-``os`` calls work identically across runtimes, so one concrete class
-suffices. ``FakeDeviceStorage``, the in-memory test double, lives in
+CircuitPython 10.x, and MicroPython. Mounting the card is someone else's
+job: the live adapter is ``hardware.circuitpython.sdcard_storage.SdCardStorage``,
+which mounts at construction time and then defers every read/write to this
+base class, since once mounted, plain ``os`` calls work identically across
+runtimes. ``FakeDeviceStorage``, the in-memory test double, lives in
 ``hardware/shared/tests/test_device_storage.py`` (not shipped here),
 mirroring where the board-free radio-transport fake lives.
 

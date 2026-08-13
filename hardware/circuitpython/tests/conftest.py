@@ -88,3 +88,17 @@ sys.modules["adafruit_drv2605"] = _drv2605_mod
 _rfm69_mod = types.ModuleType("adafruit_rfm69")
 _rfm69_mod.RFM69 = type("RFM69", (), {})  # type: ignore[attr-defined]
 sys.modules.setdefault("adafruit_rfm69", _rfm69_mod)
+
+
+# ---------------------------------------------------------------------------
+# sdcardio / storage stubs -- minimal placeholders for SdCardStorage tests
+# ---------------------------------------------------------------------------
+
+_sdcardio_mod = types.ModuleType("sdcardio")
+_sdcardio_mod.SDCard = type("SDCard", (), {})  # type: ignore[attr-defined]
+sys.modules.setdefault("sdcardio", _sdcardio_mod)
+
+_storage_mod = types.ModuleType("storage")
+_storage_mod.VfsFat = type("VfsFat", (), {})  # type: ignore[attr-defined]
+_storage_mod.mount = lambda *args, **kwargs: None  # type: ignore[attr-defined]
+sys.modules.setdefault("storage", _storage_mod)

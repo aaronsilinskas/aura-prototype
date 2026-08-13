@@ -85,6 +85,8 @@ def test_importing_device_builder_does_not_import_any_driver_library() -> None:
         "adafruit_lis3dh",
         "adafruit_drv2605",
         "adafruit_rfm69",
+        "sdcardio",
+        "storage",
     )
 
     with _library_absent("hardware.circuitpython.device_builder", *driver_libraries):
@@ -458,6 +460,77 @@ def test_build_hardware_declared_radio_raises_when_rfm69_uninstalled() -> None:
         # _setup_radio itself is intentionally left unpatched -- it must run
         # for real and hit the missing import inside rfm69_radio_transport.
         _enter_hw_patches(stack, patch_radio=False)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ImportError):
+            build_hardware(config, board_module=board_mock)
+
+
+# ---------------------------------------------------------------------------
+# Sdcard branch: sdcardio/storage stay uninstalled with no sdcard section
+# (#793) -- sdcard_storage.py is the only module that ever imports them, and
+# device_builder reaches that module through a deferred import, mirroring
+# the radio branch above.
+# ---------------------------------------------------------------------------
+
+
+def test_build_hardware_without_sdcard_section_succeeds_when_sdcardio_uninstalled() -> None:
+    config = _bare_config()
+    assert config.sdcard is None
+    board_mock = _mock_board()
+
+    with _library_absent("sdcardio", "storage"), ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.storage is None
+
+
+def test_build_hardware_disabled_sdcard_section_succeeds_when_sdcardio_uninstalled() -> None:
+    """A *disabled* sdcard section is skipped the same as an undeclared one --
+    a retained, non-None object with ``enabled=False``."""
+    mapping = dict(
+        _bare_config_mapping,
+        sdcard={"cs": "D24", "mount": "/sd", "enabled": False},
+    )
+    config = parse_device_config(mapping)
+    assert config.sdcard is not None
+    board_mock = _mock_board()
+
+    with _library_absent("sdcardio", "storage"), ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.storage is None
+
+
+def test_build_hardware_declared_sdcard_raises_when_sdcardio_uninstalled() -> None:
+    """A declared sdcard section whose driver library is missing is a hard
+    error -- unlike the undeclared case above, this must reach the real
+    `import sdcardio` inside sdcard_storage and let its ImportError
+    propagate (not the wrapped RuntimeError -- that wrap only catches
+    OSError, an unrelated failure mode from a missing card/filesystem)."""
+    mapping = dict(
+        _bare_config_mapping,
+        sdcard={"cs": "D24", "mount": "/sd"},
+    )
+    config = parse_device_config(mapping)
+    board_mock = _mock_board(D24=MagicMock())
+
+    with (
+        _library_absent("sdcardio", "storage", "hardware.circuitpython.sdcard_storage"),
+        ExitStack() as stack,
+    ):
+        # _setup_sdcard itself is intentionally left unpatched -- it must run
+        # for real and hit the missing import inside sdcard_storage.
+        _enter_hw_patches(stack, patch_sdcard=False)
 
         from hardware.circuitpython.device_builder import build_hardware
 

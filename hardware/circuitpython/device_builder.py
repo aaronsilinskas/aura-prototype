@@ -4,12 +4,14 @@ Deploy-watch only: imports board, busio, digitalio, microcontroller.
 
 Every per-component driver library (``adafruit_is31fl3741``, ``neopixel``,
 ``pulseio``, the audio stack, ``adafruit_lis3dh``, ``adafruit_drv2605``,
-``adafruit_rfm69``) is imported inside the setup helper or branch that builds
-that component, not here at module scope — so importing this module, or
-building a config that doesn't need a component, never requires that
-component's library to be installed. ``adafruit_rfm69`` itself is only ever
-imported by ``hardware.circuitpython.rfm69_radio_transport``, reached here
-through a deferred import in ``_setup_radio``.
+``adafruit_rfm69``, ``sdcardio``/``storage``) is imported inside the setup
+helper or branch that builds that component, not here at module scope — so
+importing this module, or building a config that doesn't need a component,
+never requires that component's library to be installed. ``adafruit_rfm69``
+itself is only ever imported by ``hardware.circuitpython.rfm69_radio_transport``,
+reached here through a deferred import in ``_setup_radio``; ``sdcardio``/
+``storage`` are only ever imported by ``hardware.circuitpython.sdcard_storage``,
+reached here through a deferred import in ``_setup_sdcard``.
 """
 
 from __future__ import annotations
@@ -50,10 +52,12 @@ from hardware.shared.device_config import (
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
     RadioConfig,
+    SDCardConfig,
     SPIConfig,
 )
 from hardware.shared.device_config import load_device_config as _load_shared_device_config
 from hardware.shared.device_hardware import DeviceHardware
+from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_protocol import (
     AuraInfraredDecoder,
     AuraInfraredEncoder,
@@ -433,6 +437,40 @@ def _setup_radio(spi: busio.SPI, radio_cfg: RadioConfig, board_module: object) -
     return Rfm69RadioTransport(spi, cs, reset, radio_cfg.frequency, radio_cfg.node)
 
 
+def _setup_sdcard(spi: busio.SPI, sdcard_cfg: SDCardConfig, board_module: object) -> DeviceStorage:
+    """Return a mounted SdCardStorage from *sdcard_cfg* on *spi*.
+
+    ``SdCardStorage`` (``hardware.circuitpython.sdcard_storage``) is imported
+    here, not at module load, so a config with no ``sdcard`` section never
+    requires ``sdcardio``/``storage`` to be installed — that module is the
+    only place either is imported. Unlike ``_setup_radio``'s ``cs``, which is
+    wrapped in ``digitalio.DigitalInOut``, ``sdcardio.SDCard`` takes the raw
+    resolved ``microcontroller.Pin`` directly.
+
+    "Config-gated, never presence-probed" holds here too: this is only
+    reached once ``config.sdcard`` is declared and enabled, so a mount
+    failure is a wiring fault (no card fitted, or no FAT filesystem), not a
+    normal "not present" case -- wrapped below into a section-named
+    ``RuntimeError`` rather than left as the vendor ``OSError``, unlike the
+    radio's own chip-init error, which is left to propagate raw.
+
+    Raises:
+        RuntimeError: Wrapping the ``OSError`` ``sdcardio``/``storage`` raise
+            when the card is absent or unmountable, naming the section and
+            the ``cs``/``mount`` context.
+    """
+    from hardware.circuitpython.sdcard_storage import SdCardStorage
+
+    cs = _resolve_pin(board_module, "sdcard.cs", sdcard_cfg.cs)
+    try:
+        return SdCardStorage(spi, cs, sdcard_cfg.mount)
+    except OSError as e:
+        raise RuntimeError(
+            f"sdcard section is declared but the card at cs={sdcard_cfg.cs} "
+            + f"mount={sdcard_cfg.mount} failed to mount: {e}"
+        ) from e
+
+
 def _setup_audio(audio_cfg: AudioConfig, board_module: object) -> AudioEffectOutput:
     """Return a configured AudioEffectOutput from *audio_cfg*.
 
@@ -684,9 +722,14 @@ def build_hardware(
     section is absent, and ``FAILED`` when ``_require_spi`` raises for a
     missing bus or ``_setup_radio``'s own pin resolution raises
     ``ValueError`` for an unknown ``cs``/``reset`` name — the spi line logged
-    earlier is never touched by a radio failure. A declared ir section is
-    narrated the same begin-before-pin-resolution way, on one
-    ``"ir rx=... emitters=..."`` line built by :func:`_describe_ir` from the
+    earlier is never touched by a radio failure. A declared sdcard section is
+    narrated the same way, on one ``"sdcard mount=... cs=..."`` line built
+    from the raw config scalars: ``ok`` when mounted, ``disabled`` for an
+    explicit ``enabled: false``, no line at all when the section is absent,
+    and ``FAILED`` when ``_require_spi`` raises for a missing bus or
+    ``_setup_sdcard`` raises its wrapped ``RuntimeError`` for an unmountable
+    card. A declared ir section is narrated the same begin-before-pin-resolution
+    way, on one ``"ir rx=... emitters=..."`` line built by :func:`_describe_ir` from the
     raw ``config.ir.rx``/``config.ir.emitters`` pin-name strings: ``disabled``
     for an explicit ``enabled: false``, no line at all when the section is
     absent, and (for an enabled section) ``FAILED`` when resolving an unknown
@@ -707,8 +750,9 @@ def build_hardware(
         ValueError: If a declared pin name does not exist on the board.
         RuntimeError: If pixels.type is 'matrix' but no I2C bus is available,
             an accelerometer/haptics section is declared but no I2C bus is
-            available, or a radio section is declared but no SPI bus is
-            available.
+            available, a radio section is declared but no SPI bus is
+            available, or an sdcard section is declared but no SPI bus is
+            available or the card fails to mount.
     """
     if logger is None:
         logger = Logger.SILENT
@@ -823,6 +867,16 @@ def build_hardware(
             else:
                 logger.end("disabled")
 
+        storage = None
+        if config.sdcard is not None:
+            sdcard_cfg = config.sdcard
+            logger.begin(f"sdcard mount={sdcard_cfg.mount} cs={sdcard_cfg.cs}")
+            if sdcard_cfg.enabled:
+                storage = _setup_sdcard(_require_spi(spi, "sdcard"), sdcard_cfg, board_module)
+                logger.end()
+            else:
+                logger.end("disabled")
+
         transmitters: dict[str, InfraredTransmitter] = {}
         ir_receiver = None
         if config.ir is not None:
@@ -875,6 +929,7 @@ def build_hardware(
             transmit_pump=hardware_network_controls,
             ir_receiver=ir_receiver,
             radio=radio,
+            storage=storage,
         )
     except Exception:
         logger.fail()

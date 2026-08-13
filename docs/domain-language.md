@@ -226,8 +226,8 @@ The device-only hardware builder: `build_hardware(config, board, …)` resolves 
 _Avoid_: returning a bare tuple/dict (return `DeviceHardware`); putting config parsing here (lives in the pure parser); calling it twice in one process
 
 ### DeviceHardware
-The named `__slots__` bundle `build_hardware` returns — a board-free data holder: `outputs`, `buttons`, `accelerometer`, `network_controls`, `transmit_pump`, `ir_receiver`, `radio`. `network_controls` and `transmit_pump` are the *same* `HardwareNetworkControls` seen through two faces.
-_Avoid_: exposing raw transmitters (use `network_controls`); a bare tuple/dict
+The named `__slots__` bundle `build_hardware` returns — a board-free data holder: `outputs`, `buttons`, `accelerometer`, `network_controls`, `transmit_pump`, `ir_receiver`, `radio`, `storage`. `network_controls` and `transmit_pump` are the *same* `HardwareNetworkControls` seen through two faces. `storage` is typed as the port (`DeviceStorage | None`), never the concrete adapter — `None` when no `sdcard` section is declared/enabled.
+_Avoid_: exposing raw transmitters (use `network_controls`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### RadioTransport
 The board-free half-duplex radio **port** `RadioManager` and `HardwareNetworkControls.send_radio` reach the chip through — one port for both directions because an RFM69-class chip is half-duplex. The live adapter is `Rfm69RadioTransport`.
@@ -240,6 +240,14 @@ _Avoid_: a transmit pump or pump-before-receive order; a value-returning `update
 ### Rfm69RadioTransport
 The live CircuitPython `RadioTransport` adapter wrapping `adafruit_rfm69.RFM69` — the only module importing that library, via a deferred import so a config with no `radio` section never requires it installed.
 _Avoid_: importing `adafruit_rfm69` anywhere else; reading the driver without checking `payload_ready` first (blocks)
+
+### DeviceStorage
+The board-free device-state storage port: reads/writes small device-state files under a mount root and resolves real filesystem paths for streamed/scanned consumers. No `board`/`busio` import, so it's safe on CPython, CircuitPython, and MicroPython. The live adapter is `SdCardStorage`; `FakeDeviceStorage` is the in-memory test double.
+_Avoid_: escaping the mount root (routes through `reject_escaping_path`); a second concrete implementation for CPython vs. CircuitPython (one class suffices once mounted)
+
+### SdCardStorage
+The live CircuitPython `DeviceStorage` adapter mounting an SD card via `sdcardio.SDCard` + `storage.mount` at construction time — the only module importing `sdcardio`/`storage`, via a deferred import so a config with no `sdcard` section never requires either installed. `cs` is a raw `microcontroller.Pin` (unlike `Rfm69RadioTransport`'s `digitalio.DigitalInOut`-wrapped `cs`).
+_Avoid_: importing `sdcardio`/`storage` anywhere else; wrapping `cs` in `digitalio.DigitalInOut`; presence-probing instead of trusting the config gate
 
 ### NeoPixelEffectOutput
 A CircuitPython `EffectOutput` driving **one** NeoPixel strip, subdivided into scope **segments** by pixel range; several strips may share a scope and are driven in sync.
