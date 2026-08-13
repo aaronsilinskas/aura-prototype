@@ -219,6 +219,37 @@ def test_tag_scene_every_audio_playing_effects_clip_name_resolves() -> None:
     assert len(resolved_clip_names) == 9
 
 
+# --- Red Light Green Light scene audio discovery (issue #806) ---
+
+
+def test_red_light_green_light_scene_every_audio_playing_effects_clip_name_resolves() -> None:
+    """Every rlgl effect that plays audio names a clip AudioRegistry can resolve --
+    the shared basic sting via the base, everything else via rlgl's own sounds/
+    overlay -- so the scene can run end-to-end with no unresolved clip."""
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
+    scene = scene_registry.get("red_light_green_light")
+    local_effects = scene.local_effect_registry
+
+    audio_registry = AudioRegistry()
+    audio_registry.scan_pack_sounds("basic", _packs_path("effects", "basic", "sounds"))
+    audio_registry.set_scene_sounds(scene.local_sound_map)
+
+    resolved_clip_names = []
+    for effect_name in local_effects.items():
+        builder = local_effects.get(effect_name, EffectBuilder)
+        effect = builder(effect_name, EffectConfig(resolution=16, options={}))
+        if effect.audio is None:
+            continue
+        for clip in effect.audio.clips.values():
+            resolved_clip_names.append(audio_registry.path(clip.name))
+
+    # Sanity check that the walk actually reached rlgl's audio-playing effects,
+    # so a future scan/discovery regression collapsing this to zero effects
+    # doesn't pass silently.
+    assert len(resolved_clip_names) == 7
+
+
 # --- SceneManager integration ---
 
 

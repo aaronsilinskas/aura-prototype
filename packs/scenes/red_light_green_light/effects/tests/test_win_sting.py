@@ -34,10 +34,10 @@ def test_win_sting_emits_audio_on_start() -> None:
     assert "start" in effect.audio.clips
 
 
-def test_win_sting_audio_start_clip_name_is_win_sting_start() -> None:
+def test_win_sting_audio_start_clip_name_is_scene_prefixed() -> None:
     effect = _build()
 
-    assert effect.audio.clips["start"].name == "win_sting_start"
+    assert effect.audio.clips["start"].name == "scene.win_sting_start"
 
 
 def test_win_sting_audio_start_clip_is_non_looping() -> None:

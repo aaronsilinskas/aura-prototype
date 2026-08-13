@@ -223,3 +223,44 @@ def test_build_scene_runtime_resolves_tags_shared_game_over_sting_via_the_basic_
         hw.audio_registry.path("basic.game_over_sting_start")
         == "packs/effects/basic/sounds/game_over_sting_start.wav"
     )
+
+
+# ---------------------------------------------------------------------------
+# Audio registry wiring: red_light_green_light scene discovery (issue #806)
+# ---------------------------------------------------------------------------
+
+
+def test_build_scene_runtime_installs_rlgls_sounds_as_the_active_overlay():
+    """Activating red_light_green_light installs its sounds/ folder as the
+    AudioRegistry overlay, so every scene.<stem> clip an rlgl effect references
+    resolves through the same registry AudioEffectOutput would use on real
+    hardware."""
+    hw = _fake_hw(audio_registry=AudioRegistry())
+
+    build_scene_runtime(hw, "red_light_green_light")
+
+    for stem in (
+        "green_light_music_start",
+        "red_light_music_start",
+        "level_up_start",
+        "win_sting_start",
+        "ready_start",
+        "warning_sting_peak",
+    ):
+        assert (
+            hw.audio_registry.path(f"scene.{stem}")
+            == f"packs/scenes/red_light_green_light/sounds/{stem}.wav"
+        )
+
+
+def test_build_scene_runtime_resolves_rlgls_shared_game_over_sting_via_the_basic_pack():
+    """rlgl's game_over_sting effect points at basic's shared clip rather than its
+    own -- it must resolve from the base scan, not from rlgl's sounds/ overlay."""
+    hw = _fake_hw(audio_registry=AudioRegistry())
+
+    build_scene_runtime(hw, "red_light_green_light")
+
+    assert (
+        hw.audio_registry.path("basic.game_over_sting_start")
+        == "packs/effects/basic/sounds/game_over_sting_start.wav"
+    )

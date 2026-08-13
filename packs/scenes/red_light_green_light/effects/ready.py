@@ -13,6 +13,10 @@ from engine.effects.manager import EffectBuilder
 _RED_PALETTE = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
 _GREEN_PALETTE = PaletteLUT256(bytes([0, 0, 0, 0, 255, 0, 255, 0]))
 
+_READY_AUDIO = EffectAudio(
+    clips={"start": AudioPlaybackConfig(name="scene.ready_start", loop=False)}
+)
+
 _BRIGHTEN = 0.3
 _ON = 0.2
 _DARKEN = 0.3
@@ -53,9 +57,7 @@ class _Builder(EffectBuilder):
         return Effect(
             name=name,
             pixels=_ReadyPixels(layer),
-            audio=EffectAudio(
-                clips={"start": AudioPlaybackConfig(name=name + "_start", loop=False)}
-            ),
+            audio=_READY_AUDIO,
         )
 
 

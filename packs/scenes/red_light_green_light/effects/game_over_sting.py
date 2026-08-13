@@ -22,14 +22,17 @@ _GAME_OVER_HAPTIC = EffectHaptic(
     }
 )
 
+# Shared with every other scene's game-over moment -- see basic/sounds/game_over_sting_start.wav.
+_GAME_OVER_AUDIO = EffectAudio(
+    clips={"start": AudioPlaybackConfig(name="basic.game_over_sting_start", loop=False)}
+)
+
 
 class _Builder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
         return Effect(
             name=name,
-            audio=EffectAudio(
-                clips={"start": AudioPlaybackConfig(name=name + "_start", loop=False)}
-            ),
+            audio=_GAME_OVER_AUDIO,
             haptic=_GAME_OVER_HAPTIC,
         )
 

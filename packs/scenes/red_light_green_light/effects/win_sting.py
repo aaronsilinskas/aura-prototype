@@ -26,7 +26,7 @@ class _Builder(EffectBuilder):
             audio=EffectAudio(
                 clips={
                     "start": AudioPlaybackConfig(
-                        name="win_sting_start", loop=False, stops_effect=True
+                        name="scene.win_sting_start", loop=False, stops_effect=True
                     )
                 }
             ),
