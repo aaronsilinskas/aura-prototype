@@ -84,7 +84,7 @@ def test_scan_dir_scene_with_no_sounds_subdir_has_empty_local_sound_map(scene_en
     assert scene.local_sound_map == {}
 
 
-def test_scan_dir_local_sound_map_shared_across_fresh_scene_instances(scene_env) -> None:
+def test_scan_dir_local_sound_map_same_content_across_fresh_scene_instances(scene_env) -> None:
     scene_dir = _make_scene_dir(scene_env, "forest")
     _make_sounds_subdir(scene_dir, ["chime"])
 
@@ -93,7 +93,21 @@ def test_scan_dir_local_sound_map_shared_across_fresh_scene_instances(scene_env)
 
     scene_a = registry.get("forest")
     scene_b = registry.get("forest")
-    assert scene_a.local_sound_map is scene_b.local_sound_map
+    assert scene_a.local_sound_map == scene_b.local_sound_map
+
+
+def test_scan_dir_local_sound_map_mutation_does_not_affect_next_get(scene_env) -> None:
+    scene_dir = _make_scene_dir(scene_env, "forest")
+    _make_sounds_subdir(scene_dir, ["chime"])
+
+    registry = SceneRegistry()
+    registry.scan_dir(str(scene_env), MODULE_PREFIX)
+
+    scene_a = registry.get("forest")
+    scene_a.local_sound_map["chime"] = "/tampered/path.wav"
+    scene_b = registry.get("forest")
+
+    assert scene_b.local_sound_map["chime"] != "/tampered/path.wav"
 
 
 def test_scan_dir_local_sounds_not_visible_to_other_scene(scene_env) -> None:

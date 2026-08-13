@@ -114,9 +114,11 @@ class Scene:
 
     ``local_sound_map`` is a bare-keyed ``{stem: path}`` map of this scene's
     scene-local sounds (its ``sounds/`` subdirectory).  Built once at discovery
-    via ``scan_sound_dir`` and shared across fresh ``Scene`` instances, mirroring
-    ``local_rule_registry``/``local_effect_registry``.  Purely additive for now —
-    no consumer resolves it yet.
+    via ``scan_sound_dir``; unlike ``local_rule_registry``/``local_effect_registry``
+    it is a plain mutable dict rather than an encapsulated registry, so — like
+    ``initial_data`` — each fresh ``Scene`` from ``SceneRegistry.get`` receives its
+    own copy, keeping mutation from poisoning future loads.  Purely additive for
+    now — no consumer resolves it yet.
     """
 
     __slots__ = (
@@ -318,9 +320,9 @@ class SceneRegistry:
         """Return a fresh ``Scene`` for *name*.
 
         JSON-discovered scenes share the parsed ``Version`` across calls but
-        receive their own copy of ``initial_data`` so that mutations cannot
-        poison future loads.  Factory-registered scenes return whatever the
-        factory produces.
+        receive their own copy of ``initial_data`` and ``local_sound_map`` so
+        that mutations cannot poison future loads.  Factory-registered scenes
+        return whatever the factory produces.
 
         Raises:
             ValueError: if *name* is not registered.
@@ -341,7 +343,7 @@ class SceneRegistry:
             version=entry.version,
             local_rule_registry=entry.local_rule_registry,
             local_effect_registry=entry.local_effect_registry,
-            local_sound_map=entry.local_sound_map,
+            local_sound_map=dict(entry.local_sound_map),
         )
 
     def names(self) -> list[str]:

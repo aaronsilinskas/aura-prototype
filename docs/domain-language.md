@@ -90,6 +90,10 @@ A declarative bundle of a self-contained game context: effect/rule packs, option
 An effect or rule loaded from an `effects/` or `rules/` subdirectory inside a scene's own folder, private to it and addressed with the reserved `scene.` prefix. Unlike an **Effect pack** it has no version.
 _Avoid_: "private pack"; putting scene-only code under `packs/`
 
+### Scene-local sound
+A bare `{stem: path}` map of `*.wav` files discovered from a `sounds/` subdirectory inside a scene's own folder, carried on `Scene.local_sound_map`. Unlike scene-local effects/rules it is not loaded through a `SceneLocalRegistry` (no module import, no `scene.` prefix) — just a stem-keyed path lookup. Purely additive as of its introduction; no consumer resolves it yet.
+_Avoid_: assuming it is mounted as the active-scene overlay already — that is a later ticket
+
 ### SceneLocalRegistry
 A single-namespace registry for one scene's local effects (or rules), with the same `get`/`items` surface as `PackRegistry` but no version concept.
 _Avoid_: modelling scene-local items as a synthetic single-pack `PackRegistry`
