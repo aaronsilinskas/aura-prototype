@@ -243,6 +243,10 @@ class PackRegistry:
                 source_path=norm_path,
             )
 
+    def names(self) -> list[str]:
+        """Return all registered pack names alphabetically."""
+        return sorted(self._packs)
+
     def get(self, pack_name: str, item_name: str, expected_class: type[T]) -> T:
         """Return the *item_attr* attribute of *item_name* from *pack_name*.
 

@@ -49,9 +49,6 @@ def matrix_config():
         "audio": {
             "voices": 1,
             "max_volume": 0.1,
-            "clips": {
-                "sfx_test_start": "sounds/blip.wav",
-            },
             "i2s_bit_clock": "I2S_BIT_CLOCK",
             "i2s_word_select": "I2S_WORD_SELECT",
             "i2s_data": "I2S_DATA",
@@ -109,7 +106,6 @@ def test_parse_full_matrix_config_maps_every_section(matrix_config):
     assert result.audio is not None
     assert result.audio.voices == 1
     assert result.audio.max_volume == 0.1
-    assert result.audio.clips == {"sfx_test_start": "sounds/blip.wav"}
     assert result.audio.i2s_bit_clock == "I2S_BIT_CLOCK"
     assert result.audio.i2s_word_select == "I2S_WORD_SELECT"
     assert result.audio.i2s_data == "I2S_DATA"
@@ -1284,6 +1280,21 @@ def test_parse_audio_non_integer_voices_raises_value_error(matrix_config):
         parse_device_config(matrix_config)
 
 
+def test_parse_audio_section_with_no_clips_key_succeeds_and_carries_no_clips_attribute(
+    matrix_config,
+):
+    """AudioConfig no longer carries a clips map (#804) -- clip resolution moved
+    to AudioRegistry -- so a clips-free audio section parses with
+    voices/max_volume/I2S validation unaffected."""
+    result = parse_device_config(matrix_config)
+
+    assert result.audio is not None
+    assert result.audio.voices == 1
+    assert result.audio.max_volume == 0.1
+    assert result.audio.i2s_bit_clock == "I2S_BIT_CLOCK"
+    assert not hasattr(result.audio, "clips")
+
+
 def test_parse_absent_audio_section_yields_none(matrix_config):
     config = {"pixels": matrix_config["pixels"], "buttons": ["D9"]}
 
@@ -1385,6 +1396,15 @@ def test_committed_sample_device_config_parses():
     assert result.haptics is not None
     assert result.spi is not None
     assert result.radio is not None
+
+
+def test_committed_sample_device_config_carries_no_clips_map():
+    """hardware_test's sfx_test clip now resolves via AudioRegistry's
+    hardware_test/sounds/sfx_test_start.wav scene overlay (#804), not a
+    device-config clips map."""
+    mapping = read_device_config_mapping(str(_SAMPLE_CONFIG_PATH))
+
+    assert "clips" not in mapping["audio"]
 
 
 # ---------------------------------------------------------------------------

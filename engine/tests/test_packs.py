@@ -408,6 +408,28 @@ def test_pack_registry_does_not_allow_arbitrary_attributes() -> None:
 
 
 # ---------------------------------------------------------------------------
+# names — pack name listing
+# ---------------------------------------------------------------------------
+
+
+def test_names_returns_sorted_pack_names(pack_env) -> None:
+    _make_pack(pack_env, "zebra", "1.0", {})
+    _make_pack(pack_env, "alpha", "1.0", {})
+    _make_pack(pack_env, "mango", "1.0", {})
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    assert registry.names() == ["alpha", "mango", "zebra"]
+
+
+def test_names_returns_empty_list_when_no_packs_registered(pack_env) -> None:
+    registry = _make_registry()
+    registry.scan_dir(str(pack_env), MODULE_PREFIX)
+
+    assert registry.names() == []
+
+
+# ---------------------------------------------------------------------------
 # items — item name listing
 # ---------------------------------------------------------------------------
 

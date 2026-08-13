@@ -9,7 +9,7 @@ from effects.effect import (
 from engine.effects.manager import EffectBuilder
 
 _SFX_TEST_AUDIO = EffectAudio(
-    clips={"start": AudioPlaybackConfig(name="sfx_test_start", loop=False)}
+    clips={"start": AudioPlaybackConfig(name="scene.sfx_test_start", loop=False)}
 )
 
 _SFX_TEST_HAPTIC = EffectHaptic(patterns={"start": HapticPattern([HapticPattern.STRONG_CLICK])})

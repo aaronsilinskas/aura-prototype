@@ -65,9 +65,6 @@
     "enabled": true,
     "voices": 2,
     "max_volume": 0.2,
-    "clips": {
-      "sfx_test_start": "sounds/blip.wav"
-    },
     "i2s_bit_clock": "GP7",
     "i2s_word_select": "GP8",
     "i2s_data": "GP6"

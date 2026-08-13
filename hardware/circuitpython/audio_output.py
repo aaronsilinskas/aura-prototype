@@ -77,10 +77,6 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
         audio_only = effect.pixels is None and effect.haptic is None
         stops_receipt = audio_only or config.stops_effect
         path = self._audio_registry.path(config.name)
-        if path is None:
-            if stops_receipt:
-                receipt.stop()
-            return
         self._pool.claim(self, path, config.loop, stops_receipt, receipt)
 
     def flush(self) -> None:

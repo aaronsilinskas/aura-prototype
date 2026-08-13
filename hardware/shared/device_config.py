@@ -146,10 +146,14 @@ class NeoPixelPixelsConfig:
 
 
 class AudioConfig:
-    """Parsed audio configuration."""
+    """Parsed audio configuration.
+
+    Carries no clip map -- clip resolution is ``AudioRegistry``'s job (base
+    scanned from ``packs/effects/*/sounds``, overlay installed per scene), not
+    a device-config concern.
+    """
 
     __slots__ = (
-        "clips",
         "enabled",
         "i2s_bit_clock",
         "i2s_data",
@@ -162,7 +166,6 @@ class AudioConfig:
         self,
         voices: int,
         max_volume: float,
-        clips: dict[str, str],
         i2s_bit_clock: str,
         i2s_word_select: str,
         i2s_data: str,
@@ -170,7 +173,6 @@ class AudioConfig:
     ) -> None:
         self.voices: int = voices
         self.max_volume: float = max_volume
-        self.clips: dict[str, str] = clips
         self.i2s_bit_clock: str = i2s_bit_clock
         self.i2s_word_select: str = i2s_word_select
         self.i2s_data: str = i2s_data
@@ -716,7 +718,6 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
     if not isinstance(voices, int) or voices < 1:
         raise ValueError("audio.voices must be a positive integer")
     max_volume = audio_raw.get("max_volume", 1.0)
-    clips: dict[str, str] = dict(audio_raw.get("clips", {}))
 
     # The I2S bus pins are required-together: a half-configured bus is exactly
     # the case where two of three might be missing, so every missing field is
@@ -734,7 +735,6 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
     return AudioConfig(
         voices=voices,
         max_volume=max_volume,
-        clips=clips,
         i2s_bit_clock=audio_raw["i2s_bit_clock"],
         i2s_word_select=audio_raw["i2s_word_select"],
         i2s_data=audio_raw["i2s_data"],
