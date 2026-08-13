@@ -51,6 +51,7 @@ from hardware.shared.device_config import (
     I2CConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
+    PowerConfig,
     RadioConfig,
     SDCardConfig,
     SPIConfig,
@@ -90,20 +91,28 @@ def _resolve_pin(board_module: object, field: str, name: str) -> microcontroller
         raise ValueError(f"{field}: pin '{name}' not found on board") from None
 
 
-def _setup_external_power() -> bool:
-    """Enable the PropMaker's EXTERNAL_POWER rail (powers NeoPixels, audio amp, and other
-    peripherals), if the board has one.
+def _setup_power(power_cfg: PowerConfig, board_module: object) -> None:
+    """Resolve *power_cfg*'s pin and drive it to the asserted or deasserted level.
 
-    Returns:
-        Whether the board declares an ``EXTERNAL_POWER`` rail (and therefore
-        switched it on) -- ``build_hardware`` uses this to log ``ok`` vs.
-        ``no rail``.
+    Replaces the old board-presence-probed ``EXTERNAL_POWER`` rail: the pin
+    comes solely from config now, resolved by name against *board_module*
+    (raising a ``power.pin``-named ``ValueError`` for an unknown name, via
+    :func:`_resolve_pin`).
+
+    *power_cfg* is passed in regardless of ``power_cfg.enabled`` -- unlike
+    every other gated component, a disabled power section still drives its
+    pin, to the *deasserted* level, holding the high-current rail
+    definitively off rather than leaving it floating (brown-out debugging).
+    An enabled section drives the *asserted* level instead. Both levels are
+    ``power_cfg.active_high`` or its inverse: high asserts on an
+    active-high pin, low asserts on an active-low one, and vice versa for
+    deasserted. This is the codebase's first active-low output.
     """
-    if not hasattr(board, "EXTERNAL_POWER"):
-        return False
-    power = digitalio.DigitalInOut(board.EXTERNAL_POWER)
-    power.switch_to_output(value=True)
-    return True
+    pin = _resolve_pin(board_module, "power.pin", power_cfg.pin)
+    output = digitalio.DigitalInOut(pin)
+    asserted = power_cfg.active_high
+    level = asserted if power_cfg.enabled else not asserted
+    output.switch_to_output(value=level)
 
 
 def _setup_i2c(i2c_config: I2CConfig | None, board_module: object) -> busio.I2C | None:
@@ -689,10 +698,16 @@ def build_hardware(
     bus when ``spi`` is disabled — see ``_setup_spi``).
 
     *logger*, if supplied, narrates every step that runs unconditionally
-    (the opening banner, external power, spi, and buttons) plus a closing
-    summary line; omitted or ``None`` normalizes to
-    :data:`~engine.log.Logger.SILENT` here, so every call below logs
-    unconditionally and an uninstrumented caller sees no output at all. i2c
+    (the opening banner, spi, and buttons) plus a closing summary line;
+    omitted or ``None`` normalizes to :data:`~engine.log.Logger.SILENT` here,
+    so every call below logs unconditionally and an uninstrumented caller
+    sees no output at all. A declared power section is narrated the same
+    begin-before-pin-resolution way as radio/sdcard, on one
+    ``"power pin=... active_high=..."`` line built from the raw config
+    scalars: ``asserted`` when enabled (the pin is driven to its asserted
+    level), ``held off`` when ``enabled: false`` (the pin is still driven,
+    to the deasserted level), no line at all when the section is absent, and
+    ``FAILED`` when resolving an unknown pin name raises ``ValueError``. i2c
     is narrated the same way, but only when this function builds the bus
     itself (i.e. *i2c* is not supplied) — a caller-injected *i2c* bypasses
     that setup, and its logging, entirely. Pixels are narrated per
@@ -761,11 +776,11 @@ def build_hardware(
         start = time.monotonic()
         logger.log(f"begin board={board_id()}")
 
-        logger.begin("external_power")
-        if _setup_external_power():
-            logger.end()
-        else:
-            logger.end("no rail")
+        power_cfg = config.power
+        if power_cfg is not None:
+            logger.begin(f"power pin={power_cfg.pin} active_high={power_cfg.active_high}")
+            _setup_power(power_cfg, board_module)
+            logger.end("asserted" if power_cfg.enabled else "held off")
 
         i2c_cfg = config.i2c
         if i2c is None:

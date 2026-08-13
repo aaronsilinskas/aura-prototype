@@ -1,12 +1,18 @@
 """Tests for device_builder's bus/power subsystem: ``_setup_i2c``,
-``open_config_i2c``, ``_setup_spi``, ``_setup_external_power``, and the
-matching i2c/spi/external-power slices of ``build_hardware``.
+``open_config_i2c``, ``_setup_spi``, ``_setup_power``, and the matching
+i2c/spi/power slices of ``build_hardware``.
 
 Split out of test_device_builder.py (#777) to keep that suite from growing
 unbounded; other hardware subsystems stay there. Shared config-shape helpers,
 ``_recording_logger``, and ``_enter_hw_patches`` live in _hw_patch_mocks.py
 (#775). Hardware modules (board, busio, pulseio, digitalio) are patched so
 this suite runs under CPython.
+
+The power section replaced the old board-presence-probed ``EXTERNAL_POWER``
+rail (#798): the pin is config-driven, and unlike every other gated
+component a disabled power section still drives its pin -- to the
+deasserted level, holding the rail definitively off rather than leaving it
+undriven.
 """
 
 from __future__ import annotations
@@ -116,46 +122,116 @@ def test_build_hardware_uses_its_own_constructed_bus_for_matrix_when_i2c_omitted
 
 
 # ---------------------------------------------------------------------------
-# _setup_external_power only drives the rail on boards that have one
+# _setup_power -- resolves the config-declared pin and drives the asserted
+# or deasserted level, replacing the old board-presence-probed
+# _setup_external_power (#798)
 # ---------------------------------------------------------------------------
 
 
-class _BoardWithoutExternalPower:
-    """A board stub with no EXTERNAL_POWER attribute, unlike MagicMock which
-    would fabricate one on access."""
+def _power_config(pin: str = "GP28", active_high: bool | None = None, enabled: bool | None = None):
+    power: dict[str, object] = {"pin": pin}
+    if active_high is not None:
+        power["active_high"] = active_high
+    if enabled is not None:
+        power["enabled"] = enabled
+    mapping = {"buttons": ["D9"], "power": power}
+    return parse_device_config(mapping).power
 
 
-def test_setup_external_power_enables_rail_when_board_has_pin() -> None:
-    board_mock = _mock_board(EXTERNAL_POWER=MagicMock())
+def test_setup_power_resolves_pin_by_name() -> None:
+    pin = MagicMock(name="GP28_pin")
+    board_mock = _mock_board(GP28=pin)
+    power_cfg = _power_config()
 
     with ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder.board", board_mock))
         mock_digitalio = stack.enter_context(
             patch("hardware.circuitpython.device_builder.digitalio")
         )
 
-        from hardware.circuitpython.device_builder import _setup_external_power
+        from hardware.circuitpython.device_builder import _setup_power
 
-        _setup_external_power()
+        _setup_power(power_cfg, board_mock)
 
-    mock_digitalio.DigitalInOut.assert_called_once_with(board_mock.EXTERNAL_POWER)
+    mock_digitalio.DigitalInOut.assert_called_once_with(pin)
+
+
+def test_setup_power_drives_pin_high_when_active_high_and_enabled() -> None:
+    board_mock = _mock_board(GP28=MagicMock())
+    power_cfg = _power_config(active_high=True, enabled=True)
+
+    with ExitStack() as stack:
+        mock_digitalio = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.digitalio")
+        )
+
+        from hardware.circuitpython.device_builder import _setup_power
+
+        _setup_power(power_cfg, board_mock)
+
     mock_digitalio.DigitalInOut.return_value.switch_to_output.assert_called_once_with(value=True)
 
 
-def test_setup_external_power_is_noop_when_board_has_no_pin() -> None:
+def test_setup_power_drives_pin_low_when_active_low_and_enabled() -> None:
+    board_mock = _mock_board(GP28=MagicMock())
+    power_cfg = _power_config(active_high=False, enabled=True)
+
     with ExitStack() as stack:
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder.board", _BoardWithoutExternalPower())
-        )
         mock_digitalio = stack.enter_context(
             patch("hardware.circuitpython.device_builder.digitalio")
         )
 
-        from hardware.circuitpython.device_builder import _setup_external_power
+        from hardware.circuitpython.device_builder import _setup_power
 
-        _setup_external_power()
+        _setup_power(power_cfg, board_mock)
 
-    mock_digitalio.DigitalInOut.assert_not_called()
+    mock_digitalio.DigitalInOut.return_value.switch_to_output.assert_called_once_with(value=False)
+
+
+def test_setup_power_drives_pin_low_when_active_high_and_disabled() -> None:
+    """`enabled: false` still drives the pin -- to the deasserted level,
+    holding the rail definitively off rather than leaving it undriven."""
+    board_mock = _mock_board(GP28=MagicMock())
+    power_cfg = _power_config(active_high=True, enabled=False)
+
+    with ExitStack() as stack:
+        mock_digitalio = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.digitalio")
+        )
+
+        from hardware.circuitpython.device_builder import _setup_power
+
+        _setup_power(power_cfg, board_mock)
+
+    mock_digitalio.DigitalInOut.return_value.switch_to_output.assert_called_once_with(value=False)
+
+
+def test_setup_power_drives_pin_high_when_active_low_and_disabled() -> None:
+    board_mock = _mock_board(GP28=MagicMock())
+    power_cfg = _power_config(active_high=False, enabled=False)
+
+    with ExitStack() as stack:
+        mock_digitalio = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.digitalio")
+        )
+
+        from hardware.circuitpython.device_builder import _setup_power
+
+        _setup_power(power_cfg, board_mock)
+
+    mock_digitalio.DigitalInOut.return_value.switch_to_output.assert_called_once_with(value=True)
+
+
+def test_setup_power_bad_pin_name_raises_value_error_naming_field_and_pin() -> None:
+    board_mock = MagicMock(spec=[])  # no attributes resolve
+    power_cfg = _power_config(pin="NONEXISTENT_PIN")
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
+
+        from hardware.circuitpython.device_builder import _setup_power
+
+        with pytest.raises(ValueError, match=r"power\.pin.*NONEXISTENT_PIN"):
+            _setup_power(power_cfg, board_mock)
 
 
 # ---------------------------------------------------------------------------
@@ -486,68 +562,106 @@ def test_build_hardware_passes_i2c_config_and_board_to_setup_i2c() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _setup_external_power -- return value drives build_hardware's ok/no-rail line
+# build_hardware -- power narration (#798), replacing the old
+# external-power ok/no-rail line
 # ---------------------------------------------------------------------------
 
 
-def test_setup_external_power_returns_true_when_board_has_pin() -> None:
-    board_mock = _mock_board(EXTERNAL_POWER=MagicMock())
-
-    with ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder.board", board_mock))
-        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
-
-        from hardware.circuitpython.device_builder import _setup_external_power
-
-        assert _setup_external_power() is True
-
-
-def test_setup_external_power_returns_false_when_board_has_no_pin() -> None:
-    with ExitStack() as stack:
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder.board", _BoardWithoutExternalPower())
-        )
-        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
-
-        from hardware.circuitpython.device_builder import _setup_external_power
-
-        assert _setup_external_power() is False
+def _config_with_power(
+    pin: str = "GP28", active_high: bool | None = None, enabled: bool | None = None
+):
+    power: dict[str, object] = {"pin": pin}
+    if active_high is not None:
+        power["active_high"] = active_high
+    if enabled is not None:
+        power["enabled"] = enabled
+    return parse_device_config({"buttons": ["D9"], "power": power})
 
 
-# ---------------------------------------------------------------------------
-# build_hardware -- i2c/spi/external-power narration, split out of the shared
-# logger-spine section (#758); the general banner/buttons/summary spine tests
-# stay in test_device_builder.py
-# ---------------------------------------------------------------------------
-
-
-def test_build_hardware_logs_no_rail_when_board_has_no_external_power() -> None:
-    config = _minimal_config()
-    board_mock = _mock_board(D9=MagicMock())
+def test_build_hardware_logs_power_asserted_when_enabled() -> None:
+    config = _config_with_power(active_high=True, enabled=True)
+    board_mock = _mock_board(D9=MagicMock(), GP28=MagicMock())
     logger, fragments = _recording_logger()
 
     with ExitStack() as stack:
-        stack.enter_context(
-            patch(
-                "hardware.circuitpython.device_builder._setup_external_power",
-                return_value=False,
-            )
-        )
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=MagicMock())
-        )
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_spi", return_value=MagicMock())
-        )
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
-        )
+        _enter_hw_patches(stack)
+        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
 
         from hardware.circuitpython.device_builder import build_hardware
 
         build_hardware(config, board_module=board_mock, logger=logger)
 
-    assert "[hw] external_power no rail\n" in "".join(fragments)
+    assert "[hw] power pin=GP28 active_high=True asserted\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_power_held_off_when_disabled() -> None:
+    """`enabled: false` still resolves and drives the pin -- narrated as
+    "held off", not skipped like a disabled section on every other
+    component."""
+    config = _config_with_power(active_high=True, enabled=False)
+    board_mock = _mock_board(D9=MagicMock(), GP28=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] power pin=GP28 active_high=True held off\n" in "".join(fragments)
+
+
+def test_build_hardware_logs_no_power_line_when_section_absent() -> None:
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "power" not in "".join(fragments)
+
+
+def test_build_hardware_power_bad_pin_marks_its_own_line_failed_and_propagates() -> None:
+    config = _config_with_power(pin="NONEXISTENT_PIN")
+    board_mock = MagicMock(spec=["D9"])  # power's pin has no attribute to resolve
+    board_mock.D9 = MagicMock()
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ValueError, match=r"power\.pin.*NONEXISTENT_PIN"):
+            build_hardware(config, board_module=board_mock, logger=logger)
+
+    lines = "".join(fragments).splitlines(keepends=True)
+    assert lines[-1] == "[hw] power pin=NONEXISTENT_PIN active_high=True FAILED\n"
+
+
+def test_build_hardware_no_power_pin_driven_when_section_absent() -> None:
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        mock_digitalio = stack.enter_context(
+            patch("hardware.circuitpython.device_builder.digitalio")
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock)
+
+    mock_digitalio.DigitalInOut.assert_not_called()
 
 
 def test_build_hardware_logs_configured_i2c_pins() -> None:
@@ -591,7 +705,6 @@ def test_build_hardware_logs_i2c_no_bus_outcome_when_no_pullup_found() -> None:
     logger, fragments = _recording_logger()
 
     with ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
         stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
         )
@@ -650,13 +763,14 @@ def test_build_hardware_i2c_setup_failure_marks_i2c_line_failed_and_propagates()
     """A component that raises something other than the RuntimeError
     _setup_i2c itself catches (e.g. a wedged bus) still closes its own line
     with FAILED, and the exception still propagates -- the single
-    whole-function try/except (#758), not a per-component one."""
-    config = _minimal_config()
-    board_mock = _mock_board(D9=MagicMock())
+    whole-function try/except (#758), not a per-component one. A preceding
+    power section's own line must stay untouched by the later i2c failure."""
+    config = _config_with_power(active_high=True, enabled=True)
+    board_mock = _mock_board(D9=MagicMock(), GP28=MagicMock())
     logger, fragments = _recording_logger()
 
     with ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
+        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_i2c",
@@ -670,5 +784,5 @@ def test_build_hardware_i2c_setup_failure_marks_i2c_line_failed_and_propagates()
             build_hardware(config, board_module=board_mock, logger=logger)
 
     lines = "".join(fragments).splitlines(keepends=True)
-    assert lines[-2] == "[hw] external_power ok\n"
+    assert lines[-2] == "[hw] power pin=GP28 active_high=True asserted\n"
     assert lines[-1] == "[hw] i2c default FAILED\n"

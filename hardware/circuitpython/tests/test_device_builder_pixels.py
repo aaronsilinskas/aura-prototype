@@ -745,7 +745,6 @@ def test_build_hardware_matrix_with_no_i2c_marks_its_own_pixels_line_failed() ->
     logger, fragments = _recording_logger()
 
     with ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
         stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
         )

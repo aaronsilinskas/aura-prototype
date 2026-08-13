@@ -73,7 +73,6 @@ def test_build_hardware_declared_sdcard_with_no_spi_bus_raises_runtime_error() -
     board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
 
     with ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
         stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_i2c", return_value=MagicMock())
         )

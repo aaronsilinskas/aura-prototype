@@ -1,10 +1,13 @@
 """Tests for device_builder's buttons subsystem (``_setup_buttons`` via
 build_hardware, ``_describe_buttons``) and build_hardware's cross-cutting
-narration spine (banner, external power, i2c, spi, buttons, closing
-summary). Other subsystems' narration tests live in their own split files
-(pixels, buses_power, audio_haptics, radio_ir); core/cross-subsystem
-build_hardware integration tests stay in test_device_builder.py. Config-shape
-and logging helpers come from _hw_patch_mocks.py (#775).
+narration spine (banner, i2c, spi, buttons, closing summary). Power is no
+longer unconditional -- it is config-gated like every other section (#798)
+-- so its narration lives with the rest of its coverage in
+test_device_builder_buses_power.py. Other subsystems' narration tests live in
+their own split files (pixels, buses_power, audio_haptics, radio_ir);
+core/cross-subsystem build_hardware integration tests stay in
+test_device_builder.py. Config-shape and logging helpers come from
+_hw_patch_mocks.py (#775).
 """
 
 from __future__ import annotations
@@ -46,8 +49,8 @@ def test_describe_buttons_returns_empty_string_for_no_buttons_declared() -> None
 
 
 # ---------------------------------------------------------------------------
-# build_hardware — logger spine: banner, external power, i2c, spi, buttons,
-# and the closing summary line (#758)
+# build_hardware — logger spine: banner, i2c, spi, buttons, and the closing
+# summary line (#758)
 # ---------------------------------------------------------------------------
 
 
@@ -64,13 +67,12 @@ def test_build_hardware_minimal_config_narrates_exactly_the_unconditional_steps(
         build_hardware(config, board_module=board_mock, logger=logger)
 
     lines = "".join(fragments).splitlines(keepends=True)
-    assert len(lines) == 6
+    assert len(lines) == 5
     assert lines[0] == "[hw] begin board=unknown-board\n"
-    assert lines[1] == "[hw] external_power ok\n"
-    assert lines[2] == "[hw] i2c default ok\n"
-    assert lines[3] == "[hw] spi default ok\n"
-    assert lines[4] == "[hw] buttons A=D9 ok\n"
-    assert re.fullmatch(r"\[hw\] ready outputs=0 buttons=1 elapsed_s=\d+\.\d{3}\n", lines[5])
+    assert lines[1] == "[hw] i2c default ok\n"
+    assert lines[2] == "[hw] spi default ok\n"
+    assert lines[3] == "[hw] buttons A=D9 ok\n"
+    assert re.fullmatch(r"\[hw\] ready outputs=0 buttons=1 elapsed_s=\d+\.\d{3}\n", lines[4])
 
 
 def test_build_hardware_without_logger_injected_produces_no_output_at_all() -> None:

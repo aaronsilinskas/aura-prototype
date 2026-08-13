@@ -297,7 +297,6 @@ def test_build_hardware_declared_accelerometer_with_no_i2c_bus_raises_runtime_er
     board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
 
     with ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
         stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
         )
@@ -371,7 +370,6 @@ def test_build_hardware_enabled_accelerometer_with_disabled_i2c_raises_runtime_e
     board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
 
     with ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
         stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
         )
@@ -435,7 +433,6 @@ def test_build_hardware_declared_haptics_with_no_i2c_bus_raises_runtime_error() 
     board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
 
     with ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
         stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
         )
@@ -675,7 +672,6 @@ def test_build_hardware_neither_accelerometer_nor_haptics_probed_when_undeclared
     available_i2c = MagicMock(name="available_i2c")
 
     with ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
         stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_i2c", return_value=available_i2c)
         )
@@ -763,7 +759,6 @@ def test_build_hardware_accelerometer_no_i2c_bus_marks_its_own_line_failed_and_p
     logger, fragments = _recording_logger()
 
     with ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
         stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
         )
@@ -839,7 +834,6 @@ def test_build_hardware_haptics_no_i2c_bus_marks_its_own_line_failed_and_propaga
     logger, fragments = _recording_logger()
 
     with ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
         stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
         )
