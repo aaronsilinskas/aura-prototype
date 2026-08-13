@@ -57,6 +57,7 @@
     "area_of_effect": "GP12"
   },
   "audio": {
+    "enabled": true,
     "voices": 2,
     "max_volume": 0.2,
     "clips": {
@@ -67,9 +68,15 @@
     "i2s_data": "GP6"
   },
   "radio": {
+    "enabled": true,
     "cs": "GP1",
     "reset": "GP9",
     "frequency": 915.0,
     "node": 1
+  },
+  "sdcard": {
+    "enabled": true,
+    "cs": "GP22",
+    "mount": "/sd"
   }
 }
