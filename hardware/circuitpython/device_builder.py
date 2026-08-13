@@ -94,19 +94,11 @@ def _resolve_pin(board_module: object, field: str, name: str) -> microcontroller
 def _setup_high_current_rail(rail_cfg: HighCurrentRailConfig, board_module: object) -> None:
     """Resolve *rail_cfg*'s pin and drive it to the asserted or deasserted level.
 
-    Replaces the old board-presence-probed ``EXTERNAL_POWER`` rail: the pin
-    comes solely from config now, resolved by name against *board_module*
-    (raising a ``high_current_rail.pin``-named ``ValueError`` for an unknown
-    name, via :func:`_resolve_pin`).
-
-    *rail_cfg* is passed in regardless of ``rail_cfg.enabled`` -- unlike
-    every other gated component, a disabled high-current-rail section still
-    drives its pin, to the *deasserted* level, holding the high-current rail
-    definitively off rather than leaving it floating (brown-out debugging).
-    An enabled section drives the *asserted* level instead. Both levels are
-    ``rail_cfg.active_high`` or its inverse: high asserts on an
-    active-high pin, low asserts on an active-low one, and vice versa for
-    deasserted. This is the codebase's first active-low output.
+    Unlike every other gated component, a disabled section (``enabled=False``)
+    still drives its pin -- to the *deasserted* level, holding the high-current
+    rail definitively off rather than leaving it floating (brown-out debugging).
+    An enabled section drives the *asserted* level; ``active_high`` selects
+    which physical level asserts.
     """
     pin = _resolve_pin(board_module, "high_current_rail.pin", rail_cfg.pin)
     output = digitalio.DigitalInOut(pin)
