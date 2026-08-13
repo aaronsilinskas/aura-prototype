@@ -108,6 +108,7 @@ import time
 import board
 
 from effects.performance import PerformanceTracker
+from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
 from engine.engine import GameEngine
@@ -249,7 +250,12 @@ def _build_prop() -> tuple[
     scene_registry.scan_dir("packs/scenes", "packs.scenes")
 
     manager = SceneManager(
-        engine, effect_registry, rule_registry, scene_registry, effect_admin=effect_manager
+        engine,
+        effect_registry,
+        rule_registry,
+        scene_registry,
+        effect_admin=effect_manager,
+        audio_overlay_admin=AudioRegistry(),
     )
     manager.load("tag")
     manager.update()  # applies the load transition; tag scene is now active

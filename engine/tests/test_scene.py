@@ -6,6 +6,7 @@ import sys
 
 import pytest
 
+from engine.audio import AudioOverlayAdmin
 from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.engine import GameEngine, GameRule
@@ -14,7 +15,7 @@ from engine.packs import PackRegistry, _PackEntry
 from engine.scene import Scene, SceneManager, SceneRegistry
 from engine.state import EffectAdmin, EffectControls, GameState, SceneControls, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
-from engine.tests.helpers import SpyEffectAdmin
+from engine.tests.helpers import SpyAudioOverlayAdmin, SpyEffectAdmin
 from engine.timer import Timer
 from engine.version import Version
 
@@ -111,12 +112,13 @@ def _make_scene_manager(
     rule_registry: PackRegistry | None = None,
     scene_registry: SceneRegistry | None = None,
     effect_admin: EffectAdmin | None = None,
+    audio_overlay_admin: AudioOverlayAdmin | None = None,
 ) -> SceneManager:
-    """Construct a SceneManager, defaulting any unspecified registry/effect_admin.
+    """Construct a SceneManager, defaulting any unspecified registry/admin seam.
 
-    Absorbs SceneManager's injected-EffectAdmin constructor parameter so most
-    call sites only need to override the registries/effect_admin they actually
-    care about.
+    Absorbs SceneManager's injected-EffectAdmin/AudioOverlayAdmin constructor
+    parameters so most call sites only need to override the registries/admins
+    they actually care about.
     """
     return SceneManager(
         engine,
@@ -124,6 +126,7 @@ def _make_scene_manager(
         rule_registry if rule_registry is not None else PackRegistry(item_attr="RULE"),
         scene_registry if scene_registry is not None else SceneRegistry(),
         effect_admin if effect_admin is not None else SpyEffectAdmin(),
+        audio_overlay_admin if audio_overlay_admin is not None else SpyAudioOverlayAdmin(),
     )
 
 

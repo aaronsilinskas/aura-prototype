@@ -26,24 +26,81 @@ def scan_sound_dir(path: str) -> dict[str, str]:
     return sounds
 
 
-class AudioRegistry:
-    """Maps clip names to WAV file paths.
+class AudioOverlayAdmin:
+    """Scene-transition-facing seam for swapping the active scene's sound overlay.
 
-    Pack authors (or setup code) call ``register`` explicitly; consumers
-    call ``path`` to resolve a name to a WAV path at runtime.
-
-    Has no dependency on ``PackRegistry`` or any pack directory layout.
+    Carries the one operation a scene transition needs on ``AudioRegistry`` — mirrors
+    ``EffectAdmin.set_local_effects``, keeping ``SceneManager``'s two admin seams
+    (effects, audio) shaped the same way. Reserved for ``SceneManager``: game rules
+    never call it. Raises ``NotImplementedError`` by default.
     """
 
-    __slots__ = ["_clips"]
+    def set_scene_sounds(self, sounds: dict[str, str] | None) -> None:
+        """Install *sounds* (bare ``{stem: path}``) as the active scene overlay.
+
+        Called by ``SceneManager`` on every transition so ``scene.<clip>`` names
+        resolve against the top-of-stack scene's sounds. Pass ``None`` when the
+        active scene has no sounds (or the scene stack empties) so ``scene.``
+        lookups fail immediately rather than resolving against a stale overlay.
+        """
+        raise NotImplementedError
+
+
+class AudioRegistry(AudioOverlayAdmin):
+    """Resolves a qualified clip name to a WAV path by prefix routing.
+
+    Holds two maps: a **base** (``<pack>.<stem>`` → path), populated by scanning
+    an effect pack's ``sounds/`` folder via ``scan_pack_sounds`` — shared and
+    cross-scene, mirroring how effect packs are shared; and a swappable **scene
+    overlay** (bare ``stem`` → path), installed via ``set_scene_sounds`` (the
+    ``AudioOverlayAdmin`` face) — private to whichever scene is active.
+
+    ``path`` routes exactly like ``EffectResolver``: the ``scene`` prefix reaches
+    the overlay, any other prefix reaches the base, keyed by the full
+    ``<pack>.<stem>`` name. An unprefixed name, or a name absent from its routed
+    map, raises rather than returning ``None`` — a bad clip reference (typo or a
+    missing/misnamed file) surfaces the same way a bad effect name does.
+    """
+
+    __slots__ = ("_base", "_overlay")
 
     def __init__(self) -> None:
-        self._clips: dict[str, str] = {}
+        self._base: dict[str, str] = {}
+        self._overlay: dict[str, str] | None = None
 
-    def register(self, name: str, path: str) -> None:
-        """Store a clip name → WAV path mapping, overwriting any previous entry."""
-        self._clips[name] = path
+    def scan_pack_sounds(self, pack_name: str, path: str) -> None:
+        """Scan *path* and merge its clips into the base as ``<pack_name>.<stem>``.
 
-    def path(self, name: str) -> str | None:
-        """Return the WAV path for *name*, or ``None`` if not registered."""
-        return self._clips.get(name)
+        Qualifying every stem with *pack_name* is what lets two packs each ship a
+        same-named clip (e.g. both a ``win.wav``) without colliding in the base.
+        """
+        for stem, clip_path in scan_sound_dir(path).items():
+            self._base[f"{pack_name}.{stem}"] = clip_path
+
+    def set_scene_sounds(self, sounds: dict[str, str] | None) -> None:
+        self._overlay = sounds
+
+    def path(self, name: str) -> str:
+        """Return the WAV path *name* resolves to.
+
+        *name* must be ``"scene.<stem>"`` (routes to the active scene overlay) or
+        ``"<pack>.<stem>"`` (routes to the shared base).
+
+        Raises:
+            ValueError: *name* carries no ``.`` prefix, or resolves in neither
+                the routed overlay nor the routed base.
+        """
+        if "." not in name:
+            raise ValueError(
+                f"Clip name '{name}' missing prefix (expected 'scene.clip' or 'pack.clip')"
+            )
+        prefix, stem = name.split(".", 1)
+
+        if prefix == "scene":
+            if self._overlay is None or stem not in self._overlay:
+                raise ValueError(f"Unknown scene sound '{name}'")
+            return self._overlay[stem]
+
+        if name not in self._base:
+            raise ValueError(f"Unknown sound '{name}'")
+        return self._base[name]

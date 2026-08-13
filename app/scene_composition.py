@@ -7,6 +7,7 @@ because ``DeviceHardware`` itself carries no board imports.
 
 from __future__ import annotations
 
+from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.packs import PackRegistry
@@ -78,8 +79,17 @@ def build_scene_runtime(hw: DeviceHardware, scene_name: str) -> SceneRuntime:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir("packs/scenes", "packs.scenes")
 
+    # A fresh, unwired AudioRegistry — no base scan and not reachable from any
+    # output yet. Wiring it to the device's real registry and scanning effect-pack
+    # sounds into the base is tracked separately; this keeps scene transitions
+    # able to install the (currently always-empty) per-scene overlay without error.
     manager = SceneManager(
-        engine, effect_registry, rule_registry, scene_registry, effect_admin=effect_manager
+        engine,
+        effect_registry,
+        rule_registry,
+        scene_registry,
+        effect_admin=effect_manager,
+        audio_overlay_admin=AudioRegistry(),
     )
     manager.load(_resolve_known_scene(scene_registry, scene_name))
     manager.update()  # applies the load transition; the scene is now active

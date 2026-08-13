@@ -14,7 +14,7 @@ from engine.events import Event, EventGroup
 from engine.packs import PackRegistry
 from engine.scene import Scene, SceneManager, SceneRegistry
 from engine.state import EffectControls
-from engine.tests.helpers import SpyEffectAdmin
+from engine.tests.helpers import SpyAudioOverlayAdmin, SpyEffectAdmin
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -233,9 +233,17 @@ def _make_scene_manager(
     rule_registry: PackRegistry,
     scene_registry: SceneRegistry,
 ) -> SceneManager:
-    """Construct a SceneManager with a SpyEffectAdmin — these tests only cover
-    scene-local rule discovery, not local-effects/merge-strategy transitions."""
-    return SceneManager(engine, effect_registry, rule_registry, scene_registry, SpyEffectAdmin())
+    """Construct a SceneManager with a SpyEffectAdmin/SpyAudioOverlayAdmin — these
+    tests only cover scene-local rule discovery, not local-effects/merge-strategy/
+    audio-overlay transitions."""
+    return SceneManager(
+        engine,
+        effect_registry,
+        rule_registry,
+        scene_registry,
+        SpyEffectAdmin(),
+        SpyAudioOverlayAdmin(),
+    )
 
 
 def test_scene_manager_load_includes_scene_local_rules_in_engine(scene_env) -> None:

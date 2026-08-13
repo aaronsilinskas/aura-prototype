@@ -126,11 +126,13 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `ScopeValue` / `Scope` | `engine/state.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `AMBIENT`, `Global.MAIN/BUFF/DEBUFF`, and composites `Global.ALL` / `NON_AMBIENT` / `Scope.ALL` |
 | `NetworkControls` | `engine/state.py` | Abstract interface for sending/receiving network messages |
 | `TransmitPump` | `engine/network.py` | Abstract runtime-facing seam declaring `poll_transmits()`; the type the runtime loop reaches through, distinct from the send-only `NetworkControls` |
+| `AudioOverlayAdmin` | `engine/audio.py` | Scene-transition-facing abstract interface, reserved for `SceneManager`: `set_scene_sounds(sounds \| None)` |
+| `AudioRegistry` | `engine/audio.py` | Concrete `AudioOverlayAdmin`; resolves a qualified clip name to a WAV path via prefix routing (`scene.` → active scene overlay, `<pack>.` → shared base scanned by `scan_pack_sounds`), raising on an unprefixed or unresolved name |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update(timer)` tick |
 | `GameState` | `engine/state.py` | Passed to each rule: holds `engine`, `timer`, `effect_controls`, `network_controls` |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
-| `SceneManager` | `engine/scene.py` | Activates/deactivates scenes; owns `SceneLocalRegistry` per scene; holds an injected `EffectAdmin` handle and drives every local-effects/merge-strategy transition through it |
+| `SceneManager` | `engine/scene.py` | Activates/deactivates scenes; owns `SceneLocalRegistry` per scene; holds injected `EffectAdmin` and `AudioOverlayAdmin` handles and drives every local-effects/merge-strategy/sound-overlay transition through them |
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
 | `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor owning a phase machine's `GameState` key + initial phase; the one object all of a scene's phase rules and its module-level phase reference share |
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |

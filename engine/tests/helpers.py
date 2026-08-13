@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from engine.audio import AudioOverlayAdmin
 from engine.state import EffectAdmin, EffectControls, EffectReceipt, NetworkControls, ScopeValue
 
 _STUB_RECEIPT_ID = 0
@@ -75,3 +76,17 @@ class SpyEffectAdmin(EffectAdmin):
 
     def apply_merge_strategies(self, snapshot: dict) -> None:
         self.applied_snapshots.append(snapshot)
+
+
+class SpyAudioOverlayAdmin(AudioOverlayAdmin):
+    """Test recorder for the scene-transition ``AudioOverlayAdmin`` face.
+
+    Records every ``set_scene_sounds`` push so ``SceneManager`` transition
+    tests can assert on it without wiring a real ``AudioRegistry``.
+    """
+
+    def __init__(self) -> None:
+        self.scene_sounds_history: list[dict[str, str] | None] = []
+
+    def set_scene_sounds(self, sounds: dict[str, str] | None) -> None:
+        self.scene_sounds_history.append(sounds)

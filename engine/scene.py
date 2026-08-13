@@ -18,7 +18,7 @@ except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
 import engine._path as _path
-from engine.audio import scan_sound_dir
+from engine.audio import AudioOverlayAdmin, scan_sound_dir
 from engine.engine import GameEngine, GameRule, Version
 from engine.packs import PackRegistry, UnknownItemError, load_item, scan_item_names
 from engine.state import EffectAdmin, GameState, MergeStrategy, SceneControls, Scope
@@ -391,7 +391,14 @@ class SceneManager(SceneControls):
 
     Construction::
 
-        manager = SceneManager(engine, effect_registry, rule_registry, scene_registry, effect_admin)
+        manager = SceneManager(
+            engine,
+            effect_registry,
+            rule_registry,
+            scene_registry,
+            effect_admin,
+            audio_overlay_admin,
+        )
 
     Driving the game loop::
 
@@ -413,9 +420,15 @@ class SceneManager(SceneControls):
     ``NetworkControls``/``TransmitPump`` split). Every local-effects push and
     merge-strategy reset/capture/apply routes through *effect_admin*, never
     through a stack entry's ``state.effect_controls``.
+
+    *audio_overlay_admin* is the analogous scene-transition seam for sounds —
+    typically the same ``AudioRegistry`` instance ``AudioEffectOutput`` resolves
+    clips through. Every scene transition installs the active scene's sound
+    overlay through it, right beside the *effect_admin* local-effects push.
     """
 
     __slots__ = (
+        "_audio_overlay_admin",
         "_effect_admin",
         "_effect_registry",
         "_engine",
@@ -432,12 +445,14 @@ class SceneManager(SceneControls):
         rule_registry: PackRegistry,
         scene_registry: SceneRegistry,
         effect_admin: EffectAdmin,
+        audio_overlay_admin: AudioOverlayAdmin,
     ) -> None:
         self._engine = engine
         self._effect_registry = effect_registry
         self._rule_registry = rule_registry
         self._scene_registry = scene_registry
         self._effect_admin = effect_admin
+        self._audio_overlay_admin = audio_overlay_admin
         self._stack: list[_SceneStackEntry] = []
         self._pending: (
             tuple[Literal["load"], Scene]
@@ -531,6 +546,7 @@ class SceneManager(SceneControls):
         self._engine.set_rules(entry.rules)
         entry.state.clear_queue()
         self._effect_admin.set_local_effects(entry.scene.local_effect_registry)
+        self._audio_overlay_admin.set_scene_sounds(entry.scene.local_sound_map or None)
 
     def _do_load(self, scene: Scene) -> None:
         """Replace the entire stack with a single fresh entry for *scene*."""
