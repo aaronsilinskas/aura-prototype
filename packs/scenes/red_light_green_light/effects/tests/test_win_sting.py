@@ -35,7 +35,13 @@ def test_win_sting_emits_audio_on_start() -> None:
 
 
 def test_win_sting_audio_start_clip_name_is_scene_prefixed() -> None:
-    effect = _build()
+    """Built with the unqualified effect name EffectManager actually passes (see
+    EffectManager._build_effect) to prove the clip name is a fixed literal, not
+    derived from the builder's `name` argument -- deriving it would produce an
+    unprefixed, unresolvable clip name at runtime."""
+    from packs.scenes.red_light_green_light.effects.win_sting import BUILD
+
+    effect = BUILD("win_sting", _config())
 
     assert effect.audio.clips["start"].name == "scene.win_sting_start"
 
