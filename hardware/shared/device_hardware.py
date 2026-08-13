@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.network import TransmitPump
 from engine.state import NetworkControls
@@ -29,10 +30,17 @@ class DeviceHardware:
     ``storage`` is typed as the port (``DeviceStorage``), never the concrete
     ``SdCardStorage`` adapter — ``None`` on a device with no ``sdcard``
     section declared and enabled.
+
+    ``audio_registry`` is the same ``AudioRegistry`` instance the built
+    ``AudioEffectOutput`` resolves clips through — ``None`` on a device with
+    no ``audio`` section declared and enabled. ``app.build_scene_runtime``
+    scans effect-pack sounds into it and installs it as ``SceneManager``'s
+    audio-overlay admin.
     """
 
     __slots__ = (
         "accelerometer",
+        "audio_registry",
         "buttons",
         "ir_receiver",
         "network_controls",
@@ -52,6 +60,7 @@ class DeviceHardware:
         ir_receiver: InfraredReceiver | None,
         radio: RadioTransport | None,
         storage: DeviceStorage | None,
+        audio_registry: AudioRegistry | None,
     ) -> None:
         self.outputs: list[EffectOutput] = outputs
         self.buttons: DebouncedButtons = buttons
@@ -61,3 +70,4 @@ class DeviceHardware:
         self.ir_receiver: InfraredReceiver | None = ir_receiver
         self.radio: RadioTransport | None = radio
         self.storage: DeviceStorage | None = storage
+        self.audio_registry: AudioRegistry | None = audio_registry

@@ -115,11 +115,29 @@ def _effect_oneshot_with_haptic_stops_effect(verb: str, clip_name: str) -> Effec
     )
 
 
+_TEST_PACK = "test_pack"
+
+
 def _register_wav(tmp_path, registry: AudioRegistry, name: str) -> str:
+    """Write ``<name>.wav`` under *tmp_path*, scan it into *registry*'s base
+    under the fixed ``test_pack`` prefix, and return the qualified clip name
+    (``"test_pack.<name>"``) an ``AudioPlaybackConfig`` should reference.
+
+    Re-scans the whole directory on every call (``scan_pack_sounds`` merges
+    rather than replaces), so registering a second clip in the same
+    *tmp_path* never drops an earlier one.
+    """
     wav = tmp_path / f"{name}.wav"
     wav.write_bytes(b"RIFF")
-    registry.register(name, str(wav))
-    return str(wav)
+    registry.scan_pack_sounds(_TEST_PACK, str(tmp_path))
+    return f"{_TEST_PACK}.{name}"
+
+
+def _register_missing_path(registry: AudioRegistry, name: str, path: str) -> str:
+    """Point a scene-overlay clip at *path* without creating the file, for
+    OSError-on-open tests. Returns the qualified ``"scene.<name>"`` clip name."""
+    registry.set_scene_sounds({name: path})
+    return f"scene.{name}"
 
 
 # ---------------------------------------------------------------------------
@@ -199,31 +217,35 @@ def test_handle_event_ignores_unknown_verb() -> None:
     mixer.voice[1].play.assert_not_called()
 
 
-def test_handle_event_ignores_unregistered_clip() -> None:
-    """Clip name not in AudioRegistry → no play, no crash."""
+def test_handle_event_raises_when_clip_name_is_unregistered() -> None:
+    """A clip name AudioRegistry can't resolve propagates its ValueError (#804)
+    -- handle_event no longer swallows the resolution failure into a no-op."""
     output, mixer = _make_output(AudioRegistry())
 
-    output.handle_event(
-        EffectEvent("rlgl", "effect", "start"),
-        frozenset({"personal"}),
-        _effect_oneshot("start", "missing_clip"),
-        _make_receipt(),
-    )
+    with pytest.raises(ValueError):
+        output.handle_event(
+            EffectEvent("rlgl", "effect", "start"),
+            frozenset({"personal"}),
+            _effect_oneshot("start", "test_pack.missing_clip"),
+            _make_receipt(),
+        )
 
     mixer.voice[0].play.assert_not_called()
     mixer.voice[1].play.assert_not_called()
 
 
 def test_handle_event_ignores_oserror_on_file_open(tmp_path) -> None:
-    """OSError opening the WAV file → no play, no crash."""
+    """A registered path whose file can't be opened → no play, no crash --
+    distinct from an unresolvable clip name, this failure is VoicePool's own
+    OSError guard around open_source, not AudioRegistry.path raising."""
     registry = AudioRegistry()
-    registry.register("missing", str(tmp_path / "nonexistent.wav"))
+    clip_name = _register_missing_path(registry, "missing", str(tmp_path / "nonexistent.wav"))
     output, mixer = _make_output(registry)
 
     output.handle_event(
         EffectEvent("rlgl", "effect", "start"),
         frozenset({"personal"}),
-        _effect_oneshot("start", "missing"),
+        _effect_oneshot("start", clip_name),
         _make_receipt(),
     )
 
@@ -231,32 +253,35 @@ def test_handle_event_ignores_oserror_on_file_open(tmp_path) -> None:
     mixer.voice[1].play.assert_not_called()
 
 
-def test_unregistered_clip_with_stops_effect_stops_receipt_immediately() -> None:
-    """A stops_effect clip name missing from AudioRegistry must not run forever."""
+def test_unregistered_clip_with_stops_effect_still_raises_instead_of_stopping_silently() -> None:
+    """Dropping the None guard (#804) means an unregistered clip's resolution
+    failure propagates even when stops_effect=True -- it no longer falls back
+    to a silent receipt.stop()."""
     output, _mixer = _make_output(AudioRegistry())
     receipt = _make_receipt()
 
-    output.handle_event(
-        EffectEvent("tag", "effect", "start"),
-        frozenset({"personal"}),
-        _effect_oneshot_stops_effect("start", "missing_clip"),
-        receipt,
-    )
+    with pytest.raises(ValueError):
+        output.handle_event(
+            EffectEvent("tag", "effect", "start"),
+            frozenset({"personal"}),
+            _effect_oneshot_stops_effect("start", "test_pack.missing_clip"),
+            receipt,
+        )
 
-    receipt.stop.assert_called_once()
+    receipt.stop.assert_not_called()
 
 
 def test_oserror_on_file_open_with_stops_effect_stops_receipt_immediately(tmp_path) -> None:
     """A stops_effect clip whose file fails to open must not run forever."""
     registry = AudioRegistry()
-    registry.register("missing", str(tmp_path / "nonexistent.wav"))
+    clip_name = _register_missing_path(registry, "missing", str(tmp_path / "nonexistent.wav"))
     output, _mixer = _make_output(registry)
     receipt = _make_receipt()
 
     output.handle_event(
         EffectEvent("tag", "effect", "start"),
         frozenset({"personal"}),
-        _effect_oneshot_stops_effect("start", "missing"),
+        _effect_oneshot_stops_effect("start", clip_name),
         receipt,
     )
 
@@ -271,13 +296,13 @@ def test_oserror_on_file_open_with_stops_effect_stops_receipt_immediately(tmp_pa
 def test_valid_clip_plays_on_an_idle_voice(tmp_path) -> None:
     """A registered clip is opened and played on a mixer voice at the receipt's loudness."""
     registry = AudioRegistry()
-    _register_wav(tmp_path, registry, "music")
+    clip_name = _register_wav(tmp_path, registry, "music")
     output, mixer = _make_output(registry, max_volume=0.4)
 
     output.handle_event(
         EffectEvent("rlgl", "music", "start"),
         frozenset({"ambient"}),
-        _effect_loop("start", "music"),
+        _effect_loop("start", clip_name),
         _make_receipt(loudness=0.5),
     )
 
@@ -291,14 +316,14 @@ def test_audio_only_effect_implicitly_stops_receipt_on_finish(tmp_path) -> None:
 
     receipt is stopped when the clip finishes naturally (audio is the whole effect)."""
     registry = AudioRegistry()
-    _register_wav(tmp_path, registry, "sting")
+    clip_name = _register_wav(tmp_path, registry, "sting")
     output, mixer = _make_output(registry)
     receipt = _make_receipt()
 
     output.handle_event(
         EffectEvent("rlgl", "sting", "start"),
         frozenset({"personal"}),
-        _effect_audio_only("start", "sting"),
+        _effect_audio_only("start", clip_name),
         receipt,
     )
 
@@ -311,14 +336,14 @@ def test_audio_only_effect_implicitly_stops_receipt_on_finish(tmp_path) -> None:
 def test_clip_with_pixels_and_no_stops_effect_flag_leaves_receipt_to_rules(tmp_path) -> None:
     """An effect with pixels and no stops_effect flag leaves its receipt to rules on finish."""
     registry = AudioRegistry()
-    _register_wav(tmp_path, registry, "sting")
+    clip_name = _register_wav(tmp_path, registry, "sting")
     output, mixer = _make_output(registry)
     receipt = _make_receipt()
 
     output.handle_event(
         EffectEvent("rlgl", "sting", "start"),
         frozenset({"personal"}),
-        _effect_oneshot("start", "sting"),
+        _effect_oneshot("start", clip_name),
         receipt,
     )
 
@@ -331,14 +356,14 @@ def test_clip_with_pixels_and_no_stops_effect_flag_leaves_receipt_to_rules(tmp_p
 def test_clip_with_pixels_and_stops_effect_stops_receipt_on_natural_finish(tmp_path) -> None:
     """A pixels effect with stops_effect=True stops its receipt when the clip finishes."""
     registry = AudioRegistry()
-    _register_wav(tmp_path, registry, "sting")
+    clip_name = _register_wav(tmp_path, registry, "sting")
     output, mixer = _make_output(registry)
     receipt = _make_receipt()
 
     output.handle_event(
         EffectEvent("rlgl", "sting", "start"),
         frozenset({"personal"}),
-        _effect_oneshot_stops_effect("start", "sting"),
+        _effect_oneshot_stops_effect("start", clip_name),
         receipt,
     )
 
@@ -351,8 +376,8 @@ def test_clip_with_pixels_and_stops_effect_stops_receipt_on_natural_finish(tmp_p
 def test_clip_with_pixels_and_stops_effect_stops_receipt_on_eviction(tmp_path) -> None:
     """A pixels effect with stops_effect=True stops its receipt when evicted by a new one-shot."""
     registry = AudioRegistry()
-    _register_wav(tmp_path, registry, "sting")
-    _register_wav(tmp_path, registry, "sting2")
+    clip_name = _register_wav(tmp_path, registry, "sting")
+    clip_name2 = _register_wav(tmp_path, registry, "sting2")
     output, _mixer = _make_output(registry, num_voices=1)
     evicted_receipt = _make_receipt()
     evicted_receipt.is_stopped.return_value = False
@@ -361,14 +386,14 @@ def test_clip_with_pixels_and_stops_effect_stops_receipt_on_eviction(tmp_path) -
     output.handle_event(
         EffectEvent("rlgl", "sting", "start"),
         frozenset({"personal"}),
-        _effect_oneshot_stops_effect("start", "sting"),
+        _effect_oneshot_stops_effect("start", clip_name),
         evicted_receipt,
     )
     # A new one-shot evicts the oldest one-shot (slot 0)
     output.handle_event(
         EffectEvent("rlgl", "sting2", "start"),
         frozenset({"personal"}),
-        _effect_oneshot("start", "sting2"),
+        _effect_oneshot("start", clip_name2),
         _make_receipt(),
     )
 
@@ -378,14 +403,14 @@ def test_clip_with_pixels_and_stops_effect_stops_receipt_on_eviction(tmp_path) -
 def test_clip_with_pixels_haptic_and_stops_effect_stops_receipt_on_finish(tmp_path) -> None:
     """A pixels+haptic effect with stops_effect=True stops its receipt on natural finish."""
     registry = AudioRegistry()
-    _register_wav(tmp_path, registry, "sting")
+    clip_name = _register_wav(tmp_path, registry, "sting")
     output, mixer = _make_output(registry)
     receipt = _make_receipt()
 
     output.handle_event(
         EffectEvent("rlgl", "sting", "start"),
         frozenset({"personal"}),
-        _effect_oneshot_with_haptic_stops_effect("start", "sting"),
+        _effect_oneshot_with_haptic_stops_effect("start", clip_name),
         receipt,
     )
 

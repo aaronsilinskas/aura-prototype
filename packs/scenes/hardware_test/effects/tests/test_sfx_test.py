@@ -40,10 +40,12 @@ def test_sfx_test_audio_responds_to_start_verb() -> None:
     assert "start" in effect.audio.clips
 
 
-def test_sfx_test_audio_start_clip_name_is_sfx_test_start() -> None:
+def test_sfx_test_audio_start_clip_name_is_scene_prefixed_sfx_test_start() -> None:
+    """The scene-local clip is addressed with the reserved scene. prefix (#804) so
+    AudioRegistry routes it against hardware_test's own sounds/ overlay."""
     effect = _build()
 
-    assert effect.audio.clips["start"].name == "sfx_test_start"
+    assert effect.audio.clips["start"].name == "scene.sfx_test_start"
 
 
 def test_sfx_test_audio_start_clip_is_non_looping() -> None:

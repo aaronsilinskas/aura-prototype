@@ -3,6 +3,7 @@
 import pytest
 
 from app.scene_composition import build_scene_runtime
+from engine.audio import AudioRegistry
 from engine.network import TransmitPump
 from engine.state import Scope
 from hardware.shared.device_hardware import DeviceHardware
@@ -12,7 +13,9 @@ from hardware.shared.radio_manager import RadioManager
 from hardware.shared.radio_transport import RadioTransport
 
 
-def _fake_hw(transmit_pump=None, ir_receiver=None, radio=None) -> DeviceHardware:
+def _fake_hw(
+    transmit_pump=None, ir_receiver=None, radio=None, audio_registry=None
+) -> DeviceHardware:
     """Return a DeviceHardware built entirely from CPython-safe fakes."""
     return DeviceHardware(
         outputs=[],
@@ -23,6 +26,7 @@ def _fake_hw(transmit_pump=None, ir_receiver=None, radio=None) -> DeviceHardware
         ir_receiver=ir_receiver,
         radio=radio,
         storage=None,
+        audio_registry=audio_registry,
     )
 
 
@@ -132,3 +136,51 @@ def test_build_scene_runtime_wires_radio_to_the_hardware_bundles_radio_transport
 
     assert runtime.radio.received.data == b"\xab\xcd"
     assert runtime.radio.received.sender == "3"
+
+
+# ---------------------------------------------------------------------------
+# Audio registry wiring: base scan + scene overlay (issue #804)
+# ---------------------------------------------------------------------------
+
+
+def test_build_scene_runtime_scans_effect_pack_sounds_into_the_devices_audio_registry():
+    """packs/effects/*/sounds is scanned into hw.audio_registry's base, qualified
+    by pack name, so basic.game_over_sting_start resolves once the runtime is built."""
+    hw = _fake_hw(audio_registry=AudioRegistry())
+
+    build_scene_runtime(hw, "hardware_test")
+
+    assert (
+        hw.audio_registry.path("basic.game_over_sting_start")
+        == "packs/effects/basic/sounds/game_over_sting_start.wav"
+    )
+    assert (
+        hw.audio_registry.path("elements.lightning_strike")
+        == "packs/effects/elements/sounds/lightning_strike.wav"
+    )
+
+
+def test_build_scene_runtime_installs_hardware_test_scenes_sounds_as_the_active_overlay():
+    """Activating hardware_test installs its sounds/ folder as the AudioRegistry
+    overlay, so scene.sfx_test_start -- the clip sfx_test's audio references --
+    resolves through the same registry AudioEffectOutput would use on real hardware."""
+    hw = _fake_hw(audio_registry=AudioRegistry())
+
+    build_scene_runtime(hw, "hardware_test")
+
+    assert (
+        hw.audio_registry.path("scene.sfx_test_start")
+        == "packs/scenes/hardware_test/sounds/sfx_test_start.wav"
+    )
+
+
+def test_build_scene_runtime_with_no_audio_registry_skips_scan_and_still_activates_scene():
+    """A device with no enabled audio section (hw.audio_registry is None) gets no
+    base scan and no overlay wiring, but scene activation is otherwise unaffected."""
+    hw = _fake_hw()
+
+    runtime = build_scene_runtime(hw, "hardware_test")
+
+    assert hw.audio_registry is None
+    receipt = runtime.effect_manager.set_effect(Scope.PERSONAL, "scene.sfx_test", {})
+    assert receipt is not None

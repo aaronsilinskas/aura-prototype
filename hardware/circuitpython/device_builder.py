@@ -472,23 +472,27 @@ def _setup_sdcard(spi: busio.SPI, sdcard_cfg: SDCardConfig, board_module: object
         ) from e
 
 
-def _setup_audio(audio_cfg: AudioConfig, board_module: object) -> AudioEffectOutput:
-    """Return a configured AudioEffectOutput from *audio_cfg*.
+def _setup_audio(
+    audio_cfg: AudioConfig, board_module: object, audio_registry: AudioRegistry
+) -> AudioEffectOutput:
+    """Return a configured AudioEffectOutput from *audio_cfg*, resolving clips via
+    *audio_registry*.
 
     Audio is config-gated rather than presence-probed, so unlike the
     Optional-returning accelerometer/drv2605 helpers there is no absent case
     — the caller's ``config.audio is not None and config.audio.enabled``
     guard is the only gate.
 
+    *audio_registry* is built empty by the caller (``build_hardware``) and
+    also exposed on ``DeviceHardware.audio_registry`` — populating its base
+    (scanning effect-pack ``sounds/`` folders) and overlay (per-scene sounds)
+    is ``app.build_scene_runtime``'s job, not this builder's.
+
     ``AudioEffectOutput`` is imported here, not at module load — its module
     pulls in ``audiobusio``/``audiocore``/``audiomixer`` at import time, so a
     config with no audio section never requires the audio stack installed.
     """
     from hardware.circuitpython.audio_output import AudioEffectOutput
-
-    audio_registry = AudioRegistry()
-    for clip_name, clip_path in audio_cfg.clips.items():
-        audio_registry.register(clip_name, clip_path)
 
     return AudioEffectOutput(
         audio_registry,
@@ -718,10 +722,10 @@ def build_hardware(
     same begin-before-pin-resolution way: an absent ``config.audio`` logs
     nothing, ``enabled=False`` logs its own disabled line, and an enabled
     section opens via ``logger.begin()`` -- carrying voice count,
-    ``max_volume``, registered clip count, and the raw I2S pin names
-    straight off ``AudioConfig`` -- before ``_setup_audio`` resolves any of
-    those three pins, so an unknown I2S pin name's ``ValueError`` closes the
-    audio line itself with ``FAILED``. A declared radio section is narrated
+    ``max_volume``, and the raw I2S pin names straight off ``AudioConfig`` --
+    before ``_setup_audio`` resolves any of those three pins, so an unknown
+    I2S pin name's ``ValueError`` closes the audio line itself with
+    ``FAILED``. A declared radio section is narrated
     the same way, on one ``"radio frequency=... node=... cs=... reset=..."``
     line built entirely from the raw config scalars (``cs``/``reset`` are
     still unresolved pin-name strings at that point): ``ok`` when built,
@@ -834,6 +838,7 @@ def build_hardware(
                 logger.end("disabled")
 
         audio_cfg = config.audio
+        audio_registry: AudioRegistry | None = None
         if audio_cfg is not None:
             if not audio_cfg.enabled:
                 logger.begin("audio")
@@ -841,10 +846,11 @@ def build_hardware(
             else:
                 logger.begin(
                     f"audio voices={audio_cfg.voices} max_volume={audio_cfg.max_volume:.2f} "
-                    + f"clips={len(audio_cfg.clips)} i2s_bit_clock={audio_cfg.i2s_bit_clock} "
+                    + f"i2s_bit_clock={audio_cfg.i2s_bit_clock} "
                     + f"i2s_word_select={audio_cfg.i2s_word_select} i2s_data={audio_cfg.i2s_data}"
                 )
-                outputs.append(_setup_audio(audio_cfg, board_module))
+                audio_registry = AudioRegistry()
+                outputs.append(_setup_audio(audio_cfg, board_module, audio_registry))
                 logger.end()
 
         if config.haptics is not None:
@@ -937,6 +943,7 @@ def build_hardware(
             ir_receiver=ir_receiver,
             radio=radio,
             storage=storage,
+            audio_registry=audio_registry,
         )
     except Exception:
         logger.fail()

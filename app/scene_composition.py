@@ -7,6 +7,9 @@ because ``DeviceHardware`` itself carries no board imports.
 
 from __future__ import annotations
 
+import os
+
+import engine._path as _path
 from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
@@ -46,6 +49,29 @@ class SceneRuntime:
         self.radio: RadioManager = radio
 
 
+_EFFECT_PACKS_DIR = "packs/effects"
+
+
+def _scan_effect_pack_sounds(audio_registry: AudioRegistry) -> None:
+    """Scan every ``packs/effects/<pack>/sounds`` folder into *audio_registry*'s base.
+
+    Mirrors ``PackRegistry.scan_dir``'s pack-detection rule: only an immediate
+    ``packs/effects`` subdirectory carrying a ``version.txt`` counts as a pack,
+    so a non-pack entry there is skipped entirely -- its own subdirectories
+    (a pack's ``tests/``/``helpers/``, which never sit directly under
+    ``packs/effects``) are never reached by this scan either way. A pack with
+    no ``sounds/`` folder scans to an empty merge — ``AudioRegistry.scan_pack_sounds``
+    tolerates a missing directory.
+    """
+    if not _path.isdir(_EFFECT_PACKS_DIR):
+        return
+    for entry in os.listdir(_EFFECT_PACKS_DIR):
+        pack_dir = _path.join(_EFFECT_PACKS_DIR, entry)
+        if not _path.isdir(pack_dir) or not _path.isfile(_path.join(pack_dir, "version.txt")):
+            continue
+        audio_registry.scan_pack_sounds(entry, _path.join(pack_dir, "sounds"))
+
+
 def _resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
     """Return *scene_name* if registered, else raise naming the known scenes."""
     names = scene_registry.names()
@@ -79,17 +105,26 @@ def build_scene_runtime(hw: DeviceHardware, scene_name: str) -> SceneRuntime:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir("packs/scenes", "packs.scenes")
 
-    # A fresh, unwired AudioRegistry — no base scan and not reachable from any
-    # output yet. Wiring it to the device's real registry and scanning effect-pack
-    # sounds into the base is tracked separately; this keeps scene transitions
-    # able to install the (currently always-empty) per-scene overlay without error.
+    # hw.audio_registry is the same AudioRegistry the device's AudioEffectOutput
+    # resolves clips through — scanning effect-pack sounds into its base and
+    # installing it as SceneManager's audio-overlay admin here is what lets
+    # scene./<pack>.-prefixed clip names resolve at runtime. A device with no
+    # enabled audio section has nothing to scan or wire into; a fresh,
+    # unreachable AudioRegistry keeps SceneManager's non-optional seam satisfied
+    # without pretending sound resolution works.
+    audio_registry = hw.audio_registry
+    if audio_registry is not None:
+        _scan_effect_pack_sounds(audio_registry)
+    else:
+        audio_registry = AudioRegistry()
+
     manager = SceneManager(
         engine,
         effect_registry,
         rule_registry,
         scene_registry,
         effect_admin=effect_manager,
-        audio_overlay_admin=AudioRegistry(),
+        audio_overlay_admin=audio_registry,
     )
     manager.load(_resolve_known_scene(scene_registry, scene_name))
     manager.update()  # applies the load transition; the scene is now active
