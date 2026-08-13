@@ -48,6 +48,7 @@ from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
     AudioConfig,
     DeviceConfig,
+    HighCurrentRailConfig,
     I2CConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
@@ -90,20 +91,20 @@ def _resolve_pin(board_module: object, field: str, name: str) -> microcontroller
         raise ValueError(f"{field}: pin '{name}' not found on board") from None
 
 
-def _setup_external_power() -> bool:
-    """Enable the PropMaker's EXTERNAL_POWER rail (powers NeoPixels, audio amp, and other
-    peripherals), if the board has one.
+def _setup_high_current_rail(rail_cfg: HighCurrentRailConfig, board_module: object) -> None:
+    """Resolve *rail_cfg*'s pin and drive it to the asserted or deasserted level.
 
-    Returns:
-        Whether the board declares an ``EXTERNAL_POWER`` rail (and therefore
-        switched it on) -- ``build_hardware`` uses this to log ``ok`` vs.
-        ``no rail``.
+    Unlike every other gated component, a disabled section (``enabled=False``)
+    still drives its pin -- to the *deasserted* level, holding the high-current
+    rail definitively off rather than leaving it floating (brown-out debugging).
+    An enabled section drives the *asserted* level; ``active_high`` selects
+    which physical level asserts.
     """
-    if not hasattr(board, "EXTERNAL_POWER"):
-        return False
-    power = digitalio.DigitalInOut(board.EXTERNAL_POWER)
-    power.switch_to_output(value=True)
-    return True
+    pin = _resolve_pin(board_module, "high_current_rail.pin", rail_cfg.pin)
+    output = digitalio.DigitalInOut(pin)
+    asserted = rail_cfg.active_high
+    level = asserted if rail_cfg.enabled else not asserted
+    output.switch_to_output(value=level)
 
 
 def _setup_i2c(i2c_config: I2CConfig | None, board_module: object) -> busio.I2C | None:
@@ -689,10 +690,16 @@ def build_hardware(
     bus when ``spi`` is disabled — see ``_setup_spi``).
 
     *logger*, if supplied, narrates every step that runs unconditionally
-    (the opening banner, external power, spi, and buttons) plus a closing
-    summary line; omitted or ``None`` normalizes to
-    :data:`~engine.log.Logger.SILENT` here, so every call below logs
-    unconditionally and an uninstrumented caller sees no output at all. i2c
+    (the opening banner, spi, and buttons) plus a closing summary line;
+    omitted or ``None`` normalizes to :data:`~engine.log.Logger.SILENT` here,
+    so every call below logs unconditionally and an uninstrumented caller
+    sees no output at all. A declared high_current_rail section is narrated
+    the same begin-before-pin-resolution way as radio/sdcard, on one
+    ``"high_current_rail pin=... active_high=..."`` line built from the raw config
+    scalars: ``asserted`` when enabled (the pin is driven to its asserted
+    level), ``held off`` when ``enabled: false`` (the pin is still driven,
+    to the deasserted level), no line at all when the section is absent, and
+    ``FAILED`` when resolving an unknown pin name raises ``ValueError``. i2c
     is narrated the same way, but only when this function builds the bus
     itself (i.e. *i2c* is not supplied) — a caller-injected *i2c* bypasses
     that setup, and its logging, entirely. Pixels are narrated per
@@ -761,11 +768,11 @@ def build_hardware(
         start = time.monotonic()
         logger.log(f"begin board={board_id()}")
 
-        logger.begin("external_power")
-        if _setup_external_power():
-            logger.end()
-        else:
-            logger.end("no rail")
+        rail_cfg = config.high_current_rail
+        if rail_cfg is not None:
+            logger.begin(f"high_current_rail pin={rail_cfg.pin} active_high={rail_cfg.active_high}")
+            _setup_high_current_rail(rail_cfg, board_module)
+            logger.end("asserted" if rail_cfg.enabled else "held off")
 
         i2c_cfg = config.i2c
         if i2c is None:

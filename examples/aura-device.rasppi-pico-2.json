@@ -1,5 +1,9 @@
 {
   "scene": "hardware_test",
+  "high_current_rail": {
+    "pin": "GP28",
+    "active_high": true
+  },
   "i2c": {
     "sda": "GP4",
     "scl": "GP5"

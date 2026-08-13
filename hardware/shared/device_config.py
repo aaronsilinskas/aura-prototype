@@ -17,6 +17,7 @@ __all__ = [
     "AccelerometerConfig",
     "DeviceConfig",
     "HapticsConfig",
+    "HighCurrentRailConfig",
     "I2CConfig",
     "MatrixPixelsConfig",
     "NeoPixelPixelsConfig",
@@ -54,10 +55,14 @@ _RADIO_PIN_FIELDS: Final = ("cs", "reset")
 
 _SDCARD_ALLOWED_KEYS: Final = ("cs", "mount", "enabled")
 
+_HIGH_CURRENT_RAIL_ALLOWED_KEYS: Final = ("pin", "active_high", "enabled")
+
 # `DeviceConfig.isolate` derives its isolatable set from `DeviceConfig.__slots__`
 # minus these -- i2c/spi are buses (infrastructure for the kept component, not
-# competition with it) and buttons carries no `enabled` flag to isolate.
-_ISOLATE_EXCLUDED_COMPONENTS: Final = ("i2c", "spi", "buttons")
+# competition with it), buttons carries no `enabled` flag to isolate, and
+# high_current_rail is infrastructure too: it gates the whole board's
+# high-current rail, so no `keep` should ever be able to switch it off.
+_ISOLATE_EXCLUDED_COMPONENTS: Final = ("i2c", "spi", "buttons", "high_current_rail")
 
 # ---------------------------------------------------------------------------
 # Config data classes
@@ -289,6 +294,29 @@ class SDCardConfig:
         self.enabled: bool = enabled
 
 
+class HighCurrentRailConfig:
+    """Parsed high-current rail enable-pin configuration.
+
+    Gates the board's high-current rail (NeoPixels, audio amp, and other
+    peripherals drawing more than a GPIO pin's own budget). ``active_high``
+    picks the asserted polarity: ``True`` (the default) drives the pin high
+    to enable the rail, ``False`` drives it low.
+
+    Unlike every other gated section, ``enabled=False`` does not mean "build
+    nothing" -- ``device_builder`` still resolves and drives ``pin``, to the
+    *deasserted* level, holding the rail definitively off rather than leaving
+    it floating (useful for brown-out debugging). See ``device_builder``'s
+    high-current-rail step for the driven-level logic.
+    """
+
+    __slots__ = ("active_high", "enabled", "pin")
+
+    def __init__(self, pin: str, active_high: bool = True, enabled: bool = True) -> None:
+        self.pin: str = pin
+        self.active_high: bool = active_high
+        self.enabled: bool = enabled
+
+
 def copy_with_enabled(section: object, enabled: bool) -> object:
     """Return a copy of *section* with ``enabled`` forced to *enabled*.
 
@@ -335,6 +363,7 @@ class DeviceConfig:
         "audio",
         "buttons",
         "haptics",
+        "high_current_rail",
         "i2c",
         "ir",
         "pixels",
@@ -355,6 +384,7 @@ class DeviceConfig:
         spi: SPIConfig | None,
         radio: RadioConfig | None,
         sdcard: SDCardConfig | None,
+        high_current_rail: HighCurrentRailConfig | None,
     ) -> None:
         self.pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = pixels
         self.buttons: list[str] = buttons
@@ -366,6 +396,7 @@ class DeviceConfig:
         self.spi: SPIConfig | None = spi
         self.radio: RadioConfig | None = radio
         self.sdcard: SDCardConfig | None = sdcard
+        self.high_current_rail: HighCurrentRailConfig | None = high_current_rail
 
     def isolate(self, keep: str) -> DeviceConfig:
         """Return a derived config with every isolatable component but *keep* disabled.
@@ -379,9 +410,11 @@ class DeviceConfig:
         present with ``enabled`` forced to ``False``, the same shape
         ``parse_device_config`` already produces for a declared-but-disabled
         section. A component that is absent on this config is a no-op --
-        it stays absent. ``i2c``, ``spi``, and ``buttons`` are never touched:
-        buses are infrastructure for the kept component, not competition
-        with it.
+        it stays absent. ``i2c``, ``spi``, ``buttons``, and
+        ``high_current_rail`` are never touched: buses and the high-current
+        rail are infrastructure for the kept component, not competition with
+        it -- isolating one component must never leave the whole board's
+        high-current rail switched off.
 
         The isolatable set is ``DeviceConfig.__slots__`` minus
         ``_ISOLATE_EXCLUDED_COMPONENTS``, so a component section added later
@@ -819,6 +852,23 @@ def _parse_sdcard(sdcard_raw: dict) -> SDCardConfig:
     return SDCardConfig(cs=cs, mount=mount, enabled=enabled)
 
 
+def _parse_high_current_rail(rail_raw: dict) -> HighCurrentRailConfig:
+    _reject_unknown_keys(rail_raw, "high_current_rail", allowed=_HIGH_CURRENT_RAIL_ALLOWED_KEYS)
+
+    if "pin" not in rail_raw:
+        raise ValueError("high_current_rail.pin is required")
+    pin = rail_raw["pin"]
+    if not isinstance(pin, str):
+        raise ValueError("high_current_rail.pin must be a string pin name")
+
+    active_high = rail_raw.get("active_high", True)
+    if not isinstance(active_high, bool):
+        raise ValueError(f"high_current_rail.active_high must be a boolean, got {active_high!r}")
+
+    enabled = _parse_enabled(rail_raw, "high_current_rail.enabled")
+    return HighCurrentRailConfig(pin=pin, active_high=active_high, enabled=enabled)
+
+
 def parse_device_config(mapping: dict) -> DeviceConfig:
     """Parse a device config mapping into a DeviceConfig.
 
@@ -908,6 +958,10 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     if "haptics" in mapping:
         haptics = _parse_haptics(mapping["haptics"])
 
+    high_current_rail: HighCurrentRailConfig | None = None
+    if "high_current_rail" in mapping:
+        high_current_rail = _parse_high_current_rail(mapping["high_current_rail"])
+
     return DeviceConfig(
         pixels=pixels,
         buttons=buttons,
@@ -919,6 +973,7 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
         spi=spi,
         radio=radio,
         sdcard=sdcard,
+        high_current_rail=high_current_rail,
     )
 
 

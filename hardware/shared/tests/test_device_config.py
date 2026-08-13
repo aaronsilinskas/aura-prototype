@@ -79,15 +79,16 @@ def neopixel_config():
 def full_isolatable_config(matrix_config):
     # Adds every section `matrix_config` lacks (i2c, spi, radio, sdcard,
     # accelerometer, haptics) so every isolatable component -- plus both
-    # excluded buses -- is declared and enabled, giving `isolate` tests a
-    # config where "disabled" and "absent" can never be confused for one
-    # another.
+    # excluded buses and the excluded high-current-rail section -- is declared
+    # and enabled, giving `isolate` tests a config where "disabled" and
+    # "absent" can never be confused for one another.
     matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5"}
     matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8"}
     matrix_config["radio"] = {"cs": "GP13", "reset": "GP14", "frequency": 915.0, "node": 5}
     matrix_config["sdcard"] = {"cs": "GP15"}
     matrix_config["accelerometer"] = {}
     matrix_config["haptics"] = {}
+    matrix_config["high_current_rail"] = {"pin": "GP28"}
     return matrix_config
 
 
@@ -1176,6 +1177,95 @@ def test_parse_sdcard_enabled_false_invalid_mount_still_raises_value_error(matri
 
 
 # ---------------------------------------------------------------------------
+# High-current rail (enable pin) validation
+# ---------------------------------------------------------------------------
+
+
+def test_parse_high_current_rail_section_maps_pin_active_high_and_enabled(matrix_config):
+    matrix_config["high_current_rail"] = {"pin": "GP28", "active_high": False, "enabled": False}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.high_current_rail is not None
+    assert result.high_current_rail.pin == "GP28"
+    assert result.high_current_rail.active_high is False
+    assert result.high_current_rail.enabled is False
+
+
+def test_parse_absent_high_current_rail_section_yields_none(matrix_config):
+    result = parse_device_config(matrix_config)
+
+    assert result.high_current_rail is None
+
+
+def test_parse_high_current_rail_missing_pin_raises_value_error_naming_field(matrix_config):
+    matrix_config["high_current_rail"] = {}
+
+    with pytest.raises(ValueError, match=r"high_current_rail\.pin"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_high_current_rail_non_string_pin_raises_value_error_naming_field(matrix_config):
+    matrix_config["high_current_rail"] = {"pin": 28}
+
+    with pytest.raises(ValueError, match=r"high_current_rail\.pin must be a string pin name"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_high_current_rail_absent_active_high_key_defaults_to_true(matrix_config):
+    matrix_config["high_current_rail"] = {"pin": "GP28"}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.high_current_rail.active_high is True
+
+
+def test_parse_high_current_rail_non_boolean_active_high_raises_value_error(matrix_config):
+    matrix_config["high_current_rail"] = {"pin": "GP28", "active_high": "yes"}
+
+    with pytest.raises(ValueError, match=r"high_current_rail\.active_high"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_high_current_rail_absent_enabled_key_defaults_to_true(matrix_config):
+    matrix_config["high_current_rail"] = {"pin": "GP28"}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.high_current_rail.enabled is True
+
+
+def test_parse_high_current_rail_enabled_false_retains_object_not_none(matrix_config):
+    matrix_config["high_current_rail"] = {"pin": "GP28", "enabled": False}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.high_current_rail is not None
+    assert result.high_current_rail.enabled is False
+
+
+def test_parse_high_current_rail_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
+    matrix_config["high_current_rail"] = {"pin": "GP28", "enabled": "yes"}
+
+    with pytest.raises(ValueError, match=r"high_current_rail\.enabled"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_high_current_rail_enabled_false_missing_pin_still_raises_value_error(matrix_config):
+    matrix_config["high_current_rail"] = {"enabled": False}
+
+    with pytest.raises(ValueError, match=r"high_current_rail\.pin"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_high_current_rail_unknown_key_raises_value_error_naming_allowed_keys(matrix_config):
+    matrix_config["high_current_rail"] = {"pin": "GP28", "speed": "fast"}
+
+    with pytest.raises(ValueError, match=r"high_current_rail\.speed.*pin, active_high, enabled"):
+        parse_device_config(matrix_config)
+
+
+# ---------------------------------------------------------------------------
 # Audio validation
 # ---------------------------------------------------------------------------
 
@@ -1498,6 +1588,7 @@ def test_isolate_leaves_the_original_config_unchanged(full_isolatable_config):
     assert config.haptics.enabled is True
     assert config.radio.enabled is True
     assert config.sdcard.enabled is True
+    assert config.high_current_rail.enabled is True
     assert all(entry.enabled for entry in config.pixels)
 
 
@@ -1541,7 +1632,7 @@ def test_isolate_does_not_force_enable_a_kept_component_declared_disabled(full_i
 
 
 @pytest.mark.parametrize("keep", _ISOLATABLE_COMPONENTS)
-def test_isolate_never_touches_i2c_spi_or_buttons(full_isolatable_config, keep):
+def test_isolate_never_touches_i2c_spi_buttons_or_high_current_rail(full_isolatable_config, keep):
     config = parse_device_config(full_isolatable_config)
 
     isolated = config.isolate(keep=keep)
@@ -1554,6 +1645,21 @@ def test_isolate_never_touches_i2c_spi_or_buttons(full_isolatable_config, keep):
     assert isolated.spi.miso == config.spi.miso
     assert isolated.spi.enabled == config.spi.enabled
     assert isolated.buttons == config.buttons
+    assert isolated.high_current_rail.pin == config.high_current_rail.pin
+    assert isolated.high_current_rail.active_high == config.high_current_rail.active_high
+    assert isolated.high_current_rail.enabled == config.high_current_rail.enabled
+
+
+def test_isolate_never_disables_high_current_rail_declared_disabled(full_isolatable_config):
+    """high_current_rail is excluded from isolation entirely -- even a section
+    declared `enabled: false` stays exactly as declared, unlike an isolatable
+    component's `enabled` field, which isolate never force-enables either."""
+    full_isolatable_config["high_current_rail"] = {"pin": "GP28", "enabled": False}
+    config = parse_device_config(full_isolatable_config)
+
+    isolated = config.isolate(keep="audio")
+
+    assert isolated.high_current_rail.enabled is False
 
 
 def _assert_same_fields_except_enabled(original, copy):
@@ -1614,12 +1720,14 @@ def test_isolate_on_minimal_config_is_a_no_op_for_absent_components():
     assert isolated.haptics is None
     assert isolated.radio is None
     assert isolated.sdcard is None
+    assert isolated.high_current_rail is None
     assert isolated.pixels == []
 
 
 def test_isolate_unknown_keep_raises_value_error_naming_valid_choices_sorted():
     config = parse_device_config({})
-    expected_choices = sorted(set(DeviceConfig.__slots__) - {"buttons", "i2c", "spi"})
+    excluded = {"buttons", "i2c", "high_current_rail", "spi"}
+    expected_choices = sorted(set(DeviceConfig.__slots__) - excluded)
 
     with pytest.raises(ValueError, match=", ".join(expected_choices)):
         config.isolate(keep="bogus")

@@ -72,7 +72,7 @@ if not hasattr(_rgbqt, "Adafruit_RGBMatrixQT"):
 
 # board pin stubs
 _board = sys.modules["board"]
-for _attr in ("SCL", "SDA", "EXTERNAL_POWER", "D9", "D10"):
+for _attr in ("SCL", "SDA", "D9", "D10"):
     if not hasattr(_board, _attr):
         setattr(_board, _attr, object())
 

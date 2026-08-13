@@ -48,7 +48,6 @@ def _enter_hw_patches(
     ``_setup_radio``, or ``_setup_sdcard`` to run for real (e.g. hitting
     their own ImportError probes) — their mock is then `None`.
     """
-    stack.enter_context(patch("hardware.circuitpython.device_builder._setup_external_power"))
     mock_setup_i2c = stack.enter_context(
         patch(
             "hardware.circuitpython.device_builder._setup_i2c",
