@@ -18,18 +18,18 @@ _WIN_STING_HAPTIC = EffectHaptic(
     }
 )
 
+_WIN_STING_AUDIO = EffectAudio(
+    clips={
+        "start": AudioPlaybackConfig(name="scene.win_sting_start", loop=False, stops_effect=True)
+    }
+)
+
 
 class _Builder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
         return Effect(
             name=name,
-            audio=EffectAudio(
-                clips={
-                    "start": AudioPlaybackConfig(
-                        name="win_sting_start", loop=False, stops_effect=True
-                    )
-                }
-            ),
+            audio=_WIN_STING_AUDIO,
             haptic=_WIN_STING_HAPTIC,
         )
 

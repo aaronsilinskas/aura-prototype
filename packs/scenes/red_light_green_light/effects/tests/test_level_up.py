@@ -77,7 +77,7 @@ def test_level_up_plays_level_up_start_clip_on_start_event() -> None:
     effect = _build()
 
     assert effect.audio is not None
-    assert effect.audio.clips["start"].name == "level_up_start"
+    assert effect.audio.clips["start"].name == "scene.level_up_start"
 
 
 def test_level_up_audio_clip_is_one_shot_not_looping() -> None:

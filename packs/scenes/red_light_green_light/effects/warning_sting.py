@@ -13,6 +13,10 @@ _pulse = PulseBuilder()
 
 _WARNING_STING_HAPTIC = EffectHaptic(patterns={"peak": HapticPattern([HapticPattern.STRONG_CLICK])})
 
+_WARNING_STING_AUDIO = EffectAudio(
+    clips={"peak": AudioPlaybackConfig(name="scene.warning_sting_peak", loop=False)}
+)
+
 
 class _Builder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
@@ -20,7 +24,7 @@ class _Builder(EffectBuilder):
         return Effect(
             name=base.name,
             pixels=base.pixels,
-            audio=EffectAudio(clips={"peak": AudioPlaybackConfig(name=name + "_peak", loop=False)}),
+            audio=_WARNING_STING_AUDIO,
             haptic=_WARNING_STING_HAPTIC,
         )
 
