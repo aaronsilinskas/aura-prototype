@@ -666,7 +666,7 @@ def test_scene_flag_sets_scene_key_in_existing_device_config(tmp_path: Path) -> 
     existing_config = {
         "pixels": [{"type": "matrix", "cols": 13, "scope_rows": {"personal": [0, 1]}}],
         "buttons": ["D9"],
-        "audio": {"voices": 2, "max_volume": 0.5, "clips": {}},
+        "audio": {"voices": 2, "max_volume": 0.5},
     }
     (mount / "aura-device.json").write_text(json.dumps(existing_config))
 
@@ -685,7 +685,7 @@ def test_scene_flag_preserves_other_keys_in_existing_device_config(tmp_path: Pat
     existing_config = {
         "pixels": [{"type": "matrix", "cols": 13, "scope_rows": {"personal": [0, 1]}}],
         "buttons": ["D9"],
-        "audio": {"voices": 2, "max_volume": 0.5, "clips": {}},
+        "audio": {"voices": 2, "max_volume": 0.5},
     }
     (mount / "aura-device.json").write_text(json.dumps(existing_config))
 

@@ -41,7 +41,6 @@ def test_build_hardware_pixels_outputs_precede_audio_and_haptic_outputs() -> Non
         "audio": {
             "voices": 1,
             "max_volume": 0.5,
-            "clips": {"hit": "/sounds/hit.wav"},
             "i2s_bit_clock": "I2S_BIT_CLOCK",
             "i2s_word_select": "I2S_WORD_SELECT",
             "i2s_data": "I2S_DATA",

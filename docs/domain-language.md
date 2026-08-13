@@ -187,7 +187,7 @@ _Avoid_: "phase" (a Round spans several); "level-up" (the celebratory beat betwe
 
 ### AudioRegistry
 Resolves a qualified clip name to a WAV path via **prefix routing**, exactly mirroring `EffectResolver`: `scene.<stem>` resolves against the active scene's swappable **overlay** (installed via the `AudioOverlayAdmin` face it implements); `<pack>.<stem>` resolves against a shared **base** (`<pack>.<stem>` → path), populated by scanning a pack's `sounds/` folder via `scan_pack_sounds`. An unprefixed name, or a name absent from its routed map, **raises** rather than returning `None`.
-_Avoid_: `PackRegistry.sound_path` for new audio effects (deprecated); returning `None` on a resolution miss (raise instead); a bare, unqualified base key (qualify with the pack name so two packs can share a stem)
+_Avoid_: returning `None` on a resolution miss (raise instead); a bare, unqualified base key (qualify with the pack name so two packs can share a stem)
 
 ### AudioOverlayAdmin
 The scene-transition-facing seam for swapping the active scene's sound overlay — `set_scene_sounds(sounds | None)` — mirroring `EffectAdmin.set_local_effects`. `AudioRegistry` implements it; `SceneManager` holds an injected handle and installs the active scene's sounds in `_activate`, right beside the `EffectAdmin.set_local_effects` push.
