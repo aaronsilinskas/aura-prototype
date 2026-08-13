@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 
 import engine._path as _path
-from engine.events import EffectEvent
 from engine.version import Version
 
 try:
@@ -290,25 +289,6 @@ class PackRegistry:
         if meta is None:
             raise UnknownPackError(pack_name)
         return sorted(meta.item_names)
-
-    def sound_path(self, event: EffectEvent) -> str | None:
-        """Return the WAV file path for *event*.
-
-        The lookup key is ``{event.name}_{event.verb}.wav`` inside the
-        ``sounds/`` subdirectory of the matching pack directory.
-
-        Returns the resolved path string if the pack is registered, or
-        ``None`` if the pack is unknown.
-        """
-        pack_name = event.pack
-        name = event.name
-        verb = event.verb
-        meta = self._packs.get(pack_name)
-        if meta is None:
-            return None
-        pack_dir = _path.join(meta.source_path, pack_name)
-        sounds_dir = _path.join(pack_dir, "sounds")
-        return _path.join(sounds_dir, name + "_" + verb + ".wav")
 
     def check_version(self, pack_name: str, required: Version) -> None:
         """Verify that the installed pack version satisfies the minimum required.

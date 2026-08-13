@@ -104,10 +104,7 @@ If the file is absent the built-in default (PropMaker + IS31FL3741 matrix) is us
   },
   "audio": {
     "voices": 2,
-    "max_volume": 0.1,
-    "clips": {
-      "clip_name": "sounds/file.wav"
-    }
+    "max_volume": 0.1
   }
 }
 ```
@@ -124,7 +121,9 @@ If the file is absent the built-in default (PropMaker + IS31FL3741 matrix) is us
 `area_of_effect` emitters. The wire-frame codec is injected at `build_hardware()` call site
 via `ir_encoder` / `ir_decoder` — `tag_demo.py` passes `TagInfraredEncoder/Decoder` here.
 
-**`audio`** — optional. `voices` (int, ≥ 1), `max_volume` (0.0–1.0), `clips` (name → path).
+**`audio`** — optional. `voices` (int, ≥ 1), `max_volume` (0.0–1.0). Clip resolution is
+`AudioRegistry`'s job (base scanned from `packs/effects/*/sounds`, overlay installed per
+scene), not a device-config concern.
 
 ### Running an example
 

@@ -105,7 +105,6 @@ class TestMetricsHarnessLabel:
                 ],
                 "audio": {
                     "voices": 4,
-                    "clips": {},
                     "i2s_bit_clock": "GP10",
                     "i2s_word_select": "GP11",
                     "i2s_data": "GP12",
@@ -126,7 +125,6 @@ class TestMetricsHarnessLabel:
                 "audio": {
                     "enabled": False,
                     "voices": 4,
-                    "clips": {},
                     "i2s_bit_clock": "GP10",
                     "i2s_word_select": "GP11",
                     "i2s_data": "GP12",
@@ -446,7 +444,6 @@ class TestMetricsHarnessLabel:
                 ],
                 "audio": {
                     "voices": 4,
-                    "clips": {},
                     "i2s_bit_clock": "GP10",
                     "i2s_word_select": "GP11",
                     "i2s_data": "GP12",
