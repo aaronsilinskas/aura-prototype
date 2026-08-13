@@ -18,6 +18,7 @@ except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
 import engine._path as _path
+from engine.audio import scan_sound_dir
 from engine.engine import GameEngine, GameRule, Version
 from engine.packs import PackRegistry, UnknownItemError, load_item, scan_item_names
 from engine.state import EffectAdmin, GameState, MergeStrategy, SceneControls, Scope
@@ -110,6 +111,12 @@ class Scene:
     ``local_effect_registry`` is the ``SceneLocalRegistry`` for this scene's
     scene-local effects (items expose a ``BUILD`` ``EffectBuilder``).  Built
     once at discovery and shared across fresh ``Scene`` instances.
+
+    ``local_sound_map`` is a bare-keyed ``{stem: path}`` map of this scene's
+    scene-local sounds (its ``sounds/`` subdirectory).  Built once at discovery
+    via ``scan_sound_dir`` and shared across fresh ``Scene`` instances, mirroring
+    ``local_rule_registry``/``local_effect_registry``.  Purely additive for now —
+    no consumer resolves it yet.
     """
 
     __slots__ = (
@@ -118,6 +125,7 @@ class Scene:
         "initial_data",
         "local_effect_registry",
         "local_rule_registry",
+        "local_sound_map",
         "rule_packs",
         "version",
     )
@@ -130,6 +138,7 @@ class Scene:
         version: Version | None = None,
         local_rule_registry: SceneLocalRegistry | None = None,
         local_effect_registry: SceneLocalRegistry | None = None,
+        local_sound_map: dict[str, str] | None = None,
     ) -> None:
         self.effect_packs = effect_packs
         self.rule_packs = rule_packs
@@ -145,6 +154,7 @@ class Scene:
             if local_effect_registry is not None
             else SceneLocalRegistry(item_attr="BUILD")
         )
+        self.local_sound_map = local_sound_map if local_sound_map is not None else {}
 
 
 class _SceneEntry:
@@ -155,6 +165,7 @@ class _SceneEntry:
         "initial_data",
         "local_effect_registry",
         "local_rule_registry",
+        "local_sound_map",
         "rule_packs",
         "source_path",
         "version",
@@ -169,6 +180,7 @@ class _SceneEntry:
         source_path: str,
         local_rule_registry: SceneLocalRegistry,
         local_effect_registry: SceneLocalRegistry,
+        local_sound_map: dict[str, str],
     ) -> None:
         self.version = version
         self.effect_packs = effect_packs
@@ -177,6 +189,7 @@ class _SceneEntry:
         self.source_path = source_path
         self.local_rule_registry = local_rule_registry
         self.local_effect_registry = local_effect_registry
+        self.local_sound_map = local_sound_map
 
 
 class SceneRegistry:
@@ -214,7 +227,9 @@ class SceneRegistry:
         every ``.py`` file in it (except ``__init__.py`` and any ``tests/`` subdir)
         is recorded as a scene-local rule item in that scene's
         ``SceneLocalRegistry``.  The local module prefix for each item is derived
-        as ``module_prefix + "." + scene_name + ".rules"``.
+        as ``module_prefix + "." + scene_name + ".rules"``.  If a scene folder
+        contains a ``sounds/`` subdirectory, every ``*.wav`` file in it is recorded
+        in that scene's bare-keyed ``local_sound_map`` (``stem`` → path).
 
         *module_prefix* is the dotted import root for scene directories (e.g.
         ``"packs.scenes"``).  It is required; path-relative derivation is
@@ -286,6 +301,7 @@ class SceneRegistry:
                 _path.join(scene_dir, "effects"),
                 module_prefix + "." + scene_name + ".effects",
             )
+            local_sound_map = scan_sound_dir(_path.join(scene_dir, "sounds"))
 
             self._scenes[scene_name] = _SceneEntry(
                 version=version,
@@ -295,6 +311,7 @@ class SceneRegistry:
                 source_path=norm_path,
                 local_rule_registry=local_rule_registry,
                 local_effect_registry=local_effect_registry,
+                local_sound_map=local_sound_map,
             )
 
     def get(self, name: str) -> Scene:
@@ -324,6 +341,7 @@ class SceneRegistry:
             version=entry.version,
             local_rule_registry=entry.local_rule_registry,
             local_effect_registry=entry.local_effect_registry,
+            local_sound_map=entry.local_sound_map,
         )
 
     def names(self) -> list[str]:
