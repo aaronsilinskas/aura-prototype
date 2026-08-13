@@ -113,13 +113,13 @@ def _build_output(audio_registry: AudioRegistry) -> AudioEffectOutput:
 def run() -> None:
     """Sweep concurrent voices, reporting per-frame mixer-fixed + per-voice cost."""
     audio_registry = AudioRegistry()
-    audio_registry.register(_CLIP_NAME, CLIP_PATH)
+    audio_registry.set_scene_sounds({_CLIP_NAME: CLIP_PATH})
 
     output = _build_output(audio_registry)
 
     looping_effect = Effect(
         "profiler.loop",
-        audio=EffectAudio({_EVENT_VERB: AudioPlaybackConfig(_CLIP_NAME, loop=True)}),
+        audio=EffectAudio({_EVENT_VERB: AudioPlaybackConfig(f"scene.{_CLIP_NAME}", loop=True)}),
     )
     play_event = EffectEvent("profiler", "loop", _EVENT_VERB)
 
