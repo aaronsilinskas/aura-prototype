@@ -1,6 +1,6 @@
-"""Tests for device_builder's bus/power subsystem: ``_setup_i2c``,
-``open_config_i2c``, ``_setup_spi``, ``_setup_power``, and the matching
-i2c/spi/power slices of ``build_hardware``.
+"""Tests for device_builder's bus/rail subsystem: ``_setup_i2c``,
+``open_config_i2c``, ``_setup_spi``, ``_setup_high_current_rail``, and the
+matching i2c/spi/high_current_rail slices of ``build_hardware``.
 
 Split out of test_device_builder.py (#777) to keep that suite from growing
 unbounded; other hardware subsystems stay there. Shared config-shape helpers,
@@ -8,11 +8,11 @@ unbounded; other hardware subsystems stay there. Shared config-shape helpers,
 (#775). Hardware modules (board, busio, pulseio, digitalio) are patched so
 this suite runs under CPython.
 
-The power section replaced the old board-presence-probed ``EXTERNAL_POWER``
-rail (#798): the pin is config-driven, and unlike every other gated
-component a disabled power section still drives its pin -- to the
-deasserted level, holding the rail definitively off rather than leaving it
-undriven.
+The high_current_rail section replaced the old board-presence-probed
+``EXTERNAL_POWER`` rail (#798): the pin is config-driven, and unlike every
+other gated component a disabled high_current_rail section still drives its
+pin -- to the deasserted level, holding the rail definitively off rather than
+leaving it undriven.
 """
 
 from __future__ import annotations
@@ -122,116 +122,116 @@ def test_build_hardware_uses_its_own_constructed_bus_for_matrix_when_i2c_omitted
 
 
 # ---------------------------------------------------------------------------
-# _setup_power -- resolves the config-declared pin and drives the asserted
-# or deasserted level, replacing the old board-presence-probed
+# _setup_high_current_rail -- resolves the config-declared pin and drives the
+# asserted or deasserted level, replacing the old board-presence-probed
 # _setup_external_power (#798)
 # ---------------------------------------------------------------------------
 
 
-def _power_config(pin: str = "GP28", active_high: bool | None = None, enabled: bool | None = None):
-    power: dict[str, object] = {"pin": pin}
+def _rail_config(pin: str = "GP28", active_high: bool | None = None, enabled: bool | None = None):
+    rail: dict[str, object] = {"pin": pin}
     if active_high is not None:
-        power["active_high"] = active_high
+        rail["active_high"] = active_high
     if enabled is not None:
-        power["enabled"] = enabled
-    mapping = {"buttons": ["D9"], "power": power}
-    return parse_device_config(mapping).power
+        rail["enabled"] = enabled
+    mapping = {"buttons": ["D9"], "high_current_rail": rail}
+    return parse_device_config(mapping).high_current_rail
 
 
-def test_setup_power_resolves_pin_by_name() -> None:
+def test_setup_high_current_rail_resolves_pin_by_name() -> None:
     pin = MagicMock(name="GP28_pin")
     board_mock = _mock_board(GP28=pin)
-    power_cfg = _power_config()
+    rail_cfg = _rail_config()
 
     with ExitStack() as stack:
         mock_digitalio = stack.enter_context(
             patch("hardware.circuitpython.device_builder.digitalio")
         )
 
-        from hardware.circuitpython.device_builder import _setup_power
+        from hardware.circuitpython.device_builder import _setup_high_current_rail
 
-        _setup_power(power_cfg, board_mock)
+        _setup_high_current_rail(rail_cfg, board_mock)
 
     mock_digitalio.DigitalInOut.assert_called_once_with(pin)
 
 
-def test_setup_power_drives_pin_high_when_active_high_and_enabled() -> None:
+def test_setup_high_current_rail_drives_pin_high_when_active_high_and_enabled() -> None:
     board_mock = _mock_board(GP28=MagicMock())
-    power_cfg = _power_config(active_high=True, enabled=True)
+    rail_cfg = _rail_config(active_high=True, enabled=True)
 
     with ExitStack() as stack:
         mock_digitalio = stack.enter_context(
             patch("hardware.circuitpython.device_builder.digitalio")
         )
 
-        from hardware.circuitpython.device_builder import _setup_power
+        from hardware.circuitpython.device_builder import _setup_high_current_rail
 
-        _setup_power(power_cfg, board_mock)
+        _setup_high_current_rail(rail_cfg, board_mock)
 
     mock_digitalio.DigitalInOut.return_value.switch_to_output.assert_called_once_with(value=True)
 
 
-def test_setup_power_drives_pin_low_when_active_low_and_enabled() -> None:
+def test_setup_high_current_rail_drives_pin_low_when_active_low_and_enabled() -> None:
     board_mock = _mock_board(GP28=MagicMock())
-    power_cfg = _power_config(active_high=False, enabled=True)
+    rail_cfg = _rail_config(active_high=False, enabled=True)
 
     with ExitStack() as stack:
         mock_digitalio = stack.enter_context(
             patch("hardware.circuitpython.device_builder.digitalio")
         )
 
-        from hardware.circuitpython.device_builder import _setup_power
+        from hardware.circuitpython.device_builder import _setup_high_current_rail
 
-        _setup_power(power_cfg, board_mock)
+        _setup_high_current_rail(rail_cfg, board_mock)
 
     mock_digitalio.DigitalInOut.return_value.switch_to_output.assert_called_once_with(value=False)
 
 
-def test_setup_power_drives_pin_low_when_active_high_and_disabled() -> None:
+def test_setup_high_current_rail_drives_pin_low_when_active_high_and_disabled() -> None:
     """`enabled: false` still drives the pin -- to the deasserted level,
     holding the rail definitively off rather than leaving it undriven."""
     board_mock = _mock_board(GP28=MagicMock())
-    power_cfg = _power_config(active_high=True, enabled=False)
+    rail_cfg = _rail_config(active_high=True, enabled=False)
 
     with ExitStack() as stack:
         mock_digitalio = stack.enter_context(
             patch("hardware.circuitpython.device_builder.digitalio")
         )
 
-        from hardware.circuitpython.device_builder import _setup_power
+        from hardware.circuitpython.device_builder import _setup_high_current_rail
 
-        _setup_power(power_cfg, board_mock)
+        _setup_high_current_rail(rail_cfg, board_mock)
 
     mock_digitalio.DigitalInOut.return_value.switch_to_output.assert_called_once_with(value=False)
 
 
-def test_setup_power_drives_pin_high_when_active_low_and_disabled() -> None:
+def test_setup_high_current_rail_drives_pin_high_when_active_low_and_disabled() -> None:
     board_mock = _mock_board(GP28=MagicMock())
-    power_cfg = _power_config(active_high=False, enabled=False)
+    rail_cfg = _rail_config(active_high=False, enabled=False)
 
     with ExitStack() as stack:
         mock_digitalio = stack.enter_context(
             patch("hardware.circuitpython.device_builder.digitalio")
         )
 
-        from hardware.circuitpython.device_builder import _setup_power
+        from hardware.circuitpython.device_builder import _setup_high_current_rail
 
-        _setup_power(power_cfg, board_mock)
+        _setup_high_current_rail(rail_cfg, board_mock)
 
     mock_digitalio.DigitalInOut.return_value.switch_to_output.assert_called_once_with(value=True)
 
 
-def test_setup_power_bad_pin_name_raises_value_error_naming_field_and_pin() -> None:
+def test_setup_high_current_rail_bad_pin_name_raises_value_error_naming_field_and_pin() -> None:
     board_mock = MagicMock(spec=[])  # no attributes resolve
-    power_cfg = _power_config(pin="NONEXISTENT_PIN")
+    rail_cfg = _rail_config(pin="NONEXISTENT_PIN")
 
     with ExitStack() as stack:
         stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
 
-        from hardware.circuitpython.device_builder import _setup_power
+        from hardware.circuitpython.device_builder import _setup_high_current_rail
 
-        with pytest.raises(ValueError, match=r"power\.pin.*NONEXISTENT_PIN"):
-            _setup_power(power_cfg, board_mock)
+        with pytest.raises(ValueError, match=r"high_current_rail\.pin.*NONEXISTENT_PIN"):
+            _setup_high_current_rail(rail_cfg, board_mock)
 
 
 # ---------------------------------------------------------------------------
@@ -562,24 +562,24 @@ def test_build_hardware_passes_i2c_config_and_board_to_setup_i2c() -> None:
 
 
 # ---------------------------------------------------------------------------
-# build_hardware -- power narration (#798), replacing the old
+# build_hardware -- high_current_rail narration (#798), replacing the old
 # external-power ok/no-rail line
 # ---------------------------------------------------------------------------
 
 
-def _config_with_power(
+def _config_with_rail(
     pin: str = "GP28", active_high: bool | None = None, enabled: bool | None = None
 ):
-    power: dict[str, object] = {"pin": pin}
+    rail: dict[str, object] = {"pin": pin}
     if active_high is not None:
-        power["active_high"] = active_high
+        rail["active_high"] = active_high
     if enabled is not None:
-        power["enabled"] = enabled
-    return parse_device_config({"buttons": ["D9"], "power": power})
+        rail["enabled"] = enabled
+    return parse_device_config({"buttons": ["D9"], "high_current_rail": rail})
 
 
-def test_build_hardware_logs_power_asserted_when_enabled() -> None:
-    config = _config_with_power(active_high=True, enabled=True)
+def test_build_hardware_logs_rail_asserted_when_enabled() -> None:
+    config = _config_with_rail(active_high=True, enabled=True)
     board_mock = _mock_board(D9=MagicMock(), GP28=MagicMock())
     logger, fragments = _recording_logger()
 
@@ -591,14 +591,14 @@ def test_build_hardware_logs_power_asserted_when_enabled() -> None:
 
         build_hardware(config, board_module=board_mock, logger=logger)
 
-    assert "[hw] power pin=GP28 active_high=True asserted\n" in "".join(fragments)
+    assert "[hw] high_current_rail pin=GP28 active_high=True asserted\n" in "".join(fragments)
 
 
-def test_build_hardware_logs_power_held_off_when_disabled() -> None:
+def test_build_hardware_logs_rail_held_off_when_disabled() -> None:
     """`enabled: false` still resolves and drives the pin -- narrated as
     "held off", not skipped like a disabled section on every other
     component."""
-    config = _config_with_power(active_high=True, enabled=False)
+    config = _config_with_rail(active_high=True, enabled=False)
     board_mock = _mock_board(D9=MagicMock(), GP28=MagicMock())
     logger, fragments = _recording_logger()
 
@@ -610,10 +610,10 @@ def test_build_hardware_logs_power_held_off_when_disabled() -> None:
 
         build_hardware(config, board_module=board_mock, logger=logger)
 
-    assert "[hw] power pin=GP28 active_high=True held off\n" in "".join(fragments)
+    assert "[hw] high_current_rail pin=GP28 active_high=True held off\n" in "".join(fragments)
 
 
-def test_build_hardware_logs_no_power_line_when_section_absent() -> None:
+def test_build_hardware_logs_no_rail_line_when_section_absent() -> None:
     config = _minimal_config()
     board_mock = _mock_board(D9=MagicMock())
     logger, fragments = _recording_logger()
@@ -625,12 +625,12 @@ def test_build_hardware_logs_no_power_line_when_section_absent() -> None:
 
         build_hardware(config, board_module=board_mock, logger=logger)
 
-    assert "power" not in "".join(fragments)
+    assert "high_current_rail" not in "".join(fragments)
 
 
-def test_build_hardware_power_bad_pin_marks_its_own_line_failed_and_propagates() -> None:
-    config = _config_with_power(pin="NONEXISTENT_PIN")
-    board_mock = MagicMock(spec=["D9"])  # power's pin has no attribute to resolve
+def test_build_hardware_rail_bad_pin_marks_its_own_line_failed_and_propagates() -> None:
+    config = _config_with_rail(pin="NONEXISTENT_PIN")
+    board_mock = MagicMock(spec=["D9"])  # the rail's pin has no attribute to resolve
     board_mock.D9 = MagicMock()
     logger, fragments = _recording_logger()
 
@@ -640,14 +640,14 @@ def test_build_hardware_power_bad_pin_marks_its_own_line_failed_and_propagates()
 
         from hardware.circuitpython.device_builder import build_hardware
 
-        with pytest.raises(ValueError, match=r"power\.pin.*NONEXISTENT_PIN"):
+        with pytest.raises(ValueError, match=r"high_current_rail\.pin.*NONEXISTENT_PIN"):
             build_hardware(config, board_module=board_mock, logger=logger)
 
     lines = "".join(fragments).splitlines(keepends=True)
-    assert lines[-1] == "[hw] power pin=NONEXISTENT_PIN active_high=True FAILED\n"
+    assert lines[-1] == "[hw] high_current_rail pin=NONEXISTENT_PIN active_high=True FAILED\n"
 
 
-def test_build_hardware_no_power_pin_driven_when_section_absent() -> None:
+def test_build_hardware_no_rail_pin_driven_when_section_absent() -> None:
     config = _minimal_config()
     board_mock = _mock_board(D9=MagicMock())
 
@@ -764,8 +764,9 @@ def test_build_hardware_i2c_setup_failure_marks_i2c_line_failed_and_propagates()
     _setup_i2c itself catches (e.g. a wedged bus) still closes its own line
     with FAILED, and the exception still propagates -- the single
     whole-function try/except (#758), not a per-component one. A preceding
-    power section's own line must stay untouched by the later i2c failure."""
-    config = _config_with_power(active_high=True, enabled=True)
+    high_current_rail section's own line must stay untouched by the later i2c
+    failure."""
+    config = _config_with_rail(active_high=True, enabled=True)
     board_mock = _mock_board(D9=MagicMock(), GP28=MagicMock())
     logger, fragments = _recording_logger()
 
@@ -784,5 +785,5 @@ def test_build_hardware_i2c_setup_failure_marks_i2c_line_failed_and_propagates()
             build_hardware(config, board_module=board_mock, logger=logger)
 
     lines = "".join(fragments).splitlines(keepends=True)
-    assert lines[-2] == "[hw] power pin=GP28 active_high=True asserted\n"
+    assert lines[-2] == "[hw] high_current_rail pin=GP28 active_high=True asserted\n"
     assert lines[-1] == "[hw] i2c default FAILED\n"

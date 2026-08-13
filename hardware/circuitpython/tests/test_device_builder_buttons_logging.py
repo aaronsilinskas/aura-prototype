@@ -1,9 +1,9 @@
 """Tests for device_builder's buttons subsystem (``_setup_buttons`` via
 build_hardware, ``_describe_buttons``) and build_hardware's cross-cutting
-narration spine (banner, i2c, spi, buttons, closing summary). Power is no
-longer unconditional -- it is config-gated like every other section (#798)
--- so its narration lives with the rest of its coverage in
-test_device_builder_buses_power.py. Other subsystems' narration tests live in
+narration spine (banner, i2c, spi, buttons, closing summary). The
+high_current_rail is no longer unconditional -- it is config-gated like every
+other section (#798) -- so its narration lives with the rest of its coverage
+in test_device_builder_buses_power.py. Other subsystems' narration tests live in
 their own split files (pixels, buses_power, audio_haptics, radio_ir);
 core/cross-subsystem build_hardware integration tests stay in
 test_device_builder.py. Config-shape and logging helpers come from

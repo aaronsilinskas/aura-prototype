@@ -202,20 +202,20 @@ A CircuitPython `EffectOutput` driving a DRV2605L haptic driver on all scopes (`
 _Avoid_: constructing with a `None` driver; reading `receipt.loudness` (the DRV2605L has no volume control); "motor" for the injected instance (use `driver`)
 
 ### aura-device.json
-The single **required** on-device file holding all hardware configuration; a missing file raises. Sections: `buttons`, `ir`, `pixels`, `audio`, `i2c`, `spi`, `radio`, `sdcard`, `power`, `accelerometer`, `haptics`, plus a top-level `"scene"` string (read separately, **not** part of `DeviceConfig`). `pixels` and `buttons` are each an optional, possibly-empty list.
+The single **required** on-device file holding all hardware configuration; a missing file raises. Sections: `buttons`, `ir`, `pixels`, `audio`, `i2c`, `spi`, `radio`, `sdcard`, `high_current_rail`, `accelerometer`, `haptics`, plus a top-level `"scene"` string (read separately, **not** part of `DeviceConfig`). `pixels` and `buttons` are each an optional, possibly-empty list.
 _Avoid_: `settings.toml` (removed — unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`
 
 ### DeviceConfig
 The validated value object produced by the pure `parse_device_config` parser (no `board` import) — it validates and normalizes an `aura-device.json` mapping but constructs no hardware. `isolate(keep)` derives a new config with every isolatable component but `keep` disabled.
 _Avoid_: importing `board` into the parser; constructing hardware in the parser (that is `device_builder`'s job); hand-listing the isolatable components (derive from `__slots__`)
 
-### PowerConfig
-The parsed config for the board's high-current power-enable pin — the line gating the ~2 A NeoPixel rail (and any other peripheral drawing more than a GPIO's own budget). Fields: `pin` (required), `active_high` (default `True`, picks the asserted polarity), `enabled` (default `True`). Excluded from `isolate` (like `i2c`/`spi`): it is infrastructure, not a component `isolate` should ever be able to switch off. See **Component enabled toggle** for its `enabled: false` deviation.
-_Avoid_: treating it like `SDCardConfig`'s `enabled` (build-nothing); assuming `isolate(keep=...)` ever disables it
+### HighCurrentRailConfig
+The parsed config for the board's high-current rail enable pin — the line gating the ~2 A NeoPixel rail (and any other peripheral drawing more than a GPIO's own budget). Fields: `pin` (required), `active_high` (default `True`, picks the asserted polarity), `enabled` (default `True`). Excluded from `isolate` (like `i2c`/`spi`): it is infrastructure, not a component `isolate` should ever be able to switch off. See **Component enabled toggle** for its `enabled: false` deviation.
+_Avoid_: `power`/`external power` (too generic — this is only the switched high-current subset, not board power); treating it like `SDCardConfig`'s `enabled` (build-nothing); assuming `isolate(keep=...)` ever disables it
 
 ### Component enabled toggle
-The optional `enabled` boolean on every hardware component config object (default `True`); `enabled: false` retains a parsed, fully-validated section but tells `device_builder` not to build it. `buttons` is a bare pin-name list and is not gated. `power` is the one exception: `enabled: false` still resolves and drives its pin, to the deasserted level, rather than building nothing — see `PowerConfig`.
-_Avoid_: treating `enabled: false` as omitting the section at parse time (validation still runs in full); assuming `i2c`/`spi` `enabled: false` falls back to default pins (each builds no bus at all); writing `.enabled` after parse (use `isolate`); assuming `power`'s `enabled: false` means "build nothing" like every other section
+The optional `enabled` boolean on every hardware component config object (default `True`); `enabled: false` retains a parsed, fully-validated section but tells `device_builder` not to build it. `buttons` is a bare pin-name list and is not gated. `high_current_rail` is the one exception: `enabled: false` still resolves and drives its pin, to the deasserted level, rather than building nothing — see `HighCurrentRailConfig`.
+_Avoid_: treating `enabled: false` as omitting the section at parse time (validation still runs in full); assuming `i2c`/`spi` `enabled: false` falls back to default pins (each builds no bus at all); writing `.enabled` after parse (use `isolate`); assuming `high_current_rail`'s `enabled: false` means "build nothing" like every other section
 
 ### Composition layer (app/)
 The top-level `app/` package: `scene_composition.py` builds the engine/effect/scene machinery (board-free, CPython-testable) and `scene_runtime.py` wires it to real hardware and drives the per-tick loop. The one place allowed to import both engine runtime machinery and `hardware.*`.

@@ -48,10 +48,10 @@ from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
     AudioConfig,
     DeviceConfig,
+    HighCurrentRailConfig,
     I2CConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
-    PowerConfig,
     RadioConfig,
     SDCardConfig,
     SPIConfig,
@@ -91,27 +91,27 @@ def _resolve_pin(board_module: object, field: str, name: str) -> microcontroller
         raise ValueError(f"{field}: pin '{name}' not found on board") from None
 
 
-def _setup_power(power_cfg: PowerConfig, board_module: object) -> None:
-    """Resolve *power_cfg*'s pin and drive it to the asserted or deasserted level.
+def _setup_high_current_rail(rail_cfg: HighCurrentRailConfig, board_module: object) -> None:
+    """Resolve *rail_cfg*'s pin and drive it to the asserted or deasserted level.
 
     Replaces the old board-presence-probed ``EXTERNAL_POWER`` rail: the pin
     comes solely from config now, resolved by name against *board_module*
-    (raising a ``power.pin``-named ``ValueError`` for an unknown name, via
-    :func:`_resolve_pin`).
+    (raising a ``high_current_rail.pin``-named ``ValueError`` for an unknown
+    name, via :func:`_resolve_pin`).
 
-    *power_cfg* is passed in regardless of ``power_cfg.enabled`` -- unlike
-    every other gated component, a disabled power section still drives its
-    pin, to the *deasserted* level, holding the high-current rail
+    *rail_cfg* is passed in regardless of ``rail_cfg.enabled`` -- unlike
+    every other gated component, a disabled high-current-rail section still
+    drives its pin, to the *deasserted* level, holding the high-current rail
     definitively off rather than leaving it floating (brown-out debugging).
     An enabled section drives the *asserted* level instead. Both levels are
-    ``power_cfg.active_high`` or its inverse: high asserts on an
+    ``rail_cfg.active_high`` or its inverse: high asserts on an
     active-high pin, low asserts on an active-low one, and vice versa for
     deasserted. This is the codebase's first active-low output.
     """
-    pin = _resolve_pin(board_module, "power.pin", power_cfg.pin)
+    pin = _resolve_pin(board_module, "high_current_rail.pin", rail_cfg.pin)
     output = digitalio.DigitalInOut(pin)
-    asserted = power_cfg.active_high
-    level = asserted if power_cfg.enabled else not asserted
+    asserted = rail_cfg.active_high
+    level = asserted if rail_cfg.enabled else not asserted
     output.switch_to_output(value=level)
 
 
@@ -701,9 +701,9 @@ def build_hardware(
     (the opening banner, spi, and buttons) plus a closing summary line;
     omitted or ``None`` normalizes to :data:`~engine.log.Logger.SILENT` here,
     so every call below logs unconditionally and an uninstrumented caller
-    sees no output at all. A declared power section is narrated the same
-    begin-before-pin-resolution way as radio/sdcard, on one
-    ``"power pin=... active_high=..."`` line built from the raw config
+    sees no output at all. A declared high_current_rail section is narrated
+    the same begin-before-pin-resolution way as radio/sdcard, on one
+    ``"high_current_rail pin=... active_high=..."`` line built from the raw config
     scalars: ``asserted`` when enabled (the pin is driven to its asserted
     level), ``held off`` when ``enabled: false`` (the pin is still driven,
     to the deasserted level), no line at all when the section is absent, and
@@ -776,11 +776,11 @@ def build_hardware(
         start = time.monotonic()
         logger.log(f"begin board={board_id()}")
 
-        power_cfg = config.power
-        if power_cfg is not None:
-            logger.begin(f"power pin={power_cfg.pin} active_high={power_cfg.active_high}")
-            _setup_power(power_cfg, board_module)
-            logger.end("asserted" if power_cfg.enabled else "held off")
+        rail_cfg = config.high_current_rail
+        if rail_cfg is not None:
+            logger.begin(f"high_current_rail pin={rail_cfg.pin} active_high={rail_cfg.active_high}")
+            _setup_high_current_rail(rail_cfg, board_module)
+            logger.end("asserted" if rail_cfg.enabled else "held off")
 
         i2c_cfg = config.i2c
         if i2c is None:

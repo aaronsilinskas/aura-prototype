@@ -1,6 +1,6 @@
 {
   "scene": "hardware_test",
-  "power": {
+  "high_current_rail": {
     "pin": "GP28",
     "active_high": true
   },
