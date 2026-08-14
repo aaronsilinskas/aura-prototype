@@ -59,7 +59,7 @@ def _scan_effect_pack_sounds(audio_registry: AudioRegistry, pack_names: list[str
     empty merge — ``AudioRegistry.scan_pack_sounds`` tolerates a missing directory.
     """
     for pack_name in pack_names:
-        sounds_dir = _path.join(_EFFECT_PACKS_DIR, pack_name, "sounds")
+        sounds_dir = _path.join(_path.join(_EFFECT_PACKS_DIR, pack_name), "sounds")
         audio_registry.scan_pack_sounds(pack_name, sounds_dir)
 
 
