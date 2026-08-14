@@ -11,8 +11,10 @@ helpers come from _hw_patch_mocks.py (#775).
 
 from __future__ import annotations
 
+import sys
+import types
 from contextlib import ExitStack
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -312,6 +314,61 @@ def test_build_hardware_disabled_audio_section_omits_audio_output() -> None:
 
 
 # ---------------------------------------------------------------------------
+# _setup_accelerometer — construct LIS3DH from an I2C bus, with an optional
+# address override (#835). "adafruit_lis3dh" is never stubbed in conftest.py
+# -- nothing in this repo imports it unconditionally -- so these tests inject
+# a fake module into sys.modules for the duration of the test, mirroring
+# test_device_builder_magnetometer.py's _install_fake_mmc56x3.
+# ---------------------------------------------------------------------------
+
+
+class _FakeLis3dh:
+    """Records the constructor's *i2c* plus whatever *address* was passed --
+    standing in for the real adafruit_lis3dh.LIS3DH_I2C, which isn't
+    installed in this CPython test environment."""
+
+    def __init__(self, i2c: object, *, address: int | None = None) -> None:
+        self.i2c = i2c
+        self.address = address
+
+
+def _install_fake_lis3dh(lis3dh_cls: type):
+    """Context manager installing a fake adafruit_lis3dh whose LIS3DH_I2C is
+    *lis3dh_cls*, restoring whatever (if anything) was there before."""
+    fake_module = types.ModuleType("adafruit_lis3dh")
+    fake_module.LIS3DH_I2C = lis3dh_cls  # type: ignore[attr-defined]
+    return patch.dict(sys.modules, {"adafruit_lis3dh": fake_module})
+
+
+def test_setup_accelerometer_passes_configured_address_to_lis3dh_constructor() -> None:
+    fake_i2c = MagicMock(name="i2c")
+
+    with _install_fake_lis3dh(_FakeLis3dh):
+        from hardware.circuitpython.device_builder import _setup_accelerometer
+
+        result = _setup_accelerometer(fake_i2c, address=0x19)
+
+    assert isinstance(result, _FakeLis3dh)
+    assert result.i2c is fake_i2c
+    assert result.address == 0x19
+
+
+def test_setup_accelerometer_omits_address_kwarg_when_none() -> None:
+    """A None address means no override -- the driver's own default applies,
+    so the construction call must not pass address= at all rather than
+    passing address=None."""
+    mock_lis3dh_cls = MagicMock()
+
+    with _install_fake_lis3dh(mock_lis3dh_cls):
+        from hardware.circuitpython.device_builder import _setup_accelerometer
+
+        _setup_accelerometer(MagicMock(name="i2c"), address=None)
+
+    _, kwargs = mock_lis3dh_cls.call_args
+    assert "address" not in kwargs
+
+
+# ---------------------------------------------------------------------------
 # build_hardware — accelerometer is config-gated, not presence-probed (#691)
 # ---------------------------------------------------------------------------
 
@@ -442,6 +499,51 @@ def test_build_hardware_enabled_accelerometer_with_disabled_i2c_raises_runtime_e
             build_hardware(config, board_module=board_mock)
 
     mock_setup_accelerometer.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# _setup_drv2605 — construct DRV2605 from an I2C bus, with an optional
+# address override (#835). conftest.py's adafruit_drv2605 stub only defines
+# Effect/Pause (needed by Drv2605EffectOutput tests elsewhere), not DRV2605
+# itself, so these tests patch it in with create=True.
+# ---------------------------------------------------------------------------
+
+
+class _FakeDrv2605:
+    """Records the constructor's *i2c* plus whatever *address* was passed --
+    standing in for the real adafruit_drv2605.DRV2605."""
+
+    def __init__(self, i2c: object, *, address: int | None = None) -> None:
+        self.i2c = i2c
+        self.address = address
+
+
+def test_setup_drv2605_passes_configured_address_to_drv2605_constructor() -> None:
+    fake_i2c = MagicMock(name="i2c")
+
+    with patch("adafruit_drv2605.DRV2605", _FakeDrv2605, create=True):
+        from hardware.circuitpython.device_builder import _setup_drv2605
+
+        result = _setup_drv2605(fake_i2c, address=0x5B)
+
+    assert isinstance(result, _FakeDrv2605)
+    assert result.i2c is fake_i2c
+    assert result.address == 0x5B
+
+
+def test_setup_drv2605_omits_address_kwarg_when_none() -> None:
+    """A None address means no override -- the driver's own default applies,
+    so the construction call must not pass address= at all rather than
+    passing address=None."""
+    mock_drv2605_cls = MagicMock()
+
+    with patch("adafruit_drv2605.DRV2605", mock_drv2605_cls, create=True):
+        from hardware.circuitpython.device_builder import _setup_drv2605
+
+        _setup_drv2605(MagicMock(name="i2c"), address=None)
+
+    _, kwargs = mock_drv2605_cls.call_args
+    assert "address" not in kwargs
 
 
 # ---------------------------------------------------------------------------
@@ -834,6 +936,39 @@ def test_build_hardware_accelerometer_no_i2c_bus_marks_its_own_line_failed_and_p
     assert lines[-1] == "[hw] accelerometer lis3dh FAILED\n"
 
 
+def test_build_hardware_forwards_configured_accelerometer_address_to_setup() -> None:
+    config = _neopixel_config_with_accelerometer()
+    config.accelerometer.address = 0x19
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        mocks = _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock)
+
+    mocks.accelerometer.assert_called_once_with(ANY, 0x19)
+
+
+def test_build_hardware_logs_accelerometer_address_suffix_when_configured() -> None:
+    config = _neopixel_config_with_accelerometer()
+    config.accelerometer.address = 0x19
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] accelerometer lis3dh address=0x19 ok\n" in "".join(fragments)
+
+
 def test_build_hardware_logs_haptics_ok_line_when_enabled_and_built() -> None:
     config = _neopixel_config_with_haptics()
     board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
@@ -907,6 +1042,39 @@ def test_build_hardware_haptics_no_i2c_bus_marks_its_own_line_failed_and_propaga
 
     lines = "".join(fragments).splitlines(keepends=True)
     assert lines[-1] == "[hw] haptics drv2605 FAILED\n"
+
+
+def test_build_hardware_forwards_configured_haptics_address_to_setup() -> None:
+    config = _neopixel_config_with_haptics()
+    config.haptics.address = 0x5B
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        mocks = _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock)
+
+    mocks.drv2605.assert_called_once_with(ANY, 0x5B)
+
+
+def test_build_hardware_logs_haptics_address_suffix_when_configured() -> None:
+    config = _neopixel_config_with_haptics()
+    config.haptics.address = 0x5B
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] haptics drv2605 address=0x5B ok\n" in "".join(fragments)
 
 
 # ---------------------------------------------------------------------------

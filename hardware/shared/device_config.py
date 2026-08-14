@@ -235,27 +235,29 @@ class SPIConfig:
 
 class AccelerometerConfig:
     """Parsed accelerometer configuration. Presence alone gates the LIS3DH build
-    (see ``device_builder``) — there are no configurable keys yet besides
-    ``enabled``.
+    (see ``device_builder``); ``address`` optionally overrides the driver's
+    default I2C address.
     """
 
-    __slots__ = ("enabled",)
+    __slots__ = ("address", "enabled")
 
-    def __init__(self, enabled: bool = True) -> None:
+    def __init__(self, enabled: bool = True, address: int | None = None) -> None:
         self.enabled: bool = enabled
+        self.address: int | None = address
 
 
 class MagnetometerConfig:
     """Parsed magnetometer configuration. Mirrors ``AccelerometerConfig`` --
-    there are no configurable keys yet besides ``enabled``. Pure parser
-    output only; no hardware is constructed here (that is ``device_builder``'s
-    job, added in a later ticket).
+    ``address`` optionally overrides the driver's default I2C address. Pure
+    parser output only; no hardware is constructed here (that is
+    ``device_builder``'s job, added in a later ticket).
     """
 
-    __slots__ = ("enabled",)
+    __slots__ = ("address", "enabled")
 
-    def __init__(self, enabled: bool = True) -> None:
+    def __init__(self, enabled: bool = True, address: int | None = None) -> None:
         self.enabled: bool = enabled
+        self.address: int | None = address
 
 
 class RadioConfig:
@@ -284,14 +286,15 @@ class RadioConfig:
 
 class HapticsConfig:
     """Parsed haptics configuration. Presence alone gates the DRV2605 build
-    (see ``device_builder``) — there are no configurable keys yet besides
-    ``enabled``.
+    (see ``device_builder``); ``address`` optionally overrides the driver's
+    default I2C address.
     """
 
-    __slots__ = ("enabled",)
+    __slots__ = ("address", "enabled")
 
-    def __init__(self, enabled: bool = True) -> None:
+    def __init__(self, enabled: bool = True, address: int | None = None) -> None:
         self.enabled: bool = enabled
+        self.address: int | None = address
 
 
 class SDCardConfig:
@@ -842,21 +845,24 @@ def _reject_unknown_keys(raw: dict, section: str, allowed: tuple[str, ...] = ())
 
 
 def _parse_accelerometer(accelerometer_raw: dict) -> AccelerometerConfig:
-    _reject_unknown_keys(accelerometer_raw, "accelerometer", allowed=("enabled",))
+    _reject_unknown_keys(accelerometer_raw, "accelerometer", allowed=("address", "enabled"))
     enabled = _parse_enabled(accelerometer_raw, "accelerometer.enabled")
-    return AccelerometerConfig(enabled=enabled)
+    address = _parse_address(accelerometer_raw, "address", "accelerometer.address")
+    return AccelerometerConfig(enabled=enabled, address=address)
 
 
 def _parse_magnetometer(magnetometer_raw: dict) -> MagnetometerConfig:
-    _reject_unknown_keys(magnetometer_raw, "magnetometer", allowed=("enabled",))
+    _reject_unknown_keys(magnetometer_raw, "magnetometer", allowed=("address", "enabled"))
     enabled = _parse_enabled(magnetometer_raw, "magnetometer.enabled")
-    return MagnetometerConfig(enabled=enabled)
+    address = _parse_address(magnetometer_raw, "address", "magnetometer.address")
+    return MagnetometerConfig(enabled=enabled, address=address)
 
 
 def _parse_haptics(haptics_raw: dict) -> HapticsConfig:
-    _reject_unknown_keys(haptics_raw, "haptics", allowed=("enabled",))
+    _reject_unknown_keys(haptics_raw, "haptics", allowed=("address", "enabled"))
     enabled = _parse_enabled(haptics_raw, "haptics.enabled")
-    return HapticsConfig(enabled=enabled)
+    address = _parse_address(haptics_raw, "address", "haptics.address")
+    return HapticsConfig(enabled=enabled, address=address)
 
 
 def _parse_i2c(i2c_raw: dict) -> I2CConfig:
