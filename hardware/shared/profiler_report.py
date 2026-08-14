@@ -117,14 +117,25 @@ def runtime_id() -> str:
     return format_runtime_id(impl.name, impl.version)
 
 
+def _declared_and_enabled(section: AudioConfig | IRConfig | I2CDeviceConfig | None) -> bool:
+    """Return whether a declared config section counts as active.
+
+    A section counts as active only when declared *and* ``enabled`` -- a
+    present-but-disabled section (the **Component enabled toggle**, #715)
+    labels identically to an absent one everywhere in this module. Shared by
+    every harness part below so the predicate lives in one place.
+    """
+    return section is not None and section.enabled
+
+
 def _section_active(section: I2CDeviceConfig | None) -> bool:
     """Return whether an optional I2C-device config section was actually built.
 
-    A section counts as built only when declared *and* ``enabled`` -- a
-    present-but-disabled section (the **Component enabled toggle**, #715)
-    labels identically to an absent one everywhere in this module.
+    Narrowed to ``I2CDeviceConfig`` (#844): every I2C-device harness part is
+    now produced by iterating ``_I2C_DEVICE_SECTIONS``, so this no longer
+    needs to cover audio/IR sections.
     """
-    return section is not None and section.enabled
+    return _declared_and_enabled(section)
 
 
 def _pixels_harness_part(pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig]) -> str:
@@ -166,7 +177,7 @@ def _audio_harness_part(audio: AudioConfig | None) -> str:
     A present-but-``enabled: False`` section labels identically to an
     absent one -- neither built the audio driver.
     """
-    if audio is None or not audio.enabled:
+    if not _declared_and_enabled(audio):
         return "no-audio"
     return f"audio(v{audio.voices})"
 
@@ -179,7 +190,7 @@ def _ir_harness_part(ir: IRConfig | None) -> str:
     this device-derived label. A present-but-``enabled: False`` section
     labels identically to an absent one -- neither built the IR receiver.
     """
-    if ir is None or not ir.enabled:
+    if not _declared_and_enabled(ir):
         return "no-ir"
     return f"ir(rx{len(ir.rx)})"
 
