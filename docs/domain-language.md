@@ -25,7 +25,7 @@ A capability declaring an effect's haptic behaviour, mapping event verbs to `Hap
 _Avoid_: raw DRV2605L waveform IDs as values (hardware IDs live in the output); "vibration" (use `haptic`)
 
 ### HapticPattern
-A value object holding an ordered sequence of abstract haptic constants — effect constants (`STRONG_CLICK`, …) and pause constants (`PAUSE_250`, …) — offset from hardware IDs so any unmapped value fails at the output.
+A value object holding an ordered sequence of abstract haptic constants — effect constants (`STRONG_CLICK`, …) and pause constants (`PAUSE_250`, …), distinct from hardware waveform IDs.
 _Avoid_: raw DRV2605L waveform IDs; `HapticConfig` (collides with the device-config `I2CDeviceConfig` haptics section, which gates hardware presence — a different axis)
 
 ### EffectConfig
@@ -65,7 +65,7 @@ The mutable per-scene holder of the current `PhaseKey`, the once-per-entry flag,
 _Avoid_: storing receipts or per-phase scratch on it; auto-stopping effects inside `enter()`
 
 ### PhaseSlot
-The single per-scene typed accessor owning a phase machine's `GameState` key and initial phase; every one of a scene's phase rules and its module-level phase reference share the *same* instance, so "same key ⇒ same `PhaseMachine`" holds by construction.
+The single per-scene typed accessor owning a phase machine's `GameState` key and initial phase; all of a scene's phase rules share the *same* instance, so "same key ⇒ same `PhaseMachine`" holds by construction.
 _Avoid_: constructing a fresh `PhaseSlot` per rule (import the scene's one); passing a raw machine-key string to a phase rule; confusing it with the generic `StateSlot`
 
 ### PhaseRule
@@ -91,7 +91,7 @@ An effect or rule loaded from an `effects/` or `rules/` subdirectory inside a sc
 _Avoid_: "private pack"; putting scene-only code under `packs/`
 
 ### Scene-local sound
-A bare `{stem: path}` map of `*.wav` files discovered from a `sounds/` subdirectory inside a scene's own folder, carried on `Scene.local_sound_map`. Unlike scene-local effects/rules it is not loaded through a `SceneLocalRegistry` (no module import, no `scene.` prefix) — just a stem-keyed path lookup. `SceneManager` installs it as the active scene's `AudioRegistry` overlay (via `AudioOverlayAdmin.set_scene_sounds`) on every transition, resolved through the `scene.<stem>` prefix.
+A bare `{stem: path}` map of `*.wav` files from a `sounds/` subdirectory inside a scene's own folder — a plain path lookup, not a `SceneLocalRegistry` (no module import, no `scene.` prefix stored). `SceneManager` installs it as the active scene's `AudioRegistry` overlay, addressed by the `scene.` prefix at resolution.
 _Avoid_: confusing the bare stem key here with the `scene.`-prefixed name a clip is referenced by (the prefix is added at resolution, not stored on the map)
 
 ### SceneLocalRegistry
@@ -111,14 +111,14 @@ The **runtime-facing** counterpart to `NetworkControls`, declaring `poll_transmi
 _Avoid_: naming the pump after the gate (`update_ir_gate`); allocating a fresh return dict per call; putting it in the rule-facing engine module
 
 ### SceneRegistry
-Auto-discovers JSON-described scenes from a directory tree, then serves `get(name)` (a fresh `Scene` per call), `names()`, and a test-only `register`; validates required fields and version format at scan time.
+Auto-discovers JSON-described scenes from a directory tree and serves a fresh `Scene` per lookup; validates required fields and version format at scan time.
 _Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); constructing after harness startup (scan once)
 
 ### SceneControls
 The rule-facing scene-transition seam: `load`, `overlay`, `pop`, each recording a pending transition applied after the current tick. `SceneManager` is the live implementation.
 
 ### SceneManager
-Owns the scene stack and drives transitions (`load` clears, `overlay` suspends and pushes, `pop` restores), stopping unloaded/suspended scenes' effects on `Scope.ALL` and republishing the active scene's local effects and sounds. Routes every local-effects push and merge-strategy admin through an injected `EffectAdmin`, and every sound-overlay push through an injected `AudioOverlayAdmin`.
+Owns the scene stack and drives transitions (`load` clears, `overlay` suspends and pushes, `pop` restores), tearing down unloaded/suspended scenes' effects on `Scope.ALL` and republishing the active scene's locals and sounds. Routes every scene-transition effect and sound admin through injected `EffectAdmin` and `AudioOverlayAdmin` seams.
 _Avoid_: calling `register()` on it (removed); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); routing scene-transition sound calls through anything but the injected `AudioOverlayAdmin`
 
 ### EffectControls
@@ -126,7 +126,7 @@ The **rule-facing** effect seam a rule holds via `GameState.effect_controls`: `s
 _Avoid_: adding `set_local_effects` or the merge-strategy snapshot lifecycle back onto it
 
 ### EffectAdmin
-The **scene-transition-facing** counterpart to `EffectControls` (`reset_merge_strategies`, `capture_merge_strategies`, `apply_merge_strategies`, `set_local_effects`, `set_allowed_packs`). `EffectManager` implements both faces; `SceneManager` reaches it only through this seam. `set_allowed_packs(names | None)` installs a `frozenset` of the active scene's declared `effect_packs` names, right beside the `set_local_effects` push, so `pack.effect` resolution is bounded by declaration the same way `scene.effect` resolution is bounded by the active scene's locals.
+The **scene-transition-facing** counterpart to `EffectControls`, reserved for `SceneManager`: it installs the active scene's local effects and its declared-pack allow-list (bounding `pack.` resolution the way locals bound `scene.` resolution) and owns the merge-strategy snapshot lifecycle. `EffectManager` implements both faces.
 _Avoid_: calling any `EffectAdmin` method from a `GameRule`; putting it in the rule-facing `EffectControls`
 
 ### Scope
@@ -142,7 +142,7 @@ A structured event payload (`pack`, `name`, `verb`) routed to every in-scope `Ef
 _Avoid_: confusing with `Event` (game-rule events); assuming only `"start"`/`"stop"` verbs exist
 
 ### EffectResolver
-Maps a qualified effect name to its `EffectBuilder`, owning the reserved `scene.` prefix rule (a `scene.`-name resolves against the active scene's local effects, any other against shared packs) and the `pack.` membership rule (a shared-pack name only resolves when its pack is in the active scene's declared `effect_packs`, checked before the registry lookup; `None` installed means no active scene and fails closed). Held by `EffectManager`.
+Maps a qualified effect name to its `EffectBuilder`: `scene.` names resolve against the active scene's locals, all others against shared packs gated by the `pack.` membership rule (only a declared `effect_packs` name resolves; no active scene fails closed). Held by `EffectManager`.
 _Avoid_: putting the `scene.` rule in `EffectManager`; confusing with `EffectManager` (routing/rendering, not name resolution); reporting an undeclared pack as "unknown" (the pack exists in the registry — it just isn't declared)
 
 ### Merge strategy
@@ -186,11 +186,11 @@ One red→green cycle at a single Game Level (red warning → red → green warn
 _Avoid_: "phase" (a Round spans several); "level-up" (the celebratory beat between Rounds)
 
 ### AudioRegistry
-Resolves a qualified clip name to a WAV path via **prefix routing**, exactly mirroring `EffectResolver`: `scene.<stem>` resolves against the active scene's swappable **overlay** (installed via the `AudioOverlayAdmin` face it implements); `<pack>.<stem>` resolves against a shared **base** (`<pack>.<stem>` → path), populated by scanning a pack's `sounds/` folder via `scan_pack_sounds`, and gated by the `pack.` membership rule (a base name only resolves when its pack is in the active scene's declared `effect_packs`, checked before the base lookup; `None` installed means no active scene and fails closed — sounds are only ever scanned from effect packs, so `effect_packs` is the one gating list, same as `EffectResolver`). An unprefixed name, or a name absent from its routed map, **raises** rather than returning `None`.
+Resolves a qualified clip name to a WAV path via **prefix routing**, mirroring `EffectResolver`: `scene.` names hit the active scene's swappable overlay, `<pack>.` names hit a shared base gated by the same `pack.` membership rule. A miss raises rather than returning `None`.
 _Avoid_: returning `None` on a resolution miss (raise instead); a bare, unqualified base key (qualify with the pack name so two packs can share a stem); reporting an undeclared pack as "unknown" (it may genuinely exist in the base — it just isn't declared)
 
 ### AudioOverlayAdmin
-The scene-transition-facing seam for swapping the active scene's sound overlay and declared-pack set — `set_scene_sounds(sounds | None)`, `set_allowed_packs(names | None)` — mirroring `EffectAdmin.set_local_effects`/`set_allowed_packs`. `AudioRegistry` implements it; `SceneManager` holds an injected handle and installs the active scene's sounds and its allowed-pack `frozenset` in `_activate`, right beside the `EffectAdmin.set_local_effects`/`set_allowed_packs` push — the **same** `frozenset` instance derived once for `EffectAdmin`, reused rather than re-derived.
+The scene-transition-facing seam for swapping the active scene's sound overlay and declared-pack set (`set_scene_sounds`, `set_allowed_packs`), mirroring `EffectAdmin`. `AudioRegistry` implements it; `SceneManager` installs the same allowed-pack `frozenset` it derived for `EffectAdmin`, reused rather than re-computed.
 _Avoid_: calling it from a `GameRule` (reserved for `SceneManager`); conflating with `EffectAdmin` (separate seam, separate concern); re-deriving the allowed-pack set for audio instead of reusing the one `_activate` already computed
 
 ### AudioEffectOutput
@@ -198,7 +198,7 @@ A CircuitPython `EffectOutput` driving audio via I2S and the live `VoiceSink` ad
 _Avoid_: stopping playback in `handle_event` on `"stop"`; assuming a fixed voice count or role-assigned slots; putting slot bookkeeping back in the output
 
 ### VoicePool
-A hardware-agnostic owner of audio voice-slot bookkeeping (imports no CircuitPython), driving hardware through a `VoiceSink` port; `claim` plays a clip (evicting oldest-first when full), `sweep` frees finished/stopped slots each tick.
+A hardware-agnostic owner of audio voice-slot bookkeeping (imports no CircuitPython), driving hardware through a `VoiceSink` port and evicting oldest-first when full.
 _Avoid_: importing CircuitPython audio libs here (hardware lives behind `VoiceSink`); parallel per-slot lists (use the `_Slot` record)
 
 ### VoiceSink
@@ -218,11 +218,11 @@ The validated value object produced by the pure `parse_device_config` parser (no
 _Avoid_: importing `board` into the parser; constructing hardware in the parser (that is `device_builder`'s job); hand-listing the isolatable components (derive from `__slots__`)
 
 ### HighCurrentRailConfig
-The parsed config for the board's high-current rail enable pin — the line gating the ~2 A NeoPixel rail (and any other peripheral drawing more than a GPIO's own budget). Fields: `pin` (required), `active_high` (default `True`, picks the asserted polarity), `enabled` (default `True`). Excluded from `isolate` (like `i2c`/`spi`): it is infrastructure, not a component `isolate` should ever be able to switch off. See **Component enabled toggle** for its `enabled: false` deviation.
+The parsed config for the board's high-current rail enable pin — the line gating the ~2 A NeoPixel rail (and any peripheral drawing more than a GPIO's own budget). Infrastructure rather than a component: excluded from `isolate`, and its `enabled: false` still drives the pin deasserted rather than building nothing (see **Component enabled toggle**).
 _Avoid_: `power`/`external power` (too generic — this is only the switched high-current subset, not board power); treating it like `SDCardConfig`'s `enabled` (build-nothing); assuming `isolate(keep=...)` ever disables it
 
 ### Component enabled toggle
-The optional `enabled` boolean on every hardware component config object (default `True`); `enabled: false` retains a parsed, fully-validated section but tells `device_builder` not to build it. `buttons` is a bare pin-name list and is not gated. `high_current_rail` is the one exception: `enabled: false` still resolves and drives its pin, to the deasserted level, rather than building nothing — see `HighCurrentRailConfig`.
+The optional `enabled` boolean on every hardware component config (default `True`); `enabled: false` keeps a fully-validated section but tells `device_builder` not to build it. `buttons` is a bare pin-name list and isn't gated; `high_current_rail` is the exception (still drives its pin deasserted — see `HighCurrentRailConfig`).
 _Avoid_: treating `enabled: false` as omitting the section at parse time (validation still runs in full); assuming `i2c`/`spi` `enabled: false` falls back to default pins (each builds no bus at all); writing `.enabled` after parse (use `isolate`); assuming `high_current_rail`'s `enabled: false` means "build nothing" like every other section
 
 ### Composition layer (app/)
@@ -230,7 +230,7 @@ The top-level `app/` package: `scene_composition.py` builds the engine/effect/sc
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### SceneRuntime / build_scene_runtime
-`build_scene_runtime(hw, scene_name)` wires the registries, managers, and engine, resolves and loads the scene (raising when *scene_name* isn't registered), and returns a `SceneRuntime` bundle (`manager`, `effect_manager`, `timer`, `ir`, `radio`) that `run_scene`'s per-tick loop drives.
+`build_scene_runtime(hw, scene_name)` wires the registries, managers, and engine and loads the scene (raising when *scene_name* isn't registered), returning a `SceneRuntime` bundle (`manager`, `effect_manager`, `timer`, `ir`, `radio`) that `run_scene`'s per-tick loop drives.
 _Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing `poll_transmits`/`receive` (drive `ir.update()`/`radio.update()`)
 
 ### device_builder
@@ -238,7 +238,7 @@ The device-only hardware builder: `build_hardware(config, board, …)` resolves 
 _Avoid_: returning a bare tuple/dict (return `DeviceHardware`); putting config parsing here (lives in the pure parser); calling it twice in one process
 
 ### DeviceHardware
-The named `__slots__` bundle `build_hardware` returns — a board-free data holder: `outputs`, `buttons`, `accelerometer`, `magnetometer`, `network_controls`, `transmit_pump`, `ir_receiver`, `radio`, `storage`. `network_controls` and `transmit_pump` are the *same* `HardwareNetworkControls` seen through two faces. `storage` is typed as the port (`DeviceStorage | None`), never the concrete adapter — `None` when no `sdcard` section is declared/enabled. `magnetometer` is typed `object | None`, like `accelerometer` — no concrete driver import in this board-free module.
+The named `__slots__` bundle `build_hardware` returns — a board-free data holder for the built outputs, buttons, sensors, network seams, IR, radio, and storage. `network_controls` and `transmit_pump` are one `HardwareNetworkControls` seen through two faces; ports (`storage`, sensors) are typed as their abstract port or `object | None`, never the concrete adapter, keeping the module board-free.
 _Avoid_: exposing raw transmitters (use `network_controls`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### RadioTransport
@@ -254,11 +254,11 @@ The live CircuitPython `RadioTransport` adapter wrapping `adafruit_rfm69.RFM69` 
 _Avoid_: importing `adafruit_rfm69` anywhere else; reading the driver without checking `payload_ready` first (blocks)
 
 ### DeviceStorage
-The board-free device-state storage port: reads/writes small device-state files under a mount root and resolves real filesystem paths for streamed/scanned consumers. No `board`/`busio` import, so it's safe on CPython, CircuitPython, and MicroPython. The live adapter is `SdCardStorage`; `FakeDeviceStorage` is the in-memory test double.
+The board-free device-state storage port: reads/writes small state files under a mount root and resolves real filesystem paths for streamed/scanned consumers, with no `board`/`busio` import (safe on CPython, CircuitPython, and MicroPython). Live adapter `SdCardStorage`; `FakeDeviceStorage` is the in-memory test double.
 _Avoid_: escaping the mount root (routes through `reject_escaping_path`); a second concrete implementation for CPython vs. CircuitPython (one class suffices once mounted)
 
 ### SdCardStorage
-The live CircuitPython `DeviceStorage` adapter mounting an SD card via `sdcardio.SDCard` + `storage.mount` at construction time — the only module importing `sdcardio`/`storage`, via a deferred import so a config with no `sdcard` section never requires either installed. `cs` is a raw `microcontroller.Pin` (unlike `Rfm69RadioTransport`'s `digitalio.DigitalInOut`-wrapped `cs`).
+The live CircuitPython `DeviceStorage` adapter mounting an SD card at construction — the only module importing `sdcardio`/`storage`, via a deferred import so a config with no `sdcard` section never requires either installed. `cs` is a raw `microcontroller.Pin`.
 _Avoid_: importing `sdcardio`/`storage` anywhere else; wrapping `cs` in `digitalio.DigitalInOut`; presence-probing instead of trusting the config gate
 
 ### NeoPixelEffectOutput
@@ -290,7 +290,7 @@ The hardware-agnostic infrared send/receive subsystem (no `pulseio`), reached th
 _Avoid_: importing `pulseio` into shared IR code; encoding spell fields in the transport
 
 ### InfraredManager
-The board-free per-tick owner of the IR sequence: `update()` runs the transmit pump **then** receive, owning the pump-before-receive order; results (`received`, `last_signal_strength`, `last_error_margin`, `telemetry_line()`) are read after the call. Does not build the game event.
+The board-free per-tick owner of the IR sequence: `update()` runs the transmit pump **then** receive, owning that pump-before-receive order; results (`received`, `last_signal_strength`, `last_error_margin`, `telemetry_line()`) are read after the call. Does not build the game event.
 _Avoid_: importing `NetworkEvents`/game-event vocabulary here (the event is built in `run_scene`); a value-returning `update()`; calling it a hardware "driver"
 
 ### Wire-frame codec
@@ -326,7 +326,7 @@ A normalized 0.0–1.0 quality metric derived from a packet's error margin — a
 _Avoid_: calling it "RSSI" as if measured; using it to derive hit direction
 
 ### IR receive-path telemetry
-Monotonic-since-boot counters at each receive-path stage (reader, receiver, decoder), each with exactly one declared owner via a per-class `OWNED_TELEMETRY_FIELDS` tuple whose union is `IrTelemetrySnapshot.FIELDS`; surfaced as an `IrTelemetrySnapshot` and a change-gated `telemetry_line()`.
+Monotonic-since-boot counters at each receive-path stage (reader, receiver, decoder), each with exactly one declared owner; surfaced as an `IrTelemetrySnapshot` and a change-gated `telemetry_line()`.
 _Avoid_: aggregating hit/gated counts in the scene; per-tick allocation in the no-pulse path; re-listing the counter set in a receiver (walk the sources)
 
 ### Self-echo
