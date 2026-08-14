@@ -1159,6 +1159,45 @@ def test_pop_activates_revealed_entry_with_both_rules_and_local_effects() -> Non
     )
 
 
+def test_allowed_packs_installed_in_lockstep_through_load_overlay_pop(pack_env) -> None:
+    """set_allowed_packs must track the top-of-stack scene's declared effect_packs
+    through load, overlay, and pop -- installed right beside set_local_effects."""
+    _make_effect_pack(pack_env, "fx", "1.0")
+    _make_effect_pack(pack_env, "gfx", "1.0")
+    effect_registry, rule_registry = _make_registries(str(pack_env))
+    engine = _make_engine()
+    scene_reg = _scene_registry(
+        ("base", _scene_factory(effect_packs=[("fx", "1.0")])),
+        ("overlay_scene", _scene_factory(effect_packs=[("gfx", "1.0")])),
+    )
+    effect_admin = SpyEffectAdmin()
+    manager = _make_scene_manager(
+        engine,
+        effect_registry=effect_registry,
+        rule_registry=rule_registry,
+        scene_registry=scene_reg,
+        effect_admin=effect_admin,
+    )
+
+    manager.load("base")
+    manager.update()
+    assert effect_admin.allowed_packs_history[-1] == frozenset({"fx"}), (
+        "load must install the loaded scene's own declared effect_packs"
+    )
+
+    manager.overlay("overlay_scene")
+    manager.update()
+    assert effect_admin.allowed_packs_history[-1] == frozenset({"gfx"}), (
+        "overlay must install the overlay scene's own declared effect_packs, not the base's"
+    )
+
+    manager.pop()
+    manager.update()
+    assert effect_admin.allowed_packs_history[-1] == frozenset({"fx"}), (
+        "pop must restore the revealed base entry's declared effect_packs"
+    )
+
+
 # ---------------------------------------------------------------------------
 # SceneManager — resolution-failure ordering
 # ---------------------------------------------------------------------------
