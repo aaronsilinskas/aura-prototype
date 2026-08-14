@@ -76,8 +76,8 @@ class AudioRegistry(AudioOverlayAdmin):
     The base branch is further gated by the ``pack.`` membership rule: a
     ``<pack>.<stem>`` name only resolves when *pack* is in the allowed set
     installed via ``set_allowed_packs`` (the ``AudioOverlayAdmin`` face),
-    mirroring ``EffectResolver._resolve_pack``. ``None`` installed (the
-    default) means no active scene and fails closed.
+    mirroring the membership check ``EffectResolver._resolve_pack`` performs.
+    ``None`` installed (the default) means no active scene and fails closed.
     """
 
     __slots__ = ("_allowed_packs", "_base", "_overlay")
