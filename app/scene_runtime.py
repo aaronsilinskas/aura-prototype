@@ -11,7 +11,7 @@ from __future__ import annotations
 import gc
 
 from app.scene_composition import build_scene_runtime
-from engine.input import AccelerationData, ButtonData, InputEvents
+from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
 from engine.network import NetworkEvents
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
@@ -68,7 +68,8 @@ def run_scene(
 
     _button_data = ButtonData({})
     _acceleration = AccelerationData(0.0, 0.0, 0.0) if hw.accelerometer is not None else None
-    _input_event = InputEvents.Sensors(_button_data, _acceleration)
+    _magnetic = MagneticData(0.0, 0.0, 0.0) if hw.magnetometer is not None else None
+    _input_event = InputEvents.Sensors(_button_data, _acceleration, _magnetic)
 
     _last_telemetry_print_total = 0.0
 
@@ -81,6 +82,15 @@ def run_scene(
                 _acceleration.x = ax
                 _acceleration.y = ay
                 _acceleration.z = az
+            except Exception:
+                pass  # keep last good values; None signals missing hardware, not read failure
+
+        if _magnetic is not None:
+            try:
+                mx, my, mz = hw.magnetometer.magnetic
+                _magnetic.x = mx
+                _magnetic.y = my
+                _magnetic.z = mz
             except Exception:
                 pass  # keep last good values; None signals missing hardware, not read failure
 
