@@ -7,6 +7,8 @@ formatting, markdown row formatting, and the scene-load profiler's harness
 label -- lives here and is.
 """
 
+import pytest
+
 from hardware.shared.device_config import parse_device_config
 from hardware.shared.profiler_report import (
     board_id,
@@ -85,7 +87,7 @@ class TestPrintTableRow:
 
 
 class TestMetricsHarnessLabel:
-    def test_full_harness_joins_all_five_parts_with_plus(self):
+    def test_full_harness_joins_all_six_parts_with_plus(self):
         # The sample IS31FL3741 matrix: 13 cols x 9 scoped rows = 117px.
         config = parse_device_config(
             {
@@ -111,13 +113,14 @@ class TestMetricsHarnessLabel:
                 },
                 "haptics": {},
                 "accelerometer": {},
+                "magnetometer": {},
                 "ir": {"rx": "D11"},
             }
         )
 
         label = metrics_harness_label(config)
 
-        assert label == "matrix(117px)+audio(v4)+haptic+accel+ir(rx1)"
+        assert label == "matrix(117px)+audio(v4)+accel+mag+haptic+ir(rx1)"
 
     def test_declared_but_disabled_audio_section_reports_no_audio(self):
         config = parse_device_config(
@@ -160,7 +163,7 @@ class TestMetricsHarnessLabel:
 
         label = metrics_harness_label(config)
 
-        assert label == "matrix(117px)+no-audio+haptic+no-accel+ir(rx1)"
+        assert label == "matrix(117px)+no-audio+no-accel+no-mag+haptic+ir(rx1)"
 
     def test_matrix_pixel_count_is_cols_times_rows_covered_by_scope_rows(self):
         # A narrower 8x4 matrix using only two of the six scopes: 8 x 4 = 32.
@@ -383,49 +386,46 @@ class TestMetricsHarnessLabel:
 
         assert label.endswith("+no-ir")
 
-    def test_declared_haptics_section_reports_haptic(self):
-        config = parse_device_config({"haptics": {}})
+    # Each I2C-device part (accelerometer/magnetometer/haptics) comes from
+    # iterating the shared `_I2C_DEVICE_SECTIONS` list (device_config.py,
+    # #842) rather than a hand-maintained, easy-to-forget-a-device function
+    # per section (#844) -- so each rule below is asserted once, parametrized
+    # over every section and its expected short label, rather than spelled
+    # out three times. Adding a fourth I2C-device section to that list would
+    # need only a new entry in this tuple to be exercised the same way.
+    _I2C_DEVICE_SECTION_LABELS = (
+        ("accelerometer", "accel"),
+        ("magnetometer", "mag"),
+        ("haptics", "haptic"),
+    )
 
-        label = metrics_harness_label(config)
+    @pytest.mark.parametrize("section, label", _I2C_DEVICE_SECTION_LABELS)
+    def test_declared_i2c_device_section_reports_its_short_label(self, section, label):
+        config = parse_device_config({section: {}})
 
-        assert "+haptic+" in label
+        result = metrics_harness_label(config)
 
-    def test_absent_haptics_section_reports_no_haptic(self):
+        assert f"+{label}+" in result
+
+    @pytest.mark.parametrize("section, label", _I2C_DEVICE_SECTION_LABELS)
+    def test_absent_i2c_device_section_reports_its_no_prefixed_label(self, section, label):
         config = parse_device_config({})
 
-        label = metrics_harness_label(config)
+        result = metrics_harness_label(config)
 
-        assert "+no-haptic+" in label
+        assert f"+no-{label}+" in result
 
-    def test_declared_but_disabled_haptics_section_reports_no_haptic(self):
+    @pytest.mark.parametrize("section, label", _I2C_DEVICE_SECTION_LABELS)
+    def test_declared_but_disabled_i2c_device_section_reports_its_no_prefixed_label(
+        self, section, label
+    ):
         # A declared-and-disabled section must label identically to an
         # absent one -- the label describes what ran, not why it didn't.
-        config = parse_device_config({"haptics": {"enabled": False}})
+        config = parse_device_config({section: {"enabled": False}})
 
-        label = metrics_harness_label(config)
+        result = metrics_harness_label(config)
 
-        assert "+no-haptic+" in label
-
-    def test_declared_accelerometer_section_reports_accel(self):
-        config = parse_device_config({"accelerometer": {}})
-
-        label = metrics_harness_label(config)
-
-        assert "+accel+" in label
-
-    def test_absent_accelerometer_section_reports_no_accel(self):
-        config = parse_device_config({})
-
-        label = metrics_harness_label(config)
-
-        assert "+no-accel+" in label
-
-    def test_declared_but_disabled_accelerometer_section_reports_no_accel(self):
-        config = parse_device_config({"accelerometer": {"enabled": False}})
-
-        label = metrics_harness_label(config)
-
-        assert "+no-accel+" in label
+        assert f"+no-{label}+" in result
 
     def test_isolating_audio_reports_audio_alone_with_every_other_part_not_built(self):
         # The one test spanning both halves of the spec (#717): `DeviceConfig.isolate`
@@ -450,10 +450,11 @@ class TestMetricsHarnessLabel:
                 },
                 "haptics": {},
                 "accelerometer": {},
+                "magnetometer": {},
                 "ir": {"rx": "D11"},
             }
         )
 
         label = metrics_harness_label(config.isolate(keep="audio"))
 
-        assert label == "no-pixels+audio(v4)+no-haptic+no-accel+no-ir"
+        assert label == "no-pixels+audio(v4)+no-accel+no-mag+no-haptic+no-ir"
