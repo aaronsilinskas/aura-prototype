@@ -56,7 +56,7 @@ def test_build_hardware_uses_caller_supplied_i2c_bus_for_matrix() -> None:
 
         build_hardware(config, board_module=board_mock, i2c=supplied_i2c)
 
-    mock_setup_matrix.assert_called_once_with(supplied_i2c, 1.0)
+    mock_setup_matrix.assert_called_once_with(supplied_i2c, 1.0, None)
 
 
 def test_build_hardware_does_not_construct_its_own_bus_when_i2c_supplied() -> None:
@@ -118,7 +118,7 @@ def test_build_hardware_uses_its_own_constructed_bus_for_matrix_when_i2c_omitted
 
         build_hardware(config, board_module=board_mock)
 
-    mock_setup_matrix.assert_called_once_with(own_i2c, 1.0)
+    mock_setup_matrix.assert_called_once_with(own_i2c, 1.0, None)
 
 
 # ---------------------------------------------------------------------------

@@ -187,12 +187,19 @@ def _setup_spi(spi_config: SPIConfig | None, board_module: object) -> busio.SPI 
 _MATRIX_STARTUP_TIMEOUT_S: Final = 3
 
 
-def _setup_matrix_is31fl3741(i2c: busio.I2C, brightness: float) -> Adafruit_RGBMatrixQT:
+def _setup_matrix_is31fl3741(
+    i2c: busio.I2C, brightness: float, address: int | None = None
+) -> Adafruit_RGBMatrixQT:
     """Return a configured IS31FL3741 driver on *i2c*.
 
     Retries construction for up to :data:`_MATRIX_STARTUP_TIMEOUT_S` seconds
     (useful if the I2C bus is still settling at boot), sleeping ~1s between
     attempts.
+
+    *address* is the configured I2C address override (``MatrixPixelsConfig.address``).
+    ``None`` means no override -- the ``address=`` keyword is omitted entirely
+    so the driver's own default (``0x30``) applies, rather than passing
+    ``address=None``.
 
     ``adafruit_is31fl3741`` and ``Adafruit_RGBMatrixQT`` are imported here,
     not at module load, so a config with no matrix entry never requires the
@@ -208,7 +215,12 @@ def _setup_matrix_is31fl3741(i2c: busio.I2C, brightness: float) -> Adafruit_RGBM
     matrix = None
     while matrix is None:
         try:
-            matrix = Adafruit_RGBMatrixQT(i2c, allocate=adafruit_is31fl3741.MUST_BUFFER)
+            if address is None:
+                matrix = Adafruit_RGBMatrixQT(i2c, allocate=adafruit_is31fl3741.MUST_BUFFER)
+            else:
+                matrix = Adafruit_RGBMatrixQT(
+                    i2c, address=address, allocate=adafruit_is31fl3741.MUST_BUFFER
+                )
         except Exception:
             if time.monotonic() >= deadline:
                 raise RuntimeError(
@@ -284,7 +296,7 @@ def _setup_pixels(
         # time, so this import is deferred here alongside _setup_matrix_is31fl3741's.
         from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 
-        matrix = _setup_matrix_is31fl3741(i2c, pixels_cfg.brightness)
+        matrix = _setup_matrix_is31fl3741(i2c, pixels_cfg.brightness, pixels_cfg.address)
         return [
             IS31FL3741EffectOutput(
                 matrix,
@@ -339,6 +351,8 @@ def _describe_pixel_entry(index: int, pixels_cfg: MatrixPixelsConfig | NeoPixelP
             f"cols={pixels_cfg.cols} scope_rows=[{_format_ranges(pixels_cfg.scope_rows)}] "
             + f"brightness={pixels_cfg.brightness:.2f}"
         )
+        if pixels_cfg.address is not None:
+            detail += f" address=0x{pixels_cfg.address:02X}"
     else:
         detail = _describe_neopixel_pixels(pixels_cfg)
     return f"pixels[{index}] {kind} {detail}"

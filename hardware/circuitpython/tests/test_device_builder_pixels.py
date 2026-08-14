@@ -145,6 +145,46 @@ def test_setup_matrix_is31fl3741_returns_driver_after_transient_failures() -> No
     assert result is driver
 
 
+def test_setup_matrix_is31fl3741_omits_address_kwarg_when_none() -> None:
+    """A ``None`` address means no override -- the driver's own default
+    (0x30) applies, so the construction call must not pass ``address=`` at
+    all rather than passing ``address=None``."""
+    with ExitStack() as stack:
+        mock_matrix_cls = stack.enter_context(
+            patch("adafruit_is31fl3741.adafruit_rgbmatrixqt.Adafruit_RGBMatrixQT")
+        )
+        driver = MagicMock()
+        mock_matrix_cls.return_value = driver
+
+        from hardware.circuitpython.device_builder import _setup_matrix_is31fl3741
+
+        i2c = MagicMock(name="i2c")
+        _setup_matrix_is31fl3741(i2c, 1.0, None)
+
+    _, kwargs = mock_matrix_cls.call_args
+    assert "address" not in kwargs
+
+
+def test_setup_matrix_is31fl3741_passes_configured_address_to_driver() -> None:
+    import adafruit_is31fl3741
+
+    with ExitStack() as stack:
+        mock_matrix_cls = stack.enter_context(
+            patch("adafruit_is31fl3741.adafruit_rgbmatrixqt.Adafruit_RGBMatrixQT")
+        )
+        driver = MagicMock()
+        mock_matrix_cls.return_value = driver
+
+        from hardware.circuitpython.device_builder import _setup_matrix_is31fl3741
+
+        i2c = MagicMock(name="i2c")
+        _setup_matrix_is31fl3741(i2c, 1.0, 0x31)
+
+    mock_matrix_cls.assert_called_once_with(
+        i2c, address=0x31, allocate=adafruit_is31fl3741.MUST_BUFFER
+    )
+
+
 def test_setup_matrix_is31fl3741_raises_runtime_error_past_deadline() -> None:
     with ExitStack() as stack:
         mock_matrix_cls = stack.enter_context(
@@ -391,7 +431,27 @@ def test_setup_pixels_dispatches_matrix_config_to_matrix_branch() -> None:
     assert len(outputs) == 1
     assert isinstance(outputs[0], IS31FL3741EffectOutput)
     assert outputs[0].matrix is driver
-    mock_setup_matrix.assert_called_once_with(i2c, 0.2)
+    mock_setup_matrix.assert_called_once_with(i2c, 0.2, None)
+
+
+def test_setup_pixels_forwards_configured_address_to_matrix_setup() -> None:
+    config = _matrix_config(address=0x31)
+    board_mock = _mock_board()
+    i2c = MagicMock(name="i2c")
+
+    with ExitStack() as stack:
+        mock_setup_matrix = stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_matrix_is31fl3741",
+                return_value=MagicMock(),
+            )
+        )
+
+        from hardware.circuitpython.device_builder import _setup_pixels
+
+        _setup_pixels(config.pixels[0], board_mock, i2c)
+
+    mock_setup_matrix.assert_called_once_with(i2c, 1.0, 0x31)
 
 
 def test_setup_pixels_dispatches_neopixel_config_to_neopixel_branch() -> None:
@@ -503,6 +563,20 @@ def test_describe_pixel_entry_matrix_formats_cols_scope_rows_and_brightness() ->
         "pixels[0] matrix cols=13 "
         "scope_rows=[global.buff:0-1 global.debuff:1-2 global.main:2-5 "
         "personal:5-7 directional:7-8 ambient:8-9] brightness=0.50"
+    )
+
+
+def test_describe_pixel_entry_matrix_with_configured_address_appends_address_suffix() -> None:
+    from hardware.circuitpython.device_builder import _describe_pixel_entry
+
+    config = _matrix_config(brightness=0.5, address=0x31)
+
+    description = _describe_pixel_entry(0, config.pixels[0])
+
+    assert description == (
+        "pixels[0] matrix cols=13 "
+        "scope_rows=[global.buff:0-1 global.debuff:1-2 global.main:2-5 "
+        "personal:5-7 directional:7-8 ambient:8-9] brightness=0.50 address=0x31"
     )
 
 

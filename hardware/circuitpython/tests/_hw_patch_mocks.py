@@ -121,7 +121,7 @@ def _mock_board(**pins):
     return mock
 
 
-def _matrix_config(brightness: float | None = None):
+def _matrix_config(brightness: float | None = None, address: int | None = None):
     """Return a DeviceConfig with pixels.type='matrix'."""
     pixels_entry = {
         "type": "matrix",
@@ -137,6 +137,8 @@ def _matrix_config(brightness: float | None = None):
     }
     if brightness is not None:
         pixels_entry["brightness"] = brightness
+    if address is not None:
+        pixels_entry["address"] = address
     mapping = {
         "pixels": [pixels_entry],
         "buttons": ["D9", "D10"],
