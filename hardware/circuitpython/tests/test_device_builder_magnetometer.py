@@ -37,15 +37,61 @@ from hardware.shared.device_config import parse_device_config
 # ---------------------------------------------------------------------------
 
 
+# The raw-0 all-zero-register value _setup_magnetometer probes for -- what the real
+# hardware streamed from a mis-wired MMC5603 that still ACKed the bus. Kept as the
+# on-device literal (not imported from the module constant) so these tests pin the
+# actual observed reading, and comfortably inside the module's detection tolerance.
+_SENTINEL_UT = -3276.8
+_LIVE_UT = (12.3, -4.5, 40.1)
+
+
 class _FakeMmc5603:
     """Records the constructor's *i2c* plus whatever attributes are set on it
     afterward -- standing in for the real adafruit_mmc56x3.MMC5603, which
-    isn't installed in this CPython test environment."""
+    isn't installed in this CPython test environment. Reads a live, non-sentinel
+    field so ``_setup_magnetometer``'s raw-0 probe passes on the first poll."""
 
     def __init__(self, i2c: object) -> None:
         self.i2c = i2c
         self.data_rate: int | None = None
         self.continuous_mode: bool | None = None
+
+    @property
+    def magnetic(self) -> tuple[float, float, float]:
+        return _LIVE_UT
+
+
+class _DeadMmc5603(_FakeMmc5603):
+    """A chip that ACKs the bus but never converts: every ``.magnetic`` poll
+    reads the all-zero sentinel on every axis."""
+
+    @property
+    def magnetic(self) -> tuple[float, float, float]:
+        return (_SENTINEL_UT, _SENTINEL_UT, _SENTINEL_UT)
+
+
+class _SlowStartMmc5603(_FakeMmc5603):
+    """A healthy chip whose first continuous-mode conversion hasn't landed yet:
+    reads the sentinel for its first two polls, then a live field."""
+
+    def __init__(self, i2c: object) -> None:
+        super().__init__(i2c)
+        self._polls = 0
+
+    @property
+    def magnetic(self) -> tuple[float, float, float]:
+        self._polls += 1
+        if self._polls <= 2:
+            return (_SENTINEL_UT, _SENTINEL_UT, _SENTINEL_UT)
+        return _LIVE_UT
+
+
+def _install_fake_mmc56x3(mmc5603_cls: type):
+    """Context manager installing a fake adafruit_mmc56x3 whose ``MMC5603`` is
+    *mmc5603_cls*, restoring whatever (if anything) was there before."""
+    fake_module = types.ModuleType("adafruit_mmc56x3")
+    fake_module.MMC5603 = mmc5603_cls  # type: ignore[attr-defined]
+    return patch.dict(sys.modules, {"adafruit_mmc56x3": fake_module})
 
 
 @pytest.fixture
@@ -85,6 +131,38 @@ def test_setup_magnetometer_puts_the_chip_in_continuous_mode_at_100hz(
 
     assert result.data_rate == 100
     assert result.continuous_mode is True
+
+
+def test_setup_magnetometer_raises_when_chip_only_reads_all_zero_sentinel() -> None:
+    """A chip that ACKs the bus but never converts reads the all-zero sentinel
+    on every axis forever. ``MMC5603(i2c)`` construction cannot catch this, so
+    the builder probes and turns it into the same loud wiring fault every other
+    peripheral raises rather than streaming -3276.8 as if it were field data."""
+    from hardware.circuitpython.device_builder import _setup_magnetometer
+
+    with (
+        _install_fake_mmc56x3(_DeadMmc5603),
+        patch("hardware.circuitpython.device_builder.time.sleep"),  # don't burn the probe window
+        pytest.raises(RuntimeError, match="power and ground"),
+    ):
+        _setup_magnetometer(MagicMock(name="i2c"))
+
+
+def test_setup_magnetometer_waits_for_the_first_conversion_before_giving_up() -> None:
+    """The probe must not fail a healthy chip whose first continuous-mode
+    conversion simply hasn't landed yet: reading the sentinel on early polls is
+    expected, so it keeps polling and returns the chip once a live value
+    appears."""
+    from hardware.circuitpython.device_builder import _setup_magnetometer
+
+    with (
+        _install_fake_mmc56x3(_SlowStartMmc5603),
+        patch("hardware.circuitpython.device_builder.time.sleep"),
+    ):
+        result = _setup_magnetometer(MagicMock(name="i2c"))
+
+    assert isinstance(result, _SlowStartMmc5603)
+    assert result.magnetic == _LIVE_UT
 
 
 # ---------------------------------------------------------------------------
