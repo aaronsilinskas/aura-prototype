@@ -23,14 +23,14 @@ class RlglWinRule(PhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_WIN, rlgl_phase)
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         state.effect_controls.set_effect(Scope.ALL, "elements.lightning", {"level": 7})
         receipt = state.effect_controls.add_effect(Scope.ALL, "scene.win_sting", {})
         rlgl_phase_state(state).win_sting_receipt = receipt
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         receipt = rlgl_phase_state(state).win_sting_receipt
         if receipt is not None and receipt.is_stopped():
             self.transition_to(state, PHASE_READY)

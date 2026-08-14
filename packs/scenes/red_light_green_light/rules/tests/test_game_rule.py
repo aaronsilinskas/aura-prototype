@@ -105,7 +105,7 @@ def _tick(
     button_b: bool = False,
     total: float | None = None,
 ) -> None:
-    """Queue one ButtonAndAcceleration event and advance one engine tick."""
+    """Queue one Sensors event and advance one engine tick."""
     if total is not None and timer is not None:
         timer.total = total
     button_states: dict[str, int] = {}
@@ -113,7 +113,7 @@ def _tick(
         button_states["A"] = ButtonData.PRESSED
     if button_b:
         button_states["B"] = ButtonData.PRESSED
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states=button_states), accel))
+    state.queue_event(InputEvents.Sensors(ButtonData(states=button_states), accel))
     engine.update(state)
 
 

@@ -43,7 +43,7 @@ def _tick(
     states: dict[str, int] = {}
     if button_a:
         states["A"] = ButtonData.PRESSED
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states=states)))
+    state.queue_event(InputEvents.Sensors(ButtonData(states=states)))
     engine.update(state)
 
 

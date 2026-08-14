@@ -39,9 +39,9 @@ def _apply_page(page: int, level: int, state: GameState) -> None:
 
 class ElementBrowserRule(GameRule):
     def __init__(self) -> None:
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        self.on(InputEvents.Sensors, self._handle)
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         if not state.get("shown", False):
             state.set("shown", True)
             _apply_page(state.get("page", 0), state.get("level", 1), state)

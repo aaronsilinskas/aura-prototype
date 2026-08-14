@@ -321,7 +321,7 @@ def run() -> None:
 
     _button_data = ButtonData({})
     _acceleration = AccelerationData(0.0, 0.0, 0.0) if accelerometer is not None else None
-    _input_event = InputEvents.ButtonAndAcceleration(_button_data, _acceleration)
+    _input_event = InputEvents.Sensors(_button_data, _acceleration)
 
     start_injected = not AUTO_START
     warmup_done = WARMUP_SECONDS <= 0

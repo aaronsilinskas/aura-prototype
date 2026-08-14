@@ -24,7 +24,7 @@ class RlglGreenWarningRule(PhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_GREEN_WARNING, rlgl_phase)
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         level = rlgl_phase_state(state).level
@@ -32,7 +32,7 @@ class RlglGreenWarningRule(PhaseRule):
             Scope.NON_AMBIENT, "scene.warning_sting", rlgl_config(state).warning_sting_opts(level)
         )
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         level = rlgl_phase_state(state).level
         if rlgl_phase(state).elapsed(state.total) >= rlgl_config(state).warning_duration(level):
             self.transition_to(state, PHASE_GREEN)

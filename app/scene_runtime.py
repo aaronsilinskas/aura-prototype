@@ -68,7 +68,7 @@ def run_scene(
 
     _button_data = ButtonData({})
     _acceleration = AccelerationData(0.0, 0.0, 0.0) if hw.accelerometer is not None else None
-    _input_event = InputEvents.ButtonAndAcceleration(_button_data, _acceleration)
+    _input_event = InputEvents.Sensors(_button_data, _acceleration)
 
     _last_telemetry_print_total = 0.0
 

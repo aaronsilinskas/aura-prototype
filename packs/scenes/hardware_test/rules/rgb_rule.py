@@ -24,7 +24,7 @@ class HwTestRgbRule(HwModeRule):
         for scope, name in RGB_IDLE:
             ec.set_effect(scope, name, {"level": 1})
 
-    def on_input_event(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def on_input_event(self, event: InputEvents.Sensors, state: GameState) -> None:
         if not event.buttons.is_pressed("A"):
             return
 

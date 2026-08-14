@@ -35,7 +35,7 @@ class RlglGreenRule(PhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_GREEN, rlgl_phase)
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         motion = rlgl_motion(state)
@@ -49,7 +49,7 @@ class RlglGreenRule(PhaseRule):
     def on_exit(self, state: GameState) -> None:
         rlgl_phase_state(state).stop_music()
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         # Timer expiry is always checked before motion
         config = rlgl_config(state)
         level = rlgl_phase_state(state).level

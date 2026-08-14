@@ -32,7 +32,7 @@ class RlglReadyRule(PhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_READY, rlgl_phase)
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         state.effect_controls.set_effect(Scope.ALL, "scene.ready", {})
@@ -41,7 +41,7 @@ class RlglReadyRule(PhaseRule):
             phase_state.level_receipt.stop()
             phase_state.level_receipt = None
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         if event.buttons.is_pressed("A") or event.buttons.is_pressed("B"):
             self._start_game(state)
 

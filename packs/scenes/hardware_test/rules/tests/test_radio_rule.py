@@ -38,9 +38,7 @@ def _make_state(
 
 
 def _press_a(state: GameState, engine: GameEngine) -> None:
-    state.queue_event(
-        InputEvents.ButtonAndAcceleration(ButtonData(states={"A": ButtonData.PRESSED}))
-    )
+    state.queue_event(InputEvents.Sensors(ButtonData(states={"A": ButtonData.PRESSED})))
     engine.update(state)
 
 
@@ -57,7 +55,7 @@ def _fire_radio(state: GameState, engine: GameEngine) -> None:
 def test_entering_radio_sets_white_solid_on_all(spy):
     state, engine = _make_state(spy)
     seed_phase(state, MODE_RADIO, entered=False)
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    state.queue_event(InputEvents.Sensors(ButtonData(states={})))
     engine.update(state)
 
     assert all(c[1] == "basic.solid" for c in spy.set_effect_calls)

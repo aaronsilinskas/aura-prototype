@@ -18,13 +18,13 @@ class TagReadyRule(PhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_READY, tag_phase)
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         state.effect_controls.set_effect(Scope.ALL, "scene.ready", {})
         state.effect_controls.add_effect(Scope.ALL, "scene.ready_shots", {})
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         if event.buttons.is_pressed("A") or event.buttons.is_pressed("B"):
             self.transition_to(state, PHASE_STARTING)
 

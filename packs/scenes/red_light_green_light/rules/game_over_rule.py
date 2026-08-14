@@ -22,13 +22,13 @@ class RlglGameOverRule(PhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_GAME_OVER, rlgl_phase)
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         state.effect_controls.set_effect(Scope.ALL, "elements.fire", {})
         state.effect_controls.add_effect(Scope.ALL, "scene.game_over_sting", {})
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         if rlgl_phase(state).elapsed(state.total) >= rlgl_config(state).game_over_duration:
             self.transition_to(state, PHASE_READY)
 

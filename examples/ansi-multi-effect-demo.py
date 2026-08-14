@@ -85,7 +85,7 @@ game_state = game_engine.create_state(SceneControls())
 
 class MakeEffectRule(GameRule):
     def handle_event(self, event: Event, state: GameState) -> None:
-        if isinstance(event, InputEvents.ButtonAndAcceleration):
+        if isinstance(event, InputEvents.Sensors):
             button_data = event.buttons
             if button_data.is_pressed("A"):
                 state.effect_controls.add_effect(Scope.PERSONAL, "elements.fire", {"level": 5})
@@ -102,13 +102,13 @@ game_engine.add_rules(MakeEffectRule())
 _default_acceleration = AccelerationData(x=0.0, y=9.8, z=0.0)
 
 
-def _make_event(key: str | None) -> InputEvents.ButtonAndAcceleration:
+def _make_event(key: str | None) -> InputEvents.Sensors:
     pressed = key.upper() if key else None
     states = {
         button: ButtonData.PRESSED if button == pressed else ButtonData.UP
         for button in ("A", "B", "C", "D")
     }
-    return InputEvents.ButtonAndAcceleration(ButtonData(states=states), _default_acceleration)
+    return InputEvents.Sensors(ButtonData(states=states), _default_acceleration)
 
 
 def main() -> None:

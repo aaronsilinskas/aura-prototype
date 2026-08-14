@@ -41,7 +41,7 @@ def _make_state(
 
 def _tick(state: GameState, engine: GameEngine, timer: StubTimer, total: float) -> None:
     timer.total = total
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    state.queue_event(InputEvents.Sensors(ButtonData(states={})))
     engine.update(state)
 
 

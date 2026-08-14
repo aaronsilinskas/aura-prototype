@@ -1,6 +1,6 @@
-"""Tests for ButtonData query methods and _states encapsulation."""
+"""Tests for ButtonData query methods, MagneticData, and InputEvents.Sensors."""
 
-from engine.input import ButtonData
+from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 
 
 def _make(states: dict[str, int]) -> ButtonData:
@@ -180,3 +180,58 @@ def test_set_multiple_buttons_independently():
     bd.set("B", ButtonData.UP)
     assert bd.is_pressed("A") is True
     assert bd.is_up("B") is True
+
+
+# ---------------------------------------------------------------------------
+# MagneticData
+# ---------------------------------------------------------------------------
+
+
+def test_magnetic_data_defaults_all_axes_to_zero():
+    magnetic = MagneticData()
+
+    assert (magnetic.x, magnetic.y, magnetic.z) == (0.0, 0.0, 0.0)
+
+
+def test_magnetic_data_holds_provided_axis_values():
+    magnetic = MagneticData(x=12.5, y=-3.25, z=48.0)
+
+    assert (magnetic.x, magnetic.y, magnetic.z) == (12.5, -3.25, 48.0)
+
+
+def test_magnetic_data_str_reports_all_axes():
+    magnetic = MagneticData(x=1.0, y=2.0, z=3.0)
+
+    assert str(magnetic) == "MagneticData(x=1.0, y=2.0, z=3.0)"
+
+
+# ---------------------------------------------------------------------------
+# InputEvents.Sensors
+# ---------------------------------------------------------------------------
+
+
+def test_sensors_event_carries_buttons_acceleration_and_magnetic():
+    buttons = ButtonData(states={"A": ButtonData.PRESSED})
+    acceleration = AccelerationData(x=1.0, y=2.0, z=3.0)
+    magnetic = MagneticData(x=4.0, y=5.0, z=6.0)
+
+    event = InputEvents.Sensors(buttons, acceleration, magnetic)
+
+    assert event.buttons is buttons
+    assert event.acceleration is acceleration
+    assert event.magnetic is magnetic
+
+
+def test_sensors_event_defaults_acceleration_and_magnetic_to_none():
+    buttons = ButtonData(states={})
+
+    event = InputEvents.Sensors(buttons)
+
+    assert event.acceleration is None
+    assert event.magnetic is None
+
+
+def test_sensors_event_verb_is_sensors():
+    event = InputEvents.Sensors(ButtonData(states={}))
+
+    assert event.name == "sensors"

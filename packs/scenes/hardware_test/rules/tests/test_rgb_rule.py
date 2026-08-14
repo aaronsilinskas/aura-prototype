@@ -33,7 +33,7 @@ def _make_state(spy: SpyEffectControls, mode=MODE_RGB) -> tuple[GameState, GameE
 
 def _tick(state: GameState, engine: GameEngine, button: str | None = None) -> None:
     states = {button: ButtonData.PRESSED} if button else {}
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states=states)))
+    state.queue_event(InputEvents.Sensors(ButtonData(states=states)))
     engine.update(state)
 
 

@@ -273,6 +273,10 @@ _Avoid_: "IMU" (the LIS3DH has no gyroscope or magnetometer)
 A snapshot of 3-axis accelerometer readings; `None` when no accelerometer is present — signals "no sensor data," not "device at rest."
 _Avoid_: `MovementData`
 
+### MagneticData
+A snapshot of 3-axis magnetometer readings in microteslas (µT), in the magnetometer's raw chip-native frame (unremapped); `None` when no magnetometer is present — signals "no sensor data," not "zero field" and not "read failed."
+_Avoid_: "IMU" (magnetometer is a separate sensor from the accelerometer)
+
 ### ButtonData
 A snapshot of button states, each one of `UP`, `DOWN`, `PRESSED` (down this frame), `RELEASED` (up this frame); query methods return `bool`, and `is_down` is `True` on both `PRESSED` and `DOWN`.
 _Avoid_: reading `_states` directly (use the query methods); assuming `is_down` excludes the `PRESSED` frame
