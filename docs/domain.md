@@ -126,8 +126,8 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `ScopeValue` / `Scope` | `engine/state.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `AMBIENT`, `Global.MAIN/BUFF/DEBUFF`, and composites `Global.ALL` / `NON_AMBIENT` / `Scope.ALL` |
 | `NetworkControls` | `engine/state.py` | Abstract interface for sending/receiving network messages |
 | `TransmitPump` | `engine/network.py` | Abstract runtime-facing seam declaring `poll_transmits()`; the type the runtime loop reaches through, distinct from the send-only `NetworkControls` |
-| `AudioOverlayAdmin` | `engine/audio.py` | Scene-transition-facing abstract interface, reserved for `SceneManager`: `set_scene_sounds(sounds \| None)` |
-| `AudioRegistry` | `engine/audio.py` | Concrete `AudioOverlayAdmin`; resolves a qualified clip name to a WAV path via prefix routing (`scene.` → active scene overlay, `<pack>.` → shared base scanned by `scan_pack_sounds`), raising on an unprefixed or unresolved name |
+| `AudioOverlayAdmin` | `engine/audio.py` | Scene-transition-facing abstract interface, reserved for `SceneManager`: `set_scene_sounds(sounds \| None)`, `set_allowed_packs(names \| None)` |
+| `AudioRegistry` | `engine/audio.py` | Concrete `AudioOverlayAdmin`; resolves a qualified clip name to a WAV path via prefix routing (`scene.` → active scene overlay, `<pack>.` → shared base scanned by `scan_pack_sounds`, gated by the `pack.` membership rule), raising on an unprefixed, undeclared-pack, or unresolved name |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update(timer)` tick |
 | `GameState` | `engine/state.py` | Passed to each rule: holds `engine`, `timer`, `effect_controls`, `network_controls` |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |

@@ -1198,6 +1198,75 @@ def test_allowed_packs_installed_in_lockstep_through_load_overlay_pop(pack_env) 
     )
 
 
+def test_audio_allowed_packs_installed_in_lockstep_through_load_overlay_pop(pack_env) -> None:
+    """AudioOverlayAdmin.set_allowed_packs must track the top-of-stack scene's declared
+    effect_packs through load, overlay, and pop -- installed right beside set_scene_sounds,
+    reusing the same frozenset pushed to EffectAdmin.set_allowed_packs (not re-derived)."""
+    _make_effect_pack(pack_env, "fx", "1.0")
+    _make_effect_pack(pack_env, "gfx", "1.0")
+    effect_registry, rule_registry = _make_registries(str(pack_env))
+    engine = _make_engine()
+    scene_reg = _scene_registry(
+        ("base", _scene_factory(effect_packs=[("fx", "1.0")])),
+        ("overlay_scene", _scene_factory(effect_packs=[("gfx", "1.0")])),
+    )
+    audio_overlay_admin = SpyAudioOverlayAdmin()
+    manager = _make_scene_manager(
+        engine,
+        effect_registry=effect_registry,
+        rule_registry=rule_registry,
+        scene_registry=scene_reg,
+        audio_overlay_admin=audio_overlay_admin,
+    )
+
+    manager.load("base")
+    manager.update()
+    assert audio_overlay_admin.allowed_packs_history[-1] == frozenset({"fx"}), (
+        "load must install the loaded scene's own declared effect_packs"
+    )
+
+    manager.overlay("overlay_scene")
+    manager.update()
+    assert audio_overlay_admin.allowed_packs_history[-1] == frozenset({"gfx"}), (
+        "overlay must install the overlay scene's own declared effect_packs, not the base's"
+    )
+
+    manager.pop()
+    manager.update()
+    assert audio_overlay_admin.allowed_packs_history[-1] == frozenset({"fx"}), (
+        "pop must restore the revealed base entry's declared effect_packs"
+    )
+
+
+def test_activate_pushes_the_same_allowed_packs_object_to_both_admin_seams(pack_env) -> None:
+    """_activate must derive the allowed-pack frozenset once and reuse it for both
+    EffectAdmin.set_allowed_packs and AudioOverlayAdmin.set_allowed_packs -- not
+    derive it a second time for audio."""
+    _make_effect_pack(pack_env, "fx", "1.0")
+    effect_registry, rule_registry = _make_registries(str(pack_env))
+    engine = _make_engine()
+    scene_reg = _scene_registry(("base", _scene_factory(effect_packs=[("fx", "1.0")])))
+    effect_admin = SpyEffectAdmin()
+    audio_overlay_admin = SpyAudioOverlayAdmin()
+    manager = _make_scene_manager(
+        engine,
+        effect_registry=effect_registry,
+        rule_registry=rule_registry,
+        scene_registry=scene_reg,
+        effect_admin=effect_admin,
+        audio_overlay_admin=audio_overlay_admin,
+    )
+
+    manager.load("base")
+    manager.update()
+
+    audio_allowed = audio_overlay_admin.allowed_packs_history[-1]
+    effect_allowed = effect_admin.allowed_packs_history[-1]
+    assert audio_allowed is effect_allowed, (
+        "the same frozenset instance must reach both admin seams"
+    )
+
+
 # ---------------------------------------------------------------------------
 # SceneManager — resolution-failure ordering
 # ---------------------------------------------------------------------------

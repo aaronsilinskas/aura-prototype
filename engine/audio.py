@@ -45,6 +45,18 @@ class AudioOverlayAdmin:
         """
         raise NotImplementedError
 
+    def set_allowed_packs(self, names: frozenset[str] | None) -> None:
+        """Install *names* as the active scene's declared effect-pack names.
+
+        Called by ``SceneManager`` at every transition, right beside
+        ``set_scene_sounds``, with the same ``frozenset`` it derives for
+        ``EffectAdmin.set_allowed_packs`` — reused, not re-derived — so that
+        ``pack.<clip>`` resolution is bounded by declaration the same way
+        ``pack.<effect>`` resolution is. Pass ``None`` to fail closed — no
+        ``pack.<clip>`` name resolves until a scene installs its declared set.
+        """
+        raise NotImplementedError
+
 
 class AudioRegistry(AudioOverlayAdmin):
     """Resolves a qualified clip name to a WAV path by prefix routing.
@@ -60,13 +72,20 @@ class AudioRegistry(AudioOverlayAdmin):
     ``<pack>.<stem>`` name. An unprefixed name, or a name absent from its routed
     map, raises rather than returning ``None`` — a bad clip reference (typo or a
     missing/misnamed file) surfaces the same way a bad effect name does.
+
+    The base branch is further gated by the ``pack.`` membership rule: a
+    ``<pack>.<stem>`` name only resolves when *pack* is in the allowed set
+    installed via ``set_allowed_packs`` (the ``AudioOverlayAdmin`` face),
+    mirroring ``EffectResolver._resolve_pack``. ``None`` installed (the
+    default) means no active scene and fails closed.
     """
 
-    __slots__ = ("_base", "_overlay")
+    __slots__ = ("_allowed_packs", "_base", "_overlay")
 
     def __init__(self) -> None:
         self._base: dict[str, str] = {}
         self._overlay: dict[str, str] | None = None
+        self._allowed_packs: frozenset[str] | None = None
 
     def scan_pack_sounds(self, pack_name: str, path: str) -> None:
         """Scan *path* and merge its clips into the base as ``<pack_name>.<stem>``.
@@ -80,15 +99,21 @@ class AudioRegistry(AudioOverlayAdmin):
     def set_scene_sounds(self, sounds: dict[str, str] | None) -> None:
         self._overlay = sounds
 
+    def set_allowed_packs(self, names: frozenset[str] | None) -> None:
+        self._allowed_packs = names
+
     def path(self, name: str) -> str:
         """Return the WAV path *name* resolves to.
 
         *name* must be ``"scene.<stem>"`` (routes to the active scene overlay) or
-        ``"<pack>.<stem>"`` (routes to the shared base).
+        ``"<pack>.<stem>"`` (routes to the shared base, gated by the ``pack.``
+        membership rule — see ``set_allowed_packs``).
 
         Raises:
             ValueError: *name* carries no ``.`` prefix, or resolves in neither
-                the routed overlay nor the routed base.
+                the routed overlay nor the routed base; or, for a ``<pack>.``
+                name, no active scene is installed or *pack* is not declared
+                in the active scene's ``effect_packs``.
         """
         if "." not in name:
             raise ValueError(
@@ -100,6 +125,15 @@ class AudioRegistry(AudioOverlayAdmin):
             if self._overlay is None or stem not in self._overlay:
                 raise ValueError(f"Unknown scene sound '{name}'")
             return self._overlay[stem]
+
+        if self._allowed_packs is None:
+            raise ValueError(
+                f"Clip name '{name}' references pack '{prefix}' but no scene is active"
+            )
+        if prefix not in self._allowed_packs:
+            raise ValueError(
+                f"Sound pack '{prefix}' is not declared in the active scene's effect_packs"
+            )
 
         if name not in self._base:
             raise ValueError(f"Unknown sound '{name}'")
