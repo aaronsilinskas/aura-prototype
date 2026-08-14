@@ -118,7 +118,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
 | `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
 | `EffectControls` | `engine/state.py` | Rule-facing abstract interface: `set_effect`, `add_effect`, `stop_effect`, `set_merge_strategy` |
-| `EffectAdmin` | `engine/state.py` | Scene-transition-facing abstract interface, reserved for `SceneManager`: `reset_merge_strategies`, `capture_merge_strategies`, `apply_merge_strategies`, `set_local_effects` |
+| `EffectAdmin` | `engine/state.py` | Scene-transition-facing abstract interface, reserved for `SceneManager`: `reset_merge_strategies`, `capture_merge_strategies`, `apply_merge_strategies`, `set_local_effects`, `set_allowed_packs` |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin` — two faces of one instance, mirroring `NetworkControls`/`TransmitPump`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output: `create_buffer`, `update_pixels`, `handle_event` |
 | `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → Effect`; one per effect pack |

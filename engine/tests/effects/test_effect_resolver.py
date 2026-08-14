@@ -93,6 +93,7 @@ def _make_local_registry(pack_env, scene_name: str, items: dict[str, str]) -> Sc
 def test_resolve_returns_builder_pack_and_effect_name_for_known_effect(pack_env) -> None:
     registry = _make_registry_with_pack(pack_env, "elements", {"fire": _stub_item_source()})
     resolver = EffectResolver(registry)
+    resolver.set_allowed_packs(frozenset({"elements"}))
 
     builder, pack_name, effect_name = resolver.resolve("elements.fire")
 
@@ -104,6 +105,7 @@ def test_resolve_returns_builder_pack_and_effect_name_for_known_effect(pack_env)
 def test_resolve_returns_same_builder_instance_on_repeated_calls(pack_env) -> None:
     registry = _make_registry_with_pack(pack_env, "elements", {"fire": _stub_item_source()})
     resolver = EffectResolver(registry)
+    resolver.set_allowed_packs(frozenset({"elements"}))
 
     builder_a, _, _ = resolver.resolve("elements.fire")
     builder_b, _, _ = resolver.resolve("elements.fire")
@@ -156,9 +158,14 @@ def test_resolve_error_message_includes_the_bad_name() -> None:
 
 
 def test_resolve_raises_for_unknown_pack(pack_env) -> None:
+    """A pack declared by the active scene but absent from the registry is a wiring
+    bug (declared packs are version-validated at load), not a membership failure —
+    it still surfaces as ``UnknownPackError`` via the registry lookup.
+    """
     registry = PackRegistry(item_attr="BUILD")
     registry.scan_dir(str(pack_env), _MODULE_PREFIX)
     resolver = EffectResolver(registry)
+    resolver.set_allowed_packs(frozenset({"spells"}))
 
     with pytest.raises(ValueError, match="Unknown effect pack 'spells'"):
         resolver.resolve("spells.fireball")
@@ -172,6 +179,7 @@ def test_resolve_raises_for_unknown_pack(pack_env) -> None:
 def test_resolve_raises_for_unknown_effect_in_known_pack(pack_env) -> None:
     registry = _make_registry_with_pack(pack_env, "elements", {"fire": _stub_item_source()})
     resolver = EffectResolver(registry)
+    resolver.set_allowed_packs(frozenset({"elements"}))
 
     with pytest.raises(ValueError, match="Unknown effect 'flash' in pack 'elements'"):
         resolver.resolve("elements.flash")
@@ -185,6 +193,7 @@ def test_resolve_raises_for_unknown_effect_in_known_pack(pack_env) -> None:
 def test_resolve_raises_for_invalid_build_attribute(pack_env) -> None:
     registry = _make_registry_with_pack(pack_env, "elements", {"bad": _invalid_build_source()})
     resolver = EffectResolver(registry)
+    resolver.set_allowed_packs(frozenset({"elements"}))
 
     with pytest.raises(ValueError, match="invalid BUILD"):
         resolver.resolve("elements.bad")
@@ -198,6 +207,7 @@ def test_resolve_raises_for_invalid_build_attribute(pack_env) -> None:
 def test_resolve_raises_for_missing_build_attribute(pack_env) -> None:
     registry = _make_registry_with_pack(pack_env, "elements", {"nobuild": _no_build_source()})
     resolver = EffectResolver(registry)
+    resolver.set_allowed_packs(frozenset({"elements"}))
 
     with pytest.raises(ValueError, match="missing a BUILD"):
         resolver.resolve("elements.nobuild")
@@ -315,6 +325,117 @@ def test_set_local_effects_replaces_previous_registry_old_effects_no_longer_reso
 
 
 # ---------------------------------------------------------------------------
+# Pack membership — pack.effect only resolves for packs the active scene
+# declared, mirroring how scene.effect is bounded by the active scene's locals
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_raises_when_no_allowed_packs_installed(pack_env) -> None:
+    """A fresh resolver's allowed-pack set defaults to None — fail closed."""
+    registry = _make_registry_with_pack(pack_env, "elements", {"fire": _stub_item_source()})
+    resolver = EffectResolver(registry)
+
+    with pytest.raises(ValueError, match="no scene is active"):
+        resolver.resolve("elements.fire")
+
+
+def test_resolve_no_active_scene_error_includes_the_effect_name(pack_env) -> None:
+    registry = _make_registry_with_pack(pack_env, "elements", {"fire": _stub_item_source()})
+    resolver = EffectResolver(registry)
+
+    with pytest.raises(ValueError, match=r"elements\.fire"):
+        resolver.resolve("elements.fire")
+
+
+def test_resolve_raises_for_pack_not_declared_by_active_scene(pack_env) -> None:
+    registry = _make_registry_with_pack(pack_env, "elements", {"fire": _stub_item_source()})
+    resolver = EffectResolver(registry)
+    resolver.set_allowed_packs(frozenset({"other"}))
+
+    with pytest.raises(ValueError, match="elements"):
+        resolver.resolve("elements.fire")
+
+
+def test_undeclared_pack_error_does_not_say_unknown_pack(pack_env) -> None:
+    """The pack exists in the registry — it just isn't declared by the active
+    scene — so the message must be honest and distinct from 'Unknown effect pack'.
+    """
+    registry = _make_registry_with_pack(pack_env, "elements", {"fire": _stub_item_source()})
+    resolver = EffectResolver(registry)
+    resolver.set_allowed_packs(frozenset({"other"}))
+
+    try:
+        resolver.resolve("elements.fire")
+    except ValueError as exc:
+        assert "Unknown" not in str(exc)
+    else:
+        pytest.fail("expected ValueError")
+
+
+def test_resolve_membership_checked_before_registry_lookup(pack_env) -> None:
+    """A pack absent from the registry entirely still fails with the
+    not-declared message (not 'Unknown effect pack') when it also isn't
+    in the allowed set — membership is checked first.
+    """
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    resolver = EffectResolver(registry)
+    resolver.set_allowed_packs(frozenset({"other"}))
+
+    with pytest.raises(ValueError, match="not declared"):
+        resolver.resolve("spells.fireball")
+
+
+def test_resolve_succeeds_for_declared_pack(pack_env) -> None:
+    registry = _make_registry_with_pack(pack_env, "elements", {"fire": _stub_item_source()})
+    resolver = EffectResolver(registry)
+    resolver.set_allowed_packs(frozenset({"elements"}))
+
+    builder, pack_name, effect_name = resolver.resolve("elements.fire")
+
+    assert isinstance(builder, EffectBuilder)
+    assert pack_name == "elements"
+    assert effect_name == "fire"
+
+
+def test_set_allowed_packs_none_clears_pack_prefix_resolution(pack_env) -> None:
+    registry = _make_registry_with_pack(pack_env, "elements", {"fire": _stub_item_source()})
+    resolver = EffectResolver(registry)
+    resolver.set_allowed_packs(frozenset({"elements"}))
+    resolver.set_allowed_packs(None)
+
+    with pytest.raises(ValueError, match="no scene is active"):
+        resolver.resolve("elements.fire")
+
+
+def test_set_allowed_packs_replaces_previous_set(pack_env) -> None:
+    registry = _make_registry_with_pack(pack_env, "elements", {"fire": _stub_item_source()})
+    resolver = EffectResolver(registry)
+    resolver.set_allowed_packs(frozenset({"other"}))
+    resolver.set_allowed_packs(frozenset({"elements"}))
+
+    _, pack_name, effect_name = resolver.resolve("elements.fire")
+
+    assert pack_name == "elements"
+    assert effect_name == "fire"
+
+
+def test_scene_prefix_resolution_unaffected_by_missing_allowed_packs(pack_env) -> None:
+    """scene.-prefixed names are scene-local and never gated by allowed packs."""
+    registry = PackRegistry(item_attr="BUILD")
+    local_reg = _make_local_registry(pack_env, "scene_m", {"flash": _stub_item_source()})
+    resolver = EffectResolver(registry)
+    resolver.set_local_effects(local_reg)
+    # No set_allowed_packs call at all — pack.* would fail closed, but scene.* must not.
+
+    builder, pack_name, effect_name = resolver.resolve("scene.flash")
+
+    assert isinstance(builder, EffectBuilder)
+    assert pack_name == "scene"
+    assert effect_name == "flash"
+
+
+# ---------------------------------------------------------------------------
 # Anti-regression — dispatch is by exception type, never by message text
 # ---------------------------------------------------------------------------
 
@@ -337,6 +458,7 @@ def test_resolve_pack_error_message_is_canonical_even_when_typed_error_wording_i
         UnknownItemError("totally different name", ["nope"], pack_name="totally different pack")
     )
     resolver = EffectResolver(stub_registry)  # type: ignore[arg-type]
+    resolver.set_allowed_packs(frozenset({"spells"}))
 
     with pytest.raises(ValueError, match="Unknown effect 'fireball' in pack 'spells'"):
         resolver.resolve("spells.fireball")

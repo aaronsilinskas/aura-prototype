@@ -44,35 +44,48 @@ class EffectBuilder:
 class EffectResolver:
     """Maps a qualified effect name to an (builder, pack_name, effect_name) tuple.
 
-    Owns the ``scene.`` reserved-prefix rule, the choice of registry for each
-    name, and the translation of typed registry errors (from ``engine.packs``)
-    into effect-facing messages.  ``EffectManager`` holds one resolver and
-    calls ``resolve`` once per effect start.
+    Owns the ``scene.`` reserved-prefix rule, the ``pack.`` effect-pack
+    membership rule, the choice of registry for each name, and the
+    translation of typed registry errors (from ``engine.packs``) into
+    effect-facing messages.  ``EffectManager`` holds one resolver and calls
+    ``resolve`` once per effect start.
 
     CircuitPython/MicroPython safe: no per-call allocations beyond what the
     underlying registries already do; ``__slots__`` prevents ``__dict__``.
     """
 
-    __slots__ = ("_local_effects", "_registry")
+    __slots__ = ("_allowed_packs", "_local_effects", "_registry")
 
     def __init__(self, registry: PackRegistry) -> None:
         self._registry: PackRegistry = registry
         self._local_effects: SceneLocalRegistry | None = None
+        self._allowed_packs: frozenset[str] | None = None
 
     def set_local_effects(self, local_registry: SceneLocalRegistry | None) -> None:
         """Replace the active scene-local registry.  Pass ``None`` to clear."""
         self._local_effects = local_registry
+
+    def set_allowed_packs(self, names: frozenset[str] | None) -> None:
+        """Replace the active scene's declared effect-pack names.
+
+        Pass ``None`` to fail closed — no ``pack.effect`` name resolves until
+        a scene installs its declared set.
+        """
+        self._allowed_packs = names
 
     def resolve(self, name: str) -> tuple[EffectBuilder, str, str]:
         """Return ``(builder, pack_name, effect_name)`` for *name*.
 
         *name* must be in ``"pack.effect"`` or ``"scene.effect"`` format.
         The ``scene.`` prefix routes to the currently-active scene-local
-        registry.  All other prefixes route to the shared ``PackRegistry``.
+        registry.  Any other prefix names a shared pack and is checked
+        against the active scene's declared ``effect_packs`` before routing
+        to the shared ``PackRegistry``.
 
         Raises:
             ValueError: for any resolution failure, with an effect-facing
-                message (missing prefix, unknown pack, unknown effect,
+                message (missing prefix, no active scene, pack not declared
+                by the active scene, unknown pack, unknown effect,
                 invalid/missing ``BUILD``, ``scene.`` with no active scene,
                 unknown scene-local effect).
         """
@@ -83,7 +96,7 @@ class EffectResolver:
         if pack_name == "scene":
             builder = self._resolve_scene(name, effect_name)
         else:
-            builder = self._resolve_pack(pack_name, effect_name)
+            builder = self._resolve_pack(name, pack_name, effect_name)
 
         return builder, pack_name, effect_name
 
@@ -108,7 +121,15 @@ class EffectResolver:
                 f"Scene-local effect '{effect_name}' is missing a BUILD attribute"
             ) from exc
 
-    def _resolve_pack(self, pack_name: str, effect_name: str) -> EffectBuilder:
+    def _resolve_pack(self, name: str, pack_name: str, effect_name: str) -> EffectBuilder:
+        if self._allowed_packs is None:
+            raise ValueError(
+                f"Effect name '{name}' references pack '{pack_name}' but no scene is active"
+            )
+        if pack_name not in self._allowed_packs:
+            raise ValueError(
+                f"Effect pack '{pack_name}' is not declared in the active scene's effect_packs"
+            )
         try:
             return self._registry.get(pack_name, effect_name, EffectBuilder)
         except UnknownPackError as exc:
@@ -345,6 +366,20 @@ class EffectManager(EffectControls, EffectAdmin):
         must not call this method.
         """
         self._resolver.set_local_effects(local_registry)
+
+    def set_allowed_packs(self, names: frozenset[str] | None) -> None:
+        """Store the active scene's declared effect-pack names.
+
+        Called by ``SceneManager`` at each scene transition, right beside
+        ``set_local_effects``, so that ``pack.<effect>`` names only resolve
+        for packs the active scene declared.  Pass ``None`` when the stack
+        empties so ``pack.`` lookups fail closed rather than resolving
+        unrestricted.
+
+        Reserved for ``SceneManager`` (via the ``EffectAdmin`` face) — rules
+        must not call this method.
+        """
+        self._resolver.set_allowed_packs(names)
 
     def set_merge_strategy(self, scope: ScopeValue, strategy: MergeStrategy) -> None:
         """Set the merge strategy for every key in scope.keys.

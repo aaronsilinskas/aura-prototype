@@ -126,7 +126,7 @@ The **rule-facing** effect seam a rule holds via `GameState.effect_controls`: `s
 _Avoid_: adding `set_local_effects` or the merge-strategy snapshot lifecycle back onto it
 
 ### EffectAdmin
-The **scene-transition-facing** counterpart to `EffectControls` (`reset_merge_strategies`, `capture_merge_strategies`, `apply_merge_strategies`, `set_local_effects`). `EffectManager` implements both faces; `SceneManager` reaches it only through this seam.
+The **scene-transition-facing** counterpart to `EffectControls` (`reset_merge_strategies`, `capture_merge_strategies`, `apply_merge_strategies`, `set_local_effects`, `set_allowed_packs`). `EffectManager` implements both faces; `SceneManager` reaches it only through this seam. `set_allowed_packs(names | None)` installs a `frozenset` of the active scene's declared `effect_packs` names, right beside the `set_local_effects` push, so `pack.effect` resolution is bounded by declaration the same way `scene.effect` resolution is bounded by the active scene's locals.
 _Avoid_: calling any `EffectAdmin` method from a `GameRule`; putting it in the rule-facing `EffectControls`
 
 ### Scope
@@ -142,8 +142,8 @@ A structured event payload (`pack`, `name`, `verb`) routed to every in-scope `Ef
 _Avoid_: confusing with `Event` (game-rule events); assuming only `"start"`/`"stop"` verbs exist
 
 ### EffectResolver
-Maps a qualified effect name to its `EffectBuilder`, owning the reserved `scene.` prefix rule (a `scene.`-name resolves against the active scene's local effects, any other against shared packs). Held by `EffectManager`.
-_Avoid_: putting the `scene.` rule in `EffectManager`; confusing with `EffectManager` (routing/rendering, not name resolution)
+Maps a qualified effect name to its `EffectBuilder`, owning the reserved `scene.` prefix rule (a `scene.`-name resolves against the active scene's local effects, any other against shared packs) and the `pack.` membership rule (a shared-pack name only resolves when its pack is in the active scene's declared `effect_packs`, checked before the registry lookup; `None` installed means no active scene and fails closed). Held by `EffectManager`.
+_Avoid_: putting the `scene.` rule in `EffectManager`; confusing with `EffectManager` (routing/rendering, not name resolution); reporting an undeclared pack as "unknown" (the pack exists in the registry — it just isn't declared)
 
 ### Merge strategy
 The per-scope policy deciding how a scope's stack of layered effect buffers becomes shown pixels; set per rule via `EffectControls.set_merge_strategy`, defaulting to **Split**. Two ship: **Split** and **Additive**.

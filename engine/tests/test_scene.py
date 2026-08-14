@@ -1237,6 +1237,8 @@ def _make_merge_strategy_scene_manager(pack_env, scene_names):
     Wires a real ``EffectManager`` (not the recording stub) as the engine's
     effect controls, with a 'color' pack providing solid-fill 'red'/'blue'
     effects, so merge-strategy behaviour can be observed on composed pixels.
+    Every scene declares 'color' in its effect_packs so SceneManager's
+    per-transition allowed-pack push (issue #814) doesn't block it.
     """
     _make_color_effect_pack(pack_env, "color")
     effect_registry = PackRegistry(item_attr="BUILD")
@@ -1244,7 +1246,9 @@ def _make_merge_strategy_scene_manager(pack_env, scene_names):
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     effect_manager = EffectManager(registry=effect_registry, outputs=[output])
     engine = GameEngine(effect_controls=effect_manager)
-    scene_reg = _scene_registry(*[(name, _scene_factory()) for name in scene_names])
+    scene_reg = _scene_registry(
+        *[(name, _scene_factory(effect_packs=[("color", "1.0")])) for name in scene_names]
+    )
     scene_manager = _make_scene_manager(
         engine,
         effect_registry=effect_registry,

@@ -51,21 +51,26 @@ class SpyEffectControls(EffectControls):
 class SpyEffectAdmin(EffectAdmin):
     """Test recorder for the scene-transition ``EffectAdmin`` face.
 
-    Records every ``set_local_effects`` push and merge-strategy lifecycle call
-    so ``SceneManager`` transition tests can assert on them without wiring a
-    real ``EffectManager``. ``capture_merge_strategies`` returns a fresh empty
-    dict each call (a harmless placeholder snapshot) since this spy carries no
-    live merge-strategy state of its own.
+    Records every ``set_local_effects``/``set_allowed_packs`` push and
+    merge-strategy lifecycle call so ``SceneManager`` transition tests can
+    assert on them without wiring a real ``EffectManager``.
+    ``capture_merge_strategies`` returns a fresh empty dict each call (a
+    harmless placeholder snapshot) since this spy carries no live
+    merge-strategy state of its own.
     """
 
     def __init__(self) -> None:
         self.local_effects_history: list[object] = []
+        self.allowed_packs_history: list[frozenset[str] | None] = []
         self.reset_merge_strategies_calls: int = 0
         self.capture_merge_strategies_calls: int = 0
         self.applied_snapshots: list[dict] = []
 
     def set_local_effects(self, local_registry: object) -> None:
         self.local_effects_history.append(local_registry)
+
+    def set_allowed_packs(self, names: frozenset[str] | None) -> None:
+        self.allowed_packs_history.append(names)
 
     def reset_merge_strategies(self) -> None:
         self.reset_merge_strategies_calls += 1

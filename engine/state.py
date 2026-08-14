@@ -306,6 +306,18 @@ class EffectAdmin:
         """
         raise NotImplementedError
 
+    def set_allowed_packs(self, names: frozenset[str] | None) -> None:
+        """Install the active scene's declared effect-pack names.
+
+        Called by ``SceneManager`` on every transition, right beside
+        ``set_local_effects``, so a ``pack.effect`` reference only resolves
+        when *pack* is one of the top-of-stack scene's declared
+        ``effect_packs``. Pass ``None`` when the scene stack empties so that
+        ``pack.`` lookups fail closed ("no active scene") rather than
+        resolving unrestricted. ``scene.``-prefixed names are unaffected.
+        """
+        raise NotImplementedError
+
 
 class StateSlot:
     """Callable accessor that owns the get-or-create-and-revalidate pattern for a GameState key.
