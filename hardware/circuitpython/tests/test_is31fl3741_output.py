@@ -10,7 +10,10 @@ from unittest.mock import MagicMock
 
 from effects.effect import PixelBuffer
 from engine.state import Scope
-from hardware.circuitpython.is31fl3741_output import build_offset_table
+from hardware.circuitpython.is31fl3741_output import (
+    IS31FL3741EffectOutput,
+    build_offset_table,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -30,8 +33,6 @@ _SCOPE_ROWS = {
 
 def _make_output(cols: int = _COLS, scope_rows: dict = _SCOPE_ROWS):
     """Build an IS31FL3741EffectOutput with a mock matrix driver."""
-    from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
-
     mock_matrix = MagicMock()
     return IS31FL3741EffectOutput(mock_matrix, cols=cols, scope_rows=scope_rows), mock_matrix
 
@@ -179,8 +180,6 @@ def test_write_row_routes_red_byte_to_the_b_off_register_and_blue_to_r_off() -> 
     names ``b_off``, and its blue byte in the register named ``r_off`` — only
     green lands where its name suggests.
     """
-    from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
-
     matrix = _RecordingMatrix()
     output = IS31FL3741EffectOutput(matrix, cols=1, scope_rows={"personal": range(0, 1)})
     buf = PixelBuffer(1)
