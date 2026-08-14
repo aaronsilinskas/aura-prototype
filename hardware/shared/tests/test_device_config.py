@@ -75,15 +75,16 @@ def neopixel_config():
 @pytest.fixture
 def full_isolatable_config(matrix_config):
     # Adds every section `matrix_config` lacks (i2c, spi, radio, sdcard,
-    # accelerometer, haptics) so every isolatable component -- plus both
-    # excluded buses and the excluded high-current-rail section -- is declared
-    # and enabled, giving `isolate` tests a config where "disabled" and
-    # "absent" can never be confused for one another.
+    # accelerometer, magnetometer, haptics) so every isolatable component --
+    # plus both excluded buses and the excluded high-current-rail section --
+    # is declared and enabled, giving `isolate` tests a config where
+    # "disabled" and "absent" can never be confused for one another.
     matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5"}
     matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8"}
     matrix_config["radio"] = {"cs": "GP13", "reset": "GP14", "frequency": 915.0, "node": 5}
     matrix_config["sdcard"] = {"cs": "GP15"}
     matrix_config["accelerometer"] = {}
+    matrix_config["magnetometer"] = {}
     matrix_config["haptics"] = {}
     matrix_config["high_current_rail"] = {"pin": "GP28"}
     return matrix_config
@@ -669,6 +670,56 @@ def test_parse_accelerometer_non_boolean_enabled_raises_value_error_naming_field
     matrix_config["accelerometer"] = {"enabled": "yes"}
 
     with pytest.raises(ValueError, match=r"accelerometer\.enabled"):
+        parse_device_config(matrix_config)
+
+
+# ---------------------------------------------------------------------------
+# Magnetometer validation
+# ---------------------------------------------------------------------------
+
+
+def test_parse_absent_magnetometer_section_yields_none(matrix_config):
+    result = parse_device_config(matrix_config)
+
+    assert result.magnetometer is None
+
+
+def test_parse_magnetometer_section_present_yields_non_none(matrix_config):
+    matrix_config["magnetometer"] = {}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.magnetometer is not None
+
+
+def test_parse_magnetometer_unknown_key_raises_value_error_naming_field(matrix_config):
+    matrix_config["magnetometer"] = {"sensitivity": "high"}
+
+    with pytest.raises(ValueError, match=r"magnetometer\.sensitivity"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_magnetometer_absent_enabled_key_defaults_to_true(matrix_config):
+    matrix_config["magnetometer"] = {}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.magnetometer.enabled is True
+
+
+def test_parse_magnetometer_enabled_false_retains_object_not_none(matrix_config):
+    matrix_config["magnetometer"] = {"enabled": False}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.magnetometer is not None
+    assert result.magnetometer.enabled is False
+
+
+def test_parse_magnetometer_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
+    matrix_config["magnetometer"] = {"enabled": "yes"}
+
+    with pytest.raises(ValueError, match=r"magnetometer\.enabled"):
         parse_device_config(matrix_config)
 
 
@@ -1605,6 +1656,7 @@ def test_isolate_leaves_the_original_config_unchanged(full_isolatable_config):
 
     assert config.ir.enabled is True
     assert config.accelerometer.enabled is True
+    assert config.magnetometer.enabled is True
     assert config.haptics.enabled is True
     assert config.radio.enabled is True
     assert config.sdcard.enabled is True
@@ -1617,6 +1669,7 @@ _ISOLATABLE_COMPONENTS = (
     "audio",
     "ir",
     "accelerometer",
+    "magnetometer",
     "haptics",
     "radio",
     "sdcard",
@@ -1700,6 +1753,7 @@ def test_isolate_disabled_copy_preserves_every_field_of_each_isolatable_section(
     _assert_same_fields_except_enabled(config.audio, isolated_keeping_pixels.audio)
     _assert_same_fields_except_enabled(config.ir, isolated_keeping_pixels.ir)
     _assert_same_fields_except_enabled(config.accelerometer, isolated_keeping_pixels.accelerometer)
+    _assert_same_fields_except_enabled(config.magnetometer, isolated_keeping_pixels.magnetometer)
     _assert_same_fields_except_enabled(config.haptics, isolated_keeping_pixels.haptics)
     _assert_same_fields_except_enabled(config.radio, isolated_keeping_pixels.radio)
     _assert_same_fields_except_enabled(config.sdcard, isolated_keeping_pixels.sdcard)
@@ -1737,6 +1791,7 @@ def test_isolate_on_minimal_config_is_a_no_op_for_absent_components():
     assert isolated.audio is None
     assert isolated.ir is None
     assert isolated.accelerometer is None
+    assert isolated.magnetometer is None
     assert isolated.haptics is None
     assert isolated.radio is None
     assert isolated.sdcard is None

@@ -19,6 +19,7 @@ __all__ = [
     "HapticsConfig",
     "HighCurrentRailConfig",
     "I2CConfig",
+    "MagnetometerConfig",
     "MatrixPixelsConfig",
     "NeoPixelPixelsConfig",
     "NeoPixelScopeConfig",
@@ -242,6 +243,19 @@ class AccelerometerConfig:
         self.enabled: bool = enabled
 
 
+class MagnetometerConfig:
+    """Parsed magnetometer configuration. Mirrors ``AccelerometerConfig`` --
+    there are no configurable keys yet besides ``enabled``. Pure parser
+    output only; no hardware is constructed here (that is ``device_builder``'s
+    job, added in a later ticket).
+    """
+
+    __slots__ = ("enabled",)
+
+    def __init__(self, enabled: bool = True) -> None:
+        self.enabled: bool = enabled
+
+
 class RadioConfig:
     """Parsed RFM69 radio peripheral configuration.
 
@@ -368,6 +382,7 @@ class DeviceConfig:
         "high_current_rail",
         "i2c",
         "ir",
+        "magnetometer",
         "pixels",
         "radio",
         "sdcard",
@@ -387,6 +402,7 @@ class DeviceConfig:
         radio: RadioConfig | None,
         sdcard: SDCardConfig | None,
         high_current_rail: HighCurrentRailConfig | None,
+        magnetometer: MagnetometerConfig | None,
     ) -> None:
         self.pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = pixels
         self.buttons: list[str] = buttons
@@ -399,6 +415,7 @@ class DeviceConfig:
         self.radio: RadioConfig | None = radio
         self.sdcard: SDCardConfig | None = sdcard
         self.high_current_rail: HighCurrentRailConfig | None = high_current_rail
+        self.magnetometer: MagnetometerConfig | None = magnetometer
 
     def isolate(self, keep: str) -> DeviceConfig:
         """Return a derived config with every isolatable component but *keep* disabled.
@@ -760,6 +777,12 @@ def _parse_accelerometer(accelerometer_raw: dict) -> AccelerometerConfig:
     return AccelerometerConfig(enabled=enabled)
 
 
+def _parse_magnetometer(magnetometer_raw: dict) -> MagnetometerConfig:
+    _reject_unknown_keys(magnetometer_raw, "magnetometer", allowed=("enabled",))
+    enabled = _parse_enabled(magnetometer_raw, "magnetometer.enabled")
+    return MagnetometerConfig(enabled=enabled)
+
+
 def _parse_haptics(haptics_raw: dict) -> HapticsConfig:
     _reject_unknown_keys(haptics_raw, "haptics", allowed=("enabled",))
     enabled = _parse_enabled(haptics_raw, "haptics.enabled")
@@ -954,6 +977,10 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     if "accelerometer" in mapping:
         accelerometer = _parse_accelerometer(mapping["accelerometer"])
 
+    magnetometer: MagnetometerConfig | None = None
+    if "magnetometer" in mapping:
+        magnetometer = _parse_magnetometer(mapping["magnetometer"])
+
     haptics: HapticsConfig | None = None
     if "haptics" in mapping:
         haptics = _parse_haptics(mapping["haptics"])
@@ -974,6 +1001,7 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
         radio=radio,
         sdcard=sdcard,
         high_current_rail=high_current_rail,
+        magnetometer=magnetometer,
     )
 
 
