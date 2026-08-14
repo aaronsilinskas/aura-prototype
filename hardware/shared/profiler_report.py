@@ -14,8 +14,14 @@ modules are imported defensively.
 import gc
 import sys
 
+try:
+    from typing import Final
+except ImportError:
+    pass
+
 from effects.performance import PerformanceTracker
 from hardware.shared.device_config import (
+    _I2C_DEVICE_SECTIONS,
     AudioConfig,
     DeviceConfig,
     I2CDeviceConfig,
@@ -23,6 +29,16 @@ from hardware.shared.device_config import (
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
 )
+
+# Short harness-label token per `_I2C_DEVICE_SECTIONS` entry (device_config.py,
+# #842) -- the one place this module names the three I2C-device sections, so a
+# section added there needs only its label added here, never a whole new
+# per-device harness-part function.
+_I2C_DEVICE_SHORT_LABELS: Final = {
+    "accelerometer": "accel",
+    "magnetometer": "mag",
+    "haptics": "haptic",
+}
 
 
 def board_id() -> str:
@@ -101,10 +117,8 @@ def runtime_id() -> str:
     return format_runtime_id(impl.name, impl.version)
 
 
-def _section_active(
-    section: AudioConfig | IRConfig | I2CDeviceConfig | None,
-) -> bool:
-    """Return whether an optional config section was actually built.
+def _section_active(section: I2CDeviceConfig | None) -> bool:
+    """Return whether an optional I2C-device config section was actually built.
 
     A section counts as built only when declared *and* ``enabled`` -- a
     present-but-disabled section (the **Component enabled toggle**, #715)
@@ -152,7 +166,7 @@ def _audio_harness_part(audio: AudioConfig | None) -> str:
     A present-but-``enabled: False`` section labels identically to an
     absent one -- neither built the audio driver.
     """
-    if not _section_active(audio):
+    if audio is None or not audio.enabled:
         return "no-audio"
     return f"audio(v{audio.voices})"
 
@@ -165,30 +179,29 @@ def _ir_harness_part(ir: IRConfig | None) -> str:
     this device-derived label. A present-but-``enabled: False`` section
     labels identically to an absent one -- neither built the IR receiver.
     """
-    if not _section_active(ir):
+    if ir is None or not ir.enabled:
         return "no-ir"
     return f"ir(rx{len(ir.rx)})"
 
 
-def _haptic_harness_part(haptics: I2CDeviceConfig | None) -> str:
-    """Return the ``haptic`` part of a harness label for ``config.haptics``.
+def _i2c_device_harness_parts(config: DeviceConfig) -> list[str]:
+    """Return one harness part per section in ``_I2C_DEVICE_SECTIONS``.
 
-    ``device_builder`` (#691) builds the DRV2605 haptics driver only when
-    ``config.haptics`` is declared *and* enabled (the **Component enabled
-    toggle**, #715) -- a section that is present but ``enabled: False`` is
-    not built, so it labels identically to an absent one.
+    Iterates the shared I2C-device section list (``_I2C_DEVICE_SECTIONS``,
+    device_config.py, #842) instead of a hand-maintained parallel set of
+    per-device functions, so a section added there (e.g. a future I2C
+    sensor) surfaces its part here automatically, with no edit in this
+    module. Each section's parsed config lives on ``config`` under the same
+    name the section list uses (e.g. ``config.magnetometer``); a section
+    that is present but ``enabled: False`` labels identically to an absent
+    one (**Component enabled toggle**, #715), like every other part.
     """
-    return "haptic" if _section_active(haptics) else "no-haptic"
-
-
-def _accel_harness_part(accelerometer: I2CDeviceConfig | None) -> str:
-    """Return the ``accel`` part of a harness label for ``config.accelerometer``.
-
-    Mirrors ``_haptic_harness_part``: ``device_builder`` (#691) builds the
-    LIS3DH accelerometer only when ``config.accelerometer`` is declared *and*
-    enabled (#715); present-but-disabled labels identically to absent.
-    """
-    return "accel" if _section_active(accelerometer) else "no-accel"
+    parts = []
+    for section in _I2C_DEVICE_SECTIONS:
+        label = _I2C_DEVICE_SHORT_LABELS[section]
+        section_config: I2CDeviceConfig | None = getattr(config, section)
+        parts.append(label if _section_active(section_config) else f"no-{label}")
+    return parts
 
 
 def metrics_harness_label(config: DeviceConfig) -> str:
@@ -197,9 +210,10 @@ def metrics_harness_label(config: DeviceConfig) -> str:
     Derives a short descriptor of the deployed prop entirely from ``config``
     (a :class:`~hardware.shared.device_config.DeviceConfig`), so two runs of
     the same scene against configs differing only in, say, a declared
-    ``haptics``/``accelerometer`` section produce distinguishable rows.
-    Counts, not just presence, are encoded for each part. Board-free: takes
-    an already-parsed ``DeviceConfig``, not a board or file path.
+    ``haptics``/``accelerometer``/``magnetometer`` section produce
+    distinguishable rows. Counts, not just presence, are encoded for each
+    part. Board-free: takes an already-parsed ``DeviceConfig``, not a board
+    or file path.
 
     Replaces the old hand-maintained ``HARNESSES``-derived ``_harness_label``
     in ``examples/hardware/profiling/scene_load_profiler.py``, deriving the
@@ -211,24 +225,25 @@ def metrics_harness_label(config: DeviceConfig) -> str:
     ``DeviceConfig`` declared the haptics driver. #691 config-gated the
     DRV2605 driver (and the LIS3DH accelerometer) behind their own declared
     sections, so both parts are now read straight off ``config`` like every
-    other part -- the runtime flag is gone.
+    other part -- the runtime flag is gone. #844 replaced the
+    haptic/accelerometer parts' hand-written, magnetometer-omitting pair of
+    functions with ``_i2c_device_harness_parts``, driven off the shared
+    ``_I2C_DEVICE_SECTIONS`` list (#842) -- a section added there needs no
+    edit here.
 
     Args:
         config: The parsed device config the prop was built from.
 
     Returns:
         Parts joined with ``+``, e.g.
-        ``"matrix(117px)+audio(v4)+haptic+accel+ir(rx1)"``.
+        ``"matrix(117px)+audio(v4)+accel+mag+haptic+ir(rx1)"``.
     """
-    return "+".join(
-        [
-            _pixels_harness_part(config.pixels),
-            _audio_harness_part(config.audio),
-            _haptic_harness_part(config.haptics),
-            _accel_harness_part(config.accelerometer),
-            _ir_harness_part(config.ir),
-        ]
-    )
+    # Concatenation, not [a, b, *parts, c]: CircuitPython's parser rejects
+    # star unpacking inside a list literal (see print_table_row above).
+    parts = [_pixels_harness_part(config.pixels), _audio_harness_part(config.audio)]
+    parts += _i2c_device_harness_parts(config)
+    parts.append(_ir_harness_part(config.ir))
+    return "+".join(parts)
 
 
 def linear_fit(xs: list[float], ys: list[float]) -> tuple[float, float]:
