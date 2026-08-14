@@ -845,7 +845,7 @@ def build_hardware(
     rail_cfg = config.high_current_rail
     if rail_cfg is not None:
 
-        def _build_rail(rail_cfg: HighCurrentRailConfig = rail_cfg) -> tuple[None, str]:
+        def _build_rail() -> tuple[None, str]:
             _setup_high_current_rail(rail_cfg, board_module)
             return None, "asserted" if rail_cfg.enabled else "held off"
 
