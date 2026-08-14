@@ -36,9 +36,7 @@ def _make_state(spy: SpyEffectControls, mode=MODE_SFX) -> tuple[GameState, GameE
 
 
 def _press_a(state: GameState, engine: GameEngine) -> None:
-    state.queue_event(
-        InputEvents.ButtonAndAcceleration(ButtonData(states={"A": ButtonData.PRESSED}))
-    )
+    state.queue_event(InputEvents.Sensors(ButtonData(states={"A": ButtonData.PRESSED})))
     engine.update(state)
 
 
@@ -50,7 +48,7 @@ def _press_a(state: GameState, engine: GameEngine) -> None:
 def test_entering_sfx_sets_cyan_solid_on_personal(spy):
     state, engine = _make_state(spy)
     seed_phase(state, MODE_SFX, entered=False)
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    state.queue_event(InputEvents.Sensors(ButtonData(states={})))
     engine.update(state)
 
     personal_calls = [c for c in spy.set_effect_calls if c[0] == Scope.PERSONAL]
@@ -62,7 +60,7 @@ def test_entering_sfx_sets_cyan_solid_on_personal(spy):
 def test_entering_sfx_sets_only_personal_scope(spy):
     state, engine = _make_state(spy)
     seed_phase(state, MODE_SFX, entered=False)
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    state.queue_event(InputEvents.Sensors(ButtonData(states={})))
     engine.update(state)
 
     scopes = [c[0] for c in spy.set_effect_calls]
@@ -124,13 +122,11 @@ def test_button_a_in_radio_mode_does_not_fire_sfx_test(spy):
 
 def test_non_a_press_in_sfx_mode_is_noop(spy):
     state, engine = _make_state(spy)
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    state.queue_event(InputEvents.Sensors(ButtonData(states={})))
     engine.update(state)
     spy.set_effect_calls.clear()
 
-    state.queue_event(
-        InputEvents.ButtonAndAcceleration(ButtonData(states={"B": ButtonData.PRESSED}))
-    )
+    state.queue_event(InputEvents.Sensors(ButtonData(states={"B": ButtonData.PRESSED})))
     engine.update(state)
 
     assert spy.set_effect_calls == []

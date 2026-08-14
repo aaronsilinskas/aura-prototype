@@ -43,7 +43,7 @@ class TagPlayingRule(PhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_PLAYING, tag_phase)
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         tag = tag_state(state)
@@ -74,7 +74,7 @@ class TagPlayingRule(PhaseRule):
             tag.shot.reload_receipt = None
         tag.shot.reload_started_at = None
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         tag = tag_state(state)
 
         if tag.hitpoints <= 0:

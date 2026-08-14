@@ -40,15 +40,13 @@ def _make_state(
 
 
 def _fire(state: GameState, engine: GameEngine, acceleration: AccelerationData | None) -> None:
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={}), acceleration))
+    state.queue_event(InputEvents.Sensors(ButtonData(states={}), acceleration))
     engine.update(state)
 
 
 def _press_a(state: GameState, engine: GameEngine, acceleration: AccelerationData | None) -> None:
     state.queue_event(
-        InputEvents.ButtonAndAcceleration(
-            ButtonData(states={"A": ButtonData.PRESSED}), acceleration
-        )
+        InputEvents.Sensors(ButtonData(states={"A": ButtonData.PRESSED}), acceleration)
     )
     engine.update(state)
 

@@ -35,9 +35,9 @@ class TagShootingRule(InPhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_PLAYING, tag_phase)
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        self.on(InputEvents.Sensors, self._handle)
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         tag = tag_state(state)
         config = tag_config(state)
 
@@ -57,7 +57,7 @@ class TagShootingRule(InPhaseRule):
 
     def _handle_reload(
         self,
-        event: InputEvents.ButtonAndAcceleration,
+        event: InputEvents.Sensors,
         state: GameState,
         tag: TagState,
         config: TagConfig,

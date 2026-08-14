@@ -102,26 +102,51 @@ class AccelerationData:
         return f"AccelerationData(x={self.x}, y={self.y}, z={self.z})"
 
 
+class MagneticData:
+    """Reusable buffer of magnetometer readings, overwritten in place each poll.
+
+    Unit of measure is microteslas (µT). Axes are the magnetometer's raw
+    chip-native frame — unremapped to the device's local coordinate system.
+    ``None`` in place of an instance signals that no magnetometer hardware is
+    present — not "zero field" and not "read failed".
+    """
+
+    __slots__ = ("x", "y", "z")
+
+    def __init__(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> None:
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def __str__(self) -> str:
+        return f"MagneticData(x={self.x}, y={self.y}, z={self.z})"
+
+
 class InputEvents:
     """Namespace for input-layer event types."""
 
     GROUP: Final = EventGroup("in")
 
-    class ButtonAndAcceleration(Event):
-        """Event carrying button state and optional acceleration data.
+    class Sensors(Event):
+        """Event carrying the poll's sensor snapshot: buttons plus optional readings.
 
         Fired each input poll cycle. The same instance is reused every frame;
-        ``buttons`` and ``acceleration`` are mutated in place before each
-        dispatch. ``acceleration`` is ``None`` only when the device has no
-        accelerometer hardware — transient read failures retain the last good
-        reading rather than setting ``None``.
+        ``buttons``, ``acceleration``, and ``magnetic`` are mutated in place
+        before each dispatch. ``acceleration``/``magnetic`` are ``None`` only
+        when the device has no accelerometer/magnetometer hardware —
+        transient read failures retain the last good reading rather than
+        setting ``None``.
         """
 
-        __slots__ = ("acceleration", "buttons")
+        __slots__ = ("acceleration", "buttons", "magnetic")
 
         def __init__(
-            self, buttons: ButtonData, acceleration: "AccelerationData | None" = None
+            self,
+            buttons: ButtonData,
+            acceleration: "AccelerationData | None" = None,
+            magnetic: "MagneticData | None" = None,
         ) -> None:
-            super().__init__(InputEvents.GROUP, "button_and_acceleration")
+            super().__init__(InputEvents.GROUP, "sensors")
             self.buttons = buttons
             self.acceleration = acceleration
+            self.magnetic = magnetic

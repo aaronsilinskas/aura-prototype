@@ -27,7 +27,7 @@ class HwTestRadioRule(HwModeRule):
     def on_enter(self, state: GameState) -> None:
         state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": 0xFFFFFF})
 
-    def on_input_event(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def on_input_event(self, event: InputEvents.Sensors, state: GameState) -> None:
         if not event.buttons.is_pressed("A"):
             return
 

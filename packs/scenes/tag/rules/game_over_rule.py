@@ -26,7 +26,7 @@ class TagGameOverRule(PhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_GAME_OVER, tag_phase)
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         state.effect_controls.set_effect(Scope.ALL, "elements.fire", {})
@@ -37,7 +37,7 @@ class TagGameOverRule(PhaseRule):
     def on_exit(self, state: GameState) -> None:
         tag_state(state).game_over_receipt = None
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         receipt = tag_state(state).game_over_receipt
         if receipt is not None and receipt.is_stopped():
             self.transition_to(state, PHASE_READY)

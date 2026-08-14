@@ -4,7 +4,7 @@ Each hardware_test mode (RGB, Accelerometer, IR, Radio, SFX) is a
 :class:`HwModeRule` subclass: a :class:`~engine.phase.PhaseRule` bound to the
 scene's shared :func:`hw_phase` machine. Because the override-``on()`` model
 in :mod:`engine.phase` dispatches one handler per event type, this base
-registers the single ``ButtonAndAcceleration`` handler for all five modes and
+registers the single ``Sensors`` handler for all five modes and
 uses a template method: :meth:`_handle` calls :meth:`on_input_event` (each
 mode overrides) with the whole event for per-mode logic, then performs the
 behaviour every mode shares — Button B advances to the next mode in
@@ -12,7 +12,7 @@ behaviour every mode shares — Button B advances to the next mode in
 tick.
 
 ``on_input_event`` is scene-local: it is not a general ``on_event`` and is
-only ever called for ``ButtonAndAcceleration`` events.
+only ever called for ``Sensors`` events.
 """
 
 from __future__ import annotations
@@ -72,12 +72,12 @@ class HwModeRule(PhaseRule):
 
     def __init__(self, phase: PhaseKey) -> None:
         super().__init__(phase, hw_phase)
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        self.on(InputEvents.Sensors, self._handle)
 
-    def on_input_event(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def on_input_event(self, event: InputEvents.Sensors, state: GameState) -> None:
         """Per-mode handling of the whole input event. No-op by default."""
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         # Consume any pending advance marker stamped during *this* tick. If it
         # targets this mode, a Button-B advance just transitioned into this
         # mode within this same dispatch (see _advance_mode); this dispatch is

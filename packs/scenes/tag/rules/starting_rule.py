@@ -25,7 +25,7 @@ class TagStartingRule(PhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_STARTING, tag_phase)
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         config = tag_config(state)
@@ -44,7 +44,7 @@ class TagStartingRule(PhaseRule):
     def on_exit(self, state: GameState) -> None:
         state.effect_controls.stop_effect(Scope.ALL)
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         config = tag_config(state)
         if tag_phase(state).elapsed(state.total) >= config.warning_duration():
             self.transition_to(state, PHASE_PLAYING)

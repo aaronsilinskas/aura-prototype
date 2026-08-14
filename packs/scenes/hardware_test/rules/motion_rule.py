@@ -45,10 +45,10 @@ class HwTestMotionRule(HwModeRule):
         ec.set_effect(Scope.DIRECTIONAL, "basic.progress", {"color": 0x00FF00, "progress": 0.0})
         ec.set_effect(Scope.Global.ALL, "basic.progress", {"color": 0x0000FF, "progress": 0.0})
 
-    def on_input_event(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def on_input_event(self, event: InputEvents.Sensors, state: GameState) -> None:
         self._update_axes(event, state)
 
-    def _update_axes(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _update_axes(self, event: InputEvents.Sensors, state: GameState) -> None:
         if event.acceleration is None:
             return
 

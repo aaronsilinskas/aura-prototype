@@ -74,14 +74,12 @@ def _make_state(
 
 
 def _tick(state: GameState, engine: GameEngine) -> None:
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states={})))
+    state.queue_event(InputEvents.Sensors(ButtonData(states={})))
     engine.update(state)
 
 
 def _press_button(state: GameState, engine: GameEngine, button: str) -> None:
-    state.queue_event(
-        InputEvents.ButtonAndAcceleration(ButtonData(states={button: ButtonData.PRESSED}))
-    )
+    state.queue_event(InputEvents.Sensors(ButtonData(states={button: ButtonData.PRESSED})))
     engine.update(state)
 
 

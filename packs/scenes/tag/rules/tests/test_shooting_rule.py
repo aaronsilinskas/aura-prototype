@@ -48,7 +48,7 @@ def _tick(
         states["A"] = ButtonData.PRESSED
     elif button_a is not False:
         states["A"] = button_a
-    state.queue_event(InputEvents.ButtonAndAcceleration(ButtonData(states=states)))
+    state.queue_event(InputEvents.Sensors(ButtonData(states=states)))
     engine.update(state)
 
 

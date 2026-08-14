@@ -47,21 +47,19 @@ def _make_state(
     return state, engine
 
 
-def _no_button_event() -> InputEvents.ButtonAndAcceleration:
-    return InputEvents.ButtonAndAcceleration(ButtonData(states={}))
+def _no_button_event() -> InputEvents.Sensors:
+    return InputEvents.Sensors(ButtonData(states={}))
 
 
-def _button_a_event() -> InputEvents.ButtonAndAcceleration:
-    return InputEvents.ButtonAndAcceleration(ButtonData(states={"A": ButtonData.PRESSED}))
+def _button_a_event() -> InputEvents.Sensors:
+    return InputEvents.Sensors(ButtonData(states={"A": ButtonData.PRESSED}))
 
 
-def _button_b_event() -> InputEvents.ButtonAndAcceleration:
-    return InputEvents.ButtonAndAcceleration(ButtonData(states={"B": ButtonData.PRESSED}))
+def _button_b_event() -> InputEvents.Sensors:
+    return InputEvents.Sensors(ButtonData(states={"B": ButtonData.PRESSED}))
 
 
-def _dispatch(
-    state: GameState, engine: GameEngine, event: InputEvents.ButtonAndAcceleration
-) -> None:
+def _dispatch(state: GameState, engine: GameEngine, event: InputEvents.Sensors) -> None:
     state.queue_event(event)
     engine.update(state)
 

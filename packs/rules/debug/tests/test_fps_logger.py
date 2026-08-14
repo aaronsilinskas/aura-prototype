@@ -18,7 +18,7 @@ def _make_fixture_with_logger(start_time: float = 0.0):
 
 def _dispatch(fixture: EngineFixture, n: int = 1) -> None:
     for _ in range(n):
-        fixture.state.queue_event(InputEvents.ButtonAndAcceleration(_NO_BUTTONS))
+        fixture.state.queue_event(InputEvents.Sensors(_NO_BUTTONS))
         fixture.update_engine()
 
 

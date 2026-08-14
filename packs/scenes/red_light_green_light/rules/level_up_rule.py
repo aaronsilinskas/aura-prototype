@@ -25,7 +25,7 @@ class RlglLevelUpRule(PhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_LEVEL_UP, rlgl_phase)
-        self.on(InputEvents.ButtonAndAcceleration, self._handle)
+        self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         phase_state = rlgl_phase_state(state)
@@ -38,7 +38,7 @@ class RlglLevelUpRule(PhaseRule):
         phase_state.level_receipt = receipt
         state.effect_controls.add_effect(Scope.NON_AMBIENT, "scene.level_up", {})
 
-    def _handle(self, event: InputEvents.ButtonAndAcceleration, state: GameState) -> None:
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         if rlgl_phase(state).elapsed(state.total) >= rlgl_config(state).level_up_duration:
             self.transition_to(state, PHASE_RED_WARNING)
 
