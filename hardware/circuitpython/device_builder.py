@@ -44,6 +44,7 @@ from engine.log import Logger
 from engine.network import IR_EMITTERS
 from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
+from hardware.shared.build_narration import narrate_skip, narrate_step
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
     AudioConfig,
@@ -342,19 +343,24 @@ def _address_suffix(address: int | None) -> str:
     return f" address=0x{address:02X}" if address is not None else ""
 
 
-def _describe_pixel_entry(index: int, pixels_cfg: MatrixPixelsConfig | NeoPixelPixelsConfig) -> str:
-    """Return the ``pixels[index]`` narration line for *pixels_cfg*.
+def _pixel_kind(pixels_cfg: MatrixPixelsConfig | NeoPixelPixelsConfig) -> str:
+    """Return ``"matrix"`` or ``"neopixel"`` for *pixels_cfg*, by type."""
+    return "matrix" if isinstance(pixels_cfg, MatrixPixelsConfig) else "neopixel"
 
-    For a disabled entry this is the full skipped line (``build_hardware``
-    logs it whole via ``logger.log()``, since a disabled entry is never
-    built). For an enabled entry it is the ``logger.begin()`` message --
-    detail comes entirely from the parsed config structures (indexed entry,
+
+def _describe_pixel_entry(index: int, pixels_cfg: MatrixPixelsConfig | NeoPixelPixelsConfig) -> str:
+    """Return the ``pixels[index]`` narration line for an *enabled* *pixels_cfg*.
+
+    Detail comes entirely from the parsed config structures (indexed entry,
     per-strip scope ranges), not resolved pins, so it can be computed and
     logged before ``_setup_pixels`` resolves any pin, matching the
     begin-before-pin-resolution ordering the rest of ``build_hardware``
-    follows.
+    follows. A disabled entry is narrated separately by ``build_hardware``
+    itself (via ``narrate_skip``, on a bare ``pixels[index] kind`` line) and
+    never reaches here through that path -- this still reports the disabled
+    form too, for tests that call this directly.
     """
-    kind = "matrix" if isinstance(pixels_cfg, MatrixPixelsConfig) else "neopixel"
+    kind = _pixel_kind(pixels_cfg)
     if not pixels_cfg.enabled:
         return f"pixels[{index}] {kind} disabled — skipped"
     if isinstance(pixels_cfg, MatrixPixelsConfig):
@@ -810,82 +816,17 @@ def build_hardware(
     enabled in *config*, and none is ever probed by physical presence. A
     section with ``enabled=False`` is retained by the parser but treated the
     same as absent here — neither built nor probed, and its driver library
-    is never imported. A declared-and-enabled accelerometer, magnetometer, or
-    haptics section whose chip can't be constructed (including no I2C bus
-    being available — e.g. a disabled ``i2c`` section) raises, mirroring how
-    a declared matrix with no I2C bus raises. A declared-and-enabled radio
-    section whose SPI bus can't
-    be reached (disabled or unbuildable) raises the same way, against the
-    shared SPI bus this builder constructs once (configured ``sck``/``mosi``/
-    ``miso`` pins, or ``board.SPI()`` when the ``spi`` section is absent; no
-    bus when ``spi`` is disabled — see ``_setup_spi``).
+    is never imported. Single-call: every pin below is claimed once, without
+    deiniting, so this must not be invoked twice in the same process.
 
-    *logger*, if supplied, narrates every step that runs unconditionally
-    (the opening banner, spi, and buttons) plus a closing summary line;
-    omitted or ``None`` normalizes to :data:`~engine.log.Logger.SILENT` here,
-    so every call below logs unconditionally and an uninstrumented caller
-    sees no output at all. A declared high_current_rail section is narrated
-    the same begin-before-pin-resolution way as radio/sdcard, on one
-    ``"high_current_rail pin=... active_high=..."`` line built from the raw config
-    scalars: ``asserted`` when enabled (the pin is driven to its asserted
-    level), ``held off`` when ``enabled: false`` (the pin is still driven,
-    to the deasserted level), no line at all when the section is absent, and
-    ``FAILED`` when resolving an unknown pin name raises ``ValueError``. i2c
-    is narrated the same way, but only when this function builds the bus
-    itself (i.e. *i2c* is not supplied) — a caller-injected *i2c* bypasses
-    that setup, and its logging, entirely. Pixels are narrated per
-    ``config.pixels`` entry, indexed by list position (``pixels[0]``,
-    ``pixels[1]``, ...) via :func:`_describe_pixel_entry`: a disabled entry
-    logs its own skipped line via ``logger.log()`` and is never built or
-    probed; an enabled entry opens via ``logger.begin()`` before
-    ``_setup_pixels`` resolves any of its pins, so an unknown-pin
-    ``ValueError`` or (matrix, no I2C bus) ``RuntimeError`` closes that
-    entry's own line with ``FAILED`` rather than a neighboring one. Declared
-    accelerometer, magnetometer, and haptics sections are narrated on their
-    own line each (``"accelerometer lis3dh"`` / ``"magnetometer mmc5603"`` /
-    ``"haptics drv2605"``), each gaining an ``address=0xNN`` suffix when its
-    section configures an I2C address override (mirroring the matrix pixels
-    entry -- see ``_describe_pixel_entry``): ``ok`` when built, ``disabled``
-    for an explicit ``enabled: false``, no line at all when the section is
-    absent, and ``FAILED`` (via the whole-function except below) when
-    ``_require_i2c`` raises for a missing bus. Audio is narrated the
-    same begin-before-pin-resolution way: an absent ``config.audio`` logs
-    nothing, ``enabled=False`` logs its own disabled line, and an enabled
-    section opens via ``logger.begin()`` -- carrying voice count,
-    ``max_volume``, and the raw I2S pin names straight off ``AudioConfig`` --
-    before ``_setup_audio`` resolves any of those three pins, so an unknown
-    I2S pin name's ``ValueError`` closes the audio line itself with
-    ``FAILED``. A declared radio section is narrated
-    the same way, on one ``"radio frequency=... node=... cs=... reset=..."``
-    line built entirely from the raw config scalars (``cs``/``reset`` are
-    still unresolved pin-name strings at that point): ``ok`` when built,
-    ``disabled`` for an explicit ``enabled: false``, no line at all when the
-    section is absent, and ``FAILED`` when ``_require_spi`` raises for a
-    missing bus or ``_setup_radio``'s own pin resolution raises
-    ``ValueError`` for an unknown ``cs``/``reset`` name — the spi line logged
-    earlier is never touched by a radio failure. A declared sdcard section is
-    narrated the same way, on one ``"sdcard mount=... cs=..."`` line built
-    from the raw config scalars: ``ok`` when mounted, ``disabled`` for an
-    explicit ``enabled: false``, no line at all when the section is absent,
-    and ``FAILED`` when ``_require_spi`` raises for a missing bus or
-    ``_setup_sdcard`` raises its wrapped ``RuntimeError`` for an unmountable
-    card. A declared ir section is narrated the same begin-before-pin-resolution
-    way, on one ``"ir rx=... emitters=..."`` line built by :func:`_describe_ir` from the
-    raw ``config.ir.rx``/``config.ir.emitters`` pin-name strings: ``disabled``
-    for an explicit ``enabled: false``, no line at all when the section is
-    absent, and (for an enabled section) ``FAILED`` when resolving an unknown
-    rx or emitter pin name raises ``ValueError``. Unlike the other sections,
-    the ir line's outcome is not a plain ``ok`` — the selected
-    :class:`~hardware.shared.ir_transport.PulseWriter` implementation
-    (``writer=pio`` vs. ``writer=pulseio``) is only known once
-    :func:`_setup_ir` (via :func:`_make_writer`) has actually chosen one, so
-    it is appended as ``logger.end()``'s suffix (``"writer=pio ok"``) rather
-    than re-probed here; ``_setup_ir`` surfaces its choice back on its return
-    value instead of build_hardware re-running the ``rp2pio`` import-probe a
-    second time just to log it. The whole body runs under one try/except: any
-    exception closes whatever log line is currently open with a ``FAILED``
-    marker (a no-op if none is open) before re-raising, so a failure is
-    never left attributed to the wrong, already-closed line.
+    *logger*, if supplied, narrates each component below through a single
+    :func:`~hardware.shared.build_narration.narrate_step` (built) or
+    :func:`~hardware.shared.build_narration.narrate_skip` (disabled/absent)
+    call -- see that module for the begin-before-build ordering guarantee
+    every step relies on to attribute a failure to its own line. Omitted or
+    ``None`` normalizes to :data:`~engine.log.Logger.SILENT` here, so every
+    step below narrates unconditionally and an uninstrumented caller sees no
+    output at all.
 
     Raises:
         ValueError: If a declared pin name does not exist on the board.
@@ -898,150 +839,188 @@ def build_hardware(
     if logger is None:
         logger = Logger.SILENT
 
-    try:
-        start = time.monotonic()
-        logger.log(f"begin board={board_id()}")
+    start = time.monotonic()
+    logger.log(f"begin board={board_id()}")
 
-        rail_cfg = config.high_current_rail
-        if rail_cfg is not None:
-            logger.begin(f"high_current_rail pin={rail_cfg.pin} active_high={rail_cfg.active_high}")
+    rail_cfg = config.high_current_rail
+    if rail_cfg is not None:
+
+        def _build_rail() -> tuple[None, str]:
             _setup_high_current_rail(rail_cfg, board_module)
-            logger.end("asserted" if rail_cfg.enabled else "held off")
+            return None, "asserted" if rail_cfg.enabled else "held off"
 
-        i2c_cfg = config.i2c
-        if i2c is None:
-            if i2c_cfg is not None and not i2c_cfg.enabled:
-                logger.begin("i2c")
-                logger.end("disabled")
-            else:
-                i2c_pins = (
-                    f"scl={i2c_cfg.scl} sda={i2c_cfg.sda}" if i2c_cfg is not None else "default"
-                )
-                logger.begin(f"i2c {i2c_pins}")
-                i2c = _setup_i2c(i2c_cfg, board_module)
-                if i2c is None:
-                    logger.end("no bus")
-                else:
-                    logger.end()
+        narrate_step(
+            logger,
+            f"high_current_rail pin={rail_cfg.pin} active_high={rail_cfg.active_high}",
+            _build_rail,
+        )
 
-        spi_cfg = config.spi
-        if spi_cfg is not None and not spi_cfg.enabled:
-            logger.begin("spi")
-            logger.end("disabled")
-            spi = None
+    i2c_cfg = config.i2c
+    if i2c is None:
+        if i2c_cfg is not None and not i2c_cfg.enabled:
+            narrate_skip(logger, "i2c", "disabled")
         else:
-            spi_pins = (
-                f"sck={spi_cfg.sck} mosi={spi_cfg.mosi} miso={spi_cfg.miso}"
-                if spi_cfg is not None
-                else "default"
+            i2c_pins = f"scl={i2c_cfg.scl} sda={i2c_cfg.sda}" if i2c_cfg is not None else "default"
+
+            def _build_i2c() -> tuple[busio.I2C | None, str]:
+                bus = _setup_i2c(i2c_cfg, board_module)
+                return bus, "no bus" if bus is None else "ok"
+
+            i2c = narrate_step(logger, f"i2c {i2c_pins}", _build_i2c)
+
+    spi_cfg = config.spi
+    if spi_cfg is not None and not spi_cfg.enabled:
+        narrate_skip(logger, "spi", "disabled")
+        spi = None
+    else:
+        spi_pins = (
+            f"sck={spi_cfg.sck} mosi={spi_cfg.mosi} miso={spi_cfg.miso}"
+            if spi_cfg is not None
+            else "default"
+        )
+        spi = narrate_step(
+            logger, f"spi {spi_pins}", lambda: (_setup_spi(spi_cfg, board_module), "ok")
+        )
+
+    outputs: list[EffectOutput] = []
+    for index, pixels_cfg in enumerate(config.pixels):
+        if not pixels_cfg.enabled:
+            narrate_skip(logger, f"pixels[{index}] {_pixel_kind(pixels_cfg)}", "disabled")
+            continue
+        outputs.extend(
+            narrate_step(
+                logger,
+                _describe_pixel_entry(index, pixels_cfg),
+                lambda pixels_cfg=pixels_cfg: (_setup_pixels(pixels_cfg, board_module, i2c), "ok"),
             )
-            logger.begin(f"spi {spi_pins}")
-            spi = _setup_spi(spi_cfg, board_module)
-            logger.end()
+        )
 
-        outputs: list[EffectOutput] = []
-        for index, pixels_cfg in enumerate(config.pixels):
-            description = _describe_pixel_entry(index, pixels_cfg)
-            if not pixels_cfg.enabled:
-                logger.log(description)
-                continue
-            logger.begin(description)
-            outputs.extend(_setup_pixels(pixels_cfg, board_module, i2c))
-            logger.end()
+    button_desc = _describe_buttons(config.buttons)
 
-        button_desc = _describe_buttons(config.buttons)
-        logger.begin(f"buttons {button_desc}" if button_desc else "buttons")
+    def _build_buttons() -> tuple[DebouncedButtons, str]:
         button_pins = [
             _resolve_pin(board_module, f"buttons[{i}]", name)
             for i, name in enumerate(config.buttons)
         ]
-        buttons = _setup_buttons(*button_pins)
-        logger.end()
+        return _setup_buttons(*button_pins), "ok"
 
-        accelerometer = None
-        if config.accelerometer is not None:
-            accelerometer_cfg = config.accelerometer
-            logger.begin("accelerometer lis3dh" + _address_suffix(accelerometer_cfg.address))
-            if accelerometer_cfg.enabled:
-                accelerometer = _setup_accelerometer(
-                    _require_i2c(i2c, "accelerometer"), accelerometer_cfg.address
-                )
-                logger.end()
-            else:
-                logger.end("disabled")
+    buttons = narrate_step(
+        logger, f"buttons {button_desc}" if button_desc else "buttons", _build_buttons
+    )
 
-        magnetometer = None
-        if config.magnetometer is not None:
-            magnetometer_cfg = config.magnetometer
-            logger.begin("magnetometer mmc5603" + _address_suffix(magnetometer_cfg.address))
-            if magnetometer_cfg.enabled:
-                magnetometer = _setup_magnetometer(
-                    _require_i2c(i2c, "magnetometer"), magnetometer_cfg.address
-                )
-                logger.end()
-            else:
-                logger.end("disabled")
+    accelerometer = None
+    if config.accelerometer is not None:
+        accelerometer_cfg = config.accelerometer
+        description = "accelerometer lis3dh" + _address_suffix(accelerometer_cfg.address)
+        if accelerometer_cfg.enabled:
+            accelerometer = narrate_step(
+                logger,
+                description,
+                lambda: (
+                    _setup_accelerometer(
+                        _require_i2c(i2c, "accelerometer"), accelerometer_cfg.address
+                    ),
+                    "ok",
+                ),
+            )
+        else:
+            narrate_skip(logger, description, "disabled")
 
-        audio_cfg = config.audio
-        audio_registry: AudioRegistry | None = None
-        if audio_cfg is not None:
-            if not audio_cfg.enabled:
-                logger.begin("audio")
-                logger.end("disabled")
-            else:
-                logger.begin(
-                    f"audio voices={audio_cfg.voices} max_volume={audio_cfg.max_volume:.2f} "
-                    + f"i2s_bit_clock={audio_cfg.i2s_bit_clock} "
-                    + f"i2s_word_select={audio_cfg.i2s_word_select} i2s_data={audio_cfg.i2s_data}"
-                )
-                audio_registry = AudioRegistry()
-                outputs.append(_setup_audio(audio_cfg, board_module, audio_registry))
-                logger.end()
+    magnetometer = None
+    if config.magnetometer is not None:
+        magnetometer_cfg = config.magnetometer
+        description = "magnetometer mmc5603" + _address_suffix(magnetometer_cfg.address)
+        if magnetometer_cfg.enabled:
+            magnetometer = narrate_step(
+                logger,
+                description,
+                lambda: (
+                    _setup_magnetometer(
+                        _require_i2c(i2c, "magnetometer"), magnetometer_cfg.address
+                    ),
+                    "ok",
+                ),
+            )
+        else:
+            narrate_skip(logger, description, "disabled")
 
-        if config.haptics is not None:
-            haptics_cfg = config.haptics
-            logger.begin("haptics drv2605" + _address_suffix(haptics_cfg.address))
-            if haptics_cfg.enabled:
+    audio_cfg = config.audio
+    audio_registry: AudioRegistry | None = None
+    if audio_cfg is not None:
+        if not audio_cfg.enabled:
+            narrate_skip(logger, "audio", "disabled")
+        else:
+            description = (
+                f"audio voices={audio_cfg.voices} max_volume={audio_cfg.max_volume:.2f} "
+                + f"i2s_bit_clock={audio_cfg.i2s_bit_clock} "
+                + f"i2s_word_select={audio_cfg.i2s_word_select} i2s_data={audio_cfg.i2s_data}"
+            )
+
+            def _build_audio() -> tuple[tuple[AudioRegistry, EffectOutput], str]:
+                registry = AudioRegistry()
+                return (registry, _setup_audio(audio_cfg, board_module, registry)), "ok"
+
+            audio_registry, audio_output = narrate_step(logger, description, _build_audio)
+            outputs.append(audio_output)
+
+    if config.haptics is not None:
+        haptics_cfg = config.haptics
+        description = "haptics drv2605" + _address_suffix(haptics_cfg.address)
+        if haptics_cfg.enabled:
+
+            def _build_haptics() -> tuple[EffectOutput, str]:
                 driver = _setup_drv2605(_require_i2c(i2c, "haptics"), haptics_cfg.address)
                 # Drv2605EffectOutput's own module imports adafruit_drv2605 at load
                 # time, so this import is deferred here — reached only once
                 # _setup_drv2605 has already confirmed the library is importable.
                 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 
-                outputs.append(Drv2605EffectOutput(driver))
-                logger.end()
-            else:
-                logger.end("disabled")
+                return Drv2605EffectOutput(driver), "ok"
 
-        radio = None
-        if config.radio is not None:
-            radio_cfg = config.radio
-            logger.begin(
-                f"radio frequency={radio_cfg.frequency} node={radio_cfg.node} "
-                + f"cs={radio_cfg.cs} reset={radio_cfg.reset}"
+            outputs.append(narrate_step(logger, description, _build_haptics))
+        else:
+            narrate_skip(logger, description, "disabled")
+
+    radio = None
+    if config.radio is not None:
+        radio_cfg = config.radio
+        description = (
+            f"radio frequency={radio_cfg.frequency} node={radio_cfg.node} "
+            + f"cs={radio_cfg.cs} reset={radio_cfg.reset}"
+        )
+        if radio_cfg.enabled:
+            radio = narrate_step(
+                logger,
+                description,
+                lambda: (_setup_radio(_require_spi(spi, "radio"), radio_cfg, board_module), "ok"),
             )
-            if radio_cfg.enabled:
-                radio = _setup_radio(_require_spi(spi, "radio"), radio_cfg, board_module)
-                logger.end()
-            else:
-                logger.end("disabled")
+        else:
+            narrate_skip(logger, description, "disabled")
 
-        storage = None
-        if config.sdcard is not None:
-            sdcard_cfg = config.sdcard
-            logger.begin(f"sdcard mount={sdcard_cfg.mount} cs={sdcard_cfg.cs}")
-            if sdcard_cfg.enabled:
-                storage = _setup_sdcard(_require_spi(spi, "sdcard"), sdcard_cfg, board_module)
-                logger.end()
-            else:
-                logger.end("disabled")
+    storage = None
+    if config.sdcard is not None:
+        sdcard_cfg = config.sdcard
+        description = f"sdcard mount={sdcard_cfg.mount} cs={sdcard_cfg.cs}"
+        if sdcard_cfg.enabled:
+            storage = narrate_step(
+                logger,
+                description,
+                lambda: (
+                    _setup_sdcard(_require_spi(spi, "sdcard"), sdcard_cfg, board_module),
+                    "ok",
+                ),
+            )
+        else:
+            narrate_skip(logger, description, "disabled")
 
-        transmitters: dict[str, InfraredTransmitter] = {}
-        ir_receiver = None
-        if config.ir is not None:
-            ir_cfg = config.ir
-            logger.begin(f"ir {_describe_ir(ir_cfg.rx, ir_cfg.emitters)}")
-            if ir_cfg.enabled:
+    transmitters: dict[str, InfraredTransmitter] = {}
+    ir_receiver = None
+    if config.ir is not None:
+        ir_cfg = config.ir
+        description = f"ir {_describe_ir(ir_cfg.rx, ir_cfg.emitters)}"
+        if ir_cfg.enabled:
+
+            def _build_ir() -> tuple[tuple[dict[str, InfraredTransmitter], InfraredReceiver], str]:
                 encoder = ir_encoder if ir_encoder is not None else AuraInfraredEncoder()
                 decoder = ir_decoder if ir_decoder is not None else AuraInfraredDecoder()
 
@@ -1060,38 +1039,35 @@ def build_hardware(
                         board_module, f"ir.{emitter_key}", pin_name
                     )
 
-                transmitters, ir_receiver, writer_kind = _setup_ir(
-                    rx_pins,
-                    emitter_pins,
-                    encoder=encoder,
-                    decoder=decoder,
+                transmitters, receiver, writer_kind = _setup_ir(
+                    rx_pins, emitter_pins, encoder=encoder, decoder=decoder
                 )
-                logger.end(f"writer={writer_kind} ok" if writer_kind is not None else "ok")
-            else:
-                logger.end("disabled")
+                suffix = f"writer={writer_kind} ok" if writer_kind is not None else "ok"
+                return (transmitters, receiver), suffix
 
-        # One HardwareNetworkControls instance, seen through two declared faces:
-        # rules reach it as the send-only NetworkControls; the runtime loop
-        # reaches the same object as TransmitPump to pump transmit lifecycle.
-        hardware_network_controls = HardwareNetworkControls(transmitters, radio=radio)
+            transmitters, ir_receiver = narrate_step(logger, description, _build_ir)
+        else:
+            narrate_skip(logger, description, "disabled")
 
-        elapsed = time.monotonic() - start
-        logger.log(
-            f"ready outputs={len(outputs)} buttons={len(button_pins)} elapsed_s={elapsed:.3f}"
-        )
+    # One HardwareNetworkControls instance, seen through two declared faces:
+    # rules reach it as the send-only NetworkControls; the runtime loop
+    # reaches the same object as TransmitPump to pump transmit lifecycle.
+    hardware_network_controls = HardwareNetworkControls(transmitters, radio=radio)
 
-        return DeviceHardware(
-            outputs=outputs,
-            buttons=buttons,
-            accelerometer=accelerometer,
-            magnetometer=magnetometer,
-            network_controls=hardware_network_controls,
-            transmit_pump=hardware_network_controls,
-            ir_receiver=ir_receiver,
-            radio=radio,
-            storage=storage,
-            audio_registry=audio_registry,
-        )
-    except Exception:
-        logger.fail()
-        raise
+    elapsed = time.monotonic() - start
+    logger.log(
+        f"ready outputs={len(outputs)} buttons={len(config.buttons)} elapsed_s={elapsed:.3f}"
+    )
+
+    return DeviceHardware(
+        outputs=outputs,
+        buttons=buttons,
+        accelerometer=accelerometer,
+        magnetometer=magnetometer,
+        network_controls=hardware_network_controls,
+        transmit_pump=hardware_network_controls,
+        ir_receiver=ir_receiver,
+        radio=radio,
+        storage=storage,
+        audio_registry=audio_registry,
+    )
