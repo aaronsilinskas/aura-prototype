@@ -344,6 +344,9 @@ def run() -> None:
     if DRIVER == "is31fl3741_matrix":
         worst_output, _ = _build_sweep_output(DRIVER, pixel_output, PIXEL_COUNTS[-1], matrix_cols)
         worst_manager = EffectManager(registry=registry, outputs=[worst_output])
+        # Standalone profiler, no SceneManager -- declare every scanned pack allowed
+        # (see issue #814: EffectAdmin.set_allowed_packs).
+        worst_manager.set_allowed_packs(frozenset(registry.names()))
         i2c_transaction_bytes = _measure_i2c_transaction_bytes(
             worst_manager, Timer(), element_names[0], counting_i2c
         )
@@ -367,6 +370,7 @@ def run() -> None:
     for pixel_count in PIXEL_COUNTS:
         output, actual_count = _build_sweep_output(DRIVER, pixel_output, pixel_count, matrix_cols)
         effect_manager = EffectManager(registry=registry, outputs=[output])
+        effect_manager.set_allowed_packs(frozenset(registry.names()))
         timer = Timer()
 
         for element in element_names:

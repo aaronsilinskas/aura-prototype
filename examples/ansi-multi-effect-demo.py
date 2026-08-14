@@ -75,6 +75,9 @@ class AnsiEffectOutput(EffectOutput):
 
 personal_output = AnsiEffectOutput(scopes=[Scope.PERSONAL])
 effect_manager = EffectManager(registry=_registry, outputs=[personal_output])
+# Standalone demo, no SceneManager -- declare every scanned pack allowed so
+# pack.effect names below resolve (see issue #814: EffectAdmin.set_allowed_packs).
+effect_manager.set_allowed_packs(frozenset(_registry.names()))
 
 game_engine = GameEngine(effect_controls=effect_manager)
 game_state = game_engine.create_state(SceneControls())

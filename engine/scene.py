@@ -417,9 +417,14 @@ class SceneManager(SceneControls):
     *effect_admin* is the scene-transition face of the same effect system
     ``engine`` was built with (its ``EffectControls`` and ``EffectAdmin`` are
     two faces of one ``EffectManager`` instance, mirroring the
-    ``NetworkControls``/``TransmitPump`` split). Every local-effects push and
-    merge-strategy reset/capture/apply routes through *effect_admin*, never
-    through a stack entry's ``state.effect_controls``.
+    ``NetworkControls``/``TransmitPump`` split). Every local-effects push,
+    allowed-pack push, and merge-strategy reset/capture/apply routes through
+    *effect_admin*, never through a stack entry's ``state.effect_controls``.
+    The allowed-pack set — a ``frozenset`` of the active scene's declared
+    ``effect_packs`` names — is derived fresh at every transition and pushed
+    via ``set_allowed_packs`` right beside the local-effects push, so
+    ``pack.<effect>`` resolution tracks the top-of-stack scene through
+    load/overlay/pop in lockstep.
 
     *audio_overlay_admin* is the analogous scene-transition seam for sounds —
     typically the same ``AudioRegistry`` instance ``AudioEffectOutput`` resolves
@@ -546,6 +551,8 @@ class SceneManager(SceneControls):
         self._engine.set_rules(entry.rules)
         entry.state.clear_queue()
         self._effect_admin.set_local_effects(entry.scene.local_effect_registry)
+        allowed_packs = frozenset(pack_name for pack_name, _ in entry.scene.effect_packs)
+        self._effect_admin.set_allowed_packs(allowed_packs)
         self._audio_overlay_admin.set_scene_sounds(entry.scene.local_sound_map or None)
 
     def _do_load(self, scene: Scene) -> None:
