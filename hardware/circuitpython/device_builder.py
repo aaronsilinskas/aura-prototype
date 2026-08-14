@@ -3,8 +3,8 @@
 Deploy-watch only: imports board, busio, digitalio, microcontroller.
 
 Every per-component driver library (``adafruit_is31fl3741``, ``neopixel``,
-``pulseio``, the audio stack, ``adafruit_lis3dh``, ``adafruit_drv2605``,
-``adafruit_rfm69``, ``sdcardio``/``storage``) is imported inside the setup
+``pulseio``, the audio stack, ``adafruit_lis3dh``, ``adafruit_mmc56x3``,
+``adafruit_drv2605``, ``adafruit_rfm69``, ``sdcardio``/``storage``) is imported inside the setup
 helper or branch that builds that component, not here at module scope — so
 importing this module, or building a config that doesn't need a component,
 never requires that component's library to be installed. ``adafruit_rfm69``
@@ -388,6 +388,43 @@ def _setup_accelerometer(i2c: busio.I2C) -> object:
     return adafruit_lis3dh.LIS3DH_I2C(i2c)
 
 
+_MAGNETOMETER_DATA_RATE_HZ: Final = 100
+
+
+def _setup_magnetometer(i2c: busio.I2C) -> object:
+    """Return a configured MMC5603 magnetometer on *i2c*, in continuous mode.
+
+    ``adafruit_mmc56x3`` is imported here, not at module load, so a config
+    with no ``magnetometer`` section never requires the library to be
+    installed.
+
+    Magnetometer is config-gated, not presence-probed: the caller only
+    reaches this once ``config.magnetometer`` is declared and enabled, so a
+    declared magnetometer that can't be built here is a wiring fault, not a
+    normal "not present" case.
+
+    Unlike ``_setup_accelerometer``'s bare defaults, the MMC5603 boots in
+    one-shot mode, where each ``.magnetic`` read busy-waits ~5-10ms for a
+    fresh conversion to finish -- long enough to stall the shared input poll
+    every frame. Explicitly setting a fixed :data:`_MAGNETOMETER_DATA_RATE_HZ`
+    ``data_rate`` and then ``continuous_mode = True``, in that order (mirroring
+    the vendor driver's own documented sequence), makes it free-run
+    conversions in the background, so ``.magnetic`` reads the latest sample
+    without blocking.
+
+    Raises:
+        ImportError: If ``adafruit_mmc56x3`` is not installed.
+        Exception: Whatever ``adafruit_mmc56x3.MMC5603`` raises if the
+            sensor cannot be reached on *i2c*.
+    """
+    import adafruit_mmc56x3
+
+    magnetometer = adafruit_mmc56x3.MMC5603(i2c)
+    magnetometer.data_rate = _MAGNETOMETER_DATA_RATE_HZ
+    magnetometer.continuous_mode = True
+    return magnetometer
+
+
 def _setup_drv2605(i2c: busio.I2C) -> object:
     """Return a configured DRV2605 haptic driver on *i2c*.
 
@@ -675,19 +712,20 @@ def build_hardware(
     """Assemble DeviceHardware from a parsed DeviceConfig.
 
     *i2c*, if supplied, is used for every I2C peripheral (matrix,
-    accelerometer, haptics driver) instead of the bus this function would
-    otherwise construct itself.
+    accelerometer, magnetometer, haptics driver) instead of the bus this
+    function would otherwise construct itself.
 
     Every component this builder attaches — pixels, audio, IR, the
-    accelerometer, haptics, and the RFM69 radio — is config-gated: it is
-    built only when its section is declared *and* enabled in *config*, and
-    none is ever probed by physical presence. A section with
-    ``enabled=False`` is retained by the parser but treated the same as
-    absent here — neither built nor probed, and its driver library is never
-    imported. A declared-and-enabled accelerometer or haptics section whose
-    chip can't be constructed (including no I2C bus being available — e.g. a
-    disabled ``i2c`` section) raises, mirroring how a declared matrix with no
-    I2C bus raises. A declared-and-enabled radio section whose SPI bus can't
+    accelerometer, magnetometer, haptics, and the RFM69 radio — is
+    config-gated: it is built only when its section is declared *and*
+    enabled in *config*, and none is ever probed by physical presence. A
+    section with ``enabled=False`` is retained by the parser but treated the
+    same as absent here — neither built nor probed, and its driver library
+    is never imported. A declared-and-enabled accelerometer, magnetometer, or
+    haptics section whose chip can't be constructed (including no I2C bus
+    being available — e.g. a disabled ``i2c`` section) raises, mirroring how
+    a declared matrix with no I2C bus raises. A declared-and-enabled radio
+    section whose SPI bus can't
     be reached (disabled or unbuildable) raises the same way, against the
     shared SPI bus this builder constructs once (configured ``sck``/``mosi``/
     ``miso`` pins, or ``board.SPI()`` when the ``spi`` section is absent; no
@@ -714,11 +752,12 @@ def build_hardware(
     ``_setup_pixels`` resolves any of its pins, so an unknown-pin
     ``ValueError`` or (matrix, no I2C bus) ``RuntimeError`` closes that
     entry's own line with ``FAILED`` rather than a neighboring one. Declared
-    accelerometer and haptics sections are narrated on their own line each
-    (``"accelerometer lis3dh"`` / ``"haptics drv2605"``): ``ok`` when built,
-    ``disabled`` for an explicit ``enabled: false``, no line at all when the
-    section is absent, and ``FAILED`` (via the whole-function except below)
-    when ``_require_i2c`` raises for a missing bus. Audio is narrated the
+    accelerometer, magnetometer, and haptics sections are narrated on their
+    own line each (``"accelerometer lis3dh"`` / ``"magnetometer mmc5603"`` /
+    ``"haptics drv2605"``): ``ok`` when built, ``disabled`` for an explicit
+    ``enabled: false``, no line at all when the section is absent, and
+    ``FAILED`` (via the whole-function except below) when ``_require_i2c``
+    raises for a missing bus. Audio is narrated the
     same begin-before-pin-resolution way: an absent ``config.audio`` logs
     nothing, ``enabled=False`` logs its own disabled line, and an enabled
     section opens via ``logger.begin()`` -- carrying voice count,
@@ -760,9 +799,9 @@ def build_hardware(
     Raises:
         ValueError: If a declared pin name does not exist on the board.
         RuntimeError: If pixels.type is 'matrix' but no I2C bus is available,
-            an accelerometer/haptics section is declared but no I2C bus is
-            available, a radio section is declared but no SPI bus is
-            available, or an sdcard section is declared but no SPI bus is
+            an accelerometer/magnetometer/haptics section is declared but no
+            I2C bus is available, a radio section is declared but no SPI bus
+            is available, or an sdcard section is declared but no SPI bus is
             available or the card fails to mount.
     """
     if logger is None:
@@ -833,6 +872,15 @@ def build_hardware(
             logger.begin("accelerometer lis3dh")
             if config.accelerometer.enabled:
                 accelerometer = _setup_accelerometer(_require_i2c(i2c, "accelerometer"))
+                logger.end()
+            else:
+                logger.end("disabled")
+
+        magnetometer = None
+        if config.magnetometer is not None:
+            logger.begin("magnetometer mmc5603")
+            if config.magnetometer.enabled:
+                magnetometer = _setup_magnetometer(_require_i2c(i2c, "magnetometer"))
                 logger.end()
             else:
                 logger.end("disabled")
@@ -938,6 +986,7 @@ def build_hardware(
             outputs=outputs,
             buttons=buttons,
             accelerometer=accelerometer,
+            magnetometer=magnetometer,
             network_controls=hardware_network_controls,
             transmit_pump=hardware_network_controls,
             ir_receiver=ir_receiver,

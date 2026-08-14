@@ -9,8 +9,9 @@ actually pip-installed in this CPython test environment -- the sibling
 conftest.py stubs them into ``sys.modules`` once per session so every *other*
 test in this directory can import the hardware-adjacent modules that still
 need them unconditionally at their own module scope (audio_output.py,
-drv2605_output.py, is31fl3741_output.py). ``adafruit_lis3dh`` is never stubbed
-at all -- nothing in this repo imports it unconditionally. The tests here
+drv2605_output.py, is31fl3741_output.py). Neither ``adafruit_lis3dh`` nor
+``adafruit_mmc56x3`` is ever stubbed -- nothing in this repo imports either
+unconditionally. The tests here
 instead pop the stubbed libraries for the duration of a single test --
 simulating the library being genuinely absent from a prop -- and restore them
 afterward so later tests in the session are unaffected. "Library present"
@@ -83,6 +84,7 @@ def test_importing_device_builder_does_not_import_any_driver_library() -> None:
         "audiocore",
         "audiomixer",
         "adafruit_lis3dh",
+        "adafruit_mmc56x3",
         "adafruit_drv2605",
         "adafruit_rfm69",
         "sdcardio",
@@ -330,6 +332,65 @@ def test_build_hardware_declared_accelerometer_raises_when_lis3dh_uninstalled() 
         # _setup_accelerometer itself is intentionally left unpatched -- it
         # must run for real and hit the missing import.
         _enter_hw_patches(stack, patch_accelerometer=False)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(ImportError):
+            build_hardware(config, board_module=board_mock)
+
+
+# ---------------------------------------------------------------------------
+# Magnetometer branch: adafruit_mmc56x3 stays uninstalled with no
+# magnetometer section (issue #821's config-gating, mirroring the
+# accelerometer's #691)
+# ---------------------------------------------------------------------------
+
+
+def test_build_hardware_without_magnetometer_section_succeeds_when_mmc56x3_uninstalled() -> None:
+    config = _bare_config()
+    assert config.magnetometer is None
+    board_mock = _mock_board()
+
+    with _library_absent("adafruit_mmc56x3"), ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.magnetometer is None
+
+
+def test_build_hardware_disabled_magnetometer_section_succeeds_when_mmc56x3_uninstalled() -> None:
+    """A *disabled* magnetometer section is skipped the same as an
+    undeclared one -- a retained, non-None object with ``enabled=False``."""
+    mapping = dict(_bare_config_mapping, magnetometer={"enabled": False})
+    config = parse_device_config(mapping)
+    assert config.magnetometer is not None
+    board_mock = _mock_board()
+
+    with _library_absent("adafruit_mmc56x3"), ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        hw = build_hardware(config, board_module=board_mock)
+
+    assert hw.magnetometer is None
+
+
+def test_build_hardware_declared_magnetometer_raises_when_mmc56x3_uninstalled() -> None:
+    """A declared magnetometer whose driver library is missing is a hard
+    error -- unlike the undeclared case above, this must reach the real
+    `import adafruit_mmc56x3` and let its ImportError propagate."""
+    mapping = dict(_bare_config_mapping, magnetometer={})
+    config = parse_device_config(mapping)
+    board_mock = _mock_board()
+
+    with _library_absent("adafruit_mmc56x3"), ExitStack() as stack:
+        # _setup_magnetometer itself is intentionally left unpatched -- it
+        # must run for real and hit the missing import.
+        _enter_hw_patches(stack, patch_magnetometer=False)
 
         from hardware.circuitpython.device_builder import build_hardware
 

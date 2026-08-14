@@ -238,7 +238,7 @@ The device-only hardware builder: `build_hardware(config, board, …)` resolves 
 _Avoid_: returning a bare tuple/dict (return `DeviceHardware`); putting config parsing here (lives in the pure parser); calling it twice in one process
 
 ### DeviceHardware
-The named `__slots__` bundle `build_hardware` returns — a board-free data holder: `outputs`, `buttons`, `accelerometer`, `network_controls`, `transmit_pump`, `ir_receiver`, `radio`, `storage`. `network_controls` and `transmit_pump` are the *same* `HardwareNetworkControls` seen through two faces. `storage` is typed as the port (`DeviceStorage | None`), never the concrete adapter — `None` when no `sdcard` section is declared/enabled.
+The named `__slots__` bundle `build_hardware` returns — a board-free data holder: `outputs`, `buttons`, `accelerometer`, `magnetometer`, `network_controls`, `transmit_pump`, `ir_receiver`, `radio`, `storage`. `network_controls` and `transmit_pump` are the *same* `HardwareNetworkControls` seen through two faces. `storage` is typed as the port (`DeviceStorage | None`), never the concrete adapter — `None` when no `sdcard` section is declared/enabled. `magnetometer` is typed `object | None`, like `accelerometer` — no concrete driver import in this board-free module.
 _Avoid_: exposing raw transmitters (use `network_controls`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### RadioTransport
@@ -272,6 +272,10 @@ _Avoid_: "IMU" (the LIS3DH has no gyroscope or magnetometer)
 ### AccelerationData
 A snapshot of 3-axis accelerometer readings; `None` when no accelerometer is present — signals "no sensor data," not "device at rest."
 _Avoid_: `MovementData`
+
+### Magnetometer
+A hardware sensor providing 3-axis magnetic field readings (x, y, z) in microteslas (µT); optional, absent when hardware is not present.
+_Avoid_: "IMU" (the MMC5603 has no gyroscope or accelerometer)
 
 ### MagneticData
 A snapshot of 3-axis magnetometer readings in microteslas (µT), in the magnetometer's raw chip-native frame (unremapped); `None` when no magnetometer is present — signals "no sensor data," not "zero field" and not "read failed."
