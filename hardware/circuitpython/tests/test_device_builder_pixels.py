@@ -757,8 +757,8 @@ def test_build_hardware_disabled_pixel_entry_narrates_skipped_line_not_ok() -> N
         build_hardware(config, board_module=board_mock, logger=logger)
 
     text = "".join(fragments)
-    assert "[hw] pixels[0] neopixel disabled — skipped\n" in text
-    assert "pixels[0] neopixel disabled — skipped ok" not in text
+    assert "[hw] pixels[0] neopixel disabled\n" in text
+    assert "pixels[0] neopixel disabled ok" not in text
 
 
 def test_build_hardware_empty_pixels_list_produces_no_pixel_lines() -> None:
