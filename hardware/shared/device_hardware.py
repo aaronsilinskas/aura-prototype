@@ -36,6 +36,10 @@ class DeviceHardware:
     no ``audio`` section declared and enabled. ``app.build_scene_runtime``
     scans effect-pack sounds into it and installs it as ``SceneManager``'s
     audio-overlay admin.
+
+    ``magnetometer`` is typed like ``accelerometer`` (``object | None``, no
+    concrete driver import here) — ``None`` on a device with no
+    ``magnetometer`` section declared and enabled.
     """
 
     __slots__ = (
@@ -43,6 +47,7 @@ class DeviceHardware:
         "audio_registry",
         "buttons",
         "ir_receiver",
+        "magnetometer",
         "network_controls",
         "outputs",
         "radio",
@@ -55,6 +60,7 @@ class DeviceHardware:
         outputs: list[EffectOutput],
         buttons: DebouncedButtons,
         accelerometer: object | None,
+        magnetometer: object | None,
         network_controls: NetworkControls,
         transmit_pump: TransmitPump,
         ir_receiver: InfraredReceiver | None,
@@ -65,6 +71,7 @@ class DeviceHardware:
         self.outputs: list[EffectOutput] = outputs
         self.buttons: DebouncedButtons = buttons
         self.accelerometer: object | None = accelerometer
+        self.magnetometer: object | None = magnetometer
         self.network_controls: NetworkControls = network_controls
         self.transmit_pump: TransmitPump = transmit_pump
         self.ir_receiver: InfraredReceiver | None = ir_receiver

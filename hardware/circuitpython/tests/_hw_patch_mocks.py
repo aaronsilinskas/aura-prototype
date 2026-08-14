@@ -24,6 +24,7 @@ class _HwPatchMocks(NamedTuple):
     i2c: MagicMock
     spi: MagicMock
     accelerometer: MagicMock | None
+    magnetometer: MagicMock | None
     drv2605: MagicMock | None
     radio: MagicMock | None
     sdcard: MagicMock | None
@@ -35,6 +36,7 @@ def _enter_hw_patches(
     own_spi: object | None = None,
     patch_drv2605: bool = True,
     patch_accelerometer: bool = True,
+    patch_magnetometer: bool = True,
     patch_radio: bool = True,
     patch_sdcard: bool = True,
 ) -> _HwPatchMocks:
@@ -43,10 +45,11 @@ def _enter_hw_patches(
     Returns the patched mocks so callers can assert on them (e.g. whether
     ``_setup_i2c`` was invoked at all). *own_i2c*/*own_spi* are the buses
     they return when build_hardware constructs them itself. *patch_drv2605*,
-    *patch_accelerometer*, *patch_radio*, and *patch_sdcard* are False for
-    tests that need ``_setup_drv2605``, ``_setup_accelerometer``,
-    ``_setup_radio``, or ``_setup_sdcard`` to run for real (e.g. hitting
-    their own ImportError probes) — their mock is then `None`.
+    *patch_accelerometer*, *patch_magnetometer*, *patch_radio*, and
+    *patch_sdcard* are False for tests that need ``_setup_drv2605``,
+    ``_setup_accelerometer``, ``_setup_magnetometer``, ``_setup_radio``, or
+    ``_setup_sdcard`` to run for real (e.g. hitting their own ImportError
+    probes) — their mock is then `None`.
     """
     mock_setup_i2c = stack.enter_context(
         patch(
@@ -68,6 +71,11 @@ def _enter_hw_patches(
         mock_setup_accelerometer = stack.enter_context(
             patch("hardware.circuitpython.device_builder._setup_accelerometer", return_value=None)
         )
+    mock_setup_magnetometer = None
+    if patch_magnetometer:
+        mock_setup_magnetometer = stack.enter_context(
+            patch("hardware.circuitpython.device_builder._setup_magnetometer", return_value=None)
+        )
     mock_setup_drv2605 = None
     if patch_drv2605:
         mock_setup_drv2605 = stack.enter_context(
@@ -87,6 +95,7 @@ def _enter_hw_patches(
         mock_setup_i2c,
         mock_setup_spi,
         mock_setup_accelerometer,
+        mock_setup_magnetometer,
         mock_setup_drv2605,
         mock_setup_radio,
         mock_setup_sdcard,

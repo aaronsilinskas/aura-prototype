@@ -21,6 +21,7 @@ def _fake_hw(
         outputs=[],
         buttons="fake-buttons",
         accelerometer=None,
+        magnetometer=None,
         network_controls="fake-network-controls",
         transmit_pump=transmit_pump if transmit_pump is not None else "fake-transmit-pump",
         ir_receiver=ir_receiver,
