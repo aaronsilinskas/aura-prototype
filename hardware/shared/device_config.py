@@ -529,7 +529,9 @@ def _parse_brightness(mapping: dict, key: str, field: str) -> float:
 
 
 # ---------------------------------------------------------------------------
-# I2C address validator (shared across every I2C-device config section)
+# I2C address validator (for I2C-device config sections that declare an
+# address, e.g. matrix pixels; intended for reuse by future I2C-device
+# sections)
 # ---------------------------------------------------------------------------
 
 # 0x00-0x07 and 0x78-0x7F are reserved by the I2C spec (general call/start

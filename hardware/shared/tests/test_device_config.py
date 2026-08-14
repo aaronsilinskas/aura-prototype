@@ -272,7 +272,7 @@ def test_parse_matrix_negative_brightness_raises_value_error(matrix_config):
 
 
 # ---------------------------------------------------------------------------
-# Matrix I2C address (shared _parse_address validator)
+# Matrix I2C address (_parse_address validator)
 # ---------------------------------------------------------------------------
 
 
