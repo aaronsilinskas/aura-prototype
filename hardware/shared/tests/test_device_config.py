@@ -84,9 +84,9 @@ def full_isolatable_config(matrix_config):
     matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8"}
     matrix_config["radio"] = {"cs": "GP13", "reset": "GP14", "frequency": 915.0, "node": 5}
     matrix_config["sdcard"] = {"cs": "GP15"}
-    matrix_config["accelerometer"] = {}
-    matrix_config["magnetometer"] = {}
-    matrix_config["haptics"] = {}
+    matrix_config["accelerometer"] = {"address": "0x19"}
+    matrix_config["magnetometer"] = {"address": "0x32"}
+    matrix_config["haptics"] = {"address": "0x5B"}
     matrix_config["high_current_rail"] = {"pin": "GP28"}
     return matrix_config
 
@@ -774,6 +774,51 @@ def test_parse_accelerometer_non_boolean_enabled_raises_value_error_naming_field
         parse_device_config(matrix_config)
 
 
+def test_parse_accelerometer_without_address_defaults_to_none(matrix_config):
+    matrix_config["accelerometer"] = {}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.accelerometer.address is None
+
+
+def test_parse_accelerometer_integer_address_is_stored_as_int(matrix_config):
+    matrix_config["accelerometer"] = {"address": 0x19}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.accelerometer.address == 0x19
+
+
+def test_parse_accelerometer_hex_string_address_is_normalized_to_int(matrix_config):
+    matrix_config["accelerometer"] = {"address": "0x19"}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.accelerometer.address == 0x19
+
+
+def test_parse_accelerometer_out_of_range_address_raises_value_error_naming_field(matrix_config):
+    matrix_config["accelerometer"] = {"address": 0x78}
+
+    with pytest.raises(ValueError, match=r"accelerometer\.address"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_accelerometer_boolean_address_raises_value_error_naming_field(matrix_config):
+    matrix_config["accelerometer"] = {"address": True}
+
+    with pytest.raises(ValueError, match=r"accelerometer\.address"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_accelerometer_bad_string_address_raises_value_error_naming_field(matrix_config):
+    matrix_config["accelerometer"] = {"address": "25"}
+
+    with pytest.raises(ValueError, match=r"accelerometer\.address"):
+        parse_device_config(matrix_config)
+
+
 # ---------------------------------------------------------------------------
 # Magnetometer validation
 # ---------------------------------------------------------------------------
@@ -824,6 +869,51 @@ def test_parse_magnetometer_non_boolean_enabled_raises_value_error_naming_field(
         parse_device_config(matrix_config)
 
 
+def test_parse_magnetometer_without_address_defaults_to_none(matrix_config):
+    matrix_config["magnetometer"] = {}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.magnetometer.address is None
+
+
+def test_parse_magnetometer_integer_address_is_stored_as_int(matrix_config):
+    matrix_config["magnetometer"] = {"address": 0x32}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.magnetometer.address == 0x32
+
+
+def test_parse_magnetometer_hex_string_address_is_normalized_to_int(matrix_config):
+    matrix_config["magnetometer"] = {"address": "0x32"}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.magnetometer.address == 0x32
+
+
+def test_parse_magnetometer_out_of_range_address_raises_value_error_naming_field(matrix_config):
+    matrix_config["magnetometer"] = {"address": 0x07}
+
+    with pytest.raises(ValueError, match=r"magnetometer\.address"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_magnetometer_boolean_address_raises_value_error_naming_field(matrix_config):
+    matrix_config["magnetometer"] = {"address": False}
+
+    with pytest.raises(ValueError, match=r"magnetometer\.address"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_magnetometer_bad_string_address_raises_value_error_naming_field(matrix_config):
+    matrix_config["magnetometer"] = {"address": "magnetometer"}
+
+    with pytest.raises(ValueError, match=r"magnetometer\.address"):
+        parse_device_config(matrix_config)
+
+
 # ---------------------------------------------------------------------------
 # Haptics validation
 # ---------------------------------------------------------------------------
@@ -871,6 +961,51 @@ def test_parse_haptics_non_boolean_enabled_raises_value_error_naming_field(matri
     matrix_config["haptics"] = {"enabled": "yes"}
 
     with pytest.raises(ValueError, match=r"haptics\.enabled"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_haptics_without_address_defaults_to_none(matrix_config):
+    matrix_config["haptics"] = {}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.haptics.address is None
+
+
+def test_parse_haptics_integer_address_is_stored_as_int(matrix_config):
+    matrix_config["haptics"] = {"address": 0x5B}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.haptics.address == 0x5B
+
+
+def test_parse_haptics_hex_string_address_is_normalized_to_int(matrix_config):
+    matrix_config["haptics"] = {"address": "0x5B"}
+
+    result = parse_device_config(matrix_config)
+
+    assert result.haptics.address == 0x5B
+
+
+def test_parse_haptics_out_of_range_address_raises_value_error_naming_field(matrix_config):
+    matrix_config["haptics"] = {"address": 0x78}
+
+    with pytest.raises(ValueError, match=r"haptics\.address"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_haptics_boolean_address_raises_value_error_naming_field(matrix_config):
+    matrix_config["haptics"] = {"address": True}
+
+    with pytest.raises(ValueError, match=r"haptics\.address"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_haptics_bad_string_address_raises_value_error_naming_field(matrix_config):
+    matrix_config["haptics"] = {"address": "49"}
+
+    with pytest.raises(ValueError, match=r"haptics\.address"):
         parse_device_config(matrix_config)
 
 
@@ -1733,6 +1868,24 @@ def test_copy_with_enabled_preserves_every_other_field_of_a_pixels_entry():
     assert copy.enabled is False
 
 
+def test_copy_with_enabled_preserves_address_on_accelerometer_magnetometer_and_haptics():
+    config = parse_device_config(
+        {
+            "accelerometer": {"address": "0x19"},
+            "magnetometer": {"address": "0x32"},
+            "haptics": {"address": "0x5B"},
+        }
+    )
+
+    accelerometer_copy = copy_with_enabled(config.accelerometer, enabled=False)
+    magnetometer_copy = copy_with_enabled(config.magnetometer, enabled=False)
+    haptics_copy = copy_with_enabled(config.haptics, enabled=False)
+
+    assert accelerometer_copy.address == 0x19
+    assert magnetometer_copy.address == 0x32
+    assert haptics_copy.address == 0x5B
+
+
 def test_copy_with_enabled_shares_mutable_slot_values_with_the_original():
     # The copy is shallow -- a mutable slot (scope_rows) is the *same* dict
     # object on both, not a deep copy of it.
@@ -1891,6 +2044,18 @@ def test_isolate_disabled_copy_preserves_matrix_pixels_fields(matrix_config):
     _assert_same_fields_except_enabled(config.pixels[0], isolated.pixels[0])
     assert isolated.pixels[0].address == 0x31
     assert isolated.pixels[0].enabled is False
+
+
+def test_isolate_disabled_copy_preserves_accelerometer_magnetometer_and_haptics_address(
+    full_isolatable_config,
+):
+    config = parse_device_config(full_isolatable_config)
+
+    isolated = config.isolate(keep="pixels")
+
+    assert isolated.accelerometer.address == config.accelerometer.address == 0x19
+    assert isolated.magnetometer.address == config.magnetometer.address == 0x32
+    assert isolated.haptics.address == config.haptics.address == 0x5B
 
 
 def test_isolate_disabled_copy_preserves_neopixel_pixels_fields(neopixel_config):

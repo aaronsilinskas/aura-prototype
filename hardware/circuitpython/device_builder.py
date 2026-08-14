@@ -380,7 +380,7 @@ def _describe_buttons(pin_names: list[str]) -> str:
     return " ".join(f"{chr(ord('A') + i)}={name}" for i, name in enumerate(pin_names))
 
 
-def _setup_accelerometer(i2c: busio.I2C) -> object:
+def _setup_accelerometer(i2c: busio.I2C, address: int | None = None) -> object:
     """Return a configured LIS3DH accelerometer on *i2c*.
 
     ``adafruit_lis3dh`` is imported here, not at module load, so a config
@@ -392,6 +392,11 @@ def _setup_accelerometer(i2c: busio.I2C) -> object:
     declared accelerometer that can't be built here is a wiring fault, not a
     normal "not present" case.
 
+    *address* is the configured I2C address override
+    (``AccelerometerConfig.address``). ``None`` means no override -- the
+    ``address=`` keyword is omitted entirely so the driver's own default
+    applies, rather than passing ``address=None``.
+
     Raises:
         ImportError: If ``adafruit_lis3dh`` is not installed.
         Exception: Whatever ``adafruit_lis3dh.LIS3DH_I2C`` raises if the
@@ -399,7 +404,9 @@ def _setup_accelerometer(i2c: busio.I2C) -> object:
     """
     import adafruit_lis3dh
 
-    return adafruit_lis3dh.LIS3DH_I2C(i2c)
+    if address is None:
+        return adafruit_lis3dh.LIS3DH_I2C(i2c)
+    return adafruit_lis3dh.LIS3DH_I2C(i2c, address=address)
 
 
 _MAGNETOMETER_DATA_RATE_HZ: Final = 100
@@ -423,7 +430,7 @@ _MAGNETOMETER_PROBE_ATTEMPTS: Final = 20
 _MAGNETOMETER_PROBE_INTERVAL_S: Final = 0.005
 
 
-def _setup_magnetometer(i2c: busio.I2C) -> object:
+def _setup_magnetometer(i2c: busio.I2C, address: int | None = None) -> object:
     """Return a configured MMC5603 magnetometer on *i2c*, in continuous mode.
 
     ``adafruit_mmc56x3`` is imported here, not at module load, so a config
@@ -434,6 +441,11 @@ def _setup_magnetometer(i2c: busio.I2C) -> object:
     reaches this once ``config.magnetometer`` is declared and enabled, so a
     declared magnetometer that can't be built here is a wiring fault, not a
     normal "not present" case.
+
+    *address* is the configured I2C address override
+    (``MagnetometerConfig.address``). ``None`` means no override -- the
+    ``address=`` keyword is omitted entirely so the driver's own default
+    (``0x30``) applies, rather than passing ``address=None``.
 
     Unlike ``_setup_accelerometer``'s bare defaults, the MMC5603 boots in
     one-shot mode, where each ``.magnetic`` read busy-waits ~5-10ms for a
@@ -457,7 +469,10 @@ def _setup_magnetometer(i2c: busio.I2C) -> object:
     """
     import adafruit_mmc56x3
 
-    magnetometer = adafruit_mmc56x3.MMC5603(i2c)
+    if address is None:
+        magnetometer = adafruit_mmc56x3.MMC5603(i2c)
+    else:
+        magnetometer = adafruit_mmc56x3.MMC5603(i2c, address=address)
     magnetometer.data_rate = _MAGNETOMETER_DATA_RATE_HZ
     magnetometer.continuous_mode = True
 
@@ -475,7 +490,7 @@ def _setup_magnetometer(i2c: busio.I2C) -> object:
     )
 
 
-def _setup_drv2605(i2c: busio.I2C) -> object:
+def _setup_drv2605(i2c: busio.I2C, address: int | None = None) -> object:
     """Return a configured DRV2605 haptic driver on *i2c*.
 
     ``adafruit_drv2605`` is imported here, not at module load, so a config
@@ -486,6 +501,11 @@ def _setup_drv2605(i2c: busio.I2C) -> object:
     driver that can't be built here is a wiring fault, not a normal "not
     present" case.
 
+    *address* is the configured I2C address override (``HapticsConfig.address``).
+    ``None`` means no override -- the ``address=`` keyword is omitted
+    entirely so the driver's own default applies, rather than passing
+    ``address=None``.
+
     Raises:
         ImportError: If ``adafruit_drv2605`` is not installed.
         Exception: Whatever ``adafruit_drv2605.DRV2605`` raises if the
@@ -493,7 +513,9 @@ def _setup_drv2605(i2c: busio.I2C) -> object:
     """
     import adafruit_drv2605
 
-    return adafruit_drv2605.DRV2605(i2c)
+    if address is None:
+        return adafruit_drv2605.DRV2605(i2c)
+    return adafruit_drv2605.DRV2605(i2c, address=address)
 
 
 def _require_i2c(i2c: busio.I2C | None, section: str) -> busio.I2C:
@@ -804,10 +826,12 @@ def build_hardware(
     entry's own line with ``FAILED`` rather than a neighboring one. Declared
     accelerometer, magnetometer, and haptics sections are narrated on their
     own line each (``"accelerometer lis3dh"`` / ``"magnetometer mmc5603"`` /
-    ``"haptics drv2605"``): ``ok`` when built, ``disabled`` for an explicit
-    ``enabled: false``, no line at all when the section is absent, and
-    ``FAILED`` (via the whole-function except below) when ``_require_i2c``
-    raises for a missing bus. Audio is narrated the
+    ``"haptics drv2605"``), each gaining an ``address=0xNN`` suffix when its
+    section configures an I2C address override (mirroring the matrix pixels
+    entry -- see ``_describe_pixel_entry``): ``ok`` when built, ``disabled``
+    for an explicit ``enabled: false``, no line at all when the section is
+    absent, and ``FAILED`` (via the whole-function except below) when
+    ``_require_i2c`` raises for a missing bus. Audio is narrated the
     same begin-before-pin-resolution way: an absent ``config.audio`` logs
     nothing, ``enabled=False`` logs its own disabled line, and an enabled
     section opens via ``logger.begin()`` -- carrying voice count,
@@ -919,18 +943,30 @@ def build_hardware(
 
         accelerometer = None
         if config.accelerometer is not None:
-            logger.begin("accelerometer lis3dh")
-            if config.accelerometer.enabled:
-                accelerometer = _setup_accelerometer(_require_i2c(i2c, "accelerometer"))
+            acc_cfg = config.accelerometer
+            acc_description = "accelerometer lis3dh"
+            if acc_cfg.address is not None:
+                acc_description += f" address=0x{acc_cfg.address:02X}"
+            logger.begin(acc_description)
+            if acc_cfg.enabled:
+                accelerometer = _setup_accelerometer(
+                    _require_i2c(i2c, "accelerometer"), acc_cfg.address
+                )
                 logger.end()
             else:
                 logger.end("disabled")
 
         magnetometer = None
         if config.magnetometer is not None:
-            logger.begin("magnetometer mmc5603")
-            if config.magnetometer.enabled:
-                magnetometer = _setup_magnetometer(_require_i2c(i2c, "magnetometer"))
+            mag_cfg = config.magnetometer
+            mag_description = "magnetometer mmc5603"
+            if mag_cfg.address is not None:
+                mag_description += f" address=0x{mag_cfg.address:02X}"
+            logger.begin(mag_description)
+            if mag_cfg.enabled:
+                magnetometer = _setup_magnetometer(
+                    _require_i2c(i2c, "magnetometer"), mag_cfg.address
+                )
                 logger.end()
             else:
                 logger.end("disabled")
@@ -952,9 +988,13 @@ def build_hardware(
                 logger.end()
 
         if config.haptics is not None:
-            logger.begin("haptics drv2605")
-            if config.haptics.enabled:
-                driver = _setup_drv2605(_require_i2c(i2c, "haptics"))
+            hap_cfg = config.haptics
+            hap_description = "haptics drv2605"
+            if hap_cfg.address is not None:
+                hap_description += f" address=0x{hap_cfg.address:02X}"
+            logger.begin(hap_description)
+            if hap_cfg.enabled:
+                driver = _setup_drv2605(_require_i2c(i2c, "haptics"), hap_cfg.address)
                 # Drv2605EffectOutput's own module imports adafruit_drv2605 at load
                 # time, so this import is deferred here — reached only once
                 # _setup_drv2605 has already confirmed the library is importable.

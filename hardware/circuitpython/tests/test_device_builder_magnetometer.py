@@ -19,7 +19,7 @@ from __future__ import annotations
 import sys
 import types
 from contextlib import ExitStack
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -46,13 +46,15 @@ _LIVE_UT = (12.3, -4.5, 40.1)
 
 
 class _FakeMmc5603:
-    """Records the constructor's *i2c* plus whatever attributes are set on it
-    afterward -- standing in for the real adafruit_mmc56x3.MMC5603, which
-    isn't installed in this CPython test environment. Reads a live, non-sentinel
-    field so ``_setup_magnetometer``'s raw-0 probe passes on the first poll."""
+    """Records the constructor's *i2c* and *address* plus whatever attributes
+    are set on it afterward -- standing in for the real
+    adafruit_mmc56x3.MMC5603, which isn't installed in this CPython test
+    environment. Reads a live, non-sentinel field so ``_setup_magnetometer``'s
+    raw-0 probe passes on the first poll."""
 
-    def __init__(self, i2c: object) -> None:
+    def __init__(self, i2c: object, address: int | None = None) -> None:
         self.i2c = i2c
+        self.address = address
         self.data_rate: int | None = None
         self.continuous_mode: bool | None = None
 
@@ -163,6 +165,34 @@ def test_setup_magnetometer_waits_for_the_first_conversion_before_giving_up() ->
 
     assert isinstance(result, _SlowStartMmc5603)
     assert result.magnetic == _LIVE_UT
+
+
+def test_setup_magnetometer_passes_configured_address_to_mmc5603_constructor(
+    _fake_mmc56x3_module,
+) -> None:
+    fake_i2c = MagicMock(name="i2c")
+
+    from hardware.circuitpython.device_builder import _setup_magnetometer
+
+    result = _setup_magnetometer(fake_i2c, address=0x32)
+
+    assert result.i2c is fake_i2c
+    assert result.address == 0x32
+
+
+def test_setup_magnetometer_omits_address_kwarg_when_none(_fake_mmc56x3_module) -> None:
+    """A None address means no override -- the driver's own default (0x30)
+    applies, so the construction call must not pass address= at all rather
+    than passing address=None."""
+    mock_mmc5603_cls = MagicMock(wraps=_FakeMmc5603)
+
+    with patch.object(_fake_mmc56x3_module, "MMC5603", mock_mmc5603_cls):
+        from hardware.circuitpython.device_builder import _setup_magnetometer
+
+        _setup_magnetometer(MagicMock(name="i2c"), address=None)
+
+    _, kwargs = mock_mmc5603_cls.call_args
+    assert "address" not in kwargs
 
 
 # ---------------------------------------------------------------------------
@@ -411,3 +441,36 @@ def test_build_hardware_magnetometer_no_i2c_bus_marks_its_own_line_failed_and_pr
 
     lines = "".join(fragments).splitlines(keepends=True)
     assert lines[-1] == "[hw] magnetometer mmc5603 FAILED\n"
+
+
+def test_build_hardware_forwards_configured_magnetometer_address_to_setup() -> None:
+    config = _neopixel_config_with_magnetometer()
+    config.magnetometer.address = 0x32
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+
+    with ExitStack() as stack:
+        mocks = _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock)
+
+    mocks.magnetometer.assert_called_once_with(ANY, 0x32)
+
+
+def test_build_hardware_logs_magnetometer_address_suffix_when_configured() -> None:
+    config = _neopixel_config_with_magnetometer()
+    config.magnetometer.address = 0x32
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+    logger, fragments = _recording_logger()
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock, logger=logger)
+
+    assert "[hw] magnetometer mmc5603 address=0x32 ok\n" in "".join(fragments)
