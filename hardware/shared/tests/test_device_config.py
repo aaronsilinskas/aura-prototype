@@ -7,6 +7,7 @@ import pytest
 
 from hardware.shared.device_config import (
     DeviceConfig,
+    MatrixPixelsConfig,
     copy_with_enabled,
     first_neopixel_pin,
     load_device_config,
@@ -267,6 +268,106 @@ def test_parse_matrix_negative_brightness_raises_value_error(matrix_config):
     matrix_config["pixels"][0]["brightness"] = -0.1
 
     with pytest.raises(ValueError, match=r"pixels\[0\]\.brightness"):
+        parse_device_config(matrix_config)
+
+
+# ---------------------------------------------------------------------------
+# Matrix I2C address (shared _parse_address validator)
+# ---------------------------------------------------------------------------
+
+
+def test_parse_matrix_without_address_defaults_to_none(matrix_config):
+    result = parse_device_config(matrix_config)
+
+    assert result.pixels[0].address is None
+
+
+def test_parse_matrix_integer_address_is_stored_as_int(matrix_config):
+    matrix_config["pixels"][0]["address"] = 49
+
+    result = parse_device_config(matrix_config)
+
+    assert result.pixels[0].address == 49
+
+
+def test_parse_matrix_lowercase_hex_string_address_is_normalized_to_int(matrix_config):
+    matrix_config["pixels"][0]["address"] = "0x31"
+
+    result = parse_device_config(matrix_config)
+
+    assert result.pixels[0].address == 0x31
+
+
+def test_parse_matrix_uppercase_hex_string_address_is_normalized_to_int(matrix_config):
+    matrix_config["pixels"][0]["address"] = "0X31"
+
+    result = parse_device_config(matrix_config)
+
+    assert result.pixels[0].address == 0x31
+
+
+def test_parse_matrix_address_boundary_minimum_is_accepted(matrix_config):
+    matrix_config["pixels"][0]["address"] = 0x08
+
+    result = parse_device_config(matrix_config)
+
+    assert result.pixels[0].address == 0x08
+
+
+def test_parse_matrix_address_boundary_maximum_is_accepted(matrix_config):
+    matrix_config["pixels"][0]["address"] = 0x77
+
+    result = parse_device_config(matrix_config)
+
+    assert result.pixels[0].address == 0x77
+
+
+def test_parse_matrix_address_below_reserved_floor_raises_value_error(matrix_config):
+    matrix_config["pixels"][0]["address"] = 0x07
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.address"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_matrix_address_above_reserved_ceiling_raises_value_error(matrix_config):
+    matrix_config["pixels"][0]["address"] = 0x78
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.address"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_matrix_out_of_range_address_error_echoes_value_in_hex(matrix_config):
+    matrix_config["pixels"][0]["address"] = 0x78
+
+    with pytest.raises(ValueError, match="0x78"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_matrix_boolean_address_raises_value_error(matrix_config):
+    matrix_config["pixels"][0]["address"] = True
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.address"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_matrix_bare_decimal_string_address_raises_value_error(matrix_config):
+    matrix_config["pixels"][0]["address"] = "49"
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.address"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_matrix_non_hex_string_address_raises_value_error(matrix_config):
+    matrix_config["pixels"][0]["address"] = "matrix"
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.address"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_matrix_float_address_raises_value_error(matrix_config):
+    matrix_config["pixels"][0]["address"] = 49.5
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.address"):
         parse_device_config(matrix_config)
 
 
@@ -1449,6 +1550,22 @@ def test_committed_sample_device_config_parses():
     assert result.radio is not None
 
 
+def test_committed_sample_device_config_matrix_and_magnetometer_no_longer_collide_at_0x30():
+    """The Pico 2 board wires both the matrix and the MMC5603 magnetometer on
+    the same I2C bus. The magnetometer has no configurable address and lives
+    at its driver default (0x30), so the matrix must declare a distinct
+    override (#834) rather than also defaulting to 0x30."""
+    mapping = read_device_config_mapping(str(_SAMPLE_CONFIG_PATH))
+
+    result = parse_device_config(mapping)
+
+    matrix_entries = [p for p in result.pixels if isinstance(p, MatrixPixelsConfig)]
+    assert len(matrix_entries) == 1
+    assert matrix_entries[0].address == 0x31
+    assert result.magnetometer is not None
+    assert result.magnetometer.enabled is True
+
+
 def test_committed_sample_device_config_carries_no_clips_map():
     """hardware_test's sfx_test clip now resolves via AudioRegistry's
     hardware_test/sounds/sfx_test_start.wav scene overlay (#804), not a
@@ -1600,6 +1717,7 @@ def test_copy_with_enabled_preserves_every_other_field_of_a_pixels_entry():
                     "cols": 13,
                     "scope_rows": {"personal": [0, 9]},
                     "brightness": 0.5,
+                    "address": "0x31",
                 }
             ]
         }
@@ -1611,6 +1729,7 @@ def test_copy_with_enabled_preserves_every_other_field_of_a_pixels_entry():
     assert copy.cols == original.cols
     assert copy.scope_rows == original.scope_rows
     assert copy.brightness == original.brightness
+    assert copy.address == original.address == 0x31
     assert copy.enabled is False
 
 
@@ -1764,11 +1883,13 @@ def test_isolate_disabled_copy_preserves_every_field_of_each_isolatable_section(
 
 
 def test_isolate_disabled_copy_preserves_matrix_pixels_fields(matrix_config):
+    matrix_config["pixels"][0]["address"] = "0x31"
     config = parse_device_config(matrix_config)
 
     isolated = config.isolate(keep="audio")
 
     _assert_same_fields_except_enabled(config.pixels[0], isolated.pixels[0])
+    assert isolated.pixels[0].address == 0x31
     assert isolated.pixels[0].enabled is False
 
 

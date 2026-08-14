@@ -73,7 +73,7 @@ _ISOLATE_EXCLUDED_COMPONENTS: Final = ("i2c", "spi", "buttons", "high_current_ra
 class MatrixPixelsConfig:
     """Parsed matrix pixels configuration."""
 
-    __slots__ = ("brightness", "cols", "enabled", "scope_rows")
+    __slots__ = ("address", "brightness", "cols", "enabled", "scope_rows")
 
     def __init__(
         self,
@@ -81,11 +81,13 @@ class MatrixPixelsConfig:
         scope_rows: dict[str, range],
         brightness: float = 1.0,
         enabled: bool = True,
+        address: int | None = None,
     ) -> None:
         self.cols: int = cols
         self.scope_rows: dict[str, range] = scope_rows
         self.brightness: float = brightness
         self.enabled: bool = enabled
+        self.address: int | None = address
 
 
 class NeoPixelScopeConfig:
@@ -527,6 +529,67 @@ def _parse_brightness(mapping: dict, key: str, field: str) -> float:
 
 
 # ---------------------------------------------------------------------------
+# I2C address validator (shared across every I2C-device config section)
+# ---------------------------------------------------------------------------
+
+# 0x00-0x07 and 0x78-0x7F are reserved by the I2C spec (general call/start
+# byte and the 10-bit-addressing/future-use block), so a configured 7-bit
+# address must fall strictly between them.
+_I2C_ADDRESS_MIN: Final = 0x08
+_I2C_ADDRESS_MAX: Final = 0x77
+
+
+def _parse_address(mapping: dict, key: str, field: str) -> int | None:
+    """Return the I2C address at *key* in *mapping*, or ``None`` when absent.
+
+    Accepts either a JSON integer in decimal (``49``) or a ``0x``/``0X``-prefixed
+    hex string (``"0x31"``), both normalized to a plain ``int``. Any other
+    string -- including a bare decimal string like ``"49"`` -- is rejected, as
+    is a ``bool`` (a Python ``bool`` is an ``int`` subclass but never a valid
+    address here).
+
+    Args:
+        mapping: The raw config mapping to read *key* from.
+        key: The mapping key holding the address value (e.g. ``"address"``).
+        field: Label used in error messages (e.g. ``"pixels[0].address"``).
+
+    Raises:
+        ValueError: If present but not an integer or hex-string form, or
+            outside the inclusive 7-bit I2C range ``0x08``-``0x77``, naming
+            *field* and echoing the offending value in hex where the value
+            parsed to a valid integer.
+    """
+    if key not in mapping:
+        return None
+
+    value = mapping[key]
+    format_error = ValueError(
+        f"{field} must be an int (decimal) or a '0x'-prefixed hex string, got {value!r}"
+    )
+
+    if isinstance(value, bool):
+        raise format_error
+    if isinstance(value, int):
+        address = value
+    elif isinstance(value, str):
+        if not (value.startswith("0x") or value.startswith("0X")):
+            raise format_error
+        try:
+            address = int(value, 16)
+        except ValueError:
+            raise format_error from None
+    else:
+        raise format_error
+
+    if not (_I2C_ADDRESS_MIN <= address <= _I2C_ADDRESS_MAX):
+        raise ValueError(
+            f"{field} must be in [0x{_I2C_ADDRESS_MIN:02X}, 0x{_I2C_ADDRESS_MAX:02X}], "
+            + f"got 0x{address:02X}"
+        )
+    return address
+
+
+# ---------------------------------------------------------------------------
 # Enabled validator (shared across ir, audio, i2c, accelerometer, haptics,
 # and every pixels-list entry)
 # ---------------------------------------------------------------------------
@@ -566,6 +629,7 @@ def _parse_matrix_pixels(mapping: dict, entry_index: int) -> MatrixPixelsConfig:
     raw_scope_rows = mapping["scope_rows"]
     brightness = _parse_brightness(mapping, "brightness", f"{label}.brightness")
     enabled = _parse_enabled(mapping, f"{label}.enabled")
+    address = _parse_address(mapping, "address", f"{label}.address")
 
     scope_rows: dict[str, range] = {}
     for key, value in raw_scope_rows.items():
@@ -574,7 +638,11 @@ def _parse_matrix_pixels(mapping: dict, entry_index: int) -> MatrixPixelsConfig:
     validate_band_map(scope_rows, f"{label}.scope_rows")
 
     return MatrixPixelsConfig(
-        cols=cols, scope_rows=scope_rows, brightness=brightness, enabled=enabled
+        cols=cols,
+        scope_rows=scope_rows,
+        brightness=brightness,
+        enabled=enabled,
+        address=address,
     )
 
 
