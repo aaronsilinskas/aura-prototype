@@ -642,6 +642,24 @@ def test_describe_pixel_entry_disabled_neopixel_produces_skipped_line_not_detail
 
 
 # ---------------------------------------------------------------------------
+# _pixel_kind -- "matrix" vs "neopixel" by config type, independent of a full
+# build (#852)
+# ---------------------------------------------------------------------------
+
+
+def test_pixel_kind_names_a_matrix_config_matrix() -> None:
+    from hardware.circuitpython.device_builder import _pixel_kind
+
+    assert _pixel_kind(_matrix_config().pixels[0]) == "matrix"
+
+
+def test_pixel_kind_names_a_neopixel_config_neopixel() -> None:
+    from hardware.circuitpython.device_builder import _pixel_kind
+
+    assert _pixel_kind(_neopixel_config().pixels[0]) == "neopixel"
+
+
+# ---------------------------------------------------------------------------
 # build_hardware's pixels wiring — thin orchestration over _setup_pixels
 # ---------------------------------------------------------------------------
 
@@ -701,64 +719,35 @@ def test_build_hardware_mixed_matrix_and_neopixel_config_produces_outputs_in_con
 
 
 # ---------------------------------------------------------------------------
-# build_hardware — pixels narration: indexed pixels[n] entries (#759)
+# build_hardware — pixels narration: one representative indexed pixels[n]
+# line plus the absent-section case (#759). The full "ok"/"disabled" line
+# text for every pixels[n] entry, including a mixed matrix-then-neopixel
+# config's ordering, is now the comprehensive tests' job
+# (test_device_builder.py, #852); the unknown-pin/no-I2C-bus FAILED
+# attribution this file used to assert here is proven generically by
+# hardware/shared/tests/test_build_narration.py and by the one retained
+# integration attribution test (test_device_builder_buttons_logging.py),
+# while the ValueError/RuntimeError themselves stay covered directly on
+# _setup_neopixels/_setup_pixels above.
 # ---------------------------------------------------------------------------
 
 
-def test_build_hardware_mixed_pixels_config_narrates_indexed_lines_in_config_order() -> None:
-    config = _mixed_matrix_and_neopixel_config()
-    board_mock = _mock_board(D5=MagicMock())
+def test_build_hardware_pixels_entry_narrates_its_ok_line() -> None:
+    config = _neopixel_config(scopes={"personal": {"pin": "D5", "count": 10}})
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
     logger, fragments = _recording_logger()
 
     with ExitStack() as stack:
         _enter_hw_patches(stack)
-        stack.enter_context(
-            patch(
-                "hardware.circuitpython.device_builder._setup_matrix_is31fl3741",
-                return_value=MagicMock(),
-            )
-        )
         _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import build_hardware
 
         build_hardware(config, board_module=board_mock, logger=logger)
 
-    lines = "".join(fragments).splitlines(keepends=True)
-    matrix_line = (
-        "[hw] pixels[0] matrix cols=13 "
-        "scope_rows=[global.buff:0-1 global.debuff:1-2 global.main:2-5 "
-        "personal:5-7 directional:7-8 ambient:8-9] brightness=1.00 ok\n"
+    assert "[hw] pixels[0] neopixel pin=D5 count=10 order=GRB scope=personal ok\n" in "".join(
+        fragments
     )
-    neopixel_line = "[hw] pixels[1] neopixel pin=D5 count=10 order=GRB scope=personal ok\n"
-    assert lines.index(matrix_line) < lines.index(neopixel_line)
-
-
-def test_build_hardware_disabled_pixel_entry_narrates_skipped_line_not_ok() -> None:
-    mapping = {
-        "pixels": [
-            {
-                "type": "neopixel",
-                "scopes": {"personal": {"pin": "D5", "count": 10}},
-                "enabled": False,
-            }
-        ],
-        "buttons": ["D9"],
-    }
-    config = parse_device_config(mapping)
-    board_mock = _mock_board(D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    text = "".join(fragments)
-    assert "[hw] pixels[0] neopixel disabled\n" in text
-    assert "pixels[0] neopixel disabled ok" not in text
 
 
 def test_build_hardware_empty_pixels_list_produces_no_pixel_lines() -> None:
@@ -774,71 +763,3 @@ def test_build_hardware_empty_pixels_list_produces_no_pixel_lines() -> None:
         build_hardware(config, board_module=board_mock, logger=logger)
 
     assert "pixels[" not in "".join(fragments)
-
-
-def test_build_hardware_unknown_neopixel_pin_marks_its_own_pixels_line_failed() -> None:
-    """The begin-before-pin-resolution ordering means an unknown NeoPixel pin
-    name attributes FAILED to its own pixels[n] line, leaving an earlier,
-    already-succeeded entry's line untouched (#759, mirrors #758's buttons
-    case)."""
-    mapping = {
-        "pixels": [
-            {"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}},
-            {"type": "neopixel", "scopes": {"directional": {"pin": "NOPE", "count": 4}}},
-        ],
-        "buttons": ["D9"],
-    }
-    config = parse_device_config(mapping)
-    board_mock = MagicMock(spec=["D5", "D9"])
-    board_mock.D5 = MagicMock()
-    board_mock.D9 = MagicMock()
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(ValueError, match="NOPE"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    lines = "".join(fragments).splitlines(keepends=True)
-    assert lines[-2] == "[hw] pixels[0] neopixel pin=D5 count=10 order=GRB scope=personal ok\n"
-    assert (
-        lines[-1] == "[hw] pixels[1] neopixel pin=NOPE count=4 order=GRB scope=directional FAILED\n"
-    )
-
-
-def test_build_hardware_matrix_with_no_i2c_marks_its_own_pixels_line_failed() -> None:
-    """A declared, enabled matrix entry still raises RuntimeError when no I2C
-    bus is available -- that raise closes the matrix's own pixels[n] line
-    with FAILED via the outer try/fail spine (#758), not a prior line."""
-    config = _matrix_config()
-    board_mock = _mock_board()
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
-        )
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_spi", return_value=MagicMock())
-        )
-        mock_setup_matrix = stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_matrix_is31fl3741")
-        )
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(RuntimeError, match="matrix"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    mock_setup_matrix.assert_not_called()
-    lines = "".join(fragments).splitlines(keepends=True)
-    assert lines[-2] == "[hw] spi default ok\n"
-    assert lines[-1] == (
-        "[hw] pixels[0] matrix cols=13 "
-        "scope_rows=[global.buff:0-1 global.debuff:1-2 global.main:2-5 "
-        "personal:5-7 directional:7-8 ambient:8-9] brightness=1.00 FAILED\n"
-    )

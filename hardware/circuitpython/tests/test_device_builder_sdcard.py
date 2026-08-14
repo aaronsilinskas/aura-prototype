@@ -218,7 +218,12 @@ def test_setup_sdcard_returns_a_device_storage() -> None:
 
 
 # ---------------------------------------------------------------------------
-# build_hardware -- sdcard narration (#793)
+# build_hardware -- sdcard narration (#793). One representative "ok" line
+# plus the absent-section case; "disabled" is covered by the all-disabled
+# comprehensive test, and the no-SPI-bus/unmountable-card FAILED cases are
+# proven generically by the primitive's own tests plus the non-narration
+# raises tests above and the one retained integration attribution test
+# (test_device_builder.py / test_device_builder_buttons_logging.py, #852).
 # ---------------------------------------------------------------------------
 
 
@@ -244,22 +249,6 @@ def test_build_hardware_logs_sdcard_ok_line_when_enabled_and_mounted() -> None:
     assert "[hw] sdcard mount=/sd cs=D24 ok\n" in "".join(fragments)
 
 
-def test_build_hardware_logs_sdcard_disabled_line_when_section_disabled() -> None:
-    config = _neopixel_config_with_sdcard(enabled=False)
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] sdcard mount=/sd cs=D24 disabled\n" in "".join(fragments)
-
-
 def test_build_hardware_logs_no_sdcard_line_when_section_absent() -> None:
     config = _minimal_config()
     board_mock = _mock_board(D9=MagicMock())
@@ -273,61 +262,3 @@ def test_build_hardware_logs_no_sdcard_line_when_section_absent() -> None:
         build_hardware(config, board_module=board_mock, logger=logger)
 
     assert "sdcard" not in "".join(fragments)
-
-
-def test_build_hardware_sdcard_no_spi_bus_marks_its_own_line_failed_and_propagates() -> None:
-    """A declared-and-enabled sdcard section with no SPI bus available raises
-    via _require_spi -- the failure must close the sdcard's own open line,
-    leaving the earlier spi line's own outcome untouched (mirrors the radio
-    no-SPI-bus FAILED test)."""
-    config = _neopixel_config_with_sdcard()
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack, patch_sdcard=False)
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_spi", return_value=None)
-        )
-        mock_setup_sdcard = stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_sdcard")
-        )
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(RuntimeError, match="sdcard"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    mock_setup_sdcard.assert_not_called()
-    text = "".join(fragments)
-    lines = text.splitlines(keepends=True)
-    assert "[hw] spi sck=SCK mosi=MOSI miso=MISO ok\n" in text
-    assert lines[-1] == "[hw] sdcard mount=/sd cs=D24 FAILED\n"
-
-
-def test_build_hardware_sdcard_unmountable_card_marks_its_own_line_failed() -> None:
-    config = _neopixel_config_with_sdcard()
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack, patch_sdcard=False)
-        stack.enter_context(
-            patch(
-                "hardware.circuitpython.device_builder._setup_sdcard",
-                side_effect=RuntimeError(
-                    "sdcard section is declared but the card at cs=D24 mount=/sd "
-                    "failed to mount: no SD card"
-                ),
-            )
-        )
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(RuntimeError, match="sdcard"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    lines = "".join(fragments).splitlines(keepends=True)
-    assert lines[-1] == "[hw] sdcard mount=/sd cs=D24 FAILED\n"

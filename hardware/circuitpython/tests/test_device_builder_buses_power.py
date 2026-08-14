@@ -563,7 +563,14 @@ def test_build_hardware_passes_i2c_config_and_board_to_setup_i2c() -> None:
 
 # ---------------------------------------------------------------------------
 # build_hardware -- high_current_rail narration (#798), replacing the old
-# external-power ok/no-rail line
+# external-power ok/no-rail line. One representative "asserted" outcome plus
+# the absent-section case stay here; the "held off" disabled wording and
+# every other component's "ok"/"disabled" line text are now the two
+# comprehensive tests' job (test_device_builder.py, #852) -- the bad-pin
+# ValueError this file used to assert here via a FAILED line is covered
+# directly by test_setup_high_current_rail_bad_pin_name_raises_value_error_
+# naming_field_and_pin above, and the FAILED-attribution shape itself by the
+# one retained integration test (test_device_builder_buttons_logging.py).
 # ---------------------------------------------------------------------------
 
 
@@ -594,25 +601,6 @@ def test_build_hardware_logs_rail_asserted_when_enabled() -> None:
     assert "[hw] high_current_rail pin=GP28 active_high=True asserted\n" in "".join(fragments)
 
 
-def test_build_hardware_logs_rail_held_off_when_disabled() -> None:
-    """`enabled: false` still resolves and drives the pin -- narrated as
-    "held off", not skipped like a disabled section on every other
-    component."""
-    config = _config_with_rail(active_high=True, enabled=False)
-    board_mock = _mock_board(D9=MagicMock(), GP28=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] high_current_rail pin=GP28 active_high=True held off\n" in "".join(fragments)
-
-
 def test_build_hardware_logs_no_rail_line_when_section_absent() -> None:
     config = _minimal_config()
     board_mock = _mock_board(D9=MagicMock())
@@ -626,25 +614,6 @@ def test_build_hardware_logs_no_rail_line_when_section_absent() -> None:
         build_hardware(config, board_module=board_mock, logger=logger)
 
     assert "high_current_rail" not in "".join(fragments)
-
-
-def test_build_hardware_rail_bad_pin_marks_its_own_line_failed_and_propagates() -> None:
-    config = _config_with_rail(pin="NONEXISTENT_PIN")
-    board_mock = MagicMock(spec=["D9"])  # the rail's pin has no attribute to resolve
-    board_mock.D9 = MagicMock()
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(ValueError, match=r"high_current_rail\.pin.*NONEXISTENT_PIN"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    lines = "".join(fragments).splitlines(keepends=True)
-    assert lines[-1] == "[hw] high_current_rail pin=NONEXISTENT_PIN active_high=True FAILED\n"
 
 
 def test_build_hardware_no_rail_pin_driven_when_section_absent() -> None:
@@ -662,38 +631,6 @@ def test_build_hardware_no_rail_pin_driven_when_section_absent() -> None:
         build_hardware(config, board_module=board_mock)
 
     mock_digitalio.DigitalInOut.assert_not_called()
-
-
-def test_build_hardware_logs_configured_i2c_pins() -> None:
-    config = parse_device_config({"buttons": ["D9"], "i2c": {"sda": "GP4", "scl": "GP5"}})
-    board_mock = _mock_board(D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] i2c scl=GP5 sda=GP4 ok\n" in "".join(fragments)
-
-
-def test_build_hardware_logs_i2c_disabled_line_when_section_explicitly_disabled() -> None:
-    config = parse_device_config(
-        {"buttons": ["D9"], "i2c": {"sda": "GP4", "scl": "GP5", "enabled": False}}
-    )
-    board_mock = _mock_board(D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] i2c disabled\n" in "".join(fragments)
 
 
 def test_build_hardware_logs_i2c_no_bus_outcome_when_no_pullup_found() -> None:
@@ -720,70 +657,3 @@ def test_build_hardware_logs_i2c_no_bus_outcome_when_no_pullup_found() -> None:
         build_hardware(config, board_module=board_mock, logger=logger)
 
     assert "[hw] i2c default no bus\n" in "".join(fragments)
-
-
-def test_build_hardware_logs_configured_spi_pins() -> None:
-    config = parse_device_config(
-        {"buttons": ["D9"], "spi": {"sck": "GP2", "mosi": "GP3", "miso": "GP4"}}
-    )
-    board_mock = _mock_board(D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] spi sck=GP2 mosi=GP3 miso=GP4 ok\n" in "".join(fragments)
-
-
-def test_build_hardware_logs_spi_disabled_line_when_section_explicitly_disabled() -> None:
-    config = parse_device_config(
-        {
-            "buttons": ["D9"],
-            "spi": {"sck": "GP2", "mosi": "GP3", "miso": "GP4", "enabled": False},
-        }
-    )
-    board_mock = _mock_board(D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] spi disabled\n" in "".join(fragments)
-
-
-def test_build_hardware_i2c_setup_failure_marks_i2c_line_failed_and_propagates() -> None:
-    """A component that raises something other than the RuntimeError
-    _setup_i2c itself catches (e.g. a wedged bus) still closes its own line
-    with FAILED, and the exception still propagates -- the single
-    whole-function try/except (#758), not a per-component one. A preceding
-    high_current_rail section's own line must stay untouched by the later i2c
-    failure."""
-    config = _config_with_rail(active_high=True, enabled=True)
-    board_mock = _mock_board(D9=MagicMock(), GP28=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
-        stack.enter_context(
-            patch(
-                "hardware.circuitpython.device_builder._setup_i2c",
-                side_effect=OSError("i2c bus wedged"),
-            )
-        )
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(OSError, match="i2c bus wedged"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    lines = "".join(fragments).splitlines(keepends=True)
-    assert lines[-2] == "[hw] high_current_rail pin=GP28 active_high=True asserted\n"
-    assert lines[-1] == "[hw] i2c default FAILED\n"

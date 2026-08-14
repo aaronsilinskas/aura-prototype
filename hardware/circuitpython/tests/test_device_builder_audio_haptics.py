@@ -856,7 +856,12 @@ def test_build_hardware_neither_accelerometer_nor_haptics_probed_when_undeclared
 
 
 # ---------------------------------------------------------------------------
-# build_hardware — accelerometer and haptics narration (#760)
+# build_hardware — accelerometer and haptics narration (#760): one
+# representative "ok" line plus the absent-section case per component. The
+# "disabled" line text, the address-suffix formatting (now its own direct
+# _address_suffix unit test in test_device_builder.py), and the no-I2C-bus
+# FAILED attribution are covered by the two comprehensive narration tests
+# and the primitive's own tests, not repeated here (#852).
 # ---------------------------------------------------------------------------
 
 
@@ -876,23 +881,6 @@ def test_build_hardware_logs_accelerometer_ok_line_when_enabled_and_built() -> N
     assert "[hw] accelerometer lis3dh ok\n" in "".join(fragments)
 
 
-def test_build_hardware_logs_accelerometer_disabled_line_when_section_disabled() -> None:
-    config = _neopixel_config_with_accelerometer()
-    config.accelerometer.enabled = False
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] accelerometer lis3dh disabled\n" in "".join(fragments)
-
-
 def test_build_hardware_logs_no_accelerometer_line_when_section_absent() -> None:
     config = _minimal_config()
     board_mock = _mock_board(D9=MagicMock())
@@ -906,34 +894,6 @@ def test_build_hardware_logs_no_accelerometer_line_when_section_absent() -> None
         build_hardware(config, board_module=board_mock, logger=logger)
 
     assert "accelerometer" not in "".join(fragments)
-
-
-def test_build_hardware_accelerometer_no_i2c_bus_marks_its_own_line_failed_and_propagates() -> None:
-    """A declared-and-enabled accelerometer with no I2C bus available raises via
-    _require_i2c -- the failure must close the accelerometer's own open line,
-    not whichever line closed just before it (mirrors the buttons/i2c FAILED
-    tests for the #758 spine)."""
-    config = _neopixel_config_with_accelerometer()
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
-        )
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
-        )
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_accelerometer"))
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(RuntimeError, match="accelerometer"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    lines = "".join(fragments).splitlines(keepends=True)
-    assert lines[-1] == "[hw] accelerometer lis3dh FAILED\n"
 
 
 def test_build_hardware_forwards_configured_accelerometer_address_to_setup() -> None:
@@ -952,23 +912,6 @@ def test_build_hardware_forwards_configured_accelerometer_address_to_setup() -> 
     mocks.accelerometer.assert_called_once_with(ANY, 0x19)
 
 
-def test_build_hardware_logs_accelerometer_address_suffix_when_configured() -> None:
-    config = _neopixel_config_with_accelerometer()
-    config.accelerometer.address = 0x19
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] accelerometer lis3dh address=0x19 ok\n" in "".join(fragments)
-
-
 def test_build_hardware_logs_haptics_ok_line_when_enabled_and_built() -> None:
     config = _neopixel_config_with_haptics()
     board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
@@ -985,23 +928,6 @@ def test_build_hardware_logs_haptics_ok_line_when_enabled_and_built() -> None:
     assert "[hw] haptics drv2605 ok\n" in "".join(fragments)
 
 
-def test_build_hardware_logs_haptics_disabled_line_when_section_disabled() -> None:
-    config = _neopixel_config_with_haptics()
-    config.haptics.enabled = False
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] haptics drv2605 disabled\n" in "".join(fragments)
-
-
 def test_build_hardware_logs_no_haptics_line_when_section_absent() -> None:
     config = _minimal_config()
     board_mock = _mock_board(D9=MagicMock())
@@ -1015,33 +941,6 @@ def test_build_hardware_logs_no_haptics_line_when_section_absent() -> None:
         build_hardware(config, board_module=board_mock, logger=logger)
 
     assert "haptics" not in "".join(fragments)
-
-
-def test_build_hardware_haptics_no_i2c_bus_marks_its_own_line_failed_and_propagates() -> None:
-    """A declared-and-enabled haptics section with no I2C bus available raises
-    via _require_i2c -- the failure must close the haptics line itself, not
-    whichever line closed just before it."""
-    config = _neopixel_config_with_haptics()
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
-        )
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
-        )
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_drv2605"))
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(RuntimeError, match="haptics"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    lines = "".join(fragments).splitlines(keepends=True)
-    assert lines[-1] == "[hw] haptics drv2605 FAILED\n"
 
 
 def test_build_hardware_forwards_configured_haptics_address_to_setup() -> None:
@@ -1060,25 +959,11 @@ def test_build_hardware_forwards_configured_haptics_address_to_setup() -> None:
     mocks.drv2605.assert_called_once_with(ANY, 0x5B)
 
 
-def test_build_hardware_logs_haptics_address_suffix_when_configured() -> None:
-    config = _neopixel_config_with_haptics()
-    config.haptics.address = 0x5B
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] haptics drv2605 address=0x5B ok\n" in "".join(fragments)
-
-
 # ---------------------------------------------------------------------------
-# build_hardware — audio narration: inline scalar detail, config-gated (#761)
+# build_hardware — audio narration: inline scalar detail, config-gated (#761).
+# One representative "ok" line plus the absent-section case; "disabled" and
+# unknown-i2s-pin FAILED attribution are covered by the two comprehensive
+# narration tests and the primitive's own tests, not repeated here (#852).
 # ---------------------------------------------------------------------------
 
 
@@ -1116,23 +1001,6 @@ def test_build_hardware_audio_config_narrates_voices_max_volume_and_i2s_pins() -
     ) in "".join(fragments)
 
 
-def test_build_hardware_logs_audio_disabled_line_when_section_disabled() -> None:
-    config = _neopixel_config_with_audio()
-    config.audio.enabled = False
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] audio disabled\n" in "".join(fragments)
-
-
 def test_build_hardware_absent_audio_section_produces_no_audio_line() -> None:
     config = _minimal_config()
     board_mock = _mock_board(D9=MagicMock())
@@ -1146,31 +1014,3 @@ def test_build_hardware_absent_audio_section_produces_no_audio_line() -> None:
         build_hardware(config, board_module=board_mock, logger=logger)
 
     assert "audio" not in "".join(fragments)
-
-
-def test_build_hardware_unknown_i2s_pin_marks_audio_line_failed_not_neighboring_line() -> None:
-    """The begin-before-pin-resolution ordering means an unknown I2S pin name
-    attributes FAILED to the audio line itself, not the buttons line that
-    closed just before it (mirrors #758's buttons case and #759's pixels
-    case)."""
-    config = _neopixel_config_with_audio(i2s_bit_clock="NOPE")
-    board_mock = MagicMock(spec=["D5", "D9"])
-    board_mock.D5 = MagicMock()
-    board_mock.D9 = MagicMock()
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(ValueError, match="NOPE"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    lines = "".join(fragments).splitlines(keepends=True)
-    assert lines[-2] == "[hw] buttons A=D9 ok\n"
-    assert lines[-1] == (
-        "[hw] audio voices=1 max_volume=0.50 i2s_bit_clock=NOPE "
-        "i2s_word_select=I2S_WORD_SELECT i2s_data=I2S_DATA FAILED\n"
-    )
