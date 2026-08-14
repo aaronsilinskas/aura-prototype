@@ -16,10 +16,9 @@ import sys
 
 from effects.performance import PerformanceTracker
 from hardware.shared.device_config import (
-    AccelerometerConfig,
     AudioConfig,
     DeviceConfig,
-    HapticsConfig,
+    I2CDeviceConfig,
     IRConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
@@ -103,7 +102,7 @@ def runtime_id() -> str:
 
 
 def _section_active(
-    section: AudioConfig | IRConfig | HapticsConfig | AccelerometerConfig | None,
+    section: AudioConfig | IRConfig | I2CDeviceConfig | None,
 ) -> bool:
     """Return whether an optional config section was actually built.
 
@@ -171,7 +170,7 @@ def _ir_harness_part(ir: IRConfig | None) -> str:
     return f"ir(rx{len(ir.rx)})"
 
 
-def _haptic_harness_part(haptics: HapticsConfig | None) -> str:
+def _haptic_harness_part(haptics: I2CDeviceConfig | None) -> str:
     """Return the ``haptic`` part of a harness label for ``config.haptics``.
 
     ``device_builder`` (#691) builds the DRV2605 haptics driver only when
@@ -182,7 +181,7 @@ def _haptic_harness_part(haptics: HapticsConfig | None) -> str:
     return "haptic" if _section_active(haptics) else "no-haptic"
 
 
-def _accel_harness_part(accelerometer: AccelerometerConfig | None) -> str:
+def _accel_harness_part(accelerometer: I2CDeviceConfig | None) -> str:
     """Return the ``accel`` part of a harness label for ``config.accelerometer``.
 
     Mirrors ``_haptic_harness_part``: ``device_builder`` (#691) builds the
