@@ -1,10 +1,12 @@
 """Tests for device_builder.build_hardware — the core, cross-subsystem tests
 that don't belong to any one subsystem cluster: output ordering across
-multiple components, and that ``transmit_pump``/``network_controls`` are the
-same HardwareNetworkControls instance (#608). Per-subsystem coverage (pixels,
-buses/power, audio/haptics, radio/ir, buttons/logging) lives in the sibling
-test_device_builder_*.py files split out under #767; shared config/patch
-helpers come from _hw_patch_mocks.py.
+multiple components, that ``transmit_pump``/``network_controls`` are the
+same HardwareNetworkControls instance (#608), and the
+``_construct_with_optional_address`` helper shared by the accelerometer,
+magnetometer, and haptics ``_setup_*`` functions (#843). Per-subsystem
+coverage (pixels, buses/power, audio/haptics, radio/ir, buttons/logging)
+lives in the sibling test_device_builder_*.py files split out under #767;
+shared config/patch helpers come from _hw_patch_mocks.py.
 """
 
 from __future__ import annotations
@@ -21,6 +23,40 @@ from hardware.circuitpython.tests._hw_patch_mocks import (
 from hardware.shared.device_config import (
     parse_device_config,
 )
+
+# ---------------------------------------------------------------------------
+# _construct_with_optional_address — the shared address branch every bare I2C
+# device constructor (accelerometer, magnetometer, haptics) forwards through
+# (#843)
+# ---------------------------------------------------------------------------
+
+
+def test_construct_with_optional_address_omits_address_kwarg_when_none() -> None:
+    """A None address means no override -- the driver's own default applies,
+    so the construction call must not pass address= at all rather than
+    passing address=None."""
+    from hardware.circuitpython.device_builder import _construct_with_optional_address
+
+    ctor = MagicMock()
+    fake_i2c = MagicMock(name="i2c")
+
+    result = _construct_with_optional_address(ctor, fake_i2c, None)
+
+    ctor.assert_called_once_with(fake_i2c)
+    assert result is ctor.return_value
+
+
+def test_construct_with_optional_address_forwards_configured_address() -> None:
+    from hardware.circuitpython.device_builder import _construct_with_optional_address
+
+    ctor = MagicMock()
+    fake_i2c = MagicMock(name="i2c")
+
+    result = _construct_with_optional_address(ctor, fake_i2c, 0x19)
+
+    ctor.assert_called_once_with(fake_i2c, address=0x19)
+    assert result is ctor.return_value
+
 
 # ---------------------------------------------------------------------------
 # Helpers
