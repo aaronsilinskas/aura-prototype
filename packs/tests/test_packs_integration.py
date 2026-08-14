@@ -203,6 +203,7 @@ def test_tag_scene_every_audio_playing_effects_clip_name_resolves() -> None:
     audio_registry = AudioRegistry()
     audio_registry.scan_pack_sounds("basic", _packs_path("effects", "basic", "sounds"))
     audio_registry.set_scene_sounds(scene.local_sound_map)
+    audio_registry.set_allowed_packs(frozenset(name for name, _ in scene.effect_packs))
 
     resolved_clip_names = []
     for effect_name in local_effects.items():
@@ -234,6 +235,7 @@ def test_red_light_green_light_scene_every_audio_playing_effects_clip_name_resol
     audio_registry = AudioRegistry()
     audio_registry.scan_pack_sounds("basic", _packs_path("effects", "basic", "sounds"))
     audio_registry.set_scene_sounds(scene.local_sound_map)
+    audio_registry.set_allowed_packs(frozenset(name for name, _ in scene.effect_packs))
 
     resolved_clip_names = []
     for effect_name in local_effects.items():

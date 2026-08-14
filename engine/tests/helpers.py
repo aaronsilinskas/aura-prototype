@@ -86,12 +86,17 @@ class SpyEffectAdmin(EffectAdmin):
 class SpyAudioOverlayAdmin(AudioOverlayAdmin):
     """Test recorder for the scene-transition ``AudioOverlayAdmin`` face.
 
-    Records every ``set_scene_sounds`` push so ``SceneManager`` transition
-    tests can assert on it without wiring a real ``AudioRegistry``.
+    Records every ``set_scene_sounds``/``set_allowed_packs`` push so
+    ``SceneManager`` transition tests can assert on them without wiring a
+    real ``AudioRegistry``.
     """
 
     def __init__(self) -> None:
         self.scene_sounds_history: list[dict[str, str] | None] = []
+        self.allowed_packs_history: list[frozenset[str] | None] = []
 
     def set_scene_sounds(self, sounds: dict[str, str] | None) -> None:
         self.scene_sounds_history.append(sounds)
+
+    def set_allowed_packs(self, names: frozenset[str] | None) -> None:
+        self.allowed_packs_history.append(names)

@@ -429,7 +429,11 @@ class SceneManager(SceneControls):
     *audio_overlay_admin* is the analogous scene-transition seam for sounds —
     typically the same ``AudioRegistry`` instance ``AudioEffectOutput`` resolves
     clips through. Every scene transition installs the active scene's sound
-    overlay through it, right beside the *effect_admin* local-effects push.
+    overlay through it, right beside the *effect_admin* local-effects push, and
+    the *same* allowed-pack ``frozenset`` derived for *effect_admin* is pushed
+    to it too via ``set_allowed_packs`` — one derivation feeding both seams —
+    so ``pack.<clip>`` resolution tracks the top-of-stack scene in lockstep
+    with ``pack.<effect>`` resolution.
     """
 
     __slots__ = (
@@ -554,6 +558,7 @@ class SceneManager(SceneControls):
         allowed_packs = frozenset(pack_name for pack_name, _ in entry.scene.effect_packs)
         self._effect_admin.set_allowed_packs(allowed_packs)
         self._audio_overlay_admin.set_scene_sounds(entry.scene.local_sound_map or None)
+        self._audio_overlay_admin.set_allowed_packs(allowed_packs)
 
     def _do_load(self, scene: Scene) -> None:
         """Replace the entire stack with a single fresh entry for *scene*."""
