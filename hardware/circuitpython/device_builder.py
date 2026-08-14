@@ -390,6 +390,24 @@ def _setup_accelerometer(i2c: busio.I2C) -> object:
 
 _MAGNETOMETER_DATA_RATE_HZ: Final = 100
 
+# A dead or mis-wired MMC5603 that still ACKs its I2C address -- parasitically,
+# through the shared bus pull-ups -- leaves its output registers reading raw 0 on
+# every axis. The adafruit driver maps that raw 0 to a fixed negative full-scale
+# value on all three axes at once, a reading no real field can produce (Earth's
+# field is always present), so it is a reliable "chip present on the bus but not actually
+# converting" sentinel. We must probe for it explicitly because the vendor chip-ID
+# guard accepts a 0x00 product ID, so ``MMC5603(i2c)`` construction itself never
+# raises in this state. Compared with a tolerance, not ``==``: on-device
+# CircuitPython computes the reading in single-precision float, which the
+# double-precision module constant below would never equal exactly.
+_MAGNETOMETER_DEAD_AXIS_UT: Final = (0 - (1 << 19)) * 0.00625
+_MAGNETOMETER_DEAD_TOLERANCE_UT: Final = 0.1
+# Up to ~100 ms (several conversion periods at _MAGNETOMETER_DATA_RATE_HZ) before
+# giving up: a healthy chip clears the raw-0 state within the first sample; a dead
+# one never does, so the margin costs nothing on working hardware.
+_MAGNETOMETER_PROBE_ATTEMPTS: Final = 20
+_MAGNETOMETER_PROBE_INTERVAL_S: Final = 0.005
+
 
 def _setup_magnetometer(i2c: busio.I2C) -> object:
     """Return a configured MMC5603 magnetometer on *i2c*, in continuous mode.
@@ -412,8 +430,14 @@ def _setup_magnetometer(i2c: busio.I2C) -> object:
     conversions in the background, so ``.magnetic`` reads the latest sample
     without blocking.
 
+    Finally, poll ``.magnetic`` until it returns a real reading rather than the
+    all-zero :data:`_MAGNETOMETER_DEAD_AXIS_UT` sentinel.
+
     Raises:
         ImportError: If ``adafruit_mmc56x3`` is not installed.
+        RuntimeError: If the chip reads the all-zero sentinel on every axis
+            for the whole probe window -- present on the bus but not
+            converting (typically a power/ground wiring fault).
         Exception: Whatever ``adafruit_mmc56x3.MMC5603`` raises if the
             sensor cannot be reached on *i2c*.
     """
@@ -422,7 +446,19 @@ def _setup_magnetometer(i2c: busio.I2C) -> object:
     magnetometer = adafruit_mmc56x3.MMC5603(i2c)
     magnetometer.data_rate = _MAGNETOMETER_DATA_RATE_HZ
     magnetometer.continuous_mode = True
-    return magnetometer
+
+    for _ in range(_MAGNETOMETER_PROBE_ATTEMPTS):
+        if not all(
+            abs(axis - _MAGNETOMETER_DEAD_AXIS_UT) < _MAGNETOMETER_DEAD_TOLERANCE_UT
+            for axis in magnetometer.magnetic
+        ):
+            return magnetometer
+        time.sleep(_MAGNETOMETER_PROBE_INTERVAL_S)
+
+    raise RuntimeError(
+        "MMC5603 magnetometer ACKs the I2C bus but reads all-zero on every "
+        + "axis -- check its power and ground wiring"
+    )
 
 
 def _setup_drv2605(i2c: busio.I2C) -> object:
