@@ -5,9 +5,15 @@ high_current_rail is no longer unconditional -- it is config-gated like every
 other section (#798) -- so its narration lives with the rest of its coverage
 in test_device_builder_buses_power.py. Other subsystems' narration tests live in
 their own split files (pixels, buses_power, audio_haptics, radio_ir);
-core/cross-subsystem build_hardware integration tests stay in
-test_device_builder.py. Config-shape and logging helpers come from
-_hw_patch_mocks.py (#775).
+core/cross-subsystem build_hardware integration tests, including the two
+comprehensive full-sequence narration tests, stay in test_device_builder.py
+(#852). Config-shape and logging helpers come from _hw_patch_mocks.py (#775).
+
+test_build_hardware_unknown_button_pin_marks_buttons_line_failed_not_prior_line
+below is the one narration "own line FAILED, not a neighbour's" attribution
+test retained across the whole suite (#852) -- every per-subsystem sibling of
+this test was shrunk away in favour of hardware/shared/tests/
+test_build_narration.py's generic begin/build/fail-and-reraise coverage.
 """
 
 from __future__ import annotations
@@ -91,26 +97,18 @@ def test_build_hardware_without_logger_injected_produces_no_output_at_all() -> N
     assert captured.getvalue() == ""
 
 
-def test_build_hardware_logs_each_button_label_and_pin() -> None:
-    config = parse_device_config({"buttons": ["GP2", "GP3"]})
-    board_mock = _mock_board(GP2=MagicMock(), GP3=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] buttons A=GP2 B=GP3 ok\n" in "".join(fragments)
-
-
 def test_build_hardware_unknown_button_pin_marks_buttons_line_failed_not_prior_line() -> None:
     """The begin-before-_resolve_pin reorder (#758) means an unknown button
     pin name attributes its failure to the still-open buttons line, not to
     whichever line closed just before it -- proving the earlier bug (raising
-    before begin() ever opened the line) is fixed."""
+    before begin() ever opened the line) is fixed. This is the one narration
+    attribution test retained across the whole build_hardware narration
+    suite (#852): every other component's "own line FAILED, not a
+    neighbour's" case was shrunk away because the begin/build/fail-and-
+    reraise contract itself is now proven once, generically, by
+    hardware/shared/tests/test_build_narration.py -- this test's remaining
+    job is proving the real wiring resolves pins inside the thunk, not
+    re-proving the primitive's own contract."""
     config = parse_device_config({"buttons": ["NOPE"]})
     board_mock = MagicMock(spec=[])  # no attributes -> AttributeError on resolve
     logger, fragments = _recording_logger()

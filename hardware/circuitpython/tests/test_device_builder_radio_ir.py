@@ -374,7 +374,13 @@ def test_device_hardware_does_not_expose_the_ir_transmit_gate() -> None:
 
 
 # ---------------------------------------------------------------------------
-# build_hardware — radio narration (#762)
+# build_hardware — radio narration (#762). One representative "ok" line plus
+# the absent-section case; "disabled" is covered by the all-disabled
+# comprehensive test (test_device_builder.py, #852). The no-SPI-bus FAILED
+# case is proven generically by the primitive's own tests and the one
+# retained integration attribution test, so only the unknown-cs-pin FAILED
+# test survives here -- its ValueError isn't independently covered anywhere
+# else, unlike the other components' unknown-pin cases.
 # ---------------------------------------------------------------------------
 
 
@@ -400,23 +406,6 @@ def test_build_hardware_logs_radio_ok_line_when_enabled_and_built() -> None:
     assert "[hw] radio frequency=915.0 node=1 cs=D24 reset=D25 ok\n" in "".join(fragments)
 
 
-def test_build_hardware_logs_radio_disabled_line_when_section_disabled() -> None:
-    config = _neopixel_config_with_radio()
-    config.radio.enabled = False
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] radio frequency=915.0 node=1 cs=D24 reset=D25 disabled\n" in "".join(fragments)
-
-
 def test_build_hardware_logs_no_radio_line_when_section_absent() -> None:
     config = _minimal_config()
     board_mock = _mock_board(D9=MagicMock())
@@ -430,71 +419,6 @@ def test_build_hardware_logs_no_radio_line_when_section_absent() -> None:
         build_hardware(config, board_module=board_mock, logger=logger)
 
     assert "radio" not in "".join(fragments)
-
-
-def test_build_hardware_radio_no_spi_bus_marks_its_own_line_failed_and_propagates() -> None:
-    """A declared-and-enabled radio section with no SPI bus available raises via
-    _require_spi -- the failure must close the radio's own open line, leaving
-    the earlier spi line's own outcome (whatever it already logged) untouched
-    (mirrors the accelerometer/haptics no-I2C-bus FAILED tests)."""
-    config = _neopixel_config_with_radio()
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack, patch_radio=False)
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_spi", return_value=None)
-        )
-        mock_setup_radio = stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_radio")
-        )
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(RuntimeError, match="radio"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    mock_setup_radio.assert_not_called()
-    text = "".join(fragments)
-    lines = text.splitlines(keepends=True)
-    assert "[hw] spi sck=SCK mosi=MOSI miso=MISO ok\n" in text
-    assert lines[-1] == "[hw] radio frequency=915.0 node=1 cs=D24 reset=D25 FAILED\n"
-
-
-def test_build_hardware_radio_with_disabled_spi_marks_radio_line_failed() -> None:
-    """When the spi section itself is disabled, its line already reads
-    "disabled" -- an enabled radio section on top of that still raises via
-    _require_spi and closes its own line with FAILED, leaving the earlier spi
-    "disabled" line untouched."""
-    mapping = {
-        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
-        "buttons": ["D9"],
-        "spi": {"sck": "SCK", "mosi": "MOSI", "miso": "MISO", "enabled": False},
-        "radio": {"cs": "D24", "reset": "D25", "frequency": 915.0, "node": 1},
-    }
-    config = parse_device_config(mapping)
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack, patch_radio=False)
-        mock_setup_radio = stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_radio")
-        )
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(RuntimeError, match="radio"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    mock_setup_radio.assert_not_called()
-    text = "".join(fragments)
-    lines = text.splitlines(keepends=True)
-    assert "[hw] spi disabled\n" in text
-    assert lines[-1] == "[hw] radio frequency=915.0 node=1 cs=D24 reset=D25 FAILED\n"
 
 
 def test_build_hardware_unknown_radio_cs_pin_marks_its_own_line_failed() -> None:
@@ -538,7 +462,14 @@ def test_build_hardware_unknown_radio_cs_pin_marks_its_own_line_failed() -> None
 
 
 # ---------------------------------------------------------------------------
-# build_hardware — ir narration (#763)
+# build_hardware — ir narration (#763). One representative "ok" line plus
+# the absent-section case, and the outcome variants the two comprehensive
+# tests (test_device_builder.py, #852) can't reach: writer=pio vs.
+# writer=pulseio, IR multi-receiver wording, and the no-emitters writer-
+# omitted line. "disabled" is covered by the all-disabled comprehensive
+# test; the unknown-rx/emitter-pin FAILED attribution is covered by the
+# primitive's own tests, not repeated here; the underlying ValueError for
+# each stays covered directly by the non-narration unknown-pin tests above.
 # ---------------------------------------------------------------------------
 
 
@@ -621,27 +552,6 @@ def test_build_hardware_logs_ir_multi_receiver_wording_for_two_rx_pins() -> None
     )
 
 
-def test_build_hardware_logs_ir_disabled_line_when_section_disabled() -> None:
-    config = _neopixel_config_with_ir()
-    config.ir.enabled = False
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock(), D11=MagicMock(), D12=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-        mock_setup_ir = stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_ir")
-        )
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    mock_setup_ir.assert_not_called()
-    assert "[hw] ir rx=[D11] emitters=line:D12 disabled\n" in "".join(fragments)
-
-
 def test_build_hardware_logs_no_ir_line_when_section_absent() -> None:
     config = _minimal_config()
     board_mock = _mock_board(D9=MagicMock())
@@ -655,71 +565,6 @@ def test_build_hardware_logs_no_ir_line_when_section_absent() -> None:
         build_hardware(config, board_module=board_mock, logger=logger)
 
     assert "ir" not in "".join(fragments)
-
-
-def test_build_hardware_unknown_ir_rx_pin_marks_its_own_line_failed_not_prior_line() -> None:
-    """The begin-before-pin-resolution ordering means an unknown ir rx pin name
-    attributes FAILED to the ir line itself, leaving the earlier buttons line's
-    own ok outcome untouched (mirrors #758's buttons case and #762's radio
-    case)."""
-    mapping = {
-        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
-        "buttons": ["D9"],
-        "ir": {"rx": "NOPE", "line": "D12"},
-    }
-    config = parse_device_config(mapping)
-    # spec= so an unlisted attribute (NOPE) raises AttributeError, like a real
-    # board module -- a bare MagicMock would fabricate one instead.
-    board_mock = MagicMock(spec=["D5", "D9", "D12"])
-    board_mock.D5 = MagicMock()
-    board_mock.D9 = MagicMock()
-    board_mock.D12 = MagicMock()
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(ValueError, match="NOPE"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    text = "".join(fragments)
-    lines = text.splitlines(keepends=True)
-    assert "[hw] buttons A=D9 ok\n" in text
-    assert lines[-1] == "[hw] ir rx=[NOPE] emitters=line:D12 FAILED\n"
-
-
-def test_build_hardware_unknown_ir_emitter_pin_marks_its_own_line_failed() -> None:
-    """Same begin-before-pin-resolution attribution, for an unknown emitter
-    pin name -- _resolve_pin for ir.line raises after the ir line is already
-    open with the raw rx=... emitters=... detail."""
-    mapping = {
-        "pixels": [{"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}}],
-        "buttons": ["D9"],
-        "ir": {"rx": "D11", "line": "NOPE"},
-    }
-    config = parse_device_config(mapping)
-    # spec= so an unlisted attribute (NOPE) raises AttributeError, like a real
-    # board module -- a bare MagicMock would fabricate one instead.
-    board_mock = MagicMock(spec=["D5", "D9", "D11"])
-    board_mock.D5 = MagicMock()
-    board_mock.D9 = MagicMock()
-    board_mock.D11 = MagicMock()
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(ValueError, match="NOPE"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    lines = "".join(fragments).splitlines(keepends=True)
-    assert lines[-1] == "[hw] ir rx=[D11] emitters=line:NOPE FAILED\n"
 
 
 def test_build_hardware_ir_rx_only_config_omits_writer_from_ok_line() -> None:

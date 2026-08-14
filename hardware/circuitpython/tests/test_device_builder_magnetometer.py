@@ -363,7 +363,12 @@ def test_build_hardware_magnetometer_not_probed_when_undeclared() -> None:
 
 
 # ---------------------------------------------------------------------------
-# build_hardware — magnetometer narration, mirroring accelerometer/haptics
+# build_hardware — magnetometer narration, mirroring accelerometer/haptics.
+# One representative "ok" line plus the absent-section case. The "disabled"
+# line text is covered by the two comprehensive narration tests; the
+# address-suffix formatting now has its own direct _address_suffix unit test
+# in test_device_builder.py; the no-I2C-bus FAILED attribution is covered by
+# the primitive's own tests. None of those are repeated here (#852).
 # ---------------------------------------------------------------------------
 
 
@@ -383,23 +388,6 @@ def test_build_hardware_logs_magnetometer_ok_line_when_enabled_and_built() -> No
     assert "[hw] magnetometer mmc5603 ok\n" in "".join(fragments)
 
 
-def test_build_hardware_logs_magnetometer_disabled_line_when_section_disabled() -> None:
-    config = _neopixel_config_with_magnetometer()
-    config.magnetometer.enabled = False
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] magnetometer mmc5603 disabled\n" in "".join(fragments)
-
-
 def test_build_hardware_logs_no_magnetometer_line_when_section_absent() -> None:
     config = _minimal_config()
     board_mock = _mock_board(D9=MagicMock())
@@ -413,34 +401,6 @@ def test_build_hardware_logs_no_magnetometer_line_when_section_absent() -> None:
         build_hardware(config, board_module=board_mock, logger=logger)
 
     assert "magnetometer" not in "".join(fragments)
-
-
-def test_build_hardware_magnetometer_no_i2c_bus_marks_its_own_line_failed_and_propagates() -> None:
-    """A declared-and-enabled magnetometer with no I2C bus available raises
-    via _require_i2c -- the failure must close the magnetometer's own open
-    line, not whichever line closed just before it (mirrors the
-    accelerometer/haptics FAILED tests for the #758 spine)."""
-    config = _neopixel_config_with_magnetometer()
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_i2c", return_value=None)
-        )
-        stack.enter_context(
-            patch("hardware.circuitpython.device_builder._setup_buttons", return_value=MagicMock())
-        )
-        stack.enter_context(patch("hardware.circuitpython.device_builder._setup_magnetometer"))
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        with pytest.raises(RuntimeError, match="magnetometer"):
-            build_hardware(config, board_module=board_mock, logger=logger)
-
-    lines = "".join(fragments).splitlines(keepends=True)
-    assert lines[-1] == "[hw] magnetometer mmc5603 FAILED\n"
 
 
 def test_build_hardware_forwards_configured_magnetometer_address_to_setup() -> None:
@@ -457,20 +417,3 @@ def test_build_hardware_forwards_configured_magnetometer_address_to_setup() -> N
         build_hardware(config, board_module=board_mock)
 
     mocks.magnetometer.assert_called_once_with(ANY, 0x32)
-
-
-def test_build_hardware_logs_magnetometer_address_suffix_when_configured() -> None:
-    config = _neopixel_config_with_magnetometer()
-    config.magnetometer.address = 0x32
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
-    logger, fragments = _recording_logger()
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        build_hardware(config, board_module=board_mock, logger=logger)
-
-    assert "[hw] magnetometer mmc5603 address=0x32 ok\n" in "".join(fragments)
