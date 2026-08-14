@@ -26,7 +26,7 @@ _Avoid_: raw DRV2605L waveform IDs as values (hardware IDs live in the output); 
 
 ### HapticPattern
 A value object holding an ordered sequence of abstract haptic constants — effect constants (`STRONG_CLICK`, …) and pause constants (`PAUSE_250`, …) — offset from hardware IDs so any unmapped value fails at the output.
-_Avoid_: raw DRV2605L waveform IDs; `HapticConfig` (collides with the device-config `HapticsConfig`, which gates hardware presence — a different axis)
+_Avoid_: raw DRV2605L waveform IDs; `HapticConfig` (collides with the device-config `I2CDeviceConfig` haptics section, which gates hardware presence — a different axis)
 
 ### EffectConfig
 Runtime configuration passed to effect builders at construction: `resolution`, effect-specific `options`, and `listeners`.

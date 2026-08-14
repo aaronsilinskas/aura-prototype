@@ -14,12 +14,10 @@ from engine.network import IR_EMITTERS
 from engine.state import Scope
 
 __all__ = [
-    "AccelerometerConfig",
     "DeviceConfig",
-    "HapticsConfig",
     "HighCurrentRailConfig",
     "I2CConfig",
-    "MagnetometerConfig",
+    "I2CDeviceConfig",
     "MatrixPixelsConfig",
     "NeoPixelPixelsConfig",
     "NeoPixelScopeConfig",
@@ -57,6 +55,12 @@ _RADIO_PIN_FIELDS: Final = ("cs", "reset")
 _SDCARD_ALLOWED_KEYS: Final = ("cs", "mount", "enabled")
 
 _HIGH_CURRENT_RAIL_ALLOWED_KEYS: Final = ("pin", "active_high", "enabled")
+
+# The one source of the I2C-device `DeviceConfig` slot names: `parse_device_config`
+# and `_parse_i2c_device`'s section-specific error messages both key off this
+# list, and a future profiler is expected to key its per-section labels off it
+# too, rather than each hand-listing the set separately.
+_I2C_DEVICE_SECTIONS: Final = ("accelerometer", "magnetometer", "haptics")
 
 # `DeviceConfig.isolate` derives its isolatable set from `DeviceConfig.__slots__`
 # minus these -- i2c/spi are buses (infrastructure for the kept component, not
@@ -233,24 +237,15 @@ class SPIConfig:
         self.enabled: bool = enabled
 
 
-class AccelerometerConfig:
-    """Parsed accelerometer configuration. Presence alone gates the LIS3DH build
-    (see ``device_builder``); ``address`` optionally overrides the driver's
-    default I2C address.
-    """
+class I2CDeviceConfig:
+    """Parsed configuration shared by every bare I2C peripheral (accelerometer,
+    magnetometer, haptics -- the sections named in ``_I2C_DEVICE_SECTIONS``).
 
-    __slots__ = ("address", "enabled")
-
-    def __init__(self, enabled: bool = True, address: int | None = None) -> None:
-        self.enabled: bool = enabled
-        self.address: int | None = address
-
-
-class MagnetometerConfig:
-    """Parsed magnetometer configuration. Mirrors ``AccelerometerConfig`` --
-    ``address`` optionally overrides the driver's default I2C address. Pure
-    parser output only; no hardware is constructed here (that is
-    ``device_builder``'s job, added in a later ticket).
+    Presence alone gates that peripheral's build (see ``device_builder``);
+    ``address`` optionally overrides the driver's default I2C address. The
+    three sections carry identical fields, so one class and one parser
+    (``_parse_i2c_device``) serve all of them; only the error-message prefix
+    differs per section.
     """
 
     __slots__ = ("address", "enabled")
@@ -282,19 +277,6 @@ class RadioConfig:
         self.frequency: float = frequency
         self.node: int = node
         self.enabled: bool = enabled
-
-
-class HapticsConfig:
-    """Parsed haptics configuration. Presence alone gates the DRV2605 build
-    (see ``device_builder``); ``address`` optionally overrides the driver's
-    default I2C address.
-    """
-
-    __slots__ = ("address", "enabled")
-
-    def __init__(self, enabled: bool = True, address: int | None = None) -> None:
-        self.enabled: bool = enabled
-        self.address: int | None = address
 
 
 class SDCardConfig:
@@ -401,26 +383,26 @@ class DeviceConfig:
         ir: IRConfig | None,
         audio: AudioConfig | None,
         i2c: I2CConfig | None,
-        accelerometer: AccelerometerConfig | None,
-        haptics: HapticsConfig | None,
+        accelerometer: I2CDeviceConfig | None,
+        haptics: I2CDeviceConfig | None,
         spi: SPIConfig | None,
         radio: RadioConfig | None,
         sdcard: SDCardConfig | None,
         high_current_rail: HighCurrentRailConfig | None,
-        magnetometer: MagnetometerConfig | None,
+        magnetometer: I2CDeviceConfig | None,
     ) -> None:
         self.pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = pixels
         self.buttons: list[str] = buttons
         self.ir: IRConfig | None = ir
         self.audio: AudioConfig | None = audio
         self.i2c: I2CConfig | None = i2c
-        self.accelerometer: AccelerometerConfig | None = accelerometer
-        self.haptics: HapticsConfig | None = haptics
+        self.accelerometer: I2CDeviceConfig | None = accelerometer
+        self.haptics: I2CDeviceConfig | None = haptics
         self.spi: SPIConfig | None = spi
         self.radio: RadioConfig | None = radio
         self.sdcard: SDCardConfig | None = sdcard
         self.high_current_rail: HighCurrentRailConfig | None = high_current_rail
-        self.magnetometer: MagnetometerConfig | None = magnetometer
+        self.magnetometer: I2CDeviceConfig | None = magnetometer
 
     def isolate(self, keep: str) -> DeviceConfig:
         """Return a derived config with every isolatable component but *keep* disabled.
@@ -844,25 +826,18 @@ def _reject_unknown_keys(raw: dict, section: str, allowed: tuple[str, ...] = ())
         raise ValueError(f"{section}.{key} is not a valid key; {section} has no keys")
 
 
-def _parse_accelerometer(accelerometer_raw: dict) -> AccelerometerConfig:
-    _reject_unknown_keys(accelerometer_raw, "accelerometer", allowed=("address", "enabled"))
-    enabled = _parse_enabled(accelerometer_raw, "accelerometer.enabled")
-    address = _parse_address(accelerometer_raw, "address", "accelerometer.address")
-    return AccelerometerConfig(enabled=enabled, address=address)
+def _parse_i2c_device(raw: dict, section: str) -> I2CDeviceConfig:
+    """Parse one of the ``_I2C_DEVICE_SECTIONS`` sections (accelerometer,
+    magnetometer, haptics) into a shared ``I2CDeviceConfig``.
 
-
-def _parse_magnetometer(magnetometer_raw: dict) -> MagnetometerConfig:
-    _reject_unknown_keys(magnetometer_raw, "magnetometer", allowed=("address", "enabled"))
-    enabled = _parse_enabled(magnetometer_raw, "magnetometer.enabled")
-    address = _parse_address(magnetometer_raw, "address", "magnetometer.address")
-    return MagnetometerConfig(enabled=enabled, address=address)
-
-
-def _parse_haptics(haptics_raw: dict) -> HapticsConfig:
-    _reject_unknown_keys(haptics_raw, "haptics", allowed=("address", "enabled"))
-    enabled = _parse_enabled(haptics_raw, "haptics.enabled")
-    address = _parse_address(haptics_raw, "address", "haptics.address")
-    return HapticsConfig(enabled=enabled, address=address)
+    *section* is only used to key error messages (``<section>.address``,
+    ``<section>.enabled``, unknown-key naming) -- the three sections carry
+    identical fields, so one parser serves all of them.
+    """
+    _reject_unknown_keys(raw, section, allowed=("address", "enabled"))
+    enabled = _parse_enabled(raw, f"{section}.enabled")
+    address = _parse_address(raw, "address", f"{section}.address")
+    return I2CDeviceConfig(enabled=enabled, address=address)
 
 
 def _parse_i2c(i2c_raw: dict) -> I2CConfig:
@@ -1049,17 +1024,16 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     if "sdcard" in mapping:
         sdcard = _parse_sdcard(mapping["sdcard"])
 
-    accelerometer: AccelerometerConfig | None = None
-    if "accelerometer" in mapping:
-        accelerometer = _parse_accelerometer(mapping["accelerometer"])
-
-    magnetometer: MagnetometerConfig | None = None
-    if "magnetometer" in mapping:
-        magnetometer = _parse_magnetometer(mapping["magnetometer"])
-
-    haptics: HapticsConfig | None = None
-    if "haptics" in mapping:
-        haptics = _parse_haptics(mapping["haptics"])
+    # One parse call per `_I2C_DEVICE_SECTIONS` entry -- the same shared list
+    # `_parse_i2c_device` keys its section-specific error messages off, so the
+    # section name is never hand-typed twice.
+    i2c_devices: dict[str, I2CDeviceConfig | None] = dict.fromkeys(_I2C_DEVICE_SECTIONS)
+    for section in _I2C_DEVICE_SECTIONS:
+        if section in mapping:
+            i2c_devices[section] = _parse_i2c_device(mapping[section], section)
+    accelerometer = i2c_devices["accelerometer"]
+    magnetometer = i2c_devices["magnetometer"]
+    haptics = i2c_devices["haptics"]
 
     high_current_rail: HighCurrentRailConfig | None = None
     if "high_current_rail" in mapping:

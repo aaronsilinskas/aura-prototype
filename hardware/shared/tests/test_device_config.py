@@ -7,6 +7,7 @@ import pytest
 
 from hardware.shared.device_config import (
     DeviceConfig,
+    I2CDeviceConfig,
     MatrixPixelsConfig,
     copy_with_enabled,
     first_neopixel_pin,
@@ -725,288 +726,133 @@ def test_parse_ir_non_boolean_enabled_raises_value_error_naming_field(matrix_con
 
 
 # ---------------------------------------------------------------------------
-# Accelerometer validation
+# I2C-device validation (accelerometer, magnetometer, haptics) -- the three
+# sections share one I2CDeviceConfig type and one _parse_i2c_device parser, so
+# each rule below is asserted once, parametrized over every section, rather
+# than spelled out three times.
 # ---------------------------------------------------------------------------
 
+_I2C_DEVICE_SECTIONS = ("accelerometer", "magnetometer", "haptics")
 
-def test_parse_absent_accelerometer_section_yields_none(matrix_config):
+
+@pytest.mark.parametrize("section", _I2C_DEVICE_SECTIONS)
+def test_parse_absent_i2c_device_section_yields_none(matrix_config, section):
     result = parse_device_config(matrix_config)
 
-    assert result.accelerometer is None
+    assert getattr(result, section) is None
 
 
-def test_parse_accelerometer_section_present_yields_non_none(matrix_config):
+@pytest.mark.parametrize("section", _I2C_DEVICE_SECTIONS)
+def test_parse_i2c_device_section_present_yields_non_none(matrix_config, section):
+    matrix_config[section] = {}
+
+    result = parse_device_config(matrix_config)
+
+    assert getattr(result, section) is not None
+
+
+@pytest.mark.parametrize("section", _I2C_DEVICE_SECTIONS)
+def test_parse_i2c_device_unknown_key_raises_value_error_naming_field(matrix_config, section):
+    matrix_config[section] = {"sensitivity": "high"}
+
+    with pytest.raises(ValueError, match=rf"{section}\.sensitivity"):
+        parse_device_config(matrix_config)
+
+
+@pytest.mark.parametrize("section", _I2C_DEVICE_SECTIONS)
+def test_parse_i2c_device_absent_enabled_key_defaults_to_true(matrix_config, section):
+    matrix_config[section] = {}
+
+    result = parse_device_config(matrix_config)
+
+    assert getattr(result, section).enabled is True
+
+
+@pytest.mark.parametrize("section", _I2C_DEVICE_SECTIONS)
+def test_parse_i2c_device_enabled_false_retains_object_not_none(matrix_config, section):
+    matrix_config[section] = {"enabled": False}
+
+    result = parse_device_config(matrix_config)
+
+    parsed = getattr(result, section)
+    assert parsed is not None
+    assert parsed.enabled is False
+
+
+@pytest.mark.parametrize("section", _I2C_DEVICE_SECTIONS)
+def test_parse_i2c_device_non_boolean_enabled_raises_value_error_naming_field(
+    matrix_config, section
+):
+    matrix_config[section] = {"enabled": "yes"}
+
+    with pytest.raises(ValueError, match=rf"{section}\.enabled"):
+        parse_device_config(matrix_config)
+
+
+@pytest.mark.parametrize("section", _I2C_DEVICE_SECTIONS)
+def test_parse_i2c_device_without_address_defaults_to_none(matrix_config, section):
+    matrix_config[section] = {}
+
+    result = parse_device_config(matrix_config)
+
+    assert getattr(result, section).address is None
+
+
+@pytest.mark.parametrize("section", _I2C_DEVICE_SECTIONS)
+def test_parse_i2c_device_integer_address_is_stored_as_int(matrix_config, section):
+    matrix_config[section] = {"address": 0x19}
+
+    result = parse_device_config(matrix_config)
+
+    assert getattr(result, section).address == 0x19
+
+
+@pytest.mark.parametrize("section", _I2C_DEVICE_SECTIONS)
+def test_parse_i2c_device_hex_string_address_is_normalized_to_int(matrix_config, section):
+    matrix_config[section] = {"address": "0x19"}
+
+    result = parse_device_config(matrix_config)
+
+    assert getattr(result, section).address == 0x19
+
+
+@pytest.mark.parametrize("section", _I2C_DEVICE_SECTIONS)
+def test_parse_i2c_device_out_of_range_address_raises_value_error_naming_field(
+    matrix_config, section
+):
+    matrix_config[section] = {"address": 0x78}
+
+    with pytest.raises(ValueError, match=rf"{section}\.address"):
+        parse_device_config(matrix_config)
+
+
+@pytest.mark.parametrize("section", _I2C_DEVICE_SECTIONS)
+def test_parse_i2c_device_boolean_address_raises_value_error_naming_field(matrix_config, section):
+    matrix_config[section] = {"address": True}
+
+    with pytest.raises(ValueError, match=rf"{section}\.address"):
+        parse_device_config(matrix_config)
+
+
+@pytest.mark.parametrize("section", _I2C_DEVICE_SECTIONS)
+def test_parse_i2c_device_bad_string_address_raises_value_error_naming_field(
+    matrix_config, section
+):
+    matrix_config[section] = {"address": "25"}
+
+    with pytest.raises(ValueError, match=rf"{section}\.address"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_i2c_device_sections_all_share_the_same_config_type(matrix_config):
     matrix_config["accelerometer"] = {}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.accelerometer is not None
-
-
-def test_parse_accelerometer_unknown_key_raises_value_error_naming_field(matrix_config):
-    matrix_config["accelerometer"] = {"sensitivity": "high"}
-
-    with pytest.raises(ValueError, match=r"accelerometer\.sensitivity"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_accelerometer_absent_enabled_key_defaults_to_true(matrix_config):
-    matrix_config["accelerometer"] = {}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.accelerometer.enabled is True
-
-
-def test_parse_accelerometer_enabled_false_retains_object_not_none(matrix_config):
-    matrix_config["accelerometer"] = {"enabled": False}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.accelerometer is not None
-    assert result.accelerometer.enabled is False
-
-
-def test_parse_accelerometer_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
-    matrix_config["accelerometer"] = {"enabled": "yes"}
-
-    with pytest.raises(ValueError, match=r"accelerometer\.enabled"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_accelerometer_without_address_defaults_to_none(matrix_config):
-    matrix_config["accelerometer"] = {}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.accelerometer.address is None
-
-
-def test_parse_accelerometer_integer_address_is_stored_as_int(matrix_config):
-    matrix_config["accelerometer"] = {"address": 0x19}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.accelerometer.address == 0x19
-
-
-def test_parse_accelerometer_hex_string_address_is_normalized_to_int(matrix_config):
-    matrix_config["accelerometer"] = {"address": "0x19"}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.accelerometer.address == 0x19
-
-
-def test_parse_accelerometer_out_of_range_address_raises_value_error_naming_field(matrix_config):
-    matrix_config["accelerometer"] = {"address": 0x78}
-
-    with pytest.raises(ValueError, match=r"accelerometer\.address"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_accelerometer_boolean_address_raises_value_error_naming_field(matrix_config):
-    matrix_config["accelerometer"] = {"address": True}
-
-    with pytest.raises(ValueError, match=r"accelerometer\.address"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_accelerometer_bad_string_address_raises_value_error_naming_field(matrix_config):
-    matrix_config["accelerometer"] = {"address": "25"}
-
-    with pytest.raises(ValueError, match=r"accelerometer\.address"):
-        parse_device_config(matrix_config)
-
-
-# ---------------------------------------------------------------------------
-# Magnetometer validation
-# ---------------------------------------------------------------------------
-
-
-def test_parse_absent_magnetometer_section_yields_none(matrix_config):
-    result = parse_device_config(matrix_config)
-
-    assert result.magnetometer is None
-
-
-def test_parse_magnetometer_section_present_yields_non_none(matrix_config):
     matrix_config["magnetometer"] = {}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.magnetometer is not None
-
-
-def test_parse_magnetometer_unknown_key_raises_value_error_naming_field(matrix_config):
-    matrix_config["magnetometer"] = {"sensitivity": "high"}
-
-    with pytest.raises(ValueError, match=r"magnetometer\.sensitivity"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_magnetometer_absent_enabled_key_defaults_to_true(matrix_config):
-    matrix_config["magnetometer"] = {}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.magnetometer.enabled is True
-
-
-def test_parse_magnetometer_enabled_false_retains_object_not_none(matrix_config):
-    matrix_config["magnetometer"] = {"enabled": False}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.magnetometer is not None
-    assert result.magnetometer.enabled is False
-
-
-def test_parse_magnetometer_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
-    matrix_config["magnetometer"] = {"enabled": "yes"}
-
-    with pytest.raises(ValueError, match=r"magnetometer\.enabled"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_magnetometer_without_address_defaults_to_none(matrix_config):
-    matrix_config["magnetometer"] = {}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.magnetometer.address is None
-
-
-def test_parse_magnetometer_integer_address_is_stored_as_int(matrix_config):
-    matrix_config["magnetometer"] = {"address": 0x32}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.magnetometer.address == 0x32
-
-
-def test_parse_magnetometer_hex_string_address_is_normalized_to_int(matrix_config):
-    matrix_config["magnetometer"] = {"address": "0x32"}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.magnetometer.address == 0x32
-
-
-def test_parse_magnetometer_out_of_range_address_raises_value_error_naming_field(matrix_config):
-    matrix_config["magnetometer"] = {"address": 0x07}
-
-    with pytest.raises(ValueError, match=r"magnetometer\.address"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_magnetometer_boolean_address_raises_value_error_naming_field(matrix_config):
-    matrix_config["magnetometer"] = {"address": False}
-
-    with pytest.raises(ValueError, match=r"magnetometer\.address"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_magnetometer_bad_string_address_raises_value_error_naming_field(matrix_config):
-    matrix_config["magnetometer"] = {"address": "magnetometer"}
-
-    with pytest.raises(ValueError, match=r"magnetometer\.address"):
-        parse_device_config(matrix_config)
-
-
-# ---------------------------------------------------------------------------
-# Haptics validation
-# ---------------------------------------------------------------------------
-
-
-def test_parse_absent_haptics_section_yields_none(matrix_config):
-    result = parse_device_config(matrix_config)
-
-    assert result.haptics is None
-
-
-def test_parse_haptics_section_present_yields_non_none(matrix_config):
     matrix_config["haptics"] = {}
 
     result = parse_device_config(matrix_config)
 
-    assert result.haptics is not None
-
-
-def test_parse_haptics_unknown_key_raises_value_error_naming_field(matrix_config):
-    matrix_config["haptics"] = {"intensity": 5}
-
-    with pytest.raises(ValueError, match=r"haptics\.intensity"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_haptics_absent_enabled_key_defaults_to_true(matrix_config):
-    matrix_config["haptics"] = {}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.haptics.enabled is True
-
-
-def test_parse_haptics_enabled_false_retains_object_not_none(matrix_config):
-    matrix_config["haptics"] = {"enabled": False}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.haptics is not None
-    assert result.haptics.enabled is False
-
-
-def test_parse_haptics_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
-    matrix_config["haptics"] = {"enabled": "yes"}
-
-    with pytest.raises(ValueError, match=r"haptics\.enabled"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_haptics_without_address_defaults_to_none(matrix_config):
-    matrix_config["haptics"] = {}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.haptics.address is None
-
-
-def test_parse_haptics_integer_address_is_stored_as_int(matrix_config):
-    matrix_config["haptics"] = {"address": 0x5B}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.haptics.address == 0x5B
-
-
-def test_parse_haptics_hex_string_address_is_normalized_to_int(matrix_config):
-    matrix_config["haptics"] = {"address": "0x5B"}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.haptics.address == 0x5B
-
-
-def test_parse_haptics_out_of_range_address_raises_value_error_naming_field(matrix_config):
-    matrix_config["haptics"] = {"address": 0x78}
-
-    with pytest.raises(ValueError, match=r"haptics\.address"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_haptics_boolean_address_raises_value_error_naming_field(matrix_config):
-    matrix_config["haptics"] = {"address": True}
-
-    with pytest.raises(ValueError, match=r"haptics\.address"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_haptics_bad_string_address_raises_value_error_naming_field(matrix_config):
-    matrix_config["haptics"] = {"address": "49"}
-
-    with pytest.raises(ValueError, match=r"haptics\.address"):
-        parse_device_config(matrix_config)
+    assert isinstance(result.accelerometer, I2CDeviceConfig)
+    assert type(result.accelerometer) is type(result.magnetometer) is type(result.haptics)
 
 
 # ---------------------------------------------------------------------------

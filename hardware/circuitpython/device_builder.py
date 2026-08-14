@@ -403,7 +403,7 @@ def _setup_accelerometer(i2c: busio.I2C, address: int | None = None) -> object:
     normal "not present" case.
 
     *address* is the configured I2C address override
-    (``AccelerometerConfig.address``). ``None`` means no override -- the
+    (``I2CDeviceConfig.address``). ``None`` means no override -- the
     ``address=`` keyword is omitted entirely so the driver's own default
     applies, rather than passing ``address=None``.
 
@@ -453,7 +453,7 @@ def _setup_magnetometer(i2c: busio.I2C, address: int | None = None) -> object:
     normal "not present" case.
 
     *address* is the configured I2C address override
-    (``MagnetometerConfig.address``). ``None`` means no override -- the
+    (``I2CDeviceConfig.address``). ``None`` means no override -- the
     ``address=`` keyword is omitted entirely so the driver's own default
     (``0x30``) applies, rather than passing ``address=None``.
 
@@ -511,7 +511,7 @@ def _setup_drv2605(i2c: busio.I2C, address: int | None = None) -> object:
     driver that can't be built here is a wiring fault, not a normal "not
     present" case.
 
-    *address* is the configured I2C address override (``HapticsConfig.address``).
+    *address* is the configured I2C address override (``I2CDeviceConfig.address``).
     ``None`` means no override -- the ``address=`` keyword is omitted
     entirely so the driver's own default applies, rather than passing
     ``address=None``.

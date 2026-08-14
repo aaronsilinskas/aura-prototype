@@ -148,7 +148,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `MinMaxValue` | `magic/values.py` | Clamped float with dynamic max (via `ValueWithModifiers`) |
 | `ValueWithModifiers` | `magic/values.py` | Base value + temporary multiplier stack |
 | `Duration` | `magic/values.py` | Expiry tracker: `update(elapsed) → bool` |
-| `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; `pixels` is an optional (possibly empty) list of `MatrixPixelsConfig` / `NeoPixelPixelsConfig`; optional `ir` / `audio` / `i2c` (`I2CConfig`) / `accelerometer` (`AccelerometerConfig`) / `magnetometer` (`MagnetometerConfig`) / `haptics` (`HapticsConfig`) sections |
+| `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; `pixels` is an optional (possibly empty) list of `MatrixPixelsConfig` / `NeoPixelPixelsConfig`; optional `ir` / `audio` / `i2c` (`I2CConfig`) / `accelerometer` / `magnetometer` / `haptics` (each a shared `I2CDeviceConfig`) sections |
 | `DeviceHardware` | `hardware/shared/device_hardware.py` | Named bundle `build_hardware` returns (outputs, buttons, network_controls, transmit_pump, …); board-free, importable under CPython |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete `(NetworkControls, TransmitPump)` adapter over wired `InfraredTransmitter`s; constructed by `device_builder` |
 | `InfraredManager` | `hardware/shared/ir_manager.py` | Board-free per-tick IR orchestrator: `update()` pumps transmits then receives, owning the pump-before-receive order; exposes `received` + forwarded `last_signal_strength`/`last_error_margin`/`telemetry_line()` |
