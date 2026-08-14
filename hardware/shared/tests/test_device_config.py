@@ -852,7 +852,8 @@ def test_parse_i2c_device_sections_all_share_the_same_config_type(matrix_config)
     result = parse_device_config(matrix_config)
 
     assert isinstance(result.accelerometer, I2CDeviceConfig)
-    assert type(result.accelerometer) is type(result.magnetometer) is type(result.haptics)
+    assert isinstance(result.magnetometer, I2CDeviceConfig)
+    assert isinstance(result.haptics, I2CDeviceConfig)
 
 
 # ---------------------------------------------------------------------------

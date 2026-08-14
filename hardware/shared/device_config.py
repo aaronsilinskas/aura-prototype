@@ -58,8 +58,7 @@ _HIGH_CURRENT_RAIL_ALLOWED_KEYS: Final = ("pin", "active_high", "enabled")
 
 # The one source of the I2C-device `DeviceConfig` slot names: `parse_device_config`
 # and `_parse_i2c_device`'s section-specific error messages both key off this
-# list, and a future profiler is expected to key its per-section labels off it
-# too, rather than each hand-listing the set separately.
+# list, rather than each hand-listing the set separately.
 _I2C_DEVICE_SECTIONS: Final = ("accelerometer", "magnetometer", "haptics")
 
 # `DeviceConfig.isolate` derives its isolatable set from `DeviceConfig.__slots__`
@@ -1026,14 +1025,13 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
 
     # One parse call per `_I2C_DEVICE_SECTIONS` entry -- the same shared list
     # `_parse_i2c_device` keys its section-specific error messages off, so the
-    # section name is never hand-typed twice.
+    # section name is never hand-typed twice. Keys match `DeviceConfig`'s
+    # `accelerometer`/`magnetometer`/`haptics` kwargs exactly, so the dict
+    # splats straight into the constructor call below.
     i2c_devices: dict[str, I2CDeviceConfig | None] = dict.fromkeys(_I2C_DEVICE_SECTIONS)
     for section in _I2C_DEVICE_SECTIONS:
         if section in mapping:
             i2c_devices[section] = _parse_i2c_device(mapping[section], section)
-    accelerometer = i2c_devices["accelerometer"]
-    magnetometer = i2c_devices["magnetometer"]
-    haptics = i2c_devices["haptics"]
 
     high_current_rail: HighCurrentRailConfig | None = None
     if "high_current_rail" in mapping:
@@ -1045,13 +1043,11 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
         ir=ir,
         audio=audio,
         i2c=i2c,
-        accelerometer=accelerometer,
-        haptics=haptics,
         spi=spi,
         radio=radio,
         sdcard=sdcard,
         high_current_rail=high_current_rail,
-        magnetometer=magnetometer,
+        **i2c_devices,
     )
 
 
