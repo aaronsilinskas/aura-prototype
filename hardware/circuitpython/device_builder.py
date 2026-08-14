@@ -390,6 +390,23 @@ def _describe_buttons(pin_names: list[str]) -> str:
     return " ".join(f"{chr(ord('A') + i)}={name}" for i, name in enumerate(pin_names))
 
 
+def _construct_with_optional_address(
+    ctor: Callable[..., object], i2c: busio.I2C, address: int | None
+) -> object:
+    """Return ``ctor(i2c[, address=address])`` -- the one branch every bare I2C
+    device constructor (accelerometer, magnetometer, haptics) shares.
+
+    *address* is the configured I2C address override
+    (``I2CDeviceConfig.address``). ``None`` means no override -- the
+    ``address=`` keyword is omitted entirely so the driver's own default
+    applies, rather than passing ``address=None``. A configured override is
+    forwarded as-is.
+    """
+    if address is None:
+        return ctor(i2c)
+    return ctor(i2c, address=address)
+
+
 def _setup_accelerometer(i2c: busio.I2C, address: int | None = None) -> object:
     """Return a configured LIS3DH accelerometer on *i2c*.
 
@@ -403,9 +420,8 @@ def _setup_accelerometer(i2c: busio.I2C, address: int | None = None) -> object:
     normal "not present" case.
 
     *address* is the configured I2C address override
-    (``I2CDeviceConfig.address``). ``None`` means no override -- the
-    ``address=`` keyword is omitted entirely so the driver's own default
-    applies, rather than passing ``address=None``.
+    (``I2CDeviceConfig.address``), forwarded via
+    :func:`_construct_with_optional_address`.
 
     Raises:
         ImportError: If ``adafruit_lis3dh`` is not installed.
@@ -414,9 +430,7 @@ def _setup_accelerometer(i2c: busio.I2C, address: int | None = None) -> object:
     """
     import adafruit_lis3dh
 
-    if address is None:
-        return adafruit_lis3dh.LIS3DH_I2C(i2c)
-    return adafruit_lis3dh.LIS3DH_I2C(i2c, address=address)
+    return _construct_with_optional_address(adafruit_lis3dh.LIS3DH_I2C, i2c, address)
 
 
 _MAGNETOMETER_DATA_RATE_HZ: Final = 100
@@ -453,9 +467,8 @@ def _setup_magnetometer(i2c: busio.I2C, address: int | None = None) -> object:
     normal "not present" case.
 
     *address* is the configured I2C address override
-    (``I2CDeviceConfig.address``). ``None`` means no override -- the
-    ``address=`` keyword is omitted entirely so the driver's own default
-    (``0x30``) applies, rather than passing ``address=None``.
+    (``I2CDeviceConfig.address``), forwarded via
+    :func:`_construct_with_optional_address`.
 
     Unlike ``_setup_accelerometer``'s bare defaults, the MMC5603 boots in
     one-shot mode, where each ``.magnetic`` read busy-waits ~5-10ms for a
@@ -479,10 +492,7 @@ def _setup_magnetometer(i2c: busio.I2C, address: int | None = None) -> object:
     """
     import adafruit_mmc56x3
 
-    if address is None:
-        magnetometer = adafruit_mmc56x3.MMC5603(i2c)
-    else:
-        magnetometer = adafruit_mmc56x3.MMC5603(i2c, address=address)
+    magnetometer = _construct_with_optional_address(adafruit_mmc56x3.MMC5603, i2c, address)
     magnetometer.data_rate = _MAGNETOMETER_DATA_RATE_HZ
     magnetometer.continuous_mode = True
 
@@ -511,10 +521,9 @@ def _setup_drv2605(i2c: busio.I2C, address: int | None = None) -> object:
     driver that can't be built here is a wiring fault, not a normal "not
     present" case.
 
-    *address* is the configured I2C address override (``I2CDeviceConfig.address``).
-    ``None`` means no override -- the ``address=`` keyword is omitted
-    entirely so the driver's own default applies, rather than passing
-    ``address=None``.
+    *address* is the configured I2C address override
+    (``I2CDeviceConfig.address``), forwarded via
+    :func:`_construct_with_optional_address`.
 
     Raises:
         ImportError: If ``adafruit_drv2605`` is not installed.
@@ -523,9 +532,7 @@ def _setup_drv2605(i2c: busio.I2C, address: int | None = None) -> object:
     """
     import adafruit_drv2605
 
-    if address is None:
-        return adafruit_drv2605.DRV2605(i2c)
-    return adafruit_drv2605.DRV2605(i2c, address=address)
+    return _construct_with_optional_address(adafruit_drv2605.DRV2605, i2c, address)
 
 
 def _require_i2c(i2c: busio.I2C | None, section: str) -> busio.I2C:
