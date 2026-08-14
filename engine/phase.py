@@ -2,7 +2,7 @@
 
 Almost every scene is a state machine: Tag has Ready → Starting → Playing →
 Game Over, Red Light Green Light cycles through eight phases, hardware_test
-cycles through five modes.  Before this module each scene reinvented the same
+cycles through six modes.  Before this module each scene reinvented the same
 four-step boilerplate by hand (do nothing if not my phase, initialise once,
 do the per-tick logic, clean up and change state).
 

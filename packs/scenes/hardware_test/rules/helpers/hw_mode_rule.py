@@ -1,10 +1,10 @@
-"""Scene-local ``PhaseRule`` base shared by the five hardware_test mode rules.
+"""Scene-local ``PhaseRule`` base shared by the six hardware_test mode rules.
 
-Each hardware_test mode (RGB, Accelerometer, IR, Radio, SFX) is a
-:class:`HwModeRule` subclass: a :class:`~engine.phase.PhaseRule` bound to the
-scene's shared :func:`hw_phase` machine. Because the override-``on()`` model
-in :mod:`engine.phase` dispatches one handler per event type, this base
-registers the single ``Sensors`` handler for all five modes and
+Each hardware_test mode (RGB, Accelerometer, Magnetometer, IR, Radio, SFX) is
+a :class:`HwModeRule` subclass: a :class:`~engine.phase.PhaseRule` bound to
+the scene's shared :func:`hw_phase` machine. Because the override-``on()``
+model in :mod:`engine.phase` dispatches one handler per event type, this base
+registers the single ``Sensors`` handler for all six modes and
 uses a template method: :meth:`_handle` calls :meth:`on_input_event` (each
 mode overrides) with the whole event for per-mode logic, then performs the
 behaviour every mode shares — Button B advances to the next mode in
