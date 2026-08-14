@@ -466,10 +466,10 @@ def test_build_hardware_unknown_radio_cs_pin_marks_its_own_line_failed() -> None
 # the absent-section case, and the outcome variants the two comprehensive
 # tests (test_device_builder.py, #852) can't reach: writer=pio vs.
 # writer=pulseio, IR multi-receiver wording, and the no-emitters writer-
-# omitted line. "disabled" and the unknown-rx/emitter-pin FAILED attribution
-# are covered by the all-disabled comprehensive test and the primitive's own
-# tests, not repeated here; the underlying ValueError for each stays covered
-# directly by the non-narration unknown-pin tests above.
+# omitted line. "disabled" is covered by the all-disabled comprehensive
+# test; the unknown-rx/emitter-pin FAILED attribution is covered by the
+# primitive's own tests, not repeated here; the underlying ValueError for
+# each stays covered directly by the non-narration unknown-pin tests above.
 # ---------------------------------------------------------------------------
 
 

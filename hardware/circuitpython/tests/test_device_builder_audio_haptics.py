@@ -858,10 +858,11 @@ def test_build_hardware_neither_accelerometer_nor_haptics_probed_when_undeclared
 # ---------------------------------------------------------------------------
 # build_hardware — accelerometer and haptics narration (#760): one
 # representative "ok" line plus the absent-section case per component. The
-# "disabled" line text, the address-suffix formatting (now its own direct
-# _address_suffix unit test in test_device_builder.py), and the no-I2C-bus
-# FAILED attribution are covered by the two comprehensive narration tests
-# and the primitive's own tests, not repeated here (#852).
+# "disabled" line text is covered by the two comprehensive narration tests;
+# the address-suffix formatting now has its own direct _address_suffix unit
+# test in test_device_builder.py; the no-I2C-bus FAILED attribution is
+# covered by the primitive's own tests. None of those are repeated here
+# (#852).
 # ---------------------------------------------------------------------------
 
 
