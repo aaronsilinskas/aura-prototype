@@ -1,7 +1,7 @@
 """Tests for HwModeRule shared behaviour: entry effects, Button B advance,
 mode cycling, and IR/radio flash expiry.
 
-These tests register all five mode rules together (as the scene loader
+These tests register all six mode rules together (as the scene loader
 would), since Button B advancement and entry effects depend on more than one
 mode's rule seeing the same dispatch.
 """
@@ -19,12 +19,14 @@ from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import FLASH_DURATION
 from packs.scenes.hardware_test.rules.helpers.phases import (
     MODE_ACCELEROMETER,
     MODE_IR,
+    MODE_MAGNETOMETER,
     MODE_RADIO,
     MODE_RGB,
     MODE_SFX,
     hw_phase,
 )
 from packs.scenes.hardware_test.rules.ir_rule import HwTestIrRule
+from packs.scenes.hardware_test.rules.magnetic_rule import HwTestMagneticRule
 from packs.scenes.hardware_test.rules.motion_rule import HwTestMotionRule
 from packs.scenes.hardware_test.rules.radio_rule import HwTestRadioRule
 from packs.scenes.hardware_test.rules.rgb_rule import HwTestRgbRule
@@ -59,11 +61,13 @@ def _make_state(
 ) -> tuple[GameState, GameEngine]:
     engine = GameEngine(spy, timer=timer)
     # Match SceneManager._resolve_rules: scene-local rules are added in
-    # alphabetical order by module name (ir, motion, radio, rgb, sfx). Several
-    # tests below depend on this order to reproduce the same dispatch sequence
-    # rules see in production within a single PhaseMachine.enter() tick.
+    # alphabetical order by module name (ir, magnetic, motion, radio, rgb,
+    # sfx). Several tests below depend on this order to reproduce the same
+    # dispatch sequence rules see in production within a single
+    # PhaseMachine.enter() tick.
     engine.add_rules(
         HwTestIrRule(),
+        HwTestMagneticRule(),
         HwTestMotionRule(),
         HwTestRadioRule(),
         HwTestRgbRule(),
@@ -132,14 +136,32 @@ def test_button_b_advances_mode_from_rgb_to_accelerometer(spy):
     assert hw_phase(state).phase is MODE_ACCELEROMETER
 
 
-def test_button_b_cycles_mode_through_all_five_and_back_to_rgb(spy):
+def test_button_b_cycles_mode_through_all_six_and_back_to_rgb(spy):
     state, engine = _make_state(spy)
     _tick(state, engine)
 
-    expected_order = [MODE_ACCELEROMETER, MODE_IR, MODE_RADIO, MODE_SFX, MODE_RGB]
+    expected_order = [
+        MODE_ACCELEROMETER,
+        MODE_MAGNETOMETER,
+        MODE_IR,
+        MODE_RADIO,
+        MODE_SFX,
+        MODE_RGB,
+    ]
     for expected_mode in expected_order:
         _press_button(state, engine, "B")
         assert hw_phase(state).phase is expected_mode
+
+
+def test_button_b_logs_changing_to_magnetometer_from_accelerometer(spy, capsys):
+    state, engine = _make_state(spy)
+    _tick(state, engine)
+    _press_button(state, engine, "B")  # RGB -> Accelerometer
+    capsys.readouterr()  # discard prior output
+
+    _press_button(state, engine, "B")  # Accelerometer -> Magnetometer
+
+    assert "changing to mode 2" in capsys.readouterr().out
 
 
 def test_button_b_stops_all_effects_before_starting_new_mode(spy):
@@ -180,6 +202,33 @@ def test_advancing_to_new_mode_fires_its_entry_effect_by_the_next_tick(spy):
     assert hw_phase(state).phase is MODE_ACCELEROMETER
 
     # Accelerometer entry effect: three basic.progress bars.
+    names = [c[1] for c in spy.set_effect_calls]
+    assert names.count("basic.progress") == 0
+
+    spy.set_effect_calls.clear()
+    _tick(state, engine)
+
+    names = [c[1] for c in spy.set_effect_calls]
+    assert names.count("basic.progress") == 3
+
+
+def test_advancing_to_magnetometer_fires_its_entry_effect_by_the_next_tick(spy):
+    # Same structural case as the Accelerometer entry test above, but for the
+    # Accelerometer -> Magnetometer advance: magnetic_rule is dispatched
+    # before motion_rule (alphabetical registration order), so while
+    # motion_rule is still the active mode, magnetic_rule's own phase check
+    # fails before it ever sees the AdvancedTo marker set during that same
+    # dispatch. The entry effect still fires exactly once, on the next tick.
+    state, engine = _make_state(spy)
+    _tick(state, engine)  # RGB on_enter
+    _press_button(state, engine, "B")  # RGB -> Accelerometer
+    _tick(state, engine)  # Accelerometer on_enter (fires belatedly, see above)
+    spy.set_effect_calls.clear()
+
+    _press_button(state, engine, "B")  # Accelerometer -> Magnetometer
+    assert hw_phase(state).phase is MODE_MAGNETOMETER
+
+    # Magnetometer entry effect has not fired within this same dispatch.
     names = [c[1] for c in spy.set_effect_calls]
     assert names.count("basic.progress") == 0
 

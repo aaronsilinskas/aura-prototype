@@ -1,17 +1,17 @@
 """Phase keys and the typed phase-machine accessor for the ``hardware_test`` scene.
 
-The hardware_test scene cycles through five hardware-test modes — RGB,
-Accelerometer, IR, Radio, SFX — driven by the reusable phase-machine primitive
-in :mod:`engine.phase`. This module owns the scene's named :class:`PhaseKey`
-instances, the single :data:`hw_phase` :class:`~engine.phase.PhaseSlot` --
-see that class's docstring for how every hardware_test rule and this
-module-level reference come to share one :class:`~engine.phase.PhaseMachine`
--- and the explicit :data:`MODE_ORDER` cycle plus :func:`next_in_cycle`
-helper that drives Button-B advancement.
+The hardware_test scene cycles through six hardware-test modes — RGB,
+Accelerometer, Magnetometer, IR, Radio, SFX — driven by the reusable
+phase-machine primitive in :mod:`engine.phase`. This module owns the scene's
+named :class:`PhaseKey` instances, the single :data:`hw_phase`
+:class:`~engine.phase.PhaseSlot` -- see that class's docstring for how every
+hardware_test rule and this module-level reference come to share one
+:class:`~engine.phase.PhaseMachine` -- and the explicit :data:`MODE_ORDER`
+cycle plus :func:`next_in_cycle` helper that drives Button-B advancement.
 
 Because :class:`PhaseKey` compares by identity, these module-level singletons
 are the *only* tokens that match the machine's current phase; a bare string
-literal or integer never will. All five modes share the one machine held by
+literal or integer never will. All six modes share the one machine held by
 :data:`hw_phase`.
 """
 
@@ -30,6 +30,7 @@ from engine.phase import PhaseKey, PhaseSlot
 
 MODE_RGB: Final = PhaseKey("rgb")
 MODE_ACCELEROMETER: Final = PhaseKey("accelerometer")
+MODE_MAGNETOMETER: Final = PhaseKey("magnetometer")
 MODE_IR: Final = PhaseKey("ir")
 MODE_RADIO: Final = PhaseKey("radio")
 MODE_SFX: Final = PhaseKey("sfx")
@@ -37,7 +38,14 @@ MODE_SFX: Final = PhaseKey("sfx")
 # Explicit cycle order for Button-B advancement. Because PhaseKey is opaque
 # (identity-only, no arithmetic), the cycle is this ordered tuple plus
 # next_in_cycle, rather than `(mode + 1) % NUM_MODES`.
-MODE_ORDER: Final = (MODE_RGB, MODE_ACCELEROMETER, MODE_IR, MODE_RADIO, MODE_SFX)
+MODE_ORDER: Final = (
+    MODE_RGB,
+    MODE_ACCELEROMETER,
+    MODE_MAGNETOMETER,
+    MODE_IR,
+    MODE_RADIO,
+    MODE_SFX,
+)
 
 hw_phase: PhaseSlot = PhaseSlot("hw_phase", MODE_RGB)
 

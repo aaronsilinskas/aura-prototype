@@ -10,6 +10,7 @@ from packs.scenes.hardware_test.rules.helpers.flash import Flash
 from packs.scenes.hardware_test.rules.helpers.phases import (
     MODE_ACCELEROMETER,
     MODE_IR,
+    MODE_MAGNETOMETER,
     MODE_ORDER,
     MODE_RADIO,
     MODE_RGB,
@@ -28,16 +29,17 @@ def state() -> GameState:
 # ---------------------------------------------------------------------------
 
 
-def test_next_in_cycle_advances_through_all_five_modes_and_wraps():
+def test_next_in_cycle_advances_through_all_six_modes_and_wraps():
     sequence = [MODE_RGB]
     current = MODE_RGB
-    for _ in range(5):
+    for _ in range(6):
         current = next_in_cycle(MODE_ORDER, current)
         sequence.append(current)
 
     assert sequence == [
         MODE_RGB,
         MODE_ACCELEROMETER,
+        MODE_MAGNETOMETER,
         MODE_IR,
         MODE_RADIO,
         MODE_SFX,
