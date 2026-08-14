@@ -117,27 +117,27 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `AddSamplesRenderer` | `effects/layers/add_samples_renderer.py` | Composites layers by summing float samples then sampling a palette |
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
 | `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
-| `EffectControls` | `engine/state.py` | Rule-facing abstract interface: `set_effect`, `add_effect`, `stop_effect`, `set_merge_strategy` |
-| `EffectAdmin` | `engine/state.py` | Scene-transition-facing abstract interface, reserved for `SceneManager`: `reset_merge_strategies`, `capture_merge_strategies`, `apply_merge_strategies`, `set_local_effects`, `set_allowed_packs` |
-| `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin` — two faces of one instance, mirroring `NetworkControls`/`TransmitPump`; routes effects to outputs by scope |
-| `EffectOutput` | `engine/effects/output.py` | Abstract hardware output: `create_buffer`, `update_pixels`, `handle_event` |
+| `EffectControls` | `engine/state.py` | Rule-facing effect seam |
+| `EffectAdmin` | `engine/state.py` | Scene-transition effect seam, reserved for `SceneManager` |
+| `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin`; routes effects to outputs by scope |
+| `EffectOutput` | `engine/effects/output.py` | Abstract hardware output port |
 | `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → Effect`; one per effect pack |
-| `EffectReceipt` | `engine/state.py` | Identity + `stop()` handle for a running effect instance; also carries validating `brightness`/`loudness` runtime controls in `[0.0, 1.0]` |
-| `ScopeValue` / `Scope` | `engine/state.py` | Routing keys: `PERSONAL`, `DIRECTIONAL`, `AMBIENT`, `Global.MAIN/BUFF/DEBUFF`, and composites `Global.ALL` / `NON_AMBIENT` / `Scope.ALL` |
-| `NetworkControls` | `engine/state.py` | Abstract interface for sending/receiving network messages |
-| `TransmitPump` | `engine/network.py` | Abstract runtime-facing seam declaring `poll_transmits()`; the type the runtime loop reaches through, distinct from the send-only `NetworkControls` |
-| `AudioOverlayAdmin` | `engine/audio.py` | Scene-transition-facing abstract interface, reserved for `SceneManager`: `set_scene_sounds(sounds \| None)`, `set_allowed_packs(names \| None)` |
-| `AudioRegistry` | `engine/audio.py` | Concrete `AudioOverlayAdmin`; resolves a qualified clip name to a WAV path via prefix routing (`scene.` → active scene overlay, `<pack>.` → shared base scanned by `scan_pack_sounds`, gated by the `pack.` membership rule), raising on an unprefixed, undeclared-pack, or unresolved name |
+| `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop()` plus `brightness`/`loudness` controls |
+| `ScopeValue` / `Scope` | `engine/state.py` | Output-agnostic routing keys (see glossary) |
+| `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam |
+| `TransmitPump` | `engine/network.py` | Runtime-facing pump seam, counterpart to `NetworkControls` |
+| `AudioOverlayAdmin` | `engine/audio.py` | Scene-transition sound seam, reserved for `SceneManager` |
+| `AudioRegistry` | `engine/audio.py` | Concrete `AudioOverlayAdmin`; resolves clip names to WAV paths |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update(timer)` tick |
-| `GameState` | `engine/state.py` | Passed to each rule: holds `engine`, `timer`, `effect_controls`, `network_controls` |
+| `GameState` | `engine/state.py` | Per-tick game context passed to each rule |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
-| `SceneManager` | `engine/scene.py` | Activates/deactivates scenes; owns `SceneLocalRegistry` per scene; holds injected `EffectAdmin` and `AudioOverlayAdmin` handles and drives every local-effects/merge-strategy/sound-overlay transition through them |
+| `SceneManager` | `engine/scene.py` | Drives scene transitions through injected `EffectAdmin`/`AudioOverlayAdmin` |
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
-| `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor owning a phase machine's `GameState` key + initial phase; the one object all of a scene's phase rules and its module-level phase reference share |
+| `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor for a phase machine's key + initial phase |
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
-| `EffectResolver` | `engine/effects/manager.py` | Resolves a qualified effect name to a builder; owns the `scene.` prefix rule |
-| `MergeStrategy` | `engine/state.py` | Per-scope policy compositing a scope's layered effect buffers into one region buffer (subclasses `SplitMerge` / `AdditiveMerge` live in `engine/effects/merge.py`) |
+| `EffectResolver` | `engine/effects/manager.py` | Resolves a qualified effect name to a builder |
+| `MergeStrategy` | `engine/state.py` | Per-scope compositing policy; subclasses in `engine/effects/merge.py` |
 | `PackRegistry` | `engine/packs.py` | Loads and looks up named packs (effects, rules, scenes) by entry point |
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
@@ -148,13 +148,13 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `MinMaxValue` | `magic/values.py` | Clamped float with dynamic max (via `ValueWithModifiers`) |
 | `ValueWithModifiers` | `magic/values.py` | Base value + temporary multiplier stack |
 | `Duration` | `magic/values.py` | Expiry tracker: `update(elapsed) → bool` |
-| `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; `pixels` is an optional (possibly empty) list of `MatrixPixelsConfig` / `NeoPixelPixelsConfig`; optional `ir` / `audio` / `i2c` (`I2CConfig`) / `accelerometer` / `magnetometer` / `haptics` (each a shared `I2CDeviceConfig`) sections |
-| `DeviceHardware` | `hardware/shared/device_hardware.py` | Named bundle `build_hardware` returns (outputs, buttons, network_controls, transmit_pump, …); board-free, importable under CPython |
-| `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete `(NetworkControls, TransmitPump)` adapter over wired `InfraredTransmitter`s; constructed by `device_builder` |
-| `InfraredManager` | `hardware/shared/ir_manager.py` | Board-free per-tick IR orchestrator: `update()` pumps transmits then receives, owning the pump-before-receive order; exposes `received` + forwarded `last_signal_strength`/`last_error_margin`/`telemetry_line()` |
-| `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port (`send`/`receive`); the live adapter is `Rfm69RadioTransport` |
-| `RadioManager` | `hardware/shared/radio_manager.py` | Board-free per-tick radio receive orchestrator: `update()` polls the transport and exposes `received` (no transmit pump — the chip is half-duplex) |
-| `SceneRuntime` | `app/scene_composition.py` | `__slots__` bundle (`manager`, `effect_manager`, `timer`, `ir`, `radio`) returned by `build_scene_runtime`; the wiring `run_scene`'s per-tick loop drives |
+| `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; optional `pixels` list plus optional IR/audio/I2C/sensor/haptics sections |
+| `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle `build_hardware` returns (outputs, sensors, seams, IR, radio, storage) |
+| `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete `(NetworkControls, TransmitPump)` adapter; built by `device_builder` |
+| `InfraredManager` | `hardware/shared/ir_manager.py` | Board-free per-tick IR orchestrator (pump then receive); exposes `received` + telemetry |
+| `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
+| `RadioManager` | `hardware/shared/radio_manager.py` | Board-free per-tick radio receive orchestrator; exposes `received` |
+| `SceneRuntime` | `app/scene_composition.py` | `__slots__` bundle from `build_scene_runtime` that `run_scene`'s loop drives |
 
 ---
 
