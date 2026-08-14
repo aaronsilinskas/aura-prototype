@@ -331,6 +331,17 @@ def _describe_neopixel_pixels(pixels_cfg: NeoPixelPixelsConfig) -> str:
     )
 
 
+def _address_suffix(address: int | None) -> str:
+    """Return `` address=0xNN`` for a configured override, or `""` when *address* is `None`.
+
+    Shared by every boot-log description that documents an I2C device's
+    optional address override (the matrix's ``pixels[index]`` entry and the
+    accelerometer/magnetometer/haptics sections), so the ``0xNN`` formatting
+    and the "only when overridden" rule live in one place.
+    """
+    return f" address=0x{address:02X}" if address is not None else ""
+
+
 def _describe_pixel_entry(index: int, pixels_cfg: MatrixPixelsConfig | NeoPixelPixelsConfig) -> str:
     """Return the ``pixels[index]`` narration line for *pixels_cfg*.
 
@@ -350,9 +361,8 @@ def _describe_pixel_entry(index: int, pixels_cfg: MatrixPixelsConfig | NeoPixelP
         detail = (
             f"cols={pixels_cfg.cols} scope_rows=[{_format_ranges(pixels_cfg.scope_rows)}] "
             + f"brightness={pixels_cfg.brightness:.2f}"
+            + _address_suffix(pixels_cfg.address)
         )
-        if pixels_cfg.address is not None:
-            detail += f" address=0x{pixels_cfg.address:02X}"
     else:
         detail = _describe_neopixel_pixels(pixels_cfg)
     return f"pixels[{index}] {kind} {detail}"
@@ -943,14 +953,11 @@ def build_hardware(
 
         accelerometer = None
         if config.accelerometer is not None:
-            acc_cfg = config.accelerometer
-            acc_description = "accelerometer lis3dh"
-            if acc_cfg.address is not None:
-                acc_description += f" address=0x{acc_cfg.address:02X}"
-            logger.begin(acc_description)
-            if acc_cfg.enabled:
+            accelerometer_cfg = config.accelerometer
+            logger.begin("accelerometer lis3dh" + _address_suffix(accelerometer_cfg.address))
+            if accelerometer_cfg.enabled:
                 accelerometer = _setup_accelerometer(
-                    _require_i2c(i2c, "accelerometer"), acc_cfg.address
+                    _require_i2c(i2c, "accelerometer"), accelerometer_cfg.address
                 )
                 logger.end()
             else:
@@ -958,14 +965,11 @@ def build_hardware(
 
         magnetometer = None
         if config.magnetometer is not None:
-            mag_cfg = config.magnetometer
-            mag_description = "magnetometer mmc5603"
-            if mag_cfg.address is not None:
-                mag_description += f" address=0x{mag_cfg.address:02X}"
-            logger.begin(mag_description)
-            if mag_cfg.enabled:
+            magnetometer_cfg = config.magnetometer
+            logger.begin("magnetometer mmc5603" + _address_suffix(magnetometer_cfg.address))
+            if magnetometer_cfg.enabled:
                 magnetometer = _setup_magnetometer(
-                    _require_i2c(i2c, "magnetometer"), mag_cfg.address
+                    _require_i2c(i2c, "magnetometer"), magnetometer_cfg.address
                 )
                 logger.end()
             else:
@@ -988,13 +992,10 @@ def build_hardware(
                 logger.end()
 
         if config.haptics is not None:
-            hap_cfg = config.haptics
-            hap_description = "haptics drv2605"
-            if hap_cfg.address is not None:
-                hap_description += f" address=0x{hap_cfg.address:02X}"
-            logger.begin(hap_description)
-            if hap_cfg.enabled:
-                driver = _setup_drv2605(_require_i2c(i2c, "haptics"), hap_cfg.address)
+            haptics_cfg = config.haptics
+            logger.begin("haptics drv2605" + _address_suffix(haptics_cfg.address))
+            if haptics_cfg.enabled:
+                driver = _setup_drv2605(_require_i2c(i2c, "haptics"), haptics_cfg.address)
                 # Drv2605EffectOutput's own module imports adafruit_drv2605 at load
                 # time, so this import is deferred here — reached only once
                 # _setup_drv2605 has already confirmed the library is importable.
