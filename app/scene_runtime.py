@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import gc
 
-from app.scene_composition import _resolve_known_scene, build_scene_runtime, resolve_ir_codec
+from app.scene_composition import build_scene_runtime, resolve_ir_codec, resolve_known_scene
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
 from engine.network import NetworkEvents
@@ -31,7 +31,7 @@ def run_scene(scene_name: str) -> None:
     """Bring hardware up via ``build_hardware`` and run *scene_name* forever.
 
     Scans a single ``SceneRegistry`` up front and validates *scene_name*
-    against it via ``_resolve_known_scene`` before any hardware is built, so
+    against it via ``resolve_known_scene`` before any hardware is built, so
     an unknown scene name fails once, naming the known scenes, without ever
     touching the board. The same scan then resolves the scene's declared IR
     wire-frame codec via ``resolve_ir_codec`` (Aura by default, Tag when the
@@ -59,7 +59,7 @@ def run_scene(scene_name: str) -> None:
     """
     scene_registry = SceneRegistry()
     scene_registry.scan_dir("packs/scenes", "packs.scenes")
-    _resolve_known_scene(scene_registry, scene_name)
+    resolve_known_scene(scene_registry, scene_name)
 
     ir_encoder, ir_decoder = resolve_ir_codec(scene_registry, scene_name)
 

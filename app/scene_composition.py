@@ -21,7 +21,7 @@ from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_manager import InfraredManager
 from hardware.shared.radio_manager import RadioManager
 
-__all__ = ["SceneRuntime", "build_scene_runtime", "resolve_ir_codec"]
+__all__ = ["SceneRuntime", "build_scene_runtime", "resolve_ir_codec", "resolve_known_scene"]
 
 
 class SceneRuntime:
@@ -66,7 +66,7 @@ def _scan_effect_pack_sounds(audio_registry: AudioRegistry, pack_names: list[str
         audio_registry.scan_pack_sounds(pack_name, sounds_dir)
 
 
-def _resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
+def resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
     """Return *scene_name* if registered, else raise naming the known scenes."""
     names = scene_registry.names()
     if scene_name in names:
@@ -146,7 +146,7 @@ def build_scene_runtime(
         effect_admin=effect_manager,
         audio_overlay_admin=audio_registry,
     )
-    manager.load(_resolve_known_scene(scene_registry, scene_name))
+    manager.load(resolve_known_scene(scene_registry, scene_name))
     manager.update()  # applies the load transition; the scene is now active
 
     ir = InfraredManager(hw.transmit_pump, hw.ir_receiver)
