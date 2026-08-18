@@ -1,13 +1,19 @@
 """Behaviour-driven tests for app/scene_composition.py."""
 
+import json
+import sys
+from pathlib import Path
+
 import pytest
 
 from app.scene_composition import build_scene_runtime, resolve_ir_codec
 from engine.audio import AudioRegistry
+from engine.events import Event, EventGroup
 from engine.network import TransmitPump
 from engine.scene import Scene, SceneRegistry
 from engine.state import Scope
 from hardware.shared.device_hardware import DeviceHardware
+from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 from hardware.shared.ir_manager import InfraredManager
@@ -17,7 +23,7 @@ from hardware.shared.radio_transport import RadioTransport
 
 
 def _fake_hw(
-    transmit_pump=None, ir_receiver=None, radio=None, audio_registry=None
+    transmit_pump=None, ir_receiver=None, radio=None, audio_registry=None, storage=None
 ) -> DeviceHardware:
     """Return a DeviceHardware built entirely from CPython-safe fakes."""
     return DeviceHardware(
@@ -29,7 +35,7 @@ def _fake_hw(
         transmit_pump=transmit_pump if transmit_pump is not None else "fake-transmit-pump",
         ir_receiver=ir_receiver,
         radio=radio,
-        storage=None,
+        storage=storage,
         audio_registry=audio_registry,
     )
 
@@ -342,3 +348,234 @@ def test_build_scene_runtime_resolves_rlgls_shared_game_over_sting_via_the_basic
         hw.audio_registry.path("basic.game_over_sting_start")
         == "packs/effects/basic/sounds/game_over_sting_start.wav"
     )
+
+
+# ---------------------------------------------------------------------------
+# Card scenes: aura_packs/scenes discovery (issue #870)
+# ---------------------------------------------------------------------------
+
+_CARD_TEST_EVENT_GROUP = EventGroup("card_scene_test")
+
+_CARD_RULE_SOURCE = """\
+from engine.engine import GameRule
+from engine.events import Event
+from engine.state import GameState
+
+
+class _CardRule(GameRule):
+    def __init__(self) -> None:
+        self.on(Event, self._handle)
+
+    def _handle(self, event: Event, state: GameState) -> None:
+        state.set("card_rule_ran", True)
+
+
+RULE = _CardRule()
+"""
+
+_CARD_EFFECT_SOURCE = """\
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig
+from engine.effects.manager import EffectBuilder
+
+_AUDIO = EffectAudio(clips={"start": AudioPlaybackConfig(name="scene.card_clip", loop=False)})
+
+
+class _Builder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        return Effect(name=name, pixels=None, audio=_AUDIO)
+
+
+BUILD = _Builder()
+"""
+
+
+def _write_scene_json(path, data: dict) -> None:
+    (path / "scene.json").write_text(json.dumps(data))
+
+
+def _minimal_scene_json(**overrides) -> dict:
+    base = {"version": "1.0", "effect_packs": [], "rule_packs": []}
+    base.update(overrides)
+    return base
+
+
+def _make_card_scene(mount_root: Path, scene_name: str, **json_overrides) -> Path:
+    """Create aura_packs/scenes/<scene_name>/ under *mount_root*.
+
+    Supplies an empty __init__.py at every package level, mirroring the
+    layout the flash packs/ tree already has. Returns the scene directory.
+    """
+    aura_packs = mount_root / "aura_packs"
+    scenes = aura_packs / "scenes"
+    scene_dir = scenes / scene_name
+    scene_dir.mkdir(parents=True, exist_ok=True)
+    (aura_packs / "__init__.py").touch()
+    (scenes / "__init__.py").touch()
+    (scene_dir / "__init__.py").touch()
+    _write_scene_json(scene_dir, _minimal_scene_json(**json_overrides))
+    return scene_dir
+
+
+def _add_card_scene_rule(scene_dir, item_name: str, content: str) -> None:
+    rules_dir = scene_dir / "rules"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "__init__.py").touch()
+    (rules_dir / f"{item_name}.py").write_text(content)
+
+
+def _add_card_scene_effect(scene_dir, item_name: str, content: str) -> None:
+    effects_dir = scene_dir / "effects"
+    effects_dir.mkdir(parents=True, exist_ok=True)
+    (effects_dir / "__init__.py").touch()
+    (effects_dir / f"{item_name}.py").write_text(content)
+
+
+def _add_card_scene_sound(scene_dir, stem: str) -> None:
+    sounds_dir = scene_dir / "sounds"
+    sounds_dir.mkdir(parents=True, exist_ok=True)
+    (sounds_dir / f"{stem}.wav").write_bytes(b"RIFF")  # contents unused; only the path matters
+
+
+@pytest.fixture()
+def card_storage(tmp_path):
+    """Yield a real temp-directory DeviceStorage; clean up sys.path/sys.modules after.
+
+    A real DeviceStorage (not FakeDeviceStorage) is required here, mirroring
+    hardware/shared/tests/test_device_storage.py's precedent, because the
+    behaviour under test is the module import off a real filesystem path
+    build_scene_runtime adds to sys.path.
+    """
+    storage = DeviceStorage(str(tmp_path))
+    known_modules = set(sys.modules)
+
+    yield storage
+
+    for key in list(sys.modules):
+        if key not in known_modules:
+            del sys.modules[key]
+    if storage.mount_root in sys.path:
+        sys.path.remove(storage.mount_root)
+
+
+def test_build_scene_runtime_discovers_and_activates_a_card_scene(card_storage):
+    """A scene that exists only under the card's aura_packs/scenes is selectable
+    at boot -- it loads into the same SceneRegistry flash scenes populate."""
+    _make_card_scene(Path(card_storage.mount_root), "card_scene")
+    hw = _fake_hw(storage=card_storage)
+
+    runtime = build_scene_runtime(hw, "card_scene")
+
+    assert runtime.manager.active_state is not None
+
+
+def test_card_scenes_local_rule_imports_off_the_card_and_handles_events(card_storage):
+    """A card scene's scene-local rule is imported through the aura_packs. prefix
+    against the card and receives events like any other scene-local rule."""
+    scene_dir = _make_card_scene(Path(card_storage.mount_root), "card_scene")
+    _add_card_scene_rule(scene_dir, "card_rule", _CARD_RULE_SOURCE)
+    hw = _fake_hw(storage=card_storage)
+
+    runtime = build_scene_runtime(hw, "card_scene")
+    runtime.manager.active_state.queue_event(Event(_CARD_TEST_EVENT_GROUP, "ping"))
+    runtime.manager.update()
+
+    assert runtime.manager.active_state.get_or_none("card_rule_ran", bool) is True
+
+
+def test_card_scenes_local_effect_imports_off_the_card_and_resolves_at_runtime(card_storage):
+    """A card scene's scene-local effect is imported through the aura_packs. prefix
+    and resolves via the same scene. prefix a flash scene-local effect uses."""
+    scene_dir = _make_card_scene(Path(card_storage.mount_root), "card_scene")
+    _add_card_scene_effect(scene_dir, "card_effect", _CARD_EFFECT_SOURCE)
+    hw = _fake_hw(storage=card_storage)
+
+    runtime = build_scene_runtime(hw, "card_scene")
+    receipt = runtime.effect_manager.set_effect(Scope.PERSONAL, "scene.card_effect", {})
+
+    assert receipt is not None
+
+
+def test_card_scenes_bundled_sound_resolves_to_its_on_card_path(card_storage):
+    """A card scene's sounds/ clip is recorded at its absolute on-card filesystem
+    path -- resolved through the DeviceStorage port, never a re-derived '/sd' --
+    and reaches the same AudioRegistry a flash scene's clip resolves through."""
+    scene_dir = _make_card_scene(Path(card_storage.mount_root), "card_scene")
+    _add_card_scene_sound(scene_dir, "card_clip")
+    hw = _fake_hw(storage=card_storage, audio_registry=AudioRegistry())
+
+    build_scene_runtime(hw, "card_scene")
+
+    expected_path = str(scene_dir / "sounds" / "card_clip.wav")
+    assert hw.audio_registry.path("scene.card_clip") == expected_path
+
+
+def test_repeat_build_scene_runtime_calls_never_duplicate_the_mount_root_in_sys_path(
+    card_storage,
+):
+    """The card's mount root is appended to sys.path once, even across repeated
+    build_scene_runtime calls against the same storage -- the append is guarded,
+    not just performed once per process by accident."""
+    _make_card_scene(Path(card_storage.mount_root), "card_scene")
+    hw = _fake_hw(storage=card_storage)
+
+    build_scene_runtime(hw, "card_scene")
+    build_scene_runtime(hw, "card_scene")
+
+    assert sys.path.count(card_storage.mount_root) == 1
+
+
+def test_device_with_no_storage_leaves_sys_path_unmutated():
+    """No DeviceStorage means no card to scan -- sys.path is untouched and only
+    flash scenes are ever discovered."""
+    path_before = list(sys.path)
+
+    build_scene_runtime(_fake_hw(), "tag")
+
+    assert sys.path == path_before
+
+
+def test_card_with_no_aura_packs_directory_leaves_sys_path_unmutated(card_storage):
+    """Storage is present but the card carries no top-level aura_packs/ -- the
+    sys.path append is gated on that directory's presence, not just on storage
+    being non-None."""
+    path_before = list(sys.path)
+    hw = _fake_hw(storage=card_storage)
+
+    build_scene_runtime(hw, "tag")
+
+    assert sys.path == path_before
+
+
+def test_card_with_no_aura_packs_directory_still_activates_a_flash_scene(card_storage):
+    """Storage is present but the card carries no top-level aura_packs/ -- flash
+    scene selection still works normally despite the (no-op) card scan."""
+    hw = _fake_hw(storage=card_storage)
+
+    runtime = build_scene_runtime(hw, "tag")
+
+    assert runtime.manager.active_state is not None
+
+
+def test_card_with_aura_packs_but_no_scenes_subdirectory_is_a_clean_no_op(card_storage):
+    """aura_packs/ exists (so sys.path is still appended) but has no scenes/
+    subdirectory to scan -- this must not raise, only skip the scan."""
+    aura_packs = Path(card_storage.mount_root) / "aura_packs"
+    aura_packs.mkdir(parents=True)
+    (aura_packs / "__init__.py").touch()
+    hw = _fake_hw(storage=card_storage)
+
+    runtime = build_scene_runtime(hw, "tag")
+
+    assert card_storage.mount_root in sys.path
+    assert runtime.manager.active_state is not None
+
+
+def test_card_scene_name_colliding_with_a_flash_scene_raises_at_scan_time(card_storage):
+    """A card scene sharing a name with a flash scene is the existing cross-root
+    collision SceneRegistry.scan_dir already enforces -- it must halt boot loudly
+    rather than silently picking one source over the other."""
+    _make_card_scene(Path(card_storage.mount_root), "tag")
+    hw = _fake_hw(storage=card_storage)
+
+    with pytest.raises(ValueError, match="tag"):
+        build_scene_runtime(hw, "tag")
