@@ -56,6 +56,23 @@ def test_scene_version_defaults_to_none_when_not_provided() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Scene.ir_codec field
+# ---------------------------------------------------------------------------
+
+
+def test_scene_ir_codec_defaults_to_aura_when_not_provided() -> None:
+    scene = Scene(effect_packs=[], rule_packs=[])
+
+    assert scene.ir_codec == "aura"
+
+
+def test_scene_ir_codec_is_stored_as_the_value_passed_to_constructor() -> None:
+    scene = Scene(effect_packs=[], rule_packs=[], ir_codec="tag")
+
+    assert scene.ir_codec == "tag"
+
+
+# ---------------------------------------------------------------------------
 # SceneRegistry — construction
 # ---------------------------------------------------------------------------
 
@@ -217,6 +234,54 @@ def test_scan_dir_raises_when_rule_packs_field_is_missing(tmp_path) -> None:
         registry.scan_dir(str(tmp_path), "test.scenes")
 
 
+def test_scan_dir_does_not_raise_when_ir_codec_field_is_missing(tmp_path) -> None:
+    _make_scene_dir(tmp_path, "forest")
+    registry = SceneRegistry()
+
+    registry.scan_dir(str(tmp_path), "test.scenes")  # no ir_codec key; must not raise
+
+    assert "forest" in registry.names()
+
+
+def test_scan_dir_raises_when_ir_codec_is_empty_string(tmp_path) -> None:
+    scene_dir = tmp_path / "bad"
+    scene_dir.mkdir()
+    _write_scene_json(
+        scene_dir,
+        _minimal_scene_json(ir_codec=""),
+    )
+    registry = SceneRegistry()
+
+    with pytest.raises(ValueError, match="ir_codec"):
+        registry.scan_dir(str(tmp_path), "test.scenes")
+
+
+def test_scan_dir_raises_when_ir_codec_is_whitespace_only(tmp_path) -> None:
+    scene_dir = tmp_path / "bad"
+    scene_dir.mkdir()
+    _write_scene_json(
+        scene_dir,
+        _minimal_scene_json(ir_codec="   "),
+    )
+    registry = SceneRegistry()
+
+    with pytest.raises(ValueError, match="ir_codec"):
+        registry.scan_dir(str(tmp_path), "test.scenes")
+
+
+def test_scan_dir_raises_when_ir_codec_is_not_a_string(tmp_path) -> None:
+    scene_dir = tmp_path / "bad"
+    scene_dir.mkdir()
+    _write_scene_json(
+        scene_dir,
+        _minimal_scene_json(ir_codec=42),
+    )
+    registry = SceneRegistry()
+
+    with pytest.raises(ValueError, match="ir_codec"):
+        registry.scan_dir(str(tmp_path), "test.scenes")
+
+
 # ---------------------------------------------------------------------------
 # SceneRegistry.get — correct data returned
 # ---------------------------------------------------------------------------
@@ -273,6 +338,26 @@ def test_get_returns_scene_with_none_initial_data_when_not_in_json(tmp_path) -> 
     assert scene.initial_data is None
 
 
+def test_get_returns_scene_with_default_ir_codec_when_not_in_json(tmp_path) -> None:
+    _make_scene_dir(tmp_path, "forest")
+    registry = SceneRegistry()
+    registry.scan_dir(str(tmp_path), "test.scenes")
+
+    scene = registry.get("forest")
+
+    assert scene.ir_codec == "aura"
+
+
+def test_get_returns_scene_with_ir_codec_parsed_from_json(tmp_path) -> None:
+    _make_scene_dir(tmp_path, "forest", ir_codec="tag")
+    registry = SceneRegistry()
+    registry.scan_dir(str(tmp_path), "test.scenes")
+
+    scene = registry.get("forest")
+
+    assert scene.ir_codec == "tag"
+
+
 # ---------------------------------------------------------------------------
 # SceneRegistry.get — fresh instance per call
 # ---------------------------------------------------------------------------
@@ -324,6 +409,56 @@ def test_get_raises_value_error_for_unknown_scene_name() -> None:
 
     with pytest.raises(ValueError, match="Unknown scene"):
         registry.get("nonexistent")
+
+
+# ---------------------------------------------------------------------------
+# SceneRegistry.ir_codec_for — lightweight accessor
+# ---------------------------------------------------------------------------
+
+
+def test_ir_codec_for_returns_aura_when_scene_json_has_no_ir_codec(tmp_path) -> None:
+    _make_scene_dir(tmp_path, "forest")
+    registry = SceneRegistry()
+    registry.scan_dir(str(tmp_path), "test.scenes")
+
+    assert registry.ir_codec_for("forest") == "aura"
+
+
+def test_ir_codec_for_returns_the_declared_codec_name(tmp_path) -> None:
+    _make_scene_dir(tmp_path, "arena", ir_codec="tag")
+    registry = SceneRegistry()
+    registry.scan_dir(str(tmp_path), "test.scenes")
+
+    assert registry.ir_codec_for("arena") == "tag"
+
+
+def test_ir_codec_for_raises_value_error_for_unknown_scene_name() -> None:
+    registry = SceneRegistry()
+
+    with pytest.raises(ValueError, match="Unknown scene"):
+        registry.ir_codec_for("nonexistent")
+
+
+def test_ir_codec_for_works_for_register_factory_scene() -> None:
+    registry = SceneRegistry()
+    registry.register(
+        "in_memory",
+        lambda: Scene(effect_packs=[], rule_packs=[], ir_codec="tag"),
+    )
+
+    assert registry.ir_codec_for("in_memory") == "tag"
+
+
+def test_ir_codec_for_prefers_factory_override_over_scanned_scene(tmp_path) -> None:
+    _make_scene_dir(tmp_path, "forest", ir_codec="tag")
+    registry = SceneRegistry()
+    registry.scan_dir(str(tmp_path), "test.scenes")
+    registry.register(
+        "forest",
+        lambda: Scene(effect_packs=[], rule_packs=[], ir_codec="aura"),
+    )
+
+    assert registry.ir_codec_for("forest") == "aura"
 
 
 # ---------------------------------------------------------------------------
