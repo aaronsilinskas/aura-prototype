@@ -84,7 +84,7 @@ _Avoid_: confusing with `EffectConfig`; re-reading and re-defaulting these value
 Owned internally by `GameEngine`. Rules access time only via `state.elapsed`/`state.total`, never by holding a `Timer` reference.
 
 ### Scene
-A declarative bundle of a self-contained game context: effect/rule packs, optional initial data, a `version`, and references to its scene-local effects/rules. Carries no mutable runtime state.
+A declarative bundle of a self-contained game context: effect/rule packs, optional initial data, a `version`, a declared `ir_codec` name, and references to its scene-local effects/rules. Carries no mutable runtime state.
 
 ### Scene-local effect / Scene-local rule
 An effect or rule loaded from an `effects/` or `rules/` subdirectory inside a scene's own folder, private to it and addressed with the reserved `scene.` prefix. Unlike an **Effect pack** it has no version.
@@ -111,8 +111,8 @@ The **runtime-facing** counterpart to `NetworkControls`, declaring `poll_transmi
 _Avoid_: naming the pump after the gate (`update_ir_gate`); allocating a fresh return dict per call; putting it in the rule-facing engine module
 
 ### SceneRegistry
-Auto-discovers JSON-described scenes from a directory tree and serves a fresh `Scene` per lookup; validates required fields and version format at scan time.
-_Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); constructing after harness startup (scan once)
+Auto-discovers JSON-described scenes from a directory tree and serves a fresh `Scene` per lookup; validates required fields, version format, and `ir_codec` format at scan time. `ir_codec_for(name)` reads a scanned scene's declared codec name straight off the stored scan entry — no `Scene` construction — for callers that only need the name (e.g. resolving hardware before building it).
+_Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); constructing after harness startup (scan once); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
 
 ### SceneControls
 The rule-facing scene-transition seam: `load`, `overlay`, `pop`, each recording a pending transition applied after the current tick. `SceneManager` is the live implementation.

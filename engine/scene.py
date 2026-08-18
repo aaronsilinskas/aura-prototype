@@ -103,6 +103,12 @@ class Scene:
     discovery time.  It is informational for now — format-validated and stored, but
     not checked against any requirement.
 
+    ``ir_codec`` names the scene's declared IR wire-frame codec, parsed from
+    ``scene.json`` at discovery time and defaulting to ``"aura"`` when the key
+    is absent.  A plain string only — the engine never imports the codec
+    classes themselves, preserving the one-way ``engine`` → ``hardware``
+    layering.  Resolving the name to a codec is a ``hardware``-layer concern.
+
     ``local_rule_registry`` is the ``SceneLocalRegistry`` for this scene's
     scene-local rules.  It is built once at discovery and shared across fresh
     ``Scene`` instances; mutable import-cache state lives on the registry, not
@@ -125,6 +131,7 @@ class Scene:
         "__weakref__",
         "effect_packs",
         "initial_data",
+        "ir_codec",
         "local_effect_registry",
         "local_rule_registry",
         "local_sound_map",
@@ -138,6 +145,7 @@ class Scene:
         rule_packs: Sequence[Sequence[str]],
         initial_data: dict[str, object] | None = None,
         version: Version | None = None,
+        ir_codec: str = "aura",
         local_rule_registry: SceneLocalRegistry | None = None,
         local_effect_registry: SceneLocalRegistry | None = None,
         local_sound_map: dict[str, str] | None = None,
@@ -146,6 +154,7 @@ class Scene:
         self.rule_packs = rule_packs
         self.initial_data = initial_data
         self.version = version
+        self.ir_codec = ir_codec
         self.local_rule_registry = (
             local_rule_registry
             if local_rule_registry is not None
@@ -165,6 +174,7 @@ class _SceneEntry:
     __slots__ = (
         "effect_packs",
         "initial_data",
+        "ir_codec",
         "local_effect_registry",
         "local_rule_registry",
         "local_sound_map",
@@ -180,6 +190,7 @@ class _SceneEntry:
         rule_packs: Sequence[Sequence[str]],
         initial_data: dict[str, object] | None,
         source_path: str,
+        ir_codec: str,
         local_rule_registry: SceneLocalRegistry,
         local_effect_registry: SceneLocalRegistry,
         local_sound_map: dict[str, str],
@@ -189,6 +200,7 @@ class _SceneEntry:
         self.rule_packs = rule_packs
         self.initial_data = initial_data
         self.source_path = source_path
+        self.ir_codec = ir_codec
         self.local_rule_registry = local_rule_registry
         self.local_effect_registry = local_effect_registry
         self.local_sound_map = local_sound_map
@@ -237,8 +249,13 @@ class SceneRegistry:
         ``"packs.scenes"``).  It is required; path-relative derivation is
         rejected as fragile.
 
-        All validation (required fields, version format) happens here so that
-        misconfigured scenes fail at startup.
+        An optional ``"ir_codec"`` string key names the scene's IR wire-frame
+        codec.  Absent, it defaults to ``"aura"``; present, it must be a
+        non-empty, non-whitespace string or scanning raises — it is not a
+        required key.
+
+        All validation (required fields, version format, ``ir_codec`` format)
+        happens here so that misconfigured scenes fail at startup.
 
         This method is idempotent: calling it a second time with the same *path*
         is a no-op.  Discovering a scene name that was already registered from a
@@ -248,6 +265,8 @@ class SceneRegistry:
             ValueError: if a required field (``version``, ``effect_packs``,
                 ``rule_packs``) is missing from ``scene.json``.
             ValueError: if ``version`` cannot be parsed by ``Version.parse``.
+            ValueError: if ``ir_codec`` is present but empty, whitespace-only,
+                or not a string.
             ValueError: if the same scene name is found in two different paths.
         """
         norm_path = _path.normpath(path)
@@ -293,6 +312,17 @@ class SceneRegistry:
 
             initial_data = data.get("initial_data")
 
+            if "ir_codec" in data:
+                raw_ir_codec = data["ir_codec"]
+                if not isinstance(raw_ir_codec, str) or not raw_ir_codec.strip():
+                    raise ValueError(
+                        f"Scene '{scene_name}' in '{norm_path}' has malformed ir_codec "
+                        + f"'{raw_ir_codec}': must be a non-empty string"
+                    )
+                ir_codec = raw_ir_codec
+            else:
+                ir_codec = "aura"
+
             local_rule_registry = SceneLocalRegistry(item_attr="RULE")
             local_rule_registry.scan_dir(
                 _path.join(scene_dir, "rules"),
@@ -311,6 +341,7 @@ class SceneRegistry:
                 rule_packs=data["rule_packs"],
                 initial_data=initial_data,
                 source_path=norm_path,
+                ir_codec=ir_codec,
                 local_rule_registry=local_rule_registry,
                 local_effect_registry=local_effect_registry,
                 local_sound_map=local_sound_map,
@@ -341,10 +372,37 @@ class SceneRegistry:
             rule_packs=entry.rule_packs,
             initial_data=initial_data,
             version=entry.version,
+            ir_codec=entry.ir_codec,
             local_rule_registry=entry.local_rule_registry,
             local_effect_registry=entry.local_effect_registry,
             local_sound_map=dict(entry.local_sound_map),
         )
+
+    def ir_codec_for(self, name: str) -> str:
+        """Return *name*'s declared ``ir_codec`` string (default ``"aura"``).
+
+        For scan-discovered scenes this reads straight off the stored scan
+        entry, without constructing a ``Scene``, so resolving the codec ahead
+        of hardware build never doubles scene construction.  Factory-registered
+        scenes (the ``register`` test escape hatch) have no scan entry to read,
+        so this falls back to calling the factory and reading ``ir_codec`` off
+        the resulting ``Scene``.
+
+        Mirrors ``get``'s precedence: a factory registered under the same name
+        as a scanned scene overrides it.
+
+        Raises:
+            ValueError: if *name* is not registered.
+        """
+        factory = self._factories.get(name)
+        if factory is not None:
+            return factory().ir_codec
+
+        entry = self._scenes.get(name)
+        if entry is not None:
+            return entry.ir_codec
+
+        raise ValueError(f"Unknown scene '{name}'")
 
     def names(self) -> list[str]:
         """Return all registered scene names sorted alphabetically."""
