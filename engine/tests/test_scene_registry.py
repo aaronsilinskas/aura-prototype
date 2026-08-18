@@ -244,12 +244,7 @@ def test_scan_dir_does_not_raise_when_ir_codec_field_is_missing(tmp_path) -> Non
 
 
 def test_scan_dir_raises_when_ir_codec_is_empty_string(tmp_path) -> None:
-    scene_dir = tmp_path / "bad"
-    scene_dir.mkdir()
-    _write_scene_json(
-        scene_dir,
-        _minimal_scene_json(ir_codec=""),
-    )
+    _make_scene_dir(tmp_path, "bad", ir_codec="")
     registry = SceneRegistry()
 
     with pytest.raises(ValueError, match="ir_codec"):
@@ -257,12 +252,7 @@ def test_scan_dir_raises_when_ir_codec_is_empty_string(tmp_path) -> None:
 
 
 def test_scan_dir_raises_when_ir_codec_is_whitespace_only(tmp_path) -> None:
-    scene_dir = tmp_path / "bad"
-    scene_dir.mkdir()
-    _write_scene_json(
-        scene_dir,
-        _minimal_scene_json(ir_codec="   "),
-    )
+    _make_scene_dir(tmp_path, "bad", ir_codec="   ")
     registry = SceneRegistry()
 
     with pytest.raises(ValueError, match="ir_codec"):
@@ -270,12 +260,7 @@ def test_scan_dir_raises_when_ir_codec_is_whitespace_only(tmp_path) -> None:
 
 
 def test_scan_dir_raises_when_ir_codec_is_not_a_string(tmp_path) -> None:
-    scene_dir = tmp_path / "bad"
-    scene_dir.mkdir()
-    _write_scene_json(
-        scene_dir,
-        _minimal_scene_json(ir_codec=42),
-    )
+    _make_scene_dir(tmp_path, "bad", ir_codec=42)
     registry = SceneRegistry()
 
     with pytest.raises(ValueError, match="ir_codec"):
