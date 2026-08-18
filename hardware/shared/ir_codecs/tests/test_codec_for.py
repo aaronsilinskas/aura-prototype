@@ -5,7 +5,11 @@ Covers:
 - codec_for()'s default name ("aura") always resolving
 - UnknownCodecError raised (by type) for a name with no matching module
 - UnknownCodecError naming the known codecs
+- a codec module that exists but fails on its own nested import is not
+  misreported as unknown
 """
+
+import builtins
 
 import pytest
 
@@ -46,3 +50,19 @@ def test_codec_for_unknown_name_is_still_catchable_as_a_value_error():
     # caller that only catches ValueError still catches this.
     with pytest.raises(ValueError):
         codec_for("tv_remote")
+
+
+def test_codec_for_broken_existing_module_propagates_its_own_import_error(monkeypatch):
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "hardware.shared.ir_codecs.aura":
+            raise ModuleNotFoundError(
+                "no module named 'missing_dependency'", name="missing_dependency"
+            )
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    with pytest.raises(ModuleNotFoundError, match="missing_dependency"):
+        codec_for("aura")

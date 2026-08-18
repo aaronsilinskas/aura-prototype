@@ -11,6 +11,11 @@ No ``pulseio`` import -- safe on CPython, CircuitPython 10.x, and MicroPython.
 
 import os
 
+try:
+    from typing import Final
+except ImportError:
+    pass
+
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 
 __all__ = ["UnknownCodecError", "codec_for"]
@@ -18,11 +23,11 @@ __all__ = ["UnknownCodecError", "codec_for"]
 # This package's dotted import path, used to build each codec's full module
 # name (``hardware.shared.ir_codecs.<name>``). ``__name__`` rather than a
 # literal so the constant tracks a future package rename for free.
-_PACKAGE_NAME = __name__
+_PACKAGE_NAME: Final = __name__
 
 # Modules under this package that are not themselves codecs: the shared base
 # classes (no module-level ENCODER/DECODER) and the package init itself.
-_NON_CODEC_MODULES = frozenset({"__init__", "base"})
+_NON_CODEC_MODULES: Final = frozenset({"__init__", "base"})
 
 
 class UnknownCodecError(ValueError):
@@ -84,11 +89,15 @@ def codec_for(name: str = "aura") -> tuple[type[InfraredEncoder], type[InfraredD
     Raises:
         UnknownCodecError: if no ``hardware.shared.ir_codecs.<name>`` module
             exists.  A broken *existing* codec module's own import failure
-            propagates unchanged instead of being reported as unknown.
+            propagates unchanged instead of being reported as unknown -- keyed
+            off ``ModuleNotFoundError.name`` so a codec module that exists but
+            fails on its *own* internal import isn't misreported as unknown.
     """
     full_module = f"{_PACKAGE_NAME}.{name}"
     try:
         module = __import__(full_module, None, None, [""])
-    except ModuleNotFoundError:
+    except ModuleNotFoundError as err:
+        if err.name != full_module:
+            raise
         raise UnknownCodecError(name, _known_codec_names()) from None
     return module.ENCODER, module.DECODER
