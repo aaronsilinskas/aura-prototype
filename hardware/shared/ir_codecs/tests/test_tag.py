@@ -32,7 +32,7 @@ from hardware.shared.ir_codecs.tag import (
 # ---------------------------------------------------------------------------
 
 
-def _encode_decode_byte(byte: int) -> "bytearray | None":
+def _encode_decode_byte(byte: int) -> bytearray | None:
     encoder = TagInfraredEncoder()
     decoder = TagInfraredDecoder()
 

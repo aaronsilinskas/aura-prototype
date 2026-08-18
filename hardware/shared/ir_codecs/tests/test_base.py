@@ -13,7 +13,7 @@ from hardware.shared.ir_codecs.tag import TAG_PREAMBLE, TagInfraredDecoder
 _IR_ERROR_THRESHOLD = 250  # µs — arbitrary threshold for exercising the base class directly
 
 
-def _feed_pulses(decoder: InfraredDecoder, pulses) -> "bytearray | None":
+def _feed_pulses(decoder: InfraredDecoder, pulses) -> bytearray | None:
     """Feed every pulse in *pulses* to *decoder*; return the first decoded payload."""
     for pulse in pulses:
         result = decoder.decode(pulse)
