@@ -52,7 +52,7 @@ from __future__ import annotations
 import time
 
 from effects.performance import PerformanceTracker
-from hardware.shared.ir_protocol import AuraInfraredDecoder
+from hardware.shared.ir_codecs.aura import AuraInfraredDecoder
 from hardware.shared.ir_transport import InfraredMultiReceiver
 from hardware.shared.profiler_report import (
     print_profile_header,

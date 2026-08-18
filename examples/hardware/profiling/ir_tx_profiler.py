@@ -86,7 +86,7 @@ def _build_network_controls() -> HardwareNetworkControls:
     import pulseio
 
     from hardware.circuitpython.infrared_io import PulseOutWriter
-    from hardware.shared.ir_protocol import AuraInfraredEncoder
+    from hardware.shared.ir_codecs.aura import AuraInfraredEncoder
     from hardware.shared.ir_transport import InfraredTransmitter
 
     config = load_device_config()

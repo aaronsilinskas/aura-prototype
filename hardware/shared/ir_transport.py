@@ -2,8 +2,8 @@
 
 Provides the ``PulseReader`` / ``PulseWriter`` port abstractions, the
 ``InfraredTransmitter``, and the ``InfraredSingleReceiver`` /
-``InfraredMultiReceiver`` receivers built on top of the protocol codec from
-``hardware.shared.ir_protocol``.
+``InfraredMultiReceiver`` receivers built on top of the codec base classes from
+``hardware.shared.ir_codecs.base``.
 
 No ``pulseio`` import — safe on CPython, CircuitPython 10.x, and MicroPython.
 
@@ -18,7 +18,7 @@ Design notes
 
 from array import array
 
-from hardware.shared.ir_protocol import InfraredDecoder, InfraredEncoder
+from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_telemetry import IrTelemetryGate, IrTelemetrySnapshot
 
 try:
@@ -215,7 +215,7 @@ class InfraredTransmitter:
 
     Args:
         pulse_writer: Hardware port that physically transmits pulses.
-        encoder: :class:`~hardware.shared.ir_protocol.InfraredEncoder` subclass
+        encoder: :class:`~hardware.shared.ir_codecs.base.InfraredEncoder` subclass
             that converts bytes to a pulse-duration array.
         gate: :class:`IrTransmitGate` driven across the write so the receiver
             can suppress self-echo.
@@ -482,7 +482,7 @@ class InfraredSourceReceiver(InfraredReceiver):
     is simply the N=1 case of the same machinery.
 
     :meth:`telemetry` and :meth:`reset_telemetry` walk ``OWNED_TELEMETRY_FIELDS``
-    declared on :class:`~hardware.shared.ir_protocol.InfraredDecoder`,
+    declared on :class:`~hardware.shared.ir_codecs.base.InfraredDecoder`,
     :class:`PulseReader`, and :class:`InfraredReceiver` — decoder-owned
     fields are summed across ``decoders``, reader-owned fields summed across
     ``readers``, and receiver-owned fields read (and reset) directly off
@@ -493,7 +493,7 @@ class InfraredSourceReceiver(InfraredReceiver):
     Args:
         readers: One :class:`PulseReader` per source (length 1 for a single
             receiver, N for a multi-receiver).
-        decoders: One :class:`~hardware.shared.ir_protocol.InfraredDecoder`
+        decoders: One :class:`~hardware.shared.ir_codecs.base.InfraredDecoder`
             per source, matching *readers* one-to-one.
         gate: :class:`IrTransmitGate` read for self-echo suppression.
     """
@@ -577,7 +577,7 @@ class InfraredSingleReceiver(InfraredSourceReceiver):
 
     Args:
         pulse_reader: Hardware port supplying pulse durations.
-        decoder: :class:`~hardware.shared.ir_protocol.InfraredDecoder` subclass
+        decoder: :class:`~hardware.shared.ir_codecs.base.InfraredDecoder` subclass
             that processes pulses and returns a payload when a packet completes.
         gate: :class:`IrTransmitGate` read for self-echo suppression.
     """
@@ -672,7 +672,7 @@ class InfraredMultiReceiver(InfraredSourceReceiver):
     Args:
         pulse_readers: Sequence of :class:`PulseReader` instances to poll.
         decoder_factory: Called once per reader at construction; must return a
-            fresh :class:`~hardware.shared.ir_protocol.InfraredDecoder` each
+            fresh :class:`~hardware.shared.ir_codecs.base.InfraredDecoder` each
             call so readers never share decode state.
         gate: :class:`IrTransmitGate` read for self-echo suppression.
 

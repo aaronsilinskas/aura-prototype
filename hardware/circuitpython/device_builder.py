@@ -60,12 +60,8 @@ from hardware.shared.device_config import (
 from hardware.shared.device_config import load_device_config as _load_shared_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
-from hardware.shared.ir_protocol import (
-    AuraInfraredDecoder,
-    AuraInfraredEncoder,
-    InfraredDecoder,
-    InfraredEncoder,
-)
+from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
+from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_transport import (
     InfraredMultiReceiver,
     InfraredReceiver,

@@ -21,11 +21,11 @@ from engine.input import InputEvents
 from engine.network import LINE
 from engine.phase import InPhaseRule
 from engine.state import GameState, Scope
-from hardware.shared.tag_protocol import TagData, encode_tag_data
 from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, tag_phase
 from packs.scenes.tag.rules.helpers.tag_config import TagConfig, tag_config
 from packs.scenes.tag.rules.helpers.tag_state import TagState, tag_state
 from packs.scenes.tag.rules.playing_rule import AMMO_COLOR
+from packs.scenes.tag.tag_data import TagData, encode_tag_data
 
 _SHOT_DAMAGE: Final = 1
 

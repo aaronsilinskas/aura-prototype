@@ -3,7 +3,7 @@
 Runs the ``tag`` scene: boots to Ready, starts on a button press, runs a
 five-pulse warning countdown, then drops into Playing with a 10-hitpoint
 progress bar. Button A in Playing fires a tag shot via the LINE IR emitter
-using the infrared tag protocol (``hardware.shared.tag_protocol``).
+using the infrared tag codec (``hardware.shared.ir_codecs.tag``).
 
 Hardware
 --------
@@ -56,6 +56,6 @@ How to play
 """
 
 from app.scene_runtime import run_scene
-from hardware.shared.tag_protocol import TagInfraredDecoder, TagInfraredEncoder
+from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 
 run_scene("tag", ir_encoder=TagInfraredEncoder(), ir_decoder=TagInfraredDecoder())

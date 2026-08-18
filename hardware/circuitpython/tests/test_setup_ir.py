@@ -138,8 +138,8 @@ _pulseio.PulseIn = _FakePulseIn  # type: ignore[attr-defined]
 
 from engine.network import AREA_OF_EFFECT, CONE, LINE  # noqa: E402
 from hardware.circuitpython.device_builder import _make_writer, _setup_ir  # noqa: E402
-from hardware.shared.ir_protocol import AuraInfraredDecoder, AuraInfraredEncoder  # noqa: E402
-from hardware.shared.tag_protocol import TagInfraredDecoder, TagInfraredEncoder  # noqa: E402
+from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder  # noqa: E402
+from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder  # noqa: E402
 
 _RX_PIN = object()
 _LINE_PIN = object()
@@ -428,7 +428,7 @@ def test_setup_ir_multiple_rx_pins_builds_multi_receiver_with_one_reader_per_pin
 
 
 def test_setup_ir_multiple_rx_pins_gives_each_reader_a_fresh_decoder_of_the_same_class() -> None:
-    from hardware.shared.ir_protocol import AuraInfraredDecoder
+    from hardware.shared.ir_codecs.aura import AuraInfraredDecoder
 
     decoder = AuraInfraredDecoder()
 

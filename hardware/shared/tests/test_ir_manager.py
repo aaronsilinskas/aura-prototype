@@ -11,8 +11,8 @@ Covers:
 """
 
 from engine.network import TransmitPump
+from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_manager import InfraredManager
-from hardware.shared.ir_protocol import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_transport import (
     InfraredReceiver,
     InfraredSingleReceiver,

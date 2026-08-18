@@ -12,7 +12,9 @@ import tracemalloc
 
 import pytest
 
-from hardware.shared.ir_protocol import AuraInfraredDecoder, AuraInfraredEncoder, InfraredDecoder
+from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
+from hardware.shared.ir_codecs.base import InfraredDecoder
+from hardware.shared.ir_codecs.tag import TAG_PREAMBLE, TagInfraredDecoder, TagInfraredEncoder
 from hardware.shared.ir_telemetry import IrTelemetrySnapshot
 from hardware.shared.ir_transport import (
     InfraredMultiReceiver,
@@ -23,7 +25,6 @@ from hardware.shared.ir_transport import (
     PulseReader,
     PulseWriter,
 )
-from hardware.shared.tag_protocol import TAG_PREAMBLE, TagInfraredDecoder, TagInfraredEncoder
 
 # ---------------------------------------------------------------------------
 # Local copies of wire-frame constants used by tests to nudge pulses.

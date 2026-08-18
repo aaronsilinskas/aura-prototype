@@ -12,7 +12,7 @@ RP2040/RP2350 silicon, so they are imported lazily inside :func:`make_state_mach
 rather than at module load. Importing this module on a non-RP board (or under
 CPython) is safe; only building a state machine touches the hardware libraries.
 
-All protocol logic lives in :mod:`hardware.shared.ir_protocol` and
+All codec logic lives in :mod:`hardware.shared.ir_codecs` and
 :mod:`hardware.shared.ir_transport`; this leaf owns only the DMA handoff, the
 µs→carrier-period conversion, the in-flight buffer reference, and the busy/idle
 signal.
