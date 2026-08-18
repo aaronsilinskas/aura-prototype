@@ -212,7 +212,7 @@ def test_path_creates_no_directories(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_mount_root_strips_the_trailing_slash_path_of_empty_string_carries(tmp_path):
+def test_mount_root_strips_trailing_slash_passed_to_constructor(tmp_path):
     storage = DeviceStorage(str(tmp_path) + "/")
 
     assert storage.mount_root == str(tmp_path)
@@ -221,7 +221,8 @@ def test_mount_root_strips_the_trailing_slash_path_of_empty_string_carries(tmp_p
 def test_mount_root_omits_the_trailing_slash_that_path_of_empty_string_includes(tmp_path):
     storage = DeviceStorage(str(tmp_path))
 
-    assert storage.path("") == storage.mount_root + "/"
+    assert storage.mount_root == str(tmp_path)
+    assert storage.path("") == str(tmp_path) + "/"
 
 
 # ---------------------------------------------------------------------------
@@ -361,4 +362,5 @@ def test_fake_mount_root_matches_the_root_path_prefixes():
 def test_fake_mount_root_omits_the_trailing_slash_that_path_of_empty_string_includes():
     storage = FakeDeviceStorage()
 
-    assert storage.path("") == storage.mount_root + "/"
+    assert storage.mount_root == "/fake-mount"
+    assert storage.path("") == "/fake-mount/"
