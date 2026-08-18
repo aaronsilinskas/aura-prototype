@@ -3,8 +3,9 @@
 This is the measurement half of #401: it stands up the **whole** reference prop
 (IS31FL3741 matrix, I2S audio, DRV2605L haptic, IR LINE emitter + one IR
 receiver, two buttons) running the production `tag` scene -- the same wiring as
-`examples/hardware/tag_demo.py` -- and reports the measured cost of running the
-assembled prop on a single MCU (engine-host).
+`examples/hardware/scene_demo.py` deployed with `"scene": "tag"` in `aura-device.json`
+-- and reports the measured cost of running the assembled prop on a single MCU
+(engine-host).
 
 Unlike the per-component profilers under this directory (which isolate one cost
 term each), this profiler measures the **assembled** prop end to end and reports:
@@ -32,7 +33,8 @@ The whole hardware bundle -- matrix, buttons, accelerometer, haptic driver, audi
 and IR -- is brought up through a single `build_hardware` call from the **real**,
 deployed `aura-device.json` (`load_device_config()`) -- the config-driven model
 #686 established for the scene-load profiler, and the same file
-`examples/hardware/tag_demo.py` runs against. Unlike the per-component
+`examples/hardware/scene_demo.py` runs against when `aura-device.json` selects
+`"scene": "tag"`. Unlike the per-component
 profilers under this directory, nothing is muted here: this profiler validates
 the **assembled** reference prop end to end, so every section the deployed
 config declares (pixels, buttons, `ir`, `audio`, `accelerometer`, `haptics`) is
