@@ -579,3 +579,140 @@ def test_card_scene_name_colliding_with_a_flash_scene_raises_at_scan_time(card_s
 
     with pytest.raises(ValueError, match="tag"):
         build_scene_runtime(hw, "tag")
+
+
+# ---------------------------------------------------------------------------
+# Card effect packs: aura_packs/effects discovery (issue #871)
+# ---------------------------------------------------------------------------
+
+_CARD_EFFECT_PACK_BUILD_SOURCE = """\
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig
+from engine.effects.manager import EffectBuilder
+
+_AUDIO = EffectAudio(
+    clips={{"start": AudioPlaybackConfig(name="{pack_name}.card_pack_clip", loop=False)}}
+)
+
+
+class _Builder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        return Effect(name=name, pixels=None, audio=_AUDIO)
+
+
+BUILD = _Builder()
+"""
+
+
+def _make_card_effect_pack(mount_root: Path, pack_name: str, version: str = "1.0") -> Path:
+    """Create aura_packs/effects/<pack_name>/ under *mount_root* with one item.
+
+    Mirrors ``_make_card_scene``'s package layout but for an effect pack: a
+    ``version.txt`` (the versioning contract ``PackRegistry.scan_dir`` requires)
+    plus a single ``glow`` item whose ``BUILD`` returns an effect declaring an
+    audio clip qualified by *pack_name*, so a resolved effect proves both the
+    module imported off the card and its bundled ``sounds/`` clip is reachable
+    under the same ``<pack>.<stem>`` name. Returns the pack directory.
+    """
+    aura_packs = mount_root / "aura_packs"
+    effects = aura_packs / "effects"
+    pack_dir = effects / pack_name
+    pack_dir.mkdir(parents=True, exist_ok=True)
+    (aura_packs / "__init__.py").touch()
+    (effects / "__init__.py").touch()
+    (pack_dir / "__init__.py").touch()
+    (pack_dir / "version.txt").write_text(version)
+    (pack_dir / "glow.py").write_text(_CARD_EFFECT_PACK_BUILD_SOURCE.format(pack_name=pack_name))
+    return pack_dir
+
+
+def _add_card_effect_pack_sound(pack_dir: Path, stem: str) -> None:
+    sounds_dir = pack_dir / "sounds"
+    sounds_dir.mkdir(parents=True, exist_ok=True)
+    (sounds_dir / f"{stem}.wav").write_bytes(b"RIFF")  # contents unused; only the path matters
+
+
+def _register_scene_declaring_effect_pack(
+    scene_registry: SceneRegistry, scene_name: str, pack_name: str, version: str = "1.0"
+) -> None:
+    scene_registry.register(
+        scene_name,
+        lambda: Scene(effect_packs=[(pack_name, version)], rule_packs=[]),
+    )
+
+
+def test_card_effect_pack_resolves_and_builds_after_importing_off_the_card(card_storage):
+    """A card effect pack under aura_packs/effects is discovered into the same
+    effect PackRegistry flash packs populate, and its BUILD -- only present on
+    the card, nowhere under packs/effects -- imports and builds successfully,
+    proving both discovery and on-card import."""
+    _make_card_effect_pack(Path(card_storage.mount_root), "card_pack")
+    scene_registry = SceneRegistry()
+    _register_scene_declaring_effect_pack(scene_registry, "card_pack_scene", "card_pack")
+    hw = _fake_hw(storage=card_storage)
+
+    runtime = build_scene_runtime(hw, "card_pack_scene", scene_registry=scene_registry)
+    receipt = runtime.effect_manager.set_effect(Scope.PERSONAL, "card_pack.glow", {})
+
+    assert receipt is not None
+
+
+def test_card_effect_packs_bundled_sound_resolves_to_its_on_card_path(card_storage):
+    """A card effect pack's sounds/ clip is recorded at its absolute on-card
+    filesystem path and resolves through the same AudioRegistry a flash
+    effect-pack clip resolves through, keyed <pack>.<stem>."""
+    pack_dir = _make_card_effect_pack(Path(card_storage.mount_root), "card_pack")
+    _add_card_effect_pack_sound(pack_dir, "card_pack_clip")
+    scene_registry = SceneRegistry()
+    _register_scene_declaring_effect_pack(scene_registry, "card_pack_scene", "card_pack")
+    hw = _fake_hw(storage=card_storage, audio_registry=AudioRegistry())
+
+    build_scene_runtime(hw, "card_pack_scene", scene_registry=scene_registry)
+
+    expected_path = str(pack_dir / "sounds" / "card_pack_clip.wav")
+    assert hw.audio_registry.path("card_pack.card_pack_clip") == expected_path
+
+
+def test_card_scene_resolves_a_card_effect_pack_end_to_end(card_storage):
+    """A card scene (aura_packs/scenes) that declares a card effect pack
+    (aura_packs/effects) resolves it through the same shared PackRegistry --
+    the two card-only trees merge into the same runtime a flash-only setup
+    would use."""
+    mount_root = Path(card_storage.mount_root)
+    _make_card_effect_pack(mount_root, "card_pack")
+    _make_card_scene(
+        mount_root,
+        "card_scene",
+        effect_packs=[["card_pack", "1.0"]],
+    )
+    hw = _fake_hw(storage=card_storage)
+
+    runtime = build_scene_runtime(hw, "card_scene")
+    receipt = runtime.effect_manager.set_effect(Scope.PERSONAL, "card_pack.glow", {})
+
+    assert receipt is not None
+
+
+def test_card_effect_pack_name_colliding_with_a_flash_pack_raises_at_scan_time(card_storage):
+    """A card effect pack sharing a name with a flash effect pack is the
+    existing cross-root collision PackRegistry.scan_dir already enforces for
+    scenes -- it must halt boot loudly rather than silently picking a source."""
+    _make_card_effect_pack(Path(card_storage.mount_root), "basic")
+    hw = _fake_hw(storage=card_storage)
+
+    with pytest.raises(ValueError, match="basic"):
+        build_scene_runtime(hw, "tag")
+
+
+def test_card_with_aura_packs_but_no_effects_subdirectory_is_a_clean_no_op(card_storage):
+    """aura_packs/ exists (so sys.path is still appended) but has no effects/
+    subdirectory to scan -- this must not raise, only skip the scan, and flash
+    scene activation continues normally."""
+    aura_packs = Path(card_storage.mount_root) / "aura_packs"
+    aura_packs.mkdir(parents=True)
+    (aura_packs / "__init__.py").touch()
+    hw = _fake_hw(storage=card_storage)
+
+    runtime = build_scene_runtime(hw, "tag")
+
+    assert card_storage.mount_root in sys.path
+    assert runtime.manager.active_state is not None
