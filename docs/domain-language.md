@@ -262,8 +262,8 @@ The live CircuitPython `RadioTransport` adapter wrapping `adafruit_rfm69.RFM69` 
 _Avoid_: importing `adafruit_rfm69` anywhere else; reading the driver without checking `payload_ready` first (blocks)
 
 ### DeviceStorage
-The board-free device-state storage port: reads/writes small state files under a mount root and resolves real filesystem paths for streamed/scanned consumers, with no `board`/`busio` import (safe on CPython, CircuitPython, and MicroPython). Live adapter `SdCardStorage`; `FakeDeviceStorage` is the in-memory test double.
-_Avoid_: escaping the mount root (routes through `reject_escaping_path`); a second concrete implementation for CPython vs. CircuitPython (one class suffices once mounted)
+The board-free device-state storage port: reads/writes small state files under a mount root and resolves real filesystem paths for streamed/scanned consumers, with no `board`/`busio` import (safe on CPython, CircuitPython, and MicroPython). Live adapter `SdCardStorage`; `FakeDeviceStorage` is the in-memory test double. `mount_root` is a read-only accessor for the clean root string (no trailing slash), e.g. for a `sys.path` entry — distinct from `path("")`, which carries the joining `"/"`.
+_Avoid_: escaping the mount root (routes through `reject_escaping_path`); a second concrete implementation for CPython vs. CircuitPython (one class suffices once mounted); using `path("")` where the clean root is needed (use `mount_root`)
 
 ### SdCardStorage
 The live CircuitPython `DeviceStorage` adapter mounting an SD card at construction — the only module importing `sdcardio`/`storage`, via a deferred import so a config with no `sdcard` section never requires either installed. `cs` is a raw `microcontroller.Pin`.

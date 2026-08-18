@@ -3,7 +3,7 @@
 Covers:
 - DeviceStorage: real-filesystem behaviour (tmp_path-backed) — none-on-missing,
   round-trip, atomic-replace-on-failure, subpath auto-create, escape rejection,
-  path() resolution
+  path() resolution, mount_root accessor
 - FakeDeviceStorage: the in-memory test double this file's own tests drive to
   prove it models the same observable contract
 """
@@ -208,6 +208,24 @@ def test_path_creates_no_directories(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# DeviceStorage — mount_root
+# ---------------------------------------------------------------------------
+
+
+def test_mount_root_strips_trailing_slash_passed_to_constructor(tmp_path):
+    storage = DeviceStorage(str(tmp_path) + "/")
+
+    assert storage.mount_root == str(tmp_path)
+
+
+def test_mount_root_omits_the_trailing_slash_that_path_of_empty_string_includes(tmp_path):
+    storage = DeviceStorage(str(tmp_path))
+
+    assert storage.mount_root == str(tmp_path)
+    assert storage.path("") == str(tmp_path) + "/"
+
+
+# ---------------------------------------------------------------------------
 # FakeDeviceStorage — in-memory test double
 # ---------------------------------------------------------------------------
 
@@ -218,7 +236,7 @@ class FakeDeviceStorage:
     Not a subclass of :class:`DeviceStorage` — that class is a concrete,
     directly-instantiable filesystem adapter (there is no separate abstract
     port to share, unlike ``RadioTransport``/``PulseWriter``), so this fake
-    reimplements the same three-method surface against a plain dict rather
+    reimplements the same accessor surface against a plain dict rather
     than inheriting filesystem behaviour it would only have to override.
 
     Models: ``None`` on a never-written name, atomic replace (a write only
@@ -227,8 +245,14 @@ class FakeDeviceStorage:
     rejection identical to the real port's.
     """
 
+    _MOUNT_ROOT = "/fake-mount"
+
     def __init__(self) -> None:
         self._files: dict[str, bytes] = {}
+
+    @property
+    def mount_root(self) -> str:
+        return self._MOUNT_ROOT
 
     def read_bytes(self, name: str) -> "bytes | None":
         self._guard(name)
@@ -240,7 +264,7 @@ class FakeDeviceStorage:
 
     def path(self, subpath: str) -> str:
         self._guard(subpath)
-        return "/fake-mount/" + subpath
+        return self._MOUNT_ROOT + "/" + subpath
 
     def _guard(self, relative_path: str) -> None:
         reject_escaping_path(relative_path)
@@ -322,3 +346,21 @@ def test_fake_path_creates_no_entry_observable_via_read_bytes():
     storage.path("scenes/tag/state.json")
 
     assert storage.read_bytes("scenes/tag/state.json") is None
+
+
+# ---------------------------------------------------------------------------
+# FakeDeviceStorage — mount_root
+# ---------------------------------------------------------------------------
+
+
+def test_fake_mount_root_matches_the_root_path_prefixes():
+    storage = FakeDeviceStorage()
+
+    assert storage.mount_root == "/fake-mount"
+
+
+def test_fake_mount_root_omits_the_trailing_slash_that_path_of_empty_string_includes():
+    storage = FakeDeviceStorage()
+
+    assert storage.mount_root == "/fake-mount"
+    assert storage.path("") == "/fake-mount/"

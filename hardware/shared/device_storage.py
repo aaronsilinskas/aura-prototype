@@ -2,9 +2,11 @@
 
 Reads and writes small device-state files under a mount root (e.g. an SD
 card) and resolves real filesystem paths for streamed/scanned consumers
-(audio ``open()``+``WaveFile``, scene ``os.listdir``). Every public method
-routes through :meth:`DeviceStorage._resolve`, the one place that joins a
-*name*/*subpath* onto the mount root and rejects any attempt to escape it.
+(audio ``open()``+``WaveFile``, scene ``os.listdir``). Every *name*/*subpath*
+passed in routes through :meth:`DeviceStorage._resolve`, the one place that
+joins it onto the mount root and rejects any attempt to escape it; the
+``mount_root`` accessor is the one exception, since it reads the
+already-owned root rather than resolving a caller-supplied path.
 
 No ``board``/``busio``/CircuitPython-only import — safe on CPython,
 CircuitPython 10.x, and MicroPython. Mounting the card is someone else's
@@ -60,6 +62,15 @@ class DeviceStorage:
 
     def __init__(self, mount_root: str) -> None:
         self._mount_root = mount_root.rstrip("/") or "/"
+
+    @property
+    def mount_root(self) -> str:
+        """The mount root with no trailing slash, e.g. for a ``sys.path`` entry.
+
+        Unlike ``path("")``, which resolves through ``_resolve`` and so
+        always carries the joining ``"/"``, this is the bare root string.
+        """
+        return self._mount_root
 
     def read_bytes(self, name: str) -> "bytes | None":
         """Return the full contents of *name*, or ``None`` if never written.
