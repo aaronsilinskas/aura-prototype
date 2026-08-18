@@ -230,8 +230,16 @@ The top-level `app/` package: `scene_composition.py` builds the engine/effect/sc
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### SceneRuntime / build_scene_runtime
-`build_scene_runtime(hw, scene_name)` wires the registries, managers, and engine and loads the scene (raising when *scene_name* isn't registered), returning a `SceneRuntime` bundle (`manager`, `effect_manager`, `timer`, `ir`, `radio`) that `run_scene`'s per-tick loop drives.
-_Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing `poll_transmits`/`receive` (drive `ir.update()`/`radio.update()`)
+`build_scene_runtime(hw, scene_name, scene_registry=None)` wires the registries, managers, and engine and loads the scene (raising when *scene_name* isn't registered), returning a `SceneRuntime` bundle (`manager`, `effect_manager`, `timer`, `ir`, `radio`) that `run_scene`'s per-tick loop drives. An omitted *scene_registry* is scanned fresh here; `run_scene` passes its own already-scanned registry instead, so the scene directory is scanned once per boot.
+_Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing `poll_transmits`/`receive` (drive `ir.update()`/`radio.update()`); scanning a second `SceneRegistry` when a caller already has one
+
+### resolve_known_scene
+`resolve_known_scene(scene_registry, scene_name)` in `scene_composition.py` returns *scene_name* if the registry has it, else raises `ValueError` naming the known scenes. `build_scene_runtime` calls it internally to load the scene; `run_scene` also calls it directly, before hardware is built, so an unknown scene name fails once and early rather than only surfacing deep inside `build_scene_runtime`.
+_Avoid_: duplicating the known-scene check inline instead of calling this
+
+### resolve_ir_codec
+`resolve_ir_codec(scene_registry, scene_name)` in `scene_composition.py` reads a scene's declared codec name via `SceneRegistry.ir_codec_for` and maps it through `ir_codecs.codec_for`, returning an instantiated `(encoder, decoder)` pair. Board-free, so `run_scene` calls it before `build_hardware` to feed that seam's `ir_encoder`/`ir_decoder` parameters with the scene-selected **wire-frame codec** from the first tick.
+_Avoid_: calling it after hardware is already built (defeats the boot-time-selection point); duplicating the name-to-class mapping instead of delegating to `codec_for`
 
 ### device_builder
 The device-only hardware builder: `build_hardware(config, board, …)` resolves pin names and constructs the configured outputs/buttons/sensors/IR/radio, wrapping transmitters and the radio transport in `HardwareNetworkControls`. Single-call (claims pins without deiniting); every component is config-gated, never presence-probed.

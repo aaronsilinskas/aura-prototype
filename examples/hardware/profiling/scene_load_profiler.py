@@ -154,7 +154,7 @@ LOG_INTERVAL_SECONDS: Final = 5.0
 def _resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
     """Return *scene_name* if registered, else raise naming the known scenes.
 
-    Mirrors ``app.scene_composition._resolve_known_scene`` (#684). This profiler
+    Mirrors ``app.scene_composition.resolve_known_scene`` (#684). This profiler
     keeps its own inlined staged composition rather than delegating to
     ``build_scene_runtime``, so it re-applies the same fail-loud rule -- no silent
     fallback -- against its own scanned scene registry instead of inheriting it.

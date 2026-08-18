@@ -2,11 +2,14 @@
 
 import pytest
 
-from app.scene_composition import build_scene_runtime
+from app.scene_composition import build_scene_runtime, resolve_ir_codec
 from engine.audio import AudioRegistry
 from engine.network import TransmitPump
+from engine.scene import Scene, SceneRegistry
 from engine.state import Scope
 from hardware.shared.device_hardware import DeviceHardware
+from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
+from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 from hardware.shared.ir_manager import InfraredManager
 from hardware.shared.ir_transport import InfraredReceiver
 from hardware.shared.radio_manager import RadioManager
@@ -44,6 +47,67 @@ def test_unknown_scene_name_raises_naming_the_known_scenes():
     """An unregistered scene name fails loudly instead of falling back to hardware_test."""
     with pytest.raises(ValueError, match="hardware_test"):
         build_scene_runtime(_fake_hw(), "not-a-real-scene")
+
+
+# ---------------------------------------------------------------------------
+# resolve_ir_codec (issue #862)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_ir_codec_returns_the_aura_pair_for_a_scene_with_no_declared_codec():
+    """A scene with no ir_codec key defaults to the Aura wire-frame codec."""
+    scene_registry = SceneRegistry()
+    scene_registry.register("no_codec", lambda: Scene(effect_packs=[], rule_packs=[]))
+
+    encoder, decoder = resolve_ir_codec(scene_registry, "no_codec")
+
+    assert isinstance(encoder, AuraInfraredEncoder)
+    assert isinstance(decoder, AuraInfraredDecoder)
+
+
+def test_resolve_ir_codec_returns_the_tag_pair_for_a_scene_declaring_the_tag_codec():
+    """A scene declaring ir_codec: 'tag' resolves to the Tag protocol codec."""
+    scene_registry = SceneRegistry()
+    scene_registry.register(
+        "tag_codec", lambda: Scene(effect_packs=[], rule_packs=[], ir_codec="tag")
+    )
+
+    encoder, decoder = resolve_ir_codec(scene_registry, "tag_codec")
+
+    assert isinstance(encoder, TagInfraredEncoder)
+    assert isinstance(decoder, TagInfraredDecoder)
+
+
+def test_resolve_ir_codec_raises_unknown_codec_error_for_an_undeclared_codec_name():
+    """A scene declaring a codec name with no matching hardware.shared.ir_codecs module
+    fails loudly by codec name, distinct from an unknown *scene* name."""
+    scene_registry = SceneRegistry()
+    scene_registry.register(
+        "bogus_codec", lambda: Scene(effect_packs=[], rule_packs=[], ir_codec="tv_remote")
+    )
+
+    with pytest.raises(ValueError, match="tv_remote"):
+        resolve_ir_codec(scene_registry, "bogus_codec")
+
+
+# ---------------------------------------------------------------------------
+# build_scene_runtime — optional pre-built scene_registry (issue #862)
+# ---------------------------------------------------------------------------
+
+
+def test_build_scene_runtime_activates_a_scene_only_registered_in_the_supplied_scene_registry():
+    """A pre-built, already-scanned registry is used as-is instead of a fresh internal
+    scan -- this scene exists nowhere under packs/scenes, only in the registry passed in."""
+    scene_registry = SceneRegistry()
+    scene_registry.register(
+        "only_in_supplied_registry", lambda: Scene(effect_packs=[], rule_packs=[])
+    )
+
+    runtime = build_scene_runtime(
+        _fake_hw(), "only_in_supplied_registry", scene_registry=scene_registry
+    )
+
+    assert runtime.manager.active_state is not None
 
 
 # ---------------------------------------------------------------------------

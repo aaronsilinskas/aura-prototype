@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import gc
 
-from app.scene_composition import build_scene_runtime
+from app.scene_composition import build_scene_runtime, resolve_ir_codec, resolve_known_scene
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
 from engine.network import NetworkEvents
+from engine.scene import SceneRegistry
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
-from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 
 try:
     from typing import Final
@@ -27,12 +27,18 @@ _TELEMETRY_PRINT_INTERVAL: Final = 1.0  # seconds
 __all__ = ["run_scene"]
 
 
-def run_scene(
-    scene_name: str,
-    ir_encoder: InfraredEncoder | None = None,
-    ir_decoder: InfraredDecoder | None = None,
-) -> None:
+def run_scene(scene_name: str) -> None:
     """Bring hardware up via ``build_hardware`` and run *scene_name* forever.
+
+    Scans a single ``SceneRegistry`` up front and validates *scene_name*
+    against it via ``resolve_known_scene`` before any hardware is built, so
+    an unknown scene name fails once, naming the known scenes, without ever
+    touching the board. The same scan then resolves the scene's declared IR
+    wire-frame codec via ``resolve_ir_codec`` (Aura by default, Tag when the
+    scene declares it) and forwards the instantiated encoder/decoder into
+    ``build_hardware``, so the correct codec is wired from the first tick.
+    The same registry is passed into ``build_scene_runtime`` so the scene is
+    scanned exactly once for the whole boot sequence.
 
     Drives ``runtime.ir.update()`` every tick (see
     :class:`~hardware.shared.ir_manager.InfraredManager`), which owns the
@@ -50,16 +56,18 @@ def run_scene(
 
     Args:
         scene_name: Name of the scene to load.
-        ir_encoder: Optional wire-frame-codec encoder forwarded to
-            ``build_hardware``; defaults to the Aura wire-frame when omitted.
-        ir_decoder: Optional wire-frame-codec decoder forwarded to
-            ``build_hardware``; defaults to the Aura wire-frame when omitted.
     """
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir("packs/scenes", "packs.scenes")
+    resolve_known_scene(scene_registry, scene_name)
+
+    ir_encoder, ir_decoder = resolve_ir_codec(scene_registry, scene_name)
+
     config = load_device_config()
     hw_logger = Logger("[hw]")
     hw = build_hardware(config, ir_encoder=ir_encoder, ir_decoder=ir_decoder, logger=hw_logger)
 
-    runtime = build_scene_runtime(hw, scene_name)
+    runtime = build_scene_runtime(hw, scene_name, scene_registry=scene_registry)
     manager = runtime.manager
     effect_manager = runtime.effect_manager
     timer = runtime.timer
