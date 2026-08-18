@@ -56,6 +56,7 @@ class SceneRuntime:
 _EFFECT_PACKS_DIR = "packs/effects"
 _CARD_PACKS_DIR = "aura_packs"
 _CARD_SCENES_MODULE_PREFIX = "aura_packs.scenes"
+_CARD_RULES_MODULE_PREFIX = "aura_packs.rules"
 _CARD_EFFECTS_MODULE_PREFIX = "aura_packs.effects"
 
 
@@ -166,6 +167,26 @@ def _scan_card_scenes(scene_registry: SceneRegistry, storage: DeviceStorage | No
     scene_registry.scan_dir(card_scenes_path, _CARD_SCENES_MODULE_PREFIX)
 
 
+def _scan_card_rules(rule_registry: PackRegistry, storage: DeviceStorage | None) -> None:
+    """Scan the card's ``aura_packs/rules`` into *rule_registry*, if present.
+
+    A no-op when ``_card_subdir_path`` finds no ``aura_packs/rules`` -- card
+    rule packs are purely additive on top of flash discovery. Otherwise the
+    path is scanned into *rule_registry* under the module prefix
+    ``"aura_packs.rules"``, the same ``PackRegistry`` flash rule packs
+    (``packs/rules``) live in, so a card rule pack is versioned exactly like a
+    flash pack (``version.txt`` first line, a dir without one skipped) and a
+    pack name present on both sides raises via ``PackRegistry.scan_dir``'s
+    existing cross-root collision check. Rule packs carry no audio, so unlike
+    ``_scan_effect_pack_sounds`` there is no sound wiring to do here.
+    """
+    card_rules_path = _card_subdir_path(storage, "rules")
+    if card_rules_path is None:
+        return
+
+    rule_registry.scan_dir(card_rules_path, _CARD_RULES_MODULE_PREFIX)
+
+
 def _scan_card_effects(effect_registry: PackRegistry, storage: DeviceStorage | None) -> str | None:
     """Scan the card's ``aura_packs/effects`` into *effect_registry*, if present.
 
@@ -209,7 +230,9 @@ def build_scene_runtime(
 
     After flash scenes are scanned (or the supplied registry is accepted
     as-is), ``hw.storage``'s ``aura_packs/scenes`` is scanned into the same
-    registry via ``_scan_card_scenes`` -- a no-op with no storage or no
+    registry via ``_scan_card_scenes``, and ``hw.storage``'s
+    ``aura_packs/rules`` is scanned into the rule registry via
+    ``_scan_card_rules`` -- both are no-ops with no storage or no
     ``aura_packs/`` on the card, so a device with neither behaves exactly as
     before. Likewise, after flash effect packs are scanned, ``hw.storage``'s
     ``aura_packs/effects`` is scanned into the same effect ``PackRegistry``
@@ -222,6 +245,7 @@ def build_scene_runtime(
 
     rule_registry = PackRegistry(item_attr="RULE")
     rule_registry.scan_dir("packs/rules", "packs.rules")
+    _scan_card_rules(rule_registry, hw.storage)
 
     effect_manager = EffectManager(registry=effect_registry, outputs=hw.outputs)
 

@@ -582,6 +582,117 @@ def test_card_scene_name_colliding_with_a_flash_scene_raises_at_scan_time(card_s
 
 
 # ---------------------------------------------------------------------------
+# Card rule packs: aura_packs/rules discovery (issue #872)
+# ---------------------------------------------------------------------------
+
+_CARD_RULE_PACK_SOURCE = """\
+from engine.engine import GameRule
+from engine.events import Event
+from engine.state import GameState
+
+
+class _CardPackRule(GameRule):
+    def __init__(self) -> None:
+        self.on(Event, self._handle)
+
+    def _handle(self, event: Event, state: GameState) -> None:
+        state.set("card_pack_rule_ran", True)
+
+
+RULE = _CardPackRule()
+"""
+
+
+def _make_card_rule_pack(
+    mount_root: Path, pack_name: str, item_name: str, content: str, version: str = "1.0"
+) -> Path:
+    """Create aura_packs/rules/<pack_name>/ under *mount_root* with one rule item.
+
+    Mirrors packs/rules/debug/'s on-flash layout: a version.txt whose first
+    line is the MAJOR.MINOR version, plus an empty __init__.py at every
+    package level and the rule module itself. Returns the pack directory.
+    """
+    aura_packs = mount_root / "aura_packs"
+    rules = aura_packs / "rules"
+    pack_dir = rules / pack_name
+    pack_dir.mkdir(parents=True, exist_ok=True)
+    (aura_packs / "__init__.py").touch()
+    (rules / "__init__.py").touch()
+    (pack_dir / "__init__.py").touch()
+    (pack_dir / "version.txt").write_text(version + "\n")
+    (pack_dir / f"{item_name}.py").write_text(content)
+    return pack_dir
+
+
+def test_flash_scene_can_reference_and_run_a_card_rule_packs_rule(card_storage):
+    """A card rule pack under aura_packs/rules is discovered into the same
+    PackRegistry flash rule packs populate -- a flash-registered scene (no
+    card scene involved) that declares it in rule_packs resolves and runs
+    its rule, proving the pack lands in the shared registry, imported off
+    the card, and participates in the running scene."""
+    _make_card_rule_pack(
+        Path(card_storage.mount_root), "card_pack", "card_rule", _CARD_RULE_PACK_SOURCE
+    )
+    scene_registry = SceneRegistry()
+    scene_registry.register(
+        "card_pack_scene",
+        lambda: Scene(effect_packs=[], rule_packs=[["card_pack", "1.0"]]),
+    )
+    hw = _fake_hw(storage=card_storage)
+
+    runtime = build_scene_runtime(hw, "card_pack_scene", scene_registry=scene_registry)
+    runtime.manager.active_state.queue_event(Event(_CARD_TEST_EVENT_GROUP, "ping"))
+    runtime.manager.update()
+
+    assert runtime.manager.active_state.get_or_none("card_pack_rule_ran", bool) is True
+
+
+def test_card_scene_can_reference_and_run_a_card_rule_packs_rule(card_storage):
+    """A card scene (aura_packs/scenes) that declares a card rule pack
+    (aura_packs/rules) in its own rule_packs resolves and runs it end to
+    end -- both card slices merge into the same shared registries."""
+    _make_card_scene(Path(card_storage.mount_root), "card_scene", rule_packs=[["card_pack", "1.0"]])
+    _make_card_rule_pack(
+        Path(card_storage.mount_root), "card_pack", "card_rule", _CARD_RULE_PACK_SOURCE
+    )
+    hw = _fake_hw(storage=card_storage)
+
+    runtime = build_scene_runtime(hw, "card_scene")
+    runtime.manager.active_state.queue_event(Event(_CARD_TEST_EVENT_GROUP, "ping"))
+    runtime.manager.update()
+
+    assert runtime.manager.active_state.get_or_none("card_pack_rule_ran", bool) is True
+
+
+def test_card_rule_pack_name_colliding_with_a_flash_rule_pack_raises_at_scan_time(card_storage):
+    """A card rule pack sharing a name with a flash rule pack (packs/rules/debug)
+    is the existing PackRegistry.scan_dir cross-root collision -- it must halt
+    boot loudly rather than silently picking one source over the other."""
+    _make_card_rule_pack(
+        Path(card_storage.mount_root), "debug", "card_rule", _CARD_RULE_PACK_SOURCE
+    )
+    hw = _fake_hw(storage=card_storage)
+
+    with pytest.raises(ValueError, match="debug"):
+        build_scene_runtime(hw, "tag")
+
+
+def test_card_with_no_rules_subdirectory_is_a_clean_no_op_for_rule_packs(card_storage):
+    """aura_packs/ exists (so sys.path is still appended) but has no rules/
+    subdirectory to scan -- this must not raise, only skip the scan, and a
+    flash scene still activates normally."""
+    aura_packs = Path(card_storage.mount_root) / "aura_packs"
+    aura_packs.mkdir(parents=True)
+    (aura_packs / "__init__.py").touch()
+    hw = _fake_hw(storage=card_storage)
+
+    runtime = build_scene_runtime(hw, "tag")
+
+    assert card_storage.mount_root in sys.path
+    assert runtime.manager.active_state is not None
+
+
+# ---------------------------------------------------------------------------
 # Card effect packs: aura_packs/effects discovery (issue #871)
 # ---------------------------------------------------------------------------
 
