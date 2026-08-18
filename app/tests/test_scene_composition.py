@@ -537,13 +537,36 @@ def test_device_with_no_storage_leaves_sys_path_unmutated():
 def test_card_with_no_aura_packs_directory_leaves_sys_path_unmutated(card_storage):
     """Storage is present but the card carries no top-level aura_packs/ -- the
     sys.path append is gated on that directory's presence, not just on storage
-    being non-None, and flash scene selection still works normally."""
+    being non-None."""
     path_before = list(sys.path)
+    hw = _fake_hw(storage=card_storage)
+
+    build_scene_runtime(hw, "tag")
+
+    assert sys.path == path_before
+
+
+def test_card_with_no_aura_packs_directory_still_activates_a_flash_scene(card_storage):
+    """Storage is present but the card carries no top-level aura_packs/ -- flash
+    scene selection still works normally despite the (no-op) card scan."""
     hw = _fake_hw(storage=card_storage)
 
     runtime = build_scene_runtime(hw, "tag")
 
-    assert sys.path == path_before
+    assert runtime.manager.active_state is not None
+
+
+def test_card_with_aura_packs_but_no_scenes_subdirectory_is_a_clean_no_op(card_storage):
+    """aura_packs/ exists (so sys.path is still appended) but has no scenes/
+    subdirectory to scan -- this must not raise, only skip the scan."""
+    aura_packs = Path(card_storage.mount_root) / "aura_packs"
+    aura_packs.mkdir(parents=True)
+    (aura_packs / "__init__.py").touch()
+    hw = _fake_hw(storage=card_storage)
+
+    runtime = build_scene_runtime(hw, "tag")
+
+    assert card_storage.mount_root in sys.path
     assert runtime.manager.active_state is not None
 
 

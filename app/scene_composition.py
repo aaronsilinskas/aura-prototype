@@ -104,13 +104,16 @@ def _scan_card_scenes(scene_registry: SceneRegistry, storage: DeviceStorage | No
     ``mount_root`` is appended to ``sys.path`` (guarded so a repeat
     ``build_scene_runtime`` call never duplicates the entry), which is what
     lets a card scene's scene-local ``rules/``/``effects/`` import under the
-    ``aura_packs.`` prefix against the card. The absolute
-    ``aura_packs/scenes`` path -- resolved through the ``DeviceStorage`` port
-    via ``storage.path``, never a re-derived ``"/sd"`` literal, preserving its
-    no-escape rule -- is then scanned into *scene_registry* under the module
-    prefix ``"aura_packs.scenes"``, the same registry flash scenes live in,
-    so a scene name present on both sides raises via ``SceneRegistry.scan_dir``'s
-    cross-root collision check.
+    ``aura_packs.`` prefix against the card, regardless of whether a
+    ``scenes/`` subdirectory exists to scan. The absolute ``aura_packs/scenes``
+    path -- resolved through the ``DeviceStorage`` port via ``storage.path``,
+    never a re-derived ``"/sd"`` literal, preserving its no-escape rule -- is
+    scanned into *scene_registry* under the module prefix
+    ``"aura_packs.scenes"``, the same registry flash scenes live in, so a
+    scene name present on both sides raises via ``SceneRegistry.scan_dir``'s
+    cross-root collision check. Missing entirely (``aura_packs/`` with no
+    ``scenes/`` subdirectory), the scan is skipped rather than raising --
+    ``SceneRegistry.scan_dir`` has no directory-existence guard of its own.
     """
     if storage is None:
         return
@@ -123,7 +126,11 @@ def _scan_card_scenes(scene_registry: SceneRegistry, storage: DeviceStorage | No
     if mount_root not in sys.path:
         sys.path.append(mount_root)
 
-    scene_registry.scan_dir(storage.path(_CARD_PACKS_DIR + "/scenes"), _CARD_SCENES_MODULE_PREFIX)
+    card_scenes_path = storage.path(_path.join(_CARD_PACKS_DIR, "scenes"))
+    if not _path.isdir(card_scenes_path):
+        return
+
+    scene_registry.scan_dir(card_scenes_path, _CARD_SCENES_MODULE_PREFIX)
 
 
 def build_scene_runtime(
