@@ -118,8 +118,10 @@ If the file is absent the built-in default (PropMaker + IS31FL3741 matrix) is us
 **`buttons`** — required. List of board pin name strings.
 
 **`ir`** — optional. `rx` (receiver pin) + at least `line` emitter. Optional `cone` and
-`area_of_effect` emitters. The wire-frame codec is injected at `build_hardware()` call site
-via `ir_encoder` / `ir_decoder` — `tag_demo.py` passes `TagInfraredEncoder/Decoder` here.
+`area_of_effect` emitters. The wire-frame codec is selected per scene: `run_scene` reads the
+active scene's declared `ir_codec` (`scene.json`, default `"aura"`) via `resolve_ir_codec` and
+passes the resolved `ir_encoder` / `ir_decoder` into `build_hardware()` — the `tag` scene
+declares `"ir_codec": "tag"`.
 
 **`audio`** — optional. `voices` (int, ≥ 1), `max_volume` (0.0–1.0). Clip resolution is
 `AudioRegistry`'s job (base scanned from `packs/effects/*/sounds`, overlay installed per
@@ -127,12 +129,14 @@ scene), not a device-config concern.
 
 ### Running an example
 
-Standard scenes (e.g. `hardware_test`, `red_light_green_light`, `element_browser`) are
-selected via the `"scene"` key in `aura-device.json` and run through `scene_demo.py`:
+Every scene (e.g. `hardware_test`, `red_light_green_light`, `element_browser`, `tag`) is
+selected via the `"scene"` key in `aura-device.json` and run through the single
+`scene_demo.py` entry point — including `tag`, whose `scene.json` declares the Tag IR
+wire-frame codec so it is wired in automatically:
 
 ```json
 {
-  "scene": "element_browser",
+  "scene": "tag",
   "pixels": { "..." : "..." },
   "buttons": ["D9", "D10"]
 }
@@ -141,9 +145,6 @@ selected via the `"scene"` key in `aura-device.json` and run through `scene_demo
 ```sh
 # Deploy scene_demo with a scene selected in aura-device.json:
 python scripts/deploy_watch.py examples/hardware/scene_demo.py
-
-# Tag demo — retained separately because it injects the Tag IR codec at build time:
-python scripts/deploy_watch.py examples/hardware/tag_demo.py
 ```
 
 ---

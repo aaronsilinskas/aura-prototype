@@ -1,5 +1,6 @@
 {
   "version": "1.0",
+  "ir_codec": "tag",
   "effect_packs": [
     ["basic", "1.1"],
     ["elements", "1.0"]

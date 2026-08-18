@@ -90,6 +90,19 @@ def test_resolve_ir_codec_raises_unknown_codec_error_for_an_undeclared_codec_nam
         resolve_ir_codec(scene_registry, "bogus_codec")
 
 
+def test_resolve_ir_codec_returns_the_tag_pair_for_the_real_tag_scene():
+    """The real tag scene's scene.json declares ir_codec: 'tag' (issue #863), so
+    scene_demo running "scene": "tag" gets the Tag protocol codec end to end
+    instead of the Aura default every other scene gets."""
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir("packs/scenes", "packs.scenes")
+
+    encoder, decoder = resolve_ir_codec(scene_registry, "tag")
+
+    assert isinstance(encoder, TagInfraredEncoder)
+    assert isinstance(decoder, TagInfraredDecoder)
+
+
 # ---------------------------------------------------------------------------
 # build_scene_runtime — optional pre-built scene_registry (issue #862)
 # ---------------------------------------------------------------------------
