@@ -1,8 +1,9 @@
 """Board-free scene wiring — builds the engine/effect/scene machinery for one scene.
 
-CPython-testable: imports only engine, ``hardware.shared.scene_selection``, and
-the board-free ``DeviceHardware`` type. No ``TYPE_CHECKING`` guard is needed
-because ``DeviceHardware`` itself carries no board imports.
+CPython-testable: imports only ``engine`` and the board-free modules under
+``hardware.shared`` (``device_hardware``, ``ir_codecs``, ``ir_manager``,
+``radio_manager``). No ``TYPE_CHECKING`` guard is needed because none of them
+carry board imports.
 """
 
 from __future__ import annotations
@@ -15,10 +16,12 @@ from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
 from hardware.shared.device_hardware import DeviceHardware
+from hardware.shared.ir_codecs import codec_for
+from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_manager import InfraredManager
 from hardware.shared.radio_manager import RadioManager
 
-__all__ = ["SceneRuntime", "build_scene_runtime"]
+__all__ = ["SceneRuntime", "build_scene_runtime", "resolve_ir_codec"]
 
 
 class SceneRuntime:
@@ -71,12 +74,37 @@ def _resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
     raise ValueError(f"unknown scene {scene_name!r}; known scenes: {', '.join(names)}")
 
 
-def build_scene_runtime(hw: DeviceHardware, scene_name: str) -> SceneRuntime:
+def resolve_ir_codec(
+    scene_registry: SceneRegistry, scene_name: str
+) -> tuple[InfraredEncoder, InfraredDecoder]:
+    """Return the instantiated wire-frame codec *scene_name* declares.
+
+    Reads the scene's declared codec name via ``SceneRegistry.ir_codec_for``
+    (``"aura"`` when the scene declares none) and maps it to a class pair via
+    ``ir_codecs.codec_for``, then constructs one instance of each -- board-free,
+    so this can run ahead of ``build_hardware`` and feed its ``ir_encoder`` /
+    ``ir_decoder`` seam directly.
+    """
+    codec_name = scene_registry.ir_codec_for(scene_name)
+    encoder_cls, decoder_cls = codec_for(codec_name)
+    return encoder_cls(), decoder_cls()
+
+
+def build_scene_runtime(
+    hw: DeviceHardware, scene_name: str, scene_registry: SceneRegistry | None = None
+) -> SceneRuntime:
     """Wire up the effect/rule/scene registries and load *scene_name*.
 
     Raises ``ValueError`` naming the known scenes when *scene_name* is not in
     the scanned scene registry. The returned ``SceneRuntime`` has the resolved
     scene already active — the caller only needs to drive the per-tick loop.
+
+    *scene_registry*, if supplied, is used as-is instead of scanning a fresh
+    one -- the seam ``run_scene`` uses to share the one registry scan it did
+    to resolve the boot-time IR codec (see ``resolve_ir_codec``) with the
+    scene load here, so an unknown scene name is discovered once, before
+    hardware is built, rather than scanned and validated twice. Omitted, a
+    fresh registry is scanned here so existing callers keep working unchanged.
     """
     effect_registry = PackRegistry(item_attr="BUILD")
     effect_registry.scan_dir("packs/effects", "packs.effects")
@@ -93,8 +121,9 @@ def build_scene_runtime(hw: DeviceHardware, scene_name: str) -> SceneRuntime:
         timer=timer,
     )
 
-    scene_registry = SceneRegistry()
-    scene_registry.scan_dir("packs/scenes", "packs.scenes")
+    if scene_registry is None:
+        scene_registry = SceneRegistry()
+        scene_registry.scan_dir("packs/scenes", "packs.scenes")
 
     # hw.audio_registry is the same AudioRegistry the device's AudioEffectOutput
     # resolves clips through — scanning effect-pack sounds into its base and
