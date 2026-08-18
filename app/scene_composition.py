@@ -125,28 +125,42 @@ def _ensure_card_on_sys_path(storage: DeviceStorage) -> bool:
     return True
 
 
+def _card_subdir_path(storage: DeviceStorage | None, subdir: str) -> str | None:
+    """Return the card's absolute ``aura_packs/<subdir>`` path, if it exists.
+
+    ``None`` when *storage* is ``None``, the mounted card carries no
+    top-level ``aura_packs/`` directory, or ``aura_packs/`` has no *subdir*
+    subdirectory. Otherwise ensures the card is on ``sys.path`` (via
+    ``_ensure_card_on_sys_path``) and returns the absolute path -- resolved
+    through the ``DeviceStorage`` port via ``storage.path``, never a
+    re-derived ``"/sd"`` literal, preserving its no-escape rule. Shared by
+    every card-scan helper so the presence checks read identically for
+    scenes and effect packs alike.
+    """
+    if storage is None:
+        return None
+    if not _ensure_card_on_sys_path(storage):
+        return None
+
+    subdir_path = storage.path(_path.join(_CARD_PACKS_DIR, subdir))
+    if not _path.isdir(subdir_path):
+        return None
+
+    return subdir_path
+
+
 def _scan_card_scenes(scene_registry: SceneRegistry, storage: DeviceStorage | None) -> None:
     """Scan the card's ``aura_packs/scenes`` into *scene_registry*, if present.
 
-    A no-op when *storage* is ``None`` or the mounted card carries no
-    top-level ``aura_packs/`` directory -- card scenes are purely additive on
-    top of flash discovery (see ``_ensure_card_on_sys_path``). The absolute
-    ``aura_packs/scenes`` path -- resolved through the ``DeviceStorage`` port
-    via ``storage.path``, never a re-derived ``"/sd"`` literal, preserving its
-    no-escape rule -- is scanned into *scene_registry* under the module prefix
+    A no-op when ``_card_subdir_path`` finds no ``aura_packs/scenes`` --
+    card scenes are purely additive on top of flash discovery. Otherwise the
+    path is scanned into *scene_registry* under the module prefix
     ``"aura_packs.scenes"``, the same registry flash scenes live in, so a
     scene name present on both sides raises via ``SceneRegistry.scan_dir``'s
-    cross-root collision check. Missing entirely (``aura_packs/`` with no
-    ``scenes/`` subdirectory), the scan is skipped rather than raising --
-    ``SceneRegistry.scan_dir`` has no directory-existence guard of its own.
+    cross-root collision check.
     """
-    if storage is None:
-        return
-    if not _ensure_card_on_sys_path(storage):
-        return
-
-    card_scenes_path = storage.path(_path.join(_CARD_PACKS_DIR, "scenes"))
-    if not _path.isdir(card_scenes_path):
+    card_scenes_path = _card_subdir_path(storage, "scenes")
+    if card_scenes_path is None:
         return
 
     scene_registry.scan_dir(card_scenes_path, _CARD_SCENES_MODULE_PREFIX)
@@ -155,14 +169,13 @@ def _scan_card_scenes(scene_registry: SceneRegistry, storage: DeviceStorage | No
 def _scan_card_effects(effect_registry: PackRegistry, storage: DeviceStorage | None) -> str | None:
     """Scan the card's ``aura_packs/effects`` into *effect_registry*, if present.
 
-    Mirrors ``_scan_card_scenes`` -- same ``storage is None`` / no top-level
-    ``aura_packs/`` no-op, same ``sys.path`` gating via
-    ``_ensure_card_on_sys_path`` -- but scans into the *same* effect
-    ``PackRegistry`` flash's ``packs/effects`` populates, under the distinct
-    module prefix ``"aura_packs.effects"``, rather than a ``SceneRegistry``.
-    A pack name present on both sides raises via ``PackRegistry.scan_dir``'s
-    existing cross-root collision check -- overriding a flash pack from the
-    card is out of scope, not silently allowed.
+    Mirrors ``_scan_card_scenes`` -- same no-op via ``_card_subdir_path`` --
+    but scans into the *same* effect ``PackRegistry`` flash's
+    ``packs/effects`` populates, under the distinct module prefix
+    ``"aura_packs.effects"``, rather than a ``SceneRegistry``. A pack name
+    present on both sides raises via ``PackRegistry.scan_dir``'s existing
+    cross-root collision check -- overriding a flash pack from the card is
+    out of scope, not silently allowed.
 
     Returns the absolute on-card effects-root path when a scan happened, so
     ``build_scene_runtime`` can add it to the roots ``_scan_effect_pack_sounds``
@@ -170,13 +183,8 @@ def _scan_card_effects(effect_registry: PackRegistry, storage: DeviceStorage | N
     every no-op case (no storage, no ``aura_packs/``, or ``aura_packs/`` with
     no ``effects/`` subdirectory).
     """
-    if storage is None:
-        return None
-    if not _ensure_card_on_sys_path(storage):
-        return None
-
-    card_effects_path = storage.path(_path.join(_CARD_PACKS_DIR, "effects"))
-    if not _path.isdir(card_effects_path):
+    card_effects_path = _card_subdir_path(storage, "effects")
+    if card_effects_path is None:
         return None
 
     effect_registry.scan_dir(card_effects_path, _CARD_EFFECTS_MODULE_PREFIX)
