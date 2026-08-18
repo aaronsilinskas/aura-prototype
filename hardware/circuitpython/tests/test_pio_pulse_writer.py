@@ -65,7 +65,7 @@ from hardware.circuitpython.pio_pulse_writer import (  # noqa: E402
     PioPulseWriter,
     _duration_us_to_loops,
 )
-from hardware.shared.ir_protocol import (  # noqa: E402
+from hardware.shared.ir_codecs.aura import (  # noqa: E402
     IR_HEADER_MARK,
     IR_LEAD_OUT,
     IR_UNIT,

@@ -69,7 +69,7 @@ hardware/         Hardware abstraction layer
                   counting_i2c, rfm69_radio_transport)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
                   device_config, device_hardware, network_controls, scene_selection,
-                  ir_transport, ir_protocol, tag_protocol, ir_telemetry, ir_manager,
+                  ir_transport, ir_codecs/ (base, aura, tag), ir_telemetry, ir_manager,
                   radio_transport, radio_manager, profiler_report)
 
 app/              Composition layer — the one place allowed to import both the engine's

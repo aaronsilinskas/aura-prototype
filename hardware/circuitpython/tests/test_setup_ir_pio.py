@@ -114,7 +114,7 @@ import pytest  # noqa: E402
 from hardware.circuitpython.device_builder import _make_writer  # noqa: E402
 from hardware.circuitpython.infrared_io import PulseOutWriter  # noqa: E402
 from hardware.circuitpython.pio_pulse_writer import PioPulseWriter  # noqa: E402
-from hardware.shared.ir_protocol import AuraInfraredEncoder  # noqa: E402
+from hardware.shared.ir_codecs.aura import AuraInfraredEncoder  # noqa: E402
 from hardware.shared.ir_transport import InfraredTransmitter  # noqa: E402
 
 _LINE_PIN = object()

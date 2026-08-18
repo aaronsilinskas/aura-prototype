@@ -8,11 +8,11 @@ from engine.engine import GameEngine
 from engine.network import NetworkEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls
-from hardware.shared.tag_protocol import TagData, encode_tag_data
 from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, PHASE_READY
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 from packs.scenes.tag.rules.hit_rule import TagHitRule
 from packs.scenes.tag.rules.tests.helpers import StubTimer, seed_phase
+from packs.scenes.tag.tag_data import TagData, encode_tag_data
 
 
 @pytest.fixture()

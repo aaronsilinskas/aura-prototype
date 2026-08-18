@@ -7,8 +7,9 @@ testable under plain CPython. Those contracts are first-party-to-first-party
 (``engine`` must not import ``hardware``, etc.); `import-linter`'s
 ``forbidden`` contract can name individual external modules too, but not a
 whole family sharing an ``adafruit_`` prefix (each chip ships its own PyPI
-name), so it cannot express this seam. This module parses every top-level
-``hardware/shared`` module with ``ast`` instead, mirroring
+name), so it cannot express this seam. This module parses every
+``hardware/shared`` module -- top-level and under its ``ir_codecs/``
+subpackage, but not ``tests/`` -- with ``ast`` instead, mirroring
 ``scripts/tests/test_profiler_import_guard.py``'s approach, and asserts none
 of them imports ``board``, ``busio``, ``pulseio``, ``digitalio``,
 ``microcontroller``, or any ``adafruit_*`` package -- except
@@ -81,7 +82,11 @@ def forbidden_imports(source: str, carve_out_lines: frozenset[int] = frozenset()
 
 
 def _shared_module_paths() -> list[Path]:
-    return sorted(_HARDWARE_SHARED_DIR.glob("*.py"))
+    return sorted(
+        path
+        for path in _HARDWARE_SHARED_DIR.rglob("*.py")
+        if "tests" not in path.relative_to(_HARDWARE_SHARED_DIR).parts
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +178,11 @@ def test_hardware_shared_modules_are_discovered() -> None:
     assert _shared_module_paths(), f"no modules found under {_HARDWARE_SHARED_DIR}"
 
 
-@pytest.mark.parametrize("path", _shared_module_paths(), ids=lambda p: p.name)
+@pytest.mark.parametrize(
+    "path",
+    _shared_module_paths(),
+    ids=lambda p: str(p.relative_to(_HARDWARE_SHARED_DIR)),
+)
 def test_hardware_shared_module_has_no_forbidden_import(path: Path) -> None:
     source = path.read_text()
     carve_out = (

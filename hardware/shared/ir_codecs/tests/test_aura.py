@@ -1,26 +1,23 @@
-"""Behaviour-driven tests for the Aura IR protocol codec.
+"""Behaviour-driven tests for the Aura IR wire-frame codec.
 
 Covers:
 - Round-trip encode→decode for several payload lengths
 - CRC mismatch rejection (no data emitted)
 - Short/malformed frame rejection
 - Signal-strength heuristic boundaries
-- Base-class contracts (InfraredEncoder, InfraredDecoder)
+- Noise tolerance and reset() semantics
 """
 
 import pytest
 
-from hardware.shared.ir_protocol import (
+from hardware.shared.ir_codecs.aura import (
     IR_MARK_ONE,
     IR_MARK_ZERO,
     IR_SPACE_ONE,
     IR_SPACE_ZERO,
     AuraInfraredDecoder,
     AuraInfraredEncoder,
-    InfraredDecoder,
-    InfraredEncoder,
 )
-from hardware.shared.tag_protocol import TAG_PREAMBLE, TagInfraredDecoder
 
 # ---------------------------------------------------------------------------
 # Local copies of wire-frame constants used by tests to corrupt pulses.
@@ -64,23 +61,6 @@ def _corrupt_last_crc_space(pulses: list) -> list:
     idx = len(corrupted) - 2
     corrupted[idx] = IR_SPACE_ONE if corrupted[idx] == IR_SPACE_ZERO else IR_SPACE_ZERO
     return corrupted
-
-
-# ---------------------------------------------------------------------------
-# Base-class contracts
-# ---------------------------------------------------------------------------
-
-
-def test_encoder_base_rejects_call_without_subclass():
-    enc = InfraredEncoder()
-    with pytest.raises(NotImplementedError):
-        enc.encode(b"\x01")
-
-
-def test_decoder_base_rejects_call_without_subclass():
-    dec = InfraredDecoder(_IR_ERROR_THRESHOLD)
-    with pytest.raises(NotImplementedError):
-        dec.decode(500)
 
 
 # ---------------------------------------------------------------------------
@@ -326,18 +306,6 @@ def test_reset_aborts_in_progress_decode():
 
     result = _feed_pulses(decoder, pulses[mid:])
     assert result is None
-
-
-def test_reset_does_not_zero_telemetry_counters():
-    decoder = TagInfraredDecoder()
-    bad_preamble = list(TAG_PREAMBLE)
-    bad_preamble[1] = 4000  # invalid but below the inter-frame gap threshold
-    _feed_pulses(decoder, bad_preamble)
-    assert decoder.preamble_reject == 1
-
-    decoder.reset()
-
-    assert decoder.preamble_reject == 1
 
 
 def test_reset_after_reset_allows_a_fresh_packet_to_decode_normally():

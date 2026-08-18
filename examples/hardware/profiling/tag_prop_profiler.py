@@ -123,13 +123,13 @@ from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.shared.device_config import load_device_config
 from hardware.shared.device_hardware import DeviceHardware
+from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiler_report import (
     print_profile_header,
     print_stats_line,
     print_table_row,
 )
-from hardware.shared.tag_protocol import TagInfraredDecoder, TagInfraredEncoder
 
 try:
     from typing import Final

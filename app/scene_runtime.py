@@ -15,7 +15,7 @@ from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
 from engine.network import NetworkEvents
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
-from hardware.shared.ir_protocol import InfraredDecoder, InfraredEncoder
+from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 
 try:
     from typing import Final

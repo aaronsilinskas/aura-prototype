@@ -5,8 +5,8 @@ implementations of the hardware-agnostic :class:`~hardware.shared.ir_transport.P
 and :class:`~hardware.shared.ir_transport.PulseWriter` port abstractions — wired
 to ``pulseio.PulseIn`` and ``pulseio.PulseOut`` respectively.
 
-These are the hardware leaves; all protocol logic lives in
-:mod:`hardware.shared.ir_protocol` and :mod:`hardware.shared.ir_transport`.
+These are the hardware leaves; all codec logic lives in
+:mod:`hardware.shared.ir_codecs` and :mod:`hardware.shared.ir_transport`.
 
 Usage::
 

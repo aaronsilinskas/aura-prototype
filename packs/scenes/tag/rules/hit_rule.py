@@ -25,10 +25,10 @@ from __future__ import annotations
 from engine.network import NetworkEvents
 from engine.phase import InPhaseRule
 from engine.state import GameState, Scope
-from hardware.shared.tag_protocol import decode_tag_data
 from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, tag_phase
 from packs.scenes.tag.rules.helpers.tag_config import tag_config
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
+from packs.scenes.tag.tag_data import decode_tag_data
 
 
 class TagHitRule(InPhaseRule):
