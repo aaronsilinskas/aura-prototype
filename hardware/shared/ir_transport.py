@@ -833,7 +833,8 @@ class InfraredMultiReceiver(InfraredSourceReceiver):
 
         Args:
             decoder: An instance of the decoder type to apply; only its type
-                is used.
+                is used. The type must be constructible with no arguments,
+                as every concrete decoder currently is.
         """
         decoder_type = type(decoder)
         self._decoders = [decoder_type() for _ in self._readers]
