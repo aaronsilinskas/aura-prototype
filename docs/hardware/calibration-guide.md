@@ -22,7 +22,7 @@ measured — edit them in the file before deploying:
 
 - `baseline_profiler.py`: `MODE` (`"engine_host"` / `"satellite"`).
 - `scene_load_profiler.py`: has no in-file config constant — it measures whatever the
-  deployed `aura-device.json`'s top-level `"scene"` key names, so select the scene by
+  deployed `aura-settings.json`'s `default_scene` key names, so select the scene by
   editing that file, not this module.
 - `pixel_profiler.py`: `DRIVER` (`"neopixel_pwm"` / `"is31fl3741_matrix"`).
 - `sound_profiler.py`: `NUM_VOICES` (re-run per voice count to record the scaling).
@@ -212,10 +212,11 @@ to drive the peak frame time.
 ## `scene_load_profiler.py` — per-scene in-situ baselines
 
 Feeds the **Per-scene in-situ baselines** table under *Whole-prop measurements*. Reads
-the deployed `aura-device.json` once (`read_device_config_mapping`), then derives both
-the prop (`parse_device_config`) and the scene to measure (`resolve_scene_name`, the
-config's top-level `"scene"` key) from that one mapping — the same config-driven source
-of truth `examples/hardware/scene_demo.py` / `run_scene` use, not an in-file table. It
+the deployed `aura-device.json` (`read_device_config_mapping`) to derive the prop
+(`parse_device_config`), and separately reads the deployed `aura-settings.json`
+(`read_settings_mapping`) to derive the scene to measure (`resolve_scene_name`, the
+settings' `default_scene` key) — the same config-driven source of truth
+`examples/hardware/scene_demo.py` / `run_scene` use, not an in-file table. It
 hands the parsed config to `build_hardware` with no codec argument (the default Aura
 wire-frame, the same seam `run_scene` uses) to stand up **whatever outputs the deployed
 config declares** (pixels, audio, IR, haptics driver -- all config-gated per #691), then loads the
@@ -236,8 +237,8 @@ one hardware-bundle delta followed by the stages the profiler still owns individ
 - **first-tick Δ** — the heap the first `SceneManager.update()` retains (opening effects
   fire for the first time: palettes/LUTs/buffers built, WAV files opened).
 
-Edit the deployed `aura-device.json`'s `"scene"` key to select the scene, and **confirm
-the deployed config matches the scene** — the registered audio clips, voice count, and
+Edit the deployed `aura-settings.json`'s `default_scene` key to select the scene, and
+**confirm the deployed config matches the scene** — the registered audio clips, voice count, and
 wired scopes/emitters it needs. There is no in-file harness table: the config is the
 single source of truth, and a recorded figure is valid **only for the `(scene, config)`
 pair it was measured against**. An unregistered scene name fails loudly, naming the known
