@@ -1,5 +1,4 @@
 {
-  "scene": "hardware_test",
   "high_current_rail": {
     "enabled": true,
     "pin": "GP28",

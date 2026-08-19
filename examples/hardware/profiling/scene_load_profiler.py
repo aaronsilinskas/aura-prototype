@@ -4,9 +4,9 @@ This is the diagnostic half of the capacity teardown (#460): it stands up **what
 prop the deployed ``aura-device.json`` describes** -- the same
 ``read_device_config_mapping`` -> ``parse_device_config`` -> ``build_hardware`` path
 ``examples/hardware/scene_demo.py`` drives via ``app.scene_runtime.run_scene`` -- loads
-the scene the config names, and reports the heap consumed in two headline stages (see
-"Hardware bring-up" below for the finer breakdown the ``__SCENE_STAGES`` line prints
-around them):
+the scene named by the deployed ``aura-settings.json``, and reports the heap consumed in
+two headline stages (see "Hardware bring-up" below for the finer breakdown the
+``__SCENE_STAGES`` line prints around them):
 
 - **`load` delta** -- the heap ``SceneManager.load(scene_name)`` retains: the scene
   graph (phases, rules, effects) instantiated against the prop's registered scopes.
@@ -82,10 +82,11 @@ Installation
      adafruit_lis3dh.mpy
      adafruit_drv2605.mpy  (optional - required only when a DRV2605L is wired up)
 
-3. Deploy an ``aura-device.json`` naming the scene to measure (top-level ``"scene"``
-   key) and registering that scene's clips/scopes -- see
-   ``examples/aura-device.rasppi-pico-2.json``. The file is required; a missing, invalid, or
-   unregistered-scene config fails loudly at import time, naming the known scenes.
+3. Deploy an ``aura-device.json`` registering the scene's clips/scopes -- see
+   ``examples/aura-device.rasppi-pico-2.json`` -- and an ``aura-settings.json`` naming the
+   scene to measure (its ``"default_scene"`` key) -- see ``examples/aura-settings.json``.
+   Both files are required; a missing or invalid config, settings file, or
+   unregistered scene name fails loudly at import time, naming the known scenes.
 
 4. Run the deploy script to copy all source files and set code.py:
      python scripts/deploy.py examples/hardware/profiling/scene_load_profiler.py
@@ -93,22 +94,23 @@ Installation
 
 How to use
 ----------
-- Set the deployed ``aura-device.json``'s top-level ``"scene"`` key to the scene you
-  want to measure -- CircuitPython has no argv, so the deployed config is the only
-  per-boot selector. A scene name absent from the scanned scene registry fails loud,
-  naming the known scenes.
-- Confirm the deployed config registers that scene's clips and wires the scopes/outputs
-  it targets -- an under-configured prop reproduces the headless-style artifact this
-  profiler exists to catch.
+- Set the deployed ``aura-settings.json``'s ``"default_scene"`` key to the scene you
+  want to measure -- CircuitPython has no argv, so the deployed settings file is the
+  only per-boot selector. A scene name absent from the scanned scene registry fails
+  loud, naming the known scenes.
+- Confirm the deployed ``aura-device.json`` registers that scene's clips and wires the
+  scopes/outputs it targets -- an under-configured prop reproduces the headless-style
+  artifact this profiler exists to catch.
 - Read the ``__SCENE_STAGES`` line for the staged free-heap breakdown and the
   ``__TABLE_ROW table=scene_in_situ_baselines`` line for the paste-ready row to
   record in ``docs/hardware/recorded-metrics.md``.
 
 Configuration
 -------------
-- aura-device.json: the single source of truth for both the prop under test and the
-  scene to measure (its ``"scene"`` key). Edit it, not this file, to change what is
-  measured.
+- aura-device.json: the single source of truth for the prop under test. Edit it, not
+  this file, to change what hardware is measured.
+- aura-settings.json: the single source of truth for the scene to measure (its
+  ``"default_scene"`` key). Edit it, not this file, to change which scene is measured.
 - LOG_INTERVAL_SECONDS: how often the post-load stats line is printed.
 """
 
@@ -130,6 +132,7 @@ from hardware.shared.device_config import (
     parse_device_config,
     read_device_config_mapping,
 )
+from hardware.shared.device_settings import read_settings_mapping
 from hardware.shared.profiler_report import (
     metrics_harness_label,
     print_profile_header,
@@ -145,7 +148,8 @@ except ImportError:
 
 # ---------------------------------------------------------------------------
 # Configuration -- how often the post-load stats line is printed. Everything
-# else this profiler measures comes from the deployed aura-device.json.
+# else this profiler measures comes from the deployed aura-device.json (the
+# prop) and aura-settings.json (the scene to measure).
 # ---------------------------------------------------------------------------
 
 LOG_INTERVAL_SECONDS: Final = 5.0
@@ -241,9 +245,8 @@ def _build_prop(scene_name: str, config: DeviceConfig) -> tuple[SceneManager, Ef
 
 def run() -> None:
     """Measure the deployed config's scene in-situ load/first-tick heap, then keep ticking."""
-    mapping = read_device_config_mapping()
-    config = parse_device_config(mapping)
-    scene_name = resolve_scene_name(mapping)
+    config = parse_device_config(read_device_config_mapping())
+    scene_name = resolve_scene_name(read_settings_mapping())
 
     print_profile_header(
         component=f"scene_load.{scene_name}",

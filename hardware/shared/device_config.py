@@ -1055,7 +1055,7 @@ def read_device_config_mapping(path: str = "aura-device.json") -> dict:
     """Return the raw config mapping from the JSON file at *path*.
 
     Returns the raw mapping, not a parsed :class:`DeviceConfig`, so callers can
-    read keys ``parse_device_config`` ignores (e.g. the ``"scene"`` selector).
+    read keys ``parse_device_config`` ignores.
 
     Raises:
         RuntimeError: If *path* does not exist. The device has no built-in
