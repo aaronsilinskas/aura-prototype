@@ -130,20 +130,29 @@ scene), not a device-config concern.
 ### Running an example
 
 Every scene (e.g. `hardware_test`, `red_light_green_light`, `element_browser`, `tag`) is
-selected via the `"scene"` key in `aura-device.json` and run through the single
+selected via the `default_scene` key in `aura-settings.json` and run through the single
 `scene_demo.py` entry point — including `tag`, whose `scene.json` declares the Tag IR
 wire-frame codec so it is wired in automatically:
 
+`aura-settings.json`:
+
 ```json
 {
-  "scene": "tag",
+  "default_scene": "tag"
+}
+```
+
+`aura-device.json`:
+
+```json
+{
   "pixels": { "..." : "..." },
   "buttons": ["D9", "D10"]
 }
 ```
 
 ```sh
-# Deploy scene_demo with a scene selected in aura-device.json:
+# Deploy scene_demo with a scene selected in aura-settings.json:
 python scripts/deploy_watch.py examples/hardware/scene_demo.py
 ```
 

@@ -1,25 +1,25 @@
 """Config-selected scene loader — RP2040 PropMaker Feather + IS31FL3741.
 
-Loads whichever scene ``aura-device.json`` names and runs it with the default
+Loads whichever scene ``aura-settings.json`` names and runs it with the default
 (Aura) IR wire-frame.  This is a thin entry point: it resolves the scene name
-from config and hands off to ``app.scene_runtime.run_scene``, which owns
-hardware bring-up and the main loop.
+from the device settings and hands off to ``app.scene_runtime.run_scene``,
+which owns hardware bring-up and the main loop.
 
 Scene selection
 ---------------
-Add a top-level ``"scene"`` string to ``aura-device.json``::
+Add a ``"default_scene"`` string to ``aura-settings.json``, kept alongside
+``aura-device.json`` on CIRCUITPY::
 
     {
-      "scene": "red_light_green_light",
-      "pixels": [ ... ],
-      "buttons": ["D9", "D10"]
+      "default_scene": "red_light_green_light"
     }
 
 There is no code-level default scene: a missing, empty, or non-string
-``"scene"`` value raises and stops the boot.  An unknown name (not in the
-scene registry) also raises, naming the known scenes, rather than silently
-running a fallback scene.  ``DeviceConfig`` carries no ``scene`` field — the
-key is read from the raw mapping here and ignored by ``parse_device_config``.
+``"default_scene"`` value raises and stops the boot.  An unknown name (not in
+the scene registry) also raises, naming the known scenes, rather than
+silently running a fallback scene.  ``DeviceConfig`` carries no ``scene``
+field — the hardware config (``aura-device.json``) has nothing to do with
+scene selection.
 
 Hardware
 --------
@@ -38,9 +38,11 @@ Installation
      adafruit_lis3dh.mpy
      adafruit_drv2605.mpy  (optional)
 
-3. Place ``aura-device.json`` in CIRCUITPY/ to declare pin/geometry and select
-   a scene via the ``"scene"`` key. It is required — the device has no built-in
-   default. Copy ``examples/aura-device.rasppi-pico-2.json`` as a starting point.
+3. Place ``aura-device.json`` in CIRCUITPY/ to declare pin/geometry, and
+   ``aura-settings.json`` to select a scene via the ``"default_scene"`` key.
+   Both are required — the device has no built-in default for either. Copy
+   ``examples/aura-device.rasppi-pico-2.json`` and ``examples/aura-settings.json``
+   as starting points.
 
 4. Run the deploy script to copy all source files and set code.py:
      python scripts/deploy.py examples/hardware/scene_demo.py
@@ -48,7 +50,7 @@ Installation
 """
 
 from app.scene_runtime import run_scene
-from hardware.shared.device_config import read_device_config_mapping
+from hardware.shared.device_settings import read_settings_mapping
 from hardware.shared.scene_selection import resolve_scene_name
 
-run_scene(resolve_scene_name(read_device_config_mapping()))
+run_scene(resolve_scene_name(read_settings_mapping()))

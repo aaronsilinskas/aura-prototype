@@ -68,9 +68,9 @@ hardware/         Hardware abstraction layer
                   neopixel_output, audio_output, infrared_io, pio_pulse_writer,
                   counting_i2c, rfm69_radio_transport)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
-                  device_config, device_hardware, network_controls, scene_selection,
-                  ir_transport, ir_codecs/ (base, aura, tag), ir_telemetry, ir_manager,
-                  radio_transport, radio_manager, profiler_report)
+                  device_config, device_settings, device_hardware, network_controls,
+                  scene_selection, ir_transport, ir_codecs/ (base, aura, tag), ir_telemetry,
+                  ir_manager, radio_transport, radio_manager, profiler_report)
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together

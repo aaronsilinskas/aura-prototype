@@ -6,7 +6,7 @@ from hardware.shared.scene_selection import resolve_scene_name
 
 
 def test_present_scene_name_is_used():
-    assert resolve_scene_name({"scene": "red_light_green_light"}) == "red_light_green_light"
+    assert resolve_scene_name({"default_scene": "red_light_green_light"}) == "red_light_green_light"
 
 
 def test_absent_scene_raises():
@@ -16,9 +16,9 @@ def test_absent_scene_raises():
 
 def test_empty_scene_raises():
     with pytest.raises(ValueError):
-        resolve_scene_name({"scene": ""})
+        resolve_scene_name({"default_scene": ""})
 
 
 def test_non_string_scene_raises():
     with pytest.raises(ValueError):
-        resolve_scene_name({"scene": 42})
+        resolve_scene_name({"default_scene": 42})

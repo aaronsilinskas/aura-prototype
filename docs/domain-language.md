@@ -210,8 +210,12 @@ A CircuitPython `EffectOutput` driving a DRV2605L haptic driver on all scopes (`
 _Avoid_: constructing with a `None` driver; reading `receipt.loudness` (the DRV2605L has no volume control); "motor" for the injected instance (use `driver`)
 
 ### aura-device.json
-The single **required** on-device file holding all hardware configuration; a missing file raises. Sections: `buttons`, `ir`, `pixels`, `audio`, `i2c`, `spi`, `radio`, `sdcard`, `high_current_rail`, `accelerometer`, `magnetometer`, `haptics`, plus a top-level `"scene"` string (read separately, **not** part of `DeviceConfig`). `pixels` and `buttons` are each an optional, possibly-empty list.
-_Avoid_: `settings.toml` (removed — unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`
+The single **required** on-device file holding all hardware configuration; a missing file raises. Sections: `buttons`, `ir`, `pixels`, `audio`, `i2c`, `spi`, `radio`, `sdcard`, `high_current_rail`, `accelerometer`, `magnetometer`, `haptics`. `pixels` and `buttons` are each an optional, possibly-empty list. Pure hardware config — scene selection lives in **`aura-settings.json`** instead.
+_Avoid_: `settings.toml` (removed — unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`; a top-level `"scene"` key (moved to `aura-settings.json`, #879)
+
+### aura-settings.json
+The single **required** on-device flash file holding device settings, host-authored and drag-editable over USB alongside `aura-device.json`; a missing file raises. Today it carries exactly one key, `default_scene` (`{"default_scene": "<name>"}`) — named for its *default*-selection role so a later SD-persisted override (#742) can layer on top without renaming the key. Read via `read_settings_mapping` (`hardware/shared/device_settings.py`), which mirrors `read_device_config_mapping`; the name is resolved from the mapping by `resolve_scene_name`.
+_Avoid_: reading `default_scene` from `aura-device.json` (moved out, #879); treating a stale `"scene"` key left in an old `aura-device.json` as meaningful (it is inert)
 
 ### DeviceConfig
 The validated value object produced by the pure `parse_device_config` parser (no `board` import) — it validates and normalizes an `aura-device.json` mapping but constructs no hardware. `isolate(keep)` derives a new config with every isolatable component but `keep` disabled.
