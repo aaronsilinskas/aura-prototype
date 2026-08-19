@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from hardware.shared.device_config import parse_device_config
 from scripts.deploy import deploy
 
 
@@ -44,16 +43,6 @@ def make_source_tree(root: Path) -> None:
     (root / "hardware" / "shared").mkdir()
     (root / "hardware" / "shared" / "__init__.py").write_text("")
     (root / "hardware" / "shared" / "matrix_output.py").write_text("# matrix_output")
-
-    (root / "examples").mkdir()
-    (root / "examples" / "aura-device.sample.json").write_text(
-        json.dumps(
-            {
-                "pixels": [{"type": "matrix", "cols": 13, "scope_rows": {"personal": [0, 2]}}],
-                "buttons": ["D9", "D10"],
-            }
-        )
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -653,51 +642,40 @@ def test_summary_includes_pruned_count(tmp_path: Path, capsys) -> None:
 
 
 # ---------------------------------------------------------------------------
-# --scene flag: write scene to aura-device.json (#489)
+# --scene flag: write default_scene to aura-settings.json (#880)
 # ---------------------------------------------------------------------------
 
 
-def test_scene_flag_sets_scene_key_in_existing_device_config(tmp_path: Path) -> None:
+def test_scene_flag_sets_default_scene_in_existing_settings_file(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    existing_config = {
-        "pixels": [{"type": "matrix", "cols": 13, "scope_rows": {"personal": [0, 1]}}],
-        "buttons": ["D9"],
-        "audio": {"voices": 2, "max_volume": 0.5},
-    }
-    (mount / "aura-device.json").write_text(json.dumps(existing_config))
+    (mount / "aura-settings.json").write_text(json.dumps({"default_scene": "tag"}))
 
     deploy(None, mount, source_root=source, compile=fake_compile, scene="red_light_green_light")
 
-    result = json.loads((mount / "aura-device.json").read_text())
-    assert result["scene"] == "red_light_green_light"
+    result = json.loads((mount / "aura-settings.json").read_text())
+    assert result["default_scene"] == "red_light_green_light"
 
 
-def test_scene_flag_preserves_other_keys_in_existing_device_config(tmp_path: Path) -> None:
+def test_scene_flag_preserves_other_settings_keys_when_scene_is_set(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    existing_config = {
-        "pixels": [{"type": "matrix", "cols": 13, "scope_rows": {"personal": [0, 1]}}],
-        "buttons": ["D9"],
-        "audio": {"voices": 2, "max_volume": 0.5},
-    }
-    (mount / "aura-device.json").write_text(json.dumps(existing_config))
+    existing_settings = {"default_scene": "tag", "brightness": 0.8}
+    (mount / "aura-settings.json").write_text(json.dumps(existing_settings))
 
-    deploy(None, mount, source_root=source, compile=fake_compile, scene="tag")
+    deploy(None, mount, source_root=source, compile=fake_compile, scene="hardware_test")
 
-    result = json.loads((mount / "aura-device.json").read_text())
-    assert result["buttons"] == ["D9"]
-    assert result["audio"]["voices"] == 2
-    assert result["pixels"] == existing_config["pixels"]
+    result = json.loads((mount / "aura-settings.json").read_text())
+    assert result["brightness"] == 0.8
 
 
-def test_scene_flag_seeds_config_from_sample_when_file_is_absent(tmp_path: Path) -> None:
+def test_scene_flag_creates_settings_file_fresh_when_absent(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
@@ -706,43 +684,73 @@ def test_scene_flag_seeds_config_from_sample_when_file_is_absent(tmp_path: Path)
 
     deploy(None, mount, source_root=source, compile=fake_compile, scene="hardware_test")
 
-    result = json.loads((mount / "aura-device.json").read_text())
-    assert result["scene"] == "hardware_test"
-    assert result["pixels"]
-    assert result["buttons"] == ["D9", "D10"]
-    parse_device_config(result)
+    result = json.loads((mount / "aura-settings.json").read_text())
+    assert result == {"default_scene": "hardware_test"}
 
 
-def test_omitting_scene_flag_leaves_existing_device_config_untouched(tmp_path: Path) -> None:
+def test_scene_flag_does_not_write_scene_key_into_device_config(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    original_content = json.dumps({"pixels": [], "buttons": ["D9"], "scene": "tag"})
+    existing_config = {
+        "pixels": [{"type": "matrix", "cols": 13, "scope_rows": {"personal": [0, 1]}}],
+        "buttons": ["D9"],
+    }
+    original_content = json.dumps(existing_config)
     device_config_path = mount / "aura-device.json"
     device_config_path.write_text(original_content)
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, compile=fake_compile, scene="tag")
 
     assert device_config_path.read_text() == original_content
 
 
-def test_scene_flag_with_dry_run_leaves_device_config_untouched(tmp_path: Path) -> None:
+def test_omitting_scene_flag_leaves_existing_settings_file_untouched(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    original_content = json.dumps({"pixels": [], "buttons": ["D9"], "scene": "tag"})
-    device_config_path = mount / "aura-device.json"
-    device_config_path.write_text(original_content)
+    original_content = json.dumps({"default_scene": "tag"})
+    settings_path = mount / "aura-settings.json"
+    settings_path.write_text(original_content)
+
+    deploy(None, mount, source_root=source, compile=fake_compile)
+
+    assert settings_path.read_text() == original_content
+
+
+def test_scene_flag_with_dry_run_leaves_settings_file_untouched(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    original_content = json.dumps({"default_scene": "tag"})
+    settings_path = mount / "aura-settings.json"
+    settings_path.write_text(original_content)
 
     deploy(
         None, mount, source_root=source, compile=fake_compile, scene="hardware_test", dry_run=True
     )
 
-    assert device_config_path.read_text() == original_content
+    assert settings_path.read_text() == original_content
+
+
+def test_scene_flag_with_dry_run_creates_no_settings_file_when_absent(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(
+        None, mount, source_root=source, compile=fake_compile, scene="hardware_test", dry_run=True
+    )
+
+    assert not (mount / "aura-settings.json").exists()
 
 
 # ---------------------------------------------------------------------------
