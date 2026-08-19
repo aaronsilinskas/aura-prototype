@@ -74,7 +74,7 @@ class InfraredTransceiver:
         """
         tx = self._transmitters.get(emitter)
         if tx is None:
-            raise ValueError("No transmitter wired for emitter: " + str(emitter))
+            raise ValueError(f"No transmitter wired for emitter: {emitter}")
         tx.send(data)
 
     def update(self) -> None:
