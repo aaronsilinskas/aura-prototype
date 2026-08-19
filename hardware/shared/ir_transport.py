@@ -233,6 +233,19 @@ class InfraredTransmitter:
         self._pending_queue: list[bytes] = []
         self._gate_armed: bool = False
 
+    def set_encoder(self, encoder: InfraredEncoder) -> None:
+        """Replace the encoder used to encode not-yet-started payloads.
+
+        The encoder is stateless and referenced only when a queued payload
+        starts encoding (see :meth:`_start_write`), and the pending queue
+        holds raw, not-yet-encoded payloads, so swapping the reference here
+        is sufficient — nothing derived from the old encoder needs resetting.
+
+        Args:
+            encoder: The replacement encoder.
+        """
+        self._encoder = encoder
+
     def send(self, data: bytes) -> bool:
         """Start transmitting *data* if idle, else append it to the FIFO queue.
 
@@ -440,6 +453,17 @@ class InfraredReceiver:
         """
         raise NotImplementedError
 
+    def set_decoder(self, decoder: InfraredDecoder) -> None:
+        """Replace the decoder(s) this receiver decodes through.
+
+        Args:
+            decoder: The replacement decoder.
+
+        Raises:
+            NotImplementedError: Always — subclasses must override.
+        """
+        raise NotImplementedError
+
     @property
     def last_signal_strength(self) -> "float | None":
         """Normalised signal quality (0.0–1.0) from the last received packet.
@@ -628,6 +652,21 @@ class InfraredSingleReceiver(InfraredSourceReceiver):
             self.pulses_dropped_transmitting += 1
         self._decoder.reset()
 
+    def set_decoder(self, decoder: InfraredDecoder) -> None:
+        """Install *decoder* as the one this receiver decodes through.
+
+        Updates both ``self._decoder`` — read by :meth:`receive` and the
+        ``last_signal_strength``/``last_error_margin`` accessors — and the
+        one-element decoder list :class:`InfraredSourceReceiver`'s telemetry
+        walks, so a swap can't silently desync telemetry from what actually
+        decodes.
+
+        Args:
+            decoder: The replacement decoder.
+        """
+        self._decoder = decoder
+        self._decoders[0] = decoder
+
     @property
     def last_signal_strength(self) -> "float | None":
         """Signal quality forwarded from the underlying decoder."""
@@ -782,6 +821,23 @@ class InfraredMultiReceiver(InfraredSourceReceiver):
         self.packets_surfaced += 1
 
         return scratch_packets[best_i]
+
+    def set_decoder(self, decoder: InfraredDecoder) -> None:
+        """Rebuild the per-reader decoder list from *decoder*'s type.
+
+        Builds one **fresh** ``type(decoder)`` instance per reader — mirroring
+        how ``__init__`` builds the list from ``decoder_factory`` — rather
+        than installing *decoder* itself, so stateful decoders are never
+        shared across readers. The passed-in *decoder* is discarded once its
+        type has been read.
+
+        Args:
+            decoder: An instance of the decoder type to apply; only its type
+                is used. The type must be constructible with no arguments,
+                as every concrete decoder currently is.
+        """
+        decoder_type = type(decoder)
+        self._decoders = [decoder_type() for _ in self._readers]
 
     def _drain_discard_all(self) -> None:
         """Drain every available pulse from every reader, discarding each.
