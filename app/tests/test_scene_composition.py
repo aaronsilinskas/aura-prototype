@@ -132,13 +132,9 @@ def test_build_scene_runtime_activates_a_scene_only_registered_in_the_supplied_s
 
 
 class _RecordingIrTransceiver:
-    """Fake exposing InfraredTransceiver's update()/received shape -- isolates
-    SceneRuntime wiring from InfraredTransceiver's own behaviour (covered
-    separately in hardware/shared/tests/test_ir_transceiver.py)."""
-
-    def __init__(self) -> None:
-        self.update_calls = 0
-        self.received: bytearray | None = None
+    """Stands in for an InfraredTransceiver instance -- isolates SceneRuntime
+    wiring (identity passthrough) from InfraredTransceiver's own behaviour
+    (covered separately in hardware/shared/tests/test_ir_transceiver.py)."""
 
 
 def test_build_scene_runtime_exposes_the_hardware_bundles_ir_as_runtime_ir():

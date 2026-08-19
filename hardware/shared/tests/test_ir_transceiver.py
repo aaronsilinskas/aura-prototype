@@ -3,6 +3,8 @@
 Covers:
 - send() routes a payload to the named transmitter, raising ValueError for
   an unknown emitter
+- busy() pumps and reports the named transmitter's in-flight state, raising
+  ValueError for an unknown emitter, without exposing the transmitter map
 - update() pumps every transmitter before it receives, always pumps even
   with no receiver wired, and resets received every tick
 - apply_codec() fans the encoder out to every transmitter and installs the
@@ -227,6 +229,46 @@ def test_transceiver_does_not_expose_transmitters_as_a_public_collection() -> No
     transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
 
     assert not hasattr(transceiver, "transmitters")
+
+
+# ---------------------------------------------------------------------------
+# busy() — pumps and reports one emitter's transmitter without exposing the
+# transmitter map itself
+# ---------------------------------------------------------------------------
+
+
+def test_busy_pumps_the_named_transmitter() -> None:
+    calls: list = []
+    transceiver = InfraredTransceiver({LINE: _RecordingTransmitter(calls)}, None, IrTransmitGate())
+
+    transceiver.busy(LINE)
+
+    assert calls == ["poll"]
+
+
+def test_busy_reports_the_writer_still_in_flight() -> None:
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, _StubEncoder())
+    transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
+    tx.send(b"\xab")
+    writer.set_busy(True)
+
+    assert transceiver.busy(LINE) is True
+
+
+def test_busy_reports_the_writer_idle() -> None:
+    tx, _ = _make_transmitter()
+    transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
+
+    assert transceiver.busy(LINE) is False
+
+
+def test_busy_raises_for_unwired_emitter() -> None:
+    tx, _ = _make_transmitter()
+    transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
+
+    with pytest.raises(ValueError):
+        transceiver.busy(CONE)
 
 
 # ---------------------------------------------------------------------------

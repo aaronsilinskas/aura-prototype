@@ -32,7 +32,7 @@ class InfraredTransceiver:
     this class never calls it directly.
 
     The transmitter map is never exposed as a raw collection; reach a
-    transmitter only through :meth:`send`.
+    transmitter only through :meth:`send` and :meth:`busy`.
 
     Args:
         transmitters: Map from emitter constant (``LINE``, ``CONE``,
@@ -78,6 +78,29 @@ class InfraredTransceiver:
         if tx is None:
             raise ValueError(f"No transmitter wired for emitter: {emitter}")
         tx.send(data)
+
+    def busy(self, emitter: str) -> bool:
+        """Pump *emitter*'s transmitter and report whether it is still busy.
+
+        The public seam for a caller that needs one emitter's in-flight
+        state — e.g. to gate a send on the previous transmit completing —
+        without reaching into the private transmitter map (see
+        :meth:`send`'s docstring). Pumping here is scoped to *emitter*
+        alone; :meth:`update` remains the only way to pump every wired
+        transmitter each tick.
+
+        Args:
+            emitter: One of the emitter constants (``LINE``, ``CONE``,
+                ``AREA_OF_EFFECT``).
+
+        Raises:
+            ValueError: If *emitter* is not in the transmitter map supplied
+                at construction time.
+        """
+        tx = self._transmitters.get(emitter)
+        if tx is None:
+            raise ValueError(f"No transmitter wired for emitter: {emitter}")
+        return tx.poll()
 
     def update(self) -> None:
         """Pump every transmitter, then receive — in that order, every tick.

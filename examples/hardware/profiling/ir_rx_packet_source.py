@@ -97,11 +97,9 @@ def _build_network_controls() -> tuple[HardwareNetworkControls, InfraredTranscei
     `run()`'s busy-gating loop (see its own docstring) needs LINE's raw
     busy state -- a runtime-lifecycle detail `HardwareNetworkControls`
     deliberately never surfaces (it is send-only, matching
-    `NetworkControls`). `InfraredTransceiver` does not expose per-emitter
-    busy state either (transmitters are never a public collection -- see
-    `InfraredTransceiver.send`'s docstring), so this reaches its private
-    `_transmitters` map; there is no public seam for this since #886
-    retired `TransmitPump`/`poll_transmits`.
+    `NetworkControls`). `InfraredTransceiver.busy` is the public seam for
+    LINE's raw busy state -- it never surfaces through
+    `HardwareNetworkControls`, which is send-only.
     """
     from hardware.circuitpython.device_builder import build_hardware
 
@@ -156,7 +154,7 @@ def run() -> None:
         # Poll exactly once per iteration -- the LINE busy state it reports
         # gates whether this iteration builds/sends a payload at all, so a
         # transmit still in flight is never overwritten with a fresh one.
-        line_busy = ir._transmitters[LINE].poll()
+        line_busy = ir.busy(LINE)
 
         if not line_busy:
             payload[0] = sequence & 0xFF
