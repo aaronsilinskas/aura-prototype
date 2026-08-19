@@ -44,7 +44,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   version.py      Pack semver parsing and comparison
   input.py        ButtonData, AccelerationData, InputEvents
   audio.py        AudioRegistry
-  network.py      NetworkEvents, TransmitPump
+  network.py      NetworkEvents
   effects/
     manager.py    EffectManager, EffectBuilder, EffectResolver
     output.py     EffectOutput (abstract hardware output port)
@@ -69,8 +69,8 @@ hardware/         Hardware abstraction layer
                   counting_i2c, rfm69_radio_transport)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
                   device_config, device_settings, device_hardware, network_controls,
-                  scene_selection, ir_transport, ir_codecs/ (base, aura, tag), ir_telemetry,
-                  ir_manager, radio_transport, radio_manager, profiler_report)
+                  scene_selection, ir_transport, ir_transceiver, ir_codecs/ (base, aura, tag),
+                  ir_telemetry, radio_transport, radio_manager, profiler_report)
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together
@@ -125,7 +125,6 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop()` plus `brightness`/`loudness` controls |
 | `ScopeValue` / `Scope` | `engine/state.py` | Output-agnostic routing keys (see glossary) |
 | `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam |
-| `TransmitPump` | `engine/network.py` | Runtime-facing pump seam, counterpart to `NetworkControls` |
 | `AudioOverlayAdmin` | `engine/audio.py` | Scene-transition sound seam, reserved for `SceneManager` |
 | `AudioRegistry` | `engine/audio.py` | Concrete `AudioOverlayAdmin`; resolves clip names to WAV paths |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update(timer)` tick |
@@ -149,9 +148,9 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `ValueWithModifiers` | `magic/values.py` | Base value + temporary multiplier stack |
 | `Duration` | `magic/values.py` | Expiry tracker: `update(elapsed) → bool` |
 | `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; optional `pixels` list plus optional IR/audio/I2C/sensor/haptics sections |
-| `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle `build_hardware` returns (outputs, sensors, seams, IR, radio, storage) |
-| `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete `(NetworkControls, TransmitPump)` adapter; built by `device_builder` |
-| `InfraredManager` | `hardware/shared/ir_manager.py` | Board-free per-tick IR orchestrator (pump then receive); exposes `received` + telemetry |
+| `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle `build_hardware` returns (outputs, sensors, network seam, `ir`, radio, storage) |
+| `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter; built by `device_builder`; `send_ir` delegates to `InfraredTransceiver` |
+| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, receiver, shared transmit gate); `send`, per-tick `update()` (pump then receive), `apply_codec` |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioManager` | `hardware/shared/radio_manager.py` | Board-free per-tick radio receive orchestrator; exposes `received` |
 | `SceneRuntime` | `app/scene_composition.py` | `__slots__` bundle from `build_scene_runtime` that `run_scene`'s loop drives |

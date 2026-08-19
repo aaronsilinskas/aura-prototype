@@ -3,14 +3,16 @@
 Owns the transmitter map, the receiver, and the shared :class:`IrTransmitGate`
 that keeps a device from decoding its own self-echo. Imports only the IR
 primitives from :mod:`hardware.shared.ir_transport` and the codec base types
-from :mod:`hardware.shared.ir_codecs.base` — no ``engine`` import, unlike
-:class:`~hardware.shared.ir_manager.InfraredManager`, since this class pumps
-its own transmitters directly rather than reaching them through a
-:class:`~engine.network.TransmitPump` seam.
+from :mod:`hardware.shared.ir_codecs.base` — no ``engine`` import, since this
+class pumps its own transmitters directly rather than reaching them through
+an ``engine``-side pump seam.
 
-Not yet wired into ``build_hardware`` — assembly (constructing the map,
-receiver, and gate, and swapping this in for ``HardwareNetworkControls``'s
-IR half and ``InfraredManager``) is a follow-up ticket.
+Assembled by :func:`~hardware.circuitpython.device_builder._setup_ir` and
+wired into :func:`~hardware.circuitpython.device_builder.build_hardware` as
+``DeviceHardware.ir`` and the ``ir`` reference
+``HardwareNetworkControls.send_ir`` delegates to — the single owner that
+replaced the old split across ``HardwareNetworkControls``'s transmitter map,
+``DeviceHardware.ir_receiver``, and ``InfraredManager``.
 """
 
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder

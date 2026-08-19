@@ -9,22 +9,17 @@ import pytest
 from app.scene_composition import build_scene_runtime, resolve_ir_codec
 from engine.audio import AudioRegistry
 from engine.events import Event, EventGroup
-from engine.network import TransmitPump
 from engine.scene import Scene, SceneRegistry
 from engine.state import Scope
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
-from hardware.shared.ir_manager import InfraredManager
-from hardware.shared.ir_transport import InfraredReceiver
 from hardware.shared.radio_manager import RadioManager
 from hardware.shared.radio_transport import RadioTransport
 
 
-def _fake_hw(
-    transmit_pump=None, ir_receiver=None, radio=None, audio_registry=None, storage=None
-) -> DeviceHardware:
+def _fake_hw(ir=None, radio=None, audio_registry=None, storage=None) -> DeviceHardware:
     """Return a DeviceHardware built entirely from CPython-safe fakes."""
     return DeviceHardware(
         outputs=[],
@@ -32,8 +27,7 @@ def _fake_hw(
         accelerometer=None,
         magnetometer=None,
         network_controls="fake-network-controls",
-        transmit_pump=transmit_pump if transmit_pump is not None else "fake-transmit-pump",
-        ir_receiver=ir_receiver,
+        ir=ir,
         radio=radio,
         storage=storage,
         audio_registry=audio_registry,
@@ -130,59 +124,37 @@ def test_build_scene_runtime_activates_a_scene_only_registered_in_the_supplied_s
 
 
 # ---------------------------------------------------------------------------
-# SceneRuntime.ir wiring (issue #654)
+# SceneRuntime.ir wiring (issue #886) -- build_scene_runtime no longer
+# assembles a separate IR object; SceneRuntime.ir is hw.ir directly, since
+# InfraredTransceiver (hardware/shared/ir_transceiver.py) is now the single
+# IR-subsystem owner.
 # ---------------------------------------------------------------------------
 
 
-class _CountingTransmitPump(TransmitPump):
-    """Records how many times poll_transmits() was called."""
+class _RecordingIrTransceiver:
+    """Fake exposing InfraredTransceiver's update()/received shape -- isolates
+    SceneRuntime wiring from InfraredTransceiver's own behaviour (covered
+    separately in hardware/shared/tests/test_ir_transceiver.py)."""
 
     def __init__(self) -> None:
-        self.poll_calls = 0
-
-    def poll_transmits(self) -> dict:
-        self.poll_calls += 1
-        return {}
+        self.update_calls = 0
+        self.received: bytearray | None = None
 
 
-class _StubReceiver(InfraredReceiver):
-    """Returns a fixed payload from every receive() call."""
+def test_build_scene_runtime_exposes_the_hardware_bundles_ir_as_runtime_ir():
+    """SceneRuntime.ir must be the exact hw.ir instance, not a wrapper or copy."""
+    ir = _RecordingIrTransceiver()
+    runtime = build_scene_runtime(_fake_hw(ir=ir), "tag")
 
-    def __init__(self, payload: bytearray) -> None:
-        super().__init__()
-        self._payload = payload
-
-    def receive(self) -> bytearray | None:
-        return self._payload
+    assert runtime.ir is ir
 
 
-def test_build_scene_runtime_exposes_an_infrared_manager_as_ir():
-    runtime = build_scene_runtime(_fake_hw(), "tag")
+def test_build_scene_runtime_ir_is_none_when_the_hardware_bundle_has_no_ir():
+    """A device with no ir section wired (hw.ir is None) carries that through
+    to the runtime unchanged, rather than substituting a placeholder."""
+    runtime = build_scene_runtime(_fake_hw(ir=None), "tag")
 
-    assert isinstance(runtime.ir, InfraredManager)
-
-
-def test_build_scene_runtime_wires_ir_to_the_hardware_bundles_transmit_pump():
-    """runtime.ir.update() must drive hw.transmit_pump, not a copy of it."""
-    pump = _CountingTransmitPump()
-    runtime = build_scene_runtime(_fake_hw(transmit_pump=pump), "tag")
-
-    runtime.ir.update()
-
-    assert pump.poll_calls == 1
-
-
-def test_build_scene_runtime_wires_ir_to_the_hardware_bundles_ir_receiver():
-    """runtime.ir.update() must drive hw.ir_receiver, surfacing its packet as received."""
-    payload = bytearray(b"\x01")
-    runtime = build_scene_runtime(
-        _fake_hw(transmit_pump=_CountingTransmitPump(), ir_receiver=_StubReceiver(payload)),
-        "tag",
-    )
-
-    runtime.ir.update()
-
-    assert runtime.ir.received is payload
+    assert runtime.ir is None
 
 
 # ---------------------------------------------------------------------------

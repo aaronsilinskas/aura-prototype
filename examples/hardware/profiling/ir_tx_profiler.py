@@ -55,6 +55,7 @@ import time
 from effects.performance import PerformanceTracker
 from engine.network import LINE
 from hardware.shared.device_config import load_device_config, require_pin
+from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiler_report import (
     print_profile_header,
@@ -73,7 +74,7 @@ TARGET_FPS: Final = 24.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
 
-def _build_network_controls() -> HardwareNetworkControls:
+def _build_network_controls() -> tuple[HardwareNetworkControls, InfraredTransceiver]:
     """Build the LINE transmitter directly (the same PulseOut + wrapper `setup_ir`
     constructs), but *without* the receiver -- the receiver's `PulseIn(maxlen=256)`
     belongs to the separate IR-rx component (`ir_rx_profiler.py`), not IR-tx. The
@@ -81,25 +82,32 @@ def _build_network_controls() -> HardwareNetworkControls:
     fails loudly with a "not declared" error if `ir.line` is absent -- this does
     NOT go through `build_hardware`, which would also allocate the receiver's
     `PulseIn(maxlen=256)` and pollute the transmit measurement.
+
+    Returns both the send-only `HardwareNetworkControls` seam and the
+    `InfraredTransceiver` it delegates to -- `run()` pumps the transceiver
+    directly (`transceiver.update()`) since the pump lifecycle no longer
+    lives on `HardwareNetworkControls`.
     """
     import board
     import pulseio
 
     from hardware.circuitpython.infrared_io import PulseOutWriter
     from hardware.shared.ir_codecs.aura import AuraInfraredEncoder
-    from hardware.shared.ir_transport import InfraredTransmitter
+    from hardware.shared.ir_transport import InfraredTransmitter, IrTransmitGate
 
     config = load_device_config()
     line_pin_name = require_pin(config, lambda c: c.ir.emitters["line"], "ir.line")
     line_pin = getattr(board, line_pin_name)
     pulseout = pulseio.PulseOut(line_pin, frequency=38000, duty_cycle=0x8000)
-    transmitter = InfraredTransmitter(PulseOutWriter(pulseout), AuraInfraredEncoder())
-    return HardwareNetworkControls({LINE: transmitter})
+    gate = IrTransmitGate()
+    transmitter = InfraredTransmitter(PulseOutWriter(pulseout), AuraInfraredEncoder(), gate=gate)
+    transceiver = InfraredTransceiver({LINE: transmitter}, None, gate)
+    return HardwareNetworkControls(transceiver), transceiver
 
 
 def run() -> None:
     """Sweep payload length, reporting PulseOut.send blocking duration."""
-    network_controls = _build_network_controls()
+    network_controls, transceiver = _build_network_controls()
 
     print_profile_header(
         component="ir_tx",
@@ -121,7 +129,7 @@ def run() -> None:
             send_start = time.monotonic()
             network_controls.send_ir(payload, LINE)
             blocking_send_ms = (time.monotonic() - send_start) * 1000.0
-            network_controls.poll_transmits()
+            transceiver.update()
             perf.add_update_time()
 
             if blocking_send_ms > worst_blocking_send_ms:

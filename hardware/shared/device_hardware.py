@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
-from engine.network import TransmitPump
 from engine.state import NetworkControls
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_storage import DeviceStorage
-from hardware.shared.ir_transport import InfraredReceiver
+from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.radio_transport import RadioTransport
 
 __all__ = ["DeviceHardware"]
@@ -17,12 +16,12 @@ __all__ = ["DeviceHardware"]
 class DeviceHardware:
     """Assembled hardware bundle produced by build_hardware.
 
-    ``network_controls`` and ``transmit_pump`` are the same
-    ``HardwareNetworkControls`` instance seen through its two declared faces
-    — the builder constructs it once and assigns both slots from it. Rules
-    reach the send-only ``network_controls``; the runtime loop reaches the
-    lifecycle-pumping ``transmit_pump``. Neither call site downcasts to the
-    other's type.
+    ``ir`` is the single owner of the whole IR subsystem (transmitters,
+    receiver, shared transmit gate) — the same ``InfraredTransceiver``
+    instance ``HardwareNetworkControls.send_ir`` reaches through. ``None``
+    exactly when there is no ``ir`` section declared (or it is disabled),
+    the same condition under which the old ``ir_receiver`` slot was
+    ``None``.
 
     ``radio`` is the same seam ``HardwareNetworkControls.send_radio`` reaches
     through — ``None`` on a device with no radio peripheral declared.
@@ -46,13 +45,12 @@ class DeviceHardware:
         "accelerometer",
         "audio_registry",
         "buttons",
-        "ir_receiver",
+        "ir",
         "magnetometer",
         "network_controls",
         "outputs",
         "radio",
         "storage",
-        "transmit_pump",
     )
 
     def __init__(
@@ -62,8 +60,7 @@ class DeviceHardware:
         accelerometer: object | None,
         magnetometer: object | None,
         network_controls: NetworkControls,
-        transmit_pump: TransmitPump,
-        ir_receiver: InfraredReceiver | None,
+        ir: InfraredTransceiver | None,
         radio: RadioTransport | None,
         storage: DeviceStorage | None,
         audio_registry: AudioRegistry | None,
@@ -73,8 +70,7 @@ class DeviceHardware:
         self.accelerometer: object | None = accelerometer
         self.magnetometer: object | None = magnetometer
         self.network_controls: NetworkControls = network_controls
-        self.transmit_pump: TransmitPump = transmit_pump
-        self.ir_receiver: InfraredReceiver | None = ir_receiver
+        self.ir: InfraredTransceiver | None = ir
         self.radio: RadioTransport | None = radio
         self.storage: DeviceStorage | None = storage
         self.audio_registry: AudioRegistry | None = audio_registry

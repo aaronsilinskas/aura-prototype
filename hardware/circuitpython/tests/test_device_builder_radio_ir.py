@@ -240,7 +240,7 @@ def test_describe_ir_no_emitters_notes_none() -> None:
 
 
 # ---------------------------------------------------------------------------
-# build_hardware sets hw.ir_receiver when config.ir is present
+# build_hardware sets hw.ir when config.ir is present
 # ---------------------------------------------------------------------------
 
 
@@ -256,10 +256,10 @@ def _neopixel_config_with_ir():
     return parse_device_config(mapping)
 
 
-def test_build_hardware_ir_config_sets_ir_receiver() -> None:
+def test_build_hardware_ir_config_sets_ir() -> None:
     config = _neopixel_config_with_ir()
     board_mock = _mock_board(D5=MagicMock(), D9=MagicMock(), D11=MagicMock(), D12=MagicMock())
-    mock_receiver = MagicMock()
+    mock_transceiver = MagicMock()
 
     with ExitStack() as stack:
         _enter_hw_patches(stack)
@@ -267,7 +267,7 @@ def test_build_hardware_ir_config_sets_ir_receiver() -> None:
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_ir",
-                return_value=({}, mock_receiver, "pio"),
+                return_value=(mock_transceiver, "pio"),
             )
         )
 
@@ -275,10 +275,10 @@ def test_build_hardware_ir_config_sets_ir_receiver() -> None:
 
         hw = build_hardware(config, board_module=board_mock)
 
-    assert hw.ir_receiver is not None
+    assert hw.ir is mock_transceiver
 
 
-def test_build_hardware_disabled_ir_section_leaves_ir_receiver_none() -> None:
+def test_build_hardware_disabled_ir_section_leaves_ir_none() -> None:
     """``ir: {enabled: false}`` is neither built nor probed (#692)."""
     config = _neopixel_config_with_ir()
     config.ir.enabled = False
@@ -295,7 +295,7 @@ def test_build_hardware_disabled_ir_section_leaves_ir_receiver_none() -> None:
 
         hw = build_hardware(config, board_module=board_mock)
 
-    assert hw.ir_receiver is None
+    assert hw.ir is None
     mock_setup_ir.assert_not_called()
 
 
@@ -320,8 +320,9 @@ def test_build_hardware_cone_only_ir_config_wires_only_cone_transmitter() -> Non
 
         hw = build_hardware(config, board_module=board_mock)
 
-    wired_emitters = set(hw.transmit_pump.poll_transmits().keys())
-    assert wired_emitters == {CONE}
+    hw.network_controls.send_ir(b"x", CONE)  # must not raise -- CONE is wired
+    with pytest.raises(ValueError):
+        hw.network_controls.send_ir(b"x", LINE)  # LINE was never wired
 
 
 def test_build_hardware_multi_pin_ir_rx_unknown_pin_raises_same_error_as_any_other_pin() -> None:
@@ -484,7 +485,7 @@ def test_build_hardware_logs_ir_ok_line_naming_rx_emitters_and_writer_kind() -> 
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_ir",
-                return_value=({LINE: MagicMock()}, MagicMock(), "pio"),
+                return_value=(MagicMock(), "pio"),
             )
         )
 
@@ -510,7 +511,7 @@ def test_build_hardware_logs_ir_writer_kind_matches_what_setup_ir_selected() -> 
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_ir",
-                return_value=({LINE: MagicMock()}, MagicMock(), "pulseio"),
+                return_value=(MagicMock(), "pulseio"),
             )
         )
 
@@ -539,7 +540,7 @@ def test_build_hardware_logs_ir_multi_receiver_wording_for_two_rx_pins() -> None
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_ir",
-                return_value=({LINE: MagicMock()}, MagicMock(), "pio"),
+                return_value=(MagicMock(), "pio"),
             )
         )
 

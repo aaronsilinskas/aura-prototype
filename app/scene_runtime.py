@@ -41,12 +41,14 @@ def run_scene(scene_name: str) -> None:
     scanned exactly once for the whole boot sequence.
 
     Drives ``runtime.ir.update()`` every tick (see
-    :class:`~hardware.shared.ir_manager.InfraredManager`), which owns the
-    pump-before-receive order and always runs regardless of whether a scene
-    is active. Prints the telemetry line from ``runtime.ir.telemetry_line()``
-    (see :mod:`hardware.shared.ir_telemetry`) when it returns one — the
-    receiver itself gates on whether a counter changed since the last call.
-    Also drives ``runtime.radio.update()`` every tick (see
+    :class:`~hardware.shared.ir_transceiver.InfraredTransceiver`), which owns
+    the pump-before-receive order and always runs regardless of whether a
+    scene is active — a no-op when ``runtime.ir`` is ``None`` (no ``ir``
+    section wired). Prints the telemetry line from
+    ``runtime.ir.telemetry_line()`` (see :mod:`hardware.shared.ir_telemetry`)
+    when it returns one — the receiver itself gates on whether a counter
+    changed since the last call. Also drives ``runtime.radio.update()`` every
+    tick (see
     :class:`~hardware.shared.radio_manager.RadioManager`), the radio parallel
     to the IR receive block. Constructs a live ``[hw]``-tagged
     :class:`~engine.log.Logger` and passes it to ``build_hardware`` so the
@@ -108,8 +110,10 @@ def run_scene(scene_name: str) -> None:
         # consumes this same tick. It also always receives when a receiver
         # is wired, so a packet decoded while no scene is active is
         # drained-and-dropped here rather than left to overflow — only the
-        # queuing below is conditional on a scene being active.
-        ir.update()
+        # queuing below is conditional on a scene being active. A no-op
+        # when no ir section is wired at all (ir is None).
+        if ir is not None:
+            ir.update()
 
         # Same unconditional rationale as ir.update() above: radio.update()
         # always polls for a waiting packet regardless of whether a scene is
@@ -120,7 +124,7 @@ def run_scene(scene_name: str) -> None:
         active_state = manager.active_state
 
         if active_state is not None:
-            if ir.received is not None:
+            if ir is not None and ir.received is not None:
                 active_state.queue_event(
                     NetworkEvents.IRReceived(
                         ir.received,
@@ -138,7 +142,7 @@ def run_scene(scene_name: str) -> None:
 
         if timer.total - _last_telemetry_print_total >= _TELEMETRY_PRINT_INTERVAL:
             _last_telemetry_print_total = timer.total
-            line = ir.telemetry_line()
+            line = ir.telemetry_line() if ir is not None else None
             if line is not None:
                 print(line)
 

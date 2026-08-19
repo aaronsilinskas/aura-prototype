@@ -11,7 +11,6 @@ __all__ = [
     "IR_EMITTERS",
     "LINE",
     "NetworkEvents",
-    "TransmitPump",
 ]
 
 # ---------------------------------------------------------------------------
@@ -68,28 +67,3 @@ class NetworkEvents:
             super().__init__(NetworkEvents.GROUP, "radio_received")
             self.data = data
             self.sender = sender
-
-
-class TransmitPump:
-    """Runtime-facing seam for pumping in-flight transmit lifecycle work.
-
-    A plain base class (not ``typing.Protocol``, which is unavailable on the
-    constrained runtimes) — the same substitute pattern as ``VoiceSink``.
-    Deliberately lives here rather than in ``engine/state.py``: that module
-    stays purely rule-facing, and ``NetworkControls`` never gains this
-    lifecycle method. The live adapter is ``HardwareNetworkControls``
-    (``hardware/shared/network_controls.py``), reached by the runtime loop
-    through ``DeviceHardware.transmit_pump`` rather than through the
-    send-only ``NetworkControls`` handle.
-    """
-
-    __slots__ = ()
-
-    def poll_transmits(self) -> dict[str, bool]:
-        """Pump every wired transmitter's in-flight write lifecycle forward.
-
-        Returns:
-            A map of each wired emitter constant to that transmitter's busy
-            state after this poll.
-        """
-        raise NotImplementedError
