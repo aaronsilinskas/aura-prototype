@@ -30,10 +30,6 @@ try:
 except ImportError:
     pass
 
-# Starter config copied onto a board that has no aura-device.json yet, when
-# --scene is used. There is no built-in default; this sample is the seed.
-_SAMPLE_DEVICE_CONFIG: Final = Path("examples/aura-device.sample.json")
-
 MODULE_DIRS: Final = [
     "app",
     "effects",
@@ -140,19 +136,17 @@ def _sync_file(
         print(f"COPY  {label}")
 
 
-def _write_scene(mount: Path, scene: str, source_root: Path) -> None:
-    """Set the ``"scene"`` key in ``aura-device.json``, seeding from the sample if absent.
+def _write_scene(mount: Path, scene: str) -> None:
+    """Set the ``default_scene`` key in ``aura-settings.json``, merging with any existing keys.
 
-    A board with no ``aura-device.json`` is seeded from the sample because there
-    is no built-in default config to fall back on.
+    A board with no ``aura-settings.json`` gets one created fresh holding only
+    ``default_scene`` — unlike ``aura-device.json``, there is no sample template to
+    seed from (the settings file is trivially authored).
     """
-    device_config_path = mount / "aura-device.json"
-    if device_config_path.exists():
-        config = json.loads(device_config_path.read_text())
-    else:
-        config = json.loads((source_root / _SAMPLE_DEVICE_CONFIG).read_text())
-    config["scene"] = scene
-    device_config_path.write_text(json.dumps(config, indent=2))
+    settings_path = mount / "aura-settings.json"
+    settings = json.loads(settings_path.read_text()) if settings_path.exists() else {}
+    settings["default_scene"] = scene
+    settings_path.write_text(json.dumps(settings, indent=2))
 
 
 def deploy(
@@ -173,7 +167,8 @@ def deploy(
         source_root: Root of the source tree. Defaults to ``Path.cwd()``.
         dry_run: When True, skip mount validation and print what would be copied
             without writing any files.
-        scene: Scene name to record in ``aura-device.json``; omit to leave it untouched.
+        scene: Scene name to record in ``aura-settings.json``'s ``default_scene`` key;
+            omit to leave it untouched.
         compile: Callable ``(src, dest) -> None`` used to compile each ``.py`` file
             to ``.mpy`` in a staging tree before syncing.  Defaults to the real
             ``mpy_cross_compile`` (requires ``mpy-cross`` installed).  Pass a fake
@@ -239,7 +234,7 @@ def deploy(
         sync_root = staging_root
 
     if scene is not None and not dry_run:
-        _write_scene(mount, scene, source_root)
+        _write_scene(mount, scene)
 
     copied: list[Path] = []
     skipped: list[Path] = []
@@ -333,9 +328,9 @@ def main() -> None:
         type=str,
         default=None,
         help=(
-            "Scene name to record in aura-device.json on the mounted volume. "
-            "Combines deploying code and selecting the game into one step. "
-            "Omit to leave any existing aura-device.json untouched."
+            "Scene name to record as default_scene in aura-settings.json on the mounted "
+            "volume. Combines deploying code and selecting the game into one step. "
+            "Omit to leave any existing aura-settings.json untouched."
         ),
     )
     parser.add_argument(
