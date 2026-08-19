@@ -611,6 +611,30 @@ def test_queued_send_encode_error_drops_only_the_failing_item_and_queue_keeps_dr
     assert writer.calls[-1] == list(encoder.encode(b"\x03"))
 
 
+# ---------------------------------------------------------------------------
+# InfraredTransmitter — set_encoder
+# ---------------------------------------------------------------------------
+
+
+def test_set_encoder_encodes_a_queued_payload_through_the_new_encoder():
+    """A payload queued behind a busy writer, then swapped to a different
+    codec family before it starts, must encode with the new encoder — proof
+    that set_encoder applies to not-yet-started payloads."""
+    writer = ControllableFakePulseWriter()
+    tx = InfraredTransmitter(writer, AuraInfraredEncoder())
+
+    tx.send(b"\x01")  # starts under the Aura encoder; writer goes busy
+    tx.send(b"\x02")  # queued — not yet encoded
+
+    new_encoder = TagInfraredEncoder()
+    tx.set_encoder(new_encoder)
+
+    writer.set_busy(False)
+    tx.poll()  # starts the queued payload — must encode under the new encoder
+
+    assert writer.calls[-1] == list(new_encoder.encode(b"\x02"))
+
+
 def _reordered_snapshot_init(
     self,
     packets_surfaced,
@@ -650,6 +674,12 @@ def test_receiver_base_raises_not_implemented():
     rx = InfraredReceiver()
     with pytest.raises(NotImplementedError):
         rx.receive()
+
+
+def test_receiver_base_set_decoder_raises_not_implemented():
+    rx = InfraredReceiver()
+    with pytest.raises(NotImplementedError):
+        rx.set_decoder(AuraInfraredDecoder())
 
 
 def test_receiver_base_telemetry_defaults_every_counter_to_zero():
@@ -1019,6 +1049,58 @@ def test_single_receiver_reset_telemetry_zeroes_pulses_dropped_transmitting():
 
 
 # ---------------------------------------------------------------------------
+# InfraredSingleReceiver — set_decoder
+# ---------------------------------------------------------------------------
+
+
+def test_single_receiver_set_decoder_decodes_a_pulse_stream_through_the_new_decoder():
+    """A packet encoded for the Tag protocol only decodes once the receiver's
+    decoder is swapped from Aura to Tag — proof that receive() runs pulses
+    through the newly installed decoder, not the one it was built with."""
+    payload = bytearray([0x10])
+    pulses = list(TagInfraredEncoder().encode(payload))
+    reader = FakePulseReader(pulses)
+    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+
+    rx.set_decoder(TagInfraredDecoder())
+
+    assert rx.receive() == payload
+
+
+def test_single_receiver_set_decoder_updates_last_signal_strength_and_last_error_margin():
+    """The dual-storage subtlety: last_signal_strength/last_error_margin read
+    the decoder set_decoder installs, not the one the receiver was built
+    with."""
+    payload = bytearray([0x20])
+    pulses = list(TagInfraredEncoder().encode(payload))
+    reader = FakePulseReader(pulses)
+    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+
+    rx.set_decoder(TagInfraredDecoder())
+    rx.receive()
+
+    assert rx.last_signal_strength == 1.0
+    assert rx.last_error_margin == 0
+
+
+def test_single_receiver_set_decoder_keeps_telemetry_counters_in_sync_with_the_new_decoder():
+    """The dual-storage subtlety, on the telemetry side: telemetry() walks
+    the receiver's one-element decoder list, which set_decoder must also
+    update — otherwise decode-time counters (e.g. preamble_reject) would be
+    read from the stale, no-longer-decoding decoder instance."""
+    bad_preamble = list(TAG_PREAMBLE)
+    bad_preamble[1] = 4000  # invalid but below the inter-frame gap threshold
+    reader = FakePulseReader(bad_preamble)
+    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+
+    new_decoder = TagInfraredDecoder()
+    rx.set_decoder(new_decoder)
+    rx.receive()
+
+    assert rx.telemetry().preamble_reject == new_decoder.preamble_reject == 1
+
+
+# ---------------------------------------------------------------------------
 # InfraredMultiReceiver — lowest-error-margin selection
 # ---------------------------------------------------------------------------
 
@@ -1385,6 +1467,66 @@ def test_multi_receiver_drop_path_allocates_nothing_per_tick():
         if stat.traceback[0].filename.endswith("/ir_transport.py") and stat.size_diff > 0
     ]
     assert not diff, f"Unexpected allocations in ir_transport.py during drop receive: {diff}"
+
+
+# ---------------------------------------------------------------------------
+# InfraredMultiReceiver — set_decoder
+# ---------------------------------------------------------------------------
+
+
+def test_multi_receiver_set_decoder_decodes_through_the_new_decoder_type():
+    """A packet encoded for the Tag protocol only decodes once the
+    receiver's decoders are swapped from Aura to Tag — proof that receive()
+    runs each reader's pulses through the newly installed decoder type."""
+    payload = bytearray([0x10])
+    pulses = list(TagInfraredEncoder().encode(payload))
+    rx, readers = _make_multi_receiver(2)
+
+    rx.set_decoder(TagInfraredDecoder())
+    readers[0].load(pulses)
+
+    assert rx.receive() == payload
+
+
+def test_multi_receiver_set_decoder_gives_each_reader_an_independent_decoder_instance():
+    """A partial decode left in progress on one reader must not corrupt an
+    independent, unrelated decode completing on another reader in the same
+    tick — proof set_decoder built one fresh decoder per reader rather than
+    sharing a single instance across them."""
+    payload = bytearray([0x30])
+    pulses = list(TagInfraredEncoder().encode(payload))
+    mid = len(pulses) // 2
+    rx, readers = _make_multi_receiver(2)
+    rx.set_decoder(TagInfraredDecoder())
+
+    readers[0].load(pulses[:mid])  # reader 0 left mid-decode, never completes
+    rx.receive()
+
+    readers[1].load(pulses)  # reader 1's independent, complete packet
+    result = rx.receive()
+
+    assert result == payload
+
+
+def test_multi_receiver_set_decoder_still_picks_the_lowest_error_margin_winner():
+    """The core multi-receiver selection guarantee — lowest error margin
+    wins — must keep working with the decoders set_decoder installs."""
+    payload = bytearray([0x40])
+    encoder = TagInfraredEncoder()
+    pulses_good = list(encoder.encode(payload))
+    pulses_noisy = list(encoder.encode(payload))
+    pulses_noisy[3] += 80  # 80 µs deviation — still within TAG_ERROR_MARGIN
+
+    rx, readers = _make_multi_receiver(2)
+    rx.set_decoder(TagInfraredDecoder())
+    readers[0].load(pulses_noisy)
+    readers[1].load(pulses_good)
+
+    result = rx.receive()
+
+    assert result == payload
+    assert rx.last_error_margin == 0
+    assert rx.last_best_receiver is readers[1]
 
 
 # ---------------------------------------------------------------------------
