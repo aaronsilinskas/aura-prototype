@@ -11,17 +11,17 @@ def test_present_scene_name_is_used():
 
 
 def test_absent_scene_raises():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"default_scene"):
         resolve_scene_name({})
 
 
 def test_empty_scene_raises():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"default_scene"):
         resolve_scene_name({"default_scene": ""})
 
 
 def test_non_string_scene_raises():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"default_scene"):
         resolve_scene_name({"default_scene": 42})
 
 

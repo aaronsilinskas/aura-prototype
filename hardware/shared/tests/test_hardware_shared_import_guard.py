@@ -108,6 +108,7 @@ def test_is_forbidden_root_excludes_first_party_and_stdlib_names() -> None:
     assert not is_forbidden_root("engine")
     assert not is_forbidden_root("hardware")
     assert not is_forbidden_root("sys")
+    assert not is_forbidden_root("keyboard")  # exact root, not substring match
 
 
 # ---------------------------------------------------------------------------

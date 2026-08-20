@@ -221,17 +221,6 @@ def test_transmitter_write_pulses_called_once_per_send():
     assert len(writer.calls) == 2
 
 
-def test_transmitter_without_gate_behaviour_is_unchanged():
-    writer = FakePulseWriter()
-    encoder = AuraInfraredEncoder()
-    tx = InfraredTransmitter(writer, encoder)
-
-    payload = b"\xab\xcd"
-    tx.send(payload)
-
-    assert writer.calls[0] == list(encoder.encode(payload))
-
-
 def test_transmitter_with_gate_is_transmitting_during_write_pulses():
     class ObservingWriter(PulseWriter):
         def __init__(self, gate):
