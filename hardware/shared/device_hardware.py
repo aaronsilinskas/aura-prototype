@@ -8,7 +8,7 @@ from engine.state import NetworkControls
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.radio_transport import RadioTransport
+from hardware.shared.radio_transceiver import RadioTransceiver
 
 __all__ = ["DeviceHardware"]
 
@@ -23,8 +23,11 @@ class DeviceHardware:
     the same condition under which the old ``ir_receiver`` slot was
     ``None``.
 
-    ``radio`` is the same seam ``HardwareNetworkControls.send_radio`` reaches
-    through — ``None`` on a device with no radio peripheral declared.
+    ``radio`` is the single owner of the radio subsystem's send and per-tick
+    receive — the same ``RadioTransceiver`` instance
+    ``HardwareNetworkControls.send_radio`` reaches through. ``None`` on a
+    device with no radio peripheral declared; the raw ``RadioTransport`` port
+    is private inside the transceiver and never exposed on this bundle.
 
     ``storage`` is typed as the port (``DeviceStorage``), never the concrete
     ``SdCardStorage`` adapter — ``None`` on a device with no ``sdcard``
@@ -61,7 +64,7 @@ class DeviceHardware:
         magnetometer: object | None,
         network_controls: NetworkControls,
         ir: InfraredTransceiver | None,
-        radio: RadioTransport | None,
+        radio: RadioTransceiver | None,
         storage: DeviceStorage | None,
         audio_registry: AudioRegistry | None,
     ) -> None:
@@ -71,6 +74,6 @@ class DeviceHardware:
         self.magnetometer: object | None = magnetometer
         self.network_controls: NetworkControls = network_controls
         self.ir: InfraredTransceiver | None = ir
-        self.radio: RadioTransport | None = radio
+        self.radio: RadioTransceiver | None = radio
         self.storage: DeviceStorage | None = storage
         self.audio_registry: AudioRegistry | None = audio_registry

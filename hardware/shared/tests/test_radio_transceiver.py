@@ -14,9 +14,7 @@ Covers:
   game event
 - send() takes no emitter argument (single channel)
 
-The _RecordingTransport fake mirrors the one in RadioManager's suite, ported
-here per issue #892 so RadioTransceiver has its own board-free fixtures;
-RadioManager and its own suite are untouched.
+The _RecordingTransport fake is this suite's own board-free fixture.
 """
 
 import pytest

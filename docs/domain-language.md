@@ -230,7 +230,7 @@ The top-level `app/` package: `scene_composition.py` builds the engine/effect/sc
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### SceneRuntime / build_scene_runtime
-`build_scene_runtime(hw, scene_name, scene_registry=None)` wires the registries, managers, and engine and loads the scene (raising when *scene_name* isn't registered), returning a `SceneRuntime` bundle (`manager`, `effect_manager`, `timer`, `ir`, `radio`) that `run_scene`'s per-tick loop drives. `SceneRuntime.ir` is `hw.ir` passed straight through (`InfraredTransceiver | None`) — no separate IR object is built. An omitted *scene_registry* is scanned fresh here; `run_scene` passes its own already-scanned registry instead, so the scene directory is scanned once per boot.
+`build_scene_runtime(hw, scene_name, scene_registry=None)` wires the registries, managers, and engine and loads the scene (raising when *scene_name* isn't registered), returning a `SceneRuntime` bundle (`manager`, `effect_manager`, `timer`, `ir`, `radio`) that `run_scene`'s per-tick loop drives. `SceneRuntime.ir` is `hw.ir` passed straight through (`InfraredTransceiver | None`), and `SceneRuntime.radio` is likewise `hw.radio` passed straight through (`RadioTransceiver | None`) — neither builds a separate wrapper object. An omitted *scene_registry* is scanned fresh here; `run_scene` passes its own already-scanned registry instead, so the scene directory is scanned once per boot.
 _Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing the transmit-then-receive order at a call site (drive `ir.update()`/`radio.update()`); scanning a second `SceneRegistry` when a caller already has one
 
 ### resolve_known_scene
@@ -242,20 +242,20 @@ _Avoid_: duplicating the known-scene check inline instead of calling this
 _Avoid_: calling it after hardware is already built (defeats the boot-time-selection point); duplicating the name-to-class mapping instead of delegating to `codec_for`
 
 ### device_builder
-The device-only hardware builder: `build_hardware(config, board, …)` resolves pin names and constructs the configured outputs/buttons/sensors/IR/radio, wrapping the assembled `InfraredTransceiver` and the radio transport in `HardwareNetworkControls`. Single-call (claims pins without deiniting); every component is config-gated, never presence-probed.
+The device-only hardware builder: `build_hardware(config, board, …)` resolves pin names and constructs the configured outputs/buttons/sensors/IR/radio, wrapping the assembled `InfraredTransceiver` and `RadioTransceiver` in `HardwareNetworkControls`. Single-call (claims pins without deiniting); every component is config-gated, never presence-probed.
 _Avoid_: returning a bare tuple/dict (return `DeviceHardware`); putting config parsing here (lives in the pure parser); calling it twice in one process
 
 ### DeviceHardware
-The named `__slots__` bundle `build_hardware` returns — a board-free data holder for the built outputs, buttons, sensors, network seam, `ir`, radio, and storage. `ir` is the same `InfraredTransceiver` instance `HardwareNetworkControls.send_ir` delegates to, `None` exactly when there is no `ir` section declared (or it is disabled); ports (`storage`, sensors) are typed as their abstract port or `object | None`, never the concrete adapter, keeping the module board-free.
-_Avoid_: exposing raw transmitters (use `network_controls`/`ir`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
+The named `__slots__` bundle `build_hardware` returns — a board-free data holder for the built outputs, buttons, sensors, network seam, `ir`, radio, and storage. `ir` is the same `InfraredTransceiver` instance `HardwareNetworkControls.send_ir` delegates to, `None` exactly when there is no `ir` section declared (or it is disabled); `radio` is likewise the same `RadioTransceiver` instance `HardwareNetworkControls.send_radio` delegates to, `None` on a device with no radio peripheral declared — the raw `RadioTransport` port is private inside the transceiver and never exposed on this bundle. Ports (`storage`, sensors) are typed as their abstract port or `object | None`, never the concrete adapter, keeping the module board-free.
+_Avoid_: exposing raw transmitters (use `network_controls`/`ir`); exposing the raw `RadioTransport` (use `network_controls`/`radio`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### RadioTransport
-The board-free half-duplex radio **port** `RadioManager` and `HardwareNetworkControls.send_radio` reach the chip through — one port for both directions because an RFM69-class chip is half-duplex. The live adapter is `Rfm69RadioTransport`.
+The board-free half-duplex radio **port** `RadioTransceiver` reaches the chip through — one port for both directions because an RFM69-class chip is half-duplex. The live adapter is `Rfm69RadioTransport`.
 _Avoid_: splitting it into send/receive ports; importing `adafruit_rfm69` here (that lives in the adapter)
 
-### RadioManager
-The board-free per-tick owner of the radio receive path; `update()` polls the transport once and exposes `received`. No transmit pump (the chip is half-duplex), and it builds the `NetworkEvents.RadioReceived` event itself.
-_Avoid_: a transmit pump or pump-before-receive order; a value-returning `update()` (read `received`)
+### RadioTransceiver
+The board-free single owner of a device's whole radio subsystem — assembled by `device_builder._setup_radio` and exposed as `DeviceHardware.radio`; `HardwareNetworkControls.send_radio` delegates to it. `send(data)` is a fire-and-forget write to the transport's single channel (no emitter to name, unlike IR — the whole capability is either present or absent). `update()` polls receive only and sets `received`/`last_sender` together each tick, or both to `None` — no transmit pump, since the chip is half-duplex and a fire-and-forget send leaves nothing to pump. Builds no game event itself: the raw payload and sender byte cross into game vocabulary only in `run_scene`, which builds `NetworkEvents.RadioReceived` next to the `IRReceived` block.
+_Avoid_: a transmit pump or pump-before-receive order; a value-returning `update()` (read `received`/`last_sender`); building `NetworkEvents.RadioReceived` here (that's `run_scene`'s job)
 
 ### Rfm69RadioTransport
 The live CircuitPython `RadioTransport` adapter wrapping `adafruit_rfm69.RFM69` — the only module importing that library, via a deferred import so a config with no `radio` section never requires it installed.

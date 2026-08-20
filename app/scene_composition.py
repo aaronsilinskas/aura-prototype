@@ -2,8 +2,8 @@
 
 CPython-testable: imports only ``engine`` and the board-free modules under
 ``hardware.shared`` (``device_hardware``, ``ir_codecs``, ``ir_transceiver``,
-``radio_manager``). No ``TYPE_CHECKING`` guard is needed because none of them
-carry board imports.
+``radio_transceiver``). No ``TYPE_CHECKING`` guard is needed because none of
+them carry board imports.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs import codec_for
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.radio_manager import RadioManager
+from hardware.shared.radio_transceiver import RadioTransceiver
 
 __all__ = ["SceneRuntime", "build_scene_runtime", "resolve_ir_codec", "resolve_known_scene"]
 
@@ -33,7 +33,9 @@ class SceneRuntime:
     ``manager`` applies scene transitions, ``effect_manager`` renders the
     active scene's effects, ``timer`` tracks elapsed/total tick time, ``ir``
     is the device's ``InfraredTransceiver`` (``None`` on a device with no IR
-    subsystem wired), and ``radio`` owns the per-tick radio receive poll.
+    subsystem wired), and ``radio`` is the device's ``RadioTransceiver``
+    (``None`` on a device with no radio peripheral wired) — both passed
+    straight through from ``DeviceHardware``, no separate object built here.
     """
 
     __slots__ = ("effect_manager", "ir", "manager", "radio", "timer")
@@ -44,13 +46,13 @@ class SceneRuntime:
         effect_manager: EffectManager,
         timer: Timer,
         ir: InfraredTransceiver | None,
-        radio: RadioManager,
+        radio: RadioTransceiver | None,
     ) -> None:
         self.manager: SceneManager = manager
         self.effect_manager: EffectManager = effect_manager
         self.timer: Timer = timer
         self.ir: InfraredTransceiver | None = ir
-        self.radio: RadioManager = radio
+        self.radio: RadioTransceiver | None = radio
 
 
 _EFFECT_PACKS_DIR = "packs/effects"
@@ -289,8 +291,6 @@ def build_scene_runtime(
     manager.load(resolve_known_scene(scene_registry, scene_name))
     manager.update()  # applies the load transition; the scene is now active
 
-    radio = RadioManager(hw.radio)
-
     return SceneRuntime(
-        manager=manager, effect_manager=effect_manager, timer=timer, ir=hw.ir, radio=radio
+        manager=manager, effect_manager=effect_manager, timer=timer, ir=hw.ir, radio=hw.radio
     )

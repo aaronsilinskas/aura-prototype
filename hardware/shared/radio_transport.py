@@ -1,9 +1,8 @@
 """RadioTransport — the board-free half-duplex radio port.
 
-Provides the ``RadioTransport`` port abstraction that ``RadioManager`` reaches
-the physical radio peripheral through, and that ``HardwareNetworkControls.send_radio``
-is intended to reach through once wired (still a stub as of this module).
-One port serves both directions because a single RFM69-class chip is
+Provides the ``RadioTransport`` port abstraction that ``RadioTransceiver``
+reaches the physical radio peripheral through for both send and per-tick
+receive. One port serves both directions because a single RFM69-class chip is
 half-duplex — there is no separate send/receive pair the way IR has
 ``PulseWriter``/``PulseReader``.
 
@@ -16,8 +15,7 @@ __all__ = ["RadioTransport"]
 
 
 class RadioTransport:
-    """Port through which ``RadioManager`` and ``HardwareNetworkControls``
-    reach a half-duplex radio chip.
+    """Port through which ``RadioTransceiver`` reaches a half-duplex radio chip.
 
     A plain base class — the same substitute pattern as ``VoiceSink`` and
     ``PulseReader``/``PulseWriter`` (``typing.Protocol`` is unavailable on

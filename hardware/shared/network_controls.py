@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from engine.state import NetworkControls
 from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.radio_transport import RadioTransport
+from hardware.shared.radio_transceiver import RadioTransceiver
 
 __all__ = ["HardwareNetworkControls"]
 
@@ -15,17 +15,18 @@ class HardwareNetworkControls(NetworkControls):
     Implements ``NetworkControls`` only — the runtime-facing IR pump-then-
     receive lifecycle now lives entirely on ``InfraredTransceiver.update()``,
     reached by the runtime loop through ``DeviceHardware.ir`` rather than
-    through this seam.
+    through this seam. Radio's per-tick receive lifecycle lives the same way
+    on ``RadioTransceiver.update()``, reached through ``DeviceHardware.radio``.
 
     Args:
         ir: The wired :class:`InfraredTransceiver`, or ``None`` on a device
             with no ``ir`` section declared (or a disabled one) —
             ``send_ir`` then raises ``ValueError`` for every emitter.
-        radio: The wired :class:`RadioTransport`, or ``None`` on a device
+        radio: The wired :class:`RadioTransceiver`, or ``None`` on a device
             with no radio peripheral declared — in which case ``send_radio``
-            is a no-op rather than raising, unlike ``send_ir``'s transceiver
-            reference (radio has no name to look up; the whole capability is
-            either present or absent).
+            is a silent no-op rather than raising, unlike ``send_ir``'s
+            missing-transceiver case (radio has no emitter name to fail on;
+            the whole capability is either present or absent).
     """
 
     __slots__ = ("_ir", "_radio")
@@ -33,7 +34,7 @@ class HardwareNetworkControls(NetworkControls):
     def __init__(
         self,
         ir: InfraredTransceiver | None,
-        radio: RadioTransport | None = None,
+        radio: RadioTransceiver | None = None,
     ) -> None:
         self._ir = ir
         self._radio = radio
@@ -59,9 +60,9 @@ class HardwareNetworkControls(NetworkControls):
         self._ir.send(data, emitter)
 
     def send_radio(self, data: bytes) -> None:
-        """Transmit *data* via the wired :class:`RadioTransport`.
+        """Transmit *data* via the wired :class:`RadioTransceiver`.
 
-        Fire-and-forget, matching ``send_ir``. A no-op when no radio
+        Fire-and-forget, matching ``send_ir``. A silent no-op when no radio
         peripheral is wired (``radio=None`` at construction).
 
         Args:

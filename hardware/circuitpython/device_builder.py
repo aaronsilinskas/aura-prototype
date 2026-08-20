@@ -73,7 +73,7 @@ from hardware.shared.ir_transport import (
 )
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiler_report import board_id
-from hardware.shared.radio_transport import RadioTransport
+from hardware.shared.radio_transceiver import RadioTransceiver
 
 __all__ = [
     "build_hardware",
@@ -552,8 +552,13 @@ def _require_spi(spi: busio.SPI | None, section: str) -> busio.SPI:
     return spi
 
 
-def _setup_radio(spi: busio.SPI, radio_cfg: RadioConfig, board_module: object) -> RadioTransport:
-    """Return a configured Rfm69RadioTransport from *radio_cfg* on *spi*.
+def _setup_radio(spi: busio.SPI, radio_cfg: RadioConfig, board_module: object) -> RadioTransceiver:
+    """Return a RadioTransceiver wrapping a configured Rfm69RadioTransport from
+    *radio_cfg* on *spi*.
+
+    A faithful mirror of :func:`_setup_ir`'s shape: assembles the live
+    transport, then hands it to :class:`RadioTransceiver`, the single
+    board-free owner of the radio subsystem's send and per-tick receive.
 
     ``Rfm69RadioTransport`` (``hardware.circuitpython.rfm69_radio_transport``)
     is imported here, not at module load, so a config with no ``radio``
@@ -564,7 +569,8 @@ def _setup_radio(spi: busio.SPI, radio_cfg: RadioConfig, board_module: object) -
 
     cs = digitalio.DigitalInOut(_resolve_pin(board_module, "radio.cs", radio_cfg.cs))
     reset = digitalio.DigitalInOut(_resolve_pin(board_module, "radio.reset", radio_cfg.reset))
-    return Rfm69RadioTransport(spi, cs, reset, radio_cfg.frequency, radio_cfg.node)
+    transport = Rfm69RadioTransport(spi, cs, reset, radio_cfg.frequency, radio_cfg.node)
+    return RadioTransceiver(transport)
 
 
 def _setup_sdcard(spi: busio.SPI, sdcard_cfg: SDCardConfig, board_module: object) -> DeviceStorage:
