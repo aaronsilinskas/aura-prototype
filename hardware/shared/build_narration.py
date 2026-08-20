@@ -14,6 +14,9 @@ from __future__ import annotations
 
 try:
     from collections.abc import Callable
+    from typing import TypeVar
+
+    T = TypeVar("T")
 except ImportError:
     pass  # Not available on CircuitPython
 
@@ -25,8 +28,8 @@ __all__ = ["narrate_skip", "narrate_step"]
 def narrate_step(
     logger: Logger,
     description: str,
-    build: Callable[[], tuple[object, str]],
-) -> object:
+    build: Callable[[], tuple[T, str]],
+) -> T:
     """Narrate one build step: open, build, close — or fail and re-raise.
 
     Opens *logger*'s line with *description* **before** calling *build*, so a
