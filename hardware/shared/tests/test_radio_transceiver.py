@@ -12,10 +12,11 @@ Covers:
   transport wired, and takes no emitter argument (single channel)
 - received is never a NetworkEvents.RadioReceived — this module builds no
   game event
+- send() takes no emitter argument (single channel)
 
-The _RecordingTransport fake is the same one RadioManager's suite uses,
-moved here per issue #892 since RadioTransceiver is now the board-free seam
-under test; RadioManager and its own suite are untouched.
+The _RecordingTransport fake mirrors the one in RadioManager's suite, ported
+here per issue #892 so RadioTransceiver has its own board-free fixtures;
+RadioManager and its own suite are untouched.
 """
 
 import pytest
