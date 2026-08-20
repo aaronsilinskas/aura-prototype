@@ -1,9 +1,10 @@
 import pytest
 
 from engine.engine import GameEngine
-from engine.network import CONE, LINE, TransmitPump
+from engine.network import CONE, LINE
 from engine.state import EffectControls, NetworkControls, SceneControls
-from hardware.shared.ir_transport import InfraredTransmitter, PulseWriter
+from hardware.shared.ir_transceiver import InfraredTransceiver
+from hardware.shared.ir_transport import InfraredTransmitter, IrTransmitGate, PulseWriter
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.radio_transport import RadioTransport
 
@@ -42,14 +43,18 @@ def _make_transmitter() -> tuple[InfraredTransmitter, _RecordingPulseWriter]:
     return tx, writer
 
 
+def _make_transceiver(**transmitters: InfraredTransmitter) -> InfraredTransceiver:
+    return InfraredTransceiver(transmitters, None, IrTransmitGate())
+
+
 # ---------------------------------------------------------------------------
-# HardwareNetworkControls — emitter map construction and dispatch
+# HardwareNetworkControls — send_ir delegates to the wired transceiver
 # ---------------------------------------------------------------------------
 
 
 def test_hardware_network_controls_send_ir_dispatches_correct_data() -> None:
     tx, writer = _make_transmitter()
-    controls = HardwareNetworkControls({CONE: tx})
+    controls = HardwareNetworkControls(_make_transceiver(**{CONE: tx}))
 
     controls.send_ir(b"\xab\xcd", CONE)
 
@@ -61,17 +66,17 @@ def test_hardware_network_controls_send_ir_hides_writer_completion_state() -> No
     (blocking vs. DMA/PIO) stays below this seam, owned by
     InfraredTransmitter, and never leaks upward as a bool."""
     tx, _ = _make_transmitter()
-    controls = HardwareNetworkControls({LINE: tx})
+    controls = HardwareNetworkControls(_make_transceiver(**{LINE: tx}))
 
     assert controls.send_ir(b"\x01", LINE) is None
 
 
 def test_send_ir_through_declared_network_controls_type_hides_writer_completion_state() -> None:
     """Guards the rule-facing call shape: a rule holds `state.network_controls`
-    typed as `NetworkControls`, never `HardwareNetworkControls` or a pump --
-    calling `send_ir` through that declared type is honest fire-and-forget."""
+    typed as `NetworkControls`, never `HardwareNetworkControls` -- calling
+    `send_ir` through that declared type is honest fire-and-forget."""
     tx, writer = _make_transmitter()
-    controls: NetworkControls = HardwareNetworkControls({LINE: tx})
+    controls: NetworkControls = HardwareNetworkControls(_make_transceiver(**{LINE: tx}))
 
     result = controls.send_ir(b"\x01", LINE)
 
@@ -82,7 +87,7 @@ def test_send_ir_through_declared_network_controls_type_hides_writer_completion_
 def test_hardware_network_controls_send_ir_routes_to_correct_transmitter() -> None:
     tx_line, writer_line = _make_transmitter()
     tx_cone, writer_cone = _make_transmitter()
-    controls = HardwareNetworkControls({LINE: tx_line, CONE: tx_cone})
+    controls = HardwareNetworkControls(_make_transceiver(**{LINE: tx_line, CONE: tx_cone}))
 
     controls.send_ir(b"\xff", CONE)
 
@@ -92,107 +97,45 @@ def test_hardware_network_controls_send_ir_routes_to_correct_transmitter() -> No
 
 def test_hardware_network_controls_send_ir_raises_for_unwired_emitter() -> None:
     tx, _ = _make_transmitter()
-    controls = HardwareNetworkControls({LINE: tx})
+    controls = HardwareNetworkControls(_make_transceiver(**{LINE: tx}))
 
     with pytest.raises(ValueError):
         controls.send_ir(b"x", CONE)
 
 
-def test_hardware_network_controls_send_ir_raises_for_empty_map() -> None:
-    controls = HardwareNetworkControls({})
+def test_hardware_network_controls_send_ir_raises_for_empty_transceiver() -> None:
+    controls = HardwareNetworkControls(_make_transceiver())
 
     with pytest.raises(ValueError):
         controls.send_ir(b"x", LINE)
 
 
-class _PollCountingTransmitter:
-    """Fake transmitter that just records how many times poll() was called —
-    isolates HardwareNetworkControls.poll_transmits's fan-out from
-    InfraredTransmitter's own poll() behaviour (covered separately)."""
+def test_hardware_network_controls_send_ir_raises_when_no_transceiver_is_wired() -> None:
+    controls = HardwareNetworkControls(None)
 
-    def __init__(self, busy_after_poll: bool = False) -> None:
-        self.poll_calls = 0
-        self._busy_after_poll = busy_after_poll
-
-    def poll(self) -> bool:
-        self.poll_calls += 1
-        return self._busy_after_poll
-
-    def send(self, data: bytes) -> bool:
-        return True  # not exercised by these tests
+    with pytest.raises(ValueError):
+        controls.send_ir(b"x", LINE)
 
 
-def test_poll_transmits_polls_every_wired_transmitter() -> None:
-    tx_line = _PollCountingTransmitter()
-    tx_cone = _PollCountingTransmitter()
-    controls = HardwareNetworkControls({LINE: tx_line, CONE: tx_cone})
+class _RecordingIrTransceiver:
+    """Fake transceiver that just records send() calls -- isolates
+    HardwareNetworkControls.send_ir's delegation from InfraredTransceiver's
+    own send() behaviour (covered separately in test_ir_transceiver.py)."""
 
-    controls.poll_transmits()
+    def __init__(self) -> None:
+        self.calls: list[tuple[bytes, str]] = []
 
-    assert tx_line.poll_calls == 1
-    assert tx_cone.poll_calls == 1
-
-
-def test_poll_transmits_polls_each_transmitter_once_per_call() -> None:
-    tx = _PollCountingTransmitter()
-    controls = HardwareNetworkControls({LINE: tx})
-
-    controls.poll_transmits()
-    controls.poll_transmits()
-
-    assert tx.poll_calls == 2
+    def send(self, data: bytes, emitter: str) -> None:
+        self.calls.append((data, emitter))
 
 
-def test_poll_transmits_is_a_noop_with_no_wired_transmitters() -> None:
-    controls = HardwareNetworkControls({})
-    controls.poll_transmits()  # must not raise
+def test_hardware_network_controls_send_ir_delegates_to_the_wired_transceiver() -> None:
+    transceiver = _RecordingIrTransceiver()
+    controls = HardwareNetworkControls(transceiver)
 
+    controls.send_ir(b"\x01", LINE)
 
-def test_poll_transmits_maps_each_emitter_to_its_own_busy_state() -> None:
-    tx_line = _PollCountingTransmitter(busy_after_poll=True)
-    tx_cone = _PollCountingTransmitter(busy_after_poll=False)
-    controls = HardwareNetworkControls({LINE: tx_line, CONE: tx_cone})
-
-    result = controls.poll_transmits()
-
-    assert result == {LINE: True, CONE: False}
-
-
-def test_poll_transmits_returns_the_same_dict_instance_across_calls() -> None:
-    """Pre-allocated at construction, mutated in place — no per-call allocation."""
-    tx = _PollCountingTransmitter()
-    controls = HardwareNetworkControls({LINE: tx})
-
-    first = controls.poll_transmits()
-    second = controls.poll_transmits()
-
-    assert first is second
-
-
-def test_poll_transmits_with_no_wired_transmitters_returns_empty_dict() -> None:
-    controls = HardwareNetworkControls({})
-
-    assert controls.poll_transmits() == {}
-
-
-def test_hardware_network_controls_satisfies_both_network_controls_and_transmit_pump() -> None:
-    controls = HardwareNetworkControls({})
-
-    assert isinstance(controls, NetworkControls)
-    assert isinstance(controls, TransmitPump)
-
-
-def test_poll_transmits_through_declared_transmit_pump_type_mutates_dict_in_place() -> None:
-    """Guards the runtime's actual call shape: `hw.transmit_pump` is declared
-    as TransmitPump, never downcast to HardwareNetworkControls."""
-    tx = _PollCountingTransmitter()
-    pump: TransmitPump = HardwareNetworkControls({LINE: tx})
-
-    first = pump.poll_transmits()
-    second = pump.poll_transmits()
-
-    assert first is second
-    assert first == {LINE: False}
+    assert transceiver.calls == [(b"\x01", LINE)]
 
 
 class _RecordingRadioTransport(RadioTransport):
@@ -211,13 +154,13 @@ class _RecordingRadioTransport(RadioTransport):
 
 
 def test_hardware_network_controls_send_radio_is_a_noop_with_no_radio_wired() -> None:
-    controls = HardwareNetworkControls({})
+    controls = HardwareNetworkControls(None)
     controls.send_radio(b"x")  # must not raise
 
 
 def test_hardware_network_controls_send_radio_delegates_to_the_wired_transport() -> None:
     transport = _RecordingRadioTransport()
-    controls = HardwareNetworkControls({}, radio=transport)
+    controls = HardwareNetworkControls(None, radio=transport)
 
     controls.send_radio(b"\xab\xcd")
 
@@ -230,7 +173,7 @@ def test_hardware_network_controls_send_radio_delegates_to_the_wired_transport()
 
 
 def test_create_state_wires_engine_network_controls() -> None:
-    nc = HardwareNetworkControls({})
+    nc = HardwareNetworkControls(None)
     engine = GameEngine(effect_controls=EffectControls(), network_controls=nc)
 
     state = engine.create_state(SceneControls())

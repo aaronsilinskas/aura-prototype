@@ -1,7 +1,6 @@
 """Tests for device_builder.build_hardware — the core, cross-subsystem tests
 that don't belong to any one subsystem cluster: output ordering across
-multiple components, that ``transmit_pump``/``network_controls`` are the
-same HardwareNetworkControls instance (#608), the
+multiple components, the
 ``_construct_with_optional_address`` helper shared by the accelerometer,
 magnetometer, and haptics ``_setup_*`` functions (#843), and the
 ``_address_suffix`` helper those same three sections' descriptions (plus the
@@ -31,7 +30,6 @@ from unittest.mock import MagicMock, patch
 from hardware.circuitpython.tests._hw_patch_mocks import (
     _enter_hw_patches,
     _mock_board,
-    _neopixel_config,
     _patch_neopixel,
     _recording_logger,
 )
@@ -151,44 +149,6 @@ def test_build_hardware_pixels_outputs_precede_audio_and_haptic_outputs() -> Non
 
 
 # ---------------------------------------------------------------------------
-# build_hardware wires transmit_pump and network_controls to the same
-# HardwareNetworkControls instance (issue #608)
-# ---------------------------------------------------------------------------
-
-
-def test_build_hardware_transmit_pump_is_same_object_as_network_controls() -> None:
-    config = _neopixel_config()
-    board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        hw = build_hardware(config, board_module=board_mock)
-
-    assert hw.transmit_pump is hw.network_controls
-
-
-def test_build_hardware_transmit_pump_satisfies_transmit_pump() -> None:
-    from engine.network import TransmitPump
-
-    config = _neopixel_config()
-    board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
-
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
-        _patch_neopixel(stack)
-
-        from hardware.circuitpython.device_builder import build_hardware
-
-        hw = build_hardware(config, board_module=board_mock)
-
-    assert isinstance(hw.transmit_pump, TransmitPump)
-
-
-# ---------------------------------------------------------------------------
 # build_hardware — two comprehensive full-sequence narration tests: the
 # verbatim lock for every [hw] line family in one place (#852), replacing the
 # per-subsystem exact-log-string coverage the split test_device_builder_*.py
@@ -296,7 +256,7 @@ def test_build_hardware_all_enabled_config_narrates_the_complete_ok_line_sequenc
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_ir",
-                return_value=({"line": MagicMock()}, MagicMock(), "pio"),
+                return_value=(MagicMock(), "pio"),
             )
         )
         _patch_neopixel(stack)

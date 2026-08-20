@@ -62,6 +62,7 @@ from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
+from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_transport import (
     InfraredMultiReceiver,
     InfraredReceiver,
@@ -716,8 +717,8 @@ def _setup_ir(
     encoder: InfraredEncoder | None = None,
     decoder: InfraredDecoder | None = None,
     writer_factory: Callable[[microcontroller.Pin], tuple[PulseWriter, str]] = _make_writer,
-) -> tuple[dict[str, InfraredTransmitter], InfraredReceiver, str | None]:
-    """Wire IR transceiver pins and return (transmitters, receiver, writer_kind).
+) -> tuple[InfraredTransceiver, str | None]:
+    """Wire the IR hardware and return (transceiver, writer_kind).
 
     encoder and decoder must use the same wire protocol — a mismatched pair
     silently fails to decode received frames with no error raised.
@@ -733,8 +734,9 @@ def _setup_ir(
 
     Constructs one :class:`IrTransmitGate` and injects the same instance into
     the receiver and every transmitter — the single assembly point for
-    self-echo suppression. The gate itself is not returned; it lives only as
-    a shared reference between the receiver and transmitters it wires here.
+    self-echo suppression — then hands the transmitter map, receiver, and
+    gate to a new :class:`~hardware.shared.ir_transceiver.InfraredTransceiver`,
+    the single owner of the whole IR subsystem.
 
     *emitter_pins* maps an emitter constant (a key of ``engine.network.
     IR_EMITTERS``) to the pin it is wired to; an emitter absent from the
@@ -784,7 +786,7 @@ def _setup_ir(
         writer, writer_kind = writer_factory(pin)
         transmitters[emitter] = InfraredTransmitter(writer, encoder, gate=gate)
 
-    return transmitters, receiver, writer_kind
+    return InfraredTransceiver(transmitters, receiver, gate), writer_kind
 
 
 def load_device_config() -> DeviceConfig:
@@ -1009,14 +1011,13 @@ def build_hardware(
         else:
             narrate_skip(logger, description, "disabled")
 
-    transmitters: dict[str, InfraredTransmitter] = {}
-    ir_receiver = None
+    ir: InfraredTransceiver | None = None
     if config.ir is not None:
         ir_cfg = config.ir
         description = f"ir {_describe_ir(ir_cfg.rx, ir_cfg.emitters)}"
         if ir_cfg.enabled:
 
-            def _build_ir() -> tuple[tuple[dict[str, InfraredTransmitter], InfraredReceiver], str]:
+            def _build_ir() -> tuple[InfraredTransceiver, str]:
                 encoder = ir_encoder if ir_encoder is not None else AuraInfraredEncoder()
                 decoder = ir_decoder if ir_decoder is not None else AuraInfraredDecoder()
 
@@ -1035,20 +1036,17 @@ def build_hardware(
                         board_module, f"ir.{emitter_key}", pin_name
                     )
 
-                transmitters, receiver, writer_kind = _setup_ir(
+                transceiver, writer_kind = _setup_ir(
                     rx_pins, emitter_pins, encoder=encoder, decoder=decoder
                 )
                 suffix = f"writer={writer_kind} ok" if writer_kind is not None else "ok"
-                return (transmitters, receiver), suffix
+                return transceiver, suffix
 
-            transmitters, ir_receiver = narrate_step(logger, description, _build_ir)
+            ir = narrate_step(logger, description, _build_ir)
         else:
             narrate_skip(logger, description, "disabled")
 
-    # One HardwareNetworkControls instance, seen through two declared faces:
-    # rules reach it as the send-only NetworkControls; the runtime loop
-    # reaches the same object as TransmitPump to pump transmit lifecycle.
-    hardware_network_controls = HardwareNetworkControls(transmitters, radio=radio)
+    hardware_network_controls = HardwareNetworkControls(ir, radio=radio)
 
     elapsed = time.monotonic() - start
     logger.log(
@@ -1061,8 +1059,7 @@ def build_hardware(
         accelerometer=accelerometer,
         magnetometer=magnetometer,
         network_controls=hardware_network_controls,
-        transmit_pump=hardware_network_controls,
-        ir_receiver=ir_receiver,
+        ir=ir,
         radio=radio,
         storage=storage,
         audio_registry=audio_registry,

@@ -1,6 +1,6 @@
 import pytest
 
-from engine.network import AREA_OF_EFFECT, CONE, IR_EMITTERS, LINE, NetworkEvents, TransmitPump
+from engine.network import AREA_OF_EFFECT, CONE, IR_EMITTERS, LINE, NetworkEvents
 from engine.state import EffectControls, GameState, NetworkControls, SceneControls
 
 # ---------------------------------------------------------------------------
@@ -161,21 +161,9 @@ def test_network_controls_send_radio_raises_not_implemented() -> None:
 
 
 def test_abstract_network_controls_has_no_poll_transmits() -> None:
-    """The lifecycle pump is HardwareNetworkControls-only — the abstract
-    seam game rules see stays send-only."""
+    """The lifecycle pump is InfraredTransceiver-only — the abstract seam
+    game rules see stays send-only."""
     assert not hasattr(NetworkControls(), "poll_transmits")
-
-
-# ---------------------------------------------------------------------------
-# TransmitPump — the runtime-facing declaring seam (issue #608)
-# ---------------------------------------------------------------------------
-
-
-def test_transmit_pump_poll_transmits_raises_not_implemented() -> None:
-    pump = TransmitPump()
-
-    with pytest.raises(NotImplementedError):
-        pump.poll_transmits()
 
 
 # ---------------------------------------------------------------------------

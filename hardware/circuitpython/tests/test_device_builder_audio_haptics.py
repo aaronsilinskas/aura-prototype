@@ -739,7 +739,7 @@ def test_build_hardware_fully_loaded_config_builds_accelerometer_and_haptic_outp
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_ir",
-                return_value=({}, MagicMock(), "pio"),
+                return_value=(MagicMock(), "pio"),
             )
         )
         _patch_neopixel(stack)
@@ -759,7 +759,7 @@ def test_build_hardware_fully_loaded_config_builds_accelerometer_and_haptic_outp
     assert any(isinstance(o, IS31FL3741EffectOutput) for o in hw.outputs)
     assert any(isinstance(o, NeoPixelEffectOutput) for o in hw.outputs)
     assert any(isinstance(o, AudioEffectOutput) for o in hw.outputs)
-    assert hw.ir_receiver is not None
+    assert hw.ir is not None
 
 
 def test_build_hardware_accelerometer_and_haptics_less_config_omits_both() -> None:
@@ -795,7 +795,7 @@ def test_build_hardware_accelerometer_and_haptics_less_config_omits_both() -> No
         stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_ir",
-                return_value=({}, MagicMock(), "pio"),
+                return_value=(MagicMock(), "pio"),
             )
         )
         _patch_neopixel(stack)
@@ -817,7 +817,7 @@ def test_build_hardware_accelerometer_and_haptics_less_config_omits_both() -> No
     assert any(isinstance(o, IS31FL3741EffectOutput) for o in hw.outputs)
     assert any(isinstance(o, NeoPixelEffectOutput) for o in hw.outputs)
     assert any(isinstance(o, AudioEffectOutput) for o in hw.outputs)
-    assert hw.ir_receiver is not None
+    assert hw.ir is not None
 
 
 def test_build_hardware_neither_accelerometer_nor_haptics_probed_when_undeclared() -> None:

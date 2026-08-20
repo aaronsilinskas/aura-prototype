@@ -59,6 +59,7 @@ import time
 
 from engine.network import LINE
 from hardware.shared.device_config import DeviceConfig, load_device_config
+from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiler_report import board_id, runtime_id
 
@@ -89,13 +90,23 @@ def _isolate_ir_config(config: DeviceConfig) -> DeviceConfig:
     return config.isolate(keep="ir")
 
 
-def _build_network_controls() -> HardwareNetworkControls:
+def _build_network_controls() -> tuple[HardwareNetworkControls, InfraredTransceiver]:
+    """Build the send-only seam plus the transceiver it delegates to.
+
+    The transceiver is returned alongside `hw.network_controls` because
+    `run()`'s busy-gating loop (see its own docstring) needs LINE's raw
+    busy state -- a runtime-lifecycle detail `HardwareNetworkControls`
+    deliberately never surfaces (it is send-only, matching
+    `NetworkControls`). `InfraredTransceiver.busy` is the public seam for
+    LINE's raw busy state -- it never surfaces through
+    `HardwareNetworkControls`, which is send-only.
+    """
     from hardware.circuitpython.device_builder import build_hardware
 
     device_config = load_device_config()
     device_config = _isolate_ir_config(device_config)
     hw = build_hardware(device_config)
-    return hw.network_controls
+    return hw.network_controls, hw.ir
 
 
 def _send_packet(network_controls: HardwareNetworkControls, payload: bytes) -> None:
@@ -118,7 +129,7 @@ def _send_packet(network_controls: HardwareNetworkControls, payload: bytes) -> N
 
 def run() -> None:
     """Transmit sequence-numbered packets, reporting the sustained send rate."""
-    network_controls = _build_network_controls()
+    network_controls, ir = _build_network_controls()
 
     print(
         f"__IR_RX_PACKET_SOURCE packet_size={PACKET_SIZE}, "
@@ -143,7 +154,7 @@ def run() -> None:
         # Poll exactly once per iteration -- the LINE busy state it reports
         # gates whether this iteration builds/sends a payload at all, so a
         # transmit still in flight is never overwritten with a fresh one.
-        line_busy = network_controls.poll_transmits()[LINE]
+        line_busy = ir.busy(LINE)
 
         if not line_busy:
             payload[0] = sequence & 0xFF

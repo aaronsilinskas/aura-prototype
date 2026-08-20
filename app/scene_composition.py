@@ -1,7 +1,7 @@
 """Board-free scene wiring — builds the engine/effect/scene machinery for one scene.
 
 CPython-testable: imports only ``engine`` and the board-free modules under
-``hardware.shared`` (``device_hardware``, ``ir_codecs``, ``ir_manager``,
+``hardware.shared`` (``device_hardware``, ``ir_codecs``, ``ir_transceiver``,
 ``radio_manager``). No ``TYPE_CHECKING`` guard is needed because none of them
 carry board imports.
 """
@@ -21,7 +21,7 @@ from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs import codec_for
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
-from hardware.shared.ir_manager import InfraredManager
+from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.radio_manager import RadioManager
 
 __all__ = ["SceneRuntime", "build_scene_runtime", "resolve_ir_codec", "resolve_known_scene"]
@@ -32,8 +32,8 @@ class SceneRuntime:
 
     ``manager`` applies scene transitions, ``effect_manager`` renders the
     active scene's effects, ``timer`` tracks elapsed/total tick time, ``ir``
-    owns the per-tick pump-before-receive IR sequence, and ``radio`` owns the
-    per-tick radio receive poll.
+    is the device's ``InfraredTransceiver`` (``None`` on a device with no IR
+    subsystem wired), and ``radio`` owns the per-tick radio receive poll.
     """
 
     __slots__ = ("effect_manager", "ir", "manager", "radio", "timer")
@@ -43,13 +43,13 @@ class SceneRuntime:
         manager: SceneManager,
         effect_manager: EffectManager,
         timer: Timer,
-        ir: InfraredManager,
+        ir: InfraredTransceiver | None,
         radio: RadioManager,
     ) -> None:
         self.manager: SceneManager = manager
         self.effect_manager: EffectManager = effect_manager
         self.timer: Timer = timer
-        self.ir: InfraredManager = ir
+        self.ir: InfraredTransceiver | None = ir
         self.radio: RadioManager = radio
 
 
@@ -289,9 +289,8 @@ def build_scene_runtime(
     manager.load(resolve_known_scene(scene_registry, scene_name))
     manager.update()  # applies the load transition; the scene is now active
 
-    ir = InfraredManager(hw.transmit_pump, hw.ir_receiver)
     radio = RadioManager(hw.radio)
 
     return SceneRuntime(
-        manager=manager, effect_manager=effect_manager, timer=timer, ir=ir, radio=radio
+        manager=manager, effect_manager=effect_manager, timer=timer, ir=hw.ir, radio=radio
     )

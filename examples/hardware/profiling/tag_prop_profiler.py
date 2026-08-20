@@ -126,7 +126,6 @@ from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.shared.device_config import load_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
-from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiler_report import (
     print_profile_header,
     print_stats_line,
@@ -184,9 +183,7 @@ def _require_output(hardware: DeviceHardware, output_type: type[EffectOutput]) -
         )
 
 
-def _build_prop() -> tuple[
-    SceneManager, EffectManager, Timer, object, object, object, HardwareNetworkControls, int
-]:
+def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, object, int]:
     """Stand up the whole reference tag prop and return its driving objects.
 
     Snapshots free heap before and after construction (with a GC collect on each
@@ -211,8 +208,8 @@ def _build_prop() -> tuple[
     _require_output(hardware, IS31FL3741EffectOutput)
     _require_output(hardware, AudioEffectOutput)
     _require_output(hardware, Drv2605EffectOutput)
-    if hardware.ir_receiver is None:
-        raise RuntimeError("expected an IR receiver in the built hardware bundle, found none")
+    if hardware.ir is None:
+        raise RuntimeError("expected an IR transceiver in the built hardware bundle, found none")
     if hardware.accelerometer is None:
         raise RuntimeError("expected an accelerometer in the built hardware bundle, found none")
     # Stage snapshot: the whole hardware bundle (matrix, buttons, accelerometer,
@@ -285,8 +282,7 @@ def _build_prop() -> tuple[
         timer,
         hardware.buttons,
         hardware.accelerometer,
-        hardware.ir_receiver,
-        hardware.network_controls,
+        hardware.ir,
         footprint_bytes,
     )
 
@@ -304,8 +300,7 @@ def run() -> None:
         timer,
         buttons,
         accelerometer,
-        ir_receiver,
-        network_controls,
+        ir,
         footprint_bytes,
     ) = _build_prop()
 
@@ -349,20 +344,19 @@ def run() -> None:
             except Exception:
                 pass  # keep last good values
 
-        # Outside the active_state guard and before receive(): a send can be
-        # in flight across a scene transition, and end_transmit (fired here
-        # when a deferred write completes) arms the flush latch this same
-        # tick's receive() must consume.
-        network_controls.poll_transmits()
+        # Outside the active_state guard and before checking ir.received: a
+        # send can be in flight across a scene transition, and ir.update()
+        # always pumps every transmitter before it receives, owning that
+        # order intrinsically (see InfraredTransceiver).
+        ir.update()
 
         if manager.active_state is not None:
-            ir_data = ir_receiver.receive()
-            if ir_data is not None:
+            if ir.received is not None:
                 manager.active_state.queue_event(
                     NetworkEvents.IRReceived(
-                        ir_data,
-                        ir_receiver.last_signal_strength,
-                        ir_receiver.last_error_margin,
+                        ir.received,
+                        ir.last_signal_strength,
+                        ir.last_error_margin,
                         best_receiver=None,
                     )
                 )

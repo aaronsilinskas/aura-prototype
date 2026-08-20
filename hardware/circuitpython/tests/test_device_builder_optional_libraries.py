@@ -260,7 +260,7 @@ def test_build_hardware_without_ir_section_succeeds_when_pulseio_uninstalled() -
 
         hw = build_hardware(config, board_module=board_mock)
 
-    assert hw.ir_receiver is None
+    assert hw.ir is None
 
 
 def test_build_hardware_disabled_ir_section_succeeds_when_pulseio_uninstalled() -> None:
@@ -278,7 +278,7 @@ def test_build_hardware_disabled_ir_section_succeeds_when_pulseio_uninstalled() 
 
         hw = build_hardware(config, board_module=board_mock)
 
-    assert hw.ir_receiver is None
+    assert hw.ir is None
 
 
 # ---------------------------------------------------------------------------

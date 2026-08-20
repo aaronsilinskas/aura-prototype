@@ -1,9 +1,9 @@
 """RadioManager — board-free per-tick owner of the radio receive path.
 
-Mirrors :class:`~hardware.shared.ir_manager.InfraredManager`'s shape: a
-board-free orchestrator, constructed with a seam that may be absent, whose
-:meth:`update` polls it once per tick and exposes the result as an attribute
-read afterwards rather than returned.
+Mirrors :class:`~hardware.shared.ir_transceiver.InfraredTransceiver`'s
+``update``/``received`` shape: a board-free orchestrator, constructed with a
+seam that may be absent, whose :meth:`update` polls it once per tick and
+exposes the result as an attribute read afterwards rather than returned.
 
 Unlike IR, radio's receive orchestrator builds the game-facing event itself
 rather than leaving that to ``run_scene``: the transport hands back a raw

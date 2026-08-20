@@ -474,8 +474,7 @@ class SceneManager(SceneControls):
 
     *effect_admin* is the scene-transition face of the same effect system
     ``engine`` was built with (its ``EffectControls`` and ``EffectAdmin`` are
-    two faces of one ``EffectManager`` instance, mirroring the
-    ``NetworkControls``/``TransmitPump`` split). Every local-effects push,
+    two faces of one ``EffectManager`` instance). Every local-effects push,
     allowed-pack push, and merge-strategy reset/capture/apply routes through
     *effect_admin*, never through a stack entry's ``state.effect_controls``.
     The allowed-pack set — a ``frozenset`` of the active scene's declared

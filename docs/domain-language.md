@@ -103,12 +103,8 @@ The typed `ValueError` subclasses (`RegistryError` base; `UnknownPackError`, `Un
 _Avoid_: classifying a registry failure by `str(exc)`/`startswith` on the message
 
 ### NetworkControls
-The **game-facing**, send-only network seam a rule holds via `GameState.network_controls` (`send_ir`, `send_radio`); the transmit pump lives on the separate `TransmitPump` face.
+The **game-facing**, send-only network seam a rule holds via `GameState.network_controls` (`send_ir`, `send_radio`); the runtime-facing per-tick IR pump lives entirely on `InfraredTransceiver.update()` instead.
 _Avoid_: putting `poll_transmits()` or any per-tick pump on it (keep the seam send-only)
-
-### TransmitPump
-The **runtime-facing** counterpart to `NetworkControls`, declaring `poll_transmits()`, which the runtime polls every tick. `HardwareNetworkControls` implements both faces.
-_Avoid_: naming the pump after the gate (`update_ir_gate`); allocating a fresh return dict per call; putting it in the rule-facing engine module
 
 ### SceneRegistry
 Auto-discovers JSON-described scenes from a directory tree and serves a fresh `Scene` per lookup; validates required fields, version format, and `ir_codec` format at scan time. `ir_codec_for(name)` reads a scanned scene's declared codec name straight off the stored scan entry — no `Scene` construction — for callers that only need the name (e.g. resolving hardware before building it).
@@ -234,8 +230,8 @@ The top-level `app/` package: `scene_composition.py` builds the engine/effect/sc
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### SceneRuntime / build_scene_runtime
-`build_scene_runtime(hw, scene_name, scene_registry=None)` wires the registries, managers, and engine and loads the scene (raising when *scene_name* isn't registered), returning a `SceneRuntime` bundle (`manager`, `effect_manager`, `timer`, `ir`, `radio`) that `run_scene`'s per-tick loop drives. An omitted *scene_registry* is scanned fresh here; `run_scene` passes its own already-scanned registry instead, so the scene directory is scanned once per boot.
-_Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing `poll_transmits`/`receive` (drive `ir.update()`/`radio.update()`); scanning a second `SceneRegistry` when a caller already has one
+`build_scene_runtime(hw, scene_name, scene_registry=None)` wires the registries, managers, and engine and loads the scene (raising when *scene_name* isn't registered), returning a `SceneRuntime` bundle (`manager`, `effect_manager`, `timer`, `ir`, `radio`) that `run_scene`'s per-tick loop drives. `SceneRuntime.ir` is `hw.ir` passed straight through (`InfraredTransceiver | None`) — no separate IR object is built. An omitted *scene_registry* is scanned fresh here; `run_scene` passes its own already-scanned registry instead, so the scene directory is scanned once per boot.
+_Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing the transmit-then-receive order at a call site (drive `ir.update()`/`radio.update()`); scanning a second `SceneRegistry` when a caller already has one
 
 ### resolve_known_scene
 `resolve_known_scene(scene_registry, scene_name)` in `scene_composition.py` returns *scene_name* if the registry has it, else raises `ValueError` naming the known scenes. `build_scene_runtime` calls it internally to load the scene; `run_scene` also calls it directly, before hardware is built, so an unknown scene name fails once and early rather than only surfacing deep inside `build_scene_runtime`.
@@ -246,12 +242,12 @@ _Avoid_: duplicating the known-scene check inline instead of calling this
 _Avoid_: calling it after hardware is already built (defeats the boot-time-selection point); duplicating the name-to-class mapping instead of delegating to `codec_for`
 
 ### device_builder
-The device-only hardware builder: `build_hardware(config, board, …)` resolves pin names and constructs the configured outputs/buttons/sensors/IR/radio, wrapping transmitters and the radio transport in `HardwareNetworkControls`. Single-call (claims pins without deiniting); every component is config-gated, never presence-probed.
+The device-only hardware builder: `build_hardware(config, board, …)` resolves pin names and constructs the configured outputs/buttons/sensors/IR/radio, wrapping the assembled `InfraredTransceiver` and the radio transport in `HardwareNetworkControls`. Single-call (claims pins without deiniting); every component is config-gated, never presence-probed.
 _Avoid_: returning a bare tuple/dict (return `DeviceHardware`); putting config parsing here (lives in the pure parser); calling it twice in one process
 
 ### DeviceHardware
-The named `__slots__` bundle `build_hardware` returns — a board-free data holder for the built outputs, buttons, sensors, network seams, IR, radio, and storage. `network_controls` and `transmit_pump` are one `HardwareNetworkControls` seen through two faces; ports (`storage`, sensors) are typed as their abstract port or `object | None`, never the concrete adapter, keeping the module board-free.
-_Avoid_: exposing raw transmitters (use `network_controls`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
+The named `__slots__` bundle `build_hardware` returns — a board-free data holder for the built outputs, buttons, sensors, network seam, `ir`, radio, and storage. `ir` is the same `InfraredTransceiver` instance `HardwareNetworkControls.send_ir` delegates to, `None` exactly when there is no `ir` section declared (or it is disabled); ports (`storage`, sensors) are typed as their abstract port or `object | None`, never the concrete adapter, keeping the module board-free.
+_Avoid_: exposing raw transmitters (use `network_controls`/`ir`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### RadioTransport
 The board-free half-duplex radio **port** `RadioManager` and `HardwareNetworkControls.send_radio` reach the chip through — one port for both directions because an RFM69-class chip is half-duplex. The live adapter is `Rfm69RadioTransport`.
@@ -301,12 +297,12 @@ _Avoid_: reading `_states` directly (use the query methods); assuming `is_down` 
 The hardware-agnostic infrared send/receive subsystem (no `pulseio`), reached through `PulseReader`/`PulseWriter` ports; moves opaque `bytes` with no game semantics.
 _Avoid_: importing `pulseio` into shared IR code; encoding spell fields in the transport
 
-### InfraredManager
-The board-free per-tick owner of the IR sequence: `update()` runs the transmit pump **then** receive, owning that pump-before-receive order; results (`received`, `last_signal_strength`, `last_error_margin`, `telemetry_line()`) are read after the call. Does not build the game event.
-_Avoid_: importing `NetworkEvents`/game-event vocabulary here (the event is built in `run_scene`); a value-returning `update()`; calling it a hardware "driver"
+### InfraredTransceiver
+The board-free single owner of a device's whole IR subsystem — the transmitter map, the receiver, and the shared **IR transmit gate** — assembled by `device_builder._setup_ir` and exposed as `DeviceHardware.ir`; `HardwareNetworkControls.send_ir` delegates to it. `send(data, emitter)` routes to the named transmitter; `update()` runs the transmit pump **then** receive, owning that pump-before-receive order, with results (`received`, `last_signal_strength`, `last_error_margin`, `telemetry_line()`) read after the call; `apply_codec(encoder, decoder)` swaps the wire-frame codec once, before the first tick. Does not build the game event.
+_Avoid_: importing `NetworkEvents`/game-event vocabulary here (the event is built in `run_scene`); a value-returning `update()`; calling it a hardware "driver"; exposing the transmitter map as a public collection
 
 ### Wire-frame codec
-An encoder/decoder pair mapping an opaque payload ↔ IR pulse durations, injected into the IR transport; two coexist — the **Aura wire-frame** and the **Tag protocol** — selected per scene.
+An encoder/decoder pair mapping an opaque payload ↔ IR pulse durations, injected into the IR transport; two coexist — the **Aura wire-frame** and the **Tag protocol** — selected per scene. A built device's codec is mutable once, at boot, via `InfraredTransceiver.apply_codec`.
 _Avoid_: assuming a single global wire-frame; treating wire-frames as interchangeable across scenes
 
 ### Aura wire-frame

@@ -12,8 +12,7 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
     accelerometer = "fake-accelerometer"
     magnetometer = "fake-magnetometer"
     network_controls = "fake-network-controls"
-    transmit_pump = "fake-transmit-pump"
-    ir_receiver = "fake-ir-receiver"
+    ir = "fake-ir"
     radio = "fake-radio"
     storage = "fake-storage"
     audio_registry = "fake-audio-registry"
@@ -24,8 +23,7 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
         accelerometer=accelerometer,
         magnetometer=magnetometer,
         network_controls=network_controls,
-        transmit_pump=transmit_pump,
-        ir_receiver=ir_receiver,
+        ir=ir,
         radio=radio,
         storage=storage,
         audio_registry=audio_registry,
@@ -36,11 +34,26 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
     assert hardware.accelerometer is accelerometer
     assert hardware.magnetometer is magnetometer
     assert hardware.network_controls is network_controls
-    assert hardware.transmit_pump is transmit_pump
-    assert hardware.ir_receiver is ir_receiver
+    assert hardware.ir is ir
     assert hardware.radio is radio
     assert hardware.storage is storage
     assert hardware.audio_registry is audio_registry
+
+
+def test_device_hardware_ir_defaults_to_none_when_no_ir_section_is_wired():
+    hardware = DeviceHardware(
+        outputs=[],
+        buttons="fake-buttons",
+        accelerometer=None,
+        magnetometer=None,
+        network_controls="fake-network-controls",
+        ir=None,
+        radio=None,
+        storage=None,
+        audio_registry=None,
+    )
+
+    assert hardware.ir is None
 
 
 def test_device_hardware_radio_defaults_to_none_when_no_radio_peripheral_is_wired():
@@ -50,8 +63,7 @@ def test_device_hardware_radio_defaults_to_none_when_no_radio_peripheral_is_wire
         accelerometer=None,
         magnetometer=None,
         network_controls="fake-network-controls",
-        transmit_pump="fake-transmit-pump",
-        ir_receiver=None,
+        ir=None,
         radio=None,
         storage=None,
         audio_registry=None,
@@ -67,8 +79,7 @@ def test_device_hardware_storage_defaults_to_none_when_no_sdcard_is_wired():
         accelerometer=None,
         magnetometer=None,
         network_controls="fake-network-controls",
-        transmit_pump="fake-transmit-pump",
-        ir_receiver=None,
+        ir=None,
         radio=None,
         storage=None,
         audio_registry=None,
@@ -84,8 +95,7 @@ def test_device_hardware_audio_registry_defaults_to_none_when_no_audio_is_wired(
         accelerometer=None,
         magnetometer=None,
         network_controls="fake-network-controls",
-        transmit_pump="fake-transmit-pump",
-        ir_receiver=None,
+        ir=None,
         radio=None,
         storage=None,
         audio_registry=None,
@@ -101,8 +111,7 @@ def test_device_hardware_magnetometer_defaults_to_none_when_no_magnetometer_is_w
         accelerometer=None,
         magnetometer=None,
         network_controls="fake-network-controls",
-        transmit_pump="fake-transmit-pump",
-        ir_receiver=None,
+        ir=None,
         radio=None,
         storage=None,
         audio_registry=None,
@@ -118,8 +127,7 @@ def test_device_hardware_rejects_attributes_outside_its_slots():
         accelerometer=None,
         magnetometer=None,
         network_controls="fake-network-controls",
-        transmit_pump="fake-transmit-pump",
-        ir_receiver=None,
+        ir=None,
         radio=None,
         storage=None,
         audio_registry=None,

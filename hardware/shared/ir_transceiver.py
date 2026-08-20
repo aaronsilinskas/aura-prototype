@@ -3,14 +3,16 @@
 Owns the transmitter map, the receiver, and the shared :class:`IrTransmitGate`
 that keeps a device from decoding its own self-echo. Imports only the IR
 primitives from :mod:`hardware.shared.ir_transport` and the codec base types
-from :mod:`hardware.shared.ir_codecs.base` — no ``engine`` import, unlike
-:class:`~hardware.shared.ir_manager.InfraredManager`, since this class pumps
-its own transmitters directly rather than reaching them through a
-:class:`~engine.network.TransmitPump` seam.
+from :mod:`hardware.shared.ir_codecs.base` — no ``engine`` import, since this
+class pumps its own transmitters directly rather than reaching them through
+an ``engine``-side pump seam.
 
-Not yet wired into ``build_hardware`` — assembly (constructing the map,
-receiver, and gate, and swapping this in for ``HardwareNetworkControls``'s
-IR half and ``InfraredManager``) is a follow-up ticket.
+Assembled by :func:`~hardware.circuitpython.device_builder._setup_ir` and
+wired into :func:`~hardware.circuitpython.device_builder.build_hardware` as
+``DeviceHardware.ir`` and the ``ir`` reference
+``HardwareNetworkControls.send_ir`` delegates to — the single owner that
+replaced the old split across ``HardwareNetworkControls``'s transmitter map,
+``DeviceHardware.ir_receiver``, and ``InfraredManager``.
 """
 
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
@@ -30,7 +32,7 @@ class InfraredTransceiver:
     this class never calls it directly.
 
     The transmitter map is never exposed as a raw collection; reach a
-    transmitter only through :meth:`send`.
+    transmitter only through :meth:`send` and :meth:`busy`.
 
     Args:
         transmitters: Map from emitter constant (``LINE``, ``CONE``,
@@ -76,6 +78,29 @@ class InfraredTransceiver:
         if tx is None:
             raise ValueError(f"No transmitter wired for emitter: {emitter}")
         tx.send(data)
+
+    def busy(self, emitter: str) -> bool:
+        """Pump *emitter*'s transmitter and report whether it is still busy.
+
+        The public seam for a caller that needs one emitter's in-flight
+        state — e.g. to gate a send on the previous transmit completing —
+        without reaching into the private transmitter map (see
+        :meth:`send`'s docstring). Pumping here is scoped to *emitter*
+        alone; :meth:`update` remains the only way to pump every wired
+        transmitter each tick.
+
+        Args:
+            emitter: One of the emitter constants (``LINE``, ``CONE``,
+                ``AREA_OF_EFFECT``).
+
+        Raises:
+            ValueError: If *emitter* is not in the transmitter map supplied
+                at construction time.
+        """
+        tx = self._transmitters.get(emitter)
+        if tx is None:
+            raise ValueError(f"No transmitter wired for emitter: {emitter}")
+        return tx.poll()
 
     def update(self) -> None:
         """Pump every transmitter, then receive — in that order, every tick.
