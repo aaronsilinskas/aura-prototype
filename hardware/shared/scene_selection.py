@@ -30,13 +30,11 @@ def resolve_scene_name(settings_mapping: dict) -> str:
     Args:
         settings_mapping: The raw ``aura-settings.json`` mapping.
     """
-    scene = _non_empty_string_or_none(settings_mapping.get("default_scene"))
+    raw = settings_mapping.get("default_scene")
+    scene = _non_empty_string_or_none(raw)
     if scene is not None:
         return scene
-    raise ValueError(
-        "aura-settings.json 'default_scene' must be a non-empty string, got "
-        + f"{settings_mapping.get('default_scene')!r}"
-    )
+    raise ValueError(f"aura-settings.json 'default_scene' must be a non-empty string, got {raw!r}")
 
 
 def resolve_boot_scene(
