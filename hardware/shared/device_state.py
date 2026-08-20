@@ -73,7 +73,7 @@ class DeviceStateStore:
             return {}
         try:
             mapping = self._storage.read_json(_STATE_FILE_NAME)
-        except json.JSONDecodeError as e:
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
             self._logger.log(f"{_STATE_FILE_NAME} is malformed JSON, treating as empty: {e}")
             return {}
         if mapping is None:

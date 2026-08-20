@@ -72,9 +72,36 @@ def test_non_object_json_reads_as_a_never_written_key_rather_than_raising():
     assert store.get("scene") is None
 
 
+def test_non_utf8_content_reads_as_a_never_written_key_rather_than_raising():
+    storage = FakeDeviceStorage()
+    storage.write_bytes("aura-state.json", b"\xff\xfe not valid utf-8")
+    store = DeviceStateStore(storage)
+
+    assert store.get("scene") is None
+
+
+def test_a_missing_key_within_an_otherwise_valid_object_reads_as_absent():
+    storage = FakeDeviceStorage()
+    storage.write_json("aura-state.json", {"scene": "tag"})
+    store = DeviceStateStore(storage)
+
+    assert store.get("return_to") is None
+
+
 def test_malformed_json_logs_the_fail_soft_read():
     storage = FakeDeviceStorage()
     storage.write_bytes("aura-state.json", b"{not valid json")
+    lines = []
+    store = DeviceStateStore(storage, logger=Logger("[state]", sink=lines.append))
+
+    store.get("scene")
+
+    assert lines
+
+
+def test_non_object_json_logs_the_fail_soft_read():
+    storage = FakeDeviceStorage()
+    storage.write_json("aura-state.json", ["scene", "tag"])
     lines = []
     store = DeviceStateStore(storage, logger=Logger("[state]", sink=lines.append))
 
