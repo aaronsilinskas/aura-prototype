@@ -137,7 +137,8 @@ wire-frame codec so it is wired in automatically. `run_scene` resolves the boot 
 only after hardware is brought up (so any SD card is mounted): a `scene` value persisted
 to the SD card's `aura-state.json` overrides `default_scene`; a card-less device, or one
 with nothing persisted, boots the flash default unaffected. Neither a persisted
-selection nor a flash default set raises, naming both files:
+selection nor a flash default set raises, naming both `aura-state.json` and
+`aura-settings.json`.
 
 `aura-settings.json`:
 

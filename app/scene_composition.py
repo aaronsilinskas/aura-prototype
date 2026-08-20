@@ -2,8 +2,8 @@
 
 CPython-testable: imports only ``engine`` and the board-free modules under
 ``hardware.shared`` (``device_hardware``, ``ir_codecs``, ``ir_transceiver``,
-``radio_transceiver``). No ``TYPE_CHECKING`` guard is needed because none of
-them carry board imports.
+``radio_transceiver``, ``scene_selection``). No ``TYPE_CHECKING`` guard is
+needed because none of them carry board imports.
 """
 
 from __future__ import annotations
