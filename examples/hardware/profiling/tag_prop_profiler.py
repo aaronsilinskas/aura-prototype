@@ -199,17 +199,13 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
     # gets built; the assertions below fail loudly if the deployed config doesn't
     # actually describe the reference tag prop this profiler measures.
     device_config = load_device_config()
-    hardware = build_hardware(
-        device_config,
-        board,
-        ir_encoder=TagInfraredEncoder(),
-        ir_decoder=TagInfraredDecoder(),
-    )
+    hardware = build_hardware(device_config, board)
     _require_output(hardware, IS31FL3741EffectOutput)
     _require_output(hardware, AudioEffectOutput)
     _require_output(hardware, Drv2605EffectOutput)
     if hardware.ir is None:
         raise RuntimeError("expected an IR transceiver in the built hardware bundle, found none")
+    hardware.ir.apply_codec(TagInfraredEncoder(), TagInfraredDecoder())
     if hardware.accelerometer is None:
         raise RuntimeError("expected an accelerometer in the built hardware bundle, found none")
     # Stage snapshot: the whole hardware bundle (matrix, buttons, accelerometer,

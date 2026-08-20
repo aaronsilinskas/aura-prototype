@@ -238,8 +238,8 @@ The single known-scene guard: returns the scene name if the registry has it, els
 _Avoid_: duplicating the known-scene check inline instead of calling this
 
 ### resolve_ir_codec
-Resolves a scene's declared codec name to an instantiated encoder/decoder pair. Board-free, so it runs before hardware is built, feeding the IR seam the scene-selected **wire-frame codec** from the first tick.
-_Avoid_: calling it after hardware is already built (defeats the boot-time-selection point); duplicating the name-to-class mapping instead of delegating to `codec_for`
+Resolves a scene's declared codec name to an instantiated encoder/decoder pair. Board-free, needing no built hardware to run; `run_scene` calls it after `build_hardware` returns and applies the pair onto the built `hw.ir` via `InfraredTransceiver.apply_codec` before the first tick, so the scene-selected **wire-frame codec** is still in effect from the first tick.
+_Avoid_: applying the resolved pair after the first tick (defeats the boot-time-selection point); duplicating the name-to-class mapping instead of delegating to `codec_for`
 
 ### device_builder
 The device-only hardware builder that resolves pin names and constructs the configured outputs, buttons, sensors, IR, and radio into a `DeviceHardware` bundle. Single-call (claims pins without deiniting); every component is config-gated, never presence-probed.
