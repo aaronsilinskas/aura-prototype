@@ -6,7 +6,6 @@ from engine.state import EffectControls, NetworkControls, SceneControls
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_transport import InfraredTransmitter, IrTransmitGate, PulseWriter
 from hardware.shared.network_controls import HardwareNetworkControls
-from hardware.shared.radio_transport import RadioTransport
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -138,10 +137,10 @@ def test_hardware_network_controls_send_ir_delegates_to_the_wired_transceiver() 
     assert transceiver.calls == [(b"\x01", LINE)]
 
 
-class _RecordingRadioTransport(RadioTransport):
-    """Records every payload sent, in call order -- send_radio's only
-    observable effect (see hardware/shared/tests/test_radio_transport.py's
-    RecordingRadioTransport for the full recording fake)."""
+class _RecordingRadioTransceiver:
+    """Fake transceiver that just records send() calls -- isolates
+    HardwareNetworkControls.send_radio's delegation from RadioTransceiver's
+    own send() behaviour (covered separately in test_radio_transceiver.py)."""
 
     def __init__(self) -> None:
         self.sent: list[bytes] = []
@@ -149,22 +148,19 @@ class _RecordingRadioTransport(RadioTransport):
     def send(self, data: bytes) -> None:
         self.sent.append(data)
 
-    def receive(self) -> "tuple[int, bytes] | None":
-        return None  # unused by HardwareNetworkControls.send_radio
-
 
 def test_hardware_network_controls_send_radio_is_a_noop_with_no_radio_wired() -> None:
     controls = HardwareNetworkControls(None)
     controls.send_radio(b"x")  # must not raise
 
 
-def test_hardware_network_controls_send_radio_delegates_to_the_wired_transport() -> None:
-    transport = _RecordingRadioTransport()
-    controls = HardwareNetworkControls(None, radio=transport)
+def test_hardware_network_controls_send_radio_delegates_to_the_wired_transceiver() -> None:
+    transceiver = _RecordingRadioTransceiver()
+    controls = HardwareNetworkControls(None, radio=transceiver)
 
     controls.send_radio(b"\xab\xcd")
 
-    assert transport.sent == [b"\xab\xcd"]
+    assert transceiver.sent == [b"\xab\xcd"]
 
 
 # ---------------------------------------------------------------------------

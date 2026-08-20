@@ -160,7 +160,7 @@ def test_build_hardware_without_radio_section_leaves_radio_none() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_setup_radio_wraps_resolved_pins_into_digitalinout_and_delegates_to_transport() -> None:
+def test_setup_radio_resolves_pins_and_wraps_the_transport_in_a_transceiver() -> None:
     radio_cfg = parse_device_config(
         {
             "buttons": [],
@@ -188,13 +188,20 @@ def test_setup_radio_wraps_resolved_pins_into_digitalinout_and_delegates_to_tran
         )
 
         from hardware.circuitpython.device_builder import _setup_radio
+        from hardware.shared.radio_transceiver import RadioTransceiver
 
         result = _setup_radio(spi, radio_cfg, board_mock)
 
     mock_digitalio.DigitalInOut.assert_any_call(cs_pin)
     mock_digitalio.DigitalInOut.assert_any_call(reset_pin)
     mock_transport_cls.assert_called_once_with(spi, cs_dio, reset_dio, 915.0, 3)
-    assert result is mock_transport
+    assert isinstance(result, RadioTransceiver)
+
+    # The transceiver wraps exactly the constructed transport -- proven by
+    # observing that send() delegates to it, mirroring how
+    # test_radio_transceiver.py verifies RadioTransceiver's own delegation.
+    result.send(b"\xab")
+    mock_transport.send.assert_called_once_with(b"\xab")
 
 
 # ---------------------------------------------------------------------------

@@ -70,7 +70,7 @@ hardware/         Hardware abstraction layer
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
                   device_config, device_settings, device_hardware, network_controls,
                   scene_selection, ir_transport, ir_transceiver, ir_codecs/ (base, aura, tag),
-                  ir_telemetry, radio_transport, radio_manager, profiler_report)
+                  ir_telemetry, radio_transport, radio_transceiver, profiler_report)
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together
@@ -149,10 +149,10 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `Duration` | `magic/values.py` | Expiry tracker: `update(elapsed) → bool` |
 | `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; optional `pixels` list plus optional IR/audio/I2C/sensor/haptics sections |
 | `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle `build_hardware` returns (outputs, sensors, network seam, `ir`, radio, storage) |
-| `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter; built by `device_builder`; `send_ir` delegates to `InfraredTransceiver` |
+| `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter; built by `device_builder`; `send_ir` delegates to `InfraredTransceiver`, `send_radio` delegates to `RadioTransceiver` (silent no-op when absent) |
 | `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, receiver, shared transmit gate); `send`, per-tick `update()` (pump then receive), `apply_codec` |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
-| `RadioManager` | `hardware/shared/radio_manager.py` | Board-free per-tick radio receive orchestrator; exposes `received` |
+| `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem; `send`, per-tick `update()` (receive only), exposes `received`/`last_sender` |
 | `SceneRuntime` | `app/scene_composition.py` | `__slots__` bundle from `build_scene_runtime` that `run_scene`'s loop drives |
 
 ---

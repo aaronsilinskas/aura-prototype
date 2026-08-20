@@ -15,8 +15,6 @@ from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
-from hardware.shared.radio_manager import RadioManager
-from hardware.shared.radio_transport import RadioTransport
 
 
 def _fake_hw(ir=None, radio=None, audio_registry=None, storage=None) -> DeviceHardware:
@@ -154,40 +152,34 @@ def test_build_scene_runtime_ir_is_none_when_the_hardware_bundle_has_no_ir():
 
 
 # ---------------------------------------------------------------------------
-# SceneRuntime.radio wiring (issue #704)
+# SceneRuntime.radio wiring (issue #893) -- build_scene_runtime no longer
+# assembles a separate per-tick radio orchestrator; SceneRuntime.radio is
+# hw.radio directly, since RadioTransceiver
+# (hardware/shared/radio_transceiver.py) is now the single radio-subsystem
+# owner.
 # ---------------------------------------------------------------------------
 
 
-class _StubRadioTransport(RadioTransport):
-    """Returns a fixed (from_byte, data) pair from every receive() call."""
-
-    def __init__(self, from_byte: int, data: bytes) -> None:
-        self._packet = (from_byte, data)
-
-    def send(self, data: bytes) -> None:
-        pass  # unused by these tests
-
-    def receive(self) -> "tuple[int, bytes] | None":
-        return self._packet
+class _RecordingRadioTransceiver:
+    """Stands in for a RadioTransceiver instance -- isolates SceneRuntime
+    wiring (identity passthrough) from RadioTransceiver's own behaviour
+    (covered separately in hardware/shared/tests/test_radio_transceiver.py)."""
 
 
-def test_build_scene_runtime_exposes_a_radio_manager_as_radio():
-    runtime = build_scene_runtime(_fake_hw(), "tag")
+def test_build_scene_runtime_exposes_the_hardware_bundles_radio_as_runtime_radio():
+    """SceneRuntime.radio must be the exact hw.radio instance, not a wrapper or copy."""
+    radio = _RecordingRadioTransceiver()
+    runtime = build_scene_runtime(_fake_hw(radio=radio), "tag")
 
-    assert isinstance(runtime.radio, RadioManager)
+    assert runtime.radio is radio
 
 
-def test_build_scene_runtime_wires_radio_to_the_hardware_bundles_radio_transport():
-    """runtime.radio.update() must drive hw.radio, surfacing its packet as received."""
-    runtime = build_scene_runtime(
-        _fake_hw(radio=_StubRadioTransport(3, b"\xab\xcd")),
-        "tag",
-    )
+def test_build_scene_runtime_radio_is_none_when_the_hardware_bundle_has_no_radio():
+    """A device with no radio peripheral wired (hw.radio is None) carries that
+    through to the runtime unchanged, rather than substituting a placeholder."""
+    runtime = build_scene_runtime(_fake_hw(radio=None), "tag")
 
-    runtime.radio.update()
-
-    assert runtime.radio.received.data == b"\xab\xcd"
-    assert runtime.radio.received.sender == "3"
+    assert runtime.radio is None
 
 
 # ---------------------------------------------------------------------------

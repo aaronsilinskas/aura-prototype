@@ -6,13 +6,12 @@ ownership shape: constructed with a transport seam that may be absent, its
 read afterwards rather than returned. The port is private — no call site
 reaches it through this class.
 
-Added beside :class:`~hardware.shared.radio_manager.RadioManager`, which
-keeps working unchanged; nothing is wired to this class yet. The rewiring
-and ``RadioManager``'s retirement land in a follow-up ticket. Unlike
-``RadioManager``, this class hands back the raw decoded payload and sender
-byte rather than building a ``NetworkEvents.RadioReceived`` itself — it
-imports no ``engine.network`` vocabulary. The raw packet crosses into game
-vocabulary only later, at ``run_scene``.
+Assembled by ``device_builder._setup_radio`` and exposed as
+``DeviceHardware.radio``; ``HardwareNetworkControls.send_radio`` delegates to
+it. This class hands back the raw decoded payload and sender byte rather than
+building a ``NetworkEvents.RadioReceived`` itself — it imports no
+``engine.network`` vocabulary. The raw packet crosses into game vocabulary
+only later, at ``run_scene``, which builds the event next to the IR block.
 """
 
 from hardware.shared.radio_transport import RadioTransport

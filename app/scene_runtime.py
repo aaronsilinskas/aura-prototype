@@ -49,8 +49,12 @@ def run_scene(scene_name: str) -> None:
     when it returns one — the receiver itself gates on whether a counter
     changed since the last call. Also drives ``runtime.radio.update()`` every
     tick (see
-    :class:`~hardware.shared.radio_manager.RadioManager`), the radio parallel
-    to the IR receive block. Constructs a live ``[hw]``-tagged
+    :class:`~hardware.shared.radio_transceiver.RadioTransceiver`), the radio
+    parallel to the IR receive block — likewise a no-op when ``runtime.radio``
+    is ``None`` (no radio peripheral wired). Builds the queued
+    ``NetworkEvents.RadioReceived`` event locally, next to the ``IRReceived``
+    block, from ``radio.received``/``radio.last_sender`` — ``RadioTransceiver``
+    itself builds no game event. Constructs a live ``[hw]``-tagged
     :class:`~engine.log.Logger` and passes it to ``build_hardware`` so the
     on-device path always gets hardware setup narration on stdout, with no
     opt-in required. Not unit-testable — ``build_hardware`` requires
@@ -118,8 +122,10 @@ def run_scene(scene_name: str) -> None:
         # Same unconditional rationale as ir.update() above: radio.update()
         # always polls for a waiting packet regardless of whether a scene is
         # active, so a packet decoded with no active scene is simply never
-        # queued below rather than left to build up in the transport.
-        radio.update()
+        # queued below rather than left to build up in the transport. A
+        # no-op when no radio peripheral is wired at all (radio is None).
+        if radio is not None:
+            radio.update()
 
         active_state = manager.active_state
 
@@ -133,8 +139,10 @@ def run_scene(scene_name: str) -> None:
                         best_receiver=None,
                     )
                 )
-            if radio.received is not None:
-                active_state.queue_event(radio.received)
+            if radio is not None and radio.received is not None:
+                active_state.queue_event(
+                    NetworkEvents.RadioReceived(radio.received, str(radio.last_sender))
+                )
             active_state.queue_event(_input_event)
 
         manager.update()
