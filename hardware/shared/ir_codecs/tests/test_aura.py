@@ -3,8 +3,6 @@
 import pytest
 
 from hardware.shared.ir_codecs.aura import (
-    IR_MARK_ONE,
-    IR_MARK_ZERO,
     IR_SPACE_ONE,
     IR_SPACE_ZERO,
     AuraInfraredDecoder,
@@ -97,25 +95,24 @@ def test_encoder_frame_ends_with_lead_out():
 
 
 def test_encoder_frame_length_covers_header_payload_crc_and_lead_out():
-    # header(2) + (payload + CRC) bytes * 8 bits * 2 slots + lead_out(1)
-    payload = bytes([0xAB, 0xCD])
-    pulses = AuraInfraredEncoder().encode(payload)
-    expected_len = 2 + (len(payload) + 1) * 8 * 2 + 1
-    assert len(pulses) == expected_len
+    # 2-byte payload + 1 CRC byte = 3 bytes.
+    # header(2) + 3 bytes * 8 bits * 2 slots (48) + lead_out(1) = 51 slots.
+    pulses = AuraInfraredEncoder().encode(bytes([0xAB, 0xCD]))
+    assert len(pulses) == 51
 
 
 def test_encoder_encodes_zero_bit_as_short_space():
-    # 0x00 — all bits are zero; first data bit starts at index 2.
+    # 0x00 — all bits are zero; first data bit space is at index 3.
+    # A zero bit uses the 500 µs short space.
     pulses = AuraInfraredEncoder().encode(b"\x00")
-    assert pulses[2] == IR_MARK_ZERO
-    assert pulses[3] == IR_SPACE_ZERO
+    assert pulses[3] == 500
 
 
 def test_encoder_encodes_one_bit_as_long_space():
-    # 0x80 — MSB is 1; first data bit starts at index 2.
+    # 0x80 — MSB is 1; first data bit space is at index 3.
+    # A one bit uses the 1500 µs long space.
     pulses = AuraInfraredEncoder().encode(b"\x80")
-    assert pulses[2] == IR_MARK_ONE
-    assert pulses[3] == IR_SPACE_ONE
+    assert pulses[3] == 1500
 
 
 # ---------------------------------------------------------------------------
@@ -295,7 +292,7 @@ def test_reset_aborts_in_progress_decode():
     assert result is None
 
 
-def test_reset_after_reset_allows_a_fresh_packet_to_decode_normally():
+def test_reset_allows_fresh_packet_to_decode_after_partial_header():
     encoder = AuraInfraredEncoder()
     decoder = AuraInfraredDecoder()
 

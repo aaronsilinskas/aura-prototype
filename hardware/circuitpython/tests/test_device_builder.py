@@ -87,7 +87,7 @@ def test_address_suffix_omits_the_field_entirely_when_address_is_none() -> None:
 def test_address_suffix_formats_a_configured_override_as_two_digit_hex() -> None:
     from hardware.circuitpython.device_builder import _address_suffix
 
-    assert _address_suffix(0x19) == " address=0x19"
+    assert _address_suffix(0x05) == " address=0x05"
 
 
 # ---------------------------------------------------------------------------

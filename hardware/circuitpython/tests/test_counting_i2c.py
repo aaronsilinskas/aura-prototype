@@ -149,6 +149,13 @@ class TestWriteto:
         counting.writeto(0x77, buf, start=1, end=3)
         assert ("writeto", 0x77, bytes(buf), 1, 3) in fake.calls
 
+    def test_omitted_end_forwards_resolved_end_of_buffer_length(
+        self, counting: CountingI2C, fake: FakeI2C
+    ) -> None:
+        buf = bytearray(b"\x01\x02\x03\x04")
+        counting.writeto(0x77, buf)
+        assert ("writeto", 0x77, bytes(buf), 0, len(buf)) in fake.calls
+
     def test_does_not_increment_bytes_read(self, counting: CountingI2C, fake: FakeI2C) -> None:
         counting.writeto(0x42, bytearray(4))
         assert counting.bytes_read == 0
@@ -432,12 +439,12 @@ class TestContextManager:
         counting.__exit__(None, None, None)
         assert ("__exit__",) in fake.calls
 
-    def test_exit_returns_none(self, counting: CountingI2C) -> None:
-        result = counting.__exit__(None, None, None)
-        assert result is None
+    def test_exit_does_not_suppress_exceptions(self, fake: FakeI2C) -> None:
+        with pytest.raises(ValueError), CountingI2C(fake):
+            raise ValueError("boom")
 
     def test_context_manager_protocol_works_end_to_end(self, fake: FakeI2C) -> None:
         with CountingI2C(fake) as bus:
-            assert isinstance(bus, CountingI2C)
+            bus.writeto(0x42, bytearray(2))
         assert ("__enter__",) in fake.calls
         assert any(call[0] == "__exit__" for call in fake.calls)

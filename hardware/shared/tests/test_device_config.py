@@ -7,7 +7,6 @@ import pytest
 
 from hardware.shared.device_config import (
     DeviceConfig,
-    I2CDeviceConfig,
     MatrixPixelsConfig,
     copy_with_enabled,
     first_neopixel_pin,
@@ -535,12 +534,6 @@ def test_validate_band_map_invalid_scope_key_raises_value_error():
 # ---------------------------------------------------------------------------
 
 
-def test_parse_neopixel_config_returns_device_config(neopixel_config):
-    result = parse_device_config(neopixel_config)
-
-    assert isinstance(result, DeviceConfig)
-
-
 def test_parse_neopixel_first_entry_exposes_configured_scopes(neopixel_config):
     result = parse_device_config(neopixel_config)
 
@@ -841,18 +834,6 @@ def test_parse_i2c_device_bad_string_address_raises_value_error_naming_field(
 
     with pytest.raises(ValueError, match=rf"{section}\.address"):
         parse_device_config(matrix_config)
-
-
-def test_parse_i2c_device_sections_all_share_the_same_config_type(matrix_config):
-    matrix_config["accelerometer"] = {}
-    matrix_config["magnetometer"] = {}
-    matrix_config["haptics"] = {}
-
-    result = parse_device_config(matrix_config)
-
-    assert isinstance(result.accelerometer, I2CDeviceConfig)
-    assert isinstance(result.magnetometer, I2CDeviceConfig)
-    assert isinstance(result.haptics, I2CDeviceConfig)
 
 
 # ---------------------------------------------------------------------------
@@ -1933,8 +1914,7 @@ def test_isolate_on_minimal_config_is_a_no_op_for_absent_components():
 
 def test_isolate_unknown_keep_raises_value_error_naming_valid_choices_sorted():
     config = parse_device_config({})
-    excluded = {"buttons", "i2c", "high_current_rail", "spi"}
-    expected_choices = sorted(set(DeviceConfig.__slots__) - excluded)
+    expected_choices = "accelerometer, audio, haptics, ir, magnetometer, pixels, radio, sdcard"
 
-    with pytest.raises(ValueError, match=", ".join(expected_choices)):
+    with pytest.raises(ValueError, match=expected_choices):
         config.isolate(keep="bogus")

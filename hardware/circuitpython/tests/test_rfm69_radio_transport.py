@@ -83,7 +83,9 @@ def test_receive_recovers_from_byte_as_sender_and_strips_the_header() -> None:
     assert result == (7, b"\xab\xcd")
 
 
-def test_receive_reads_with_header_true() -> None:
+def test_receive_requests_the_radiohead_header_so_the_sender_can_be_identified() -> None:
+    # Without with_header=True the driver strips the RadioHead header itself and
+    # the From byte is lost, leaving no way to tell who sent the packet.
     mock_radio = MagicMock(name="radio")
     mock_radio.payload_ready = True
     mock_radio.receive.return_value = bytes([0x02, 0x07, 0x00, 0x00]) + b"\xab"

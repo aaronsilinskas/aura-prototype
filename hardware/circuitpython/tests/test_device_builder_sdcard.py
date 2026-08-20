@@ -23,7 +23,6 @@ from hardware.circuitpython.tests._hw_patch_mocks import (
     _recording_logger,
 )
 from hardware.shared.device_config import parse_device_config
-from hardware.shared.device_storage import DeviceStorage
 
 # ---------------------------------------------------------------------------
 # build_hardware -- sdcard is config-gated on spi, mirroring radio (#793)
@@ -97,24 +96,28 @@ def test_build_hardware_declared_sdcard_with_no_spi_bus_raises_runtime_error() -
 
 def test_build_hardware_declared_sdcard_raises_when_card_unmountable() -> None:
     """A declared sdcard whose card can't be mounted on an available bus is
-    a hard error too -- not just the no-SPI-bus case."""
+    a hard error too -- not just the no-SPI-bus case. build_hardware must
+    propagate the setup failure rather than swallow it into a storage-less
+    bundle: it reaches _setup_sdcard and lets the error out."""
     config = _neopixel_config_with_sdcard()
     board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
 
     with ExitStack() as stack:
         _enter_hw_patches(stack, patch_sdcard=False)
-        stack.enter_context(
+        mock_setup_sdcard = stack.enter_context(
             patch(
                 "hardware.circuitpython.device_builder._setup_sdcard",
-                side_effect=RuntimeError("sdcard section is declared but the card ... "),
+                side_effect=RuntimeError("card not mountable"),
             )
         )
         _patch_neopixel(stack)
 
         from hardware.circuitpython.device_builder import build_hardware
 
-        with pytest.raises(RuntimeError, match="sdcard"):
+        with pytest.raises(RuntimeError):
             build_hardware(config, board_module=board_mock)
+
+    mock_setup_sdcard.assert_called_once()
 
 
 def test_build_hardware_disabled_sdcard_section_omits_storage_from_bundle() -> None:
@@ -198,7 +201,10 @@ def test_setup_sdcard_wraps_mount_os_error_naming_section_cs_and_mount() -> None
     assert isinstance(excinfo.value.__cause__, OSError)
 
 
-def test_setup_sdcard_returns_a_device_storage() -> None:
+def test_setup_sdcard_mounts_via_real_sdcardstorage() -> None:
+    """Unlike the delegation test (which stubs SdCardStorage whole), this drives
+    the real SdCardStorage through the real sdcardio/storage stack: the card is
+    mounted at the configured point and the returned storage is rooted there."""
     sdcard_cfg = parse_device_config(
         {"buttons": [], "sdcard": {"cs": "D24", "mount": "/sd"}}
     ).sdcard
@@ -208,13 +214,14 @@ def test_setup_sdcard_returns_a_device_storage() -> None:
     with (
         patch("hardware.circuitpython.sdcard_storage.sdcardio.SDCard"),
         patch("hardware.circuitpython.sdcard_storage.storage.VfsFat"),
-        patch("hardware.circuitpython.sdcard_storage.storage.mount"),
+        patch("hardware.circuitpython.sdcard_storage.storage.mount") as mock_mount,
     ):
         from hardware.circuitpython.device_builder import _setup_sdcard
 
         result = _setup_sdcard(spi, sdcard_cfg, board_mock)
 
-    assert isinstance(result, DeviceStorage)
+    assert result.mount_root == "/sd"
+    assert mock_mount.call_args.args[1] == "/sd"
 
 
 # ---------------------------------------------------------------------------

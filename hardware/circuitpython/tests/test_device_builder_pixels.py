@@ -106,12 +106,40 @@ def test_setup_matrix_is31fl3741_drives_scaling_from_brightness() -> None:
 
         from hardware.circuitpython.device_builder import _setup_matrix_is31fl3741
 
+        _setup_matrix_is31fl3741(MagicMock(), 0.2)
+
+    # 0.2 * 0xFF == 0x33 -- the old hard-coded calibration byte.
+    driver.set_led_scaling.assert_called_once_with(0x33)
+
+
+def test_setup_matrix_is31fl3741_drives_global_current_to_max() -> None:
+    with ExitStack() as stack:
+        mock_matrix_cls = stack.enter_context(
+            patch("adafruit_is31fl3741.adafruit_rgbmatrixqt.Adafruit_RGBMatrixQT")
+        )
+        driver = MagicMock()
+        mock_matrix_cls.return_value = driver
+
+        from hardware.circuitpython.device_builder import _setup_matrix_is31fl3741
+
+        _setup_matrix_is31fl3741(MagicMock(), 0.2)
+
+    assert driver.global_current == 0xFF
+
+
+def test_setup_matrix_is31fl3741_returns_the_constructed_driver() -> None:
+    with ExitStack() as stack:
+        mock_matrix_cls = stack.enter_context(
+            patch("adafruit_is31fl3741.adafruit_rgbmatrixqt.Adafruit_RGBMatrixQT")
+        )
+        driver = MagicMock()
+        mock_matrix_cls.return_value = driver
+
+        from hardware.circuitpython.device_builder import _setup_matrix_is31fl3741
+
         result = _setup_matrix_is31fl3741(MagicMock(), 0.2)
 
     assert result is driver
-    # 0.2 * 0xFF == 0x33 -- the old hard-coded calibration byte.
-    driver.set_led_scaling.assert_called_once_with(0x33)
-    assert driver.global_current == 0xFF
 
 
 def test_setup_matrix_is31fl3741_full_brightness_drives_max_scaling() -> None:

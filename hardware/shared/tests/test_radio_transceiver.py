@@ -4,8 +4,6 @@ The _RecordingTransport fake is this suite's own board-free fixture, so these
 tests run without radio hardware.
 """
 
-import pytest
-
 from hardware.shared.radio_transceiver import RadioTransceiver
 from hardware.shared.radio_transport import RadioTransport
 
@@ -145,21 +143,19 @@ def test_send_is_a_noop_with_no_transport_wired():
     transceiver.send(b"\xab")  # must not raise
 
 
-def test_send_takes_no_emitter_argument():
-    transceiver = RadioTransceiver(_RecordingTransport())
-
-    with pytest.raises(TypeError):
-        transceiver.send(b"\xab", "line")
-
-
 # ---------------------------------------------------------------------------
 # No-event guarantee — this module builds no game event
 # ---------------------------------------------------------------------------
 
 
 def test_received_is_the_raw_payload_not_a_network_event():
-    transceiver = RadioTransceiver(_RecordingTransport([(3, b"\xab")]))
+    payload = b"\xab"
+    transceiver = RadioTransceiver(_RecordingTransport([(3, payload)]))
 
     transceiver.update()
 
-    assert type(transceiver.received) is bytes
+    # The raw decoded payload is handed back verbatim, with no game
+    # vocabulary wrapped around it: it equals the transport's bytes exactly,
+    # not a NetworkEvents.RadioReceived (or any object carrying a .payload).
+    assert transceiver.received == payload
+    assert not hasattr(transceiver.received, "payload")

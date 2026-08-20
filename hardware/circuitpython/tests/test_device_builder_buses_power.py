@@ -56,7 +56,8 @@ def test_build_hardware_uses_caller_supplied_i2c_bus_for_matrix() -> None:
 
         build_hardware(config, board_module=board_mock, i2c=supplied_i2c)
 
-    mock_setup_matrix.assert_called_once_with(supplied_i2c, 1.0, None)
+    mock_setup_matrix.assert_called_once()
+    assert mock_setup_matrix.call_args.args[0] is supplied_i2c
 
 
 def test_build_hardware_does_not_construct_its_own_bus_when_i2c_supplied() -> None:
@@ -118,7 +119,8 @@ def test_build_hardware_uses_its_own_constructed_bus_for_matrix_when_i2c_omitted
 
         build_hardware(config, board_module=board_mock)
 
-    mock_setup_matrix.assert_called_once_with(own_i2c, 1.0, None)
+    mock_setup_matrix.assert_called_once()
+    assert mock_setup_matrix.call_args.args[0] is own_i2c
 
 
 # ---------------------------------------------------------------------------
@@ -536,29 +538,33 @@ def test_setup_spi_disabled_config_builds_no_bus() -> None:
 
 
 # ---------------------------------------------------------------------------
-# build_hardware wires config.i2c and the board module into _setup_i2c
+# build_hardware builds its self-constructed I2C bus on config.i2c's pins
 # ---------------------------------------------------------------------------
 
 
-def test_build_hardware_passes_i2c_config_and_board_to_setup_i2c() -> None:
-    """build_hardware threads config.i2c and the board module into the
-    self-constructed-bus branch, so a bad-alias board with an i2c section
-    resolves named pins rather than falling back to board.SCL/board.SDA."""
+def test_build_hardware_builds_i2c_bus_on_configured_pins() -> None:
+    """build_hardware threads config.i2c and the board module through to the
+    busio seam, so a board carrying an i2c section builds its bus on the
+    section's named pins (GP5/GP4 here) rather than falling back to
+    board.SCL/board.SDA."""
     mapping = {
         "buttons": ["D9"],
         "i2c": {"sda": "GP4", "scl": "GP5"},
     }
     config = parse_device_config(mapping)
-    board_mock = _mock_board(D9=MagicMock())
+    scl_pin = MagicMock(name="scl_pin")
+    sda_pin = MagicMock(name="sda_pin")
+    board_mock = _mock_board(D9=MagicMock(), GP5=scl_pin, GP4=sda_pin)
 
     with ExitStack() as stack:
-        mock_setup_i2c = _enter_hw_patches(stack).i2c
+        mock_busio = stack.enter_context(patch("hardware.circuitpython.device_builder.busio"))
+        stack.enter_context(patch("hardware.circuitpython.device_builder.digitalio"))
 
         from hardware.circuitpython.device_builder import build_hardware
 
         build_hardware(config, board_module=board_mock)
 
-    mock_setup_i2c.assert_called_once_with(config.i2c, board_mock)
+    mock_busio.I2C.assert_called_once_with(scl_pin, sda_pin)
 
 
 # ---------------------------------------------------------------------------

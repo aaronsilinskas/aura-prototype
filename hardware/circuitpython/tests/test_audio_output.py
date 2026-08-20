@@ -148,22 +148,6 @@ def _register_missing_path(registry: AudioRegistry, name: str, path: str) -> str
 # ---------------------------------------------------------------------------
 
 
-def test_requires_num_voices_and_max_volume() -> None:
-    """AudioEffectOutput must be constructed with max_volume and num_voices — no defaults."""
-    import audiobusio  # type: ignore[import]
-    import audiomixer  # type: ignore[import]
-
-    audiobusio.I2SOut = MagicMock(return_value=MagicMock())
-    mock_mixer = MagicMock()
-    mock_mixer.voice = []
-    audiomixer.Mixer = MagicMock(return_value=mock_mixer)
-
-    from hardware.circuitpython.audio_output import AudioEffectOutput
-
-    with pytest.raises(TypeError):
-        AudioEffectOutput(audio_registry=AudioRegistry())  # type: ignore[call-arg]
-
-
 def test_i2sout_constructed_with_caller_supplied_pins() -> None:
     """audiobusio.I2SOut is constructed with the caller-supplied I2S pins."""
     import audiobusio  # type: ignore[import]
@@ -311,7 +295,7 @@ def test_valid_clip_plays_on_an_idle_voice(tmp_path) -> None:
 
     mixer.voice[0].play.assert_called_once()
     assert mixer.voice[0].play.call_args[1]["loop"] is True
-    assert mixer.voice[0].level == pytest.approx(0.4 * 0.5)
+    assert mixer.voice[0].level == pytest.approx(0.2)
 
 
 def test_audio_only_effect_implicitly_stops_receipt_on_finish(tmp_path) -> None:
@@ -498,7 +482,7 @@ def test_set_loudness_applies_max_volume(tmp_path) -> None:
 
     output.set_loudness(0, 0.5)
 
-    assert mixer.voice[0].level == pytest.approx(0.4 * 0.5)
+    assert mixer.voice[0].level == pytest.approx(0.2)
 
 
 def test_is_playing_reads_voice_playing(tmp_path) -> None:

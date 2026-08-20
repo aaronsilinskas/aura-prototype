@@ -116,10 +116,9 @@ def test_build_hardware_unknown_button_pin_marks_buttons_line_failed_not_prior_l
 
 
 def test_build_hardware_summary_counts_reflect_actually_built_outputs_and_buttons() -> None:
-    """The summary line's outputs=/buttons= counts are read off build_hardware's
-    own local state (the outputs list and resolved button pins), not off
-    logging state -- this ties the counts to a config building two NeoPixel
-    outputs and one button, independent of the log lines that led there."""
+    """The closing summary line reports the configured output and button counts
+    -- here a config with two NeoPixel outputs and one button surfaces as
+    outputs=2 buttons=1."""
     config = _neopixel_config()
     board_mock = _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock())
     logger, fragments = _recording_logger()

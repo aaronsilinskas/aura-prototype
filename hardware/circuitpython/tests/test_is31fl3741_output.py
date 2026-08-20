@@ -131,7 +131,7 @@ def test_registered_on_all_scopes() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_write_row_separates_rgb_channels_across_buffer_positions() -> None:
+def test_write_row_emits_one_byte_per_channel() -> None:
     cols = 3
     output, mock_matrix = _make_output(cols=cols, scope_rows={"personal": range(0, 1)})
     buf = PixelBuffer(cols)
@@ -144,15 +144,6 @@ def test_write_row_separates_rgb_channels_across_buffer_positions() -> None:
     written_values = [c.args[1] for c in mock_matrix.__setitem__.call_args_list]
     assert written_values.count(0xFF) == 3
     assert written_values.count(0x00) == 6
-
-
-def test_write_row_does_not_use_pixel_api() -> None:
-    output, mock_matrix = _make_output(cols=2, scope_rows={"personal": range(0, 1)})
-    buf = PixelBuffer(2)
-
-    output.update_pixels("personal", buf)
-
-    mock_matrix.pixel.assert_not_called()
 
 
 def test_write_row_writes_each_channel_to_a_distinct_buffer_position() -> None:

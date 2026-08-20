@@ -125,12 +125,12 @@ def test_two_buttons_track_their_own_states_independently():
     assert not out.is_pressed("B")
 
 
-def test_out_buffer_reflects_latest_pin_state_on_successive_updates():
+def test_press_edge_commits_after_a_prior_settled_update():
     pin = [True]
     buttons = DebouncedButtons([("A", lambda: pin[0])], interval=0)
     out = _out()
 
-    buttons.update(0.0, out)
+    buttons.update(0.0, out)  # settle into UP state
 
     pin[0] = False
     buttons.update(0.0, out)

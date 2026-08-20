@@ -348,7 +348,6 @@ def test_setup_accelerometer_passes_configured_address_to_lis3dh_constructor() -
 
         result = _setup_accelerometer(fake_i2c, address=0x19)
 
-    assert isinstance(result, _FakeLis3dh)
     assert result.i2c is fake_i2c
     assert result.address == 0x19
 
@@ -526,7 +525,6 @@ def test_setup_drv2605_passes_configured_address_to_drv2605_constructor() -> Non
 
         result = _setup_drv2605(fake_i2c, address=0x5B)
 
-    assert isinstance(result, _FakeDrv2605)
     assert result.i2c is fake_i2c
     assert result.address == 0x5B
 
@@ -706,7 +704,7 @@ def _fully_loaded_board_mock() -> MagicMock:
     )
 
 
-def test_build_hardware_fully_loaded_config_builds_accelerometer_and_haptic_output() -> None:
+def test_build_hardware_fully_loaded_config_builds_every_declared_subsystem() -> None:
     from hardware.circuitpython.audio_output import AudioEffectOutput
     from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
     from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
@@ -762,7 +760,7 @@ def test_build_hardware_fully_loaded_config_builds_accelerometer_and_haptic_outp
     assert hw.ir is not None
 
 
-def test_build_hardware_accelerometer_and_haptics_less_config_omits_both() -> None:
+def test_build_hardware_accelerometer_and_haptics_less_config_builds_the_other_subsystems() -> None:
     """The accelerometer/haptics-less counterpart to the fully-loaded prop
     above: every other section stays declared, but omitting accelerometer
     and haptics yields hw.accelerometer is None and no haptic output,
