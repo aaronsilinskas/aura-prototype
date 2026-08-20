@@ -2,8 +2,8 @@
 
 CPython-testable: imports only ``engine`` and the board-free modules under
 ``hardware.shared`` (``device_hardware``, ``ir_codecs``, ``ir_transceiver``,
-``radio_transceiver``). No ``TYPE_CHECKING`` guard is needed because none of
-them carry board imports.
+``radio_transceiver``, ``scene_selection``). No ``TYPE_CHECKING`` guard is
+needed because none of them carry board imports.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import engine._path as _path
 from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
+from engine.log import Logger
 from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
@@ -23,8 +24,15 @@ from hardware.shared.ir_codecs import codec_for
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.radio_transceiver import RadioTransceiver
+from hardware.shared.scene_selection import resolve_boot_scene
 
-__all__ = ["SceneRuntime", "build_scene_runtime", "resolve_ir_codec", "resolve_known_scene"]
+__all__ = [
+    "SceneRuntime",
+    "build_scene_runtime",
+    "resolve_boot_scene_name",
+    "resolve_ir_codec",
+    "resolve_known_scene",
+]
 
 
 class SceneRuntime:
@@ -91,17 +99,32 @@ def resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
     raise ValueError(f"unknown scene {scene_name!r}; known scenes: {', '.join(names)}")
 
 
+def resolve_boot_scene_name(
+    scene_registry: SceneRegistry,
+    storage: DeviceStorage | None,
+    settings_mapping: dict,
+    logger: Logger | None = None,
+) -> str:
+    """Resolve the boot scene name and validate it against *scene_registry*.
+
+    ``resolve_boot_scene`` decides only source precedence (persisted SD
+    ``scene`` -> flash ``default_scene`` -> raise), never registry membership,
+    so its result is validated here via ``resolve_known_scene`` -- an unknown
+    name, from either source, raises naming the known scenes. A ``None``
+    *storage* is treated as no persisted override, leaving the flash
+    ``default_scene`` to win.
+    """
+    scene_name = resolve_boot_scene(storage, settings_mapping, logger)
+    return resolve_known_scene(scene_registry, scene_name)
+
+
 def resolve_ir_codec(
     scene_registry: SceneRegistry, scene_name: str
 ) -> tuple[InfraredEncoder, InfraredDecoder]:
     """Return the instantiated wire-frame codec *scene_name* declares.
 
-    Reads the scene's declared codec name via ``SceneRegistry.ir_codec_for``
-    (``"aura"`` when the scene declares none) and maps it to a class pair via
-    ``ir_codecs.codec_for``, then constructs one instance of each -- board-free,
-    so it needs no built hardware to run. ``run_scene`` calls this after
-    ``build_hardware`` returns and applies the pair onto the built ``hw.ir``
-    via ``InfraredTransceiver.apply_codec``, before the first tick.
+    Defaults to the ``"aura"`` codec when the scene declares none, and needs
+    no built hardware to resolve.
     """
     codec_name = scene_registry.ir_codec_for(scene_name)
     encoder_cls, decoder_cls = codec_for(codec_name)
@@ -225,11 +248,9 @@ def build_scene_runtime(
     scene already active — the caller only needs to drive the per-tick loop.
 
     *scene_registry*, if supplied, is used as-is instead of scanning a fresh
-    one -- the seam ``run_scene`` uses to share the one registry scan it did
-    to resolve the boot-time IR codec (see ``resolve_ir_codec``) with the
-    scene load here, so an unknown scene name is discovered once, before
-    hardware is built, rather than scanned and validated twice. Omitted, a
-    fresh registry is scanned here so existing callers keep working unchanged.
+    one -- letting a caller that has already scanned a registry reuse it here
+    rather than scan and validate a second time. Omitted, a fresh registry is
+    scanned here so existing callers keep working unchanged.
 
     After flash scenes are scanned (or the supplied registry is accepted
     as-is), ``hw.storage``'s ``aura_packs/scenes`` is scanned into the same
