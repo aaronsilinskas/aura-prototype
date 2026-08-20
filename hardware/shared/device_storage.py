@@ -14,14 +14,16 @@ job: the live adapter is ``hardware.circuitpython.sdcard_storage.SdCardStorage``
 which mounts at construction time and then defers every read/write to this
 base class, since once mounted, plain ``os`` calls work identically across
 runtimes. ``FakeDeviceStorage``, the in-memory test double, lives in
-``hardware/shared/tests/test_device_storage.py`` (not shipped here),
-mirroring where the board-free radio-transport fake lives.
+``hardware/shared/tests/helpers.py``, mirroring where the board-free
+radio-transport fake lives.
 
-Bytes primitives are the general seam; text/JSON convenience wrappers are
-deferred to a later ticket.
+``read_json``/``write_json`` are a thin JSON convenience built on the bytes
+primitives, so they inherit ``read_bytes``/``write_bytes``'s escape-rejection
+and durable atomic-as-FAT-allows write guarantees for free.
 """
 
 import errno
+import json
 import os
 
 try:
@@ -129,6 +131,43 @@ class DeviceStorage:
 
         os.rename(temp_path, resolved)
         os.sync()
+
+    def read_json(self, name: str) -> "dict | None":
+        """Return *name*'s contents parsed as JSON, or ``None`` if never written.
+
+        A thin decode wrapped around :meth:`read_bytes`; stays a faithful
+        primitive rather than a fail-soft convenience, so malformed content
+        raises rather than silently returning ``None`` — that policy call
+        belongs to callers, not this port.
+
+        Args:
+            name: File name or subpath under the mount root.
+
+        Raises:
+            ValueError: *name* escapes the mount root (``..`` or an
+                absolute path).
+            json.JSONDecodeError: *name*'s content is not valid JSON.
+        """
+        data = self.read_bytes(name)
+        if data is None:
+            return None
+        return json.loads(data.decode("utf-8"))
+
+    def write_json(self, name: str, mapping: dict) -> None:
+        """Serialise *mapping* to JSON and durably replace *name* with it whole.
+
+        A thin encode wrapped around :meth:`write_bytes`, so it inherits the
+        same atomic-as-FAT-allows replace guarantee.
+
+        Args:
+            name: File name or subpath under the mount root.
+            mapping: The mapping to serialise and write.
+
+        Raises:
+            ValueError: *name* escapes the mount root (``..`` or an
+                absolute path).
+        """
+        self.write_bytes(name, json.dumps(mapping).encode("utf-8"))
 
     def path(self, subpath: str) -> str:
         """Return *subpath* resolved to a real filesystem path under the mount root.
