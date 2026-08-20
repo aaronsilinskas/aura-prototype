@@ -1,12 +1,5 @@
 """Behaviour-driven tests for Rfm69RadioTransport (hardware/circuitpython/rfm69_radio_transport.py).
 
-Covers:
-- send() transmits via the underlying RFM69 with keep_listening=True, so the
-  chip returns to RX after transmitting
-- receive() gates on payload_ready, never blocking when nothing is waiting
-- receive() reads with_header=True and recovers the RadioHead From byte as
-  sender, payload as data
-
 ``adafruit_rfm69`` is stubbed into ``sys.modules`` by the sibling conftest.py
 so this suite runs under CPython; the RFM69 class itself is a MagicMock
 substituted per test via ``patch``.

@@ -148,7 +148,6 @@ def test_gate_stops_transmitting_after_matching_end_transmit():
 
 
 def test_gate_stays_transmitting_until_last_of_concurrent_emissions_ends():
-    """Depth-counted: begin, begin, end leaves one emission still in flight."""
     gate = IrTransmitGate()
     gate.begin_transmit()
     gate.begin_transmit()
@@ -234,8 +233,6 @@ def test_transmitter_without_gate_behaviour_is_unchanged():
 
 
 def test_transmitter_with_gate_is_transmitting_during_write_pulses():
-    """The gate must be armed for the duration of the (blocking) write call."""
-
     class ObservingWriter(PulseWriter):
         def __init__(self, gate):
             self.gate = gate
@@ -1127,7 +1124,6 @@ def test_multi_receiver_returns_payload_when_one_reader_has_complete_packet():
 
 
 def test_multi_receiver_picks_packet_with_lower_error_margin():
-    """When both readers decode a packet, the lower-error-margin packet wins."""
     payload = b"\xab"
     encoder = AuraInfraredEncoder()
     pulses_good = list(encoder.encode(payload))

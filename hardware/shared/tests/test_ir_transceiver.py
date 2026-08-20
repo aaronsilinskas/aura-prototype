@@ -1,24 +1,4 @@
-"""Behaviour-driven tests for InfraredTransceiver (hardware/shared/ir_transceiver.py).
-
-Covers:
-- send() routes a payload to the named transmitter, raising ValueError for
-  an unknown emitter
-- busy() pumps and reports the named transmitter's in-flight state, raising
-  ValueError for an unknown emitter, without exposing the transmitter map
-- update() pumps every transmitter before it receives, always pumps even
-  with no receiver wired, and resets received every tick
-- apply_codec() fans the encoder out to every transmitter and installs the
-  decoder on the receiver, safely no-op with no transmitters/no receiver
-- last_signal_strength / last_error_margin / telemetry_line() forwarded from
-  the receiver, and None-safe with no receiver wired
-- the full self-echo suppression cycle driven through update(), using fake
-  PulseReader/PulseWriter ports wired through the real IrTransmitGate,
-  InfraredTransmitter, and InfraredSingleReceiver
-
-Coverage migrated from hardware/shared/tests/test_ir_manager.py, adapted to
-InfraredTransceiver owning its transmitters directly rather than reaching
-them through an engine.network.TransmitPump seam.
-"""
+"""Behaviour-driven tests for InfraredTransceiver (hardware/shared/ir_transceiver.py)."""
 
 import pytest
 

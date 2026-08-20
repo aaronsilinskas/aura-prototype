@@ -40,10 +40,9 @@ def _make_output(cols: int = _COLS, scope_rows: dict = _SCOPE_ROWS):
 class _RecordingMatrix:
     """Fake matrix satisfying the duck-type contract, recording every write.
 
-    Implements indexed byte writes and ``show()`` (the contract the real
-    driver injected by ``device_builder`` must satisfy) and records every
-    ``matrix[offset] = byte`` write so tests can assert exactly which
-    register offset received which byte.
+    Unlike the ``MagicMock`` matrix used elsewhere, it retains each
+    ``offset -> byte`` write so a test can assert exactly which register
+    offset received which byte.
     """
 
     def __init__(self) -> None:
@@ -118,13 +117,11 @@ def test_offset_table_switches_addressing_scheme_at_the_bank_boundary() -> None:
 
 
 def test_accepts_caller_supplied_cols_and_scope_rows() -> None:
-    """IS31FL3741EffectOutput accepts cols and scope_rows as constructor arguments."""
     output, _ = _make_output(cols=5, scope_rows={"personal": range(0, 2)})
     assert output.min_resolution == 5
 
 
 def test_registered_on_all_scopes() -> None:
-    """IS31FL3741EffectOutput is registered on Scope.ALL."""
     output, _ = _make_output()
     assert Scope.ALL in output.scopes
 
@@ -187,9 +184,9 @@ def test_write_row_routes_red_byte_to_the_b_off_register_and_blue_to_r_off() -> 
 
     output.update_pixels("personal", buf)
 
-    assert matrix.writes[242] == 0xAA  # b_off register receives the red byte
-    assert matrix.writes[241] == 0xBB  # g_off register receives the green byte
-    assert matrix.writes[240] == 0xCC  # r_off register receives the blue byte
+    assert matrix.writes[242] == 0xAA  # b_off
+    assert matrix.writes[241] == 0xBB  # g_off
+    assert matrix.writes[240] == 0xCC  # r_off
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +195,6 @@ def test_write_row_routes_red_byte_to_the_b_off_register_and_blue_to_r_off() -> 
 
 
 def test_flush_calls_matrix_show() -> None:
-    """flush() delegates to matrix.show() exactly once."""
     output, mock_matrix = _make_output()
     output.flush()
     mock_matrix.show.assert_called_once()

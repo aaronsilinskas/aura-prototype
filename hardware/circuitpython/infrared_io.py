@@ -50,8 +50,7 @@ class PulseInReader(PulseReader):
 
         Removes the returned pulse from the ``PulseIn`` buffer.  Non-blocking —
         returns ``None`` immediately when the buffer is empty.  Increments
-        ``buffer_full_on_poll`` when the buffer is found at ``maxlen`` —
-        a proxy for pulses that may have been dropped by overrun.
+        ``buffer_full_on_poll`` when the buffer is found at ``maxlen``.
 
         Returns:
             Pulse duration in µs, or ``None`` if no pulse is ready.

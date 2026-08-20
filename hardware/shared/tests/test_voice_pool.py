@@ -11,22 +11,20 @@ from hardware.shared.voice_pool import VoicePool, VoiceSink
 class RecordingSink(VoiceSink):
     """A VoiceSink fake that records every call and tracks per-slot playing state.
 
-    No audio hardware: ``open_source`` returns a stand-in source object (or a
-    pre-configured failure), ``play`` marks the slot playing, ``stop`` marks it
-    not playing, and ``is_playing`` reports that flag.  Every call is recorded
-    so tests assert against observable behaviour rather than pool internals.
+    Every call is recorded so tests assert against observable behaviour rather
+    than pool internals.
     """
 
     def __init__(self, num_voices: int) -> None:
         self.calls: list = []
         self.playing = [False] * num_voices
         # Sources returned by open_source, in order.  None entries simulate a
-        # failed load.  When exhausted, a fresh unique object is returned.
+        # failed load.
         self._open_results: list = []
         self._next_source_id = 0
 
     def fail_next_open(self) -> None:
-        """Make the next ``open_source`` call return None (a failed load)."""
+        """Make the next ``open_source`` call return ``None`` (a failed load)."""
         self._open_results.append(None)
 
     def open_source(self, path):
@@ -343,7 +341,6 @@ def test_sweep_frees_externally_stopped_receipt(pool: VoicePool, sink: Recording
 def test_sweep_does_not_stop_an_already_externally_stopped_receipt_again(
     pool: VoicePool, sink: RecordingSink
 ) -> None:
-    # An externally stopped receipt must not be re-stopped by sweep.
     class CountingReceipt(EffectReceipt):
         def __init__(self) -> None:
             super().__init__(99)

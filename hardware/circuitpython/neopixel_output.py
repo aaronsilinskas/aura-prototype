@@ -45,11 +45,9 @@ class NeoPixelEffectOutput(EffectOutput):
 
     @property
     def strip(self) -> object:
-        """The underlying hardware NeoPixel strip this output writes to.
-
-        Read-only. Lets a caller reach the one shared strip to build further
+        """The shared hardware strip, exposed so a caller can build further
         outputs around it (e.g. the pixel profiler sweeping segment lengths)
-        without re-constructing the strip or touching a private attribute.
+        without re-constructing the strip or reaching for a private attribute.
         """
         return self._strip
 

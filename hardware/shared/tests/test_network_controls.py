@@ -71,9 +71,9 @@ def test_hardware_network_controls_send_ir_hides_writer_completion_state() -> No
 
 
 def test_send_ir_through_declared_network_controls_type_hides_writer_completion_state() -> None:
-    """Guards the rule-facing call shape: a rule holds `state.network_controls`
-    typed as `NetworkControls`, never `HardwareNetworkControls` -- calling
-    `send_ir` through that declared type is honest fire-and-forget."""
+    """Guards the rule-facing call shape: a rule holds ``state.network_controls``
+    typed as ``NetworkControls``, never ``HardwareNetworkControls`` -- calling
+    ``send_ir`` through that declared type is honest fire-and-forget."""
     tx, writer = _make_transmitter()
     controls: NetworkControls = HardwareNetworkControls(_make_transceiver(**{LINE: tx}))
 

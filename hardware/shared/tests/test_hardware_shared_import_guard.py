@@ -200,8 +200,6 @@ def test_hardware_shared_module_has_no_forbidden_import(path: Path) -> None:
 
 
 def test_profiler_report_board_import_outside_board_id_is_still_flagged() -> None:
-    """The carve-out is scoped to board_id's own body -- a hypothetical board
-    import elsewhere in profiler_report.py is not swept in with it."""
     source = "def board_id():\n    import board\n    return board\n\nimport board\n"
     carve_out = frozenset(board_id_carve_out_lines(source))
 

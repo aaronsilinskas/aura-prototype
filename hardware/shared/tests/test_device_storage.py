@@ -1,11 +1,7 @@
 """Behaviour-driven tests for the DeviceStorage port (hardware/shared/device_storage.py).
 
-Covers:
-- DeviceStorage: real-filesystem behaviour (tmp_path-backed) — none-on-missing,
-  round-trip, atomic-replace-on-failure, subpath auto-create, escape rejection,
-  path() resolution, mount_root accessor
-- FakeDeviceStorage: the in-memory test double this file's own tests drive to
-  prove it models the same observable contract
+Also exercises FakeDeviceStorage, the in-memory double defined here, against the
+same observable contract so the two stay interchangeable.
 """
 
 import builtins
@@ -238,11 +234,6 @@ class FakeDeviceStorage:
     port to share, unlike ``RadioTransport``/``PulseWriter``), so this fake
     reimplements the same accessor surface against a plain dict rather
     than inheriting filesystem behaviour it would only have to override.
-
-    Models: ``None`` on a never-written name, atomic replace (a write only
-    ever produces "prior content" or "new content", nothing torn), subpaths
-    round-tripping with no directory bookkeeping required, and escape
-    rejection identical to the real port's.
     """
 
     _MOUNT_ROOT = "/fake-mount"

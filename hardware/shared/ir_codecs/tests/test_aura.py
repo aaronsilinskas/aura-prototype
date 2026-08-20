@@ -1,12 +1,4 @@
-"""Behaviour-driven tests for the Aura IR wire-frame codec.
-
-Covers:
-- Round-trip encode→decode for several payload lengths
-- CRC mismatch rejection (no data emitted)
-- Short/malformed frame rejection
-- Signal-strength heuristic boundaries
-- Noise tolerance and reset() semantics
-"""
+"""Behaviour-driven tests for the Aura IR wire-frame codec."""
 
 import pytest
 
@@ -157,7 +149,6 @@ def test_corrupted_packet_is_discarded_and_next_valid_packet_decodes():
 
 
 def test_frame_with_only_header_and_lead_out_is_rejected():
-    """Header followed immediately by lead-out — no data bytes — is rejected."""
     encoder = AuraInfraredEncoder()
     full = list(encoder.encode(b"\x00"))
     short = [full[0], full[1], full[-1]]  # header mark + space + lead-out only
@@ -167,7 +158,6 @@ def test_frame_with_only_header_and_lead_out_is_rejected():
 
 
 def test_out_of_range_pulse_mid_frame_causes_frame_to_be_dropped():
-    """An unrecognised pulse during data reception drops the in-progress frame."""
     encoder = AuraInfraredEncoder()
     pulses = list(encoder.encode(b"\xab"))
     mid = len(pulses) // 2
@@ -178,7 +168,6 @@ def test_out_of_range_pulse_mid_frame_causes_frame_to_be_dropped():
 
 
 def test_invalid_header_space_causes_frame_to_be_dropped():
-    """A garbage header space resets the decoder — no output for that frame."""
     encoder = AuraInfraredEncoder()
     pulses = list(encoder.encode(b"\x01"))
     pulses[1] = 1234  # replace valid header space with garbage
@@ -230,7 +219,6 @@ def test_signal_strength_is_partial_when_error_exceeds_thirty_percent_of_thresho
 
 
 def test_signal_strength_below_forty_percent_at_worst_accepted_error():
-    """An error margin just under the rejection threshold yields very low signal strength."""
     encoder = AuraInfraredEncoder()
     decoder = AuraInfraredDecoder()
 
@@ -293,7 +281,6 @@ def test_error_margin_is_replaced_by_subsequent_packet():
 
 
 def test_reset_aborts_in_progress_decode():
-    """Feeding the remainder of a frame after reset() does not complete it."""
     encoder = AuraInfraredEncoder()
     decoder = AuraInfraredDecoder()
 

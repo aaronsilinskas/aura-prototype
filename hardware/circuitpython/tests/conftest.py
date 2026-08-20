@@ -1,4 +1,4 @@
-"""Stub out CircuitPython-only hardware modules so CPython can import audio_output."""
+"""Stub CircuitPython-only hardware modules so the hardware code imports under CPython for tests."""
 
 import sys
 import types

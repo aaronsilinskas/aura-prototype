@@ -12,21 +12,21 @@ __all__ = ["HardwareNetworkControls"]
 class HardwareNetworkControls(NetworkControls):
     """Concrete, send-only network controls for real hardware peripherals.
 
-    Implements ``NetworkControls`` only — the runtime-facing IR pump-then-
-    receive lifecycle now lives entirely on ``InfraredTransceiver.update()``,
-    reached by the runtime loop through ``DeviceHardware.ir`` rather than
-    through this seam. Radio's per-tick receive lifecycle lives the same way
-    on ``RadioTransceiver.update()``, reached through ``DeviceHardware.radio``.
+    Implements ``NetworkControls`` only. The per-tick IR and radio receive
+    lifecycles live on :meth:`InfraredTransceiver.update` and
+    :meth:`RadioTransceiver.update`, reached by the runtime loop through
+    ``DeviceHardware.ir`` and ``DeviceHardware.radio`` rather than this seam.
+
+    Missing-transceiver behavior is asymmetric: :meth:`send_ir` raises
+    because each call names an emitter that cannot be honored, while
+    :meth:`send_radio` is a silent no-op — radio is present or absent as a
+    whole, with no emitter name to fail on.
 
     Args:
         ir: The wired :class:`InfraredTransceiver`, or ``None`` on a device
-            with no ``ir`` section declared (or a disabled one) —
-            ``send_ir`` then raises ``ValueError`` for every emitter.
+            with no ``ir`` section declared (or a disabled one).
         radio: The wired :class:`RadioTransceiver`, or ``None`` on a device
-            with no radio peripheral declared — in which case ``send_radio``
-            is a silent no-op rather than raising, unlike ``send_ir``'s
-            missing-transceiver case (radio has no emitter name to fail on;
-            the whole capability is either present or absent).
+            with no radio peripheral declared.
     """
 
     __slots__ = ("_ir", "_radio")

@@ -1,11 +1,4 @@
-"""Behaviour-driven tests for the pure IR receive-path telemetry summary.
-
-Covers:
-- IrTelemetryGate.poll() returns a formatted line only when a counter changed
-  since the last poll
-- format_ir_telemetry_line() renders every stage counter in pipeline order
-- IrTelemetryGate.poll() allocates nothing per call when nothing changed
-"""
+"""Behaviour-driven tests for the pure IR receive-path telemetry summary."""
 
 import tracemalloc
 
@@ -52,9 +45,8 @@ def test_format_line_includes_every_counter_in_pipeline_order():
 
     line = format_ir_telemetry_line(snapshot)
 
-    # Pipeline order per the issue: pulses_seen -> buffer_full_on_poll ->
-    # packets_started -> rejected{preamble,mark,space} -> packets_completed
-    # -> packets_surfaced -> pulses_dropped_transmitting.
+    # The order asserted below is the receive-pipeline order defined by the
+    # issue, not an arbitrary field ordering.
     fields_in_order = [
         "pulses_seen=10",
         "buffer_full_on_poll=1",
@@ -71,8 +63,9 @@ def test_format_line_includes_every_counter_in_pipeline_order():
 
 
 def test_format_line_matches_the_exact_serial_summary_string():
-    """Regression pin: the FIELDS-driven rewrite must not change a single
-    byte of the line ``run_scene`` prints to the serial console."""
+    """Regression pin: this is the exact line ``run_scene`` prints to the
+    serial console, asserted byte-for-byte so a refactor cannot silently
+    change what downstream log consumers see."""
     snapshot = _snapshot(
         pulses_seen=10,
         buffer_full_on_poll=1,
@@ -157,7 +150,7 @@ def test_gate_does_not_report_again_until_pulses_dropped_transmitting_changes_fu
 
 
 def test_gate_poll_allocates_nothing_when_unchanged():
-    """The common no-pulse tick must not allocate — assert via tracemalloc."""
+    """The no-pulse tick is the common hot path and must not allocate."""
     gate = IrTelemetryGate()
     snapshot = _snapshot()
     gate.poll(snapshot)  # warm up / establish baseline

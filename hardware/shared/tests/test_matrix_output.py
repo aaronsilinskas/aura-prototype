@@ -105,7 +105,7 @@ def test_update_pixels_writes_the_same_buffer_verbatim_to_every_row(
 
 
 # ---------------------------------------------------------------------------
-# clear_pixels — zeros row band using pre-allocated zero buffer
+# clear_pixels — zeros the row band
 # ---------------------------------------------------------------------------
 
 

@@ -490,7 +490,6 @@ def test_parse_neopixel_scope_out_of_range_brightness_raises_value_error(neopixe
 
 
 def test_parse_matrix_overlapping_scope_rows_raises_value_error(matrix_config):
-    # Replace scope_rows with two overlapping bands.
     matrix_config["pixels"][0]["scope_rows"] = {
         "global.main": [0, 5],
         "personal": [3, 7],  # overlaps global.main at rows 3-4

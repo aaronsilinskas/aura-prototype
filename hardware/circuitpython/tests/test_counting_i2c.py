@@ -16,7 +16,7 @@ from hardware.circuitpython.counting_i2c import CountingI2C
 
 
 class FakeI2C:
-    """Recording fake for the busio.I2C surface that adafruit_bus_device exercises."""
+    """Recording fake for the ``busio.I2C`` surface that ``adafruit_bus_device`` exercises."""
 
     def __init__(self) -> None:
         self.calls: list = []
@@ -39,7 +39,6 @@ class FakeI2C:
 
     def readfrom_into(self, address, buffer, *, start=0, end=None) -> None:
         self.calls.append(("readfrom_into", address, start, end))
-        # Fill buffer with a recognizable value so callers can verify passthrough
         for i in range(len(buffer)):
             buffer[i] = 0xAB
 

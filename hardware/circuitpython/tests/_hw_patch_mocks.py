@@ -1,10 +1,9 @@
 """Shared test helpers for hardware/circuitpython test modules.
 
-Extracted from test_device_builder.py so the subsystem-cluster test modules
-that split off from it can import the same ExitStack-based patch helpers,
-config builders, and recording-logger factory from one place instead of
-each re-deriving (or cross-importing from each other) where they should
-live.
+Extracted from test_device_builder.py so the test modules that split off
+from it share one copy of the ExitStack-based patch helpers, config
+builders, and recording-logger factory, rather than each re-deriving them
+or cross-importing from one another.
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ from hardware.shared.device_config import parse_device_config
 
 
 class _HwPatchMocks(NamedTuple):
-    """The mocks `_enter_hw_patches` installed, so callers can assert on any of them."""
+    """The mocks :func:`_enter_hw_patches` installed, so callers can assert on any of them."""
 
     i2c: MagicMock
     spi: MagicMock

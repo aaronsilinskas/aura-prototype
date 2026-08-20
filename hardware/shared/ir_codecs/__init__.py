@@ -53,8 +53,7 @@ def _known_codec_names() -> list[str]:
     Dir-scans the package directory rather than consulting a hand-maintained
     list -- the same convention ``engine.packs.scan_item_names`` uses for
     packs/items.  Recognises both ``.py`` (CPython, source deploys) and
-    ``.mpy`` (compiled CircuitPython deploys) files, and excludes the
-    package's own ``__init__`` and the codec-free ``base`` module.
+    ``.mpy`` (compiled CircuitPython deploys) files.
     """
     package_dir = os.path.dirname(__file__)
     names = set()
@@ -88,10 +87,10 @@ def codec_for(name: str = "aura") -> tuple[type[InfraredEncoder], type[InfraredD
 
     Raises:
         UnknownCodecError: if no ``hardware.shared.ir_codecs.<name>`` module
-            exists.  A broken *existing* codec module's own import failure
-            propagates unchanged instead of being reported as unknown -- keyed
-            off ``ModuleNotFoundError.name`` so a codec module that exists but
-            fails on its *own* internal import isn't misreported as unknown.
+            exists.  A codec module that *does* exist but fails on its own
+            internal import propagates that ``ModuleNotFoundError`` unchanged
+            -- distinguished by ``ModuleNotFoundError.name`` -- rather than
+            being misreported as unknown.
     """
     full_module = f"{_PACKAGE_NAME}.{name}"
     try:

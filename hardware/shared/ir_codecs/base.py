@@ -105,7 +105,7 @@ class InfraredDecoder:
 
         # State machine position
         self._decoder_state: int = 0
-        # Byte accumulator — cleared in place on reset to avoid per-packet allocation
+        # Completed-byte accumulator
         self._received_data: bytearray = bytearray()
         # Bit-writer state (MSB-first: starts at bit 7)
         self._received_bit_index: int = 7

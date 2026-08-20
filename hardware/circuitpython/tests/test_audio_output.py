@@ -315,9 +315,11 @@ def test_valid_clip_plays_on_an_idle_voice(tmp_path) -> None:
 
 
 def test_audio_only_effect_implicitly_stops_receipt_on_finish(tmp_path) -> None:
-    """An effect with no pixels/haptic implicitly sets stops_receipt=True: its
+    """An effect with no pixels/haptic implicitly sets stops_receipt=True.
 
-    receipt is stopped when the clip finishes naturally (audio is the whole effect)."""
+    Its receipt is stopped when the clip finishes naturally (audio is the
+    whole effect).
+    """
     registry = AudioRegistry()
     clip_name = _register_wav(tmp_path, registry, "sting")
     output, mixer = _make_output(registry)

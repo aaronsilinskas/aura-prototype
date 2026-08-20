@@ -19,9 +19,7 @@ class IrTelemetrySnapshot:
     Plain value holder (no ``dataclasses`` — unavailable on constrained
     runtimes). ``FIELDS`` is the single ordered list of counter names —
     ``__slots__``, ``format_ir_telemetry_line``, and ``IrTelemetryGate`` all
-    iterate it rather than re-enumerating the counters: ``pulses_seen ->
-    buffer_full_on_poll -> packets_started -> rejected{preamble,mark,space}
-    -> packets_completed -> packets_surfaced -> pulses_dropped_transmitting``.
+    iterate it rather than re-enumerating the counters.
     """
 
     FIELDS: Final = (

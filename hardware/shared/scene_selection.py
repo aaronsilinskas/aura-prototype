@@ -6,13 +6,12 @@ __all__ = ["resolve_scene_name"]
 
 
 def resolve_scene_name(settings_mapping: dict) -> str:
-    """Return the requested scene name, raising when none is configured.
+    """Return the configured ``default_scene``, or raise when none is set.
 
-    The ``"default_scene"`` value is honoured only when it is a non-empty
-    string; a missing, empty, or non-string value raises ``ValueError`` —
-    there is no code-level default scene, so ``aura-settings.json`` must
-    declare one explicitly.  This helper does no registry lookup — verifying
-    the name against the available scenes is the runtime's job.
+    There is no code-level fallback scene, so ``aura-settings.json`` must
+    declare a non-empty ``default_scene`` string or resolution fails.  This
+    helper does no registry lookup — verifying the name against the available
+    scenes is the runtime's job.
 
     Args:
         settings_mapping: The raw ``aura-settings.json`` mapping.
