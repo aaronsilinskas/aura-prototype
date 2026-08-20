@@ -107,19 +107,12 @@ def resolve_boot_scene_name(
 ) -> str:
     """Resolve the boot scene name and validate it against *scene_registry*.
 
-    Composes ``hardware.shared.scene_selection.resolve_boot_scene`` (persisted
-    SD ``scene`` -> flash ``default_scene`` -> raise) with ``resolve_known_scene``,
-    so a name -- persisted or flash-authored -- that isn't registered fails
-    loudly here, naming the known scenes, instead of surfacing later inside
-    ``build_scene_runtime``. ``resolve_boot_scene`` itself checks only
-    precedence between the two sources, never registry membership (see its
-    own docstring), which is why this wrapper exists as the ``run_scene``
-    seam rather than calling ``resolve_boot_scene`` directly.
-
-    *storage* is ``hw.storage`` -- ``None`` on a card-less device, which
-    ``resolve_boot_scene`` treats as no persisted override, so the flash
-    ``default_scene`` is used unaffected. Called after ``build_hardware``
-    returns, since *storage* only exists once the SD card is mounted.
+    ``resolve_boot_scene`` decides only source precedence (persisted SD
+    ``scene`` -> flash ``default_scene`` -> raise), never registry membership,
+    so its result is validated here via ``resolve_known_scene`` -- an unknown
+    name, from either source, raises naming the known scenes. A ``None``
+    *storage* is treated as no persisted override, leaving the flash
+    ``default_scene`` to win.
     """
     scene_name = resolve_boot_scene(storage, settings_mapping, logger)
     return resolve_known_scene(scene_registry, scene_name)
@@ -130,12 +123,8 @@ def resolve_ir_codec(
 ) -> tuple[InfraredEncoder, InfraredDecoder]:
     """Return the instantiated wire-frame codec *scene_name* declares.
 
-    Reads the scene's declared codec name via ``SceneRegistry.ir_codec_for``
-    (``"aura"`` when the scene declares none) and maps it to a class pair via
-    ``ir_codecs.codec_for``, then constructs one instance of each -- board-free,
-    so it needs no built hardware to run. ``run_scene`` calls this after
-    ``build_hardware`` returns and applies the pair onto the built ``hw.ir``
-    via ``InfraredTransceiver.apply_codec``, before the first tick.
+    Defaults to the ``"aura"`` codec when the scene declares none, and needs
+    no built hardware to resolve.
     """
     codec_name = scene_registry.ir_codec_for(scene_name)
     encoder_cls, decoder_cls = codec_for(codec_name)
@@ -259,11 +248,9 @@ def build_scene_runtime(
     scene already active — the caller only needs to drive the per-tick loop.
 
     *scene_registry*, if supplied, is used as-is instead of scanning a fresh
-    one -- the seam ``run_scene`` uses to share the one registry scan it did
-    to resolve the boot-time IR codec (see ``resolve_ir_codec``) with the
-    scene load here, so an unknown scene name is discovered once, before
-    hardware is built, rather than scanned and validated twice. Omitted, a
-    fresh registry is scanned here so existing callers keep working unchanged.
+    one -- letting a caller that has already scanned a registry reuse it here
+    rather than scan and validate a second time. Omitted, a fresh registry is
+    scanned here so existing callers keep working unchanged.
 
     After flash scenes are scanned (or the supplied registry is accepted
     as-is), ``hw.storage``'s ``aura_packs/scenes`` is scanned into the same

@@ -234,15 +234,15 @@ The board-free bundle `build_scene_runtime` returns — the wired registries, ma
 _Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing the transmit-then-receive order at a call site (drive `ir.update()`/`radio.update()`); scanning a second `SceneRegistry` when a caller already has one
 
 ### resolve_boot_scene_name
-`app.scene_composition`'s boot-time seam: composes `hardware.shared.scene_selection.resolve_boot_scene` (persisted SD `scene` → flash `default_scene` → raise) with `resolve_known_scene`, so the name that wins is also guaranteed registered. `run_scene` calls it after `build_hardware` returns, passing `hw.storage` (`None` on a card-less device, which falls through to the flash default unaffected).
+`app.scene_composition`'s boot-time seam: composes `hardware.shared.scene_selection.resolve_boot_scene` (persisted SD `scene` → flash `default_scene` → raise) with `resolve_known_scene`, so the name that wins is also guaranteed registered. A `None` `storage` (card-less device) falls through to the flash default unaffected.
 _Avoid_: calling `resolve_boot_scene` directly from `run_scene` and skipping registry validation; calling it before `build_hardware` (the persisted leg needs `hw.storage` mounted)
 
 ### resolve_known_scene
-The single known-scene guard: returns the scene name if the registry has it, else raises naming the known scenes. `run_scene` reaches it through `resolve_boot_scene_name`, which composes it with `hardware.shared.scene_selection.resolve_boot_scene` (persisted SD `scene` → flash `default_scene` → raise) — called after `build_hardware`, since the persisted leg needs `hw.storage` mounted, so an unknown scene name (from either source) fails loudly there rather than ahead of hardware bring-up.
+The single known-scene guard: returns the scene name if the registry has it, else raises naming the known scenes. Reached at boot through `resolve_boot_scene_name`, which composes it with `hardware.shared.scene_selection.resolve_boot_scene` (persisted SD `scene` → flash `default_scene` → raise).
 _Avoid_: duplicating the known-scene check inline instead of calling this; assuming it still runs ahead of `build_hardware` (moved, #902)
 
 ### resolve_ir_codec
-Resolves a scene's declared codec name to an instantiated encoder/decoder pair. Board-free, needing no built hardware to run; `run_scene` calls it after `build_hardware` returns and applies the pair onto the built `hw.ir` via `InfraredTransceiver.apply_codec` before the first tick, so the scene-selected **wire-frame codec** is still in effect from the first tick.
+Resolves a scene's declared **wire-frame codec** name to an instantiated encoder/decoder pair. Board-free, needing no built hardware to run.
 _Avoid_: applying the resolved pair after the first tick (defeats the boot-time-selection point); duplicating the name-to-class mapping instead of delegating to `codec_for`
 
 ### device_builder
