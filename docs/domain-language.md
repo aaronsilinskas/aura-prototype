@@ -49,7 +49,7 @@ _Avoid_: importing layer helpers from anywhere other than `effects.layers`
 An event handler registered with `GameEngine`. **Game-data-stateless** — all game data lives in `GameState`, never as mutable instance attributes (construction-time config is the only permitted instance state).
 
 ### GameState
-The game context passed to every rule handler each tick: the controls seams (`effect_controls`, `network_controls`, `scene_controls`), read-only `elapsed`/`total`, `queue_event`, and typed get/set accessors for mutable game data.
+The game context passed to every rule handler each tick: the control seams, the read-only clock, event queuing, and typed accessors for all mutable game data.
 _Avoid_: `clear_queue()` from rules (reserved for `SceneManager`); `get(key, None)` (use `get_or_none`)
 
 ### Phase
@@ -107,14 +107,14 @@ The **game-facing**, send-only network seam a rule holds via `GameState.network_
 _Avoid_: putting `poll_transmits()` or any per-tick pump on it (keep the seam send-only)
 
 ### SceneRegistry
-Auto-discovers JSON-described scenes from a directory tree and serves a fresh `Scene` per lookup; validates required fields, version format, and `ir_codec` format at scan time. `ir_codec_for(name)` reads a scanned scene's declared codec name straight off the stored scan entry — no `Scene` construction — for callers that only need the name (e.g. resolving hardware before building it).
+Auto-discovers JSON-described scenes from a directory tree and serves a fresh `Scene` per lookup, validating required fields and formats at scan time. Can also surface a scanned scene's declared codec name without constructing the `Scene`, for callers resolving hardware before building it.
 _Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); constructing after harness startup (scan once); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
 
 ### SceneControls
 The rule-facing scene-transition seam: `load`, `overlay`, `pop`, each recording a pending transition applied after the current tick. `SceneManager` is the live implementation.
 
 ### SceneManager
-Owns the scene stack and drives transitions (`load` clears, `overlay` suspends and pushes, `pop` restores), tearing down unloaded/suspended scenes' effects on `Scope.ALL` and republishing the active scene's locals and sounds. Routes every scene-transition effect and sound admin through injected `EffectAdmin` and `AudioOverlayAdmin` seams.
+Owns the scene stack and drives transitions (load, overlay, pop), tearing down departing scenes' effects and republishing the active scene's locals and sounds. Routes every scene-transition effect and sound operation through the injected `EffectAdmin`/`AudioOverlayAdmin` seams.
 _Avoid_: calling `register()` on it (removed); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); routing scene-transition sound calls through anything but the injected `AudioOverlayAdmin`
 
 ### EffectControls
@@ -138,7 +138,7 @@ A structured event payload (`pack`, `name`, `verb`) routed to every in-scope `Ef
 _Avoid_: confusing with `Event` (game-rule events); assuming only `"start"`/`"stop"` verbs exist
 
 ### EffectResolver
-Maps a qualified effect name to its `EffectBuilder`: `scene.` names resolve against the active scene's locals, all others against shared packs gated by the `pack.` membership rule (only a declared `effect_packs` name resolves; no active scene fails closed). Held by `EffectManager`.
+Maps a qualified effect name to its `EffectBuilder`: `scene.` names resolve against the active scene's locals, all others against shared packs gated by the declared-pack membership rule (an undeclared pack fails closed). Held by `EffectManager`.
 _Avoid_: putting the `scene.` rule in `EffectManager`; confusing with `EffectManager` (routing/rendering, not name resolution); reporting an undeclared pack as "unknown" (the pack exists in the registry — it just isn't declared)
 
 ### Merge strategy
@@ -186,8 +186,8 @@ Resolves a qualified clip name to a WAV path via **prefix routing**, mirroring `
 _Avoid_: returning `None` on a resolution miss (raise instead); a bare, unqualified base key (qualify with the pack name so two packs can share a stem); reporting an undeclared pack as "unknown" (it may genuinely exist in the base — it just isn't declared)
 
 ### AudioOverlayAdmin
-The scene-transition-facing seam for swapping the active scene's sound overlay and declared-pack set (`set_scene_sounds`, `set_allowed_packs`), mirroring `EffectAdmin`. `AudioRegistry` implements it; `SceneManager` installs the same allowed-pack `frozenset` it derived for `EffectAdmin`, reused rather than re-computed.
-_Avoid_: calling it from a `GameRule` (reserved for `SceneManager`); conflating with `EffectAdmin` (separate seam, separate concern); re-deriving the allowed-pack set for audio instead of reusing the one `_activate` already computed
+The scene-transition-facing seam for swapping the active scene's sound overlay and declared-pack set, mirroring `EffectAdmin`. `AudioRegistry` implements it.
+_Avoid_: calling it from a `GameRule` (reserved for `SceneManager`); conflating with `EffectAdmin` (separate seam, separate concern)
 
 ### AudioEffectOutput
 A CircuitPython `EffectOutput` driving audio via I2S and the live `VoiceSink` adapter; owns the hardware (amp, mixer, WAV sources) but delegates voice-slot bookkeeping to a `VoicePool`.
@@ -210,11 +210,11 @@ The single **required** on-device file holding all hardware configuration; a mis
 _Avoid_: `settings.toml` (removed — unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`; a top-level `"scene"` key (moved to `aura-settings.json`, #879)
 
 ### aura-settings.json
-The single **required** on-device flash file holding device settings, host-authored and drag-editable over USB alongside `aura-device.json`; a missing file raises. Today it carries exactly one key, `default_scene` (`{"default_scene": "<name>"}`) — named for its *default*-selection role so a later SD-persisted override (#742) can layer on top without renaming the key. Read via `read_settings_mapping` (`hardware/shared/device_settings.py`), which mirrors `read_device_config_mapping`; the name is resolved from the mapping by `resolve_scene_name`.
+The single **required** on-device flash file holding device settings, host-authored and drag-editable over USB alongside `aura-device.json`; a missing file raises. Today it carries exactly one key, `default_scene` — named for its *default*-selection role so a later SD-persisted override (#742) can layer on top without renaming the key.
 _Avoid_: reading `default_scene` from `aura-device.json` (moved out, #879); treating a stale `"scene"` key left in an old `aura-device.json` as meaningful (it is inert)
 
 ### DeviceConfig
-The validated value object produced by the pure `parse_device_config` parser (no `board` import) — it validates and normalizes an `aura-device.json` mapping but constructs no hardware. `isolate(keep)` derives a new config with every isolatable component but `keep` disabled.
+The validated value object parsed from an `aura-device.json` mapping — no `board` import, constructs no hardware. Can derive an isolated copy with every isolatable component but one disabled, for single-component bring-up.
 _Avoid_: importing `board` into the parser; constructing hardware in the parser (that is `device_builder`'s job); hand-listing the isolatable components (derive from `__slots__`)
 
 ### HighCurrentRailConfig
@@ -226,27 +226,27 @@ The optional `enabled` boolean on every hardware component config (default `True
 _Avoid_: treating `enabled: false` as omitting the section at parse time (validation still runs in full); assuming `i2c`/`spi` `enabled: false` falls back to default pins (each builds no bus at all); writing `.enabled` after parse (use `isolate`); assuming `high_current_rail`'s `enabled: false` means "build nothing" like every other section
 
 ### Composition layer (app/)
-The top-level `app/` package: `scene_composition.py` builds the engine/effect/scene machinery (board-free, CPython-testable) and `scene_runtime.py` wires it to real hardware and drives the per-tick loop. The one place allowed to import both engine runtime machinery and `hardware.*`.
+The top-level `app/` package — the one place allowed to import both engine runtime machinery and `hardware.*` together. It composes the board-free engine/effect/scene machinery (CPython-testable) and wires it to real hardware for the per-tick loop.
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### SceneRuntime / build_scene_runtime
-`build_scene_runtime(hw, scene_name, scene_registry=None)` wires the registries, managers, and engine and loads the scene (raising when *scene_name* isn't registered), returning a `SceneRuntime` bundle (`manager`, `effect_manager`, `timer`, `ir`, `radio`) that `run_scene`'s per-tick loop drives. `SceneRuntime.ir` is `hw.ir` passed straight through (`InfraredTransceiver | None`), and `SceneRuntime.radio` is likewise `hw.radio` passed straight through (`RadioTransceiver | None`) — neither builds a separate wrapper object. An omitted *scene_registry* is scanned fresh here; `run_scene` passes its own already-scanned registry instead, so the scene directory is scanned once per boot.
+The board-free bundle `build_scene_runtime` returns — the wired registries, managers, engine, and pass-through `ir`/`radio` handles that `run_scene`'s per-tick loop drives. It holds no hardware wrappers of its own: `ir`/`radio` are the `DeviceHardware` instances passed straight through.
 _Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing the transmit-then-receive order at a call site (drive `ir.update()`/`radio.update()`); scanning a second `SceneRegistry` when a caller already has one
 
 ### resolve_known_scene
-`resolve_known_scene(scene_registry, scene_name)` in `scene_composition.py` returns *scene_name* if the registry has it, else raises `ValueError` naming the known scenes. `build_scene_runtime` calls it internally to load the scene; `run_scene` also calls it directly, before hardware is built, so an unknown scene name fails once and early rather than only surfacing deep inside `build_scene_runtime`.
+The single known-scene guard: returns the scene name if the registry has it, else raises naming the known scenes. Called before hardware is built so an unknown scene name fails once and early.
 _Avoid_: duplicating the known-scene check inline instead of calling this
 
 ### resolve_ir_codec
-`resolve_ir_codec(scene_registry, scene_name)` in `scene_composition.py` reads a scene's declared codec name via `SceneRegistry.ir_codec_for` and maps it through `ir_codecs.codec_for`, returning an instantiated `(encoder, decoder)` pair. Board-free, so `run_scene` calls it before `build_hardware` to feed that seam's `ir_encoder`/`ir_decoder` parameters with the scene-selected **wire-frame codec** from the first tick.
+Resolves a scene's declared codec name to an instantiated encoder/decoder pair. Board-free, so it runs before hardware is built, feeding the IR seam the scene-selected **wire-frame codec** from the first tick.
 _Avoid_: calling it after hardware is already built (defeats the boot-time-selection point); duplicating the name-to-class mapping instead of delegating to `codec_for`
 
 ### device_builder
-The device-only hardware builder: `build_hardware(config, board, …)` resolves pin names and constructs the configured outputs/buttons/sensors/IR/radio, wrapping the assembled `InfraredTransceiver` and `RadioTransceiver` in `HardwareNetworkControls`. Single-call (claims pins without deiniting); every component is config-gated, never presence-probed.
+The device-only hardware builder that resolves pin names and constructs the configured outputs, buttons, sensors, IR, and radio into a `DeviceHardware` bundle. Single-call (claims pins without deiniting); every component is config-gated, never presence-probed.
 _Avoid_: returning a bare tuple/dict (return `DeviceHardware`); putting config parsing here (lives in the pure parser); calling it twice in one process
 
 ### DeviceHardware
-The named `__slots__` bundle `build_hardware` returns — a board-free data holder for the built outputs, buttons, sensors, network seam, `ir`, radio, and storage. `ir` is the same `InfraredTransceiver` instance `HardwareNetworkControls.send_ir` delegates to, `None` exactly when there is no `ir` section declared (or it is disabled); `radio` is likewise the same `RadioTransceiver` instance `HardwareNetworkControls.send_radio` delegates to, `None` on a device with no radio peripheral declared — the raw `RadioTransport` port is private inside the transceiver and never exposed on this bundle. Ports (`storage`, sensors) are typed as their abstract port or `object | None`, never the concrete adapter, keeping the module board-free.
+The board-free bundle `build_hardware` returns — a data holder for the built outputs, buttons, sensors, network seam, `ir`, `radio`, and storage. `ir`/`radio` are the same `InfraredTransceiver`/`RadioTransceiver` instances the network seam delegates to (`None` when that peripheral isn't declared); the raw `RadioTransport` port stays private inside the transceiver. Ports are typed as their abstract port, never the concrete adapter, keeping the module board-free.
 _Avoid_: exposing raw transmitters (use `network_controls`/`ir`); exposing the raw `RadioTransport` (use `network_controls`/`radio`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### RadioTransport
@@ -254,7 +254,7 @@ The board-free half-duplex radio **port** `RadioTransceiver` reaches the chip th
 _Avoid_: splitting it into send/receive ports; importing `adafruit_rfm69` here (that lives in the adapter)
 
 ### RadioTransceiver
-The board-free single owner of a device's whole radio subsystem — assembled by `device_builder._setup_radio` and exposed as `DeviceHardware.radio`; `HardwareNetworkControls.send_radio` delegates to it. `send(data)` is a fire-and-forget write to the transport's single channel (no emitter to name, unlike IR — the whole capability is either present or absent). `update()` polls receive only and sets `received`/`last_sender` together each tick, or both to `None` — no transmit pump, since the chip is half-duplex and a fire-and-forget send leaves nothing to pump. Builds no game event itself: the raw payload and sender byte cross into game vocabulary only in `run_scene`, which builds `NetworkEvents.RadioReceived` next to the `IRReceived` block.
+The board-free single owner of a device's whole radio subsystem, exposed as `DeviceHardware.radio`; the network seam's `send_radio` delegates to it. A send is fire-and-forget on the transport's single channel — no emitter to name, unlike IR, since the whole capability is either present or absent. Its per-tick update polls receive only (no transmit pump, the chip being half-duplex) and surfaces the raw payload and sender; it builds no game event itself.
 _Avoid_: a transmit pump or pump-before-receive order; a value-returning `update()` (read `received`/`last_sender`); building `NetworkEvents.RadioReceived` here (that's `run_scene`'s job)
 
 ### Rfm69RadioTransport
@@ -262,7 +262,7 @@ The live CircuitPython `RadioTransport` adapter wrapping `adafruit_rfm69.RFM69` 
 _Avoid_: importing `adafruit_rfm69` anywhere else; reading the driver without checking `payload_ready` first (blocks)
 
 ### DeviceStorage
-The board-free device-state storage port: reads/writes small state files under a mount root and resolves real filesystem paths for streamed/scanned consumers, with no `board`/`busio` import (safe on CPython, CircuitPython, and MicroPython). Live adapter `SdCardStorage`; `FakeDeviceStorage` is the in-memory test double. `mount_root` is a read-only accessor for the clean root string (no trailing slash), e.g. for a `sys.path` entry — distinct from `path("")`, which carries the joining `"/"`.
+The board-free device-state storage port: reads/writes small state files under a mount root and resolves real filesystem paths for streamed/scanned consumers, with no `board`/`busio` import. Live adapter `SdCardStorage`; `FakeDeviceStorage` is the in-memory test double.
 _Avoid_: escaping the mount root (routes through `reject_escaping_path`); a second concrete implementation for CPython vs. CircuitPython (one class suffices once mounted); using `path("")` where the clean root is needed (use `mount_root`)
 
 ### SdCardStorage
@@ -298,7 +298,7 @@ The hardware-agnostic infrared send/receive subsystem (no `pulseio`), reached th
 _Avoid_: importing `pulseio` into shared IR code; encoding spell fields in the transport
 
 ### InfraredTransceiver
-The board-free single owner of a device's whole IR subsystem — the transmitter map, the receiver, and the shared **IR transmit gate** — assembled by `device_builder._setup_ir` and exposed as `DeviceHardware.ir`; `HardwareNetworkControls.send_ir` delegates to it. `send(data, emitter)` routes to the named transmitter; `update()` runs the transmit pump **then** receive, owning that pump-before-receive order, with results (`received`, `last_signal_strength`, `last_error_margin`, `telemetry_line()`) read after the call; `apply_codec(encoder, decoder)` swaps the wire-frame codec once, before the first tick. Does not build the game event.
+The board-free single owner of a device's whole IR subsystem — the transmitter map, the receiver, and the shared **IR transmit gate** — exposed as `DeviceHardware.ir`; the network seam's `send_ir` delegates to it. A send routes to the named emitter; its per-tick update owns the transmit-pump-**then**-receive order and surfaces the results, and its codec is swappable once before the first tick. It builds no game event.
 _Avoid_: importing `NetworkEvents`/game-event vocabulary here (the event is built in `run_scene`); a value-returning `update()`; calling it a hardware "driver"; exposing the transmitter map as a public collection
 
 ### Wire-frame codec
@@ -342,7 +342,7 @@ The IR pulses a device's own receiver captures from its own emitter while transm
 _Avoid_: suppressing it in a scene (the old Tag `deafen_until` hack); telling it from a real overlapping shot at the pulse level (indistinguishable — drop both)
 
 ### IR transmit gate
-The shared coordination primitive (`IrTransmitGate`) that keeps a device from decoding its own **self-echo**: transmitters drive it (`begin_transmit`/`end_transmit`), the receiver reads it through `should_discard()` — `True` while transmitting, then once more on the falling edge.
+The shared coordination primitive that keeps a device from decoding its own **self-echo**: transmitters mark when they are emitting, and the receiver discards while emission is active plus once more on the falling edge.
 _Avoid_: a second source of truth for "transmitting"; exposing it on `DeviceHardware`; calling `should_discard()` more than once per tick per receiver
 
 ### Drain-but-discard

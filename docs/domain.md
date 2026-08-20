@@ -66,16 +66,19 @@ packs/            Game-specific packs loaded at runtime (CircuitPython/MicroPyth
 hardware/         Hardware abstraction layer
   circuitpython/  CircuitPython drivers (device_builder, is31fl3741_output, drv2605_output,
                   neopixel_output, audio_output, infrared_io, pio_pulse_writer,
-                  counting_i2c, rfm69_radio_transport)
+                  counting_i2c, rfm69_radio_transport, sdcard_storage)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
-                  device_config, device_settings, device_hardware, network_controls,
-                  scene_selection, ir_transport, ir_transceiver, ir_codecs/ (base, aura, tag),
-                  ir_telemetry, radio_transport, radio_transceiver, profiler_report)
+                  device_config, device_settings, device_hardware, device_storage,
+                  network_controls, scene_selection, ir_transport, ir_transceiver,
+                  ir_codecs/ (base, aura, tag), ir_telemetry, radio_transport,
+                  radio_transceiver, profiler_report, build_narration)
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together
   scene_composition.py  build_scene_runtime (board-free, CPython-testable)
   scene_runtime.py      run_scene (device-only)
+
+examples/         Runnable CircuitPython entry points; deploy-watch's flash targets
 
 scripts/          Deploy and maintenance scripts (CPython-only)
 
