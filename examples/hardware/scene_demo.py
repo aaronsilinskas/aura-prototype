@@ -1,9 +1,9 @@
 """Config-selected scene loader — RP2040 PropMaker Feather + IS31FL3741.
 
-Loads whichever scene ``aura-settings.json`` names and runs it with the default
-(Aura) IR wire-frame.  This is a thin entry point: it resolves the scene name
-from the device settings and hands off to ``app.scene_runtime.run_scene``,
-which owns hardware bring-up and the main loop.
+Loads whichever scene is resolved at boot and runs it with the default (Aura)
+IR wire-frame.  This is a thin entry point: it hands straight off to
+``app.scene_runtime.run_scene``, which owns hardware bring-up, boot-scene
+resolution, and the main loop.
 
 Scene selection
 ---------------
@@ -14,12 +14,16 @@ Add a ``"default_scene"`` string to ``aura-settings.json``, kept alongside
       "default_scene": "red_light_green_light"
     }
 
-There is no code-level default scene: a missing, empty, or non-string
-``"default_scene"`` value raises and stops the boot.  An unknown name (not in
-the scene registry) also raises, naming the known scenes, rather than
-silently running a fallback scene.  ``DeviceConfig`` carries no ``scene``
-field — the hardware config (``aura-device.json``) has nothing to do with
-scene selection.
+``run_scene`` resolves the boot scene only after hardware is brought up (so
+the SD card, if any, is mounted): a ``scene`` value persisted to the SD
+card's ``aura-state.json`` overrides this flash ``default_scene``; a
+card-less device, or one with nothing persisted, boots the flash default
+unaffected.  There is no code-level default scene: when neither a persisted
+selection nor a flash default is set, boot raises and stops.  An unknown
+name (not in the scene registry) also raises, naming the known scenes,
+rather than silently running a fallback scene.  ``DeviceConfig`` carries no
+``scene`` field — the hardware config (``aura-device.json``) has nothing to
+do with scene selection.
 
 Hardware
 --------
@@ -50,7 +54,5 @@ Installation
 """
 
 from app.scene_runtime import run_scene
-from hardware.shared.device_settings import read_settings_mapping
-from hardware.shared.scene_selection import resolve_scene_name
 
-run_scene(resolve_scene_name(read_settings_mapping()))
+run_scene()

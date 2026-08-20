@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import gc
 
-from app.scene_composition import build_scene_runtime, resolve_ir_codec, resolve_known_scene
+from app.scene_composition import build_scene_runtime, resolve_boot_scene_name, resolve_ir_codec
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
 from engine.network import NetworkEvents
 from engine.scene import SceneRegistry
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
+from hardware.shared.device_settings import read_settings_mapping
 
 try:
     from typing import Final
@@ -27,17 +28,30 @@ _TELEMETRY_PRINT_INTERVAL: Final = 1.0  # seconds
 __all__ = ["run_scene"]
 
 
-def run_scene(scene_name: str) -> None:
-    """Bring hardware up via ``build_hardware`` and run *scene_name* forever.
+def run_scene() -> None:
+    """Bring hardware up via ``build_hardware`` and run the resolved boot scene forever.
 
-    Scans a single ``SceneRegistry`` up front and validates *scene_name*
-    against it via ``resolve_known_scene`` before any hardware is built, so
-    an unknown scene name fails once, naming the known scenes, without ever
-    touching the board. ``build_hardware`` is then called with no codec
-    override, so it wires the IR subsystem with its default Aura wire-frame.
-    Only after the build returns does this resolve the scene's declared IR
+    Scans a single ``SceneRegistry`` up front, then calls ``build_hardware``
+    with no codec override (it wires the IR subsystem with its default Aura
+    wire-frame). Only after the build returns -- once ``hw.storage`` reflects
+    whatever SD card is mounted -- is the boot scene resolved, via
+    ``resolve_boot_scene_name``: a persisted SD ``scene`` (``aura-state.json``)
+    overrides the flash ``default_scene`` (``aura-settings.json``), falling
+    back to the flash default on a card-less device (``hw.storage is None``)
+    or when no override is persisted, and raising when neither is set. The
+    resolved name is validated against the scanned registry as part of that
+    same call, so an unknown name -- persisted or flash-authored -- fails
+    loudly, naming the known scenes.
+
+    Accepted consequence: unlike the old flash-only resolution this replaces,
+    that unknown-scene fail-fast can no longer run ahead of ``build_hardware``
+    -- the SD override that can feed the name only exists once storage is
+    mounted, so hardware is always brought up before a scene name is known to
+    be valid.
+
+    Once the scene name is resolved, this resolves the scene's declared IR
     wire-frame codec via ``resolve_ir_codec`` (Aura by default, Tag when the
-    scene declares it) and apply it onto the built ``hw.ir`` via
+    scene declares it) and applies it onto the built ``hw.ir`` via
     ``InfraredTransceiver.apply_codec``, before the first tick -- so the
     correct codec is still in effect from the first tick even though it is
     selected after the build. The same registry is passed into
@@ -62,18 +76,23 @@ def run_scene(scene_name: str) -> None:
     :class:`~engine.log.Logger` and passes it to ``build_hardware`` so the
     on-device path always gets hardware setup narration on stdout, with no
     opt-in required. Not unit-testable — ``build_hardware`` requires
-    CircuitPython board imports; validate via deploy-watch.
-
-    Args:
-        scene_name: Name of the scene to load.
+    CircuitPython board imports; validate via deploy-watch. The board-free
+    boot-scene resolution this reorder relies on (``resolve_boot_scene_name``,
+    composing ``hardware.shared.scene_selection.resolve_boot_scene`` with
+    ``resolve_known_scene``) is unit-tested separately in
+    ``app/tests/test_scene_composition.py``.
     """
     scene_registry = SceneRegistry()
     scene_registry.scan_dir("packs/scenes", "packs.scenes")
-    resolve_known_scene(scene_registry, scene_name)
 
     config = load_device_config()
     hw_logger = Logger("[hw]")
     hw = build_hardware(config, logger=hw_logger)
+
+    settings_mapping = read_settings_mapping()
+    scene_name = resolve_boot_scene_name(
+        scene_registry, hw.storage, settings_mapping, logger=hw_logger
+    )
 
     ir_encoder, ir_decoder = resolve_ir_codec(scene_registry, scene_name)
     if hw.ir is not None:

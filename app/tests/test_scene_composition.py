@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from app.scene_composition import build_scene_runtime, resolve_ir_codec
+from app.scene_composition import build_scene_runtime, resolve_boot_scene_name, resolve_ir_codec
 from engine.audio import AudioRegistry
 from engine.events import Event, EventGroup
 from engine.scene import Scene, SceneRegistry
@@ -15,6 +15,7 @@ from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
+from hardware.shared.tests.helpers import FakeDeviceStorage
 
 
 def _fake_hw(ir=None, radio=None, audio_registry=None, storage=None) -> DeviceHardware:
@@ -45,6 +46,65 @@ def test_unknown_scene_name_raises_naming_the_known_scenes():
     """An unregistered scene name fails loudly instead of falling back to hardware_test."""
     with pytest.raises(ValueError, match="hardware_test"):
         build_scene_runtime(_fake_hw(), "not-a-real-scene")
+
+
+# ---------------------------------------------------------------------------
+# resolve_boot_scene_name (issue #902)
+# ---------------------------------------------------------------------------
+
+
+def _scene_registry_with(*scene_names: str) -> SceneRegistry:
+    scene_registry = SceneRegistry()
+    for scene_name in scene_names:
+        scene_registry.register(scene_name, lambda: Scene(effect_packs=[], rule_packs=[]))
+    return scene_registry
+
+
+def test_persisted_sd_scene_overrides_flash_default_when_both_are_known_scenes():
+    """A persisted SD override wins even though the flash default is also valid --
+    proving resolve_boot_scene's precedence survives the registry-validation wrap."""
+    scene_registry = _scene_registry_with("tag", "red_light_green_light")
+    storage = FakeDeviceStorage()
+    storage.write_json("aura-state.json", {"scene": "tag"})
+
+    scene_name = resolve_boot_scene_name(
+        scene_registry, storage, {"default_scene": "red_light_green_light"}
+    )
+
+    assert scene_name == "tag"
+
+
+def test_card_less_device_boots_the_flash_default_scene():
+    """hw.storage is None on a card-less device -- the persisted leg is skipped
+    entirely and the flash default is used, unaffected."""
+    scene_registry = _scene_registry_with("red_light_green_light")
+
+    scene_name = resolve_boot_scene_name(
+        scene_registry, None, {"default_scene": "red_light_green_light"}
+    )
+
+    assert scene_name == "red_light_green_light"
+
+
+def test_neither_persisted_nor_flash_scene_raises_naming_both_files():
+    """With no SD override and no flash default, boot fails loudly rather than
+    silently picking a scene -- the same contract resolve_boot_scene documents."""
+    scene_registry = _scene_registry_with("red_light_green_light")
+    storage = FakeDeviceStorage()
+
+    with pytest.raises(ValueError, match=r"aura-state\.json.*aura-settings\.json"):
+        resolve_boot_scene_name(scene_registry, storage, {})
+
+
+def test_persisted_scene_unknown_to_the_registry_raises_naming_the_known_scenes():
+    """A persisted SD scene name with no matching registry entry fails loudly by
+    name here -- the registry-validation step resolve_boot_scene itself skips."""
+    scene_registry = _scene_registry_with("red_light_green_light")
+    storage = FakeDeviceStorage()
+    storage.write_json("aura-state.json", {"scene": "not-a-real-scene"})
+
+    with pytest.raises(ValueError, match="red_light_green_light"):
+        resolve_boot_scene_name(scene_registry, storage, {"default_scene": "red_light_green_light"})
 
 
 # ---------------------------------------------------------------------------

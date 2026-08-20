@@ -133,7 +133,11 @@ scene), not a device-config concern.
 Every scene (e.g. `hardware_test`, `red_light_green_light`, `element_browser`, `tag`) is
 selected via the `default_scene` key in `aura-settings.json` and run through the single
 `scene_demo.py` entry point — including `tag`, whose `scene.json` declares the Tag IR
-wire-frame codec so it is wired in automatically:
+wire-frame codec so it is wired in automatically. `run_scene` resolves the boot scene
+only after hardware is brought up (so any SD card is mounted): a `scene` value persisted
+to the SD card's `aura-state.json` overrides `default_scene`; a card-less device, or one
+with nothing persisted, boots the flash default unaffected. Neither a persisted
+selection nor a flash default set raises, naming both files:
 
 `aura-settings.json`:
 

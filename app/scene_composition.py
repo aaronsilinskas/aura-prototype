@@ -14,6 +14,7 @@ import engine._path as _path
 from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
+from engine.log import Logger
 from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
 from engine.timer import Timer
@@ -23,8 +24,15 @@ from hardware.shared.ir_codecs import codec_for
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.radio_transceiver import RadioTransceiver
+from hardware.shared.scene_selection import resolve_boot_scene
 
-__all__ = ["SceneRuntime", "build_scene_runtime", "resolve_ir_codec", "resolve_known_scene"]
+__all__ = [
+    "SceneRuntime",
+    "build_scene_runtime",
+    "resolve_boot_scene_name",
+    "resolve_ir_codec",
+    "resolve_known_scene",
+]
 
 
 class SceneRuntime:
@@ -89,6 +97,32 @@ def resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
     if scene_name in names:
         return scene_name
     raise ValueError(f"unknown scene {scene_name!r}; known scenes: {', '.join(names)}")
+
+
+def resolve_boot_scene_name(
+    scene_registry: SceneRegistry,
+    storage: DeviceStorage | None,
+    settings_mapping: dict,
+    logger: Logger | None = None,
+) -> str:
+    """Resolve the boot scene name and validate it against *scene_registry*.
+
+    Composes ``hardware.shared.scene_selection.resolve_boot_scene`` (persisted
+    SD ``scene`` -> flash ``default_scene`` -> raise) with ``resolve_known_scene``,
+    so a name -- persisted or flash-authored -- that isn't registered fails
+    loudly here, naming the known scenes, instead of surfacing later inside
+    ``build_scene_runtime``. ``resolve_boot_scene`` itself checks only
+    precedence between the two sources, never registry membership (see its
+    own docstring), which is why this wrapper exists as the ``run_scene``
+    seam rather than calling ``resolve_boot_scene`` directly.
+
+    *storage* is ``hw.storage`` -- ``None`` on a card-less device, which
+    ``resolve_boot_scene`` treats as no persisted override, so the flash
+    ``default_scene`` is used unaffected. Called after ``build_hardware``
+    returns, since *storage* only exists once the SD card is mounted.
+    """
+    scene_name = resolve_boot_scene(storage, settings_mapping, logger)
+    return resolve_known_scene(scene_registry, scene_name)
 
 
 def resolve_ir_codec(
