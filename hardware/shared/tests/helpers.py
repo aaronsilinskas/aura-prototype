@@ -1,8 +1,6 @@
 """Shared test doubles for hardware/shared, importable across test modules."""
 
-import json
-
-from hardware.shared.device_storage import reject_escaping_path
+from hardware.shared.device_storage import decode_json, encode_json, reject_escaping_path
 
 __all__ = ["FakeDeviceStorage"]
 
@@ -39,10 +37,10 @@ class FakeDeviceStorage:
         data = self.read_bytes(name)
         if data is None:
             return None
-        return json.loads(data.decode("utf-8"))
+        return decode_json(data)
 
     def write_json(self, name: str, mapping: dict) -> None:
-        self.write_bytes(name, json.dumps(mapping).encode("utf-8"))
+        self.write_bytes(name, encode_json(mapping))
 
     def path(self, subpath: str) -> str:
         self._guard(subpath)

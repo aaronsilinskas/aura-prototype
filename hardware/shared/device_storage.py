@@ -31,7 +31,7 @@ try:
 except ImportError:
     pass
 
-__all__ = ["DeviceStorage", "reject_escaping_path"]
+__all__ = ["DeviceStorage", "decode_json", "encode_json", "reject_escaping_path"]
 
 _TEMP_SUFFIX: Final = ".tmp"
 
@@ -51,6 +51,27 @@ def reject_escaping_path(relative_path: str) -> None:
     for segment in relative_path.split("/"):
         if segment == "..":
             raise ValueError(f"path escapes mount root: {relative_path!r}")
+
+
+def decode_json(data: bytes) -> dict:
+    """Parse UTF-8 JSON *data* into a mapping.
+
+    Shared by :meth:`DeviceStorage.read_json` and ``FakeDeviceStorage.read_json``
+    so the decoding can't drift between the real and fake implementations.
+
+    Raises:
+        json.JSONDecodeError: *data* is not valid JSON.
+    """
+    return json.loads(data.decode("utf-8"))
+
+
+def encode_json(mapping: dict) -> bytes:
+    """Serialise *mapping* to UTF-8 JSON bytes.
+
+    Shared by :meth:`DeviceStorage.write_json` and ``FakeDeviceStorage.write_json``
+    so the encoding can't drift between the real and fake implementations.
+    """
+    return json.dumps(mapping).encode("utf-8")
 
 
 class DeviceStorage:
@@ -151,7 +172,7 @@ class DeviceStorage:
         data = self.read_bytes(name)
         if data is None:
             return None
-        return json.loads(data.decode("utf-8"))
+        return decode_json(data)
 
     def write_json(self, name: str, mapping: dict) -> None:
         """Serialise *mapping* to JSON and durably replace *name* with it whole.
@@ -167,7 +188,7 @@ class DeviceStorage:
             ValueError: *name* escapes the mount root (``..`` or an
                 absolute path).
         """
-        self.write_bytes(name, json.dumps(mapping).encode("utf-8"))
+        self.write_bytes(name, encode_json(mapping))
 
     def path(self, subpath: str) -> str:
         """Return *subpath* resolved to a real filesystem path under the mount root.

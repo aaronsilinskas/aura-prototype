@@ -14,6 +14,21 @@ import pytest
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.tests.helpers import FakeDeviceStorage
 
+ESCAPING_NAMES = ["../secret.txt", "scenes/../../secret.txt", "/etc/passwd"]
+
+
+def _break_temp_file_writes(monkeypatch):
+    """Make writing to a ``.tmp`` sibling fail, simulating a mid-write disk failure."""
+    real_open = builtins.open
+
+    def flaky_open(path, mode="r", *args, **kwargs):
+        if str(path).endswith(".tmp") and "w" in mode:
+            raise OSError("simulated disk full")
+        return real_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", flaky_open)
+
+
 # ---------------------------------------------------------------------------
 # DeviceStorage — read_bytes / write_bytes round-trip
 # ---------------------------------------------------------------------------
@@ -63,14 +78,7 @@ def test_failed_write_bytes_leaves_prior_content_intact(tmp_path, monkeypatch):
     storage = DeviceStorage(str(tmp_path))
     storage.write_bytes("state.json", b"original-content")
 
-    real_open = builtins.open
-
-    def flaky_open(path, mode="r", *args, **kwargs):
-        if str(path).endswith(".tmp") and "w" in mode:
-            raise OSError("simulated disk full")
-        return real_open(path, mode, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "open", flaky_open)
+    _break_temp_file_writes(monkeypatch)
 
     with pytest.raises(OSError):
         storage.write_bytes("state.json", b"content-that-never-lands")
@@ -142,10 +150,7 @@ def test_write_bytes_tolerates_already_present_parent_directories(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "escaping_name",
-    ["../secret.txt", "scenes/../../secret.txt", "/etc/passwd"],
-)
+@pytest.mark.parametrize("escaping_name", ESCAPING_NAMES)
 def test_read_bytes_rejects_a_name_that_escapes_the_mount_root(tmp_path, escaping_name):
     storage = DeviceStorage(str(tmp_path))
 
@@ -153,10 +158,7 @@ def test_read_bytes_rejects_a_name_that_escapes_the_mount_root(tmp_path, escapin
         storage.read_bytes(escaping_name)
 
 
-@pytest.mark.parametrize(
-    "escaping_name",
-    ["../secret.txt", "scenes/../../secret.txt", "/etc/passwd"],
-)
+@pytest.mark.parametrize("escaping_name", ESCAPING_NAMES)
 def test_write_bytes_rejects_a_name_that_escapes_the_mount_root(tmp_path, escaping_name):
     storage = DeviceStorage(str(tmp_path))
 
@@ -164,10 +166,7 @@ def test_write_bytes_rejects_a_name_that_escapes_the_mount_root(tmp_path, escapi
         storage.write_bytes(escaping_name, b"data")
 
 
-@pytest.mark.parametrize(
-    "escaping_subpath",
-    ["../secret.txt", "scenes/../../secret.txt", "/etc/passwd"],
-)
+@pytest.mark.parametrize("escaping_subpath", ESCAPING_NAMES)
 def test_path_rejects_a_subpath_that_escapes_the_mount_root(tmp_path, escaping_subpath):
     storage = DeviceStorage(str(tmp_path))
 
@@ -259,10 +258,7 @@ def test_read_json_raises_on_malformed_content(tmp_path):
         storage.read_json("state.json")
 
 
-@pytest.mark.parametrize(
-    "escaping_name",
-    ["../secret.txt", "scenes/../../secret.txt", "/etc/passwd"],
-)
+@pytest.mark.parametrize("escaping_name", ESCAPING_NAMES)
 def test_read_json_rejects_a_name_that_escapes_the_mount_root(tmp_path, escaping_name):
     storage = DeviceStorage(str(tmp_path))
 
@@ -270,10 +266,7 @@ def test_read_json_rejects_a_name_that_escapes_the_mount_root(tmp_path, escaping
         storage.read_json(escaping_name)
 
 
-@pytest.mark.parametrize(
-    "escaping_name",
-    ["../secret.txt", "scenes/../../secret.txt", "/etc/passwd"],
-)
+@pytest.mark.parametrize("escaping_name", ESCAPING_NAMES)
 def test_write_json_rejects_a_name_that_escapes_the_mount_root(tmp_path, escaping_name):
     storage = DeviceStorage(str(tmp_path))
 
@@ -285,14 +278,7 @@ def test_failed_write_json_leaves_prior_content_intact(tmp_path, monkeypatch):
     storage = DeviceStorage(str(tmp_path))
     storage.write_json("state.json", {"scene": "tag"})
 
-    real_open = builtins.open
-
-    def flaky_open(path, mode="r", *args, **kwargs):
-        if str(path).endswith(".tmp") and "w" in mode:
-            raise OSError("simulated disk full")
-        return real_open(path, mode, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "open", flaky_open)
+    _break_temp_file_writes(monkeypatch)
 
     with pytest.raises(OSError):
         storage.write_json("state.json", {"scene": "rlgl"})
@@ -337,10 +323,7 @@ def test_fake_write_bytes_supports_subpaths_with_no_directory_setup():
     assert storage.read_bytes("scenes/tag/state.json") == b"tag-state"
 
 
-@pytest.mark.parametrize(
-    "escaping_name",
-    ["../secret.txt", "scenes/../../secret.txt", "/etc/passwd"],
-)
+@pytest.mark.parametrize("escaping_name", ESCAPING_NAMES)
 def test_fake_read_bytes_rejects_a_name_that_escapes_the_mount_root(escaping_name):
     storage = FakeDeviceStorage()
 
@@ -348,10 +331,7 @@ def test_fake_read_bytes_rejects_a_name_that_escapes_the_mount_root(escaping_nam
         storage.read_bytes(escaping_name)
 
 
-@pytest.mark.parametrize(
-    "escaping_name",
-    ["../secret.txt", "scenes/../../secret.txt", "/etc/passwd"],
-)
+@pytest.mark.parametrize("escaping_name", ESCAPING_NAMES)
 def test_fake_write_bytes_rejects_a_name_that_escapes_the_mount_root(escaping_name):
     storage = FakeDeviceStorage()
 
@@ -359,10 +339,7 @@ def test_fake_write_bytes_rejects_a_name_that_escapes_the_mount_root(escaping_na
         storage.write_bytes(escaping_name, b"data")
 
 
-@pytest.mark.parametrize(
-    "escaping_subpath",
-    ["../secret.txt", "scenes/../../secret.txt", "/etc/passwd"],
-)
+@pytest.mark.parametrize("escaping_subpath", ESCAPING_NAMES)
 def test_fake_path_rejects_a_subpath_that_escapes_the_mount_root(escaping_subpath):
     storage = FakeDeviceStorage()
 
@@ -429,10 +406,7 @@ def test_fake_read_json_raises_on_malformed_content():
         storage.read_json("state.json")
 
 
-@pytest.mark.parametrize(
-    "escaping_name",
-    ["../secret.txt", "scenes/../../secret.txt", "/etc/passwd"],
-)
+@pytest.mark.parametrize("escaping_name", ESCAPING_NAMES)
 def test_fake_read_json_rejects_a_name_that_escapes_the_mount_root(escaping_name):
     storage = FakeDeviceStorage()
 
@@ -440,10 +414,7 @@ def test_fake_read_json_rejects_a_name_that_escapes_the_mount_root(escaping_name
         storage.read_json(escaping_name)
 
 
-@pytest.mark.parametrize(
-    "escaping_name",
-    ["../secret.txt", "scenes/../../secret.txt", "/etc/passwd"],
-)
+@pytest.mark.parametrize("escaping_name", ESCAPING_NAMES)
 def test_fake_write_json_rejects_a_name_that_escapes_the_mount_root(escaping_name):
     storage = FakeDeviceStorage()
 
