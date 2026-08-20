@@ -105,15 +105,19 @@ def test_pause_constant_writes_pause_object_to_correct_slot() -> None:
 
 def test_all_pause_constants_write_correct_durations() -> None:
     output, driver = _make_output()
-    effect = _effect_with_sequence("strike", [HapticPattern.PAUSE_500, HapticPattern.PAUSE_1000])
+    effect = _effect_with_sequence(
+        "strike",
+        [HapticPattern.PAUSE_250, HapticPattern.PAUSE_500, HapticPattern.PAUSE_1000],
+    )
     receipt = _make_receipt()
 
     output.handle_event(
         EffectEvent("rlgl", "haptic", "strike"), frozenset({"all"}), effect, receipt
     )
 
-    assert driver.sequence[0] == adafruit_drv2605.Pause(0.5)
-    assert driver.sequence[1] == adafruit_drv2605.Pause(1.0)
+    assert driver.sequence[0] == adafruit_drv2605.Pause(0.25)
+    assert driver.sequence[1] == adafruit_drv2605.Pause(0.5)
+    assert driver.sequence[2] == adafruit_drv2605.Pause(1.0)
 
 
 def test_known_verb_calls_driver_play() -> None:

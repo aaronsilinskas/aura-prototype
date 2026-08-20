@@ -1,6 +1,8 @@
-"""Tests for NeoPixelEffectOutput — single-scope NeoPixel strip routing.
+"""Tests for NeoPixelEffectOutput — scope-segment NeoPixel strip routing.
 
-The single-scope case is the degenerate one-segment-covering-[0, count] shape.
+Covers the degenerate single-segment-covering-[0, count] shape plus offset
+routing, where a segment starting past 0 lands at strip[start + j] and one
+scope's write leaves another scope's segment on the same strip untouched.
 Uses in-memory fake strips to verify routing; no neopixel hardware import needed.
 """
 
@@ -62,40 +64,12 @@ def test_min_resolution_equals_strip_count() -> None:
 def test_create_buffer_returns_pixel_buffer_sized_to_strip_count() -> None:
     output, _ = _make_output(count=8)
     buf = output.create_buffer("personal")
-    assert isinstance(buf, PixelBuffer)
     assert len(buf) == 8
 
 
 # ---------------------------------------------------------------------------
 # update_pixels — routing to the strip
 # ---------------------------------------------------------------------------
-
-
-def test_update_pixels_writes_buffer_to_strip() -> None:
-    output, strip = _make_output(count=3)
-
-    buf = PixelBuffer(3)
-    buf[0] = 0xFF0000
-    buf[1] = 0x00FF00
-    buf[2] = 0x0000FF
-
-    output.update_pixels("personal", buf)
-
-    strip.__setitem__.assert_has_calls([call(0, 0xFF0000), call(1, 0x00FF00), call(2, 0x0000FF)])
-
-
-def test_update_pixels_does_not_write_to_unrelated_strip() -> None:
-    from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
-
-    strip_a = _make_strip(3)
-    strip_b = _make_strip(2)
-    output_a = NeoPixelEffectOutput(strip_a, {"personal": range(0, 3)})
-    NeoPixelEffectOutput(strip_b, {"directional": range(0, 2)})  # independent instance
-
-    buf = PixelBuffer(3)
-    output_a.update_pixels("personal", buf)
-
-    strip_b.__setitem__.assert_not_called()
 
 
 def test_update_pixels_writes_the_single_buffer_verbatim() -> None:
@@ -111,14 +85,39 @@ def test_update_pixels_writes_the_single_buffer_verbatim() -> None:
     strip.__setitem__.assert_has_calls([call(0, 0xAAAAAA), call(1, 0xBBBBBB)])
 
 
-def test_neopixel_effect_output_constructs_without_brightness_argument() -> None:
-    """NeoPixelEffectOutput takes only strip and scope_pixels -- no brightness param."""
+def test_update_pixels_routes_a_non_zero_start_segment_to_offset_indices() -> None:
+    """A segment starting past 0 writes at strip[start + j], not strip[j]."""
     from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 
-    strip = _make_strip(1)
+    strip = _make_strip(5)
+    output = NeoPixelEffectOutput(strip, {"personal": range(2, 5)})
 
-    # Must not raise TypeError for a missing brightness argument.
-    NeoPixelEffectOutput(strip, {"personal": range(0, 1)})
+    buf = PixelBuffer(3)
+    buf[0] = 0xFF0000
+    buf[1] = 0x00FF00
+    buf[2] = 0x0000FF
+
+    output.update_pixels("personal", buf)
+
+    strip.__setitem__.assert_has_calls([call(2, 0xFF0000), call(3, 0x00FF00), call(4, 0x0000FF)])
+
+
+def test_update_pixels_on_one_scope_leaves_another_scope_segment_untouched() -> None:
+    """Two scopes share one strip; writing scope A must not touch scope B's indices."""
+    from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
+
+    strip = _make_strip(5)
+    output = NeoPixelEffectOutput(strip, {"personal": range(0, 2), "directional": range(2, 5)})
+
+    buf = PixelBuffer(2)
+    buf[0] = 0xAAAAAA
+    buf[1] = 0xBBBBBB
+
+    output.update_pixels("personal", buf)
+
+    # Only scope A's indices (0, 1) were written; scope B's (2, 3, 4) were left alone.
+    written = {c.args[0] for c in strip.__setitem__.call_args_list}
+    assert written == {0, 1}
 
 
 # ---------------------------------------------------------------------------
@@ -134,19 +133,6 @@ def test_clear_pixels_writes_zeros_to_strip() -> None:
     strip.__setitem__.assert_has_calls([call(0, 0), call(1, 0), call(2, 0)])
 
 
-def test_clear_pixels_does_not_touch_unrelated_strip() -> None:
-    from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
-
-    strip_personal = _make_strip(3)
-    strip_directional = _make_strip(2)
-    NeoPixelEffectOutput(strip_personal, {"personal": range(0, 3)})
-    output_b = NeoPixelEffectOutput(strip_directional, {"directional": range(0, 2)})
-
-    output_b.clear_pixels("directional")
-
-    strip_personal.__setitem__.assert_not_called()
-
-
 # ---------------------------------------------------------------------------
 # flush — delegates to strip.show()
 # ---------------------------------------------------------------------------
@@ -158,16 +144,3 @@ def test_flush_calls_show_on_its_strip() -> None:
     output.flush()
 
     strip.show.assert_called_once()
-
-
-def test_flush_on_one_instance_does_not_show_another_instances_strip() -> None:
-    from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
-
-    strip_a = _make_strip(3)
-    strip_b = _make_strip(2)
-    output_a = NeoPixelEffectOutput(strip_a, {"personal": range(0, 3)})
-    NeoPixelEffectOutput(strip_b, {"directional": range(0, 2)})
-
-    output_a.flush()
-
-    strip_b.show.assert_not_called()

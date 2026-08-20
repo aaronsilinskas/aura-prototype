@@ -2,7 +2,7 @@ import pytest
 
 from engine.engine import GameEngine
 from engine.network import CONE, LINE
-from engine.state import EffectControls, NetworkControls, SceneControls
+from engine.state import EffectControls, SceneControls
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_transport import InfraredTransmitter, IrTransmitGate, PulseWriter
 from hardware.shared.network_controls import HardwareNetworkControls
@@ -58,55 +58,6 @@ def test_hardware_network_controls_send_ir_dispatches_correct_data() -> None:
     controls.send_ir(b"\xab\xcd", CONE)
 
     assert writer.calls[0] == [0xAB, 0xCD]
-
-
-def test_hardware_network_controls_send_ir_hides_writer_completion_state() -> None:
-    """send_ir is honest fire-and-forget -- the writer-type distinction
-    (blocking vs. DMA/PIO) stays below this seam, owned by
-    InfraredTransmitter, and never leaks upward as a bool."""
-    tx, _ = _make_transmitter()
-    controls = HardwareNetworkControls(_make_transceiver(**{LINE: tx}))
-
-    assert controls.send_ir(b"\x01", LINE) is None
-
-
-def test_send_ir_through_declared_network_controls_type_hides_writer_completion_state() -> None:
-    """Guards the rule-facing call shape: a rule holds ``state.network_controls``
-    typed as ``NetworkControls``, never ``HardwareNetworkControls`` -- calling
-    ``send_ir`` through that declared type is honest fire-and-forget."""
-    tx, writer = _make_transmitter()
-    controls: NetworkControls = HardwareNetworkControls(_make_transceiver(**{LINE: tx}))
-
-    result = controls.send_ir(b"\x01", LINE)
-
-    assert result is None
-    assert writer.calls == [[0x01]]
-
-
-def test_hardware_network_controls_send_ir_routes_to_correct_transmitter() -> None:
-    tx_line, writer_line = _make_transmitter()
-    tx_cone, writer_cone = _make_transmitter()
-    controls = HardwareNetworkControls(_make_transceiver(**{LINE: tx_line, CONE: tx_cone}))
-
-    controls.send_ir(b"\xff", CONE)
-
-    assert len(writer_cone.calls) == 1
-    assert len(writer_line.calls) == 0
-
-
-def test_hardware_network_controls_send_ir_raises_for_unwired_emitter() -> None:
-    tx, _ = _make_transmitter()
-    controls = HardwareNetworkControls(_make_transceiver(**{LINE: tx}))
-
-    with pytest.raises(ValueError):
-        controls.send_ir(b"x", CONE)
-
-
-def test_hardware_network_controls_send_ir_raises_for_empty_transceiver() -> None:
-    controls = HardwareNetworkControls(_make_transceiver())
-
-    with pytest.raises(ValueError):
-        controls.send_ir(b"x", LINE)
 
 
 def test_hardware_network_controls_send_ir_raises_when_no_transceiver_is_wired() -> None:

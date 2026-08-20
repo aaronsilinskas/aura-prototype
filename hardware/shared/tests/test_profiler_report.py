@@ -70,9 +70,13 @@ class TestPrintTableRow:
         print_table_row("engine_component_costs", ["0.10", "0.20", "0.30", "_TBD_"])
         out = capsys.readouterr().out
         row_line = next(line for line in out.splitlines() if line.startswith("| "))
-        assert row_line == format_table_row(
-            [board_id(), runtime_id(), "-", "0.10", "0.20", "0.30", "_TBD_"]
-        )
+        # Split the emitted row back into its cells and assert the prepended
+        # key sits in the first three positions, in board/runtime/driver order,
+        # ahead of the component cells -- against independent expectations, not
+        # a row rebuilt with the same production helper the code uses.
+        cells = [cell.strip() for cell in row_line.strip("| ").split(" | ")]
+        assert cells[:3] == [board_id(), runtime_id(), "-"]
+        assert cells[3:] == ["0.10", "0.20", "0.30", "_TBD_"]
 
     def test_uses_the_given_driver_in_place_of_the_dash(self, capsys):
         print_table_row("pixel_costs", ["1.0"], driver="neopixel_pwm")

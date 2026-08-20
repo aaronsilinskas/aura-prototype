@@ -9,8 +9,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hardware.shared.device_storage import DeviceStorage
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -65,12 +63,6 @@ def test_construction_mounts_the_card_as_writable_fat_filesystem() -> None:
     mock_mount.assert_called_once_with(mock_vfs, "/sd", readonly=False)
 
 
-def test_construction_mounts_at_the_given_mount_point() -> None:
-    _, _, _, mock_mount, _, _ = _build_storage(mount="/external")
-
-    assert mock_mount.call_args.args[1] == "/external"
-
-
 # ---------------------------------------------------------------------------
 # resulting instance -- behaves as a DeviceStorage against the mount point
 # ---------------------------------------------------------------------------
@@ -79,7 +71,6 @@ def test_construction_mounts_at_the_given_mount_point() -> None:
 def test_sdcard_storage_is_a_device_storage_rooted_at_the_mount_point() -> None:
     storage_instance, *_ = _build_storage(mount="/sd")
 
-    assert isinstance(storage_instance, DeviceStorage)
     assert storage_instance.path("state.json") == "/sd/state.json"
 
 

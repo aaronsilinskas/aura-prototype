@@ -60,7 +60,6 @@ class _FakeProgram:
 # sys.modules.
 from hardware.circuitpython.pio_pulse_writer import (  # noqa: E402
     _CARRIER_PERIOD_US,
-    _INTERFRAME_GAP_US,
     PioPulseWriter,
     _duration_us_to_loops,
 )
@@ -152,12 +151,6 @@ def test_write_pulses_hands_the_built_buffer_to_the_dma():
     assert sm.background_writes[0] is writer._inflight
 
 
-def test_in_flight_buffer_is_held_until_write_completes():
-    writer, sm = _make_writer()
-    writer.write_pulses(array("H", [100, 200, 300]))
-    assert writer._inflight is sm.background_writes[0]  # ownership is the contract
-
-
 def test_in_flight_buffer_reference_is_dropped_once_idle():
     writer, sm = _make_writer()
     writer.write_pulses(array("H", [100, 200]))
@@ -188,8 +181,10 @@ def test_write_pulses_converts_us_durations_to_loop_counts():
     is the buffer's first element.
     """
     writer, sm = _make_writer()
-    writer.write_pulses(array("H", [IR_UNIT]))
-    assert sm.background_writes[0][0] == _duration_us_to_loops(IR_UNIT)
+    # 500 µs, hand-computed against the source formula (independent of the
+    # function under test): round(500 / 26) - 1 = 19 - 1 = 18 carrier periods.
+    writer.write_pulses(array("H", [500]))
+    assert sm.background_writes[0][0] == 18
 
 
 def test_write_pulses_pads_odd_frames_to_even_with_a_trailing_gap():
@@ -202,7 +197,10 @@ def test_write_pulses_pads_odd_frames_to_even_with_a_trailing_gap():
     writer.write_pulses(array("H", [IR_UNIT, IR_UNIT, IR_LEAD_OUT]))  # odd (3)
     buffer = sm.background_writes[0]
     assert len(buffer) == 4  # padded to even
-    assert buffer[-1] == _duration_us_to_loops(_INTERFRAME_GAP_US)
+    # The pad is the 5000 µs inter-frame gap, hand-computed against the source
+    # formula (independent of the function under test):
+    # round(5000 / 26) - 1 = 192 - 1 = 191 carrier periods.
+    assert buffer[-1] == 191
 
 
 def test_header_mark_round_trips_within_protocol_tolerance():

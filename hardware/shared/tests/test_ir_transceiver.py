@@ -4,6 +4,7 @@ import pytest
 
 from engine.network import CONE, LINE
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
+from hardware.shared.ir_telemetry import format_ir_telemetry_line
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_transport import (
     InfraredReceiver,
@@ -417,20 +418,17 @@ def test_last_error_margin_is_forwarded_from_the_receiver() -> None:
 
 
 def test_telemetry_line_is_forwarded_from_the_receiver() -> None:
-    payload = b"\x42"
-    pulses = _encode_pulses(payload)
-    reader = FakePulseReader(pulses)
+    payload = bytearray(b"\x42")
+    reader = FakePulseReader(_encode_pulses(payload))
     receiver = InfraredSingleReceiver(reader, AuraInfraredDecoder())
     transceiver = InfraredTransceiver({}, receiver, IrTransmitGate())
 
     transceiver.update()
     line = transceiver.telemetry_line()
 
-    assert line == (
-        "ir: pulses_seen=" + str(len(pulses)) + " buffer_full_on_poll=0 "
-        "packets_started=0 preamble_reject=0 mark_reject=0 space_reject=0 "
-        "packets_completed=0 packets_surfaced=1 pulses_dropped_transmitting=0"
-    )
+    # Proves forwarding: the transceiver hands back exactly the receiver's own
+    # telemetry, rendered through the shared formatter — no re-derivation here.
+    assert line == format_ir_telemetry_line(receiver.telemetry())
 
 
 def test_last_signal_strength_is_none_with_no_receiver_wired() -> None:

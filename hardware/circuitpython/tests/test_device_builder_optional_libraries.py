@@ -117,6 +117,13 @@ def test_build_hardware_without_matrix_entry_succeeds_when_is31fl3741_uninstalle
 
         hw = build_hardware(config, board_module=board_mock)
 
+        # The matrix branch was never entered, so its driver library stayed
+        # unimported -- the real guarantee. ``hw.outputs == []`` alone holds
+        # for any bare config and cannot witness that the absent branch (not
+        # a built-then-empty one) was the path taken.
+        assert "adafruit_is31fl3741" not in sys.modules
+        assert "adafruit_is31fl3741.adafruit_rgbmatrixqt" not in sys.modules
+
     assert hw.outputs == []
 
 
@@ -148,6 +155,12 @@ def test_build_hardware_disabled_matrix_entry_succeeds_when_is31fl3741_uninstall
 
         hw = build_hardware(config, board_module=board_mock)
 
+        # A disabled matrix entry is skipped before its driver library is
+        # touched, so it stays unimported -- the real guarantee ``hw.outputs
+        # == []`` (true for any bare config) cannot witness on its own.
+        assert "adafruit_is31fl3741" not in sys.modules
+        assert "adafruit_is31fl3741.adafruit_rgbmatrixqt" not in sys.modules
+
     assert hw.outputs == []
 
 
@@ -166,6 +179,12 @@ def test_build_hardware_without_neopixel_entry_succeeds_when_neopixel_uninstalle
         from hardware.circuitpython.device_builder import build_hardware
 
         hw = build_hardware(config, board_module=board_mock)
+
+        # The NeoPixel branch was never entered, so ``neopixel`` stayed
+        # unimported -- the real guarantee. ``hw.outputs == []`` alone holds
+        # for any bare config and cannot witness that the absent branch was
+        # the path taken.
+        assert "neopixel" not in sys.modules
 
     assert hw.outputs == []
 
@@ -193,6 +212,11 @@ def test_build_hardware_disabled_neopixel_entry_succeeds_when_neopixel_uninstall
 
         hw = build_hardware(config, board_module=board_mock)
 
+        # A disabled neopixel entry is skipped before ``neopixel`` is
+        # imported, so it stays absent -- the real guarantee ``hw.outputs ==
+        # []`` (true for any bare config) cannot witness on its own.
+        assert "neopixel" not in sys.modules
+
     assert hw.outputs == []
 
 
@@ -212,6 +236,14 @@ def test_build_hardware_without_audio_section_succeeds_when_audio_stack_uninstal
         from hardware.circuitpython.device_builder import build_hardware
 
         hw = build_hardware(config, board_module=board_mock)
+
+        # The audio branch was never entered, so the audio stack stayed
+        # unimported -- the real guarantee. ``hw.outputs == []`` alone holds
+        # for any bare config and cannot witness that the absent branch was
+        # the path taken.
+        assert "audiobusio" not in sys.modules
+        assert "audiocore" not in sys.modules
+        assert "audiomixer" not in sys.modules
 
     assert hw.outputs == []
 
@@ -239,6 +271,13 @@ def test_build_hardware_disabled_audio_section_succeeds_when_audio_stack_uninsta
         from hardware.circuitpython.device_builder import build_hardware
 
         hw = build_hardware(config, board_module=board_mock)
+
+        # A disabled audio section is skipped before the audio stack is
+        # imported, so it stays absent -- the real guarantee ``hw.outputs ==
+        # []`` (true for any bare config) cannot witness on its own.
+        assert "audiobusio" not in sys.modules
+        assert "audiocore" not in sys.modules
+        assert "audiomixer" not in sys.modules
 
     assert hw.outputs == []
 
@@ -418,6 +457,12 @@ def test_build_hardware_without_haptics_section_succeeds_when_drv2605_uninstalle
 
         hw = build_hardware(config, board_module=board_mock)
 
+        # The haptics branch was never entered, so ``adafruit_drv2605`` stayed
+        # unimported -- the real guarantee. ``hw.outputs == []`` alone holds
+        # for any bare config and cannot witness that the absent branch was
+        # the path taken.
+        assert "adafruit_drv2605" not in sys.modules
+
     assert hw.outputs == []
 
 
@@ -435,6 +480,11 @@ def test_build_hardware_disabled_haptics_section_succeeds_when_drv2605_uninstall
         from hardware.circuitpython.device_builder import build_hardware
 
         hw = build_hardware(config, board_module=board_mock)
+
+        # A disabled haptics section is skipped before ``adafruit_drv2605`` is
+        # imported, so it stays absent -- the real guarantee ``hw.outputs ==
+        # []`` (true for any bare config) cannot witness on its own.
+        assert "adafruit_drv2605" not in sys.modules
 
     assert hw.outputs == []
 

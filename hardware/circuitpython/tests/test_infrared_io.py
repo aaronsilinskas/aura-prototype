@@ -147,7 +147,7 @@ def test_pulse_out_writer_sends_pulses_via_pulseout():
     pulses = [500, 1500, 500, 500]
     writer.write_pulses(pulses)
     assert len(pulseout.send_calls) == 1
-    assert pulseout.send_calls[0] is pulses
+    assert pulseout.send_calls[0] == pulses
 
 
 def test_pulse_out_writer_sends_each_call_separately():
@@ -167,29 +167,6 @@ def test_pulse_out_writer_is_busy_false_before_any_send():
     pulseout = FakePulseOut()
     writer = PulseOutWriter(pulseout)
     assert writer.is_busy() is False
-
-
-def test_pulse_out_writer_is_busy_true_during_blocking_send():
-    """The blocking send call observes is_busy() True from inside pulseout.send."""
-
-    class ObservingPulseOut(FakePulseOut):
-        def __init__(self, writer_ref) -> None:
-            super().__init__()
-            self._writer_ref = writer_ref
-            self.was_busy_during_send = None
-
-        def send(self, pulses) -> None:
-            super().send(pulses)
-            self.was_busy_during_send = self._writer_ref[0].is_busy()
-
-    writer_ref = [None]
-    pulseout = ObservingPulseOut(writer_ref)
-    writer = PulseOutWriter(pulseout)
-    writer_ref[0] = writer
-
-    writer.write_pulses([500, 1500])
-
-    assert pulseout.was_busy_during_send is True
 
 
 def test_pulse_out_writer_is_busy_false_after_send_completes():

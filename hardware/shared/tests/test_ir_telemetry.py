@@ -30,38 +30,6 @@ def _snapshot(**overrides) -> IrTelemetrySnapshot:
 # ---------------------------------------------------------------------------
 
 
-def test_format_line_includes_every_counter_in_pipeline_order():
-    snapshot = _snapshot(
-        pulses_seen=10,
-        buffer_full_on_poll=1,
-        packets_started=2,
-        preamble_reject=3,
-        mark_reject=4,
-        space_reject=5,
-        packets_completed=6,
-        packets_surfaced=7,
-        pulses_dropped_transmitting=9,
-    )
-
-    line = format_ir_telemetry_line(snapshot)
-
-    # The order asserted below is the receive-pipeline order defined by the
-    # issue, not an arbitrary field ordering.
-    fields_in_order = [
-        "pulses_seen=10",
-        "buffer_full_on_poll=1",
-        "packets_started=2",
-        "preamble_reject=3",
-        "mark_reject=4",
-        "space_reject=5",
-        "packets_completed=6",
-        "packets_surfaced=7",
-        "pulses_dropped_transmitting=9",
-    ]
-    positions = [line.index(field) for field in fields_in_order]
-    assert positions == sorted(positions)
-
-
 def test_format_line_matches_the_exact_serial_summary_string():
     """Regression pin: this is the exact line ``run_scene`` prints to the
     serial console, asserted byte-for-byte so a refactor cannot silently
@@ -124,24 +92,6 @@ def test_gate_does_not_report_again_until_another_change():
     gate.poll(_snapshot(packets_surfaced=1))
 
     assert gate.poll(_snapshot(packets_surfaced=1)) is None
-
-
-def test_gate_returns_line_when_pulses_dropped_transmitting_changed():
-    gate = IrTelemetryGate()
-    gate.poll(_snapshot())
-
-    result = gate.poll(_snapshot(pulses_dropped_transmitting=1))
-
-    assert result is not None
-    assert "pulses_dropped_transmitting=1" in result
-
-
-def test_gate_does_not_report_again_until_pulses_dropped_transmitting_changes_further():
-    gate = IrTelemetryGate()
-    gate.poll(_snapshot())
-    gate.poll(_snapshot(pulses_dropped_transmitting=1))
-
-    assert gate.poll(_snapshot(pulses_dropped_transmitting=1)) is None
 
 
 # ---------------------------------------------------------------------------

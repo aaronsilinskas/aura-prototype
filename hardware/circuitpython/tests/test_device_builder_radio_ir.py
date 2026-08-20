@@ -46,7 +46,7 @@ def _neopixel_config_with_radio():
     return parse_device_config(mapping)
 
 
-def test_build_hardware_radio_section_builds_radio_transport_onto_bundle() -> None:
+def test_build_hardware_wires_setup_radio_result_onto_bundle() -> None:
     config = _neopixel_config_with_radio()
     board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
     mock_transport = MagicMock(name="radio_transport")
@@ -372,13 +372,6 @@ def test_build_hardware_unknown_ir_emitter_pin_name_raises_value_error() -> None
 
         with pytest.raises(ValueError, match=r"ir\.line.*NOPE"):
             build_hardware(config, board_module=board_mock)
-
-
-def test_device_hardware_does_not_expose_the_ir_transmit_gate() -> None:
-    from hardware.shared.device_hardware import DeviceHardware
-
-    assert "gate" not in DeviceHardware.__slots__
-    assert not hasattr(DeviceHardware, "ir_transmit_gate")
 
 
 # ---------------------------------------------------------------------------

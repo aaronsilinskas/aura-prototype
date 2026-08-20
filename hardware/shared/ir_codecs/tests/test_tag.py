@@ -14,15 +14,10 @@ The game-layer data codec (``TagData`` / ``encode_tag_data`` /
 import pytest
 
 from hardware.shared.ir_codecs.tag import (
-    TAG_DAMAGE_BITS,
     TAG_ERROR_MARGIN,
     TAG_GAP_THRESHOLD,
-    TAG_PLAYER_BITS,
     TAG_PREAMBLE,
     TAG_PREAMBLE_ERROR_MARGIN,
-    TAG_SPACE_ONE,
-    TAG_SPACE_ZERO,
-    TAG_TEAM_BITS,
     TagInfraredDecoder,
     TagInfraredEncoder,
 )
@@ -87,10 +82,9 @@ def test_encoder_frame_starts_with_preamble():
 
 
 def test_encoder_frame_length_covers_preamble_and_data_bits():
-    data_bits = TAG_TEAM_BITS + TAG_PLAYER_BITS + TAG_DAMAGE_BITS
     pulses = TagInfraredEncoder().encode(bytearray([0x00]))
 
-    assert len(pulses) == len(TAG_PREAMBLE) + data_bits * 2
+    assert len(pulses) == 17
 
 
 def test_encoder_encodes_one_bit_as_long_space():
@@ -98,14 +92,14 @@ def test_encoder_encodes_one_bit_as_long_space():
     pulses = TagInfraredEncoder().encode(bytearray([0x40]))
 
     first_bit_space_index = len(TAG_PREAMBLE) + 1
-    assert pulses[first_bit_space_index] == TAG_SPACE_ONE
+    assert pulses[first_bit_space_index] == 2000
 
 
 def test_encoder_encodes_zero_bit_as_short_space():
     pulses = TagInfraredEncoder().encode(bytearray([0x00]))
 
     first_bit_space_index = len(TAG_PREAMBLE) + 1
-    assert pulses[first_bit_space_index] == TAG_SPACE_ZERO
+    assert pulses[first_bit_space_index] == 1000
 
 
 # ---------------------------------------------------------------------------

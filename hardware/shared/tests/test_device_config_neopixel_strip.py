@@ -66,13 +66,13 @@ def two_strip_config():
 # ---------------------------------------------------------------------------
 
 
-def test_parse_neopixel_strip_pixels_contains_one_entry(single_strip_config):
+def test_parse_neopixel_entry_produces_single_pixels_output(single_strip_config):
     result = parse_device_config(single_strip_config)
 
     assert len(result.pixels) == 1
 
 
-def test_parse_neopixel_strip_strips_contains_one_entry(single_strip_config):
+def test_parse_neopixel_entry_produces_single_strip(single_strip_config):
     result = parse_device_config(single_strip_config)
 
     assert len(result.pixels[0].strips) == 1
@@ -358,7 +358,7 @@ def test_parse_neopixel_strip_segment_start_below_zero_raises_value_error():
         "buttons": ["D9"],
     }
 
-    with pytest.raises(ValueError, match="personal"):
+    with pytest.raises(ValueError, match=r"scope 'personal'.*is out of range"):
         parse_device_config(config)
 
 
@@ -375,7 +375,7 @@ def test_parse_neopixel_strip_segment_end_exceeds_count_raises_value_error():
         "buttons": ["D9"],
     }
 
-    with pytest.raises(ValueError, match="personal"):
+    with pytest.raises(ValueError, match=r"scope 'personal'.*is out of range"):
         parse_device_config(config)
 
 
@@ -392,7 +392,7 @@ def test_parse_neopixel_strip_inverted_segment_raises_value_error():
         "buttons": ["D9"],
     }
 
-    with pytest.raises(ValueError, match="personal"):
+    with pytest.raises(ValueError, match=r"scope 'personal'.*is out of range"):
         parse_device_config(config)
 
 
@@ -426,7 +426,7 @@ def test_parse_neopixel_strip_out_of_range_error_names_scope():
         "buttons": ["D9"],
     }
 
-    with pytest.raises(ValueError, match="personal"):
+    with pytest.raises(ValueError, match=r"scope 'personal'.*requires 0 <= start < end <= count"):
         parse_device_config(config)
 
 

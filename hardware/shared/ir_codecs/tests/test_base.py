@@ -3,7 +3,11 @@
 import pytest
 
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
-from hardware.shared.ir_codecs.tag import TAG_PREAMBLE, TagInfraredDecoder
+from hardware.shared.ir_codecs.tag import (
+    TAG_PREAMBLE,
+    TagInfraredDecoder,
+    TagInfraredEncoder,
+)
 
 _IR_ERROR_THRESHOLD = 250  # µs — arbitrary threshold for exercising the base class directly
 
@@ -52,3 +56,25 @@ def test_reset_does_not_zero_telemetry_counters():
     decoder.reset()
 
     assert decoder.preamble_reject == 1
+
+
+def test_reset_returns_decoder_to_idle_so_the_next_signal_decodes_cleanly():
+    # reset()'s core job is to discard an in-progress partial decode and return
+    # to idle. Drive a partial packet (preamble matched, one data bit already
+    # accumulated but the packet unfinished), reset, then feed a fresh clean
+    # packet: it must decode to its own value, proving the abandoned partial was
+    # discarded and neither blocked nor corrupted the next decode.
+    encoder = TagInfraredEncoder()
+    decoder = TagInfraredDecoder()
+
+    # Preamble plus the first three data-bit pulses — enough to leave the
+    # bit-writer mid-byte, short of the finalising pulse.
+    partial = list(encoder.encode(bytearray([0x7F])))[: len(TAG_PREAMBLE) + 3]
+    _feed_pulses(decoder, partial)
+
+    decoder.reset()
+
+    fresh_value = 0x2A  # independent literal — unrelated to the abandoned partial
+    result = _feed_pulses(decoder, encoder.encode(bytearray([fresh_value])))
+
+    assert result == bytearray([fresh_value])
