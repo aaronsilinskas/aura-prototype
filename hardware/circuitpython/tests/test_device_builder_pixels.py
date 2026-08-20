@@ -210,7 +210,6 @@ def test_setup_matrix_is31fl3741_raises_runtime_error_past_deadline() -> None:
 
 
 def _segmented_strip_config():
-    """Return a DeviceConfig with one neopixel strip entry using scope_pixels."""
     mapping = {
         "pixels": [
             {

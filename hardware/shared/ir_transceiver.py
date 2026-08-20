@@ -1,18 +1,12 @@
 """InfraredTransceiver — board-free single owner of the IR hardware subsystem.
 
 Owns the transmitter map, the receiver, and the shared :class:`IrTransmitGate`
-that keeps a device from decoding its own self-echo. Imports only the IR
-primitives from :mod:`hardware.shared.ir_transport` and the codec base types
-from :mod:`hardware.shared.ir_codecs.base` — no ``engine`` import, since this
-class pumps its own transmitters directly rather than reaching them through
-an ``engine``-side pump seam.
+that keeps a device from decoding its own self-echo. Pumps its own
+transmitters directly rather than through an ``engine``-side seam, so it
+imports no ``engine`` types.
 
 Assembled by :func:`~hardware.circuitpython.device_builder._setup_ir` and
-wired into :func:`~hardware.circuitpython.device_builder.build_hardware` as
-``DeviceHardware.ir`` and the ``ir`` reference
-``HardwareNetworkControls.send_ir`` delegates to — the single owner that
-replaced the old split across ``HardwareNetworkControls``'s transmitter map,
-``DeviceHardware.ir_receiver``, and ``InfraredManager``.
+exposed as ``DeviceHardware.ir``.
 """
 
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
@@ -23,13 +17,6 @@ __all__ = ["InfraredTransceiver"]
 
 class InfraredTransceiver:
     """Owns and drives the whole IR subsystem for one device.
-
-    Constructed with the same ``{emitter: InfraredTransmitter}`` map,
-    ``InfraredReceiver | None``, and shared :class:`IrTransmitGate` that
-    :func:`~hardware.circuitpython.device_builder._setup_ir` already builds
-    today. The gate is stored only as the assembly owner — it is already
-    wired into every transmitter and the receiver at construction time, so
-    this class never calls it directly.
 
     The transmitter map is never exposed as a raw collection; reach a
     transmitter only through :meth:`send` and :meth:`busy`.
@@ -42,7 +29,8 @@ class InfraredTransceiver:
         receiver: The wired :class:`InfraredReceiver`, or ``None`` on a
             device with no IR receiver.
         gate: The :class:`IrTransmitGate` shared by *transmitters* and
-            *receiver* — owned here as the assembly reference, not driven.
+            *receiver*. Held only as the assembly reference — already wired
+            into both at construction, so this class never drives it.
     """
 
     __slots__ = ("_gate", "_receiver", "_transmitters", "received")
@@ -61,7 +49,7 @@ class InfraredTransceiver:
     def send(self, data: bytes, emitter: str) -> None:
         """Route *data* to the transmitter wired to *emitter*.
 
-        Fire-and-forget, mirroring :meth:`InfraredTransmitter.send` — whether
+        Fire-and-forget, mirroring :meth:`InfraredTransmitter.send`: whether
         the write completes synchronously or is still in flight stays a
         transmitter-level detail.
 
@@ -71,8 +59,7 @@ class InfraredTransceiver:
                 ``AREA_OF_EFFECT``).
 
         Raises:
-            ValueError: If *emitter* is not in the transmitter map supplied
-                at construction time.
+            ValueError: If *emitter* is not in the transmitter map.
         """
         tx = self._transmitters.get(emitter)
         if tx is None:
@@ -82,20 +69,15 @@ class InfraredTransceiver:
     def busy(self, emitter: str) -> bool:
         """Pump *emitter*'s transmitter and report whether it is still busy.
 
-        The public seam for a caller that needs one emitter's in-flight
-        state — e.g. to gate a send on the previous transmit completing —
-        without reaching into the private transmitter map (see
-        :meth:`send`'s docstring). Pumping here is scoped to *emitter*
-        alone; :meth:`update` remains the only way to pump every wired
-        transmitter each tick.
+        Pumping is scoped to *emitter* alone; :meth:`update` remains the only
+        way to pump every wired transmitter each tick.
 
         Args:
             emitter: One of the emitter constants (``LINE``, ``CONE``,
                 ``AREA_OF_EFFECT``).
 
         Raises:
-            ValueError: If *emitter* is not in the transmitter map supplied
-                at construction time.
+            ValueError: If *emitter* is not in the transmitter map.
         """
         tx = self._transmitters.get(emitter)
         if tx is None:
@@ -106,11 +88,11 @@ class InfraredTransceiver:
         """Pump every transmitter, then receive — in that order, every tick.
 
         Pumping runs unconditionally, even with no receiver wired: a
-        deferred ``end_transmit`` from a non-blocking write can complete
-        this same tick, and a receiver's gate check must see it released
-        promptly. Sets :attr:`received` to this tick's decoded packet, or
-        ``None`` when nothing decoded or no receiver is wired — never left
-        stale from a previous tick.
+        deferred ``end_transmit`` from a non-blocking write can complete this
+        same tick, and a later gate check must see it released promptly. Sets
+        :attr:`received` to this tick's decoded packet, or ``None`` when
+        nothing decoded or no receiver is wired — never left stale from a
+        previous tick.
         """
         for tx in self._transmitters.values():
             tx.poll()
@@ -121,13 +103,10 @@ class InfraredTransceiver:
     def apply_codec(self, encoder: InfraredEncoder, decoder: InfraredDecoder) -> None:
         """Install *encoder* on every transmitter and *decoder* on the receiver.
 
-        Fans *encoder* out to every wired transmitter via
-        :meth:`InfraredTransmitter.set_encoder` — a no-op when no
-        transmitters are wired. Installs *decoder* on the receiver via
-        :meth:`InfraredReceiver.set_decoder` when a receiver is wired; the
-        decoder step is skipped entirely with no receiver. Applied
-        uniformly, with no "differs from default?" branch — intended for a
-        single call before the first tick, not guarded against mid-run use.
+        Applied uniformly, with no "differs from default?" branch — intended
+        for a single call before the first tick, not guarded against mid-run
+        use. A no-op for transmitters when none are wired, and the decoder
+        step is skipped with no receiver.
 
         Args:
             encoder: The encoder instance to install on every transmitter.

@@ -1,13 +1,4 @@
-"""Behaviour-driven tests for convention-based IR codec resolution.
-
-Covers:
-- codec_for() resolving "aura" and "tag" to their class pairs
-- codec_for()'s default name ("aura") always resolving
-- UnknownCodecError raised (by type) for a name with no matching module
-- UnknownCodecError naming the known codecs
-- a codec module that exists but fails on its own nested import is not
-  misreported as unknown
-"""
+"""Behaviour-driven tests for convention-based IR codec resolution."""
 
 import builtins
 

@@ -7,7 +7,10 @@ from engine.input import ButtonData
 
 
 class _ButtonState:
-    """Per-button debounce state: settled value, candidate value, accumulated candidate time."""
+    """Per-button debounce state.
+
+    ``candidate_time`` accumulates how long ``candidate`` has held stable.
+    """
 
     __slots__ = ("candidate", "candidate_time", "settled")
 
@@ -57,8 +60,6 @@ class DebouncedButtons:
             state.candidate_time += elapsed
             if state.candidate != state.settled and state.candidate_time >= self._interval:
                 state.settled = state.candidate
-                # Falling edge (settled became False/LOW) → PRESSED
-                # Rising edge (settled became True/HIGH) → RELEASED
                 out.set(label, ButtonData.PRESSED if not state.settled else ButtonData.RELEASED)
             else:
                 out.set(label, ButtonData.DOWN if not state.settled else ButtonData.UP)

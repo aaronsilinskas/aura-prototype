@@ -1,10 +1,10 @@
-"""Tests for the table-row emission helpers shared across profiler scripts.
+"""Tests for the profiler-report helpers shared across profiler scripts.
 
 The profiler scripts themselves run forever on-device and are not unit-tested,
 but the pure logic they rely on to turn a sweep into a paste-ready
 ``recorded-metrics.md`` table row -- least-squares slope fitting, runtime-id
 formatting, markdown row formatting, and the scene-load profiler's harness
-label -- lives here and is.
+label -- lives here and is unit-tested.
 """
 
 import pytest

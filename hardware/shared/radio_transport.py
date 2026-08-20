@@ -15,11 +15,11 @@ __all__ = ["RadioTransport"]
 
 
 class RadioTransport:
-    """Port through which ``RadioTransceiver`` reaches a half-duplex radio chip.
+    """Port through which :class:`RadioTransceiver` reaches a half-duplex radio chip.
 
-    A plain base class — the same substitute pattern as ``VoiceSink`` and
-    ``PulseReader``/``PulseWriter`` (``typing.Protocol`` is unavailable on
-    the constrained runtimes). Subclass and override both methods to connect
+    A plain base class — the same substitute pattern as :class:`VoiceSink` and
+    :class:`PulseReader`/:class:`PulseWriter` (``typing.Protocol`` is unavailable
+    on the constrained runtimes). Subclass and override both methods to connect
     to hardware (e.g. ``adafruit_rfm69.RFM69``) or a test fake.
     """
 

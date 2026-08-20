@@ -129,7 +129,6 @@ def test_update_pixels_for_second_segment_writes_at_correct_offset() -> None:
 
     output.update_pixels("ambient", buf)
 
-    # First write must be at strip index 10
     first_call = strip.__setitem__.call_args_list[0]
     assert first_call == call(10, 0xAABBCC)
 

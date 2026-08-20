@@ -91,7 +91,7 @@ def test_address_suffix_formats_a_configured_override_as_two_digit_hex() -> None
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# build_hardware — cross-component output ordering
 # ---------------------------------------------------------------------------
 
 
@@ -149,16 +149,7 @@ def test_build_hardware_pixels_outputs_precede_audio_and_haptic_outputs() -> Non
 
 
 # ---------------------------------------------------------------------------
-# build_hardware — two comprehensive full-sequence narration tests: the
-# verbatim lock for every [hw] line family in one place (#852), replacing the
-# per-subsystem exact-log-string coverage the split test_device_builder_*.py
-# files previously carried one outcome at a time. One config enables every
-# gated section; the other declares every gated section but disables it --
-# together they pin the entire "ok" vocabulary and the entire
-# "disabled"/"held off" vocabulary. Per-subsystem files keep one
-# representative narrated line per component plus the outcome variants
-# neither config here can reach (i2c's "no bus", ir's writer=pio/
-# writer=pulseio, and IR multi-receiver).
+# build_hardware — the two comprehensive full-sequence narration tests (#852)
 # ---------------------------------------------------------------------------
 
 

@@ -131,9 +131,9 @@ def _declared_and_enabled(section: AudioConfig | IRConfig | I2CDeviceConfig | No
 def _section_active(section: I2CDeviceConfig | None) -> bool:
     """Return whether an optional I2C-device config section was actually built.
 
-    Narrowed to ``I2CDeviceConfig`` (#844): every I2C-device harness part is
-    now produced by iterating ``_I2C_DEVICE_SECTIONS``, so this no longer
-    needs to cover audio/IR sections.
+    The I2C-device-only alias of :func:`_declared_and_enabled`: every
+    I2C-device harness part is produced by iterating ``_I2C_DEVICE_SECTIONS``,
+    so this predicate never needs to cover audio/IR sections.
     """
     return _declared_and_enabled(section)
 
@@ -142,14 +142,11 @@ def _pixels_harness_part(pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig]
     """Return the ``pixels`` part of a harness label for ``config.pixels``.
 
     ``pixels`` mirrors ``DeviceConfig.pixels``: a possibly-empty list holding
-    at most one ``MatrixPixelsConfig`` and any number of ``NeoPixelPixelsConfig``
-    entries. Entries with ``enabled: False`` did not get built, so they are
-    filtered out before either check below -- a disabled entry counts the
-    same as an absent one. A matrix wins when present and enabled (a config
-    never mixes the two on real props) and its pixel count is ``cols`` times
-    the rows covered by ``scope_rows`` -- the bands are non-overlapping, so
-    summing each band's length gives the total scoped rows. Otherwise every
-    enabled NeoPixel entry's strip counts are summed, covering both the
+    at most one ``MatrixPixelsConfig`` and any number of
+    ``NeoPixelPixelsConfig`` entries. Entries with ``enabled: False`` were not
+    built and count the same as absent ones, so they are filtered out first. A
+    present, enabled matrix wins (a config never mixes the two on real props);
+    otherwise the enabled NeoPixel strip counts are summed, covering both the
     current ``strips`` shape and the legacy one-strip-per-scope ``scopes``
     shape.
     """
@@ -225,22 +222,6 @@ def metrics_harness_label(config: DeviceConfig) -> str:
     distinguishable rows. Counts, not just presence, are encoded for each
     part. Board-free: takes an already-parsed ``DeviceConfig``, not a board
     or file path.
-
-    Replaces the old hand-maintained ``HARNESSES``-derived ``_harness_label``
-    in ``examples/hardware/profiling/scene_load_profiler.py``, deriving the
-    label from the config actually assembled rather than a parallel
-    hand-edited table.
-
-    The haptic part originally (#685) came from a caller-supplied
-    ``haptic_present`` runtime flag, since at the time nothing in
-    ``DeviceConfig`` declared the haptics driver. #691 config-gated the
-    DRV2605 driver (and the LIS3DH accelerometer) behind their own declared
-    sections, so both parts are now read straight off ``config`` like every
-    other part -- the runtime flag is gone. #844 replaced the
-    haptic/accelerometer parts' hand-written, magnetometer-omitting pair of
-    functions with ``_i2c_device_harness_parts``, driven off the shared
-    ``_I2C_DEVICE_SECTIONS`` list (#842) -- a section added there needs no
-    edit here.
 
     Args:
         config: The parsed device config the prop was built from.

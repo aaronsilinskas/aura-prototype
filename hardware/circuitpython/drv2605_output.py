@@ -12,9 +12,9 @@ from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.state import EffectReceipt, Scope
 
-# Maps HapticPattern constants to adafruit_drv2605 Effect/Pause objects.
-# Effect constants are offset from DRV2605L hardware IDs; the mapping here
-# translates them back to the correct waveform IDs.
+# HapticPattern constants are offset from the DRV2605L hardware waveform IDs
+# (see effects.effect.HapticPattern), so this table restores the real IDs the
+# driver expects: STRONG_CLICK -> Effect(1), and so on.
 _DRV2605L_EFFECT_MAP: Final = {
     HapticPattern.STRONG_CLICK: adafruit_drv2605.Effect(1),
     HapticPattern.SHARP_CLICK: adafruit_drv2605.Effect(4),

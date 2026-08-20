@@ -158,8 +158,6 @@ class PioPulseWriter(PulseWriter):
 
     def __init__(self, state_machine: object) -> None:
         self._sm = state_machine
-        # The pulse array handed to the DMA; held until the write completes so
-        # the buffer cannot be garbage-collected out from under the transfer.
         self._inflight: object | None = None
 
     def write_pulses(self, durations: array[int] | list[int]) -> None:
@@ -185,9 +183,7 @@ class PioPulseWriter(PulseWriter):
                 38 kHz carrier.
         """
         n = len(durations)
-        # Pad odd frames to even with one trailing gap space (keeps mark/space
-        # phase aligned across frames; see the docstring). The Aura encoder is
-        # always odd, so this appends exactly once in practice.
+        # The Aura encoder always emits an odd count, so this pads exactly once.
         pad = n % 2
         buffer = array("H", bytearray((n + pad) * 2))
         for i in range(n):

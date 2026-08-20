@@ -13,26 +13,6 @@ tests wire an emitter and so never reach the writer path at all.
 build_hardware-level radio and IR integration/narration coverage (config
 gating, hard-error and disabled/absent-section narration, and the ir/radio
 narration lines) lives in test_device_builder_radio_ir.py (#779) instead.
-
-Covers:
-- _setup_ir defaults writer_factory to _make_writer
-- _setup_ir calls writer_factory once per wired emitter, with that emitter's pin
-- _setup_ir with a line_pin returns a LINE transmitter and receiver
-- _setup_ir with cone_pin returns LINE and CONE transmitters
-- _setup_ir with aoe_pin returns LINE and AREA_OF_EFFECT transmitters
-- _setup_ir with all pins returns all three transmitters
-- _setup_ir omits any emitter (line/cone/area_of_effect) when its pin is None
-- _setup_ir wires every transmitter and the receiver to the same gate
-- _setup_ir receiver is wired to rx_pin
-- _setup_ir defaults to Aura codecs when encoder/decoder are omitted
-- _setup_ir wires a provided encoder/decoder pair into transmitters/receiver
-- _setup_ir reuses the same encoder instance across all wired transmitters
-- _setup_ir chooses InfraredSingleReceiver for one rx pin, wired with the
-  given decoder
-- _setup_ir chooses InfraredMultiReceiver with one PulseInReader per rx pin
-  for multiple rx pins
-- _setup_ir gives each multi-receiver reader its own decoder instance of the
-  same class
 """
 
 from __future__ import annotations

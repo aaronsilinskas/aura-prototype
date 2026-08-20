@@ -135,7 +135,7 @@ class IrTransmitGate:
         self._flush_pending: bool = False
 
     def begin_transmit(self) -> None:
-        """Mark one emission as starting. Increments the active-emission depth."""
+        """Mark one emission as starting."""
         self._depth += 1
 
     def end_transmit(self) -> None:
@@ -196,9 +196,8 @@ class InfraredTransmitter:
         calls :meth:`PulseWriter.write_pulses`, arms the deferred-release
         flag, then calls :meth:`_release_gate_when_idle`. If the writer is
         already idle (a blocking writer finished synchronously)
-        :meth:`IrTransmitGate.end_transmit` fires immediately — reproducing
-        the original ``try``/``finally`` byte-for-byte. If the writer is
-        still busy (e.g. DMA in flight) the flag stays armed and the next
+        :meth:`IrTransmitGate.end_transmit` fires immediately. If the writer
+        is still busy (e.g. DMA in flight) the flag stays armed and the next
         :meth:`poll` that observes idle releases it, via the same
         :meth:`_release_gate_when_idle`, before starting the oldest queued
         send.
@@ -571,9 +570,8 @@ class InfraredSourceReceiver(InfraredReceiver):
         """Zero this receiver's own counters, then every decoder and reader.
 
         Resetting every source that :meth:`telemetry` reads from means a
-        counter can never go stale after a reset the way
-        ``buffer_full_on_poll`` used to on a multi-receiver — reading and
-        resetting walk the same lists, so there is nothing left to forget.
+        counter can never go stale after a reset — reading and resetting walk
+        the same lists, so there is nothing left to forget.
         Also rebuilds :meth:`telemetry_line`'s change-gate baseline, so the
         next call reports unconditionally.
         """

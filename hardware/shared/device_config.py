@@ -108,9 +108,8 @@ class NeoPixelScopeConfig:
 class NeoPixelStripConfig:
     """Parsed NeoPixel strip configuration with scope_pixels segmentation.
 
-    Each strip entry has a single physical pin, a total pixel count, optional
-    order and brightness, and a ``scope_pixels`` mapping of scope key to a
-    ``range`` of pixel indices ``[start, end)`` within the strip.
+    ``scope_pixels`` maps each scope key to a ``range`` of pixel indices
+    ``[start, end)`` within the strip.
     """
 
     __slots__ = ("brightness", "count", "order", "pin", "scope_pixels")

@@ -37,10 +37,9 @@ def test_radio_transport_receive_base_raises_not_implemented():
 class RecordingRadioTransport(RadioTransport):
     """Recording fake backing both directions of the half-duplex port.
 
-    ``send`` records every payload, in call order, for assertions.
-    ``queue_receive`` loads a pending ``(from_byte, data)`` pair; ``receive``
-    replays queued pairs FIFO and returns ``None`` once the queue is empty —
-    matching the port's non-blocking "nothing waiting" contract.
+    ``queue_receive`` feeds what a later ``receive`` returns; an empty queue
+    yields ``None``, matching the port's non-blocking "nothing waiting"
+    contract.
     """
 
     def __init__(self) -> None:
@@ -48,7 +47,6 @@ class RecordingRadioTransport(RadioTransport):
         self._receive_queue: list[tuple[int, bytes]] = []
 
     def queue_receive(self, from_byte: int, data: bytes) -> None:
-        """Queue one (from_byte, data) pair to return from a future receive() call."""
         self._receive_queue.append((from_byte, data))
 
     def send(self, data: bytes) -> None:

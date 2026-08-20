@@ -1,20 +1,7 @@
 """Behaviour-driven tests for RadioTransceiver (hardware/shared/radio_transceiver.py).
 
-Covers:
-- update() is a no-op when the transport is None; received/last_sender stay
-  None
-- received/last_sender are set together only on a receiving tick, and reset
-  together on the tick after
-- the raw payload and From byte pass through untouched, at their boundary
-  values
-- update() polls the transport's receive() exactly once per tick
-- send() delegates the payload to the transport, is a silent no-op with no
-  transport wired, and takes no emitter argument (single channel)
-- received is never a NetworkEvents.RadioReceived — this module builds no
-  game event
-- send() takes no emitter argument (single channel)
-
-The _RecordingTransport fake is this suite's own board-free fixture.
+The _RecordingTransport fake is this suite's own board-free fixture, so these
+tests run without radio hardware.
 """
 
 import pytest
@@ -28,9 +15,7 @@ from hardware.shared.radio_transport import RadioTransport
 
 
 class _RecordingTransport(RadioTransport):
-    """Recording fake — queue_receive loads pending (from_byte, data) pairs,
-    replayed FIFO; receive_calls counts every receive() call for asserting
-    polling discipline. send() records every payload written to it."""
+    """In-memory RadioTransport fake that records sends and replays queued receives FIFO."""
 
     def __init__(self, results: list | None = None) -> None:
         self._receive_queue = list(results) if results else []

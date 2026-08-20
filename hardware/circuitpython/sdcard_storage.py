@@ -31,9 +31,9 @@ class SdCardStorage(DeviceStorage):
 
     Raises:
         OSError: From ``sdcardio.SDCard`` or ``storage.mount`` -- no card
-            fitted, or the card carries no FAT filesystem.
-            ``device_builder._setup_sdcard`` catches this and wraps it in a
-            legible ``RuntimeError`` naming the section and cs/mount context.
+            fitted, or the card carries no FAT filesystem. Propagates
+            unwrapped; the builder that constructs this is responsible for
+            adding legible context.
     """
 
     def __init__(self, spi: object, cs: object, mount: str) -> None:

@@ -1,11 +1,5 @@
 """Behaviour-driven tests for SdCardStorage (hardware/circuitpython/sdcard_storage.py).
 
-Covers:
-- construction mounts via sdcardio.SDCard + storage.mount(..., readonly=False)
-- the mount is writable (readonly=False passed explicitly, not relied upon
-  as VfsFat's default)
-- the resulting instance behaves as a DeviceStorage against its mount point
-
 ``sdcardio``/``storage`` are stubbed into ``sys.modules`` by the sibling
 conftest.py so this suite runs under CPython; the SDCard/VfsFat classes and
 mount() function are MagicMocks substituted per test via ``patch``.

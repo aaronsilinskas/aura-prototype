@@ -22,9 +22,7 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
     This class is the live :class:`VoiceSink` adapter: it owns only hardware —
     the I2S amp, the ``audiomixer.Mixer``, the ``max_volume`` calibration, and a
     per-slot ``source`` list of open WAV files — and translates the pool's slot
-    decisions into mixer and file-handle calls.  ``handle_event`` routes an
-    effect's clip into ``pool.claim``; ``flush`` reconciles slots via
-    ``pool.sweep``.
+    decisions into mixer and file-handle calls.
     """
 
     __slots__ = (

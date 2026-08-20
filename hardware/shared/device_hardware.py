@@ -19,9 +19,7 @@ class DeviceHardware:
     ``ir`` is the single owner of the whole IR subsystem (transmitters,
     receiver, shared transmit gate) — the same ``InfraredTransceiver``
     instance ``HardwareNetworkControls.send_ir`` reaches through. ``None``
-    exactly when there is no ``ir`` section declared (or it is disabled),
-    the same condition under which the old ``ir_receiver`` slot was
-    ``None``.
+    exactly when there is no ``ir`` section declared (or it is disabled).
 
     ``radio`` is the single owner of the radio subsystem's send and per-tick
     receive — the same ``RadioTransceiver`` instance
@@ -35,9 +33,7 @@ class DeviceHardware:
 
     ``audio_registry`` is the same ``AudioRegistry`` instance the built
     ``AudioEffectOutput`` resolves clips through — ``None`` on a device with
-    no ``audio`` section declared and enabled. ``app.build_scene_runtime``
-    scans effect-pack sounds into it and installs it as ``SceneManager``'s
-    audio-overlay admin.
+    no ``audio`` section declared and enabled.
 
     ``magnetometer`` is typed like ``accelerometer`` (``object | None``, no
     concrete driver import here) — ``None`` on a device with no

@@ -28,8 +28,7 @@ class MatrixEffectOutput(EffectOutput):
 
         Read-only. Lets a caller reach the one shared driver to build further
         outputs around it (e.g. the pixel profiler sweeping row bands) without
-        re-probing hardware or touching a private attribute. Subclasses set
-        ``self._matrix`` to the driver they own.
+        re-probing hardware or touching a private attribute.
         """
         return self._matrix
 
@@ -44,7 +43,7 @@ class MatrixEffectOutput(EffectOutput):
             self._write_row(row, buffer)
 
     def clear_pixels(self, scope_key: str) -> None:
-        """Zero all rows in the scope's row band using the pre-allocated zero buffer."""
+        """Zero all rows in the scope's row band."""
         row_band = self._scope_rows[scope_key]
         for row in row_band:
             self._write_row(row, self._zero_buffer)

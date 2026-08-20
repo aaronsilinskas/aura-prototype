@@ -80,7 +80,7 @@ class TagInfraredEncoder(InfraredEncoder):
     """
 
     def encode(self, data: bytes | bytearray) -> array:
-        """Encode *data* into a infrared tag IR pulse array.
+        """Encode *data* into an infrared tag IR pulse array.
 
         Args:
             data: Buffer containing at least one byte of encoded tag

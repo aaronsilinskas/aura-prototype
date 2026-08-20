@@ -35,11 +35,9 @@ def narrate_step(
     Opens *logger*'s line with *description* **before** calling *build*, so a
     failure inside *build* (e.g. resolving an unknown pin) always closes this
     step's own line rather than one already closed by a neighbouring step.
-    *build* returns a ``(value, suffix)`` pair; on return, the line is closed
-    with that *suffix* and *value* is returned to the caller. A plain success
-    is just ``(value, "ok")`` — nothing here special-cases it. If *build*
-    raises, the line is closed with ``FAILED`` and the exception is
-    re-raised unchanged.
+    *build* returns a ``(value, suffix)`` pair: *suffix* closes the line and
+    *value* is returned to the caller. If *build* raises, the line is closed
+    with ``FAILED`` and the exception propagates unchanged.
 
     Trusts *logger* is a real :class:`~engine.log.Logger` — a caller that
     accepts an optional logger owns normalizing ``None`` to
@@ -58,7 +56,7 @@ def narrate_step(
 def narrate_skip(logger: Logger, description: str, note: str) -> None:
     """Narrate a step with no build: open the line, close it with *note*.
 
-    For a disabled or otherwise not-built component — no thunk runs.
+    For a disabled or otherwise not-built component.
     """
     logger.begin(description)
     logger.end(note)

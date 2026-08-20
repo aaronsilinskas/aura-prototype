@@ -103,9 +103,7 @@ class DeviceStorage:
         ``os.rename(temp, name)`` and ``os.sync()`` again — a reader opening
         *name* therefore only ever observes the complete old content or the
         complete new content, never a torn file. Missing parent directories
-        are created by walking each segment with a single-level
-        ``os.mkdir`` (there is no ``os.makedirs`` on CircuitPython),
-        tolerating already-present directories.
+        are created first (see :meth:`_ensure_parent_dirs`).
 
         Args:
             name: File name or subpath under the mount root.

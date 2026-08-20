@@ -1,9 +1,4 @@
-"""Behaviour-driven tests for the shared IR codec base classes.
-
-Covers:
-- Base-class contracts (InfraredEncoder, InfraredDecoder)
-- reset() leaving telemetry counters untouched
-"""
+"""Behaviour-driven tests for the shared IR codec base classes."""
 
 import pytest
 

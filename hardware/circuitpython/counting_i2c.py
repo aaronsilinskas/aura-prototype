@@ -1,10 +1,4 @@
-"""CountingI2C — transparent decorator that tallies I2C byte traffic.
-
-Wraps a ``busio.I2C`` bus and forwards every method
-``adafruit_bus_device.I2CDevice`` exercises while tallying running
-``bytes_written`` / ``bytes_read`` totals.  Call ``reset()`` to zero both
-counters between measurement windows.
-"""
+"""CountingI2C — a ``busio.I2C`` decorator that tallies byte traffic."""
 
 from __future__ import annotations
 

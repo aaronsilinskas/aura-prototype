@@ -19,7 +19,7 @@ from __future__ import annotations
 from array import array
 
 # ---------------------------------------------------------------------------
-# Stub rp2pio + adafruit_pioasm before importing the adapter under test.
+# Test doubles for rp2pio.StateMachine and adafruit_pioasm.Program.
 # ---------------------------------------------------------------------------
 
 
@@ -55,10 +55,9 @@ class _FakeProgram:
         self.kwargs = kwargs
 
 
-# The adapter's module import is hardware-guarded (rp2pio is imported lazily,
-# only inside make_state_machine), so importing PioPulseWriter here needs no
-# rp2pio stub and leaks nothing into sys.modules. The tests drive a fake state
-# machine directly, exercising the writer without the hardware libraries.
+# rp2pio is imported lazily inside make_state_machine, never at module scope,
+# so importing PioPulseWriter here needs no rp2pio stub and leaks nothing into
+# sys.modules.
 from hardware.circuitpython.pio_pulse_writer import (  # noqa: E402
     _CARRIER_PERIOD_US,
     _INTERFRAME_GAP_US,
@@ -93,14 +92,12 @@ def _loops_to_us(loops: int) -> int:
 
 
 def test_write_pulses_starts_a_background_write():
-    """write_pulses kicks off a DMA-fed background_write on the state machine."""
     writer, sm = _make_writer()
     writer.write_pulses(array("H", [100, 200, 300]))
     assert len(sm.background_writes) == 1
 
 
 def test_write_pulses_returns_before_transmission_completes():
-    """write_pulses returns while the send is still outstanding (non-blocking)."""
     writer, _sm = _make_writer()
     writer.write_pulses(array("H", [100, 200]))
     assert writer.is_busy() is True
@@ -112,7 +109,6 @@ def test_write_pulses_returns_before_transmission_completes():
 
 
 def test_is_busy_is_false_before_any_write():
-    """A freshly constructed writer reports idle."""
     writer, _sm = _make_writer()
     assert writer.is_busy() is False
 
@@ -132,7 +128,6 @@ def test_is_busy_is_false_before_any_write_even_when_state_machine_reports_writi
 
 
 def test_is_busy_reflects_state_machine_writing_flag():
-    """is_busy mirrors the state machine's writing state as the DMA completes."""
     writer, sm = _make_writer()
     writer.write_pulses(array("H", [100, 200]))
     assert writer.is_busy() is True
@@ -158,14 +153,12 @@ def test_write_pulses_hands_the_built_buffer_to_the_dma():
 
 
 def test_in_flight_buffer_is_held_until_write_completes():
-    """The DMA buffer is kept referenced while the write is outstanding."""
     writer, sm = _make_writer()
     writer.write_pulses(array("H", [100, 200, 300]))
     assert writer._inflight is sm.background_writes[0]  # ownership is the contract
 
 
 def test_in_flight_buffer_reference_is_dropped_once_idle():
-    """Once is_busy() reads False, the writer releases the in-flight buffer."""
     writer, sm = _make_writer()
     writer.write_pulses(array("H", [100, 200]))
     sm.writing = False

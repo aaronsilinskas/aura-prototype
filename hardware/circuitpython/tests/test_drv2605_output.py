@@ -75,7 +75,6 @@ def test_construction_sets_scopes_to_all() -> None:
 
 
 def test_known_verb_writes_effect_to_driver_sequence() -> None:
-    """A known event verb writes the correct Effect objects into driver.sequence."""
     output, driver = _make_output()
     effect = _effect_with_sequence(
         "strike",
@@ -93,7 +92,6 @@ def test_known_verb_writes_effect_to_driver_sequence() -> None:
 
 
 def test_pause_constant_writes_pause_object_to_correct_slot() -> None:
-    """PAUSE_250 constant is translated to Pause(0.25) in driver.sequence."""
     output, driver = _make_output()
     effect = _effect_with_sequence("strike", [HapticPattern.PAUSE_250])
     receipt = _make_receipt()
@@ -106,7 +104,6 @@ def test_pause_constant_writes_pause_object_to_correct_slot() -> None:
 
 
 def test_all_pause_constants_write_correct_durations() -> None:
-    """PAUSE_500 and PAUSE_1000 map to Pause(0.5) and Pause(1.0) respectively."""
     output, driver = _make_output()
     effect = _effect_with_sequence("strike", [HapticPattern.PAUSE_500, HapticPattern.PAUSE_1000])
     receipt = _make_receipt()
@@ -120,7 +117,6 @@ def test_all_pause_constants_write_correct_durations() -> None:
 
 
 def test_known_verb_calls_driver_play() -> None:
-    """A known event verb causes driver.play() to be called."""
     output, driver = _make_output()
     effect = _effect_with_sequence("strike", [HapticPattern.STRONG_CLICK])
     receipt = _make_receipt()
@@ -138,7 +134,6 @@ def test_known_verb_calls_driver_play() -> None:
 
 
 def test_shorter_sequence_clears_remaining_slots_to_effect_zero() -> None:
-    """A sequence shorter than 8 clears all remaining slots with Effect(0)."""
     output, driver = _make_output()
     effect = _effect_with_sequence("strike", [HapticPattern.STRONG_CLICK])
     receipt = _make_receipt()
@@ -152,7 +147,6 @@ def test_shorter_sequence_clears_remaining_slots_to_effect_zero() -> None:
 
 
 def test_second_event_with_shorter_sequence_clears_stale_slots() -> None:
-    """A shorter follow-up sequence overwrites stale slots from a longer previous sequence."""
     output, driver = _make_output()
     long_effect = _effect_with_sequence(
         "strike",
@@ -182,7 +176,6 @@ def test_second_event_with_shorter_sequence_clears_stale_slots() -> None:
 
 
 def test_second_event_calls_play_again_without_stop() -> None:
-    """A second event writes a new sequence and calls driver.play() again without stop()."""
     output, driver = _make_output()
     effect = _effect_with_sequence("strike", [HapticPattern.STRONG_CLICK])
     receipt1 = _make_receipt()
@@ -205,7 +198,6 @@ def test_second_event_calls_play_again_without_stop() -> None:
 
 
 def test_handle_event_ignores_effect_with_no_haptic() -> None:
-    """effect.haptic is None → driver is not touched."""
     output, driver = _make_output()
     effect = Effect(name="silent")
     receipt = _make_receipt()
@@ -218,7 +210,6 @@ def test_handle_event_ignores_effect_with_no_haptic() -> None:
 
 
 def test_handle_event_ignores_unknown_verb() -> None:
-    """Verb not in haptic.patterns → driver is not touched."""
     output, driver = _make_output()
     effect = _effect_with_sequence("strike", [HapticPattern.STRONG_CLICK])
     receipt = _make_receipt()
@@ -266,7 +257,6 @@ def test_unknown_constant_in_sequence_raises() -> None:
 
 
 def test_flush_calls_driver_stop_when_active_receipt_is_externally_stopped() -> None:
-    """flush() calls driver.stop() when the active receipt is externally stopped."""
     output, driver = _make_output()
     effect = _effect_with_sequence("strike", [HapticPattern.STRONG_CLICK])
     receipt = _make_receipt()
@@ -297,7 +287,6 @@ def test_flush_clears_receipt_after_stopping_driver() -> None:
 
 
 def test_flush_does_nothing_when_no_active_receipt() -> None:
-    """flush() is a no-op when no effect is playing."""
     output, driver = _make_output()
 
     output.flush()
@@ -306,7 +295,6 @@ def test_flush_does_nothing_when_no_active_receipt() -> None:
 
 
 def test_flush_does_nothing_when_receipt_is_still_active() -> None:
-    """flush() leaves the driver running when the receipt is not stopped."""
     output, driver = _make_output()
     effect = _effect_with_sequence("strike", [HapticPattern.STRONG_CLICK])
     receipt = _make_receipt()

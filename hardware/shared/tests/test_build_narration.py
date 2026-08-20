@@ -1,12 +1,4 @@
-"""Behaviour-driven tests for narrate_step / narrate_skip (hardware/shared/build_narration.py).
-
-Covers:
-- narrate_step opens the line before the build thunk runs, closes it with the
-  thunk's own success suffix, and returns the built value
-- a throwing build thunk closes the line FAILED and the exception propagates
-  unchanged
-- narrate_skip's begin-then-end no-build path
-"""
+"""Behaviour-driven tests for ``narrate_step`` and ``narrate_skip``."""
 
 import pytest
 

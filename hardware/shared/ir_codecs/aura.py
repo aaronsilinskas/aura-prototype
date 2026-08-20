@@ -1,22 +1,15 @@
-"""Aura IR wire-frame codec for the Aura platform.
+"""Aura IR wire-frame codec.
 
-The concrete Aura wire-frame implementation (``AuraInfraredEncoder`` /
-``AuraInfraredDecoder``), subclassing the shared base classes in
-:mod:`hardware.shared.ir_codecs.base`.
+Concrete ``AuraInfraredEncoder`` / ``AuraInfraredDecoder`` implementations of
+the shared base classes in :mod:`hardware.shared.ir_codecs.base`. The frame
+carries a variable-length opaque payload plus a trailing CRC-8; the timing
+constants below are the source of truth, and :class:`AuraInfraredEncoder`
+documents the frame layout.
 
 No ``pulseio`` import — safe on CPython, CircuitPython 10.x, and MicroPython.
 
-Wire-frame constants (all times in microseconds):
-
-- ``IR_UNIT`` = 500 µs — base timing unit
-- Header mark = 4000 µs (8 × unit), header space = 3000 µs (6 × unit)
-- Bit mark = 500 µs (1 × unit) for both 0 and 1
-- Bit space zero = 500 µs (1 × unit), bit space one = 1500 µs (3 × unit)
-- Lead-out terminator = 5000 µs (10 × unit)
-- CRC-8 with generator 0x1D, MSB-first, variable-length opaque payload
-
-Module-level ``ENCODER`` / ``DECODER`` attributes point at this codec's class
-pair — the resolution convention a later ticket relies on (name → module).
+The module-level ``ENCODER`` / ``DECODER`` names let a codec be resolved by
+module (name → class pair), the convention shared across IR codec modules.
 """
 
 from array import array
@@ -55,10 +48,9 @@ _CRC_GENERATOR: Final = 0x1D
 
 
 def _calculate_crc(data: bytes | bytearray, length: int = -1) -> int:
-    """Return the CRC-8 (generator 0x1D) of the first *length* bytes of *data*.
+    """Return the CRC-8 (generator ``0x1D``) of the first *length* bytes of *data*.
 
-    Accepts ``bytes`` or ``bytearray``.  If *length* is -1 (default) the
-    entire buffer is used.
+    A *length* of -1 (the default) covers the entire buffer.
     """
     if length == -1:
         length = len(data)
@@ -162,15 +154,6 @@ class AuraInfraredDecoder(InfraredDecoder):
     def decode(self, pulse: int) -> bytearray | None:
         """Process one pulse and return payload bytes when a packet completes.
 
-        States:
-        - ``_STATE_IDLE``: scan for header mark; discard non-matching pulses.
-        - ``_STATE_HEADER_SPACE``: expect header space; reset on mismatch.
-        - ``_STATE_DATA``: alternate between bit marks, bit spaces, and lead-out.
-
-        IR_SPACE_ONE is checked before IR_SPACE_ZERO in the space branch.
-        Both are at least 1000 µs apart so they cannot fall within each
-        other's error window (threshold = 250 µs).
-
         Args:
             pulse: Pulse duration in microseconds.
 
@@ -198,7 +181,9 @@ class AuraInfraredDecoder(InfraredDecoder):
                 else:
                     self.reset(self._error_threshold)
             else:
-                # Space determines bit value. Check one first — further from zero.
+                # Space encodes the bit value. The two space durations are
+                # >=1000 µs apart, well outside the 250 µs error window, so
+                # either check order classifies unambiguously.
                 if self._check_pulse(pulse, IR_SPACE_ONE):
                     self._write_bit(1)
                     self._awaiting_space = False
