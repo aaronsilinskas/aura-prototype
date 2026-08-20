@@ -33,12 +33,16 @@ def run_scene(scene_name: str) -> None:
     Scans a single ``SceneRegistry`` up front and validates *scene_name*
     against it via ``resolve_known_scene`` before any hardware is built, so
     an unknown scene name fails once, naming the known scenes, without ever
-    touching the board. The same scan then resolves the scene's declared IR
+    touching the board. ``build_hardware`` is then called with no codec
+    override, so it wires the IR subsystem with its default Aura wire-frame.
+    Only after the build returns does this resolve the scene's declared IR
     wire-frame codec via ``resolve_ir_codec`` (Aura by default, Tag when the
-    scene declares it) and forwards the instantiated encoder/decoder into
-    ``build_hardware``, so the correct codec is wired from the first tick.
-    The same registry is passed into ``build_scene_runtime`` so the scene is
-    scanned exactly once for the whole boot sequence.
+    scene declares it) and apply it onto the built ``hw.ir`` via
+    ``InfraredTransceiver.apply_codec``, before the first tick -- so the
+    correct codec is still in effect from the first tick even though it is
+    selected after the build. The same registry is passed into
+    ``build_scene_runtime`` so the scene is scanned exactly once for the
+    whole boot sequence.
 
     Drives ``runtime.ir.update()`` every tick (see
     :class:`~hardware.shared.ir_transceiver.InfraredTransceiver`), which owns
@@ -67,11 +71,13 @@ def run_scene(scene_name: str) -> None:
     scene_registry.scan_dir("packs/scenes", "packs.scenes")
     resolve_known_scene(scene_registry, scene_name)
 
-    ir_encoder, ir_decoder = resolve_ir_codec(scene_registry, scene_name)
-
     config = load_device_config()
     hw_logger = Logger("[hw]")
-    hw = build_hardware(config, ir_encoder=ir_encoder, ir_decoder=ir_decoder, logger=hw_logger)
+    hw = build_hardware(config, logger=hw_logger)
+
+    ir_encoder, ir_decoder = resolve_ir_codec(scene_registry, scene_name)
+    if hw.ir is not None:
+        hw.ir.apply_codec(ir_encoder, ir_decoder)
 
     runtime = build_scene_runtime(hw, scene_name, scene_registry=scene_registry)
     manager = runtime.manager

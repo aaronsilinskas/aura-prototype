@@ -99,8 +99,9 @@ def resolve_ir_codec(
     Reads the scene's declared codec name via ``SceneRegistry.ir_codec_for``
     (``"aura"`` when the scene declares none) and maps it to a class pair via
     ``ir_codecs.codec_for``, then constructs one instance of each -- board-free,
-    so this can run ahead of ``build_hardware`` and feed its ``ir_encoder`` /
-    ``ir_decoder`` seam directly.
+    so it needs no built hardware to run. ``run_scene`` calls this after
+    ``build_hardware`` returns and applies the pair onto the built ``hw.ir``
+    via ``InfraredTransceiver.apply_codec``, before the first tick.
     """
     codec_name = scene_registry.ir_codec_for(scene_name)
     encoder_cls, decoder_cls = codec_for(codec_name)

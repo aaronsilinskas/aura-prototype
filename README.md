@@ -118,10 +118,11 @@ If the file is absent the built-in default (PropMaker + IS31FL3741 matrix) is us
 **`buttons`** — required. List of board pin name strings.
 
 **`ir`** — optional. `rx` (receiver pin) + at least `line` emitter. Optional `cone` and
-`area_of_effect` emitters. The wire-frame codec is selected per scene: `run_scene` reads the
-active scene's declared `ir_codec` (`scene.json`, default `"aura"`) via `resolve_ir_codec` and
-passes the resolved `ir_encoder` / `ir_decoder` into `build_hardware()` — the `tag` scene
-declares `"ir_codec": "tag"`.
+`area_of_effect` emitters. The wire-frame codec is selected per scene: `build_hardware()` wires
+the IR subsystem with its default Aura codec, then `run_scene` reads the active scene's declared
+`ir_codec` (`scene.json`, default `"aura"`) via `resolve_ir_codec` and applies the resolved
+encoder/decoder onto the built hardware via `hw.ir.apply_codec()` before the first tick — the
+`tag` scene declares `"ir_codec": "tag"`.
 
 **`audio`** — optional. `voices` (int, ≥ 1), `max_volume` (0.0–1.0). Clip resolution is
 `AudioRegistry`'s job (base scanned from `packs/effects/*/sounds`, overlay installed per

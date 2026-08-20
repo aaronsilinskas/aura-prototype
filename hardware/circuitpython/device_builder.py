@@ -803,8 +803,6 @@ def load_device_config() -> DeviceConfig:
 def build_hardware(
     config: DeviceConfig,
     board_module: object = board,
-    ir_encoder: InfraredEncoder | None = None,
-    ir_decoder: InfraredDecoder | None = None,
     i2c: busio.I2C | None = None,
     logger: Logger | None = None,
 ) -> DeviceHardware:
@@ -1024,9 +1022,6 @@ def build_hardware(
         if ir_cfg.enabled:
 
             def _build_ir() -> tuple[InfraredTransceiver, str]:
-                encoder = ir_encoder if ir_encoder is not None else AuraInfraredEncoder()
-                decoder = ir_decoder if ir_decoder is not None else AuraInfraredDecoder()
-
                 rx_pin_names = ir_cfg.rx
                 if len(rx_pin_names) == 1:
                     rx_pins = [_resolve_pin(board_module, "ir.rx", rx_pin_names[0])]
@@ -1042,9 +1037,7 @@ def build_hardware(
                         board_module, f"ir.{emitter_key}", pin_name
                     )
 
-                transceiver, writer_kind = _setup_ir(
-                    rx_pins, emitter_pins, encoder=encoder, decoder=decoder
-                )
+                transceiver, writer_kind = _setup_ir(rx_pins, emitter_pins)
                 suffix = f"writer={writer_kind} ok" if writer_kind is not None else "ok"
                 return transceiver, suffix
 

@@ -285,6 +285,60 @@ def test_build_hardware_ir_config_sets_ir() -> None:
     assert hw.ir is mock_transceiver
 
 
+def test_build_hardware_no_longer_accepts_ir_encoder_keyword() -> None:
+    """The wire-frame codec is applied post-build via ``InfraredTransceiver.
+    apply_codec`` now (#898) -- build_hardware has no codec-override seam."""
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(TypeError):
+            build_hardware(config, board_module=board_mock, ir_encoder=MagicMock())
+
+
+def test_build_hardware_no_longer_accepts_ir_decoder_keyword() -> None:
+    config = _minimal_config()
+    board_mock = _mock_board(D9=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        with pytest.raises(TypeError):
+            build_hardware(config, board_module=board_mock, ir_decoder=MagicMock())
+
+
+def test_build_hardware_ir_section_passes_no_codec_override_to_setup_ir() -> None:
+    """With the override seam gone, build_hardware calls ``_setup_ir`` with
+    no encoder/decoder, leaving ``_setup_ir``'s own default (AuraInfraredEncoder/
+    AuraInfraredDecoder, proven in test_setup_ir.py) to apply (#898)."""
+    config = _neopixel_config_with_ir()
+    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock(), D11=MagicMock(), D12=MagicMock())
+
+    with ExitStack() as stack:
+        _enter_hw_patches(stack)
+        _patch_neopixel(stack)
+        mock_setup_ir = stack.enter_context(
+            patch(
+                "hardware.circuitpython.device_builder._setup_ir",
+                return_value=(MagicMock(), "pio"),
+            )
+        )
+
+        from hardware.circuitpython.device_builder import build_hardware
+
+        build_hardware(config, board_module=board_mock)
+
+    _, kwargs = mock_setup_ir.call_args
+    assert "encoder" not in kwargs
+    assert "decoder" not in kwargs
+
+
 def test_build_hardware_disabled_ir_section_leaves_ir_none() -> None:
     """``ir: {enabled: false}`` is neither built nor probed (#692)."""
     config = _neopixel_config_with_ir()
