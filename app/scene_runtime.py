@@ -78,12 +78,10 @@ def run_scene() -> None:
     on-device path always gets hardware setup narration on stdout, with no
     opt-in required.
 
-    Constructs the live ``DeviceSceneReboot``
-    (:mod:`hardware.circuitpython.device_reboot`) with the resolved
-    *scene_name* as its booted-scene and ``hw.storage``, then threads it into
-    ``build_scene_runtime`` as the board-free ``SceneReboot`` port — the only
-    place that adapter is built, so no rule needs to know its own scene name
-    to reboot back to it later via ``state.scene_controls.reboot_to_previous``.
+    This is the only place the live ``DeviceSceneReboot``
+    (:mod:`hardware.circuitpython.device_reboot`) is constructed and threaded
+    into ``build_scene_runtime`` as the board-free ``SceneReboot`` port; see
+    that module for why it takes the booted *scene_name* and ``hw.storage``.
 
     Not unit-testable — ``build_hardware`` requires
     CircuitPython board imports; validate via deploy-watch. The board-free
