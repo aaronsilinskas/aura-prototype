@@ -102,8 +102,8 @@ class LobbyConfig:
                 ``scopes``/``entries`` is missing or empty, if any scope name
                 is unknown, or if an entry is missing ``scene``/``effect``.
         """
-        raw = state.get(config_key, None)
-        if not isinstance(raw, dict):
+        raw = state.get_or_none(config_key, dict)
+        if raw is None:
             raise ValueError(f"Lobby config key {config_key!r} is missing or not a dict")
 
         scopes = [scope_by_name(name) for name in raw.get("scopes", [])]
