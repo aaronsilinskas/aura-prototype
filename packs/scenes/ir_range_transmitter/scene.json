@@ -1,0 +1,9 @@
+{
+  "version": "1.0",
+  "effect_packs": [],
+  "rule_packs": [],
+  "initial_data": {
+    "irtx_send_rate_hz": 5.0,
+    "irtx_payload_size": 4
+  }
+}
