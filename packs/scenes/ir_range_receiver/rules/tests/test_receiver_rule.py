@@ -117,6 +117,25 @@ def test_gap_in_the_stream_paints_a_progress_bar_at_the_reception_fraction(spy):
     assert opts["progress"] == pytest.approx(2 / 6)
 
 
+def test_progress_bar_updates_as_the_rate_moves_while_still_partial(spy):
+    """basic.progress bakes its fill in at construction -- if the rule only
+    re-issued on a categorical state change, the bar would freeze at whatever
+    rate first entered Partial. The rate must keep re-issuing here even though
+    the state label ("partial") never changes."""
+    state, engine, timer = _make_state(spy)
+    _tick(state, engine, timer, total=0.0, ir_events=[_ir_event(0)])
+    _tick(state, engine, timer, total=0.1, ir_events=[_ir_event(5)])  # gap of 5 -- Partial
+    spy.set_effect_calls.clear()
+
+    _tick(state, engine, timer, total=0.2, ir_events=[_ir_event(6)])  # contiguous -- rate rises
+
+    assert len(spy.set_effect_calls) == 1
+    scope, name, opts = spy.set_effect_calls[0]
+    assert scope is Scope.NON_AMBIENT
+    assert name == "basic.progress"
+    assert opts["progress"] == pytest.approx(3 / 7)
+
+
 def test_silence_past_the_timeout_after_packets_reverts_to_solid_red(spy):
     state, engine, timer = _make_state(spy)
     _tick(state, engine, timer, total=0.0, ir_events=[_ir_event(0)])

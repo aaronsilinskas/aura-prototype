@@ -9,8 +9,11 @@ silence timeout. The heartbeat is required for silence detection --
 when transmission goes quiet.
 
 Rendering is a single effect on ``Scope.NON_AMBIENT``, re-issued only when the
-displayed state changes -- an already-issued effect persists, so this is an
-optimization, not a correctness requirement.
+displayed result (state + progress) changes -- an already-issued effect
+persists and ``basic.progress`` bakes its fill in at construction, so a
+partial-state tick whose reception rate moved must still re-issue for the bar
+to visibly shrink or grow; the change-guard is an optimization against
+redundant identical calls, not a correctness requirement.
 """
 
 from __future__ import annotations
@@ -30,7 +33,7 @@ from packs.scenes.ir_range_receiver.rules.helpers.reception_quality_meter import
     ReceptionQuality,
 )
 
-_LAST_STATE_KEY: Final = "ir_range_last_state"
+_LAST_RENDER_KEY: Final = "ir_range_last_render"
 _NEXT_PRINT_KEY: Final = "ir_range_next_print"
 _PRINT_INTERVAL: Final = 1.0
 
@@ -52,8 +55,9 @@ class IrRangeReceiverRule(GameRule):
     def _on_sensors(self, event: InputEvents.Sensors, state: GameState) -> None:
         quality = ir_range_meter(state).evaluate(state.total)
 
-        if state.get(_LAST_STATE_KEY, None) != quality.state:
-            state.set(_LAST_STATE_KEY, quality.state)
+        render_key = (quality.state, quality.progress)
+        if state.get(_LAST_RENDER_KEY, None) != render_key:
+            state.set(_LAST_RENDER_KEY, render_key)
             self._render(quality, state)
 
         self._maybe_print(quality, state)
