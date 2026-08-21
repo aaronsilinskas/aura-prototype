@@ -118,6 +118,7 @@ from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.network import NetworkEvents
 from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
+from engine.state import SceneReboot
 from engine.timer import Timer
 from hardware.circuitpython.audio_output import AudioEffectOutput
 from hardware.circuitpython.device_builder import build_hardware
@@ -251,6 +252,7 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
         scene_registry,
         effect_admin=effect_manager,
         audio_overlay_admin=AudioRegistry(),
+        scene_reboot=SceneReboot(),
     )
     manager.load("tag")
     manager.update()  # applies the load transition; tag scene is now active

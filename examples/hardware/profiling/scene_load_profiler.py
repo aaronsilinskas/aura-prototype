@@ -124,6 +124,7 @@ from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
+from engine.state import SceneReboot
 from engine.timer import Timer
 from hardware.circuitpython.device_builder import build_hardware
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
@@ -208,6 +209,7 @@ def _build_prop(scene_name: str, config: DeviceConfig) -> tuple[SceneManager, Ef
         scene_registry,
         effect_admin=effect_manager,
         audio_overlay_admin=AudioRegistry(),
+        scene_reboot=SceneReboot(),
     )
     gc.collect()
     free_after_engine = gc.mem_free()

@@ -134,7 +134,8 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `GameState` | `engine/state.py` | Per-tick game context passed to each rule |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
-| `SceneManager` | `engine/scene.py` | Drives scene transitions through injected `EffectAdmin`/`AudioOverlayAdmin` |
+| `SceneManager` | `engine/scene.py` | Drives scene transitions through injected `EffectAdmin`/`AudioOverlayAdmin`; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot` |
+| `SceneReboot` | `engine/state.py` | Board-free port `SceneManager` reboots through; live adapter `DeviceSceneReboot` |
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
 | `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor for a phase machine's key + initial phase |
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
@@ -157,6 +158,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem; `send`, per-tick `update()` (receive only), exposes `received`/`last_sender` |
 | `SceneRuntime` | `app/scene_composition.py` | `__slots__` bundle from `build_scene_runtime` that `run_scene`'s loop drives |
+| `DeviceSceneReboot` | `hardware/circuitpython/device_reboot.py` | Live `SceneReboot`: composes `DeviceStateStore` to persist, then calls `microcontroller.reset()` |
 
 ---
 

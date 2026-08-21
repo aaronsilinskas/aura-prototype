@@ -61,6 +61,21 @@ class DeviceStateStore:
         mapping[key] = value
         self._storage.write_json(_STATE_FILE_NAME, mapping)
 
+    def clear(self, key: str) -> None:
+        """Remove *key* from the persisted state, leaving every other key untouched.
+
+        Read-modify-write, mirroring :meth:`set`. A no-op when *storage* is
+        None, or when *key* is already absent -- clearing an unset key is an
+        ordinary case, not an error.
+        """
+        if self._storage is None:
+            return
+        mapping = self._read_mapping()
+        if key not in mapping:
+            return
+        del mapping[key]
+        self._storage.write_json(_STATE_FILE_NAME, mapping)
+
     def _read_mapping(self) -> dict:
         """Return the persisted state mapping, fail-soft on every bad case.
 

@@ -21,7 +21,7 @@ import engine._path as _path
 from engine.audio import AudioOverlayAdmin, scan_sound_dir
 from engine.engine import GameEngine, GameRule, Version
 from engine.packs import PackRegistry, UnknownItemError, load_item, scan_item_names
-from engine.state import EffectAdmin, GameState, MergeStrategy, SceneControls, Scope
+from engine.state import EffectAdmin, GameState, MergeStrategy, SceneControls, SceneReboot, Scope
 
 _REQUIRED_KEYS = frozenset(("version", "effect_packs", "rule_packs"))
 
@@ -409,6 +409,19 @@ class SceneRegistry:
         all_names = set(self._scenes.keys()) | set(self._factories.keys())
         return sorted(all_names)
 
+    def resolve_known(self, name: str) -> str:
+        """Return *name* if registered, else raise naming the known scenes.
+
+        The single known-scene check, shared by
+        ``app.scene_composition.resolve_known_scene`` (the boot-time guard)
+        and ``SceneManager.reboot_into`` (the Button-B fail-fast guard) so the
+        check and its message have exactly one implementation.
+        """
+        names = self.names()
+        if name in names:
+            return name
+        raise ValueError(f"unknown scene {name!r}; known scenes: {', '.join(names)}")
+
     def register(self, name: str, factory: Callable[[], Scene]) -> None:
         """Register *factory* — a zero-arg callable returning a ``Scene`` — for *name*.
 
@@ -456,6 +469,7 @@ class SceneManager(SceneControls):
             scene_registry,
             effect_admin,
             audio_overlay_admin,
+            scene_reboot,
         )
 
     Driving the game loop::
@@ -491,6 +505,12 @@ class SceneManager(SceneControls):
     to it too via ``set_allowed_packs`` — one derivation feeding both seams —
     so ``pack.<clip>`` resolution tracks the top-of-stack scene in lockstep
     with ``pack.<effect>`` resolution.
+
+    *scene_reboot* is the injected ``SceneReboot`` port ``reboot_into``/
+    ``reboot_to_previous`` delegate to. Unlike *effect_admin*/
+    *audio_overlay_admin* it plays no role in ``load``/``overlay``/``pop`` —
+    it exists solely for the two reboot methods, which apply immediately and
+    synchronously rather than joining the deferred-transition queue.
     """
 
     __slots__ = (
@@ -500,6 +520,7 @@ class SceneManager(SceneControls):
         "_engine",
         "_pending",
         "_rule_registry",
+        "_scene_reboot",
         "_scene_registry",
         "_stack",
     )
@@ -512,6 +533,7 @@ class SceneManager(SceneControls):
         scene_registry: SceneRegistry,
         effect_admin: EffectAdmin,
         audio_overlay_admin: AudioOverlayAdmin,
+        scene_reboot: SceneReboot,
     ) -> None:
         self._engine = engine
         self._effect_registry = effect_registry
@@ -519,6 +541,7 @@ class SceneManager(SceneControls):
         self._scene_registry = scene_registry
         self._effect_admin = effect_admin
         self._audio_overlay_admin = audio_overlay_admin
+        self._scene_reboot = scene_reboot
         self._stack: list[_SceneStackEntry] = []
         self._pending: (
             tuple[Literal["load"], Scene]
@@ -558,6 +581,33 @@ class SceneManager(SceneControls):
         if n <= 1:
             raise ValueError(f"Cannot pop: stack has {n} entr{'y' if n == 1 else 'ies'}")
         self._pending = ("pop",)
+
+    # ------------------------------------------------------------------
+    # SceneControls interface — immediate reboot (not deferred)
+    # ------------------------------------------------------------------
+
+    def reboot_into(self, target: str) -> None:
+        """Validate *target*, then delegate to the injected ``SceneReboot`` port.
+
+        Raises ``ValueError`` naming the known scenes, and persists nothing,
+        when *target* is not in the scene registry — a typo caught here
+        (e.g. at the Button-B press) never reaches the port, so it never
+        persists a name that would brick the next boot. A known *target*
+        delegates straight through; ``SceneReboot.reboot_into`` reboots and
+        never returns.
+        """
+        self._scene_registry.resolve_known(target)
+        self._scene_reboot.reboot_into(target)
+
+    def reboot_to_previous(self) -> None:
+        """Delegate to the injected ``SceneReboot`` port, unvalidated.
+
+        Unlike ``reboot_into``, the recorded ``return_to`` target is
+        validated at boot by ``resolve_known_scene``, exactly like the
+        persisted ``scene`` already is — duplicating that check here would
+        only re-do work the boot path already does.
+        """
+        self._scene_reboot.reboot_to_previous()
 
     # ------------------------------------------------------------------
     # Main loop driver

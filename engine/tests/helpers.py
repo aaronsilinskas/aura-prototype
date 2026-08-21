@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 from engine.audio import AudioOverlayAdmin
-from engine.state import EffectAdmin, EffectControls, EffectReceipt, NetworkControls, ScopeValue
+from engine.state import (
+    EffectAdmin,
+    EffectControls,
+    EffectReceipt,
+    NetworkControls,
+    SceneReboot,
+    ScopeValue,
+)
 
 _STUB_RECEIPT_ID = 0
 
@@ -100,3 +107,23 @@ class SpyAudioOverlayAdmin(AudioOverlayAdmin):
 
     def set_allowed_packs(self, names: frozenset[str] | None) -> None:
         self.allowed_packs_history.append(names)
+
+
+class RecordingSceneReboot(SceneReboot):
+    """Test recorder for the board-free ``SceneReboot`` port.
+
+    Records every ``reboot_into``/``reboot_to_previous`` call instead of
+    touching storage or resetting anything, so ``SceneManager``'s
+    validate-then-delegate behaviour is testable without a live
+    ``DeviceSceneReboot``.
+    """
+
+    def __init__(self) -> None:
+        self.reboot_into_calls: list[str] = []
+        self.reboot_to_previous_calls: int = 0
+
+    def reboot_into(self, target: str) -> None:
+        self.reboot_into_calls.append(target)
+
+    def reboot_to_previous(self) -> None:
+        self.reboot_to_previous_calls += 1

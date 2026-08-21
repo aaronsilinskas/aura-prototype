@@ -133,3 +133,37 @@ def test_no_storage_makes_a_write_a_silent_no_op():
     store.set("scene", "tag")
 
     assert store.get("scene") is None
+
+
+def test_clear_removes_a_previously_set_key():
+    store = DeviceStateStore(FakeDeviceStorage())
+    store.set("return_to", "lobby")
+
+    store.clear("return_to")
+
+    assert store.get("return_to") is None
+
+
+def test_clear_preserves_a_different_key():
+    store = DeviceStateStore(FakeDeviceStorage())
+    store.set("scene", "tag")
+    store.set("return_to", "lobby")
+
+    store.clear("return_to")
+
+    assert store.get("scene") == "tag"
+
+
+def test_clear_of_an_already_absent_key_is_a_no_op():
+    store = DeviceStateStore(FakeDeviceStorage())
+    store.set("scene", "tag")
+
+    store.clear("return_to")
+
+    assert store.get("scene") == "tag"
+
+
+def test_no_storage_makes_clear_a_silent_no_op():
+    store = DeviceStateStore(None)
+
+    store.clear("return_to")  # must not raise

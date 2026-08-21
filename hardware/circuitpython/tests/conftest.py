@@ -17,6 +17,7 @@ for _name in (
 
 _microcontroller_mod = types.ModuleType("microcontroller")
 _microcontroller_mod.Pin = type("Pin", (), {})  # type: ignore[attr-defined]
+_microcontroller_mod.reset = lambda: None  # type: ignore[attr-defined]
 sys.modules.setdefault("microcontroller", _microcontroller_mod)
 
 _board = sys.modules["board"]

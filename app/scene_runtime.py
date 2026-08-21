@@ -16,6 +16,7 @@ from engine.log import Logger
 from engine.network import NetworkEvents
 from engine.scene import SceneRegistry
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
+from hardware.circuitpython.device_reboot import DeviceSceneReboot
 from hardware.shared.device_settings import read_settings_mapping
 
 try:
@@ -75,7 +76,14 @@ def run_scene() -> None:
     itself builds no game event. Constructs a live ``[hw]``-tagged
     :class:`~engine.log.Logger` and passes it to ``build_hardware`` so the
     on-device path always gets hardware setup narration on stdout, with no
-    opt-in required. Not unit-testable — ``build_hardware`` requires
+    opt-in required.
+
+    This is the only place the live ``DeviceSceneReboot``
+    (:mod:`hardware.circuitpython.device_reboot`) is constructed and threaded
+    into ``build_scene_runtime`` as the board-free ``SceneReboot`` port; see
+    that module for why it takes the booted *scene_name* and ``hw.storage``.
+
+    Not unit-testable — ``build_hardware`` requires
     CircuitPython board imports; validate via deploy-watch. The board-free
     boot-scene resolution this reorder relies on (``resolve_boot_scene_name``,
     composing ``hardware.shared.scene_selection.resolve_boot_scene`` with
@@ -98,7 +106,10 @@ def run_scene() -> None:
     if hw.ir is not None:
         hw.ir.apply_codec(ir_encoder, ir_decoder)
 
-    runtime = build_scene_runtime(hw, scene_name, scene_registry=scene_registry)
+    scene_reboot = DeviceSceneReboot(hw.storage, booted_scene=scene_name, logger=hw_logger)
+    runtime = build_scene_runtime(
+        hw, scene_name, scene_registry=scene_registry, scene_reboot=scene_reboot
+    )
     manager = runtime.manager
     effect_manager = runtime.effect_manager
     timer = runtime.timer

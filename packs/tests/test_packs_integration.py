@@ -12,6 +12,7 @@ from engine.effects.manager import EffectBuilder, EffectManager
 from engine.engine import GameEngine, GameRule
 from engine.packs import PackRegistry
 from engine.scene import Scene, SceneManager, SceneRegistry
+from engine.state import SceneReboot
 from packs.rules.debug.event_logger import EventLoggerRule
 
 _PACKS_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
@@ -274,6 +275,7 @@ def loaded_debug_engine():
         scene_registry,
         effect_admin=effect_manager,
         audio_overlay_admin=AudioRegistry(),
+        scene_reboot=SceneReboot(),
     )
     manager.load("test_scene")
     manager.update()
@@ -317,6 +319,7 @@ def test_scene_manager_load_raises_for_incompatible_pack_version() -> None:
         scene_registry,
         effect_admin=effect_manager,
         audio_overlay_admin=AudioRegistry(),
+        scene_reboot=SceneReboot(),
     )
 
     with pytest.raises(ValueError):

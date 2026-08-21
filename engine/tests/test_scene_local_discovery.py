@@ -14,7 +14,7 @@ from engine.events import Event, EventGroup
 from engine.packs import PackRegistry
 from engine.scene import Scene, SceneManager, SceneRegistry
 from engine.state import EffectControls
-from engine.tests.helpers import SpyAudioOverlayAdmin, SpyEffectAdmin
+from engine.tests.helpers import RecordingSceneReboot, SpyAudioOverlayAdmin, SpyEffectAdmin
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -243,6 +243,7 @@ def _make_scene_manager(
         scene_registry,
         SpyEffectAdmin(),
         SpyAudioOverlayAdmin(),
+        RecordingSceneReboot(),
     )
 
 
