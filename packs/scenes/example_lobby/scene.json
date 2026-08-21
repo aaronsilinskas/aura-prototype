@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "effect_packs": [
+    ["elements", "1.0"],
+    ["basic", "1.1"]
+  ],
+  "rule_packs": [
+    ["lobby", "1.0"]
+  ],
+  "initial_data": {
+    "lobby": {
+      "scopes": [
+        "personal",
+        "directional",
+        "global.main",
+        "global.buff",
+        "global.debuff",
+        "ambient"
+      ],
+      "entries": [
+        { "scene": "hardware_test", "effect": "elements.lightning", "options": { "level": 5 } },
+        { "scene": "element_browser", "effect": "elements.light", "options": { "level": 5 } },
+        { "scene": "red_light_green_light", "effect": "elements.fire", "options": { "level": 5 } },
+        { "scene": "tag", "effect": "basic.solid", "options": { "color": 16711680 } }
+      ]
+    }
+  }
+}
