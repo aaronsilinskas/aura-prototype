@@ -4,11 +4,13 @@
     ["elements", "1.0"]
   ],
   "rule_packs": [
-    ["debug", "1.0"]
+    ["debug", "1.0"],
+    ["return_to_lobby", "1.0"]
   ],
   "initial_data": {
     "page": 0,
     "level": 1,
-    "fps_logging_enabled": true
+    "fps_logging_enabled": true,
+    "return_to_lobby": { "hold_seconds": 5.0 }
   }
 }

@@ -123,6 +123,43 @@ def test_debug_exposes_all_expected_rule_modules() -> None:
     assert "event_logger" in items
 
 
+# --- Return-to-lobby rule pack (issue #912) ---
+
+
+def test_return_to_lobby_rule_is_a_game_rule() -> None:
+    registry = PackRegistry(item_attr="RULE")
+    registry.scan_dir(_packs_path("rules"), "packs.rules")
+
+    rule = registry.get("return_to_lobby", "return_to_lobby_rule", GameRule)
+
+    assert isinstance(rule, GameRule)
+
+
+@pytest.mark.parametrize(
+    "scene_name", ["hardware_test", "element_browser", "red_light_green_light", "tag"]
+)
+def test_non_lobby_scene_declares_the_return_to_lobby_rule_pack(scene_name: str) -> None:
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
+
+    scene = scene_registry.get(scene_name)
+
+    rule_pack_names = [tuple(entry) for entry in scene.rule_packs]
+    assert ("return_to_lobby", "1.0") in rule_pack_names
+
+
+@pytest.mark.parametrize(
+    "scene_name", ["hardware_test", "element_browser", "red_light_green_light", "tag"]
+)
+def test_non_lobby_scene_configures_return_to_lobby_hold_seconds(scene_name: str) -> None:
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
+
+    scene = scene_registry.get(scene_name)
+
+    assert scene.initial_data["return_to_lobby"] == {"hold_seconds": 5.0}
+
+
 def test_hardware_test_scene_local_effect_sfx_test_is_discovered() -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
