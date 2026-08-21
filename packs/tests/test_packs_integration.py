@@ -160,6 +160,41 @@ def test_non_lobby_scene_configures_return_to_lobby_hold_seconds(scene_name: str
     assert scene.initial_data["return_to_lobby"] == {"hold_seconds": 5.0}
 
 
+# --- ir_range_receiver scene discovery (issue #918) ---
+
+
+def test_ir_range_receiver_scene_local_rule_is_discovered() -> None:
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
+
+    scene = scene_registry.get("ir_range_receiver")
+    local_rules = scene.local_rule_registry
+
+    rule = local_rules.get("receiver_rule", GameRule)
+    assert isinstance(rule, GameRule)
+
+
+def test_ir_range_receiver_scene_declares_the_basic_effect_pack() -> None:
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
+
+    scene = scene_registry.get("ir_range_receiver")
+
+    pack_names = [name for name, _ in scene.effect_packs]
+    assert "basic" in pack_names
+
+
+def test_ir_range_receiver_scene_declares_no_return_to_lobby_rule_pack() -> None:
+    """Minimal bench scene -- no phases, no buttons, no return_to_lobby."""
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")
+
+    scene = scene_registry.get("ir_range_receiver")
+
+    rule_pack_names = [name for name, _ in scene.rule_packs]
+    assert rule_pack_names == []
+
+
 def test_hardware_test_scene_local_effect_sfx_test_is_discovered() -> None:
     scene_registry = SceneRegistry()
     scene_registry.scan_dir(_packs_path("scenes"), "packs.scenes")

@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "effect_packs": [
+    ["basic", "1.1"]
+  ],
+  "rule_packs": [],
+  "initial_data": {
+    "ir_range_window_seconds": 1.0,
+    "ir_range_silence_timeout": 0.5,
+    "ir_range_green_threshold": 1.0
+  }
+}

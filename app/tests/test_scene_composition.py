@@ -47,6 +47,16 @@ def test_known_scene_name_activates_that_scenes_local_effects():
     assert receipt is not None
 
 
+def test_ir_range_receiver_scene_boots_and_activates_via_the_standard_pipeline():
+    """ir_range_receiver (issue #918) needs no special-casing -- it discovers
+    and activates through the same build_scene_runtime path as every other
+    scene, proving scene_demo.py can boot straight into it via
+    aura-settings.json's default_scene."""
+    runtime = build_scene_runtime(_fake_hw(), "ir_range_receiver")
+
+    assert runtime.manager.active_state is not None
+
+
 def test_unknown_scene_name_raises_naming_the_known_scenes():
     """An unregistered scene name fails loudly instead of falling back to hardware_test."""
     with pytest.raises(ValueError, match="hardware_test"):
