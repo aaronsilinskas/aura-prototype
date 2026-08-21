@@ -94,10 +94,7 @@ def _scan_effect_pack_sounds(
 
 def resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
     """Return *scene_name* if registered, else raise naming the known scenes."""
-    names = scene_registry.names()
-    if scene_name in names:
-        return scene_name
-    raise ValueError(f"unknown scene {scene_name!r}; known scenes: {', '.join(names)}")
+    return scene_registry.resolve_known(scene_name)
 
 
 def resolve_boot_scene_name(

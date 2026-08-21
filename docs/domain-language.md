@@ -111,11 +111,15 @@ Auto-discovers JSON-described scenes from a directory tree and serves a fresh `S
 _Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); constructing after harness startup (scan once); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
 
 ### SceneControls
-The rule-facing scene-transition seam: `load`, `overlay`, `pop`, each recording a pending transition applied after the current tick. `SceneManager` is the live implementation.
+The rule-facing scene-transition seam: `load`, `overlay`, `pop` each record a pending transition applied after the current tick; `reboot_into`/`reboot_to_previous` are the opposite — a reboot is not in-process, so both apply immediately and synchronously instead of joining the deferred-transition queue. `SceneManager` is the live implementation.
 
 ### SceneManager
-Owns the scene stack and drives transitions (load, overlay, pop), tearing down departing scenes' effects and republishing the active scene's locals and sounds. Routes every scene-transition effect and sound operation through the injected `EffectAdmin`/`AudioOverlayAdmin` seams.
+Owns the scene stack and drives transitions (load, overlay, pop), tearing down departing scenes' effects and republishing the active scene's locals and sounds. Routes every scene-transition effect and sound operation through the injected `EffectAdmin`/`AudioOverlayAdmin` seams, and `reboot_into`/`reboot_to_previous` through the injected `SceneReboot` port — `reboot_into` first validates its target against the scene registry so a typo never persists a name that would brick the next boot.
 _Avoid_: calling `register()` on it (removed); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); routing scene-transition sound calls through anything but the injected `AudioOverlayAdmin`
+
+### SceneReboot
+The board-free port `SceneManager` reaches to persist a scene switch and reboot, mirroring how it already reaches `EffectAdmin`/`AudioOverlayAdmin`. `reboot_into`/`reboot_to_previous` raise `NotImplementedError` by default; `DeviceSceneReboot` (`hardware.circuitpython.device_reboot`) is the live implementation, composing `DeviceStateStore` to persist `scene`/`return_to` then calling `microcontroller.reset()`; a recording fake stands in for CPython tests.
+_Avoid_: validating the target here (validation is `SceneManager.reboot_into`'s job, via `SceneRegistry.resolve_known`); calling `microcontroller.reset()` anywhere but the live adapter
 
 ### EffectControls
 The **rule-facing** effect seam a rule holds via `GameState.effect_controls`: `set_effect`, `add_effect`, `stop_effect`, `set_merge_strategy`; scene-transition operations live on `EffectAdmin`.
@@ -238,8 +242,8 @@ _Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-se
 _Avoid_: calling `resolve_boot_scene` directly from `run_scene` and skipping registry validation; calling it before `build_hardware` (the persisted leg needs `hw.storage` mounted)
 
 ### resolve_known_scene
-The single known-scene guard: returns the scene name if the registry has it, else raises naming the known scenes. Reached at boot through `resolve_boot_scene_name`, which composes it with `hardware.shared.scene_selection.resolve_boot_scene` (persisted SD `scene` → flash `default_scene` → raise).
-_Avoid_: duplicating the known-scene check inline instead of calling this; assuming it still runs ahead of `build_hardware` (moved, #902)
+The boot-time known-scene guard: returns the scene name if the registry has it, else raises naming the known scenes. A thin wrapper over `SceneRegistry.resolve_known` — the single implementation of the check, shared with `SceneManager.reboot_into`'s Button-B fail-fast guard. Reached at boot through `resolve_boot_scene_name`, which composes it with `hardware.shared.scene_selection.resolve_boot_scene` (persisted SD `scene` → flash `default_scene` → raise).
+_Avoid_: duplicating the known-scene check inline instead of calling `SceneRegistry.resolve_known`; assuming it still runs ahead of `build_hardware` (moved, #902)
 
 ### resolve_ir_codec
 Resolves a scene's declared **wire-frame codec** name to an instantiated encoder/decoder pair. Board-free, needing no built hardware to run.

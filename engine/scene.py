@@ -409,6 +409,19 @@ class SceneRegistry:
         all_names = set(self._scenes.keys()) | set(self._factories.keys())
         return sorted(all_names)
 
+    def resolve_known(self, name: str) -> str:
+        """Return *name* if registered, else raise naming the known scenes.
+
+        The single known-scene check, shared by
+        ``app.scene_composition.resolve_known_scene`` (the boot-time guard)
+        and ``SceneManager.reboot_into`` (the Button-B fail-fast guard) so the
+        check and its message have exactly one implementation.
+        """
+        names = self.names()
+        if name in names:
+            return name
+        raise ValueError(f"unknown scene {name!r}; known scenes: {', '.join(names)}")
+
     def register(self, name: str, factory: Callable[[], Scene]) -> None:
         """Register *factory* — a zero-arg callable returning a ``Scene`` — for *name*.
 
@@ -583,9 +596,7 @@ class SceneManager(SceneControls):
         delegates straight through; ``SceneReboot.reboot_into`` reboots and
         never returns.
         """
-        known_names = self._scene_registry.names()
-        if target not in known_names:
-            raise ValueError(f"unknown scene {target!r}; known scenes: {', '.join(known_names)}")
+        self._scene_registry.resolve_known(target)
         self._scene_reboot.reboot_into(target)
 
     def reboot_to_previous(self) -> None:
