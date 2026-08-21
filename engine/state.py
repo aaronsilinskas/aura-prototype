@@ -8,6 +8,7 @@ __all__ = [
     "MergeStrategy",
     "NetworkControls",
     "SceneControls",
+    "SceneReboot",
     "Scope",
     "ScopeValue",
     "StateSlot",
@@ -99,8 +100,12 @@ class SceneControls:
     unit tests) pass the base ``SceneControls()`` instance, which raises on
     any call.
 
-    Transitions are deferred to end-of-tick — the transition is applied after
-    ``engine.update(state)`` returns, not immediately inside the rule.
+    ``load``/``overlay``/``pop`` are deferred to end-of-tick — the transition
+    is applied after ``engine.update(state)`` returns, not immediately inside
+    the rule. ``reboot_into``/``reboot_to_previous`` are the opposite: scene
+    switching across a reboot is not in-process, so both apply immediately
+    and synchronously (``microcontroller.reset()`` never returns) rather than
+    joining the deferred-transition queue.
     """
 
     __slots__ = ()
@@ -115,6 +120,51 @@ class SceneControls:
 
     def pop(self) -> None:
         """Unload the top scene and restore the scene below it."""
+        raise NotImplementedError
+
+    def reboot_into(self, target: str) -> None:
+        """Persist *target* as the next boot scene and reboot immediately.
+
+        Also records the scene this process booted into as ``return_to``,
+        so a later ``reboot_to_previous`` call (after a reboot into
+        *target*) can return here — no rule needs to know its own scene
+        name. A successful reboot never returns to the caller.
+        """
+        raise NotImplementedError
+
+    def reboot_to_previous(self) -> None:
+        """Persist the recorded ``return_to`` scene and reboot immediately.
+
+        A no-op when no ``return_to`` was recorded. A successful reboot
+        never returns to the caller.
+        """
+        raise NotImplementedError
+
+
+class SceneReboot:
+    """Board-free port through which ``SceneManager`` persists-and-reboots.
+
+    Mirrors how ``SceneManager`` already reaches ``EffectAdmin``/
+    ``AudioOverlayAdmin`` through an injected seam: ``SceneManager``
+    validates ``reboot_into``'s *target* against its scene registry (a typo
+    must never persist a name that would brick the next boot) and otherwise
+    delegates both methods straight to this port. All the device work —
+    writing the scene switch to durable storage and physically resetting the
+    device — lives on the concrete implementation, since a reboot is
+    inherently a hardware operation the board-free engine cannot perform
+    itself. Both methods raise ``NotImplementedError`` by default;
+    ``DeviceSceneReboot`` (``hardware.circuitpython.device_reboot``) is the
+    live implementation, and a recording fake stands in for CPython tests.
+    """
+
+    __slots__ = ()
+
+    def reboot_into(self, target: str) -> None:
+        """Persist *target* as the next boot scene and reboot immediately."""
+        raise NotImplementedError
+
+    def reboot_to_previous(self) -> None:
+        """Persist the recorded ``return_to`` scene and reboot immediately."""
         raise NotImplementedError
 
 

@@ -17,7 +17,7 @@ from engine.packs import PackRegistry
 from engine.scene import Scene, SceneLocalRegistry, SceneManager, SceneRegistry
 from engine.state import EffectAdmin, EffectControls, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
-from engine.tests.helpers import SpyAudioOverlayAdmin, SpyEffectAdmin
+from engine.tests.helpers import RecordingSceneReboot, SpyAudioOverlayAdmin, SpyEffectAdmin
 from engine.timer import Timer
 
 # ---------------------------------------------------------------------------
@@ -332,6 +332,7 @@ def test_scene_manager_pushes_local_effects_on_load(scene_env) -> None:
         scene_registry,
         effect_admin,
         SpyAudioOverlayAdmin(),
+        RecordingSceneReboot(),
     )
     manager.load("forest")
     manager.update()
@@ -359,6 +360,7 @@ def test_scene_manager_load_replaces_active_scene_registry_with_new_scenes(scene
         scene_registry,
         effect_admin,
         SpyAudioOverlayAdmin(),
+        RecordingSceneReboot(),
     )
 
     manager.load("a")
@@ -389,6 +391,7 @@ def test_scene_manager_pushes_overlay_scene_local_effects_on_overlay(scene_env) 
         scene_registry,
         effect_admin,
         SpyAudioOverlayAdmin(),
+        RecordingSceneReboot(),
     )
 
     manager.load("scene_a")
@@ -421,6 +424,7 @@ def test_scene_manager_restores_base_local_effects_on_pop(scene_env) -> None:
         scene_registry,
         effect_admin,
         SpyAudioOverlayAdmin(),
+        RecordingSceneReboot(),
     )
 
     manager.load("scene_a")
@@ -459,6 +463,7 @@ def test_scene_manager_installs_scene_sound_overlay_on_load(scene_env) -> None:
         scene_registry,
         SpyEffectAdmin(),
         audio_overlay_admin,
+        RecordingSceneReboot(),
     )
     manager.load("forest")
     manager.update()
@@ -483,6 +488,7 @@ def test_scene_manager_load_installs_none_overlay_for_scene_with_no_sounds(scene
         scene_registry,
         SpyEffectAdmin(),
         audio_overlay_admin,
+        RecordingSceneReboot(),
     )
     manager.load("bare_scene")
     manager.update()
@@ -507,6 +513,7 @@ def test_scene_manager_installs_overlay_scene_sounds_on_overlay(scene_env) -> No
         scene_registry,
         SpyEffectAdmin(),
         audio_overlay_admin,
+        RecordingSceneReboot(),
     )
 
     manager.load("scene_a")
@@ -539,6 +546,7 @@ def test_scene_manager_restores_base_scene_sounds_on_pop(scene_env) -> None:
         scene_registry,
         SpyEffectAdmin(),
         audio_overlay_admin,
+        RecordingSceneReboot(),
     )
 
     manager.load("scene_a")

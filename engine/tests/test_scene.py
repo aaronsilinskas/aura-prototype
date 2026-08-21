@@ -13,9 +13,9 @@ from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
 from engine.packs import PackRegistry, _PackEntry
 from engine.scene import Scene, SceneManager, SceneRegistry
-from engine.state import EffectAdmin, EffectControls, GameState, SceneControls, Scope
+from engine.state import EffectAdmin, EffectControls, GameState, SceneControls, SceneReboot, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
-from engine.tests.helpers import SpyAudioOverlayAdmin, SpyEffectAdmin
+from engine.tests.helpers import RecordingSceneReboot, SpyAudioOverlayAdmin, SpyEffectAdmin
 from engine.timer import Timer
 from engine.version import Version
 
@@ -113,12 +113,13 @@ def _make_scene_manager(
     scene_registry: SceneRegistry | None = None,
     effect_admin: EffectAdmin | None = None,
     audio_overlay_admin: AudioOverlayAdmin | None = None,
+    scene_reboot: SceneReboot | None = None,
 ) -> SceneManager:
-    """Construct a SceneManager, defaulting any unspecified registry/admin seam.
+    """Construct a SceneManager, defaulting any unspecified registry/admin/port.
 
-    Absorbs SceneManager's injected-EffectAdmin/AudioOverlayAdmin constructor
-    parameters so most call sites only need to override the registries/admins
-    they actually care about.
+    Absorbs SceneManager's injected-EffectAdmin/AudioOverlayAdmin/SceneReboot
+    constructor parameters so most call sites only need to override the
+    registries/admins/ports they actually care about.
     """
     return SceneManager(
         engine,
@@ -127,6 +128,7 @@ def _make_scene_manager(
         scene_registry if scene_registry is not None else SceneRegistry(),
         effect_admin if effect_admin is not None else SpyEffectAdmin(),
         audio_overlay_admin if audio_overlay_admin is not None else SpyAudioOverlayAdmin(),
+        scene_reboot if scene_reboot is not None else RecordingSceneReboot(),
     )
 
 
@@ -198,6 +200,34 @@ def test_scene_controls_pop_raises_not_implemented_error() -> None:
 
     with pytest.raises(NotImplementedError):
         sc.pop()
+
+
+def test_scene_controls_reboot_into_raises_not_implemented_error() -> None:
+    sc = SceneControls()
+
+    with pytest.raises(NotImplementedError):
+        sc.reboot_into("any")
+
+
+def test_scene_controls_reboot_to_previous_raises_not_implemented_error() -> None:
+    sc = SceneControls()
+
+    with pytest.raises(NotImplementedError):
+        sc.reboot_to_previous()
+
+
+def test_scene_reboot_reboot_into_raises_not_implemented_error() -> None:
+    port = SceneReboot()
+
+    with pytest.raises(NotImplementedError):
+        port.reboot_into("any")
+
+
+def test_scene_reboot_reboot_to_previous_raises_not_implemented_error() -> None:
+    port = SceneReboot()
+
+    with pytest.raises(NotImplementedError):
+        port.reboot_to_previous()
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +392,57 @@ def test_pop_raises_immediately_with_exactly_one_entry_on_stack() -> None:
 
     with pytest.raises(ValueError):
         manager.pop()
+
+
+# ---------------------------------------------------------------------------
+# SceneManager — reboot_into / reboot_to_previous (immediate, not deferred)
+# ---------------------------------------------------------------------------
+
+
+def test_reboot_into_delegates_to_the_injected_scene_reboot_port() -> None:
+    engine = _make_engine()
+    scene_reg = _scene_registry(("tag", _scene_factory()))
+    scene_reboot = RecordingSceneReboot()
+    manager = _make_scene_manager(engine, scene_registry=scene_reg, scene_reboot=scene_reboot)
+
+    manager.reboot_into("tag")
+
+    assert scene_reboot.reboot_into_calls == ["tag"]
+
+
+def test_reboot_into_rejects_an_unregistered_scene_name_and_persists_nothing() -> None:
+    """An unknown target must never reach the port -- a typo persisted there
+    would brick the next boot."""
+    engine = _make_engine()
+    scene_reboot = RecordingSceneReboot()
+    manager = _make_scene_manager(engine, scene_reboot=scene_reboot)
+
+    with pytest.raises(ValueError, match="unknown scene"):
+        manager.reboot_into("nonexistent")
+
+    assert scene_reboot.reboot_into_calls == []
+
+
+def test_reboot_to_previous_delegates_to_the_injected_scene_reboot_port() -> None:
+    engine = _make_engine()
+    scene_reboot = RecordingSceneReboot()
+    manager = _make_scene_manager(engine, scene_reboot=scene_reboot)
+
+    manager.reboot_to_previous()
+
+    assert scene_reboot.reboot_to_previous_calls == 1
+
+
+def test_reboot_to_previous_delegates_without_registry_validation() -> None:
+    """Unlike reboot_into, no scene name is validated here at all -- the
+    recorded return_to is checked at boot by resolve_known_scene instead."""
+    engine = _make_engine()
+    scene_reboot = RecordingSceneReboot()
+    manager = _make_scene_manager(engine, scene_registry=SceneRegistry(), scene_reboot=scene_reboot)
+
+    manager.reboot_to_previous()  # must not raise, even with an empty registry
+
+    assert scene_reboot.reboot_to_previous_calls == 1
 
 
 # ---------------------------------------------------------------------------

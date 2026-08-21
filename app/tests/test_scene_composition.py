@@ -11,6 +11,7 @@ from engine.audio import AudioRegistry
 from engine.events import Event, EventGroup
 from engine.scene import Scene, SceneRegistry
 from engine.state import Scope
+from engine.tests.helpers import RecordingSceneReboot
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
@@ -177,6 +178,35 @@ def test_build_scene_runtime_activates_a_scene_only_registered_in_the_supplied_s
     runtime = build_scene_runtime(
         _fake_hw(), "only_in_supplied_registry", scene_registry=scene_registry
     )
+
+    assert runtime.manager.active_state is not None
+
+
+# ---------------------------------------------------------------------------
+# build_scene_runtime — scene_reboot port wiring (issue #910)
+# ---------------------------------------------------------------------------
+
+
+def test_build_scene_runtime_wires_the_supplied_scene_reboot_into_the_manager():
+    """runtime.manager.reboot_into delegates to the exact scene_reboot instance
+    supplied -- proving build_scene_runtime threads it through to SceneManager
+    rather than substituting its own."""
+    scene_registry = _scene_registry_with("tag")
+    scene_reboot = RecordingSceneReboot()
+
+    runtime = build_scene_runtime(
+        _fake_hw(), "tag", scene_registry=scene_registry, scene_reboot=scene_reboot
+    )
+    runtime.manager.reboot_into("tag")
+
+    assert scene_reboot.reboot_into_calls == ["tag"]
+
+
+def test_build_scene_runtime_with_no_scene_reboot_supplied_still_activates_a_scene():
+    """Omitting scene_reboot falls back to a base (unreachable) SceneReboot --
+    SceneManager's non-optional seam is satisfied and scene activation is
+    otherwise unaffected, even though no rule in this test ever reboots."""
+    runtime = build_scene_runtime(_fake_hw(), "tag")
 
     assert runtime.manager.active_state is not None
 

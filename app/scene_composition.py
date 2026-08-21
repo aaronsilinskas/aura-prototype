@@ -17,6 +17,7 @@ from engine.engine import GameEngine
 from engine.log import Logger
 from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
+from engine.state import SceneReboot
 from engine.timer import Timer
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
@@ -239,7 +240,10 @@ def _scan_card_effects(effect_registry: PackRegistry, storage: DeviceStorage | N
 
 
 def build_scene_runtime(
-    hw: DeviceHardware, scene_name: str, scene_registry: SceneRegistry | None = None
+    hw: DeviceHardware,
+    scene_name: str,
+    scene_registry: SceneRegistry | None = None,
+    scene_reboot: SceneReboot | None = None,
 ) -> SceneRuntime:
     """Wire up the effect/rule/scene registries and load *scene_name*.
 
@@ -251,6 +255,16 @@ def build_scene_runtime(
     one -- letting a caller that has already scanned a registry reuse it here
     rather than scan and validate a second time. Omitted, a fresh registry is
     scanned here so existing callers keep working unchanged.
+
+    *scene_reboot*, if supplied, is the board-free ``SceneReboot`` port wired
+    into ``SceneManager`` so rules can call ``state.scene_controls.reboot_into``/
+    ``reboot_to_previous``. Device-only ``run_scene`` supplies the live
+    ``DeviceSceneReboot`` (``hardware.circuitpython.device_reboot``),
+    constructed with the booted scene name and ``hw.storage`` -- this
+    function stays board-free, so it never constructs that adapter itself.
+    Omitted, a fresh base ``SceneReboot`` stands in, satisfying
+    ``SceneManager``'s non-optional seam without pretending a reboot request
+    can go anywhere.
 
     After flash scenes are scanned (or the supplied registry is accepted
     as-is), ``hw.storage``'s ``aura_packs/scenes`` is scanned into the same
@@ -309,6 +323,7 @@ def build_scene_runtime(
         scene_registry,
         effect_admin=effect_manager,
         audio_overlay_admin=audio_registry,
+        scene_reboot=scene_reboot if scene_reboot is not None else SceneReboot(),
     )
     manager.load(resolve_known_scene(scene_registry, scene_name))
     manager.update()  # applies the load transition; the scene is now active
