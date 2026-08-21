@@ -4,6 +4,11 @@
 	(generator_version "10.0")
 	(uuid "c38f086c-163b-4591-a131-a759f2a1c31e")
 	(paper "A4")
+	(title_block
+		(title "IR Tester")
+		(date "2026-08-21")
+		(rev "b")
+	)
 	(lib_symbols
 		(symbol "Connector:Conn_01x02_Pin"
 			(pin_names
@@ -3286,16 +3291,6 @@
 	)
 	(wire
 		(pts
-			(xy 44.45 104.14) (xy 53.34 104.14)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "2943bd51-cc9d-4404-888c-c41356e00e1d")
-	)
-	(wire
-		(pts
 			(xy 33.02 39.37) (xy 33.02 41.91)
 		)
 		(stroke
@@ -3326,7 +3321,7 @@
 	)
 	(wire
 		(pts
-			(xy 46.99 107.95) (xy 59.69 107.95)
+			(xy 46.99 105.41) (xy 66.04 105.41)
 		)
 		(stroke
 			(width 0)
@@ -3386,33 +3381,13 @@
 	)
 	(wire
 		(pts
-			(xy 36.83 104.14) (xy 33.02 104.14)
+			(xy 71.12 119.38) (xy 74.93 119.38)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "45b00a2b-6e79-4d81-85aa-9936d1e87d3a")
-	)
-	(wire
-		(pts
-			(xy 59.69 107.95) (xy 59.69 110.49)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "461c20a6-5de2-43e9-872d-25cd6f003f78")
-	)
-	(wire
-		(pts
-			(xy 59.69 110.49) (xy 63.5 110.49)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "47dc85ac-4f67-4ad1-a6fb-3cea23d76f40")
 	)
 	(wire
 		(pts
@@ -3516,16 +3491,6 @@
 	)
 	(wire
 		(pts
-			(xy 53.34 105.41) (xy 66.04 105.41)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "62625676-4695-413c-8762-bc09c253866d")
-	)
-	(wire
-		(pts
 			(xy 93.98 39.37) (xy 104.14 39.37)
 		)
 		(stroke
@@ -3533,16 +3498,6 @@
 			(type default)
 		)
 		(uuid "644cf318-c18a-476d-9234-ceae4a446cb9")
-	)
-	(wire
-		(pts
-			(xy 63.5 107.95) (xy 63.5 110.49)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "66c54c30-13c2-48b3-8002-6f592559a68b")
 	)
 	(wire
 		(pts
@@ -3586,6 +3541,16 @@
 	)
 	(wire
 		(pts
+			(xy 60.96 119.38) (xy 60.96 107.95)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "776b6797-0b59-465a-b334-f8a920633a40")
+	)
+	(wire
+		(pts
 			(xy 166.37 77.47) (xy 171.45 77.47)
 		)
 		(stroke
@@ -3613,6 +3578,26 @@
 			(type default)
 		)
 		(uuid "7add3669-d0fd-4b1b-bc92-89fb86a29c03")
+	)
+	(wire
+		(pts
+			(xy 46.99 105.41) (xy 46.99 107.95)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7afa46f1-03a1-4dfb-b0a1-86b2fe0acf0b")
+	)
+	(wire
+		(pts
+			(xy 60.96 107.95) (xy 66.04 107.95)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7c1b7f53-0914-4af2-8d14-97dbe44f14f8")
 	)
 	(wire
 		(pts
@@ -3693,16 +3678,6 @@
 			(type default)
 		)
 		(uuid "90e5f93a-f69c-4935-9b8a-9414598cb900")
-	)
-	(wire
-		(pts
-			(xy 53.34 104.14) (xy 53.34 105.41)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9149a076-2fe7-427c-95be-b47cddf4d7c3")
 	)
 	(wire
 		(pts
@@ -3843,16 +3818,6 @@
 			(type default)
 		)
 		(uuid "ad6876cf-f262-4bfa-8954-ca538b1c2302")
-	)
-	(wire
-		(pts
-			(xy 66.04 107.95) (xy 63.5 107.95)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "af303701-6581-4d90-a975-cbcbbd3aba7c")
 	)
 	(wire
 		(pts
@@ -4153,6 +4118,16 @@
 			(type default)
 		)
 		(uuid "fe5fa0bd-7c6b-4b8f-b7af-e4e068353bc8")
+	)
+	(wire
+		(pts
+			(xy 63.5 119.38) (xy 60.96 119.38)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fea3bc1d-413e-4254-a70b-9273961de759")
 	)
 	(label "VS 65"
 		(at 113.03 90.17 0)
@@ -6010,7 +5985,8 @@
 	)
 	(symbol
 		(lib_id "power:VCC")
-		(at 33.02 104.14 0)
+		(at 74.93 119.38 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -6020,7 +5996,7 @@
 		(dnp no)
 		(uuid "57b68372-138d-46df-aaa5-a31c4c3c7017")
 		(property "Reference" "#PWR058"
-			(at 33.02 107.95 0)
+			(at 74.93 123.19 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6031,7 +6007,7 @@
 			)
 		)
 		(property "Value" "+3.3V"
-			(at 33.02 100.33 0)
+			(at 74.93 115.57 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6041,7 +6017,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 33.02 104.14 0)
+			(at 74.93 119.38 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6052,7 +6028,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 33.02 104.14 0)
+			(at 74.93 119.38 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6063,7 +6039,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"VCC\""
-			(at 33.02 104.14 0)
+			(at 74.93 119.38 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9150,7 +9126,8 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 40.64 104.14 90)
+		(at 67.31 119.38 270)
+		(mirror x)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -9161,7 +9138,7 @@
 		(fields_autoplaced yes)
 		(uuid "dd598461-e7f3-4af3-bc8e-e9023eae3ab8")
 		(property "Reference" "R11"
-			(at 40.64 97.79 90)
+			(at 67.31 113.03 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9171,7 +9148,7 @@
 			)
 		)
 		(property "Value" "30"
-			(at 40.64 100.33 90)
+			(at 67.31 115.57 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9181,7 +9158,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-			(at 40.64 105.918 90)
+			(at 67.31 121.158 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9192,7 +9169,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 40.64 104.14 0)
+			(at 67.31 119.38 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9203,7 +9180,7 @@
 			)
 		)
 		(property "Description" "Resistor"
-			(at 40.64 104.14 0)
+			(at 67.31 119.38 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9214,7 +9191,7 @@
 			)
 		)
 		(property "LCSC Part" "C17622"
-			(at 40.64 104.14 90)
+			(at 67.31 119.38 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9225,7 +9202,7 @@
 			)
 		)
 		(property "Manufacturer" "UNI-ROYAL"
-			(at -63.5 144.78 0)
+			(at 171.45 160.02 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9236,7 +9213,7 @@
 			)
 		)
 		(property "MPN" "0805W8F300JT5E"
-			(at 40.64 104.14 90)
+			(at 67.31 119.38 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
