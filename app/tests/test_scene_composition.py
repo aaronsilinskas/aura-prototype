@@ -9,9 +9,11 @@ import pytest
 from app.scene_composition import build_scene_runtime, resolve_boot_scene_name, resolve_ir_codec
 from engine.audio import AudioRegistry
 from engine.events import Event, EventGroup
+from engine.input import ButtonData, InputEvents
+from engine.network import LINE
 from engine.scene import Scene, SceneRegistry
 from engine.state import Scope
-from engine.tests.helpers import RecordingSceneReboot
+from engine.tests.helpers import RecordingSceneReboot, SpyNetworkControls
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
@@ -19,14 +21,16 @@ from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 from hardware.shared.tests.helpers import FakeDeviceStorage
 
 
-def _fake_hw(ir=None, radio=None, audio_registry=None, storage=None) -> DeviceHardware:
+def _fake_hw(ir=None, radio=None, audio_registry=None, storage=None, network_controls=None):
     """Return a DeviceHardware built entirely from CPython-safe fakes."""
     return DeviceHardware(
         outputs=[],
         buttons="fake-buttons",
         accelerometer=None,
         magnetometer=None,
-        network_controls="fake-network-controls",
+        network_controls=(
+            network_controls if network_controls is not None else "fake-network-controls"
+        ),
         ir=ir,
         radio=radio,
         storage=storage,
@@ -47,6 +51,29 @@ def test_unknown_scene_name_raises_naming_the_known_scenes():
     """An unregistered scene name fails loudly instead of falling back to hardware_test."""
     with pytest.raises(ValueError, match="hardware_test"):
         build_scene_runtime(_fake_hw(), "not-a-real-scene")
+
+
+def test_ir_range_transmitter_scene_is_auto_discovered_by_the_default_disk_scan():
+    """packs/scenes/ir_range_transmitter is picked up with no scene_registry
+    override -- the same disk scan scene_demo.py's run_scene() uses to resolve
+    "ir_range_transmitter" as a flash-configured default_scene (issue #919)."""
+    runtime = build_scene_runtime(_fake_hw(), "ir_range_transmitter")
+
+    assert runtime.manager.active_state is not None
+
+
+def test_ir_range_transmitter_sends_an_ir_packet_on_line_with_no_button_press():
+    """The scene auto-starts transmitting on boot: a bare sensor heartbeat with
+    no button pressed is enough to trigger a send on LINE (issue #919)."""
+    network_spy = SpyNetworkControls()
+    runtime = build_scene_runtime(_fake_hw(network_controls=network_spy), "ir_range_transmitter")
+
+    runtime.manager.active_state.queue_event(InputEvents.Sensors(ButtonData(states={})))
+    runtime.manager.update()
+
+    assert len(network_spy.send_ir_calls) == 1
+    _, emitter = network_spy.send_ir_calls[0]
+    assert emitter == LINE
 
 
 # ---------------------------------------------------------------------------
