@@ -4,5 +4,10 @@
     ["elements", "1.0"],
     ["basic", "1.1"]
   ],
-  "rule_packs": []
+  "rule_packs": [
+    ["return_to_lobby", "1.0"]
+  ],
+  "initial_data": {
+    "return_to_lobby": { "hold_seconds": 5.0 }
+  }
 }

@@ -4,8 +4,11 @@
     ["elements", "1.0"],
     ["basic", "1.0"]
   ],
-  "rule_packs": [],
+  "rule_packs": [
+    ["return_to_lobby", "1.0"]
+  ],
   "initial_data": {
-    "hw_mode": 0
+    "hw_mode": 0,
+    "return_to_lobby": { "hold_seconds": 5.0 }
   }
 }
