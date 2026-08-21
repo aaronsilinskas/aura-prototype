@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from engine.engine import GameRule
 from engine.input import InputEvents
-from engine.state import GameState
+from engine.state import GameState, StateSlot
 
 try:
     from typing import Final
@@ -19,7 +19,16 @@ except ImportError:
 
 _HELD_KEY: Final = "return_to_lobby_held"
 _CONFIG_KEY: Final = "return_to_lobby"
+_HOLD_SECONDS_KEY: Final = "_return_to_lobby_hold_seconds"
 _DEFAULT_HOLD_SECONDS: Final = 5.0
+
+
+def _resolve_hold_seconds(state: GameState) -> float:
+    """Read ``hold_seconds`` from the scene's ``initial_data["return_to_lobby"]``."""
+    return state.get(_CONFIG_KEY, {}).get("hold_seconds", _DEFAULT_HOLD_SECONDS)
+
+
+_hold_seconds: StateSlot = StateSlot(_HOLD_SECONDS_KEY, _resolve_hold_seconds, float)
 
 
 class ReturnToLobbyRule(GameRule):
@@ -43,8 +52,7 @@ class ReturnToLobbyRule(GameRule):
             return
 
         held = state.get(_HELD_KEY, 0.0) + state.elapsed
-        hold_seconds = state.get(_CONFIG_KEY, {}).get("hold_seconds", _DEFAULT_HOLD_SECONDS)
-        if held >= hold_seconds:
+        if held >= _hold_seconds(state):
             state.set(_HELD_KEY, 0.0)
             state.scene_controls.reboot_to_previous()
         else:
