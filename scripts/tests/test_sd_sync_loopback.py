@@ -93,12 +93,15 @@ class _CountingTransport(Transport):
         return self._inner.recv()
 
 
-def _serve_forever(server: SdSyncServer, transport: Transport, verb: str) -> None:
-    serve_one = {
-        "pull": server.serve_pull,
-        "push": server.serve_push,
-        "list": server.serve_list,
-    }[verb]
+def _serve_forever(server: SdSyncServer, transport: Transport, verb: "str | None") -> None:
+    if verb is None:
+        serve_one = server.serve_one
+    else:
+        serve_one = {
+            "pull": server.serve_pull,
+            "push": server.serve_push,
+            "list": server.serve_list,
+        }[verb]
     while True:
         serve_one(transport)
 
@@ -106,7 +109,7 @@ def _serve_forever(server: SdSyncServer, transport: Transport, verb: str) -> Non
 def make_loopback_client(
     storage: "FakeDeviceStorage | None",
     *,
-    verb: str = "pull",
+    verb: "str | None" = "pull",
     server_side_wrapper=None,
     client_side_wrapper=None,
     **client_kwargs,
@@ -118,9 +121,12 @@ def make_loopback_client(
     in-memory. *verb* picks which of the server's per-verb serve methods the
     thread drives -- ``"pull"`` (default), ``"push"``, or ``"list"`` (a test
     only ever exercises one verb per client, so there is no need for the server
-    to dispatch by request text itself). Returns the client and a counting
-    wrapper around its send side, for tests that assert on how many frames of
-    each kind were exchanged.
+    to dispatch by request text itself); pass ``None`` to instead dispatch each
+    request by its own verb via ``SdSyncServer.serve_one`` (#930), the shape a
+    real device-side loop needs to service a mix of pull/push/list requests
+    over one connection. Returns the client and a counting wrapper around its
+    send side, for tests that assert on how many frames of each kind were
+    exchanged.
     """
     to_server: queue.Queue[bytes] = queue.Queue()
     to_client: queue.Queue[bytes] = queue.Queue()
@@ -528,3 +534,23 @@ def test_list_files_with_no_sd_configured_raises_no_storage_error():
 
     with pytest.raises(SdSyncNoStorageError):
         client.list_files()
+
+
+# ---------------------------------------------------------------------------
+# serve_one dispatch -- one connection services a mix of verbs (#930)
+# ---------------------------------------------------------------------------
+
+
+def test_one_connection_services_pull_then_push_then_list_in_sequence(tmp_path: Path):
+    storage = FakeDeviceStorage()
+    storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    client, _ = make_loopback_client(storage, verb=None)
+    pulled_path = tmp_path / "aura-state.json"
+
+    client.pull("aura-state.json", str(pulled_path))
+    client.push(str(pulled_path), "aura-state-copy.json")
+    listing = client.list_files()
+
+    assert pulled_path.read_bytes() == b'{"scene": "tag"}'
+    assert storage.read_bytes("aura-state-copy.json") == b'{"scene": "tag"}'
+    assert ("aura-state-copy.json", 16) in listing

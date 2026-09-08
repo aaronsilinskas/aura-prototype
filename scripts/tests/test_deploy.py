@@ -155,6 +155,89 @@ def test_no_example_file_leaves_code_py_untouched(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# boot.py deploy pairing (#930)
+# ---------------------------------------------------------------------------
+
+
+def test_boot_py_is_deployed_alongside_code_py(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    (source / "boot.py").write_text("# boot")
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    example = source / "my_demo.py"
+    example.write_text("# demo")
+
+    deploy(example, mount, source_root=source, compile=fake_compile)
+
+    assert (mount / "boot.py").read_text() == "# boot"
+
+
+def test_boot_py_is_not_deployed_when_no_example_file_given(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    (source / "boot.py").write_text("# boot")
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source, compile=fake_compile)
+
+    assert not (mount / "boot.py").exists()
+
+
+def test_boot_py_deploy_overwrites_a_stale_copy_already_on_mount(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    boot_source = source / "boot.py"
+    boot_source.write_text("# new boot")
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    example = source / "my_demo.py"
+    example.write_text("# demo")
+    existing_boot = mount / "boot.py"
+    existing_boot.write_text("# old boot")
+    # Same mtime as the source boot.py -- would normally look "up to date".
+    os.utime(existing_boot, (boot_source.stat().st_mtime, boot_source.stat().st_mtime))
+
+    deploy(example, mount, source_root=source, compile=fake_compile)
+
+    assert existing_boot.read_text() == "# new boot"
+
+
+def test_boot_py_is_never_deleted_from_mount(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    boot_py = mount / "boot.py"
+    boot_py.write_text("# running boot")
+
+    deploy(None, mount, source_root=source, compile=fake_compile)
+
+    assert boot_py.exists()
+
+
+def test_deploying_an_example_with_no_repo_boot_py_does_not_fail(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    example = source / "my_demo.py"
+    example.write_text("# demo")
+
+    result = deploy(example, mount, source_root=source, compile=fake_compile)
+
+    assert result == 0
+    assert (mount / "code.py").read_text() == "# demo"
+    assert not (mount / "boot.py").exists()
+
+
+# ---------------------------------------------------------------------------
 # Module directory sync
 # ---------------------------------------------------------------------------
 

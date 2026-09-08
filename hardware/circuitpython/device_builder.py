@@ -76,10 +76,22 @@ from hardware.shared.profiler_report import board_id
 from hardware.shared.radio_transceiver import RadioTransceiver
 
 __all__ = [
+    "SdCardMountError",
     "build_hardware",
     "load_device_config",
     "open_config_i2c",
 ]
+
+
+class SdCardMountError(RuntimeError):
+    """Raised when a declared ``sdcard`` section is present but the card fails to mount.
+
+    Distinguishes a wiring/card fault (no card fitted, no FAT filesystem) from
+    other build failures so callers can react to it specifically -- e.g.
+    ``examples/sd_sync.py`` reports it and idles rather than crashing into the
+    REPL. A ``RuntimeError`` subclass so existing broad ``except RuntimeError``
+    handlers still catch it.
+    """
 
 
 def _resolve_pin(board_module: object, field: str, name: str) -> microcontroller.Pin:
@@ -586,12 +598,12 @@ def _setup_sdcard(spi: busio.SPI, sdcard_cfg: SDCardConfig, board_module: object
     "Config-gated, never presence-probed" holds here too: this is only
     reached once ``config.sdcard`` is declared and enabled, so a mount
     failure is a wiring fault (no card fitted, or no FAT filesystem), not a
-    normal "not present" case -- wrapped below into a section-named
-    ``RuntimeError`` rather than left as the vendor ``OSError``, unlike the
-    radio's own chip-init error, which is left to propagate raw.
+    normal "not present" case -- wrapped below into an :class:`SdCardMountError`
+    rather than left as the vendor ``OSError``, unlike the radio's own chip-init
+    error, which is left to propagate raw.
 
     Raises:
-        RuntimeError: Wrapping the ``OSError`` ``sdcardio``/``storage`` raise
+        SdCardMountError: Wrapping the ``OSError`` ``sdcardio``/``storage`` raise
             when the card is absent or unmountable, naming the section and
             the ``cs``/``mount`` context.
     """
@@ -601,7 +613,7 @@ def _setup_sdcard(spi: busio.SPI, sdcard_cfg: SDCardConfig, board_module: object
     try:
         return SdCardStorage(spi, cs, sdcard_cfg.mount)
     except OSError as e:
-        raise RuntimeError(
+        raise SdCardMountError(
             f"sdcard section is declared but the card at cs={sdcard_cfg.cs} "
             + f"mount={sdcard_cfg.mount} failed to mount: {e}"
         ) from e
