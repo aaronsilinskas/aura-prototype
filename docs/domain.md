@@ -160,7 +160,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `SceneRuntime` | `app/scene_composition.py` | `__slots__` bundle from `build_scene_runtime` that `run_scene`'s loop drives |
 | `DeviceSceneReboot` | `hardware/circuitpython/device_reboot.py` | Live `SceneReboot`: composes `DeviceStateStore` to persist, then calls `microcontroller.reset()` |
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol; services requests against a `DeviceStorage` (or `None`) over an injected `Transport` |
-| `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol; `pull` streams an SD file to a host path over an injected `Transport` |
+| `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol; `pull`/`push` stream a file between an SD path and a host path over an injected `Transport` |
 | `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port through which `SdSyncClient`/`SdSyncServer` exchange base64-framed lines; live adapter is a later ticket, `FakeDeviceStorage`-backed loopback stands in for tests |
 
 ---

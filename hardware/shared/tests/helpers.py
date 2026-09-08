@@ -1,7 +1,7 @@
 """Shared test doubles for hardware/shared, importable across test modules."""
 
 try:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator
 except ImportError:
     pass  # Not available on all embedded runtimes
 
@@ -44,6 +44,10 @@ class FakeDeviceStorage:
     def write_bytes(self, name: str, data: bytes) -> None:
         self._guard(name)
         self._files[name] = bytes(data)
+
+    def write_chunks(self, name: str, chunks: "Iterable[bytes]") -> None:
+        self._guard(name)
+        self._files[name] = b"".join(chunks)
 
     def read_json(self, name: str) -> "dict | None":
         data = self.read_bytes(name)

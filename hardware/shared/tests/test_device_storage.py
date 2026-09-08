@@ -105,6 +105,39 @@ def test_read_chunks_rejects_a_name_that_escapes_the_mount_root(tmp_path, escapi
 
 
 # ---------------------------------------------------------------------------
+# DeviceStorage — write_chunks
+# ---------------------------------------------------------------------------
+
+
+def test_write_chunks_concatenates_chunks_in_order(tmp_path):
+    storage = DeviceStorage(str(tmp_path))
+
+    storage.write_chunks("log.txt", [b"0123", b"4567", b"89"])
+
+    assert storage.read_bytes("log.txt") == b"0123456789"
+
+
+def test_write_chunks_accepts_a_generator_without_reading_it_eagerly(tmp_path):
+    storage = DeviceStorage(str(tmp_path))
+
+    def chunks():
+        yield b"hello, "
+        yield b"world"
+
+    storage.write_chunks("greeting.txt", chunks())
+
+    assert storage.read_bytes("greeting.txt") == b"hello, world"
+
+
+def test_write_bytes_is_equivalent_to_write_chunks_with_one_chunk(tmp_path):
+    storage = DeviceStorage(str(tmp_path))
+
+    storage.write_bytes("state.json", b"\x00\x01hello\xff")
+
+    assert storage.read_bytes("state.json") == b"\x00\x01hello\xff"
+
+
+# ---------------------------------------------------------------------------
 # DeviceStorage — atomic-replace semantics
 # ---------------------------------------------------------------------------
 
