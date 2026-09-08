@@ -193,9 +193,9 @@ def test_setup_sdcard_wraps_mount_os_error_naming_section_cs_and_mount() -> None
         "hardware.circuitpython.sdcard_storage.SdCardStorage",
         side_effect=OSError("no SD card"),
     ):
-        from hardware.circuitpython.device_builder import _setup_sdcard
+        from hardware.circuitpython.device_builder import SdCardMountError, _setup_sdcard
 
-        with pytest.raises(RuntimeError, match=r"sdcard.*cs=D24.*mount=/sd") as excinfo:
+        with pytest.raises(SdCardMountError, match=r"sdcard.*cs=D24.*mount=/sd") as excinfo:
             _setup_sdcard(spi, sdcard_cfg, board_mock)
 
     assert isinstance(excinfo.value.__cause__, OSError)

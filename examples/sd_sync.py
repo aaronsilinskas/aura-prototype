@@ -43,7 +43,11 @@ import time
 import usb_cdc
 
 from engine.log import Logger
-from hardware.circuitpython.device_builder import build_hardware, load_device_config
+from hardware.circuitpython.device_builder import (
+    SdCardMountError,
+    build_hardware,
+    load_device_config,
+)
 from hardware.circuitpython.usb_cdc_transport import UsbCdcTransport
 from hardware.shared.sd_sync_server import SdSyncServer
 
@@ -55,10 +59,7 @@ config = load_device_config()
 
 try:
     hw = build_hardware(config, logger=logger)
-except RuntimeError as e:
-    if "failed to mount" not in str(e):
-        raise  # An unrelated hardware fault -- a real bug, not a routine "no card" case.
-
+except SdCardMountError as e:
     logger.log(f"no card detected -- {e}")
     while True:
         time.sleep(_IDLE_SECONDS)
