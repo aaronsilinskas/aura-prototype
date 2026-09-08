@@ -70,6 +70,41 @@ def test_read_bytes_propagates_an_open_error_other_than_missing_file(tmp_path, m
 
 
 # ---------------------------------------------------------------------------
+# DeviceStorage — read_chunks
+# ---------------------------------------------------------------------------
+
+
+def test_read_chunks_returns_none_for_a_never_written_name(tmp_path):
+    storage = DeviceStorage(str(tmp_path))
+
+    assert storage.read_chunks("state.json", chunk_size=8) is None
+
+
+def test_write_bytes_then_read_chunks_round_trips_exact_bytes(tmp_path):
+    storage = DeviceStorage(str(tmp_path))
+    storage.write_bytes("state.json", b"\x00\x01hello\xff")
+
+    assert b"".join(storage.read_chunks("state.json", chunk_size=8)) == b"\x00\x01hello\xff"
+
+
+def test_read_chunks_yields_multiple_chunks_when_content_exceeds_chunk_size(tmp_path):
+    storage = DeviceStorage(str(tmp_path))
+    storage.write_bytes("log.txt", b"0123456789")
+
+    chunks = list(storage.read_chunks("log.txt", chunk_size=4))
+
+    assert chunks == [b"0123", b"4567", b"89"]
+
+
+@pytest.mark.parametrize("escaping_name", ESCAPING_NAMES)
+def test_read_chunks_rejects_a_name_that_escapes_the_mount_root(tmp_path, escaping_name):
+    storage = DeviceStorage(str(tmp_path))
+
+    with pytest.raises(ValueError):
+        storage.read_chunks(escaping_name, chunk_size=8)
+
+
+# ---------------------------------------------------------------------------
 # DeviceStorage — atomic-replace semantics
 # ---------------------------------------------------------------------------
 
@@ -321,6 +356,36 @@ def test_fake_write_bytes_supports_subpaths_with_no_directory_setup():
     storage.write_bytes("scenes/tag/state.json", b"tag-state")
 
     assert storage.read_bytes("scenes/tag/state.json") == b"tag-state"
+
+
+def test_fake_read_chunks_returns_none_for_a_never_written_name():
+    storage = FakeDeviceStorage()
+
+    assert storage.read_chunks("state.json", chunk_size=8) is None
+
+
+def test_fake_write_bytes_then_read_chunks_round_trips_exact_bytes():
+    storage = FakeDeviceStorage()
+    storage.write_bytes("state.json", b"\x00\x01hello\xff")
+
+    assert b"".join(storage.read_chunks("state.json", chunk_size=8)) == b"\x00\x01hello\xff"
+
+
+def test_fake_read_chunks_yields_multiple_chunks_when_content_exceeds_chunk_size():
+    storage = FakeDeviceStorage()
+    storage.write_bytes("log.txt", b"0123456789")
+
+    chunks = list(storage.read_chunks("log.txt", chunk_size=4))
+
+    assert chunks == [b"0123", b"4567", b"89"]
+
+
+@pytest.mark.parametrize("escaping_name", ESCAPING_NAMES)
+def test_fake_read_chunks_rejects_a_name_that_escapes_the_mount_root(escaping_name):
+    storage = FakeDeviceStorage()
+
+    with pytest.raises(ValueError):
+        storage.read_chunks(escaping_name, chunk_size=8)
 
 
 @pytest.mark.parametrize("escaping_name", ESCAPING_NAMES)
