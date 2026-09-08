@@ -29,7 +29,7 @@ import os
 from engine._path import isdir
 
 try:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator
     from typing import Final
 except ImportError:
     pass
@@ -168,17 +168,37 @@ class DeviceStorage:
     def write_bytes(self, name: str, data: bytes) -> None:
         """Durably, atomically-as-FAT-allows replace *name* with *data*.
 
-        FAT ``os.rename`` raises ``EEXIST`` on an existing target, so true
-        POSIX atomic replace is impossible. Instead: write a sibling temp
-        file, ``os.sync()``, remove the existing target if present, then
-        ``os.rename(temp, name)`` and ``os.sync()`` again — a reader opening
-        *name* therefore only ever observes the complete old content or the
-        complete new content, never a torn file. Missing parent directories
-        are created first (see :meth:`_ensure_parent_dirs`).
+        A thin wrapper over :meth:`write_chunks` with a single-chunk
+        iterable — see there for the temp-file-then-rename mechanics.
 
         Args:
             name: File name or subpath under the mount root.
             data: Full contents to write.
+
+        Raises:
+            ValueError: *name* escapes the mount root (``..`` or an
+                absolute path).
+        """
+        self.write_chunks(name, (data,))
+
+    def write_chunks(self, name: str, chunks: "Iterable[bytes]") -> None:
+        """Durably, atomically-as-FAT-allows replace *name* with the concatenation of *chunks*.
+
+        FAT ``os.rename`` raises ``EEXIST`` on an existing target, so true
+        POSIX atomic replace is impossible. Instead: write a sibling temp
+        file — one chunk at a time, so a caller streaming chunks off a wire
+        (e.g. :meth:`hardware.shared.sd_sync_server.SdSyncServer.write`)
+        never holds more than one chunk in memory, unlike :meth:`write_bytes`,
+        which needs the whole payload up front — then ``os.sync()``, remove
+        the existing target if present, then ``os.rename(temp, name)`` and
+        ``os.sync()`` again. A reader opening *name* therefore only ever
+        observes the complete old content or the complete new content, never
+        a torn file. Missing parent directories are created first (see
+        :meth:`_ensure_parent_dirs`).
+
+        Args:
+            name: File name or subpath under the mount root.
+            chunks: The file's content, in order.
 
         Raises:
             ValueError: *name* escapes the mount root (``..`` or an
@@ -189,7 +209,8 @@ class DeviceStorage:
 
         temp_path = resolved + _TEMP_SUFFIX
         with open(temp_path, "wb") as f:
-            f.write(data)
+            for chunk in chunks:
+                f.write(chunk)
         os.sync()
 
         try:
