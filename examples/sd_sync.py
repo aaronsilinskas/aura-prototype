@@ -70,7 +70,7 @@ config = load_device_config()
 try:
     hw = build_hardware(config, logger=logger)
 except RuntimeError as e:
-    if "sdcard" not in str(e):
+    if "failed to mount" not in str(e):
         raise  # An unrelated hardware fault -- a real bug, not a routine "no card" case.
 
     logger.log(f"no card detected -- {e}")

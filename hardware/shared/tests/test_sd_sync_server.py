@@ -130,7 +130,7 @@ class _ScriptedTransport(Transport):
         return self._recv_lines.pop(0)
 
 
-def test_serve_one_dispatches_a_list_request_to_serve_list():
+def test_serve_one_services_a_list_request():
     storage = FakeDeviceStorage()
     storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
     server = SdSyncServer(storage)
@@ -142,7 +142,7 @@ def test_serve_one_dispatches_a_list_request_to_serve_list():
     assert decode_listing(response.payload) == [("aura-state.json", 16)]
 
 
-def test_serve_one_dispatches_a_pull_request_to_serve_pull():
+def test_serve_one_services_a_pull_request():
     server = SdSyncServer(None)
     transport = _ScriptedTransport([encode_frame(Frame("req", "pull missing.json"))])
 
@@ -151,7 +151,7 @@ def test_serve_one_dispatches_a_pull_request_to_serve_pull():
     assert decode_frame(transport.sent[0]).text == "no_storage"
 
 
-def test_serve_one_dispatches_a_push_request_to_serve_push():
+def test_serve_one_services_a_push_request():
     server = SdSyncServer(None)
     transport = _ScriptedTransport([encode_frame(Frame("req", "push new.json"))])
 

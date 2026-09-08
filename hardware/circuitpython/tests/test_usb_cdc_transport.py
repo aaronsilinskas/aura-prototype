@@ -12,7 +12,7 @@ from hardware.circuitpython.usb_cdc_transport import UsbCdcTransport
 class _FakeSerial:
     """Fake serial stream returning one scripted chunk per ``read()`` call."""
 
-    def __init__(self, reads: "list[bytes]" = ()) -> None:
+    def __init__(self, reads: "tuple[bytes, ...]" = ()) -> None:
         self._reads = list(reads)
         self.written = b""
 
