@@ -32,7 +32,16 @@ try:
 except ImportError:
     pass  # Not available on all embedded runtimes
 
-__all__ = ["CHUNK_SIZE", "Frame", "Transport", "decode_frame", "encode_frame", "iter_chunks"]
+__all__ = [
+    "CHUNK_SIZE",
+    "Frame",
+    "Transport",
+    "decode_frame",
+    "decode_listing",
+    "encode_frame",
+    "encode_listing",
+    "iter_chunks",
+]
 
 CHUNK_SIZE: Final = 512
 
@@ -100,6 +109,33 @@ def decode_frame(line: bytes) -> Frame:
     header, _, payload = raw.partition(b"\n")
     kind, _, text = header.decode("utf-8").partition(" ")
     return Frame(kind, text, payload)
+
+
+def encode_listing(entries: "list[tuple[str, int]]") -> bytes:
+    """Serialize (path, size) pairs into a ``list`` response frame's payload.
+
+    One ``"path\\tsize"`` line per entry, newline-joined, UTF-8 encoded --
+    a listing is small enough (unlike a pulled file's contents) to send
+    whole in a single frame rather than chunked. A free implementation
+    detail of the ``list`` verb, paired with :func:`decode_listing`; not
+    asserted directly by tests, only through the round trip it enables.
+    """
+    return "\n".join(f"{path}\t{size}" for path, size in entries).encode("utf-8")
+
+
+def decode_listing(payload: bytes) -> "list[tuple[str, int]]":
+    """Parse a payload produced by :func:`encode_listing` back into (path, size) pairs.
+
+    Empty *payload* decodes to an empty list, matching an empty or
+    missing subtree.
+    """
+    if not payload:
+        return []
+    entries: list[tuple[str, int]] = []
+    for line in payload.decode("utf-8").split("\n"):
+        path, _, size = line.partition("\t")
+        entries.append((path, int(size)))
+    return entries
 
 
 def iter_chunks(data: bytes, chunk_size: int = CHUNK_SIZE) -> "Iterator[bytes]":

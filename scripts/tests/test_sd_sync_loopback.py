@@ -92,15 +92,17 @@ class _CountingTransport(Transport):
         return self._inner.recv()
 
 
-def _serve_forever(server: SdSyncServer, transport: Transport) -> None:
+def _serve_forever(server: SdSyncServer, transport: Transport, serve_method: str) -> None:
+    method = getattr(server, serve_method)
     while True:
-        server.serve_pull(transport)
+        method(transport)
 
 
 def make_loopback_client(
     storage: "FakeDeviceStorage | None",
     *,
     server_side_wrapper=None,
+    serve_method: str = "serve_pull",
     **client_kwargs,
 ) -> tuple[SdSyncClient, _CountingTransport]:
     """Wire a fresh ``SdSyncClient`` to a fresh ``SdSyncServer(storage)`` over a loopback.
@@ -109,6 +111,8 @@ def make_loopback_client(
     ``recv`` between requests -- the same shape a real serial link has, just
     in-memory. Returns the client and a counting wrapper around its send side,
     for tests that assert on how many frames of each kind were exchanged.
+    *serve_method* names which ``SdSyncServer`` verb method to loop on
+    (``"serve_pull"`` by default; pass ``"serve_list"`` for the list verb).
     """
     to_server: queue.Queue[bytes] = queue.Queue()
     to_client: queue.Queue[bytes] = queue.Queue()
@@ -119,7 +123,9 @@ def make_loopback_client(
         server_transport = server_side_wrapper(server_transport)
 
     server = SdSyncServer(storage)
-    thread = threading.Thread(target=_serve_forever, args=(server, server_transport), daemon=True)
+    thread = threading.Thread(
+        target=_serve_forever, args=(server, server_transport, serve_method), daemon=True
+    )
     thread.start()
 
     return SdSyncClient(client_transport, **client_kwargs), client_transport
@@ -287,3 +293,44 @@ def test_pull_with_no_sd_configured_leaves_no_host_file(tmp_path: Path):
         client.pull("aura-state.json", str(host_path))
 
     assert not host_path.exists()
+
+
+# ---------------------------------------------------------------------------
+# list_files
+# ---------------------------------------------------------------------------
+
+
+def test_list_files_returns_every_seeded_path_and_size_at_the_card_root():
+    storage = FakeDeviceStorage()
+    storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    storage.write_bytes("aura_packs/scenes/tag/scene.json", b"{}")
+    client, _ = make_loopback_client(storage, serve_method="serve_list")
+
+    assert client.list_files() == [
+        ("aura-state.json", 16),
+        ("aura_packs/scenes/tag/scene.json", 2),
+    ]
+
+
+def test_list_files_of_a_named_subpath_scopes_to_files_beneath_it():
+    storage = FakeDeviceStorage()
+    storage.write_bytes("aura_packs/scenes/tag/scene.json", b"{}")
+    storage.write_bytes("aura_packs/scenes/lobby/scene.json", b"{}")
+    client, _ = make_loopback_client(storage, serve_method="serve_list")
+
+    assert client.list_files("aura_packs/scenes/tag") == [("aura_packs/scenes/tag/scene.json", 2)]
+
+
+def test_list_files_of_an_empty_subpath_returns_no_entries():
+    storage = FakeDeviceStorage()
+    storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    client, _ = make_loopback_client(storage, serve_method="serve_list")
+
+    assert client.list_files("aura_packs/scenes") == []
+
+
+def test_list_files_with_no_sd_configured_raises_no_storage_error():
+    client, _ = make_loopback_client(storage=None, serve_method="serve_list")
+
+    with pytest.raises(SdSyncNoStorageError):
+        client.list_files()

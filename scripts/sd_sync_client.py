@@ -2,7 +2,7 @@
 
 Drives an :class:`~hardware.shared.sd_sync_server.SdSyncServer` (over an
 injected :class:`~hardware.shared.sd_sync_protocol.Transport`) to pull files off
-a device's SD card onto the host filesystem. CPython-only, like the rest of
+and list directories on a device's SD card. CPython-only, like the rest of
 ``scripts/``; the real serial transport (pointed at the device's data CDC port)
 is a later ticket -- this client only knows the ``Transport`` port, so it runs
 unchanged against that transport or an in-memory loopback.
@@ -16,13 +16,23 @@ one accumulated the same way, chunk-by-chunk, while writing. A mismatch retries
 the whole pull from scratch (a fresh request, a fresh receive) up to
 ``max_attempts`` times; exhausting them raises :class:`SdSyncIntegrityError`
 rather than leaving a corrupt file with no indication anything went wrong.
+
+``list_files`` returns the server's enumeration of a subtree as ``(path, size)``
+pairs -- small enough to arrive in a single frame, unlike a pulled file's bytes,
+so it carries no chunking or CRC verification of its own.
 """
 
 import binascii
 import os
 from typing import Final
 
-from hardware.shared.sd_sync_protocol import Frame, Transport, decode_frame, encode_frame
+from hardware.shared.sd_sync_protocol import (
+    Frame,
+    Transport,
+    decode_frame,
+    decode_listing,
+    encode_frame,
+)
 
 __all__ = [
     "SdSyncClient",
@@ -100,6 +110,25 @@ class SdSyncClient:
         raise SdSyncIntegrityError(
             f"CRC-32 mismatch pulling {sd_path!r} after {self._max_attempts} attempt(s)"
         )
+
+    def list_files(self, sd_subpath: str = "") -> "list[tuple[str, int]]":
+        """Return the server's enumeration of *sd_subpath* on the SD card.
+
+        Args:
+            sd_subpath: Mount-relative subtree to enumerate; the default
+                (empty string) lists the whole card root.
+
+        Raises:
+            SdSyncNoStorageError: The device has no SD card configured.
+        """
+        self._transport.send(encode_frame(Frame("req", f"list {sd_subpath}")))
+        response = decode_frame(self._transport.recv())
+        status, _, _ = response.text.partition(" ")
+
+        if status == "no_storage":
+            raise SdSyncNoStorageError(f"no SD configured; cannot list {sd_subpath!r}")
+
+        return decode_listing(response.payload)
 
     def _receive_verified(self, host_path: str) -> bool:
         """Stream one pull response's chunks to *host_path*; return whether its CRC matched.
