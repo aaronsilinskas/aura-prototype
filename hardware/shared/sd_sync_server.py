@@ -272,15 +272,13 @@ class SdSyncServer:
     def serve_one(self, transport: Transport) -> None:
         """Receive one request frame and service it, dispatching by its verb.
 
-        Peeks at the request's verb -- the first word of its ``text``, e.g.
+        Reads the request's verb -- the first word of its ``text``, e.g.
         ``"pull aura-state.json"`` -- to pick the matching ``serve_pull``,
         ``serve_push``, or ``serve_list``, then hands it a transport that
-        replays the already-received line so the request is not lost (each
-        of those methods calls ``transport.recv()`` itself to fetch it). This
-        is the seam a device-side loop drives repeatedly to service a mix of
-        verbs over one connection, one request at a time, rather than
-        pinning a connection to a single verb the way each of this project's
-        own tests still do for their own simplicity.
+        replays the already-received line so the request is not lost (each of
+        those methods calls ``transport.recv()`` itself to fetch it). A
+        device-side loop drives this repeatedly to service a mix of verbs over
+        one connection, one request at a time.
 
         Args:
             transport: The port to receive the request from and reply on.

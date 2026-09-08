@@ -7,8 +7,8 @@ can still exchange one frame per :meth:`~UsbCdcTransport.send`/:meth:`~UsbCdcTra
 
 Needs no ``usb_cdc`` import: it frames lines over any object exposing
 ``read(size) -> bytes``/``write(data: bytes) -> None``, so on-device wiring
-passes it ``usb_cdc.data`` (the channel ``boot.py`` enables via
-``usb_cdc.enable(data=True)``) while tests pass a plain fake stream.
+passes it ``usb_cdc.data`` (the channel ``boot.py`` opens) while tests pass a
+plain fake stream.
 """
 
 from hardware.shared.sd_sync_protocol import Transport

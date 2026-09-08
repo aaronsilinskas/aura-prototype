@@ -222,9 +222,6 @@ def test_boot_py_is_never_deleted_from_mount(tmp_path: Path) -> None:
 
 
 def test_deploying_an_example_with_no_repo_boot_py_does_not_fail(tmp_path: Path) -> None:
-    """No source boot.py (e.g. an isolated fake source tree) is not an error --
-    deploy still succeeds and code.py deploys normally; only a real boot.py
-    alongside the example gets paired onto the mount."""
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
