@@ -19,6 +19,11 @@ makes every verb reply with a clear ``"no_storage"`` response instead of raising
 -- a request for a file is a normal, expected event on a card-less device, not a
 programming error.
 
+:meth:`serve_one` receives one request and dispatches it to whichever
+``serve_*`` matches its verb, so a caller can drive a single connection
+through a mix of verbs one request at a time -- the device-side loop's job
+-- rather than pinning a connection to one verb ahead of time.
+
 No ``board``/``busio``/CircuitPython-only import -- safe on CPython,
 CircuitPython 10.x, and MicroPython.
 """
@@ -54,6 +59,31 @@ class _CrcMismatchError(Exception):
     corrupt transfer never replaces the file already on disk. Caught by
     :meth:`SdSyncServer.serve_push`, never escapes this module.
     """
+
+
+class _ReplayTransport(Transport):
+    """``Transport`` wrapper that replays one already-received line, then delegates.
+
+    :meth:`SdSyncServer.serve_one` must read a request frame to learn its verb
+    before it knows which of ``serve_pull``/``serve_push``/``serve_list`` to
+    call -- but each of those methods begins by calling ``transport.recv()``
+    itself to fetch that same request. Wrapping the real transport in one of
+    these lets ``serve_one`` hand off a transport whose first ``recv()`` returns
+    the line it already consumed, so the request is serviced once, not lost.
+    """
+
+    def __init__(self, inner: Transport, first_line: bytes) -> None:
+        self._inner = inner
+        self._first_line: bytes | None = first_line
+
+    def send(self, line: bytes) -> None:
+        self._inner.send(line)
+
+    def recv(self) -> bytes:
+        if self._first_line is not None:
+            line, self._first_line = self._first_line, None
+            return line
+        return self._inner.recv()
 
 
 class SdSyncServer:
@@ -238,3 +268,31 @@ class SdSyncServer:
             return
 
         transport.send(encode_frame(Frame("resp", "ok", encode_listing(entries))))
+
+    def serve_one(self, transport: Transport) -> None:
+        """Receive one request frame and service it, dispatching by its verb.
+
+        Peeks at the request's verb -- the first word of its ``text``, e.g.
+        ``"pull aura-state.json"`` -- to pick the matching ``serve_pull``,
+        ``serve_push``, or ``serve_list``, then hands it a transport that
+        replays the already-received line so the request is not lost (each
+        of those methods calls ``transport.recv()`` itself to fetch it). This
+        is the seam a device-side loop drives repeatedly to service a mix of
+        verbs over one connection, one request at a time, rather than
+        pinning a connection to a single verb the way each of this project's
+        own tests still do for their own simplicity.
+
+        Args:
+            transport: The port to receive the request from and reply on.
+
+        Raises:
+            ValueError: The request's verb is none of ``"pull"``, ``"push"``,
+                ``"list"`` -- a malformed request, not a routine outcome.
+        """
+        line = transport.recv()
+        verb, _, _ = decode_frame(line).text.partition(" ")
+        handlers = {"pull": self.serve_pull, "push": self.serve_push, "list": self.serve_list}
+        handler = handlers.get(verb)
+        if handler is None:
+            raise ValueError(f"unknown SD-sync request verb {verb!r}")
+        handler(_ReplayTransport(transport, line))

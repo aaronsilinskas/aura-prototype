@@ -4,10 +4,21 @@ The full request/response/chunk/CRC protocol is exercised end-to-end by the
 loopback tests in ``scripts/tests/test_sd_sync_loopback.py``, which drive
 ``SdSyncServer`` through ``SdSyncClient`` -- the seam that matters for the
 protocol as a whole. These tests cover ``read``, ``write`` and ``list``
-directly, the pieces of server behaviour meaningful in isolation from the wire.
+directly, the pieces of server behaviour meaningful in isolation from the wire,
+plus ``serve_one``'s request-verb dispatch (#930) -- the piece a device-side
+loop needs to service a mix of verbs over one connection.
 """
 
-from hardware.shared.sd_sync_protocol import CHUNK_SIZE
+import pytest
+
+from hardware.shared.sd_sync_protocol import (
+    CHUNK_SIZE,
+    Frame,
+    Transport,
+    decode_frame,
+    decode_listing,
+    encode_frame,
+)
 from hardware.shared.sd_sync_server import SdSyncServer
 from hardware.shared.tests.helpers import FakeDeviceStorage
 
@@ -98,3 +109,60 @@ def test_list_with_no_sd_configured_returns_none_rather_than_raising():
     server = SdSyncServer(None)
 
     assert server.list() is None
+
+
+# ---------------------------------------------------------------------------
+# serve_one -- request-verb dispatch (#930)
+# ---------------------------------------------------------------------------
+
+
+class _ScriptedTransport(Transport):
+    """Test double replaying pre-recorded ``recv()`` lines; records every ``send()``."""
+
+    def __init__(self, recv_lines: list[bytes]) -> None:
+        self._recv_lines = list(recv_lines)
+        self.sent: list[bytes] = []
+
+    def send(self, line: bytes) -> None:
+        self.sent.append(line)
+
+    def recv(self) -> bytes:
+        return self._recv_lines.pop(0)
+
+
+def test_serve_one_dispatches_a_list_request_to_serve_list():
+    storage = FakeDeviceStorage()
+    storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    server = SdSyncServer(storage)
+    transport = _ScriptedTransport([encode_frame(Frame("req", "list "))])
+
+    server.serve_one(transport)
+
+    response = decode_frame(transport.sent[0])
+    assert decode_listing(response.payload) == [("aura-state.json", 16)]
+
+
+def test_serve_one_dispatches_a_pull_request_to_serve_pull():
+    server = SdSyncServer(None)
+    transport = _ScriptedTransport([encode_frame(Frame("req", "pull missing.json"))])
+
+    server.serve_one(transport)
+
+    assert decode_frame(transport.sent[0]).text == "no_storage"
+
+
+def test_serve_one_dispatches_a_push_request_to_serve_push():
+    server = SdSyncServer(None)
+    transport = _ScriptedTransport([encode_frame(Frame("req", "push new.json"))])
+
+    server.serve_one(transport)
+
+    assert decode_frame(transport.sent[0]).text == "no_storage"
+
+
+def test_serve_one_raises_for_an_unrecognized_verb():
+    server = SdSyncServer(None)
+    transport = _ScriptedTransport([encode_frame(Frame("req", "frobnicate x"))])
+
+    with pytest.raises(ValueError, match="frobnicate"):
+        server.serve_one(transport)

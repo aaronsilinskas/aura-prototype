@@ -162,7 +162,8 @@ def deploy(
 
     Args:
         example_file: Path to the example file to copy as ``code.py``.
-            Pass ``None`` to sync modules only without touching ``code.py``.
+            Pass ``None`` to sync modules only without touching ``code.py``
+            (or its paired ``boot.py`` -- see below).
         mount: Path to the mounted CIRCUITPY volume.
         source_root: Root of the source tree. Defaults to ``Path.cwd()``.
         dry_run: When True, skip mount validation and print what would be copied
@@ -175,6 +176,12 @@ def deploy(
             for unit tests.  When ``None`` the real compiler is used.
         use_source: When True, skip compilation entirely and sync raw ``.py`` files
             directly from the source tree.  Requires no ``mpy-cross`` toolchain.
+
+    ``boot.py`` at the repo root, if present, is copied to the mount's
+    ``boot.py`` alongside ``code.py`` whenever *example_file* is given -- the
+    same force-always, never-pruned handling ``code.py`` gets, since a mount's
+    existing ``boot.py`` is otherwise indistinguishable from a stale one (#930).
+    It is not deployed when *example_file* is ``None`` (module-only sync).
     """
     # Import here to avoid a circular import (build imports from deploy).
     from scripts.build import (
@@ -242,6 +249,12 @@ def deploy(
 
     if example_file is not None:
         _sync_file(example_file, mount / "code.py", "code.py", copied, skipped, dry_run, force=True)
+
+        boot_source = source_root / "boot.py"
+        if boot_source.is_file():
+            _sync_file(
+                boot_source, mount / "boot.py", "boot.py", copied, skipped, dry_run, force=True
+            )
 
     for module in MODULE_DIRS:
         src_dir = sync_root / module

@@ -103,6 +103,33 @@ def _serve_forever(server: SdSyncServer, transport: Transport, verb: str) -> Non
         serve_one(transport)
 
 
+def _serve_dispatched_forever(server: SdSyncServer, transport: Transport) -> None:
+    while True:
+        server.serve_one(transport)
+
+
+def make_dispatching_loopback_client(storage: "FakeDeviceStorage | None") -> SdSyncClient:
+    """Wire a fresh ``SdSyncClient`` to a fresh ``SdSyncServer(storage)`` over a loopback
+    whose background thread dispatches each request by its verb via ``serve_one`` (#930),
+    rather than pinning the connection to one verb ahead of time like
+    :func:`make_loopback_client` -- the shape a real device-side loop needs to service a
+    mix of pull/push/list requests over the single data-CDC connection.
+    """
+    to_server: queue.Queue[bytes] = queue.Queue()
+    to_client: queue.Queue[bytes] = queue.Queue()
+
+    client_transport: Transport = _QueueTransport(send_q=to_server, recv_q=to_client)
+    server_transport: Transport = _QueueTransport(send_q=to_client, recv_q=to_server)
+
+    server = SdSyncServer(storage)
+    thread = threading.Thread(
+        target=_serve_dispatched_forever, args=(server, server_transport), daemon=True
+    )
+    thread.start()
+
+    return SdSyncClient(client_transport)
+
+
 def make_loopback_client(
     storage: "FakeDeviceStorage | None",
     *,
@@ -528,3 +555,23 @@ def test_list_files_with_no_sd_configured_raises_no_storage_error():
 
     with pytest.raises(SdSyncNoStorageError):
         client.list_files()
+
+
+# ---------------------------------------------------------------------------
+# serve_one dispatch -- one connection services a mix of verbs (#930)
+# ---------------------------------------------------------------------------
+
+
+def test_one_connection_services_pull_then_push_then_list_in_sequence(tmp_path: Path):
+    storage = FakeDeviceStorage()
+    storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    client = make_dispatching_loopback_client(storage)
+    pulled_path = tmp_path / "aura-state.json"
+
+    client.pull("aura-state.json", str(pulled_path))
+    client.push(str(pulled_path), "aura-state-copy.json")
+    listing = client.list_files()
+
+    assert pulled_path.read_bytes() == b'{"scene": "tag"}'
+    assert storage.read_bytes("aura-state-copy.json") == b'{"scene": "tag"}'
+    assert ("aura-state-copy.json", 16) in listing
