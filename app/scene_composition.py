@@ -33,6 +33,7 @@ __all__ = [
     "resolve_boot_scene_name",
     "resolve_ir_codec",
     "resolve_known_scene",
+    "scan_boot_scene_registry",
 ]
 
 
@@ -129,12 +130,36 @@ def resolve_ir_codec(
     return encoder_cls(), decoder_cls()
 
 
+def scan_boot_scene_registry(storage: DeviceStorage | None) -> SceneRegistry:
+    """Build the complete boot-time scene registry: flash scenes, then card scenes.
+
+    Constructs a fresh ``SceneRegistry``, scans flash ``packs/scenes`` into it,
+    then scans *storage*'s ``aura_packs/scenes`` into the *same* registry via
+    ``_scan_card_scenes`` -- the same discovery ``build_scene_runtime`` used to
+    perform internally, now hoisted here so the complete registered-scene set
+    exists before anything reads it (boot-scene resolution, IR-codec
+    resolution, and scene-runtime construction all share this one registry).
+
+    A card-less device (*storage* is ``None``) or a mounted card with no
+    ``aura_packs/scenes`` both yield a flash-only registry, exactly as before
+    this change. A card scene sharing a name with a flash scene raises the
+    same cross-root collision error ``SceneRegistry.scan_dir`` already
+    enforces.
+    """
+    scene_registry = SceneRegistry()
+    scene_registry.scan_dir("packs/scenes", "packs.scenes")
+    _scan_card_scenes(scene_registry, storage)
+    return scene_registry
+
+
 def _ensure_card_on_sys_path(storage: DeviceStorage) -> bool:
     """Return whether the mounted card carries a top-level ``aura_packs/`` directory.
 
     When it does, *storage*'s ``mount_root`` is appended to ``sys.path``
-    (guarded so a repeat ``build_scene_runtime`` call never duplicates the
-    entry), which is what lets any ``aura_packs.`` package on the card --
+    (guarded so a repeat call against the same storage -- whether from
+    ``scan_boot_scene_registry`` or ``build_scene_runtime`` -- never
+    duplicates the entry), which is what lets any ``aura_packs.`` package on
+    the card --
     scenes, effect packs, or their scene-local ``rules/``/``effects/`` --
     import against the card. Shared by every card-scan helper so the
     presence check and the ``sys.path`` mutation happen exactly once per
@@ -239,19 +264,22 @@ def _scan_card_effects(effect_registry: PackRegistry, storage: DeviceStorage | N
 def build_scene_runtime(
     hw: DeviceHardware,
     scene_name: str,
-    scene_registry: SceneRegistry | None = None,
+    scene_registry: SceneRegistry,
     scene_reboot: SceneReboot | None = None,
 ) -> SceneRuntime:
-    """Wire up the effect/rule/scene registries and load *scene_name*.
+    """Wire up the effect/rule registries and load *scene_name* from *scene_registry*.
 
     Raises ``ValueError`` naming the known scenes when *scene_name* is not in
-    the scanned scene registry. The returned ``SceneRuntime`` has the resolved
-    scene already active — the caller only needs to drive the per-tick loop.
+    *scene_registry*. The returned ``SceneRuntime`` has the resolved scene
+    already active — the caller only needs to drive the per-tick loop.
 
-    *scene_registry*, if supplied, is used as-is instead of scanning a fresh
-    one -- letting a caller that has already scanned a registry reuse it here
-    rather than scan and validate a second time. Omitted, a fresh registry is
-    scanned here so existing callers keep working unchanged.
+    *scene_registry* is a caller-supplied input, not discovered here: this
+    function no longer scans scenes at all, neither the flash ``packs/scenes``
+    self-scan nor ``hw.storage``'s ``aura_packs/scenes``. The caller builds it
+    up front via ``scan_boot_scene_registry(hw.storage)`` -- the same complete
+    registry boot-scene resolution and IR-codec resolution already consumed --
+    and shares that one registry here, so a scene is scanned exactly once for
+    the whole boot sequence.
 
     *scene_reboot*, if supplied, is the board-free ``SceneReboot`` port wired
     into ``SceneManager`` so rules can call ``state.scene_controls.reboot_into``/
@@ -261,16 +289,15 @@ def build_scene_runtime(
     ``SceneReboot`` stands in, satisfying ``SceneManager``'s non-optional seam
     without pretending a reboot request can go anywhere.
 
-    After flash scenes are scanned (or the supplied registry is accepted
-    as-is), ``hw.storage``'s ``aura_packs/scenes`` is scanned into the same
-    registry via ``_scan_card_scenes``, and ``hw.storage``'s
-    ``aura_packs/rules`` is scanned into the rule registry via
-    ``_scan_card_rules`` -- both are no-ops with no storage or no
-    ``aura_packs/`` on the card, so a device with neither behaves exactly as
-    before. Likewise, after flash effect packs are scanned, ``hw.storage``'s
+    ``hw.storage``'s ``aura_packs/rules`` is scanned into the rule registry
+    via ``_scan_card_rules`` -- a no-op with no storage or no ``aura_packs/``
+    on the card, so a device with neither behaves exactly as before.
+    Likewise, after flash effect packs are scanned, ``hw.storage``'s
     ``aura_packs/effects`` is scanned into the same effect ``PackRegistry``
     via ``_scan_card_effects``, so a card effect pack resolves through
-    ``effect_manager`` exactly like a flash one.
+    ``effect_manager`` exactly like a flash one. Rule and effect registries
+    stay build-internal -- unlike scenes, nothing outside this function reads
+    them first.
     """
     effect_registry = PackRegistry(item_attr="BUILD")
     effect_registry.scan_dir("packs/effects", "packs.effects")
@@ -288,12 +315,6 @@ def build_scene_runtime(
         network_controls=hw.network_controls,
         timer=timer,
     )
-
-    if scene_registry is None:
-        scene_registry = SceneRegistry()
-        scene_registry.scan_dir("packs/scenes", "packs.scenes")
-
-    _scan_card_scenes(scene_registry, hw.storage)
 
     # hw.audio_registry is the same AudioRegistry the device's AudioEffectOutput
     # resolves clips through — scanning effect-pack sounds into its base and

@@ -234,8 +234,12 @@ The top-level `app/` package — the one place allowed to import both engine run
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### SceneRuntime / build_scene_runtime
-The board-free bundle `build_scene_runtime` returns — the wired registries, managers, engine, and pass-through `ir`/`radio` handles that `run_scene`'s per-tick loop drives. It holds no hardware wrappers of its own: `ir`/`radio` are the `DeviceHardware` instances passed straight through.
-_Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing the transmit-then-receive order at a call site (drive `ir.update()`/`radio.update()`); scanning a second `SceneRegistry` when a caller already has one
+The board-free bundle `build_scene_runtime` returns — the wired registries, managers, engine, and pass-through `ir`/`radio` handles that `run_scene`'s per-tick loop drives. It holds no hardware wrappers of its own: `ir`/`radio` are the `DeviceHardware` instances passed straight through. Its `scene_registry` parameter is **required** — a complete, pre-scanned registry the caller builds via `scan_boot_scene_registry`; `build_scene_runtime` discovers no scenes itself, only card **rules** and **effects** (those stay build-internal).
+_Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing the transmit-then-receive order at a call site (drive `ir.update()`/`radio.update()`); scanning a second `SceneRegistry` when a caller already has one; expecting it to discover scenes (pass a registry from `scan_boot_scene_registry` instead)
+
+### scan_boot_scene_registry
+`app.scene_composition`'s board-free registry builder: constructs a fresh `SceneRegistry`, scans flash `packs/scenes`, then scans the mounted card's `aura_packs/scenes` into the same registry via `_scan_card_scenes` — one scan, shared across boot-scene resolution, IR-codec resolution, and `build_scene_runtime`, so a card scene is a first-class boot target exactly like a flash one. A `None` `storage` or a card with no `aura_packs/scenes` both yield a flash-only registry.
+_Avoid_: calling it before `build_hardware` (the card leg needs `hw.storage` mounted); scanning scenes anywhere else once this exists (`build_scene_runtime` no longer does)
 
 ### resolve_boot_scene_name
 `app.scene_composition`'s boot-time seam: composes `hardware.shared.scene_selection.resolve_boot_scene` (persisted SD `scene` → flash `default_scene` → raise) with `resolve_known_scene`, so the name that wins is also guaranteed registered. A `None` `storage` (card-less device) falls through to the flash default unaffected.

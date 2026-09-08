@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from app.scene_composition import build_scene_runtime, resolve_boot_scene_name, resolve_ir_codec
+from app.scene_composition import (
+    build_scene_runtime,
+    resolve_boot_scene_name,
+    resolve_ir_codec,
+    scan_boot_scene_registry,
+)
 from engine.audio import AudioRegistry
 from engine.events import Event, EventGroup
 from engine.input import ButtonData, InputEvents
@@ -38,9 +43,20 @@ def _fake_hw(ir=None, radio=None, audio_registry=None, storage=None, network_con
     )
 
 
+def _boot_scene_registry(storage: DeviceStorage | None = None) -> SceneRegistry:
+    """Return the complete boot-time scene registry, one line per call site.
+
+    Wraps ``scan_boot_scene_registry`` so every ``build_scene_runtime`` call
+    site below mirrors the real scan-then-build boot sequence in
+    ``run_scene`` -- scan first, then build -- instead of relying on
+    ``build_scene_runtime``'s old (now-removed) self-scan.
+    """
+    return scan_boot_scene_registry(storage)
+
+
 def test_known_scene_name_activates_that_scenes_local_effects():
     """The tag scene's scene-local 'ready' effect resolves once tag is active."""
-    runtime = build_scene_runtime(_fake_hw(), "tag")
+    runtime = build_scene_runtime(_fake_hw(), "tag", scene_registry=_boot_scene_registry())
 
     receipt = runtime.effect_manager.set_effect(Scope.PERSONAL, "scene.ready", {})
 
@@ -52,7 +68,9 @@ def test_ir_range_receiver_scene_boots_and_activates_via_the_standard_pipeline()
     and activates through the same build_scene_runtime path as every other
     scene, proving scene_demo.py can boot straight into it via
     aura-settings.json's default_scene."""
-    runtime = build_scene_runtime(_fake_hw(), "ir_range_receiver")
+    runtime = build_scene_runtime(
+        _fake_hw(), "ir_range_receiver", scene_registry=_boot_scene_registry()
+    )
 
     assert runtime.manager.active_state is not None
 
@@ -60,14 +78,16 @@ def test_ir_range_receiver_scene_boots_and_activates_via_the_standard_pipeline()
 def test_unknown_scene_name_raises_naming_the_known_scenes():
     """An unregistered scene name fails loudly instead of falling back to hardware_test."""
     with pytest.raises(ValueError, match="hardware_test"):
-        build_scene_runtime(_fake_hw(), "not-a-real-scene")
+        build_scene_runtime(_fake_hw(), "not-a-real-scene", scene_registry=_boot_scene_registry())
 
 
 def test_ir_range_transmitter_scene_is_auto_discovered_by_the_default_disk_scan():
-    """packs/scenes/ir_range_transmitter is picked up with no scene_registry
-    override -- the same disk scan scene_demo.py's run_scene() uses to resolve
-    "ir_range_transmitter" as a flash-configured default_scene (issue #919)."""
-    runtime = build_scene_runtime(_fake_hw(), "ir_range_transmitter")
+    """packs/scenes/ir_range_transmitter is picked up by scan_boot_scene_registry's
+    flash disk scan -- the same disk scan scene_demo.py's run_scene() uses to
+    resolve "ir_range_transmitter" as a flash-configured default_scene (issue #919)."""
+    runtime = build_scene_runtime(
+        _fake_hw(), "ir_range_transmitter", scene_registry=_boot_scene_registry()
+    )
 
     assert runtime.manager.active_state is not None
 
@@ -76,7 +96,11 @@ def test_ir_range_transmitter_sends_an_ir_packet_on_line_with_no_button_press():
     """The scene auto-starts transmitting on boot: a bare sensor heartbeat with
     no button pressed is enough to trigger a send on LINE (issue #919)."""
     network_spy = SpyNetworkControls()
-    runtime = build_scene_runtime(_fake_hw(network_controls=network_spy), "ir_range_transmitter")
+    runtime = build_scene_runtime(
+        _fake_hw(network_controls=network_spy),
+        "ir_range_transmitter",
+        scene_registry=_boot_scene_registry(),
+    )
 
     runtime.manager.active_state.queue_event(InputEvents.Sensors(ButtonData(states={})))
     runtime.manager.update()
@@ -143,6 +167,105 @@ def test_persisted_scene_unknown_to_the_registry_raises_naming_the_known_scenes(
 
     with pytest.raises(ValueError, match="red_light_green_light"):
         resolve_boot_scene_name(scene_registry, storage, {"default_scene": "red_light_green_light"})
+
+
+# ---------------------------------------------------------------------------
+# scan_boot_scene_registry: complete boot registry, flash + card (issue #923)
+#
+# These compose scan_boot_scene_registry with resolve_boot_scene_name, over a
+# real DeviceStorage (the card_storage fixture, defined further below) rather
+# than FakeDeviceStorage, because the card leg under test -- _scan_card_scenes
+# -- scans a real filesystem directory tree.
+# ---------------------------------------------------------------------------
+
+
+def test_a_card_scene_named_as_the_persisted_sd_scene_resolves(card_storage):
+    """A card scene named as the persisted SD 'scene' resolves at boot -- the
+    registry scan_boot_scene_registry builds already carries card scenes, so
+    resolve_boot_scene_name's registry-validation step finds it instead of
+    raising "unknown scene" (the bug issue #923 fixes)."""
+    _make_card_scene(Path(card_storage.mount_root), "card_scene")
+    card_storage.write_json("aura-state.json", {"scene": "card_scene"})
+
+    scene_registry = scan_boot_scene_registry(card_storage)
+    scene_name = resolve_boot_scene_name(scene_registry, card_storage, {})
+
+    assert scene_name == "card_scene"
+
+
+def test_a_card_scene_named_as_the_flash_default_scene_resolves(card_storage):
+    """A card scene named as the flash 'default_scene' resolves at boot, with
+    no persisted SD override in play."""
+    _make_card_scene(Path(card_storage.mount_root), "card_scene")
+
+    scene_registry = scan_boot_scene_registry(card_storage)
+    scene_name = resolve_boot_scene_name(
+        scene_registry, card_storage, {"default_scene": "card_scene"}
+    )
+
+    assert scene_name == "card_scene"
+
+
+def test_a_persisted_card_scene_wins_over_a_flash_default_scene(card_storage):
+    """Navigating into a card scene and rebooting persists its name as the SD
+    'scene' -- it must win over a *different*, also-valid flash default
+    rather than raising "unknown scene": the reboot-survival case issue #923
+    fixes."""
+    _make_card_scene(Path(card_storage.mount_root), "card_scene")
+    card_storage.write_json("aura-state.json", {"scene": "card_scene"})
+
+    scene_registry = scan_boot_scene_registry(card_storage)
+    scene_name = resolve_boot_scene_name(scene_registry, card_storage, {"default_scene": "tag"})
+
+    assert scene_name == "card_scene"
+
+
+def test_card_less_storage_yields_a_flash_only_registry_and_a_card_only_name_raises():
+    """storage=None (card-less device) is unaffected: scan_boot_scene_registry
+    yields a flash-only registry, so a name that only exists on a (nonexistent)
+    card still raises naming the known flash scenes."""
+    scene_registry = scan_boot_scene_registry(None)
+
+    with pytest.raises(ValueError, match="hardware_test"):
+        resolve_boot_scene_name(scene_registry, None, {"default_scene": "card_scene"})
+
+
+def test_scan_boot_scene_registry_with_a_card_but_no_aura_packs_directory_is_flash_only(
+    card_storage,
+):
+    """A mounted card carrying no top-level aura_packs/ at all contributes
+    nothing -- the registry is flash-only, exactly as a card-less boot."""
+    scene_registry = scan_boot_scene_registry(card_storage)
+
+    scene_name = resolve_boot_scene_name(scene_registry, card_storage, {"default_scene": "tag"})
+
+    assert scene_name == "tag"
+
+
+def test_unknown_boot_scene_name_raises_naming_both_flash_and_card_scenes(card_storage):
+    """A name unknown to either source fails loudly naming every scene the
+    complete registry carries -- both flash and card scenes are listed."""
+    _make_card_scene(Path(card_storage.mount_root), "card_scene")
+    scene_registry = scan_boot_scene_registry(card_storage)
+
+    with pytest.raises(ValueError) as exc_info:
+        resolve_boot_scene_name(scene_registry, card_storage, {"default_scene": "not-a-real-scene"})
+
+    assert "card_scene" in str(exc_info.value)
+    assert "hardware_test" in str(exc_info.value)
+
+
+def test_scan_boot_scene_registry_raises_when_a_card_scene_name_collides_with_a_flash_scene(
+    card_storage,
+):
+    """A card scene sharing a name with a flash scene is the existing
+    cross-root collision SceneRegistry.scan_dir already enforces -- it must
+    halt boot loudly during the registry scan itself, before build_scene_runtime
+    is ever reached, rather than silently picking one source over the other."""
+    _make_card_scene(Path(card_storage.mount_root), "tag")
+
+    with pytest.raises(ValueError, match="tag"):
+        scan_boot_scene_registry(card_storage)
 
 
 # ---------------------------------------------------------------------------
@@ -243,7 +366,7 @@ def test_build_scene_runtime_with_no_scene_reboot_supplied_still_activates_a_sce
     """Omitting scene_reboot falls back to a base (unreachable) SceneReboot --
     SceneManager's non-optional seam is satisfied and scene activation is
     otherwise unaffected, even though no rule in this test ever reboots."""
-    runtime = build_scene_runtime(_fake_hw(), "tag")
+    runtime = build_scene_runtime(_fake_hw(), "tag", scene_registry=_boot_scene_registry())
 
     assert runtime.manager.active_state is not None
 
@@ -265,7 +388,7 @@ class _RecordingIrTransceiver:
 def test_build_scene_runtime_exposes_the_hardware_bundles_ir_as_runtime_ir():
     """SceneRuntime.ir must be the exact hw.ir instance, not a wrapper or copy."""
     ir = _RecordingIrTransceiver()
-    runtime = build_scene_runtime(_fake_hw(ir=ir), "tag")
+    runtime = build_scene_runtime(_fake_hw(ir=ir), "tag", scene_registry=_boot_scene_registry())
 
     assert runtime.ir is ir
 
@@ -273,7 +396,7 @@ def test_build_scene_runtime_exposes_the_hardware_bundles_ir_as_runtime_ir():
 def test_build_scene_runtime_ir_is_none_when_the_hardware_bundle_has_no_ir():
     """A device with no ir section wired (hw.ir is None) carries that through
     to the runtime unchanged, rather than substituting a placeholder."""
-    runtime = build_scene_runtime(_fake_hw(ir=None), "tag")
+    runtime = build_scene_runtime(_fake_hw(ir=None), "tag", scene_registry=_boot_scene_registry())
 
     assert runtime.ir is None
 
@@ -296,7 +419,9 @@ class _RecordingRadioTransceiver:
 def test_build_scene_runtime_exposes_the_hardware_bundles_radio_as_runtime_radio():
     """SceneRuntime.radio must be the exact hw.radio instance, not a wrapper or copy."""
     radio = _RecordingRadioTransceiver()
-    runtime = build_scene_runtime(_fake_hw(radio=radio), "tag")
+    runtime = build_scene_runtime(
+        _fake_hw(radio=radio), "tag", scene_registry=_boot_scene_registry()
+    )
 
     assert runtime.radio is radio
 
@@ -304,7 +429,9 @@ def test_build_scene_runtime_exposes_the_hardware_bundles_radio_as_runtime_radio
 def test_build_scene_runtime_radio_is_none_when_the_hardware_bundle_has_no_radio():
     """A device with no radio peripheral wired (hw.radio is None) carries that
     through to the runtime unchanged, rather than substituting a placeholder."""
-    runtime = build_scene_runtime(_fake_hw(radio=None), "tag")
+    runtime = build_scene_runtime(
+        _fake_hw(radio=None), "tag", scene_registry=_boot_scene_registry()
+    )
 
     assert runtime.radio is None
 
@@ -319,7 +446,7 @@ def test_build_scene_runtime_scans_effect_pack_sounds_into_the_devices_audio_reg
     by pack name, so basic.game_over_sting_start resolves once the runtime is built."""
     hw = _fake_hw(audio_registry=AudioRegistry())
 
-    build_scene_runtime(hw, "hardware_test")
+    build_scene_runtime(hw, "hardware_test", scene_registry=_boot_scene_registry())
 
     assert (
         hw.audio_registry.path("basic.game_over_sting_start")
@@ -337,7 +464,7 @@ def test_build_scene_runtime_installs_hardware_test_scenes_sounds_as_the_active_
     resolves through the same registry AudioEffectOutput would use on real hardware."""
     hw = _fake_hw(audio_registry=AudioRegistry())
 
-    build_scene_runtime(hw, "hardware_test")
+    build_scene_runtime(hw, "hardware_test", scene_registry=_boot_scene_registry())
 
     assert (
         hw.audio_registry.path("scene.sfx_test_start")
@@ -350,7 +477,7 @@ def test_build_scene_runtime_with_no_audio_registry_skips_scan_and_still_activat
     base scan and no overlay wiring, but scene activation is otherwise unaffected."""
     hw = _fake_hw()
 
-    runtime = build_scene_runtime(hw, "hardware_test")
+    runtime = build_scene_runtime(hw, "hardware_test", scene_registry=_boot_scene_registry())
 
     assert hw.audio_registry is None
     receipt = runtime.effect_manager.set_effect(Scope.PERSONAL, "scene.sfx_test", {})
@@ -368,7 +495,7 @@ def test_build_scene_runtime_installs_tag_scenes_sounds_as_the_active_overlay():
     registry AudioEffectOutput would use on real hardware."""
     hw = _fake_hw(audio_registry=AudioRegistry())
 
-    build_scene_runtime(hw, "tag")
+    build_scene_runtime(hw, "tag", scene_registry=_boot_scene_registry())
 
     for stem in (
         "fire_shot_start",
@@ -388,7 +515,7 @@ def test_build_scene_runtime_resolves_tags_shared_game_over_sting_via_the_basic_
     own -- it must resolve from the base scan, not from tag's sounds/ overlay."""
     hw = _fake_hw(audio_registry=AudioRegistry())
 
-    build_scene_runtime(hw, "tag")
+    build_scene_runtime(hw, "tag", scene_registry=_boot_scene_registry())
 
     assert (
         hw.audio_registry.path("basic.game_over_sting_start")
@@ -408,7 +535,7 @@ def test_build_scene_runtime_installs_rlgls_sounds_as_the_active_overlay():
     hardware."""
     hw = _fake_hw(audio_registry=AudioRegistry())
 
-    build_scene_runtime(hw, "red_light_green_light")
+    build_scene_runtime(hw, "red_light_green_light", scene_registry=_boot_scene_registry())
 
     for stem in (
         "green_light_music_start",
@@ -429,7 +556,7 @@ def test_build_scene_runtime_resolves_rlgls_shared_game_over_sting_via_the_basic
     own -- it must resolve from the base scan, not from rlgl's sounds/ overlay."""
     hw = _fake_hw(audio_registry=AudioRegistry())
 
-    build_scene_runtime(hw, "red_light_green_light")
+    build_scene_runtime(hw, "red_light_green_light", scene_registry=_boot_scene_registry())
 
     assert (
         hw.audio_registry.path("basic.game_over_sting_start")
@@ -550,7 +677,9 @@ def test_build_scene_runtime_discovers_and_activates_a_card_scene(card_storage):
     _make_card_scene(Path(card_storage.mount_root), "card_scene")
     hw = _fake_hw(storage=card_storage)
 
-    runtime = build_scene_runtime(hw, "card_scene")
+    runtime = build_scene_runtime(
+        hw, "card_scene", scene_registry=_boot_scene_registry(card_storage)
+    )
 
     assert runtime.manager.active_state is not None
 
@@ -562,7 +691,9 @@ def test_card_scenes_local_rule_imports_off_the_card_and_handles_events(card_sto
     _add_card_scene_rule(scene_dir, "card_rule", _CARD_RULE_SOURCE)
     hw = _fake_hw(storage=card_storage)
 
-    runtime = build_scene_runtime(hw, "card_scene")
+    runtime = build_scene_runtime(
+        hw, "card_scene", scene_registry=_boot_scene_registry(card_storage)
+    )
     runtime.manager.active_state.queue_event(Event(_CARD_TEST_EVENT_GROUP, "ping"))
     runtime.manager.update()
 
@@ -576,7 +707,9 @@ def test_card_scenes_local_effect_imports_off_the_card_and_resolves_at_runtime(c
     _add_card_scene_effect(scene_dir, "card_effect", _CARD_EFFECT_SOURCE)
     hw = _fake_hw(storage=card_storage)
 
-    runtime = build_scene_runtime(hw, "card_scene")
+    runtime = build_scene_runtime(
+        hw, "card_scene", scene_registry=_boot_scene_registry(card_storage)
+    )
     receipt = runtime.effect_manager.set_effect(Scope.PERSONAL, "scene.card_effect", {})
 
     assert receipt is not None
@@ -590,7 +723,7 @@ def test_card_scenes_bundled_sound_resolves_to_its_on_card_path(card_storage):
     _add_card_scene_sound(scene_dir, "card_clip")
     hw = _fake_hw(storage=card_storage, audio_registry=AudioRegistry())
 
-    build_scene_runtime(hw, "card_scene")
+    build_scene_runtime(hw, "card_scene", scene_registry=_boot_scene_registry(card_storage))
 
     expected_path = str(scene_dir / "sounds" / "card_clip.wav")
     assert hw.audio_registry.path("scene.card_clip") == expected_path
@@ -604,9 +737,10 @@ def test_repeat_build_scene_runtime_calls_never_duplicate_the_mount_root_in_sys_
     not just performed once per process by accident."""
     _make_card_scene(Path(card_storage.mount_root), "card_scene")
     hw = _fake_hw(storage=card_storage)
+    scene_registry = _boot_scene_registry(card_storage)
 
-    build_scene_runtime(hw, "card_scene")
-    build_scene_runtime(hw, "card_scene")
+    build_scene_runtime(hw, "card_scene", scene_registry=scene_registry)
+    build_scene_runtime(hw, "card_scene", scene_registry=scene_registry)
 
     assert sys.path.count(card_storage.mount_root) == 1
 
@@ -616,7 +750,7 @@ def test_device_with_no_storage_leaves_sys_path_unmutated():
     flash scenes are ever discovered."""
     path_before = list(sys.path)
 
-    build_scene_runtime(_fake_hw(), "tag")
+    build_scene_runtime(_fake_hw(), "tag", scene_registry=_boot_scene_registry())
 
     assert sys.path == path_before
 
@@ -627,8 +761,9 @@ def test_card_with_no_aura_packs_directory_leaves_sys_path_unmutated(card_storag
     being non-None."""
     path_before = list(sys.path)
     hw = _fake_hw(storage=card_storage)
+    scene_registry = _boot_scene_registry(card_storage)
 
-    build_scene_runtime(hw, "tag")
+    build_scene_runtime(hw, "tag", scene_registry=scene_registry)
 
     assert sys.path == path_before
 
@@ -638,7 +773,7 @@ def test_card_with_no_aura_packs_directory_still_activates_a_flash_scene(card_st
     scene selection still works normally despite the (no-op) card scan."""
     hw = _fake_hw(storage=card_storage)
 
-    runtime = build_scene_runtime(hw, "tag")
+    runtime = build_scene_runtime(hw, "tag", scene_registry=_boot_scene_registry(card_storage))
 
     assert runtime.manager.active_state is not None
 
@@ -651,21 +786,16 @@ def test_card_with_aura_packs_but_no_scenes_subdirectory_is_a_clean_no_op(card_s
     (aura_packs / "__init__.py").touch()
     hw = _fake_hw(storage=card_storage)
 
-    runtime = build_scene_runtime(hw, "tag")
+    runtime = build_scene_runtime(hw, "tag", scene_registry=_boot_scene_registry(card_storage))
 
     assert card_storage.mount_root in sys.path
     assert runtime.manager.active_state is not None
 
 
-def test_card_scene_name_colliding_with_a_flash_scene_raises_at_scan_time(card_storage):
-    """A card scene sharing a name with a flash scene is the existing cross-root
-    collision SceneRegistry.scan_dir already enforces -- it must halt boot loudly
-    rather than silently picking one source over the other."""
-    _make_card_scene(Path(card_storage.mount_root), "tag")
-    hw = _fake_hw(storage=card_storage)
-
-    with pytest.raises(ValueError, match="tag"):
-        build_scene_runtime(hw, "tag")
+# A card scene name colliding with a flash scene now raises during the
+# registry scan itself -- before build_scene_runtime is ever reached. See
+# test_scan_boot_scene_registry_raises_when_a_card_scene_name_collides_with_a_flash_scene
+# in the scan_boot_scene_registry section above (issue #923).
 
 
 # ---------------------------------------------------------------------------
@@ -744,7 +874,9 @@ def test_card_scene_can_reference_and_run_a_card_rule_packs_rule(card_storage):
     )
     hw = _fake_hw(storage=card_storage)
 
-    runtime = build_scene_runtime(hw, "card_scene")
+    runtime = build_scene_runtime(
+        hw, "card_scene", scene_registry=_boot_scene_registry(card_storage)
+    )
     runtime.manager.active_state.queue_event(Event(_CARD_TEST_EVENT_GROUP, "ping"))
     runtime.manager.update()
 
@@ -754,14 +886,16 @@ def test_card_scene_can_reference_and_run_a_card_rule_packs_rule(card_storage):
 def test_card_rule_pack_name_colliding_with_a_flash_rule_pack_raises_at_scan_time(card_storage):
     """A card rule pack sharing a name with a flash rule pack (packs/rules/debug)
     is the existing PackRegistry.scan_dir cross-root collision -- it must halt
-    boot loudly rather than silently picking one source over the other."""
+    boot loudly rather than silently picking one source over the other. Rule
+    packs stay build-internal to build_scene_runtime (unlike scenes), so this
+    raise still happens there, not during scan_boot_scene_registry."""
     _make_card_rule_pack(
         Path(card_storage.mount_root), "debug", "card_rule", _CARD_RULE_PACK_SOURCE
     )
     hw = _fake_hw(storage=card_storage)
 
     with pytest.raises(ValueError, match="debug"):
-        build_scene_runtime(hw, "tag")
+        build_scene_runtime(hw, "tag", scene_registry=_boot_scene_registry(card_storage))
 
 
 def test_card_with_no_rules_subdirectory_is_a_clean_no_op_for_rule_packs(card_storage):
@@ -773,7 +907,7 @@ def test_card_with_no_rules_subdirectory_is_a_clean_no_op_for_rule_packs(card_st
     (aura_packs / "__init__.py").touch()
     hw = _fake_hw(storage=card_storage)
 
-    runtime = build_scene_runtime(hw, "tag")
+    runtime = build_scene_runtime(hw, "tag", scene_registry=_boot_scene_registry(card_storage))
 
     assert card_storage.mount_root in sys.path
     assert runtime.manager.active_state is not None
@@ -884,7 +1018,9 @@ def test_card_scene_resolves_a_card_effect_pack_end_to_end(card_storage):
     )
     hw = _fake_hw(storage=card_storage)
 
-    runtime = build_scene_runtime(hw, "card_scene")
+    runtime = build_scene_runtime(
+        hw, "card_scene", scene_registry=_boot_scene_registry(card_storage)
+    )
     receipt = runtime.effect_manager.set_effect(Scope.PERSONAL, "card_pack.glow", {})
 
     assert receipt is not None
@@ -893,12 +1029,14 @@ def test_card_scene_resolves_a_card_effect_pack_end_to_end(card_storage):
 def test_card_effect_pack_name_colliding_with_a_flash_pack_raises_at_scan_time(card_storage):
     """A card effect pack sharing a name with a flash effect pack is the
     existing cross-root collision PackRegistry.scan_dir already enforces for
-    scenes -- it must halt boot loudly rather than silently picking a source."""
+    scenes -- it must halt boot loudly rather than silently picking a source.
+    Effect packs stay build-internal to build_scene_runtime (unlike scenes),
+    so this raise still happens there, not during scan_boot_scene_registry."""
     _make_card_effect_pack(Path(card_storage.mount_root), "basic")
     hw = _fake_hw(storage=card_storage)
 
     with pytest.raises(ValueError, match="basic"):
-        build_scene_runtime(hw, "tag")
+        build_scene_runtime(hw, "tag", scene_registry=_boot_scene_registry(card_storage))
 
 
 def test_card_with_aura_packs_but_no_effects_subdirectory_is_a_clean_no_op(card_storage):
@@ -910,7 +1048,7 @@ def test_card_with_aura_packs_but_no_effects_subdirectory_is_a_clean_no_op(card_
     (aura_packs / "__init__.py").touch()
     hw = _fake_hw(storage=card_storage)
 
-    runtime = build_scene_runtime(hw, "tag")
+    runtime = build_scene_runtime(hw, "tag", scene_registry=_boot_scene_registry(card_storage))
 
     assert card_storage.mount_root in sys.path
     assert runtime.manager.active_state is not None

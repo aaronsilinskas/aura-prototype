@@ -10,11 +10,15 @@ from __future__ import annotations
 
 import gc
 
-from app.scene_composition import build_scene_runtime, resolve_boot_scene_name, resolve_ir_codec
+from app.scene_composition import (
+    build_scene_runtime,
+    resolve_boot_scene_name,
+    resolve_ir_codec,
+    scan_boot_scene_registry,
+)
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
 from engine.network import NetworkEvents
-from engine.scene import SceneRegistry
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
 from hardware.circuitpython.device_reboot import DeviceSceneReboot
 from hardware.shared.device_settings import read_settings_mapping
@@ -32,17 +36,22 @@ __all__ = ["run_scene"]
 def run_scene() -> None:
     """Bring hardware up via ``build_hardware`` and run the resolved boot scene forever.
 
-    Scans a single ``SceneRegistry`` up front, then calls ``build_hardware``
-    with no codec override (it wires the IR subsystem with its default Aura
-    wire-frame). Only after the build returns -- once ``hw.storage`` reflects
-    whatever SD card is mounted -- is the boot scene resolved, via
+    Calls ``build_hardware`` first, with no codec override (it wires the IR
+    subsystem with its default Aura wire-frame). Only after the build returns
+    -- once ``hw.storage`` reflects whatever SD card is mounted -- is the
+    complete boot-time scene registry built, via
+    ``scan_boot_scene_registry(hw.storage)``: flash ``packs/scenes`` plus,
+    when a card is mounted, its ``aura_packs/scenes``, in the one registry
+    every remaining boot step shares. The boot scene is then resolved via
     ``resolve_boot_scene_name``: a persisted SD ``scene`` (``aura-state.json``)
     overrides the flash ``default_scene`` (``aura-settings.json``), falling
     back to the flash default on a card-less device (``hw.storage is None``)
     or when no override is persisted, and raising when neither is set. The
-    resolved name is validated against the scanned registry as part of that
-    same call, so an unknown name -- persisted or flash-authored -- fails
-    loudly, naming the known scenes.
+    resolved name is validated against the complete registry as part of that
+    same call, so an unknown name -- persisted or flash-authored, flash or
+    card scene -- fails loudly, naming the known scenes. This is also what
+    lets a card scene named as the persisted ``scene`` or the flash
+    ``default_scene`` resolve instead of raising "unknown scene."
 
     Accepted consequence: unlike the old flash-only resolution this replaces,
     that unknown-scene fail-fast can no longer run ahead of ``build_hardware``
@@ -55,9 +64,9 @@ def run_scene() -> None:
     scene declares it) and applies it onto the built ``hw.ir`` via
     ``InfraredTransceiver.apply_codec``, before the first tick -- so the
     correct codec is still in effect from the first tick even though it is
-    selected after the build. The same registry is passed into
-    ``build_scene_runtime`` so the scene is scanned exactly once for the
-    whole boot sequence.
+    selected after the build. The same complete registry is passed into
+    ``build_scene_runtime``, which now requires it and scans no scenes of its
+    own, so a scene is scanned exactly once for the whole boot sequence.
 
     Drives ``runtime.ir.update()`` every tick (see
     :class:`~hardware.shared.ir_transceiver.InfraredTransceiver`), which owns
@@ -90,12 +99,11 @@ def run_scene() -> None:
     ``resolve_known_scene``) is unit-tested separately in
     ``app/tests/test_scene_composition.py``.
     """
-    scene_registry = SceneRegistry()
-    scene_registry.scan_dir("packs/scenes", "packs.scenes")
-
     config = load_device_config()
     hw_logger = Logger("[hw]")
     hw = build_hardware(config, logger=hw_logger)
+
+    scene_registry = scan_boot_scene_registry(hw.storage)
 
     settings_mapping = read_settings_mapping()
     scene_name = resolve_boot_scene_name(
