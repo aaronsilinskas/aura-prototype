@@ -111,7 +111,7 @@ class SdSyncClient:
             f"CRC-32 mismatch pulling {sd_path!r} after {self._max_attempts} attempt(s)"
         )
 
-    def list_files(self, sd_subpath: str = "") -> "list[tuple[str, int]]":
+    def list_files(self, sd_subpath: str = "") -> list[tuple[str, int]]:
         """Return the server's enumeration of *sd_subpath* on the SD card.
 
         Args:
