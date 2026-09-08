@@ -7,9 +7,12 @@ owns no serial code -- ``Transport`` is an injected port, so the same server
 logic runs against the real device's data CDC channel or an in-memory loopback
 without change.
 
-Ships the ``pull`` verb (served by :meth:`serve_pull`) and the ``push`` verb
-(served by :meth:`serve_push`), sharing the same streaming/CRC-32 machinery in
-opposite directions; ``list`` is a later verb.
+Three verbs ship: ``pull`` (served by :meth:`serve_pull`), which streams a
+file's bytes chunk-by-chunk with a whole-file CRC-32 for the client to verify;
+``push`` (served by :meth:`serve_push`), which streams bytes the opposite
+direction through the same CRC-32 machinery; and ``list`` (served by
+:meth:`serve_list`), which enumerates a subtree via ``DeviceStorage.walk`` and
+replies with the whole listing in one frame.
 
 Card-less (``storage is None``, i.e. no ``sdcard`` section in ``aura-device.json``)
 makes every verb reply with a clear ``"no_storage"`` response instead of raising
@@ -36,6 +39,7 @@ from hardware.shared.sd_sync_protocol import (
     Transport,
     decode_frame,
     encode_frame,
+    encode_listing,
 )
 
 __all__ = ["SdSyncServer"]
@@ -97,6 +101,24 @@ class SdSyncServer:
             chunks: The file's content, in order.
         """
         self._storage.write_chunks(sd_path, chunks)
+
+    def list(self, subpath: str = "") -> list[tuple[str, int]] | None:
+        """Enumerate every file under *subpath*, or ``None`` if this server has no storage.
+
+        A thin read through the injected storage's
+        :meth:`~hardware.shared.device_storage.DeviceStorage.walk`. Unlike
+        :meth:`read`, there is no per-path "not found" case here -- a missing
+        or empty subtree is simply an empty list; ``None`` means only "this
+        server was built with no storage," mirroring how ``storage is None``
+        replies ``"no_storage"`` on the wire instead of raising.
+
+        Args:
+            subpath: Mount-relative subtree to enumerate; the default (empty
+                string) lists the whole card root.
+        """
+        if self._storage is None:
+            return None
+        return self._storage.walk(subpath)
 
     def serve_pull(self, transport: Transport) -> None:
         """Receive one ``pull`` request on *transport* and serve it to completion.
@@ -193,3 +215,26 @@ class SdSyncServer:
             crc = binascii.crc32(frame.payload, crc)
             transport.send(encode_frame(Frame("ack", frame.text)))
             yield frame.payload
+
+    def serve_list(self, transport: Transport) -> None:
+        """Receive one ``list`` request on *transport* and reply with its enumeration.
+
+        Replies ``"no_storage"`` when this server was built with no storage
+        -- the same in-band response :meth:`serve_pull` uses instead of
+        raising, since a listing request against a card-less device is
+        routine. Otherwise replies ``"ok"`` with the enumeration from
+        :meth:`list` serialized into the response frame's payload via
+        :func:`~hardware.shared.sd_sync_protocol.encode_listing`.
+
+        Args:
+            transport: The port to receive the request from and reply on.
+        """
+        request = decode_frame(transport.recv())
+        _, _, subpath = request.text.partition(" ")
+
+        entries = self.list(subpath)
+        if entries is None:
+            transport.send(encode_frame(Frame("resp", "no_storage")))
+            return
+
+        transport.send(encode_frame(Frame("resp", "ok", encode_listing(entries))))
