@@ -27,6 +27,7 @@ import json
 import os
 
 try:
+    from collections.abc import Iterator
     from typing import Final
 except ImportError:
     pass
@@ -116,6 +117,51 @@ class DeviceStorage:
             if e.errno != errno.ENOENT:
                 raise  # Anything but "not written yet" is a real failure.
             return None
+
+    def read_chunks(self, name: str, chunk_size: int) -> "Iterator[bytes] | None":
+        """Yield *name*'s contents in *chunk_size*-byte pieces, or ``None`` if never written.
+
+        Opens the file once and reads it *chunk_size* bytes at a time, so a
+        streaming caller (e.g. :meth:`hardware.shared.sd_sync_server.SdSyncServer.read`)
+        never holds more than one chunk of the file in memory at once -- unlike
+        :meth:`read_bytes`, which buffers the whole file. The handle stays open
+        for the lifetime of the generator and is closed once it is exhausted or
+        the caller stops iterating early (via ``GeneratorExit`` on ``close()`` or
+        garbage collection).
+
+        Args:
+            name: File name or subpath under the mount root.
+            chunk_size: Maximum number of bytes to read per yielded chunk.
+
+        Raises:
+            ValueError: *name* escapes the mount root (``..`` or an
+                absolute path).
+        """
+        resolved = self._resolve(name)
+        try:
+            f = open(resolved, "rb")  # noqa: SIM115 -- handle outlives this method; see below
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise  # Anything but "not written yet" is a real failure.
+            return None
+        return self._read_open_file_in_chunks(f, chunk_size)
+
+    def _read_open_file_in_chunks(self, f, chunk_size: int) -> "Iterator[bytes]":
+        """Yield successive *chunk_size* reads from already-open file *f*, closing it when done.
+
+        A separate generator function so :meth:`read_chunks` itself stays a
+        plain method that can return ``None`` immediately on a missing file --
+        a ``def`` containing ``yield`` always returns a generator object, even
+        on the first line, so the ``ENOENT`` check has to live outside it.
+        """
+        try:
+            while True:
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    return
+                yield chunk
+        finally:
+            f.close()
 
     def write_bytes(self, name: str, data: bytes) -> None:
         """Durably, atomically-as-FAT-allows replace *name* with *data*.

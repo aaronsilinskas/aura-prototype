@@ -23,13 +23,18 @@ from __future__ import annotations
 
 import binascii
 
+try:
+    from collections.abc import Iterator
+except ImportError:
+    pass  # Not available on all embedded runtimes
+
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.sd_sync_protocol import (
+    CHUNK_SIZE,
     Frame,
     Transport,
     decode_frame,
     encode_frame,
-    iter_chunks,
 )
 
 __all__ = ["SdSyncServer"]
@@ -46,18 +51,22 @@ class SdSyncServer:
     def __init__(self, storage: DeviceStorage | None) -> None:
         self._storage = storage
 
-    def read(self, sd_path: str) -> bytes | None:
-        """Return *sd_path*'s full contents, or ``None`` if it was never written.
+    def read(self, sd_path: str) -> Iterator[bytes] | None:
+        """Stream *sd_path*'s contents in wire-sized chunks, or ``None`` if never written.
 
-        A thin read through the injected storage; :meth:`serve_pull` is what
-        turns the result into bounded, acknowledged wire chunks -- this method
-        exists as its own seam so a caller (or a future verb) can reuse the
-        read without going through the wire protocol.
+        A thin read through the injected storage's
+        :meth:`~hardware.shared.device_storage.DeviceStorage.read_chunks` --
+        the file is read chunk-by-chunk off disk, never buffered whole, so
+        transfer memory is bounded by one chunk rather than by the file (see
+        the parent spec's bounded-memory contract). :meth:`serve_pull` is what
+        turns the chunks into acknowledged wire frames -- this method exists
+        as its own seam so a caller (or a future verb) can reuse the
+        streaming read without going through the wire protocol.
 
         Args:
             sd_path: The file's path, relative to the SD mount root.
         """
-        return self._storage.read_bytes(sd_path)
+        return self._storage.read_chunks(sd_path, CHUNK_SIZE)
 
     def serve_pull(self, transport: Transport) -> None:
         """Receive one ``pull`` request on *transport* and serve it to completion.
@@ -66,11 +75,12 @@ class SdSyncServer:
         or ``"not_found"`` when *sd_path* was never written -- both clear,
         in-band responses rather than a raised exception, since either is a
         routine outcome from the client's perspective. Otherwise replies
-        ``"ok"`` with the file size, then streams the file as a sequence of
-        :data:`~hardware.shared.sd_sync_protocol.CHUNK_SIZE`-bounded chunks,
-        waiting for the client's ``ack`` before sending the next (stop-and-
-        wait), and finishes with a ``done`` frame carrying the whole file's
-        incremental CRC-32 for the client to verify.
+        ``"ok"``, then streams the file as a sequence of
+        :data:`~hardware.shared.sd_sync_protocol.CHUNK_SIZE`-bounded chunks
+        read straight off disk by :meth:`read`, waiting for the client's
+        ``ack`` before sending the next (stop-and-wait), and finishes with a
+        ``done`` frame carrying the whole file's incremental CRC-32 for the
+        client to verify.
 
         Args:
             transport: The port to receive the request from and reply on.
@@ -82,15 +92,15 @@ class SdSyncServer:
             transport.send(encode_frame(Frame("resp", "no_storage")))
             return
 
-        data = self.read(sd_path)
-        if data is None:
+        chunks = self.read(sd_path)
+        if chunks is None:
             transport.send(encode_frame(Frame("resp", "not_found")))
             return
 
-        transport.send(encode_frame(Frame("resp", f"ok {len(data)}")))
+        transport.send(encode_frame(Frame("resp", "ok")))
 
         crc = 0
-        for seq, chunk in enumerate(iter_chunks(data)):
+        for seq, chunk in enumerate(chunks):
             crc = binascii.crc32(chunk, crc)
             transport.send(encode_frame(Frame("chunk", str(seq), chunk)))
             transport.recv()  # ack -- stop-and-wait; the seq is implied by order

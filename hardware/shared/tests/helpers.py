@@ -1,5 +1,10 @@
 """Shared test doubles for hardware/shared, importable across test modules."""
 
+try:
+    from collections.abc import Iterator
+except ImportError:
+    pass  # Not available on all embedded runtimes
+
 from hardware.shared.device_storage import decode_json, encode_json, reject_escaping_path
 
 __all__ = ["FakeDeviceStorage"]
@@ -28,6 +33,13 @@ class FakeDeviceStorage:
     def read_bytes(self, name: str) -> "bytes | None":
         self._guard(name)
         return self._files.get(name)
+
+    def read_chunks(self, name: str, chunk_size: int) -> "Iterator[bytes] | None":
+        self._guard(name)
+        data = self._files.get(name)
+        if data is None:
+            return None
+        return (data[start : start + chunk_size] for start in range(0, len(data), chunk_size))
 
     def write_bytes(self, name: str, data: bytes) -> None:
         self._guard(name)
