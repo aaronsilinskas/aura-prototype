@@ -281,6 +281,18 @@ _Avoid_: escaping the mount root (routes through `reject_escaping_path`); a seco
 The live CircuitPython `DeviceStorage` adapter mounting an SD card at construction — the only module importing `sdcardio`/`storage`, via a deferred import so a config with no `sdcard` section never requires either installed. `cs` is a raw `microcontroller.Pin`.
 _Avoid_: importing `sdcardio`/`storage` anywhere else; wrapping `cs` in `digitalio.DigitalInOut`; presence-probing instead of trusting the config gate
 
+### SdSyncServer
+The board-free device side of the SD-sync protocol, in `hardware/shared`; services a decoded request against one `DeviceStorage` (or `None`) over an injected `Transport`, owning no serial code. `storage is None` (no `sdcard` section) makes every verb reply with a clear `"no_storage"` response instead of raising. `read` is the verb primitive `serve_pull` streams over the wire; ships with `pull` in this ticket, `list`/`push` are later verbs reusing the same chunked/CRC machinery.
+_Avoid_: raising for "not found"/"no SD configured" (reply in-band instead — both are routine, not programming errors); asserting its wire-format internals in tests (assert only external behaviour: bytes read, responses returned)
+
+### SdSyncClient
+The board-free (CPython-only), host side of the SD-sync protocol, in `scripts/`; drives an `SdSyncServer` over an injected `Transport`. `pull(sd_path, host_path)` streams a file to a host path chunk-by-chunk (never buffering the whole file), verifying the server's per-file CRC-32 and retrying the whole transfer on mismatch; exhausted retries raise `SdSyncIntegrityError` rather than leaving a silently corrupt file. `SdSyncNotFoundError`/`SdSyncNoStorageError` surface the server's in-band "not found"/"no SD configured" responses as loud, typed failures instead of an empty host file.
+_Avoid_: opening the host file before the server confirms the pull will proceed (leaves an empty file on a "not found"); treating a CRC mismatch as chunk-level (it is whole-file, so a retry re-runs the entire pull)
+
+### SD-sync `Transport`
+The board-free port (`hardware/shared/sd_sync_protocol.py`) `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through — `send`/`recv` of one already-encoded `Frame` line at a time. The real serial adapter (pointed at the device's data CDC port) is a later ticket; a paired in-memory loopback stands in for CI, wiring the two board-free sides together without a device.
+_Avoid_: assuming the wire grammar (frame header shape, chunk size, ack shape) is a stable contract — it's a free implementation detail, not asserted directly in tests
+
 ### NeoPixelEffectOutput
 A CircuitPython `EffectOutput` driving **one** NeoPixel strip, subdivided into scope **segments** by pixel range; several strips may share a scope and are driven in sync.
 _Avoid_: the old per-scope shape (one strip per `Scope`); conflating segment length with `min_resolution`; a brightness field on this output; overlapping segments on one strip
