@@ -26,6 +26,8 @@ import errno
 import json
 import os
 
+from engine._path import isdir
+
 try:
     from typing import Final
 except ImportError:
@@ -34,11 +36,6 @@ except ImportError:
 __all__ = ["DeviceStorage", "decode_json", "encode_json", "reject_escaping_path"]
 
 _TEMP_SUFFIX: Final = ".tmp"
-
-# The directory bit of a POSIX st_mode, as returned by os.stat()[0]. Hand-rolled
-# rather than stat.S_ISDIR to avoid depending on the stat module's availability
-# on CircuitPython/MicroPython, mirroring engine._path's isdir/isfile fallbacks.
-_S_IFDIR: Final = 0x4000
 
 
 def reject_escaping_path(relative_path: str) -> None:
@@ -247,11 +244,10 @@ class DeviceStorage:
         for name in os.listdir(dir_path):
             child_path = dir_path + "/" + name
             relative_path = relative_prefix + "/" + name if relative_prefix else name
-            stat_result = os.stat(child_path)
-            if stat_result[0] & _S_IFDIR:
+            if isdir(child_path):
                 self._walk_into(child_path, relative_path, entries)
             else:
-                entries.append((relative_path, stat_result[6]))
+                entries.append((relative_path, os.stat(child_path)[6]))
 
     def _resolve(self, relative_path: str) -> str:
         """Join *relative_path* onto the mount root, rejecting any escape.
