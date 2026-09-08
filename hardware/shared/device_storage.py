@@ -26,6 +26,8 @@ import errno
 import json
 import os
 
+from engine._path import isdir
+
 try:
     from collections.abc import Iterator
     from typing import Final
@@ -251,6 +253,47 @@ class DeviceStorage:
                 absolute path).
         """
         return self._resolve(subpath)
+
+    def walk(self, subpath: str = "") -> "list[tuple[str, int]]":
+        """Recursively list every file under *subpath*, sorted by mount-relative path.
+
+        Files only -- directories are never reported as entries, only implied
+        by the file paths beneath them. Each returned path is mount-relative
+        (not relative to *subpath*), so it can be passed straight back into
+        :meth:`read_bytes`/:meth:`path`. There is no ``os.walk`` on
+        CircuitPython, so this recurses by hand via ``os.listdir`` +
+        ``os.stat``.
+
+        Args:
+            subpath: Mount-relative subtree to enumerate; the default (empty
+                string) walks the whole mount root.
+
+        Raises:
+            ValueError: *subpath* escapes the mount root (``..`` or an
+                absolute path).
+        """
+        root = self._resolve(subpath)
+        entries: list[tuple[str, int]] = []
+        self._walk_into(root, subpath.rstrip("/"), entries)
+        entries.sort()
+        return entries
+
+    def _walk_into(
+        self, dir_path: str, relative_prefix: str, entries: "list[tuple[str, int]]"
+    ) -> None:
+        """Append every file under *dir_path* to *entries*, recursing into subdirectories.
+
+        *relative_prefix* is the mount-relative path to *dir_path* itself, so
+        each appended entry carries its full mount-relative path rather than
+        one relative to :meth:`walk`'s starting subpath.
+        """
+        for name in os.listdir(dir_path):
+            child_path = dir_path + "/" + name
+            relative_path = relative_prefix + "/" + name if relative_prefix else name
+            if isdir(child_path):
+                self._walk_into(child_path, relative_path, entries)
+            else:
+                entries.append((relative_path, os.stat(child_path)[6]))
 
     def _resolve(self, relative_path: str) -> str:
         """Join *relative_path* onto the mount root, rejecting any escape.

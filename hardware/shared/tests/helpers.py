@@ -58,5 +58,23 @@ class FakeDeviceStorage:
         self._guard(subpath)
         return self._MOUNT_ROOT + "/" + subpath
 
+    def walk(self, subpath: str = "") -> "list[tuple[str, int]]":
+        """Mirror ``DeviceStorage.walk`` against the flat ``_files`` dict.
+
+        There is no directory modelling here -- each key in ``_files`` is
+        already the full mount-relative path a real ``DeviceStorage`` would
+        report, so scoping to *subpath* is a prefix filter rather than a
+        recursive descent.
+        """
+        self._guard(subpath)
+        prefix = subpath.rstrip("/")
+        entries: list[tuple[str, int]] = []
+        for name, data in self._files.items():
+            if prefix and name != prefix and not name.startswith(prefix + "/"):
+                continue
+            entries.append((name, len(data)))
+        entries.sort()
+        return entries
+
     def _guard(self, relative_path: str) -> None:
         reject_escaping_path(relative_path)
