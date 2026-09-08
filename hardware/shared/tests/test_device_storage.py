@@ -288,6 +288,60 @@ def test_failed_write_json_leaves_prior_content_intact(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# DeviceStorage — walk()
+# ---------------------------------------------------------------------------
+
+
+def test_walk_returns_every_file_recursively_with_its_size(tmp_path):
+    storage = DeviceStorage(str(tmp_path))
+    storage.write_bytes("root.txt", b"12345")
+    storage.write_bytes("scenes/tag/state.json", b"1234567890")
+
+    assert storage.walk() == [
+        ("root.txt", 5),
+        ("scenes/tag/state.json", 10),
+    ]
+
+
+def test_walk_scopes_to_a_named_subtree_and_keeps_mount_relative_paths(tmp_path):
+    storage = DeviceStorage(str(tmp_path))
+    storage.write_bytes("root.txt", b"12345")
+    storage.write_bytes("scenes/tag/state.json", b"1234567890")
+    storage.write_bytes("scenes/rlgl/state.json", b"12")
+
+    assert storage.walk("scenes/tag") == [("scenes/tag/state.json", 10)]
+
+
+def test_walk_sorts_entries_by_path_regardless_of_write_order(tmp_path):
+    storage = DeviceStorage(str(tmp_path))
+    storage.write_bytes("scenes/rlgl/state.json", b"12")
+    storage.write_bytes("scenes/tag/state.json", b"1234567890")
+    storage.write_bytes("scenes/anthem.wav", b"1")
+
+    assert storage.walk() == [
+        ("scenes/anthem.wav", 1),
+        ("scenes/rlgl/state.json", 2),
+        ("scenes/tag/state.json", 10),
+    ]
+
+
+def test_walk_returns_an_empty_list_for_a_subtree_with_no_files(tmp_path):
+    storage = DeviceStorage(str(tmp_path))
+    storage.write_bytes("scenes/tag/state.json", b"1234567890")
+    os.mkdir(str(tmp_path / "scenes" / "empty"))
+
+    assert storage.walk("scenes/empty") == []
+
+
+@pytest.mark.parametrize("escaping_subpath", ESCAPING_NAMES)
+def test_walk_rejects_a_subpath_that_escapes_the_mount_root(tmp_path, escaping_subpath):
+    storage = DeviceStorage(str(tmp_path))
+
+    with pytest.raises(ValueError):
+        storage.walk(escaping_subpath)
+
+
+# ---------------------------------------------------------------------------
 # FakeDeviceStorage — in-memory test double (hardware/shared/tests/helpers.py)
 # ---------------------------------------------------------------------------
 
@@ -420,3 +474,66 @@ def test_fake_write_json_rejects_a_name_that_escapes_the_mount_root(escaping_nam
 
     with pytest.raises(ValueError):
         storage.write_json(escaping_name, {"scene": "tag"})
+
+
+# ---------------------------------------------------------------------------
+# FakeDeviceStorage — walk()
+# ---------------------------------------------------------------------------
+
+
+def test_fake_walk_returns_every_file_recursively_with_its_size():
+    storage = FakeDeviceStorage()
+    storage.write_bytes("root.txt", b"12345")
+    storage.write_bytes("scenes/tag/state.json", b"1234567890")
+
+    assert storage.walk() == [
+        ("root.txt", 5),
+        ("scenes/tag/state.json", 10),
+    ]
+
+
+def test_fake_walk_scopes_to_a_named_subtree_and_keeps_mount_relative_paths():
+    storage = FakeDeviceStorage()
+    storage.write_bytes("root.txt", b"12345")
+    storage.write_bytes("scenes/tag/state.json", b"1234567890")
+    storage.write_bytes("scenes/rlgl/state.json", b"12")
+
+    assert storage.walk("scenes/tag") == [("scenes/tag/state.json", 10)]
+
+
+def test_fake_walk_does_not_treat_a_directory_name_prefix_as_matching():
+    """Guards the fake's string-prefix scoping against matching "scenes/ta"
+    onto a sibling directory named "scenes/tag" -- the drift risk called out
+    in issue #926, since the fake has no real directory boundaries to lean on."""
+    storage = FakeDeviceStorage()
+    storage.write_bytes("scenes/tag/state.json", b"1234567890")
+
+    assert storage.walk("scenes/ta") == []
+
+
+def test_fake_walk_sorts_entries_by_path_regardless_of_write_order():
+    storage = FakeDeviceStorage()
+    storage.write_bytes("scenes/rlgl/state.json", b"12")
+    storage.write_bytes("scenes/tag/state.json", b"1234567890")
+    storage.write_bytes("scenes/anthem.wav", b"1")
+
+    assert storage.walk() == [
+        ("scenes/anthem.wav", 1),
+        ("scenes/rlgl/state.json", 2),
+        ("scenes/tag/state.json", 10),
+    ]
+
+
+def test_fake_walk_returns_an_empty_list_for_a_subtree_with_no_files():
+    storage = FakeDeviceStorage()
+    storage.write_bytes("scenes/tag/state.json", b"1234567890")
+
+    assert storage.walk("scenes/empty") == []
+
+
+@pytest.mark.parametrize("escaping_subpath", ESCAPING_NAMES)
+def test_fake_walk_rejects_a_subpath_that_escapes_the_mount_root(escaping_subpath):
+    storage = FakeDeviceStorage()
+
+    with pytest.raises(ValueError):
+        storage.walk(escaping_subpath)
