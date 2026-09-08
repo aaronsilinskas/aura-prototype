@@ -25,7 +25,7 @@ from __future__ import annotations
 import binascii
 
 try:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator
 except ImportError:
     pass  # Not available on all embedded runtimes
 
@@ -80,7 +80,7 @@ class SdSyncServer:
         """
         return self._storage.read_chunks(sd_path, CHUNK_SIZE)
 
-    def write(self, sd_path: str, chunks: Iterator[bytes]) -> None:
+    def write(self, sd_path: str, chunks: Iterable[bytes]) -> None:
         """Durably replace *sd_path* with the streamed *chunks*, creating missing parent dirs.
 
         A thin write through the injected storage's
