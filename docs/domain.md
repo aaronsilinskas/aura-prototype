@@ -161,8 +161,10 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `DeviceSceneReboot` | `hardware/circuitpython/device_reboot.py` | Live `SceneReboot`: composes `DeviceStateStore` to persist, then calls `microcontroller.reset()` |
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol; services requests against a `DeviceStorage` (or `None`) over an injected `Transport`; `serve_one` dispatches one request to the right verb by its wire text |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol; `pull`/`push` stream a file between an SD path and a host path over an injected `Transport` |
-| `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port through which `SdSyncClient`/`SdSyncServer` exchange base64-framed lines; `FakeDeviceStorage`-backed loopback stands in for tests; live adapter is `UsbCdcTransport` |
+| `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port through which `SdSyncClient`/`SdSyncServer` exchange base64-framed lines; `FakeDeviceStorage`-backed loopback stands in for tests; live adapters are `UsbCdcTransport` (device) and `SerialTransport` (host) |
 | `UsbCdcTransport` | `hardware/circuitpython/usb_cdc_transport.py` | Live `Transport` framing SD-sync lines with a newline delimiter over any `read`/`write` stream (on-device, `usb_cdc.data`); needs no `usb_cdc` import itself, so it is CPython-testable against a fake stream |
+| `SerialTransport` | `scripts/sd_sync_transport.py` | Live host-side `Transport`, framing SD-sync lines the same way as `UsbCdcTransport` but over a host serial port opened via `deploy_watch`'s `SerialHandle`/`_open_serial_with_retry` |
+| `find_data_port` / `select_data_port` | `scripts/sd_sync_transport.py` | Data-channel port resolution for `scripts/sd_sync.py`: auto-detects via `adafruit_board_toolkit.circuitpython_serial.data_comports()`, single match wins, `--port` always overrides, zero/multiple matches raises `SdSyncPortError` |
 
 ---
 

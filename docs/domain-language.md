@@ -290,12 +290,20 @@ The board-free (CPython-only), host side of the SD-sync protocol, in `scripts/`;
 _Avoid_: opening the host file before the server confirms the pull will proceed (leaves an empty file on a "not found"); treating a CRC mismatch as chunk-level (it is whole-file, so a retry re-runs the entire transfer)
 
 ### SD-sync `Transport`
-The board-free port (`hardware/shared/sd_sync_protocol.py`) `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through — `send`/`recv` of one already-encoded `Frame` line at a time. The live adapter is `UsbCdcTransport`, pointed at the device's data CDC port (`usb_cdc.data`, opened by `boot.py`); a paired in-memory loopback stands in for CI, wiring the two board-free sides together without a device.
+The board-free port (`hardware/shared/sd_sync_protocol.py`) `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through — `send`/`recv` of one already-encoded `Frame` line at a time. Live adapters are `UsbCdcTransport`, pointed at the device's data CDC port (`usb_cdc.data`, opened by `boot.py`), and `SerialTransport`, the host-side counterpart pointed at that same port's `/dev/tty.*` device; a paired in-memory loopback stands in for CI, wiring the two board-free sides together without a device.
 
 ### UsbCdcTransport
 The live `Transport` adapter (`hardware/circuitpython/usb_cdc_transport.py`) framing SD-sync lines over a serial-like stream — appends a newline delimiter on `send`, buffers across `read` calls until one arrives on `recv` — since `encode_frame`'s base64 output has no message boundary of its own. Needs no `usb_cdc` import: it frames lines over any object exposing `read(size)`/`write(data)`, so `examples/sd_sync.py` is the only module that hands it the real `usb_cdc.data`, and it is otherwise CPython-testable against a fake stream (#930).
 _Avoid_: importing `usb_cdc` into this module (keep it duck-typed; the device-only wiring lives in `examples/sd_sync.py`)
 _Avoid_: assuming the wire grammar (frame header shape, chunk size, ack shape) is a stable contract — it's a free implementation detail, not asserted directly in tests
+
+### SerialTransport
+The live host-side SD-sync `Transport` (`scripts/sd_sync_transport.py`), framing lines the same way as `UsbCdcTransport` (newline-delimited, buffered across reads) but over a host serial port opened via `deploy_watch`'s `SerialHandle`/`_open_serial_with_retry`. Byte-framed like the wire protocol itself — distinct from `deploy_watch`'s own `iter_serial_lines`, which is line/UTF-8-oriented for the REPL channel and not reused here (#931).
+_Avoid_: reusing `iter_serial_lines` for SD-sync (it decodes UTF-8 and targets the REPL channel, not the byte-framed data channel)
+
+### Data-channel port auto-detect
+`scripts/sd_sync_transport.py`'s `find_data_port`/`select_data_port`: resolves the serial port for the SD-sync data channel via `adafruit_board_toolkit.circuitpython_serial.data_comports()`, which distinguishes a CircuitPython board's data CDC interface from its REPL CDC interface (unlike `deploy_watch`'s own `/dev/tty.usbmodem*` glob, which can no longer pick the right one once both interfaces are present). A single match auto-selects; an explicit `--port` always overrides; zero or multiple matches raises `SdSyncPortError` naming `--port` as the fix.
+_Avoid_: reusing `deploy_watch.find_port`'s glob for the data channel (it can't tell the two CDC interfaces apart); guessing among multiple matches instead of failing loudly
 
 ### NeoPixelEffectOutput
 A CircuitPython `EffectOutput` driving **one** NeoPixel strip, subdivided into scope **segments** by pixel range; several strips may share a scope and are driven in sync.

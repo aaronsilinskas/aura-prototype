@@ -3,12 +3,25 @@ revision = 3
 requires-python = ">=3.10"
 
 [[package]]
+name = "adafruit-board-toolkit"
+version = "1.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyserial" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9a/a3/7e0b2c5214f5d3530f1692026c48d3c0f0946470cd0040176f66fe6bd870/adafruit_board_toolkit-1.1.2.tar.gz", hash = "sha256:03cdc59ed7a73b8e24a4ad55bd8120ba89d00fd10e4febac1903c0646687915e", size = 34062, upload-time = "2024-11-12T19:20:21.066Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/68/c2/0096e0fcc15e27b0622340afb5c60b80594afb703cb7893571f8e89d0d64/adafruit_board_toolkit-1.1.2-py3-none-any.whl", hash = "sha256:de2362fbd4e9f24b2f77f7915cf3c3020e4e377cb94d7ce70094af6fa406920d", size = 12950, upload-time = "2024-11-12T19:20:19.496Z" },
+]
+
+[[package]]
 name = "aura-prototype"
 version = "0.1.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "adafruit-board-toolkit" },
     { name = "import-linter" },
     { name = "pre-commit" },
     { name = "pyserial" },
@@ -22,6 +35,7 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "adafruit-board-toolkit", specifier = ">=1.1.2" },
     { name = "import-linter", specifier = ">=2.3" },
     { name = "pre-commit", specifier = ">=4.0.0" },
     { name = "pyserial", specifier = ">=3.5" },
@@ -193,7 +207,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [

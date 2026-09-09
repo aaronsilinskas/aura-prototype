@@ -24,7 +24,7 @@ No ``board``/``busio``/CircuitPython-only import -- safe on CPython,
 CircuitPython 10.x, and MicroPython.
 """
 
-import base64
+import binascii
 
 try:
     from collections.abc import Iterator
@@ -100,12 +100,14 @@ def encode_frame(frame: Frame) -> bytes:
     swallowed by the encoding, so the returned bytes contain none.
     """
     header = (frame.kind + " " + frame.text).encode("utf-8")
-    return base64.b64encode(header + b"\n" + frame.payload)
+    # binascii.b2a_base64 always appends a trailing newline; strip it so the
+    # returned bytes stay a single line with none embedded.
+    return binascii.b2a_base64(header + b"\n" + frame.payload).rstrip(b"\n")
 
 
 def decode_frame(line: bytes) -> Frame:
     """Decode a base64 *line* produced by :func:`encode_frame` back into a ``Frame``."""
-    raw = base64.b64decode(line)
+    raw = binascii.a2b_base64(line)
     header, _, payload = raw.partition(b"\n")
     kind, _, text = header.decode("utf-8").partition(" ")
     return Frame(kind, text, payload)

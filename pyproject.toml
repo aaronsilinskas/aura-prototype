@@ -12,6 +12,7 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+    "adafruit-board-toolkit>=1.1.2",
     "import-linter>=2.3",
     # mpy-cross is NOT on PyPI for CircuitPython — the PyPI package is MicroPython's.
     # Download the CircuitPython binary via: scripts/setup_mpy_cross.sh
