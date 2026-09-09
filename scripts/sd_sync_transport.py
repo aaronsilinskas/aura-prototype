@@ -10,7 +10,7 @@ already knows how to distinguish the two CDC interfaces (and carries the
 macOS composite-CDC workaround `deploy_watch` doesn't need).
 
 :class:`SerialTransport` is the live SD-sync ``Transport`` adapter for that
-port: it reuses ``deploy_watch``'s ``SerialHandle``/``_open_serial_with_retry``
+port: it reuses ``deploy_watch``'s ``SerialHandle``/``open_serial_with_retry``
 to open the connection, then frames protocol lines the same way
 :class:`~hardware.circuitpython.usb_cdc_transport.UsbCdcTransport` does on the
 device side -- a trailing newline delimiter, since ``encode_frame``'s base64
@@ -24,7 +24,7 @@ from typing import Final
 from adafruit_board_toolkit import circuitpython_serial
 
 from hardware.shared.sd_sync_protocol import Transport
-from scripts.deploy_watch import SerialHandle, _open_serial_with_retry
+from scripts.deploy_watch import SerialHandle, open_serial_with_retry
 
 __all__ = ["SdSyncPortError", "SerialTransport", "find_data_port", "open_serial_transport"]
 
@@ -71,7 +71,7 @@ class SerialTransport(Transport):
 
     Args:
         handle: The open connection, from ``deploy_watch``'s
-            ``SerialHandle``/``_open_serial_with_retry`` (see
+            ``SerialHandle``/``open_serial_with_retry`` (see
             :func:`open_serial_transport`).
     """
 
@@ -100,5 +100,5 @@ class SerialTransport(Transport):
 
 def open_serial_transport(port: str, baud: int = _DEFAULT_BAUD) -> SerialTransport:
     """Open *port* (retrying transient failures) and wrap it as a :class:`SerialTransport`."""
-    ser = _open_serial_with_retry(port, baud)
+    ser = open_serial_with_retry(port, baud)
     return SerialTransport(SerialHandle(ser, port, baud))

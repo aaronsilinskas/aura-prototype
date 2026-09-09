@@ -195,7 +195,7 @@ def find_port() -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def _open_serial_with_retry(
+def open_serial_with_retry(
     port: str,
     baud: int,
     *,
@@ -276,7 +276,7 @@ def iter_serial_lines(
             chunk = handle.ser.read(handle.ser.in_waiting or 1)
         except serial.SerialException:
             handle.ser.close()
-            handle.ser = _open_serial_with_retry(handle.port, handle.baud)
+            handle.ser = open_serial_with_retry(handle.port, handle.baud)
             buffer.clear()
             yield reconnect_marker
             continue
@@ -385,7 +385,7 @@ def main() -> None:
             sys.exit(1)
 
     try:
-        ser = _open_serial_with_retry(port, args.baud)
+        ser = open_serial_with_retry(port, args.baud)
     except OSError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
