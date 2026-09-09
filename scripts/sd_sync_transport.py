@@ -99,6 +99,13 @@ class SerialTransport(Transport):
 
 
 def open_serial_transport(port: str, baud: int = _DEFAULT_BAUD) -> SerialTransport:
-    """Open *port* (retrying transient failures) and wrap it as a :class:`SerialTransport`."""
+    """Open *port* (retrying transient failures) and wrap it as a :class:`SerialTransport`.
+
+    Explicitly asserts DTR: ``usb_cdc.data`` only considers a host
+    "connected" -- and delivers bytes written to it -- once DTR is
+    asserted, and while most platforms' pyserial builds do this
+    automatically on open, that isn't guaranteed everywhere.
+    """
     ser = open_serial_with_retry(port, baud)
+    ser.dtr = True
     return SerialTransport(SerialHandle(ser, port, baud))

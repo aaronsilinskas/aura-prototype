@@ -27,6 +27,11 @@ class UsbCdcTransport(Transport):
     """
 
     def __init__(self, serial: object) -> None:
+        # usb_cdc.Serial defaults to a None (infinite) timeout, which makes
+        # read(size) block until exactly size bytes arrive -- recv() below
+        # relies on a non-blocking read (whatever's available now, even
+        # nothing) so it can poll for a newline across short frames instead.
+        serial.timeout = 0
         self._serial = serial
         self._buffered = b""
 
