@@ -32,7 +32,7 @@ _Avoid_: raw DRV2605L waveform IDs; `HapticConfig` (collides with the device-con
 Runtime configuration passed to effect builders at construction: `resolution`, effect-specific `options`, and `listeners`.
 
 ### Effect pack
-An `EffectBuilder` owning a named, versioned set of effects under `packs/effects/`; shared and cross-scene.
+An `EffectBuilder` owning a named, versioned set of effects; shared and cross-scene.
 _Avoid_: calling a scene-local effect set a "pack" (a pack is shared, versioned, cross-scene)
 
 ### DynamicValue
@@ -111,15 +111,15 @@ Auto-discovers JSON-described scenes from a directory tree and serves a fresh `S
 _Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); constructing after harness startup (scan once); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
 
 ### SceneControls
-The rule-facing scene-transition seam: `load`, `overlay`, `pop` each record a pending transition applied after the current tick; `reboot_into`/`reboot_to_previous` are the opposite — a reboot is not in-process, so both apply immediately and synchronously instead of joining the deferred-transition queue. `SceneManager` is the live implementation.
+The rule-facing scene-transition seam (`load`, `overlay`, `pop`, `reboot_into`, `reboot_to_previous`); `SceneManager` is the live implementation.
 
 ### SceneManager
-Owns the scene stack and drives transitions (load, overlay, pop), tearing down departing scenes' effects and republishing the active scene's locals and sounds. Routes every scene-transition effect and sound operation through the injected `EffectAdmin`/`AudioOverlayAdmin` seams, and `reboot_into`/`reboot_to_previous` through the injected `SceneReboot` port — `reboot_into` first validates its target against the scene registry so a typo never persists a name that would brick the next boot.
+Owns the scene stack and drives scene transitions, routing every transition through the injected `EffectAdmin`/`AudioOverlayAdmin` seams and reboots through the injected `SceneReboot` port. The live `SceneControls`.
 _Avoid_: calling `register()` on it (removed); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); routing scene-transition sound calls through anything but the injected `AudioOverlayAdmin`
 
 ### SceneReboot
-The board-free port `SceneManager` reaches to persist a scene switch and reboot, mirroring how it already reaches `EffectAdmin`/`AudioOverlayAdmin`. `reboot_into`/`reboot_to_previous` raise `NotImplementedError` by default; `DeviceSceneReboot` (`hardware.circuitpython.device_reboot`) is the live implementation, composing `DeviceStateStore` to persist `scene`/`return_to` then calling `microcontroller.reset()`; a recording fake stands in for CPython tests.
-_Avoid_: validating the target here (validation is `SceneManager.reboot_into`'s job, via `SceneRegistry.resolve_known`); calling `microcontroller.reset()` anywhere but the live adapter
+The board-free port `SceneManager` reaches to persist a scene switch and reboot the device; live adapter `DeviceSceneReboot`.
+_Avoid_: validating the target here (that is `SceneManager.reboot_into`'s job); calling `microcontroller.reset()` anywhere but the live adapter
 
 ### EffectControls
 The **rule-facing** effect seam a rule holds via `GameState.effect_controls`: `set_effect`, `add_effect`, `stop_effect`, `set_merge_strategy`; scene-transition operations live on `EffectAdmin`.
@@ -186,7 +186,7 @@ One red→green cycle at a single Game Level (red warning → red → green warn
 _Avoid_: "phase" (a Round spans several); "level-up" (the celebratory beat between Rounds)
 
 ### AudioRegistry
-Resolves a qualified clip name to a WAV path via **prefix routing**, mirroring `EffectResolver`: `scene.` names hit the active scene's swappable overlay, `<pack>.` names hit a shared base gated by the same `pack.` membership rule. A miss raises rather than returning `None`.
+Resolves a qualified clip name to a WAV path via **prefix routing** (a `scene.` overlay over shared `<pack>.` bases), mirroring `EffectResolver`; the concrete `AudioOverlayAdmin`.
 _Avoid_: returning `None` on a resolution miss (raise instead); a bare, unqualified base key (qualify with the pack name so two packs can share a stem); reporting an undeclared pack as "unknown" (it may genuinely exist in the base — it just isn't declared)
 
 ### AudioOverlayAdmin
@@ -211,11 +211,11 @@ _Avoid_: constructing with a `None` driver; reading `receipt.loudness` (the DRV2
 
 ### aura-device.json
 The single **required** on-device file holding all hardware configuration; a missing file raises. Sections: `buttons`, `ir`, `pixels`, `audio`, `i2c`, `spi`, `radio`, `sdcard`, `high_current_rail`, `accelerometer`, `magnetometer`, `haptics`. `pixels` and `buttons` are each an optional, possibly-empty list. Pure hardware config — scene selection lives in **`aura-settings.json`** instead.
-_Avoid_: `settings.toml` (removed — unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`; a top-level `"scene"` key (moved to `aura-settings.json`, #879)
+_Avoid_: `settings.toml` (removed — unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`; a top-level `"scene"` key (moved to `aura-settings.json`)
 
 ### aura-settings.json
-The single **required** on-device flash file holding device settings, host-authored and drag-editable over USB alongside `aura-device.json`; a missing file raises. Today it carries exactly one key, `default_scene` — named for its *default*-selection role so a later SD-persisted override (#742) can layer on top without renaming the key.
-_Avoid_: reading `default_scene` from `aura-device.json` (moved out, #879); treating a stale `"scene"` key left in an old `aura-device.json` as meaningful (it is inert)
+The single **required** on-device flash file holding device settings, host-authored and drag-editable over USB alongside `aura-device.json`; a missing file raises. Carries the `default_scene` key — named for its *default*-selection role so a later SD-persisted override can layer on top without renaming it.
+_Avoid_: reading `default_scene` from `aura-device.json` (moved out); treating a stale `"scene"` key left in an old `aura-device.json` as meaningful (it is inert)
 
 ### DeviceConfig
 The validated value object parsed from an `aura-device.json` mapping — no `board` import, constructs no hardware. Can derive an isolated copy with every isolatable component but one disabled, for single-component bring-up.
@@ -234,20 +234,20 @@ The top-level `app/` package — the one place allowed to import both engine run
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### SceneRuntime / build_scene_runtime
-The board-free bundle `build_scene_runtime` returns — the wired registries, managers, engine, and pass-through `ir`/`radio` handles that `run_scene`'s per-tick loop drives. It holds no hardware wrappers of its own: `ir`/`radio` are the `DeviceHardware` instances passed straight through. Its `scene_registry` parameter is **required** — a complete, pre-scanned registry the caller builds via `scan_boot_scene_registry`; `build_scene_runtime` discovers no scenes itself, only card **rules** and **effects** (those stay build-internal).
-_Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing the transmit-then-receive order at a call site (drive `ir.update()`/`radio.update()`); scanning a second `SceneRegistry` when a caller already has one; expecting it to discover scenes (pass a registry from `scan_boot_scene_registry` instead)
+The board-free bundle `build_scene_runtime` wires and returns for `run_scene`'s per-tick loop to drive — registries, managers, engine, and pass-through `ir`/`radio` handles. Discovers no scenes itself; takes a pre-scanned `SceneRegistry` from `scan_boot_scene_registry`.
+_Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing the transmit-then-receive order at a call site (drive `ir.update()`/`radio.update()`); scanning a second `SceneRegistry` when a caller already has one; expecting it to discover scenes
 
 ### scan_boot_scene_registry
-`app.scene_composition`'s board-free registry builder: constructs a fresh `SceneRegistry`, scans flash `packs/scenes`, then scans the mounted card's `aura_packs/scenes` into the same registry via `_scan_card_scenes` — one scan, shared across boot-scene resolution, IR-codec resolution, and `build_scene_runtime`, so a card scene is a first-class boot target exactly like a flash one. A `None` `storage` or a card with no `aura_packs/scenes` both yield a flash-only registry.
-_Avoid_: calling it before `build_hardware` (the card leg needs `hw.storage` mounted); scanning scenes anywhere else once this exists (`build_scene_runtime` no longer does)
+The board-free builder of the shared boot `SceneRegistry`: scans both flash and the mounted card into one registry, so a card scene is a first-class boot target exactly like a flash one.
+_Avoid_: calling it before `build_hardware` (the card leg needs storage mounted); scanning scenes anywhere else once this exists
 
 ### resolve_boot_scene_name
-`app.scene_composition`'s boot-time seam: composes `hardware.shared.scene_selection.resolve_boot_scene` (persisted SD `scene` → flash `default_scene` → raise) with `resolve_known_scene`, so the name that wins is also guaranteed registered. A `None` `storage` (card-less device) falls through to the flash default unaffected.
-_Avoid_: calling `resolve_boot_scene` directly from `run_scene` and skipping registry validation; calling it before `build_hardware` (the persisted leg needs `hw.storage` mounted)
+The boot-time seam that picks the scene to boot into (persisted SD `scene` → flash `default_scene` → raise) and guarantees the winner is registered.
+_Avoid_: calling `resolve_boot_scene` directly and skipping registry validation; calling it before `build_hardware` (the persisted leg needs storage mounted)
 
 ### resolve_known_scene
-The boot-time known-scene guard: returns the scene name if the registry has it, else raises naming the known scenes. A thin wrapper over `SceneRegistry.resolve_known` — the single implementation of the check, shared with `SceneManager.reboot_into`'s Button-B fail-fast guard. Reached at boot through `resolve_boot_scene_name`, which composes it with `hardware.shared.scene_selection.resolve_boot_scene` (persisted SD `scene` → flash `default_scene` → raise).
-_Avoid_: duplicating the known-scene check inline instead of calling `SceneRegistry.resolve_known`; assuming it still runs ahead of `build_hardware` (moved, #902)
+The boot-time known-scene guard: returns the scene name if the registry has it, else raises naming the known scenes. A thin wrapper over `SceneRegistry.resolve_known`, the single implementation of the check.
+_Avoid_: duplicating the known-scene check inline instead of calling `SceneRegistry.resolve_known`; assuming it runs ahead of `build_hardware` (it does not)
 
 ### resolve_ir_codec
 Resolves a scene's declared **wire-frame codec** name to an instantiated encoder/decoder pair. Board-free, needing no built hardware to run.
@@ -258,7 +258,7 @@ The device-only hardware builder that resolves pin names and constructs the conf
 _Avoid_: returning a bare tuple/dict (return `DeviceHardware`); putting config parsing here (lives in the pure parser); calling it twice in one process
 
 ### DeviceHardware
-The board-free bundle `build_hardware` returns — a data holder for the built outputs, buttons, sensors, network seam, `ir`, `radio`, and storage. `ir`/`radio` are the same `InfraredTransceiver`/`RadioTransceiver` instances the network seam delegates to (`None` when that peripheral isn't declared); the raw `RadioTransport` port stays private inside the transceiver. Ports are typed as their abstract port, never the concrete adapter, keeping the module board-free.
+The board-free bundle `build_hardware` returns — a data holder for the built outputs, buttons, sensors, network seam, `ir`, `radio`, and storage. Ports are typed as their abstract port, never the concrete adapter, keeping the module board-free.
 _Avoid_: exposing raw transmitters (use `network_controls`/`ir`); exposing the raw `RadioTransport` (use `network_controls`/`radio`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### RadioTransport
@@ -266,44 +266,43 @@ The board-free half-duplex radio **port** `RadioTransceiver` reaches the chip th
 _Avoid_: splitting it into send/receive ports; importing `adafruit_rfm69` here (that lives in the adapter)
 
 ### RadioTransceiver
-The board-free single owner of a device's whole radio subsystem, exposed as `DeviceHardware.radio`; the network seam's `send_radio` delegates to it. A send is fire-and-forget on the transport's single channel — no emitter to name, unlike IR, since the whole capability is either present or absent. Its per-tick update polls receive only (no transmit pump, the chip being half-duplex) and surfaces the raw payload and sender; it builds no game event itself.
+The board-free single owner of a device's whole radio subsystem, exposed as `DeviceHardware.radio`; the network seam's `send_radio` delegates to it. A send is fire-and-forget on the single channel — no emitter to name, unlike IR — and it builds no game event itself.
 _Avoid_: a transmit pump or pump-before-receive order; a value-returning `update()` (read `received`/`last_sender`); building `NetworkEvents.RadioReceived` here (that's `run_scene`'s job)
 
 ### Rfm69RadioTransport
-The live CircuitPython `RadioTransport` adapter wrapping `adafruit_rfm69.RFM69` — the only module importing that library, via a deferred import so a config with no `radio` section never requires it installed.
+The live CircuitPython `RadioTransport` adapter wrapping `adafruit_rfm69.RFM69` — the only module importing that library.
 _Avoid_: importing `adafruit_rfm69` anywhere else; reading the driver without checking `payload_ready` first (blocks)
 
 ### DeviceStorage
-The board-free device-state storage port: reads/writes small state files under a mount root and resolves real filesystem paths for streamed/scanned consumers, with no `board`/`busio` import. Live adapter `SdCardStorage`; `FakeDeviceStorage` is the in-memory test double.
-_Avoid_: escaping the mount root (routes through `reject_escaping_path`); a second concrete implementation for CPython vs. CircuitPython (one class suffices once mounted); using `path("")` where the clean root is needed (use `mount_root`)
+The board-free device-state storage port: reads/writes small state files under a mount root and resolves real filesystem paths for streamed/scanned consumers. Live adapter `SdCardStorage`; `FakeDeviceStorage` is the in-memory test double.
+_Avoid_: escaping the mount root; a second concrete implementation for CPython vs. CircuitPython (one class suffices once mounted); using `path("")` where the clean root is needed (use `mount_root`)
 
 ### SdCardStorage
-The live CircuitPython `DeviceStorage` adapter mounting an SD card at construction — the only module importing `sdcardio`/`storage`, via a deferred import so a config with no `sdcard` section never requires either installed. `cs` is a raw `microcontroller.Pin`.
+The live CircuitPython `DeviceStorage` adapter that mounts an SD card at construction — the only module importing `sdcardio`/`storage`.
 _Avoid_: importing `sdcardio`/`storage` anywhere else; wrapping `cs` in `digitalio.DigitalInOut`; presence-probing instead of trusting the config gate
 
 ### SdSyncServer
-The board-free device side of the SD-sync protocol, in `hardware/shared`; services a decoded request against one `DeviceStorage` (or `None`) over an injected `Transport`, owning no serial code. `storage is None` (no `sdcard` section) makes every verb reply with a clear `"no_storage"` response instead of raising. Three verbs ship: `read`/`write` are the primitives `serve_pull`/`serve_push` stream chunk-by-chunk over the wire with a whole-file CRC-32; `list` is the primitive `serve_list` sends whole in one frame, enumerating a subtree via `DeviceStorage.walk`. `serve_push` accumulates its own CRC-32 of the received bytes and compares it to the client's declared one before its underlying write finalizes — a mismatch replies `"crc_mismatch"` and leaves the file already on SD untouched rather than committing a corrupt replacement. `serve_one` receives one request and dispatches it to whichever `serve_*` matches the verb named in the request's own text, so a device-side loop can service a mix of verbs over one connection instead of pinning it to a single verb ahead of time (#930).
-_Avoid_: raising for "not found"/"no SD configured" (reply in-band instead — both are routine, not programming errors); asserting its wire-format internals in tests (assert only external behaviour: bytes read, responses returned); pinning a real connection to one verb the way per-verb tests still do for their own simplicity (drive `serve_one` instead)
+The board-free device side of the SD-sync protocol; serves file read/write/list requests against a `DeviceStorage` over an injected `Transport`, replying in-band when no SD is configured.
+_Avoid_: raising for "not found"/"no SD configured" (reply in-band instead — both are routine, not programming errors); asserting its wire-format internals in tests (assert only external behaviour: bytes read, responses returned); pinning a real connection to one verb (drive `serve_one` instead)
 
 ### SdSyncClient
-The board-free (CPython-only), host side of the SD-sync protocol, in `scripts/`; drives an `SdSyncServer` over an injected `Transport`. `pull(sd_path, host_path)` streams a file to a host path chunk-by-chunk (never buffering the whole file), verifying the server's per-file CRC-32 and retrying the whole transfer on mismatch; exhausted retries raise `SdSyncIntegrityError` rather than leaving a silently corrupt file. `push(host_path, sd_path)` is the reverse: streams a host file to the named SD path chunk-by-chunk, preserving that path exactly regardless of the host file's own layout, and retries the whole upload the same way when the server reports its accumulated CRC-32 didn't match. `list_files(sd_subpath)` returns the server's `(path, size)` enumeration of a subtree, defaulting to the whole card root — a missing or empty subtree is an empty list, not an error. `SdSyncNotFoundError`/`SdSyncNoStorageError` surface the server's in-band "not found"/"no SD configured" responses (the latter shared by `pull`, `push`, and `list_files`) as loud, typed failures instead of an empty host file (pull), a silent no-op (push), or a silently misleading result (list).
+The board-free (CPython-only) host side of the SD-sync protocol; drives an `SdSyncServer` over an injected `Transport` to pull, push, and list files, verifying a whole-file CRC-32 and surfacing the server's in-band failures as loud, typed errors.
 _Avoid_: opening the host file before the server confirms the pull will proceed (leaves an empty file on a "not found"); treating a CRC mismatch as chunk-level (it is whole-file, so a retry re-runs the entire transfer)
 
 ### SD-sync `Transport`
-The board-free port (`hardware/shared/sd_sync_protocol.py`) `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through — `send`/`recv` of one already-encoded `Frame` line at a time. Live adapters are `UsbCdcTransport`, pointed at the device's data CDC port (`usb_cdc.data`, opened by `boot.py`), and `SerialTransport`, the host-side counterpart pointed at that same port's `/dev/tty.*` device; a paired in-memory loopback stands in for CI, wiring the two board-free sides together without a device.
+The board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through, one `Frame` at a time. Live adapters are `UsbCdcTransport` (device) and `SerialTransport` (host); an in-memory loopback stands in for CI.
 
 ### UsbCdcTransport
-The live `Transport` adapter (`hardware/circuitpython/usb_cdc_transport.py`) framing SD-sync lines over a serial-like stream — appends a newline delimiter on `send`, buffers across `read` calls until one arrives on `recv` — since `encode_frame`'s base64 output has no message boundary of its own. Needs no `usb_cdc` import: it frames lines over any object exposing `read(size)`/`write(data)`, so `examples/sd_sync.py` is the only module that hands it the real `usb_cdc.data`, and it is otherwise CPython-testable against a fake stream (#930).
-_Avoid_: importing `usb_cdc` into this module (keep it duck-typed; the device-only wiring lives in `examples/sd_sync.py`)
-_Avoid_: assuming the wire grammar (frame header shape, chunk size, ack shape) is a stable contract — it's a free implementation detail, not asserted directly in tests
+The live device-side `Transport` adapter, newline-framing SD-sync lines over a serial-like stream. Duck-typed against any `read`/`write` stream — it imports no `usb_cdc`, so it is CPython-testable against a fake stream.
+_Avoid_: importing `usb_cdc` into this module (the device-only wiring lives in `examples/sd_sync.py`); assuming the wire grammar is a stable contract (it's a free implementation detail, not asserted in tests)
 
 ### SerialTransport
-The live host-side SD-sync `Transport` (`scripts/sd_sync_transport.py`), framing lines the same way as `UsbCdcTransport` (newline-delimited, buffered across reads) but over a host serial port opened via `deploy_watch`'s `SerialHandle`/`_open_serial_with_retry`. Byte-framed like the wire protocol itself — distinct from `deploy_watch`'s own `iter_serial_lines`, which is line/UTF-8-oriented for the REPL channel and not reused here (#931).
-_Avoid_: reusing `iter_serial_lines` for SD-sync (it decodes UTF-8 and targets the REPL channel, not the byte-framed data channel)
+The live host-side SD-sync `Transport`, newline-framing lines the same way as `UsbCdcTransport` but over a host serial port. Byte-framed, distinct from `deploy_watch`'s UTF-8 REPL channel.
+_Avoid_: reusing `deploy_watch`'s `iter_serial_lines` for SD-sync (it decodes UTF-8 and targets the REPL channel, not the byte-framed data channel)
 
 ### Data-channel port auto-detect
-`scripts/sd_sync_transport.py`'s `find_data_port`/`select_data_port`: resolves the serial port for the SD-sync data channel via `adafruit_board_toolkit.circuitpython_serial.data_comports()`, which distinguishes a CircuitPython board's data CDC interface from its REPL CDC interface (unlike `deploy_watch`'s own `/dev/tty.usbmodem*` glob, which can no longer pick the right one once both interfaces are present). A single match auto-selects; an explicit `--port` always overrides; zero or multiple matches raises `SdSyncPortError` naming `--port` as the fix.
-_Avoid_: reusing `deploy_watch.find_port`'s glob for the data channel (it can't tell the two CDC interfaces apart); guessing among multiple matches instead of failing loudly
+Resolution of the serial port for the SD-sync **data** CDC channel, distinct from the REPL CDC channel: a single match auto-selects, an explicit `--port` overrides, and zero or multiple matches fails loudly.
+_Avoid_: reusing `deploy_watch`'s port glob for the data channel (it can't tell the two CDC interfaces apart); guessing among multiple matches instead of failing loudly
 
 ### NeoPixelEffectOutput
 A CircuitPython `EffectOutput` driving **one** NeoPixel strip, subdivided into scope **segments** by pixel range; several strips may share a scope and are driven in sync.
@@ -334,7 +333,7 @@ The hardware-agnostic infrared send/receive subsystem (no `pulseio`), reached th
 _Avoid_: importing `pulseio` into shared IR code; encoding spell fields in the transport
 
 ### InfraredTransceiver
-The board-free single owner of a device's whole IR subsystem — the transmitter map, the receiver, and the shared **IR transmit gate** — exposed as `DeviceHardware.ir`; the network seam's `send_ir` delegates to it. A send routes to the named emitter; its per-tick update owns the transmit-pump-**then**-receive order and surfaces the results, and its codec is swappable once before the first tick. It builds no game event.
+The board-free single owner of a device's whole IR subsystem — the transmitter map, the receiver, and the shared **IR transmit gate** — exposed as `DeviceHardware.ir`; the network seam's `send_ir` delegates to it. A send routes to the named emitter, and it builds no game event.
 _Avoid_: importing `NetworkEvents`/game-event vocabulary here (the event is built in `run_scene`); a value-returning `update()`; calling it a hardware "driver"; exposing the transmitter map as a public collection
 
 ### Wire-frame codec
@@ -390,7 +389,7 @@ The idle period between two IR shots, delivered by `PulseIn` as a single over-lo
 _Avoid_: trying to "re-arm" or salvage a pulse from an overlapping frame (recognise the gap and start the next frame clean)
 
 ### Deploy-watch
-The `scripts/deploy_watch.py` host tool that deploys an example and captures the resulting serial run; unlike `deploy.py` it flashes *and* captures.
+The host tool that deploys an example and captures the resulting serial run; unlike `deploy.py` it flashes *and* captures.
 _Avoid_: treating it as a read-only serial monitor (it overwrites `code.py` and reboots); a no-deploy "just watch" mode
 
 ### Reload boundary
