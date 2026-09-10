@@ -45,6 +45,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   input.py        ButtonData, AccelerationData, InputEvents
   audio.py        AudioRegistry
   network.py      NetworkEvents
+  log.py          Board-free, tag-prefixed line logger with an injectable sink
   effects/
     manager.py    EffectManager, EffectBuilder, EffectResolver
     output.py     EffectOutput (abstract hardware output port)
@@ -59,19 +60,22 @@ magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
 
 packs/            Game-specific packs loaded at runtime (CircuitPython/MicroPython-safe)
   effects/        Shared, versioned effect packs (basic, elements) — each with a version.txt
-  rules/          Shared, versioned rule packs (debug)
-  scenes/         Scene definitions (element_browser, hardware_test, red_light_green_light, tag);
+  rules/          Shared, versioned rule packs (debug, hw_test, lobby, return_to_lobby)
+  scenes/         Scene definitions (element_browser, example_lobby, hardware_test,
+                  ir_range_receiver, ir_range_transmitter, red_light_green_light, tag);
                   each has a scene.json and optional scene-local effects/ and rules/ subdirs
 
 hardware/         Hardware abstraction layer
   circuitpython/  CircuitPython drivers (device_builder, is31fl3741_output, drv2605_output,
                   neopixel_output, audio_output, infrared_io, pio_pulse_writer,
-                  counting_i2c, rfm69_radio_transport, sdcard_storage)
+                  counting_i2c, rfm69_radio_transport, sdcard_storage, device_reboot,
+                  usb_cdc_transport)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
-                  device_config, device_settings, device_hardware, device_storage,
-                  network_controls, scene_selection, ir_transport, ir_transceiver,
-                  ir_codecs/ (base, aura, tag), ir_telemetry, radio_transport,
-                  radio_transceiver, profiler_report, build_narration)
+                  device_config, device_settings, device_state, device_hardware,
+                  device_storage, network_controls, scene_selection, ir_transport,
+                  ir_transceiver, ir_codecs/ (base, aura, tag), ir_telemetry,
+                  radio_transport, radio_transceiver, sd_sync_protocol, sd_sync_server,
+                  profiler_report, build_narration)
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together
@@ -112,9 +116,9 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 |------|----------|------|
 | `EffectConfig` | `effects/effect.py` | Resolution, options, and listeners for one render pass |
 | `PixelBuffer` | `effects/effect.py` | List-backed in-memory pixel buffer of packed RGB values |
-| `Effect` | `effects/effect.py` | Base class for all effects; subclasses implement `name`, `update(elapsed)`, `render(output)` |
-| `Layer` | `effects/layers/layer.py` | Base layer: `update(elapsed)` + `sample(position, pixel_count) -> float` |
-| `Scroll` | `effects/layers/scroll.py` | Scroll base: `update(elapsed)` + `apply(position) -> float` |
+| `Effect` | `effects/effect.py` | Base class for all effects; subclasses implement `name`, `update`, `render` |
+| `Layer` | `effects/layers/layer.py` | Base layer: `update` + `sample` |
+| `Scroll` | `effects/layers/scroll.py` | Scroll base: `update` + `apply` |
 | `LayerRenderer` | `effects/layers/renderer.py` | Single-layer `Effect` |
 | `AddColorsRenderer` | `effects/layers/add_colors_renderer.py` | Composites layers by summing packed RGB colors |
 | `AddSamplesRenderer` | `effects/layers/add_samples_renderer.py` | Composites layers by summing float samples then sampling a palette |
@@ -125,12 +129,12 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output port |
 | `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → Effect`; one per effect pack |
-| `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop()` plus `brightness`/`loudness` controls |
+| `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop` plus `brightness`/`loudness` controls |
 | `ScopeValue` / `Scope` | `engine/state.py` | Output-agnostic routing keys (see glossary) |
 | `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam |
 | `AudioOverlayAdmin` | `engine/audio.py` | Scene-transition sound seam, reserved for `SceneManager` |
 | `AudioRegistry` | `engine/audio.py` | Concrete `AudioOverlayAdmin`; resolves clip names to WAV paths |
-| `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update(timer)` tick |
+| `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update` tick |
 | `GameState` | `engine/state.py` | Per-tick game context passed to each rule |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
@@ -150,18 +154,18 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 | `AuraEvent` | `magic/aura.py` | Base event routed through active spells; can be canceled |
 | `MinMaxValue` | `magic/values.py` | Clamped float with dynamic max (via `ValueWithModifiers`) |
 | `ValueWithModifiers` | `magic/values.py` | Base value + temporary multiplier stack |
-| `Duration` | `magic/values.py` | Expiry tracker: `update(elapsed) → bool` |
+| `Duration` | `magic/values.py` | Expiry tracker |
 | `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; optional `pixels` list plus optional IR/audio/I2C/sensor/haptics sections |
 | `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle `build_hardware` returns (outputs, sensors, network seam, `ir`, radio, storage) |
-| `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter; built by `device_builder`; `send_ir` delegates to `InfraredTransceiver`, `send_radio` delegates to `RadioTransceiver` (silent no-op when absent) |
-| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, receiver, shared transmit gate); `send`, per-tick `update()` (pump then receive), `apply_codec` |
+| `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter |
+| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, receiver, shared transmit gate) |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
-| `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem; `send`, per-tick `update()` (receive only), exposes `received`/`last_sender` |
-| `SceneRuntime` | `app/scene_composition.py` | `__slots__` bundle from `build_scene_runtime` that `run_scene`'s loop drives |
-| `DeviceSceneReboot` | `hardware/circuitpython/device_reboot.py` | Live `SceneReboot`: composes `DeviceStateStore` to persist, then calls `microcontroller.reset()` |
-| `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol; services requests against a `DeviceStorage` (or `None`) over an injected `Transport`; `serve_one` dispatches one request to the right verb by its wire text |
-| `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol; `pull`/`push` stream a file between an SD path and a host path over an injected `Transport` |
-| `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port through which `SdSyncClient`/`SdSyncServer` exchange base64-framed lines; `FakeDeviceStorage`-backed loopback stands in for tests; live adapters are `UsbCdcTransport` (device) and `SerialTransport` (host) |
+| `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |
+| `SceneRuntime` | `app/scene_composition.py` | Bundle from `build_scene_runtime` that `run_scene`'s loop drives |
+| `DeviceSceneReboot` | `hardware/circuitpython/device_reboot.py` | Live `SceneReboot` adapter |
+| `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol |
+| `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol |
+| `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through; live adapters `UsbCdcTransport` (device) / `SerialTransport` (host) |
 | `UsbCdcTransport` | `hardware/circuitpython/usb_cdc_transport.py` | Live `Transport` framing SD-sync lines with a newline delimiter over any `read`/`write` stream (on-device, `usb_cdc.data`); needs no `usb_cdc` import itself, so it is CPython-testable against a fake stream |
 | `SerialTransport` | `scripts/sd_sync_transport.py` | Live host-side `Transport`, framing SD-sync lines the same way as `UsbCdcTransport` but over a host serial port opened via `deploy_watch`'s `SerialHandle`/`_open_serial_with_retry` |
 | `find_data_port` / `select_data_port` | `scripts/sd_sync_transport.py` | Data-channel port resolution for `scripts/sd_sync.py`: auto-detects via `adafruit_board_toolkit.circuitpython_serial.data_comports()`, single match wins, `--port` always overrides, zero/multiple matches raises `SdSyncPortError` |
