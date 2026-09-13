@@ -254,7 +254,7 @@ def deploy(
     if example_file is not None:
         _sync_file(example_file, mount / "code.py", "code.py", copied, skipped, dry_run, force=True)
 
-        boot_source = source_root / "hardware" / "circuitpython" / "boot.py"
+        boot_source = source_root / "hardware/circuitpython" / "boot.py"
         if boot_source.is_file():
             _sync_file(
                 boot_source, mount / "boot.py", "boot.py", copied, skipped, dry_run, force=True
