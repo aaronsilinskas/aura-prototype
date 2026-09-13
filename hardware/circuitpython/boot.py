@@ -10,6 +10,12 @@ easy-to-forget second deploy step.
 
 CircuitPython applies ``usb_cdc.enable`` only from ``boot.py``, and only on a
 hard reset -- a soft reload will not pick up a change to this file.
+
+Special file, special home: this module lives under ``hardware/circuitpython/``
+with the other drivers, but ``scripts/deploy.py`` copies it to the mount's
+*volume root* as raw ``.py`` -- never compiled, never synced into the mount's
+``hardware/circuitpython/`` subtree -- because the volume root is the only
+location and form in which CircuitPython will execute it.
 """
 
 import usb_cdc

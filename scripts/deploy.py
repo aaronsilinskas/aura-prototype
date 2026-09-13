@@ -41,7 +41,11 @@ MODULE_DIRS: Final = [
     "rules",
 ]
 _EXCLUDE_DIRS: Final = {"__pycache__", "tests"}
-_EXCLUDE_NAMES: Final = {"conftest.py"}
+# "boot.py" lives under hardware/circuitpython/ but is placed on the mount root by
+# the pairing block below, not by the module-sync walk -- exclude it from both that
+# walk and the compile step (build.py imports this set) so it is never duplicated
+# into the mount's hardware/circuitpython/ subtree or compiled to .mpy.
+_EXCLUDE_NAMES: Final = {"conftest.py", "boot.py"}
 _INCLUDE_SUFFIXES: Final = {".py", ".mpy", ".txt", ".json", ".wav"}
 _DEFAULT_MOUNT: Final = "/Volumes/CIRCUITPY"
 
@@ -177,7 +181,7 @@ def deploy(
         use_source: When True, skip compilation entirely and sync raw ``.py`` files
             directly from the source tree.  Requires no ``mpy-cross`` toolchain.
 
-    ``boot.py`` at the repo root, if present, is copied to the mount's
+    ``hardware/circuitpython/boot.py``, if present, is copied to the mount's
     ``boot.py`` alongside ``code.py`` whenever *example_file* is given -- the
     same force-always, never-pruned handling ``code.py`` gets, since a mount's
     existing ``boot.py`` is otherwise indistinguishable from a stale one (#930).
@@ -250,7 +254,7 @@ def deploy(
     if example_file is not None:
         _sync_file(example_file, mount / "code.py", "code.py", copied, skipped, dry_run, force=True)
 
-        boot_source = source_root / "boot.py"
+        boot_source = source_root / "hardware/circuitpython" / "boot.py"
         if boot_source.is_file():
             _sync_file(
                 boot_source, mount / "boot.py", "boot.py", copied, skipped, dry_run, force=True

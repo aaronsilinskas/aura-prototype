@@ -69,7 +69,7 @@ hardware/         Hardware abstraction layer
   circuitpython/  CircuitPython drivers (device_builder, is31fl3741_output, drv2605_output,
                   neopixel_output, audio_output, infrared_io, pio_pulse_writer,
                   counting_i2c, rfm69_radio_transport, sdcard_storage, device_reboot,
-                  usb_cdc_transport)
+                  usb_cdc_transport, boot)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
                   device_config, device_settings, device_state, device_hardware,
                   device_storage, network_controls, scene_selection, ir_transport,
