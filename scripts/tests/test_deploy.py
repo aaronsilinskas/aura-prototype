@@ -43,6 +43,12 @@ def make_source_tree(root: Path) -> None:
     (root / "hardware" / "shared").mkdir()
     (root / "hardware" / "shared" / "__init__.py").write_text("")
     (root / "hardware" / "shared" / "matrix_output.py").write_text("# matrix_output")
+    (root / "hardware" / "circuitpython").mkdir()
+
+
+def boot_py_source(root: Path) -> Path:
+    """Return the fixture path for boot.py's new home under hardware/circuitpython/."""
+    return root / "hardware" / "circuitpython" / "boot.py"
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +169,7 @@ def test_boot_py_is_deployed_alongside_code_py(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
-    (source / "boot.py").write_text("# boot")
+    boot_py_source(source).write_text("# boot")
     mount = tmp_path / "mount"
     mount.mkdir()
     example = source / "my_demo.py"
@@ -178,7 +184,7 @@ def test_boot_py_is_not_deployed_when_no_example_file_given(tmp_path: Path) -> N
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
-    (source / "boot.py").write_text("# boot")
+    boot_py_source(source).write_text("# boot")
     mount = tmp_path / "mount"
     mount.mkdir()
 
@@ -191,7 +197,7 @@ def test_boot_py_deploy_overwrites_a_stale_copy_already_on_mount(tmp_path: Path)
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
-    boot_source = source / "boot.py"
+    boot_source = boot_py_source(source)
     boot_source.write_text("# new boot")
     mount = tmp_path / "mount"
     mount.mkdir()
@@ -235,6 +241,44 @@ def test_deploying_an_example_with_no_repo_boot_py_does_not_fail(tmp_path: Path)
     assert result == 0
     assert (mount / "code.py").read_text() == "# demo"
     assert not (mount / "boot.py").exists()
+
+
+def test_boot_py_is_not_duplicated_into_mounts_hardware_circuitpython_on_compiled_path(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    boot_py_source(source).write_text("# boot")
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    example = source / "my_demo.py"
+    example.write_text("# demo")
+
+    deploy(example, mount, source_root=source, compile=fake_compile)
+
+    assert (mount / "boot.py").read_text() == "# boot"
+    assert not (mount / "hardware" / "circuitpython" / "boot.py").exists()
+    assert not (mount / "hardware" / "circuitpython" / "boot.mpy").exists()
+
+
+def test_boot_py_is_not_duplicated_into_mounts_hardware_circuitpython_on_raw_source_path(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    boot_py_source(source).write_text("# boot")
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    example = source / "my_demo.py"
+    example.write_text("# demo")
+
+    deploy(example, mount, source_root=source, use_source=True)
+
+    assert (mount / "boot.py").read_text() == "# boot"
+    assert not (mount / "hardware" / "circuitpython" / "boot.py").exists()
+    assert not (mount / "hardware" / "circuitpython" / "boot.mpy").exists()
 
 
 # ---------------------------------------------------------------------------

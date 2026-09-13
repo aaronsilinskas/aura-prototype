@@ -30,8 +30,8 @@ Installation
 1. Place ``aura-device.json`` on CIRCUITPY, declaring the SD card's ``sdcard``
    section (``cs``, ``mount``).
 2. Deploy: ``python scripts/deploy.py examples/sd_sync.py`` -- this also copies
-   the repo's ``boot.py`` (which opens the data channel; see there for the
-   first-time hard reset it needs).
+   ``hardware/circuitpython/boot.py`` (which opens the data channel; see there
+   for the first-time hard reset it needs).
 3. On the host, drive the device's data CDC port with
    :class:`scripts.sd_sync_client.SdSyncClient`.
 """
