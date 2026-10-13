@@ -45,7 +45,7 @@ Installation
 3. Place ``aura-device.json`` in CIRCUITPY/ to declare pin/geometry, and
    ``aura-settings.json`` to select a scene via the ``"default_scene"`` key.
    Both are required — the device has no built-in default for either. Copy
-   ``examples/aura-device.rasppi-pico-2.json`` and ``examples/aura-settings.json``
+   ``examples/aura-device.pico-2.json`` and ``examples/aura-settings.json``
    as starting points.
 
 4. Run the deploy script to copy all source files and set code.py:

@@ -18,7 +18,7 @@ from hardware.shared.device_config import (
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_SAMPLE_CONFIG_PATH = _REPO_ROOT / "examples" / "aura-device.rasppi-pico-2.json"
+_SAMPLE_CONFIG_PATH = _REPO_ROOT / "examples" / "aura-device.pico-2.json"
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -1493,7 +1493,7 @@ def test_parse_audio_i2s_data_non_string_raises_value_error(matrix_config):
 
 
 # ---------------------------------------------------------------------------
-# Committed sample config — examples/aura-device.rasppi-pico-2.json parses as-is
+# Committed sample config — examples/aura-device.pico-2.json parses as-is
 # ---------------------------------------------------------------------------
 
 

@@ -83,7 +83,7 @@ Installation
      adafruit_drv2605.mpy  (optional - required only when a DRV2605L is wired up)
 
 3. Deploy an ``aura-device.json`` registering the scene's clips/scopes -- see
-   ``examples/aura-device.rasppi-pico-2.json`` -- and an ``aura-settings.json`` naming the
+   ``examples/aura-device.pico-2.json`` -- and an ``aura-settings.json`` naming the
    scene to measure (its ``"default_scene"`` key) -- see ``examples/aura-settings.json``.
    Both files are required; a missing or invalid config, settings file, or
    unregistered scene name fails loudly at import time, naming the known scenes.

@@ -88,7 +88,7 @@ device's config file declares, and leaves out the rest:
 
 | Part | What the code supports |
 |------|------------------------|
-| Microcontroller | RP2350 with PSRAM, running CircuitPython 10. A Pimoroni [Pico Plus 2](https://shop.pimoroni.com/products/pimoroni-pico-plus-2) or [Pico LiPo 2](https://shop.pimoroni.com/products/pimoroni-pico-lipo-2) has both; a standard Raspberry Pi Pico 2 has no PSRAM and will not work |
+| Microcontroller | RP2350 with PSRAM, running CircuitPython 10. Pimoroni's Pico 2 boards with PSRAM work well, for example the [Pico Plus 2](https://shop.pimoroni.com/products/pimoroni-pico-plus-2) or [Pico LiPo 2](https://shop.pimoroni.com/products/pimoroni-pico-lipo-2). A standard Raspberry Pi Pico 2 has no PSRAM and will not work |
 | Lights | IS31FL3741 13×9 RGB LED matrix, NeoPixel strips |
 | Sound | I2S audio output |
 | Vibration | DRV2605L haptic driver |
@@ -115,8 +115,8 @@ required; there are no built-in defaults.
 
 - **`aura-device.json`** declares the hardware: which parts are fitted and which
   pins they use. Each part is built only if its section is present and enabled.
-  [`examples/aura-device.rasppi-pico-2.json`](examples/aura-device.rasppi-pico-2.json)
-  is a complete example, using Pico-style `GP` pin names.
+  [`examples/aura-device.pico-2.json`](examples/aura-device.pico-2.json)
+  is a complete example, tested on Pimoroni Pico 2 boards.
 - **`aura-settings.json`** picks the scene to boot, by its folder name under
   `packs/scenes/`:
 
