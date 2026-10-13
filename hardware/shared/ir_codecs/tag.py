@@ -45,7 +45,7 @@ except ImportError:
 
 TAG_ERROR_MARGIN: Final = 500  # Maximum allowed timing deviation
 TAG_PREAMBLE_ERROR_MARGIN: Final = 1000  # Maximum timing deviation for preamble
-TAG_PREAMBLE: Final = [3000, 6000, 3000]  # Laser tag start sequence
+TAG_PREAMBLE: Final = [3000, 6000, 3000]  # Infrared tag start sequence
 
 # Inter-frame idle gap: PulseIn reports the silence between frames as a single
 # long space pulse. Longest valid in-frame pulse is the preamble space
