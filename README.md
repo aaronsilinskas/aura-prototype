@@ -24,10 +24,8 @@ Aura is in prototype. This is working code under active development, not a kit.
   boards.
 - **You can read the code, run the tests, and watch the effects in a terminal**
   without any hardware. See [Try it without hardware](#try-it-without-hardware).
-- **Two games run on the prototype today**: Red Light Green Light and Tag. The other
-  scenes in `packs/scenes/` are tools for testing hardware and browsing effects.
-- **Nothing is stable.** Module layout, pack formats, and config files change
-  without notice, and there are no releases.
+- **The games are in `packs/scenes/`**, one folder per scene, alongside scenes for
+  testing hardware and browsing effects.
 
 Issues and pull requests are not being sought yet. To hear when there is something
 to build or play, sign up at [mindwidgets.com](https://mindwidgets.com).
@@ -90,7 +88,7 @@ device's config file declares, and leaves out the rest:
 
 | Part | What the code supports |
 |------|------------------------|
-| Microcontroller | RP2350 or RP2040 running CircuitPython 10 (developed on a Raspberry Pi Pico 2 and an Adafruit RP2040 Prop-Maker Feather) |
+| Microcontroller | RP2350 with PSRAM, running CircuitPython 10 |
 | Lights | IS31FL3741 13×9 RGB LED matrix, NeoPixel strips |
 | Sound | I2S audio output |
 | Vibration | DRV2605L haptic driver |
