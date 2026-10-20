@@ -1,0 +1,5 @@
+interface:
+  display_name: "Checkout"
+  short_description: "Check out a branch to validate it"
+policy:
+  allow_implicit_invocation: false

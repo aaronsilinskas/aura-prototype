@@ -7,6 +7,18 @@
       "skillPath": "skills/engineering/ask-matt/SKILL.md",
       "computedHash": "d1c5b4151720e96135154bd593ac4986a1030a2bc81e2aaf129f8b11224af9a9"
     },
+    "checkout": {
+      "source": "aaronsilinskas/ai-skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/checkout/SKILL.md",
+      "computedHash": "88104283a9fe1ea8486f06736b46cc87b5b51a3013f158d7337aabccf6831581"
+    },
+    "code-quality": {
+      "source": "aaronsilinskas/ai-skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/code-quality/SKILL.md",
+      "computedHash": "cc2b3acdad93ae606d4b17b342fcc0d39a90035a55b787f96d54ea050a925db0"
+    },
     "code-review": {
       "source": "mattpocock/skills",
       "sourceType": "github",
@@ -18,6 +30,12 @@
       "sourceType": "github",
       "skillPath": "skills/engineering/codebase-design/SKILL.md",
       "computedHash": "b2888e4f4e8c0af3bfd557575a64b905c44e6248c3101d72077816882b3a92b9"
+    },
+    "comments": {
+      "source": "aaronsilinskas/ai-skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/comments/SKILL.md",
+      "computedHash": "277f355c165c30801e35789ac6dc8042999de123a71b419376ddf3234070282f"
     },
     "diagnosing-bugs": {
       "source": "mattpocock/skills",
@@ -114,6 +132,18 @@
       "sourceType": "github",
       "skillPath": "skills/productivity/teach/SKILL.md",
       "computedHash": "81c196426808c270a9d4688be291405c038bba11f020b9fe10098ad0f1d8c132"
+    },
+    "test-quality": {
+      "source": "aaronsilinskas/ai-skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/test-quality/SKILL.md",
+      "computedHash": "5ec3190b98d1ccccaefd339b6ed0d084a02880d1007a98ab96884aeb8f0f4fbe"
+    },
+    "to-idea": {
+      "source": "aaronsilinskas/ai-skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/to-idea/SKILL.md",
+      "computedHash": "a37480d72734ba6d205584a356580fcdd15006328d8bd8e18d1f47d4b47194f0"
     },
     "to-questionnaire": {
       "source": "mattpocock/skills",

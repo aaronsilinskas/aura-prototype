@@ -1,0 +1,3 @@
+interface:
+  display_name: "Test Quality"
+  short_description: "Review tests against a quality bar"

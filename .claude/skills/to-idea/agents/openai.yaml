@@ -1,0 +1,5 @@
+interface:
+  display_name: "To Idea"
+  short_description: "Capture an idea as a stub issue"
+policy:
+  allow_implicit_invocation: false
