@@ -1,0 +1,3 @@
+interface:
+  display_name: "Comments"
+  short_description: "Decide whether code needs a comment, and write it well"
