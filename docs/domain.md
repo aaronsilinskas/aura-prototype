@@ -104,13 +104,13 @@ pre-commit hook on every commit):
   `engine.scene`, `engine.packs`, `engine.timer`, `engine.effects.manager`.
 - `app/` is the sole sanctioned crossing point: the one place allowed to
   import both the engine's runtime machinery and `hardware.*` together (see
-  **Composition layer (app/)** in `domain-language.md`).
+  **Composition layer (app/)** in `GLOSSARY.md`).
 
 ---
 
 ## Key types and relationships
 
-A map of where the major types live. Authoritative term meanings are in [`domain-language.md`](domain-language.md), not restated here.
+A map of where the major types live. Authoritative term meanings are in [`GLOSSARY.md`](../GLOSSARY.md), not restated here.
 
 | Type | Lives in | Role |
 |------|----------|------|
@@ -174,7 +174,7 @@ A map of where the major types live. Authoritative term meanings are in [`domain
 
 ## Domain vocabulary
 
-Code-facing terms are defined in [`domain-language.md`](domain-language.md) — the single source for the project's vocabulary and the words to avoid. Magic-system vocabulary (elements, auras, spells) lives in the aura-docs vault (`Overview/Magic System.md`).
+Code-facing terms are defined in [`GLOSSARY.md`](../GLOSSARY.md) — the single source for the project's vocabulary and the words to avoid. Magic-system vocabulary (elements, auras, spells) lives in the aura-docs vault (`Overview/Magic System.md`).
 
 ---
 

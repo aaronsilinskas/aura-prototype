@@ -1,6 +1,6 @@
-# Issue Labels
+# Triage Labels
 
-Labels used on this repo's issue backlog. Most are **triage roles** the skills speak in terms of; others (like `idea`) sit outside the triage flow.
+Labels used on this repo's issue tracker. Most are **triage roles** the skills speak in terms of; others (like `idea`) sit outside the triage flow.
 
 ## Triage roles
 
@@ -32,7 +32,7 @@ An `idea` is a placeholder you revisit deliberately (`gh issue list --label idea
 
 ## Wayfinder labels
 
-The `wayfinder` skill speaks in terms of these canonical role labels. This section maps them to the actual label strings used in this repo. See the "Wayfinding operations" section of [backlog.md](backlog.md) for how they're used.
+The `wayfinder` skill speaks in terms of these canonical role labels. This section maps them to the actual label strings used in this repo. See the "Wayfinding operations" section of [issue-tracker.md](issue-tracker.md) for how they're used.
 
 | Canonical role       | Label in our backlog   | Meaning                                                            |
 | -------------------- | ---------------------- | ----------------------------------------------------------------- |
