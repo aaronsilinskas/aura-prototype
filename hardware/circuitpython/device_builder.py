@@ -705,7 +705,7 @@ def _describe_ir(rx_pin_names: list[str], emitter_pins: dict[str, str]) -> str:
     any rx/emitter pin, which may raise.
 
     ``rx=[<pin>]`` for a single rx pin; two or more append the domain's **IR
-    multi-receiver** label (see docs/domain-language.md), e.g.
+    multi-receiver** label (see GLOSSARY.md), e.g.
     ``rx=[GP7 GP9] (IR multi-receiver)`` -- selected purely by pin count, not
     a separate config flag. Emitters are listed ``key:pin`` in
     ``IR_EMITTERS`` order (independent of *emitter_pins*' own key order,

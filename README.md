@@ -56,7 +56,7 @@ A few words used throughout the code:
   elemental magic effects (fire, water, lightning, and the rest) are a pack.
 
 See [`docs/domain.md`](docs/domain.md) for key types and constraints, and
-[`docs/domain-language.md`](docs/domain-language.md) for the full glossary.
+[`GLOSSARY.md`](GLOSSARY.md) for the full glossary.
 
 ---
 
