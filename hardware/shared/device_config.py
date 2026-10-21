@@ -512,6 +512,29 @@ def _parse_brightness(mapping: dict, key: str, field: str) -> float:
 
 
 # ---------------------------------------------------------------------------
+# NeoPixel count validator (shared across strip and legacy scope entries)
+# ---------------------------------------------------------------------------
+
+
+def _parse_count(mapping: dict, key: str, field: str) -> int:
+    """Return the required pixel count at *key* in *mapping*.
+
+    Args:
+        mapping: The raw config mapping to read *key* from; *key* must be present.
+        key: The mapping key holding the count (e.g. ``"count"``).
+        field: Label used in error messages (e.g. ``"pixels[0].count"``).
+
+    Raises:
+        ValueError: If the value is not an ``int`` (``bool`` included) or is
+            below 1, naming *field*.
+    """
+    value = mapping[key]
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(f"{field} must be a positive integer, got {value!r}")
+    return value
+
+
+# ---------------------------------------------------------------------------
 # I2C address validator (for I2C-device config sections that declare an
 # address, e.g. matrix pixels; intended for reuse by future I2C-device
 # sections)
@@ -640,7 +663,7 @@ def _parse_neopixel_strip_entry(mapping: dict, entry_index: int) -> NeoPixelStri
         raise ValueError(f"{label}.count is required for neopixel type")
 
     pin: str = mapping["pin"]
-    count: int = mapping["count"]
+    count: int = _parse_count(mapping, "count", f"{label}.count")
     order: str = mapping.get("order", "GRB")
     brightness: float = _parse_brightness(mapping, "brightness", f"{label}.brightness")
 
@@ -697,10 +720,11 @@ def _parse_neopixel_pixels(mapping: dict, entry_index: int) -> NeoPixelPixelsCon
             raise ValueError(f"pixels.scopes.{key}.pin must be a string pin name")
         if "count" not in scope_cfg:
             raise ValueError(f"pixels.scopes.{key}.count is required")
+        count = _parse_count(scope_cfg, "count", f"pixels.scopes.{key}.count")
         brightness = _parse_brightness(scope_cfg, "brightness", f"pixels.scopes.{key}.brightness")
         scopes[key] = NeoPixelScopeConfig(
             pin=scope_cfg["pin"],
-            count=scope_cfg["count"],
+            count=count,
             order=scope_cfg.get("order", "GRB"),
             brightness=brightness,
         )
