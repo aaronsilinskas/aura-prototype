@@ -67,6 +67,11 @@ _DEFAULT_CURRENT_LIMIT_MA: Final = 2000
 _DEFAULT_MAX_PIXEL_CURRENT_MA: Final = 60
 _DEFAULT_MIN_BRIGHTNESS: Final = 0.05
 
+# The tuner solves for a limit shrunk by this relative margin so float
+# rounding (~1e-16 per operation) can only land the tuned total under the
+# real limit, never over -- with no exact-summation primitive on device.
+_BUDGET_ROUNDING_MARGIN: Final = 1e-9
+
 # The one source of the I2C-device `DeviceConfig` slot names: `parse_device_config`
 # and `_parse_i2c_device`'s section-specific error messages both key off this
 # list, rather than each hand-listing the set separately.
@@ -345,13 +350,16 @@ class NeoPixelCurrentBudgetConfig:
     ``current_limit_ma`` caps the worst-case NeoPixel draw, estimated with
     ``max_pixel_current_ma`` per pixel (full white at full brightness).
 
-    ``estimate_ma`` (the worst case at *declared* brightness) and ``scale``
-    (the shared factor applied to every NeoPixel strip, ``1.0`` when under
-    budget) are results recorded by ``parse_device_config`` for boot
-    narration; the tuned brightness itself lives on each strip config.
+    ``estimate_ma`` (the worst case at *declared* brightness), ``scale``
+    (the shared factor applied to every strip not held at the floor, ``1.0``
+    when under budget), and ``at_min_brightness`` (how many strips were held
+    at their declared value or at ``min_brightness``) are results recorded by
+    ``parse_device_config`` for boot narration; the tuned brightness itself
+    lives on each strip config.
     """
 
     __slots__ = (
+        "at_min_brightness",
         "current_limit_ma",
         "estimate_ma",
         "max_pixel_current_ma",
@@ -366,12 +374,14 @@ class NeoPixelCurrentBudgetConfig:
         min_brightness: float,
         estimate_ma: float,
         scale: float,
+        at_min_brightness: int,
     ) -> None:
         self.current_limit_ma: int = current_limit_ma
         self.max_pixel_current_ma: int = max_pixel_current_ma
         self.min_brightness: float = min_brightness
         self.estimate_ma: float = estimate_ma
         self.scale: float = scale
+        self.at_min_brightness: int = at_min_brightness
 
 
 def copy_with_enabled(section: object, enabled: bool) -> object:
@@ -1036,36 +1046,89 @@ def _parse_milliamps(budget_raw: dict, key: str, default: int) -> int:
     return value
 
 
-def _tune_neopixel_brightness(
+def _budgeted_strips(
     pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig],
-    current_limit_ma: int,
-    max_pixel_current_ma: int,
-) -> tuple[float, float]:
-    """Dim every enabled NeoPixel strip in *pixels* by one shared factor to fit the limit.
-
-    Rewrites each strip's ``brightness`` in place; under the limit, nothing
-    changes.
-
-    Returns:
-        ``(estimate_ma, scale)``: the worst-case draw at declared brightness
-        and the factor applied (``1.0`` when under the limit).
-    """
+) -> list[NeoPixelStripConfig | NeoPixelScopeConfig]:
+    """Every strip the current budget counts: enabled NeoPixel entries, both shapes."""
     strips: list[NeoPixelStripConfig | NeoPixelScopeConfig] = []
     for entry in pixels:
         if isinstance(entry, NeoPixelPixelsConfig) and entry.enabled:
             strips.extend(entry.strips)
             strips.extend(entry.scopes.values())
+    return strips
 
-    estimate_ma = 0.0
+
+def _draw_ma(
+    strips: list[NeoPixelStripConfig | NeoPixelScopeConfig], max_pixel_current_ma: int
+) -> float:
+    """Worst-case draw of *strips* at full white, at their current brightness."""
+    total = 0.0
     for strip in strips:
-        estimate_ma += strip.count * strip.brightness * max_pixel_current_ma
+        total += strip.count * strip.brightness * max_pixel_current_ma
+    return total
+
+
+def _tune_neopixel_brightness(
+    pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig],
+    current_limit_ma: int,
+    max_pixel_current_ma: int,
+    min_brightness: float,
+) -> tuple[float, float, int]:
+    """Dim every enabled NeoPixel strip in *pixels* to fit the limit, never below the floor.
+
+    Rewrites each strip's ``brightness`` in place; under the limit, nothing
+    changes.
+
+    Returns:
+        ``(estimate_ma, scale, at_min_brightness)``: the worst-case draw at
+        declared brightness, the factor applied to strips not held at the
+        floor (``1.0`` when under the limit), and how many strips were held.
+
+    Raises:
+        ValueError: If the strips exceed the limit even at the floor.
+    """
+    strips = _budgeted_strips(pixels)
+    estimate_ma = _draw_ma(strips, max_pixel_current_ma)
     if estimate_ma <= current_limit_ma:
-        return estimate_ma, 1.0
+        return estimate_ma, 1.0, 0
 
-    scale = current_limit_ma / estimate_ma
+    # A strip declared at or below the floor is held as declared, never scaled.
+    held = [strip for strip in strips if strip.brightness <= min_brightness]
+    unheld = sorted(
+        (strip for strip in strips if strip.brightness > min_brightness),
+        key=lambda strip: strip.brightness,
+    )
+
+    floor_ma = 0.0
     for strip in strips:
+        floor_ma += strip.count * min(strip.brightness, min_brightness) * max_pixel_current_ma
+    if floor_ma > current_limit_ma:
+        raise ValueError(
+            f"neopixel_current_budget: NeoPixel strips draw {floor_ma:.1f} mA even at"
+            + f" min_brightness {min_brightness}, over current_limit_ma {current_limit_ma} mA"
+        )
+
+    # Holding a strip leaves less for the rest, so the shared scale only
+    # falls -- the dimmest unheld strip is always the next to cross the
+    # floor. Hold strips dimmest-first until the scale keeps the rest above it.
+    target_ma = current_limit_ma * (1 - _BUDGET_ROUNDING_MARGIN)
+    held_ma = _draw_ma(held, max_pixel_current_ma)
+    scale = 1.0
+    while unheld:
+        scale = max(0.0, (target_ma - held_ma) / _draw_ma(unheld, max_pixel_current_ma))
+        dimmest = unheld[0]
+        if dimmest.brightness * scale >= min_brightness:
+            break
+        unheld.pop(0)
+        dimmest.brightness = min_brightness
+        held_ma += _draw_ma([dimmest], max_pixel_current_ma)
+    # An empty `unheld` means the floor current is (within the rounding
+    # margin) the limit itself: the floor wins, and the last solved scale
+    # is kept for narration.
+
+    for strip in unheld:
         strip.brightness *= scale
-    return estimate_ma, scale
+    return estimate_ma, scale, len(strips) - len(unheld)
 
 
 def _parse_neopixel_current_budget(
@@ -1085,13 +1148,16 @@ def _parse_neopixel_current_budget(
         else _DEFAULT_MIN_BRIGHTNESS
     )
 
-    estimate_ma, scale = _tune_neopixel_brightness(pixels, current_limit_ma, max_pixel_current_ma)
+    estimate_ma, scale, at_min_brightness = _tune_neopixel_brightness(
+        pixels, current_limit_ma, max_pixel_current_ma, min_brightness
+    )
     return NeoPixelCurrentBudgetConfig(
         current_limit_ma=current_limit_ma,
         max_pixel_current_ma=max_pixel_current_ma,
         min_brightness=min_brightness,
         estimate_ma=estimate_ma,
         scale=scale,
+        at_min_brightness=at_min_brightness,
     )
 
 
