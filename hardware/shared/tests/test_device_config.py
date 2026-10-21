@@ -564,6 +564,18 @@ def test_parse_neopixel_scope_missing_count_raises_value_error(neopixel_config):
         parse_device_config(neopixel_config)
 
 
+@pytest.mark.parametrize("count", ["10", 10.0, True, 0, -1])
+def test_parse_neopixel_scope_count_not_positive_integer_raises_value_error_naming_field(
+    neopixel_config, count
+):
+    neopixel_config["pixels"][0]["scopes"]["personal"]["count"] = count
+
+    with pytest.raises(
+        ValueError, match=r"pixels\.scopes\.personal\.count must be a positive integer"
+    ):
+        parse_device_config(neopixel_config)
+
+
 def test_parse_neopixel_scope_with_unknown_key_raises_value_error(neopixel_config):
     neopixel_config["pixels"][0]["scopes"]["bad_scope"] = {"pin": "D7", "count": 5}
 

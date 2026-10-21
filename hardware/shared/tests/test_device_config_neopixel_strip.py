@@ -301,6 +301,16 @@ def test_parse_neopixel_strip_missing_count_raises_value_error():
         parse_device_config(config)
 
 
+@pytest.mark.parametrize("count", ["30", 30.0, True, 0, -1])
+def test_parse_neopixel_strip_count_not_positive_integer_raises_value_error_naming_field(
+    single_strip_config, count
+):
+    single_strip_config["pixels"][0]["count"] = count
+
+    with pytest.raises(ValueError, match=r"pixels\[0\]\.count must be a positive integer"):
+        parse_device_config(single_strip_config)
+
+
 # ---------------------------------------------------------------------------
 # Validation: unknown scope key
 # ---------------------------------------------------------------------------
