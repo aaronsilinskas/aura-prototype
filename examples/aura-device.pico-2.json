@@ -4,6 +4,9 @@
     "pin": "GP28",
     "active_high": true
   },
+  "neopixel_current_budget": {
+    "current_limit_ma": 1000
+  },
   "i2c": {
     "sda": "GP4",
     "scl": "GP5"

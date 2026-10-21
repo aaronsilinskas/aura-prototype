@@ -1524,6 +1524,16 @@ def test_committed_sample_device_config_parses():
     assert result.radio is not None
 
 
+def test_committed_sample_device_config_tunes_its_neopixel_strip_to_the_1000_ma_budget():
+    # 24 px @ 1.0 x 60 mA = 1440 mA against a 1000 mA budget: 1000 / 1440.
+    mapping = read_device_config_mapping(str(_SAMPLE_CONFIG_PATH))
+
+    result = parse_device_config(mapping)
+
+    neopixel = next(p for p in result.pixels if not isinstance(p, MatrixPixelsConfig))
+    assert neopixel.strips[0].brightness == pytest.approx(0.694, abs=0.001)
+
+
 def test_committed_sample_device_config_matrix_and_magnetometer_no_longer_collide_at_0x30():
     """The Pico 2 board wires both the matrix and the MMC5603 magnetometer on
     the same I2C bus. The magnetometer has no configurable address and lives
