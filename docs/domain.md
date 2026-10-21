@@ -156,6 +156,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `ValueWithModifiers` | `magic/values.py` | Base value + temporary multiplier stack |
 | `Duration` | `magic/values.py` | Expiry tracker |
 | `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; optional `pixels` list plus optional IR/audio/I2C/sensor/haptics sections |
+| `NeoPixelCurrentBudgetConfig` | `hardware/shared/device_config.py` | Opt-in `neopixel_current_budget` policy; the parser folds the tuned brightness into each NeoPixel strip config and records the estimate/scale for boot narration |
 | `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle `build_hardware` returns (outputs, sensors, network seam, `ir`, radio, storage) |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter |
 | `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, receiver, shared transmit gate) |
