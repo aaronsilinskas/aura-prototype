@@ -797,7 +797,8 @@ def test_build_hardware_mixed_matrix_and_neopixel_config_produces_outputs_in_con
 
 # ---------------------------------------------------------------------------
 # build_hardware — pixels narration: one representative indexed pixels[n]
-# line plus the absent-section case (#759). The full "ok"/"disabled" line
+# line, the absent-section case (#759), and the neopixel_current_budget line
+# with and without the section (#950). The full "ok"/"disabled" line
 # text for every pixels[n] entry, including a mixed matrix-then-neopixel
 # config's ordering, is now the comprehensive tests' job
 # (test_device_builder.py, #852); the unknown-pin/no-I2C-bus FAILED
@@ -809,9 +810,8 @@ def test_build_hardware_mixed_matrix_and_neopixel_config_produces_outputs_in_con
 # ---------------------------------------------------------------------------
 
 
-def test_build_hardware_pixels_entry_narrates_its_ok_line() -> None:
-    config = _neopixel_config(scopes={"personal": {"pin": "D5", "count": 10}})
-    board_mock = _mock_board(D5=MagicMock(), D9=MagicMock())
+def _narrate_build(config, board_mock: MagicMock) -> str:
+    """Run ``build_hardware`` on *config* and return everything it narrated."""
     logger, fragments = _recording_logger()
 
     with ExitStack() as stack:
@@ -822,22 +822,74 @@ def test_build_hardware_pixels_entry_narrates_its_ok_line() -> None:
 
         build_hardware(config, board_module=board_mock, logger=logger)
 
+    return "".join(fragments)
+
+
+def test_build_hardware_pixels_entry_narrates_its_ok_line() -> None:
+    config = _neopixel_config(scopes={"personal": {"pin": "D5", "count": 10}})
+
+    narration = _narrate_build(config, _mock_board(D5=MagicMock(), D9=MagicMock()))
+
     expected = (
         "[hw] pixels[0] neopixel pin=D5 count=10 order=GRB scope=personal brightness=1.00 ok\n"
     )
-    assert expected in "".join(fragments)
+    assert expected in narration
 
 
 def test_build_hardware_empty_pixels_list_produces_no_pixel_lines() -> None:
-    config = _minimal_config()
-    board_mock = _mock_board(D9=MagicMock())
-    logger, fragments = _recording_logger()
+    narration = _narrate_build(_minimal_config(), _mock_board(D9=MagicMock()))
 
-    with ExitStack() as stack:
-        _enter_hw_patches(stack)
+    assert "pixels[" not in narration
 
-        from hardware.circuitpython.device_builder import build_hardware
 
-        build_hardware(config, board_module=board_mock, logger=logger)
+def test_build_hardware_narrates_budget_limit_estimate_scale_and_held_strip_count() -> None:
+    # #857's worked example: 100 px @ 1.0 + 100 px @ 0.2 at 60 mA/px is a
+    # 7200 mA estimate; C is held at the 0.1 floor and A scaled by 1400 / 6000.
+    config = parse_device_config(
+        {
+            "pixels": [
+                {
+                    "type": "neopixel",
+                    "pin": "D5",
+                    "count": 100,
+                    "scope_pixels": {"personal": [0, 100]},
+                },
+                {
+                    "type": "neopixel",
+                    "pin": "D6",
+                    "count": 100,
+                    "brightness": 0.2,
+                    "scope_pixels": {"ambient": [0, 100]},
+                },
+            ],
+            "buttons": ["D9"],
+            "neopixel_current_budget": {"current_limit_ma": 2000, "min_brightness": 0.1},
+        }
+    )
 
-    assert "pixels[" not in "".join(fragments)
+    narration = _narrate_build(config, _mock_board(D5=MagicMock(), D6=MagicMock(), D9=MagicMock()))
+
+    expected = (
+        "[hw] neopixel_current_budget limit=2000mA estimate=7200mA scale=0.23 at_min_brightness=1\n"
+    )
+    assert expected in narration
+
+
+def test_build_hardware_without_a_neopixel_current_budget_narrates_no_budget_line() -> None:
+    config = parse_device_config(
+        {
+            "pixels": [
+                {
+                    "type": "neopixel",
+                    "pin": "D5",
+                    "count": 10,
+                    "scope_pixels": {"personal": [0, 10]},
+                }
+            ],
+            "buttons": ["D9"],
+        }
+    )
+
+    narration = _narrate_build(config, _mock_board(D5=MagicMock(), D9=MagicMock()))
+
+    assert "neopixel_current_budget" not in narration

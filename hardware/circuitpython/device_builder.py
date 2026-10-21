@@ -52,6 +52,7 @@ from hardware.shared.device_config import (
     HighCurrentRailConfig,
     I2CConfig,
     MatrixPixelsConfig,
+    NeoPixelCurrentBudgetConfig,
     NeoPixelPixelsConfig,
     RadioConfig,
     SDCardConfig,
@@ -383,6 +384,19 @@ def _describe_pixel_entry(index: int, pixels_cfg: MatrixPixelsConfig | NeoPixelP
     else:
         detail = _describe_neopixel_pixels(pixels_cfg)
     return f"pixels[{index}] {kind} {detail}"
+
+
+def _describe_neopixel_current_budget(budget: NeoPixelCurrentBudgetConfig) -> str:
+    """Return the boot line explaining what the parse-time current budget applied.
+
+    The tuning already happened in ``parse_device_config``; this only reports
+    it, so each ``pixels[i]`` line's ``brightness=`` reads as the tuned value.
+    """
+    return (
+        f"neopixel_current_budget limit={budget.current_limit_ma}mA "
+        + f"estimate={budget.estimate_ma:.0f}mA scale={budget.scale:.2f} "
+        + f"at_min_brightness={budget.at_min_brightness}"
+    )
 
 
 def _setup_buttons(*pins: microcontroller.Pin) -> DebouncedButtons:
@@ -897,6 +911,9 @@ def build_hardware(
         spi = narrate_step(
             logger, f"spi {spi_pins}", lambda: (_setup_spi(spi_cfg, board_module), "ok")
         )
+
+    if config.neopixel_current_budget is not None:
+        logger.log(_describe_neopixel_current_budget(config.neopixel_current_budget))
 
     outputs: list[EffectOutput] = []
     for index, pixels_cfg in enumerate(config.pixels):

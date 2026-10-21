@@ -187,7 +187,10 @@ To put the code on a board:
   (0.0 to 1.0), and the three I2S pins.
 
 The example file also shows the `accelerometer`, `magnetometer`, `haptics`, `radio`,
-`sdcard`, `i2c`, `spi`, and `high_current_rail` sections.
+`sdcard`, `i2c`, `spi`, `high_current_rail`, and `neopixel_current_budget` sections.
+`neopixel_current_budget` is optional: when the NeoPixel strips could draw more than
+`current_limit_ma` at full white, the device dims them at boot to fit, never below
+`min_brightness`.
 
 ---
 
