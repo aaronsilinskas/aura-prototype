@@ -19,6 +19,7 @@ __all__ = [
     "I2CConfig",
     "I2CDeviceConfig",
     "MatrixPixelsConfig",
+    "NeoPixelCurrentBudgetConfig",
     "NeoPixelPixelsConfig",
     "NeoPixelScopeConfig",
     "NeoPixelStripConfig",
@@ -56,6 +57,16 @@ _SDCARD_ALLOWED_KEYS: Final = ("cs", "mount", "enabled")
 
 _HIGH_CURRENT_RAIL_ALLOWED_KEYS: Final = ("pin", "active_high", "enabled")
 
+_NEOPIXEL_CURRENT_BUDGET_ALLOWED_KEYS: Final = (
+    "current_limit_ma",
+    "max_pixel_current_ma",
+    "min_brightness",
+)
+
+_DEFAULT_CURRENT_LIMIT_MA: Final = 2000
+_DEFAULT_MAX_PIXEL_CURRENT_MA: Final = 60
+_DEFAULT_MIN_BRIGHTNESS: Final = 0.05
+
 # The one source of the I2C-device `DeviceConfig` slot names: `parse_device_config`
 # and `_parse_i2c_device`'s section-specific error messages both key off this
 # list, rather than each hand-listing the set separately.
@@ -66,7 +77,15 @@ _I2C_DEVICE_SECTIONS: Final = ("accelerometer", "magnetometer", "haptics")
 # competition with it), buttons carries no `enabled` flag to isolate, and
 # high_current_rail is infrastructure too: it gates the whole board's
 # high-current rail, so no `keep` should ever be able to switch it off.
-_ISOLATE_EXCLUDED_COMPONENTS: Final = ("i2c", "spi", "buttons", "high_current_rail")
+# neopixel_current_budget is parse-time policy with no `enabled` flag; it
+# builds nothing, so there is nothing to isolate.
+_ISOLATE_EXCLUDED_COMPONENTS: Final = (
+    "i2c",
+    "spi",
+    "buttons",
+    "high_current_rail",
+    "neopixel_current_budget",
+)
 
 # ---------------------------------------------------------------------------
 # Config data classes
@@ -318,6 +337,43 @@ class HighCurrentRailConfig:
         self.enabled: bool = enabled
 
 
+class NeoPixelCurrentBudgetConfig:
+    """Parsed opt-in NeoPixel current budget.
+
+    Parse-time policy rather than a component: it builds no hardware and has
+    no ``enabled`` toggle -- the section's presence is the switch.
+    ``current_limit_ma`` caps the worst-case NeoPixel draw, estimated with
+    ``max_pixel_current_ma`` per pixel (full white at full brightness).
+
+    ``estimate_ma`` (the worst case at *declared* brightness) and ``scale``
+    (the shared factor applied to every NeoPixel strip, ``1.0`` when under
+    budget) are results recorded by ``parse_device_config`` for boot
+    narration; the tuned brightness itself lives on each strip config.
+    """
+
+    __slots__ = (
+        "current_limit_ma",
+        "estimate_ma",
+        "max_pixel_current_ma",
+        "min_brightness",
+        "scale",
+    )
+
+    def __init__(
+        self,
+        current_limit_ma: int,
+        max_pixel_current_ma: int,
+        min_brightness: float,
+        estimate_ma: float,
+        scale: float,
+    ) -> None:
+        self.current_limit_ma: int = current_limit_ma
+        self.max_pixel_current_ma: int = max_pixel_current_ma
+        self.min_brightness: float = min_brightness
+        self.estimate_ma: float = estimate_ma
+        self.scale: float = scale
+
+
 def copy_with_enabled(section: object, enabled: bool) -> object:
     """Return a copy of *section* with ``enabled`` forced to *enabled*.
 
@@ -368,6 +424,7 @@ class DeviceConfig:
         "i2c",
         "ir",
         "magnetometer",
+        "neopixel_current_budget",
         "pixels",
         "radio",
         "sdcard",
@@ -388,6 +445,7 @@ class DeviceConfig:
         sdcard: SDCardConfig | None,
         high_current_rail: HighCurrentRailConfig | None,
         magnetometer: I2CDeviceConfig | None,
+        neopixel_current_budget: NeoPixelCurrentBudgetConfig | None,
     ) -> None:
         self.pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = pixels
         self.buttons: list[str] = buttons
@@ -401,6 +459,7 @@ class DeviceConfig:
         self.sdcard: SDCardConfig | None = sdcard
         self.high_current_rail: HighCurrentRailConfig | None = high_current_rail
         self.magnetometer: I2CDeviceConfig | None = magnetometer
+        self.neopixel_current_budget: NeoPixelCurrentBudgetConfig | None = neopixel_current_budget
 
     def isolate(self, keep: str) -> DeviceConfig:
         """Return a derived config with every isolatable component but *keep* disabled.
@@ -414,11 +473,12 @@ class DeviceConfig:
         present with ``enabled`` forced to ``False``, the same shape
         ``parse_device_config`` already produces for a declared-but-disabled
         section. A component that is absent on this config is a no-op --
-        it stays absent. ``i2c``, ``spi``, ``buttons``, and
-        ``high_current_rail`` are never touched: buses and the high-current
-        rail are infrastructure for the kept component, not competition with
-        it -- isolating one component must never leave the whole board's
-        high-current rail switched off.
+        it stays absent. ``i2c``, ``spi``, ``buttons``,
+        ``high_current_rail``, and ``neopixel_current_budget`` are never
+        touched: buses and the high-current rail are infrastructure for the
+        kept component, not competition with it -- isolating one component
+        must never leave the whole board's high-current rail switched off --
+        and the budget is parse-time policy that builds nothing.
 
         The isolatable set is ``DeviceConfig.__slots__`` minus
         ``_ISOLATE_EXCLUDED_COMPONENTS``, so a component section added later
@@ -965,6 +1025,76 @@ def _parse_high_current_rail(rail_raw: dict) -> HighCurrentRailConfig:
     return HighCurrentRailConfig(pin=pin, active_high=active_high, enabled=enabled)
 
 
+def _parse_milliamps(budget_raw: dict, key: str, default: int) -> int:
+    # Whole milliamps only: sub-mA precision buys nothing, and rounding a
+    # per-pixel figure up errs safe.
+    value = budget_raw.get(key, default)
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(
+            f"neopixel_current_budget.{key} must be a positive integer (mA), got {value!r}"
+        )
+    return value
+
+
+def _tune_neopixel_brightness(
+    pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig],
+    current_limit_ma: int,
+    max_pixel_current_ma: int,
+) -> tuple[float, float]:
+    """Dim every enabled NeoPixel strip in *pixels* by one shared factor to fit the limit.
+
+    Rewrites each strip's ``brightness`` in place; under the limit, nothing
+    changes.
+
+    Returns:
+        ``(estimate_ma, scale)``: the worst-case draw at declared brightness
+        and the factor applied (``1.0`` when under the limit).
+    """
+    strips: list[NeoPixelStripConfig | NeoPixelScopeConfig] = []
+    for entry in pixels:
+        if isinstance(entry, NeoPixelPixelsConfig) and entry.enabled:
+            strips.extend(entry.strips)
+            strips.extend(entry.scopes.values())
+
+    estimate_ma = 0.0
+    for strip in strips:
+        estimate_ma += strip.count * strip.brightness * max_pixel_current_ma
+    if estimate_ma <= current_limit_ma:
+        return estimate_ma, 1.0
+
+    scale = current_limit_ma / estimate_ma
+    for strip in strips:
+        strip.brightness *= scale
+    return estimate_ma, scale
+
+
+def _parse_neopixel_current_budget(
+    budget_raw: dict, pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig]
+) -> NeoPixelCurrentBudgetConfig:
+    """Parse the budget block and tune the already-parsed *pixels* to fit it."""
+    _reject_unknown_keys(
+        budget_raw, "neopixel_current_budget", allowed=_NEOPIXEL_CURRENT_BUDGET_ALLOWED_KEYS
+    )
+    current_limit_ma = _parse_milliamps(budget_raw, "current_limit_ma", _DEFAULT_CURRENT_LIMIT_MA)
+    max_pixel_current_ma = _parse_milliamps(
+        budget_raw, "max_pixel_current_ma", _DEFAULT_MAX_PIXEL_CURRENT_MA
+    )
+    min_brightness = (
+        _parse_brightness(budget_raw, "min_brightness", "neopixel_current_budget.min_brightness")
+        if "min_brightness" in budget_raw
+        else _DEFAULT_MIN_BRIGHTNESS
+    )
+
+    estimate_ma, scale = _tune_neopixel_brightness(pixels, current_limit_ma, max_pixel_current_ma)
+    return NeoPixelCurrentBudgetConfig(
+        current_limit_ma=current_limit_ma,
+        max_pixel_current_ma=max_pixel_current_ma,
+        min_brightness=min_brightness,
+        estimate_ma=estimate_ma,
+        scale=scale,
+    )
+
+
 def parse_device_config(mapping: dict) -> DeviceConfig:
     """Parse a device config mapping into a DeviceConfig.
 
@@ -1060,6 +1190,12 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     if "high_current_rail" in mapping:
         high_current_rail = _parse_high_current_rail(mapping["high_current_rail"])
 
+    neopixel_current_budget: NeoPixelCurrentBudgetConfig | None = None
+    if "neopixel_current_budget" in mapping:
+        neopixel_current_budget = _parse_neopixel_current_budget(
+            mapping["neopixel_current_budget"], pixels
+        )
+
     return DeviceConfig(
         pixels=pixels,
         buttons=buttons,
@@ -1070,6 +1206,7 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
         radio=radio,
         sdcard=sdcard,
         high_current_rail=high_current_rail,
+        neopixel_current_budget=neopixel_current_budget,
         **i2c_devices,
     )
 

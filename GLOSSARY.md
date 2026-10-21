@@ -210,7 +210,7 @@ A CircuitPython `EffectOutput` driving a DRV2605L haptic driver on all scopes (`
 _Avoid_: constructing with a `None` driver; reading `receipt.loudness` (the DRV2605L has no volume control); "motor" for the injected instance (use `driver`)
 
 ### aura-device.json
-The single **required** on-device file holding all hardware configuration; a missing file raises. Sections: `buttons`, `ir`, `pixels`, `audio`, `i2c`, `spi`, `radio`, `sdcard`, `high_current_rail`, `accelerometer`, `magnetometer`, `haptics`. `pixels` and `buttons` are each an optional, possibly-empty list. Pure hardware config — scene selection lives in **`aura-settings.json`** instead.
+The single **required** on-device file holding all hardware configuration; a missing file raises. Sections: `buttons`, `ir`, `pixels`, `audio`, `i2c`, `spi`, `radio`, `sdcard`, `high_current_rail`, `neopixel_current_budget`, `accelerometer`, `magnetometer`, `haptics`. `pixels` and `buttons` are each an optional, possibly-empty list. Pure hardware config — scene selection lives in **`aura-settings.json`** instead.
 _Avoid_: `settings.toml` (removed — unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`; a top-level `"scene"` key (moved to `aura-settings.json`)
 
 ### aura-settings.json
@@ -224,6 +224,10 @@ _Avoid_: importing `board` into the parser; constructing hardware in the parser 
 ### HighCurrentRailConfig
 The parsed config for the board's high-current rail enable pin — the line gating the ~2 A NeoPixel rail (and any peripheral drawing more than a GPIO's own budget). Infrastructure rather than a component: excluded from `isolate`, and its `enabled: false` still drives the pin deasserted rather than building nothing (see **Component enabled toggle**).
 _Avoid_: `power`/`external power` (too generic — this is only the switched high-current subset, not board power); treating it like `SDCardConfig`'s `enabled` (build-nothing); assuming `isolate(keep=...)` ever disables it
+
+### NeoPixelCurrentBudgetConfig
+The opt-in, parse-time cap on the total worst-case NeoPixel current (every enabled NeoPixel strip at full white, at its declared brightness), dimming strips to fit and never below a **minimum brightness** floor; strips declared at or below that floor are left as declared. Policy rather than a component: it builds no hardware, has no `enabled` toggle (presence is the switch), and is excluded from `isolate`. Budgets the NeoPixel draw only, within the rail `HighCurrentRailConfig` gates.
+_Avoid_: `neopixel_power`/`power budget` (too generic, see `HighCurrentRailConfig`); reading it as a live current limit or measurement (it is a static arithmetic bound fixed at boot); counting the matrix or disabled strips against it; expecting relative brightness between strips to survive once a strip is held at the floor
 
 ### Component enabled toggle
 The optional `enabled` boolean on every hardware component config (default `True`); `enabled: false` keeps a fully-validated section but tells `device_builder` not to build it. `buttons` is a bare pin-name list and isn't gated; `high_current_rail` is the exception (still drives its pin deasserted — see `HighCurrentRailConfig`).
