@@ -631,7 +631,32 @@ def test_describe_pixel_entry_neopixel_strips_form_formats_pin_count_order_and_s
     description = _describe_pixel_entry(0, config.pixels[0])
 
     assert description == (
-        "pixels[0] neopixel pin=D5 count=20 order=GRB scope_pixels=[personal:0-10 ambient:10-20]"
+        "pixels[0] neopixel pin=D5 count=20 order=GRB "
+        "scope_pixels=[personal:0-10 ambient:10-20] brightness=1.00"
+    )
+
+
+def test_describe_pixel_entry_neopixel_strips_form_reports_brightness_to_two_decimals() -> None:
+    from hardware.circuitpython.device_builder import _describe_pixel_entry
+
+    mapping = {
+        "pixels": [
+            {
+                "type": "neopixel",
+                "pin": "D5",
+                "count": 20,
+                "brightness": 0.4,
+                "scope_pixels": {"personal": [0, 20]},
+            }
+        ],
+        "buttons": ["D9"],
+    }
+    config = parse_device_config(mapping)
+
+    description = _describe_pixel_entry(0, config.pixels[0])
+
+    assert description == (
+        "pixels[0] neopixel pin=D5 count=20 order=GRB scope_pixels=[personal:0-20] brightness=0.40"
     )
 
 
@@ -643,8 +668,33 @@ def test_describe_pixel_entry_neopixel_legacy_scopes_form_names_each_strips_scop
     description = _describe_pixel_entry(0, config.pixels[0])
 
     assert description == (
-        "pixels[0] neopixel pin=D5 count=10 order=GRB scope=personal | "
-        "pin=D6 count=4 order=GRB scope=directional"
+        "pixels[0] neopixel pin=D5 count=10 order=GRB scope=personal brightness=1.00 | "
+        "pin=D6 count=4 order=GRB scope=directional brightness=1.00"
+    )
+
+
+def test_describe_pixel_entry_neopixel_legacy_scopes_form_reports_each_strips_brightness() -> None:
+    from hardware.circuitpython.device_builder import _describe_pixel_entry
+
+    mapping = {
+        "pixels": [
+            {
+                "type": "neopixel",
+                "scopes": {
+                    "personal": {"pin": "D5", "count": 10, "brightness": 0.25},
+                    "directional": {"pin": "D6", "count": 4, "brightness": 0.6},
+                },
+            }
+        ],
+        "buttons": ["D9"],
+    }
+    config = parse_device_config(mapping)
+
+    description = _describe_pixel_entry(0, config.pixels[0])
+
+    assert description == (
+        "pixels[0] neopixel pin=D5 count=10 order=GRB scope=personal brightness=0.25 | "
+        "pin=D6 count=4 order=GRB scope=directional brightness=0.60"
     )
 
 
@@ -772,9 +822,10 @@ def test_build_hardware_pixels_entry_narrates_its_ok_line() -> None:
 
         build_hardware(config, board_module=board_mock, logger=logger)
 
-    assert "[hw] pixels[0] neopixel pin=D5 count=10 order=GRB scope=personal ok\n" in "".join(
-        fragments
+    expected = (
+        "[hw] pixels[0] neopixel pin=D5 count=10 order=GRB scope=personal brightness=1.00 ok\n"
     )
+    assert expected in "".join(fragments)
 
 
 def test_build_hardware_empty_pixels_list_produces_no_pixel_lines() -> None:

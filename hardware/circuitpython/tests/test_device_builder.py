@@ -269,7 +269,7 @@ def test_build_hardware_all_enabled_config_narrates_the_complete_ok_line_sequenc
         "[hw] i2c scl=GP5 sda=GP4 ok\n",
         "[hw] spi sck=SCK mosi=MOSI miso=MISO ok\n",
         "[hw] pixels[0] matrix cols=13 scope_rows=[global.main:0-5] brightness=1.00 ok\n",
-        "[hw] pixels[1] neopixel pin=D5 count=10 order=GRB scope=personal ok\n",
+        "[hw] pixels[1] neopixel pin=D5 count=10 order=GRB scope=personal brightness=1.00 ok\n",
         "[hw] buttons A=D9 ok\n",
         "[hw] accelerometer lis3dh ok\n",
         "[hw] magnetometer mmc5603 ok\n",
