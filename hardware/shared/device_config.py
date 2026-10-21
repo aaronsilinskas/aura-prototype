@@ -1046,9 +1046,26 @@ def _parse_milliamps(budget_raw: dict, key: str, default: int) -> int:
     return value
 
 
-def _strip_current_ma(count: int, brightness: float, max_pixel_current_ma: int) -> float:
-    """Worst-case draw of *count* pixels at full white, at *brightness*."""
-    return count * brightness * max_pixel_current_ma
+def _budgeted_strips(
+    pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig],
+) -> list[NeoPixelStripConfig | NeoPixelScopeConfig]:
+    """Every strip the current budget counts: enabled NeoPixel entries, both shapes."""
+    strips: list[NeoPixelStripConfig | NeoPixelScopeConfig] = []
+    for entry in pixels:
+        if isinstance(entry, NeoPixelPixelsConfig) and entry.enabled:
+            strips.extend(entry.strips)
+            strips.extend(entry.scopes.values())
+    return strips
+
+
+def _draw_ma(
+    strips: list[NeoPixelStripConfig | NeoPixelScopeConfig], max_pixel_current_ma: int
+) -> float:
+    """Worst-case draw of *strips* at full white, at their current brightness."""
+    total = 0.0
+    for strip in strips:
+        total += strip.count * strip.brightness * max_pixel_current_ma
+    return total
 
 
 def _tune_neopixel_brightness(
@@ -1070,60 +1087,48 @@ def _tune_neopixel_brightness(
     Raises:
         ValueError: If the strips exceed the limit even at the floor.
     """
-    strips: list[NeoPixelStripConfig | NeoPixelScopeConfig] = []
-    for entry in pixels:
-        if isinstance(entry, NeoPixelPixelsConfig) and entry.enabled:
-            strips.extend(entry.strips)
-            strips.extend(entry.scopes.values())
-    indices = range(len(strips))
-    declared = [strip.brightness for strip in strips]
-    floored = [min(brightness, min_brightness) for brightness in declared]
-
-    estimate_ma = 0.0
-    for i in indices:
-        estimate_ma += _strip_current_ma(strips[i].count, declared[i], max_pixel_current_ma)
+    strips = _budgeted_strips(pixels)
+    estimate_ma = _draw_ma(strips, max_pixel_current_ma)
     if estimate_ma <= current_limit_ma:
         return estimate_ma, 1.0, 0
 
+    # A strip declared at or below the floor is held as declared, never scaled.
+    held = [strip for strip in strips if strip.brightness <= min_brightness]
+    unheld = sorted(
+        (strip for strip in strips if strip.brightness > min_brightness),
+        key=lambda strip: strip.brightness,
+    )
+
     floor_ma = 0.0
-    for i in indices:
-        floor_ma += _strip_current_ma(strips[i].count, floored[i], max_pixel_current_ma)
+    for strip in strips:
+        floor_ma += strip.count * min(strip.brightness, min_brightness) * max_pixel_current_ma
     if floor_ma > current_limit_ma:
         raise ValueError(
             f"neopixel_current_budget: NeoPixel strips draw {floor_ma:.1f} mA even at"
             + f" min_brightness {min_brightness}, over current_limit_ma {current_limit_ma} mA"
         )
 
-    # A strip declared at or below the floor is never scaled.
+    # Holding a strip leaves less for the rest, so the shared scale only
+    # falls -- the dimmest unheld strip is always the next to cross the
+    # floor. Hold strips dimmest-first until the scale keeps the rest above it.
     target_ma = current_limit_ma * (1 - _BUDGET_ROUNDING_MARGIN)
-    held = [brightness <= min_brightness for brightness in declared]
+    held_ma = _draw_ma(held, max_pixel_current_ma)
     scale = 1.0
-    # Every strip ends up held only when the floor current is (within the
-    # rounding margin) the limit itself: the floor then wins over the margin,
-    # and the last solved scale is kept for narration.
-    while not all(held):
-        held_ma = 0.0
-        unheld_ma = 0.0
-        for i in indices:
-            if held[i]:
-                held_ma += _strip_current_ma(strips[i].count, floored[i], max_pixel_current_ma)
-            else:
-                unheld_ma += _strip_current_ma(strips[i].count, declared[i], max_pixel_current_ma)
-        scale = max(0.0, (target_ma - held_ma) / unheld_ma)
-
-        # Holding a strip frees nothing for it but shrinks what the rest may
-        # share, so re-solve until no further strip crosses the floor.
-        newly_held = False
-        for i in indices:
-            if not held[i] and declared[i] * scale < min_brightness:
-                held[i] = True
-                newly_held = True
-        if not newly_held:
+    while unheld:
+        scale = max(0.0, (target_ma - held_ma) / _draw_ma(unheld, max_pixel_current_ma))
+        dimmest = unheld[0]
+        if dimmest.brightness * scale >= min_brightness:
             break
+        unheld.pop(0)
+        dimmest.brightness = min_brightness
+        held_ma += _draw_ma([dimmest], max_pixel_current_ma)
+    # An empty `unheld` means the floor current is (within the rounding
+    # margin) the limit itself: the floor wins, and the last solved scale
+    # is kept for narration.
 
-    for i in indices:
-        strips[i].brightness = floored[i] if held[i] else declared[i] * scale
-    return estimate_ma, scale, sum(held)
+    for strip in unheld:
+        strip.brightness *= scale
+    return estimate_ma, scale, len(strips) - len(unheld)
 
 
 def _parse_neopixel_current_budget(
