@@ -1,5 +1,5 @@
 """Behaviour-driven tests for build_scene_tick, the per-tick loop shared by
-the device and the Simulated device (issue #958)."""
+the device and the Simulated device."""
 
 from app.scene_composition import (
     SceneRuntime,
@@ -94,7 +94,7 @@ def test_each_tick_queues_one_sensors_event_carrying_the_debounced_button_states
     assert sensors[0].buttons.get("A") == ButtonData.UP
 
 
-def test_every_tick_reuses_the_same_sensors_event_and_button_buffer():
+def test_ticks_reuse_one_sensors_event_and_button_buffer_instead_of_allocating():
     hw = _hw(buttons=DebouncedButtons([("A", lambda: True)]))
     runtime = _runtime(hw)
     tick = build_scene_tick(hw, runtime)
@@ -249,7 +249,7 @@ def test_ticking_a_real_scene_delivers_the_sensors_event_to_its_rules():
     assert [emitter for _, emitter in network_spy.send_ir_calls] == [LINE]
 
 
-def test_each_tick_advances_the_scene_and_then_renders_effects_on_the_runtimes_timer():
+def test_each_tick_updates_the_scene_and_renders_effects_on_the_runtimes_timer():
     hw = _hw()
     runtime = _runtime(hw)
     tick = build_scene_tick(hw, runtime)

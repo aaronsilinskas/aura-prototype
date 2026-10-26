@@ -61,7 +61,7 @@ def run_scene() -> None:
     own, so a scene is scanned exactly once for the whole boot sequence.
 
     Each tick runs the shared per-tick body from
-    ``app.scene_composition.build_scene_tick`` (the same one the Simulated
+    :func:`app.scene_composition.build_scene_tick` (the same one the Simulated
     device drives), then ``gc.collect()``. Constructs a live ``[hw]``-tagged
     :class:`~engine.log.Logger` and passes it to ``build_hardware`` so the
     on-device path always gets hardware setup narration on stdout, with no

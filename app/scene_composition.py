@@ -361,21 +361,13 @@ def build_scene_runtime(
 def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], None]:
     """Return the per-tick body that drives *runtime* on *hw*; call it once per tick.
 
-    The one loop body shared by the device (``run_scene``, which adds only
-    ``while True:`` and ``gc.collect()``) and the Simulated device, so neither
-    copies it. Build it once per runtime: the ``InputEvents.Sensors`` event,
-    its button/acceleration/magnetic buffers, and the telemetry gate are
-    allocated here and mutated in place every tick, never reallocated.
-
-    Each tick reads the debounced buttons and any accelerometer/magnetometer
-    (a failed read keeps the last good values; ``None`` means the hardware is
-    absent), pumps ``runtime.ir.update()`` and ``runtime.radio.update()``
-    whether or not a scene is active, then -- only while a scene is active --
-    queues a received IR packet as ``NetworkEvents.IRReceived``, a received
-    radio packet as ``NetworkEvents.RadioReceived``, and the sensors event.
-    It then runs ``manager.update()`` and ``effect_manager.update(timer)``,
-    and prints ``runtime.ir.telemetry_line()`` (when it returns one) at most
-    once per second of ``timer.total``.
+    The one loop body shared by the device
+    (:func:`app.scene_runtime.run_scene`, which adds only ``while True:`` and
+    ``gc.collect()``) and the Simulated device, so neither copies it. Build it
+    once per runtime: the ``InputEvents.Sensors`` event, its
+    button/acceleration/magnetic buffers, and the telemetry gate are
+    allocated here and mutated in place every tick, so the steady-state tick
+    allocates nothing on-device.
 
     A caller with events of its own to inject (e.g. a simulation delivering
     IR with no medium) queues them on ``runtime.manager.active_state`` before
