@@ -417,7 +417,9 @@ class SceneRegistry:
         entry = self._scenes.get(name)
         if entry is None:
             raise ValueError(f"Unknown scene '{name}'")
-        entry.initial_data = {**(entry.initial_data or {}), **overrides}
+        merged = dict(entry.initial_data or {})
+        merged.update(overrides)
+        entry.initial_data = merged
 
     def names(self) -> list[str]:
         """Return all registered scene names sorted alphabetically."""
