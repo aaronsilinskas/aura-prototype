@@ -187,6 +187,8 @@ class _SimulatedAudio(EffectOutput, VoiceSink):
         self._registry = registry
         self._pool = VoicePool(voices)
         self._ends_at: list[float | None] = [None] * voices
+        self._clips: list[str | None] = [None] * voices
+        """The clip each voice is playing, or ``None`` while it is idle."""
 
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
@@ -198,8 +200,14 @@ class _SimulatedAudio(EffectOutput, VoiceSink):
             return
         stops_receipt = clip_stops_receipt(effect, config)
         path = self._registry.path(config.name)
-        if self._pool.claim(self, path, config.loop, stops_receipt, receipt) != -1:
+        slot = self._pool.claim(self, path, config.loop, stops_receipt, receipt)
+        if slot != -1:
+            self._clips[slot] = config.name
             self._sim_hw.played.append(Played(self._sim_hw.now(), config.name))
+
+    def is_clip_playing(self, clip: str) -> bool:
+        """Whether a voice is playing or looping *clip*."""
+        return any(name == clip and self.is_playing(i) for i, name in enumerate(self._clips))
 
     def flush(self) -> None:
         self._pool.sweep(self)
@@ -209,10 +217,11 @@ class _SimulatedAudio(EffectOutput, VoiceSink):
 
     def play(self, slot: int, source: object, loop: bool) -> None:
         assert isinstance(source, float)  # the clip length open_source returned
-        self._ends_at[slot] = None if loop else self._sim_hw.now() + source
+        self._ends_at[slot] = math.inf if loop else self._sim_hw.now() + source
 
     def stop(self, slot: int) -> None:
         self._ends_at[slot] = None
+        self._clips[slot] = None
 
     def set_loudness(self, slot: int, loudness: float) -> None:
         pass
@@ -316,8 +325,13 @@ class SimulatedHardware:
         self._strips = [_RecordingPixels(segments) for segments in _strip_segments(config)]
         self._audio_registry = AudioRegistry()
         outputs: list[EffectOutput] = [*self._strips]
-        if config.audio is not None and config.audio.enabled:
-            outputs.append(_SimulatedAudio(self, self._audio_registry, config.audio.voices))
+        self._audio = (
+            _SimulatedAudio(self, self._audio_registry, config.audio.voices)
+            if config.audio is not None and config.audio.enabled
+            else None
+        )
+        if self._audio is not None:
+            outputs.append(self._audio)
         if config.haptics is not None and config.haptics.enabled:
             outputs.append(_RecordingHaptic(self))
         self._ir_readers: list[_SimulatedPulseReader] = []
@@ -364,6 +378,10 @@ class SimulatedHardware:
     def clip_length(self, clip: str) -> float:
         """Seconds *clip* plays for, read from the WAV header it plays from."""
         return _wav_length(self._audio_registry.path(clip))
+
+    def is_playing(self, clip: str) -> bool:
+        """Whether *clip* is playing or looping on one of the device's voices."""
+        return self._audio is not None and self._audio.is_clip_playing(clip)
 
     def releases(self, button: str) -> int:
         """How many releases of *button* the debouncer has registered so far."""

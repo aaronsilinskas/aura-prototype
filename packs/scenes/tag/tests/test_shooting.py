@@ -11,7 +11,7 @@ from __future__ import annotations
 from app.simulation import SimulatedDevice, Simulation, Strip
 from effects.effect import HapticPattern
 from engine.state import Scope
-from packs.scenes.tag.tests.helpers import AMMO_AMBER, shots, start_game
+from packs.scenes.tag.tests.helpers import AMMO_AMBER, SHOOTER, shots, start_game
 
 TWO_ROUNDS = {"tag_max_ammo": 2, "tag_shot_cooldown": 0.3, "tag_reload_duration": 1.0}
 """A short magazine and reload, so running dry and reloading stay quick."""
@@ -23,12 +23,12 @@ TWO_ROUNDS = {"tag_max_ammo": 2, "tag_shot_cooldown": 0.3, "tag_reload_duration"
 
 
 def test_pressing_a_fires_the_players_own_tag_on_the_line_emitter(sim):
-    player = sim.add_device("red", scene="tag")
+    player = sim.add_device("red", scene="tag", scene_data=SHOOTER)
     start_game(sim, player)
 
     player.tap("A")
 
-    assert shots(player) == [(0, 1, 1)]
+    assert shots(player) == [(2, 3, 1)]
 
 
 def test_a_shot_flashes_the_directional_strip_white(sim):
@@ -295,11 +295,11 @@ def test_a_press_after_an_abandoned_reload_dry_fires(sim):
 
 
 def test_one_players_trigger_never_fires_another_players_blaster(sim):
-    red = sim.add_device("red", scene="tag")
+    red = sim.add_device("red", scene="tag", scene_data=SHOOTER)
     blue = sim.add_device("blue", scene="tag", scene_data={"tag_expected_team": 1})
     start_game(sim, red, blue)
 
     red.tap("A")
 
-    assert shots(red) == [(0, 1, 1)]
+    assert shots(red) == [(2, 3, 1)]
     assert shots(blue) == []
