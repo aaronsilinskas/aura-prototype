@@ -9,17 +9,34 @@ contract keeps out of ``hardware/``.
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 from app.scene_composition import build_scene_runtime, build_scene_tick, scan_boot_scene_registry
 from engine.network import NetworkEvents
 from engine.state import ScopeValue
 from engine.timer import Timer
-from hardware.simulated.device import Buzzed, IrSent, Played, SimulatedHardware, Strip
+from hardware.shared.device_config import DeviceConfig, load_device_config
+from hardware.simulated.device import (
+    Buzzed,
+    IrSent,
+    Played,
+    SimulatedHardware,
+    Strip,
+    wav_length,
+)
 
 __all__ = ["TICK", "SimulatedDevice", "Simulation"]
 
 TICK = 1 / 60
 """Fixed simulation step. Every device in a ``Simulation`` ticks on it in lockstep."""
+
+_SIMULATED_DEVICE_CONFIG = (
+    Path(__file__).resolve().parents[2] / "examples" / "aura-device.simulated.json"
+)
+
+
+def _simulated_device_config() -> DeviceConfig:
+    return load_device_config(str(_SIMULATED_DEVICE_CONFIG))
 
 
 class _SimulationClock(Timer):
@@ -79,7 +96,8 @@ class SimulatedDevice:
         self, sim: Simulation, name: str, scene: str, scene_data: dict[str, object]
     ) -> None:
         self.name = name
-        self._sim_hw = SimulatedHardware(now=lambda: sim.now)
+        self._sim = sim
+        self._sim_hw = SimulatedHardware(now=lambda: sim.now, config=_simulated_device_config())
         hw = self._sim_hw.hw
         registry = scan_boot_scene_registry(hw.storage)
         if scene_data:
@@ -93,14 +111,21 @@ class SimulatedDevice:
     # -- inputs -------------------------------------------------------------
 
     def tap(self, button: str) -> None:
-        """Press and release *button*, each long enough to register."""
-        self._sim_hw.tap(button)
+        """Press and release *button*, advancing the simulation until both register.
+
+        Every device ticks while it waits, as with ``Simulation.advance``.
+        """
+        released = self._sim_hw.releases(button)
+        self._sim_hw.hold(button)
+        self._sim_hw.release(button)
+        self._sim.run_until(lambda: self._sim_hw.releases(button) > released)
 
     def hold(self, button: str) -> None:
-        """Press *button* and keep it down until ``release``."""
+        """Schedule a press of *button*, kept down until ``release``; time does not advance."""
         self._sim_hw.hold(button)
 
     def release(self, button: str) -> None:
+        """Schedule a release of *button*; time does not advance."""
         self._sim_hw.release(button)
 
     def receive_ir(self, payload: bytes) -> None:
@@ -126,6 +151,12 @@ class SimulatedDevice:
 
     def has_played(self, clip: str) -> bool:
         return any(p.clip == clip for p in self.played)
+
+    def clip_length(self, clip: str) -> float:
+        """Seconds *clip* plays for, read from the WAV header the device plays it from."""
+        registry = self._sim_hw.hw.audio_registry
+        assert registry is not None  # the Simulated device always builds one
+        return wav_length(registry.path(clip))
 
     def forget(self) -> None:
         """Drop everything recorded so far, so later asserts see only what follows.

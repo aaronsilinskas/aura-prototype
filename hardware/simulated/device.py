@@ -5,9 +5,12 @@ Builds a real ``DeviceHardware`` around a real ``DebouncedButtons`` and a real
 a board. It obeys the hardware import contract: it knows nothing about scenes,
 the engine loop, or time beyond the ``now`` it is handed.
 
-Only what the Tag shooting scenario needs is simulated: every leaf scope is
-one fixed strip, and there is no IR or radio transceiver (``send_ir`` only
-records, and incoming IR is injected by the harness).
+Its shape comes from a ``DeviceConfig``: one button per declared pin, labelled
+``A`` onward as on a board; one recording pixel output per NeoPixel strip; the
+declared voice count; a haptic output when ``haptics`` is declared. Wiring
+(pins, buses, addresses) is ignored. Matrix pixels, sensors, and the IR and
+radio transceivers are not simulated (``send_ir`` only records, and incoming
+IR is injected by the harness).
 """
 
 from __future__ import annotations
@@ -20,26 +23,15 @@ from effects.effect import Effect, PixelBuffer
 from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
+from engine.input import ButtonData
 from engine.state import EffectReceipt, NetworkControls, Scope, ScopeValue
 from hardware.shared.debounced_buttons import DebouncedButtons
+from hardware.shared.device_config import DeviceConfig, MatrixPixelsConfig
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.voice_pool import VoicePool, VoiceSink
 
-__all__ = ["Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip"]
+__all__ = ["Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip", "wav_length"]
 
-PIXELS_PER_SCOPE = 10
-
-_LEAF_SCOPES = [
-    Scope.PERSONAL,
-    Scope.DIRECTIONAL,
-    Scope.AMBIENT,
-    Scope.Global.MAIN,
-    Scope.Global.BUFF,
-    Scope.Global.DEBUFF,
-]
-
-_BUTTONS: tuple[str, ...] = ("A", "B")
-_VOICES = 2  # matches the example PropMaker device config
 _DEBOUNCE_INTERVAL = 0.05
 _PIN_SETTLE = 2 * _DEBOUNCE_INTERVAL
 """How long a scripted pin level holds before the next change may start.
@@ -75,6 +67,10 @@ class Strip:
         self.pixels = pixels
 
     @property
+    def size(self) -> int:
+        return len(self.pixels)
+
+    @property
     def lit(self) -> int:
         return sum(1 for p in self.pixels if p != 0)
 
@@ -100,23 +96,29 @@ class _RecordingNetwork(NetworkControls):
         pass
 
 
-class _RecordingPixels(EffectOutput):
-    """One pixel output covering every leaf scope; keeps each scope's latest frame."""
+def wav_length(path: str) -> float:
+    """Seconds of audio in the WAV at *path*, read from its header."""
+    with wave.open(path, "rb") as clip:
+        return clip.getnframes() / clip.getframerate()
 
-    def __init__(self) -> None:
+
+class _RecordingPixels(EffectOutput):
+    """One NeoPixel strip's scope segments; keeps each segment's latest frame."""
+
+    def __init__(self, segments: dict[str, range]) -> None:
         super().__init__()
-        self.min_resolution = PIXELS_PER_SCOPE
-        self.scopes = _LEAF_SCOPES
-        self.frames: dict[str, list[int]] = {}
+        self.min_resolution = max(len(seg) for seg in segments.values())
+        self.scopes = [ScopeValue(key) for key in segments]
+        self.frames = {key: [0] * len(seg) for key, seg in segments.items()}
 
     def create_buffer(self, scope_key: str) -> PixelBuffer:
-        return PixelBuffer(PIXELS_PER_SCOPE)
+        return PixelBuffer(len(self.frames[scope_key]))
 
     def update_pixels(self, scope_key: str, buffer: PixelBuffer) -> None:
         self.frames[scope_key] = list(buffer)
 
     def clear_pixels(self, scope_key: str) -> None:
-        self.frames[scope_key] = [0] * PIXELS_PER_SCOPE
+        self.frames[scope_key] = [0] * len(self.frames[scope_key])
 
 
 class _SimulatedAudio(EffectOutput, VoiceSink):
@@ -153,8 +155,7 @@ class _SimulatedAudio(EffectOutput, VoiceSink):
         self._pool.sweep(self)
 
     def open_source(self, path: str) -> object | None:
-        with wave.open(path, "rb") as clip:
-            return clip.getnframes() / clip.getframerate()
+        return wav_length(path)
 
     def play(self, slot: int, source: object, loop: bool) -> None:
         assert isinstance(source, float)  # the clip length open_source returned
@@ -188,6 +189,33 @@ class _RecordingHaptic(EffectOutput):
             self._sim_hw.buzzed.append(Buzzed(self._sim_hw.now(), tuple(pattern.sequence)))
 
 
+class _CountingButtons(DebouncedButtons):
+    """The real debouncer, also counting each button's registered releases."""
+
+    def __init__(self, buttons: list[tuple[str, Callable[[], bool]]], interval: float) -> None:
+        super().__init__(buttons, interval=interval)
+        self.releases = {label: 0 for label, _ in buttons}
+
+    def update(self, elapsed: float, out: ButtonData) -> None:
+        super().update(elapsed, out)
+        for label in self.releases:
+            if out.is_released(label):
+                self.releases[label] += 1
+
+
+def _strip_segments(config: DeviceConfig) -> list[dict[str, range]]:
+    """Each enabled NeoPixel strip's scope segments, one dict per strip."""
+    strips: list[dict[str, range]] = []
+    for entry in config.pixels:
+        if isinstance(entry, MatrixPixelsConfig):
+            raise ValueError("the Simulated device has no matrix; lay pixels out as strips")
+        if not entry.enabled:
+            continue
+        strips.extend(strip.scope_pixels for strip in entry.strips)
+        strips.extend({key: range(legacy.count)} for key, legacy in entry.scopes.items())
+    return strips
+
+
 class SimulatedHardware:
     """A Simulated device: ``hw`` is the ``DeviceHardware`` a scene boots on.
 
@@ -196,26 +224,28 @@ class SimulatedHardware:
     tick, before the tick reads the buttons.
     """
 
-    def __init__(self, now: Callable[[], float]) -> None:
+    def __init__(self, now: Callable[[], float], config: DeviceConfig) -> None:
         self.now = now
         self.ir_sent: list[IrSent] = []
         self.played: list[Played] = []
         self.buzzed: list[Buzzed] = []
-        self._pressed = dict.fromkeys(_BUTTONS, False)
-        self._pin_changes: dict[str, list[tuple[float, bool]]] = {b: [] for b in _BUTTONS}
-        self._pin_free_at = dict.fromkeys(_BUTTONS, 0.0)
-        self._pixels = _RecordingPixels()
+        labels = [chr(ord("A") + i) for i in range(len(config.buttons))]
+        self._pressed = dict.fromkeys(labels, False)
+        self._pin_changes: dict[str, list[tuple[float, bool]]] = {b: [] for b in labels}
+        self._pin_free_at = dict.fromkeys(labels, 0.0)
+        self._buttons = _CountingButtons(
+            [(label, self._pin_reader(label)) for label in labels], interval=_DEBOUNCE_INTERVAL
+        )
+        self._strips = [_RecordingPixels(segments) for segments in _strip_segments(config)]
         audio_registry = AudioRegistry()
+        outputs: list[EffectOutput] = [*self._strips]
+        if config.audio is not None and config.audio.enabled:
+            outputs.append(_SimulatedAudio(self, audio_registry, config.audio.voices))
+        if config.haptics is not None and config.haptics.enabled:
+            outputs.append(_RecordingHaptic(self))
         self.hw = DeviceHardware(
-            outputs=[
-                self._pixels,
-                _SimulatedAudio(self, audio_registry, _VOICES),
-                _RecordingHaptic(self),
-            ],
-            buttons=DebouncedButtons(
-                [(label, self._pin_reader(label)) for label in _BUTTONS],
-                interval=_DEBOUNCE_INTERVAL,
-            ),
+            outputs=outputs,
+            buttons=self._buttons,
             accelerometer=None,
             magnetometer=None,
             network_controls=_RecordingNetwork(self),
@@ -225,9 +255,9 @@ class SimulatedHardware:
             audio_registry=audio_registry,
         )
 
-    def tap(self, button: str) -> None:
-        self.hold(button)
-        self.release(button)
+    def releases(self, button: str) -> int:
+        """How many releases of *button* the debouncer has registered so far."""
+        return self._buttons.releases[button]
 
     def hold(self, button: str) -> None:
         self._schedule(button, True)
@@ -243,8 +273,12 @@ class SimulatedHardware:
                 self._pressed[button] = changes.pop(0)[1]
 
     def strip(self, scope: ScopeValue) -> Strip:
+        """The latest frame of the one strip segment showing leaf *scope*."""
         (key,) = scope.keys
-        return Strip(self._pixels.frames.get(key, [0] * PIXELS_PER_SCOPE))
+        frames = [s.frames[key] for s in self._strips if key in s.frames]
+        if len(frames) != 1:
+            raise KeyError(f"{len(frames)} strips show scope '{key}'; expected exactly one")
+        return Strip(frames[0])
 
     def forget(self) -> None:
         self.ir_sent.clear()
