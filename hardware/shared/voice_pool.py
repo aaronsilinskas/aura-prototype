@@ -2,7 +2,8 @@
 
 ``VoicePool`` owns every voice-slot decision — slot occupancy, claim ordering,
 the eviction policy, the stops-receipt release rule, and loudness tracking —
-without ever touching audio hardware.  All hardware lives behind the
+without ever touching audio hardware.  ``clip_stops_receipt`` decides, per
+clip, whether its release stops the effect's receipt.  All hardware lives behind the
 ``VoiceSink`` port, so the pool runs unchanged on CPython, CircuitPython, and
 MicroPython and is testable with a plain recording fake.
 
@@ -19,9 +20,8 @@ from engine.state import EffectReceipt
 def clip_stops_receipt(effect: Effect, clip: AudioPlaybackConfig) -> bool:
     """Whether ``clip``'s release (finish or eviction) should stop ``effect``'s receipt.
 
-    True when audio is the whole effect (no pixels, no haptic) or the clip sets
-    ``stops_effect``; otherwise the receipt's lifecycle stays with rules.  The
-    value every audio output passes as :meth:`VoicePool.claim`'s ``stops_receipt``.
+    The one copy of the claim rule, shared so the board and the Simulated device
+    cannot drift apart.
     """
     return (effect.pixels is None and effect.haptic is None) or clip.stops_effect
 
