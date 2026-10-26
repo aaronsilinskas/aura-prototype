@@ -176,6 +176,17 @@ def test_pressing_with_an_empty_magazine_dry_fires_instead_of_shooting(sim):
     assert player.has_played("scene.dry_fire_start")
 
 
+def test_a_dry_fire_bumps_the_haptic_softly(sim):
+    player = sim.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    start_game(sim, player)
+    empty_the_magazine(sim, player)
+
+    player.hold("A")
+    sim.advance(0.2)
+
+    assert [b.pattern for b in player.buzzed] == [(HapticPattern.SOFT_BUMP,)]
+
+
 def test_pressing_with_an_empty_magazine_starts_reloading(sim):
     player = sim.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
     start_game(sim, player)
@@ -222,6 +233,31 @@ def test_holding_through_the_reload_plays_the_reload_complete_sound(sim):
     reload_fully(sim, player)
 
     assert player.has_played("scene.reload_complete")
+
+
+def test_holding_through_the_reload_double_clicks_the_haptic(sim):
+    player = sim.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    start_game(sim, player)
+    empty_the_magazine(sim, player)
+
+    reload_fully(sim, player)
+
+    assert player.buzzed[-1].pattern == (HapticPattern.DOUBLE_CLICK,)
+
+
+def test_the_ammo_bar_fills_red_as_the_reload_is_held(sim):
+    player = sim.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    start_game(sim, player)
+    empty_the_magazine(sim, player)
+
+    player.hold("A")
+    sim.advance(TWO_ROUNDS["tag_reload_duration"] / 4)
+    early = player.strip(Scope.Global.BUFF)
+    sim.advance(TWO_ROUNDS["tag_reload_duration"] / 2)
+    later = player.strip(Scope.Global.BUFF)
+
+    assert 0 < early.lit < later.lit < later.size
+    assert early.shades_of(RED) and later.shades_of(RED)
 
 
 def test_holding_through_the_reload_refills_the_amber_ammo_bar(sim):
