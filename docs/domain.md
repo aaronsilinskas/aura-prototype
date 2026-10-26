@@ -79,8 +79,8 @@ hardware/         Hardware abstraction layer
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together
-  scene_composition.py  build_scene_runtime (board-free, CPython-testable)
-  scene_runtime.py      run_scene (device-only)
+  scene_composition.py  build_scene_runtime, build_scene_tick (board-free, CPython-testable)
+  scene_runtime.py      run_scene (device-only: bring-up, then loops build_scene_tick)
 
 examples/         Runnable CircuitPython entry points; deploy-watch's flash targets
 
@@ -162,7 +162,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, receiver, shared transmit gate) |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |
-| `SceneRuntime` | `app/scene_composition.py` | Bundle from `build_scene_runtime` that `run_scene`'s loop drives |
+| `SceneRuntime` | `app/scene_composition.py` | Bundle from `build_scene_runtime` that `build_scene_tick` drives |
 | `DeviceSceneReboot` | `hardware/circuitpython/device_reboot.py` | Live `SceneReboot` adapter |
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol |
