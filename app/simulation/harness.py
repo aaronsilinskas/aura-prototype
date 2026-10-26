@@ -11,8 +11,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from app.scene_composition import build_scene_runtime, build_scene_tick, scan_boot_scene_registry
-from engine.network import NetworkEvents
+from app.scene_composition import (
+    build_scene_runtime,
+    build_scene_tick,
+    resolve_ir_codec,
+    scan_boot_scene_registry,
+)
 from engine.state import ScopeValue
 from engine.timer import Timer
 from hardware.shared.device_config import DeviceConfig, load_device_config
@@ -95,11 +99,11 @@ class SimulatedDevice:
         registry = scan_boot_scene_registry(hw.storage)
         if scene_data:
             registry.override_initial_data(scene, scene_data)
+        self._sim_hw.apply_ir_codec(*resolve_ir_codec(registry, scene))
         self._runtime = build_scene_runtime(
             hw, scene, scene_registry=registry, timer=_SimulationClock(sim)
         )
         self._scene_tick = build_scene_tick(hw, self._runtime)
-        self._ir_inbox: list[NetworkEvents.IRReceived] = []
 
     # -- inputs -------------------------------------------------------------
 
@@ -122,8 +126,12 @@ class SimulatedDevice:
         self._sim_hw.release(button)
 
     def receive_ir(self, payload: bytes) -> None:
-        """Deliver a clean, full-strength IR packet on the next tick, as if decoded."""
-        self._ir_inbox.append(NetworkEvents.IRReceived(payload, 100, 0, best_receiver=None))
+        """Land a clean shot carrying *payload* over the scene's wire-frame codec.
+
+        Decoded on the next tick, one shot per tick, unless the device's own
+        send masks it.
+        """
+        self._sim_hw.receive_ir(payload)
 
     # -- queries ------------------------------------------------------------
 
@@ -160,9 +168,4 @@ class SimulatedDevice:
 
     def _tick(self) -> None:
         self._sim_hw.settle_pins()
-        active_state = self._runtime.manager.active_state
-        if active_state is not None:
-            for event in self._ir_inbox:
-                active_state.queue_event(event)
-        self._ir_inbox.clear()
         self._scene_tick()
