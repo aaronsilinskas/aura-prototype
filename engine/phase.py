@@ -133,7 +133,7 @@ class PhaseSlot:
     match.  Two slots sharing one key are unsupported.
 
     The slot also knows which :class:`PhaseRule` owns each of its phases (see
-    :meth:`owner_of`); every ``PhaseRule`` registers itself here when built.
+    :meth:`owner_of`).
     """
 
     __slots__ = ("_owners", "_slot")
@@ -156,7 +156,6 @@ class PhaseSlot:
         return self._owners.get(phase)
 
     def _register_owner(self, rule: PhaseRule) -> None:
-        """Record *rule* as its phase's owner; raise ``ValueError`` if the phase already has one."""
         if rule.phase in self._owners:
             raise ValueError(f"Phase {rule.phase!r} of {self.key!r} already has an owner")
         self._owners[rule.phase] = rule

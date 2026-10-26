@@ -30,8 +30,7 @@ def _make_state(
     network_spy: SpyNetworkControls | None = None,
 ) -> tuple[GameState, GameEngine]:
     engine = GameEngine(spy, network_controls=network_spy)
-    rule = RULE
-    engine.add_rules(rule)
+    engine.add_rules(RULE)
     state = engine.create_state(SceneControls(), initial_data={})
     seed_phase(state, mode, entered=(mode is MODE_RADIO))
     return state, engine

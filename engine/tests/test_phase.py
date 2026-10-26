@@ -310,6 +310,16 @@ def test_constructing_a_second_owner_for_a_phase_raises_naming_the_phase() -> No
         _LifecycleRule(_PHASE_A, "two", phase_slot=slot)
 
 
+def test_the_same_phase_may_have_an_owner_under_each_of_two_slots() -> None:
+    one_slot = PhaseSlot("machine_one", _PHASE_A)
+    other_slot = PhaseSlot("machine_two", _PHASE_A)
+    one = _LifecycleRule(_PHASE_A, "one", phase_slot=one_slot)
+    other = _LifecycleRule(_PHASE_A, "other", phase_slot=other_slot)
+
+    assert one_slot.owner_of(_PHASE_A) is one
+    assert other_slot.owner_of(_PHASE_A) is other
+
+
 def test_in_phase_rules_never_own_their_phase() -> None:
     slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
     _InPhaseEmitter(_PHASE_A, "first", phase_slot=slot)

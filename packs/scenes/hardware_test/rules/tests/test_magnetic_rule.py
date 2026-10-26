@@ -32,8 +32,7 @@ def _make_state(
     timer: StubTimer | None = None,
 ) -> tuple[GameState, GameEngine]:
     engine = GameEngine(spy, timer=timer)
-    rule = RULE
-    engine.add_rules(rule)
+    engine.add_rules(RULE)
     state = engine.create_state(SceneControls(), initial_data={})
     seed_phase(state, mode, entered=(mode is MODE_MAGNETOMETER))
     return state, engine
