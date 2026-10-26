@@ -125,6 +125,22 @@ class SimulatedDevice:
         """Schedule a release of *button*; time does not advance."""
         self._sim_hw.release(button)
 
+    def accelerate(self, x: float, y: float, z: float) -> None:
+        """Hold the accelerometer at ``(x, y, z)`` m/s², for a jolt or a tilt.
+
+        A held reading is not motion: a scene that tracks gravity reads it as a
+        jolt that fades within a few ticks. Use ``move`` for sustained motion.
+        """
+        self._sim_hw.accelerate(x, y, z)
+
+    def move(self) -> None:
+        """Sway on top of the held reading, read as motion tick after tick until ``hold_still``."""
+        self._sim_hw.move()
+
+    def hold_still(self) -> None:
+        """Back to rest, with gravity on z, and stop any ``move``."""
+        self._sim_hw.hold_still()
+
     def receive_ir(self, payload: bytes) -> None:
         """Land a clean shot carrying *payload* over the scene's wire-frame codec.
 

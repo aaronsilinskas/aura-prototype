@@ -189,3 +189,109 @@ def test_a_payload_landing_with_the_devices_own_send_is_dropped_with_it():
     _ir(sim_hw).update()
 
     assert _ir(sim_hw).received is None
+
+
+# ---------------------------------------------------------------------------
+# Accelerometer
+# ---------------------------------------------------------------------------
+
+Reading = tuple[float, float, float]
+"""An ``(x, y, z)`` acceleration in m/s², as the accelerometer reports it."""
+
+TICK = 1 / 60
+"""The 60 Hz scene tick a reading is taken on."""
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def _with_accelerometer(clock: _Clock) -> SimulatedHardware:
+    return SimulatedHardware(now=clock, config=_config(accelerometer={"enabled": True}))
+
+
+def _acceleration(sim_hw: SimulatedHardware) -> Reading:
+    accelerometer = sim_hw.hw.accelerometer
+    assert accelerometer is not None
+    # DeviceHardware types every sensor as a bare ``object``, as the board's driver is untyped.
+    return accelerometer.acceleration  # type: ignore[attr-defined]
+
+
+def _readings_over(sim_hw: SimulatedHardware, clock: _Clock, seconds: float) -> list[Reading]:
+    """One reading per tick for *seconds*, advancing *clock* as it goes."""
+    readings = []
+    for _ in range(round(seconds / TICK)):
+        clock.now += TICK
+        readings.append(_acceleration(sim_hw))
+    return readings
+
+
+def _distance(a: Reading, b: Reading) -> float:
+    return sum((p - q) ** 2 for p, q in zip(a, b, strict=True)) ** 0.5
+
+
+def _keeps_straying(readings: list[Reading], rest: Reading) -> bool:
+    """Whether every quarter second of *readings* swings more than 3 m/s² off *rest*."""
+    window = round(0.25 / TICK)
+    windows = [readings[i : i + window] for i in range(0, len(readings), window)]
+    return all(max(_distance(r, rest) for r in w) > 3.0 for w in windows)
+
+
+def test_a_device_boots_still_with_gravity_on_z():
+    sim_hw = _with_accelerometer(_Clock())
+
+    assert _acceleration(sim_hw) == (0.0, 0.0, 9.81)
+
+
+@pytest.mark.parametrize("sections", [{}, {"accelerometer": {"enabled": False}}])
+def test_a_device_has_an_accelerometer_only_when_the_config_enables_one(sections):
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(**sections))
+
+    assert sim_hw.hw.accelerometer is None
+
+
+def test_accelerate_holds_its_reading_over_time():
+    clock = _Clock()
+    sim_hw = _with_accelerometer(clock)
+
+    sim_hw.accelerate(3.0, -2.0, 9.0)
+
+    assert set(_readings_over(sim_hw, clock, 1.0)) == {(3.0, -2.0, 9.0)}
+
+
+def test_move_keeps_swaying_well_away_from_the_held_reading():
+    clock = _Clock()
+    sim_hw = _with_accelerometer(clock)
+    sim_hw.accelerate(1.0, 2.0, 9.0)
+
+    sim_hw.move()
+
+    assert _keeps_straying(_readings_over(sim_hw, clock, 2.0), rest=(1.0, 2.0, 9.0))
+
+
+def test_hold_still_returns_to_rest_and_stops_moving():
+    clock = _Clock()
+    sim_hw = _with_accelerometer(clock)
+    sim_hw.accelerate(3.0, -2.0, 9.0)
+    sim_hw.move()
+    clock.now = 0.3
+
+    sim_hw.hold_still()
+
+    assert set(_readings_over(sim_hw, clock, 1.0)) == {(0.0, 0.0, 9.81)}
+
+
+@pytest.mark.parametrize(
+    "drive",
+    [lambda hw: hw.accelerate(0.0, 0.0, 0.0), lambda hw: hw.move(), lambda hw: hw.hold_still()],
+    ids=["accelerate", "move", "hold_still"],
+)
+def test_a_device_without_an_accelerometer_cannot_be_driven(drive):
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config())
+
+    with pytest.raises(ValueError, match="accelerometer"):
+        drive(sim_hw)
