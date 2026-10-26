@@ -238,8 +238,12 @@ The top-level `app/` package — the one place allowed to import both engine run
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### SceneRuntime / build_scene_runtime
-The board-free bundle `build_scene_runtime` wires and returns for `run_scene`'s per-tick loop to drive — registries, managers, engine, and pass-through `ir`/`radio` handles. Discovers no scenes itself; takes a pre-scanned `SceneRegistry` from `scan_boot_scene_registry`.
+The board-free bundle `build_scene_runtime` wires and returns for the per-tick loop to drive — registries, managers, engine, and pass-through `ir`/`radio` handles. Discovers no scenes itself; takes a pre-scanned `SceneRegistry` from `scan_boot_scene_registry`.
 _Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing the transmit-then-receive order at a call site (drive `ir.update()`/`radio.update()`); scanning a second `SceneRegistry` when a caller already has one; expecting it to discover scenes
+
+### build_scene_tick
+The board-free per-tick body shared by the device (`run_scene`) and the **Simulated device**: reads inputs, pumps IR/radio, queues events onto the active scene, then updates the scene and its effects. Built once per `SceneRuntime`; its buffers are allocated at build time and reused every tick.
+_Avoid_: copying the loop body into a harness or entry point; rebuilding it every tick (reallocates the per-tick buffers)
 
 ### scan_boot_scene_registry
 The board-free builder of the shared boot `SceneRegistry`: scans both flash and the mounted card into one registry, so a card scene is a first-class boot target exactly like a flash one.

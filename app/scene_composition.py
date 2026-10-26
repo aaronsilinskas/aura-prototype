@@ -14,7 +14,9 @@ import engine._path as _path
 from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
+from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
+from engine.network import NetworkEvents
 from engine.packs import PackRegistry
 from engine.scene import SceneManager, SceneRegistry
 from engine.state import SceneReboot
@@ -27,9 +29,15 @@ from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.radio_transceiver import RadioTransceiver
 from hardware.shared.scene_selection import resolve_boot_scene
 
+try:
+    from collections.abc import Callable
+except ImportError:
+    pass  # collections.abc not available on all embedded runtimes
+
 __all__ = [
     "SceneRuntime",
     "build_scene_runtime",
+    "build_scene_tick",
     "resolve_boot_scene_name",
     "resolve_ir_codec",
     "resolve_known_scene",
@@ -65,6 +73,7 @@ class SceneRuntime:
         self.radio: RadioTransceiver | None = radio
 
 
+_TELEMETRY_PRINT_INTERVAL = 1.0  # seconds
 _EFFECT_PACKS_DIR = "packs/effects"
 _CARD_PACKS_DIR = "aura_packs"
 _CARD_SCENES_MODULE_PREFIX = "aura_packs.scenes"
@@ -347,3 +356,110 @@ def build_scene_runtime(
     return SceneRuntime(
         manager=manager, effect_manager=effect_manager, timer=timer, ir=hw.ir, radio=hw.radio
     )
+
+
+def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], None]:
+    """Return the per-tick body that drives *runtime* on *hw*; call it once per tick.
+
+    The one loop body shared by the device (``run_scene``, which adds only
+    ``while True:`` and ``gc.collect()``) and the Simulated device, so neither
+    copies it. Build it once per runtime: the ``InputEvents.Sensors`` event,
+    its button/acceleration/magnetic buffers, and the telemetry gate are
+    allocated here and mutated in place every tick, never reallocated.
+
+    Each tick reads the debounced buttons and any accelerometer/magnetometer
+    (a failed read keeps the last good values; ``None`` means the hardware is
+    absent), pumps ``runtime.ir.update()`` and ``runtime.radio.update()``
+    whether or not a scene is active, then -- only while a scene is active --
+    queues a received IR packet as ``NetworkEvents.IRReceived``, a received
+    radio packet as ``NetworkEvents.RadioReceived``, and the sensors event.
+    It then runs ``manager.update()`` and ``effect_manager.update(timer)``,
+    and prints ``runtime.ir.telemetry_line()`` (when it returns one) at most
+    once per second of ``timer.total``.
+
+    A caller with events of its own to inject (e.g. a simulation delivering
+    IR with no medium) queues them on ``runtime.manager.active_state`` before
+    calling the tick; they are dispatched in that tick's ``manager.update()``.
+    """
+    accelerometer = hw.accelerometer
+    magnetometer = hw.magnetometer
+    button_data = ButtonData({})
+    acceleration = AccelerationData(0.0, 0.0, 0.0) if accelerometer is not None else None
+    magnetic = MagneticData(0.0, 0.0, 0.0) if magnetometer is not None else None
+    input_event = InputEvents.Sensors(button_data, acceleration, magnetic)
+    manager = runtime.manager
+    effect_manager = runtime.effect_manager
+    timer = runtime.timer
+    ir = runtime.ir
+    radio = runtime.radio
+    last_telemetry_print_total = 0.0
+
+    def tick() -> None:
+        nonlocal last_telemetry_print_total
+
+        hw.buttons.update(timer.elapsed, button_data)
+
+        if acceleration is not None:
+            try:
+                ax, ay, az = accelerometer.acceleration
+                acceleration.x = ax
+                acceleration.y = ay
+                acceleration.z = az
+            except Exception:
+                pass  # keep last good values; None signals missing hardware, not read failure
+
+        if magnetic is not None:
+            try:
+                mx, my, mz = magnetometer.magnetic
+                magnetic.x = mx
+                magnetic.y = my
+                magnetic.z = mz
+            except Exception:
+                pass  # keep last good values; None signals missing hardware, not read failure
+
+        # Unconditional, before the active_state check: a send can be in
+        # flight across a scene transition, and ir.update() always pumps so
+        # a deferred end_transmit still arms the flush latch its own receive
+        # consumes this same tick. It also always receives when a receiver
+        # is wired, so a packet decoded while no scene is active is
+        # drained-and-dropped here rather than left to overflow — only the
+        # queuing below is conditional on a scene being active. A no-op
+        # when no ir section is wired at all (ir is None).
+        if ir is not None:
+            ir.update()
+
+        # Same unconditional rationale as ir.update() above: radio.update()
+        # always polls for a waiting packet regardless of whether a scene is
+        # active, so a packet decoded with no active scene is simply never
+        # queued below rather than left to build up in the transport. A
+        # no-op when no radio peripheral is wired at all (radio is None).
+        if radio is not None:
+            radio.update()
+
+        active_state = manager.active_state
+
+        if active_state is not None:
+            if ir is not None and ir.received is not None:
+                active_state.queue_event(
+                    NetworkEvents.IRReceived(
+                        ir.received,
+                        ir.last_signal_strength,
+                        ir.last_error_margin,
+                        best_receiver=None,
+                    )
+                )
+            if radio is not None and radio.received is not None:
+                active_state.queue_event(
+                    NetworkEvents.RadioReceived(radio.received, str(radio.last_sender))
+                )
+            active_state.queue_event(input_event)
+        manager.update()
+        effect_manager.update(timer)
+
+        if timer.total - last_telemetry_print_total >= _TELEMETRY_PRINT_INTERVAL:
+            last_telemetry_print_total = timer.total
+            line = ir.telemetry_line() if ir is not None else None
+            if line is not None:
+                print(line)
+
+    return tick
