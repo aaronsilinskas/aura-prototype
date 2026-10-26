@@ -30,6 +30,12 @@ HALF_SECOND_PULSES = {
     "rlgl_red_duration": 1.0,
 }
 
+ONE_SECOND_PULSES = {
+    "rlgl_warning_pulse_max": 1.0,
+    "rlgl_warning_pulse_min": 1.0,
+}
+"""Peaks far enough apart that one peak's sound ends well before the next."""
+
 QUICKENING = {
     "rlgl_max_level": 2,
     "rlgl_warning_pulse_max": 1.0,
@@ -61,6 +67,16 @@ def test_each_warning_peak_clicks_the_haptic(sim):
     wait_for(sim, player, RED_MUSIC)
 
     assert [b.pattern for b in player.buzzed] == [(HapticPattern.STRONG_CLICK,)] * 3
+
+
+def test_each_warning_peak_sound_plays_once(sim):
+    player = sim.add_device("p1", scene="red_light_green_light", scene_data=ONE_SECOND_PULSES)
+    player.tap("A")
+    wait_for(sim, player, WARNING_PEAK)
+
+    sim.advance(player.clip_length(WARNING_PEAK) + SLACK)
+
+    assert not player.is_playing(WARNING_PEAK)
 
 
 def test_the_red_warning_peaks_in_yellow_on_every_light_strip(sim):

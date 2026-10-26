@@ -38,6 +38,10 @@ GAME = {
 """Five levels, each filling two of the level bar's ten pixels."""
 
 
+LONG_GAME_OVER = {**GAME, "rlgl_game_over_duration": 5.0}
+"""A game-over pause outlasting the sting."""
+
+
 def caught_on_red_light(sim: Simulation, player: SimulatedDevice) -> None:
     """Move on the next Red Light, then hold still once caught."""
     wait_for(sim, player, RED_MUSIC)
@@ -60,6 +64,16 @@ def test_the_game_over_sting_buzzes_three_times(sim):
 
     buzz, pause = HapticPattern.STRONG_BUZZ, HapticPattern.PAUSE_250
     assert player.buzzed[-1].pattern == (buzz, pause, buzz, pause, buzz)
+
+
+def test_the_game_over_sting_plays_once(sim):
+    player = sim.add_device("p1", scene="red_light_green_light", scene_data=LONG_GAME_OVER)
+    player.tap("A")
+    caught_on_red_light(sim, player)
+
+    sim.advance(player.clip_length(GAME_OVER_STING) + SLACK)
+
+    assert not player.is_playing(GAME_OVER_STING)
 
 
 def test_game_over_burns_fire_across_every_pixel_of_every_strip(sim):

@@ -38,6 +38,9 @@ ROUNDS = {
 FIVE_LEVELS = {**ROUNDS, "rlgl_max_level": 5}
 """Each level fills two of the level bar's ten pixels."""
 
+LONG_LEVEL_UP = {**FIVE_LEVELS, "rlgl_level_up_duration": 3.0}
+"""A Level Up outlasting its sound."""
+
 ONE_LEVEL = {**ROUNDS, "rlgl_max_level": 1}
 """The first round is the last, so surviving it wins."""
 
@@ -77,6 +80,16 @@ def test_a_level_up_double_clicks_the_haptic(sim):
     survive_round(sim, player)
 
     assert player.buzzed[-1].pattern == (HapticPattern.DOUBLE_CLICK,)
+
+
+def test_the_level_up_sound_plays_once(sim):
+    player = sim.add_device("p1", scene="red_light_green_light", scene_data=LONG_LEVEL_UP)
+    player.tap("A")
+    survive_round(sim, player)
+
+    sim.advance(player.clip_length(LEVEL_UP_SOUND) + SLACK)
+
+    assert not player.is_playing(LEVEL_UP_SOUND)
 
 
 def test_a_level_up_flashes_gold_on_every_light_strip(sim):
