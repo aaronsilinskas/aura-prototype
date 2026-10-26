@@ -19,7 +19,7 @@ BAR_FREE_STRIPS = [Scope.Global.DEBUFF, Scope.Global.MAIN, Scope.DIRECTIONAL, Sc
 ONE_PULSE = {"tag_warning_pulse_duration": 0.6}
 
 
-def lit_pixels(strip: Strip) -> set[int]:
+def lit_positions(strip: Strip) -> set[int]:
     return {i for i, p in enumerate(strip.pixels) if p != 0}
 
 
@@ -43,11 +43,13 @@ def test_a_booted_device_sweeps_red_across_every_strip(sim):
 def test_the_ready_laser_moves_along_the_strip(sim):
     player = sim.add_device("red", scene="tag")
     sim.advance(TICK)
-    before = lit_pixels(player.strip(Scope.Global.MAIN))
+    before = lit_positions(player.strip(Scope.Global.MAIN))
 
     sim.advance(0.25)
 
-    assert lit_pixels(player.strip(Scope.Global.MAIN)) != before
+    after = player.strip(Scope.Global.MAIN)
+    assert sweeping_red(after)
+    assert lit_positions(after) != before
 
 
 def test_an_idle_device_plays_the_ready_shots_only_once(sim):

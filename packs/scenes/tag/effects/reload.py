@@ -22,7 +22,7 @@ from packs.scenes.tag.effects.helpers.progress_fill_effect import ProgressFillEf
 _RELOAD_AUDIO = EffectAudio(clips={"start": AudioPlaybackConfig(name="scene.reload", loop=True)})
 
 _COLOR: Final = 0xFF0000
-_DEFAULT_DURATION = 3.0
+_DEFAULT_DURATION: Final = 3.0
 
 
 class _Builder(EffectBuilder):

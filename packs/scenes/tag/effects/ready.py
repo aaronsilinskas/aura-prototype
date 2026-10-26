@@ -22,7 +22,7 @@ from effects.shape import Shape
 from engine.effects.manager import EffectBuilder
 
 # Black -> red: the laser body lights up red, the dead zones stay dark.
-_RED_PALETTE = bytes([0, 0, 0, 0, 255, 255, 0, 0])
+_RED_PALETTE: Final = bytes([0, 0, 0, 0, 255, 255, 0, 0])
 
 # Revolutions per second of the sweeping laser.
 _ROTATE_SPEED: Final = 0.6
