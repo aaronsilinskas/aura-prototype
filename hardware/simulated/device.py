@@ -23,7 +23,7 @@ from engine.events import EffectEvent
 from engine.state import EffectReceipt, NetworkControls, Scope, ScopeValue
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_hardware import DeviceHardware
-from hardware.shared.voice_pool import VoicePool, VoiceSink
+from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
 
 __all__ = ["Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip"]
 
@@ -122,8 +122,9 @@ class _RecordingPixels(EffectOutput):
 class _SimulatedAudio(EffectOutput, VoiceSink):
     """Plays clips on a real ``VoicePool``; a clip "plays" for its WAV's length.
 
-    Mirrors ``AudioEffectOutput``'s claim rule, so a ``stops_effect`` clip ends
-    its effect when the clip runs out, exactly as on a board.
+    Claims through the same ``clip_stops_receipt`` rule as ``AudioEffectOutput``,
+    so a ``stops_effect`` clip ends its effect when the clip runs out, exactly as
+    on a board.
     """
 
     def __init__(self, sim_hw: SimulatedHardware, registry: AudioRegistry, voices: int) -> None:
@@ -143,8 +144,7 @@ class _SimulatedAudio(EffectOutput, VoiceSink):
         config = effect.audio.clips.get(event.verb)
         if config is None:
             return
-        audio_only = effect.pixels is None and effect.haptic is None
-        stops_receipt = audio_only or config.stops_effect
+        stops_receipt = clip_stops_receipt(effect, config)
         path = self._registry.path(config.name)
         if self._pool.claim(self, path, config.loop, stops_receipt, receipt) != -1:
             self._sim_hw.played.append(Played(self._sim_hw.now(), config.name))

@@ -12,7 +12,18 @@ Imports no CircuitPython modules (``audiobusio`` / ``audiocore`` /
 
 from __future__ import annotations
 
+from effects.effect import AudioPlaybackConfig, Effect
 from engine.state import EffectReceipt
+
+
+def clip_stops_receipt(effect: Effect, clip: AudioPlaybackConfig) -> bool:
+    """Whether ``clip``'s release (finish or eviction) should stop ``effect``'s receipt.
+
+    True when audio is the whole effect (no pixels, no haptic) or the clip sets
+    ``stops_effect``; otherwise the receipt's lifecycle stays with rules.  The
+    value every audio output passes as :meth:`VoicePool.claim`'s ``stops_receipt``.
+    """
+    return (effect.pixels is None and effect.haptic is None) or clip.stops_effect
 
 
 class VoiceSink:
