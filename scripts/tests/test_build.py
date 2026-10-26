@@ -185,6 +185,45 @@ def test_tests_directory_is_not_in_staging_tree(tmp_path: Path) -> None:
     assert not (staging / "engine" / "tests").exists()
 
 
+def test_simulation_test_harness_is_not_in_staging_tree(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    (source / "app" / "simulation").mkdir(parents=True)
+    (source / "app" / "simulation" / "harness.py").write_text("# harness")
+    staging = tmp_path / "build"
+
+    build(source_root=source, staging_root=staging, compile=fake_compile)
+
+    assert not (staging / "app" / "simulation").exists()
+
+
+def test_simulated_device_is_not_in_staging_tree(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    (source / "hardware" / "simulated").mkdir()
+    (source / "hardware" / "simulated" / "device.py").write_text("# device")
+    staging = tmp_path / "build"
+
+    build(source_root=source, staging_root=staging, compile=fake_compile)
+
+    assert not (staging / "hardware" / "simulated").exists()
+
+
+def test_a_shipped_package_merely_named_simulation_is_compiled(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    (source / "packs" / "simulation").mkdir()
+    (source / "packs" / "simulation" / "rule.py").write_text("# rule")
+    staging = tmp_path / "build"
+
+    build(source_root=source, staging_root=staging, compile=fake_compile)
+
+    assert (staging / "packs" / "simulation" / "rule.mpy").exists()
+
+
 def test_pycache_is_not_in_staging_tree(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()

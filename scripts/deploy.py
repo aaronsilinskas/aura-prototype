@@ -41,6 +41,11 @@ MODULE_DIRS: Final = [
     "rules",
 ]
 _EXCLUDE_DIRS: Final = {"__pycache__", "tests"}
+# Repo-relative package dirs that are test-only (the Simulation test harness)
+# and never imported on-device. Matched by path, not name, so a shipped package
+# that happens to share the name is still deployed. (The Simulated device under
+# hardware/simulated is already outside MODULE_DIRS.)
+_EXCLUDE_PATHS: Final = {Path("app/simulation")}
 # "boot.py" lives under hardware/circuitpython/ but is placed on the mount root by
 # the pairing block below, not by the module-sync walk -- exclude it from both that
 # walk and the compile step (build.py imports this set) so it is never duplicated
@@ -51,7 +56,9 @@ _DEFAULT_MOUNT: Final = "/Volumes/CIRCUITPY"
 
 
 def _is_excluded(rel: Path) -> bool:
-    """Return True if a relative path should be excluded from sync."""
+    """Return True if a repo-relative path should be excluded from sync."""
+    if any(rel.is_relative_to(path) for path in _EXCLUDE_PATHS):
+        return True
     for part in rel.parts:
         if part in _EXCLUDE_DIRS:
             return True
@@ -60,7 +67,7 @@ def _is_excluded(rel: Path) -> bool:
     return rel.suffix not in _INCLUDE_SUFFIXES
 
 
-def _collect_stale_files(src_dir: Path, dest_dir: Path) -> list[Path]:
+def _collect_stale_files(src_dir: Path, dest_dir: Path, module: str) -> list[Path]:
     """Return files in dest_dir that have no counterpart in src_dir.
 
     Returns an empty list if dest_dir does not exist.
@@ -73,7 +80,7 @@ def _collect_stale_files(src_dir: Path, dest_dir: Path) -> list[Path]:
         if dest_file.is_dir():
             continue
         rel = dest_file.relative_to(dest_dir)
-        if _is_excluded(rel):
+        if _is_excluded(module / rel):
             continue
         if not (src_dir / rel).exists():
             stale.append(dest_file)
@@ -273,14 +280,14 @@ def deploy(
                 if src_file.is_dir():
                     continue
                 rel = src_file.relative_to(src_dir)
-                if _is_excluded(rel):
+                if _is_excluded(module / rel):
                     continue
                 if use_source and src_file.suffix == ".mpy":
                     continue
                 label = f"{module}/{rel}"
                 _sync_file(src_file, dest_dir / rel, label, copied, skipped, dry_run)
 
-        stale_files = _collect_stale_files(src_dir, dest_dir)
+        stale_files = _collect_stale_files(src_dir, dest_dir, module)
         if use_source and dest_dir.is_dir():
             stale_set = set(stale_files)
             for dest_file in sorted(dest_dir.rglob("*")):

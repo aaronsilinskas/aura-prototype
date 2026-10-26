@@ -275,6 +275,7 @@ def build_scene_runtime(
     scene_name: str,
     scene_registry: SceneRegistry,
     scene_reboot: SceneReboot | None = None,
+    timer: Timer | None = None,
 ) -> SceneRuntime:
     """Wire up the effect/rule registries and load *scene_name* from *scene_registry*.
 
@@ -298,6 +299,11 @@ def build_scene_runtime(
     ``SceneReboot`` stands in, satisfying ``SceneManager``'s non-optional seam
     without pretending a reboot request can go anywhere.
 
+    *timer*, if supplied, is the clock the whole runtime ticks on — the
+    engine, the effects, and the debouncer via ``SceneRuntime.timer``. The
+    Simulation test harness passes a fixed-step clock here; omitted, a
+    wall-clock ``Timer`` is built.
+
     ``hw.storage``'s ``aura_packs/rules`` is scanned into the rule registry
     via ``_scan_card_rules`` -- a no-op with no storage or no ``aura_packs/``
     on the card, so a device with neither behaves exactly as before.
@@ -318,7 +324,8 @@ def build_scene_runtime(
 
     effect_manager = EffectManager(registry=effect_registry, outputs=hw.outputs)
 
-    timer = Timer()
+    if timer is None:
+        timer = Timer()
     engine = GameEngine(
         effect_controls=effect_manager,
         network_controls=hw.network_controls,

@@ -91,3 +91,12 @@ forbidden_modules = [
 ignore_imports = [
     "hardware.shared.tests.test_network_controls -> engine.engine",
 ]
+
+[[tool.importlinter.contracts]]
+name = "shipped code must not import test-only simulation code"
+type = "protected"
+protected_modules = ["app.simulation", "hardware.simulated"]
+# Tests are not shipped (scripts/deploy.py excludes every tests/ directory), so a
+# scene's tests may play it on the Simulation test harness, which itself builds
+# on the Simulated device. Nothing else may import either.
+allowed_importers = ["**.tests", "app.simulation"]

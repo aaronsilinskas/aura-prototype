@@ -13,7 +13,7 @@ try:
 except ImportError:
     pass
 
-from scripts.deploy import _EXCLUDE_DIRS, _EXCLUDE_NAMES, MODULE_DIRS
+from scripts.deploy import _EXCLUDE_DIRS, _EXCLUDE_NAMES, _EXCLUDE_PATHS, MODULE_DIRS
 
 _RAW_SUFFIXES: Final = {".json", ".txt", ".wav"}
 _HASH_SUFFIX: Final = ".srcsha256"
@@ -138,6 +138,8 @@ def validate_mpy_cross_version(mount: Path | None, mpy_cross_bin: str) -> None:
 
 
 def _is_excluded(rel: Path) -> bool:
+    if any(rel.is_relative_to(path) for path in _EXCLUDE_PATHS):
+        return True
     for part in rel.parts:
         if part in _EXCLUDE_DIRS:
             return True
@@ -212,7 +214,7 @@ def build(
                 if src_file.is_dir():
                     continue
                 rel = src_file.relative_to(src_dir)
-                if _is_excluded(rel):
+                if _is_excluded(module / rel):
                     continue
 
                 if src_file.suffix == ".py":

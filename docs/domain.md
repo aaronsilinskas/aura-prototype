@@ -76,11 +76,14 @@ hardware/         Hardware abstraction layer
                   ir_transceiver, ir_codecs/ (base, aura, tag), ir_telemetry,
                   radio_transport, radio_transceiver, sd_sync_protocol, sd_sync_server,
                   profiler_report, build_narration)
+  simulated/      Test-only Simulated device (device: SimulatedHardware) — never deployed
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together
   scene_composition.py  build_scene_runtime, build_scene_tick (board-free, CPython-testable)
   scene_runtime.py      run_scene (device-only: bring-up, then loops build_scene_tick)
+  simulation/           Test-only Simulation test harness (Simulation, SimulatedDevice):
+                        boots real scenes on simulated devices — never deployed
 
 examples/         Runnable CircuitPython entry points; deploy-watch's flash targets
 
@@ -105,6 +108,9 @@ pre-commit hook on every commit):
 - `app/` is the sole sanctioned crossing point: the one place allowed to
   import both the engine's runtime machinery and `hardware.*` together (see
   **Composition layer (app/)** in `GLOSSARY.md`).
+- No shipped module may import the test-only `app.simulation` or
+  `hardware.simulated`; only `tests/` packages may. `scripts/deploy.py` (and
+  the `scripts/build.py` compile step) skip both directories.
 
 ---
 
