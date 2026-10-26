@@ -270,12 +270,20 @@ The board-free bundle `build_hardware` returns — a data holder for the built o
 _Avoid_: exposing raw transmitters (use `network_controls`/`ir`); exposing the raw `RadioTransport` (use `network_controls`/`radio`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### Simulated device
-A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz, and send. Its shape comes from a `DeviceConfig` — the harness boots it from `examples/aura-device.simulated.json`, kept capability-equal to every other example config by a sync test. When real hardware exposes a bug it missed, the simulated device is extended until that bug is visible.
+A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz, and send. Its own emitters light its own receivers; its IR reaches other simulated devices only through the **IR medium**, where it is aimed. Its shape comes from a `DeviceConfig` — the harness boots it from `examples/aura-device.simulated.json`, kept capability-equal to every other example config by a sync test. When real hardware exposes a bug it missed, the simulated device is extended until that bug is visible.
 _Avoid_: mock device, virtual device, emulator (it does not run CircuitPython); faking the CircuitPython libraries beneath `device_builder`; hard-coding its hardware shape (declare it in the simulated config)
 
 ### Simulation test harness
 The test-only fixture layer that boots real scenes on one or more **simulated devices**, drives them through scripted inputs and time, and answers questions about what each device observably did. Tests written on it state behaviour, not the engine calls that produce it.
 _Avoid_: device harness, scene harness (both read as runtime code); asserting on which effect names a rule passed to `EffectControls`
+
+### Aim
+A test's standing statement that one simulated device's IR emitter reaches a set of other simulated devices, optionally only some of their receivers; it holds until replaced, and a new device starts aimed at nobody.
+_Avoid_: link, target, line of sight (no geometry is modelled); "connect" (there is no connection, only reach)
+
+### IR medium
+The simulation's carrier of IR pulses between simulated devices: what an emitter sends during one tick lands at the start of the next on every device it was aimed at when sent (a later aim does not redirect pulses already in flight), queued in a fixed order with no collisions.
+_Avoid_: network, channel (collide with the radio and the network seam); "air"
 
 ### Shade
 A pixel showing a dimmed version of one colour (the colour scaled toward black, hue unchanged); a strip whose lit pixels are all shades of red shows only red, at any brightness. Dark pixels are no colour's shade.
