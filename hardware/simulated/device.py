@@ -244,17 +244,27 @@ class _SimulatedAccelerometer:
 
     def __init__(self, now: Callable[[], float]) -> None:
         self._now = now
-        self.held = _AT_REST
-        self.sway_from: float | None = None
+        self._held = _AT_REST
+        self._sway_from: float | None = None
         """When the sway started, or ``None`` while the device is not moving."""
 
     @property
     def acceleration(self) -> tuple[float, float, float]:
-        x, y, z = self.held
-        if self.sway_from is not None:
-            phase = 2 * math.pi * _SWAY_HZ * (self._now() - self.sway_from)
+        x, y, z = self._held
+        if self._sway_from is not None:
+            phase = 2 * math.pi * _SWAY_HZ * (self._now() - self._sway_from)
             x += _SWAY_AMPLITUDE * math.sin(phase)
         return (x, y, z)
+
+    def hold(self, x: float, y: float, z: float) -> None:
+        self._held = (x, y, z)
+
+    def sway(self) -> None:
+        self._sway_from = self._now()
+
+    def rest(self) -> None:
+        self._held = _AT_REST
+        self._sway_from = None
 
 
 class _CountingButtons(DebouncedButtons):
@@ -360,18 +370,13 @@ class SimulatedHardware:
         return self._buttons.releases[button]
 
     def accelerate(self, x: float, y: float, z: float) -> None:
-        """Hold the accelerometer at ``(x, y, z)`` m/s² until told otherwise."""
-        self._require_accelerometer().held = (x, y, z)
+        self._require_accelerometer().hold(x, y, z)
 
     def move(self) -> None:
-        """Sway on top of the held reading, tick after tick, until ``hold_still``."""
-        self._require_accelerometer().sway_from = self.now()
+        self._require_accelerometer().sway()
 
     def hold_still(self) -> None:
-        """Back to rest, with gravity on z, and stop any ``move``."""
-        accelerometer = self._require_accelerometer()
-        accelerometer.held = _AT_REST
-        accelerometer.sway_from = None
+        self._require_accelerometer().rest()
 
     def hold(self, button: str) -> None:
         self._schedule(button, True)

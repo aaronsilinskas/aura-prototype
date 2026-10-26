@@ -1,4 +1,9 @@
-"""The Simulation test harness's input and query surface, driven through Tag."""
+"""The Simulation test harness's input and query surface.
+
+Driven through Tag, and through Red Light Green Light for the accelerometer:
+its Red phase ends the game on any motion, and its Red Warning ignores motion,
+so a test sets the accelerometer up during Warning and watches Red.
+"""
 
 from __future__ import annotations
 
@@ -25,6 +30,18 @@ def start_game(sim: Simulation, *players: SimulatedDevice) -> None:
 
 def shot_count(player: SimulatedDevice) -> int:
     return sum(1 for s in player.ir_sent if s.emitter == LINE)
+
+
+def start_red_light_warning(player: SimulatedDevice) -> None:
+    player.tap("A")
+
+
+def reach_red_light(sim: Simulation, player: SimulatedDevice) -> None:
+    sim.run_until(lambda: player.has_played("scene.red_light_music_start"))
+
+
+def caught_moving(player: SimulatedDevice) -> bool:
+    return player.has_played("basic.game_over_sting_start")
 
 
 def test_tap_returns_once_the_press_has_registered(sim):
@@ -102,24 +119,50 @@ def test_clip_length_reads_the_clips_wav_header(sim):
     assert player.clip_length("scene.fire_shot_start") == pytest.approx(3456 / 11025)
 
 
-def reach_red_light(sim: Simulation, player: SimulatedDevice) -> None:
-    player.tap("A")
-    sim.run_until(lambda: player.has_played("scene.red_light_music_start"))
+# ---------------------------------------------------------------------------
+# Accelerometer
+# ---------------------------------------------------------------------------
 
 
-def test_a_moving_device_reads_as_motion_to_the_scene(sim):
+def test_a_moving_device_reads_as_motion(sim):
     player = sim.add_device("p1", scene="red_light_green_light")
+    start_red_light_warning(player)
     reach_red_light(sim, player)
 
     player.move()
+    sim.advance(0.5)
 
-    sim.run_until(lambda: player.has_played("basic.game_over_sting_start"), timeout=1.0)
+    assert caught_moving(player)
 
 
-def test_a_still_device_does_not_read_as_motion_to_the_scene(sim):
+def test_a_still_device_does_not_read_as_motion(sim):
     player = sim.add_device("p1", scene="red_light_green_light")
+    start_red_light_warning(player)
     reach_red_light(sim, player)
 
     sim.advance(2.0)
 
-    assert not player.has_played("basic.game_over_sting_start")
+    assert not caught_moving(player)
+
+
+def test_a_held_tilt_does_not_read_as_motion(sim):
+    player = sim.add_device("p1", scene="red_light_green_light")
+    start_red_light_warning(player)
+
+    player.accelerate(0.0, 4.0, 8.9)
+    reach_red_light(sim, player)
+    sim.advance(2.0)
+
+    assert not caught_moving(player)
+
+
+def test_hold_still_stops_a_move(sim):
+    player = sim.add_device("p1", scene="red_light_green_light")
+    start_red_light_warning(player)
+    player.move()
+
+    player.hold_still()
+    reach_red_light(sim, player)
+    sim.advance(2.0)
+
+    assert not caught_moving(player)
