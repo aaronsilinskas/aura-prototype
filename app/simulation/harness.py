@@ -126,12 +126,10 @@ class SimulatedDevice:
         self._sim_hw.release(button)
 
     def receive_ir(self, payload: bytes) -> None:
-        """Land a clean shot carrying *payload* on this device's IR receivers.
+        """Land a clean shot carrying *payload* over the scene's wire-frame codec.
 
-        It travels the scene's wire-frame codec and is decoded on the next
-        tick, one shot per tick, unless the device's own send masks it. Only
-        what that wire-frame carries arrives: Tag's carries 7 bits of the
-        first byte.
+        Decoded on the next tick, one shot per tick, unless the device's own
+        send masks it.
         """
         self._sim_hw.receive_ir(payload)
 

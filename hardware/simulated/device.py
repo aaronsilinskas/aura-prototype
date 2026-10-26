@@ -132,10 +132,7 @@ class _SimulatedPulseWriter(PulseWriter):
         self._emitter = emitter
 
     def write_pulses(self, durations: array | list[int]) -> None:
-        sim_hw = self._sim_hw
-        sim_hw.ir_sent.append(IrSent(sim_hw.now(), self._emitter, sim_hw._decode_wire(durations)))
-        for reader in sim_hw._ir_readers:
-            reader.capture(durations)
+        self._sim_hw._emit(self._emitter, durations)
 
     def is_busy(self) -> bool:
         return False
@@ -321,9 +318,7 @@ class SimulatedHardware:
         Encoded through the installed codec; the transceiver's next
         ``update`` decodes it.
         """
-        pulses = self._ir_encoder.encode(payload)
-        for reader in self._ir_readers:
-            reader.capture(pulses)
+        self._light_readers(self._ir_encoder.encode(payload))
 
     def clip_length(self, clip: str) -> float:
         """Seconds *clip* plays for, read from the WAV header it plays from."""
@@ -376,6 +371,15 @@ class SimulatedHardware:
             if emitter in config.emitters
         }
         return InfraredTransceiver(transmitters, receiver, gate)
+
+    def _emit(self, emitter: str, pulses: array | list[int]) -> None:
+        """Record what *emitter* carried, and let the device's own readers see it."""
+        self.ir_sent.append(IrSent(self.now(), emitter, self._decode_wire(pulses)))
+        self._light_readers(pulses)
+
+    def _light_readers(self, pulses: array | list[int]) -> None:
+        for reader in self._ir_readers:
+            reader.capture(pulses)
 
     def _decode_wire(self, pulses: array | list[int]) -> bytes:
         """The payload *pulses* carry, read back through the installed codec."""
