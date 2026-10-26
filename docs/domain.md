@@ -83,7 +83,8 @@ app/              Composition layer — the one place allowed to import both the
   scene_composition.py  build_scene_runtime, build_scene_tick (board-free, CPython-testable)
   scene_runtime.py      run_scene (device-only: bring-up, then loops build_scene_tick)
   simulation/           Test-only Simulation test harness (Simulation, SimulatedDevice):
-                        boots real scenes on simulated devices — never deployed
+                        boots real scenes on simulated devices and carries aimed
+                        IR between them (the IR medium) — never deployed
 
 examples/         Runnable CircuitPython entry points; deploy-watch's flash targets
 

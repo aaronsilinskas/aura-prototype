@@ -15,9 +15,12 @@ otherwise ignored. Matrix pixels, the magnetometer, and the radio are not
 simulated.
 
 IR pulses are ideal: a write lands at exactly the codec's durations, with no
-noise, jitter, or airtime. What an emitter writes also reaches the device's own
-readers, as a lit emitter does on a board, so the real transmit gate is what
-keeps a device from hearing itself.
+noise, jitter, or airtime. What an emitter writes reaches the device's own
+readers at once, as a lit emitter does on a board, so the real transmit gate is
+what keeps a device from hearing itself. Each write is also handed, with its
+emitter, to the optional ``ir_sink``; ``land_ir`` lands pulses from elsewhere on
+chosen receivers. Which other devices hear a write is the harness's business:
+this device knows of no other.
 """
 
 from __future__ import annotations
@@ -27,7 +30,7 @@ import math
 import wave
 from array import array
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from effects.effect import Effect, PixelBuffer
@@ -334,11 +337,18 @@ class SimulatedHardware:
 
     *now* reads the simulation clock; every recording is stamped with it, and
     scripted pin changes fall due against it. Call ``settle_pins`` once per
-    tick, before the tick reads the buttons.
+    tick, before the tick reads the buttons. *ir_sink*, when given, is handed
+    every emitter write as ``(emitter, pulses)``.
     """
 
-    def __init__(self, now: Callable[[], float], config: DeviceConfig) -> None:
+    def __init__(
+        self,
+        now: Callable[[], float],
+        config: DeviceConfig,
+        ir_sink: Callable[[str, list[int]], None] | None = None,
+    ) -> None:
         self.now = now
+        self._ir_sink = ir_sink
         self.ir_sent: list[IrSent] = []
         self.played: list[Played] = []
         self.buzzed: list[Buzzed] = []
@@ -362,6 +372,8 @@ class SimulatedHardware:
         if config.haptics is not None and config.haptics.enabled:
             outputs.append(_RecordingHaptic(self))
         self._ir_readers: list[_SimulatedPulseReader] = []
+        self._ir_receiver: InfraredReceiver | None = None
+        self._wired_emitters: tuple[str, ...] = ()
         self._ir_encoder: InfraredEncoder = AuraInfraredEncoder()
         self._wire_decoder: InfraredDecoder = AuraInfraredDecoder()
         ir = self._build_ir(config.ir) if config.ir is not None and config.ir.enabled else None
@@ -400,7 +412,40 @@ class SimulatedHardware:
         Encoded through the installed codec; the transceiver's next
         ``update`` decodes it.
         """
-        self._light_readers(self._ir_encoder.encode(payload))
+        self.land_ir(self._ir_encoder.encode(payload))
+
+    def land_ir(self, pulses: array | list[int], receivers: Sequence[int] | None = None) -> None:
+        """Land *pulses* on the IR receivers at indexes *receivers*, or on every one.
+
+        Already encoded: whatever wire-frame they carry, the transceiver's
+        next ``update`` decodes them with the installed codec, or fails to.
+        """
+        readers = (
+            self._ir_readers if receivers is None else [self._ir_readers[i] for i in receivers]
+        )
+        for reader in readers:
+            reader.capture(pulses)
+
+    @property
+    def ir_emitters(self) -> tuple[str, ...]:
+        """The emitters the config wires, in ``IR_EMITTERS`` order."""
+        return self._wired_emitters
+
+    @property
+    def ir_receiver_count(self) -> int:
+        return len(self._ir_readers)
+
+    @property
+    def best_receiver(self) -> int | None:
+        """Index of the IR receiver the multi-receiver picked for the latest shot.
+
+        ``None`` before any shot, or with fewer than two receivers, where
+        there is no pick to make.
+        """
+        if self._ir_receiver is None:
+            return None
+        best = self._ir_receiver.last_best_receiver
+        return next((i for i, reader in enumerate(self._ir_readers) if reader is best), None)
 
     def clip_length(self, clip: str) -> float:
         """Seconds *clip* plays for, read from the WAV header it plays from."""
@@ -458,23 +503,22 @@ class SimulatedHardware:
             receiver = InfraredSingleReceiver(self._ir_readers[0], AuraInfraredDecoder(), gate)
         else:
             receiver = InfraredMultiReceiver(list(self._ir_readers), AuraInfraredDecoder, gate)
+        self._ir_receiver = receiver
+        self._wired_emitters = tuple(e for e in IR_EMITTERS if e in config.emitters)
         transmitters = {
             emitter: InfraredTransmitter(
                 _SimulatedPulseWriter(self, emitter), self._ir_encoder, gate
             )
-            for emitter in IR_EMITTERS
-            if emitter in config.emitters
+            for emitter in self._wired_emitters
         }
         return InfraredTransceiver(transmitters, receiver, gate)
 
     def _emit(self, emitter: str, pulses: array | list[int]) -> None:
-        """Record what *emitter* carried, and let the device's own readers see it."""
+        """Record what *emitter* carried, let the device's own readers see it, and hand it on."""
         self.ir_sent.append(IrSent(self.now(), emitter, self._decode_wire(pulses)))
-        self._light_readers(pulses)
-
-    def _light_readers(self, pulses: array | list[int]) -> None:
-        for reader in self._ir_readers:
-            reader.capture(pulses)
+        self.land_ir(pulses)
+        if self._ir_sink is not None:
+            self._ir_sink(emitter, list(pulses))
 
     def _decode_wire(self, pulses: array | list[int]) -> bytes:
         """The payload *pulses* carry, read back through the installed codec."""
