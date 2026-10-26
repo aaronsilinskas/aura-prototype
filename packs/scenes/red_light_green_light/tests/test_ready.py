@@ -17,6 +17,7 @@ from packs.scenes.red_light_green_light.tests.helpers import (
     RED,
     SLACK,
     WARNING_PEAK,
+    wait_for,
 )
 
 FIVE_LEVELS = {"rlgl_max_level": 5}
@@ -44,6 +45,7 @@ def test_a_booted_device_plays_the_ready_sound(sim):
 
 def test_the_ready_sound_plays_once(sim):
     player = sim.add_device("p1", scene="red_light_green_light")
+    wait_for(sim, player, READY_SOUND)
 
     sim.advance(player.clip_length(READY_SOUND) + SLACK)
 

@@ -31,7 +31,6 @@ HALF_SECOND_PULSES = {
 }
 
 ONE_SECOND_PULSES = {
-    **HALF_SECOND_PULSES,
     "rlgl_warning_pulse_max": 1.0,
     "rlgl_warning_pulse_min": 1.0,
 }
