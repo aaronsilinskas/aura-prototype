@@ -1,13 +1,13 @@
 """Host-side wiring for the SD-sync data channel: port auto-detect and byte transport.
 
 Enabling the on-device SD-sync app (#930) makes a CircuitPython board expose
-*two* ``/dev/tty.usbmodem*`` ports -- one for the REPL, one for the data
-channel that carries the SD-sync protocol -- so ``deploy_watch``'s
-"exactly one match" glob (:func:`scripts.deploy_watch.find_port`) can no
-longer tell them apart. :func:`find_data_port` instead asks
+*two* serial ports -- the console channel and the data channel that carries
+the SD-sync protocol -- and their device names alone can't tell them apart.
+:func:`find_data_port` asks
 ``adafruit_board_toolkit.circuitpython_serial.data_comports()``, which
-already knows how to distinguish the two CDC interfaces (and carries the
-macOS composite-CDC workaround `deploy_watch` doesn't need).
+distinguishes the two CDC interfaces (including a macOS composite-CDC
+workaround), mirroring how :func:`scripts.deploy_watch.find_console_port`
+resolves the console channel.
 
 :class:`SerialTransport` is the live SD-sync ``Transport`` adapter for that
 port: it reuses ``deploy_watch``'s ``SerialHandle``/``open_serial_with_retry``

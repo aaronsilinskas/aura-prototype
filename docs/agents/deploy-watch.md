@@ -24,7 +24,7 @@ At least one of `--seconds` or `--until` is required.
 | `--seconds N` | Stop after N seconds of serial output |
 | `--until TEXT` | Stop as soon as any output line contains TEXT (exit 0) |
 | `--output FILE` | Also write clean device output to FILE (no deploy chatter) |
-| `--port PORT` | Serial port; auto-detected from `/dev/tty.usbmodem*` if omitted |
+| `--port PORT` | Serial port; if omitted, auto-detects the board's console channel (works with the data channel enabled too) |
 | `--reboot-timeout N` | Seconds to wait for the CircuitPython soft-reboot banner (default 5) |
 
 Both `--seconds` and `--until` can be combined: exits 0 on match, 2 on timeout.
@@ -85,7 +85,7 @@ aggregation into comparison tables.
 
 - **Exit 3 / banner never seen** — the device may be hung or failed to reload;
   try a manual reset or increase `--reboot-timeout`.
-- **Exit 1 / no port found** — device not connected or not mounted; use `--port`
-  to specify manually.
-- **Exit 1 / multiple ports** — more than one usbmodem device detected; use
-  `--port /dev/tty.usbmodem<id>` to disambiguate.
+- **Exit 1 / no console port found** — no CircuitPython board is connected, or
+  its USB interface isn't recognised; use `--port` to specify manually.
+- **Exit 1 / multiple console ports** — more than one CircuitPython board is
+  attached; the error lists the candidates, pick one with `--port <device>`.
