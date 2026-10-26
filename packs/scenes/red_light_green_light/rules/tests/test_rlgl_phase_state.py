@@ -40,7 +40,6 @@ def test_new_phase_state_starts_at_level_one_with_no_receipts():
 
     assert phase_state.level == 1
     assert phase_state.music_receipt is None
-    assert phase_state.level_receipt is None
     assert phase_state.win_sting_receipt is None
 
 

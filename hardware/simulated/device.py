@@ -55,7 +55,7 @@ from hardware.shared.ir_transport import (
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
 
-__all__ = ["Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip"]
+__all__ = ["DEFAULT_SWAY_STRENGTH", "Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip"]
 
 _DEBOUNCE_INTERVAL = 0.05
 _PIN_SETTLE = 2 * _DEBOUNCE_INTERVAL
@@ -66,9 +66,10 @@ release registers and tests never need to know the debounce interval.
 """
 
 _AT_REST = (0.0, 0.0, AccelerationData.GRAVITY)
-_SWAY_AMPLITUDE = 4.0
+DEFAULT_SWAY_STRENGTH = 4.0
+"""``move``'s sway strength in m/s² unless given one: well above any sensible motion threshold."""
 _SWAY_HZ = 2.0
-"""``move``'s sway on x: well above any sensible motion threshold, at a hand's pace."""
+"""``move``'s sway frequency on x: a hand's pace."""
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,26 @@ class Played:
 class Buzzed:
     at: float
     pattern: tuple[int, ...]
+
+
+def _channels(pixel: int) -> tuple[int, int, int]:
+    return (pixel >> 16) & 0xFF, (pixel >> 8) & 0xFF, pixel & 0xFF
+
+
+def _is_shade(pixel: int, color: int) -> bool:
+    """Whether lit *pixel* is *color* scaled toward black, give or take a step of rounding.
+
+    A channel *color* leaves dark must stay dark, so rounding never passes off
+    another hue as a shade.
+    """
+    shown, wanted = _channels(pixel), _channels(color)
+    peak = max(range(3), key=lambda c: wanted[c])
+    if shown[peak] == 0 or shown[peak] > wanted[peak]:
+        return False
+    scale = shown[peak] / wanted[peak]
+    return all(
+        s == 0 if w == 0 else abs(s - w * scale) <= 1 for s, w in zip(shown, wanted, strict=True)
+    )
 
 
 class Strip:
@@ -110,6 +131,10 @@ class Strip:
 
     def all_lit(self, color: int) -> bool:
         return all(p == color for p in self.pixels)
+
+    def shades_of(self, color: int) -> bool:
+        """Whether every lit pixel is a shade of *color*; dark pixels are allowed."""
+        return all(_is_shade(p, color) for p in self.pixels if p != 0)
 
     def __repr__(self) -> str:
         return "Strip(" + " ".join(f"{p:06X}" for p in self.pixels) + ")"
@@ -254,6 +279,7 @@ class _SimulatedAccelerometer:
     def __init__(self, now: Callable[[], float]) -> None:
         self._now = now
         self._held = _AT_REST
+        self._sway_strength = DEFAULT_SWAY_STRENGTH
         self._sway_from: float | None = None
         """When the sway started, or ``None`` while the device is not moving."""
 
@@ -262,13 +288,14 @@ class _SimulatedAccelerometer:
         x, y, z = self._held
         if self._sway_from is not None:
             phase = 2 * math.pi * _SWAY_HZ * (self._now() - self._sway_from)
-            x += _SWAY_AMPLITUDE * math.sin(phase)
+            x += self._sway_strength * math.sin(phase)
         return (x, y, z)
 
     def hold(self, x: float, y: float, z: float) -> None:
         self._held = (x, y, z)
 
-    def sway(self) -> None:
+    def sway(self, strength: float) -> None:
+        self._sway_strength = strength
         self._sway_from = self._now()
 
     def rest(self) -> None:
@@ -389,8 +416,9 @@ class SimulatedHardware:
     def accelerate(self, x: float, y: float, z: float) -> None:
         self._require_accelerometer().hold(x, y, z)
 
-    def move(self) -> None:
-        self._require_accelerometer().sway()
+    def move(self, strength: float = DEFAULT_SWAY_STRENGTH) -> None:
+        """Sway *strength* m/s² either side of the held reading on x."""
+        self._require_accelerometer().sway(strength)
 
     def hold_still(self) -> None:
         self._require_accelerometer().rest()

@@ -11,7 +11,7 @@ from __future__ import annotations
 from app.simulation import SimulatedDevice, Simulation, Strip
 from effects.effect import HapticPattern
 from engine.state import Scope
-from packs.scenes.tag.tests.helpers import AMMO_AMBER, SHOOTER, shots, start_game
+from packs.scenes.tag.tests.helpers import AMMO_AMBER, RED, SHOOTER, shots, start_game
 
 TWO_ROUNDS = {"tag_max_ammo": 2, "tag_shot_cooldown": 0.3, "tag_reload_duration": 1.0}
 """A short magazine and reload, so running dry and reloading stay quick."""
@@ -152,7 +152,7 @@ def abandon_reload(sim: Simulation, player: SimulatedDevice) -> None:
 
 
 def pulsing_red(strip: Strip) -> bool:
-    return not strip.dark and all(p & 0x00FFFF == 0 for p in strip.pixels)
+    return not strip.dark and strip.shades_of(RED)
 
 
 def test_firing_the_last_round_pulses_the_ammo_bar_red(sim):

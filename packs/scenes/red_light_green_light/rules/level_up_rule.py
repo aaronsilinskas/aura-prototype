@@ -1,8 +1,8 @@
 """RLGL scene Level Up phase rule.
 
 On entry, increments the Game Level, updates the ``Scope.AMBIENT`` progress
-bar to the new level's fraction (storing the new receipt as
-``level_receipt``), and plays the level-up sting on ``Scope.NON_AMBIENT``.
+bar to the new level's fraction, and replaces Green Light on
+``Scope.NON_AMBIENT`` with the level-up flash.
 Transitions back to Red Warning after ``rlgl_level_up_duration``.
 """
 
@@ -32,11 +32,10 @@ class RlglLevelUpRule(PhaseRule):
         level = phase_state.level + 1
         phase_state.level = level
         max_level = rlgl_config(state).max_level
-        receipt = state.effect_controls.set_effect(
+        state.effect_controls.set_effect(
             Scope.AMBIENT, "basic.progress", {"progress": level / max_level}
         )
-        phase_state.level_receipt = receipt
-        state.effect_controls.add_effect(Scope.NON_AMBIENT, "scene.level_up", {})
+        state.effect_controls.set_effect(Scope.NON_AMBIENT, "scene.level_up", {})
 
     def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         if rlgl_phase(state).elapsed(state.total) >= rlgl_config(state).level_up_duration:

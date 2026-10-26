@@ -10,7 +10,7 @@ from engine.state import Scope
 from hardware.shared.device_config import DeviceConfig, parse_device_config
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.simulated.device import IrSent, SimulatedHardware
+from hardware.simulated.device import IrSent, SimulatedHardware, Strip
 
 
 def _config(**sections: object) -> DeviceConfig:
@@ -54,6 +54,41 @@ def test_a_scope_strip_starts_dark():
     sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config())
 
     assert sim_hw.strip(Scope.PERSONAL).dark
+
+
+RED = 0xFF0000
+AMBER = 0xFFBF00
+
+
+@pytest.mark.parametrize(
+    ("pixels", "color"),
+    [
+        ([0xFF0000, 0x800000, 0x010000], RED),
+        ([0x000000, 0x400000, 0x000000], RED),
+        ([0xFFBF00, 0x806000, 0x403000], AMBER),
+    ],
+    ids=["dimmed", "partly-dark", "mixed-color"],
+)
+def test_a_strip_lit_only_in_dimmed_copies_of_a_color_shows_shades_of_it(pixels, color):
+    assert Strip(pixels).shades_of(color)
+
+
+@pytest.mark.parametrize(
+    ("pixels", "color"),
+    [
+        ([0xFF0000, 0xFF0100], RED),
+        ([0xFF0000, 0x00FF00], RED),
+        ([0x7F7F00], AMBER),
+        ([0xFF0000], 0x800000),
+    ],
+    ids=["one-pixel-off-hue", "another-color", "wrong-mix", "brighter-than-the-color"],
+)
+def test_a_strip_with_any_lit_pixel_off_the_color_does_not_show_shades_of_it(pixels, color):
+    assert not Strip(pixels).shades_of(color)
+
+
+def test_a_dark_strip_counts_as_shades_of_any_color():
+    assert Strip([0, 0, 0]).shades_of(0x00FF00)
 
 
 def test_buttons_are_labelled_a_onward_one_per_configured_pin():

@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import pytest
 
-from app.simulation import TICK
+from app.simulation import TICK, Strip
 from packs.scenes.red_light_green_light.tests.helpers import (
     EVERY_STRIP,
+    GREEN,
     LEVEL_BAR,
     READY_SOUND,
+    RED,
     WARNING_PEAK,
 )
 
@@ -26,12 +28,9 @@ FIRST_PULSE_ON = 0.4
 """Partway through the first pulse's hold, when it is at full brightness."""
 
 
-def only_red(pixels: list[int]) -> bool:
-    return all(p != 0 and p & 0x00FFFF == 0 for p in pixels)
-
-
-def only_green(pixels: list[int]) -> bool:
-    return all(p != 0 and p & 0xFF00FF == 0 for p in pixels)
+def pulsing(strip: Strip, color: int) -> bool:
+    """Every pixel lit, each a shade of *color*."""
+    return strip.lit == strip.size and strip.shades_of(color)
 
 
 def test_a_booted_device_plays_the_ready_sound(sim):
@@ -47,7 +46,7 @@ def test_ready_first_pulses_red_on_every_strip(sim):
 
     sim.advance(FIRST_PULSE_ON)
 
-    assert all(only_red(player.strip(scope).pixels) for scope in EVERY_STRIP)
+    assert all(pulsing(player.strip(scope), RED) for scope in EVERY_STRIP)
 
 
 def test_ready_follows_the_red_pulse_with_a_green_one_on_every_strip(sim):
@@ -55,7 +54,7 @@ def test_ready_follows_the_red_pulse_with_a_green_one_on_every_strip(sim):
 
     sim.advance(FIRST_PULSE_ON + READY_PULSE)
 
-    assert all(only_green(player.strip(scope).pixels) for scope in EVERY_STRIP)
+    assert all(pulsing(player.strip(scope), GREEN) for scope in EVERY_STRIP)
 
 
 def test_an_idle_device_stays_in_ready(sim):

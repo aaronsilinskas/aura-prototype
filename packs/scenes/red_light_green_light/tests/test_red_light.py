@@ -115,6 +115,16 @@ def test_moving_on_red_light_ends_the_game(sim):
     assert player.has_played(GAME_OVER_STING)
 
 
+def test_a_slow_creep_on_red_light_ends_the_game(sim):
+    player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    reach_red_light(sim, player)
+
+    player.move(strength=0.5)
+    sim.advance(0.5)
+
+    assert player.has_played(GAME_OVER_STING)
+
+
 def test_red_light_catches_motion_at_once(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
     reach_red_light(sim, player)
