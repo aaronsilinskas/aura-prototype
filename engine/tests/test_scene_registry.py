@@ -521,3 +521,35 @@ def test_names_does_not_duplicate_when_factory_overrides_scanned_scene(
     registry.register("forest", lambda: Scene(effect_packs=[], rule_packs=[]))
 
     assert registry.names().count("forest") == 1
+
+
+# ---------------------------------------------------------------------------
+# override_initial_data
+# ---------------------------------------------------------------------------
+
+
+def test_override_initial_data_replaces_named_keys_and_keeps_the_rest(tmp_path) -> None:
+    _make_scene_dir(tmp_path, "forest", initial_data={"max_ammo": 10, "team": 0})
+    registry = SceneRegistry()
+    registry.scan_dir(str(tmp_path), "test.scenes")
+
+    registry.override_initial_data("forest", {"max_ammo": 2})
+
+    assert registry.get("forest").initial_data == {"max_ammo": 2, "team": 0}
+
+
+def test_override_initial_data_adds_keys_to_a_scene_without_initial_data(tmp_path) -> None:
+    _make_scene_dir(tmp_path, "forest")
+    registry = SceneRegistry()
+    registry.scan_dir(str(tmp_path), "test.scenes")
+
+    registry.override_initial_data("forest", {"max_ammo": 2})
+
+    assert registry.get("forest").initial_data == {"max_ammo": 2}
+
+
+def test_override_initial_data_raises_value_error_for_unknown_scene_name() -> None:
+    registry = SceneRegistry()
+
+    with pytest.raises(ValueError, match="nowhere"):
+        registry.override_initial_data("nowhere", {"max_ammo": 2})

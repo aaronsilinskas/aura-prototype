@@ -40,7 +40,9 @@ MODULE_DIRS: Final = [
     "packs",
     "rules",
 ]
-_EXCLUDE_DIRS: Final = {"__pycache__", "tests"}
+# "simulation" (app/) and "simulated" (hardware/) hold the test-only Simulation
+# test harness and Simulated device -- CPython-only and never imported on-device.
+_EXCLUDE_DIRS: Final = {"__pycache__", "tests", "simulation", "simulated"}
 # "boot.py" lives under hardware/circuitpython/ but is placed on the mount root by
 # the pairing block below, not by the module-sync walk -- exclude it from both that
 # walk and the compile step (build.py imports this set) so it is never duplicated

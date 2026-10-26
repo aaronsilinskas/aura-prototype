@@ -404,6 +404,21 @@ class SceneRegistry:
 
         raise ValueError(f"Unknown scene '{name}'")
 
+    def override_initial_data(self, name: str, overrides: dict[str, object]) -> None:
+        """Merge *overrides* over scanned scene *name*'s ``initial_data``.
+
+        Every later ``get`` sees the merged keys; keys not named keep their
+        ``scene.json`` value.  The seam a simulated device boots a scene with
+        shortened tunables through (e.g. a two-round magazine).
+
+        Raises:
+            ValueError: if *name* is not a scanned scene.
+        """
+        entry = self._scenes.get(name)
+        if entry is None:
+            raise ValueError(f"Unknown scene '{name}'")
+        entry.initial_data = {**(entry.initial_data or {}), **overrides}
+
     def names(self) -> list[str]:
         """Return all registered scene names sorted alphabetically."""
         all_names = set(self._scenes.keys()) | set(self._factories.keys())
