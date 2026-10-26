@@ -1,0 +1,88 @@
+{
+  "i2c": {
+    "sda": "SIM_SDA",
+    "scl": "SIM_SCL"
+  },
+  "spi": {
+    "sck": "SIM_SCK",
+    "mosi": "SIM_MOSI",
+    "miso": "SIM_MISO"
+  },
+  "pixels": [
+    {
+      "type": "neopixel",
+      "pin": "SIM_PIXELS_GLOBAL_BUFF",
+      "count": 10,
+      "scope_pixels": { "global.buff": [0, 10] }
+    },
+    {
+      "type": "neopixel",
+      "pin": "SIM_PIXELS_GLOBAL_DEBUFF",
+      "count": 10,
+      "scope_pixels": { "global.debuff": [0, 10] }
+    },
+    {
+      "type": "neopixel",
+      "pin": "SIM_PIXELS_GLOBAL_MAIN",
+      "count": 10,
+      "scope_pixels": { "global.main": [0, 10] }
+    },
+    {
+      "type": "neopixel",
+      "pin": "SIM_PIXELS_PERSONAL",
+      "count": 10,
+      "scope_pixels": { "personal": [0, 10] }
+    },
+    {
+      "type": "neopixel",
+      "pin": "SIM_PIXELS_DIRECTIONAL",
+      "count": 10,
+      "scope_pixels": { "directional": [0, 10] }
+    },
+    {
+      "type": "neopixel",
+      "pin": "SIM_PIXELS_AMBIENT",
+      "count": 10,
+      "scope_pixels": { "ambient": [0, 10] }
+    }
+  ],
+  "buttons": ["SIM_BUTTON_A", "SIM_BUTTON_B"],
+  "accelerometer": {
+    "enabled": true
+  },
+  "haptics": {
+    "enabled": true
+  },
+  "magnetometer": {
+    "enabled": true
+  },
+  "ir": {
+    "rx": [
+      "SIM_IR_RX_0",
+      "SIM_IR_RX_1",
+      "SIM_IR_RX_2"
+    ],
+    "line": "SIM_IR_LINE",
+    "cone": "SIM_IR_CONE",
+    "area_of_effect": "SIM_IR_AREA_OF_EFFECT"
+  },
+  "audio": {
+    "enabled": true,
+    "voices": 2,
+    "i2s_bit_clock": "SIM_I2S_BIT_CLOCK",
+    "i2s_word_select": "SIM_I2S_WORD_SELECT",
+    "i2s_data": "SIM_I2S_DATA"
+  },
+  "radio": {
+    "enabled": true,
+    "cs": "SIM_RADIO_CS",
+    "reset": "SIM_RADIO_RESET",
+    "frequency": 915.0,
+    "node": 1
+  },
+  "sdcard": {
+    "enabled": true,
+    "cs": "SIM_SD_CS",
+    "mount": "/sd"
+  }
+}

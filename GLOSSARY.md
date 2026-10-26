@@ -270,8 +270,8 @@ The board-free bundle `build_hardware` returns — a data holder for the built o
 _Avoid_: exposing raw transmitters (use `network_controls`/`ir`); exposing the raw `RadioTransport` (use `network_controls`/`radio`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### Simulated device
-A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz, and send. When real hardware exposes a bug it missed, the simulated device is extended until that bug is visible.
-_Avoid_: mock device, virtual device, emulator (it does not run CircuitPython); faking the CircuitPython libraries beneath `device_builder`
+A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz, and send. Its shape comes from a `DeviceConfig` — the harness boots it from `examples/aura-device.simulated.json`, kept capability-equal to every other example config by a sync test. When real hardware exposes a bug it missed, the simulated device is extended until that bug is visible.
+_Avoid_: mock device, virtual device, emulator (it does not run CircuitPython); faking the CircuitPython libraries beneath `device_builder`; hard-coding its hardware shape (declare it in the simulated config)
 
 ### Simulation test harness
 The test-only fixture layer that boots real scenes on one or more **simulated devices**, drives them through scripted inputs and time, and answers questions about what each device observably did. Tests written on it state behaviour, not the engine calls that produce it.
