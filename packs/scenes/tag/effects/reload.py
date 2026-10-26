@@ -9,6 +9,11 @@ loop stays intact.
 
 from __future__ import annotations
 
+try:
+    from typing import Final
+except ImportError:
+    pass
+
 from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig
 from effects.layers.progress_layer import ProgressLayer
 from engine.effects.manager import EffectBuilder
@@ -16,16 +21,15 @@ from packs.scenes.tag.effects.helpers.progress_fill_effect import ProgressFillEf
 
 _RELOAD_AUDIO = EffectAudio(clips={"start": AudioPlaybackConfig(name="scene.reload", loop=True)})
 
-_DEFAULT_COLOR = 0xFF0000
-_DEFAULT_DURATION = 3.0
+_COLOR: Final = 0xFF0000
+_DEFAULT_DURATION: Final = 3.0
 
 
 class _Builder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        color = config.get_option("color", _DEFAULT_COLOR)
         duration = config.get_option("duration", _DEFAULT_DURATION)
         layer = ProgressLayer(0.0)
-        pixels = ProgressFillEffect(layer, color=color, duration=duration)
+        pixels = ProgressFillEffect(layer, color=_COLOR, duration=duration)
         return Effect(name=name, pixels=pixels, audio=_RELOAD_AUDIO)
 
 

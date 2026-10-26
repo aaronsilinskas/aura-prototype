@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.simulation import TICK
+from app.simulation import TICK, Strip
 from effects.effect import HapticPattern
 from engine.state import Scope
 from packs.scenes.tag.tests.helpers import AMMO_AMBER, EVERY_STRIP, GREEN, sweeping_red
@@ -17,6 +17,10 @@ BAR_FREE_STRIPS = [Scope.Global.DEBUFF, Scope.Global.MAIN, Scope.DIRECTIONAL, Sc
 """The strips Playing shows no bar on."""
 
 ONE_PULSE = {"tag_warning_pulse_duration": 0.6}
+
+
+def lit_positions(strip: Strip) -> set[int]:
+    return {i for i, p in enumerate(strip.pixels) if p != 0}
 
 
 def peaks_before_go(clips: list[str]) -> int:
@@ -34,6 +38,18 @@ def test_a_booted_device_sweeps_red_across_every_strip(sim):
     sim.advance(TICK)
 
     assert all(sweeping_red(player.strip(scope)) for scope in EVERY_STRIP)
+
+
+def test_the_ready_laser_moves_along_the_strip(sim):
+    player = sim.add_device("red", scene="tag")
+    sim.advance(TICK)
+    before = lit_positions(player.strip(Scope.Global.MAIN))
+
+    sim.advance(0.25)
+
+    after = player.strip(Scope.Global.MAIN)
+    assert sweeping_red(after)
+    assert lit_positions(after) != before
 
 
 def test_an_idle_device_plays_the_ready_shots_only_once(sim):

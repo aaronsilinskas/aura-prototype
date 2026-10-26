@@ -7,6 +7,11 @@ waiting for a button press to start the game.
 
 from __future__ import annotations
 
+try:
+    from typing import Final
+except ImportError:
+    pass
+
 from effects.effect import Effect, EffectConfig
 from effects.layers.add_colors_renderer import AddColorsRenderer
 from effects.layers.scroll import ScrollOffset
@@ -17,18 +22,17 @@ from effects.shape import Shape
 from engine.effects.manager import EffectBuilder
 
 # Black -> red: the laser body lights up red, the dead zones stay dark.
-_RED_PALETTE = bytes([0, 0, 0, 0, 255, 255, 0, 0])
+_RED_PALETTE: Final = bytes([0, 0, 0, 0, 255, 255, 0, 0])
 
 # Revolutions per second of the sweeping laser.
-_ROTATE_SPEED = 0.6
+_ROTATE_SPEED: Final = 0.6
 
 
 class _Builder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        rotate_speed = config.get_option("rotate_speed", _ROTATE_SPEED)
         laser = ScrollLayer(
             ShapeLayer(Shape.padded(0.25, Shape.centered_gradient())),
-            ScrollOffset(speed=rotate_speed),
+            ScrollOffset(speed=_ROTATE_SPEED),
         )
         return Effect(
             name=name,
