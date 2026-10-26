@@ -6,11 +6,11 @@ import pytest
 
 from engine.input import ButtonData
 from engine.state import Scope
-from hardware.shared.device_config import parse_device_config
+from hardware.shared.device_config import DeviceConfig, parse_device_config
 from hardware.simulated.device import SimulatedHardware
 
 
-def _config(**sections: object):
+def _config(**sections: object) -> DeviceConfig:
     return parse_device_config(
         {
             "pixels": [
@@ -32,11 +32,11 @@ def _config(**sections: object):
     )
 
 
-def _press_settled(sim_hw: SimulatedHardware, seconds: float = 0.5) -> ButtonData:
-    """Tick the device's buttons with the pins settled at *seconds*."""
+def _read_buttons(sim_hw: SimulatedHardware) -> ButtonData:
+    """Apply due pin changes, then read the buttons once a debounce interval has passed."""
     out = ButtonData(states={})
     sim_hw.settle_pins()
-    sim_hw.hw.buttons.update(seconds, out)
+    sim_hw.hw.buttons.update(0.5, out)
     return out
 
 
@@ -57,7 +57,7 @@ def test_buttons_are_labelled_a_onward_one_per_configured_pin():
     sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(buttons=["X", "Y", "Z"]))
 
     sim_hw.hold("C")
-    out = _press_settled(sim_hw)
+    out = _read_buttons(sim_hw)
 
     assert out.is_pressed("C")
 

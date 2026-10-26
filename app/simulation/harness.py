@@ -16,14 +16,7 @@ from engine.network import NetworkEvents
 from engine.state import ScopeValue
 from engine.timer import Timer
 from hardware.shared.device_config import DeviceConfig, load_device_config
-from hardware.simulated.device import (
-    Buzzed,
-    IrSent,
-    Played,
-    SimulatedHardware,
-    Strip,
-    wav_length,
-)
+from hardware.simulated.device import Buzzed, IrSent, Played, SimulatedHardware, Strip
 
 __all__ = ["TICK", "SimulatedDevice", "Simulation"]
 
@@ -154,9 +147,7 @@ class SimulatedDevice:
 
     def clip_length(self, clip: str) -> float:
         """Seconds *clip* plays for, read from the WAV header the device plays it from."""
-        registry = self._sim_hw.hw.audio_registry
-        assert registry is not None  # the Simulated device always builds one
-        return wav_length(registry.path(clip))
+        return self._sim_hw.clip_length(clip)
 
     def forget(self) -> None:
         """Drop everything recorded so far, so later asserts see only what follows.

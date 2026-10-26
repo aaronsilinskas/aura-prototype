@@ -30,7 +30,7 @@ from hardware.shared.device_config import DeviceConfig, MatrixPixelsConfig
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.voice_pool import VoicePool, VoiceSink
 
-__all__ = ["Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip", "wav_length"]
+__all__ = ["Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip"]
 
 _DEBOUNCE_INTERVAL = 0.05
 _PIN_SETTLE = 2 * _DEBOUNCE_INTERVAL
@@ -96,7 +96,7 @@ class _RecordingNetwork(NetworkControls):
         pass
 
 
-def wav_length(path: str) -> float:
+def _wav_length(path: str) -> float:
     """Seconds of audio in the WAV at *path*, read from its header."""
     with wave.open(path, "rb") as clip:
         return clip.getnframes() / clip.getframerate()
@@ -155,7 +155,7 @@ class _SimulatedAudio(EffectOutput, VoiceSink):
         self._pool.sweep(self)
 
     def open_source(self, path: str) -> object | None:
-        return wav_length(path)
+        return _wav_length(path)
 
     def play(self, slot: int, source: object, loop: bool) -> None:
         assert isinstance(source, float)  # the clip length open_source returned
@@ -212,7 +212,6 @@ def _strip_segments(config: DeviceConfig) -> list[dict[str, range]]:
         if not entry.enabled:
             continue
         strips.extend(strip.scope_pixels for strip in entry.strips)
-        strips.extend({key: range(legacy.count)} for key, legacy in entry.scopes.items())
     return strips
 
 
@@ -237,10 +236,10 @@ class SimulatedHardware:
             [(label, self._pin_reader(label)) for label in labels], interval=_DEBOUNCE_INTERVAL
         )
         self._strips = [_RecordingPixels(segments) for segments in _strip_segments(config)]
-        audio_registry = AudioRegistry()
+        self._audio_registry = AudioRegistry()
         outputs: list[EffectOutput] = [*self._strips]
         if config.audio is not None and config.audio.enabled:
-            outputs.append(_SimulatedAudio(self, audio_registry, config.audio.voices))
+            outputs.append(_SimulatedAudio(self, self._audio_registry, config.audio.voices))
         if config.haptics is not None and config.haptics.enabled:
             outputs.append(_RecordingHaptic(self))
         self.hw = DeviceHardware(
@@ -252,8 +251,12 @@ class SimulatedHardware:
             ir=None,
             radio=None,
             storage=None,
-            audio_registry=audio_registry,
+            audio_registry=self._audio_registry,
         )
+
+    def clip_length(self, clip: str) -> float:
+        """Seconds *clip* plays for, read from the WAV header it plays from."""
+        return _wav_length(self._audio_registry.path(clip))
 
     def releases(self, button: str) -> int:
         """How many releases of *button* the debouncer has registered so far."""
