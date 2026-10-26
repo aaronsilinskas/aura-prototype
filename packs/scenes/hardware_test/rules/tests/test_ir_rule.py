@@ -11,7 +11,7 @@ from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls, SpyNetworkControls
 from packs.scenes.hardware_test.rules.helpers.flash import ir_flash
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_IR, MODE_RGB
-from packs.scenes.hardware_test.rules.ir_rule import HW_TEST_PAYLOAD, HwTestIrRule
+from packs.scenes.hardware_test.rules.ir_rule import HW_TEST_PAYLOAD, RULE
 from packs.scenes.hardware_test.rules.tests.helpers import seed_phase
 
 # ---------------------------------------------------------------------------
@@ -30,7 +30,7 @@ def _make_state(
     network_spy: SpyNetworkControls | None = None,
 ) -> tuple[GameState, GameEngine]:
     engine = GameEngine(spy, network_controls=network_spy)
-    rule = HwTestIrRule()
+    rule = RULE
     engine.add_rules(rule)
     state = engine.create_state(SceneControls(), initial_data={})
     seed_phase(state, mode, entered=(mode is MODE_IR))

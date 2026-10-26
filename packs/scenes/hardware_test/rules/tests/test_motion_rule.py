@@ -12,7 +12,7 @@ from packs.scenes.hardware_test.rules.helpers.phases import MODE_ACCELEROMETER, 
 from packs.scenes.hardware_test.rules.motion_rule import (
     ACCEL_LOG_INTERVAL,
     ACCEL_MAX,
-    HwTestMotionRule,
+    RULE,
 )
 from packs.scenes.hardware_test.rules.tests.helpers import StubTimer, seed_phase
 
@@ -32,7 +32,7 @@ def _make_state(
     timer: StubTimer | None = None,
 ) -> tuple[GameState, GameEngine]:
     engine = GameEngine(spy, timer=timer)
-    rule = HwTestMotionRule()
+    rule = RULE
     engine.add_rules(rule)
     state = engine.create_state(SceneControls(), initial_data={})
     seed_phase(state, mode, entered=(mode is MODE_ACCELEROMETER))

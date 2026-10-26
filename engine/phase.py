@@ -130,13 +130,17 @@ class PhaseSlot:
     scene's own module-level phase reference. Because they all hold the one
     object, they resolve the *same* cached :class:`PhaseMachine` structurally
     — sharing is guaranteed by construction, not by a key string happening to
-    match.
+    match.  Two slots sharing one key are unsupported.
+
+    The slot also knows which :class:`PhaseRule` owns each of its phases (see
+    :meth:`owner_of`); every ``PhaseRule`` registers itself here when built.
     """
 
-    __slots__ = ("_slot",)
+    __slots__ = ("_owners", "_slot")
 
     def __init__(self, key: str, initial_phase: PhaseKey) -> None:
         self._slot: StateSlot = StateSlot(key, lambda s: PhaseMachine(initial_phase), PhaseMachine)
+        self._owners: dict[PhaseKey, PhaseRule] = {}
 
     @property
     def key(self) -> str:
@@ -146,6 +150,16 @@ class PhaseSlot:
     def __call__(self, state: GameState) -> PhaseMachine:
         """Return this slot's :class:`PhaseMachine`, creating and caching it on first use."""
         return self._slot(state)
+
+    def owner_of(self, phase: PhaseKey) -> PhaseRule | None:
+        """Return the :class:`PhaseRule` owning *phase*, or ``None`` if none has been built."""
+        return self._owners.get(phase)
+
+    def _register_owner(self, rule: PhaseRule) -> None:
+        """Record *rule* as its phase's owner; raise ``ValueError`` if the phase already has one."""
+        if rule.phase in self._owners:
+            raise ValueError(f"Phase {rule.phase!r} of {self.key!r} already has an owner")
+        self._owners[rule.phase] = rule
 
 
 class _PhaseGuardedRule(GameRule):
@@ -202,9 +216,13 @@ class PhaseRule(_PhaseGuardedRule):
     then the subscribed handler runs in the same dispatch.  The handler fires
     every tick while the phase is active.  ``on_exit`` runs when a handler
     calls :meth:`transition_to`.  Exactly one ``PhaseRule`` may own a given
-    ``(machine key, phase)`` pair; a second is a configuration error caught at
-    scene load (see ``GameEngine.set_rules``).
+    phase of a :class:`PhaseSlot`: each registers itself with its slot when
+    constructed, and constructing a second owner raises ``ValueError``.
     """
+
+    def __init__(self, phase: PhaseKey, phase_slot: PhaseSlot) -> None:
+        super().__init__(phase, phase_slot)
+        phase_slot._register_owner(self)
 
     def transition_to(self, state: GameState, next_phase: PhaseKey) -> None:
         """Run ``on_exit`` then move the machine to *next_phase*.
@@ -222,14 +240,6 @@ class PhaseRule(_PhaseGuardedRule):
 
     def on_exit(self, state: GameState) -> None:
         """Run when :meth:`transition_to` leaves this phase. No-op by default."""
-
-    def phase_ownership(self) -> tuple[str, PhaseKey]:
-        """Return the ``(machine key, phase)`` pair this rule claims ownership of.
-
-        Used by ``GameEngine.set_rules`` to fail fast when two ``PhaseRule``s
-        claim the same pair.
-        """
-        return (self._phase_slot.key, self.phase)
 
     def _before_handler(self, machine: PhaseMachine, state: GameState) -> None:
         if machine.take_just_entered():

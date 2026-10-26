@@ -12,7 +12,7 @@ from packs.scenes.hardware_test.rules.helpers.phases import MODE_MAGNETOMETER, M
 from packs.scenes.hardware_test.rules.magnetic_rule import (
     MAG_LOG_INTERVAL,
     MAG_MAX,
-    HwTestMagneticRule,
+    RULE,
 )
 from packs.scenes.hardware_test.rules.tests.helpers import StubTimer, seed_phase
 
@@ -32,7 +32,7 @@ def _make_state(
     timer: StubTimer | None = None,
 ) -> tuple[GameState, GameEngine]:
     engine = GameEngine(spy, timer=timer)
-    rule = HwTestMagneticRule()
+    rule = RULE
     engine.add_rules(rule)
     state = engine.create_state(SceneControls(), initial_data={})
     seed_phase(state, mode, entered=(mode is MODE_MAGNETOMETER))

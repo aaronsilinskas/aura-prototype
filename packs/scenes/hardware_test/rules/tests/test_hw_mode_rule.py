@@ -25,12 +25,12 @@ from packs.scenes.hardware_test.rules.helpers.phases import (
     MODE_SFX,
     hw_phase,
 )
-from packs.scenes.hardware_test.rules.ir_rule import HwTestIrRule
-from packs.scenes.hardware_test.rules.magnetic_rule import HwTestMagneticRule
-from packs.scenes.hardware_test.rules.motion_rule import HwTestMotionRule
-from packs.scenes.hardware_test.rules.radio_rule import HwTestRadioRule
-from packs.scenes.hardware_test.rules.rgb_rule import HwTestRgbRule
-from packs.scenes.hardware_test.rules.sfx_rule import HwTestSfxRule
+from packs.scenes.hardware_test.rules.ir_rule import RULE as IR_RULE
+from packs.scenes.hardware_test.rules.magnetic_rule import RULE as MAGNETIC_RULE
+from packs.scenes.hardware_test.rules.motion_rule import RULE as MOTION_RULE
+from packs.scenes.hardware_test.rules.radio_rule import RULE as RADIO_RULE
+from packs.scenes.hardware_test.rules.rgb_rule import RULE as RGB_RULE
+from packs.scenes.hardware_test.rules.sfx_rule import RULE as SFX_RULE
 from packs.scenes.hardware_test.rules.tests.helpers import seed_phase
 
 
@@ -66,12 +66,12 @@ def _make_state(
     # dispatch sequence rules see in production within a single
     # PhaseMachine.enter() tick.
     engine.add_rules(
-        HwTestIrRule(),
-        HwTestMagneticRule(),
-        HwTestMotionRule(),
-        HwTestRadioRule(),
-        HwTestRgbRule(),
-        HwTestSfxRule(),
+        IR_RULE,
+        MAGNETIC_RULE,
+        MOTION_RULE,
+        RADIO_RULE,
+        RGB_RULE,
+        SFX_RULE,
     )
     state = engine.create_state(SceneControls(), initial_data={})
     return state, engine
