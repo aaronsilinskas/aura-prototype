@@ -1,6 +1,6 @@
 """``TagState`` — the residual flat per-tick state for the Tag scene.
 
-Phase mechanics (the current phase, the first-tick entry flag, and the
+Phase mechanics (the current phase, the pending-entry flag, and the
 phase-start clock) now live in the scene's :class:`PhaseMachine`, reached via
 :func:`packs.scenes.tag.rules.helpers.phases.tag_phase`. What remains here is
 the flat gameplay bookkeeping that the phase machine deliberately does not

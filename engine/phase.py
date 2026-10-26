@@ -11,7 +11,7 @@ This module ships that machinery once:
 - :class:`PhaseKey` — an opaque, identity-typed phase token.  The engine ships
   only the *type*; scenes own the named instances.
 - :class:`PhaseMachine` — the mutable phase mechanics (current phase, a private
-  first-tick entry flag, and ``phase_start``), cached in :class:`GameState`.
+  pending-entry flag, and ``phase_start``), cached in :class:`GameState`.
 - :class:`PhaseSlot` — the one accessor a scene builds per machine, shared by
   every rule that touches it.  See its docstring for the identity contract.
 - :class:`PhaseRule` — owns one phase's lifecycle: ``on_enter`` /
@@ -20,9 +20,10 @@ This module ships that machinery once:
 - :class:`InPhaseRule` — phase-gated handlers without the entry/exit
   lifecycle; any number may share a phase.
 
-The entry flag is consumed atomically by whichever :class:`PhaseRule` first
-dispatches while in its phase, so ``on_enter`` fires exactly once per entry
-regardless of rule registration order (see :meth:`PhaseMachine.enter`).
+A phase starts in the tick it is entered, whatever order the scene's rules
+run in: :meth:`PhaseRule.transition_to` runs the entering phase's ``on_enter``
+itself, finding its owner through the :class:`PhaseSlot`.  The initial phase
+has no transition, so its ``on_enter`` runs on its owner's first dispatch.
 """
 
 from __future__ import annotations
@@ -69,27 +70,27 @@ class PhaseKey:
 class PhaseMachine:
     """Mutable phase mechanics cached in :class:`GameState`.
 
-    Holds only the current :class:`PhaseKey`, a private first-tick entry flag,
-    and ``phase_start``.  It owns no effects and no receipts — :meth:`enter`
-    has no side effects beyond the three fields, so it can never leak an
-    effect across a transition.  Lifecycle teardown belongs to the owning
+    Holds only the current :class:`PhaseKey`, ``phase_start``, and private
+    flags marking an ``on_enter`` as pending or running.  It owns no effects
+    and no receipts — :meth:`enter` has no side effects beyond those fields,
+    so it can never leak an effect across a transition.  Lifecycle teardown belongs to the owning
     :class:`PhaseRule`'s ``on_exit``.
     """
 
-    __slots__ = ("_just_entered", "phase", "phase_start")
+    __slots__ = ("_entering", "_just_entered", "phase", "phase_start")
 
     def __init__(self, initial_phase: PhaseKey) -> None:
         self.phase = initial_phase
         self.phase_start: float = 0.0
         self._just_entered = True
+        self._entering = False
 
     def enter(self, phase: PhaseKey, now: float) -> None:
-        """Atomically set ``phase`` and ``phase_start`` and raise the entry flag.
+        """Atomically set ``phase`` and ``phase_start`` and mark ``on_enter`` pending.
 
-        Has no other side effects: it never stops effects or clears receipts.
-        Because the entry flag persists until consumed, the entering phase's
-        ``on_enter`` fires on whichever later dispatch first sees the new
-        phase — correctness never depends on rule dispatch order.
+        Has no other side effects: it never stops effects or clears receipts,
+        and it does not run ``on_enter`` itself — :meth:`PhaseRule.transition_to`
+        does, straight after.
         """
         self.phase = phase
         self.phase_start = now
@@ -100,7 +101,7 @@ class PhaseMachine:
         return now - self.phase_start
 
     def take_just_entered(self) -> bool:
-        """Return ``True`` on the first dispatch of the current phase, clearing the flag.
+        """Return ``True`` if the current phase's ``on_enter`` is pending, clearing the flag.
 
         Consumed internally by :class:`PhaseRule` to drive ``on_enter``; this
         is not a public predicate.  Combining the test and the clear into one
@@ -211,10 +212,11 @@ class _PhaseGuardedRule(GameRule):
 class PhaseRule(_PhaseGuardedRule):
     """A :class:`GameRule` that owns one phase's lifecycle.
 
-    On the first dispatch after entering its phase, ``on_enter`` runs once and
-    then the subscribed handler runs in the same dispatch.  The handler fires
-    every tick while the phase is active.  ``on_exit`` runs when a handler
-    calls :meth:`transition_to`.  Exactly one ``PhaseRule`` may own a given
+    ``on_enter`` runs once per entry: inside the :meth:`transition_to` that
+    enters the phase or, for the scene's initial phase, on this rule's first
+    dispatch, just before its handler.  The handler fires every tick while the
+    phase is active.  ``on_exit`` runs when a handler calls
+    :meth:`transition_to`.  Exactly one ``PhaseRule`` may own a given
     phase of a :class:`PhaseSlot`: each registers itself with its slot when
     constructed, and constructing a second owner raises ``ValueError``.
     """
@@ -224,33 +226,51 @@ class PhaseRule(_PhaseGuardedRule):
         phase_slot._register_owner(self)
 
     def transition_to(self, state: GameState, next_phase: PhaseKey) -> None:
-        """Run ``on_exit`` then move the machine to *next_phase*.
+        """Run ``on_exit``, move the machine to *next_phase*, then run its ``on_enter``.
 
+        The entering phase's owner is found through the :class:`PhaseSlot`.
         Only a handler should call this, and it should return immediately
-        after: ``on_enter`` never transitions.  Transitions are free-running
-        (no one-per-tick guard); the next phase's ``on_enter`` fires on
-        whichever later dispatch first sees it.
+        after.  Transitions are free-running (no one-per-tick guard).
+
+        Raises ``RuntimeError`` when called while an ``on_enter`` is running,
+        and ``ValueError`` when no :class:`PhaseRule` owns *next_phase*; both
+        are checked before ``on_exit`` runs.
         """
+        machine = self._machine(state)
+        if machine._entering:
+            raise RuntimeError(f"transition_to({next_phase!r}) called from on_enter")
+        owner = self._phase_slot.owner_of(next_phase)
+        if owner is None:
+            raise ValueError(f"Phase {next_phase!r} of {self._phase_slot.key!r} has no owner")
         self.on_exit(state)
-        self._machine(state).enter(next_phase, state.total)
+        machine.enter(next_phase, state.total)
+        owner._start(machine, state)
 
     def on_enter(self, state: GameState) -> None:
-        """Run once on the first dispatch after entering this phase. No-op by default."""
+        """Run once each time this phase is entered. No-op by default; must not transition."""
 
     def on_exit(self, state: GameState) -> None:
         """Run when :meth:`transition_to` leaves this phase. No-op by default."""
 
     def _before_handler(self, machine: PhaseMachine, state: GameState) -> None:
-        if machine.take_just_entered():
+        self._start(machine, state)
+
+    def _start(self, machine: PhaseMachine, state: GameState) -> None:
+        if not machine.take_just_entered():
+            return
+        machine._entering = True
+        try:
             self.on_enter(state)
+        finally:
+            machine._entering = False
 
 
 class InPhaseRule(_PhaseGuardedRule):
     """A :class:`GameRule` whose handlers fire only while its phase is active.
 
     Shares the phase-gated ``on`` override and forwarding with
-    :class:`PhaseRule` but has no entry/exit lifecycle: it never consumes the
-    entry flag and has no ``on_enter`` / ``on_exit`` / ``transition_to``.  Any
+    :class:`PhaseRule` but has no entry/exit lifecycle: it never runs the
+    pending ``on_enter`` and has no ``on_enter`` / ``on_exit`` / ``transition_to``.  Any
     number of ``InPhaseRule``s may share a phase, and an ``InPhaseRule`` may
     share a phase with that phase's owning :class:`PhaseRule`.
     """

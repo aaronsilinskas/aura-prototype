@@ -66,6 +66,22 @@ def test_a_hit_drains_the_green_hitpoints_bar_by_its_damage(sim):
     assert set(bar.pixels) <= {0, GREEN}
 
 
+def test_a_hit_on_the_first_tick_of_playing_costs_a_hitpoint(sim):
+    player = sim.add_device("red", scene="tag", scene_data=TEN_HITPOINTS)
+    player.tap("A")
+
+    # A tag every tick through the countdown: the first to play the hit is the
+    # first to land in Playing.
+    deadline = sim.now + 10.0
+    while not player.has_played("scene.hit_start"):
+        assert sim.now < deadline, "no tag landed in Playing"
+        player.receive_ir(shooters_tag())
+        sim.advance(TICK)
+
+    bar = player.strip(Scope.PERSONAL)
+    assert bar.lit == bar.size - bar.size // 10
+
+
 def test_successive_hits_keep_draining_the_hitpoints_bar(sim):
     player = sim.add_device("red", scene="tag", scene_data=TEN_HITPOINTS)
     start_game(sim, player)
