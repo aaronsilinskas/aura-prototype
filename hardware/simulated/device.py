@@ -7,15 +7,23 @@ the engine loop, or time beyond the ``now`` it is handed.
 
 Its shape comes from a ``DeviceConfig``: one button per declared pin, labelled
 ``A`` onward as on a board; one recording pixel output per NeoPixel strip; the
-declared voice count; a haptic output when ``haptics`` is declared. Wiring
-(pins, buses, addresses) is ignored. Matrix pixels, sensors, and the IR and
-radio transceivers are not simulated (``send_ir`` only records, and incoming
-IR is injected by the harness).
+declared voice count; a haptic output when ``haptics`` is declared; the real
+``InfraredTransceiver`` over one simulated reader per ``ir.rx`` pin and one
+simulated writer per wired emitter. Wiring (pins, buses, addresses) is
+otherwise ignored. Matrix pixels, sensors, and the radio are not simulated.
+
+IR pulses are ideal: a write lands at exactly the codec's durations, with no
+noise, jitter, or airtime. What an emitter writes also reaches the device's own
+readers, as a lit emitter does on a board, so the real transmit gate is what
+keeps a device from hearing itself.
 """
 
 from __future__ import annotations
 
+import copy
 import wave
+from array import array
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -24,10 +32,24 @@ from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.input import ButtonData
-from engine.state import EffectReceipt, NetworkControls, Scope, ScopeValue
+from engine.network import IR_EMITTERS
+from engine.state import EffectReceipt, Scope, ScopeValue
 from hardware.shared.debounced_buttons import DebouncedButtons
-from hardware.shared.device_config import DeviceConfig, MatrixPixelsConfig
+from hardware.shared.device_config import DeviceConfig, IRConfig, MatrixPixelsConfig
 from hardware.shared.device_hardware import DeviceHardware
+from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
+from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
+from hardware.shared.ir_transceiver import InfraredTransceiver
+from hardware.shared.ir_transport import (
+    InfraredMultiReceiver,
+    InfraredReceiver,
+    InfraredSingleReceiver,
+    InfraredTransmitter,
+    IrTransmitGate,
+    PulseReader,
+    PulseWriter,
+)
+from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
 
 __all__ = ["Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip"]
@@ -85,15 +107,38 @@ class Strip:
         return "Strip(" + " ".join(f"{p:06X}" for p in self.pixels) + ")"
 
 
-class _RecordingNetwork(NetworkControls):
-    def __init__(self, sim_hw: SimulatedHardware) -> None:
+class _SimulatedPulseReader(PulseReader):
+    """One IR receiver's pulse buffer: pulses queue up and are read oldest first."""
+
+    def __init__(self) -> None:
+        self._pulses: deque[int] = deque()
+
+    def capture(self, pulses: array | list[int]) -> None:
+        self._pulses.extend(pulses)
+
+    def read_pulse(self) -> int | None:
+        return self._pulses.popleft() if self._pulses else None
+
+
+class _SimulatedPulseWriter(PulseWriter):
+    """One emitter: lights the device's own readers, and records the payload it carried.
+
+    Blocking, like ``pulseio.PulseOut``: a write has finished by the time it
+    returns.
+    """
+
+    def __init__(self, sim_hw: SimulatedHardware, emitter: str) -> None:
         self._sim_hw = sim_hw
+        self._emitter = emitter
 
-    def send_ir(self, data: bytes, emitter: str) -> None:
-        self._sim_hw.ir_sent.append(IrSent(self._sim_hw.now(), emitter, bytes(data)))
+    def write_pulses(self, durations: array | list[int]) -> None:
+        sim_hw = self._sim_hw
+        sim_hw.ir_sent.append(IrSent(sim_hw.now(), self._emitter, sim_hw._decode_wire(durations)))
+        for reader in sim_hw._ir_readers:
+            reader.capture(durations)
 
-    def send_radio(self, data: bytes) -> None:
-        pass
+    def is_busy(self) -> bool:
+        return False
 
 
 def _wav_length(path: str) -> float:
@@ -242,17 +287,43 @@ class SimulatedHardware:
             outputs.append(_SimulatedAudio(self, self._audio_registry, config.audio.voices))
         if config.haptics is not None and config.haptics.enabled:
             outputs.append(_RecordingHaptic(self))
+        self._ir_readers: list[_SimulatedPulseReader] = []
+        self._ir_encoder: InfraredEncoder = AuraInfraredEncoder()
+        self._wire_decoder: InfraredDecoder = AuraInfraredDecoder()
+        ir = self._build_ir(config.ir) if config.ir is not None and config.ir.enabled else None
         self.hw = DeviceHardware(
             outputs=outputs,
             buttons=self._buttons,
             accelerometer=None,
             magnetometer=None,
-            network_controls=_RecordingNetwork(self),
-            ir=None,
+            network_controls=HardwareNetworkControls(ir),
+            ir=ir,
             radio=None,
             storage=None,
             audio_registry=self._audio_registry,
         )
+
+    def apply_ir_codec(self, encoder: InfraredEncoder, decoder: InfraredDecoder) -> None:
+        """Install the wire-frame codec, as ``run_scene`` does before the first tick.
+
+        Also sets the codec ``receive_ir`` encodes through and ``ir_sent``
+        decodes with. Until called, the device speaks the Aura wire-frame, as
+        ``device_builder`` defaults to.
+        """
+        self._ir_encoder = encoder
+        self._wire_decoder = copy.deepcopy(decoder)  # the receiver keeps *decoder* itself
+        if self.hw.ir is not None:
+            self.hw.ir.apply_codec(encoder, decoder)
+
+    def receive_ir(self, payload: bytes) -> None:
+        """Land a clean shot carrying *payload* on every IR receiver.
+
+        Encoded through the installed codec; the transceiver's next
+        ``update`` decodes it.
+        """
+        pulses = self._ir_encoder.encode(payload)
+        for reader in self._ir_readers:
+            reader.capture(pulses)
 
     def clip_length(self, clip: str) -> float:
         """Seconds *clip* plays for, read from the WAV header it plays from."""
@@ -287,6 +358,34 @@ class SimulatedHardware:
         self.ir_sent.clear()
         self.played.clear()
         self.buzzed.clear()
+
+    def _build_ir(self, config: IRConfig) -> InfraredTransceiver:
+        """Assemble the real IR stack the way ``device_builder`` does, on simulated pulses."""
+        gate = IrTransmitGate()
+        self._ir_readers = [_SimulatedPulseReader() for _ in config.rx]
+        receiver: InfraredReceiver
+        if len(self._ir_readers) == 1:
+            receiver = InfraredSingleReceiver(self._ir_readers[0], AuraInfraredDecoder(), gate)
+        else:
+            receiver = InfraredMultiReceiver(list(self._ir_readers), AuraInfraredDecoder, gate)
+        transmitters = {
+            emitter: InfraredTransmitter(
+                _SimulatedPulseWriter(self, emitter), self._ir_encoder, gate
+            )
+            for emitter in IR_EMITTERS
+            if emitter in config.emitters
+        }
+        return InfraredTransceiver(transmitters, receiver, gate)
+
+    def _decode_wire(self, pulses: array | list[int]) -> bytes:
+        """The payload *pulses* carry, read back through the installed codec."""
+        decoder = self._wire_decoder
+        decoder.reset()
+        for pulse in pulses:
+            payload = decoder.decode(pulse)
+            if payload is not None:
+                return bytes(payload)
+        raise ValueError(f"the {decoder.__class__.__name__} cannot read back what was sent")
 
     def _schedule(self, button: str, pressed: bool) -> None:
         # Queued behind the previous change, so back-to-back calls never land

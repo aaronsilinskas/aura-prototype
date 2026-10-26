@@ -376,9 +376,9 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     allocated here and mutated in place every tick, so the steady-state tick
     allocates nothing on-device.
 
-    A caller with events of its own to inject (e.g. a simulation delivering
-    IR with no medium) queues them on ``runtime.manager.active_state`` before
-    calling the tick; they are dispatched in that tick's ``manager.update()``.
+    A caller with events of its own to inject queues them on
+    ``runtime.manager.active_state`` before calling the tick; they are
+    dispatched in that tick's ``manager.update()``.
     """
     accelerometer = hw.accelerometer
     magnetometer = hw.magnetometer

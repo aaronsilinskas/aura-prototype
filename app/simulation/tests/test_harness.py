@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from app.simulation import SimulatedDevice, Simulation
+from app.simulation import TICK, SimulatedDevice, Simulation
 from engine.network import LINE
+from engine.state import Scope
+from packs.scenes.tag.tag_data import TagData, encode_tag_data
 
 
 @pytest.fixture()
@@ -65,6 +67,32 @@ def test_hold_and_release_only_schedule_the_pin_change(sim):
 
     assert sim.now == before
     assert shot_count(player) == 0
+
+
+def test_a_device_does_not_hear_its_own_shot(sim):
+    # Red's own shot is a matching tag for red, so hearing it would count as a hit.
+    player = sim.add_device("red", scene="tag")
+    start_game(sim, player)
+
+    player.tap("A")
+    sim.advance(0.5)
+
+    assert shot_count(player) == 1
+    assert not player.has_played("scene.hit_start")
+
+
+def test_payloads_received_together_arrive_on_successive_ticks(sim):
+    # Each matching one-damage tag takes one of ten pips off the hitpoint bar.
+    player = sim.add_device("red", scene="tag", scene_data={"tag_starting_hitpoints": 10})
+    start_game(sim, player)
+
+    player.receive_ir(bytes(encode_tag_data(TagData(0, 1, 1))))
+    player.receive_ir(bytes(encode_tag_data(TagData(0, 1, 1))))
+    sim.advance(TICK)
+    after_first_tick = player.strip(Scope.PERSONAL).lit
+    sim.advance(TICK)
+
+    assert (after_first_tick, player.strip(Scope.PERSONAL).lit) == (9, 8)
 
 
 def test_clip_length_reads_the_clips_wav_header(sim):

@@ -5,9 +5,12 @@ from __future__ import annotations
 import pytest
 
 from engine.input import ButtonData
+from engine.network import CONE, LINE
 from engine.state import Scope
 from hardware.shared.device_config import DeviceConfig, parse_device_config
-from hardware.simulated.device import SimulatedHardware
+from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
+from hardware.shared.ir_transceiver import InfraredTransceiver
+from hardware.simulated.device import IrSent, SimulatedHardware
 
 
 def _config(**sections: object) -> DeviceConfig:
@@ -78,3 +81,111 @@ def test_a_matrix_pixel_entry_is_rejected():
 
     with pytest.raises(ValueError, match="matrix"):
         SimulatedHardware(now=lambda: 0.0, config=config)
+
+
+# ---------------------------------------------------------------------------
+# IR
+# ---------------------------------------------------------------------------
+
+LINE_ONLY_IR = {"rx": "GP5", "line": "GP6"}
+
+
+def _ir(sim_hw: SimulatedHardware) -> InfraredTransceiver:
+    assert sim_hw.hw.ir is not None
+    return sim_hw.hw.ir
+
+
+def test_sending_on_an_emitter_the_config_does_not_wire_raises():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir=LINE_ONLY_IR))
+
+    with pytest.raises(ValueError, match="cone"):
+        sim_hw.hw.network_controls.send_ir(b"\x01", CONE)
+
+
+def test_a_device_without_an_ir_section_cannot_send():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config())
+
+    with pytest.raises(ValueError, match="line"):
+        sim_hw.hw.network_controls.send_ir(b"\x01", LINE)
+
+
+def test_ir_sent_records_the_payload_the_wire_carried_per_emitter():
+    sim_hw = SimulatedHardware(now=lambda: 2.5, config=_config(ir=LINE_ONLY_IR))
+
+    sim_hw.hw.network_controls.send_ir(b"\x12\x34", LINE)
+
+    assert sim_hw.ir_sent == [IrSent(at=2.5, emitter=LINE, payload=b"\x12\x34")]
+
+
+def test_ir_sent_holds_only_what_the_installed_codec_put_on_the_wire():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir=LINE_ONLY_IR))
+    sim_hw.apply_ir_codec(TagInfraredEncoder(), TagInfraredDecoder())
+
+    # The Tag wire-frame carries 7 bits of the first byte only.
+    sim_hw.hw.network_controls.send_ir(b"\xff\x01", LINE)
+
+    assert [s.payload for s in sim_hw.ir_sent] == [b"\x7f"]
+
+
+@pytest.mark.parametrize("rx", ["GP5", ["GP5", "GP7", "GP8"]], ids=["one-rx", "three-rx"])
+def test_a_received_payload_decodes_on_the_next_transceiver_update(rx):
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir={"rx": rx}))
+
+    sim_hw.receive_ir(b"\x12\x34")
+    _ir(sim_hw).update()
+
+    assert _ir(sim_hw).received == b"\x12\x34"
+
+
+def test_a_received_payload_reports_full_signal_strength():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir=LINE_ONLY_IR))
+
+    sim_hw.receive_ir(b"\x12")
+    _ir(sim_hw).update()
+
+    assert _ir(sim_hw).last_signal_strength == 1.0
+
+
+def test_a_received_payload_travels_the_installed_codecs_wire():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir=LINE_ONLY_IR))
+    sim_hw.apply_ir_codec(TagInfraredEncoder(), TagInfraredDecoder())
+
+    sim_hw.receive_ir(b"\xff\x01")
+    _ir(sim_hw).update()
+
+    assert _ir(sim_hw).received == b"\x7f"
+
+
+def test_payloads_received_together_decode_one_per_update():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir=LINE_ONLY_IR))
+
+    sim_hw.receive_ir(b"\x01")
+    sim_hw.receive_ir(b"\x02")
+    received = []
+    for _ in range(3):
+        _ir(sim_hw).update()
+        received.append(_ir(sim_hw).received)
+
+    assert received == [b"\x01", b"\x02", None]
+
+
+def test_a_device_never_decodes_its_own_send():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir=LINE_ONLY_IR))
+
+    sim_hw.hw.network_controls.send_ir(b"\x01", LINE)
+    received = []
+    for _ in range(2):
+        _ir(sim_hw).update()
+        received.append(_ir(sim_hw).received)
+
+    assert received == [None, None]
+
+
+def test_a_payload_landing_with_the_devices_own_send_is_dropped_with_it():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir=LINE_ONLY_IR))
+
+    sim_hw.hw.network_controls.send_ir(b"\x01", LINE)
+    sim_hw.receive_ir(b"\x02")
+    _ir(sim_hw).update()
+
+    assert _ir(sim_hw).received is None
