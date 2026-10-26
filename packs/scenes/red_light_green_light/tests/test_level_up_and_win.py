@@ -51,7 +51,7 @@ def gold(pixel: int) -> bool:
     return red > green > 0 and blue == 0
 
 
-def win(sim: Simulation, player: SimulatedDevice) -> None:
+def win_the_only_round(sim: Simulation, player: SimulatedDevice) -> None:
     player.tap("A")
     survive_round(sim, player)
 
@@ -130,7 +130,7 @@ def test_moving_during_a_level_up_is_not_caught(sim):
 def test_surviving_green_light_at_the_top_level_wins(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
 
-    win(sim, player)
+    win_the_only_round(sim, player)
 
     assert (player.has_played(WIN_STING), player.has_played(LEVEL_UP_SOUND)) == (True, False)
 
@@ -138,14 +138,14 @@ def test_surviving_green_light_at_the_top_level_wins(sim):
 def test_a_win_triple_clicks_the_haptic(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
 
-    win(sim, player)
+    win_the_only_round(sim, player)
 
     assert player.buzzed[-1].pattern == (HapticPattern.TRIPLE_CLICK,)
 
 
 def test_a_win_strikes_lightning_across_every_strip(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
-    win(sim, player)
+    win_the_only_round(sim, player)
 
     lit, dark = set(), set()
     for _ in range(int(2.0 / TICK)):
@@ -159,7 +159,7 @@ def test_a_win_strikes_lightning_across_every_strip(sim):
 
 def test_the_device_returns_to_ready_the_moment_the_win_sting_ends(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
-    win(sim, player)
+    win_the_only_round(sim, player)
 
     wait_for(sim, player, READY_SOUND)
 
@@ -169,7 +169,7 @@ def test_the_device_returns_to_ready_the_moment_the_win_sting_ends(sim):
 
 def test_moving_during_a_win_is_not_caught(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
-    win(sim, player)
+    win_the_only_round(sim, player)
 
     player.move()
     wait_for(sim, player, READY_SOUND)

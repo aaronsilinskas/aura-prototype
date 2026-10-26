@@ -31,9 +31,9 @@ GAME_OVER_STING = "basic.game_over_sting_start"
 SLACK = 3 * TICK
 """How far an observed phase change may trail its tunable.
 
-A rule listed before the one whose phase it follows (Ready before Win, Red
-Warning before Level Up) sees the new phase a tick late, and a clip running
-out is only seen on the tick after it ends.
+A phase whose rule runs earlier in the tick than the rule it follows only
+starts on the next tick, and a clip running out is only seen on the tick
+after it ends.
 """
 
 QUICK_WARNINGS = {"rlgl_warning_pulse_max": 0.2, "rlgl_warning_pulse_min": 0.2}

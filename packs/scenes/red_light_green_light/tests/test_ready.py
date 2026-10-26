@@ -11,7 +11,6 @@ import pytest
 from app.simulation import TICK
 from packs.scenes.red_light_green_light.tests.helpers import (
     EVERY_STRIP,
-    GAME_OVER_STING,
     LEVEL_BAR,
     READY_SOUND,
     WARNING_PEAK,
@@ -19,6 +18,12 @@ from packs.scenes.red_light_green_light.tests.helpers import (
 
 FIVE_LEVELS = {"rlgl_max_level": 5}
 """Each level fills two of the level bar's ten pixels."""
+
+READY_PULSE = 1.0
+"""How long Ready's pulse takes to brighten, hold and fade, alternating red and green."""
+
+FIRST_PULSE_ON = 0.4
+"""Partway through the first pulse's hold, when it is at full brightness."""
 
 
 def only_red(pixels: list[int]) -> bool:
@@ -37,15 +42,20 @@ def test_a_booted_device_plays_the_ready_sound(sim):
     assert player.has_played(READY_SOUND)
 
 
-def test_ready_pulses_red_then_green_on_every_strip(sim):
+def test_ready_first_pulses_red_on_every_strip(sim):
     player = sim.add_device("p1", scene="red_light_green_light")
 
-    sim.advance(0.4)
-    red_pulse = all(only_red(player.strip(scope).pixels) for scope in EVERY_STRIP)
-    sim.advance(1.0)
-    green_pulse = all(only_green(player.strip(scope).pixels) for scope in EVERY_STRIP)
+    sim.advance(FIRST_PULSE_ON)
 
-    assert (red_pulse, green_pulse) == (True, True)
+    assert all(only_red(player.strip(scope).pixels) for scope in EVERY_STRIP)
+
+
+def test_ready_follows_the_red_pulse_with_a_green_one_on_every_strip(sim):
+    player = sim.add_device("p1", scene="red_light_green_light")
+
+    sim.advance(FIRST_PULSE_ON + READY_PULSE)
+
+    assert all(only_green(player.strip(scope).pixels) for scope in EVERY_STRIP)
 
 
 def test_an_idle_device_stays_in_ready(sim):
@@ -56,14 +66,13 @@ def test_an_idle_device_stays_in_ready(sim):
     assert [p.clip for p in player.played] == [READY_SOUND]
 
 
-def test_moving_in_ready_neither_starts_nor_ends_a_game(sim):
+def test_moving_in_ready_does_nothing(sim):
     player = sim.add_device("p1", scene="red_light_green_light")
 
     player.move()
     sim.advance(5.0)
 
     assert [p.clip for p in player.played] == [READY_SOUND]
-    assert not player.has_played(GAME_OVER_STING)
 
 
 @pytest.mark.parametrize("button", ["A", "B"])

@@ -30,7 +30,11 @@ GREEN_LIGHT = {
     "rlgl_red_duration": 1.0,
     "rlgl_green_duration": 3.0,
     "rlgl_green_still_timeout": 0.75,
+    "rlgl_max_level": 5,
 }
+
+SETTLING = 0.1
+"""How long the smoothed motion takes to fall below the move threshold once ``move`` stops."""
 
 LONG_GREEN_LIGHT = {**GREEN_LIGHT, "rlgl_green_duration": 6.0}
 """Green Light outlasting its music clip."""
@@ -96,7 +100,7 @@ def test_stopping_on_green_light_ends_the_game_a_still_timeout_later(sim):
     player.hold_still()
     wait_for(sim, player, GAME_OVER_STING)
 
-    assert sim.now - stopped_at == pytest.approx(0.75, abs=0.1)
+    assert sim.now - stopped_at == pytest.approx(0.75, abs=SETTLING)
 
 
 def test_a_pause_shorter_than_the_still_timeout_is_forgiven(sim):

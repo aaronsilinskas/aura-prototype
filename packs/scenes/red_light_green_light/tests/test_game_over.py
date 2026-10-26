@@ -31,6 +31,7 @@ GAME = {
     "rlgl_red_duration": 1.0,
     "rlgl_green_duration": 1.0,
     "rlgl_level_up_duration": 0.5,
+    "rlgl_green_still_timeout": 0.5,
     "rlgl_game_over_duration": 2.0,
     "rlgl_max_level": 5,
 }
@@ -38,28 +39,22 @@ GAME = {
 
 
 def caught_on_red_light(sim: Simulation, player: SimulatedDevice) -> None:
-    player.tap("A")
+    """Move on the next Red Light, then hold still once caught."""
     wait_for(sim, player, RED_MUSIC)
     player.move()
     wait_for(sim, player, GAME_OVER_STING)
+    player.hold_still()
 
 
 def caught_on_green_light(sim: Simulation, player: SimulatedDevice) -> None:
-    player.tap("A")
+    """Hold still through the next Green Light until caught."""
     wait_for(sim, player, GREEN_MUSIC)
     wait_for(sim, player, GAME_OVER_STING)
 
 
-def test_being_caught_plays_the_game_over_sting(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=GAME)
-
-    caught_on_red_light(sim, player)
-
-    assert player.has_played(GAME_OVER_STING)
-
-
 def test_the_game_over_sting_buzzes_three_times(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=GAME)
+    player.tap("A")
 
     caught_on_red_light(sim, player)
 
@@ -69,6 +64,7 @@ def test_the_game_over_sting_buzzes_three_times(sim):
 
 def test_game_over_burns_fire_across_every_pixel_of_every_strip(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=GAME)
+    player.tap("A")
     caught_on_red_light(sim, player)
 
     sim.advance(0.5)
@@ -83,6 +79,7 @@ def test_game_over_burns_fire_across_every_pixel_of_every_strip(sim):
 )
 def test_being_caught_stops_the_lights_music(sim, get_caught, music):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=GAME)
+    player.tap("A")
 
     get_caught(sim, player)
 
@@ -91,6 +88,7 @@ def test_being_caught_stops_the_lights_music(sim, get_caught, music):
 
 def test_being_caught_on_green_light_does_not_level_up(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=GAME)
+    player.tap("A")
     caught_on_green_light(sim, player)
 
     wait_for(sim, player, READY_SOUND)
@@ -100,6 +98,7 @@ def test_being_caught_on_green_light_does_not_level_up(sim):
 
 def test_the_device_returns_to_ready_after_the_game_over_pause(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=GAME)
+    player.tap("A")
     caught_on_red_light(sim, player)
 
     wait_for(sim, player, READY_SOUND)
@@ -111,10 +110,7 @@ def test_a_game_after_game_over_starts_again_from_level_one(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=GAME)
     player.tap("A")
     survive_round(sim, player)
-    wait_for(sim, player, RED_MUSIC)
-    player.move()
-    wait_for(sim, player, GAME_OVER_STING)
-    player.hold_still()
+    caught_on_red_light(sim, player)
     wait_for(sim, player, READY_SOUND)
 
     player.tap("A")

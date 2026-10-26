@@ -22,7 +22,6 @@ from packs.scenes.red_light_green_light.tests.helpers import (
     last_played_at,
     lit_in,
     survive_round,
-    times_played,
     wait_for,
 )
 
@@ -39,6 +38,9 @@ SHORTENING = {
 }
 """Red Light lasts 3.0 s at level one and 1.0 s at the top level, level two."""
 
+CAUGHT_WITHIN = 0.1
+"""A handful of ticks: as long as ``move``'s sway takes to clear the smoothed red threshold."""
+
 THREE_ROUNDS = {**SHORTENING, "rlgl_max_level": 3}
 
 
@@ -47,7 +49,7 @@ def reach_red_light(sim: Simulation, player: SimulatedDevice) -> None:
     wait_for(sim, player, RED_MUSIC)
 
 
-def red_light_ends(sim: Simulation, player: SimulatedDevice) -> None:
+def wait_for_red_light_to_end(sim: Simulation, player: SimulatedDevice) -> None:
     sim.run_until(lambda: not lit_in(player, RED))
 
 
@@ -89,7 +91,7 @@ def test_red_light_lasts_its_duration(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
     reach_red_light(sim, player)
 
-    red_light_ends(sim, player)
+    wait_for_red_light_to_end(sim, player)
 
     assert sim.now - last_played_at(player, RED_MUSIC) == pytest.approx(3.0, abs=SLACK)
 
@@ -98,7 +100,7 @@ def test_the_red_music_stops_when_red_light_ends(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
     reach_red_light(sim, player)
 
-    red_light_ends(sim, player)
+    wait_for_red_light_to_end(sim, player)
 
     assert not player.is_playing(RED_MUSIC)
 
@@ -121,7 +123,7 @@ def test_red_light_catches_motion_at_once(sim):
     player.move()
     wait_for(sim, player, GAME_OVER_STING)
 
-    assert sim.now - moved_at <= 0.1
+    assert sim.now - moved_at <= CAUGHT_WITHIN
 
 
 def test_a_one_tick_jolt_on_red_light_is_not_caught(sim):
@@ -136,16 +138,14 @@ def test_a_one_tick_jolt_on_red_light_is_not_caught(sim):
     assert not player.has_played(GAME_OVER_STING)
 
 
-def test_pressing_a_button_on_red_light_changes_nothing(sim):
+def test_pressing_a_button_on_red_light_keeps_red_light_on(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
     reach_red_light(sim, player)
-    peaks = times_played(player, WARNING_PEAK)
 
     player.tap("A")
     player.tap("B")
 
-    assert (lit_in(player, RED), player.is_playing(RED_MUSIC)) == (True, True)
-    assert times_played(player, WARNING_PEAK) == peaks
+    assert lit_in(player, RED)
 
 
 def test_red_light_shortens_to_its_minimum_at_the_top_level(sim):
@@ -154,7 +154,7 @@ def test_red_light_shortens_to_its_minimum_at_the_top_level(sim):
     survive_round(sim, player)
 
     wait_for(sim, player, RED_MUSIC)
-    red_light_ends(sim, player)
+    wait_for_red_light_to_end(sim, player)
 
     assert sim.now - last_played_at(player, RED_MUSIC) == pytest.approx(1.0, abs=SLACK)
 

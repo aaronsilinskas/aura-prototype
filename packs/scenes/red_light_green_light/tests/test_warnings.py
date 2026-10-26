@@ -63,10 +63,20 @@ def test_each_warning_peak_clicks_the_haptic(sim):
     assert [b.pattern for b in player.buzzed] == [(HapticPattern.STRONG_CLICK,)] * 3
 
 
-def test_a_warning_peaks_in_yellow_on_every_light_strip(sim):
+def test_the_red_warning_peaks_in_yellow_on_every_light_strip(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES)
 
     player.tap("A")
+    wait_for(sim, player, WARNING_PEAK)
+
+    assert lit_in(player, YELLOW)
+
+
+def test_the_green_warning_peaks_in_yellow_on_every_light_strip(sim):
+    player = sim.add_device("p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES)
+    player.tap("A")
+    wait_for(sim, player, RED_MUSIC)
+
     wait_for(sim, player, WARNING_PEAK)
 
     assert lit_in(player, YELLOW)
@@ -83,6 +93,16 @@ def test_warning_peaks_come_one_pulse_apart(sim):
         pytest.approx(0.5, abs=SLACK),
         pytest.approx(0.5, abs=SLACK),
     )
+
+
+def test_warnings_start_at_the_maximum_pulse_at_level_one(sim):
+    player = sim.add_device("p1", scene="red_light_green_light", scene_data=QUICKENING)
+
+    player.tap("A")
+    wait_for(sim, player, RED_MUSIC)
+
+    first, second, _ = peak_times(player, 0.0, sim.now)
+    assert second - first == pytest.approx(1.0, abs=SLACK)
 
 
 def test_warnings_quicken_to_the_minimum_pulse_at_the_top_level(sim):
