@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from engine.engine import GameEngine
+from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
 from engine.phase import (
     InPhaseRule,
@@ -84,6 +84,19 @@ class _TransitionsOnEnterRule(PhaseRule):
 
     def _tick(self, event: _TickEvent, state: GameState) -> None:
         pass
+
+
+class _QueuesOneTickRule(GameRule):
+    """Plain rule that queues one more ``_TickEvent`` the first time it hears one."""
+
+    def __init__(self) -> None:
+        self._queued = False
+        self.on(_TickEvent, self._tick)
+
+    def _tick(self, event: _TickEvent, state: GameState) -> None:
+        if not self._queued:
+            self._queued = True
+            state.queue_event(_TickEvent())
 
 
 class _InPhaseEmitter(InPhaseRule):
@@ -264,11 +277,13 @@ def test_an_entered_phases_in_phase_rule_does_not_see_the_event_that_entered_it(
     slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
     bystander = _InPhaseEmitter(_PHASE_B, "bystander", phase_slot=slot)
     leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
-    _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
+    # Built only to register B's owner with the slot; transition_to needs one.
+    _owner = _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
     rules = [bystander, leaving] if bystander_dispatches_first else [leaving, bystander]
 
     names = _run(rules, ticks=1)
 
+    assert "enter:b" in names
     assert "in:bystander" not in names
 
 
@@ -281,6 +296,17 @@ def test_an_entered_phases_handlers_see_the_next_event_queued_in_the_same_tick()
     names = _run([leaving, arriving, bystander], ticks=1, events_per_tick=2)
 
     assert names == ["enter:a", "tick:a", "exit:a", "enter:b", "tick:b", "in:bystander"]
+
+
+def test_an_entered_phases_handlers_see_an_event_queued_during_the_entering_dispatch() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    queuer = _QueuesOneTickRule()
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+    arriving = _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
+
+    names = _run([queuer, leaving, arriving], ticks=1)
+
+    assert names == ["enter:a", "tick:a", "exit:a", "enter:b", "tick:b"]
 
 
 def test_transitioning_to_a_phase_no_phase_rule_owns_raises_naming_the_phase() -> None:

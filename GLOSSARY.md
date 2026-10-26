@@ -61,7 +61,7 @@ An opaque, identity-typed constant naming one phase; compared by identity, so a 
 _Avoid_: bare `str`/`int` phase values; comparing a phase against a string literal
 
 ### PhaseMachine
-The mutable per-scene holder of the current `PhaseKey` and the phase-start time; reached through a scene's `PhaseSlot`.
+The mutable per-scene holder of the current `PhaseKey`, the phase-start time, and the dispatch the phase was entered on (so its handlers skip that event); reached through a scene's `PhaseSlot`.
 _Avoid_: storing receipts or per-phase scratch on it; auto-stopping effects inside `enter()`
 
 ### PhaseSlot
