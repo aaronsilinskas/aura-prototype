@@ -9,6 +9,7 @@ from packs.scenes.tag.tag_data import TagData, decode_tag_data, encode_tag_data
 
 AMMO_AMBER = 0xFFBF00
 GREEN = 0x00FF00
+RED = 0xFF0000
 
 EVERY_STRIP = [
     Scope.Global.BUFF,
@@ -60,4 +61,4 @@ def shots(player: SimulatedDevice) -> list[tuple[int, int, int]]:
 
 def sweeping_red(strip: Strip) -> bool:
     """Part of the strip lit, and only in red: the Ready laser sweep."""
-    return 0 < strip.lit < strip.size and all(p & 0x00FFFF == 0 for p in strip.pixels)
+    return 0 < strip.lit < strip.size and strip.shades_of(RED)

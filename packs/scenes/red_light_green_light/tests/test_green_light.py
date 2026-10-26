@@ -117,6 +117,16 @@ def test_a_pause_shorter_than_the_still_timeout_is_forgiven(sim):
     assert not player.has_played(GAME_OVER_STING)
 
 
+def test_a_gentle_sway_on_green_light_counts_as_still(sim):
+    player = sim.add_device("p1", scene="red_light_green_light", scene_data=GREEN_LIGHT)
+    reach_green_light(sim, player)
+
+    player.move(strength=1.0)
+    wait_for(sim, player, GAME_OVER_STING)
+
+    assert sim.now - last_played_at(player, GREEN_MUSIC) == pytest.approx(0.75, abs=SLACK)
+
+
 def test_a_one_tick_jolt_on_green_light_does_not_count_as_moving(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=GREEN_LIGHT)
     reach_green_light(sim, player)

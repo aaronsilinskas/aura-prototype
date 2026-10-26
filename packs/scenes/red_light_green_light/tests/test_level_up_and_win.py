@@ -89,6 +89,16 @@ def test_a_level_up_flashes_gold_on_every_light_strip(sim):
     assert all(any(gold(p) for p in player.strip(scope).pixels) for scope in LIGHT_STRIPS)
 
 
+def test_a_level_up_shows_only_gold_on_the_light_strips(sim):
+    player = sim.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+    player.tap("A")
+    survive_round(sim, player)
+
+    sim.advance(0.3)
+
+    assert all(all(gold(p) for p in player.strip(scope).pixels) for scope in LIGHT_STRIPS)
+
+
 def test_a_level_up_grows_the_level_bar_by_one_level(sim):
     player = sim.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
     player.tap("A")

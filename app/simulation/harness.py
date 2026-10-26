@@ -20,7 +20,7 @@ from app.scene_composition import (
 from engine.state import ScopeValue
 from engine.timer import Timer
 from hardware.shared.device_config import DeviceConfig, load_device_config
-from hardware.simulated.device import Buzzed, IrSent, Played, SimulatedHardware, Strip
+from hardware.simulated.device import DEFAULT_SWAY, Buzzed, IrSent, Played, SimulatedHardware, Strip
 
 __all__ = ["TICK", "SimulatedDevice", "Simulation"]
 
@@ -133,9 +133,13 @@ class SimulatedDevice:
         """
         self._sim_hw.accelerate(x, y, z)
 
-    def move(self) -> None:
-        """Sway on top of the held reading, read as motion tick after tick until ``hold_still``."""
-        self._sim_hw.move()
+    def move(self, strength: float = DEFAULT_SWAY) -> None:
+        """Sway *strength* m/s² on top of the held reading, tick after tick until ``hold_still``.
+
+        The default is far above any motion threshold; pass a gentler
+        *strength* to probe one.
+        """
+        self._sim_hw.move(strength)
 
     def hold_still(self) -> None:
         """Back to rest, with gravity on z, and stop any ``move``."""
