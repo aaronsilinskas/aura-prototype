@@ -110,6 +110,17 @@ def test_a_reload_in_progress_when_the_game_ends_never_completes(sim):
     assert not player.has_played("scene.reload_complete")
 
 
+def test_a_reload_in_progress_when_the_game_ends_stops_its_loop(sim):
+    player = sim.add_device("red", scene="tag", scene_data=MID_RELOAD)
+    start_game(sim, player)
+    start_reloading(sim, player)
+    reloading = player.is_playing("scene.reload")
+
+    run_out_of_hitpoints(sim, player)
+
+    assert (reloading, player.is_playing("scene.reload")) == (True, False)
+
+
 # ---------------------------------------------------------------------------
 # Back to Ready
 # ---------------------------------------------------------------------------

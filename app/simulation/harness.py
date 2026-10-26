@@ -173,6 +173,10 @@ class SimulatedDevice:
         """Seconds *clip* plays for, read from the WAV header the device plays it from."""
         return self._sim_hw.clip_length(clip)
 
+    def is_playing(self, clip: str) -> bool:
+        """Whether *clip* is playing or looping now; false once it ran out or was stopped."""
+        return self._sim_hw.is_playing(clip)
+
     def forget(self) -> None:
         """Drop everything recorded so far, so later asserts see only what follows.
 

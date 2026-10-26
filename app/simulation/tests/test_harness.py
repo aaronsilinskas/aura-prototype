@@ -20,6 +20,10 @@ def sim() -> Simulation:
     return Simulation()
 
 
+ONE_ROUND = {"tag_max_ammo": 1, "tag_reload_duration": 1.0}
+"""One round, so a fresh press after it starts a one-second reload."""
+
+
 def start_game(sim: Simulation, *players: SimulatedDevice) -> None:
     for player in players:
         player.tap("A")
@@ -30,6 +34,13 @@ def start_game(sim: Simulation, *players: SimulatedDevice) -> None:
 
 def shot_count(player: SimulatedDevice) -> int:
     return sum(1 for s in player.ir_sent if s.emitter == LINE)
+
+
+def reload_part_way(sim: Simulation, player: SimulatedDevice) -> None:
+    """Fire the only round, then hold the trigger halfway through the reload."""
+    player.tap("A")
+    player.hold("A")
+    sim.advance(0.5)
 
 
 def start_red_light_warning(player: SimulatedDevice) -> None:
@@ -117,6 +128,39 @@ def test_clip_length_reads_the_clips_wav_header(sim):
 
     # fire_shot_start.wav: 3456 frames of 11025 Hz mono
     assert player.clip_length("scene.fire_shot_start") == pytest.approx(3456 / 11025)
+
+
+def test_a_one_shot_clip_is_playing_until_it_runs_out(sim):
+    player = sim.add_device("red", scene="tag")
+    start_game(sim, player)
+    player.tap("A")
+    (shot,) = player.played
+    ends_at = shot.at + player.clip_length(shot.clip)
+
+    sim.advance(ends_at - sim.now - 2 * TICK)
+    still_playing = player.is_playing("scene.fire_shot_start")
+    sim.advance(2 * TICK)
+
+    assert (still_playing, player.is_playing("scene.fire_shot_start")) == (True, False)
+
+
+def test_is_playing_rejects_a_clip_the_device_cannot_play(sim):
+    player = sim.add_device("red", scene="tag")
+
+    with pytest.raises(ValueError):
+        player.is_playing("scene.relaod")
+
+
+def test_a_looping_clip_is_playing_until_its_effect_stops(sim):
+    player = sim.add_device("red", scene="tag", scene_data=ONE_ROUND)
+    start_game(sim, player)
+    reload_part_way(sim, player)
+
+    looping = player.is_playing("scene.reload")
+    player.release("A")
+    sim.advance(0.2)
+
+    assert (looping, player.is_playing("scene.reload")) == (True, False)
 
 
 # ---------------------------------------------------------------------------
