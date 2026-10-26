@@ -321,11 +321,11 @@ The USB-CDC serial channel a board always exposes for REPL and `print` output; w
 _Avoid_: "REPL port", "the usbmodem port", or bare "serial port" (ambiguous once the data channel is enabled)
 
 ### Data channel
-The second USB-CDC serial channel a board exposes when `boot.py` enables it, carrying SD-sync protocol bytes rather than text.
+The second USB-CDC serial channel a board exposes when enabled on the device, carrying SD-sync protocol bytes rather than text.
 _Avoid_: "CDC2", "the other port", bare "serial port"
 
 ### Port auto-detect
-Resolution of a host serial port for one named channel (**console channel** or **data channel**) by asking which board interface it is: a single match auto-selects, an explicit `--port` overrides without scanning, and zero or multiple matches fails loudly.
+Resolution of a host serial port for one named channel (**console channel** or **data channel**) by asking which board interface it is: a single match auto-selects, an explicitly named port overrides without scanning, and zero or multiple matches fails loudly.
 _Avoid_: picking a port by device-name pattern (both channels look alike); falling back to "the only usbmodem device" when no channel matches; guessing among multiple matches
 
 ### NeoPixelEffectOutput

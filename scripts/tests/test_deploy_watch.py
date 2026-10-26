@@ -10,6 +10,7 @@ from scripts.deploy_watch import (
     SplitWriter,
     discard_until,
     exit_code_for,
+    find_console_port,
     select_console_port,
     watch_stream,
 )
@@ -344,6 +345,10 @@ def test_split_writer_file_excludes_lines_written_directly_to_stdout() -> None:
 # ---------------------------------------------------------------------------
 
 
+# A console port alongside a data port needs no case here: repl_comports()
+# filters the data channel out before selection.
+
+
 class _FakeComport:
     def __init__(self, device: str) -> None:
         self.device = device
@@ -367,10 +372,5 @@ def test_select_console_port_raises_listing_candidates_when_multiple_console_por
         )
 
 
-def test_select_console_port_explicit_port_wins_over_ambiguous_auto_detection() -> None:
-    port = select_console_port(
-        [_FakeComport("/dev/cu.usbmodem1101"), _FakeComport("/dev/cu.usbmodem2101")],
-        explicit_port="/dev/tty.explicit",
-    )
-
-    assert port == "/dev/tty.explicit"
+def test_find_console_port_returns_an_explicit_port_unchanged() -> None:
+    assert find_console_port(explicit_port="/dev/tty.explicit") == "/dev/tty.explicit"

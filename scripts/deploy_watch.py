@@ -180,17 +180,13 @@ class ConsolePortError(Exception):
     """Zero or more than one console-channel port was found and none was named explicitly."""
 
 
-def select_console_port(comports: "list[object]", *, explicit_port: "str | None" = None) -> str:
+def select_console_port(comports: "list[object]") -> str:
     """Pick the console-channel port from *comports* (each exposing a ``.device`` path).
 
-    *explicit_port* always wins when given. Otherwise exactly one comport must
-    be present -- zero or several (more than one board attached) is ambiguous
-    and raises :class:`ConsolePortError` naming ``--port`` as the fix, rather
-    than guessing.
+    Exactly one comport must be present -- zero or several (more than one
+    board attached) is ambiguous and raises :class:`ConsolePortError` naming
+    ``--port`` as the fix, rather than guessing.
     """
-    if explicit_port is not None:
-        return explicit_port
-
     if len(comports) == 1:
         return comports[0].device
 
@@ -206,12 +202,11 @@ def select_console_port(comports: "list[object]", *, explicit_port: "str | None"
 
 
 def find_console_port(*, explicit_port: "str | None" = None) -> str:
-    """Resolve the console-channel serial port, auto-detecting via ``repl_comports()``.
+    """Resolve the console-channel serial port: *explicit_port* if given, else auto-detect.
 
-    An explicit port skips the scan entirely. See :func:`select_console_port`
-    for the selection rule; this wraps it with the live comport scan (not
-    itself unit-tested -- it is a thin call into ``adafruit_board_toolkit``,
-    imported here so pyserial stays out of module import).
+    Auto-detect scans ``repl_comports()`` and applies :func:`select_console_port`.
+    The toolkit is imported here, not at module level, so pyserial stays out of
+    module import.
     """
     if explicit_port is not None:
         return explicit_port

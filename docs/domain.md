@@ -170,7 +170,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `UsbCdcTransport` | `hardware/circuitpython/usb_cdc_transport.py` | Live `Transport` framing SD-sync lines with a newline delimiter over any `read`/`write` stream (on-device, `usb_cdc.data`); needs no `usb_cdc` import itself, so it is CPython-testable against a fake stream |
 | `SerialTransport` | `scripts/sd_sync_transport.py` | Live host-side `Transport`, framing SD-sync lines the same way as `UsbCdcTransport` but over a host serial port opened via `deploy_watch`'s `SerialHandle`/`_open_serial_with_retry` |
 | `find_data_port` / `select_data_port` | `scripts/sd_sync_transport.py` | Data-channel port resolution for `scripts/sd_sync.py`: auto-detects via `adafruit_board_toolkit.circuitpython_serial.data_comports()`, single match wins, `--port` always overrides, zero/multiple matches raises `SdSyncPortError` |
-| `find_console_port` / `select_console_port` | `scripts/deploy_watch.py` | Console-channel port resolution for `deploy_watch`: auto-detects via `adafruit_board_toolkit.circuitpython_serial.repl_comports()` (imported lazily), single match wins, `--port` always overrides, zero/multiple matches raises `ConsolePortError` |
+| `find_console_port` / `select_console_port` | `scripts/deploy_watch.py` | Console-channel port resolution for `deploy_watch`: auto-detects via `adafruit_board_toolkit.circuitpython_serial.repl_comports()` (imported lazily), single match wins, `--port` overrides without scanning, zero/multiple matches raises `ConsolePortError` |
 
 ---
 
