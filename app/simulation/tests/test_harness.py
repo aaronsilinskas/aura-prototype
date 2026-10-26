@@ -144,6 +144,13 @@ def test_a_one_shot_clip_is_playing_until_it_runs_out(sim):
     assert (still_playing, player.is_playing("scene.fire_shot_start")) == (True, False)
 
 
+def test_is_playing_rejects_a_clip_the_device_cannot_play(sim):
+    player = sim.add_device("red", scene="tag")
+
+    with pytest.raises(ValueError):
+        player.is_playing("scene.relaod")
+
+
 def test_a_looping_clip_is_playing_until_its_effect_stops(sim):
     player = sim.add_device("red", scene="tag", scene_data=ONE_ROUND)
     start_game(sim, player)

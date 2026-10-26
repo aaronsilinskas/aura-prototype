@@ -186,9 +186,8 @@ class _SimulatedAudio(EffectOutput, VoiceSink):
         self._sim_hw = sim_hw
         self._registry = registry
         self._pool = VoicePool(voices)
-        self._ends_at: list[float | None] = [None] * voices
-        self._clips: list[str | None] = [None] * voices
-        """The clip each voice is playing, or ``None`` while it is idle."""
+        self._voices: list[tuple[str, float] | None] = [None] * voices
+        """Each voice's clip path and when it ends (``inf`` for a loop), or ``None`` while idle."""
 
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
@@ -200,35 +199,36 @@ class _SimulatedAudio(EffectOutput, VoiceSink):
             return
         stops_receipt = clip_stops_receipt(effect, config)
         path = self._registry.path(config.name)
-        slot = self._pool.claim(self, path, config.loop, stops_receipt, receipt)
-        if slot != -1:
-            self._clips[slot] = config.name
+        if self._pool.claim(self, path, config.loop, stops_receipt, receipt) != -1:
             self._sim_hw.played.append(Played(self._sim_hw.now(), config.name))
 
     def is_clip_playing(self, clip: str) -> bool:
-        """Whether a voice is playing or looping *clip*."""
-        return any(name == clip and self.is_playing(i) for i, name in enumerate(self._clips))
+        path = self._registry.path(clip)
+        return any(
+            voice is not None and voice[0] == path and self.is_playing(slot)
+            for slot, voice in enumerate(self._voices)
+        )
 
     def flush(self) -> None:
         self._pool.sweep(self)
 
     def open_source(self, path: str) -> object | None:
-        return _wav_length(path)
+        return (path, _wav_length(path))
 
     def play(self, slot: int, source: object, loop: bool) -> None:
-        assert isinstance(source, float)  # the clip length open_source returned
-        self._ends_at[slot] = math.inf if loop else self._sim_hw.now() + source
+        assert isinstance(source, tuple)  # the (path, length) open_source returned
+        path, length = source
+        self._voices[slot] = (path, math.inf if loop else self._sim_hw.now() + length)
 
     def stop(self, slot: int) -> None:
-        self._ends_at[slot] = None
-        self._clips[slot] = None
+        self._voices[slot] = None
 
     def set_loudness(self, slot: int, loudness: float) -> None:
         pass
 
     def is_playing(self, slot: int) -> bool:
-        ends_at = self._ends_at[slot]
-        return ends_at is not None and self._sim_hw.now() < ends_at
+        voice = self._voices[slot]
+        return voice is not None and self._sim_hw.now() < voice[1]
 
 
 class _RecordingHaptic(EffectOutput):
@@ -380,7 +380,6 @@ class SimulatedHardware:
         return _wav_length(self._audio_registry.path(clip))
 
     def is_playing(self, clip: str) -> bool:
-        """Whether *clip* is playing or looping on one of the device's voices."""
         return self._audio is not None and self._audio.is_clip_playing(clip)
 
     def releases(self, button: str) -> int:
