@@ -8,21 +8,34 @@ what the device's strips show. A test that depends on a tunable pins it with
 
 from __future__ import annotations
 
+import math
+
 from app.simulation import SimulatedDevice, Simulation, Strip
 from engine.state import Scope
 
 RED = 0xFF0000
 GREEN = 0x00FF00
 
+METER_STRIPS = [
+    Scope.Global.BUFF,
+    Scope.Global.DEBUFF,
+    Scope.Global.MAIN,
+    Scope.PERSONAL,
+    Scope.DIRECTIONAL,
+]
+"""Every strip but ambient: where the meter shows."""
+
+SILENCE_TIMEOUT = 0.5
+
 METER = {
     "ir_range_window_seconds": 1.0,
-    "ir_range_silence_timeout": 0.5,
+    "ir_range_silence_timeout": SILENCE_TIMEOUT,
     "ir_range_green_threshold": 1.0,
 }
-"""A one-second window that goes quiet after half a second, green only when nothing drops."""
+"""A one-second window that goes quiet after ``SILENCE_TIMEOUT``, green only when nothing drops."""
 
 SHOT_SPACING = 0.1
-"""Sim seconds between landed shots: well inside ``METER``'s silence timeout."""
+"""Sim seconds between landed shots: well inside ``SILENCE_TIMEOUT``."""
 
 
 def land(sim: Simulation, receiver: SimulatedDevice, *sequences: int) -> None:
@@ -32,17 +45,20 @@ def land(sim: Simulation, receiver: SimulatedDevice, *sequences: int) -> None:
         sim.advance(SHOT_SPACING)
 
 
-def yellow_bar(strip: Strip) -> bool:
-    """Part of the strip lit, and only in shades of yellow: the partial-reception bar."""
-    lit = [p for p in strip.pixels if p != 0]
-    yellow = all(p >> 16 == (p >> 8) & 0xFF and p & 0xFF == 0 for p in lit)
-    return 0 < len(lit) < strip.size and yellow
+def yellow_bar_at(strip: Strip, fraction: float) -> bool:
+    """Lit in shades of yellow to *fraction* of the strip, its last pixel dimmed for the edge."""
+    yellow = all(p >> 16 == (p >> 8) & 0xFF and p & 0xFF == 0 for p in strip.pixels if p != 0)
+    return yellow and strip.lit == math.ceil(fraction * strip.size)
+
+
+def meter_lines(out: str) -> list[str]:
+    return [line for line in out.splitlines() if line.startswith("[ir_range")]
 
 
 def test_a_device_that_has_heard_nothing_shows_solid_red(sim):
     receiver = sim.add_device("rx", scene="ir_range_receiver", scene_data=METER)
 
-    sim.advance(0.1)
+    sim.advance(SHOT_SPACING)
 
     assert receiver.strip(Scope.PERSONAL).all_lit(RED)
 
@@ -60,28 +76,25 @@ def test_the_meter_shows_on_every_strip_but_ambient(sim):
 
     land(sim, receiver, 0, 1, 2)
 
-    for scope in (Scope.Global.BUFF, Scope.Global.DEBUFF, Scope.Global.MAIN, Scope.DIRECTIONAL):
-        assert receiver.strip(scope).all_lit(GREEN), scope
+    assert all(receiver.strip(scope).all_lit(GREEN) for scope in METER_STRIPS)
     assert receiver.strip(Scope.AMBIENT).dark
 
 
-def test_dropped_shots_show_a_partial_yellow_bar(sim):
+def test_dropped_shots_show_a_yellow_bar_at_the_share_that_arrived(sim):
     receiver = sim.add_device("rx", scene="ir_range_receiver", scene_data=METER)
 
     land(sim, receiver, 0, 5)  # 1 to 4 dropped: 2 of 6 arrived
 
-    assert yellow_bar(receiver.strip(Scope.PERSONAL))
+    assert yellow_bar_at(receiver.strip(Scope.PERSONAL), 2 / 6)
 
 
 def test_the_bar_grows_as_shots_arrive_unbroken_again(sim):
     receiver = sim.add_device("rx", scene="ir_range_receiver", scene_data=METER)
     land(sim, receiver, 0, 5)  # 2 of 6 arrived
-    before = receiver.strip(Scope.PERSONAL).lit
 
     land(sim, receiver, 6)  # 3 of 7 arrived
 
-    assert yellow_bar(receiver.strip(Scope.PERSONAL))
-    assert receiver.strip(Scope.PERSONAL).lit > before
+    assert yellow_bar_at(receiver.strip(Scope.PERSONAL), 3 / 7)
 
 
 def test_dropped_shots_age_out_of_the_window_back_to_green(sim):
@@ -97,7 +110,7 @@ def test_silence_past_the_timeout_returns_to_solid_red(sim):
     receiver = sim.add_device("rx", scene="ir_range_receiver", scene_data=METER)
     land(sim, receiver, 0, 1, 2)
 
-    sim.advance(0.6)
+    sim.advance(SILENCE_TIMEOUT + SHOT_SPACING)
 
     assert receiver.strip(Scope.PERSONAL).all_lit(RED)
 
@@ -106,7 +119,7 @@ def test_a_short_pause_inside_the_timeout_stays_green(sim):
     receiver = sim.add_device("rx", scene="ir_range_receiver", scene_data=METER)
     land(sim, receiver, 0, 1, 2)
 
-    sim.advance(0.3)
+    sim.advance(SILENCE_TIMEOUT - 2 * SHOT_SPACING)
 
     assert receiver.strip(Scope.PERSONAL).all_lit(GREEN)
 
@@ -119,11 +132,7 @@ def test_the_sequence_number_wraps_from_255_without_reading_as_a_drop(sim):
     assert receiver.strip(Scope.PERSONAL).all_lit(GREEN)
 
 
-def meter_lines(out: str) -> list[str]:
-    return [line for line in out.splitlines() if line.startswith("[ir_range")]
-
-
-def test_a_serial_line_reports_the_state_and_counts_once_a_second(sim, capsys):
+def test_a_serial_line_reports_the_state_and_drops_once_a_second(sim, capsys):
     receiver = sim.add_device("rx", scene="ir_range_receiver", scene_data=METER)
     land(sim, receiver, 0, 1)  # the boot line prints on the first tick, before any shot
     capsys.readouterr()

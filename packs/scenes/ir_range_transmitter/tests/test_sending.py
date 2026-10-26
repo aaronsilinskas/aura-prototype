@@ -14,9 +14,10 @@ import pytest
 from app.simulation import TICK, SimulatedDevice
 from engine.network import LINE
 
-FIVE_HZ = {"irtx_send_rate_hz": 5.0, "irtx_payload_size": 4}
+FIVE_HZ = {"irtx_send_rate_hz": 5.0}
+"""One send every 0.2 s: twelve ticks apart."""
 
-EVERY_TICK = {"irtx_send_rate_hz": 1000.0, "irtx_payload_size": 4}
+EVERY_TICK = {"irtx_send_rate_hz": 1000.0}
 """A rate far above the tick rate, so the transmitter sends on every tick."""
 
 
@@ -79,7 +80,9 @@ def test_each_send_carries_the_configured_payload_size(sim, size):
 
 
 def test_bytes_after_the_sequence_number_carry_the_fixed_padding_marker(sim):
-    transmitter = sim.add_device("tx", scene="ir_range_transmitter", scene_data=FIVE_HZ)
+    transmitter = sim.add_device(
+        "tx", scene="ir_range_transmitter", scene_data={**FIVE_HZ, "irtx_payload_size": 4}
+    )
 
     sim.advance(TICK)
 
