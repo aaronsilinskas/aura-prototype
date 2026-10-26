@@ -153,15 +153,18 @@ def test_a_receiver_subset_surfaces_as_the_best_receiver(sim):
 
 
 def test_a_shot_in_another_wire_frame_codec_is_not_decoded(sim):
-    # Tag speaks the Tag wire-frame; the range receiver decodes only the Aura one.
-    red = sim.add_device("red", scene="tag")
+    # Tag speaks the Tag wire-frame; the range receiver decodes only the Aura
+    # one. Blue, hit by the same shot, shows it did land.
+    red = sim.add_device("red", scene="tag", scene_data=SHOOTER)
+    blue = sim.add_device("blue", scene="tag", scene_data=SHOOTER)
     receiver = sim.add_device("rx", scene="ir_range_receiver")
-    start_game(sim, red)
+    start_game(sim, red, blue)
 
-    red.aim(LINE, at=receiver)
+    red.aim(LINE, at=[blue, receiver])
     red.tap("A")
     sim.advance(0.1)
 
+    assert blue.has_played("scene.hit_start")
     assert receiver.strip(Scope.PERSONAL).all_lit(RED)
 
 

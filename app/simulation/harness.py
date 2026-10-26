@@ -13,6 +13,7 @@ the IR medium, where a test has aimed it: ``red.aim(LINE, at=blue)`` then
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.scene_composition import (
@@ -65,8 +66,22 @@ class _SimulationClock(Timer):
         self.total = self._sim.now
 
 
-_Landing = tuple["SimulatedDevice", tuple[int, ...] | None]
-"""One aimed device, and the indexes of its receivers the aim reaches (``None``: all)."""
+@dataclass(frozen=True)
+class _Reach:
+    """One device an aim reaches, and which of its receivers."""
+
+    device: SimulatedDevice
+    receivers: tuple[int, ...] | None
+    """Indexes of the receivers reached; ``None`` for every one."""
+
+
+@dataclass(frozen=True)
+class _InFlight:
+    """Pulses one emitter wrote, on their way to where it was aimed when they were sent."""
+
+    sender: SimulatedDevice
+    reaches: tuple[_Reach, ...]
+    pulses: list[int]
 
 
 class Simulation:
@@ -82,8 +97,8 @@ class Simulation:
     def __init__(self) -> None:
         self.now = 0.0
         self.devices: list[SimulatedDevice] = []
-        self._aims: dict[tuple[SimulatedDevice, str], tuple[_Landing, ...]] = {}
-        self._in_flight: list[tuple[SimulatedDevice, tuple[_Landing, ...], list[int]]] = []
+        self._aims: dict[tuple[SimulatedDevice, str], tuple[_Reach, ...]] = {}
+        self._in_flight: list[_InFlight] = []
 
     def add_device(
         self, name: str, scene: str, scene_data: dict[str, object] | None = None
@@ -114,36 +129,36 @@ class Simulation:
         self,
         sender: SimulatedDevice,
         emitter: str,
-        targets: Sequence[SimulatedDevice],
+        devices: Sequence[SimulatedDevice],
         receivers: Sequence[int] | None,
     ) -> None:
         if emitter not in sender._sim_hw.ir_emitters:
             raise ValueError(f"{sender.name} has no {emitter!r} emitter wired")
         reach = None if receivers is None else tuple(receivers)
-        landings: list[_Landing] = []
-        for target in dict.fromkeys(targets):
-            if target is sender:
+        reaches: list[_Reach] = []
+        for device in dict.fromkeys(devices):
+            if device is sender:
                 raise ValueError(f"{sender.name} cannot aim at itself")
-            if target._sim is not self:
-                raise ValueError(f"{target.name} is in another Simulation")
-            count = target._sim_hw.ir_receiver_count
+            if device._sim is not self:
+                raise ValueError(f"{device.name} is in another Simulation")
+            count = device._sim_hw.ir_receiver_count
             if reach is not None and any(not 0 <= i < count for i in reach):
-                raise ValueError(f"{target.name} has receivers 0 to {count - 1}, not {reach}")
-            landings.append((target, reach))
-        self._aims[(sender, emitter)] = tuple(landings)
+                raise ValueError(f"{device.name} has receivers 0 to {count - 1}, not {reach}")
+            reaches.append(_Reach(device, reach))
+        self._aims[(sender, emitter)] = tuple(reaches)
 
     def _carry_ir(self, sender: SimulatedDevice, emitter: str, pulses: list[int]) -> None:
         """Put what *sender*'s *emitter* wrote into the medium, toward its aim as it stands now."""
-        landings = self._aims.get((sender, emitter), ())
-        if landings:
-            self._in_flight.append((sender, landings, pulses))
+        reaches = self._aims.get((sender, emitter), ())
+        if reaches:
+            self._in_flight.append(_InFlight(sender, reaches, pulses))
 
     def _land_in_flight_ir(self) -> None:
         in_flight, self._in_flight = self._in_flight, []
-        in_flight.sort(key=lambda shot: self.devices.index(shot[0]))
-        for _sender, landings, pulses in in_flight:
-            for target, receivers in landings:
-                target._sim_hw.land_ir(pulses, receivers)
+        in_flight.sort(key=lambda shot: self.devices.index(shot.sender))
+        for shot in in_flight:
+            for reach in shot.reaches:
+                reach.device._sim_hw.land_ir(shot.pulses, reach.receivers)
 
 
 class SimulatedDevice:
@@ -219,18 +234,21 @@ class SimulatedDevice:
         from the next tick on; pulses already in the IR medium still land
         where they were aimed. A new device starts aimed at nobody.
 
-        Raises ``ValueError`` for an emitter the device does not wire, a
-        receiver index the target lacks, aiming at this device itself, or at
-        a device from another ``Simulation``. A target whose scene speaks
-        another wire-frame codec is allowed: its decoder fails on the shot.
+        A device whose scene speaks another wire-frame codec can be aimed at:
+        its decoder fails on the shot.
+
+        Raises:
+            ValueError: If this device does not wire *emitter*, *at* includes
+                this device or one from another ``Simulation``, or
+                *receivers* names an index a device lacks.
         """
         if at is None:
-            targets: Sequence[SimulatedDevice] = ()
+            devices: Sequence[SimulatedDevice] = ()
         elif isinstance(at, SimulatedDevice):
-            targets = (at,)
+            devices = (at,)
         else:
-            targets = at
-        self._sim._aim(self, emitter, targets, receivers)
+            devices = at
+        self._sim._aim(self, emitter, devices, receivers)
 
     def receive_ir(self, payload: bytes) -> None:
         """Land a clean shot carrying *payload* from a sender outside the ``Simulation``.

@@ -48,11 +48,10 @@ def test_a_receiver_the_transmitter_turns_away_from_returns_to_solid_red(sim):
 
 
 def test_the_meter_ignores_which_receiver_heard_the_shot(sim):
-    # Restored from #981: each shot lands on a different one of the device's receivers.
     transmitter = sim.add_device("tx", scene="ir_range_transmitter", scene_data=TEN_HZ)
     receiver = sim.add_device("rx", scene="ir_range_receiver", scene_data=METER)
 
-    for index in (0, 1, 2, 0, 1):
+    for index in (0, 1, 2, 0, 1):  # each shot heard by a different receiver
         transmitter.aim(LINE, at=receiver, receivers=[index])
         sim.advance(0.1)
 
