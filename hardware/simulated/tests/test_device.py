@@ -87,7 +87,7 @@ def test_a_strip_with_any_lit_pixel_off_the_color_does_not_show_shades_of_it(pix
     assert not Strip(pixels).shades_of(color)
 
 
-def test_a_dark_strip_shows_no_other_color():
+def test_a_dark_strip_counts_as_shades_of_any_color():
     assert Strip([0, 0, 0]).shades_of(0x00FF00)
 
 

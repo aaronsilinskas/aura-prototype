@@ -55,7 +55,7 @@ from hardware.shared.ir_transport import (
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
 
-__all__ = ["DEFAULT_SWAY", "Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip"]
+__all__ = ["DEFAULT_SWAY_STRENGTH", "Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip"]
 
 _DEBOUNCE_INTERVAL = 0.05
 _PIN_SETTLE = 2 * _DEBOUNCE_INTERVAL
@@ -66,7 +66,7 @@ release registers and tests never need to know the debounce interval.
 """
 
 _AT_REST = (0.0, 0.0, AccelerationData.GRAVITY)
-DEFAULT_SWAY = 4.0
+DEFAULT_SWAY_STRENGTH = 4.0
 """``move``'s sway strength in m/s² unless given one: well above any sensible motion threshold."""
 _SWAY_HZ = 2.0
 """``move``'s sway frequency on x: a hand's pace."""
@@ -96,14 +96,14 @@ def _channels(pixel: int) -> tuple[int, int, int]:
 
 
 def _is_shade(pixel: int, color: int) -> bool:
-    """Whether *pixel* is *color* scaled toward black, give or take a step of rounding.
+    """Whether lit *pixel* is *color* scaled toward black, give or take a step of rounding.
 
     A channel *color* leaves dark must stay dark, so rounding never passes off
     another hue as a shade.
     """
     shown, wanted = _channels(pixel), _channels(color)
     peak = max(range(3), key=lambda c: wanted[c])
-    if wanted[peak] == 0 or shown[peak] > wanted[peak]:
+    if shown[peak] == 0 or shown[peak] > wanted[peak]:
         return False
     scale = shown[peak] / wanted[peak]
     return all(
@@ -279,7 +279,7 @@ class _SimulatedAccelerometer:
     def __init__(self, now: Callable[[], float]) -> None:
         self._now = now
         self._held = _AT_REST
-        self._sway_strength = DEFAULT_SWAY
+        self._sway_strength = DEFAULT_SWAY_STRENGTH
         self._sway_from: float | None = None
         """When the sway started, or ``None`` while the device is not moving."""
 
@@ -416,7 +416,7 @@ class SimulatedHardware:
     def accelerate(self, x: float, y: float, z: float) -> None:
         self._require_accelerometer().hold(x, y, z)
 
-    def move(self, strength: float = DEFAULT_SWAY) -> None:
+    def move(self, strength: float = DEFAULT_SWAY_STRENGTH) -> None:
         """Sway *strength* m/s² either side of the held reading on x."""
         self._require_accelerometer().sway(strength)
 
