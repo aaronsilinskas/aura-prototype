@@ -8,22 +8,13 @@ played, haptics, strip pixels. A test that depends on a tunable pins it with
 
 from __future__ import annotations
 
-import pytest
-
 from app.simulation import SimulatedDevice, Simulation, Strip
 from effects.effect import HapticPattern
 from engine.state import Scope
-from packs.scenes.tag.tests.helpers import shots, start_game
-
-AMMO_AMBER = 0xFFBF00
+from packs.scenes.tag.tests.helpers import AMMO_AMBER, shots, start_game
 
 TWO_ROUNDS = {"tag_max_ammo": 2, "tag_shot_cooldown": 0.3, "tag_reload_duration": 1.0}
 """A short magazine and reload, so running dry and reloading stay quick."""
-
-
-@pytest.fixture()
-def sim() -> Simulation:
-    return Simulation()
 
 
 # ---------------------------------------------------------------------------

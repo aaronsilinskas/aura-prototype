@@ -1,42 +1,22 @@
 """Booting into Tag and starting a game, played on simulated devices.
 
 A device boots into Ready, a button press starts the countdown, and the
-countdown runs into Playing. A test that depends on a tunable pins it with
-``scene_data``.
+countdown runs into Playing.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from app.simulation import Simulation, Strip
+from app.simulation import TICK
 from effects.effect import HapticPattern
 from engine.state import Scope
-
-AMMO_AMBER = 0xFFBF00
-GREEN = 0x00FF00
-
-EVERY_STRIP = [
-    Scope.Global.BUFF,
-    Scope.Global.DEBUFF,
-    Scope.Global.MAIN,
-    Scope.PERSONAL,
-    Scope.DIRECTIONAL,
-    Scope.AMBIENT,
-]
+from packs.scenes.tag.tests.helpers import AMMO_AMBER, EVERY_STRIP, GREEN, sweeping_red
 
 BAR_FREE_STRIPS = [Scope.Global.DEBUFF, Scope.Global.MAIN, Scope.DIRECTIONAL, Scope.AMBIENT]
 """The strips Playing shows no bar on."""
 
-
-@pytest.fixture()
-def sim() -> Simulation:
-    return Simulation()
-
-
-def sweeping_red(strip: Strip) -> bool:
-    """Part of the strip lit, and only in red: the Ready laser sweep."""
-    return 0 < strip.lit < strip.size and all(p & 0x00FFFF == 0 for p in strip.pixels)
+ONE_PULSE = {"tag_warning_pulse_duration": 0.6}
 
 
 def peaks_before_go(clips: list[str]) -> int:
@@ -51,12 +31,12 @@ def peaks_before_go(clips: list[str]) -> int:
 def test_a_booted_device_sweeps_red_across_every_strip(sim):
     player = sim.add_device("red", scene="tag")
 
-    sim.advance(0.5)
+    sim.advance(TICK)
 
     assert all(sweeping_red(player.strip(scope)) for scope in EVERY_STRIP)
 
 
-def test_a_booted_device_plays_the_ready_shots_once(sim):
+def test_an_idle_device_plays_the_ready_shots_only_once(sim):
     player = sim.add_device("red", scene="tag")
 
     sim.advance(10.0)
@@ -66,11 +46,10 @@ def test_a_booted_device_plays_the_ready_shots_once(sim):
 
 @pytest.mark.parametrize("button", ["A", "B"])
 def test_pressing_either_button_in_ready_starts_the_countdown(sim, button):
-    player = sim.add_device("red", scene="tag", scene_data={"tag_warning_pulse_duration": 0.6})
-    sim.advance(0.5)
+    player = sim.add_device("red", scene="tag", scene_data=ONE_PULSE)
 
     player.tap(button)
-    sim.advance(0.6)
+    sim.advance(ONE_PULSE["tag_warning_pulse_duration"])
 
     assert player.has_played("scene.warning_pulse_peak")
 
@@ -81,19 +60,19 @@ def test_pressing_either_button_in_ready_starts_the_countdown(sim, button):
 
 
 def test_each_countdown_pulse_clicks_the_haptic(sim):
-    player = sim.add_device("red", scene="tag", scene_data={"tag_warning_pulse_duration": 0.6})
+    player = sim.add_device("red", scene="tag", scene_data=ONE_PULSE)
 
     player.tap("A")
-    sim.advance(0.6)
+    sim.advance(ONE_PULSE["tag_warning_pulse_duration"])
 
     assert [b.pattern for b in player.buzzed] == [(HapticPattern.SHARP_CLICK,)]
 
 
 def test_the_countdown_pulses_every_strip(sim):
-    player = sim.add_device("red", scene="tag", scene_data={"tag_warning_pulse_duration": 0.6})
+    player = sim.add_device("red", scene="tag", scene_data=ONE_PULSE)
 
     player.tap("A")
-    sim.advance(0.6)
+    sim.advance(ONE_PULSE["tag_warning_pulse_duration"])
 
     assert all(not player.strip(scope).dark for scope in EVERY_STRIP)
 
@@ -107,6 +86,19 @@ def test_the_countdown_runs_its_pulse_count_then_the_game_starts(sim, count):
     sim.run_until(lambda: player.has_played("scene.go_start"))
 
     assert peaks_before_go([p.clip for p in player.played]) == count
+
+
+def test_pressing_during_the_countdown_does_not_restart_it(sim):
+    countdown = {"tag_warning_pulse_count": 3, "tag_warning_pulse_duration": 0.4}
+    player = sim.add_device("red", scene="tag", scene_data=countdown)
+    player.tap("A")
+    sim.run_until(lambda: player.has_played("scene.warning_pulse_peak"))
+
+    player.tap("A")
+    player.tap("B")
+    sim.run_until(lambda: player.has_played("scene.go_start"))
+
+    assert peaks_before_go([p.clip for p in player.played]) == 3
 
 
 # ---------------------------------------------------------------------------
