@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from engine.engine import GameEngine
+from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
 from engine.phase import (
     InPhaseRule,
@@ -86,6 +86,19 @@ class _TransitionsOnEnterRule(PhaseRule):
         pass
 
 
+class _QueuesOneTickRule(GameRule):
+    """Plain rule that queues one more ``_TickEvent`` the first time it hears one."""
+
+    def __init__(self) -> None:
+        self._queued = False
+        self.on(_TickEvent, self._tick)
+
+    def _tick(self, event: _TickEvent, state: GameState) -> None:
+        if not self._queued:
+            self._queued = True
+            state.queue_event(_TickEvent())
+
+
 class _InPhaseEmitter(InPhaseRule):
     """InPhaseRule that emits an ``in:`` effect each tick its phase is active."""
 
@@ -103,14 +116,15 @@ class _InPhaseEmitter(InPhaseRule):
         state.effect_controls.add_effect(Scope.PERSONAL, "in:" + self._label, {})
 
 
-def _run(rules: list, ticks: int) -> list[str]:
+def _run(rules: list, ticks: int, events_per_tick: int = 1) -> list[str]:
     """Run *rules* through *ticks* engine updates; return emitted effect names in order."""
     spy = SpyEffectControls()
     engine = GameEngine(effect_controls=spy)
     state = engine.create_state(SceneControls())
     engine.set_rules(rules)
     for _ in range(ticks):
-        state.queue_event(_TickEvent())
+        for _ in range(events_per_tick):
+            state.queue_event(_TickEvent())
         engine.update(state)
     return [name for _, name, _ in spy.add_effect_calls]
 
@@ -145,7 +159,7 @@ def test_enter_sets_phase_and_phase_start_and_raises_the_entry_flag() -> None:
     machine = PhaseMachine(_PHASE_A)
     machine.take_enter_pending()  # consume the initial flag
 
-    machine.enter(_PHASE_B, now=4.0)
+    machine.enter(_PHASE_B, now=4.0, dispatch=1)
 
     assert machine.phase is _PHASE_B
     assert machine.phase_start == 4.0
@@ -154,7 +168,7 @@ def test_enter_sets_phase_and_phase_start_and_raises_the_entry_flag() -> None:
 
 def test_elapsed_reports_the_gap_since_entry() -> None:
     machine = PhaseMachine(_PHASE_A)
-    machine.enter(_PHASE_B, now=10.0)
+    machine.enter(_PHASE_B, now=10.0, dispatch=1)
 
     assert machine.elapsed(now=13.5) == pytest.approx(3.5)
 
@@ -217,9 +231,8 @@ def test_on_exit_fires_on_transition_and_the_next_phase_enters() -> None:
     names = _run([leaving, arriving], ticks=2)
 
     # tick1: A enters and ticks, then transitions out: A exits and B enters in
-    # the same call; B, registered after A, then ticks in that same tick.
-    # tick2: only B is active and ticks again.
-    assert names == ["enter:a", "tick:a", "exit:a", "enter:b", "tick:b", "tick:b"]
+    # the same call. tick2: only B is active and ticks.
+    assert names == ["enter:a", "tick:a", "exit:a", "enter:b", "tick:b"]
 
 
 def test_handler_does_not_fire_after_its_phase_is_left() -> None:
@@ -240,7 +253,60 @@ def test_an_owner_registered_before_the_transitioning_rule_enters_during_the_tra
 
     names = _run([arriving, leaving], ticks=1)
 
+    assert names[-2:] == ["exit:a", "enter:b"]
+
+
+@pytest.mark.parametrize("owner_dispatches_first", [True, False])
+def test_an_entered_phases_handler_does_not_see_the_event_that_entered_it(
+    owner_dispatches_first: bool,
+) -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+    arriving = _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
+    rules = [arriving, leaving] if owner_dispatches_first else [leaving, arriving]
+
+    names = _run(rules, ticks=1)
+
     assert names == ["enter:a", "tick:a", "exit:a", "enter:b"]
+
+
+@pytest.mark.parametrize("bystander_dispatches_first", [True, False])
+def test_an_entered_phases_in_phase_rule_does_not_see_the_event_that_entered_it(
+    bystander_dispatches_first: bool,
+) -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    bystander = _InPhaseEmitter(_PHASE_B, "bystander", phase_slot=slot)
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+    # Built only to register B's owner with the slot; transition_to needs one.
+    _owner = _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
+    rules = [bystander, leaving] if bystander_dispatches_first else [leaving, bystander]
+
+    names = _run(rules, ticks=1)
+
+    assert "enter:b" in names
+    assert "in:bystander" not in names
+
+
+def test_an_entered_phases_handlers_see_the_next_event_queued_in_the_same_tick() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+    arriving = _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
+    bystander = _InPhaseEmitter(_PHASE_B, "bystander", phase_slot=slot)
+
+    names = _run([leaving, arriving, bystander], ticks=1, events_per_tick=2)
+
+    assert names == ["enter:a", "tick:a", "exit:a", "enter:b", "tick:b", "in:bystander"]
+
+
+def test_an_entered_phases_handlers_see_an_event_queued_during_the_entering_dispatch() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    queuer = _QueuesOneTickRule()
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+    arriving = _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
+
+    names = _run([queuer, leaving, arriving], ticks=1)
+
+    assert names == ["enter:a", "tick:a", "exit:a", "enter:b", "tick:b"]
 
 
 def test_transitioning_to_a_phase_no_phase_rule_owns_raises_naming_the_phase() -> None:

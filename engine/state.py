@@ -421,6 +421,7 @@ class GameState:
 
     __slots__ = (
         "_data",
+        "_dispatch_count",
         "_elapsed",
         "_len",
         "_queue",
@@ -448,6 +449,7 @@ class GameState:
         self._data: dict[str, object] = data if data is not None else {}
         self._elapsed: float = 0.0
         self._total: float = 0.0
+        self._dispatch_count: int = 0
 
     @property
     def elapsed(self) -> float:
@@ -517,6 +519,15 @@ class GameState:
         return key in self._data
 
     @property
+    def dispatch_count(self) -> int:
+        """How many events the engine has dispatched, counting the one in flight.
+
+        Bumped once per event, so the reused per-frame ``Sensors`` event still
+        counts as a new dispatch each frame.
+        """
+        return self._dispatch_count
+
+    @property
     def event_count(self) -> int:
         """Number of events currently queued (the queue's fill level)."""
         return self._len
@@ -570,6 +581,10 @@ class GameState:
             queue[i] = None
             i += 1
         self._len = 0
+
+    def _begin_dispatch(self) -> None:
+        """Count the event about to be dispatched. Called only by GameEngine."""
+        self._dispatch_count += 1
 
     def _update_time(self, elapsed: float, total: float) -> None:
         """Refresh time values from the engine's timer. Called only by GameEngine."""

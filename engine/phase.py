@@ -24,6 +24,12 @@ A phase starts in the tick it is entered, whatever order the scene's rules
 run in: :meth:`PhaseRule.transition_to` runs the entering phase's ``on_enter``
 itself, finding its owner through the :class:`PhaseSlot`.  The initial phase
 has no transition, so its ``on_enter`` runs on its owner's first dispatch.
+
+A newly entered phase's handlers, on both :class:`PhaseRule` and
+:class:`InPhaseRule`, first hear the event *after* the one that entered it,
+again whatever the rule order.  The engine counts every event it dispatches
+(:attr:`GameState.dispatch_count`) and the machine records the count at
+entry, so this holds even for the reused per-frame ``Sensors`` event.
 """
 
 from __future__ import annotations
@@ -70,23 +76,29 @@ class PhaseKey:
 class PhaseMachine:
     """Mutable phase mechanics cached in :class:`GameState`.
 
-    Holds only the current :class:`PhaseKey`, ``phase_start``, and private
+    Holds only the current :class:`PhaseKey`, ``phase_start``, the
+    :attr:`GameState.dispatch_count` the phase was entered on, and private
     flags marking an ``on_enter`` as pending or running.  It owns no effects
     and no receipts — :meth:`enter` has no side effects beyond those fields,
     so it can never leak an effect across a transition.  Lifecycle teardown
     belongs to the owning :class:`PhaseRule`'s ``on_exit``.
     """
 
-    __slots__ = ("_enter_pending", "_entering", "phase", "phase_start")
+    __slots__ = ("_enter_pending", "_entering", "_entry_dispatch", "phase", "phase_start")
 
     def __init__(self, initial_phase: PhaseKey) -> None:
         self.phase = initial_phase
         self.phase_start: float = 0.0
+        # No event is dispatched as 0, so the initial phase hears the first one.
+        self._entry_dispatch = 0
         self._enter_pending = True
         self._entering = False
 
-    def enter(self, phase: PhaseKey, now: float) -> None:
-        """Atomically set ``phase`` and ``phase_start`` and mark ``on_enter`` pending.
+    def enter(self, phase: PhaseKey, now: float, dispatch: int) -> None:
+        """Atomically move to *phase* at *now* on *dispatch* and mark ``on_enter`` pending.
+
+        *dispatch* is the :attr:`GameState.dispatch_count` of the event being
+        dispatched at entry; the phase's handlers skip that event.
 
         Has no other side effects: it never stops effects or clears receipts,
         and it does not run ``on_enter`` itself — :meth:`PhaseRule.transition_to`
@@ -94,6 +106,7 @@ class PhaseMachine:
         """
         self.phase = phase
         self.phase_start = now
+        self._entry_dispatch = dispatch
         self._enter_pending = True
 
     def elapsed(self, now: float) -> float:
@@ -168,7 +181,8 @@ class _PhaseGuardedRule(GameRule):
     Overrides :meth:`on` to stash the user handler in a private per-event-type
     map and subscribe a single private dispatcher.  The dispatcher fetches the
     machine through :meth:`_machine`, returns immediately unless the machine is
-    in this rule's phase, then defers to subclass behaviour.
+    in this rule's phase and the event is not the one dispatched when that
+    phase was entered, then defers to subclass behaviour.
 
     Takes the scene's one :class:`PhaseSlot` for the machine it guards, through
     which it reaches the shared :class:`PhaseMachine`.
@@ -195,7 +209,7 @@ class _PhaseGuardedRule(GameRule):
 
     def _phase_dispatch(self, event: Event, state: GameState) -> None:
         machine = self._machine(state)
-        if machine.phase != self.phase:
+        if machine.phase != self.phase or machine._entry_dispatch == state.dispatch_count:
             return
         self._before_handler(machine, state)
         handler = self._phase_handlers.get(type(event))
@@ -214,8 +228,9 @@ class PhaseRule(_PhaseGuardedRule):
 
     ``on_enter`` runs once per entry: inside the :meth:`transition_to` that
     enters the phase or, for the scene's initial phase, on this rule's first
-    dispatch, just before its handler.  The handler fires every tick while the
-    phase is active.  ``on_exit`` runs when a handler calls
+    dispatch, just before its handler.  The handlers fire for every event while
+    the phase is active, starting with the event after the one that entered
+    it.  ``on_exit`` runs when a handler calls
     :meth:`transition_to`.  Exactly one ``PhaseRule`` may own a given
     phase of a :class:`PhaseSlot`: each registers itself with its slot when
     constructed, and constructing a second owner raises ``ValueError``.
@@ -245,7 +260,7 @@ class PhaseRule(_PhaseGuardedRule):
         if owner is None:
             raise ValueError(f"Phase {next_phase!r} of {self._phase_slot.key!r} has no owner")
         self.on_exit(state)
-        machine.enter(next_phase, state.total)
+        machine.enter(next_phase, state.total, state.dispatch_count)
         owner._run_pending_enter(machine, state)
 
     def on_enter(self, state: GameState) -> None:
@@ -273,7 +288,8 @@ class InPhaseRule(_PhaseGuardedRule):
     Shares the phase-gated ``on`` override and forwarding with
     :class:`PhaseRule` but has no entry/exit lifecycle: it never runs a
     pending ``on_enter`` and has no ``on_enter`` / ``on_exit`` /
-    ``transition_to``.  Any number of ``InPhaseRule``s may share a phase, and
-    an ``InPhaseRule`` may share a phase with that phase's owning
-    :class:`PhaseRule`.
+    ``transition_to``.  Like a :class:`PhaseRule`, its handlers start with the
+    event after the one that entered its phase.  Any number of
+    ``InPhaseRule``s may share a phase, and an ``InPhaseRule`` may share a
+    phase with that phase's owning :class:`PhaseRule`.
     """
