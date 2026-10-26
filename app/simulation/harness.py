@@ -4,11 +4,16 @@ Boots each device's scene through ``build_scene_runtime`` and drives it with
 the same ``build_scene_tick`` body the board runs. It lives under ``app/``
 because booting a scene needs the composition layer, which the hardware import
 contract keeps out of ``hardware/``.
+
+A device's IR reaches its own receivers at once and other devices only through
+the IR medium, where a test has aimed it: ``red.aim(LINE, at=blue)`` then
+``red.tap("A")``. ``receive_ir`` stands in for a sender outside the simulation.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.scene_composition import (
@@ -61,12 +66,39 @@ class _SimulationClock(Timer):
         self.total = self._sim.now
 
 
+@dataclass(frozen=True)
+class _Reach:
+    """One device an aim reaches, and which of its receivers."""
+
+    device: SimulatedDevice
+    receivers: tuple[int, ...] | None
+    """Indexes of the receivers reached; ``None`` for every one."""
+
+
+@dataclass(frozen=True)
+class _InFlight:
+    """Pulses one emitter wrote, on their way to where it was aimed when they were sent."""
+
+    sender: SimulatedDevice
+    reaches: tuple[_Reach, ...]
+    pulses: list[int]
+
+
 class Simulation:
-    """One shared clock and every simulated device on it."""
+    """One shared clock, every simulated device on it, and the IR medium between them.
+
+    The IR medium holds each device's aims and the pulses in flight. Pulses an
+    emitter writes during one tick land on every device it is aimed at at the
+    start of the next, before any device ticks, so the order devices were
+    added in never decides who hears what. Shots from several senders on one
+    tick queue in sender add order; nothing collides.
+    """
 
     def __init__(self) -> None:
         self.now = 0.0
         self.devices: list[SimulatedDevice] = []
+        self._aims: dict[tuple[SimulatedDevice, str], tuple[_Reach, ...]] = {}
+        self._in_flight: list[_InFlight] = []
 
     def add_device(
         self, name: str, scene: str, scene_data: dict[str, object] | None = None
@@ -81,6 +113,7 @@ class Simulation:
         end = self.now + seconds - TICK / 2
         while self.now < end:
             self.now += TICK
+            self._land_in_flight_ir()
             for device in self.devices:
                 device._tick()
 
@@ -92,6 +125,41 @@ class Simulation:
                 raise AssertionError(f"condition not met within {timeout}s of sim time")
             self.advance(TICK)
 
+    def _aim(
+        self,
+        sender: SimulatedDevice,
+        emitter: str,
+        devices: Sequence[SimulatedDevice],
+        receivers: Sequence[int] | None,
+    ) -> None:
+        if emitter not in sender._sim_hw.ir_emitters:
+            raise ValueError(f"{sender.name} has no {emitter!r} emitter wired")
+        reach = None if receivers is None else tuple(receivers)
+        reaches: list[_Reach] = []
+        for device in dict.fromkeys(devices):
+            if device is sender:
+                raise ValueError(f"{sender.name} cannot aim at itself")
+            if device._sim is not self:
+                raise ValueError(f"{device.name} is in another Simulation")
+            count = device._sim_hw.ir_receiver_count
+            if reach is not None and any(not 0 <= i < count for i in reach):
+                raise ValueError(f"{device.name} has receivers 0 to {count - 1}, not {reach}")
+            reaches.append(_Reach(device, reach))
+        self._aims[(sender, emitter)] = tuple(reaches)
+
+    def _carry_ir(self, sender: SimulatedDevice, emitter: str, pulses: list[int]) -> None:
+        """Put what *sender*'s *emitter* wrote into the medium, toward its aim as it stands now."""
+        reaches = self._aims.get((sender, emitter), ())
+        if reaches:
+            self._in_flight.append(_InFlight(sender, reaches, pulses))
+
+    def _land_in_flight_ir(self) -> None:
+        in_flight, self._in_flight = self._in_flight, []
+        in_flight.sort(key=lambda shot: self.devices.index(shot.sender))
+        for shot in in_flight:
+            for reach in shot.reaches:
+                reach.device._sim_hw.land_ir(shot.pulses, reach.receivers)
+
 
 class SimulatedDevice:
     """A simulated device running a real scene: the handle a test talks to."""
@@ -101,7 +169,11 @@ class SimulatedDevice:
     ) -> None:
         self.name = name
         self._sim = sim
-        self._sim_hw = SimulatedHardware(now=lambda: sim.now, config=_simulated_device_config())
+        self._sim_hw = SimulatedHardware(
+            now=lambda: sim.now,
+            config=_simulated_device_config(),
+            ir_sink=lambda emitter, pulses: sim._carry_ir(self, emitter, pulses),
+        )
         hw = self._sim_hw.hw
         registry = scan_boot_scene_registry(hw.storage)
         if scene_data:
@@ -148,11 +220,42 @@ class SimulatedDevice:
         """Back to rest, with gravity on z, and stop any ``move``."""
         self._sim_hw.hold_still()
 
-    def receive_ir(self, payload: bytes) -> None:
-        """Land a clean shot carrying *payload* over the scene's wire-frame codec.
+    def aim(
+        self,
+        emitter: str,
+        *,
+        at: SimulatedDevice | Sequence[SimulatedDevice] | None,
+        receivers: Sequence[int] | None = None,
+    ) -> None:
+        """Aim *emitter* at a device, at several, or (``None``) at nobody.
 
-        Decoded on the next tick, one shot per tick, unless the device's own
-        send masks it.
+        The aim holds until replaced, and reaches the receivers at indexes
+        *receivers* on each device, or every one. It applies to pulses sent
+        from the next tick on; pulses already in the IR medium still land
+        where they were aimed. A new device starts aimed at nobody.
+
+        A device whose scene speaks another wire-frame codec can be aimed at:
+        its decoder fails on the shot.
+
+        Raises:
+            ValueError: If this device does not wire *emitter*, *at* includes
+                this device or one from another ``Simulation``, or
+                *receivers* names an index a device lacks.
+        """
+        if at is None:
+            devices: Sequence[SimulatedDevice] = ()
+        elif isinstance(at, SimulatedDevice):
+            devices = (at,)
+        else:
+            devices = at
+        self._sim._aim(self, emitter, devices, receivers)
+
+    def receive_ir(self, payload: bytes) -> None:
+        """Land a clean shot carrying *payload* from a sender outside the ``Simulation``.
+
+        Encoded with the scene's wire-frame codec and landed on every receiver
+        at once, not through the IR medium. Decoded on the next tick, one shot
+        per tick, unless the device's own send masks it.
         """
         self._sim_hw.receive_ir(payload)
 
@@ -169,6 +272,11 @@ class SimulatedDevice:
     @property
     def buzzed(self) -> list[Buzzed]:
         return self._sim_hw.buzzed
+
+    @property
+    def best_receiver(self) -> int | None:
+        """Index of the IR receiver that decoded the latest shot best; ``None`` before any."""
+        return self._sim_hw.best_receiver
 
     def strip(self, scope: ScopeValue) -> Strip:
         return self._sim_hw.strip(scope)
