@@ -22,10 +22,22 @@ TICK = 1 / 60
 """Fixed simulation step. Every device in a ``Simulation`` ticks on it in lockstep."""
 
 
-class _FixedStepClock(Timer):
+class _SimulationClock(Timer):
+    """A device's engine clock, read straight off the ``Simulation``'s ``now``.
+
+    Every device and its recordings share one timeline, even a device added
+    after the simulation has already advanced.
+    """
+
+    __slots__ = ("_sim",)
+
+    def __init__(self, sim: Simulation) -> None:
+        super().__init__()
+        self._sim = sim
+
     def update(self) -> None:
         self.elapsed = TICK
-        self.total += TICK
+        self.total = self._sim.now
 
 
 class Simulation:
@@ -73,7 +85,7 @@ class SimulatedDevice:
         if scene_data:
             registry.override_initial_data(scene, scene_data)
         self._runtime = build_scene_runtime(
-            hw, scene, scene_registry=registry, timer=_FixedStepClock()
+            hw, scene, scene_registry=registry, timer=_SimulationClock(sim)
         )
         self._scene_tick = build_scene_tick(hw, self._runtime)
         self._ir_inbox: list[NetworkEvents.IRReceived] = []
@@ -91,11 +103,9 @@ class SimulatedDevice:
     def release(self, button: str) -> None:
         self._sim_hw.release(button)
 
-    def receive_ir(self, payload: bytes, signal_strength: int = 100, error_margin: int = 0) -> None:
-        """Deliver an IR packet on the next tick, as if the receiver decoded it."""
-        self._ir_inbox.append(
-            NetworkEvents.IRReceived(payload, signal_strength, error_margin, best_receiver=None)
-        )
+    def receive_ir(self, payload: bytes) -> None:
+        """Deliver a clean, full-strength IR packet on the next tick, as if decoded."""
+        self._ir_inbox.append(NetworkEvents.IRReceived(payload, 100, 0, best_receiver=None))
 
     # -- queries ------------------------------------------------------------
 
@@ -118,7 +128,10 @@ class SimulatedDevice:
         return any(p.clip == clip for p in self.played)
 
     def forget(self) -> None:
-        """Drop everything recorded so far, so later asserts see only what follows."""
+        """Drop everything recorded so far, so later asserts see only what follows.
+
+        Strips keep showing their current frame; only the event records clear.
+        """
         self._sim_hw.forget()
 
     # -- loop ---------------------------------------------------------------

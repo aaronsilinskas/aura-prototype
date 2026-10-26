@@ -25,7 +25,7 @@ from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.voice_pool import VoicePool, VoiceSink
 
-__all__ = ["PIXELS_PER_SCOPE", "Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip"]
+__all__ = ["Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip"]
 
 PIXELS_PER_SCOPE = 10
 
@@ -39,6 +39,7 @@ _LEAF_SCOPES = [
 ]
 
 _BUTTONS: tuple[str, ...] = ("A", "B")
+_VOICES = 2  # matches the example PropMaker device config
 _DEBOUNCE_INTERVAL = 0.05
 _PIN_SETTLE = 2 * _DEBOUNCE_INTERVAL
 """How long a scripted pin level holds before the next change may start.
@@ -195,7 +196,7 @@ class SimulatedHardware:
     tick, before the tick reads the buttons.
     """
 
-    def __init__(self, now: Callable[[], float], voices: int = 2) -> None:
+    def __init__(self, now: Callable[[], float]) -> None:
         self.now = now
         self.ir_sent: list[IrSent] = []
         self.played: list[Played] = []
@@ -208,7 +209,7 @@ class SimulatedHardware:
         self.hw = DeviceHardware(
             outputs=[
                 self._pixels,
-                _SimulatedAudio(self, audio_registry, voices),
+                _SimulatedAudio(self, audio_registry, _VOICES),
                 _RecordingHaptic(self),
             ],
             buttons=DebouncedButtons(
@@ -225,16 +226,13 @@ class SimulatedHardware:
         )
 
     def tap(self, button: str) -> None:
-        """Press and release *button*, each held long enough to register."""
         self.hold(button)
         self.release(button)
 
     def hold(self, button: str) -> None:
-        """Press *button* and keep it down."""
         self._schedule(button, True)
 
     def release(self, button: str) -> None:
-        """Let go of *button*."""
         self._schedule(button, False)
 
     def settle_pins(self) -> None:
@@ -249,7 +247,6 @@ class SimulatedHardware:
         return Strip(self._pixels.frames.get(key, [0] * PIXELS_PER_SCOPE))
 
     def forget(self) -> None:
-        """Drop everything recorded so far; strips keep their current frame."""
         self.ir_sent.clear()
         self.played.clear()
         self.buzzed.clear()

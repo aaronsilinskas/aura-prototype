@@ -94,18 +94,9 @@ ignore_imports = [
 
 [[tool.importlinter.contracts]]
 name = "shipped code must not import test-only simulation code"
-type = "forbidden"
-source_modules = [
-    "effects",
-    "engine",
-    "magic",
-    "packs",
-    "hardware.circuitpython",
-    "hardware.shared",
-    "app.scene_composition",
-    "app.scene_runtime",
-]
-forbidden_modules = ["app.simulation", "hardware.simulated"]
+type = "protected"
+protected_modules = ["app.simulation", "hardware.simulated"]
 # Tests are not shipped (scripts/deploy.py excludes every tests/ directory), so a
-# scene's tests may play it on the Simulation test harness.
-ignore_imports = ["**.tests.** -> app.simulation"]
+# scene's tests may play it on the Simulation test harness, which itself builds
+# on the Simulated device. Nothing else may import either.
+allowed_importers = ["**.tests", "app.simulation"]

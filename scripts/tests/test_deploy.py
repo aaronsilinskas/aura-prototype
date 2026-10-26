@@ -410,6 +410,20 @@ def test_simulation_test_harness_is_not_copied_to_mount(tmp_path: Path) -> None:
     assert not (mount / "app" / "simulation").exists()
 
 
+def test_simulated_device_is_not_copied_to_mount(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    (source / "hardware" / "simulated").mkdir()
+    (source / "hardware" / "simulated" / "device.py").write_text("# device")
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    deploy(None, mount, source_root=source, compile=fake_compile)
+
+    assert not (mount / "hardware" / "simulated").exists()
+
+
 def test_conftest_py_is_not_copied_to_mount(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()

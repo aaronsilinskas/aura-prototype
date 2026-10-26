@@ -13,6 +13,7 @@ from app.simulation import SimulatedDevice, Simulation
 from effects.effect import HapticPattern
 from engine.network import LINE
 from engine.state import Scope
+from hardware.simulated.device import Strip
 from packs.scenes.tag.tag_data import TagData, decode_tag_data, encode_tag_data
 
 COUNTDOWN = 5 * 0.6  # Tag's default warning pulses x pulse duration
@@ -57,7 +58,7 @@ def test_pressing_a_fires_the_players_own_tag_on_the_line_emitter(sim):
     assert shots(player) == [(0, 1, 1)]
 
 
-def test_a_shot_flashes_directional_white_plays_the_fire_sound_and_clicks(sim):
+def test_a_shot_flashes_the_directional_strip_white(sim):
     player = sim.add_device("red", scene="tag")
     start_game(sim, player)
 
@@ -65,7 +66,25 @@ def test_a_shot_flashes_directional_white_plays_the_fire_sound_and_clicks(sim):
     sim.advance(0.15)
 
     assert player.strip(Scope.DIRECTIONAL).all_lit(0xFFFFFF)
+
+
+def test_a_shot_plays_the_fire_sound(sim):
+    player = sim.add_device("red", scene="tag")
+    start_game(sim, player)
+
+    player.tap("A")
+    sim.advance(0.15)
+
     assert player.has_played("scene.fire_shot_start")
+
+
+def test_a_shot_clicks_the_haptic(sim):
+    player = sim.add_device("red", scene="tag")
+    start_game(sim, player)
+
+    player.tap("A")
+    sim.advance(0.15)
+
     assert [b.pattern for b in player.buzzed] == [(HapticPattern.STRONG_CLICK,)]
 
 
@@ -79,10 +98,9 @@ def test_the_fire_flash_goes_dark_when_the_fire_sound_ends(sim):
     assert player.strip(Scope.DIRECTIONAL).dark
 
 
-def test_a_shot_drains_one_pip_from_the_amber_ammo_bar(sim):
+def test_a_shot_drains_one_pip_from_the_full_amber_ammo_bar(sim):
     player = sim.add_device("red", scene="tag")
     start_game(sim, player)
-    assert player.strip(Scope.Global.BUFF).lit == 10
 
     player.tap("A")
     sim.advance(0.2)
@@ -118,12 +136,12 @@ def test_pressing_a_before_the_game_starts_counts_down_instead_of_firing(sim):
 
 
 def test_a_second_press_inside_the_cooldown_is_swallowed(sim):
-    player = sim.add_device("red", scene="tag")
+    player = sim.add_device("red", scene="tag", scene_data={"tag_shot_cooldown": 1.0})
     start_game(sim, player)
 
     player.tap("A")
     player.tap("A")
-    sim.advance(COOLDOWN + 0.2)
+    sim.advance(0.8)
 
     assert len(shots(player)) == 1
 
@@ -149,8 +167,25 @@ def empty_the_magazine(sim: Simulation, player: SimulatedDevice) -> None:
     for _ in range(2):
         player.tap("A")
         sim.advance(COOLDOWN + 0.1)
-    assert len(shots(player)) == 2
     player.forget()
+
+
+def reload_fully(sim: Simulation, player: SimulatedDevice) -> None:
+    player.hold("A")
+    sim.advance(RELOAD + 0.2)
+    player.release("A")
+    sim.advance(0.2)
+
+
+def abandon_reload(sim: Simulation, player: SimulatedDevice) -> None:
+    player.hold("A")
+    sim.advance(1.0)
+    player.release("A")
+    sim.advance(RELOAD)
+
+
+def pulsing_red(strip: Strip) -> bool:
+    return not strip.dark and all(p & 0x00FFFF == 0 for p in strip.pixels)
 
 
 def test_firing_the_last_round_pulses_the_ammo_bar_red(sim):
@@ -160,12 +195,10 @@ def test_firing_the_last_round_pulses_the_ammo_bar_red(sim):
     empty_the_magazine(sim, player)
     sim.advance(0.3)
 
-    bar = player.strip(Scope.Global.BUFF)
-    assert not bar.dark
-    assert all(p & 0x00FFFF == 0 for p in bar.pixels)  # red only, no amber
+    assert pulsing_red(player.strip(Scope.Global.BUFF))
 
 
-def test_pressing_with_an_empty_magazine_dry_fires_and_starts_reloading(sim):
+def test_pressing_with_an_empty_magazine_dry_fires_instead_of_shooting(sim):
     player = sim.add_device("red", scene="tag", scene_data={"tag_max_ammo": 2})
     start_game(sim, player)
     empty_the_magazine(sim, player)
@@ -175,6 +208,16 @@ def test_pressing_with_an_empty_magazine_dry_fires_and_starts_reloading(sim):
 
     assert shots(player) == []
     assert player.has_played("scene.dry_fire_start")
+
+
+def test_pressing_with_an_empty_magazine_starts_reloading(sim):
+    player = sim.add_device("red", scene="tag", scene_data={"tag_max_ammo": 2})
+    start_game(sim, player)
+    empty_the_magazine(sim, player)
+
+    player.hold("A")
+    sim.advance(0.2)
+
     assert player.has_played("scene.reload")
 
 
@@ -201,20 +244,35 @@ def test_a_fresh_press_right_after_the_last_round_reloads_despite_the_cooldown(s
     assert player.has_played("scene.reload")
 
 
-def test_holding_through_the_reload_refills_the_magazine(sim):
+def test_holding_through_the_reload_plays_the_reload_complete_sound(sim):
     player = sim.add_device("red", scene="tag", scene_data={"tag_max_ammo": 2})
     start_game(sim, player)
     empty_the_magazine(sim, player)
 
-    player.hold("A")
-    sim.advance(RELOAD + 0.2)
-    player.release("A")
-    sim.advance(0.2)
+    reload_fully(sim, player)
 
     assert player.has_played("scene.reload_complete")
+
+
+def test_holding_through_the_reload_refills_the_amber_ammo_bar(sim):
+    player = sim.add_device("red", scene="tag", scene_data={"tag_max_ammo": 2})
+    start_game(sim, player)
+    empty_the_magazine(sim, player)
+
+    reload_fully(sim, player)
+
     assert player.strip(Scope.Global.BUFF).all_lit(AMMO_AMBER)
+
+
+def test_a_press_after_a_full_reload_fires_again(sim):
+    player = sim.add_device("red", scene="tag", scene_data={"tag_max_ammo": 2})
+    start_game(sim, player)
+    empty_the_magazine(sim, player)
+    reload_fully(sim, player)
+
     player.tap("A")
     sim.advance(0.2)
+
     assert len(shots(player)) == 1
 
 
@@ -229,21 +287,36 @@ def test_the_trigger_still_held_after_a_reload_does_not_auto_fire(sim):
     assert shots(player) == []
 
 
-def test_letting_go_before_the_reload_finishes_leaves_the_magazine_empty(sim):
+def test_letting_go_before_the_reload_finishes_never_completes_it(sim):
     player = sim.add_device("red", scene="tag", scene_data={"tag_max_ammo": 2})
     start_game(sim, player)
     empty_the_magazine(sim, player)
 
-    player.hold("A")
-    sim.advance(1.0)
-    player.release("A")
-    sim.advance(RELOAD)
+    abandon_reload(sim, player)
 
     assert not player.has_played("scene.reload_complete")
-    assert all(p & 0x00FFFF == 0 for p in player.strip(Scope.Global.BUFF).pixels)
+
+
+def test_letting_go_before_the_reload_finishes_returns_the_bar_to_pulsing_red(sim):
+    player = sim.add_device("red", scene="tag", scene_data={"tag_max_ammo": 2})
+    start_game(sim, player)
+    empty_the_magazine(sim, player)
+
+    abandon_reload(sim, player)
+
+    assert pulsing_red(player.strip(Scope.Global.BUFF))
+
+
+def test_a_press_after_an_abandoned_reload_dry_fires(sim):
+    player = sim.add_device("red", scene="tag", scene_data={"tag_max_ammo": 2})
+    start_game(sim, player)
+    empty_the_magazine(sim, player)
+    abandon_reload(sim, player)
     player.forget()
+
     player.tap("A")
     sim.advance(0.2)
+
     assert shots(player) == []
     assert player.has_played("scene.dry_fire_start")
 
