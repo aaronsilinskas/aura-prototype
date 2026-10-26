@@ -54,16 +54,18 @@ def test_a_scope_strip_starts_dark():
 
 
 def test_buttons_are_labelled_a_onward_one_per_configured_pin():
-    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(buttons=["X", "Y", "Z"]))
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(buttons=["GP2", "GP3", "GP4"]))
 
-    sim_hw.hold("C")
+    for label in ("A", "B", "C"):
+        sim_hw.hold(label)
     out = _read_buttons(sim_hw)
 
-    assert out.is_pressed("C")
+    assert sorted(label for label, _ in out.items()) == ["A", "B", "C"]
+    assert all(out.is_pressed(label) for label in ("A", "B", "C"))
 
 
 def test_a_button_the_config_does_not_declare_cannot_be_held():
-    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(buttons=["X"]))
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(buttons=["GP2"]))
 
     with pytest.raises(KeyError):
         sim_hw.hold("B")
