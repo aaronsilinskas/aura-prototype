@@ -147,7 +147,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `SceneManager` | `engine/scene.py` | Drives scene transitions through injected `EffectAdmin`/`AudioOverlayAdmin`; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot` |
 | `SceneReboot` | `engine/state.py` | Board-free port `SceneManager` reboots through; live adapter `DeviceSceneReboot` |
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
-| `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor for a phase machine's key + initial phase |
+| `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor for a phase machine's key + initial phase; registry of each phase's owning `PhaseRule` |
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
 | `EffectResolver` | `engine/effects/manager.py` | Resolves a qualified effect name to a builder |
 | `MergeStrategy` | `engine/state.py` | Per-scope compositing policy; subclasses in `engine/effects/merge.py` |

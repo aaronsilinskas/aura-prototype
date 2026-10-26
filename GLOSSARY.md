@@ -53,24 +53,24 @@ The game context passed to every rule handler each tick: the control seams, the 
 _Avoid_: `clear_queue()` from rules (reserved for `SceneManager`); `get(key, None)` (use `get_or_none`)
 
 ### Phase
-A named stage of a scene's game flow (e.g. Tag's Ready/Starting/Playing/Game Over), identified by a `PhaseKey`.
-_Avoid_: "state" (collides with `GameState`); "mode" except as the hardware_test label
+A named stage of a scene's game flow (e.g. Tag's Ready/Starting/Playing/Game Over), identified by a `PhaseKey`. A phase starts the moment it is entered, in the same tick, whatever order the scene's rules run in; its handlers first hear the event after the one that entered it.
+_Avoid_: "state" (collides with `GameState`); "mode" except as the hardware_test label; relying on rule order for when a phase starts
 
 ### PhaseKey
 An opaque, identity-typed constant naming one phase; compared by identity, so a bare string literal never matches and a typo fails loudly.
 _Avoid_: bare `str`/`int` phase values; comparing a phase against a string literal
 
 ### PhaseMachine
-The mutable per-scene holder of the current `PhaseKey`, the once-per-entry flag, and the phase-start time; reached through a scene's `PhaseSlot`.
+The mutable per-scene holder of the current `PhaseKey` and the phase-start time; reached through a scene's `PhaseSlot`.
 _Avoid_: storing receipts or per-phase scratch on it; auto-stopping effects inside `enter()`
 
 ### PhaseSlot
-The single per-scene typed accessor owning a phase machine's `GameState` key and initial phase; all of a scene's phase rules share the *same* instance, so "same key ⇒ same `PhaseMachine`" holds by construction.
-_Avoid_: constructing a fresh `PhaseSlot` per rule (import the scene's one); passing a raw machine-key string to a phase rule; confusing it with the generic `StateSlot`
+The single per-scene typed accessor owning a phase machine's `GameState` key and initial phase, and knowing which `PhaseRule` owns each phase; all of a scene's phase rules share the *same* instance, so "same key ⇒ same `PhaseMachine`" holds by construction.
+_Avoid_: constructing a fresh `PhaseSlot` per rule (import the scene's one); passing a raw machine-key string to a phase rule; confusing it with the generic `StateSlot`; two slots sharing one key
 
 ### PhaseRule
 A `GameRule` owning one phase's lifecycle: `on_enter`/`on_exit`, phase-gated handlers, and `transition_to`; exactly one per `(machine, phase)`.
-_Avoid_: hand-rolled entry flags (use `on_enter`); reaching `super().on(...)` (bypasses the phase guard)
+_Avoid_: hand-rolled entry flags (use `on_enter`); reaching `super().on(...)` (bypasses the phase guard); transitioning from `on_enter`; transitioning to a phase no `PhaseRule` owns
 
 ### InPhaseRule
 A `GameRule` whose handlers fire only while a given phase is active, with no lifecycle hooks and no transitions; any number may share a phase.
