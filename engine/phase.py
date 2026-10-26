@@ -73,16 +73,16 @@ class PhaseMachine:
     Holds only the current :class:`PhaseKey`, ``phase_start``, and private
     flags marking an ``on_enter`` as pending or running.  It owns no effects
     and no receipts — :meth:`enter` has no side effects beyond those fields,
-    so it can never leak an effect across a transition.  Lifecycle teardown belongs to the owning
-    :class:`PhaseRule`'s ``on_exit``.
+    so it can never leak an effect across a transition.  Lifecycle teardown
+    belongs to the owning :class:`PhaseRule`'s ``on_exit``.
     """
 
-    __slots__ = ("_entering", "_just_entered", "phase", "phase_start")
+    __slots__ = ("_enter_pending", "_entering", "phase", "phase_start")
 
     def __init__(self, initial_phase: PhaseKey) -> None:
         self.phase = initial_phase
         self.phase_start: float = 0.0
-        self._just_entered = True
+        self._enter_pending = True
         self._entering = False
 
     def enter(self, phase: PhaseKey, now: float) -> None:
@@ -94,13 +94,13 @@ class PhaseMachine:
         """
         self.phase = phase
         self.phase_start = now
-        self._just_entered = True
+        self._enter_pending = True
 
     def elapsed(self, now: float) -> float:
         """Return the time elapsed since :attr:`phase_start`."""
         return now - self.phase_start
 
-    def take_just_entered(self) -> bool:
+    def take_enter_pending(self) -> bool:
         """Return ``True`` if the current phase's ``on_enter`` is pending, clearing the flag.
 
         Consumed internally by :class:`PhaseRule` to drive ``on_enter``; this
@@ -108,9 +108,9 @@ class PhaseMachine:
         atomic call means the entry signal can be checked exactly once and
         never left half-consumed.
         """
-        was_just_entered = self._just_entered
-        self._just_entered = False
-        return was_just_entered
+        was_pending = self._enter_pending
+        self._enter_pending = False
+        return was_pending
 
 
 class PhaseSlot:
@@ -232,9 +232,11 @@ class PhaseRule(_PhaseGuardedRule):
         Only a handler should call this, and it should return immediately
         after.  Transitions are free-running (no one-per-tick guard).
 
-        Raises ``RuntimeError`` when called while an ``on_enter`` is running,
-        and ``ValueError`` when no :class:`PhaseRule` owns *next_phase*; both
-        are checked before ``on_exit`` runs.
+        Both misuses below are caught before ``on_exit`` runs.
+
+        Raises:
+            RuntimeError: if called while an ``on_enter`` is running.
+            ValueError: if no :class:`PhaseRule` owns *next_phase*.
         """
         machine = self._machine(state)
         if machine._entering:
@@ -244,7 +246,7 @@ class PhaseRule(_PhaseGuardedRule):
             raise ValueError(f"Phase {next_phase!r} of {self._phase_slot.key!r} has no owner")
         self.on_exit(state)
         machine.enter(next_phase, state.total)
-        owner._start(machine, state)
+        owner._run_pending_enter(machine, state)
 
     def on_enter(self, state: GameState) -> None:
         """Run once each time this phase is entered. No-op by default; must not transition."""
@@ -253,10 +255,10 @@ class PhaseRule(_PhaseGuardedRule):
         """Run when :meth:`transition_to` leaves this phase. No-op by default."""
 
     def _before_handler(self, machine: PhaseMachine, state: GameState) -> None:
-        self._start(machine, state)
+        self._run_pending_enter(machine, state)
 
-    def _start(self, machine: PhaseMachine, state: GameState) -> None:
-        if not machine.take_just_entered():
+    def _run_pending_enter(self, machine: PhaseMachine, state: GameState) -> None:
+        if not machine.take_enter_pending():
             return
         machine._entering = True
         try:
@@ -269,8 +271,9 @@ class InPhaseRule(_PhaseGuardedRule):
     """A :class:`GameRule` whose handlers fire only while its phase is active.
 
     Shares the phase-gated ``on`` override and forwarding with
-    :class:`PhaseRule` but has no entry/exit lifecycle: it never runs the
-    pending ``on_enter`` and has no ``on_enter`` / ``on_exit`` / ``transition_to``.  Any
-    number of ``InPhaseRule``s may share a phase, and an ``InPhaseRule`` may
-    share a phase with that phase's owning :class:`PhaseRule`.
+    :class:`PhaseRule` but has no entry/exit lifecycle: it never runs a
+    pending ``on_enter`` and has no ``on_enter`` / ``on_exit`` /
+    ``transition_to``.  Any number of ``InPhaseRule``s may share a phase, and
+    an ``InPhaseRule`` may share a phase with that phase's owning
+    :class:`PhaseRule`.
     """

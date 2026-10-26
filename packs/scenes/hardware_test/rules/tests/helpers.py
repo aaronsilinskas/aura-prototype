@@ -27,9 +27,9 @@ def seed_phase(state: GameState, phase: PhaseKey, entered: bool = False) -> None
     """Jump the scene's phase machine to *phase*.
 
     If *entered* is ``True``, the phase's one-time entry side-effects are
-    treated as already having run (the just-entered flag is cleared).
+    treated as already having run (the pending-entry flag is cleared).
     """
     machine = hw_phase(state)
     machine.enter(phase, state.total)
     if entered:
-        machine.take_just_entered()
+        machine.take_enter_pending()

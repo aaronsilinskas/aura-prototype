@@ -143,13 +143,13 @@ def test_distinct_phase_keys_with_the_same_name_are_not_equal() -> None:
 
 def test_enter_sets_phase_and_phase_start_and_raises_the_entry_flag() -> None:
     machine = PhaseMachine(_PHASE_A)
-    machine.take_just_entered()  # consume the initial flag
+    machine.take_enter_pending()  # consume the initial flag
 
     machine.enter(_PHASE_B, now=4.0)
 
     assert machine.phase is _PHASE_B
     assert machine.phase_start == 4.0
-    assert machine.take_just_entered() is True
+    assert machine.take_enter_pending() is True
 
 
 def test_elapsed_reports_the_gap_since_entry() -> None:
@@ -159,11 +159,11 @@ def test_elapsed_reports_the_gap_since_entry() -> None:
     assert machine.elapsed(now=13.5) == pytest.approx(3.5)
 
 
-def test_take_just_entered_returns_true_once_then_false() -> None:
+def test_take_enter_pending_returns_true_once_then_false() -> None:
     machine = PhaseMachine(_PHASE_A)
 
-    assert machine.take_just_entered() is True
-    assert machine.take_just_entered() is False
+    assert machine.take_enter_pending() is True
+    assert machine.take_enter_pending() is False
 
 
 # ---------------------------------------------------------------------------
