@@ -135,7 +135,7 @@ def test_button_b_advances_mode_from_rgb_to_accelerometer(spy):
     assert hw_phase(state).phase is MODE_ACCELEROMETER
 
 
-def test_button_b_cycles_mode_through_all_six_and_back_to_rgb(spy):
+def test_each_button_b_press_advances_exactly_one_mode_around_the_whole_cycle(spy):
     state, engine = _make_state(spy)
     _tick(state, engine)
 

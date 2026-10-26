@@ -24,12 +24,13 @@ class StubTimer:
 
 
 def seed_phase(state: GameState, phase: PhaseKey, entered: bool = False) -> None:
-    """Jump the scene's phase machine to *phase*.
+    """Jump the scene's phase machine to *phase*, as if entered on the last dispatched event.
 
-    If *entered* is ``True``, the phase's one-time entry side-effects are
-    treated as already having run (the pending-entry flag is cleared).
+    The phase's handlers therefore hear the next event. If *entered* is
+    ``True``, the phase's one-time entry side-effects are treated as already
+    having run (the pending-entry flag is cleared).
     """
     machine = hw_phase(state)
-    machine.enter(phase, state.total)
+    machine.enter(phase, state.total, state.dispatch_count)
     if entered:
         machine.take_enter_pending()

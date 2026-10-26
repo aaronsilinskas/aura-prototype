@@ -105,6 +105,7 @@ class GameEngine:
         i = 0
         while i < state.event_count:
             event = state.event_at(i)
+            state._begin_dispatch()
             for rule in self._rules:
                 rule.handle_event(event, state)
             i += 1

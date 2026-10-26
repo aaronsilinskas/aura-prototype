@@ -34,31 +34,6 @@ from packs.scenes.hardware_test.rules.helpers.phases import (
 
 FLASH_DURATION: Final = 0.5
 
-# Set by _advance_mode to (PhaseKey just transitioned to, state.total at the
-# time of the transition), and consumed by the newly-entered mode's own
-# _handle if it is dispatched again within the *same* tick (its rule comes
-# after the advancing rule in registration order). The state.total stamp
-# distinguishes this from a stale entry left over from a previous tick (when
-# the newly-entered mode's rule had already been dispatched and so never saw
-# the new phase until the next tick) — a stale entry's stamp won't match the
-# current tick's state.total, so it is never mistaken for "skip this
-# dispatch".
-_ADVANCED_TO_KEY: Final = "hw_mode_advanced_to"
-
-
-class AdvancedTo:
-    """Records the mode just transitioned to and the ``state.total`` stamp of that transition.
-
-    See :data:`_ADVANCED_TO_KEY` for how this is used to detect and skip a
-    same-tick re-dispatch into the newly-entered mode.
-    """
-
-    __slots__ = ("at", "phase")
-
-    def __init__(self, phase: PhaseKey, at: float) -> None:
-        self.phase = phase
-        self.at = at
-
 
 class HwModeRule(PhaseRule):
     """A :class:`PhaseRule` bound to the hardware_test scene's shared phase machine.
@@ -78,19 +53,6 @@ class HwModeRule(PhaseRule):
         """Per-mode handling of the whole input event. No-op by default."""
 
     def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
-        # Consume any pending advance marker stamped during *this* tick. If it
-        # targets this mode, a Button-B advance just transitioned into this
-        # mode within this same dispatch (see _advance_mode); this dispatch is
-        # a continuation of that one press, not a fresh tick, so skip it
-        # entirely. A marker stamped during a previous tick (left over because
-        # the newly-entered mode's rule had already been dispatched that tick)
-        # is stale and is simply discarded without skipping.
-        advanced = state.get_or_none(_ADVANCED_TO_KEY, AdvancedTo)
-        if advanced is not None:
-            state.delete(_ADVANCED_TO_KEY)
-            if advanced.phase is self.phase and advanced.at == state.total:
-                return
-
         self.on_input_event(event, state)
 
         self._check_flash_expiry(state)
@@ -106,7 +68,6 @@ class HwModeRule(PhaseRule):
 
         next_mode = next_in_cycle(MODE_ORDER, self.phase)
         print("changing to mode " + str(MODE_ORDER.index(next_mode)))
-        state.set(_ADVANCED_TO_KEY, AdvancedTo(next_mode, state.total))
         self.transition_to(state, next_mode)
 
     def _check_flash_expiry(self, state: GameState) -> None:
