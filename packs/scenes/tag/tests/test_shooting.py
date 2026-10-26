@@ -8,38 +8,13 @@ played, haptics, strip pixels. A test that depends on a tunable pins it with
 
 from __future__ import annotations
 
-import pytest
-
 from app.simulation import SimulatedDevice, Simulation, Strip
 from effects.effect import HapticPattern
-from engine.network import LINE
 from engine.state import Scope
-from packs.scenes.tag.tag_data import TagData, decode_tag_data, encode_tag_data
-
-AMMO_AMBER = 0xFFBF00
+from packs.scenes.tag.tests.helpers import AMMO_AMBER, shots, start_game
 
 TWO_ROUNDS = {"tag_max_ammo": 2, "tag_shot_cooldown": 0.3, "tag_reload_duration": 1.0}
 """A short magazine and reload, so running dry and reloading stay quick."""
-
-
-@pytest.fixture()
-def sim() -> Simulation:
-    return Simulation()
-
-
-def start_game(sim: Simulation, *players: SimulatedDevice) -> None:
-    """Ready -> Starting -> Playing through real input, then clear the record."""
-    for player in players:
-        player.tap("A")
-    sim.run_until(lambda: all(p.has_played("scene.go_start") for p in players))
-    for player in players:
-        player.forget()
-
-
-def shots(player: SimulatedDevice) -> list[tuple[int, int, int]]:
-    """Every tag shot the player sent on the LINE emitter, as (team, player, damage)."""
-    decoded = [decode_tag_data(s.payload) for s in player.ir_sent if s.emitter == LINE]
-    return [(d.team, d.player, d.damage) for d in decoded]
 
 
 # ---------------------------------------------------------------------------
@@ -328,14 +303,3 @@ def test_one_players_trigger_never_fires_another_players_blaster(sim):
 
     assert shots(red) == [(0, 1, 1)]
     assert shots(blue) == []
-
-
-def test_an_incoming_matching_tag_plays_the_hit_on_the_main_strip(sim):
-    player = sim.add_device("red", scene="tag")
-    start_game(sim, player)
-
-    player.receive_ir(bytes(encode_tag_data(TagData(0, 1, 1))))
-    sim.advance(0.1)
-
-    assert player.has_played("scene.hit_start")
-    assert not player.strip(Scope.Global.MAIN).dark
