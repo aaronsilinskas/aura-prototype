@@ -1,9 +1,19 @@
-"""Tests for deploy_watch.watch_stream, discard_until, exit-code mapping, and SplitWriter."""
+"""Tests for deploy_watch: watch_stream, discard_until, exit codes, SplitWriter, port selection."""
 
 import io
 from collections.abc import Callable
 
-from scripts.deploy_watch import SplitWriter, discard_until, exit_code_for, watch_stream
+import pytest
+
+from scripts.deploy_watch import (
+    ConsolePortError,
+    SplitWriter,
+    discard_until,
+    exit_code_for,
+    find_console_port,
+    select_console_port,
+    watch_stream,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -328,3 +338,39 @@ def test_split_writer_file_excludes_lines_written_directly_to_stdout() -> None:
 
     assert file_out.getvalue() == "BOOT OK\nsensor=42\nDONE\n"
     assert "Deploying" not in file_out.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# select_console_port
+# ---------------------------------------------------------------------------
+
+
+# A console port alongside a data port needs no case here: repl_comports()
+# filters the data channel out before selection.
+
+
+class _FakeComport:
+    def __init__(self, device: str) -> None:
+        self.device = device
+
+
+def test_select_console_port_auto_selects_the_single_console_port() -> None:
+    port = select_console_port([_FakeComport("/dev/cu.usbmodem1101")])
+
+    assert port == "/dev/cu.usbmodem1101"
+
+
+def test_select_console_port_raises_when_no_console_port_found() -> None:
+    with pytest.raises(ConsolePortError, match="--port"):
+        select_console_port([])
+
+
+def test_select_console_port_raises_listing_candidates_when_multiple_console_ports_found() -> None:
+    with pytest.raises(ConsolePortError, match=r"cu\.usbmodem1101.*cu\.usbmodem2101.*--port"):
+        select_console_port(
+            [_FakeComport("/dev/cu.usbmodem1101"), _FakeComport("/dev/cu.usbmodem2101")]
+        )
+
+
+def test_find_console_port_returns_an_explicit_port_unchanged() -> None:
+    assert find_console_port(explicit_port="/dev/tty.explicit") == "/dev/tty.explicit"

@@ -313,12 +313,20 @@ The live device-side `Transport` adapter, newline-framing SD-sync lines over a s
 _Avoid_: importing `usb_cdc` into this module (the device-only wiring lives in `examples/sd_sync.py`); assuming the wire grammar is a stable contract (it's a free implementation detail, not asserted in tests)
 
 ### SerialTransport
-The live host-side SD-sync `Transport`, newline-framing lines the same way as `UsbCdcTransport` but over a host serial port. Byte-framed, distinct from `deploy_watch`'s UTF-8 REPL channel.
-_Avoid_: reusing `deploy_watch`'s `iter_serial_lines` for SD-sync (it decodes UTF-8 and targets the REPL channel, not the byte-framed data channel)
+The live host-side SD-sync `Transport`, newline-framing lines the same way as `UsbCdcTransport` but over a host serial port. Byte-framed over the **data channel**, distinct from `deploy_watch`'s UTF-8 **console channel**.
+_Avoid_: reusing `deploy_watch`'s `iter_serial_lines` for SD-sync (it decodes UTF-8 and targets the console channel, not the byte-framed data channel)
 
-### Data-channel port auto-detect
-Resolution of the serial port for the SD-sync **data** CDC channel, distinct from the REPL CDC channel: a single match auto-selects, an explicit `--port` overrides, and zero or multiple matches fails loudly.
-_Avoid_: reusing `deploy_watch`'s port glob for the data channel (it can't tell the two CDC interfaces apart); guessing among multiple matches instead of failing loudly
+### Console channel
+The USB-CDC serial channel a board always exposes for REPL and `print` output; what **Deploy-watch** captures.
+_Avoid_: "REPL port", "the usbmodem port", or bare "serial port" (ambiguous once the data channel is enabled)
+
+### Data channel
+The second USB-CDC serial channel a board exposes when enabled on the device, carrying SD-sync protocol bytes rather than text.
+_Avoid_: "CDC2", "the other port", bare "serial port"
+
+### Port auto-detect
+Resolution of a host serial port for one named channel (**console channel** or **data channel**) by asking which board interface it is: a single match auto-selects, an explicitly named port overrides without scanning, and zero or multiple matches fails loudly.
+_Avoid_: picking a port by device-name pattern (both channels look alike); falling back to "the only usbmodem device" when no channel matches; guessing among multiple matches
 
 ### NeoPixelEffectOutput
 A CircuitPython `EffectOutput` driving **one** NeoPixel strip, subdivided into scope **segments** by pixel range; several strips may share a scope and are driven in sync.

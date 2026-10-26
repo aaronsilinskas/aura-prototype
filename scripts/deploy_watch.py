@@ -20,7 +20,6 @@ Exit codes
 """
 
 import argparse
-import glob
 import sys
 import time
 from collections.abc import Callable, Iterable
@@ -30,7 +29,6 @@ from typing import IO, Final
 from scripts.deploy import _DEFAULT_MOUNT, deploy
 
 _DEFAULT_BAUD: Final = 115200
-_PORT_GLOB: Final = "/dev/tty.usbmodem*"
 _OPEN_RETRY_SECONDS: Final = 10.0
 _OPEN_RETRY_INTERVAL: Final = 0.5
 _DEFAULT_REBOOT_TIMEOUT: Final = 5.0
@@ -178,16 +176,44 @@ def exit_code_for(reason: str, *, until: str | None) -> int:
 # ---------------------------------------------------------------------------
 
 
-def find_port() -> str | None:
-    """Auto-detect a single usbmodem serial port.
+class ConsolePortError(Exception):
+    """Zero or more than one console-channel port was found and none was named explicitly."""
 
-    Returns the port path when exactly one ``/dev/tty.usbmodem*`` device is
-    found, otherwise ``None`` (zero or multiple matches).
+
+def select_console_port(comports: "list[object]") -> str:
+    """Pick the console-channel port from *comports* (each exposing a ``.device`` path).
+
+    Exactly one comport must be present -- zero or several (more than one
+    board attached) is ambiguous and raises :class:`ConsolePortError` naming
+    ``--port`` as the fix, rather than guessing.
     """
-    matches = glob.glob(_PORT_GLOB)
-    if len(matches) == 1:
-        return matches[0]
-    return None
+    if len(comports) == 1:
+        return comports[0].device
+
+    if not comports:
+        raise ConsolePortError(
+            "no CircuitPython console port found; connect the device or pass --port"
+        )
+
+    raise ConsolePortError(
+        f"multiple CircuitPython console ports found ({', '.join(c.device for c in comports)}); "
+        "pass --port to select one"
+    )
+
+
+def find_console_port(*, explicit_port: "str | None" = None) -> str:
+    """Resolve the console-channel serial port: *explicit_port* if given, else auto-detect.
+
+    Auto-detect scans ``repl_comports()`` and applies :func:`select_console_port`.
+    The toolkit is imported here, not at module level, so pyserial stays out of
+    module import.
+    """
+    if explicit_port is not None:
+        return explicit_port
+
+    from adafruit_board_toolkit import circuitpython_serial
+
+    return select_console_port(list(circuitpython_serial.repl_comports()))
 
 
 # ---------------------------------------------------------------------------
@@ -316,7 +342,7 @@ def main() -> None:
     parser.add_argument(
         "--port",
         default=None,
-        help="Serial port (default: auto-detect from /dev/tty.usbmodem*).",
+        help="Serial port (default: auto-detect the CircuitPython console port).",
     )
     parser.add_argument(
         "--baud",
@@ -365,24 +391,11 @@ def main() -> None:
         parser.error("at least one of --until or --seconds is required")
 
     # --- port discovery ---
-    port = args.port
-    if port is None:
-        port = find_port()
-        if port is None:
-            matches = glob.glob(_PORT_GLOB)
-            if not matches:
-                print(
-                    f"Error: no serial port found matching {_PORT_GLOB}. "
-                    "Connect the device or use --port.",
-                    file=sys.stderr,
-                )
-            else:
-                print(
-                    f"Error: multiple serial ports found ({', '.join(sorted(matches))}). "
-                    "Use --port to select one.",
-                    file=sys.stderr,
-                )
-            sys.exit(1)
+    try:
+        port = find_console_port(explicit_port=args.port)
+    except ConsolePortError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     try:
         ser = open_serial_with_retry(port, args.baud)
