@@ -7,7 +7,7 @@ from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.state import EffectReceipt, Scope
-from hardware.shared.voice_pool import VoicePool, VoiceSink
+from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
 
 
 class AudioEffectOutput(EffectOutput, VoiceSink):
@@ -72,8 +72,7 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
         config = effect.audio.clips.get(event.verb)
         if config is None:
             return
-        audio_only = effect.pixels is None and effect.haptic is None
-        stops_receipt = audio_only or config.stops_effect
+        stops_receipt = clip_stops_receipt(effect, config)
         path = self._audio_registry.path(config.name)
         self._pool.claim(self, path, config.loop, stops_receipt, receipt)
 

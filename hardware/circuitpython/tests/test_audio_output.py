@@ -1,10 +1,12 @@
 """Tests for AudioEffectOutput — the live VoiceSink adapter.
 
 Voice-slot bookkeeping (claim/eviction/sweep, the stops-receipt release rule,
-loudness tracking) lives in ``VoicePool`` and is covered by ``test_voice_pool.py``.
+loudness tracking) and the ``clip_stops_receipt`` claim rule live in
+``hardware/shared/voice_pool.py`` and are covered by ``test_voice_pool.py``.
 These tests cover only what the adapter itself owns: the shell-routing guards in
-``handle_event`` and the last-mile hardware mapping of the five ``VoiceSink``
-methods onto the mixer and file handles.
+``handle_event``, that it feeds the claim rule's answer into the pool, and the
+last-mile hardware mapping of the five ``VoiceSink`` methods onto the mixer and
+file handles.
 """
 
 from __future__ import annotations
@@ -13,7 +15,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectHaptic, EffectPixels
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectPixels
 from engine.audio import AudioRegistry
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
@@ -97,18 +99,6 @@ def _effect_oneshot_stops_effect(verb: str, clip_name: str) -> Effect:
     return Effect(
         name="test",
         pixels=MagicMock(spec=EffectPixels),
-        audio=EffectAudio(
-            clips={verb: AudioPlaybackConfig(name=clip_name, loop=False, stops_effect=True)}
-        ),
-    )
-
-
-def _effect_oneshot_with_haptic_stops_effect(verb: str, clip_name: str) -> Effect:
-    """One-shot effect with pixels, haptic, and stops_effect=True."""
-    return Effect(
-        name="test",
-        pixels=MagicMock(spec=EffectPixels),
-        haptic=MagicMock(spec=EffectHaptic),
         audio=EffectAudio(
             clips={verb: AudioPlaybackConfig(name=clip_name, loop=False, stops_effect=True)}
         ),
@@ -340,73 +330,6 @@ def test_clip_with_pixels_and_no_stops_effect_flag_leaves_receipt_to_rules(tmp_p
     output.flush()
 
     receipt.stop.assert_not_called()
-
-
-def test_clip_with_pixels_and_stops_effect_stops_receipt_on_natural_finish(tmp_path) -> None:
-    """A pixels effect with stops_effect=True stops its receipt when the clip finishes."""
-    registry = AudioRegistry()
-    clip_name = _register_wav(tmp_path, registry, "sting")
-    output, mixer = _make_output(registry)
-    receipt = _make_receipt()
-
-    output.handle_event(
-        EffectEvent("rlgl", "sting", "start"),
-        frozenset({"personal"}),
-        _effect_oneshot_stops_effect("start", clip_name),
-        receipt,
-    )
-
-    mixer.voice[0].playing = False
-    output.flush()
-
-    receipt.stop.assert_called_once()
-
-
-def test_clip_with_pixels_and_stops_effect_stops_receipt_on_eviction(tmp_path) -> None:
-    """A pixels effect with stops_effect=True stops its receipt when evicted by a new one-shot."""
-    registry = AudioRegistry()
-    clip_name = _register_wav(tmp_path, registry, "sting")
-    clip_name2 = _register_wav(tmp_path, registry, "sting2")
-    output, _mixer = _make_output(registry, num_voices=1)
-    evicted_receipt = _make_receipt()
-    evicted_receipt.is_stopped.return_value = False
-
-    # Claim the only slot with stops_effect=True pixels effect (one-shot)
-    output.handle_event(
-        EffectEvent("rlgl", "sting", "start"),
-        frozenset({"personal"}),
-        _effect_oneshot_stops_effect("start", clip_name),
-        evicted_receipt,
-    )
-    # A new one-shot evicts the oldest one-shot (slot 0)
-    output.handle_event(
-        EffectEvent("rlgl", "sting2", "start"),
-        frozenset({"personal"}),
-        _effect_oneshot("start", clip_name2),
-        _make_receipt(),
-    )
-
-    evicted_receipt.stop.assert_called_once()
-
-
-def test_clip_with_pixels_haptic_and_stops_effect_stops_receipt_on_finish(tmp_path) -> None:
-    """A pixels+haptic effect with stops_effect=True stops its receipt on natural finish."""
-    registry = AudioRegistry()
-    clip_name = _register_wav(tmp_path, registry, "sting")
-    output, mixer = _make_output(registry)
-    receipt = _make_receipt()
-
-    output.handle_event(
-        EffectEvent("rlgl", "sting", "start"),
-        frozenset({"personal"}),
-        _effect_oneshot_with_haptic_stops_effect("start", clip_name),
-        receipt,
-    )
-
-    mixer.voice[0].playing = False
-    output.flush()
-
-    receipt.stop.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

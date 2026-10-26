@@ -1,7 +1,8 @@
 import pytest
 
+from effects.effect import AudioPlaybackConfig, Effect, EffectHaptic, EffectPixels
 from engine.state import EffectReceipt
-from hardware.shared.voice_pool import VoicePool, VoiceSink
+from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
 
 # ---------------------------------------------------------------------------
 # Test double — a recording VoiceSink fake
@@ -382,6 +383,33 @@ def test_sweep_does_not_reapply_unchanged_loudness(pool: VoicePool, sink: Record
 def test_sweep_ignores_idle_slots(pool: VoicePool, sink: RecordingSink) -> None:
     pool.sweep(sink)
     assert sink.calls == []
+
+
+# ---------------------------------------------------------------------------
+# clip_stops_receipt — the claim rule both audio outputs share
+# ---------------------------------------------------------------------------
+
+_PIXELS = EffectPixels()
+_HAPTIC = EffectHaptic(patterns={})
+
+
+@pytest.mark.parametrize(
+    ("pixels", "haptic", "stops_effect", "expected"),
+    [
+        pytest.param(None, None, False, True, id="audio-only effect"),
+        pytest.param(_PIXELS, None, False, False, id="pixels, no flag"),
+        pytest.param(None, _HAPTIC, False, False, id="haptic, no flag"),
+        pytest.param(_PIXELS, _HAPTIC, False, False, id="pixels and haptic, no flag"),
+        pytest.param(_PIXELS, None, True, True, id="pixels, stops_effect"),
+        pytest.param(_PIXELS, _HAPTIC, True, True, id="pixels and haptic, stops_effect"),
+    ],
+)
+def test_clip_stops_receipt_when_audio_is_the_whole_effect_or_clip_says_so(
+    pixels: EffectPixels | None, haptic: EffectHaptic | None, stops_effect: bool, expected: bool
+) -> None:
+    clip = AudioPlaybackConfig(name="pack.clip", loop=False, stops_effect=stops_effect)
+    effect = Effect(name="fx", pixels=pixels, haptic=haptic)
+    assert clip_stops_receipt(effect, clip) is expected
 
 
 # ---------------------------------------------------------------------------
