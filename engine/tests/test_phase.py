@@ -71,6 +71,21 @@ class _LifecycleRule(PhaseRule):
             self._transitions_to = None
 
 
+class _TransitionsOnEnterRule(PhaseRule):
+    """PhaseRule whose ``on_enter`` (wrongly) transitions straight to another phase."""
+
+    def __init__(self, phase: PhaseKey, phase_slot: PhaseSlot, transitions_to: PhaseKey) -> None:
+        super().__init__(phase, phase_slot)
+        self._transitions_to = transitions_to
+        self.on(_TickEvent, self._tick)
+
+    def on_enter(self, state: GameState) -> None:
+        self.transition_to(state, self._transitions_to)
+
+    def _tick(self, event: _TickEvent, state: GameState) -> None:
+        pass
+
+
 class _InPhaseEmitter(InPhaseRule):
     """InPhaseRule that emits an ``in:`` effect each tick its phase is active."""
 
@@ -128,13 +143,13 @@ def test_distinct_phase_keys_with_the_same_name_are_not_equal() -> None:
 
 def test_enter_sets_phase_and_phase_start_and_raises_the_entry_flag() -> None:
     machine = PhaseMachine(_PHASE_A)
-    machine.take_just_entered()  # consume the initial flag
+    machine.take_enter_pending()  # consume the initial flag
 
     machine.enter(_PHASE_B, now=4.0)
 
     assert machine.phase is _PHASE_B
     assert machine.phase_start == 4.0
-    assert machine.take_just_entered() is True
+    assert machine.take_enter_pending() is True
 
 
 def test_elapsed_reports_the_gap_since_entry() -> None:
@@ -144,11 +159,11 @@ def test_elapsed_reports_the_gap_since_entry() -> None:
     assert machine.elapsed(now=13.5) == pytest.approx(3.5)
 
 
-def test_take_just_entered_returns_true_once_then_false() -> None:
+def test_take_enter_pending_returns_true_once_then_false() -> None:
     machine = PhaseMachine(_PHASE_A)
 
-    assert machine.take_just_entered() is True
-    assert machine.take_just_entered() is False
+    assert machine.take_enter_pending() is True
+    assert machine.take_enter_pending() is False
 
 
 # ---------------------------------------------------------------------------
@@ -186,7 +201,7 @@ def test_phase_slot_exposes_its_key() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_on_enter_fires_once_while_the_gated_handler_fires_every_tick() -> None:
+def test_the_initial_phases_on_enter_runs_once_on_the_first_dispatch() -> None:
     rule = _LifecycleRule(_PHASE_A, "owner", PhaseSlot(_MACHINE_KEY, _PHASE_A))
 
     names = _run([rule], ticks=3)
@@ -201,8 +216,8 @@ def test_on_exit_fires_on_transition_and_the_next_phase_enters() -> None:
 
     names = _run([leaving, arriving], ticks=2)
 
-    # tick1: A enters and ticks, then transitions out (exit on A); because B is
-    # registered after A it sees the new phase within the same tick and enters.
+    # tick1: A enters and ticks, then transitions out: A exits and B enters in
+    # the same call; B, registered after A, then ticks in that same tick.
     # tick2: only B is active and ticks again.
     assert names == ["enter:a", "tick:a", "exit:a", "enter:b", "tick:b", "tick:b"]
 
@@ -218,13 +233,46 @@ def test_handler_does_not_fire_after_its_phase_is_left() -> None:
     assert names.count("tick:a") == 1  # only the entry tick, never after leaving A
 
 
+def test_an_owner_registered_before_the_transitioning_rule_enters_during_the_transition() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    arriving = _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+
+    names = _run([arriving, leaving], ticks=1)
+
+    assert names == ["enter:a", "tick:a", "exit:a", "enter:b"]
+
+
+def test_transitioning_to_a_phase_no_phase_rule_owns_raises_naming_the_phase() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+
+    with pytest.raises(ValueError, match="PhaseKey\\('b'\\)"):
+        _run([leaving], ticks=1)
+
+
+def test_transitioning_from_the_initial_phases_on_enter_raises() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    rule = _TransitionsOnEnterRule(_PHASE_A, slot, transitions_to=_PHASE_B)
+    _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
+
+    with pytest.raises(RuntimeError):
+        _run([rule], ticks=1)
+
+
+def test_transitioning_from_an_entered_phases_on_enter_raises() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+    _TransitionsOnEnterRule(_PHASE_B, slot, transitions_to=_PHASE_A)
+
+    with pytest.raises(RuntimeError):
+        _run([leaving], ticks=1)
+
+
 @pytest.mark.parametrize("owner_dispatches_first", [True, False])
 def test_on_enter_fires_exactly_once_regardless_of_dispatch_order(
     owner_dispatches_first: bool,
 ) -> None:
-    # Whether the arriving owner sorts before or after the transitioning rule,
-    # its on_enter must fire exactly once: same tick if it dispatches after the
-    # transition, otherwise the following tick (the entry flag persists).
     slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
     leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
     arriving = _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
@@ -246,6 +294,7 @@ def test_in_phase_rule_handler_fires_only_while_its_phase_is_active() -> None:
     slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
     bystander = _InPhaseEmitter(_PHASE_B, "bystander", phase_slot=slot)
     leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+    _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
 
     names = _run([bystander, leaving], ticks=4)
 

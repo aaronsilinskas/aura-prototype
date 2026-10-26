@@ -14,6 +14,7 @@ from packs.scenes.hardware_test.rules.helpers.phases import (
     MODE_RGB,
     MODE_SFX,
 )
+from packs.scenes.hardware_test.rules.rgb_rule import RULE as RGB_RULE
 from packs.scenes.hardware_test.rules.sfx_rule import RULE
 from packs.scenes.hardware_test.rules.tests.helpers import seed_phase
 
@@ -120,16 +121,14 @@ def test_button_a_in_radio_mode_does_not_fire_sfx_test(spy):
     assert spy.set_effect_calls == []
 
 
-def test_non_a_press_in_sfx_mode_is_noop(spy):
+def test_button_b_in_sfx_mode_does_not_fire_sfx_test(spy):
     state, engine = _make_state(spy)
-    state.queue_event(InputEvents.Sensors(ButtonData(states={})))
-    engine.update(state)
-    spy.set_effect_calls.clear()
+    engine.add_rules(RGB_RULE)  # B advances SFX -> RGB, which needs its owner
 
     state.queue_event(InputEvents.Sensors(ButtonData(states={"B": ButtonData.PRESSED})))
     engine.update(state)
 
-    assert spy.set_effect_calls == []
+    assert [c for c in spy.set_effect_calls if c[1] == "scene.sfx_test"] == []
 
 
 def test_button_a_in_non_sfx_mode_produces_no_log(spy, capsys):
