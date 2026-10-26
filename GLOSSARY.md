@@ -277,6 +277,10 @@ _Avoid_: mock device, virtual device, emulator (it does not run CircuitPython); 
 The test-only fixture layer that boots real scenes on one or more **simulated devices**, drives them through scripted inputs and time, and answers questions about what each device observably did. Tests written on it state behaviour, not the engine calls that produce it.
 _Avoid_: device harness, scene harness (both read as runtime code); asserting on which effect names a rule passed to `EffectControls`
 
+### Shade
+A pixel showing a dimmed version of one colour (the colour scaled toward black, hue unchanged); a strip whose lit pixels are all shades of red shows only red, at any brightness. Dark pixels are no colour's shade.
+_Avoid_: tint, hue (both read as other colour operations); bit-masking a pixel against a channel in a test (ask whether it is a shade instead)
+
 ### RadioTransport
 The board-free half-duplex radio **port** `RadioTransceiver` reaches the chip through — one port for both directions because an RFM69-class chip is half-duplex. The live adapter is `Rfm69RadioTransport`.
 _Avoid_: splitting it into send/receive ports; importing `adafruit_rfm69` here (that lives in the adapter)
