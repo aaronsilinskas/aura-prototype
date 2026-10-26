@@ -49,7 +49,7 @@ def hit_at(player: SimulatedDevice) -> float:
 
 
 def add_in_order(sim: Simulation, receiver_first: bool) -> tuple[SimulatedDevice, SimulatedDevice]:
-    """A red shooter and a blue target, added in the order given."""
+    """A red shooter and the blue device it aims at, added in the order given."""
     if receiver_first:
         blue = sim.add_device("blue", scene="tag", scene_data=SHOOTER)
         red = sim.add_device("red", scene="tag", scene_data=SHOOTER)
@@ -197,7 +197,7 @@ def test_a_device_cannot_aim_at_a_device_in_another_simulation(sim):
         red.aim(LINE, at=blue)
 
 
-def test_an_aim_cannot_reach_a_receiver_the_target_lacks(sim):
+def test_an_aim_cannot_reach_a_receiver_the_device_lacks(sim):
     red = sim.add_device("red", scene="tag")
     blue = sim.add_device("blue", scene="tag")
 
