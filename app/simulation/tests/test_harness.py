@@ -100,3 +100,26 @@ def test_clip_length_reads_the_clips_wav_header(sim):
 
     # fire_shot_start.wav: 3456 frames of 11025 Hz mono
     assert player.clip_length("scene.fire_shot_start") == pytest.approx(3456 / 11025)
+
+
+def reach_red_light(sim: Simulation, player: SimulatedDevice) -> None:
+    player.tap("A")
+    sim.run_until(lambda: player.has_played("scene.red_light_music_start"))
+
+
+def test_a_moving_device_reads_as_motion_to_the_scene(sim):
+    player = sim.add_device("p1", scene="red_light_green_light")
+    reach_red_light(sim, player)
+
+    player.move()
+
+    sim.run_until(lambda: player.has_played("basic.game_over_sting_start"), timeout=1.0)
+
+
+def test_a_still_device_does_not_read_as_motion_to_the_scene(sim):
+    player = sim.add_device("p1", scene="red_light_green_light")
+    reach_red_light(sim, player)
+
+    sim.advance(2.0)
+
+    assert not player.has_played("basic.game_over_sting_start")

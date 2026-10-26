@@ -7,10 +7,12 @@ the engine loop, or time beyond the ``now`` it is handed.
 
 Its shape comes from a ``DeviceConfig``: one button per declared pin, labelled
 ``A`` onward as on a board; one recording pixel output per NeoPixel strip; the
-declared voice count; a haptic output when ``haptics`` is declared; the real
+declared voice count; a haptic output when ``haptics`` is declared; an
+accelerometer when ``accelerometer`` is declared; the real
 ``InfraredTransceiver`` over one simulated reader per ``ir.rx`` pin and one
 simulated writer per wired emitter. Wiring (pins, buses, addresses) is
-otherwise ignored. Matrix pixels, sensors, and the radio are not simulated.
+otherwise ignored. Matrix pixels, the magnetometer, and the radio are not
+simulated.
 
 IR pulses are ideal: a write lands at exactly the codec's durations, with no
 noise, jitter, or airtime. What an emitter writes also reaches the device's own
@@ -21,6 +23,7 @@ keeps a device from hearing itself.
 from __future__ import annotations
 
 import copy
+import math
 import wave
 from array import array
 from collections import deque
@@ -31,7 +34,7 @@ from effects.effect import Effect, PixelBuffer
 from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
-from engine.input import ButtonData
+from engine.input import AccelerationData, ButtonData
 from engine.network import IR_EMITTERS
 from engine.state import EffectReceipt, Scope, ScopeValue
 from hardware.shared.debounced_buttons import DebouncedButtons
@@ -61,6 +64,11 @@ _PIN_SETTLE = 2 * _DEBOUNCE_INTERVAL
 Long enough for the debouncer to commit it, so every scripted press and
 release registers and tests never need to know the debounce interval.
 """
+
+_AT_REST = (0.0, 0.0, AccelerationData.GRAVITY)
+_SWAY_AMPLITUDE = 4.0
+_SWAY_HZ = 2.0
+"""``move``'s sway on x: well above any sensible motion threshold, at a hand's pace."""
 
 
 @dataclass(frozen=True)
@@ -231,6 +239,24 @@ class _RecordingHaptic(EffectOutput):
             self._sim_hw.buzzed.append(Buzzed(self._sim_hw.now(), tuple(pattern.sequence)))
 
 
+class _SimulatedAccelerometer:
+    """An accelerometer reading a held ``(x, y, z)`` in m/s², plus any sway on x."""
+
+    def __init__(self, now: Callable[[], float]) -> None:
+        self._now = now
+        self.held = _AT_REST
+        self.sway_from: float | None = None
+        """When the sway started, or ``None`` while the device is not moving."""
+
+    @property
+    def acceleration(self) -> tuple[float, float, float]:
+        x, y, z = self.held
+        if self.sway_from is not None:
+            phase = 2 * math.pi * _SWAY_HZ * (self._now() - self.sway_from)
+            x += _SWAY_AMPLITUDE * math.sin(phase)
+        return (x, y, z)
+
+
 class _CountingButtons(DebouncedButtons):
     """The real debouncer, also counting each button's registered releases."""
 
@@ -288,10 +314,15 @@ class SimulatedHardware:
         self._ir_encoder: InfraredEncoder = AuraInfraredEncoder()
         self._wire_decoder: InfraredDecoder = AuraInfraredDecoder()
         ir = self._build_ir(config.ir) if config.ir is not None and config.ir.enabled else None
+        self._accelerometer = (
+            _SimulatedAccelerometer(now)
+            if config.accelerometer is not None and config.accelerometer.enabled
+            else None
+        )
         self.hw = DeviceHardware(
             outputs=outputs,
             buttons=self._buttons,
-            accelerometer=None,
+            accelerometer=self._accelerometer,
             magnetometer=None,
             network_controls=HardwareNetworkControls(ir),
             ir=ir,
@@ -327,6 +358,20 @@ class SimulatedHardware:
     def releases(self, button: str) -> int:
         """How many releases of *button* the debouncer has registered so far."""
         return self._buttons.releases[button]
+
+    def accelerate(self, x: float, y: float, z: float) -> None:
+        """Hold the accelerometer at ``(x, y, z)`` m/s² until told otherwise."""
+        self._require_accelerometer().held = (x, y, z)
+
+    def move(self) -> None:
+        """Sway on top of the held reading, tick after tick, until ``hold_still``."""
+        self._require_accelerometer().sway_from = self.now()
+
+    def hold_still(self) -> None:
+        """Back to rest, with gravity on z, and stop any ``move``."""
+        accelerometer = self._require_accelerometer()
+        accelerometer.held = _AT_REST
+        accelerometer.sway_from = None
 
     def hold(self, button: str) -> None:
         self._schedule(button, True)
@@ -390,6 +435,11 @@ class SimulatedHardware:
             if payload is not None:
                 return bytes(payload)
         raise ValueError(f"the {decoder.__class__.__name__} cannot read back what was sent")
+
+    def _require_accelerometer(self) -> _SimulatedAccelerometer:
+        if self._accelerometer is None:
+            raise ValueError("the config declares no accelerometer")
+        return self._accelerometer
 
     def _schedule(self, button: str, pressed: bool) -> None:
         # Queued behind the previous change, so back-to-back calls never land

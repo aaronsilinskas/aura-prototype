@@ -189,3 +189,91 @@ def test_a_payload_landing_with_the_devices_own_send_is_dropped_with_it():
     _ir(sim_hw).update()
 
     assert _ir(sim_hw).received is None
+
+
+# ---------------------------------------------------------------------------
+# Accelerometer
+# ---------------------------------------------------------------------------
+
+ACCELEROMETER = {"enabled": True}
+
+
+def _acceleration(sim_hw: SimulatedHardware) -> tuple[float, float, float]:
+    accelerometer = sim_hw.hw.accelerometer
+    assert accelerometer is not None
+    return accelerometer.acceleration  # type: ignore[attr-defined]
+
+
+def test_a_device_boots_still_with_gravity_on_z():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(accelerometer=ACCELEROMETER))
+
+    assert _acceleration(sim_hw) == (0.0, 0.0, 9.81)
+
+
+@pytest.mark.parametrize("sections", [{}, {"accelerometer": {"enabled": False}}])
+def test_a_device_has_an_accelerometer_only_when_the_config_enables_one(sections):
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(**sections))
+
+    assert sim_hw.hw.accelerometer is None
+
+
+def test_accelerate_holds_its_reading_over_time():
+    clock = [0.0]
+    sim_hw = SimulatedHardware(now=lambda: clock[0], config=_config(accelerometer=ACCELEROMETER))
+
+    sim_hw.accelerate(3.0, -2.0, 9.0)
+    first = _acceleration(sim_hw)
+    clock[0] = 5.0
+
+    assert first == (3.0, -2.0, 9.0)
+    assert _acceleration(sim_hw) == (3.0, -2.0, 9.0)
+
+
+def _readings_over(
+    sim_hw: SimulatedHardware, clock: list[float], seconds: float
+) -> list[tuple[float, float, float]]:
+    """One reading per 60 Hz tick for *seconds*, advancing *clock* as it goes."""
+    readings = []
+    for _ in range(round(seconds * 60)):
+        clock[0] += 1 / 60
+        readings.append(_acceleration(sim_hw))
+    return readings
+
+
+def _distance(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
+    return sum((p - q) ** 2 for p, q in zip(a, b, strict=True)) ** 0.5
+
+
+def _strays(readings: list[tuple[float, float, float]], rest: tuple[float, float, float]) -> bool:
+    """Whether every quarter second of *readings* swings more than 3 m/s² off *rest*."""
+    windows = [readings[i : i + 15] for i in range(0, len(readings), 15)]
+    return all(max(_distance(r, rest) for r in window) > 3.0 for window in windows)
+
+
+def test_move_keeps_swaying_well_away_from_the_held_reading():
+    clock = [0.0]
+    sim_hw = SimulatedHardware(now=lambda: clock[0], config=_config(accelerometer=ACCELEROMETER))
+    sim_hw.accelerate(1.0, 2.0, 9.0)
+
+    sim_hw.move()
+
+    assert _strays(_readings_over(sim_hw, clock, 2.0), rest=(1.0, 2.0, 9.0))
+
+
+def test_hold_still_returns_to_rest_and_stops_moving():
+    clock = [0.0]
+    sim_hw = SimulatedHardware(now=lambda: clock[0], config=_config(accelerometer=ACCELEROMETER))
+    sim_hw.accelerate(3.0, -2.0, 9.0)
+    sim_hw.move()
+    clock[0] = 0.3
+
+    sim_hw.hold_still()
+
+    assert set(_readings_over(sim_hw, clock, 1.0)) == {(0.0, 0.0, 9.81)}
+
+
+def test_a_device_without_an_accelerometer_cannot_be_moved():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config())
+
+    with pytest.raises(ValueError, match="accelerometer"):
+        sim_hw.move()
