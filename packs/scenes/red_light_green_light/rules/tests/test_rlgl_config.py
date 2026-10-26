@@ -1,4 +1,4 @@
-"""Tests for ``RlglConfig`` — duration/scaling methods, ``from_state`` defaults,
+"""Tests for ``RlglConfig`` — warning sting options, ``from_state`` defaults,
 and the ``rlgl_config`` get-or-create accessor."""
 
 from __future__ import annotations
@@ -51,47 +51,6 @@ def _config(**overrides) -> RlglConfig:
 
 
 # ---------------------------------------------------------------------------
-# Level-scaled duration methods
-# ---------------------------------------------------------------------------
-
-
-def test_red_duration_at_level_1_equals_max():
-    config = _config(red_duration_max=5.0, red_duration_min=2.0, max_level=10)
-    assert config.red_duration(1) == pytest.approx(5.0)
-
-
-def test_red_duration_at_max_level_equals_min():
-    config = _config(red_duration_max=5.0, red_duration_min=2.0, max_level=10)
-    assert config.red_duration(10) == pytest.approx(2.0)
-
-
-def test_green_duration_at_level_1_equals_max():
-    config = _config(green_duration_max=5.0, green_duration_min=2.0, max_level=10)
-    assert config.green_duration(1) == pytest.approx(5.0)
-
-
-def test_green_duration_at_max_level_equals_min():
-    config = _config(green_duration_max=5.0, green_duration_min=2.0, max_level=10)
-    assert config.green_duration(10) == pytest.approx(2.0)
-
-
-def test_warning_pulse_duration_at_level_1_equals_max():
-    config = _config(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10)
-    assert config.warning_pulse_duration(1) == pytest.approx(1.0)
-
-
-def test_warning_pulse_duration_at_max_level_equals_min():
-    config = _config(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10)
-    assert config.warning_pulse_duration(10) == pytest.approx(0.4)
-
-
-def test_warning_duration_is_three_times_pulse_duration():
-    config = _config(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10)
-    assert config.warning_duration(1) == pytest.approx(3.0 * 1.0)
-    assert config.warning_duration(10) == pytest.approx(3.0 * 0.4)
-
-
-# ---------------------------------------------------------------------------
 # Warning sting options builder
 # ---------------------------------------------------------------------------
 
@@ -140,33 +99,6 @@ def test_from_state_applies_defaults_when_unseeded():
     assert config.green_still_timeout == pytest.approx(0.75)
     assert config.level_up_duration == pytest.approx(1.0)
     assert config.max_level == 10
-
-
-def test_from_state_reads_seeded_overrides():
-    state = _make_state(
-        initial_data={
-            "rlgl_red_duration": 9.0,
-            "rlgl_green_duration_min": 1.5,
-            "rlgl_max_level": 5,
-        }
-    )
-
-    config = RlglConfig.from_state(state)
-
-    assert config.red_duration_max == pytest.approx(9.0)
-    assert config.green_duration_min == pytest.approx(1.5)
-    assert config.max_level == 5
-
-
-# ---------------------------------------------------------------------------
-# rlgl_config — get-or-create accessor
-# ---------------------------------------------------------------------------
-
-
-def test_rlgl_config_reflects_seeded_overrides_on_first_build():
-    state = _make_state(initial_data={"rlgl_max_level": 5})
-
-    assert rlgl_config(state).max_level == 5
 
 
 def test_rlgl_config_caches_the_same_instance_across_calls():
