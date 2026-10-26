@@ -36,7 +36,6 @@ class _TickEvent(Event):
 _PHASE_A = PhaseKey("a")
 _PHASE_B = PhaseKey("b")
 _MACHINE_KEY = "test_machine"
-_DEFAULT_SLOT = PhaseSlot(_MACHINE_KEY, _PHASE_A)
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +50,7 @@ class _LifecycleRule(PhaseRule):
         self,
         phase: PhaseKey,
         label: str,
-        phase_slot: PhaseSlot = _DEFAULT_SLOT,
+        phase_slot: PhaseSlot,
         transitions_to: PhaseKey | None = None,
     ) -> None:
         super().__init__(phase, phase_slot)
@@ -79,7 +78,7 @@ class _InPhaseEmitter(InPhaseRule):
         self,
         phase: PhaseKey,
         label: str,
-        phase_slot: PhaseSlot = _DEFAULT_SLOT,
+        phase_slot: PhaseSlot,
     ) -> None:
         super().__init__(phase, phase_slot)
         self._label = label
@@ -182,25 +181,13 @@ def test_phase_slot_exposes_its_key() -> None:
     assert slot.key == "some_machine"
 
 
-def test_two_phase_slots_with_the_same_key_still_resolve_the_same_cached_machine() -> None:
-    # Lazy get-or-create means any two PhaseSlots keyed alike reach the one
-    # cached PhaseMachine already stored under that key in GameState -- there
-    # is no "unestablished key" failure. Identity divergence is instead caught
-    # at scene load by _check_phase_owners (see the engine.py tests below).
-    state = GameState(SpyEffectControls(), SceneControls())
-    first = PhaseSlot("shared_machine", _PHASE_A)
-    second = PhaseSlot("shared_machine", _PHASE_A)
-
-    assert first(state) is second(state)
-
-
 # ---------------------------------------------------------------------------
 # PhaseRule lifecycle through the engine seam
 # ---------------------------------------------------------------------------
 
 
 def test_on_enter_fires_once_while_the_gated_handler_fires_every_tick() -> None:
-    rule = _LifecycleRule(_PHASE_A, "owner")
+    rule = _LifecycleRule(_PHASE_A, "owner", PhaseSlot(_MACHINE_KEY, _PHASE_A))
 
     names = _run([rule], ticks=3)
 
@@ -302,63 +289,56 @@ def test_in_phase_rule_and_phase_rule_coexist_on_one_phase() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Duplicate-owner fail-fast at scene load (GameEngine.set_rules)
+# PhaseSlot ownership — each PhaseRule registers as its phase's owner
 # ---------------------------------------------------------------------------
 
 
-def test_two_phase_rules_owning_the_same_machine_and_phase_fail_at_load() -> None:
-    engine = GameEngine(effect_controls=SpyEffectControls())
-    one = _LifecycleRule(_PHASE_A, "one")
-    two = _LifecycleRule(_PHASE_A, "two")
+def test_phase_slot_reports_the_phase_rule_constructed_for_each_phase() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    a = _LifecycleRule(_PHASE_A, "a", phase_slot=slot)
+    b = _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
 
-    with pytest.raises(ValueError):
-        engine.set_rules([one, two])
-
-
-def test_phase_rules_on_different_phases_load_cleanly() -> None:
-    engine = GameEngine(effect_controls=SpyEffectControls())
-    a = _LifecycleRule(_PHASE_A, "a")
-    b = _LifecycleRule(_PHASE_B, "b")
-
-    engine.set_rules([a, b])  # does not raise
-
-    assert len(engine.rules) == 2
+    assert slot.owner_of(_PHASE_A) is a
+    assert slot.owner_of(_PHASE_B) is b
 
 
-def test_same_phase_under_different_phase_slots_loads_cleanly() -> None:
-    engine = GameEngine(effect_controls=SpyEffectControls())
-    one = _LifecycleRule(_PHASE_A, "one", phase_slot=PhaseSlot("machine_one", _PHASE_A))
-    two = _LifecycleRule(_PHASE_A, "two", phase_slot=PhaseSlot("machine_two", _PHASE_A))
+def test_constructing_a_second_owner_for_a_phase_raises_naming_the_phase() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    _LifecycleRule(_PHASE_A, "one", phase_slot=slot)
 
-    engine.set_rules([one, two])  # does not raise
-
-    assert len(engine.rules) == 2
+    with pytest.raises(ValueError, match="PhaseKey\\('a'\\)"):
+        _LifecycleRule(_PHASE_A, "two", phase_slot=slot)
 
 
-def test_in_phase_rule_sharing_a_phase_with_its_owner_is_not_a_duplicate() -> None:
-    engine = GameEngine(effect_controls=SpyEffectControls())
+def test_the_same_phase_may_have_an_owner_under_each_of_two_slots() -> None:
+    one_slot = PhaseSlot("machine_one", _PHASE_A)
+    other_slot = PhaseSlot("machine_two", _PHASE_A)
+    one = _LifecycleRule(_PHASE_A, "one", phase_slot=one_slot)
+    other = _LifecycleRule(_PHASE_A, "other", phase_slot=other_slot)
+
+    assert one_slot.owner_of(_PHASE_A) is one
+    assert other_slot.owner_of(_PHASE_A) is other
+
+
+def test_in_phase_rules_never_own_their_phase() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    _InPhaseEmitter(_PHASE_A, "first", phase_slot=slot)
+    _InPhaseEmitter(_PHASE_A, "second", phase_slot=slot)
+
+    assert slot.owner_of(_PHASE_A) is None
+
+
+def test_in_phase_rules_sharing_a_phase_leave_its_owner_in_place() -> None:
     slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
     owner = _LifecycleRule(_PHASE_A, "owner", phase_slot=slot)
-    bystander = _InPhaseEmitter(_PHASE_A, "bystander", phase_slot=slot)
+    _InPhaseEmitter(_PHASE_A, "bystander", phase_slot=slot)
 
-    engine.set_rules([owner, bystander])  # does not raise
-
-    assert len(engine.rules) == 2
+    assert slot.owner_of(_PHASE_A) is owner
 
 
 # ---------------------------------------------------------------------------
-# PhaseRule per-instance PhaseSlot — slot identity and phase_ownership
+# Shared PhaseSlot — every rule resolves the one machine
 # ---------------------------------------------------------------------------
-
-
-def test_phase_rule_phase_ownership_returns_slot_key_and_phase() -> None:
-    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
-    rule = _LifecycleRule(_PHASE_A, "owner", phase_slot=slot)
-
-    key, phase = rule.phase_ownership()
-
-    assert key == _MACHINE_KEY
-    assert phase is _PHASE_A
 
 
 def test_shared_phase_slot_resolves_the_same_machine_for_phase_rule_and_in_phase_rule() -> None:

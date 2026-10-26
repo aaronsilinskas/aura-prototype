@@ -9,7 +9,7 @@ from engine.input import ButtonData, InputEvents
 from engine.state import GameState, SceneControls
 from engine.tests.helpers import SpyEffectControls
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_ACCELEROMETER, MODE_RGB
-from packs.scenes.hardware_test.rules.rgb_rule import HwTestRgbRule
+from packs.scenes.hardware_test.rules.rgb_rule import RULE
 from packs.scenes.hardware_test.rules.tests.helpers import seed_phase
 
 # ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@ def spy() -> SpyEffectControls:
 
 def _make_state(spy: SpyEffectControls, mode=MODE_RGB) -> tuple[GameState, GameEngine]:
     engine = GameEngine(spy)
-    engine.add_rules(HwTestRgbRule())
+    engine.add_rules(RULE)
     state = engine.create_state(SceneControls(), initial_data={})
     if mode is not MODE_RGB:
         seed_phase(state, mode)

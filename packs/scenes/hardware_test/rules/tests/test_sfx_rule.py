@@ -14,7 +14,7 @@ from packs.scenes.hardware_test.rules.helpers.phases import (
     MODE_RGB,
     MODE_SFX,
 )
-from packs.scenes.hardware_test.rules.sfx_rule import HwTestSfxRule
+from packs.scenes.hardware_test.rules.sfx_rule import RULE
 from packs.scenes.hardware_test.rules.tests.helpers import seed_phase
 
 # ---------------------------------------------------------------------------
@@ -29,7 +29,7 @@ def spy() -> SpyEffectControls:
 
 def _make_state(spy: SpyEffectControls, mode=MODE_SFX) -> tuple[GameState, GameEngine]:
     engine = GameEngine(spy)
-    engine.add_rules(HwTestSfxRule())
+    engine.add_rules(RULE)
     state = engine.create_state(SceneControls(), initial_data={})
     seed_phase(state, mode, entered=(mode is MODE_SFX))
     return state, engine
