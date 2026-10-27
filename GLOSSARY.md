@@ -117,6 +117,10 @@ The rule-facing scene-transition seam (`load`, `overlay`, `pop`, `reboot_into`, 
 Owns the scene stack and drives scene transitions, routing every transition through the injected `EffectAdmin`/`AudioOverlayAdmin` seams and reboots through the injected `SceneReboot` port. The live `SceneControls`.
 _Avoid_: calling `register()` on it (removed); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); routing scene-transition sound calls through anything but the injected `AudioOverlayAdmin`
 
+### Reboot
+How a device switches scenes: the target is persisted to device storage, then the device resets and boots that scene. Only storage and what is physically happening to the device (held buttons, motion, where its IR points) carry across; game state, phases and output state do not, and nothing after the reset runs. A device with no SD card cannot persist a target, so it does not reboot.
+_Avoid_: "scene switch" for a reboot (`load`/`overlay`/`pop` switch scenes without one); "restart", "reload" (reload is CircuitPython's soft reboot after a deploy)
+
 ### SceneReboot
 The board-free port `SceneManager` reaches to persist a scene switch and reboot the device; live adapter `DeviceSceneReboot`.
 _Avoid_: validating the target here (that is `SceneManager.reboot_into`'s job); calling `microcontroller.reset()` anywhere but `run_scene` (and the on-device `reboot_demo` example), which inject it into `DeviceSceneReboot`
@@ -270,7 +274,7 @@ The board-free bundle `build_hardware` returns — a data holder for the built o
 _Avoid_: exposing raw transmitters (use `network_controls`/`ir`); exposing the raw `RadioTransport` (use `network_controls`/`radio`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### Simulated device
-A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz, and send. Its own emitters light its own receivers; its IR reaches other simulated devices only through the **IR medium**, where it is aimed. Its shape comes from a `DeviceConfig` — the harness boots it from `examples/aura-device.simulated.json`, kept capability-equal to every other example config by a sync test. When real hardware exposes a bug it missed, the simulated device is extended until that bug is visible.
+A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz, and send. Its own emitters light its own receivers; its IR reaches other simulated devices only through the **IR medium**, where it is aimed. Its shape comes from a `DeviceConfig` — the harness boots it from `examples/aura-device.simulated.json`, kept capability-equal to every other example config by a sync test. It has its own in-memory storage unless a test makes it card-less, and a **reboot** boots it again at the next tick: it is switched on into the scene the test names, and every later boot comes from what a reboot persisted. When real hardware exposes a bug it missed, the simulated device is extended until that bug is visible.
 _Avoid_: mock device, virtual device, emulator (it does not run CircuitPython); faking the CircuitPython libraries beneath `device_builder`; hard-coding its hardware shape (declare it in the simulated config)
 
 ### Simulation test harness
