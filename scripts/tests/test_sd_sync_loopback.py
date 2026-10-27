@@ -26,7 +26,7 @@ from hardware.shared.sd_sync_protocol import (
     encode_frame,
 )
 from hardware.shared.sd_sync_server import SdSyncServer
-from hardware.shared.tests.helpers import FakeDeviceStorage
+from hardware.simulated.storage import FakeDeviceStorage
 from scripts.sd_sync_client import (
     SdSyncClient,
     SdSyncIntegrityError,

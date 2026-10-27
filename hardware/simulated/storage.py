@@ -1,40 +1,44 @@
-"""Shared test doubles for hardware/shared, importable across test modules."""
+"""The Simulated device's SD card: a ``DeviceStorage`` held in memory.
 
-try:
-    from collections.abc import Iterable, Iterator
-except ImportError:
-    pass  # Not available on all embedded runtimes
+Also the in-memory double the ``hardware/shared`` storage, state and SD-sync
+tests use, so it stays a faithful copy of ``DeviceStorage``'s contract.
+"""
 
-from hardware.shared.device_storage import decode_json, encode_json, reject_escaping_path
+from __future__ import annotations
+
+from collections.abc import Iterable, Iterator
+
+from hardware.shared.device_storage import (
+    DeviceStorage,
+    decode_json,
+    encode_json,
+    reject_escaping_path,
+)
 
 __all__ = ["FakeDeviceStorage"]
 
 
-class FakeDeviceStorage:
-    """In-memory ``DeviceStorage`` double modelling its observable contract.
+class FakeDeviceStorage(DeviceStorage):
+    """In-memory ``DeviceStorage`` modelling its observable contract.
 
-    Not a subclass of :class:`hardware.shared.device_storage.DeviceStorage`
-    -- that class is a concrete, directly-instantiable filesystem adapter
-    (there is no separate abstract port to share, unlike
-    ``RadioTransport``/``PulseWriter``), so this fake reimplements the same
-    accessor surface against a plain dict rather than inheriting filesystem
-    behaviour it would only have to override.
+    A subclass only so it stands wherever a ``DeviceStorage`` is expected:
+    ``DeviceStorage`` is itself the filesystem adapter (there is no separate
+    abstract port, unlike ``RadioTransport``/``PulseWriter``), so every public
+    method is overridden against a plain dict and none of the filesystem
+    behaviour is used.
     """
 
     _MOUNT_ROOT = "/fake-mount"
 
     def __init__(self) -> None:
+        super().__init__(self._MOUNT_ROOT)
         self._files: dict[str, bytes] = {}
 
-    @property
-    def mount_root(self) -> str:
-        return self._MOUNT_ROOT
-
-    def read_bytes(self, name: str) -> "bytes | None":
+    def read_bytes(self, name: str) -> bytes | None:
         self._guard(name)
         return self._files.get(name)
 
-    def read_chunks(self, name: str, chunk_size: int) -> "Iterator[bytes] | None":
+    def read_chunks(self, name: str, chunk_size: int) -> Iterator[bytes] | None:
         self._guard(name)
         data = self._files.get(name)
         if data is None:
@@ -45,11 +49,11 @@ class FakeDeviceStorage:
         self._guard(name)
         self._files[name] = bytes(data)
 
-    def write_chunks(self, name: str, chunks: "Iterable[bytes]") -> None:
+    def write_chunks(self, name: str, chunks: Iterable[bytes]) -> None:
         self._guard(name)
         self._files[name] = b"".join(chunks)
 
-    def read_json(self, name: str) -> "dict | None":
+    def read_json(self, name: str) -> dict | None:
         data = self.read_bytes(name)
         if data is None:
             return None
@@ -62,7 +66,7 @@ class FakeDeviceStorage:
         self._guard(subpath)
         return self._MOUNT_ROOT + "/" + subpath
 
-    def walk(self, subpath: str = "") -> "list[tuple[str, int]]":
+    def walk(self, subpath: str = "") -> list[tuple[str, int]]:
         """Mirror ``DeviceStorage.walk`` against the flat ``_files`` dict.
 
         There is no directory modelling here -- each key in ``_files`` is

@@ -1,6 +1,6 @@
 """Behaviour-driven tests for the DeviceStorage port (hardware/shared/device_storage.py).
 
-Also exercises FakeDeviceStorage (hardware/shared/tests/helpers.py), the in-memory
+Also exercises FakeDeviceStorage (hardware/simulated/storage.py), the in-memory
 double, against the same observable contract so the two stay interchangeable.
 """
 
@@ -12,7 +12,7 @@ import os
 import pytest
 
 from hardware.shared.device_storage import DeviceStorage
-from hardware.shared.tests.helpers import FakeDeviceStorage
+from hardware.simulated.storage import FakeDeviceStorage
 
 ESCAPING_NAMES = ["../secret.txt", "scenes/../../secret.txt", "/etc/passwd"]
 
@@ -437,7 +437,7 @@ def test_walk_rejects_a_subpath_that_escapes_the_mount_root(tmp_path, escaping_s
 
 
 # ---------------------------------------------------------------------------
-# FakeDeviceStorage — in-memory test double (hardware/shared/tests/helpers.py)
+# FakeDeviceStorage — in-memory test double (hardware/simulated/storage.py)
 # ---------------------------------------------------------------------------
 
 

@@ -3,7 +3,7 @@
 import pytest
 
 from hardware.shared.scene_selection import resolve_boot_scene, resolve_scene_name
-from hardware.shared.tests.helpers import FakeDeviceStorage
+from hardware.simulated.storage import FakeDeviceStorage
 
 
 def test_present_scene_name_is_used():

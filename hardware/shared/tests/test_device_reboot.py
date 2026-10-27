@@ -7,7 +7,7 @@ so a "reboot" only records what storage held at the moment it fired.
 from engine.log import Logger
 from hardware.shared.device_reboot import DeviceSceneReboot
 from hardware.shared.device_state import DeviceStateStore
-from hardware.shared.tests.helpers import FakeDeviceStorage
+from hardware.simulated.storage import FakeDeviceStorage
 
 
 class RecordingReset:

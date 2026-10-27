@@ -11,8 +11,8 @@ declared voice count; a haptic output when ``haptics`` is declared; an
 accelerometer when ``accelerometer`` is declared; the real
 ``InfraredTransceiver`` over one simulated reader per ``ir.rx`` pin and one
 simulated writer per wired emitter. Wiring (pins, buses, addresses) is
-otherwise ignored. Matrix pixels, the magnetometer, and the radio are not
-simulated.
+otherwise ignored; an enabled ``sdcard`` section is an in-memory card. Matrix
+pixels, the magnetometer, and the radio are not simulated.
 
 IR pulses are ideal: a write lands at exactly the codec's durations, with no
 noise, jitter, or airtime. What an emitter writes reaches the device's own
@@ -41,7 +41,7 @@ from engine.input import AccelerationData, ButtonData
 from engine.network import IR_EMITTERS
 from engine.state import EffectReceipt, Scope, ScopeValue
 from hardware.shared.debounced_buttons import DebouncedButtons
-from hardware.shared.device_config import DeviceConfig, IRConfig, MatrixPixelsConfig
+from hardware.shared.device_config import DeviceConfig, MatrixPixelsConfig
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
@@ -57,6 +57,7 @@ from hardware.shared.ir_transport import (
 )
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
+from hardware.simulated.storage import FakeDeviceStorage
 
 __all__ = ["DEFAULT_SWAY_STRENGTH", "Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip"]
 
@@ -307,11 +308,16 @@ class _SimulatedAccelerometer:
 
 
 class _CountingButtons(DebouncedButtons):
-    """The real debouncer, also counting each button's registered releases."""
+    """The real debouncer, also counting each button's registered releases into *releases*."""
 
-    def __init__(self, buttons: list[tuple[str, Callable[[], bool]]], interval: float) -> None:
+    def __init__(
+        self,
+        buttons: list[tuple[str, Callable[[], bool]]],
+        interval: float,
+        releases: dict[str, int],
+    ) -> None:
         super().__init__(buttons, interval=interval)
-        self.releases = {label: 0 for label, _ in buttons}
+        self.releases = releases
 
     def update(self, elapsed: float, out: ButtonData) -> None:
         super().update(elapsed, out)
@@ -339,6 +345,10 @@ class SimulatedHardware:
     scripted pin changes fall due against it. Call ``settle_pins`` once per
     tick, before the tick reads the buttons. *ir_sink*, when given, is handed
     every emitter write as ``(emitter, pulses)``.
+
+    ``hw.storage`` is an in-memory card when the config declares an enabled
+    ``sdcard`` section, else ``None``. ``power_on`` resets the device: see
+    there for what it rebuilds.
     """
 
     def __init__(
@@ -348,16 +358,47 @@ class SimulatedHardware:
         ir_sink: Callable[[str, list[int]], None] | None = None,
     ) -> None:
         self.now = now
+        self._config = config
         self._ir_sink = ir_sink
         self.ir_sent: list[IrSent] = []
         self.played: list[Played] = []
         self.buzzed: list[Buzzed] = []
-        labels = [chr(ord("A") + i) for i in range(len(config.buttons))]
-        self._pressed = dict.fromkeys(labels, False)
-        self._pin_changes: dict[str, list[tuple[float, bool]]] = {b: [] for b in labels}
-        self._pin_free_at = dict.fromkeys(labels, 0.0)
+        self._labels = [chr(ord("A") + i) for i in range(len(config.buttons))]
+        self._pressed = dict.fromkeys(self._labels, False)
+        self._pin_changes: dict[str, list[tuple[float, bool]]] = {b: [] for b in self._labels}
+        self._pin_free_at = dict.fromkeys(self._labels, 0.0)
+        self._releases = dict.fromkeys(self._labels, 0)
+        ir_config = config.ir if config.ir is not None and config.ir.enabled else None
+        self._ir_receiver_count = len(ir_config.rx) if ir_config is not None else 0
+        self._wired_emitters = (
+            tuple(e for e in IR_EMITTERS if e in ir_config.emitters)
+            if ir_config is not None
+            else ()
+        )
+        self._accelerometer = (
+            _SimulatedAccelerometer(now)
+            if config.accelerometer is not None and config.accelerometer.enabled
+            else None
+        )
+        self._storage = (
+            FakeDeviceStorage() if config.sdcard is not None and config.sdcard.enabled else None
+        )
+        self.power_on()
+
+    def power_on(self) -> None:
+        """Build ``hw`` afresh, as a reset does; the card, pins, accelerometer and recordings stay.
+
+        The debouncer reads the pins as they stand, so a button held through
+        it stays down without a new press. Strips are dark, no clip plays,
+        the IR receivers have caught nothing, and the device speaks the Aura
+        wire-frame until ``apply_ir_codec``.
+        """
+        config = self._config
+        self._ir_readers = [_SimulatedPulseReader() for _ in range(self._ir_receiver_count)]
         self._buttons = _CountingButtons(
-            [(label, self._pin_reader(label)) for label in labels], interval=_DEBOUNCE_INTERVAL
+            [(label, self._pin_reader(label)) for label in self._labels],
+            interval=_DEBOUNCE_INTERVAL,
+            releases=self._releases,
         )
         self._strips = [_RecordingPixels(segments) for segments in _strip_segments(config)]
         self._audio_registry = AudioRegistry()
@@ -371,17 +412,10 @@ class SimulatedHardware:
             outputs.append(self._audio)
         if config.haptics is not None and config.haptics.enabled:
             outputs.append(_RecordingHaptic(self))
-        self._ir_readers: list[_SimulatedPulseReader] = []
         self._ir_receiver: InfraredReceiver | None = None
-        self._wired_emitters: tuple[str, ...] = ()
         self._ir_encoder: InfraredEncoder = AuraInfraredEncoder()
         self._wire_decoder: InfraredDecoder = AuraInfraredDecoder()
-        ir = self._build_ir(config.ir) if config.ir is not None and config.ir.enabled else None
-        self._accelerometer = (
-            _SimulatedAccelerometer(now)
-            if config.accelerometer is not None and config.accelerometer.enabled
-            else None
-        )
+        ir = self._build_ir() if self._ir_readers else None
         self.hw = DeviceHardware(
             outputs=outputs,
             buttons=self._buttons,
@@ -390,7 +424,7 @@ class SimulatedHardware:
             network_controls=HardwareNetworkControls(ir),
             ir=ir,
             radio=None,
-            storage=None,
+            storage=self._storage,
             audio_registry=self._audio_registry,
         )
 
@@ -456,7 +490,7 @@ class SimulatedHardware:
 
     def releases(self, button: str) -> int:
         """How many releases of *button* the debouncer has registered so far."""
-        return self._buttons.releases[button]
+        return self._releases[button]
 
     def accelerate(self, x: float, y: float, z: float) -> None:
         self._require_accelerometer().hold(x, y, z)
@@ -494,17 +528,15 @@ class SimulatedHardware:
         self.played.clear()
         self.buzzed.clear()
 
-    def _build_ir(self, config: IRConfig) -> InfraredTransceiver:
+    def _build_ir(self) -> InfraredTransceiver:
         """Assemble the real IR stack the way ``device_builder`` does, on simulated pulses."""
         gate = IrTransmitGate()
-        self._ir_readers = [_SimulatedPulseReader() for _ in config.rx]
         receiver: InfraredReceiver
         if len(self._ir_readers) == 1:
             receiver = InfraredSingleReceiver(self._ir_readers[0], AuraInfraredDecoder(), gate)
         else:
             receiver = InfraredMultiReceiver(list(self._ir_readers), AuraInfraredDecoder, gate)
         self._ir_receiver = receiver
-        self._wired_emitters = tuple(e for e in IR_EMITTERS if e in config.emitters)
         transmitters = {
             emitter: InfraredTransmitter(
                 _SimulatedPulseWriter(self, emitter), self._ir_encoder, gate

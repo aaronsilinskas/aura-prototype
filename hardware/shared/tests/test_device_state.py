@@ -1,13 +1,13 @@
 """Behaviour-driven tests for DeviceStateStore, the aura-state.json owner.
 
 Exercises DeviceStateStore (hardware/shared/device_state.py) against the shared
-FakeDeviceStorage double (hardware/shared/tests/helpers.py), the same seam
+FakeDeviceStorage double (hardware/simulated/storage.py), the same seam
 DeviceStorage's own tests use.
 """
 
 from engine.log import Logger
 from hardware.shared.device_state import DeviceStateStore
-from hardware.shared.tests.helpers import FakeDeviceStorage
+from hardware.simulated.storage import FakeDeviceStorage
 
 
 def test_get_returns_none_for_a_never_written_key():
