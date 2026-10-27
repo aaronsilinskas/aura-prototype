@@ -28,11 +28,19 @@ LEVEL_UP_SOUND = "scene.level_up_start"
 WIN_STING = "scene.win_sting_start"
 GAME_OVER_STING = "basic.game_over_sting_start"
 
-SLACK = 2 * TICK
-"""How far an observed phase change may trail its tunable.
+SLACK = TICK
+"""How far a timed phase change, or a clip running out, may trail its tunable.
 
-A clip running out is only seen on the tick after the one it ends in, up to
-two ticks past its length.
+Both are checked once a tick, so they land on the first tick at or past it.
+One that falls on a tick boundary can land a tick later still: the clock sums
+``TICK`` tick by tick, and the sum can fall a hair short of the boundary.
+"""
+
+CLIP_END_SLACK = 2 * TICK
+"""How far a phase change that waits on a clip running out may trail the clip's length.
+
+The clip is seen to have run out on the first tick at or past its end, and the
+phase changes on the tick after that one.
 """
 
 QUICK_WARNINGS = {"rlgl_warning_pulse_max": 0.2, "rlgl_warning_pulse_min": 0.2}

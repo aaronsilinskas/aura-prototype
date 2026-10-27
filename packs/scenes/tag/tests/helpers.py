@@ -43,7 +43,7 @@ def shooters_tag(damage: int = 1) -> bytes:
     return tag_shot(SHOOTER["tag_expected_team"], SHOOTER["tag_expected_player"], damage)
 
 
-def land(sim: Simulation, player: SimulatedDevice, payload: bytes) -> None:
+def hit(sim: Simulation, player: SimulatedDevice, payload: bytes) -> None:
     """Land a tag shot on *player* and run the ticks that react to it.
 
     The first tick decodes the shot and plays the hit; the second is the
@@ -51,6 +51,21 @@ def land(sim: Simulation, player: SimulatedDevice, payload: bytes) -> None:
     """
     player.receive_ir(payload)
     sim.advance(2 * TICK)
+
+
+def fire_together(sim: Simulation, *shooters: SimulatedDevice) -> None:
+    """Pull every shooter's trigger on the same tick, and run until their shots are decoded.
+
+    A shot goes out on the tick its trigger registers and is decoded, wherever
+    it was aimed, on the next.
+    """
+    sent = [len(shooter.ir_sent) for shooter in shooters]
+    for shooter in shooters:
+        shooter.hold("A")
+    sim.run_until(lambda: all(len(s.ir_sent) > n for s, n in zip(shooters, sent, strict=True)))
+    for shooter in shooters:
+        shooter.release("A")
+    sim.advance(TICK)
 
 
 def shots(player: SimulatedDevice) -> list[tuple[int, int, int]]:

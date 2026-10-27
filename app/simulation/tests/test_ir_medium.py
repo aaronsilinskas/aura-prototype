@@ -12,6 +12,7 @@ from app.simulation import TICK, SimulatedDevice, Simulation
 from engine.network import LINE
 from engine.state import Scope
 
+# SHOOTER and start_game copy Tag's test helpers: the harness's tests stand on no scene's tests.
 SHOOTER: dict[str, object] = {"tag_expected_team": 2, "tag_expected_player": 3}
 """The team/player a Tag device both fires as and counts hits from."""
 

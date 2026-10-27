@@ -17,7 +17,7 @@ from packs.scenes.tag.tests.helpers import (
     EVERY_STRIP,
     GREEN,
     SHOOTER,
-    land,
+    hit,
     shooters_tag,
     start_game,
     sweeping_red,
@@ -33,8 +33,8 @@ MID_RELOAD = {**TWO_HITS_TO_LOSE, "tag_max_ammo": 1, "tag_reload_duration": 1.0}
 
 
 def run_out_of_hitpoints(sim: Simulation, player: SimulatedDevice) -> None:
-    land(sim, player, shooters_tag())
-    land(sim, player, shooters_tag())
+    hit(sim, player, shooters_tag())
+    hit(sim, player, shooters_tag())
 
 
 def start_reloading(sim: Simulation, player: SimulatedDevice) -> None:
@@ -76,7 +76,7 @@ def test_a_hit_that_leaves_hitpoints_does_not_end_the_game(sim):
     player = sim.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
     start_game(sim, player)
 
-    land(sim, player, shooters_tag())
+    hit(sim, player, shooters_tag())
 
     assert not player.has_played(STING)
 
@@ -85,7 +85,7 @@ def test_damage_past_zero_ends_the_game_too(sim):
     player = sim.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
     start_game(sim, player)
 
-    land(sim, player, shooters_tag(damage=4))
+    hit(sim, player, shooters_tag(damage=4))
 
     assert player.has_played(STING)
 
