@@ -1,17 +1,17 @@
-"""DeviceSceneReboot — the live SceneReboot backed by microcontroller.reset().
+"""DeviceSceneReboot — the live SceneReboot: persist the target, then reset.
 
-The only module that calls ``microcontroller.reset()``. Imported only from
-``app.scene_runtime`` (device-only), which constructs it with the scene name
-the process booted into plus ``hw.storage``, then hands it to
-``build_scene_runtime`` as the board-free ``SceneReboot`` port. Unlike
-``rfm69_radio_transport``/``sdcard_storage``, ``microcontroller`` needs no
-deferred import to keep an optional peripheral library uninstalled — it is a
-core CircuitPython module, always present.
+Board-free: the reset is injected rather than imported, so the adapter runs
+under CPython. On a board, ``app.scene_runtime.run_scene`` passes
+``microcontroller.reset`` and hands the adapter to ``build_scene_runtime`` as
+the ``SceneReboot`` port.
 """
 
 from __future__ import annotations
 
-import microcontroller
+try:
+    from collections.abc import Callable
+except ImportError:
+    pass  # Not available on CircuitPython
 
 from engine.log import Logger
 from engine.state import SceneReboot
@@ -40,20 +40,24 @@ class DeviceSceneReboot(SceneReboot):
             Recorded as ``return_to`` by :meth:`reboot_into`, so no rule
             needs to know its own scene name — the return target is "the
             scene being left," known automatically at construction.
+        reset: Resets the device. On a board this is
+            ``microcontroller.reset``, which never returns.
         logger: Where a card-less or no-``return_to`` no-op is logged.
             Omitted or None normalizes to ``Logger.SILENT``.
     """
 
-    __slots__ = ("_booted_scene", "_logger", "_state_store", "_storage")
+    __slots__ = ("_booted_scene", "_logger", "_reset", "_state_store", "_storage")
 
     def __init__(
         self,
         storage: DeviceStorage | None,
         booted_scene: str,
+        reset: Callable[[], None],
         logger: Logger | None = None,
     ) -> None:
         self._storage = storage
         self._booted_scene = booted_scene
+        self._reset = reset
         self._logger = logger if logger is not None else Logger.SILENT
         self._state_store = DeviceStateStore(storage, self._logger)
 
@@ -68,7 +72,7 @@ class DeviceSceneReboot(SceneReboot):
             return
         self._state_store.set("scene", target)
         self._state_store.set("return_to", self._booted_scene)
-        microcontroller.reset()
+        self._reset()
 
     def reboot_to_previous(self) -> None:
         """Persist the recorded ``return_to`` as ``scene``, clear it, then reset.
@@ -85,4 +89,4 @@ class DeviceSceneReboot(SceneReboot):
             return
         self._state_store.set("scene", return_to)
         self._state_store.clear("return_to")
-        microcontroller.reset()
+        self._reset()

@@ -153,7 +153,7 @@ class SceneReboot:
     device — lives on the concrete implementation, since a reboot is
     inherently a hardware operation the board-free engine cannot perform
     itself. Both methods raise ``NotImplementedError`` by default;
-    ``DeviceSceneReboot`` (``hardware.circuitpython.device_reboot``) is the
+    ``DeviceSceneReboot`` (``hardware.shared.device_reboot``) is the
     live implementation, and a recording fake stands in for CPython tests.
     """
 
