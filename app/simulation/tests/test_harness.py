@@ -228,3 +228,60 @@ def test_hold_still_stops_a_move(sim):
     sim.advance(2.0)
 
     assert not caught_moving(player)
+
+
+# ---------------------------------------------------------------------------
+# Magnetometer
+# ---------------------------------------------------------------------------
+
+# hardware_test's magnetometer mode, two presses of B in, bars each axis of the
+# raw field: x on the personal strip, red when positive, full at MAG_MAX µT.
+MAGNETOMETER_MODE = 2
+MAG_MAX = 100.0
+
+
+def enter_magnetometer_mode(device: SimulatedDevice) -> None:
+    for _ in range(MAGNETOMETER_MODE):
+        device.tap("B")
+
+
+def test_magnetize_sets_the_field_a_scene_reads(sim):
+    device = sim.add_device("red", scene="hardware_test")
+    enter_magnetometer_mode(device)
+
+    device.magnetize(MAG_MAX, 0.0, 0.0)
+    sim.advance(TICK)
+
+    assert device.strip(Scope.PERSONAL).all_lit(0xFF0000)
+
+
+def test_a_device_switches_on_reading_a_zero_field(sim, capsys):
+    # The mode logs the field only when the scene has one: no magnetometer reads as no line.
+    device = sim.add_device("red", scene="hardware_test")
+    capsys.readouterr()
+
+    enter_magnetometer_mode(device)
+
+    assert "mag (0.0, 0.0, 0.0)" in capsys.readouterr().out
+
+
+def test_a_magnetized_field_holds_until_changed(sim):
+    device = sim.add_device("red", scene="hardware_test")
+    enter_magnetometer_mode(device)
+    device.magnetize(MAG_MAX, 0.0, 0.0)
+
+    sim.advance(2.0)
+
+    assert device.strip(Scope.PERSONAL).all_lit(0xFF0000)
+
+
+def test_magnetizing_again_changes_the_field(sim):
+    device = sim.add_device("red", scene="hardware_test")
+    enter_magnetometer_mode(device)
+    device.magnetize(MAG_MAX, 0.0, 0.0)
+    sim.advance(TICK)
+
+    device.magnetize(0.0, 0.0, 0.0)
+    sim.advance(TICK)
+
+    assert device.strip(Scope.PERSONAL).dark
