@@ -10,26 +10,36 @@ from collections.abc import Callable
 
 import pytest
 
-from app.simulation import TICK, SimulatedDevice
+from app.simulation import SimulatedDevice
+from engine.network import LINE
 from engine.state import Scope
 from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import FLASH_DURATION
-from packs.scenes.hardware_test.rules.helpers.mode import HW_TEST_PAYLOAD
+from packs.scenes.hardware_test.rules.magnetic_rule import MAG_MAX
 from packs.scenes.hardware_test.tests.helpers import (
     ACCELEROMETER,
     BLUE,
     CYAN,
-    EVERY_STRIP,
     GLOBAL_STRIPS,
     IR,
     MAGNETOMETER,
     MODE_COUNT,
     RADIO,
+    RED,
     SFX,
+    YELLOW,
     all_white,
+    every_global_strip_lit,
     press,
-    send_a_packet,
+    send_on_a,
     strips_but,
 )
+
+FIELD = (MAG_MAX, 0.0, -MAG_MAX)
+"""The field every device in the cycle reads; only Magnetometer mode shows it.
+
+z is negative, not positive: Accelerometer mode leaves the global strips blue at rest,
+so only yellow tells the z bar from it.
+"""
 
 
 def shows_rgb(device: SimulatedDevice) -> bool:
@@ -44,8 +54,8 @@ def shows_accelerometer(device: SimulatedDevice) -> bool:
 
 
 def shows_magnetometer(device: SimulatedDevice) -> bool:
-    """Every bar empty."""
-    return all(device.strip(scope).dark for scope in EVERY_STRIP)
+    """The bars for ``FIELD``: x full on personal red, z full on every global strip yellow."""
+    return device.strip(Scope.PERSONAL).all_lit(RED) and every_global_strip_lit(device, YELLOW)
 
 
 def sends_ir_on_a(device: SimulatedDevice) -> bool:
@@ -88,6 +98,7 @@ def test_each_press_of_b_steps_one_mode_on(
     sim, mode: int, is_in_mode: Callable[[SimulatedDevice], bool]
 ):
     device = sim.add_device("red", scene="hardware_test")
+    device.magnetize(*FIELD)
 
     press(device, "B", mode)
 
@@ -98,15 +109,17 @@ def test_an_ir_flash_cut_short_by_a_mode_change_does_not_light_a_later_mode(sim)
     # Two presses of B, from IR to SFX, take less than the flash. SFX leaves
     # the directional strip dark; the IR flash, had it outlived IR mode,
     # would end by lighting it white.
-    device = sim.add_device("red", scene="hardware_test")
-    press(device, "B", IR)
-    device.receive_ir(HW_TEST_PAYLOAD)
-    sim.advance(TICK)
+    red = sim.add_device("red", scene="hardware_test")
+    blue = sim.add_device("blue", scene="hardware_test")
+    press(red, "B", IR)
+    press(blue, "B", IR)
+    red.aim(LINE, at=blue)
+    send_on_a(sim, red)
 
-    press(device, "B", SFX - IR)
+    press(blue, "B", SFX - IR)
     sim.advance(FLASH_DURATION)
 
-    assert device.strip(Scope.DIRECTIONAL).dark
+    assert blue.strip(Scope.DIRECTIONAL).dark
 
 
 def test_a_radio_flash_cut_short_by_a_mode_change_does_not_light_a_later_mode(sim):
@@ -117,7 +130,7 @@ def test_a_radio_flash_cut_short_by_a_mode_change_does_not_light_a_later_mode(si
     blue = sim.add_device("blue", scene="hardware_test")
     press(red, "B", RADIO)
     press(blue, "B", RADIO)
-    send_a_packet(sim, red)
+    send_on_a(sim, red)
 
     press(blue, "B", SFX - RADIO)
     sim.advance(FLASH_DURATION)

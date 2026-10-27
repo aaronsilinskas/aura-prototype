@@ -49,8 +49,8 @@ def every_global_strip_lit(device: SimulatedDevice, color: int) -> bool:
     return all(device.strip(scope).all_lit(color) for scope in GLOBAL_STRIPS)
 
 
-def send_a_packet(sim: Simulation, device: SimulatedDevice) -> None:
-    """Press A in Radio mode, and advance one tick so the packet lands on every other device.
+def send_on_a(sim: Simulation, device: SimulatedDevice) -> None:
+    """Press A, so the mode's send goes out this tick, and advance one tick so it lands.
 
     A is held, not tapped, so a flash it starts is exactly one tick old on return; a tap
     would also wait out the release.

@@ -17,6 +17,7 @@ from packs.scenes.hardware_test.tests.helpers import (
     WHITE,
     all_white,
     press,
+    send_on_a,
     strips_but,
 )
 
@@ -70,35 +71,41 @@ def test_a_shot_received_flashes_the_directional_strip_green(sim):
 
 
 def test_a_received_shot_flashes_only_the_directional_strip(sim):
-    device = sim.add_device("red", scene="hardware_test")
-    press(device, "B", IR)
+    red = sim.add_device("red", scene="hardware_test")
+    blue = sim.add_device("blue", scene="hardware_test")
+    press(red, "B", IR)
+    press(blue, "B", IR)
+    red.aim(LINE, at=blue)
 
-    device.receive_ir(HW_TEST_PAYLOAD)
-    sim.advance(TICK)
+    red.tap("A")
 
-    assert all(device.strip(scope).all_lit(WHITE) for scope in strips_but(Scope.DIRECTIONAL))
+    assert all(blue.strip(scope).all_lit(WHITE) for scope in strips_but(Scope.DIRECTIONAL))
 
 
 def test_the_flash_holds_for_the_flash_duration(sim):
-    device = sim.add_device("red", scene="hardware_test")
-    press(device, "B", IR)
-    device.receive_ir(HW_TEST_PAYLOAD)
-    sim.advance(TICK)
+    red = sim.add_device("red", scene="hardware_test")
+    blue = sim.add_device("blue", scene="hardware_test")
+    press(red, "B", IR)
+    press(blue, "B", IR)
+    red.aim(LINE, at=blue)
+    send_on_a(sim, red)
 
     sim.advance(FLASH_DURATION - TICK)
 
-    assert device.strip(Scope.DIRECTIONAL).all_lit(GREEN)
+    assert blue.strip(Scope.DIRECTIONAL).all_lit(GREEN)
 
 
 def test_once_the_flash_duration_has_passed_the_directional_strip_returns_to_white(sim):
-    device = sim.add_device("red", scene="hardware_test")
-    press(device, "B", IR)
-    device.receive_ir(HW_TEST_PAYLOAD)
-    sim.advance(TICK)
+    red = sim.add_device("red", scene="hardware_test")
+    blue = sim.add_device("blue", scene="hardware_test")
+    press(red, "B", IR)
+    press(blue, "B", IR)
+    red.aim(LINE, at=blue)
+    send_on_a(sim, red)
 
     sim.advance(FLASH_DURATION + TICK)
 
-    assert device.strip(Scope.DIRECTIONAL).all_lit(WHITE)
+    assert blue.strip(Scope.DIRECTIONAL).all_lit(WHITE)
 
 
 def test_a_device_does_not_flash_at_its_own_shot(sim):
@@ -112,9 +119,11 @@ def test_a_device_does_not_flash_at_its_own_shot(sim):
 
 def test_a_shot_received_outside_ir_mode_does_not_flash(sim):
     # RGB shows fire on the directional strip, which is never green.
-    device = sim.add_device("red", scene="hardware_test")
+    red = sim.add_device("red", scene="hardware_test")
+    blue = sim.add_device("blue", scene="hardware_test")
+    press(red, "B", IR)
+    red.aim(LINE, at=blue)
 
-    device.receive_ir(HW_TEST_PAYLOAD)
-    sim.advance(TICK)
+    send_on_a(sim, red)
 
-    assert not device.strip(Scope.DIRECTIONAL).all_lit(GREEN)
+    assert not blue.strip(Scope.DIRECTIONAL).all_lit(GREEN)

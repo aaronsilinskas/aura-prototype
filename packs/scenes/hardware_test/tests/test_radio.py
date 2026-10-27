@@ -17,7 +17,7 @@ from packs.scenes.hardware_test.tests.helpers import (
     all_white,
     every_global_strip_lit,
     press,
-    send_a_packet,
+    send_on_a,
     strips_but,
 )
 
@@ -96,7 +96,7 @@ def test_the_flash_holds_for_the_flash_duration(sim):
     blue = sim.add_device("blue", scene="hardware_test")
     press(red, "B", RADIO)
     press(blue, "B", RADIO)
-    send_a_packet(sim, red)
+    send_on_a(sim, red)
 
     sim.advance(FLASH_DURATION - TICK)
 
@@ -108,7 +108,7 @@ def test_once_the_flash_duration_has_passed_the_global_strips_return_to_white(si
     blue = sim.add_device("blue", scene="hardware_test")
     press(red, "B", RADIO)
     press(blue, "B", RADIO)
-    send_a_packet(sim, red)
+    send_on_a(sim, red)
 
     sim.advance(FLASH_DURATION + TICK)
 
