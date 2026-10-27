@@ -1,8 +1,4 @@
-"""Tests for the hw_test rules/helpers subpackage.
-
-The mode cycle and a started flash's expiry are tested through the scene, on
-the Simulation test harness (``packs/scenes/hardware_test/tests``).
-"""
+"""Tests for the hw_test rules/helpers subpackage."""
 
 from __future__ import annotations
 

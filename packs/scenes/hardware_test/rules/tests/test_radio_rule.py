@@ -10,7 +10,6 @@ from engine.network import NetworkEvents
 from engine.state import GameState, SceneControls, Scope
 from engine.tests.helpers import SpyEffectControls, SpyNetworkControls
 from packs.scenes.hardware_test.rules.helpers.flash import radio_flash
-from packs.scenes.hardware_test.rules.helpers.mode import RECEIVE_FLASH_COLOR
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_RADIO, MODE_RGB
 from packs.scenes.hardware_test.rules.radio_rule import HW_TEST_PAYLOAD, RULE
 from packs.scenes.hardware_test.rules.tests.helpers import seed_phase
@@ -80,14 +79,14 @@ def test_radio_received_is_noop_when_mode_is_rgb(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_radio_received_calls_set_effect_on_global_all_with_green_solid(spy):
+def test_radio_received_flashes_global_all_green(spy):
     state, engine = _make_state(spy)
     _fire_radio(state, engine)
     assert len(spy.set_effect_calls) == 1
     scope, name, options = spy.set_effect_calls[0]
     assert scope is Scope.Global.ALL
     assert name == "basic.solid"
-    assert options == {"color": RECEIVE_FLASH_COLOR}
+    assert options == {"color": 0x00FF00}
 
 
 def test_radio_received_writes_radio_flash_receipt_to_state(spy):

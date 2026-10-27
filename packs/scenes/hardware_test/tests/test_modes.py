@@ -16,25 +16,29 @@ from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import FLASH_DURATION
 from packs.scenes.hardware_test.rules.helpers.mode import HW_TEST_PAYLOAD
 from packs.scenes.hardware_test.tests.helpers import (
     ACCELEROMETER,
+    BLUE,
+    CYAN,
     EVERY_STRIP,
     IR,
     MAGNETOMETER,
+    MODE_COUNT,
     RADIO,
     SFX,
-    WHITE,
-    enter_mode,
+    all_white,
+    press,
+    strips_but,
 )
 
 
 def shows_rgb(device: SimulatedDevice) -> bool:
     """Water on personal: lit, in shades of blue."""
     personal = device.strip(Scope.PERSONAL)
-    return not personal.dark and personal.shades_of(0x0000FF)
+    return not personal.dark and personal.shades_of(BLUE)
 
 
 def shows_accelerometer(device: SimulatedDevice) -> bool:
     """At rest, gravity fills the z bar on global main blue and leaves the x bar dark."""
-    return device.strip(Scope.Global.MAIN).all_lit(0x0000FF) and device.strip(Scope.PERSONAL).dark
+    return device.strip(Scope.Global.MAIN).all_lit(BLUE) and device.strip(Scope.PERSONAL).dark
 
 
 def shows_magnetometer(device: SimulatedDevice) -> bool:
@@ -43,65 +47,61 @@ def shows_magnetometer(device: SimulatedDevice) -> bool:
 
 
 def sends_ir_on_a(device: SimulatedDevice) -> bool:
+    """Tap A; whether it sent IR."""
     device.forget()
     device.tap("A")
     return bool(device.ir_sent)
 
 
-def shows_ir(device: SimulatedDevice) -> bool:
-    """White everywhere, and A sends IR."""
-    return all(device.strip(scope).all_lit(WHITE) for scope in EVERY_STRIP) and sends_ir_on_a(
-        device
-    )
+def shows_white_and_sends_ir_on_a(device: SimulatedDevice) -> bool:
+    """IR mode. Taps A."""
+    return all_white(device) and sends_ir_on_a(device)
 
 
-def shows_radio(device: SimulatedDevice) -> bool:
-    """White everywhere, and A sends no IR."""
-    return all(device.strip(scope).all_lit(WHITE) for scope in EVERY_STRIP) and not sends_ir_on_a(
-        device
-    )
+def shows_white_and_sends_no_ir_on_a(device: SimulatedDevice) -> bool:
+    """Radio mode. Taps A."""
+    return all_white(device) and not sends_ir_on_a(device)
 
 
 def shows_sfx(device: SimulatedDevice) -> bool:
     """Cyan on personal only."""
-    others = [scope for scope in EVERY_STRIP if scope is not Scope.PERSONAL]
-    return device.strip(Scope.PERSONAL).all_lit(0x00FFFF) and all(
-        device.strip(scope).dark for scope in others
+    return device.strip(Scope.PERSONAL).all_lit(CYAN) and all(
+        device.strip(scope).dark for scope in strips_but(Scope.PERSONAL)
     )
 
 
 @pytest.mark.parametrize(
-    ("presses", "shows"),
+    ("mode", "is_in_mode"),
     [
         (ACCELEROMETER, shows_accelerometer),
         (MAGNETOMETER, shows_magnetometer),
-        (IR, shows_ir),
-        (RADIO, shows_radio),
+        (IR, shows_white_and_sends_ir_on_a),
+        (RADIO, shows_white_and_sends_no_ir_on_a),
         (SFX, shows_sfx),
-        (SFX + 1, shows_rgb),
+        (MODE_COUNT, shows_rgb),
     ],
     ids=["accelerometer", "magnetometer", "ir", "radio", "sfx", "back-to-rgb"],
 )
 def test_each_press_of_b_steps_one_mode_on(
-    sim, presses: int, shows: Callable[[SimulatedDevice], bool]
+    sim, mode: int, is_in_mode: Callable[[SimulatedDevice], bool]
 ):
     device = sim.add_device("red", scene="hardware_test")
 
-    enter_mode(device, presses)
+    press(device, "B", mode)
 
-    assert shows(device)
+    assert is_in_mode(device)
 
 
-def test_a_flash_cut_short_by_a_mode_change_does_not_light_a_later_mode(sim):
+def test_an_ir_flash_cut_short_by_a_mode_change_does_not_light_a_later_mode(sim):
     # Two presses of B, from IR to SFX, take less than the flash. SFX leaves
     # the directional strip dark; the IR flash, had it outlived IR mode,
     # would end by lighting it white.
     device = sim.add_device("red", scene="hardware_test")
-    enter_mode(device, IR)
+    press(device, "B", IR)
     device.receive_ir(HW_TEST_PAYLOAD)
     sim.advance(TICK)
 
-    enter_mode(device, SFX - IR)
+    press(device, "B", SFX - IR)
     sim.advance(FLASH_DURATION)
 
     assert device.strip(Scope.DIRECTIONAL).dark

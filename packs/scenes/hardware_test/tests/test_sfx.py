@@ -11,20 +11,21 @@ from effects.effect import HapticPattern
 from engine.state import Scope
 from packs.scenes.hardware_test.tests.helpers import (
     ACCELEROMETER,
-    EVERY_STRIP,
+    CYAN,
     RADIO,
+    RGB,
     SFX,
-    enter_mode,
+    press,
+    strips_but,
 )
 
-CYAN = 0x00FFFF
 TEST_SOUND = "scene.sfx_test_start"
 
 
 def test_entering_sfx_mode_lights_the_personal_strip_cyan(sim):
     device = sim.add_device("red", scene="hardware_test")
 
-    enter_mode(device, SFX)
+    press(device, "B", SFX)
 
     assert device.strip(Scope.PERSONAL).all_lit(CYAN)
 
@@ -33,15 +34,14 @@ def test_entering_sfx_mode_leaves_every_other_strip_dark(sim):
     # Radio mode, just before, lights every strip white.
     device = sim.add_device("red", scene="hardware_test")
 
-    enter_mode(device, SFX)
+    press(device, "B", SFX)
 
-    others = [scope for scope in EVERY_STRIP if scope is not Scope.PERSONAL]
-    assert all(device.strip(scope).dark for scope in others)
+    assert all(device.strip(scope).dark for scope in strips_but(Scope.PERSONAL))
 
 
 def test_a_plays_the_test_sound(sim):
     device = sim.add_device("red", scene="hardware_test")
-    enter_mode(device, SFX)
+    press(device, "B", SFX)
 
     device.tap("A")
 
@@ -50,7 +50,7 @@ def test_a_plays_the_test_sound(sim):
 
 def test_a_buzzes_a_strong_click(sim):
     device = sim.add_device("red", scene="hardware_test")
-    enter_mode(device, SFX)
+    press(device, "B", SFX)
 
     device.tap("A")
 
@@ -59,7 +59,7 @@ def test_a_buzzes_a_strong_click(sim):
 
 def test_the_test_sound_plays_once_through_without_looping(sim):
     device = sim.add_device("red", scene="hardware_test")
-    enter_mode(device, SFX)
+    press(device, "B", SFX)
     device.tap("A")
 
     sim.advance(device.clip_length(TEST_SOUND))
@@ -67,20 +67,22 @@ def test_the_test_sound_plays_once_through_without_looping(sim):
     assert not device.is_playing(TEST_SOUND)
 
 
-@pytest.mark.parametrize("mode", [0, ACCELEROMETER, RADIO], ids=["rgb", "accelerometer", "radio"])
-def test_a_outside_sfx_and_ir_mode_plays_nothing(sim, mode):
+@pytest.mark.parametrize("mode", [RGB, ACCELEROMETER, RADIO], ids=["rgb", "accelerometer", "radio"])
+def test_a_outside_sfx_and_ir_mode_is_silent(sim, mode):
     device = sim.add_device("red", scene="hardware_test")
-    enter_mode(device, mode)
+    press(device, "B", mode)
 
     device.tap("A")
 
-    assert (device.played, device.buzzed) == ([], [])
+    assert device.played == []
+    assert device.buzzed == []
 
 
-def test_b_in_sfx_mode_plays_nothing(sim):
+def test_b_in_sfx_mode_is_silent(sim):
     device = sim.add_device("red", scene="hardware_test")
-    enter_mode(device, SFX)
+    press(device, "B", SFX)
 
     device.tap("B")
 
-    assert (device.played, device.buzzed) == ([], [])
+    assert device.played == []
+    assert device.buzzed == []

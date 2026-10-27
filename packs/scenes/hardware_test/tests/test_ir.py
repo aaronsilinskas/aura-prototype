@@ -11,20 +11,27 @@ from engine.network import LINE
 from engine.state import Scope
 from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import FLASH_DURATION
 from packs.scenes.hardware_test.rules.helpers.mode import HW_TEST_PAYLOAD
-from packs.scenes.hardware_test.tests.helpers import EVERY_STRIP, GREEN, IR, WHITE, enter_mode
+from packs.scenes.hardware_test.tests.helpers import (
+    GREEN,
+    IR,
+    WHITE,
+    all_white,
+    press,
+    strips_but,
+)
 
 
 def test_entering_ir_mode_lights_every_strip_white(sim):
     device = sim.add_device("red", scene="hardware_test")
 
-    enter_mode(device, IR)
+    press(device, "B", IR)
 
-    assert all(device.strip(scope).all_lit(WHITE) for scope in EVERY_STRIP)
+    assert all_white(device)
 
 
 def test_a_sends_the_test_payload_on_the_line_emitter(sim):
     device = sim.add_device("red", scene="hardware_test")
-    enter_mode(device, IR)
+    press(device, "B", IR)
     device.forget()
 
     device.tap("A")
@@ -32,21 +39,29 @@ def test_a_sends_the_test_payload_on_the_line_emitter(sim):
     assert [(s.emitter, s.payload) for s in device.ir_sent] == [(LINE, HW_TEST_PAYLOAD)]
 
 
-def test_a_plays_the_test_sound_with_a_strong_click(sim):
+def test_a_plays_the_test_sound(sim):
     device = sim.add_device("red", scene="hardware_test")
-    enter_mode(device, IR)
+    press(device, "B", IR)
 
     device.tap("A")
 
     assert device.has_played("scene.sfx_test_start")
+
+
+def test_a_buzzes_a_strong_click(sim):
+    device = sim.add_device("red", scene="hardware_test")
+    press(device, "B", IR)
+
+    device.tap("A")
+
     assert [b.pattern for b in device.buzzed] == [(HapticPattern.STRONG_CLICK,)]
 
 
 def test_a_shot_received_flashes_the_directional_strip_green(sim):
     red = sim.add_device("red", scene="hardware_test")
     blue = sim.add_device("blue", scene="hardware_test")
-    enter_mode(red, IR)
-    enter_mode(blue, IR)
+    press(red, "B", IR)
+    press(blue, "B", IR)
     red.aim(LINE, at=blue)
 
     red.tap("A")
@@ -56,18 +71,17 @@ def test_a_shot_received_flashes_the_directional_strip_green(sim):
 
 def test_a_received_shot_flashes_only_the_directional_strip(sim):
     device = sim.add_device("red", scene="hardware_test")
-    enter_mode(device, IR)
+    press(device, "B", IR)
 
     device.receive_ir(HW_TEST_PAYLOAD)
     sim.advance(TICK)
 
-    others = [scope for scope in EVERY_STRIP if scope is not Scope.DIRECTIONAL]
-    assert all(device.strip(scope).all_lit(WHITE) for scope in others)
+    assert all(device.strip(scope).all_lit(WHITE) for scope in strips_but(Scope.DIRECTIONAL))
 
 
 def test_the_flash_holds_for_the_flash_duration(sim):
     device = sim.add_device("red", scene="hardware_test")
-    enter_mode(device, IR)
+    press(device, "B", IR)
     device.receive_ir(HW_TEST_PAYLOAD)
     sim.advance(TICK)
 
@@ -78,7 +92,7 @@ def test_the_flash_holds_for_the_flash_duration(sim):
 
 def test_once_the_flash_duration_has_passed_the_directional_strip_returns_to_white(sim):
     device = sim.add_device("red", scene="hardware_test")
-    enter_mode(device, IR)
+    press(device, "B", IR)
     device.receive_ir(HW_TEST_PAYLOAD)
     sim.advance(TICK)
 
@@ -89,7 +103,7 @@ def test_once_the_flash_duration_has_passed_the_directional_strip_returns_to_whi
 
 def test_a_device_does_not_flash_at_its_own_shot(sim):
     device = sim.add_device("red", scene="hardware_test")
-    enter_mode(device, IR)
+    press(device, "B", IR)
 
     device.tap("A")
 
