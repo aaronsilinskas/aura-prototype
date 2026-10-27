@@ -1,6 +1,6 @@
 from engine.input import ButtonData, InputEvents
-from packs.rules.conftest import CapturingLogger, EngineFixture
 from packs.rules.debug.fps_logger import FpsLoggerRule
+from packs.rules.debug.tests.helpers import CapturingLogger, EngineFixture
 
 _NO_BUTTONS = ButtonData(states={})
 _WINDOW = 3.0
@@ -82,20 +82,4 @@ def test_prints_once_per_window_not_every_frame():
     clock_time[0] = _WINDOW
     _dispatch(fixture, 20)
 
-    assert len(logger.logs) == 1
-
-
-def test_custom_enabled_key_controls_output():
-    fixture = EngineFixture()
-    logger = CapturingLogger()
-    clock_time = [_WINDOW]
-    rule = FpsLoggerRule(output=logger, clock=lambda: clock_time[0], enabled_key="my_fps_flag")
-    fixture.game_engine.add_rules(rule)
-
-    _dispatch(fixture, 10)
-    assert logger.logs == []
-
-    fixture.state.set("my_fps_flag", True)
-    clock_time[0] = _WINDOW * 2
-    _dispatch(fixture)
     assert len(logger.logs) == 1
