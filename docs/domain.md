@@ -68,14 +68,14 @@ packs/            Game-specific packs loaded at runtime (CircuitPython/MicroPyth
 hardware/         Hardware abstraction layer
   circuitpython/  CircuitPython drivers (device_builder, is31fl3741_output, drv2605_output,
                   neopixel_output, audio_output, infrared_io, pio_pulse_writer,
-                  counting_i2c, rfm69_radio_transport, sdcard_storage, device_reboot,
+                  counting_i2c, rfm69_radio_transport, sdcard_storage,
                   usb_cdc_transport, boot)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
                   device_config, device_settings, device_state, device_hardware,
                   device_storage, network_controls, scene_selection, ir_transport,
                   ir_transceiver, ir_codecs/ (base, aura, tag), ir_telemetry,
                   radio_transport, radio_transceiver, sd_sync_protocol, sd_sync_server,
-                  profiler_report, build_narration)
+                  profiler_report, build_narration, device_reboot)
   simulated/      Test-only Simulated device (device: SimulatedHardware) — never deployed
 
 app/              Composition layer — the one place allowed to import both the engine's
@@ -170,7 +170,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |
 | `SceneRuntime` | `app/scene_composition.py` | Bundle from `build_scene_runtime` that `build_scene_tick` drives |
-| `DeviceSceneReboot` | `hardware/circuitpython/device_reboot.py` | Live `SceneReboot` adapter |
+| `DeviceSceneReboot` | `hardware/shared/device_reboot.py` | Live `SceneReboot` adapter; persists the target, then calls its injected `reset` (`run_scene` passes `microcontroller.reset`) |
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol |
 | `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through; live adapters `UsbCdcTransport` (device) / `SerialTransport` (host) |

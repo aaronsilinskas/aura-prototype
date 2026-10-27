@@ -5,7 +5,8 @@ scene selection written to ``aura-state.json`` actually survives
 ``microcontroller.reset()`` and is read back by the boot resolver on the next
 boot. A rule triggers a reboot only through downstream lobby work, so this
 example drives the live adapter
-(:class:`~hardware.circuitpython.device_reboot.DeviceSceneReboot`) directly --
+(:class:`~hardware.shared.device_reboot.DeviceSceneReboot`, reset by
+``microcontroller.reset``) directly --
 the smallest end-to-end exercise of the seam on real hardware. Keep it around
 as a regression check to re-run whenever the reboot path, the state store, or
 the boot resolver changes.
@@ -58,11 +59,13 @@ from __future__ import annotations
 
 import time
 
+import microcontroller
+
 from app.scene_composition import resolve_boot_scene_name
 from engine.log import Logger
 from engine.scene import SceneRegistry
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
-from hardware.circuitpython.device_reboot import DeviceSceneReboot
+from hardware.shared.device_reboot import DeviceSceneReboot
 from hardware.shared.device_settings import read_settings_mapping
 from hardware.shared.device_state import DeviceStateStore
 
@@ -95,7 +98,9 @@ state = DeviceStateStore(hw.storage, hw_logger)
 phase = state.get("reboot_demo_phase")
 return_to = state.get("return_to")
 
-reboot = DeviceSceneReboot(hw.storage, booted_scene=scene_name, logger=hw_logger)
+reboot = DeviceSceneReboot(
+    hw.storage, booted_scene=scene_name, reset=microcontroller.reset, logger=hw_logger
+)
 
 if hw.storage is None:
     # Card-less: the adapter would only log-and-return, so there's nothing to

@@ -295,7 +295,7 @@ def build_scene_runtime(
     into ``SceneManager`` so rules can call ``state.scene_controls.reboot_into``/
     ``reboot_to_previous``. This function stays board-free, so it never
     constructs the live adapter itself -- device-only ``run_scene`` supplies
-    it (see ``hardware.circuitpython.device_reboot``). Omitted, a fresh base
+    it (see ``hardware.shared.device_reboot``). Omitted, a fresh base
     ``SceneReboot`` stands in, satisfying ``SceneManager``'s non-optional seam
     without pretending a reboot request can go anywhere.
 

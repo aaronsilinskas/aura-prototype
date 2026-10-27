@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import gc
 
+import microcontroller
+
 from app.scene_composition import (
     build_scene_runtime,
     build_scene_tick,
@@ -19,7 +21,7 @@ from app.scene_composition import (
 )
 from engine.log import Logger
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
-from hardware.circuitpython.device_reboot import DeviceSceneReboot
+from hardware.shared.device_reboot import DeviceSceneReboot
 from hardware.shared.device_settings import read_settings_mapping
 
 __all__ = ["run_scene"]
@@ -68,8 +70,9 @@ def run_scene() -> None:
     opt-in required.
 
     This is the only place the live ``DeviceSceneReboot``
-    (:mod:`hardware.circuitpython.device_reboot`) is constructed and threaded
-    into ``build_scene_runtime`` as the board-free ``SceneReboot`` port; see
+    (:mod:`hardware.shared.device_reboot`) is constructed and threaded into
+    ``build_scene_runtime`` as the ``SceneReboot`` port, and the only scene
+    path that names ``microcontroller.reset``, which it injects as the reset; see
     that module for why it takes the booted *scene_name* and ``hw.storage``.
 
     Not unit-testable — ``build_hardware`` requires
@@ -94,7 +97,9 @@ def run_scene() -> None:
     if hw.ir is not None:
         hw.ir.apply_codec(ir_encoder, ir_decoder)
 
-    scene_reboot = DeviceSceneReboot(hw.storage, booted_scene=scene_name, logger=hw_logger)
+    scene_reboot = DeviceSceneReboot(
+        hw.storage, booted_scene=scene_name, reset=microcontroller.reset, logger=hw_logger
+    )
     runtime = build_scene_runtime(
         hw, scene_name, scene_registry=scene_registry, scene_reboot=scene_reboot
     )

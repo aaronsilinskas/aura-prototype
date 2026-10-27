@@ -119,7 +119,7 @@ _Avoid_: calling `register()` on it (removed); routing scene-transition effect c
 
 ### SceneReboot
 The board-free port `SceneManager` reaches to persist a scene switch and reboot the device; live adapter `DeviceSceneReboot`.
-_Avoid_: validating the target here (that is `SceneManager.reboot_into`'s job); calling `microcontroller.reset()` anywhere but the live adapter
+_Avoid_: validating the target here (that is `SceneManager.reboot_into`'s job); calling `microcontroller.reset()` anywhere but `run_scene` (and the on-device `reboot_demo` example), which inject it into `DeviceSceneReboot`
 
 ### EffectControls
 The **rule-facing** effect seam a rule holds via `GameState.effect_controls`: `set_effect`, `add_effect`, `stop_effect`, `set_merge_strategy`; scene-transition operations live on `EffectAdmin`.
