@@ -20,6 +20,8 @@ EVERY_STRIP = [
     Scope.AMBIENT,
 ]
 
+GLOBAL_STRIPS = [Scope.Global.MAIN, Scope.Global.BUFF, Scope.Global.DEBUFF]
+
 RGB, ACCELEROMETER, MAGNETOMETER, IR, RADIO, SFX = range(6)
 """Each mode's place in the cycle: how many presses of B reach it from RGB, where a device
 switches on."""

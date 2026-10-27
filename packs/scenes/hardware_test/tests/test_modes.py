@@ -19,6 +19,7 @@ from packs.scenes.hardware_test.tests.helpers import (
     BLUE,
     CYAN,
     EVERY_STRIP,
+    GLOBAL_STRIPS,
     IR,
     MAGNETOMETER,
     MODE_COUNT,
@@ -105,3 +106,18 @@ def test_an_ir_flash_cut_short_by_a_mode_change_does_not_light_a_later_mode(sim)
     sim.advance(FLASH_DURATION)
 
     assert device.strip(Scope.DIRECTIONAL).dark
+
+
+def test_a_radio_flash_cut_short_by_a_mode_change_does_not_light_a_later_mode(sim):
+    # One press of B, from Radio to SFX, takes less than the flash. SFX leaves
+    # the global strips dark; the radio flash, had it outlived Radio mode,
+    # would end by lighting them white.
+    device = sim.add_device("red", scene="hardware_test")
+    press(device, "B", RADIO)
+    device.receive_radio(HW_TEST_PAYLOAD, sender=9)
+    sim.advance(TICK)
+
+    press(device, "B", SFX - RADIO)
+    sim.advance(FLASH_DURATION)
+
+    assert all(device.strip(scope).dark for scope in GLOBAL_STRIPS)

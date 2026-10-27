@@ -16,11 +16,10 @@ from packs.scenes.hardware_test.tests.helpers import (
     BLUE,
     CYAN,
     EVERY_STRIP,
+    GLOBAL_STRIPS,
     RED,
     press,
 )
-
-GLOBAL_STRIPS = [Scope.Global.MAIN, Scope.Global.BUFF, Scope.Global.DEBUFF]
 
 
 @pytest.mark.parametrize(
