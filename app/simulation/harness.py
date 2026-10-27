@@ -228,10 +228,10 @@ class SimulatedDevice:
     within that same tick, into whatever its card names; it ticks the new
     scene from the next.
     A reboot carries over the card, the pins, the accelerometer and
-    magnetometer readings, its aims,
-    the IR and radio media, its radio node, and the recordings; game state is
-    gone, outputs are dark and silent, and packets it had not yet read are
-    lost, as a real reset clears the radio chip.
+    magnetometer readings, its aims, the IR and radio media, its radio node,
+    and the recordings; game state is gone, outputs are dark and silent, and
+    packets it had not yet read are lost, as a real reset clears the radio
+    chip.
     """
 
     def __init__(

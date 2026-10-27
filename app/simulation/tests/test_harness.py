@@ -235,7 +235,9 @@ def test_hold_still_stops_a_move(sim):
 # ---------------------------------------------------------------------------
 
 # hardware_test's magnetometer mode, two presses of B in, bars each axis of the
-# raw field: x on the personal strip, red when positive, full at MAG_MAX µT.
+# raw field, full at MAG_MAX µT: x on the personal strip (red when positive), y
+# on directional (green when positive), z on every global strip (yellow when
+# negative).
 MAGNETOMETER_MODE = 2
 MAG_MAX = 100.0
 
@@ -245,14 +247,16 @@ def enter_magnetometer_mode(device: SimulatedDevice) -> None:
         device.tap("B")
 
 
-def test_magnetize_sets_the_field_a_scene_reads(sim):
+def test_magnetize_sets_each_axis_of_the_field_a_scene_reads(sim):
     device = sim.add_device("red", scene="hardware_test")
     enter_magnetometer_mode(device)
 
-    device.magnetize(MAG_MAX, 0.0, 0.0)
+    device.magnetize(MAG_MAX, MAG_MAX, -MAG_MAX)
     sim.advance(TICK)
 
     assert device.strip(Scope.PERSONAL).all_lit(0xFF0000)
+    assert device.strip(Scope.DIRECTIONAL).all_lit(0x00FF00)
+    assert device.strip(Scope.Global.MAIN).all_lit(0xFFFF00)
 
 
 def test_a_device_switches_on_reading_a_zero_field(sim, capsys):

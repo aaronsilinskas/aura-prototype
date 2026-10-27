@@ -654,11 +654,6 @@ class SimulatedHardware:
                 return bytes(payload)
         raise ValueError(f"the {decoder.__class__.__name__} cannot read back what was sent")
 
-    def _require_magnetometer(self) -> _SimulatedMagnetometer:
-        if self._magnetometer is None:
-            raise ValueError("the config declares no magnetometer")
-        return self._magnetometer
-
     def _require_radio(self) -> _SimulatedRadioTransport:
         if self._radio is None:
             raise ValueError("the config declares no radio")
@@ -668,6 +663,11 @@ class SimulatedHardware:
         if self._accelerometer is None:
             raise ValueError("the config declares no accelerometer")
         return self._accelerometer
+
+    def _require_magnetometer(self) -> _SimulatedMagnetometer:
+        if self._magnetometer is None:
+            raise ValueError("the config declares no magnetometer")
+        return self._magnetometer
 
     def _schedule(self, buttons: tuple[str, ...], pressed: bool) -> None:
         # Queued behind the previous change of every button, so back-to-back
