@@ -109,9 +109,13 @@ def test_buttons_held_together_press_at_once_even_behind_a_recent_release():
     sim_hw.release("A")
 
     sim_hw.hold("A", "B")
-    out = _read_buttons(sim_hw)  # A's release is still settling; neither may press yet
+    _read_buttons(sim_hw)  # A down
+    clock[0] = 0.15
+    b_before_a_settles = _read_buttons(sim_hw).is_down("B")  # A's release lands, still settling
+    clock[0] = 0.2
+    out = _read_buttons(sim_hw)
 
-    assert not out.is_down("B")
+    assert (b_before_a_settles, out.is_pressed("A"), out.is_pressed("B")) == (False, True, True)
 
 
 def test_a_button_the_config_does_not_declare_cannot_be_held():
