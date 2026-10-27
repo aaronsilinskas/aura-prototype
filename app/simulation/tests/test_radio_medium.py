@@ -44,6 +44,32 @@ def flashed(device: SimulatedDevice) -> bool:
     return device.strip(Scope.Global.MAIN).all_lit(GREEN)
 
 
+def send_together(sim: Simulation, *senders: SimulatedDevice) -> None:
+    """Press A on every sender on the same tick, and run until each has sent."""
+    for sender in senders:
+        sender.forget()
+        sender.schedule_hold("A")
+    sim.run_until(lambda: all(s.radio_sent for s in senders))
+    assert len({s.radio_sent[0].at for s in senders}) == 1, "the senders sent on different ticks"
+
+
+def heard_by_receiver(sim: Simulation, capsys: pytest.CaptureFixture[str]) -> list[int]:
+    """Tick until every packet is read; return the senders the last-added device heard, in order.
+
+    For two senders and one receiver added after them. Every device ticks in
+    add order, so the receiver's line ends each tick's output; each sender
+    hears the other's one packet on the first tick, so later lines are the
+    receiver's alone.
+    """
+    capsys.readouterr()
+    sim.advance(TICK)
+    heard = heard_from(capsys.readouterr().out)[-1:]
+    for _ in range(3):
+        sim.advance(TICK)
+        heard += heard_from(capsys.readouterr().out)
+    return heard
+
+
 # ---------------------------------------------------------------------------
 # Reach
 # ---------------------------------------------------------------------------
@@ -86,34 +112,8 @@ def test_a_send_lands_on_the_tick_after_it_was_sent_whatever_the_add_order(sim, 
 # ---------------------------------------------------------------------------
 
 
-def send_together(sim: Simulation, *senders: SimulatedDevice) -> None:
-    """Press A on every sender on the same tick, and run until each has sent."""
-    for sender in senders:
-        sender.schedule_hold("A")
-    sim.run_until(lambda: all(s.radio_sent for s in senders))
-
-
-def heard_by_receiver(sim: Simulation, capsys: pytest.CaptureFixture[str]) -> list[int]:
-    """Tick until the air is quiet; return the sender nodes the last-added device heard, in order.
-
-    For two senders and one receiver added after them. Every device ticks in
-    add order, so the receiver's line ends each tick's output; each sender
-    hears the other's one packet on the first tick, so later lines are the
-    receiver's alone.
-    """
-    capsys.readouterr()
-    sim.advance(TICK)
-    heard = heard_from(capsys.readouterr().out)[-1:]
-    for _ in range(3):
-        sim.advance(TICK)
-        heard += heard_from(capsys.readouterr().out)
-    return heard
-
-
 @pytest.mark.parametrize("red_first", [True, False], ids=["red-added-first", "green-added-first"])
-def test_sends_on_one_tick_reach_a_receiver_one_per_tick_in_sender_add_order(
-    sim, capsys, red_first
-):
+def test_sends_on_one_tick_reach_a_receiver_in_sender_add_order(sim, capsys, red_first):
     names = ("red", "green") if red_first else ("green", "red")
     first, second = add_in_radio_mode(sim, *names)
     add_in_radio_mode(sim, "blue")  # the receiver, added last

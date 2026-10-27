@@ -101,6 +101,15 @@ class _InFlight:
     pulses: list[int]
 
 
+@dataclass(frozen=True)
+class _RadioInFlight:
+    """A packet one device sent, on its way to every device there was when it was sent."""
+
+    sender: SimulatedDevice
+    receivers: tuple[SimulatedDevice, ...]
+    payload: bytes
+
+
 class Simulation:
     """One shared clock, every simulated device on it, and the IR and radio media between them.
 
@@ -111,7 +120,8 @@ class Simulation:
     tick queue in sender add order; nothing collides.
 
     The radio medium keeps the same time, with no aim: a packet sent during
-    one tick lands at the start of the next on every device but its sender.
+    one tick lands at the start of the next on every device but its sender
+    that was in the simulation when it was sent.
     Packets from several senders queue in sender add order, with no collision
     or loss, and a device reads one a tick.
     """
@@ -121,7 +131,7 @@ class Simulation:
         self.devices: list[SimulatedDevice] = []
         self._aims: dict[tuple[SimulatedDevice, str], tuple[_Reach, ...]] = {}
         self._in_flight: list[_InFlight] = []
-        self._radio_in_flight: list[tuple[SimulatedDevice, bytes]] = []
+        self._radio_in_flight: list[_RadioInFlight] = []
 
     def add_device(
         self,
@@ -189,15 +199,15 @@ class Simulation:
             self._in_flight.append(_InFlight(sender, reaches, pulses))
 
     def _carry_radio(self, sender: SimulatedDevice, payload: bytes) -> None:
-        self._radio_in_flight.append((sender, payload))
+        receivers = tuple(device for device in self.devices if device is not sender)
+        self._radio_in_flight.append(_RadioInFlight(sender, receivers, payload))
 
     def _land_in_flight_radio(self) -> None:
         in_flight, self._radio_in_flight = self._radio_in_flight, []
-        in_flight.sort(key=lambda packet: self.devices.index(packet[0]))
-        for sender, payload in in_flight:
-            for device in self.devices:
-                if device is not sender:
-                    device._sim_hw.land_radio(sender.radio_node, payload)
+        in_flight.sort(key=lambda packet: self.devices.index(packet.sender))
+        for packet in in_flight:
+            for device in packet.receivers:
+                device._sim_hw.land_radio(packet.payload, packet.sender.radio_node)
 
     def _land_in_flight_ir(self) -> None:
         in_flight, self._in_flight = self._in_flight, []
@@ -219,7 +229,8 @@ class SimulatedDevice:
     scene from the next.
     A reboot carries over the card, the pins, the accelerometer, its aims,
     the IR and radio media, its radio node, and the recordings; game state is
-    gone, outputs are dark and silent, and its radio has caught nothing.
+    gone, outputs are dark and silent, and packets it had not yet read are
+    lost, as a real reset clears the radio chip.
     """
 
     def __init__(
@@ -232,6 +243,8 @@ class SimulatedDevice:
         radio_node: int,
     ) -> None:
         self.name = name
+        self.radio_node = radio_node
+        """The node this device sends as: its place in add order, from 1."""
         self._sim = sim
         self._switched_on_into = scene
         self._scene_data = scene_data
@@ -360,7 +373,7 @@ class SimulatedDevice:
         Not through the radio medium: it waits on this device's radio, read
         on the next tick, one packet per tick.
         """
-        self._sim_hw.land_radio(sender, payload)
+        self._sim_hw.land_radio(payload, sender)
 
     # -- queries ------------------------------------------------------------
 
@@ -371,13 +384,6 @@ class SimulatedDevice:
     @property
     def radio_sent(self) -> list[RadioSent]:
         return self._sim_hw.radio_sent
-
-    @property
-    def radio_node(self) -> int:
-        """The node this device sends as: its place in add order, from 1."""
-        node = self._sim_hw.radio_node
-        assert node is not None  # the simulated config declares a radio
-        return node
 
     @property
     def played(self) -> list[Played]:

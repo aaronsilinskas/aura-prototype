@@ -26,8 +26,8 @@ this device knows of no other.
 
 Radio is ideal too: a send is handed, whole, to the optional ``radio_sink``
 and never reaches the device's own radio, as the half-duplex chip never hears
-itself. ``land_radio`` lands a packet from elsewhere; the transceiver reads one
-per ``update``, oldest first.
+itself. ``land_radio`` lands a packet from elsewhere, where it waits, in turn,
+to be read.
 """
 
 from __future__ import annotations
@@ -521,14 +521,9 @@ class SimulatedHardware:
         for reader in readers:
             reader.capture(pulses)
 
-    def land_radio(self, sender: int, payload: bytes) -> None:
+    def land_radio(self, payload: bytes, sender: int) -> None:
         """Land a packet *sender* sent, for the transceiver's next free ``update`` to read."""
         self._require_radio().waiting.append((sender, payload))
-
-    @property
-    def radio_node(self) -> int | None:
-        """The node the device sends as; ``None`` when the config declares no radio."""
-        return self._radio_node
 
     @property
     def ir_emitters(self) -> tuple[str, ...]:
