@@ -81,8 +81,11 @@ hardware/         Hardware abstraction layer
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together
-  scene_composition.py  build_scene_runtime, build_scene_tick (board-free, CPython-testable)
-  scene_runtime.py      run_scene (device-only: bring-up, then loops build_scene_tick)
+  scene_composition.py  build_scene_boot, build_scene_runtime, build_scene_tick (board-free,
+                        CPython-testable); the device and the Simulated device share
+                        both the boot and the tick
+  scene_runtime.py      run_scene (device-only: bring-up, build_scene_boot, then loops
+                        the tick it returns)
   simulation/           Test-only Simulation test harness (Simulation, SimulatedDevice):
                         boots real scenes on simulated devices, reboots them
                         through their in-memory cards (or not, when card-less),
@@ -173,7 +176,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |
 | `SceneRuntime` | `app/scene_composition.py` | Bundle from `build_scene_runtime` that `build_scene_tick` drives |
-| `DeviceSceneReboot` | `hardware/shared/device_reboot.py` | Live `SceneReboot` adapter; persists the target, then calls its injected `reset` (`run_scene` passes `microcontroller.reset`) |
+| `DeviceSceneReboot` | `hardware/shared/device_reboot.py` | Live `SceneReboot` adapter; persists the target, then calls its injected `reset` (`build_scene_boot` wires it; `run_scene` passes `microcontroller.reset`) |
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol |
 | `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through; live adapters `UsbCdcTransport` (device) / `SerialTransport` (host) |

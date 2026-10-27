@@ -1,9 +1,9 @@
 """DeviceSceneReboot — the live SceneReboot: persist the target, then reset.
 
 Board-free: the reset is injected rather than imported, so the adapter runs
-under CPython. On a board, ``app.scene_runtime.run_scene`` passes
-``microcontroller.reset`` and hands the adapter to ``build_scene_runtime`` as
-the ``SceneReboot`` port.
+under CPython. ``app.scene_composition.build_scene_boot`` builds it with the
+reset it is handed (on a board, ``run_scene`` passes ``microcontroller.reset``)
+and hands it to ``build_scene_runtime`` as the ``SceneReboot`` port.
 """
 
 from __future__ import annotations

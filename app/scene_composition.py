@@ -22,6 +22,7 @@ from engine.scene import SceneManager, SceneRegistry
 from engine.state import SceneReboot
 from engine.timer import Timer
 from hardware.shared.device_hardware import DeviceHardware
+from hardware.shared.device_reboot import DeviceSceneReboot
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs import codec_for
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
@@ -36,6 +37,7 @@ except ImportError:
 
 __all__ = [
     "SceneRuntime",
+    "build_scene_boot",
     "build_scene_runtime",
     "build_scene_tick",
     "resolve_boot_scene_name",
@@ -294,8 +296,8 @@ def build_scene_runtime(
     *scene_reboot*, if supplied, is the board-free ``SceneReboot`` port wired
     into ``SceneManager`` so rules can call ``state.scene_controls.reboot_into``/
     ``reboot_to_previous``. This function stays board-free, so it never
-    constructs the live adapter itself -- device-only ``run_scene`` supplies
-    it (see ``hardware.shared.device_reboot``). Omitted, a fresh base
+    constructs the live adapter itself -- ``build_scene_boot`` supplies it
+    (see ``hardware.shared.device_reboot``). Omitted, a fresh base
     ``SceneReboot`` stands in, satisfying ``SceneManager``'s non-optional seam
     without pretending a reboot request can go anywhere.
 
@@ -365,12 +367,47 @@ def build_scene_runtime(
     )
 
 
+def build_scene_boot(
+    hw: DeviceHardware,
+    settings_mapping: dict,
+    reset: Callable[[], None],
+    timer: Timer | None = None,
+    logger: Logger | None = None,
+    scene_data: dict[str, dict[str, object]] | None = None,
+) -> tuple[str, Callable[[], None]]:
+    """Boot *hw* into its boot scene; return the scene's name and its per-tick body.
+
+    The one boot shared by the device (:func:`app.scene_runtime.run_scene`)
+    and the Simulated device, as :func:`build_scene_tick` is their one tick.
+    The card's persisted ``scene`` wins over *settings_mapping*'s
+    ``default_scene``; an unknown name raises naming the known scenes. A
+    reboot the scene asks for persists to ``hw.storage``, then calls *reset*.
+
+    *scene_data* maps a scene name to tunables merged over its
+    ``initial_data``; the Simulated device boots shortened scenes through it.
+    """
+    scene_registry = scan_boot_scene_registry(hw.storage)
+    for name, overrides in (scene_data or {}).items():
+        scene_registry.override_initial_data(name, overrides)
+    scene_name = resolve_boot_scene_name(scene_registry, hw.storage, settings_mapping, logger)
+    if hw.ir is not None:
+        hw.ir.apply_codec(*resolve_ir_codec(scene_registry, scene_name))
+    scene_reboot = DeviceSceneReboot(
+        hw.storage, booted_scene=scene_name, reset=reset, logger=logger
+    )
+    runtime = build_scene_runtime(
+        hw, scene_name, scene_registry=scene_registry, scene_reboot=scene_reboot, timer=timer
+    )
+    return scene_name, build_scene_tick(hw, runtime)
+
+
 def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], None]:
     """Return the per-tick body that drives *runtime* on *hw*; call it once per tick.
 
     The one loop body shared by the device
     (:func:`app.scene_runtime.run_scene`, which adds only ``while True:`` and
-    ``gc.collect()``) and the Simulated device, so neither copies it. Build it
+    ``gc.collect()``) and the Simulated device, so neither copies it, as
+    both share the boot that builds it (:func:`build_scene_boot`). Build it
     once per runtime: the ``InputEvents.Sensors`` event, its
     button/acceleration/magnetic buffers, and the telemetry gate are
     allocated here and mutated in place every tick, so the steady-state tick
