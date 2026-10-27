@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from app.scene_composition import (
+    build_scene_boot,
     build_scene_runtime,
     resolve_boot_scene_name,
     resolve_ir_codec,
@@ -167,6 +168,44 @@ def test_persisted_scene_unknown_to_the_registry_raises_naming_the_known_scenes(
 
     with pytest.raises(ValueError, match="red_light_green_light"):
         resolve_boot_scene_name(scene_registry, storage, {"default_scene": "red_light_green_light"})
+
+
+# ---------------------------------------------------------------------------
+# build_scene_boot: the boot run_scene and the Simulated device share (issue #1020)
+# ---------------------------------------------------------------------------
+
+
+def _no_reset() -> None:
+    raise AssertionError("the boot reset the device")
+
+
+def test_boot_runs_the_scene_the_card_names_over_the_flash_default():
+    storage = FakeDeviceStorage()
+    storage.write_json("aura-state.json", {"scene": "tag"})
+
+    scene_name, _tick = build_scene_boot(
+        _fake_hw(storage=storage), {"default_scene": "hardware_test"}, reset=_no_reset
+    )
+
+    assert scene_name == "tag"
+
+
+class _CodecRecordingIr:
+    def __init__(self) -> None:
+        self.codec: tuple[object, object] | None = None
+
+    def apply_codec(self, encoder, decoder) -> None:
+        self.codec = (encoder, decoder)
+
+
+def test_boot_speaks_the_wire_frame_codec_the_booted_scene_declares():
+    ir = _CodecRecordingIr()
+
+    build_scene_boot(_fake_hw(ir=ir), {"default_scene": "tag"}, reset=_no_reset)
+
+    encoder, decoder = ir.codec
+    assert isinstance(encoder, TagInfraredEncoder)
+    assert isinstance(decoder, TagInfraredDecoder)
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,9 @@
 """The Simulation test harness: real scenes on simulated devices, one shared clock.
 
-Boots each device's scene through ``build_scene_runtime`` and drives it with
-the same ``build_scene_tick`` body the board runs. It lives under ``app/``
-because booting a scene needs the composition layer, which the hardware import
-contract keeps out of ``hardware/``.
+Boots each device through the same ``build_scene_boot`` the board boots
+through, and drives it with the ``build_scene_tick`` body that returns. It
+lives under ``app/`` because booting a scene needs the composition layer,
+which the hardware import contract keeps out of ``hardware/``.
 
 A device's IR reaches its own receivers at once and other devices only through
 the IR medium, where a test has aimed it: ``red.aim(LINE, at=blue)`` then
@@ -19,18 +19,10 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.scene_composition import (
-    build_scene_runtime,
-    build_scene_tick,
-    resolve_boot_scene_name,
-    resolve_ir_codec,
-    resolve_known_scene,
-    scan_boot_scene_registry,
-)
+from app.scene_composition import build_scene_boot
 from engine.state import ScopeValue
 from engine.timer import Timer
 from hardware.shared.device_config import DeviceConfig, load_device_config
-from hardware.shared.device_reboot import DeviceSceneReboot
 from hardware.simulated.device import (
     DEFAULT_SWAY_STRENGTH,
     Buzzed,
@@ -127,10 +119,11 @@ class Simulation:
         scene_data: dict[str, object] | None = None,
         sd_card: bool = True,
     ) -> SimulatedDevice:
-        """Switch a new simulated device on into *scene*.
+        """Switch a new simulated device on into *scene*, its flash ``default_scene``.
 
-        *scene_data* overrides *scene*'s tunables on every boot. The device's
-        card starts empty; with *sd_card* false it has none, and never reboots.
+        Every boot runs the scene the card names, else *scene*. *scene_data*
+        overrides *scene*'s tunables on every boot. The device's card starts
+        empty; with *sd_card* false it has none, and never reboots.
         """
         device = SimulatedDevice(self, name, scene, scene_data or {}, sd_card)
         self.devices.append(device)
@@ -192,9 +185,12 @@ class Simulation:
 class SimulatedDevice:
     """A simulated device running a real scene: the handle a test talks to.
 
-    It reboots as a board does: ``DeviceSceneReboot`` persists the next scene
-    to its card, then resets it. The reset abandons the rest of the tick, and
-    the device boots at the next tick, at once, into whatever its card names.
+    It boots and ticks as a board does, through the same ``build_scene_boot``
+    and ``build_scene_tick``; the scene it was switched on into stands in for
+    the flash ``default_scene``. It reboots as a board does:
+    ``DeviceSceneReboot`` persists the next scene to its card, then resets
+    it. The reset abandons the rest of the tick, and the device boots at the
+    next tick, at once, into whatever its card names.
     A reboot carries over the card, the pins, the accelerometer, its aims and
     the IR medium, and the recordings; game state is gone and outputs are
     dark and silent.
@@ -218,31 +214,17 @@ class SimulatedDevice:
             ir_sink=lambda emitter, pulses: sim._carry_ir(self, emitter, pulses),
         )
         self._reset_pending = False
-        self._boot(scene)
+        self._boot()
 
-    def _boot(self, into: str | None = None) -> None:
-        """Boot as ``run_scene`` does: into *into* when given, else the scene the card names.
-
-        There are no flash settings, so the card is the only source a reboot
-        boots from.
-        """
-        hw = self._sim_hw.hw
-        registry = scan_boot_scene_registry(hw.storage)
-        if self._scene_data:
-            registry.override_initial_data(self._switched_on_into, self._scene_data)
-        if into is None:
-            scene = resolve_boot_scene_name(registry, hw.storage, {})
-        else:
-            scene = resolve_known_scene(registry, into)
-        self._sim_hw.apply_ir_codec(*resolve_ir_codec(registry, scene))
-        runtime = build_scene_runtime(
-            hw,
-            scene,
-            scene_registry=registry,
-            scene_reboot=DeviceSceneReboot(hw.storage, booted_scene=scene, reset=_reset),
+    def _boot(self) -> None:
+        """Boot through ``build_scene_boot``, the boot ``run_scene`` uses."""
+        scene, self._scene_tick = build_scene_boot(
+            self._sim_hw.hw,
+            {"default_scene": self._switched_on_into},
+            reset=_reset,
             timer=_SimulationClock(self._sim),
+            scene_data={self._switched_on_into: self._scene_data} if self._scene_data else None,
         )
-        self._scene_tick = build_scene_tick(hw, runtime)
         self.scene = scene
         """The scene the device is running now."""
 
