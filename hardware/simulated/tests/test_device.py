@@ -395,3 +395,26 @@ def test_with_no_radio_declared_a_packet_cannot_land():
 
     with pytest.raises(ValueError, match="no radio"):
         sim_hw.land_radio(b"ping", sender=4)
+
+
+_MAGNETOMETER = {"magnetometer": {"enabled": True}}
+
+
+def test_a_magnetometer_switches_on_reading_a_zero_field():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(**_MAGNETOMETER))
+
+    assert sim_hw.hw.magnetometer.magnetic == (0.0, 0.0, 0.0)  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize("sections", [{}, {"magnetometer": {"enabled": False}}])
+def test_a_device_has_a_magnetometer_only_when_the_config_enables_one(sections):
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(**sections))
+
+    assert sim_hw.hw.magnetometer is None
+
+
+def test_without_a_magnetometer_a_field_cannot_be_set():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config())
+
+    with pytest.raises(ValueError, match="no magnetometer"):
+        sim_hw.magnetize(1.0, 2.0, 3.0)

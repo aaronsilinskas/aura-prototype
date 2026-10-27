@@ -227,10 +227,11 @@ class SimulatedDevice:
     it. The reset abandons the rest of the tick, and the device boots at once,
     within that same tick, into whatever its card names; it ticks the new
     scene from the next.
-    A reboot carries over the card, the pins, the accelerometer, its aims,
-    the IR and radio media, its radio node, and the recordings; game state is
-    gone, outputs are dark and silent, and packets it had not yet read are
-    lost, as a real reset clears the radio chip.
+    A reboot carries over the card, the pins, the accelerometer and
+    magnetometer readings, its aims, the IR and radio media, its radio node,
+    and the recordings; game state is gone, outputs are dark and silent, and
+    packets it had not yet read are lost, as a real reset clears the radio
+    chip.
     """
 
     def __init__(
@@ -327,6 +328,13 @@ class SimulatedDevice:
     def hold_still(self) -> None:
         """Back to rest, with gravity on z, and stop any ``move``."""
         self._sim_hw.hold_still()
+
+    def magnetize(self, x: float, y: float, z: float) -> None:
+        """Hold the magnetometer's raw field at ``(x, y, z)`` µT, in the chip's own frame.
+
+        It holds until changed; a device switches on reading a zero field.
+        """
+        self._sim_hw.magnetize(x, y, z)
 
     def aim(
         self,

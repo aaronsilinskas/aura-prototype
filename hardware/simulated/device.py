@@ -8,13 +8,13 @@ the engine loop, or time beyond the ``now`` it is handed.
 Its shape comes from a ``DeviceConfig``: one button per declared pin, labelled
 ``A`` onward as on a board; one recording pixel output per NeoPixel strip; the
 declared voice count; a haptic output when ``haptics`` is declared; an
-accelerometer when ``accelerometer`` is declared; the real
+accelerometer when ``accelerometer`` is declared; a magnetometer when
+``magnetometer`` is declared; the real
 ``InfraredTransceiver`` over one simulated reader per ``ir.rx`` pin and one
 simulated writer per wired emitter; the real ``RadioTransceiver`` over a
 simulated ``RadioTransport`` when ``radio`` is declared, sending as its
 ``node``. Wiring (pins, buses, addresses) is otherwise ignored; an enabled
-``sdcard`` section is an in-memory card. Matrix pixels and the magnetometer
-are not simulated.
+``sdcard`` section is an in-memory card. Matrix pixels are not simulated.
 
 IR pulses are ideal: a write lands at exactly the codec's durations, with no
 noise, jitter, or airtime. What an emitter writes reaches the device's own
@@ -368,6 +368,13 @@ class _SimulatedAccelerometer:
         self._sway_from = None
 
 
+class _SimulatedMagnetometer:
+    """A magnetometer reading a held raw field ``(x, y, z)`` in µT; zero until set."""
+
+    def __init__(self) -> None:
+        self.magnetic = (0.0, 0.0, 0.0)
+
+
 class _ReadingButtons(DebouncedButtons):
     """The real debouncer, also keeping in *down* whether it last read each button as down."""
 
@@ -444,6 +451,11 @@ class SimulatedHardware:
             if config.accelerometer is not None and config.accelerometer.enabled
             else None
         )
+        self._magnetometer = (
+            _SimulatedMagnetometer()
+            if config.magnetometer is not None and config.magnetometer.enabled
+            else None
+        )
         self._storage = (
             FakeDeviceStorage() if config.sdcard is not None and config.sdcard.enabled else None
         )
@@ -453,7 +465,7 @@ class SimulatedHardware:
         self.power_on()
 
     def power_on(self) -> None:
-        """Build ``hw`` afresh, as a reset does; the card, pins, accelerometer and recordings stay.
+        """Build ``hw`` afresh, as a reset does; the card, pins, sensors and recordings stay.
 
         The debouncer reads the pins as they stand, so a button held through
         it stays down without a new press. Strips are dark, no clip plays,
@@ -489,7 +501,7 @@ class SimulatedHardware:
             outputs=outputs,
             buttons=self._buttons,
             accelerometer=self._accelerometer,
-            magnetometer=None,
+            magnetometer=self._magnetometer,
             network_controls=HardwareNetworkControls(ir, radio),
             ir=ir,
             radio=radio,
@@ -571,6 +583,9 @@ class SimulatedHardware:
     def hold_still(self) -> None:
         self._require_accelerometer().rest()
 
+    def magnetize(self, x: float, y: float, z: float) -> None:
+        self._require_magnetometer().magnetic = (x, y, z)
+
     def hold(self, *buttons: str) -> None:
         """Schedule a press of every one of *buttons*, all at the same moment."""
         self._schedule(buttons, True)
@@ -648,6 +663,11 @@ class SimulatedHardware:
         if self._accelerometer is None:
             raise ValueError("the config declares no accelerometer")
         return self._accelerometer
+
+    def _require_magnetometer(self) -> _SimulatedMagnetometer:
+        if self._magnetometer is None:
+            raise ValueError("the config declares no magnetometer")
+        return self._magnetometer
 
     def _schedule(self, buttons: tuple[str, ...], pressed: bool) -> None:
         # Queued behind the previous change of every button, so back-to-back

@@ -133,3 +133,16 @@ def test_after_a_reboot_the_device_still_sends_radio_as_its_own_node(sim, capsys
     red.tap("A")
 
     assert f"from {red.radio_node}" in capsys.readouterr().out
+
+
+def test_a_magnetized_field_holds_through_a_reboot(sim):
+    # hardware_test's magnetometer mode, two presses of B in, fills the
+    # personal strip red at a 100 µT field on x.
+    device = sim.add_device("red", scene="example_lobby")
+    device.magnetize(100.0, 0.0, 0.0)
+
+    launch(device, "hardware_test")
+    for _ in range(2):
+        device.tap("B")
+
+    assert device.strip(Scope.PERSONAL).all_lit(0xFF0000)
