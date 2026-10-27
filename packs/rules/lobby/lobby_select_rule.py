@@ -1,8 +1,7 @@
 """``LobbySelectRule`` — multi-scope scene picker, config-driven via ``initial_data``.
 
 A lobby scene needs no Python of its own: it declares a ``rule_packs: [["lobby",
-"1.0"]]`` entry and seeds ``initial_data`` with a ``lobby`` dict (state key
-default-overridable, à la ``FpsLoggerRule``'s ``enabled_key``)::
+"1.0"]]`` entry and seeds ``initial_data`` with a ``lobby`` dict::
 
     "initial_data": {
       "lobby": {
@@ -32,33 +31,34 @@ from engine.input import InputEvents
 from engine.state import GameState, StateSlot
 from packs.rules.lobby.helpers.lobby_config import LobbyConfig
 
-_DEFAULT_CONFIG_KEY = "lobby"
+try:
+    from typing import Final
+except ImportError:
+    pass  # Not available on CircuitPython/MicroPython
+
+_CONFIG_KEY: Final = "lobby"
+_INDEX_KEY: Final = "lobby_index"
+
+_config: StateSlot = StateSlot(
+    "lobby_resolved", lambda state: LobbyConfig.from_state(state, _CONFIG_KEY), LobbyConfig
+)
 
 
 class LobbySelectRule(GameRule):
     """Cycles a scene selection across a wrapping look-ahead window of scopes.
 
-    Reads its scopes/entries config from a scene's ``initial_data`` under
-    *config_key* (default ``"lobby"``) via a :class:`engine.state.StateSlot`
-    (the ``rlgl_config``/``tag_config`` precedent), which resolves and caches
-    a ``LobbyConfig`` in ``GameState`` on first read (see
-    ``LobbyConfig.from_state``), so an empty or malformed config raises
-    there rather than at construction time (this rule is built with no
-    ``GameState`` available yet -- see the pack's ``RULE`` singleton below).
+    Reads its scopes/entries config from a scene's ``initial_data["lobby"]``
+    via a :class:`engine.state.StateSlot` (the ``rlgl_config``/``tag_config``
+    precedent), which resolves and caches a ``LobbyConfig`` in ``GameState``
+    on first read (see ``LobbyConfig.from_state``), so an empty or malformed
+    config raises there rather than at construction time (this rule is built
+    with no ``GameState`` available yet -- see the pack's ``RULE`` singleton
+    below).
     Selection state (the current index, the resolved config) lives entirely
-    in ``GameState``; this rule holds no game data of its own, only the
-    construction-time slot/key names.
+    in ``GameState``; this rule holds no game data of its own.
     """
 
-    __slots__ = ("_config_slot", "_index_key")
-
-    def __init__(self, config_key: str = _DEFAULT_CONFIG_KEY) -> None:
-        self._config_slot = StateSlot(
-            config_key + "_resolved",
-            lambda state: LobbyConfig.from_state(state, config_key),
-            LobbyConfig,
-        )
-        self._index_key = config_key + "_index"
+    def __init__(self) -> None:
         self.on(InputEvents.Sensors, self._handle)
 
     def _paint(self, config: LobbyConfig, index: int, state: GameState) -> None:
@@ -69,18 +69,18 @@ class LobbySelectRule(GameRule):
             state.effect_controls.set_effect(scope, entry.effect, entry.options)
 
     def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
-        config = self._config_slot(state)
+        config = _config(state)
 
-        if not state.has(self._index_key):
-            state.set(self._index_key, 0)
+        if not state.has(_INDEX_KEY):
+            state.set(_INDEX_KEY, 0)
             self._paint(config, 0, state)
             return
 
-        index = state.get(self._index_key, 0)
+        index = state.get(_INDEX_KEY, 0)
 
         if event.buttons.is_pressed("A"):
             index = (index + 1) % len(config.entries)
-            state.set(self._index_key, index)
+            state.set(_INDEX_KEY, index)
             self._paint(config, index, state)
         elif event.buttons.is_pressed("B"):
             state.scene_controls.reboot_into(config.entries[index].scene)
