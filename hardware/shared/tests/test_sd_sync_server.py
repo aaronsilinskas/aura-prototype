@@ -20,7 +20,7 @@ from hardware.shared.sd_sync_protocol import (
     encode_frame,
 )
 from hardware.shared.sd_sync_server import SdSyncServer
-from hardware.shared.tests.helpers import FakeDeviceStorage
+from hardware.simulated.storage import FakeDeviceStorage
 
 
 def test_read_returns_the_exact_bytes_of_a_written_file():

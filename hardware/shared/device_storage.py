@@ -13,9 +13,9 @@ CircuitPython 10.x, and MicroPython. Mounting the card is someone else's
 job: the live adapter is ``hardware.circuitpython.sdcard_storage.SdCardStorage``,
 which mounts at construction time and then defers every read/write to this
 base class, since once mounted, plain ``os`` calls work identically across
-runtimes. ``FakeDeviceStorage``, the in-memory test double, lives in
-``hardware/shared/tests/helpers.py``, mirroring where the board-free
-radio-transport fake lives.
+runtimes. ``FakeDeviceStorage``, the in-memory double, lives with the
+Simulated device in ``hardware/simulated/storage.py``, which also uses it as
+each simulated device's card.
 
 ``read_json``/``write_json`` are a thin JSON convenience built on the bytes
 primitives, so they inherit ``read_bytes``/``write_bytes``'s escape-rejection

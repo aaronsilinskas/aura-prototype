@@ -17,7 +17,7 @@ import pytest
 
 from hardware.shared.sd_sync_protocol import Transport
 from hardware.shared.sd_sync_server import SdSyncServer
-from hardware.shared.tests.helpers import FakeDeviceStorage
+from hardware.simulated.storage import FakeDeviceStorage
 from scripts.sd_sync import build_client, dispatch, parse_args
 from scripts.sd_sync_client import SdSyncNotFoundError
 from scripts.sd_sync_transport import SdSyncPortError, select_data_port

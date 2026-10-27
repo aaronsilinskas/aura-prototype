@@ -76,15 +76,18 @@ hardware/         Hardware abstraction layer
                   ir_transceiver, ir_codecs/ (base, aura, tag), ir_telemetry,
                   radio_transport, radio_transceiver, sd_sync_protocol, sd_sync_server,
                   profiler_report, build_narration, device_reboot)
-  simulated/      Test-only Simulated device (device: SimulatedHardware) — never deployed
+  simulated/      Test-only Simulated device (device: SimulatedHardware; storage:
+                  FakeDeviceStorage, its in-memory card) — never deployed
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together
   scene_composition.py  build_scene_runtime, build_scene_tick (board-free, CPython-testable)
   scene_runtime.py      run_scene (device-only: bring-up, then loops build_scene_tick)
   simulation/           Test-only Simulation test harness (Simulation, SimulatedDevice):
-                        boots real scenes on simulated devices and carries aimed
-                        IR between them (the IR medium) — never deployed
+                        boots real scenes on simulated devices, reboots them
+                        through their in-memory cards (or not, when card-less),
+                        and carries aimed IR between them (the IR medium) —
+                        never deployed
 
 examples/         Runnable CircuitPython entry points; deploy-watch's flash targets
 

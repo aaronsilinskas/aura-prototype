@@ -23,7 +23,7 @@ from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
-from hardware.shared.tests.helpers import FakeDeviceStorage
+from hardware.simulated.storage import FakeDeviceStorage
 
 
 def _fake_hw(ir=None, radio=None, audio_registry=None, storage=None, network_controls=None):

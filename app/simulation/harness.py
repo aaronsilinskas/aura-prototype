@@ -8,6 +8,10 @@ contract keeps out of ``hardware/``.
 A device's IR reaches its own receivers at once and other devices only through
 the IR medium, where a test has aimed it: ``red.aim(LINE, at=blue)`` then
 ``red.tap("A")``. ``receive_ir`` stands in for a sender outside the simulation.
+
+A device reboots through the same ``DeviceSceneReboot`` a board does, onto its
+own in-memory card, so a test can follow the lobby into a game and back;
+``device.scene`` names the scene it is running now.
 """
 
 from __future__ import annotations
@@ -19,12 +23,15 @@ from pathlib import Path
 from app.scene_composition import (
     build_scene_runtime,
     build_scene_tick,
+    resolve_boot_scene_name,
     resolve_ir_codec,
+    resolve_known_scene,
     scan_boot_scene_registry,
 )
 from engine.state import ScopeValue
 from engine.timer import Timer
 from hardware.shared.device_config import DeviceConfig, load_device_config
+from hardware.shared.device_reboot import DeviceSceneReboot
 from hardware.simulated.device import (
     DEFAULT_SWAY_STRENGTH,
     Buzzed,
@@ -44,8 +51,22 @@ _SIMULATED_DEVICE_CONFIG = (
 )
 
 
-def _simulated_device_config() -> DeviceConfig:
-    return load_device_config(str(_SIMULATED_DEVICE_CONFIG))
+def _simulated_device_config(sd_card: bool) -> DeviceConfig:
+    config = load_device_config(str(_SIMULATED_DEVICE_CONFIG))
+    if not sd_card:
+        config.sdcard = None
+    return config
+
+
+class _Reset(BaseException):
+    """A simulated device's reset: unwinds the rest of its tick, as a real reset does.
+
+    A ``BaseException``, so no ``except Exception`` in a rule can swallow it.
+    """
+
+
+def _reset() -> None:
+    raise _Reset
 
 
 class _SimulationClock(Timer):
@@ -101,10 +122,18 @@ class Simulation:
         self._in_flight: list[_InFlight] = []
 
     def add_device(
-        self, name: str, scene: str, scene_data: dict[str, object] | None = None
+        self,
+        name: str,
+        scene: str,
+        scene_data: dict[str, object] | None = None,
+        sd_card: bool = True,
     ) -> SimulatedDevice:
-        """Boot *scene* on a new simulated device; *scene_data* overrides its tunables."""
-        device = SimulatedDevice(self, name, scene, scene_data or {})
+        """Switch a new simulated device on into *scene*.
+
+        *scene_data* overrides *scene*'s tunables on every boot. The device's
+        card starts empty; with *sd_card* false it has none, and never reboots.
+        """
+        device = SimulatedDevice(self, name, scene, scene_data or {}, sd_card)
         self.devices.append(device)
         return device
 
@@ -162,27 +191,61 @@ class Simulation:
 
 
 class SimulatedDevice:
-    """A simulated device running a real scene: the handle a test talks to."""
+    """A simulated device running a real scene: the handle a test talks to.
+
+    It reboots as a board does: ``DeviceSceneReboot`` persists the next scene
+    to its card, then resets it. The reset abandons the rest of the tick, and
+    the device boots at the next tick, at once, into whatever its card names.
+    A reboot carries over the card, the pins, the accelerometer, its aims and
+    the IR medium, and the recordings; game state is gone and outputs are
+    dark and silent.
+    """
 
     def __init__(
-        self, sim: Simulation, name: str, scene: str, scene_data: dict[str, object]
+        self,
+        sim: Simulation,
+        name: str,
+        scene: str,
+        scene_data: dict[str, object],
+        sd_card: bool,
     ) -> None:
         self.name = name
         self._sim = sim
+        self._switched_on_into = scene
+        self._scene_data = scene_data
         self._sim_hw = SimulatedHardware(
             now=lambda: sim.now,
-            config=_simulated_device_config(),
+            config=_simulated_device_config(sd_card),
             ir_sink=lambda emitter, pulses: sim._carry_ir(self, emitter, pulses),
         )
+        self._reset_pending = False
+        self._boot(scene)
+
+    def _boot(self, switched_on_into: str | None = None) -> None:
+        """Boot as ``run_scene`` does, into *switched_on_into* or else the scene the card names.
+
+        There are no flash settings, so the card is the only source a reboot
+        boots from.
+        """
         hw = self._sim_hw.hw
         registry = scan_boot_scene_registry(hw.storage)
-        if scene_data:
-            registry.override_initial_data(scene, scene_data)
+        if self._scene_data:
+            registry.override_initial_data(self._switched_on_into, self._scene_data)
+        if switched_on_into is None:
+            scene = resolve_boot_scene_name(registry, hw.storage, {})
+        else:
+            scene = resolve_known_scene(registry, switched_on_into)
         self._sim_hw.apply_ir_codec(*resolve_ir_codec(registry, scene))
-        self._runtime = build_scene_runtime(
-            hw, scene, scene_registry=registry, timer=_SimulationClock(sim)
+        runtime = build_scene_runtime(
+            hw,
+            scene,
+            scene_registry=registry,
+            scene_reboot=DeviceSceneReboot(hw.storage, booted_scene=scene, reset=_reset),
+            timer=_SimulationClock(self._sim),
         )
-        self._scene_tick = build_scene_tick(hw, self._runtime)
+        self._scene_tick = build_scene_tick(hw, runtime)
+        self.scene = scene
+        """The scene the device is running now."""
 
     # -- inputs -------------------------------------------------------------
 
@@ -303,4 +366,11 @@ class SimulatedDevice:
 
     def _tick(self) -> None:
         self._sim_hw.settle_pins()
-        self._scene_tick()
+        if self._reset_pending:
+            self._reset_pending = False
+            self._sim_hw.power_on()
+            self._boot()
+        try:
+            self._scene_tick()
+        except _Reset:
+            self._reset_pending = True
