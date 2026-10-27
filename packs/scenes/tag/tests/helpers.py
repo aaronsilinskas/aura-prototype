@@ -61,10 +61,10 @@ def fire_together(sim: Simulation, *shooters: SimulatedDevice) -> None:
     """
     sent = [len(shooter.ir_sent) for shooter in shooters]
     for shooter in shooters:
-        shooter.hold("A")
+        shooter.schedule_hold("A")
     sim.run_until(lambda: all(len(s.ir_sent) > n for s, n in zip(shooters, sent, strict=True)))
     for shooter in shooters:
-        shooter.release("A")
+        shooter.schedule_release("A")
     sim.advance(TICK)
 
 

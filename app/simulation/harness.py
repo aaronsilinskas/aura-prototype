@@ -189,8 +189,9 @@ class SimulatedDevice:
     and ``build_scene_tick``; the scene it was switched on into stands in for
     the flash ``default_scene``. It reboots as a board does:
     ``DeviceSceneReboot`` persists the next scene to its card, then resets
-    it. The reset abandons the rest of the tick, and the device boots at the
-    next tick, at once, into whatever its card names.
+    it. The reset abandons the rest of the tick, and the device boots at once,
+    within that same tick, into whatever its card names; it ticks the new
+    scene from the next.
     A reboot carries over the card, the pins, the accelerometer, its aims and
     the IR medium, and the recordings; game state is gone and outputs are
     dark and silent.
@@ -213,7 +214,6 @@ class SimulatedDevice:
             config=_simulated_device_config(sd_card),
             ir_sink=lambda emitter, pulses: sim._carry_ir(self, emitter, pulses),
         )
-        self._reset_pending = False
         self._boot()
 
     def _boot(self) -> None:
@@ -235,18 +235,42 @@ class SimulatedDevice:
 
         Every device ticks while it waits, as with ``Simulation.advance``.
         """
-        released = self._sim_hw.releases(button)
         self._sim_hw.hold(button)
         self._sim_hw.release(button)
-        self._sim.run_until(lambda: self._sim_hw.releases(button) > released)
+        self._wait_until_registered((button,))
 
-    def hold(self, button: str) -> None:
-        """Schedule a press of *button*, kept down until ``release``; time does not advance."""
-        self._sim_hw.hold(button)
+    def hold(self, *buttons: str) -> None:
+        """Press every one of *buttons* together, kept down until ``release``.
 
-    def release(self, button: str) -> None:
-        """Schedule a release of *button*; time does not advance."""
-        self._sim_hw.release(button)
+        Advances the simulation until every press registers, ticking every
+        device as ``Simulation.advance`` does.
+        """
+        self._sim_hw.hold(*buttons)
+        self._wait_until_registered(buttons)
+
+    def release(self, *buttons: str) -> None:
+        """Release every one of *buttons* together, advancing until every release registers.
+
+        A release that lands as the device reboots registers too: the scene
+        that boots reads the button as up.
+        """
+        self._sim_hw.release(*buttons)
+        self._wait_until_registered(buttons)
+
+    def schedule_hold(self, *buttons: str) -> None:
+        """Schedule a press of every one of *buttons* together; time does not advance.
+
+        For presses on several devices on the same tick, which ``hold`` cannot
+        give because it advances.
+        """
+        self._sim_hw.hold(*buttons)
+
+    def schedule_release(self, *buttons: str) -> None:
+        """Schedule a release of every one of *buttons* together; time does not advance."""
+        self._sim_hw.release(*buttons)
+
+    def _wait_until_registered(self, buttons: tuple[str, ...]) -> None:
+        self._sim.run_until(lambda: all(self._sim_hw.registered(button) for button in buttons))
 
     def accelerate(self, x: float, y: float, z: float) -> None:
         """Hold the accelerometer at ``(x, y, z)`` m/s², for a jolt or a tilt.
@@ -347,11 +371,8 @@ class SimulatedDevice:
 
     def _tick(self) -> None:
         self._sim_hw.settle_pins()
-        if self._reset_pending:
-            self._reset_pending = False
-            self._sim_hw.power_on()
-            self._boot()
         try:
             self._scene_tick()
         except _Reset:
-            self._reset_pending = True
+            self._sim_hw.power_on()
+            self._boot()

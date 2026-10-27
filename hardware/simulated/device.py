@@ -331,23 +331,22 @@ class _SimulatedAccelerometer:
         self._sway_from = None
 
 
-class _CountingButtons(DebouncedButtons):
-    """The real debouncer, also counting each button's registered releases into *releases*."""
+class _ReadingButtons(DebouncedButtons):
+    """The real debouncer, also keeping in *down* whether it last read each button as down."""
 
     def __init__(
         self,
         buttons: list[tuple[str, Callable[[], bool]]],
         interval: float,
-        releases: dict[str, int],
+        down: dict[str, bool],
     ) -> None:
         super().__init__(buttons, interval=interval)
-        self.releases = releases
+        self.down = down
 
     def update(self, elapsed: float, out: ButtonData) -> None:
         super().update(elapsed, out)
-        for label in self.releases:
-            if out.is_released(label):
-                self.releases[label] += 1
+        for label in self.down:
+            self.down[label] = out.is_down(label)
 
 
 def _strip_segments(config: DeviceConfig) -> list[dict[str, range]]:
@@ -391,7 +390,7 @@ class SimulatedHardware:
         self._pressed = dict.fromkeys(self._labels, False)
         self._pin_changes: dict[str, list[tuple[float, bool]]] = {b: [] for b in self._labels}
         self._pin_free_at = dict.fromkeys(self._labels, 0.0)
-        self._releases = dict.fromkeys(self._labels, 0)
+        self._read_down = dict.fromkeys(self._labels, False)
         ir_config = config.ir if config.ir is not None and config.ir.enabled else None
         self._ir_receiver_count = len(ir_config.rx) if ir_config is not None else 0
         self._wired_emitters = (
@@ -419,10 +418,10 @@ class SimulatedHardware:
         """
         config = self._config
         self._ir_readers = [_SimulatedPulseReader() for _ in range(self._ir_receiver_count)]
-        self._buttons = _CountingButtons(
+        self._buttons = _ReadingButtons(
             [(label, self._pin_reader(label)) for label in self._labels],
             interval=_DEBOUNCE_INTERVAL,
-            releases=self._releases,
+            down=self._read_down,
         )
         self._strips = [_RecordingPixels(segments) for segments in _strip_segments(config)]
         self._audio_registry = AudioRegistry()
@@ -504,9 +503,13 @@ class SimulatedHardware:
     def is_playing(self, clip: str) -> bool:
         return self._audio is not None and self._audio.is_clip_playing(clip)
 
-    def releases(self, button: str) -> int:
-        """How many releases of *button* the debouncer has registered so far."""
-        return self._releases[button]
+    def registered(self, button: str) -> bool:
+        """Whether every scheduled change of *button* has landed and the debouncer reads it.
+
+        A change that lands as the device boots registers without an edge:
+        the new debouncer reads the pin as it stands.
+        """
+        return not self._pin_changes[button] and self._read_down[button] == self._pressed[button]
 
     def accelerate(self, x: float, y: float, z: float) -> None:
         self._require_accelerometer().hold(x, y, z)
@@ -518,11 +521,13 @@ class SimulatedHardware:
     def hold_still(self) -> None:
         self._require_accelerometer().rest()
 
-    def hold(self, button: str) -> None:
-        self._schedule(button, True)
+    def hold(self, *buttons: str) -> None:
+        """Schedule a press of every one of *buttons*, all at the same moment."""
+        self._schedule(buttons, True)
 
-    def release(self, button: str) -> None:
-        self._schedule(button, False)
+    def release(self, *buttons: str) -> None:
+        """Schedule a release of every one of *buttons*, all at the same moment."""
+        self._schedule(buttons, False)
 
     def settle_pins(self) -> None:
         """Apply every scripted pin change that has fallen due."""
@@ -583,12 +588,13 @@ class SimulatedHardware:
             raise ValueError("the config declares no accelerometer")
         return self._accelerometer
 
-    def _schedule(self, button: str, pressed: bool) -> None:
-        # Queued behind the previous change, so back-to-back calls never land
-        # inside the debounce window and get swallowed.
-        at = max(self.now(), self._pin_free_at[button])
-        self._pin_changes[button].append((at, pressed))
-        self._pin_free_at[button] = at + _PIN_SETTLE
+    def _schedule(self, buttons: tuple[str, ...], pressed: bool) -> None:
+        # Queued behind the previous change of every button, so back-to-back
+        # calls never land inside the debounce window and get swallowed.
+        at = max([self.now(), *(self._pin_free_at[button] for button in buttons)])
+        for button in buttons:
+            self._pin_changes[button].append((at, pressed))
+            self._pin_free_at[button] = at + _PIN_SETTLE
 
     def _pin_reader(self, label: str) -> Callable[[], bool]:
         return lambda: not self._pressed[label]  # pull-up: HIGH means not pressed

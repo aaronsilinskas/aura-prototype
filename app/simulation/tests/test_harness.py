@@ -79,19 +79,38 @@ def test_tap_advances_every_device_in_lockstep(sim):
     blue = sim.add_device("blue", scene="tag", scene_data={"tag_expected_team": 1})
     start_game(sim, red, blue)
 
-    blue.hold("A")
+    blue.schedule_hold("A")
     red.tap("A")
 
     assert shot_count(blue) == 1
 
 
-def test_hold_and_release_only_schedule_the_pin_change(sim):
+def test_hold_returns_once_the_press_has_registered(sim):
+    player = sim.add_device("red", scene="tag")
+    start_game(sim, player)
+
+    player.hold("A")
+
+    assert shot_count(player) == 1
+
+
+def test_release_returns_once_the_release_has_registered(sim):
+    player = sim.add_device("red", scene="tag", scene_data=ONE_ROUND)
+    start_game(sim, player)
+    reload_part_way(sim, player)
+
+    player.release("A")
+
+    assert not player.is_playing("scene.reload")
+
+
+def test_schedule_hold_and_schedule_release_only_schedule_the_pin_change(sim):
     player = sim.add_device("red", scene="tag")
     start_game(sim, player)
     before = sim.now
 
-    player.hold("A")
-    player.release("A")
+    player.schedule_hold("A")
+    player.schedule_release("A")
 
     assert sim.now == before
     assert shot_count(player) == 0
@@ -158,7 +177,6 @@ def test_a_looping_clip_is_playing_until_its_effect_stops(sim):
 
     looping = player.is_playing("scene.reload")
     player.release("A")
-    sim.advance(0.2)
 
     assert (looping, player.is_playing("scene.reload")) == (True, False)
 

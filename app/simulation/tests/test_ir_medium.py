@@ -38,7 +38,7 @@ def start_game(sim: Simulation, *players: SimulatedDevice) -> None:
 def fire_together(sim: Simulation, *shooters: SimulatedDevice) -> float:
     """Pull every shooter's trigger on the same tick; return when the shots went out."""
     for shooter in shooters:
-        shooter.hold("A")
+        shooter.schedule_hold("A")
     sim.run_until(lambda: all(s.ir_sent for s in shooters))
     (at,) = {s.ir_sent[0].at for s in shooters}
     return at
