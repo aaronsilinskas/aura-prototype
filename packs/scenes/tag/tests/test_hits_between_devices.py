@@ -8,7 +8,7 @@ single-device ``receive_ir`` tests in ``test_hit.py``.
 from __future__ import annotations
 
 from engine.network import LINE
-from packs.scenes.tag.tests.helpers import SHOOTER, start_game
+from packs.scenes.tag.tests.helpers import SHOOTER, fire_together, start_game
 
 
 def test_when_red_shoots_blue_blue_registers_the_hit(sim):
@@ -17,8 +17,7 @@ def test_when_red_shoots_blue_blue_registers_the_hit(sim):
     start_game(sim, red, blue)
 
     red.aim(LINE, at=blue)
-    red.tap("A")
-    sim.advance(0.1)
+    fire_together(sim, red)
 
     assert blue.has_played("scene.hit_start")
 
@@ -28,7 +27,6 @@ def test_a_shot_aimed_at_nobody_hits_no_one(sim):
     blue = sim.add_device("blue", scene="tag", scene_data=SHOOTER)
     start_game(sim, red, blue)
 
-    red.tap("A")
-    sim.advance(0.1)
+    fire_together(sim, red)
 
     assert not blue.has_played("scene.hit_start")

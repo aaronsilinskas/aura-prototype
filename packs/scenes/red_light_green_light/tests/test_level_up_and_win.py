@@ -12,6 +12,7 @@ import pytest
 from app.simulation import TICK, SimulatedDevice, Simulation
 from effects.effect import HapticPattern
 from packs.scenes.red_light_green_light.tests.helpers import (
+    CLIP_END_SLACK,
     EVERY_STRIP,
     GAME_OVER_STING,
     LEVEL_BAR,
@@ -130,7 +131,8 @@ def test_the_next_round_starts_once_the_level_up_is_over(sim):
 
     level_up_and_warning = 1.0 + 3 * QUICK_WARNINGS["rlgl_warning_pulse_max"]
     assert sim.now - last_played_at(player, LEVEL_UP_SOUND) == pytest.approx(
-        level_up_and_warning, abs=SLACK
+        level_up_and_warning,
+        abs=2 * SLACK,  # two timed phases, one after the other
     )
 
 
@@ -187,7 +189,9 @@ def test_the_device_returns_to_ready_the_moment_the_win_sting_ends(sim):
     wait_for(sim, player, READY_SOUND)
 
     sting_length = player.clip_length(WIN_STING)
-    assert sim.now - last_played_at(player, WIN_STING) == pytest.approx(sting_length, abs=SLACK)
+    assert sim.now - last_played_at(player, WIN_STING) == pytest.approx(
+        sting_length, abs=CLIP_END_SLACK
+    )
 
 
 def test_moving_during_a_win_is_not_caught(sim):
