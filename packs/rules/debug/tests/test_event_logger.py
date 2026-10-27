@@ -10,7 +10,7 @@ import pytest
 
 from app.simulation import TICK
 
-LOGGING = {"event_logging_enabled": True}
+LOGGING_ON = {"event_logging_enabled": True}
 
 
 def logged(capsys: pytest.CaptureFixture[str]) -> list[str]:
@@ -32,7 +32,7 @@ def test_nothing_is_logged_by_default(sim, capsys):
 
 
 def test_each_input_event_logs_one_line(sim, capsys):
-    sim.add_device("red", scene="element_browser", scene_data=LOGGING)
+    sim.add_device("red", scene="element_browser", scene_data=LOGGING_ON)
     capsys.readouterr()
 
     sim.advance(10 * TICK)
@@ -41,17 +41,17 @@ def test_each_input_event_logs_one_line(sim, capsys):
 
 
 def test_the_line_shows_the_button_states(sim, capsys):
-    device = sim.add_device("red", scene="element_browser", scene_data=LOGGING)
+    device = sim.add_device("red", scene="element_browser", scene_data=LOGGING_ON)
     device.hold("A")
     capsys.readouterr()
 
     sim.advance(TICK)
 
-    assert "A=DOWN" in logged_input(capsys)[-1]
+    assert "buttons=ButtonData(A=DOWN, B=UP)" in logged_input(capsys)[-1]
 
 
 def test_the_line_shows_the_acceleration(sim, capsys):
-    device = sim.add_device("red", scene="element_browser", scene_data=LOGGING)
+    device = sim.add_device("red", scene="element_browser", scene_data=LOGGING_ON)
     device.accelerate(1.0, 2.0, 3.0)
     capsys.readouterr()
 
@@ -61,7 +61,7 @@ def test_the_line_shows_the_acceleration(sim, capsys):
 
 
 def test_the_line_shows_the_time_the_scene_has_run(sim, capsys):
-    sim.add_device("red", scene="element_browser", scene_data=LOGGING)
+    sim.add_device("red", scene="element_browser", scene_data=LOGGING_ON)
     sim.advance(1.0 - TICK)
     capsys.readouterr()
 
