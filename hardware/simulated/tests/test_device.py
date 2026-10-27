@@ -102,6 +102,18 @@ def test_buttons_are_labelled_a_onward_one_per_configured_pin():
     assert all(out.is_pressed(label) for label in ("A", "B", "C"))
 
 
+def test_buttons_held_together_press_at_once_even_behind_a_recent_release():
+    clock = [0.0]
+    sim_hw = SimulatedHardware(now=lambda: clock[0], config=_config(buttons=["GP2", "GP3"]))
+    sim_hw.hold("A")
+    sim_hw.release("A")
+
+    sim_hw.hold("A", "B")
+    out = _read_buttons(sim_hw)  # A's release is still settling; neither may press yet
+
+    assert not out.is_down("B")
+
+
 def test_a_button_the_config_does_not_declare_cannot_be_held():
     sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(buttons=["GP2"]))
 

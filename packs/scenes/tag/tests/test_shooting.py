@@ -139,9 +139,8 @@ def empty_the_magazine(sim: Simulation, player: SimulatedDevice) -> None:
 
 def reload_fully(sim: Simulation, player: SimulatedDevice) -> None:
     player.hold("A")
-    sim.advance(TWO_ROUNDS["tag_reload_duration"] + 0.2)
+    sim.advance(TWO_ROUNDS["tag_reload_duration"])
     player.release("A")
-    sim.advance(0.2)
 
 
 def abandon_reload(sim: Simulation, player: SimulatedDevice) -> None:
@@ -170,7 +169,6 @@ def test_pressing_with_an_empty_magazine_dry_fires_instead_of_shooting(sim):
     empty_the_magazine(sim, player)
 
     player.hold("A")
-    sim.advance(0.2)
 
     assert shots(player) == []
     assert player.has_played("scene.dry_fire_start")
@@ -182,7 +180,6 @@ def test_a_dry_fire_bumps_the_haptic_softly(sim):
     empty_the_magazine(sim, player)
 
     player.hold("A")
-    sim.advance(0.2)
 
     assert [b.pattern for b in player.buzzed] == [(HapticPattern.SOFT_BUMP,)]
 
@@ -193,7 +190,6 @@ def test_pressing_with_an_empty_magazine_starts_reloading(sim):
     empty_the_magazine(sim, player)
 
     player.hold("A")
-    sim.advance(0.2)
 
     assert player.has_played("scene.reload")
 
@@ -219,7 +215,6 @@ def test_a_fresh_press_right_after_the_last_round_reloads_despite_the_cooldown(s
 
     player.tap("A")
     player.hold("A")  # registers well inside the cooldown the last round started
-    sim.advance(0.2)
 
     assert len(shots(player)) == 1
     assert player.has_played("scene.reload")

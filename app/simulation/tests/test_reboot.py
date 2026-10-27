@@ -2,10 +2,13 @@
 
 Driven through ``example_lobby``, whose B reboots into the selected scene, and
 ``return_to_lobby``, whose A+B hold reboots back to the scene that launched
-this one.
+this one. ``return_to_lobby``'s own behaviour is pinned in its pack's tests.
 """
 
 from __future__ import annotations
+
+import json
+from pathlib import Path
 
 import pytest
 
@@ -13,10 +16,14 @@ from app.simulation import TICK, SimulatedDevice, Simulation
 from engine.network import LINE
 from engine.state import Scope
 
-HOLD_SECONDS = 5.0
-"""``return_to_lobby``'s ``hold_seconds`` in every scene that ships it."""
+_SCENES_DIR = Path(__file__).resolve().parents[3] / "packs" / "scenes"
 
-LOBBY_ENTRIES = ["hardware_test", "element_browser", "red_light_green_light", "tag"]
+
+def _initial_data(scene: str) -> dict:
+    return json.loads((_SCENES_DIR / scene / "scene.json").read_text())["initial_data"]
+
+
+LOBBY_ENTRIES = [entry["scene"] for entry in _initial_data("example_lobby")["lobby"]["entries"]]
 """``example_lobby``'s entries, in the order A steps through them."""
 
 
@@ -40,16 +47,9 @@ def launch(device: SimulatedDevice, scene: str) -> None:
 
 
 def hold_to_return(sim: Simulation, device: SimulatedDevice) -> None:
-    """Hold A+B for the full ``hold_seconds``, then let go.
-
-    The margin covers the debounce, and a press queued behind a tap that
-    just let go of the same button.
-    """
-    device.hold("A")
-    device.hold("B")
-    sim.advance(HOLD_SECONDS + 0.2)
-    device.release("A")
-    device.release("B")
+    """Hold A+B for the scene's ``hold_seconds``, rebooting back to the lobby; A and B stay down."""
+    device.hold("A", "B")
+    sim.advance(_initial_data(device.scene)["return_to_lobby"]["hold_seconds"])
 
 
 def test_the_lobbys_b_reboots_into_the_selected_scene(sim):
@@ -60,40 +60,12 @@ def test_the_lobbys_b_reboots_into_the_selected_scene(sim):
     assert device.scene == "element_browser"
 
 
-def test_holding_a_and_b_for_hold_seconds_reboots_back_to_the_lobby(sim):
-    device = sim.add_device("red", scene="example_lobby")
-    launch(device, "element_browser")
-
-    hold_to_return(sim, device)
-
-    assert device.scene == "example_lobby"
-
-
-def test_holding_a_and_b_short_of_hold_seconds_stays_in_the_scene(sim):
-    device = sim.add_device("red", scene="example_lobby")
-    launch(device, "element_browser")
-
-    device.hold("A")
-    device.hold("B")
-    sim.advance(HOLD_SECONDS - 0.5)
-
-    assert device.scene == "element_browser"
-
-
 def test_a_card_less_device_stays_in_its_scene(sim):
     device = sim.add_device("red", scene="example_lobby", sd_card=False)
 
     launch(device, "element_browser")
 
     assert device.scene == "example_lobby"
-
-
-def test_a_device_switched_on_into_a_scene_has_nothing_to_return_to(sim):
-    device = sim.add_device("red", scene="element_browser")
-
-    hold_to_return(sim, device)
-
-    assert device.scene == "element_browser"
 
 
 def test_after_a_reboot_into_tag_the_device_speaks_tags_wire_frame(sim):
@@ -135,7 +107,7 @@ def test_a_button_held_through_a_reboot_gives_no_new_press(sim):
     launch(device, "element_browser")
 
     hold_to_return(sim, device)  # A is still down as the lobby boots
-    sim.advance(0.2)
+    device.release("A", "B")
     device.tap("B")
 
     assert device.scene == LOBBY_ENTRIES[0]  # the lobby's A never stepped the selection
