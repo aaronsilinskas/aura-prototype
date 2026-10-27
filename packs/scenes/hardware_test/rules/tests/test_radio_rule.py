@@ -79,14 +79,14 @@ def test_radio_received_is_noop_when_mode_is_rgb(spy):
 # ---------------------------------------------------------------------------
 
 
-def test_radio_received_calls_set_effect_on_global_all_with_white_solid(spy):
+def test_radio_received_flashes_global_all_green(spy):
     state, engine = _make_state(spy)
     _fire_radio(state, engine)
     assert len(spy.set_effect_calls) == 1
     scope, name, options = spy.set_effect_calls[0]
     assert scope is Scope.Global.ALL
     assert name == "basic.solid"
-    assert options == {"color": 0xFFFFFF}
+    assert options == {"color": 0x00FF00}
 
 
 def test_radio_received_writes_radio_flash_receipt_to_state(spy):

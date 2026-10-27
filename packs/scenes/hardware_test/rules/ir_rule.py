@@ -5,7 +5,7 @@ from engine.network import LINE, NetworkEvents
 from engine.state import GameState, Scope
 from packs.scenes.hardware_test.rules.helpers.flash import ir_flash
 from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import HwModeRule
-from packs.scenes.hardware_test.rules.helpers.mode import HW_TEST_PAYLOAD
+from packs.scenes.hardware_test.rules.helpers.mode import HW_TEST_PAYLOAD, RECEIVE_FLASH_COLOR
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_IR
 
 
@@ -15,7 +15,7 @@ class HwTestIrRule(HwModeRule):
     On entry, shows a white solid on ``Scope.ALL``. Button A transmits
     ``HW_TEST_PAYLOAD`` via the LINE IR emitter and fires the
     ``scene.sfx_test`` "sent" cue on ``Scope.PERSONAL``. Receiving an IR
-    packet flashes ``Scope.DIRECTIONAL`` with a white solid and records the
+    packet flashes ``Scope.DIRECTIONAL`` green and records the
     receipt/timestamp so the shared ``HwModeRule`` flash-expiry can restore
     the idle effect.
     """
@@ -37,7 +37,7 @@ class HwTestIrRule(HwModeRule):
 
     def _handle_ir_received(self, event: NetworkEvents.IRReceived, state: GameState) -> None:
         receipt = state.effect_controls.set_effect(
-            Scope.DIRECTIONAL, "basic.solid", {"color": 0xFFFFFF}
+            Scope.DIRECTIONAL, "basic.solid", {"color": RECEIVE_FLASH_COLOR}
         )
         ir_flash(state).restart(state.total, receipt)
         print(
