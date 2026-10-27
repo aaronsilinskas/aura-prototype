@@ -278,7 +278,7 @@ A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` 
 _Avoid_: mock device, virtual device, emulator (it does not run CircuitPython); faking the CircuitPython libraries beneath `device_builder`; hard-coding its hardware shape (declare it in the simulated config)
 
 ### Simulation test harness
-The test-only fixture layer that boots real scenes on one or more **simulated devices**, drives them through scripted inputs and time, and answers questions about what each device observably did. Tests written on it state behaviour, not the engine calls that produce it. Each device is switched on into the scene the test names with an empty card (or none, with `sd_card=False`); a **reboot** persists through that card and boots the device again at the next tick, keeping its card, inputs, aims and recordings, and `device.scene` names the scene it runs now.
+The test-only fixture layer that boots real scenes on one or more **simulated devices**, drives them through scripted inputs and time, and answers questions about what each device observably did. Tests written on it state behaviour, not the engine calls that produce it. A test can make a device card-less, and follow it through each **reboot** into the scene it runs next.
 _Avoid_: device harness, scene harness (both read as runtime code); asserting on which effect names a rule passed to `EffectControls`
 
 ### Aim

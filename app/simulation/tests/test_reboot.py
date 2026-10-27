@@ -12,7 +12,6 @@ import pytest
 from app.simulation import TICK, SimulatedDevice, Simulation
 from engine.network import LINE
 from engine.state import Scope
-from packs.scenes.tag.tests.helpers import start_game
 
 HOLD_SECONDS = 5.0
 """``return_to_lobby``'s ``hold_seconds`` in every scene that ships it."""
@@ -24,6 +23,13 @@ LOBBY_ENTRIES = ["hardware_test", "element_browser", "red_light_green_light", "t
 @pytest.fixture()
 def sim() -> Simulation:
     return Simulation()
+
+
+def start_game(sim: Simulation, *players: SimulatedDevice) -> None:
+    """Start a Tag game on every player: A in Ready, then the countdown."""
+    for player in players:
+        player.tap("A")
+    sim.run_until(lambda: all(p.has_played("scene.go_start") for p in players))
 
 
 def launch(device: SimulatedDevice, scene: str) -> None:
@@ -63,7 +69,7 @@ def test_holding_a_and_b_for_hold_seconds_reboots_back_to_the_lobby(sim):
     assert device.scene == "example_lobby"
 
 
-def test_releasing_a_and_b_before_hold_seconds_stays_in_the_scene(sim):
+def test_holding_a_and_b_short_of_hold_seconds_stays_in_the_scene(sim):
     device = sim.add_device("red", scene="example_lobby")
     launch(device, "element_browser")
 

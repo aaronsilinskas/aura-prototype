@@ -347,10 +347,8 @@ class SimulatedHardware:
     every emitter write as ``(emitter, pulses)``.
 
     ``hw.storage`` is an in-memory card when the config declares an enabled
-    ``sdcard`` section, else ``None``. ``power_on`` resets the device: ``hw``
-    is rebuilt with its outputs dark and silent, while the card, the pins,
-    the accelerometer, what the IR receivers have caught, and the recordings
-    carry on.
+    ``sdcard`` section, else ``None``. ``power_on`` resets the device: see
+    there for what it rebuilds.
     """
 
     def __init__(
@@ -371,9 +369,7 @@ class SimulatedHardware:
         self._pin_free_at = dict.fromkeys(self._labels, 0.0)
         self._releases = dict.fromkeys(self._labels, 0)
         ir_config = config.ir if config.ir is not None and config.ir.enabled else None
-        self._ir_readers = (
-            [_SimulatedPulseReader() for _ in ir_config.rx] if ir_config is not None else []
-        )
+        self._ir_receiver_count = len(ir_config.rx) if ir_config is not None else 0
         self._wired_emitters = (
             tuple(e for e in IR_EMITTERS if e in ir_config.emitters)
             if ir_config is not None
@@ -390,13 +386,15 @@ class SimulatedHardware:
         self.power_on()
 
     def power_on(self) -> None:
-        """Build ``hw`` afresh, as a reset does: the debouncer reads the pins as they stand.
+        """Build ``hw`` afresh, as a reset does; the card, pins, accelerometer and recordings stay.
 
-        A button held through it stays down without a new press. Strips are
-        dark, no clip plays, and the device speaks the Aura wire-frame until
-        ``apply_ir_codec``.
+        The debouncer reads the pins as they stand, so a button held through
+        it stays down without a new press. Strips are dark, no clip plays,
+        the IR receivers have caught nothing, and the device speaks the Aura
+        wire-frame until ``apply_ir_codec``.
         """
         config = self._config
+        self._ir_readers = [_SimulatedPulseReader() for _ in range(self._ir_receiver_count)]
         self._buttons = _CountingButtons(
             [(label, self._pin_reader(label)) for label in self._labels],
             interval=_DEBOUNCE_INTERVAL,

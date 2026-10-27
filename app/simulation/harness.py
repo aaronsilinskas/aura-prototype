@@ -9,9 +9,8 @@ A device's IR reaches its own receivers at once and other devices only through
 the IR medium, where a test has aimed it: ``red.aim(LINE, at=blue)`` then
 ``red.tap("A")``. ``receive_ir`` stands in for a sender outside the simulation.
 
-A device reboots through the same ``DeviceSceneReboot`` a board does, onto its
-own in-memory card, so a test can follow the lobby into a game and back;
-``device.scene`` names the scene it is running now.
+A device reboots as a board does (see ``SimulatedDevice``), so a test can
+follow the lobby into a game and back.
 """
 
 from __future__ import annotations
@@ -221,8 +220,8 @@ class SimulatedDevice:
         self._reset_pending = False
         self._boot(scene)
 
-    def _boot(self, switched_on_into: str | None = None) -> None:
-        """Boot as ``run_scene`` does, into *switched_on_into* or else the scene the card names.
+    def _boot(self, into: str | None = None) -> None:
+        """Boot as ``run_scene`` does: into *into* when given, else the scene the card names.
 
         There are no flash settings, so the card is the only source a reboot
         boots from.
@@ -231,10 +230,10 @@ class SimulatedDevice:
         registry = scan_boot_scene_registry(hw.storage)
         if self._scene_data:
             registry.override_initial_data(self._switched_on_into, self._scene_data)
-        if switched_on_into is None:
+        if into is None:
             scene = resolve_boot_scene_name(registry, hw.storage, {})
         else:
-            scene = resolve_known_scene(registry, switched_on_into)
+            scene = resolve_known_scene(registry, into)
         self._sim_hw.apply_ir_codec(*resolve_ir_codec(registry, scene))
         runtime = build_scene_runtime(
             hw,
