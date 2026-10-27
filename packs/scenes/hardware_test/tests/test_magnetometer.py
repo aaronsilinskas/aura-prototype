@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.simulation import TICK
+from app.simulation import TICK, Simulation
 from engine.state import Scope
 from packs.scenes.hardware_test.rules.magnetic_rule import MAG_LOG_INTERVAL, MAG_MAX
 from packs.scenes.hardware_test.tests.helpers import (
@@ -19,13 +19,25 @@ from packs.scenes.hardware_test.tests.helpers import (
     EVERY_STRIP,
     GLOBAL_STRIPS,
     GREEN,
+    IR,
+    MAGENTA,
     MAGNETOMETER,
     RED,
+    YELLOW,
+    all_white,
     press,
 )
 
-MAGENTA = 0xFF00FF
-YELLOW = 0xFFFF00
+
+def test_a_field_outside_magnetometer_mode_draws_no_bars(sim):
+    # IR mode idles white on every strip, so any bar would show over it.
+    device = sim.add_device("red", scene="hardware_test")
+    press(device, "B", IR)
+
+    device.magnetize(MAG_MAX, -MAG_MAX, MAG_MAX)
+    sim.advance(0.1)
+
+    assert all_white(device)
 
 
 @pytest.mark.parametrize(
@@ -103,7 +115,8 @@ def test_the_bars_follow_a_changing_field(sim):
     device.magnetize(MAG_MAX / 2, 0.0, 0.0)
     sim.advance(0.1)
 
-    assert device.strip(Scope.PERSONAL).lit == device.strip(Scope.PERSONAL).size // 2
+    personal = device.strip(Scope.PERSONAL)
+    assert personal.lit == personal.size // 2
 
 
 def test_the_bar_takes_the_other_colour_when_the_field_changes_sign(sim):
@@ -151,17 +164,29 @@ def test_the_console_logs_the_field_it_reads(sim, capsys):
     assert "mag (1.0, 2.0, 3.0)" in capsys.readouterr().out
 
 
-def test_the_console_logs_the_field_at_most_once_per_log_interval(sim, capsys):
+def just_logged_a_field(sim: Simulation, capsys: pytest.CaptureFixture[str]) -> None:
+    """Advance until the console logs a field, and drop everything logged so far."""
+    capsys.readouterr()
+    sim.run_until(lambda: "mag " in capsys.readouterr().out)
+
+
+def test_the_console_logs_no_field_again_within_the_log_interval(sim, capsys):
     device = sim.add_device("red", scene="hardware_test")
     press(device, "B", MAGNETOMETER)
-    capsys.readouterr()
-    sim.run_until(lambda: "mag " in capsys.readouterr().out)  # a field was just logged
+    just_logged_a_field(sim, capsys)
 
     sim.advance(MAG_LOG_INTERVAL - TICK)
-    before_the_interval = capsys.readouterr().out
-    sim.advance(2 * TICK)
 
-    assert "mag " not in before_the_interval
+    assert "mag " not in capsys.readouterr().out
+
+
+def test_the_console_logs_the_field_again_once_the_log_interval_has_passed(sim, capsys):
+    device = sim.add_device("red", scene="hardware_test")
+    press(device, "B", MAGNETOMETER)
+    just_logged_a_field(sim, capsys)
+
+    sim.advance(MAG_LOG_INTERVAL + TICK)
+
     assert capsys.readouterr().out.count("mag ") == 1
 
 
