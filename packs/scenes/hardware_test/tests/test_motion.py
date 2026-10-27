@@ -16,11 +16,13 @@ from packs.scenes.hardware_test.tests.helpers import (
     BLUE,
     CYAN,
     EVERY_STRIP,
+    GLOBAL_STRIPS,
+    GREEN,
+    MAGENTA,
     RED,
+    YELLOW,
     press,
 )
-
-GLOBAL_STRIPS = [Scope.Global.MAIN, Scope.Global.BUFF, Scope.Global.DEBUFF]
 
 
 @pytest.mark.parametrize(
@@ -28,10 +30,10 @@ GLOBAL_STRIPS = [Scope.Global.MAIN, Scope.Global.BUFF, Scope.Global.DEBUFF]
     [
         ((ACCEL_MAX, 0.0, 0.0), [Scope.PERSONAL], RED),
         ((-ACCEL_MAX, 0.0, 0.0), [Scope.PERSONAL], CYAN),
-        ((0.0, ACCEL_MAX, 0.0), [Scope.DIRECTIONAL], 0x00FF00),
-        ((0.0, -ACCEL_MAX, 0.0), [Scope.DIRECTIONAL], 0xFF00FF),
+        ((0.0, ACCEL_MAX, 0.0), [Scope.DIRECTIONAL], GREEN),
+        ((0.0, -ACCEL_MAX, 0.0), [Scope.DIRECTIONAL], MAGENTA),
         ((0.0, 0.0, ACCEL_MAX), GLOBAL_STRIPS, BLUE),
-        ((0.0, 0.0, -ACCEL_MAX), GLOBAL_STRIPS, 0xFFFF00),
+        ((0.0, 0.0, -ACCEL_MAX), GLOBAL_STRIPS, YELLOW),
     ],
     ids=["x+", "x-", "y+", "y-", "z+", "z-"],
 )
