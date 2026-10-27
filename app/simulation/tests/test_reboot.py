@@ -118,3 +118,18 @@ def test_a_rule_failure_inside_a_tick_still_fails(sim):
 
     with pytest.raises(ValueError, match="scopes"):
         sim.advance(TICK)
+
+
+def test_after_a_reboot_the_device_still_sends_radio_as_its_own_node(sim, capsys):
+    # hardware_test's radio mode, four presses of B in, logs each packet's sender.
+    blue = sim.add_device("blue", scene="hardware_test")
+    red = sim.add_device("red", scene="example_lobby")
+    launch(red, "hardware_test")
+    for device in (blue, red):
+        for _ in range(4):
+            device.tap("B")
+    capsys.readouterr()
+
+    red.tap("A")
+
+    assert f"from {red.radio_node}" in capsys.readouterr().out

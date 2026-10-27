@@ -89,7 +89,8 @@ app/              Composition layer — the one place allowed to import both the
   simulation/           Test-only Simulation test harness (Simulation, SimulatedDevice):
                         boots real scenes on simulated devices, reboots them
                         through their in-memory cards (or not, when card-less),
-                        and carries aimed IR between them (the IR medium) —
+                        and carries aimed IR between them (the IR medium) and
+                        radio to every other device (the radio medium) —
                         never deployed
 
 examples/         Runnable CircuitPython entry points; deploy-watch's flash targets

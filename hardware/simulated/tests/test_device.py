@@ -346,3 +346,52 @@ def test_a_device_without_an_accelerometer_cannot_be_driven(drive):
 
     with pytest.raises(ValueError, match="accelerometer"):
         drive(sim_hw)
+
+
+_RADIO = {"radio": {"cs": "P2", "reset": "P3", "frequency": 915.0, "node": 9}}
+
+
+def test_a_radio_send_is_handed_to_the_radio_sink():
+    sent: list[bytes] = []
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(**_RADIO), radio_sink=sent.append)
+
+    sim_hw.hw.network_controls.send_radio(b"ping")
+
+    assert sent == [b"ping"]
+
+
+def test_a_landed_radio_packet_is_read_with_its_sender():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(**_RADIO))
+    radio = sim_hw.hw.radio
+    assert radio is not None
+
+    sim_hw.land_radio(b"ping", sender=4)
+    radio.update()
+
+    assert radio.received == b"ping"
+    assert radio.last_sender == 4
+
+
+def test_a_reset_loses_radio_packets_not_yet_read():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(**_RADIO))
+    sim_hw.land_radio(b"ping", sender=4)
+
+    sim_hw.power_on()
+    radio = sim_hw.hw.radio
+    assert radio is not None
+    radio.update()
+
+    assert radio.received is None
+
+
+def test_with_no_radio_declared_the_device_has_none():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config())
+
+    assert sim_hw.hw.radio is None
+
+
+def test_with_no_radio_declared_a_packet_cannot_land():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config())
+
+    with pytest.raises(ValueError, match="no radio"):
+        sim_hw.land_radio(b"ping", sender=4)
