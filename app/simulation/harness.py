@@ -8,6 +8,8 @@ which the hardware import contract keeps out of ``hardware/``.
 A device's IR reaches its own receivers at once and other devices only through
 the IR medium, where a test has aimed it: ``red.aim(LINE, at=blue)`` then
 ``red.tap("A")``. ``receive_ir`` stands in for a sender outside the simulation.
+Its radio reaches every other device through the radio medium, with no aim;
+``receive_radio`` stands in for an outside sender.
 
 A device reboots as a board does (see ``SimulatedDevice``), so a test can
 follow the lobby into a game and back.
@@ -28,6 +30,7 @@ from hardware.simulated.device import (
     Buzzed,
     IrSent,
     Played,
+    RadioSent,
     SimulatedHardware,
     Strip,
 )
@@ -42,10 +45,12 @@ _SIMULATED_DEVICE_CONFIG = (
 )
 
 
-def _simulated_device_config(sd_card: bool) -> DeviceConfig:
+def _simulated_device_config(sd_card: bool, radio_node: int) -> DeviceConfig:
     config = load_device_config(str(_SIMULATED_DEVICE_CONFIG))
     if not sd_card:
         config.sdcard = None
+    assert config.radio is not None  # the simulated config declares one
+    config.radio.node = radio_node
     return config
 
 
@@ -97,13 +102,18 @@ class _InFlight:
 
 
 class Simulation:
-    """One shared clock, every simulated device on it, and the IR medium between them.
+    """One shared clock, every simulated device on it, and the IR and radio media between them.
 
     The IR medium holds each device's aims and the pulses in flight. Pulses an
     emitter writes during one tick land on every device it is aimed at at the
     start of the next, before any device ticks, so the order devices were
     added in never decides who hears what. Shots from several senders on one
     tick queue in sender add order; nothing collides.
+
+    The radio medium keeps the same time, with no aim: a packet sent during
+    one tick lands at the start of the next on every device but its sender.
+    Packets from several senders queue in sender add order, with no collision
+    or loss, and a device reads one a tick.
     """
 
     def __init__(self) -> None:
@@ -111,6 +121,7 @@ class Simulation:
         self.devices: list[SimulatedDevice] = []
         self._aims: dict[tuple[SimulatedDevice, str], tuple[_Reach, ...]] = {}
         self._in_flight: list[_InFlight] = []
+        self._radio_in_flight: list[tuple[SimulatedDevice, bytes]] = []
 
     def add_device(
         self,
@@ -123,9 +134,11 @@ class Simulation:
 
         Every boot runs the scene the card names, else *scene*. *scene_data*
         overrides *scene*'s tunables on every boot. The device's card starts
-        empty; with *sd_card* false it has none, and never reboots.
+        empty; with *sd_card* false it has none, and never reboots. Its radio
+        node is its place in add order, from 1.
         """
-        device = SimulatedDevice(self, name, scene, scene_data or {}, sd_card)
+        radio_node = len(self.devices) + 1
+        device = SimulatedDevice(self, name, scene, scene_data or {}, sd_card, radio_node)
         self.devices.append(device)
         return device
 
@@ -135,6 +148,7 @@ class Simulation:
         while self.now < end:
             self.now += TICK
             self._land_in_flight_ir()
+            self._land_in_flight_radio()
             for device in self.devices:
                 device._tick()
 
@@ -174,6 +188,17 @@ class Simulation:
         if reaches:
             self._in_flight.append(_InFlight(sender, reaches, pulses))
 
+    def _carry_radio(self, sender: SimulatedDevice, payload: bytes) -> None:
+        self._radio_in_flight.append((sender, payload))
+
+    def _land_in_flight_radio(self) -> None:
+        in_flight, self._radio_in_flight = self._radio_in_flight, []
+        in_flight.sort(key=lambda packet: self.devices.index(packet[0]))
+        for sender, payload in in_flight:
+            for device in self.devices:
+                if device is not sender:
+                    device._sim_hw.land_radio(sender.radio_node, payload)
+
     def _land_in_flight_ir(self) -> None:
         in_flight, self._in_flight = self._in_flight, []
         in_flight.sort(key=lambda shot: self.devices.index(shot.sender))
@@ -192,9 +217,9 @@ class SimulatedDevice:
     it. The reset abandons the rest of the tick, and the device boots at once,
     within that same tick, into whatever its card names; it ticks the new
     scene from the next.
-    A reboot carries over the card, the pins, the accelerometer, its aims and
-    the IR medium, and the recordings; game state is gone and outputs are
-    dark and silent.
+    A reboot carries over the card, the pins, the accelerometer, its aims,
+    the IR and radio media, its radio node, and the recordings; game state is
+    gone, outputs are dark and silent, and its radio has caught nothing.
     """
 
     def __init__(
@@ -204,6 +229,7 @@ class SimulatedDevice:
         scene: str,
         scene_data: dict[str, object],
         sd_card: bool,
+        radio_node: int,
     ) -> None:
         self.name = name
         self._sim = sim
@@ -211,8 +237,9 @@ class SimulatedDevice:
         self._scene_data = scene_data
         self._sim_hw = SimulatedHardware(
             now=lambda: sim.now,
-            config=_simulated_device_config(sd_card),
+            config=_simulated_device_config(sd_card, radio_node),
             ir_sink=lambda emitter, pulses: sim._carry_ir(self, emitter, pulses),
+            radio_sink=lambda payload: sim._carry_radio(self, payload),
         )
         self._boot()
 
@@ -327,11 +354,30 @@ class SimulatedDevice:
         """
         self._sim_hw.receive_ir(payload)
 
+    def receive_radio(self, payload: bytes, sender: int) -> None:
+        """Land a packet carrying *payload* from node *sender*, outside the ``Simulation``.
+
+        Not through the radio medium: it waits on this device's radio, read
+        on the next tick, one packet per tick.
+        """
+        self._sim_hw.land_radio(sender, payload)
+
     # -- queries ------------------------------------------------------------
 
     @property
     def ir_sent(self) -> list[IrSent]:
         return self._sim_hw.ir_sent
+
+    @property
+    def radio_sent(self) -> list[RadioSent]:
+        return self._sim_hw.radio_sent
+
+    @property
+    def radio_node(self) -> int:
+        """The node this device sends as: its place in add order, from 1."""
+        node = self._sim_hw.radio_node
+        assert node is not None  # the simulated config declares a radio
+        return node
 
     @property
     def played(self) -> list[Played]:

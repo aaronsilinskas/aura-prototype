@@ -10,9 +10,11 @@ Its shape comes from a ``DeviceConfig``: one button per declared pin, labelled
 declared voice count; a haptic output when ``haptics`` is declared; an
 accelerometer when ``accelerometer`` is declared; the real
 ``InfraredTransceiver`` over one simulated reader per ``ir.rx`` pin and one
-simulated writer per wired emitter. Wiring (pins, buses, addresses) is
-otherwise ignored; an enabled ``sdcard`` section is an in-memory card. Matrix
-pixels, the magnetometer, and the radio are not simulated.
+simulated writer per wired emitter; the real ``RadioTransceiver`` over a
+simulated ``RadioTransport`` when ``radio`` is declared, sending as its
+``node``. Wiring (pins, buses, addresses) is otherwise ignored; an enabled
+``sdcard`` section is an in-memory card. Matrix pixels and the magnetometer
+are not simulated.
 
 IR pulses are ideal: a write lands at exactly the codec's durations, with no
 noise, jitter, or airtime. What an emitter writes reaches the device's own
@@ -21,6 +23,11 @@ what keeps a device from hearing itself. Each write is also handed, with its
 emitter, to the optional ``ir_sink``; ``land_ir`` lands pulses from elsewhere on
 chosen receivers. Which other devices hear a write is the harness's business:
 this device knows of no other.
+
+Radio is ideal too: a send is handed, whole, to the optional ``radio_sink``
+and never reaches the device's own radio, as the half-duplex chip never hears
+itself. ``land_radio`` lands a packet from elsewhere; the transceiver reads one
+per ``update``, oldest first.
 """
 
 from __future__ import annotations
@@ -56,10 +63,20 @@ from hardware.shared.ir_transport import (
     PulseWriter,
 )
 from hardware.shared.network_controls import HardwareNetworkControls
+from hardware.shared.radio_transceiver import RadioTransceiver
+from hardware.shared.radio_transport import RadioTransport
 from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
 from hardware.simulated.storage import FakeDeviceStorage
 
-__all__ = ["DEFAULT_SWAY_STRENGTH", "Buzzed", "IrSent", "Played", "SimulatedHardware", "Strip"]
+__all__ = [
+    "DEFAULT_SWAY_STRENGTH",
+    "Buzzed",
+    "IrSent",
+    "Played",
+    "RadioSent",
+    "SimulatedHardware",
+    "Strip",
+]
 
 _DEBOUNCE_INTERVAL = 0.05
 _PIN_SETTLE = 2 * _DEBOUNCE_INTERVAL
@@ -80,6 +97,12 @@ _SWAY_HZ = 2.0
 class IrSent:
     at: float
     emitter: str
+    payload: bytes
+
+
+@dataclass(frozen=True)
+class RadioSent:
+    at: float
     payload: bytes
 
 
@@ -197,6 +220,20 @@ class _SimulatedInfraredTransceiver(InfraredTransceiver):
     def apply_codec(self, encoder: InfraredEncoder, decoder: InfraredDecoder) -> None:
         super().apply_codec(encoder, decoder)
         self._sim_hw._codec_installed(encoder, decoder)
+
+
+class _SimulatedRadioTransport(RadioTransport):
+    """The radio chip: a send goes to the device, and landed packets wait to be read."""
+
+    def __init__(self, sim_hw: SimulatedHardware) -> None:
+        self._sim_hw = sim_hw
+        self.waiting: deque[tuple[int, bytes]] = deque()
+
+    def send(self, data: bytes) -> None:
+        self._sim_hw._send_radio(bytes(data))
+
+    def receive(self) -> tuple[int, bytes] | None:
+        return self.waiting.popleft() if self.waiting else None
 
 
 def _wav_length(path: str) -> float:
@@ -367,7 +404,8 @@ class SimulatedHardware:
     *now* reads the simulation clock; every recording is stamped with it, and
     scripted pin changes fall due against it. Call ``settle_pins`` once per
     tick, before the tick reads the buttons. *ir_sink*, when given, is handed
-    every emitter write as ``(emitter, pulses)``.
+    every emitter write as ``(emitter, pulses)``, and *radio_sink* every radio
+    send's payload.
 
     ``hw.storage`` is an in-memory card when the config declares an enabled
     ``sdcard`` section, else ``None``. ``power_on`` resets the device: see
@@ -379,11 +417,14 @@ class SimulatedHardware:
         now: Callable[[], float],
         config: DeviceConfig,
         ir_sink: Callable[[str, list[int]], None] | None = None,
+        radio_sink: Callable[[bytes], None] | None = None,
     ) -> None:
         self.now = now
         self._config = config
         self._ir_sink = ir_sink
+        self._radio_sink = radio_sink
         self.ir_sent: list[IrSent] = []
+        self.radio_sent: list[RadioSent] = []
         self.played: list[Played] = []
         self.buzzed: list[Buzzed] = []
         self._labels = [chr(ord("A") + i) for i in range(len(config.buttons))]
@@ -406,6 +447,9 @@ class SimulatedHardware:
         self._storage = (
             FakeDeviceStorage() if config.sdcard is not None and config.sdcard.enabled else None
         )
+        self._radio_node = (
+            config.radio.node if config.radio is not None and config.radio.enabled else None
+        )
         self.power_on()
 
     def power_on(self) -> None:
@@ -413,8 +457,8 @@ class SimulatedHardware:
 
         The debouncer reads the pins as they stand, so a button held through
         it stays down without a new press. Strips are dark, no clip plays,
-        the IR receivers have caught nothing, and the device speaks the Aura
-        wire-frame until ``hw.ir.apply_codec``.
+        the IR receivers and the radio have caught nothing, and the device
+        speaks the Aura wire-frame until ``hw.ir.apply_codec``.
         """
         config = self._config
         self._ir_readers = [_SimulatedPulseReader() for _ in range(self._ir_receiver_count)]
@@ -439,14 +483,16 @@ class SimulatedHardware:
         self._ir_encoder: InfraredEncoder = AuraInfraredEncoder()
         self._wire_decoder: InfraredDecoder = AuraInfraredDecoder()
         ir = self._build_ir() if self._ir_readers else None
+        self._radio = _SimulatedRadioTransport(self) if self._radio_node is not None else None
+        radio = RadioTransceiver(self._radio) if self._radio is not None else None
         self.hw = DeviceHardware(
             outputs=outputs,
             buttons=self._buttons,
             accelerometer=self._accelerometer,
             magnetometer=None,
-            network_controls=HardwareNetworkControls(ir),
+            network_controls=HardwareNetworkControls(ir, radio),
             ir=ir,
-            radio=None,
+            radio=radio,
             storage=self._storage,
             audio_registry=self._audio_registry,
         )
@@ -474,6 +520,15 @@ class SimulatedHardware:
         )
         for reader in readers:
             reader.capture(pulses)
+
+    def land_radio(self, sender: int, payload: bytes) -> None:
+        """Land a packet *sender* sent, for the transceiver's next free ``update`` to read."""
+        self._require_radio().waiting.append((sender, payload))
+
+    @property
+    def radio_node(self) -> int | None:
+        """The node the device sends as; ``None`` when the config declares no radio."""
+        return self._radio_node
 
     @property
     def ir_emitters(self) -> tuple[str, ...]:
@@ -546,6 +601,7 @@ class SimulatedHardware:
 
     def forget(self) -> None:
         self.ir_sent.clear()
+        self.radio_sent.clear()
         self.played.clear()
         self.buzzed.clear()
 
@@ -573,6 +629,11 @@ class SimulatedHardware:
         if self._ir_sink is not None:
             self._ir_sink(emitter, list(pulses))
 
+    def _send_radio(self, payload: bytes) -> None:
+        self.radio_sent.append(RadioSent(self.now(), payload))
+        if self._radio_sink is not None:
+            self._radio_sink(payload)
+
     def _decode_wire(self, pulses: array | list[int]) -> bytes:
         """The payload *pulses* carry, read back through the installed codec."""
         decoder = self._wire_decoder
@@ -582,6 +643,11 @@ class SimulatedHardware:
             if payload is not None:
                 return bytes(payload)
         raise ValueError(f"the {decoder.__class__.__name__} cannot read back what was sent")
+
+    def _require_radio(self) -> _SimulatedRadioTransport:
+        if self._radio is None:
+            raise ValueError("the config declares no radio")
+        return self._radio
 
     def _require_accelerometer(self) -> _SimulatedAccelerometer:
         if self._accelerometer is None:
