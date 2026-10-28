@@ -270,7 +270,7 @@ The board-free turning of a `DeviceConfig` into a `DeviceHardware`, shared by th
 _Avoid_: builder (names the device-only entry point); repeating gating or IR wiring in a `DeviceParts` adapter
 
 ### DeviceParts
-The port **Device assembly** reaches leaf hardware through — one constructor per part (pins, buses, pixels, buttons, sensors, audio, haptics, IR pulse readers and writers, radio transport, storage), taking pin names rather than pin objects. Live adapter `CircuitPythonParts`; the **Simulated device**'s adapter `SimulatedParts`, which also decides which parts persist across a **reboot**.
+The port **Device assembly** reaches leaf hardware through — one constructor per part (pins, buses, pixels, buttons, sensors, audio, haptics, IR pulse readers and writers, radio transport, storage), taking pin names rather than pin objects. One adapter per platform, so a new platform (CircuitPython today; MicroPython or a Linux single-board computer later) adds an adapter, not a builder: `CircuitPythonParts` on a board, and the **Simulated device**'s `SimulatedParts`, which also decides which parts persist across a **reboot**.
 _Avoid_: leaves, leaf factory; deciding enabled/declared or bus requirements in an adapter (that is the assembly's job)
 
 ### device_builder
