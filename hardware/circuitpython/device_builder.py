@@ -41,7 +41,6 @@ from engine.log import Logger
 
 # Shared with CircuitPythonParts until build_hardware runs the Device assembly (#1055).
 from hardware.circuitpython.circuitpython_parts import (
-    CircuitPythonParts,
     _resolve_pin,
     _setup_accelerometer,
     _setup_drv2605,
@@ -81,7 +80,6 @@ from hardware.shared.device_config import (
 )
 from hardware.shared.device_config import load_device_config as _load_shared_device_config
 from hardware.shared.device_hardware import DeviceHardware
-from hardware.shared.device_parts import PinRef
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_transport import PulseReader, PulseWriter
@@ -358,12 +356,34 @@ def _setup_sdcard(spi: busio.SPI, sdcard_cfg: SDCardConfig, board_module: object
 def _setup_audio(
     audio_cfg: AudioConfig, board_module: object, audio_registry: AudioRegistry
 ) -> AudioEffectOutput:
-    return CircuitPythonParts(board_module).audio_output(
-        audio_cfg,
+    """Return a configured AudioEffectOutput from *audio_cfg*, resolving clips via
+    *audio_registry*.
+
+    Audio is config-gated rather than presence-probed, so unlike the
+    Optional-returning accelerometer/drv2605 helpers there is no absent case
+    — the caller's ``config.audio is not None and config.audio.enabled``
+    guard is the only gate.
+
+    *audio_registry* is built empty by the caller (``build_hardware``) and
+    also exposed on ``DeviceHardware.audio_registry`` — populating its base
+    (scanning effect-pack ``sounds/`` folders) and overlay (per-scene sounds)
+    is ``app.build_scene_runtime``'s job, not this builder's.
+
+    ``AudioEffectOutput`` is imported here, not at module load — its module
+    pulls in ``audiobusio``/``audiocore``/``audiomixer`` at import time, so a
+    config with no audio section never requires the audio stack installed.
+    """
+    from hardware.circuitpython.audio_output import AudioEffectOutput
+
+    return AudioEffectOutput(
         audio_registry,
-        PinRef(audio_cfg.i2s_bit_clock, "audio.i2s_bit_clock"),
-        PinRef(audio_cfg.i2s_word_select, "audio.i2s_word_select"),
-        PinRef(audio_cfg.i2s_data, "audio.i2s_data"),
+        max_volume=audio_cfg.max_volume,
+        num_voices=audio_cfg.voices,
+        i2s_bit_clock=_resolve_pin(board_module, "audio.i2s_bit_clock", audio_cfg.i2s_bit_clock),
+        i2s_word_select=_resolve_pin(
+            board_module, "audio.i2s_word_select", audio_cfg.i2s_word_select
+        ),
+        i2s_data=_resolve_pin(board_module, "audio.i2s_data", audio_cfg.i2s_data),
     )
 
 

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import sys
 import time
+from collections.abc import Callable
+from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import ClassVar
 
@@ -562,15 +564,22 @@ def _buzz(output: EffectOutput) -> None:
     )
 
 
-def test_haptic_output_plays_on_a_drv2605_on_the_given_bus_at_its_configured_address(
+def test_haptic_output_drives_a_drv2605_on_the_given_bus_at_its_configured_address(
     drv2605: None,
 ) -> None:
     bus = object()
-    output = CircuitPythonParts(_board()).haptic_output(I2CDeviceConfig(address=0x5B), bus)
+
+    CircuitPythonParts(_board()).haptic_output(I2CDeviceConfig(address=0x5B), bus)
+
+    assert [(d.i2c, d.kwargs) for d in _FakeDrv2605.built] == [(bus, {"address": 0x5B})]
+
+
+def test_haptic_output_plays_haptic_effects_on_its_drv2605(drv2605: None) -> None:
+    output = CircuitPythonParts(_board()).haptic_output(I2CDeviceConfig(), object())
 
     _buzz(output)
 
-    assert [(d.i2c, d.kwargs, d.plays) for d in _FakeDrv2605.built] == [(bus, {"address": 0x5B}, 1)]
+    assert [d.plays for d in _FakeDrv2605.built] == [1]
 
 
 def test_haptic_output_leaves_the_drivers_default_address_when_none_is_configured(
@@ -681,7 +690,7 @@ def test_audio_output_caps_full_loudness_at_the_configured_max_volume(audio_stac
 
 
 def test_audio_output_resolves_clip_names_through_the_given_registry(
-    audio_stack: None, tmp_path: pytest.TempPathFactory
+    audio_stack: None, tmp_path: Path
 ) -> None:
     clip = tmp_path / "zap.wav"
     clip.write_bytes(b"RIFF")
@@ -728,10 +737,12 @@ _OPTIONAL_PARTS = {
 }
 
 
-def _request(parts: CircuitPythonParts, part: str) -> object:
-    if part == "audio_output":
-        return parts.audio_output(_audio(), AudioRegistry(), *_I2S_PINS)
-    return getattr(parts, part)(I2CDeviceConfig(), object())
+_REQUESTS: dict[str, Callable[[CircuitPythonParts], object]] = {
+    "accelerometer": lambda parts: parts.accelerometer(I2CDeviceConfig(), object()),
+    "magnetometer": lambda parts: parts.magnetometer(I2CDeviceConfig(), object()),
+    "haptic_output": lambda parts: parts.haptic_output(I2CDeviceConfig(), object()),
+    "audio_output": lambda parts: parts.audio_output(_audio(), AudioRegistry(), *_I2S_PINS),
+}
 
 
 @pytest.fixture
@@ -750,14 +761,15 @@ def test_requesting_a_part_whose_driver_library_is_missing_raises_import_error(
     parts = CircuitPythonParts(_board("GP10", "GP11", "GP12"))
 
     with pytest.raises(ImportError):
-        _request(parts, part)
+        _REQUESTS[part](parts)
 
 
-def test_parts_that_need_no_optional_library_build_while_every_one_is_missing(
+def test_button_reader_builds_and_reads_while_every_optional_library_is_missing(
     libraries_missing: None, gpio: list[_FakeDigitalInOut]
 ) -> None:
-    parts = CircuitPythonParts(_board("D9"))
+    read = CircuitPythonParts(_board("D9")).button_reader(PinRef("D9", "buttons[0]"))
+    (pin,) = gpio
 
-    read = parts.button_reader(PinRef("D9", "buttons[0]"))
+    pin.value = False
 
-    assert callable(read)
+    assert read() is False
