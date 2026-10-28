@@ -170,7 +170,7 @@ def test_ir_sent_records_the_payload_the_wire_carried_per_emitter():
 
 def test_ir_sent_holds_only_what_the_installed_codec_put_on_the_wire():
     sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir=LINE_ONLY_IR))
-    _ir(sim_hw).apply_codec(TagInfraredEncoder(), TagInfraredDecoder())
+    _ir(sim_hw).apply_codec(TagInfraredEncoder, TagInfraredDecoder)
 
     # The Tag wire-frame carries 7 bits of the first byte only.
     sim_hw.hw.network_controls.send_ir(b"\xff\x01", LINE)
@@ -188,6 +188,14 @@ def test_a_received_payload_decodes_on_the_next_transceiver_update(rx):
     assert _ir(sim_hw).received == b"\x12\x34"
 
 
+def test_a_device_without_an_ir_section_catches_nothing_it_is_sent():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config())
+
+    sim_hw.receive_ir(b"\x12")  # must not raise
+
+    assert sim_hw.hw.ir is None
+
+
 def test_a_received_payload_reports_full_signal_strength():
     sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir=LINE_ONLY_IR))
 
@@ -199,7 +207,7 @@ def test_a_received_payload_reports_full_signal_strength():
 
 def test_a_received_payload_travels_the_installed_codecs_wire():
     sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir=LINE_ONLY_IR))
-    _ir(sim_hw).apply_codec(TagInfraredEncoder(), TagInfraredDecoder())
+    _ir(sim_hw).apply_codec(TagInfraredEncoder, TagInfraredDecoder)
 
     sim_hw.receive_ir(b"\xff\x01")
     _ir(sim_hw).update()

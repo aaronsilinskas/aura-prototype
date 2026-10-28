@@ -130,15 +130,13 @@ def resolve_boot_scene_name(
 
 def resolve_ir_codec(
     scene_registry: SceneRegistry, scene_name: str
-) -> tuple[InfraredEncoder, InfraredDecoder]:
-    """Return the instantiated wire-frame codec *scene_name* declares.
+) -> tuple[type[InfraredEncoder], type[InfraredDecoder]]:
+    """Return the encoder/decoder class pair of the wire-frame codec *scene_name* declares.
 
     Defaults to the ``"aura"`` codec when the scene declares none, and needs
     no built hardware to resolve.
     """
-    codec_name = scene_registry.ir_codec_for(scene_name)
-    encoder_cls, decoder_cls = codec_for(codec_name)
-    return encoder_cls(), decoder_cls()
+    return codec_for(scene_registry.ir_codec_for(scene_name))
 
 
 def scan_boot_scene_registry(storage: DeviceStorage | None) -> SceneRegistry:

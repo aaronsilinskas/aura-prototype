@@ -194,8 +194,8 @@ class _CodecRecordingIr:
     def __init__(self) -> None:
         self.codec: tuple[object, object] | None = None
 
-    def apply_codec(self, encoder, decoder) -> None:
-        self.codec = (encoder, decoder)
+    def apply_codec(self, encoder_class, decoder_class) -> None:
+        self.codec = (encoder_class, decoder_class)
 
 
 def test_boot_speaks_the_wire_frame_codec_the_booted_scene_declares():
@@ -203,9 +203,7 @@ def test_boot_speaks_the_wire_frame_codec_the_booted_scene_declares():
 
     build_scene_boot(_fake_hw(ir=ir), {"default_scene": "tag"}, reset=_no_reset)
 
-    encoder, decoder = ir.codec
-    assert isinstance(encoder, TagInfraredEncoder)
-    assert isinstance(decoder, TagInfraredDecoder)
+    assert ir.codec == (TagInfraredEncoder, TagInfraredDecoder)
 
 
 # ---------------------------------------------------------------------------
@@ -317,10 +315,10 @@ def test_resolve_ir_codec_returns_the_aura_pair_for_a_scene_with_no_declared_cod
     scene_registry = SceneRegistry()
     scene_registry.register("no_codec", lambda: Scene(effect_packs=[], rule_packs=[]))
 
-    encoder, decoder = resolve_ir_codec(scene_registry, "no_codec")
-
-    assert isinstance(encoder, AuraInfraredEncoder)
-    assert isinstance(decoder, AuraInfraredDecoder)
+    assert resolve_ir_codec(scene_registry, "no_codec") == (
+        AuraInfraredEncoder,
+        AuraInfraredDecoder,
+    )
 
 
 def test_resolve_ir_codec_returns_the_tag_pair_for_a_scene_declaring_the_tag_codec():
@@ -330,10 +328,10 @@ def test_resolve_ir_codec_returns_the_tag_pair_for_a_scene_declaring_the_tag_cod
         "tag_codec", lambda: Scene(effect_packs=[], rule_packs=[], ir_codec="tag")
     )
 
-    encoder, decoder = resolve_ir_codec(scene_registry, "tag_codec")
-
-    assert isinstance(encoder, TagInfraredEncoder)
-    assert isinstance(decoder, TagInfraredDecoder)
+    assert resolve_ir_codec(scene_registry, "tag_codec") == (
+        TagInfraredEncoder,
+        TagInfraredDecoder,
+    )
 
 
 def test_resolve_ir_codec_raises_unknown_codec_error_for_an_undeclared_codec_name():
@@ -355,10 +353,7 @@ def test_resolve_ir_codec_returns_the_tag_pair_for_the_real_tag_scene():
     scene_registry = SceneRegistry()
     scene_registry.scan_dir("packs/scenes", "packs.scenes")
 
-    encoder, decoder = resolve_ir_codec(scene_registry, "tag")
-
-    assert isinstance(encoder, TagInfraredEncoder)
-    assert isinstance(decoder, TagInfraredDecoder)
+    assert resolve_ir_codec(scene_registry, "tag") == (TagInfraredEncoder, TagInfraredDecoder)
 
 
 # ---------------------------------------------------------------------------

@@ -459,20 +459,17 @@ class InfraredReceiver:
 
         return best_packet
 
-    def set_decoder(self, decoder: InfraredDecoder) -> None:
-        """Rebuild the per-reader decoder list from *decoder*'s type.
+    def set_decoder(self, decoder_class: "type[InfraredDecoder]") -> None:
+        """Rebuild the per-reader decoder list from *decoder_class*.
 
-        Builds one **fresh** ``type(decoder)`` instance per reader rather than
-        installing *decoder* itself, so stateful decoders are never shared
-        across readers. The passed-in *decoder* is discarded once its type has
-        been read.
+        Builds one **fresh** decoder per reader, so stateful decoders are
+        never shared across readers.
 
         Args:
-            decoder: An instance of the decoder type to apply; only its type
-                is used. The type must be constructible with no arguments.
+            decoder_class: Called with no arguments once per reader, as at
+                construction.
         """
-        decoder_type = type(decoder)
-        self._decoders = [decoder_type() for _ in self._readers]
+        self._decoders = [decoder_class() for _ in self._readers]
 
     def _drain_discard_all(self) -> None:
         """Drain every available pulse from every reader, discarding each.

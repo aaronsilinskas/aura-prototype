@@ -62,7 +62,6 @@ from hardware.shared.device_config import load_device_config as _load_shared_dev
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
-from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_transport import (
     InfraredReceiver,
@@ -746,20 +745,17 @@ def _describe_ir(rx_pin_names: list[str], emitter_pins: dict[str, str]) -> str:
 def _setup_ir(
     rx_pins: list[microcontroller.Pin],
     emitter_pins: dict[str, microcontroller.Pin],
-    encoder: InfraredEncoder | None = None,
-    decoder: InfraredDecoder | None = None,
     writer_factory: Callable[[microcontroller.Pin], tuple[PulseWriter, str]] = _make_writer,
 ) -> tuple[InfraredTransceiver, str | None]:
     """Wire the IR hardware and return (transceiver, writer_kind).
 
-    encoder and decoder must use the same wire protocol — a mismatched pair
-    silently fails to decode received frames with no error raised.
+    Always wires the Aura wire-frame codec;
+    :meth:`~hardware.shared.ir_transceiver.InfraredTransceiver.apply_codec` is
+    the only way to change it.
 
     One :class:`~hardware.circuitpython.infrared_io.PulseInReader` is built
     per entry in *rx_pins*, all read by one
-    :class:`~hardware.shared.ir_transport.InfraredReceiver` built with
-    ``type(decoder)``, so every reader gets its own fresh decoder (the
-    *decoder* instance itself is never installed).
+    :class:`~hardware.shared.ir_transport.InfraredReceiver`.
 
     Constructs one :class:`IrTransmitGate` and injects the same instance into
     the receiver and every transmitter — the single assembly point for
@@ -789,19 +785,15 @@ def _setup_ir(
     """
     import pulseio
 
-    if encoder is None:
-        encoder = AuraInfraredEncoder()
-    if decoder is None:
-        decoder = AuraInfraredDecoder()
-
     gate = IrTransmitGate()
 
     readers = [
         PulseInReader(pulseio.PulseIn(rx_pin, maxlen=256, idle_state=True)) for rx_pin in rx_pins
     ]
 
-    receiver = InfraredReceiver(readers, type(decoder), gate=gate)
+    receiver = InfraredReceiver(readers, AuraInfraredDecoder, gate=gate)
 
+    encoder = AuraInfraredEncoder()
     transmitters: dict[str, InfraredTransmitter] = {}
     writer_kind: str | None = None
     for emitter in IR_EMITTERS:
