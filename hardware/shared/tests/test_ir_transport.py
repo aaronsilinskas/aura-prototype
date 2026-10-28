@@ -1131,8 +1131,6 @@ def test_receiver_set_decoder_decodes_through_the_new_decoder_type(num_readers):
 
 
 def test_receiver_set_decoder_gives_each_reader_its_own_fresh_decoder(recording_tag_decoder):
-    """set_decoder builds one new decoder per reader, so no decode state is
-    shared between readers."""
     decoder_class, built = recording_tag_decoder
     rx, _ = _make_receiver(2)
 

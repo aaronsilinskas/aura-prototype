@@ -755,8 +755,7 @@ def _setup_ir(
 
     One :class:`~hardware.circuitpython.infrared_io.PulseInReader` is built
     per entry in *rx_pins*, all read by one
-    :class:`~hardware.shared.ir_transport.InfraredReceiver`, which gives every
-    reader its own fresh decoder.
+    :class:`~hardware.shared.ir_transport.InfraredReceiver`.
 
     Constructs one :class:`IrTransmitGate` and injects the same instance into
     the receiver and every transmitter — the single assembly point for

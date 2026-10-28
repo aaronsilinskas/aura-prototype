@@ -188,6 +188,14 @@ def test_a_received_payload_decodes_on_the_next_transceiver_update(rx):
     assert _ir(sim_hw).received == b"\x12\x34"
 
 
+def test_a_device_without_an_ir_section_catches_nothing_it_is_sent():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config())
+
+    sim_hw.receive_ir(b"\x12")  # must not raise
+
+    assert sim_hw.hw.ir is None
+
+
 def test_a_received_payload_reports_full_signal_strength():
     sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir=LINE_ONLY_IR))
 

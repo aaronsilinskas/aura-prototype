@@ -120,7 +120,7 @@ _pulseio.PulseIn = _FakePulseIn  # type: ignore[attr-defined]
 
 from engine.network import AREA_OF_EFFECT, CONE, LINE  # noqa: E402
 from hardware.circuitpython.device_builder import _setup_ir  # noqa: E402
-from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder  # noqa: E402
+from hardware.shared.ir_codecs.aura import AuraInfraredEncoder  # noqa: E402
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder  # noqa: E402
 
 _RX_PIN = object()
@@ -268,6 +268,11 @@ def _wired_decoders(transceiver: object) -> list:
     return transceiver._receiver._decoders
 
 
+def _wired_encoder(transceiver: object, emitter: str) -> object:
+    """Return *emitter*'s transmitter's private ``_encoder``. See :func:`_wired_readers`."""
+    return transceiver._transmitters[emitter]._encoder
+
+
 # ---------------------------------------------------------------------------
 # _setup_ir — receiver
 # ---------------------------------------------------------------------------
@@ -296,13 +301,12 @@ def test_setup_ir_receiver_pulsein_uses_active_low_idle_state():
 # ---------------------------------------------------------------------------
 
 
-def test_setup_ir_wires_the_aura_wire_frame_codec():
+def test_setup_ir_wires_transmitters_with_the_aura_encoder():
     transceiver, _writer_kind = _setup_ir(
         [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
     )
 
-    assert transceiver.codec == (AuraInfraredEncoder, AuraInfraredDecoder)
-    assert isinstance(transceiver._transmitters[LINE]._encoder, AuraInfraredEncoder)
+    assert isinstance(_wired_encoder(transceiver, LINE), AuraInfraredEncoder)
 
 
 def test_apply_codec_gives_every_assembled_transmitter_one_shared_encoder():
@@ -314,10 +318,10 @@ def test_apply_codec_gives_every_assembled_transmitter_one_shared_encoder():
 
     transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
 
-    encoder = transceiver._transmitters[LINE]._encoder
+    encoder = _wired_encoder(transceiver, LINE)
     assert isinstance(encoder, TagInfraredEncoder)
-    assert transceiver._transmitters[CONE]._encoder is encoder
-    assert transceiver._transmitters[AREA_OF_EFFECT]._encoder is encoder
+    assert _wired_encoder(transceiver, CONE) is encoder
+    assert _wired_encoder(transceiver, AREA_OF_EFFECT) is encoder
 
 
 # ---------------------------------------------------------------------------
@@ -341,7 +345,9 @@ def test_setup_ir_builds_one_pulsein_reader_per_rx_pin() -> None:
 
 
 @pytest.mark.parametrize("pin_count", [1, 2])
-def test_apply_codec_gives_each_assembled_reader_its_own_fresh_decoder(pin_count) -> None:
+def test_apply_codec_gives_each_assembled_reader_its_own_fresh_decoder_of_the_new_codec(
+    pin_count,
+) -> None:
     with ExitStack() as stack:
         stack.enter_context(patch.dict(sys.modules, {"pulseio": MagicMock()}))
 
