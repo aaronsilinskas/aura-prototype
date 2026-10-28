@@ -136,3 +136,29 @@ def test_press_edge_commits_after_a_prior_settled_update():
     buttons.update(0.0, out)
 
     assert out.is_pressed("A")
+
+
+def test_a_button_held_at_boot_is_down_before_any_update():
+    buttons = DebouncedButtons([("A", lambda: False)], interval=0.1)
+
+    assert buttons.is_down("A")
+
+
+def test_a_press_still_within_the_debounce_interval_is_not_down_yet():
+    pin = [True]
+    buttons = DebouncedButtons([("A", lambda: pin[0])], interval=0.1)
+    pin[0] = False
+
+    buttons.update(0.05, _out())
+
+    assert not buttons.is_down("A")
+
+
+def test_a_press_held_for_the_debounce_interval_is_down():
+    pin = [True]
+    buttons = DebouncedButtons([("A", lambda: pin[0])], interval=0.1)
+    pin[0] = False
+
+    buttons.update(0.1, _out())
+
+    assert buttons.is_down("A")

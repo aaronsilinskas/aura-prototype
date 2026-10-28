@@ -46,6 +46,13 @@ class DebouncedButtons:
         self._predicates = buttons
         self._states = [_ButtonState(pred()) for _, pred in buttons]
 
+    def is_down(self, label: str) -> bool:
+        """Whether the debouncer has settled on button *label* being held."""
+        for i, (name, _pred) in enumerate(self._predicates):
+            if name == label:
+                return not self._states[i].settled
+        raise KeyError(label)
+
     def update(self, elapsed: float, out: ButtonData) -> None:
         """Advance debounce state by ``elapsed`` seconds and write results into *out*.
 

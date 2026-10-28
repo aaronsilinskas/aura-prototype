@@ -118,6 +118,26 @@ def test_buttons_held_together_press_at_once_even_behind_a_recent_release():
     assert (b_before_a_settles, out.is_pressed("A"), out.is_pressed("B")) == (False, True, True)
 
 
+def test_a_press_that_lands_before_a_reset_registers_with_no_tick_after_it():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(buttons=["GP2"]))
+    sim_hw.hold("A")
+    sim_hw.settle_pins()  # the pin is low, but the old debouncer never reads it
+
+    sim_hw.power_on()
+
+    assert sim_hw.registered("A")
+
+
+def test_a_button_held_through_a_reset_stays_registered():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(buttons=["GP2"]))
+    sim_hw.hold("A")
+    _read_buttons(sim_hw)
+
+    sim_hw.power_on()
+
+    assert sim_hw.registered("A")
+
+
 def test_a_button_the_config_does_not_declare_cannot_be_held():
     sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(buttons=["GP2"]))
 

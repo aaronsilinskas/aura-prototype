@@ -43,7 +43,7 @@ from effects.effect import Effect, PixelBuffer
 from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
-from engine.input import AccelerationData, ButtonData
+from engine.input import AccelerationData
 from engine.network import IR_EMITTERS
 from engine.state import EffectReceipt, Scope, ScopeValue
 from hardware.shared.debounced_buttons import DebouncedButtons
@@ -347,24 +347,6 @@ class _SimulatedMagnetometer:
         self.magnetic = (0.0, 0.0, 0.0)
 
 
-class _ReadingButtons(DebouncedButtons):
-    """The real debouncer, also keeping in *down* whether it last read each button as down."""
-
-    def __init__(
-        self,
-        buttons: list[tuple[str, Callable[[], bool]]],
-        interval: float,
-        down: dict[str, bool],
-    ) -> None:
-        super().__init__(buttons, interval=interval)
-        self.down = down
-
-    def update(self, elapsed: float, out: ButtonData) -> None:
-        super().update(elapsed, out)
-        for label in self.down:
-            self.down[label] = out.is_down(label)
-
-
 def _strip_segments(config: DeviceConfig) -> list[dict[str, range]]:
     """Each enabled NeoPixel strip's scope segments, one dict per strip."""
     strips: list[dict[str, range]] = []
@@ -410,7 +392,6 @@ class SimulatedHardware:
         self._pressed = dict.fromkeys(self._labels, False)
         self._pin_changes: dict[str, list[tuple[float, bool]]] = {b: [] for b in self._labels}
         self._pin_free_at = dict.fromkeys(self._labels, 0.0)
-        self._read_down = dict.fromkeys(self._labels, False)
         ir_config = config.ir if config.ir is not None and config.ir.enabled else None
         self._ir_receiver_count = len(ir_config.rx) if ir_config is not None else 0
         self._wired_emitters = (
@@ -446,10 +427,9 @@ class SimulatedHardware:
         """
         config = self._config
         self._ir_readers = [_SimulatedPulseReader() for _ in range(self._ir_receiver_count)]
-        self._buttons = _ReadingButtons(
+        self._buttons = DebouncedButtons(
             [(label, self._pin_reader(label)) for label in self._labels],
             interval=_DEBOUNCE_INTERVAL,
-            down=self._read_down,
         )
         self._strips = [_RecordingPixels(segments) for segments in _strip_segments(config)]
         self._audio_registry = AudioRegistry()
@@ -541,7 +521,9 @@ class SimulatedHardware:
         A change that lands as the device boots registers without an edge:
         the new debouncer reads the pin as it stands.
         """
-        return not self._pin_changes[button] and self._read_down[button] == self._pressed[button]
+        return (
+            not self._pin_changes[button] and self._buttons.is_down(button) == self._pressed[button]
+        )
 
     def accelerate(self, x: float, y: float, z: float) -> None:
         self._require_accelerometer().hold(x, y, z)
