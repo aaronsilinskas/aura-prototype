@@ -47,7 +47,7 @@ class DebouncedButtons:
         self._states = [_ButtonState(pred()) for _, pred in buttons]
 
     def is_down(self, label: str) -> bool:
-        """Whether the debouncer has settled on button *label* being held."""
+        """Whether the debouncer has settled on button ``label`` being held."""
         for i, (name, _pred) in enumerate(self._predicates):
             if name == label:
                 return not self._states[i].settled

@@ -1,3 +1,5 @@
+import pytest
+
 from engine.input import ButtonData
 from hardware.shared.debounced_buttons import DebouncedButtons
 
@@ -162,3 +164,10 @@ def test_a_press_held_for_the_debounce_interval_is_down():
     buttons.update(0.1, _out())
 
     assert buttons.is_down("A")
+
+
+def test_a_button_the_debouncer_does_not_watch_has_no_settled_state():
+    buttons = DebouncedButtons([("A", lambda: True)], interval=0)
+
+    with pytest.raises(KeyError):
+        buttons.is_down("B")
