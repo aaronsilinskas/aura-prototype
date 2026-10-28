@@ -5,13 +5,18 @@ that keeps a device from decoding its own self-echo. Pumps its own
 transmitters directly rather than through an ``engine``-side seam, so it
 imports no ``engine`` types.
 
-Assembled by :func:`~hardware.circuitpython.device_builder._setup_ir` and
-exposed as ``DeviceHardware.ir``.
+Assembled by :func:`~hardware.shared.ir_wiring.wire_ir` and exposed as
+``DeviceHardware.ir``.
 """
 
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
-from hardware.shared.ir_transport import InfraredReceiver, InfraredTransmitter, IrTransmitGate
+from hardware.shared.ir_transport import (
+    InfraredReceiver,
+    InfraredTransmitter,
+    IrTransmitGate,
+    PulseReader,
+)
 
 __all__ = ["InfraredTransceiver"]
 
@@ -161,6 +166,16 @@ class InfraredTransceiver:
         """
         receiver = self._receiver
         return receiver.last_error_margin if receiver is not None else None
+
+    @property
+    def last_best_receiver(self) -> PulseReader | None:
+        """The reader the receiver picked for the last packet, forwarded from it.
+
+        ``None`` with no receiver wired, with a single reader, or before the
+        receiver's first successful decode.
+        """
+        receiver = self._receiver
+        return receiver.last_best_receiver if receiver is not None else None
 
     def telemetry_line(self) -> str | None:
         """Delegate to the receiver's change-gated telemetry summary.

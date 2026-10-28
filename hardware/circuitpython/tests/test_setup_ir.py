@@ -1,16 +1,11 @@
-"""Tests for _setup_ir in device_builder — builds the IR hardware objects and
-assembles them into an InfraredTransceiver for injection into
-HardwareNetworkControls and DeviceHardware.
+"""Tests for _setup_ir in device_builder — the CircuitPython half of the IR wiring.
 
-Assembly only: writer *selection* (the ``rp2pio`` import-probe inside
-``_make_writer``) is exercised separately in ``test_setup_ir_pio.py``. These
-tests inject a trivial fake ``writer_factory`` so assembly is CPython-testable
-without stubbing ``rp2pio``/``pulseio`` for the writer path. This file also
-owns _setup_ir's one-reader-per-rx-pin wiring (#672) -- the one piece of
-assembly behavior that runs _setup_ir for real (via its default
-writer_factory) rather than through the fake, since none of those tests wire
-an emitter and so never reach the writer path at all.
-build_hardware-level radio and IR integration/narration coverage (config
+_setup_ir builds one PulseIn-backed reader per rx pin and hands the rest to
+the shared wiring, whose gate, receiver, transmitter and codec behaviour is
+covered in ``hardware/shared/tests/test_ir_wiring.py``. Writer *selection*
+(the ``rp2pio`` import-probe inside ``_make_writer``) is exercised separately
+in ``test_setup_ir_pio.py``; these tests wire no emitter, so they never reach
+the writer path. build_hardware-level radio and IR integration/narration coverage (config
 gating, hard-error and disabled/absent-section narration, and the ir/radio
 narration lines) lives in test_device_builder_radio_ir.py (#779) instead.
 """
@@ -22,14 +17,11 @@ import types
 from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 # ---------------------------------------------------------------------------
 # Stub out CircuitPython-only hardware modules before importing device_builder.
 # We must be careful to set up all modules that device_builder.py imports at
-# module level, including a minimal pulseio (only PulseIn is touched by
-# assembly — the receiver's PulseIn wiring — since the injected fake
-# writer_factory never calls the real PulseOut-backed writer path).
+# module level, including a minimal pulseio (only PulseIn is touched, since
+# these tests wire no emitter and so never build a PulseOut-backed writer).
 # ---------------------------------------------------------------------------
 
 for _name in (
@@ -82,9 +74,8 @@ if not hasattr(_busio, "I2C"):
 
 
 # ---------------------------------------------------------------------------
-# pulseio.PulseIn stub — the receiver's rx-side wiring, untouched by writer
-# selection. No PulseOut stub is needed: the injected fake writer_factory
-# never calls _make_writer, so pulseio.PulseOut is never constructed here.
+# pulseio.PulseIn stub — the receiver's rx-side wiring. No PulseOut stub is
+# needed: no test here wires an emitter, so pulseio.PulseOut is never built.
 # ---------------------------------------------------------------------------
 
 
@@ -118,220 +109,37 @@ _pulseio.PulseIn = _FakePulseIn  # type: ignore[attr-defined]
 # ---------------------------------------------------------------------------
 
 
-from engine.network import AREA_OF_EFFECT, CONE, LINE  # noqa: E402
 from hardware.circuitpython.device_builder import _setup_ir  # noqa: E402
-from hardware.shared.ir_codecs.aura import AuraInfraredEncoder  # noqa: E402
-from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder  # noqa: E402
+from hardware.circuitpython.infrared_io import PulseInReader  # noqa: E402
 
 _RX_PIN = object()
-_LINE_PIN = object()
-_CONE_PIN = object()
-_AOE_PIN = object()
-
-
-class _FakeWriter:
-    """Trivial stand-in PulseWriter recording the pin it was built for."""
-
-    def __init__(self, pin) -> None:
-        self.pin = pin
-
-
-_FAKE_WRITER_KIND = "fake"
-
-
-def _fake_writer_factory(pin):
-    return _FakeWriter(pin), _FAKE_WRITER_KIND
-
-
-# ---------------------------------------------------------------------------
-# _setup_ir — writer_factory seam
-# ---------------------------------------------------------------------------
-
-
-def test_setup_ir_calls_writer_factory_once_per_wired_emitter_with_its_own_pin():
-    """writer_factory(pin) is invoked once per wired emitter, each with its own pin,
-    in IR_EMITTERS order regardless of the emitter_pins mapping's own key order."""
-    calls: list[object] = []
-
-    def recording_factory(pin):
-        calls.append(pin)
-        return _FakeWriter(pin), _FAKE_WRITER_KIND
-
-    _setup_ir(
-        [_RX_PIN],
-        {AREA_OF_EFFECT: _AOE_PIN, CONE: _CONE_PIN, LINE: _LINE_PIN},
-        writer_factory=recording_factory,
-    )
-    assert calls == [_LINE_PIN, _CONE_PIN, _AOE_PIN]
-
-
-def test_setup_ir_uses_writer_returned_by_writer_factory():
-    """Each transmitter's writer is exactly what writer_factory returned for its pin."""
-    transceiver, _writer_kind = _setup_ir(
-        [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
-    )
-    assert transceiver._transmitters[LINE]._writer.pin is _LINE_PIN
-
-
-def test_setup_ir_returns_writer_kind_reported_by_writer_factory():
-    """The returned writer_kind is exactly what writer_factory reported, not
-    re-derived from the writer instance -- #763's hand-off so build_hardware's
-    ir narration can ask rather than re-probe rp2pio."""
-    _transceiver, writer_kind = _setup_ir(
-        [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
-    )
-    assert writer_kind == _FAKE_WRITER_KIND
-
-
-def test_setup_ir_returns_none_writer_kind_when_no_emitters_wired():
-    """An rx-only ir config (no emitters) never calls writer_factory, so there
-    is no writer kind to report."""
-    _transceiver, writer_kind = _setup_ir([_RX_PIN], {}, writer_factory=_fake_writer_factory)
-    assert writer_kind is None
-
-
-# ---------------------------------------------------------------------------
-# _setup_ir — transmitter map
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("emitter", "emitter_pins"),
-    [
-        (LINE, {LINE: _LINE_PIN}),
-        (CONE, {LINE: _LINE_PIN, CONE: _CONE_PIN}),
-        (AREA_OF_EFFECT, {LINE: _LINE_PIN, AREA_OF_EFFECT: _AOE_PIN}),
-    ],
-    ids=["line", "cone", "aoe"],
-)
-def test_setup_ir_includes_transmitter_when_emitter_in_emitter_pins(emitter, emitter_pins):
-    """_setup_ir wires an emitter's transmitter when its pin is in emitter_pins."""
-    transceiver, _writer_kind = _setup_ir(
-        [_RX_PIN], emitter_pins, writer_factory=_fake_writer_factory
-    )
-    assert emitter in transceiver._transmitters
-
-
-@pytest.mark.parametrize(
-    ("emitter", "emitter_pins"),
-    [
-        (CONE, {LINE: _LINE_PIN}),
-        (AREA_OF_EFFECT, {LINE: _LINE_PIN}),
-        (LINE, {}),
-    ],
-    ids=["cone", "aoe", "line"],
-)
-def test_setup_ir_omits_transmitter_when_emitter_absent_from_emitter_pins(emitter, emitter_pins):
-    """No transmitter map entry for an emitter absent from emitter_pins -- every
-    emitter is optional, LINE included."""
-    transceiver, _writer_kind = _setup_ir(
-        [_RX_PIN], emitter_pins, writer_factory=_fake_writer_factory
-    )
-    assert emitter not in transceiver._transmitters
-
-
-def test_setup_ir_all_pins_returns_three_transmitters():
-    """All three emitter keys are present when all three are in emitter_pins."""
-    transceiver, _writer_kind = _setup_ir(
-        [_RX_PIN],
-        {LINE: _LINE_PIN, CONE: _CONE_PIN, AREA_OF_EFFECT: _AOE_PIN},
-        writer_factory=_fake_writer_factory,
-    )
-    assert set(transceiver._transmitters.keys()) == {LINE, CONE, AREA_OF_EFFECT}
-
-
-def test_setup_ir_transmitters_share_the_gate_with_receiver():
-    """The shared IrTransmitGate is injected into the receiver and every transmitter."""
-    transceiver, _writer_kind = _setup_ir(
-        [_RX_PIN],
-        {LINE: _LINE_PIN, CONE: _CONE_PIN, AREA_OF_EFFECT: _AOE_PIN},
-        writer_factory=_fake_writer_factory,
-    )
-    gate = transceiver._receiver._gate
-    assert gate is not None
-    for emitter in (LINE, CONE, AREA_OF_EFFECT):
-        assert transceiver._transmitters[emitter]._gate is gate
 
 
 def _wired_readers(transceiver: object) -> list:
     """Return the private ``_readers`` list wired onto the transceiver's receiver.
 
-    InfraredTransceiver exposes no public getter for a receiver's readers or
-    decoders, so the tests below reach into those private fields, only through
-    these two helpers, to pin the internal wiring contract.
+    InfraredTransceiver exposes no public getter for a receiver's readers, so
+    these tests reach into that private field, only through this helper, to
+    pin which PulseIn each reader wraps.
     """
     return transceiver._receiver._readers
 
 
-def _wired_decoders(transceiver: object) -> list:
-    """Return the private ``_decoders`` list. See :func:`_wired_readers`."""
-    return transceiver._receiver._decoders
-
-
-def _wired_encoder(transceiver: object, emitter: str) -> object:
-    """Return *emitter*'s transmitter's private ``_encoder``. See :func:`_wired_readers`."""
-    return transceiver._transmitters[emitter]._encoder
-
-
-# ---------------------------------------------------------------------------
-# _setup_ir — receiver
-# ---------------------------------------------------------------------------
-
-
 def test_setup_ir_receiver_is_wired_to_rx_pin():
     """The returned receiver reads pulses from the rx_pin PulseIn buffer."""
-    transceiver, _writer_kind = _setup_ir(
-        [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
-    )
+    transceiver, _writer_kind = _setup_ir([_RX_PIN], {})
     pulsein = _wired_readers(transceiver)[0]._pulsein
     assert pulsein.pin is _RX_PIN
 
 
 def test_setup_ir_receiver_pulsein_uses_active_low_idle_state():
     """PulseIn is constructed with idle_state=True for active-low IR receivers."""
-    transceiver, _writer_kind = _setup_ir(
-        [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
-    )
+    transceiver, _writer_kind = _setup_ir([_RX_PIN], {})
     pulsein = _wired_readers(transceiver)[0]._pulsein
     assert pulsein.idle_state is True
 
 
-# ---------------------------------------------------------------------------
-# _setup_ir — codec: the Aura wire-frame, until apply_codec
-# ---------------------------------------------------------------------------
-
-
-def test_setup_ir_wires_transmitters_with_the_aura_encoder():
-    transceiver, _writer_kind = _setup_ir(
-        [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
-    )
-
-    assert isinstance(_wired_encoder(transceiver, LINE), AuraInfraredEncoder)
-
-
-def test_apply_codec_gives_every_assembled_transmitter_one_shared_encoder():
-    transceiver, _writer_kind = _setup_ir(
-        [_RX_PIN],
-        {LINE: _LINE_PIN, CONE: _CONE_PIN, AREA_OF_EFFECT: _AOE_PIN},
-        writer_factory=_fake_writer_factory,
-    )
-
-    transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
-
-    encoder = _wired_encoder(transceiver, LINE)
-    assert isinstance(encoder, TagInfraredEncoder)
-    assert _wired_encoder(transceiver, CONE) is encoder
-    assert _wired_encoder(transceiver, AREA_OF_EFFECT) is encoder
-
-
-# ---------------------------------------------------------------------------
-# _setup_ir wires one reader and one fresh decoder per resolved rx pin (#672)
-# ---------------------------------------------------------------------------
-
-
 def test_setup_ir_builds_one_pulsein_reader_per_rx_pin() -> None:
-    from hardware.circuitpython.infrared_io import PulseInReader
-
     with ExitStack() as stack:
         stack.enter_context(patch.dict(sys.modules, {"pulseio": MagicMock()}))
 
@@ -342,23 +150,3 @@ def test_setup_ir_builds_one_pulsein_reader_per_rx_pin() -> None:
     readers = _wired_readers(transceiver)
     assert len(readers) == 3
     assert all(isinstance(reader, PulseInReader) for reader in readers)
-
-
-@pytest.mark.parametrize("pin_count", [1, 2])
-def test_apply_codec_gives_each_assembled_reader_its_own_fresh_decoder_of_the_new_codec(
-    pin_count,
-) -> None:
-    with ExitStack() as stack:
-        stack.enter_context(patch.dict(sys.modules, {"pulseio": MagicMock()}))
-
-        transceiver, _writer_kind = _setup_ir(
-            rx_pins=[MagicMock() for _ in range(pin_count)], emitter_pins={}
-        )
-    before = list(_wired_decoders(transceiver))
-
-    transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
-
-    decoders = _wired_decoders(transceiver)
-    assert len(decoders) == pin_count
-    assert len({id(decoder) for decoder in [*before, *decoders]}) == 2 * pin_count
-    assert all(isinstance(decoder, TagInfraredDecoder) for decoder in decoders)

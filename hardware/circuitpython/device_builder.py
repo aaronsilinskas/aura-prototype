@@ -41,7 +41,6 @@ import microcontroller
 from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.log import Logger
-from engine.network import IR_EMITTERS
 from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 from hardware.shared.build_narration import (
@@ -76,14 +75,9 @@ from hardware.shared.device_config import (
 from hardware.shared.device_config import load_device_config as _load_shared_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
-from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.ir_transport import (
-    InfraredReceiver,
-    InfraredTransmitter,
-    IrTransmitGate,
-    PulseWriter,
-)
+from hardware.shared.ir_transport import PulseReader, PulseWriter
+from hardware.shared.ir_wiring import wire_ir
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiler_report import board_id
 from hardware.shared.radio_transceiver import RadioTransceiver
@@ -637,65 +631,24 @@ def _make_writer(pin: microcontroller.Pin) -> tuple[PulseWriter, str]:
 def _setup_ir(
     rx_pins: list[microcontroller.Pin],
     emitter_pins: dict[str, microcontroller.Pin],
-    writer_factory: Callable[[microcontroller.Pin], tuple[PulseWriter, str]] = _make_writer,
 ) -> tuple[InfraredTransceiver, str | None]:
     """Wire the IR hardware and return (transceiver, writer_kind).
 
-    Always wires the Aura wire-frame codec;
-    :meth:`~hardware.shared.ir_transceiver.InfraredTransceiver.apply_codec` is
-    the only way to change it.
-
-    One :class:`~hardware.circuitpython.infrared_io.PulseInReader` is built
-    per entry in *rx_pins*, all read by one
-    :class:`~hardware.shared.ir_transport.InfraredReceiver`.
-
-    Constructs one :class:`IrTransmitGate` and injects the same instance into
-    the receiver and every transmitter — the single assembly point for
-    self-echo suppression — then hands the transmitter map, receiver, and
-    gate to a new :class:`~hardware.shared.ir_transceiver.InfraredTransceiver`,
-    the single owner of the whole IR subsystem.
-
-    *emitter_pins* maps an emitter constant (a key of ``engine.network.
-    IR_EMITTERS``) to the pin it is wired to; an emitter absent from the
-    mapping is skipped. Transmitters are wired in ``IR_EMITTERS`` order,
-    independent of *emitter_pins*' own key order.
-
-    *writer_factory* builds the :class:`PulseWriter` for each wired emitter
-    pin, paired with a kind string (``"pio"``/``"pulseio"`` from the default
-    :func:`_make_writer`, or whatever a test double reports) — this is
-    assembly's only seam onto writer *selection*: swapping it in tests
-    exercises transmitter wiring (one per emitter, sharing the gate, codec
-    defaulting) and the writer-kind hand-off without touching the
-    silicon-coupled ``rp2pio`` probe in :func:`_make_writer`. The returned
-    *writer_kind* is whatever the last-called *writer_factory* invocation
-    reported — every wired emitter shares one board, so one kind describes
-    all of them — or ``None`` when *emitter_pins* wired nothing, so no
-    writer was ever built.
+    Builds one :class:`~hardware.circuitpython.infrared_io.PulseInReader`
+    per entry in *rx_pins* and hands them, with :func:`_make_writer` as the
+    per-emitter writer factory, to
+    :func:`~hardware.shared.ir_wiring.wire_ir`, which owns the gate,
+    receiver, transmitter and codec wiring.
 
     ``pulseio`` is imported here, not at module load, so a config with no
     ``ir`` section never requires the library to be installed.
     """
     import pulseio
 
-    gate = IrTransmitGate()
-
-    readers = [
+    readers: list[PulseReader] = [
         PulseInReader(pulseio.PulseIn(rx_pin, maxlen=256, idle_state=True)) for rx_pin in rx_pins
     ]
-
-    receiver = InfraredReceiver(readers, AuraInfraredDecoder, gate=gate)
-
-    encoder = AuraInfraredEncoder()
-    transmitters: dict[str, InfraredTransmitter] = {}
-    writer_kind: str | None = None
-    for emitter in IR_EMITTERS:
-        pin = emitter_pins.get(emitter)
-        if pin is None:
-            continue
-        writer, writer_kind = writer_factory(pin)
-        transmitters[emitter] = InfraredTransmitter(writer, encoder, gate=gate)
-
-    return InfraredTransceiver(transmitters, receiver, gate), writer_kind
+    return wire_ir(readers, emitter_pins, lambda _emitter, pin: _make_writer(pin))
 
 
 def load_device_config() -> DeviceConfig:

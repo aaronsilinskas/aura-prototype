@@ -73,7 +73,7 @@ hardware/         Hardware abstraction layer
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
                   device_config, device_settings, device_state, device_hardware,
                   device_storage, network_controls, scene_selection, ir_transport,
-                  ir_transceiver, ir_codecs/ (base, aura, tag), ir_telemetry,
+                  ir_transceiver, ir_wiring, ir_codecs/ (base, aura, tag), ir_telemetry,
                   radio_transport, radio_transceiver, sd_sync_protocol, sd_sync_server,
                   profiler_report, build_narration, device_reboot)
   simulated/      Test-only Simulated device (device: SimulatedHardware; storage:
@@ -173,7 +173,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `NeoPixelCurrentBudgetConfig` | `hardware/shared/device_config.py` | Opt-in `neopixel_current_budget` policy; the parser folds the tuned brightness into each NeoPixel strip config and records the estimate/scale for boot narration |
 | `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle `build_hardware` returns (outputs, sensors, network seam, `ir`, radio, storage) |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter |
-| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, receiver, shared transmit gate) |
+| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, receiver, shared transmit gate); wired only by `wire_ir` (`hardware/shared/ir_wiring.py`), for the device and the Simulated device alike |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |
 | `SceneRuntime` | `app/scene_composition.py` | Bundle from `build_scene_runtime` that `build_scene_tick` drives |
