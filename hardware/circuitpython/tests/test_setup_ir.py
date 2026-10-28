@@ -292,47 +292,32 @@ def test_setup_ir_receiver_pulsein_uses_active_low_idle_state():
 
 
 # ---------------------------------------------------------------------------
-# _setup_ir — codec injection
+# _setup_ir — codec: the Aura wire-frame, until apply_codec
 # ---------------------------------------------------------------------------
 
 
-def test_setup_ir_defaults_to_aura_encoder_for_transmitters():
-    """Omitting encoder wires transmitters with AuraInfraredEncoder."""
+def test_setup_ir_wires_the_aura_wire_frame_codec():
     transceiver, _writer_kind = _setup_ir(
         [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
     )
+
+    assert transceiver.codec == (AuraInfraredEncoder, AuraInfraredDecoder)
     assert isinstance(transceiver._transmitters[LINE]._encoder, AuraInfraredEncoder)
 
 
-def test_setup_ir_defaults_to_aura_decoder_for_receiver():
-    """Omitting decoder wires the receiver with AuraInfraredDecoder."""
-    transceiver, _writer_kind = _setup_ir(
-        [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
-    )
-    assert isinstance(_wired_decoders(transceiver)[0], AuraInfraredDecoder)
-
-
-def test_setup_ir_wires_provided_encoder_into_transmitters():
-    """A passed-in encoder is used by the wired transmitters."""
-    encoder = TagInfraredEncoder()
+def test_apply_codec_gives_every_assembled_transmitter_one_shared_encoder():
     transceiver, _writer_kind = _setup_ir(
         [_RX_PIN],
         {LINE: _LINE_PIN, CONE: _CONE_PIN, AREA_OF_EFFECT: _AOE_PIN},
-        encoder=encoder,
         writer_factory=_fake_writer_factory,
     )
-    assert transceiver._transmitters[LINE]._encoder is encoder
+
+    transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
+
+    encoder = transceiver._transmitters[LINE]._encoder
+    assert isinstance(encoder, TagInfraredEncoder)
     assert transceiver._transmitters[CONE]._encoder is encoder
     assert transceiver._transmitters[AREA_OF_EFFECT]._encoder is encoder
-
-
-def test_setup_ir_wires_provided_decoder_type_into_receiver():
-    """The receiver decodes with the passed-in decoder's type."""
-    decoder = TagInfraredDecoder()
-    transceiver, _writer_kind = _setup_ir(
-        [_RX_PIN], {LINE: _LINE_PIN}, decoder=decoder, writer_factory=_fake_writer_factory
-    )
-    assert type(_wired_decoders(transceiver)[0]) is TagInfraredDecoder
 
 
 # ---------------------------------------------------------------------------
@@ -356,20 +341,18 @@ def test_setup_ir_builds_one_pulsein_reader_per_rx_pin() -> None:
 
 
 @pytest.mark.parametrize("pin_count", [1, 2])
-def test_setup_ir_gives_each_reader_a_fresh_decoder_of_the_passed_class(pin_count) -> None:
-    from hardware.shared.ir_codecs.aura import AuraInfraredDecoder
-
-    decoder = AuraInfraredDecoder()
-
+def test_apply_codec_gives_each_assembled_reader_its_own_fresh_decoder(pin_count) -> None:
     with ExitStack() as stack:
         stack.enter_context(patch.dict(sys.modules, {"pulseio": MagicMock()}))
 
         transceiver, _writer_kind = _setup_ir(
-            rx_pins=[MagicMock() for _ in range(pin_count)], emitter_pins={}, decoder=decoder
+            rx_pins=[MagicMock() for _ in range(pin_count)], emitter_pins={}
         )
+    before = list(_wired_decoders(transceiver))
+
+    transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
 
     decoders = _wired_decoders(transceiver)
     assert len(decoders) == pin_count
-    for wired_decoder in decoders:
-        assert type(wired_decoder) is AuraInfraredDecoder
-        assert wired_decoder is not decoder
+    assert len({id(decoder) for decoder in [*before, *decoders]}) == 2 * pin_count
+    assert all(isinstance(decoder, TagInfraredDecoder) for decoder in decoders)

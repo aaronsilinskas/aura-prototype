@@ -1,8 +1,7 @@
 """Tests for device_builder's radio and IR subsystems: ``_setup_radio`` and
 the radio slice of ``build_hardware``, plus ``_describe_ir`` and the ir
 slice of ``build_hardware``. Unit-level ``_setup_ir`` assembly tests
-(pin/emitter wiring, codec injection, writer_factory hand-off, receiver-class
-selection) live in test_setup_ir.py instead.
+(pin/emitter wiring, the default codec, writer_factory hand-off) live in test_setup_ir.py instead.
 
 Split out of test_device_builder.py (#779) to keep that suite from growing
 without bound; shared config-shape helpers and hardware patches come from

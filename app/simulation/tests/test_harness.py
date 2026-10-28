@@ -128,6 +128,18 @@ def test_a_device_does_not_hear_its_own_shot(sim):
     assert not player.has_played("scene.hit_start")
 
 
+def test_a_tag_device_records_the_tag_its_shot_carried(sim):
+    # Read back off the wire through the Tag wire-frame codec the scene installs.
+    player = sim.add_device(
+        "red", scene="tag", scene_data={"tag_expected_team": 2, "tag_expected_player": 3}
+    )
+    start_game(sim, player)
+
+    player.tap("A")
+
+    assert [s.payload for s in player.ir_sent] == [bytes(encode_tag_data(TagData(2, 3, 1)))]
+
+
 def test_payloads_received_together_arrive_on_successive_ticks(sim):
     # Each matching one-damage tag takes one of ten pips off the hitpoint bar.
     player = sim.add_device("red", scene="tag", scene_data={"tag_starting_hitpoints": 10})

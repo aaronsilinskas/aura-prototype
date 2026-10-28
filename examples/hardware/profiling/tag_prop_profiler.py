@@ -206,7 +206,7 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, o
     _require_output(hardware, Drv2605EffectOutput)
     if hardware.ir is None:
         raise RuntimeError("expected an IR transceiver in the built hardware bundle, found none")
-    hardware.ir.apply_codec(TagInfraredEncoder(), TagInfraredDecoder())
+    hardware.ir.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
     if hardware.accelerometer is None:
         raise RuntimeError("expected an accelerometer in the built hardware bundle, found none")
     # Stage snapshot: the whole hardware bundle (matrix, buttons, accelerometer,

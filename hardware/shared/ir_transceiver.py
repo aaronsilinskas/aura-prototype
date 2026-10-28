@@ -9,6 +9,7 @@ Assembled by :func:`~hardware.circuitpython.device_builder._setup_ir` and
 exposed as ``DeviceHardware.ir``.
 """
 
+from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_transport import InfraredReceiver, InfraredTransmitter, IrTransmitGate
 
@@ -33,7 +34,7 @@ class InfraredTransceiver:
             into both at construction, so this class never drives it.
     """
 
-    __slots__ = ("_gate", "_receiver", "_transmitters", "received")
+    __slots__ = ("_codec", "_gate", "_receiver", "_transmitters", "received")
 
     def __init__(
         self,
@@ -44,6 +45,10 @@ class InfraredTransceiver:
         self._transmitters = transmitters
         self._receiver = receiver
         self._gate = gate
+        self._codec: tuple[type[InfraredEncoder], type[InfraredDecoder]] = (
+            AuraInfraredEncoder,
+            AuraInfraredDecoder,
+        )
         self.received: bytearray | None = None
 
     def send(self, data: bytes, emitter: str) -> None:
@@ -100,8 +105,14 @@ class InfraredTransceiver:
         receiver = self._receiver
         self.received = receiver.receive() if receiver is not None else None
 
-    def apply_codec(self, encoder: InfraredEncoder, decoder: InfraredDecoder) -> None:
-        """Install *encoder* on every transmitter and *decoder* on the receiver.
+    def apply_codec(
+        self, encoder_class: type[InfraredEncoder], decoder_class: type[InfraredDecoder]
+    ) -> None:
+        """Install the codec *encoder_class* and *decoder_class* make up.
+
+        Builds one encoder that every transmitter shares, and hands
+        *decoder_class* to the receiver, which builds a fresh decoder per
+        reader. Both classes must be constructible with no arguments.
 
         Applied uniformly, with no "differs from default?" branch — intended
         for a single call before the first tick, not guarded against mid-run
@@ -109,15 +120,27 @@ class InfraredTransceiver:
         step is skipped with no receiver.
 
         Args:
-            encoder: The encoder instance to install on every transmitter.
-            decoder: The decoder instance to install on the receiver.
+            encoder_class: The encoder class, as
+                :func:`~hardware.shared.ir_codecs.codec_for` returns it.
+            decoder_class: The matching decoder class.
         """
+        self._codec = (encoder_class, decoder_class)
+
+        encoder = encoder_class()
         for tx in self._transmitters.values():
             tx.set_encoder(encoder)
 
         receiver = self._receiver
         if receiver is not None:
-            receiver.set_decoder(decoder)
+            receiver.set_decoder(decoder_class)
+
+    @property
+    def codec(self) -> tuple[type[InfraredEncoder], type[InfraredDecoder]]:
+        """The installed ``(encoder_class, decoder_class)`` pair, as :meth:`apply_codec` took it.
+
+        The Aura wire-frame pair until :meth:`apply_codec` is called.
+        """
+        return self._codec
 
     @property
     def last_signal_strength(self) -> float | None:

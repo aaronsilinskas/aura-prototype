@@ -32,7 +32,6 @@ to be read.
 
 from __future__ import annotations
 
-import copy
 import math
 import wave
 from array import array
@@ -51,7 +50,6 @@ from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import DeviceConfig, MatrixPixelsConfig
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
-from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_transport import (
     InfraredReceiver,
@@ -194,30 +192,6 @@ class _SimulatedPulseWriter(PulseWriter):
 
     def is_busy(self) -> bool:
         return False
-
-
-class _SimulatedInfraredTransceiver(InfraredTransceiver):
-    """The real transceiver, which also hands the codec it installs to the device.
-
-    So ``receive_ir`` encodes, and ``ir_sent`` decodes, with whatever codec
-    the boot installed through ``hw.ir.apply_codec``.
-    """
-
-    __slots__ = ("_sim_hw",)
-
-    def __init__(
-        self,
-        sim_hw: SimulatedHardware,
-        transmitters: dict[str, InfraredTransmitter],
-        receiver: InfraredReceiver | None,
-        gate: IrTransmitGate,
-    ) -> None:
-        super().__init__(transmitters, receiver, gate)
-        self._sim_hw = sim_hw
-
-    def apply_codec(self, encoder: InfraredEncoder, decoder: InfraredDecoder) -> None:
-        super().apply_codec(encoder, decoder)
-        self._sim_hw._codec_installed(encoder, decoder)
 
 
 class _SimulatedRadioTransport(RadioTransport):
@@ -490,8 +464,6 @@ class SimulatedHardware:
         if config.haptics is not None and config.haptics.enabled:
             outputs.append(_RecordingHaptic(self))
         self._ir_receiver: InfraredReceiver | None = None
-        self._ir_encoder: InfraredEncoder = AuraInfraredEncoder()
-        self._wire_decoder: InfraredDecoder = AuraInfraredDecoder()
         ir = self._build_ir() if self._ir_readers else None
         self._radio = _SimulatedRadioTransport(self) if self._radio_node is not None else None
         radio = RadioTransceiver(self._radio) if self._radio is not None else None
@@ -507,17 +479,17 @@ class SimulatedHardware:
             audio_registry=self._audio_registry,
         )
 
-    def _codec_installed(self, encoder: InfraredEncoder, decoder: InfraredDecoder) -> None:
-        self._ir_encoder = encoder
-        self._wire_decoder = copy.deepcopy(decoder)  # the receiver keeps *decoder* itself
-
     def receive_ir(self, payload: bytes) -> None:
         """Land a clean shot carrying *payload* on every IR receiver.
 
         Encoded through the installed codec; the transceiver's next
-        ``update`` decodes it.
+        ``update`` decodes it. A device with no IR receiver catches nothing.
         """
-        self.land_ir(self._ir_encoder.encode(payload))
+        ir = self.hw.ir
+        if ir is None:
+            return
+        encoder_class, _decoder_class = ir.codec
+        self.land_ir(encoder_class().encode(payload))
 
     def land_ir(self, pulses: array | list[int], receivers: Sequence[int] | None = None) -> None:
         """Land *pulses* on the IR receivers at indexes *receivers*, or on every one.
@@ -618,13 +590,12 @@ class SimulatedHardware:
         gate = IrTransmitGate()
         receiver = InfraredReceiver(list(self._ir_readers), AuraInfraredDecoder, gate)
         self._ir_receiver = receiver
+        encoder = AuraInfraredEncoder()
         transmitters = {
-            emitter: InfraredTransmitter(
-                _SimulatedPulseWriter(self, emitter), self._ir_encoder, gate
-            )
+            emitter: InfraredTransmitter(_SimulatedPulseWriter(self, emitter), encoder, gate)
             for emitter in self._wired_emitters
         }
-        return _SimulatedInfraredTransceiver(self, transmitters, receiver, gate)
+        return InfraredTransceiver(transmitters, receiver, gate)
 
     def _emit(self, emitter: str, pulses: array | list[int]) -> None:
         """Record what *emitter* carried, let the device's own readers see it, and hand it on."""
@@ -640,8 +611,10 @@ class SimulatedHardware:
 
     def _decode_wire(self, pulses: array | list[int]) -> bytes:
         """The payload *pulses* carry, read back through the installed codec."""
-        decoder = self._wire_decoder
-        decoder.reset()
+        ir = self.hw.ir
+        assert ir is not None  # only an assembled transceiver's emitters emit
+        _encoder_class, decoder_class = ir.codec
+        decoder = decoder_class()
         for pulse in pulses:
             payload = decoder.decode(pulse)
             if payload is not None:

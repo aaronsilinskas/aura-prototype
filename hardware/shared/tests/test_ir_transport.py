@@ -1124,23 +1124,22 @@ def test_receiver_set_decoder_decodes_through_the_new_decoder_type(num_readers):
     payload = bytearray([0x10])
     rx, readers = _make_receiver(num_readers)
 
-    rx.set_decoder(TagInfraredDecoder())
+    rx.set_decoder(TagInfraredDecoder)
     readers[-1].load(list(TagInfraredEncoder().encode(payload)))
 
     assert rx.receive() == payload
 
 
 def test_receiver_set_decoder_gives_each_reader_its_own_fresh_decoder(recording_tag_decoder):
-    """set_decoder builds one new decoder per reader and never installs the
-    instance it was handed, so no decode state is shared between readers."""
+    """set_decoder builds one new decoder per reader, so no decode state is
+    shared between readers."""
     decoder_class, built = recording_tag_decoder
     rx, _ = _make_receiver(2)
-    handed = decoder_class()
 
-    rx.set_decoder(handed)
+    rx.set_decoder(decoder_class)
 
-    built_by_receiver = [d for d in built if d is not handed]
-    assert len(built_by_receiver) == 2
+    assert len(built) == 2
+    assert built[0] is not built[1]
 
 
 def test_receiver_set_decoder_keeps_a_partial_decode_on_one_reader_from_corrupting_another():
@@ -1148,7 +1147,7 @@ def test_receiver_set_decoder_keeps_a_partial_decode_on_one_reader_from_corrupti
     pulses = list(TagInfraredEncoder().encode(payload))
     mid = len(pulses) // 2
     rx, readers = _make_receiver(2)
-    rx.set_decoder(TagInfraredDecoder())
+    rx.set_decoder(TagInfraredDecoder)
 
     readers[0].load(pulses[:mid])  # reader 0 left mid-decode, never completes
     rx.receive()
@@ -1161,7 +1160,7 @@ def test_receiver_set_decoder_reports_telemetry_from_the_new_decoders():
     bad_preamble = list(TAG_PREAMBLE)
     bad_preamble[1] = 4000  # invalid but below the inter-frame gap threshold
     rx, readers = _make_receiver(1)
-    rx.set_decoder(TagInfraredDecoder())
+    rx.set_decoder(TagInfraredDecoder)
     readers[0].load(bad_preamble)
 
     rx.receive()

@@ -319,9 +319,8 @@ def test_received_resets_to_none_on_the_tick_after_a_decode() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_apply_codec_fans_the_encoder_out_to_every_transmitter() -> None:
+def test_apply_codec_gives_every_transmitter_one_shared_encoder_of_the_given_class() -> None:
     calls: list = []
-    encoder = AuraInfraredEncoder()
     transceiver = InfraredTransceiver(
         {
             LINE: _RecordingSetEncoderTransmitter(calls),
@@ -331,9 +330,11 @@ def test_apply_codec_fans_the_encoder_out_to_every_transmitter() -> None:
         IrTransmitGate(),
     )
 
-    transceiver.apply_codec(encoder, AuraInfraredDecoder())
+    transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
 
-    assert calls == [encoder, encoder]
+    line_encoder, cone_encoder = calls
+    assert isinstance(line_encoder, TagInfraredEncoder)
+    assert cone_encoder is line_encoder
 
 
 def test_apply_codec_installs_the_decoder_on_the_receiver() -> None:
@@ -342,7 +343,7 @@ def test_apply_codec_installs_the_decoder_on_the_receiver() -> None:
     receiver = _receiver_holding(TagInfraredEncoder().encode(payload))
     transceiver = InfraredTransceiver({}, receiver, IrTransmitGate())
 
-    transceiver.apply_codec(TagInfraredEncoder(), TagInfraredDecoder())
+    transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
     transceiver.update()
 
     assert transceiver.received == payload
@@ -350,20 +351,46 @@ def test_apply_codec_installs_the_decoder_on_the_receiver() -> None:
 
 def test_apply_codec_still_fans_out_the_encoder_with_no_receiver_wired() -> None:
     calls: list = []
-    encoder = AuraInfraredEncoder()
     transceiver = InfraredTransceiver(
         {LINE: _RecordingSetEncoderTransmitter(calls)}, None, IrTransmitGate()
     )
 
-    transceiver.apply_codec(encoder, AuraInfraredDecoder())  # must not raise
+    transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)  # must not raise
 
-    assert calls == [encoder]
+    (encoder,) = calls
+    assert isinstance(encoder, TagInfraredEncoder)
 
 
 def test_apply_codec_is_a_safe_noop_with_no_transmitters_and_no_receiver() -> None:
     transceiver = InfraredTransceiver({}, None, IrTransmitGate())
 
-    transceiver.apply_codec(AuraInfraredEncoder(), AuraInfraredDecoder())  # must not raise
+    transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# codec — the installed class pair, read back
+# ---------------------------------------------------------------------------
+
+
+def test_codec_is_the_aura_pair_before_any_codec_is_applied() -> None:
+    transceiver = InfraredTransceiver({}, None, IrTransmitGate())
+
+    assert transceiver.codec == (AuraInfraredEncoder, AuraInfraredDecoder)
+
+
+def test_codec_reads_back_the_class_pair_apply_codec_took() -> None:
+    transceiver = InfraredTransceiver({}, None, IrTransmitGate())
+
+    transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
+
+    assert transceiver.codec == (TagInfraredEncoder, TagInfraredDecoder)
+
+
+def test_codec_cannot_be_assigned() -> None:
+    transceiver = InfraredTransceiver({}, None, IrTransmitGate())
+
+    with pytest.raises(AttributeError):
+        transceiver.codec = (TagInfraredEncoder, TagInfraredDecoder)  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
