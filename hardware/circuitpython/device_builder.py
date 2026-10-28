@@ -17,8 +17,7 @@ reached here through a deferred import in ``_setup_sdcard``.
 from __future__ import annotations
 
 try:
-    from collections.abc import Callable
-    from typing import TYPE_CHECKING, Final
+    from typing import TYPE_CHECKING
 except ImportError:
     TYPE_CHECKING = False
 
@@ -41,7 +40,13 @@ from engine.effects.output import EffectOutput
 from engine.log import Logger
 
 # Shared with CircuitPythonParts until build_hardware runs the Device assembly (#1055).
-from hardware.circuitpython.circuitpython_parts import _resolve_pin, _setup_matrix_is31fl3741
+from hardware.circuitpython.circuitpython_parts import (
+    _resolve_pin,
+    _setup_accelerometer,
+    _setup_drv2605,
+    _setup_magnetometer,
+    _setup_matrix_is31fl3741,
+)
 from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 from hardware.shared.build_narration import (
@@ -277,151 +282,6 @@ def _setup_buttons(*pins: microcontroller.Pin) -> DebouncedButtons:
         btn.switch_to_input(pull=digitalio.Pull.UP)
         pairs.append((label, lambda p=btn: p.value))
     return DebouncedButtons(pairs)
-
-
-def _construct_with_optional_address(
-    ctor: Callable[..., object], i2c: busio.I2C, address: int | None
-) -> object:
-    """Return ``ctor(i2c[, address=address])`` -- the one branch every bare I2C
-    device constructor (accelerometer, magnetometer, haptics) shares.
-
-    *address* is the configured I2C address override
-    (``I2CDeviceConfig.address``). ``None`` means no override -- the
-    ``address=`` keyword is omitted entirely so the driver's own default
-    applies, rather than passing ``address=None``. A configured override is
-    forwarded as-is.
-    """
-    if address is None:
-        return ctor(i2c)
-    return ctor(i2c, address=address)
-
-
-def _setup_accelerometer(i2c: busio.I2C, address: int | None = None) -> object:
-    """Return a configured LIS3DH accelerometer on *i2c*.
-
-    ``adafruit_lis3dh`` is imported here, not at module load, so a config
-    with no ``accelerometer`` section never requires the library to be
-    installed.
-
-    Accelerometer is config-gated, not presence-probed: the caller only
-    reaches this once ``config.accelerometer`` is declared and enabled, so a
-    declared accelerometer that can't be built here is a wiring fault, not a
-    normal "not present" case.
-
-    *address* is the configured I2C address override
-    (``I2CDeviceConfig.address``), forwarded via
-    :func:`_construct_with_optional_address`.
-
-    Raises:
-        ImportError: If ``adafruit_lis3dh`` is not installed.
-        Exception: Whatever ``adafruit_lis3dh.LIS3DH_I2C`` raises if the
-            sensor cannot be reached on *i2c*.
-    """
-    import adafruit_lis3dh
-
-    return _construct_with_optional_address(adafruit_lis3dh.LIS3DH_I2C, i2c, address)
-
-
-_MAGNETOMETER_DATA_RATE_HZ: Final = 100
-
-# A dead or mis-wired MMC5603 that still ACKs its I2C address -- parasitically,
-# through the shared bus pull-ups -- leaves its output registers reading raw 0 on
-# every axis. The adafruit driver maps that raw 0 to a fixed negative full-scale
-# value on all three axes at once, a reading no real field can produce (Earth's
-# field is always present), so it is a reliable "chip present on the bus but not actually
-# converting" sentinel. We must probe for it explicitly because the vendor chip-ID
-# guard accepts a 0x00 product ID, so ``MMC5603(i2c)`` construction itself never
-# raises in this state. Compared with a tolerance, not ``==``: on-device
-# CircuitPython computes the reading in single-precision float, which the
-# double-precision module constant below would never equal exactly.
-_MAGNETOMETER_DEAD_AXIS_UT: Final = (0 - (1 << 19)) * 0.00625
-_MAGNETOMETER_DEAD_TOLERANCE_UT: Final = 0.1
-# Up to ~100 ms (several conversion periods at _MAGNETOMETER_DATA_RATE_HZ) before
-# giving up: a healthy chip clears the raw-0 state within the first sample; a dead
-# one never does, so the margin costs nothing on working hardware.
-_MAGNETOMETER_PROBE_ATTEMPTS: Final = 20
-_MAGNETOMETER_PROBE_INTERVAL_S: Final = 0.005
-
-
-def _setup_magnetometer(i2c: busio.I2C, address: int | None = None) -> object:
-    """Return a configured MMC5603 magnetometer on *i2c*, in continuous mode.
-
-    ``adafruit_mmc56x3`` is imported here, not at module load, so a config
-    with no ``magnetometer`` section never requires the library to be
-    installed.
-
-    Magnetometer is config-gated, not presence-probed: the caller only
-    reaches this once ``config.magnetometer`` is declared and enabled, so a
-    declared magnetometer that can't be built here is a wiring fault, not a
-    normal "not present" case.
-
-    *address* is the configured I2C address override
-    (``I2CDeviceConfig.address``), forwarded via
-    :func:`_construct_with_optional_address`.
-
-    Unlike ``_setup_accelerometer``'s bare defaults, the MMC5603 boots in
-    one-shot mode, where each ``.magnetic`` read busy-waits ~5-10ms for a
-    fresh conversion to finish -- long enough to stall the shared input poll
-    every frame. Explicitly setting a fixed :data:`_MAGNETOMETER_DATA_RATE_HZ`
-    ``data_rate`` and then ``continuous_mode = True``, in that order (mirroring
-    the vendor driver's own documented sequence), makes it free-run
-    conversions in the background, so ``.magnetic`` reads the latest sample
-    without blocking.
-
-    Finally, poll ``.magnetic`` until it returns a real reading rather than the
-    all-zero :data:`_MAGNETOMETER_DEAD_AXIS_UT` sentinel.
-
-    Raises:
-        ImportError: If ``adafruit_mmc56x3`` is not installed.
-        RuntimeError: If the chip reads the all-zero sentinel on every axis
-            for the whole probe window -- present on the bus but not
-            converting (typically a power/ground wiring fault).
-        Exception: Whatever ``adafruit_mmc56x3.MMC5603`` raises if the
-            sensor cannot be reached on *i2c*.
-    """
-    import adafruit_mmc56x3
-
-    magnetometer = _construct_with_optional_address(adafruit_mmc56x3.MMC5603, i2c, address)
-    magnetometer.data_rate = _MAGNETOMETER_DATA_RATE_HZ
-    magnetometer.continuous_mode = True
-
-    for _ in range(_MAGNETOMETER_PROBE_ATTEMPTS):
-        if not all(
-            abs(axis - _MAGNETOMETER_DEAD_AXIS_UT) < _MAGNETOMETER_DEAD_TOLERANCE_UT
-            for axis in magnetometer.magnetic
-        ):
-            return magnetometer
-        time.sleep(_MAGNETOMETER_PROBE_INTERVAL_S)
-
-    raise RuntimeError(
-        "MMC5603 magnetometer ACKs the I2C bus but reads all-zero on every "
-        + "axis -- check its power and ground wiring"
-    )
-
-
-def _setup_drv2605(i2c: busio.I2C, address: int | None = None) -> object:
-    """Return a configured DRV2605 haptic driver on *i2c*.
-
-    ``adafruit_drv2605`` is imported here, not at module load, so a config
-    with no ``haptics`` section never requires the library to be installed.
-
-    Haptics is config-gated, not presence-probed: the caller only reaches
-    this once ``config.haptics`` is declared and enabled, so a declared
-    driver that can't be built here is a wiring fault, not a normal "not
-    present" case.
-
-    *address* is the configured I2C address override
-    (``I2CDeviceConfig.address``), forwarded via
-    :func:`_construct_with_optional_address`.
-
-    Raises:
-        ImportError: If ``adafruit_drv2605`` is not installed.
-        Exception: Whatever ``adafruit_drv2605.DRV2605`` raises if the
-            driver cannot be reached on *i2c*.
-    """
-    import adafruit_drv2605
-
-    return _construct_with_optional_address(adafruit_drv2605.DRV2605, i2c, address)
 
 
 def _require_i2c(i2c: busio.I2C | None, section: str) -> busio.I2C:
