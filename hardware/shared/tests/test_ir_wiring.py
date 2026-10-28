@@ -48,14 +48,19 @@ class _WriterFactory:
         return writer, self.kind
 
 
-def test_a_send_reaches_the_writer_built_for_that_emitter_in_the_aura_wire_frame():
+@pytest.mark.parametrize("emitter", [LINE, CONE, AREA_OF_EFFECT])
+def test_a_send_reaches_only_the_writer_built_for_that_emitter_in_the_aura_wire_frame(emitter):
     factory = _WriterFactory()
-    transceiver, _kind = wire_ir([_FakeReader()], {LINE: "GP1", CONE: "GP2"}, factory)
+    transceiver, _kind = wire_ir(
+        [_FakeReader()], {LINE: "GP1", CONE: "GP2", AREA_OF_EFFECT: "GP3"}, factory
+    )
 
-    transceiver.send(b"\x2a", CONE)
+    transceiver.send(b"\x2a", emitter)
 
-    assert factory.writers[LINE].writes == []
-    assert factory.writers[CONE].writes == [list(AuraInfraredEncoder().encode(b"\x2a"))]
+    assert {e: w.writes for e, w in factory.writers.items()} == {
+        e: [list(AuraInfraredEncoder().encode(b"\x2a"))] if e == emitter else []
+        for e in (LINE, CONE, AREA_OF_EFFECT)
+    }
 
 
 def test_emitters_are_built_in_ir_emitters_order_with_their_key_and_pin_whatever_the_config_order():

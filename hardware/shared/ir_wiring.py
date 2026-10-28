@@ -24,6 +24,8 @@ from hardware.shared.ir_transport import (
 __all__ = ["wire_ir"]
 
 
+# A pin is whatever the platform's writer factory takes (a board pin, a config
+# pin name), so it is passed through untouched and typed no tighter than object.
 def wire_ir(
     readers: "list[PulseReader]",
     emitter_pins: "dict[str, object]",
@@ -32,19 +34,18 @@ def wire_ir(
     """Wire the IR subsystem over *readers* and the emitters in *emitter_pins*.
 
     One :class:`IrTransmitGate` is shared by the receiver and every
-    transmitter, so a device never decodes its own self-echo. The receiver
-    reads every one of *readers*; each transmitter gets its writer from
-    *writer_factory*, called with the emitter key and its pin, in
-    ``IR_EMITTERS`` order whatever *emitter_pins*' own order. Both speak the
-    Aura wire-frame until ``apply_codec``.
+    transmitter, so a device never decodes its own self-echo. Everything
+    speaks the Aura wire-frame until
+    :meth:`~hardware.shared.ir_transceiver.InfraredTransceiver.apply_codec`.
 
     Args:
         readers: One pulse reader per IR receiver; never empty.
         emitter_pins: Emitter key (a member of ``IR_EMITTERS``) to whatever
             the platform's *writer_factory* needs to build that emitter's
             writer. An emitter absent from it is not wired.
-        writer_factory: Builds one emitter's writer, returning it paired with
-            the writer kind.
+        writer_factory: Called with an emitter key and its pin, in
+            ``IR_EMITTERS`` order; builds that emitter's writer and returns it
+            paired with the writer kind.
 
     Returns:
         The transceiver, and the writer kind the factory last reported, or
