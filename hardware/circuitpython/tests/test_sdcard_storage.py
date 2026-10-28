@@ -75,8 +75,8 @@ def test_sdcard_storage_is_a_device_storage_rooted_at_the_mount_point() -> None:
 
 
 def test_construction_propagates_mount_failure_as_the_raw_os_error() -> None:
-    """No wrapping happens here -- device_builder._setup_sdcard is the layer
-    that catches this OSError and wraps it in a section-named RuntimeError."""
+    """No wrapping happens here -- CircuitPythonParts.storage is the layer
+    that catches this OSError and wraps it in an SdCardMountError."""
     with (
         patch("hardware.circuitpython.sdcard_storage.sdcardio.SDCard") as mock_sdcard_cls,
         patch("hardware.circuitpython.sdcard_storage.storage.VfsFat"),

@@ -6,7 +6,7 @@ ownership shape: constructed with a transport seam that may be absent, its
 read afterwards rather than returned. The port is private — no call site
 reaches it through this class.
 
-Assembled by ``device_builder._setup_radio`` and exposed as
+Assembled by the Device assembly (``device_assembly``) and exposed as
 ``DeviceHardware.radio``; ``HardwareNetworkControls.send_radio`` delegates to
 it. This class hands back the raw decoded payload and sender byte rather than
 building a ``NetworkEvents.RadioReceived`` itself — it imports no

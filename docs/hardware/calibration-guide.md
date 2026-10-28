@@ -131,7 +131,7 @@ count, so `flush_ms` is the **constant max-length `show()` cost** and
 ### Matrix driver: the buffered I2C transaction boundary
 
 The production IS31FL3741 driver runs **buffered** (`allocate=MUST_BUFFER`, set in
-`device_builder._setup_matrix_is31fl3741`): it accumulates pixel writes in RAM and flushes
+`circuitpython_parts._setup_matrix_is31fl3741`): it accumulates pixel writes in RAM and flushes
 in a single I2C burst at `show()`, so `flush_ms` dominates and
 `worst_case_effect_per_pixel_ms` is low.
 

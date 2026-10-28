@@ -223,7 +223,7 @@ _Avoid_: reading `default_scene` from `aura-device.json` (moved out); treating a
 
 ### DeviceConfig
 The validated value object parsed from an `aura-device.json` mapping — no `board` import, constructs no hardware. Can derive an isolated copy with every isolatable component but one disabled, for single-component bring-up. Never changed once parsed — a different config is a different mapping, parsed again, so every config satisfies its `NeoPixelCurrentBudgetConfig`; `isolate` is the one derivation, because it only narrows.
-_Avoid_: importing `board` into the parser; constructing hardware in the parser (that is `device_builder`'s job); hand-listing the isolatable components (derive from `__slots__`); assigning to a parsed config or its sections
+_Avoid_: importing `board` into the parser; constructing hardware in the parser (that is the **Device assembly**'s job); hand-listing the isolatable components (derive from `__slots__`); assigning to a parsed config or its sections
 
 ### HighCurrentRailConfig
 The parsed config for the board's high-current rail enable pin — the line gating the ~2 A NeoPixel rail (and any peripheral drawing more than a GPIO's own budget). Infrastructure rather than a component: excluded from `isolate`, and its `enabled: false` still drives the pin deasserted rather than building nothing (see **Component enabled toggle**).
@@ -234,7 +234,7 @@ The opt-in, parse-time cap on the total worst-case NeoPixel current (every enabl
 _Avoid_: `neopixel_power`/`power budget` (too generic, see `HighCurrentRailConfig`); reading it as a live current limit or measurement (it is a static arithmetic bound fixed at boot); counting the matrix or disabled strips against it; expecting relative brightness between strips to survive once a strip is held at the floor
 
 ### Component enabled toggle
-The optional `enabled` boolean on every hardware component config (default `True`); `enabled: false` keeps a fully-validated section but tells `device_builder` not to build it. `buttons` is a bare pin-name list and isn't gated; `high_current_rail` is the exception (still drives its pin deasserted — see `HighCurrentRailConfig`).
+The optional `enabled` boolean on every hardware component config (default `True`); `enabled: false` keeps a fully-validated section but tells the **Device assembly** not to build it. `buttons` is a bare pin-name list and isn't gated; `high_current_rail` is the exception (still drives its pin deasserted — see `HighCurrentRailConfig`).
 _Avoid_: treating `enabled: false` as omitting the section at parse time (validation still runs in full); assuming `i2c`/`spi` `enabled: false` falls back to default pins (each builds no bus at all); writing `.enabled` after parse (use `isolate`); assuming `high_current_rail`'s `enabled: false` means "build nothing" like every other section
 
 ### Composition layer (app/)

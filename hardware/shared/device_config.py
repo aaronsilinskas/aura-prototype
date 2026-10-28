@@ -228,7 +228,7 @@ class IRConfig:
 class I2CConfig:
     """Parsed I2C bus configuration.
 
-    ``enabled=False`` means ``device_builder`` builds no I2C bus at all —
+    ``enabled=False`` means the Device assembly builds no I2C bus at all —
     distinct from an absent ``i2c`` section, which still defaults to the
     board's SCL/SDA pins.
     """
@@ -246,7 +246,7 @@ class SPIConfig:
 
     Mirrors ``I2CConfig``: ``sck``/``mosi``/``miso`` are required together
     when the ``spi`` section is present. Absent ``spi`` section means
-    ``device_builder`` falls back to ``board.SPI()`` later; ``enabled=False``
+    the board's default SPI bus is used later; ``enabled=False``
     builds no bus at all.
     """
 
@@ -263,7 +263,7 @@ class I2CDeviceConfig:
     """Parsed configuration shared by every bare I2C peripheral (accelerometer,
     magnetometer, haptics -- the sections named in ``_I2C_DEVICE_SECTIONS``).
 
-    Presence alone gates that peripheral's build (see ``device_builder``);
+    Presence alone gates that peripheral's build (see ``device_assembly``);
     ``address`` optionally overrides the driver's default I2C address. The
     three sections carry identical fields, so one class and one parser
     (``_parse_i2c_device``) serve all of them; only the error-message prefix
@@ -328,9 +328,9 @@ class HighCurrentRailConfig:
     to enable the rail, ``False`` drives it low.
 
     Unlike every other gated section, ``enabled=False`` does not mean "build
-    nothing" -- ``device_builder`` still resolves and drives ``pin``, to the
+    nothing" -- the Device assembly still drives ``pin``, to the
     *deasserted* level, holding the rail definitively off rather than leaving
-    it floating (useful for brown-out debugging). See ``device_builder``'s
+    it floating (useful for brown-out debugging). See ``device_assembly``'s
     high-current-rail step for the driven-level logic.
     """
 
