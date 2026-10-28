@@ -1,11 +1,8 @@
 """CircuitPythonParts — the Device assembly's ``DeviceParts`` adapter on a CircuitPython board.
 
-Deploy-watch only: imports board, busio and digitalio. Every per-part driver
-library is imported inside the part that builds it, so a config that doesn't
-need a part never requires its library to be installed.
-
-The adapter only builds what it is asked for: every enabled/declared and
-bus-requirement decision belongs to ``hardware.shared.device_assembly``.
+Deploy-watch only: imports board, busio, digitalio and microcontroller. Every
+per-part driver library is imported inside the part that builds it, so a config
+that doesn't need a part never requires its library to be installed.
 """
 
 from __future__ import annotations
@@ -16,7 +13,6 @@ try:
 except ImportError:
     TYPE_CHECKING = False
 
-# Type-checker-only: the driver library is imported by the part that builds it.
 if TYPE_CHECKING:
     from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
@@ -31,6 +27,7 @@ from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 from hardware.shared.device_config import MatrixPixelsConfig, NeoPixelStripConfig
 from hardware.shared.device_parts import DeviceParts, PinRef
+from hardware.shared.profiler_report import board_id
 
 __all__ = ["CircuitPythonParts"]
 
@@ -58,10 +55,6 @@ def _setup_matrix_is31fl3741(
     ``None`` means no override -- the ``address=`` keyword is omitted entirely
     so the driver's own default (``0x30``) applies, rather than passing
     ``address=None``.
-
-    ``adafruit_is31fl3741`` and ``Adafruit_RGBMatrixQT`` are imported here,
-    not at module load, so a config with no matrix entry never requires the
-    library to be installed.
 
     Raises:
         RuntimeError: If the matrix has not responded within the timeout.
@@ -105,6 +98,9 @@ class CircuitPythonParts(DeviceParts):
 
     def _pin(self, pin: PinRef) -> microcontroller.Pin:
         return _resolve_pin(self._board, pin.field, pin.name)
+
+    def board_name(self) -> str:
+        return board_id()
 
     def high_current_rail(self, pin: PinRef, level: bool) -> None:
         digitalio.DigitalInOut(self._pin(pin)).switch_to_output(value=level)

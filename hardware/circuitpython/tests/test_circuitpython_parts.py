@@ -68,6 +68,17 @@ def gpio(monkeypatch: pytest.MonkeyPatch) -> list[_FakeDigitalInOut]:
 
 
 # ---------------------------------------------------------------------------
+# Board name
+# ---------------------------------------------------------------------------
+
+
+def test_board_name_is_the_running_boards_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys.modules["board"], "board_id", "pimoroni_pico_plus2w", raising=False)
+
+    assert CircuitPythonParts(_board()).board_name() == "pimoroni_pico_plus2w"
+
+
+# ---------------------------------------------------------------------------
 # Pin references
 # ---------------------------------------------------------------------------
 
@@ -283,11 +294,14 @@ class _FakeMatrixDriver:
     """An IS31FL3741 driver; the first ``unresponsive_attempts`` constructions raise."""
 
     unresponsive_attempts = 0
+    responded: _FakeMatrixDriver | None = None
+    """The driver that answered, once one has."""
 
     def __init__(self, i2c: object, **kwargs: object) -> None:
         if _FakeMatrixDriver.unresponsive_attempts > 0:
             _FakeMatrixDriver.unresponsive_attempts -= 1
             raise OSError("no ACK")
+        _FakeMatrixDriver.responded = self
         self.i2c = i2c
         self.kwargs = kwargs
         self.led_scaling: int | None = None
@@ -311,6 +325,7 @@ class _Clock:
 @pytest.fixture
 def matrix_driver(monkeypatch: pytest.MonkeyPatch) -> None:
     _FakeMatrixDriver.unresponsive_attempts = 0
+    _FakeMatrixDriver.responded = None
     module = sys.modules["adafruit_is31fl3741.adafruit_rgbmatrixqt"]
     monkeypatch.setattr(module, "Adafruit_RGBMatrixQT", _FakeMatrixDriver)
     clock = _Clock()
@@ -370,7 +385,7 @@ def test_matrix_that_responds_within_the_startup_window_is_used(matrix_driver: N
 
     output = CircuitPythonParts(_board()).matrix_pixels(_matrix(), object())
 
-    assert isinstance(output.matrix, _FakeMatrixDriver)
+    assert output.matrix is _FakeMatrixDriver.responded
 
 
 def test_matrix_that_never_responds_raises_after_the_startup_window(matrix_driver: None) -> None:
