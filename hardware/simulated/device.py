@@ -1,20 +1,18 @@
 """The Simulated device: scripted pins in, recorded outputs out.
 
-Builds a real ``DeviceHardware`` around a real ``DebouncedButtons`` and a real
-``VoicePool``, so input debouncing and clip-driven effect endings behave as on
-a board. It obeys the hardware import contract: it knows nothing about scenes,
-the engine loop, or time beyond the ``now`` it is handed.
+It boots through the Device assembly, as a board does, with ``SimulatedParts``
+standing in for the hardware, so it builds, skips, rejects and narrates a
+``DeviceConfig`` exactly as a board would: a section that needs a disabled bus
+is rejected, and so is an enabled matrix entry (there is no simulated matrix).
+Pin names and buses are otherwise ignored. It obeys the hardware import
+contract: it knows nothing about scenes, the engine loop, or time beyond the
+``now`` it is handed.
 
-Its shape comes from a ``DeviceConfig``: one button per declared pin, labelled
-``A`` onward as on a board; one recording pixel output per NeoPixel strip; the
-declared voice count; a haptic output when ``haptics`` is declared; an
-accelerometer when ``accelerometer`` is declared; a magnetometer when
-``magnetometer`` is declared; the real
-``InfraredTransceiver`` over one simulated reader per ``ir.rx`` pin and one
-simulated writer per wired emitter; the real ``RadioTransceiver`` over a
-simulated ``RadioTransport`` when ``radio`` is declared, sending as its
-``node``. Wiring (pins, buses, addresses) is otherwise ignored; an enabled
-``sdcard`` section is an in-memory card. Matrix pixels are not simulated.
+What the assembly builds is real wherever it can be: a real ``DebouncedButtons``
+over scripted pins, a real ``VoicePool`` behind the recording audio, the real
+``InfraredTransceiver`` over simulated pulse readers and writers, and the real
+``RadioTransceiver`` over a simulated radio chip. An enabled ``sdcard`` section
+is an in-memory card.
 
 IR pulses are ideal: a write lands at exactly the codec's durations, with no
 noise, jitter, or airtime. What an emitter writes reaches the device's own
@@ -32,31 +30,23 @@ to be read.
 
 from __future__ import annotations
 
-import math
-import wave
 from array import array
-from collections import deque
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from effects.effect import Effect, PixelBuffer
-from engine.audio import AudioRegistry
-from engine.effects.output import EffectOutput
-from engine.events import EffectEvent
-from engine.input import AccelerationData
-from engine.network import IR_EMITTERS
-from engine.state import EffectReceipt, Scope, ScopeValue
-from hardware.shared.debounced_buttons import DebouncedButtons
-from hardware.shared.device_config import DeviceConfig, MatrixPixelsConfig
-from hardware.shared.device_hardware import DeviceHardware
-from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.ir_transport import PulseReader, PulseWriter
-from hardware.shared.ir_wiring import wire_ir
-from hardware.shared.network_controls import HardwareNetworkControls
-from hardware.shared.radio_transceiver import RadioTransceiver
-from hardware.shared.radio_transport import RadioTransport
-from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
-from hardware.simulated.storage import FakeDeviceStorage
+from engine.log import Logger
+from engine.state import ScopeValue
+from hardware.shared.debounced_buttons import DEBOUNCE_INTERVAL
+from hardware.shared.device_assembly import assemble_device, button_label
+from hardware.shared.device_config import DeviceConfig
+from hardware.simulated.simulated_parts import (
+    DEFAULT_SWAY_STRENGTH,
+    SimulatedAccelerometer,
+    SimulatedMagnetometer,
+    SimulatedParts,
+    SimulatedRadioTransport,
+    wav_length,
+)
 
 __all__ = [
     "DEFAULT_SWAY_STRENGTH",
@@ -68,19 +58,12 @@ __all__ = [
     "Strip",
 ]
 
-_DEBOUNCE_INTERVAL = 0.05
-_PIN_SETTLE = 2 * _DEBOUNCE_INTERVAL
+_PIN_SETTLE = 2 * DEBOUNCE_INTERVAL
 """How long a scripted pin level holds before the next change may start.
 
 Long enough for the debouncer to commit it, so every scripted press and
 release registers and tests never need to know the debounce interval.
 """
-
-_AT_REST = (0.0, 0.0, AccelerationData.GRAVITY)
-DEFAULT_SWAY_STRENGTH = 4.0
-"""``move``'s sway strength in m/s² unless given one: well above any sensible motion threshold."""
-_SWAY_HZ = 2.0
-"""``move``'s sway frequency on x: a hand's pace."""
 
 
 @dataclass(frozen=True)
@@ -157,202 +140,6 @@ class Strip:
         return "Strip(" + " ".join(f"{p:06X}" for p in self.pixels) + ")"
 
 
-class _SimulatedPulseReader(PulseReader):
-    """One IR receiver's pulse buffer: pulses queue up and are read oldest first."""
-
-    def __init__(self) -> None:
-        self._pulses: deque[int] = deque()
-
-    def capture(self, pulses: array | list[int]) -> None:
-        self._pulses.extend(pulses)
-
-    def read_pulse(self) -> int | None:
-        return self._pulses.popleft() if self._pulses else None
-
-
-class _SimulatedPulseWriter(PulseWriter):
-    """One emitter: lights the device's own readers, and records the payload it carried.
-
-    Blocking, like ``pulseio.PulseOut``: a write has finished by the time it
-    returns.
-    """
-
-    def __init__(self, sim_hw: SimulatedHardware, emitter: str) -> None:
-        self._sim_hw = sim_hw
-        self._emitter = emitter
-
-    def write_pulses(self, durations: array | list[int]) -> None:
-        self._sim_hw._emit(self._emitter, durations)
-
-    def is_busy(self) -> bool:
-        return False
-
-
-class _SimulatedRadioTransport(RadioTransport):
-    """The radio chip: a send goes to the device, and landed packets wait to be read."""
-
-    def __init__(self, sim_hw: SimulatedHardware) -> None:
-        self._sim_hw = sim_hw
-        self.waiting: deque[tuple[int, bytes]] = deque()
-
-    def send(self, data: bytes) -> None:
-        self._sim_hw._send_radio(bytes(data))
-
-    def receive(self) -> tuple[int, bytes] | None:
-        return self.waiting.popleft() if self.waiting else None
-
-
-def _wav_length(path: str) -> float:
-    """Seconds of audio in the WAV at *path*, read from its header."""
-    with wave.open(path, "rb") as clip:
-        return clip.getnframes() / clip.getframerate()
-
-
-class _RecordingPixels(EffectOutput):
-    """One NeoPixel strip's scope segments; keeps each segment's latest frame."""
-
-    def __init__(self, segments: dict[str, range]) -> None:
-        super().__init__()
-        self.min_resolution = max(len(seg) for seg in segments.values())
-        self.scopes = [ScopeValue(key) for key in segments]
-        self.frames = {key: [0] * len(seg) for key, seg in segments.items()}
-
-    def create_buffer(self, scope_key: str) -> PixelBuffer:
-        return PixelBuffer(len(self.frames[scope_key]))
-
-    def update_pixels(self, scope_key: str, buffer: PixelBuffer) -> None:
-        self.frames[scope_key] = list(buffer)
-
-    def clear_pixels(self, scope_key: str) -> None:
-        self.frames[scope_key] = [0] * len(self.frames[scope_key])
-
-
-class _SimulatedAudio(EffectOutput, VoiceSink):
-    """Plays clips on a real ``VoicePool``; a clip "plays" for its WAV's length.
-
-    Claims through the same ``clip_stops_receipt`` rule as ``AudioEffectOutput``,
-    so a ``stops_effect`` clip ends its effect when the clip runs out, exactly as
-    on a board.
-    """
-
-    def __init__(self, sim_hw: SimulatedHardware, registry: AudioRegistry, voices: int) -> None:
-        super().__init__(receives_pixels=False)
-        self.min_resolution = 1
-        self.scopes = [Scope.ALL]
-        self._sim_hw = sim_hw
-        self._registry = registry
-        self._pool = VoicePool(voices)
-        self._voices: list[tuple[str, float] | None] = [None] * voices
-        """Each voice's clip path and when it ends (``inf`` for a loop), or ``None`` while idle."""
-
-    def handle_event(
-        self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
-    ) -> None:
-        if effect.audio is None:
-            return
-        config = effect.audio.clips.get(event.verb)
-        if config is None:
-            return
-        stops_receipt = clip_stops_receipt(effect, config)
-        path = self._registry.path(config.name)
-        if self._pool.claim(self, path, config.loop, stops_receipt, receipt) != -1:
-            self._sim_hw.played.append(Played(self._sim_hw.now(), config.name))
-
-    def is_clip_playing(self, clip: str) -> bool:
-        path = self._registry.path(clip)
-        return any(
-            voice is not None and voice[0] == path and self.is_playing(slot)
-            for slot, voice in enumerate(self._voices)
-        )
-
-    def flush(self) -> None:
-        self._pool.sweep(self)
-
-    def open_source(self, path: str) -> object | None:
-        return (path, _wav_length(path))
-
-    def play(self, slot: int, source: object, loop: bool) -> None:
-        assert isinstance(source, tuple)  # the (path, length) open_source returned
-        path, length = source
-        self._voices[slot] = (path, math.inf if loop else self._sim_hw.now() + length)
-
-    def stop(self, slot: int) -> None:
-        self._voices[slot] = None
-
-    def set_loudness(self, slot: int, loudness: float) -> None:
-        pass
-
-    def is_playing(self, slot: int) -> bool:
-        voice = self._voices[slot]
-        return voice is not None and self._sim_hw.now() < voice[1]
-
-
-class _RecordingHaptic(EffectOutput):
-    def __init__(self, sim_hw: SimulatedHardware) -> None:
-        super().__init__(receives_pixels=False)
-        self.min_resolution = 1
-        self.scopes = [Scope.ALL]
-        self._sim_hw = sim_hw
-
-    def handle_event(
-        self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
-    ) -> None:
-        if effect.haptic is None:
-            return
-        pattern = effect.haptic.patterns.get(event.verb)
-        if pattern is not None:
-            self._sim_hw.buzzed.append(Buzzed(self._sim_hw.now(), tuple(pattern.sequence)))
-
-
-class _SimulatedAccelerometer:
-    """An accelerometer reading a held ``(x, y, z)`` in m/s², plus any sway on x."""
-
-    def __init__(self, now: Callable[[], float]) -> None:
-        self._now = now
-        self._held = _AT_REST
-        self._sway_strength = DEFAULT_SWAY_STRENGTH
-        self._sway_from: float | None = None
-        """When the sway started, or ``None`` while the device is not moving."""
-
-    @property
-    def acceleration(self) -> tuple[float, float, float]:
-        x, y, z = self._held
-        if self._sway_from is not None:
-            phase = 2 * math.pi * _SWAY_HZ * (self._now() - self._sway_from)
-            x += self._sway_strength * math.sin(phase)
-        return (x, y, z)
-
-    def hold(self, x: float, y: float, z: float) -> None:
-        self._held = (x, y, z)
-
-    def sway(self, strength: float) -> None:
-        self._sway_strength = strength
-        self._sway_from = self._now()
-
-    def rest(self) -> None:
-        self._held = _AT_REST
-        self._sway_from = None
-
-
-class _SimulatedMagnetometer:
-    """A magnetometer reading a held raw field ``(x, y, z)`` in µT; zero until set."""
-
-    def __init__(self) -> None:
-        self.magnetic = (0.0, 0.0, 0.0)
-
-
-def _strip_segments(config: DeviceConfig) -> list[dict[str, range]]:
-    """Each enabled NeoPixel strip's scope segments, one dict per strip."""
-    strips: list[dict[str, range]] = []
-    for entry in config.pixels:
-        if isinstance(entry, MatrixPixelsConfig):
-            raise ValueError("the Simulated device has no matrix; lay pixels out as strips")
-        if not entry.enabled:
-            continue
-        strips.extend(strip.scope_pixels for strip in entry.strips)
-    return strips
-
-
 class SimulatedHardware:
     """A Simulated device: ``hw`` is the ``DeviceHardware`` a scene boots on.
 
@@ -360,11 +147,14 @@ class SimulatedHardware:
     scripted pin changes fall due against it. Call ``settle_pins`` once per
     tick, before the tick reads the buttons. *ir_sink*, when given, is handed
     every emitter write as ``(emitter, pulses)``, and *radio_sink* every radio
-    send's payload.
+    send's payload. *logger*, when given, narrates every boot; without one the
+    device is silent.
 
-    ``hw.storage`` is an in-memory card when the config declares an enabled
-    ``sdcard`` section, else ``None``. ``power_on`` resets the device: see
-    there for what it rebuilds.
+    ``power_on`` resets the device: see there for what it rebuilds.
+
+    Raises:
+        RuntimeError: If the config is one the Device assembly rejects.
+        ValueError: If the config has an enabled matrix pixel entry.
     """
 
     def __init__(
@@ -373,85 +163,36 @@ class SimulatedHardware:
         config: DeviceConfig,
         ir_sink: Callable[[str, list[int]], None] | None = None,
         radio_sink: Callable[[bytes], None] | None = None,
+        logger: Logger | None = None,
     ) -> None:
         self.now = now
         self._config = config
         self._ir_sink = ir_sink
         self._radio_sink = radio_sink
+        self._logger = logger
         self.ir_sent: list[IrSent] = []
         self.radio_sent: list[RadioSent] = []
         self.played: list[Played] = []
         self.buzzed: list[Buzzed] = []
-        self._labels = [chr(ord("A") + i) for i in range(len(config.buttons))]
-        self._pressed = dict.fromkeys(self._labels, False)
-        self._pin_changes: dict[str, list[tuple[float, bool]]] = {b: [] for b in self._labels}
-        self._pin_free_at = dict.fromkeys(self._labels, 0.0)
-        ir_config = config.ir if config.ir is not None and config.ir.enabled else None
-        self._ir_receiver_count = len(ir_config.rx) if ir_config is not None else 0
-        self._ir_emitter_pins = ir_config.emitters if ir_config is not None else {}
-        self._wired_emitters = (
-            tuple(e for e in IR_EMITTERS if e in ir_config.emitters)
-            if ir_config is not None
-            else ()
-        )
-        self._accelerometer = (
-            _SimulatedAccelerometer(now)
-            if config.accelerometer is not None and config.accelerometer.enabled
-            else None
-        )
-        self._magnetometer = (
-            _SimulatedMagnetometer()
-            if config.magnetometer is not None and config.magnetometer.enabled
-            else None
-        )
-        self._storage = (
-            FakeDeviceStorage() if config.sdcard is not None and config.sdcard.enabled else None
-        )
-        self._radio_node = (
-            config.radio.node if config.radio is not None and config.radio.enabled else None
-        )
-        self.power_on()
+        # Which button each pin is, so a scripted press of a label reaches its pin.
+        self._button_of_pin = {name: button_label(i) for i, name in enumerate(config.buttons)}
+        labels = self._button_of_pin.values()
+        self._pressed = dict.fromkeys(labels, False)
+        self._pin_changes: dict[str, list[tuple[float, bool]]] = {b: [] for b in labels}
+        self._pin_free_at = dict.fromkeys(labels, 0.0)
+        self._boot(SimulatedParts(self))
 
     def power_on(self) -> None:
-        """Build ``hw`` afresh, as a reset does; the card, pins, sensors and recordings stay.
+        """Boot through the Device assembly afresh, as a reset does.
 
-        The debouncer reads the pins as they stand, so a button held through
-        it stays down without a new press. Strips are dark, no clip plays,
-        the IR receivers and the radio have caught nothing, and the device
-        speaks the Aura wire-frame until ``hw.ir.apply_codec``.
+        The card, the sensors, the pins and the recordings stay; everything
+        else is rebuilt. The debouncer reads the pins as they stand, so a
+        button held through it stays down without a new press. Strips are
+        dark, no clip plays, the IR receivers and the radio have caught
+        nothing, and the device speaks the Aura wire-frame until
+        ``hw.ir.apply_codec``.
         """
-        config = self._config
-        self._ir_readers = [_SimulatedPulseReader() for _ in range(self._ir_receiver_count)]
-        self._buttons = DebouncedButtons(
-            [(label, self._pin_reader(label)) for label in self._labels],
-            interval=_DEBOUNCE_INTERVAL,
-        )
-        self._strips = [_RecordingPixels(segments) for segments in _strip_segments(config)]
-        self._audio_registry = AudioRegistry()
-        outputs: list[EffectOutput] = [*self._strips]
-        self._audio = (
-            _SimulatedAudio(self, self._audio_registry, config.audio.voices)
-            if config.audio is not None and config.audio.enabled
-            else None
-        )
-        if self._audio is not None:
-            outputs.append(self._audio)
-        if config.haptics is not None and config.haptics.enabled:
-            outputs.append(_RecordingHaptic(self))
-        ir = self._wire_ir() if self._ir_readers else None
-        self._radio = _SimulatedRadioTransport(self) if self._radio_node is not None else None
-        radio = RadioTransceiver(self._radio) if self._radio is not None else None
-        self.hw = DeviceHardware(
-            outputs=outputs,
-            buttons=self._buttons,
-            accelerometer=self._accelerometer,
-            magnetometer=self._magnetometer,
-            network_controls=HardwareNetworkControls(ir, radio),
-            ir=ir,
-            radio=radio,
-            storage=self._storage,
-            audio_registry=self._audio_registry,
-        )
+        self._boot(SimulatedParts(self, previous=self._parts))
 
     def receive_ir(self, payload: bytes) -> None:
         """Land a clean shot carrying *payload* on every IR receiver.
@@ -471,9 +212,8 @@ class SimulatedHardware:
         Already encoded: whatever wire-frame they carry, the transceiver's
         next ``update`` decodes them with the installed codec, or fails to.
         """
-        readers = (
-            self._ir_readers if receivers is None else [self._ir_readers[i] for i in receivers]
-        )
+        built = self._parts.ir_readers
+        readers = built if receivers is None else [built[i] for i in receivers]
         for reader in readers:
             reader.capture(pulses)
 
@@ -483,12 +223,12 @@ class SimulatedHardware:
 
     @property
     def ir_emitters(self) -> tuple[str, ...]:
-        """The emitters the config wires, in ``IR_EMITTERS`` order."""
-        return self._wired_emitters
+        """The emitters the assembly wired, in ``IR_EMITTERS`` order."""
+        return tuple(self._parts.ir_emitters)
 
     @property
     def ir_receiver_count(self) -> int:
-        return len(self._ir_readers)
+        return len(self._parts.ir_readers)
 
     @property
     def best_receiver(self) -> int | None:
@@ -499,14 +239,19 @@ class SimulatedHardware:
         """
         ir = self.hw.ir
         best = ir.last_best_receiver if ir is not None else None
-        return next((i for i, reader in enumerate(self._ir_readers) if reader is best), None)
+        readers = self._parts.ir_readers
+        return next((i for i, reader in enumerate(readers) if reader is best), None)
 
     def clip_length(self, clip: str) -> float:
         """Seconds *clip* plays for, read from the WAV header it plays from."""
-        return _wav_length(self._audio_registry.path(clip))
+        registry = self.hw.audio_registry
+        if registry is None:
+            raise ValueError("the config declares no audio")
+        return wav_length(registry.path(clip))
 
     def is_playing(self, clip: str) -> bool:
-        return self._audio is not None and self._audio.is_clip_playing(clip)
+        audio = self._parts.audio
+        return audio is not None and audio.is_clip_playing(clip)
 
     def registered(self, button: str) -> bool:
         """Whether every scheduled change of *button* has landed and the debouncer reads it.
@@ -515,7 +260,8 @@ class SimulatedHardware:
         the new debouncer reads the pin as it stands.
         """
         return (
-            not self._pin_changes[button] and self._buttons.is_down(button) == self._pressed[button]
+            not self._pin_changes[button]
+            and self.hw.buttons.is_down(button) == self._pressed[button]
         )
 
     def accelerate(self, x: float, y: float, z: float) -> None:
@@ -549,7 +295,7 @@ class SimulatedHardware:
     def strip(self, scope: ScopeValue) -> Strip:
         """The latest frame of the one strip segment showing leaf *scope*."""
         (key,) = scope.keys
-        frames = [s.frames[key] for s in self._strips if key in s.frames]
+        frames = [s.frames[key] for s in self._parts.strips if key in s.frames]
         if len(frames) != 1:
             raise KeyError(f"{len(frames)} strips show scope '{key}'; expected exactly one")
         return Strip(frames[0])
@@ -560,26 +306,33 @@ class SimulatedHardware:
         self.played.clear()
         self.buzzed.clear()
 
-    def _wire_ir(self) -> InfraredTransceiver:
-        """Wire the real IR stack the way a device does, on simulated pulses."""
-        transceiver, _writer_kind = wire_ir(
-            list(self._ir_readers),
-            self._ir_emitter_pins,
-            lambda emitter, _pin: (_SimulatedPulseWriter(self, emitter), "simulated"),
-        )
-        return transceiver
+    def _boot(self, parts: SimulatedParts) -> None:
+        self._parts = parts
+        self.hw = assemble_device(self._config, parts, self._logger)
 
-    def _emit(self, emitter: str, pulses: array | list[int]) -> None:
+    # -- what the device's parts report (see SimulatedParts) -------------------
+
+    def on_ir_written(self, emitter: str, pulses: array | list[int]) -> None:
         """Record what *emitter* carried, let the device's own readers see it, and hand it on."""
         self.ir_sent.append(IrSent(self.now(), emitter, self._decode_wire(pulses)))
         self.land_ir(pulses)
         if self._ir_sink is not None:
             self._ir_sink(emitter, list(pulses))
 
-    def _send_radio(self, payload: bytes) -> None:
+    def on_clip_played(self, clip: str) -> None:
+        self.played.append(Played(self.now(), clip))
+
+    def on_buzzed(self, pattern: tuple[int, ...]) -> None:
+        self.buzzed.append(Buzzed(self.now(), pattern))
+
+    def on_radio_sent(self, payload: bytes) -> None:
         self.radio_sent.append(RadioSent(self.now(), payload))
         if self._radio_sink is not None:
             self._radio_sink(payload)
+
+    def pin_level(self, pin: str) -> bool:
+        """The raw level of button *pin*: pulled up, so HIGH (``True``) means not pressed."""
+        return not self._pressed[self._button_of_pin[pin]]
 
     def _decode_wire(self, pulses: array | list[int]) -> bytes:
         """The payload *pulses* carry, read back through the installed codec."""
@@ -593,20 +346,25 @@ class SimulatedHardware:
                 return bytes(payload)
         raise ValueError(f"the {decoder.__class__.__name__} cannot read back what was sent")
 
-    def _require_radio(self) -> _SimulatedRadioTransport:
-        if self._radio is None:
+    def _require_radio(self) -> SimulatedRadioTransport:
+        radio = self._parts.radio
+        if radio is None:
             raise ValueError("the config declares no radio")
-        return self._radio
+        return radio
 
-    def _require_accelerometer(self) -> _SimulatedAccelerometer:
-        if self._accelerometer is None:
+    def _require_accelerometer(self) -> SimulatedAccelerometer:
+        accelerometer = self.hw.accelerometer
+        if accelerometer is None:
             raise ValueError("the config declares no accelerometer")
-        return self._accelerometer
+        assert isinstance(accelerometer, SimulatedAccelerometer)
+        return accelerometer
 
-    def _require_magnetometer(self) -> _SimulatedMagnetometer:
-        if self._magnetometer is None:
+    def _require_magnetometer(self) -> SimulatedMagnetometer:
+        magnetometer = self.hw.magnetometer
+        if magnetometer is None:
             raise ValueError("the config declares no magnetometer")
-        return self._magnetometer
+        assert isinstance(magnetometer, SimulatedMagnetometer)
+        return magnetometer
 
     def _schedule(self, buttons: tuple[str, ...], pressed: bool) -> None:
         # Queued behind the previous change of every button, so back-to-back
@@ -615,6 +373,3 @@ class SimulatedHardware:
         for button in buttons:
             self._pin_changes[button].append((at, pressed))
             self._pin_free_at[button] = at + _PIN_SETTLE
-
-    def _pin_reader(self, label: str) -> Callable[[], bool]:
-        return lambda: not self._pressed[label]  # pull-up: HIGH means not pressed

@@ -75,9 +75,11 @@ hardware/         Hardware abstraction layer
                   device_storage, network_controls, scene_selection, ir_transport,
                   ir_transceiver, ir_wiring, ir_codecs/ (base, aura, tag), ir_telemetry,
                   radio_transport, radio_transceiver, sd_sync_protocol, sd_sync_server,
-                  profiler_report, build_narration, device_reboot)
-  simulated/      Test-only Simulated device (device: SimulatedHardware; storage:
-                  FakeDeviceStorage, its in-memory card) — never deployed
+                  profiler_report, build_narration, device_reboot,
+                  device_assembly, device_parts)
+  simulated/      Test-only Simulated device (device: SimulatedHardware; simulated_parts:
+                  SimulatedParts, its DeviceParts adapter; storage: FakeDeviceStorage,
+                  its in-memory card) — never deployed
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together
@@ -171,7 +173,9 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `Duration` | `magic/values.py` | Expiry tracker |
 | `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; optional `pixels` list plus optional IR/audio/I2C/sensor/haptics sections |
 | `NeoPixelCurrentBudgetConfig` | `hardware/shared/device_config.py` | Opt-in `neopixel_current_budget` policy; the parser folds the tuned brightness into each NeoPixel strip config and records the estimate/scale for boot narration |
-| `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle `build_hardware` returns (outputs, sensors, network seam, `ir`, radio, storage) |
+| `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the Device assembly returns (outputs, sensors, network seam, `ir`, radio, storage) |
+| `assemble_device` | `hardware/shared/device_assembly.py` | The **Device assembly**: board-free `DeviceConfig` → `DeviceHardware`, owning gating, bus requirements, build order, narration, buttons, IR/radio wiring and network controls; reaches hardware only through `DeviceParts` |
+| `DeviceParts` / `PinRef` | `hardware/shared/device_parts.py` | Port the Device assembly builds each part through (one constructor per part), taking config sections and pin references (a pin name with its config field); adapters `SimulatedParts` (`hardware/simulated/simulated_parts.py`, which also decides what persists across a reboot) and, from later tickets, `CircuitPythonParts` |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter |
 | `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, receiver, shared transmit gate); wired only by `wire_ir` (`hardware/shared/ir_wiring.py`), for the device and the Simulated device alike |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |

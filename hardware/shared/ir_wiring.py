@@ -7,6 +7,9 @@ here and nowhere else.
 
 try:
     from collections.abc import Callable
+    from typing import TypeVar
+
+    Pin = TypeVar("Pin")
 except ImportError:
     pass
 
@@ -24,12 +27,12 @@ from hardware.shared.ir_transport import (
 __all__ = ["wire_ir"]
 
 
-# A pin is whatever the platform's writer factory takes (a board pin, a config
-# pin name), so it is passed through untouched and typed no tighter than object.
+# A pin is whatever the platform's writer factory takes (a board pin, a pin
+# reference), so it is passed through untouched.
 def wire_ir(
     readers: "list[PulseReader]",
-    emitter_pins: "dict[str, object]",
-    writer_factory: "Callable[[str, object], tuple[PulseWriter, str]]",
+    emitter_pins: "dict[str, Pin]",
+    writer_factory: "Callable[[str, Pin], tuple[PulseWriter, str]]",
 ) -> "tuple[InfraredTransceiver, str | None]":
     """Wire the IR subsystem over *readers* and the emitters in *emitter_pins*.
 
