@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
     from hardware.circuitpython.audio_output import AudioEffectOutput
     from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
+    from hardware.circuitpython.rfm69_radio_transport import Rfm69RadioTransport
+    from hardware.circuitpython.sdcard_storage import SdCardStorage
 
 import time
 
@@ -27,6 +29,7 @@ import digitalio
 import microcontroller
 
 from engine.audio import AudioRegistry
+from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 from hardware.shared.device_config import (
@@ -34,11 +37,25 @@ from hardware.shared.device_config import (
     I2CDeviceConfig,
     MatrixPixelsConfig,
     NeoPixelStripConfig,
+    RadioConfig,
+    SDCardConfig,
 )
 from hardware.shared.device_parts import DeviceParts, PinRef
+from hardware.shared.ir_transport import PulseWriter
 from hardware.shared.profiler_report import board_id
 
-__all__ = ["CircuitPythonParts"]
+__all__ = ["CircuitPythonParts", "SdCardMountError"]
+
+
+class SdCardMountError(RuntimeError):
+    """Raised when a declared ``sdcard`` section is present but the card fails to mount.
+
+    Distinguishes a wiring/card fault (no card fitted, no FAT filesystem) from
+    other build failures so callers can react to it specifically -- e.g.
+    ``examples/sd_sync.py`` reports it and idles rather than crashing into the
+    REPL. A ``RuntimeError`` subclass so existing broad ``except RuntimeError``
+    handlers still catch it.
+    """
 
 
 def _resolve_pin(board_module: object, field: str, name: str) -> microcontroller.Pin:
@@ -176,6 +193,34 @@ def _setup_drv2605(i2c: busio.I2C, address: int | None = None) -> object:
     return _construct_with_optional_address(adafruit_drv2605.DRV2605, i2c, address)
 
 
+def _make_writer(pin: microcontroller.Pin) -> tuple[PulseWriter, str]:
+    """Return the IR writer the silicon supports for *pin*, and its kind.
+
+    An importable ``rp2pio`` (RP2040/RP2350 only) means the carrier can be
+    clocked out by PIO without blocking; any other board falls back to the
+    blocking ``pulseio`` writer. PIO support is a property of the silicon, so
+    there is no config knob.
+
+    The kind (``"pio"``/``"pulseio"``) is returned alongside the writer rather
+    than re-derived for the ``ir`` boot line, which could then diverge from
+    what was actually built.
+    """
+    try:
+        import rp2pio  # noqa: F401  # present only on RP2040/RP2350
+    except ImportError:
+        import pulseio
+
+        pulseout = pulseio.PulseOut(pin, frequency=38000, duty_cycle=0x8000)
+        return PulseOutWriter(pulseout), "pulseio"
+
+    from hardware.circuitpython.pio_pulse_writer import (
+        PioPulseWriter,
+        make_state_machine,
+    )
+
+    return PioPulseWriter(make_state_machine(pin)), "pio"
+
+
 class CircuitPythonParts(DeviceParts):
     """Builds parts on *board_module*'s pins; *i2c*, if given, is the I2C bus handed out.
 
@@ -272,3 +317,42 @@ class CircuitPythonParts(DeviceParts):
             i2s_word_select=self._pin(word_select),
             i2s_data=self._pin(data),
         )
+
+    def ir_reader(self, pin: PinRef) -> PulseInReader:
+        import pulseio
+
+        return PulseInReader(pulseio.PulseIn(self._pin(pin), maxlen=256, idle_state=True))
+
+    def ir_writer(self, emitter: str, pin: PinRef) -> tuple[PulseWriter, str]:
+        return _make_writer(self._pin(pin))
+
+    def radio_transport(
+        self, radio: RadioConfig, spi: busio.SPI, cs: PinRef, reset: PinRef
+    ) -> Rfm69RadioTransport:
+        # The only importer of adafruit_rfm69, which it imports at load time.
+        from hardware.circuitpython.rfm69_radio_transport import Rfm69RadioTransport
+
+        return Rfm69RadioTransport(
+            spi,
+            digitalio.DigitalInOut(self._pin(cs)),
+            digitalio.DigitalInOut(self._pin(reset)),
+            radio.frequency,
+            radio.node,
+        )
+
+    def storage(self, sdcard: SDCardConfig, spi: busio.SPI, cs: PinRef) -> SdCardStorage:
+        """Return the card mounted at ``sdcard.mount``.
+
+        Raises:
+            SdCardMountError: When the card is absent or unmountable.
+        """
+        # The only importer of sdcardio and storage, which it imports at load time.
+        from hardware.circuitpython.sdcard_storage import SdCardStorage
+
+        try:
+            return SdCardStorage(spi, self._pin(cs), sdcard.mount)
+        except OSError as e:
+            raise SdCardMountError(
+                f"sdcard section is declared but the card at cs={cs.name} "
+                + f"mount={sdcard.mount} failed to mount: {e}"
+            ) from e

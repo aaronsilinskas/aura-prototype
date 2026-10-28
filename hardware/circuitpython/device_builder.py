@@ -41,13 +41,15 @@ from engine.log import Logger
 
 # Shared with CircuitPythonParts until build_hardware runs the Device assembly (#1055).
 from hardware.circuitpython.circuitpython_parts import (
+    SdCardMountError,
+    _make_writer,
     _resolve_pin,
     _setup_accelerometer,
     _setup_drv2605,
     _setup_magnetometer,
     _setup_matrix_is31fl3741,
 )
-from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
+from hardware.circuitpython.infrared_io import PulseInReader
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 from hardware.shared.build_narration import (
     describe_accelerometer,
@@ -82,7 +84,7 @@ from hardware.shared.device_config import load_device_config as _load_shared_dev
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.ir_transport import PulseReader, PulseWriter
+from hardware.shared.ir_transport import PulseReader
 from hardware.shared.ir_wiring import wire_ir
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiler_report import board_id
@@ -94,17 +96,6 @@ __all__ = [
     "load_device_config",
     "open_config_i2c",
 ]
-
-
-class SdCardMountError(RuntimeError):
-    """Raised when a declared ``sdcard`` section is present but the card fails to mount.
-
-    Distinguishes a wiring/card fault (no card fitted, no FAT filesystem) from
-    other build failures so callers can react to it specifically -- e.g.
-    ``examples/sd_sync.py`` reports it and idles rather than crashing into the
-    REPL. A ``RuntimeError`` subclass so existing broad ``except RuntimeError``
-    handlers still catch it.
-    """
 
 
 def _setup_high_current_rail(rail_cfg: HighCurrentRailConfig, board_module: object) -> None:
@@ -385,51 +376,6 @@ def _setup_audio(
         ),
         i2s_data=_resolve_pin(board_module, "audio.i2s_data", audio_cfg.i2s_data),
     )
-
-
-def _make_writer(pin: microcontroller.Pin) -> tuple[PulseWriter, str]:
-    """Return the best non-blocking IR writer the silicon supports for *pin*,
-    paired with a short string naming which kind was chosen.
-
-    Selection is by import-probe: ``rp2pio`` is present only on RP2040/RP2350,
-    so an importable ``rp2pio`` means the board can clock the carrier out via
-    PIO/DMA — wire a :class:`PioPulseWriter` over its own state machine. On any
-    other board ``rp2pio`` is missing and the blocking ``pulseio``-backed
-    :class:`PulseOutWriter` is used. PIO availability is a property of the
-    silicon, so there is no config knob; the PIO-writer module is imported here
-    (not at module load) so it never executes on non-RP boards. The ``pulseio``
-    fallback import is deferred the same way, so a board that never reaches
-    this function (no IR section configured) never requires ``pulseio`` to be
-    installed.
-
-    The kind string (``"pio"``/``"pulseio"``) is returned alongside the writer
-    rather than left for a caller to re-derive: ``build_hardware`` narrates it
-    on the ``ir`` line, and re-running this same import-probe a second time
-    just for logging could theoretically diverge from what was actually
-    built. Asking the writer that was actually constructed is exact, not
-    theoretical.
-
-    Args:
-        pin: The transmit pin the emitter is wired to.
-
-    Returns:
-        A tuple of a :class:`PulseWriter` — a PIO-backed one on RP boards,
-        else blocking — and the kind string naming which one.
-    """
-    try:
-        import rp2pio  # noqa: F401  # present only on RP2040/RP2350
-    except ImportError:
-        import pulseio
-
-        pulseout = pulseio.PulseOut(pin, frequency=38000, duty_cycle=0x8000)
-        return PulseOutWriter(pulseout), "pulseio"
-
-    from hardware.circuitpython.pio_pulse_writer import (
-        PioPulseWriter,
-        make_state_machine,
-    )
-
-    return PioPulseWriter(make_state_machine(pin)), "pio"
 
 
 def _setup_ir(
