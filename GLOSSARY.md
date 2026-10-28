@@ -222,8 +222,8 @@ The single **required** on-device flash file holding device settings, host-autho
 _Avoid_: reading `default_scene` from `aura-device.json` (moved out); treating a stale `"scene"` key left in an old `aura-device.json` as meaningful (it is inert)
 
 ### DeviceConfig
-The validated value object parsed from an `aura-device.json` mapping — no `board` import, constructs no hardware. Can derive an isolated copy with every isolatable component but one disabled, for single-component bring-up.
-_Avoid_: importing `board` into the parser; constructing hardware in the parser (that is `device_builder`'s job); hand-listing the isolatable components (derive from `__slots__`)
+The validated value object parsed from an `aura-device.json` mapping — no `board` import, constructs no hardware. Can derive an isolated copy with every isolatable component but one disabled, for single-component bring-up. Never changed once parsed — a different config is a different mapping, parsed again, so every config satisfies its `NeoPixelCurrentBudgetConfig`; `isolate` is the one derivation, because it only narrows.
+_Avoid_: importing `board` into the parser; constructing hardware in the parser (that is `device_builder`'s job); hand-listing the isolatable components (derive from `__slots__`); assigning to a parsed config or its sections
 
 ### HighCurrentRailConfig
 The parsed config for the board's high-current rail enable pin — the line gating the ~2 A NeoPixel rail (and any peripheral drawing more than a GPIO's own budget). Infrastructure rather than a component: excluded from `isolate`, and its `enabled: false` still drives the pin deasserted rather than building nothing (see **Component enabled toggle**).
@@ -262,11 +262,19 @@ The boot-time known-scene guard: returns the scene name if the registry has it, 
 _Avoid_: duplicating the known-scene check inline instead of calling `SceneRegistry.resolve_known`; assuming it runs ahead of `build_hardware` (it does not)
 
 ### resolve_ir_codec
-Resolves a scene's declared **wire-frame codec** name to an instantiated encoder/decoder pair. Board-free, needing no built hardware to run.
+Resolves a scene's declared **wire-frame codec** name to its encoder/decoder class pair. Board-free, needing no built hardware to run.
 _Avoid_: applying the resolved pair after the first tick (defeats the boot-time-selection point); duplicating the name-to-class mapping instead of delegating to `codec_for`
 
+### Device assembly
+The board-free turning of a `DeviceConfig` into a `DeviceHardware`, shared by the physical device and the **Simulated device**: which components are built or skipped, which need a bus, the order they come up in, how each is narrated, and how the IR and radio subsystems are wired. It reaches hardware only through **DeviceParts**, so a config the board rejects for config reasons is rejected in simulation too.
+_Avoid_: builder (names the device-only entry point); repeating gating or IR wiring in a `DeviceParts` adapter
+
+### DeviceParts
+The port **Device assembly** reaches leaf hardware through — one constructor per part (pins, buses, pixels, buttons, sensors, audio, haptics, IR pulse readers and writers, radio transport, storage), taking pin names rather than pin objects. Live adapter `CircuitPythonParts`; the **Simulated device**'s adapter `SimulatedParts`, which also decides which parts persist across a **reboot**.
+_Avoid_: leaves, leaf factory; deciding enabled/declared or bus requirements in an adapter (that is the assembly's job)
+
 ### device_builder
-The device-only hardware builder that resolves pin names and constructs the configured outputs, buttons, sensors, IR, and radio into a `DeviceHardware` bundle. Single-call (claims pins without deiniting); every component is config-gated, never presence-probed.
+The device-only entry point that runs **Device assembly** with `CircuitPythonParts`. Single-call (claims pins without deiniting); every component is config-gated, never presence-probed.
 _Avoid_: returning a bare tuple/dict (return `DeviceHardware`); putting config parsing here (lives in the pure parser); calling it twice in one process
 
 ### DeviceHardware
@@ -274,7 +282,7 @@ The board-free bundle `build_hardware` returns — a data holder for the built o
 _Avoid_: exposing raw transmitters (use `network_controls`/`ir`); exposing the raw `RadioTransport` (use `network_controls`/`radio`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### Simulated device
-A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz, and send. Its own emitters light its own receivers; its IR reaches other simulated devices only through the **IR medium**, where it is aimed, and its radio reaches every other one through the **radio medium**. Each has its own radio node, so a receiver can tell senders apart. Its shape comes from a `DeviceConfig` — the harness boots it from `examples/aura-device.simulated.json`, kept capability-equal to every other example config by a sync test. It has its own in-memory storage unless a test makes it card-less, and a **reboot** boots it again at once, within the tick that reset it. A test switches it on into a scene: that scene is its flash default, so every boot, the first included, picks the scene its card names and falls back to that default, as a real device does. Its reboot is instant: a real device is away for a moment while it boots, and IR aimed at it then is lost, but a simulated one never is. Its reboot also keeps module-level state, which a real reset clears, so shipped code keeps none. When real hardware exposes a bug it missed, the simulated device is extended until that bug is visible.
+A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz, and send. Its own emitters light its own receivers; its IR reaches other simulated devices only through the **IR medium**, where it is aimed, and its radio reaches every other one through the **radio medium**. Each has its own radio node, so a receiver can tell senders apart. Its shape comes from a `DeviceConfig` — the harness boots it from `examples/aura-device.simulated.json`, kept capability-equal to every other example config by a sync test. It has its own card, a real directory it can carry scenes and packs on, unless a test makes it card-less, and a **reboot** boots it again at once, within the tick that reset it. A test switches it on into a scene: that scene is its flash default, so every boot, the first included, picks the scene its card names and falls back to that default, as a real device does. Its reboot is instant: a real device is away for a moment while it boots, and IR aimed at it then is lost, but a simulated one never is. Its reboot also keeps module-level state, which a real reset clears, so shipped code keeps none. When real hardware exposes a bug it missed, the simulated device is extended until that bug is visible.
 _Avoid_: mock device, virtual device, emulator (it does not run CircuitPython); faking the CircuitPython libraries beneath `device_builder`; hard-coding its hardware shape (declare it in the simulated config)
 
 ### Simulation test harness
@@ -310,7 +318,7 @@ The live CircuitPython `RadioTransport` adapter wrapping `adafruit_rfm69.RFM69` 
 _Avoid_: importing `adafruit_rfm69` anywhere else; reading the driver without checking `payload_ready` first (blocks)
 
 ### DeviceStorage
-The board-free device-state storage port: reads/writes small state files under a mount root and resolves real filesystem paths for streamed/scanned consumers. Live adapter `SdCardStorage`; `FakeDeviceStorage` is the in-memory double, and the **Simulated device**'s card.
+The board-free device-state storage port: reads/writes small state files under a mount root and resolves real filesystem paths for streamed/scanned consumers. Live adapter `SdCardStorage`; tests and the **Simulated device**'s card run the same storage over a temporary directory.
 _Avoid_: escaping the mount root; a second concrete implementation for CPython vs. CircuitPython (one class suffices once mounted); using `path("")` where the clean root is needed (use `mount_root`)
 
 ### SdCardStorage
@@ -356,6 +364,10 @@ _Avoid_: the old per-scope shape (one strip per `Scope`); conflating segment len
 A hardware sensor providing 3-axis acceleration readings (x, y, z) in m/s²; optional, absent when hardware is not present.
 _Avoid_: "IMU" (the LIS3DH has no gyroscope or magnetometer)
 
+### PolledSensor
+The board-free owner of one 3-axis sensor's reading: polled once per tick, it refreshes its reading buffer from the raw chip, and a failed read keeps the last good reading. The accelerometer and magnetometer are each one; `None` in their place on `DeviceHardware` means the hardware is absent.
+_Avoid_: `Sensor` (buttons and IR receivers are sensors too); swallowing read failures at the call site
+
 ### AccelerationData
 A snapshot of 3-axis accelerometer readings; `None` when no accelerometer is present — signals "no sensor data," not "device at rest."
 _Avoid_: `MovementData`
@@ -381,8 +393,8 @@ The board-free single owner of a device's whole IR subsystem — the transmitter
 _Avoid_: importing `NetworkEvents`/game-event vocabulary here (the event is built in `run_scene`); a value-returning `update()`; calling it a hardware "driver"; exposing the transmitter map as a public collection
 
 ### Wire-frame codec
-An encoder/decoder pair mapping an opaque payload ↔ IR pulse durations, injected into the IR transport; two coexist — the **Aura wire-frame** and the **Tag protocol** — selected per scene. A built device's codec is mutable once, at boot, via `InfraredTransceiver.apply_codec`.
-_Avoid_: assuming a single global wire-frame; treating wire-frames as interchangeable across scenes
+An encoder/decoder pair mapping an opaque payload ↔ IR pulse durations, injected into the IR transport; two coexist — the **Aura wire-frame** and the **Tag protocol** — selected per scene. Travels as a class pair, so each receiver reader gets its own fresh decoder. A built device's codec is mutable once, at boot, via `InfraredTransceiver.apply_codec`, which hands the installed pair back read-only.
+_Avoid_: assuming a single global wire-frame; treating wire-frames as interchangeable across scenes; passing codec instances (one decoder must never be shared between readers)
 
 ### Aura wire-frame
 Aura's internal IR wire-frame (header mark/space, MSB-first bits, CRC-8, lead-out terminator); carries any-length payloads and is free to change since both ends are Aura devices.
@@ -403,6 +415,10 @@ _Avoid_: importing `magic.CastType` for IR emitters; a default emitter on `send_
 ### IR multi-receiver
 Several IR receivers, each on its own data line, returning the packet with the lowest **error margin**; improves reception reliability only (no hit direction). Selected by listing **two or more `rx` pins** in `aura-device.json`.
 _Avoid_: treating the array as a direction finder; sharing one data line across receivers; a separate config flag to opt in (pin count is the switch)
+
+### InfraredReceiver
+The one board-free receiver that reads every IR receiver on a device through that receiver's own pulse reader and decoder, for any number of readers; surfaces at most one packet per tick, the one with the lowest **IR error margin**, and names the winning reader only when there was a pick to make. On its own, "IR receiver" means the physical sensor on one data line.
+_Avoid_: separate single- and multi-receiver classes; branching on reader count to choose a receiver; sharing one decoder between readers
 
 ### IR error margin
 The worst-case pulse-timing deviation (µs) tolerated while still decoding a packet; lower is better, and it's the key the multi-receiver uses to pick the best receiver.
