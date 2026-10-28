@@ -434,6 +434,22 @@ def test_telemetry_line_is_forwarded_from_the_receiver() -> None:
     assert line == format_ir_telemetry_line(receiver.telemetry())
 
 
+def test_last_best_receiver_is_forwarded_from_the_receiver() -> None:
+    readers = [FakePulseReader(), FakePulseReader(_encode_pulses(b"\x42"))]
+    transceiver = InfraredTransceiver(
+        {}, InfraredReceiver(readers, AuraInfraredDecoder), IrTransmitGate()
+    )
+
+    transceiver.update()
+
+    assert transceiver.last_best_receiver is readers[1]
+
+
+def test_last_best_receiver_is_none_with_no_receiver_wired() -> None:
+    transceiver = InfraredTransceiver({}, None, IrTransmitGate())
+    assert transceiver.last_best_receiver is None
+
+
 def test_last_signal_strength_is_none_with_no_receiver_wired() -> None:
     transceiver = InfraredTransceiver({}, None, IrTransmitGate())
     assert transceiver.last_signal_strength is None

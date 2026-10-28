@@ -49,15 +49,9 @@ from engine.state import EffectReceipt, Scope, ScopeValue
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import DeviceConfig, MatrixPixelsConfig
 from hardware.shared.device_hardware import DeviceHardware
-from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.ir_transport import (
-    InfraredReceiver,
-    InfraredTransmitter,
-    IrTransmitGate,
-    PulseReader,
-    PulseWriter,
-)
+from hardware.shared.ir_transport import PulseReader, PulseWriter
+from hardware.shared.ir_wiring import wire_ir
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.radio_transceiver import RadioTransceiver
 from hardware.shared.radio_transport import RadioTransport
@@ -394,6 +388,7 @@ class SimulatedHardware:
         self._pin_free_at = dict.fromkeys(self._labels, 0.0)
         ir_config = config.ir if config.ir is not None and config.ir.enabled else None
         self._ir_receiver_count = len(ir_config.rx) if ir_config is not None else 0
+        self._ir_emitter_pins = ir_config.emitters if ir_config is not None else {}
         self._wired_emitters = (
             tuple(e for e in IR_EMITTERS if e in ir_config.emitters)
             if ir_config is not None
@@ -443,8 +438,7 @@ class SimulatedHardware:
             outputs.append(self._audio)
         if config.haptics is not None and config.haptics.enabled:
             outputs.append(_RecordingHaptic(self))
-        self._ir_receiver: InfraredReceiver | None = None
-        ir = self._build_ir() if self._ir_readers else None
+        ir = self._wire_ir() if self._ir_readers else None
         self._radio = _SimulatedRadioTransport(self) if self._radio_node is not None else None
         radio = RadioTransceiver(self._radio) if self._radio is not None else None
         self.hw = DeviceHardware(
@@ -503,9 +497,8 @@ class SimulatedHardware:
         ``None`` before any shot, or with fewer than two receivers, where
         there is no pick to make.
         """
-        if self._ir_receiver is None:
-            return None
-        best = self._ir_receiver.last_best_receiver
+        ir = self.hw.ir
+        best = ir.last_best_receiver if ir is not None else None
         return next((i for i, reader in enumerate(self._ir_readers) if reader is best), None)
 
     def clip_length(self, clip: str) -> float:
@@ -567,17 +560,14 @@ class SimulatedHardware:
         self.played.clear()
         self.buzzed.clear()
 
-    def _build_ir(self) -> InfraredTransceiver:
-        """Assemble the real IR stack the way ``device_builder`` does, on simulated pulses."""
-        gate = IrTransmitGate()
-        receiver = InfraredReceiver(list(self._ir_readers), AuraInfraredDecoder, gate)
-        self._ir_receiver = receiver
-        encoder = AuraInfraredEncoder()
-        transmitters = {
-            emitter: InfraredTransmitter(_SimulatedPulseWriter(self, emitter), encoder, gate)
-            for emitter in self._wired_emitters
-        }
-        return InfraredTransceiver(transmitters, receiver, gate)
+    def _wire_ir(self) -> InfraredTransceiver:
+        """Wire the real IR stack the way a device does, on simulated pulses."""
+        transceiver, _writer_kind = wire_ir(
+            list(self._ir_readers),
+            self._ir_emitter_pins,
+            lambda emitter, _pin: (_SimulatedPulseWriter(self, emitter), "simulated"),
+        )
+        return transceiver
 
     def _emit(self, emitter: str, pulses: array | list[int]) -> None:
         """Record what *emitter* carried, let the device's own readers see it, and hand it on."""
