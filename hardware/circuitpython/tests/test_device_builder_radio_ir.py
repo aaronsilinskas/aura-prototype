@@ -1,6 +1,6 @@
 """Tests for device_builder's radio and IR subsystems: ``_setup_radio`` and
-the radio slice of ``build_hardware``, plus ``_describe_ir`` and the ir
-slice of ``build_hardware``. Unit-level ``_setup_ir`` assembly tests
+the radio slice of ``build_hardware``, plus the ir slice of
+``build_hardware``. Unit-level ``_setup_ir`` assembly tests
 (pin/emitter wiring, the default codec, writer_factory hand-off) live in test_setup_ir.py instead.
 
 Split out of test_device_builder.py (#779) to keep that suite from growing
@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from engine.network import AREA_OF_EFFECT, CONE, LINE
+from engine.network import CONE, LINE
 from hardware.circuitpython.tests._hw_patch_mocks import (
     _enter_hw_patches,
     _minimal_config,
@@ -201,48 +201,6 @@ def test_setup_radio_resolves_pins_and_wraps_the_transport_in_a_transceiver() ->
     # test_radio_transceiver.py verifies RadioTransceiver's own delegation.
     result.send(b"\xab")
     mock_transport.send.assert_called_once_with(b"\xab")
-
-
-# ---------------------------------------------------------------------------
-# _describe_ir -- ir line's rx/emitter detail formatting, independent of a
-# full build (#763)
-# ---------------------------------------------------------------------------
-
-
-def test_describe_ir_single_rx_pin_names_it_without_multi_receiver_wording() -> None:
-    from hardware.circuitpython.device_builder import _describe_ir
-
-    description = _describe_ir(["D11"], {LINE: "D12"})
-
-    assert description == "rx=[D11] emitters=line:D12"
-
-
-def test_describe_ir_two_rx_pins_names_them_as_ir_multi_receiver() -> None:
-    from hardware.circuitpython.device_builder import _describe_ir
-
-    description = _describe_ir(["D11", "D13"], {LINE: "D12"})
-
-    assert description == "rx=[D11 D13] (IR multi-receiver) emitters=line:D12"
-
-
-def test_describe_ir_lists_every_wired_emitter_in_ir_emitters_order() -> None:
-    from hardware.circuitpython.device_builder import _describe_ir
-
-    # Insertion order deliberately reversed from IR_EMITTERS (line, cone,
-    # area_of_effect) to confirm the description follows the canonical
-    # order, not emitter_pins' own key order -- matching _setup_ir's own
-    # wiring order.
-    description = _describe_ir(["D11"], {AREA_OF_EFFECT: "D14", CONE: "D13", LINE: "D12"})
-
-    assert description == "rx=[D11] emitters=line:D12 cone:D13 area_of_effect:D14"
-
-
-def test_describe_ir_no_emitters_notes_none() -> None:
-    from hardware.circuitpython.device_builder import _describe_ir
-
-    description = _describe_ir(["D11"], {})
-
-    assert description == "rx=[D11] emitters=(none)"
 
 
 # ---------------------------------------------------------------------------

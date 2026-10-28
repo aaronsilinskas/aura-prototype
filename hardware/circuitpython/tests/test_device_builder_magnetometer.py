@@ -366,9 +366,9 @@ def test_build_hardware_magnetometer_not_probed_when_undeclared() -> None:
 # build_hardware — magnetometer narration, mirroring accelerometer/haptics.
 # One representative "ok" line plus the absent-section case. The "disabled"
 # line text is covered by the two comprehensive narration tests; the
-# address-suffix formatting now has its own direct _address_suffix unit test
-# in test_device_builder.py; the no-I2C-bus FAILED attribution is covered by
-# the primitive's own tests. None of those are repeated here (#852).
+# address-suffix formatting is tested board-free in test_build_narration.py;
+# the no-I2C-bus FAILED attribution is covered by the primitive's own tests.
+# None of those are repeated here (#852).
 # ---------------------------------------------------------------------------
 
 
