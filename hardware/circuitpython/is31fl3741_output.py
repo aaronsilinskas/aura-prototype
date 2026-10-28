@@ -3,7 +3,7 @@
 Board-free and importable under CPython: no vendor driver or ``board``
 import. The injected ``matrix`` need only satisfy the duck-type contract the
 constructor and ``flush`` reach through: indexed byte writes
-(``matrix[offset] = byte``) and ``matrix.show()``. ``device_builder`` owns
+(``matrix[offset] = byte``) and ``matrix.show()``. ``CircuitPythonParts`` owns
 the real vendor import and driver construction and injects the built driver
 here.
 """

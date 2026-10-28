@@ -27,8 +27,6 @@ except ImportError:
 # the corresponding component (see module docstring), so this block never
 # runs, and never requires the libraries, outside a type checker.
 if TYPE_CHECKING:
-    from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
-
     from hardware.circuitpython.audio_output import AudioEffectOutput
 
 import time
@@ -41,6 +39,9 @@ import microcontroller
 from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.log import Logger
+
+# Shared with CircuitPythonParts until build_hardware runs the Device assembly (#1055).
+from hardware.circuitpython.circuitpython_parts import _resolve_pin, _setup_matrix_is31fl3741
 from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 from hardware.shared.build_narration import (
@@ -99,13 +100,6 @@ class SdCardMountError(RuntimeError):
     REPL. A ``RuntimeError`` subclass so existing broad ``except RuntimeError``
     handlers still catch it.
     """
-
-
-def _resolve_pin(board_module: object, field: str, name: str) -> microcontroller.Pin:
-    try:
-        return getattr(board_module, name)
-    except AttributeError:
-        raise ValueError(f"{field}: pin '{name}' not found on board") from None
 
 
 def _setup_high_current_rail(rail_cfg: HighCurrentRailConfig, board_module: object) -> None:
@@ -199,56 +193,6 @@ def _setup_spi(spi_config: SPIConfig | None, board_module: object) -> busio.SPI 
         miso = _resolve_pin(board_module, "spi.miso", spi_config.miso)
         return busio.SPI(sck, MOSI=mosi, MISO=miso)
     return board_module.SPI()
-
-
-_MATRIX_STARTUP_TIMEOUT_S: Final = 3
-
-
-def _setup_matrix_is31fl3741(
-    i2c: busio.I2C, brightness: float, address: int | None = None
-) -> Adafruit_RGBMatrixQT:
-    """Return a configured IS31FL3741 driver on *i2c*.
-
-    Retries construction for up to :data:`_MATRIX_STARTUP_TIMEOUT_S` seconds
-    (useful if the I2C bus is still settling at boot), sleeping ~1s between
-    attempts.
-
-    *address* is the configured I2C address override (``MatrixPixelsConfig.address``).
-    ``None`` means no override -- the ``address=`` keyword is omitted entirely
-    so the driver's own default (``0x30``) applies, rather than passing
-    ``address=None``.
-
-    ``adafruit_is31fl3741`` and ``Adafruit_RGBMatrixQT`` are imported here,
-    not at module load, so a config with no matrix entry never requires the
-    library to be installed.
-
-    Raises:
-        RuntimeError: If the matrix has not responded within the timeout.
-    """
-    import adafruit_is31fl3741
-    from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
-
-    deadline = time.monotonic() + _MATRIX_STARTUP_TIMEOUT_S
-    matrix = None
-    while matrix is None:
-        try:
-            if address is None:
-                matrix = Adafruit_RGBMatrixQT(i2c, allocate=adafruit_is31fl3741.MUST_BUFFER)
-            else:
-                matrix = Adafruit_RGBMatrixQT(
-                    i2c, address=address, allocate=adafruit_is31fl3741.MUST_BUFFER
-                )
-        except Exception:
-            if time.monotonic() >= deadline:
-                raise RuntimeError(
-                    f"IS31FL3741 matrix did not respond within {_MATRIX_STARTUP_TIMEOUT_S}s"
-                ) from None
-            time.sleep(1)
-    scaling = round(brightness * 0xFF)
-    matrix.set_led_scaling(scaling)
-    matrix.global_current = 0xFF
-    matrix.enable = True
-    return matrix
 
 
 def _setup_neopixels(pixels_cfg: NeoPixelPixelsConfig, board_module: object) -> list[EffectOutput]:
