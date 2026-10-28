@@ -857,8 +857,8 @@ def test_build_hardware_neither_accelerometer_nor_haptics_probed_when_undeclared
 # build_hardware — accelerometer and haptics narration (#760): one
 # representative "ok" line plus the absent-section case per component. The
 # "disabled" line text is covered by the two comprehensive narration tests;
-# the address-suffix formatting now has its own direct _address_suffix unit
-# test in test_device_builder.py; the no-I2C-bus FAILED attribution is
+# the address-suffix formatting is tested board-free in
+# test_build_narration.py; the no-I2C-bus FAILED attribution is
 # covered by the primitive's own tests. None of those are repeated here
 # (#852).
 # ---------------------------------------------------------------------------
@@ -968,8 +968,7 @@ def test_build_hardware_forwards_configured_haptics_address_to_setup() -> None:
 
 def test_build_hardware_audio_config_narrates_voices_max_volume_and_i2s_pins() -> None:
     """An enabled, present audio config opens via logger.begin() carrying
-    voice count, max_volume, and the raw I2S pin names -- all inline, no
-    _describe_* helper needed for a handful of scalars -- and closes with
+    voice count, max_volume, and the raw I2S pin names, and closes with
     the default ok suffix."""
     from hardware.circuitpython.audio_output import AudioEffectOutput
 

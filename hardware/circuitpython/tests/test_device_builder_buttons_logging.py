@@ -1,5 +1,5 @@
 """Tests for device_builder's buttons subsystem (``_setup_buttons`` via
-build_hardware, ``_describe_buttons``) and build_hardware's cross-cutting
+build_hardware) and build_hardware's cross-cutting
 narration spine (banner, i2c, spi, buttons, closing summary).
 
 Sibling subsystems' narration tests live in their own split files (pixels,
@@ -29,23 +29,6 @@ from hardware.circuitpython.tests._hw_patch_mocks import (
 from hardware.shared.device_config import (
     parse_device_config,
 )
-
-# ---------------------------------------------------------------------------
-# _describe_buttons -- pairs each button label with its declared pin name
-# ---------------------------------------------------------------------------
-
-
-def test_describe_buttons_pairs_each_label_with_its_declared_pin_in_order() -> None:
-    from hardware.circuitpython.device_builder import _describe_buttons
-
-    assert _describe_buttons(["GP2", "GP3", "GP4"]) == "A=GP2 B=GP3 C=GP4"
-
-
-def test_describe_buttons_returns_empty_string_for_no_buttons_declared() -> None:
-    from hardware.circuitpython.device_builder import _describe_buttons
-
-    assert _describe_buttons([]) == ""
-
 
 # ---------------------------------------------------------------------------
 # build_hardware — logger spine: banner, i2c, spi, buttons, and the closing

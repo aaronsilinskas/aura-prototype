@@ -2,9 +2,9 @@
 that don't belong to any one subsystem cluster: output ordering across
 multiple components, the
 ``_construct_with_optional_address`` helper shared by the accelerometer,
-magnetometer, and haptics ``_setup_*`` functions (#843), and the
-``_address_suffix`` helper those same three sections' descriptions (plus the
-matrix pixel entry's) format their address override through (#852).
+magnetometer, and haptics ``_setup_*`` functions (#843). Boot-line
+description formatting is tested board-free in
+``hardware/shared/tests/test_build_narration.py`` (#1049).
 
 Also hosts the two comprehensive full-sequence narration tests -- one
 all-enabled config, one all-disabled config -- that are the verbatim lock for
@@ -69,25 +69,6 @@ def test_construct_with_optional_address_forwards_configured_address() -> None:
 
     ctor.assert_called_once_with(fake_i2c, address=0x19)
     assert result is ctor.return_value
-
-
-# ---------------------------------------------------------------------------
-# _address_suffix — the shared I2C address-override formatter every bare I2C
-# device's boot-log description forwards through: the matrix pixel entry and
-# the accelerometer/magnetometer/haptics sections (#852)
-# ---------------------------------------------------------------------------
-
-
-def test_address_suffix_omits_the_field_entirely_when_address_is_none() -> None:
-    from hardware.circuitpython.device_builder import _address_suffix
-
-    assert _address_suffix(None) == ""
-
-
-def test_address_suffix_formats_a_configured_override_as_two_digit_hex() -> None:
-    from hardware.circuitpython.device_builder import _address_suffix
-
-    assert _address_suffix(0x05) == " address=0x05"
 
 
 # ---------------------------------------------------------------------------

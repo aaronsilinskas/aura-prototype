@@ -44,7 +44,23 @@ from engine.log import Logger
 from engine.network import IR_EMITTERS
 from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
-from hardware.shared.build_narration import narrate_skip, narrate_step
+from hardware.shared.build_narration import (
+    describe_accelerometer,
+    describe_audio,
+    describe_buttons,
+    describe_haptics,
+    describe_high_current_rail,
+    describe_i2c,
+    describe_ir,
+    describe_magnetometer,
+    describe_neopixel_current_budget,
+    describe_pixel_entry,
+    describe_radio,
+    describe_sdcard,
+    describe_spi,
+    narrate_skip,
+    narrate_step,
+)
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
     AudioConfig,
@@ -52,7 +68,6 @@ from hardware.shared.device_config import (
     HighCurrentRailConfig,
     I2CConfig,
     MatrixPixelsConfig,
-    NeoPixelCurrentBudgetConfig,
     NeoPixelPixelsConfig,
     RadioConfig,
     SDCardConfig,
@@ -315,87 +330,6 @@ def _setup_pixels(
     return _setup_neopixels(pixels_cfg, board_module)
 
 
-def _format_ranges(ranges: dict[str, range]) -> str:
-    """Format a scope-key -> range mapping as ``"key:start-stop"`` pairs, e.g.
-    a matrix's ``scope_rows`` or a NeoPixel strip's ``scope_pixels``."""
-    return " ".join(f"{key}:{r.start}-{r.stop}" for key, r in ranges.items())
-
-
-def _describe_neopixel_pixels(pixels_cfg: NeoPixelPixelsConfig) -> str:
-    """Return the pin/count/order/segmentation/brightness detail for an enabled NeoPixel
-    entry -- the ``strips`` form (one physical strip, segmented by
-    ``scope_pixels``) or the legacy ``scopes`` map form (one physical strip
-    per scope key, joined with ``" | "`` when more than one shares the entry).
-    """
-    if pixels_cfg.strips:
-        strip = pixels_cfg.strips[0]
-        return (
-            f"pin={strip.pin} count={strip.count} order={strip.order} "
-            + f"scope_pixels=[{_format_ranges(strip.scope_pixels)}] "
-            + f"brightness={strip.brightness:.2f}"
-        )
-    return " | ".join(
-        f"pin={scope.pin} count={scope.count} order={scope.order} scope={key} "
-        + f"brightness={scope.brightness:.2f}"
-        for key, scope in pixels_cfg.scopes.items()
-    )
-
-
-def _address_suffix(address: int | None) -> str:
-    """Return `` address=0xNN`` for a configured override, or `""` when *address* is `None`.
-
-    Shared by every boot-log description that documents an I2C device's
-    optional address override (the matrix's ``pixels[index]`` entry and the
-    accelerometer/magnetometer/haptics sections), so the ``0xNN`` formatting
-    and the "only when overridden" rule live in one place.
-    """
-    return f" address=0x{address:02X}" if address is not None else ""
-
-
-def _pixel_kind(pixels_cfg: MatrixPixelsConfig | NeoPixelPixelsConfig) -> str:
-    """Return ``"matrix"`` or ``"neopixel"`` for *pixels_cfg*, by type."""
-    return "matrix" if isinstance(pixels_cfg, MatrixPixelsConfig) else "neopixel"
-
-
-def _describe_pixel_entry(index: int, pixels_cfg: MatrixPixelsConfig | NeoPixelPixelsConfig) -> str:
-    """Return the ``pixels[index]`` narration line for an *enabled* *pixels_cfg*.
-
-    Detail comes entirely from the parsed config structures (indexed entry,
-    per-strip scope ranges), not resolved pins, so it can be computed and
-    logged before ``_setup_pixels`` resolves any pin, matching the
-    begin-before-pin-resolution ordering the rest of ``build_hardware``
-    follows. A disabled entry is narrated separately by ``build_hardware``
-    itself (via ``narrate_skip``, on a bare ``pixels[index] kind`` line) and
-    never reaches here through that path -- this still reports the disabled
-    form too, for tests that call this directly.
-    """
-    kind = _pixel_kind(pixels_cfg)
-    if not pixels_cfg.enabled:
-        return f"pixels[{index}] {kind} disabled — skipped"
-    if isinstance(pixels_cfg, MatrixPixelsConfig):
-        detail = (
-            f"cols={pixels_cfg.cols} scope_rows=[{_format_ranges(pixels_cfg.scope_rows)}] "
-            + f"brightness={pixels_cfg.brightness:.2f}"
-            + _address_suffix(pixels_cfg.address)
-        )
-    else:
-        detail = _describe_neopixel_pixels(pixels_cfg)
-    return f"pixels[{index}] {kind} {detail}"
-
-
-def _describe_neopixel_current_budget(budget: NeoPixelCurrentBudgetConfig) -> str:
-    """Return the boot line explaining what the parse-time current budget applied.
-
-    The tuning already happened in ``parse_device_config``; this only reports
-    it, so each ``pixels[i]`` line's ``brightness=`` reads as the tuned value.
-    """
-    return (
-        f"neopixel_current_budget limit={budget.current_limit_ma}mA "
-        + f"estimate={budget.estimate_ma:.0f}mA scale={budget.scale:.2f} "
-        + f"at_min_brightness={budget.at_min_brightness}"
-    )
-
-
 def _setup_buttons(*pins: microcontroller.Pin) -> DebouncedButtons:
     """Return a ``DebouncedButtons`` instance for the given pins with pull-up resistors."""
     labels = [chr(ord("A") + i) for i in range(len(pins))]
@@ -405,17 +339,6 @@ def _setup_buttons(*pins: microcontroller.Pin) -> DebouncedButtons:
         btn.switch_to_input(pull=digitalio.Pull.UP)
         pairs.append((label, lambda p=btn: p.value))
     return DebouncedButtons(pairs)
-
-
-def _describe_buttons(pin_names: list[str]) -> str:
-    """Return each button's label paired with its declared pin name, e.g. ``"A=GP2 B=GP3"``.
-
-    Uses the same A, B, C, ... label scheme :func:`_setup_buttons` assigns,
-    but works from the raw config pin-name strings rather than resolved
-    ``microcontroller.Pin`` objects -- so ``build_hardware`` can log this
-    description *before* calling :func:`_resolve_pin`, which may raise.
-    """
-    return " ".join(f"{chr(ord('A') + i)}={name}" for i, name in enumerate(pin_names))
 
 
 def _construct_with_optional_address(
@@ -711,37 +634,6 @@ def _make_writer(pin: microcontroller.Pin) -> tuple[PulseWriter, str]:
     return PioPulseWriter(make_state_machine(pin)), "pio"
 
 
-def _describe_ir(rx_pin_names: list[str], emitter_pins: dict[str, str]) -> str:
-    """Return the ``ir`` line's rx/emitter detail, built entirely from the raw
-    config pin-name strings already on ``IRConfig`` -- no pin resolution, so
-    ``build_hardware`` can log this *before* calling :func:`_resolve_pin` for
-    any rx/emitter pin, which may raise.
-
-    ``rx=[<pin>]`` for a single rx pin; two or more append the domain's **IR
-    multi-receiver** label (see GLOSSARY.md), e.g.
-    ``rx=[GP7 GP9] (IR multi-receiver)`` -- selected purely by pin count, not
-    a separate config flag. Emitters are listed ``key:pin`` in
-    ``IR_EMITTERS`` order (independent of *emitter_pins*' own key order,
-    matching :func:`_setup_ir`'s own wiring order), or ``emitters=(none)``
-    when no emitter is wired.
-
-    The selected :class:`PulseWriter` implementation (``writer=pio`` vs.
-    ``writer=pulseio``) is not part of this description -- it is only known
-    once :func:`_setup_ir` has actually run, so ``build_hardware`` appends it
-    separately via ``logger.end()``'s suffix once construction succeeds.
-    """
-    rx_desc = f"rx=[{' '.join(rx_pin_names)}]"
-    if len(rx_pin_names) > 1:
-        rx_desc += " (IR multi-receiver)"
-    if emitter_pins:
-        emitters_desc = "emitters=" + " ".join(
-            f"{key}:{emitter_pins[key]}" for key in IR_EMITTERS if key in emitter_pins
-        )
-    else:
-        emitters_desc = "emitters=(none)"
-    return f"{rx_desc} {emitters_desc}"
-
-
 def _setup_ir(
     rx_pins: list[microcontroller.Pin],
     emitter_pins: dict[str, microcontroller.Pin],
@@ -862,56 +754,44 @@ def build_hardware(
             _setup_high_current_rail(rail_cfg, board_module)
             return None, "asserted" if rail_cfg.enabled else "held off"
 
-        narrate_step(
-            logger,
-            f"high_current_rail pin={rail_cfg.pin} active_high={rail_cfg.active_high}",
-            _build_rail,
-        )
+        narrate_step(logger, describe_high_current_rail(rail_cfg), _build_rail)
 
     i2c_cfg = config.i2c
     if i2c is None:
         if i2c_cfg is not None and not i2c_cfg.enabled:
-            narrate_skip(logger, "i2c", "disabled")
+            narrate_skip(logger, describe_i2c(i2c_cfg), "disabled")
         else:
-            i2c_pins = f"scl={i2c_cfg.scl} sda={i2c_cfg.sda}" if i2c_cfg is not None else "default"
 
             def _build_i2c() -> tuple[busio.I2C | None, str]:
                 bus = _setup_i2c(i2c_cfg, board_module)
                 return bus, "no bus" if bus is None else "ok"
 
-            i2c = narrate_step(logger, f"i2c {i2c_pins}", _build_i2c)
+            i2c = narrate_step(logger, describe_i2c(i2c_cfg), _build_i2c)
 
     spi_cfg = config.spi
     if spi_cfg is not None and not spi_cfg.enabled:
-        narrate_skip(logger, "spi", "disabled")
+        narrate_skip(logger, describe_spi(spi_cfg), "disabled")
         spi = None
     else:
-        spi_pins = (
-            f"sck={spi_cfg.sck} mosi={spi_cfg.mosi} miso={spi_cfg.miso}"
-            if spi_cfg is not None
-            else "default"
-        )
         spi = narrate_step(
-            logger, f"spi {spi_pins}", lambda: (_setup_spi(spi_cfg, board_module), "ok")
+            logger, describe_spi(spi_cfg), lambda: (_setup_spi(spi_cfg, board_module), "ok")
         )
 
     if config.neopixel_current_budget is not None:
-        logger.log(_describe_neopixel_current_budget(config.neopixel_current_budget))
+        logger.log(describe_neopixel_current_budget(config.neopixel_current_budget))
 
     outputs: list[EffectOutput] = []
     for index, pixels_cfg in enumerate(config.pixels):
         if not pixels_cfg.enabled:
-            narrate_skip(logger, f"pixels[{index}] {_pixel_kind(pixels_cfg)}", "disabled")
+            narrate_skip(logger, describe_pixel_entry(index, pixels_cfg), "disabled")
             continue
         outputs.extend(
             narrate_step(
                 logger,
-                _describe_pixel_entry(index, pixels_cfg),
+                describe_pixel_entry(index, pixels_cfg),
                 lambda pixels_cfg=pixels_cfg: (_setup_pixels(pixels_cfg, board_module, i2c), "ok"),
             )
         )
-
-    button_desc = _describe_buttons(config.buttons)
 
     def _build_buttons() -> tuple[DebouncedButtons, str]:
         button_pins = [
@@ -920,14 +800,12 @@ def build_hardware(
         ]
         return _setup_buttons(*button_pins), "ok"
 
-    buttons = narrate_step(
-        logger, f"buttons {button_desc}" if button_desc else "buttons", _build_buttons
-    )
+    buttons = narrate_step(logger, describe_buttons(config.buttons), _build_buttons)
 
     accelerometer = None
     if config.accelerometer is not None:
         accelerometer_cfg = config.accelerometer
-        description = "accelerometer lis3dh" + _address_suffix(accelerometer_cfg.address)
+        description = describe_accelerometer(accelerometer_cfg)
         if accelerometer_cfg.enabled:
             accelerometer = narrate_step(
                 logger,
@@ -945,7 +823,7 @@ def build_hardware(
     magnetometer = None
     if config.magnetometer is not None:
         magnetometer_cfg = config.magnetometer
-        description = "magnetometer mmc5603" + _address_suffix(magnetometer_cfg.address)
+        description = describe_magnetometer(magnetometer_cfg)
         if magnetometer_cfg.enabled:
             magnetometer = narrate_step(
                 logger,
@@ -964,24 +842,21 @@ def build_hardware(
     audio_registry: AudioRegistry | None = None
     if audio_cfg is not None:
         if not audio_cfg.enabled:
-            narrate_skip(logger, "audio", "disabled")
+            narrate_skip(logger, describe_audio(audio_cfg), "disabled")
         else:
-            description = (
-                f"audio voices={audio_cfg.voices} max_volume={audio_cfg.max_volume:.2f} "
-                + f"i2s_bit_clock={audio_cfg.i2s_bit_clock} "
-                + f"i2s_word_select={audio_cfg.i2s_word_select} i2s_data={audio_cfg.i2s_data}"
-            )
 
             def _build_audio() -> tuple[tuple[AudioRegistry, EffectOutput], str]:
                 registry = AudioRegistry()
                 return (registry, _setup_audio(audio_cfg, board_module, registry)), "ok"
 
-            audio_registry, audio_output = narrate_step(logger, description, _build_audio)
+            audio_registry, audio_output = narrate_step(
+                logger, describe_audio(audio_cfg), _build_audio
+            )
             outputs.append(audio_output)
 
     if config.haptics is not None:
         haptics_cfg = config.haptics
-        description = "haptics drv2605" + _address_suffix(haptics_cfg.address)
+        description = describe_haptics(haptics_cfg)
         if haptics_cfg.enabled:
 
             def _build_haptics() -> tuple[EffectOutput, str]:
@@ -1000,10 +875,7 @@ def build_hardware(
     radio = None
     if config.radio is not None:
         radio_cfg = config.radio
-        description = (
-            f"radio frequency={radio_cfg.frequency} node={radio_cfg.node} "
-            + f"cs={radio_cfg.cs} reset={radio_cfg.reset}"
-        )
+        description = describe_radio(radio_cfg)
         if radio_cfg.enabled:
             radio = narrate_step(
                 logger,
@@ -1016,7 +888,7 @@ def build_hardware(
     storage = None
     if config.sdcard is not None:
         sdcard_cfg = config.sdcard
-        description = f"sdcard mount={sdcard_cfg.mount} cs={sdcard_cfg.cs}"
+        description = describe_sdcard(sdcard_cfg)
         if sdcard_cfg.enabled:
             storage = narrate_step(
                 logger,
@@ -1032,7 +904,7 @@ def build_hardware(
     ir: InfraredTransceiver | None = None
     if config.ir is not None:
         ir_cfg = config.ir
-        description = f"ir {_describe_ir(ir_cfg.rx, ir_cfg.emitters)}"
+        description = describe_ir(ir_cfg)
         if ir_cfg.enabled:
 
             def _build_ir() -> tuple[InfraredTransceiver, str]:
