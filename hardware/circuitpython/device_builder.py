@@ -65,9 +65,7 @@ from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEnco
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_transport import (
-    InfraredMultiReceiver,
     InfraredReceiver,
-    InfraredSingleReceiver,
     InfraredTransmitter,
     IrTransmitGate,
     PulseWriter,
@@ -758,13 +756,10 @@ def _setup_ir(
     silently fails to decode received frames with no error raised.
 
     One :class:`~hardware.circuitpython.infrared_io.PulseInReader` is built
-    per entry in *rx_pins*. A single rx pin builds an
-    :class:`~hardware.shared.ir_transport.InfraredSingleReceiver` wired with
-    *decoder* directly — today's unchanged path. Two or more build an
-    :class:`~hardware.shared.ir_transport.InfraredMultiReceiver`, passing
-    ``type(decoder)`` as its ``decoder_factory`` so every reader gets its own
-    fresh, symmetric decoder instance (the *decoder* instance itself is not
-    reused across readers in that case).
+    per entry in *rx_pins*, all read by one
+    :class:`~hardware.shared.ir_transport.InfraredReceiver` built with
+    ``type(decoder)``, so every reader gets its own fresh decoder (the
+    *decoder* instance itself is never installed).
 
     Constructs one :class:`IrTransmitGate` and injects the same instance into
     the receiver and every transmitter — the single assembly point for
@@ -805,11 +800,7 @@ def _setup_ir(
         PulseInReader(pulseio.PulseIn(rx_pin, maxlen=256, idle_state=True)) for rx_pin in rx_pins
     ]
 
-    receiver: InfraredReceiver
-    if len(readers) == 1:
-        receiver = InfraredSingleReceiver(readers[0], decoder, gate=gate)
-    else:
-        receiver = InfraredMultiReceiver(readers, type(decoder), gate=gate)
+    receiver = InfraredReceiver(readers, type(decoder), gate=gate)
 
     transmitters: dict[str, InfraredTransmitter] = {}
     writer_kind: str | None = None

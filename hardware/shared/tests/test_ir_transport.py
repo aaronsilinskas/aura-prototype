@@ -3,9 +3,8 @@
 Covers:
 - PulseReader / PulseWriter port contracts
 - InfraredTransmitter: send encodes and writes pulses
-- InfraredSingleReceiver: round-trip receive with fake ports
-- InfraredMultiReceiver: picks the packet with the lowest error margin
-- InfraredMultiReceiver.receive() allocates nothing per tick in the polled path
+- InfraredReceiver: receives over one or many readers, picking the packet
+  with the lowest error margin, and allocates nothing per tick
 """
 
 import tracemalloc
@@ -17,9 +16,7 @@ from hardware.shared.ir_codecs.base import InfraredDecoder
 from hardware.shared.ir_codecs.tag import TAG_PREAMBLE, TagInfraredDecoder, TagInfraredEncoder
 from hardware.shared.ir_telemetry import IrTelemetrySnapshot
 from hardware.shared.ir_transport import (
-    InfraredMultiReceiver,
     InfraredReceiver,
-    InfraredSingleReceiver,
     InfraredTransmitter,
     IrTransmitGate,
     PulseReader,
@@ -652,55 +649,7 @@ def _reordered_snapshot_init(
 
 
 # ---------------------------------------------------------------------------
-# InfraredReceiver base contract
-# ---------------------------------------------------------------------------
-
-
-def test_receiver_base_raises_not_implemented():
-    rx = InfraredReceiver()
-    with pytest.raises(NotImplementedError):
-        rx.receive()
-
-
-def test_receiver_base_set_decoder_raises_not_implemented():
-    rx = InfraredReceiver()
-    with pytest.raises(NotImplementedError):
-        rx.set_decoder(AuraInfraredDecoder())
-
-
-def test_receiver_base_telemetry_defaults_every_counter_to_zero():
-    rx = InfraredReceiver()
-
-    snapshot = rx.telemetry()
-
-    assert snapshot.pulses_seen == 0
-    assert snapshot.packets_surfaced == 0
-    assert snapshot.packets_started == 0
-    assert snapshot.packets_completed == 0
-    assert snapshot.preamble_reject == 0
-    assert snapshot.mark_reject == 0
-    assert snapshot.space_reject == 0
-    assert snapshot.buffer_full_on_poll == 0
-    assert snapshot.pulses_dropped_transmitting == 0
-
-
-def test_bare_receiver_subclass_satisfies_telemetry_contract_with_no_overrides():
-    """A fake receiver with no telemetry code still returns a real snapshot —
-    the base default reads counters generically off ``self``."""
-
-    class FakeReceiver(InfraredReceiver):
-        def receive(self):
-            return None
-
-    rx = FakeReceiver()
-    rx.pulses_seen = 5
-
-    assert rx.telemetry().pulses_seen == 5
-    assert rx.telemetry().packets_completed == 0
-
-
-# ---------------------------------------------------------------------------
-# InfraredSingleReceiver — round-trip
+# InfraredReceiver — fixtures
 # ---------------------------------------------------------------------------
 
 
@@ -708,31 +657,54 @@ def _encode_pulses(payload: bytes):
     return list(AuraInfraredEncoder().encode(payload))
 
 
-def test_single_receiver_returns_none_when_no_pulses_available():
-    reader = FakePulseReader()
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+def _make_receiver(num_readers, decoder_class=AuraInfraredDecoder, gate=None):
+    """Build an InfraredReceiver over ``num_readers`` independent FakePulseReaders."""
+    readers = [FakePulseReader() for _ in range(num_readers)]
+    rx = InfraredReceiver(readers, decoder_class, gate)
+    return rx, readers
+
+
+@pytest.fixture
+def recording_tag_decoder():
+    """A Tag decoder class that records every instance built, paired with that
+    record, so a test can reach the decoders a receiver built for itself."""
+    built: list[TagInfraredDecoder] = []
+
+    class RecordingTagDecoder(TagInfraredDecoder):
+        def __init__(self):
+            super().__init__()
+            built.append(self)
+
+    return RecordingTagDecoder, built
+
+
+# ---------------------------------------------------------------------------
+# InfraredReceiver — receiving packets
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("num_readers", [1, 3])
+def test_receiver_returns_none_when_no_reader_has_pulses(num_readers):
+    rx, _ = _make_receiver(num_readers)
+
     assert rx.receive() is None
 
 
-def test_single_receiver_returns_payload_after_complete_packet():
+def test_receiver_returns_payload_after_complete_packet():
     payload = b"\xde\xad"
-    reader = FakePulseReader(_encode_pulses(payload))
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+    rx, readers = _make_receiver(1)
+    readers[0].load(_encode_pulses(payload))
 
-    result = rx.receive()
-    assert result == bytearray(payload)
+    assert rx.receive() == bytearray(payload)
 
 
-def test_single_receiver_returns_payload_across_multiple_receive_calls():
-    """Partial pulses fed across ticks still assemble a full packet."""
+def test_receiver_assembles_a_packet_fed_across_several_ticks():
     payload = b"\xbe\xef"
-    pulses = _encode_pulses(payload)
-    reader = FakePulseReader()
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+    rx, readers = _make_receiver(1)
 
     result = None
-    for pulse in pulses:
-        reader.load([pulse])
+    for pulse in _encode_pulses(payload):
+        readers[0].load([pulse])
         result = rx.receive()
         if result is not None:
             break
@@ -740,417 +712,58 @@ def test_single_receiver_returns_payload_across_multiple_receive_calls():
     assert result == bytearray(payload)
 
 
-def test_single_receiver_telemetry_after_successful_receive():
-    payload = b"\x42"
-    reader = FakePulseReader(_encode_pulses(payload))
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
-
-    rx.receive()
-
-    assert rx.last_signal_strength == 1.0
-    assert rx.last_error_margin == 0
-    assert rx.last_best_receiver is None  # single receiver always returns None
-
-
-def test_single_receiver_telemetry_is_none_before_first_packet():
-    reader = FakePulseReader()
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
-    assert rx.last_signal_strength is None
-    assert rx.last_error_margin is None
-    assert rx.last_best_receiver is None
-
-
-# ---------------------------------------------------------------------------
-# InfraredSingleReceiver — telemetry counters
-# ---------------------------------------------------------------------------
-
-
-def test_single_receiver_pulses_seen_counts_every_drained_pulse():
-    payload = b"\xde\xad"
-    pulses = _encode_pulses(payload)
-    reader = FakePulseReader(pulses)
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
-
-    rx.receive()
-
-    assert rx.telemetry().pulses_seen == len(pulses)
-
-
-def test_single_receiver_pulses_seen_accumulates_across_receive_calls():
-    reader = FakePulseReader()
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
-
-    reader.load([100, 200])
-    rx.receive()
-    reader.load([300])
-    rx.receive()
-
-    assert rx.telemetry().pulses_seen == 3
-
-
-def test_single_receiver_packets_surfaced_increments_on_successful_receive():
-    payload = b"\x01"
-    reader = FakePulseReader(_encode_pulses(payload))
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
-
-    rx.receive()
-    rx.receive()  # second call: no more pulses, no new packet
-
-    assert rx.telemetry().packets_surfaced == 1
-
-
-def test_single_receiver_delegates_decoder_counters_from_tag_decoder():
-    """The whole path reads off ir_receiver — decoder counters surface here."""
-    decoder = TagInfraredDecoder()
-    bad_preamble = list(TAG_PREAMBLE)
-    bad_preamble[1] = 4000  # invalid but below the inter-frame gap threshold
-    reader = FakePulseReader(bad_preamble)
-    rx = InfraredSingleReceiver(reader, decoder)
-
-    rx.receive()
-
-    snapshot = rx.telemetry()
-    assert snapshot.preamble_reject == decoder.preamble_reject == 1
-    assert snapshot.packets_started == decoder.packets_started == 0
-    assert snapshot.packets_completed == decoder.packets_completed == 0
-    assert snapshot.mark_reject == decoder.mark_reject == 0
-    assert snapshot.space_reject == decoder.space_reject == 0
-
-
-def test_single_receiver_delegates_buffer_full_on_poll_from_reader():
-    reader = FakePulseReader()
-    reader.buffer_full_on_poll = 3
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
-
-    assert rx.telemetry().buffer_full_on_poll == 3
-
-
-def test_single_receiver_reset_telemetry_zeroes_whole_ir_path():
-    decoder = TagInfraredDecoder()
-    payload = [*list(TagInfraredEncoder().encode(bytearray([0x10]))), TAG_PREAMBLE[0]]
-    reader = FakePulseReader(payload)
-    rx = InfraredSingleReceiver(reader, decoder)
-    reader.buffer_full_on_poll = 2
-    rx.receive()
-
-    rx.reset_telemetry()
-
-    snapshot = rx.telemetry()
-    assert snapshot.pulses_seen == 0
-    assert snapshot.packets_surfaced == 0
-    assert snapshot.packets_started == 0
-    assert snapshot.packets_completed == 0
-    assert snapshot.preamble_reject == 0
-    assert snapshot.mark_reject == 0
-    assert snapshot.space_reject == 0
-    assert snapshot.buffer_full_on_poll == 0
-    assert decoder.packets_started == 0
-    assert decoder.packets_completed == 0
-    assert reader.buffer_full_on_poll == 0
-
-
-def test_single_receiver_telemetry_survives_a_fields_reorder(monkeypatch):
-    """A ``FIELDS`` reorder (simulated here by an ``IrTelemetrySnapshot``
-    constructor with two parameters swapped) must not swap counters — proves
-    ``telemetry()`` builds the snapshot by keyword, not position."""
-    monkeypatch.setattr(IrTelemetrySnapshot, "__init__", _reordered_snapshot_init)
-    payload = b"\xde\xad"
-    reader = FakePulseReader(_encode_pulses(payload))
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
-
-    rx.receive()
-    snapshot = rx.telemetry()
-
-    assert snapshot.pulses_seen == rx.pulses_seen
-    assert snapshot.packets_surfaced == rx.packets_surfaced
-
-
-# ---------------------------------------------------------------------------
-# InfraredSingleReceiver — telemetry_line() change-gating
-# ---------------------------------------------------------------------------
-
-
-def test_single_receiver_telemetry_line_reports_on_first_call():
-    """The very first call has no prior baseline, so it always reports."""
-    rx = InfraredSingleReceiver(FakePulseReader(), AuraInfraredDecoder())
-
-    assert rx.telemetry_line() is not None
-
-
-def test_single_receiver_telemetry_line_is_none_when_nothing_changed():
-    rx = InfraredSingleReceiver(FakePulseReader(), AuraInfraredDecoder())
-    rx.telemetry_line()
-
-    assert rx.telemetry_line() is None
-
-
-def test_single_receiver_telemetry_line_reports_the_pipeline_format_after_a_packet():
-    payload = b"\x42"
-    pulses = _encode_pulses(payload)
-    reader = FakePulseReader(pulses)
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
-
-    rx.receive()
-    line = rx.telemetry_line()
-
-    assert line == (
-        "ir: pulses_seen=" + str(len(pulses)) + " buffer_full_on_poll=0 "
-        "packets_started=0 preamble_reject=0 mark_reject=0 space_reject=0 "
-        "packets_completed=0 packets_surfaced=1 pulses_dropped_transmitting=0"
-    )
-
-
-def test_single_receiver_telemetry_line_reports_again_after_reset_telemetry():
-    """reset_telemetry() clears the change-gate baseline along with the counters."""
-    reader = FakePulseReader()
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
-    rx.telemetry_line()
-
-    rx.reset_telemetry()
-
-    assert rx.telemetry_line() is not None
-
-
-# ---------------------------------------------------------------------------
-# InfraredSingleReceiver — gate-driven self-echo suppression
-# ---------------------------------------------------------------------------
-
-
-def test_single_receiver_without_gate_behaviour_is_unchanged():
-    payload = b"\xde\xad"
-    reader = FakePulseReader(_encode_pulses(payload))
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
-
-    assert rx.receive() == bytearray(payload)
-
-
-def test_single_receiver_drops_pulses_while_gate_transmitting():
-    gate = IrTransmitGate()
-    gate.begin_transmit()
-    payload = b"\xde\xad"
-    reader = FakePulseReader(_encode_pulses(payload))
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder(), gate)
-
-    assert rx.receive() is None
-
-
-def test_single_receiver_drop_increments_dropped_counter_not_pulses_seen():
-    gate = IrTransmitGate()
-    gate.begin_transmit()
-    payload = b"\xde\xad"
-    pulses = _encode_pulses(payload)
-    reader = FakePulseReader(pulses)
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder(), gate)
-
-    rx.receive()
-
-    snapshot = rx.telemetry()
-    assert snapshot.pulses_dropped_transmitting == len(pulses)
-    assert snapshot.pulses_seen == 0
-
-
-def test_single_receiver_partial_decode_in_progress_when_transmit_begins_is_reset():
-    """Feeding the remainder of a frame after the gate opens does not complete it."""
-    payload = b"\xde\xad"
-    pulses = _encode_pulses(payload)
-    mid = len(pulses) // 2
-    gate = IrTransmitGate()
-    reader = FakePulseReader()
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder(), gate)
-
-    reader.load(pulses[:mid])
-    rx.receive()
-
-    gate.begin_transmit()
-    rx.receive()  # the drop path resets the decoder even with nothing buffered
-
-    reader.load(pulses[mid:])
-    assert rx.receive() is None
-
-
-def test_single_receiver_partial_decode_in_progress_when_transmit_ends_is_reset():
-    """A decode mid-flight at the falling-edge flush does not survive it either."""
-    payload = b"\xde\xad"
-    pulses = _encode_pulses(payload)
-    mid = len(pulses) // 2
-    gate = IrTransmitGate()
-    reader = FakePulseReader()
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder(), gate)
-
-    gate.begin_transmit()
-    reader.load(pulses[:mid])  # echo pulses captured mid-emission
-    rx.receive()
-
-    gate.end_transmit()
-    rx.receive()  # falling-edge flush resets the decoder
-
-    reader.load(pulses[mid:])
-    assert rx.receive() is None
-
-
-def test_single_receiver_falling_edge_flushes_once_then_decodes_normally():
-    gate = IrTransmitGate()
-    gate.begin_transmit()
-    gate.end_transmit()
-
-    reader = FakePulseReader([111, 222])  # buffered echo tail
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder(), gate)
-
-    # First poll after the falling edge: one flush, discards the echo tail.
-    assert rx.receive() is None
-    assert rx.telemetry().pulses_dropped_transmitting == 2
-
-    # Next poll: gate is fully idle, a genuine packet decodes normally.
-    payload = b"\x07"
-    reader.load(_encode_pulses(payload))
-    assert rx.receive() == bytearray(payload)
-
-
-def test_single_receiver_gate_idle_does_not_discard_repeatedly():
-    """The falling-edge flush is one-shot — a second idle poll must not re-drop."""
-    gate = IrTransmitGate()
-    gate.begin_transmit()
-    gate.end_transmit()
-
-    reader = FakePulseReader()
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder(), gate)
-    rx.receive()  # consumes the one-shot flush
-
-    payload = b"\x09"
-    reader.load(_encode_pulses(payload))
-    assert rx.receive() == bytearray(payload)
-
-
-def test_single_receiver_reset_telemetry_zeroes_pulses_dropped_transmitting():
-    gate = IrTransmitGate()
-    gate.begin_transmit()
-    reader = FakePulseReader([100, 200])
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder(), gate)
-    rx.receive()
-    assert rx.telemetry().pulses_dropped_transmitting == 2
-
-    rx.reset_telemetry()
-
-    assert rx.telemetry().pulses_dropped_transmitting == 0
-
-
-# ---------------------------------------------------------------------------
-# InfraredSingleReceiver — set_decoder
-# ---------------------------------------------------------------------------
-
-
-def test_single_receiver_set_decoder_decodes_a_pulse_stream_through_the_new_decoder():
-    """A packet encoded for the Tag protocol only decodes once the receiver's
-    decoder is swapped from Aura to Tag — proof that receive() runs pulses
-    through the newly installed decoder, not the one it was built with."""
-    payload = bytearray([0x10])
-    pulses = list(TagInfraredEncoder().encode(payload))
-    reader = FakePulseReader(pulses)
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
-
-    rx.set_decoder(TagInfraredDecoder())
-
-    assert rx.receive() == payload
-
-
-def test_single_receiver_set_decoder_updates_last_signal_strength_and_last_error_margin():
-    """The dual-storage subtlety: last_signal_strength/last_error_margin read
-    the decoder set_decoder installs, not the one the receiver was built
-    with."""
-    payload = bytearray([0x20])
-    pulses = list(TagInfraredEncoder().encode(payload))
-    reader = FakePulseReader(pulses)
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
-
-    rx.set_decoder(TagInfraredDecoder())
-    rx.receive()
-
-    assert rx.last_signal_strength == 1.0
-    assert rx.last_error_margin == 0
-
-
-def test_single_receiver_set_decoder_keeps_telemetry_counters_in_sync_with_the_new_decoder():
-    """The dual-storage subtlety, on the telemetry side: telemetry() walks
-    the receiver's one-element decoder list, which set_decoder must also
-    update — otherwise decode-time counters (e.g. preamble_reject) would be
-    read from the stale, no-longer-decoding decoder instance."""
-    bad_preamble = list(TAG_PREAMBLE)
-    bad_preamble[1] = 4000  # invalid but below the inter-frame gap threshold
-    reader = FakePulseReader(bad_preamble)
-    rx = InfraredSingleReceiver(reader, AuraInfraredDecoder())
-
-    new_decoder = TagInfraredDecoder()
-    rx.set_decoder(new_decoder)
-    rx.receive()
-
-    assert rx.telemetry().preamble_reject == new_decoder.preamble_reject == 1
-
-
-# ---------------------------------------------------------------------------
-# InfraredMultiReceiver — lowest-error-margin selection
-# ---------------------------------------------------------------------------
-
-
-def _make_multi_receiver(num_readers):
-    """Build a MultiReceiver with ``num_readers`` independent FakePulseReaders."""
-    readers = [FakePulseReader() for _ in range(num_readers)]
-    rx = InfraredMultiReceiver(readers, AuraInfraredDecoder)
-    return rx, readers
-
-
-def test_multi_receiver_returns_none_when_no_readers_have_pulses():
-    rx, _ = _make_multi_receiver(3)
-    assert rx.receive() is None
-
-
-def test_multi_receiver_returns_payload_when_one_reader_has_complete_packet():
+def test_receiver_returns_payload_when_one_of_several_readers_has_a_complete_packet():
     payload = b"\x11\x22"
-    rx, readers = _make_multi_receiver(2)
-    readers[0].load(_encode_pulses(payload))
+    rx, readers = _make_receiver(2)
+    readers[1].load(_encode_pulses(payload))
 
-    result = rx.receive()
-    assert result == bytearray(payload)
+    assert rx.receive() == bytearray(payload)
 
 
-def test_multi_receiver_picks_packet_with_lower_error_margin():
+def test_receiver_surfaces_at_most_one_packet_per_reader_per_tick():
+    """Two back-to-back packets buffered on one reader surface one tick apart."""
+    rx, readers = _make_receiver(1)
+    readers[0].load(_encode_pulses(b"\x01") + _encode_pulses(b"\x02"))
+
+    assert rx.receive() == bytearray(b"\x01")
+    assert rx.receive() == bytearray(b"\x02")
+
+
+# ---------------------------------------------------------------------------
+# InfraredReceiver — lowest-error-margin selection
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("clean_index", [0, 1])
+def test_receiver_picks_the_packet_with_the_lowest_error_margin(clean_index):
     payload = b"\xab"
-    encoder = AuraInfraredEncoder()
-    pulses_good = list(encoder.encode(payload))
-    pulses_noisy = list(encoder.encode(payload))
-    # Nudge a bit space in the noisy stream to introduce timing error
+    pulses_clean = _encode_pulses(payload)
+    pulses_noisy = _encode_pulses(payload)
     pulses_noisy[3] += 80  # 80 µs deviation — still within threshold
 
-    rx, readers = _make_multi_receiver(2)
-    readers[0].load(pulses_good)
-    readers[1].load(pulses_noisy)
+    rx, readers = _make_receiver(2)
+    readers[clean_index].load(pulses_clean)
+    readers[1 - clean_index].load(pulses_noisy)
 
-    result = rx.receive()
-    assert result == bytearray(payload)
-    assert rx.last_error_margin == 0  # perfect packet won
-    assert rx.last_best_receiver is readers[0]
-
-
-def test_multi_receiver_picks_least_noisy_regardless_of_reader_order():
-    """Noisy reader first — the cleaner reader should still win."""
-    payload = b"\x55"
-    encoder = AuraInfraredEncoder()
-    pulses_noisy = list(encoder.encode(payload))
-    pulses_noisy[3] += 100  # 100 µs timing error
-    pulses_clean = list(encoder.encode(payload))
-
-    rx, readers = _make_multi_receiver(2)
-    readers[0].load(pulses_noisy)
-    readers[1].load(pulses_clean)
-
-    result = rx.receive()
-    assert result == bytearray(payload)
+    assert rx.receive() == bytearray(payload)
     assert rx.last_error_margin == 0
+    assert rx.last_best_receiver is readers[clean_index]
+
+
+def test_receiver_picks_the_first_reader_on_an_error_margin_tie():
+    payload = b"\x5a"
+    rx, readers = _make_receiver(3)
+    readers[1].load(_encode_pulses(payload))
+    readers[2].load(_encode_pulses(payload))
+
+    rx.receive()
+
     assert rx.last_best_receiver is readers[1]
 
 
-def test_multi_receiver_telemetry_after_single_decoder_fires():
+def test_receiver_reports_the_winning_readers_signal():
     payload = b"\x99"
-    rx, readers = _make_multi_receiver(3)
+    rx, readers = _make_receiver(3)
     readers[2].load(_encode_pulses(payload))
 
     rx.receive()
@@ -1160,204 +773,56 @@ def test_multi_receiver_telemetry_after_single_decoder_fires():
     assert rx.last_best_receiver is readers[2]
 
 
-def test_multi_receiver_telemetry_is_none_before_first_packet():
-    rx, _ = _make_multi_receiver(2)
+def test_receiver_reports_no_signal_before_the_first_packet():
+    rx, _ = _make_receiver(2)
+
     assert rx.last_signal_strength is None
     assert rx.last_error_margin is None
     assert rx.last_best_receiver is None
 
 
-# ---------------------------------------------------------------------------
-# InfraredMultiReceiver — gate-driven self-echo suppression
-# ---------------------------------------------------------------------------
-
-
-def _make_gated_multi_receiver(num_readers, gate):
-    readers = [FakePulseReader() for _ in range(num_readers)]
-    rx = InfraredMultiReceiver(readers, AuraInfraredDecoder, gate)
-    return rx, readers
-
-
-def test_multi_receiver_without_gate_behaviour_is_unchanged():
-    payload = b"\x11\x22"
-    rx, readers = _make_multi_receiver(2)
-    readers[0].load(_encode_pulses(payload))
-
-    assert rx.receive() == bytearray(payload)
-
-
-def test_multi_receiver_drops_echo_across_all_readers_while_transmitting():
-    gate = IrTransmitGate()
-    gate.begin_transmit()
-    rx, readers = _make_gated_multi_receiver(3, gate)
-    payload = b"\x33"
-    readers[0].load(_encode_pulses(payload))
-    readers[2].load(_encode_pulses(payload))
-
-    assert rx.receive() is None
-
-
-def test_multi_receiver_drop_discards_pulses_from_every_reader():
-    gate = IrTransmitGate()
-    gate.begin_transmit()
-    rx, readers = _make_gated_multi_receiver(2, gate)
-    readers[0].load([100, 200])
-    readers[1].load([300, 400, 500])
+def test_single_reader_receiver_reports_signal_but_no_best_receiver():
+    """With one reader there is no pick to report, but the signal still is."""
+    rx, readers = _make_receiver(1)
+    readers[0].load(_encode_pulses(b"\x42"))
 
     rx.receive()
 
-    snapshot = rx.telemetry()
-    assert snapshot.pulses_dropped_transmitting == 5
-    assert snapshot.pulses_seen == 0
-
-
-def test_multi_receiver_drop_resets_every_decoder():
-    """A partial decode in any reader does not survive a drop."""
-    payload = b"\x44"
-    pulses = _encode_pulses(payload)
-    mid = len(pulses) // 2
-
-    gate = IrTransmitGate()
-    rx, readers = _make_gated_multi_receiver(2, gate)
-    readers[0].load(pulses[:mid])
-    readers[1].load(pulses[:mid])
-    rx.receive()  # both readers mid-decode, gate idle
-
-    gate.begin_transmit()
-    rx.receive()  # drop resets both decoders
-    gate.end_transmit()
-    rx.receive()  # consume the flush
-
-    readers[0].load(pulses[mid:])
-    readers[1].load(pulses[mid:])
-    assert rx.receive() is None
-
-
-def test_multi_receiver_falling_edge_flushes_once_then_decodes_normally():
-    gate = IrTransmitGate()
-    gate.begin_transmit()
-    gate.end_transmit()
-
-    rx, readers = _make_gated_multi_receiver(2, gate)
-    readers[0].load([111])  # buffered echo tail
-
-    assert rx.receive() is None  # one-shot flush
-    assert rx.telemetry().pulses_dropped_transmitting == 1
-
-    payload = b"\x21"
-    readers[1].load(_encode_pulses(payload))
-    assert rx.receive() == bytearray(payload)
-
-
-def test_multi_receiver_reset_telemetry_zeroes_pulses_dropped_transmitting():
-    gate = IrTransmitGate()
-    gate.begin_transmit()
-    rx, readers = _make_gated_multi_receiver(2, gate)
-    readers[0].load([100])
-
-    rx.receive()
-    assert rx.telemetry().pulses_dropped_transmitting == 1
-
-    rx.reset_telemetry()
-
-    assert rx.telemetry().pulses_dropped_transmitting == 0
+    assert rx.last_signal_strength == 1.0
+    assert rx.last_error_margin == 0
+    assert rx.last_best_receiver is None
 
 
 # ---------------------------------------------------------------------------
-# InfraredMultiReceiver — receive-path telemetry (issue #600)
+# InfraredReceiver — telemetry counters
 # ---------------------------------------------------------------------------
 
 
-def test_multi_receiver_pulses_seen_accumulates_across_all_readers():
-    rx, readers = _make_multi_receiver(2)
+def test_receiver_pulses_seen_counts_every_pulse_across_readers_and_ticks():
+    rx, readers = _make_receiver(2)
     readers[0].load([100, 200])
     readers[1].load([300])
-
+    rx.receive()
+    readers[0].load([400])
     rx.receive()
 
-    assert rx.telemetry().pulses_seen == 3
+    assert rx.telemetry().pulses_seen == 4
 
 
-def test_multi_receiver_pulses_seen_accumulates_across_receive_calls():
-    rx, readers = _make_multi_receiver(1)
-    readers[0].load([100, 200])
+def test_receiver_packets_surfaced_counts_only_winning_packets():
+    rx, readers = _make_receiver(2)
+    readers[0].load(_encode_pulses(b"\x01"))
     rx.receive()
-    readers[0].load([300])
-    rx.receive()
-
-    assert rx.telemetry().pulses_seen == 3
-
-
-def test_multi_receiver_packets_surfaced_increments_on_winning_packet():
-    payload = b"\x01"
-    rx, readers = _make_multi_receiver(2)
-    readers[0].load(_encode_pulses(payload))
-
+    readers[1].load([100, 200])  # noise, no packet
     rx.receive()
 
     assert rx.telemetry().packets_surfaced == 1
 
 
-def test_multi_receiver_packets_surfaced_does_not_increment_without_a_winner():
-    rx, readers = _make_multi_receiver(2)
-    readers[0].load([100, 200])
-
-    rx.receive()
-
-    assert rx.telemetry().packets_surfaced == 0
-
-
-def test_multi_receiver_reset_telemetry_zeroes_pulses_seen_and_packets_surfaced():
-    payload = b"\x01"
-    rx, readers = _make_multi_receiver(2)
-    readers[0].load(_encode_pulses(payload))
-    rx.receive()
-
-    rx.reset_telemetry()
-
-    snapshot = rx.telemetry()
-    assert snapshot.pulses_seen == 0
-    assert snapshot.packets_surfaced == 0
-
-
-def test_multi_receiver_telemetry_sums_buffer_full_on_poll_across_readers():
-    rx, readers = _make_multi_receiver(3)
-    readers[0].buffer_full_on_poll = 2
-    readers[1].buffer_full_on_poll = 0
-    readers[2].buffer_full_on_poll = 5
-
-    assert rx.telemetry().buffer_full_on_poll == 7
-
-
-def test_multi_receiver_telemetry_survives_a_fields_reorder(monkeypatch):
-    """A ``FIELDS`` reorder (simulated here by an ``IrTelemetrySnapshot``
-    constructor with two parameters swapped) must not swap counters — proves
-    ``telemetry()`` builds the snapshot by keyword, not position."""
-    monkeypatch.setattr(IrTelemetrySnapshot, "__init__", _reordered_snapshot_init)
-    payload = b"\x01"
-    rx, readers = _make_multi_receiver(2)
-    readers[0].load(_encode_pulses(payload))
-
-    rx.receive()
-    snapshot = rx.telemetry()
-
-    assert snapshot.pulses_seen == rx.pulses_seen
-    assert snapshot.packets_surfaced == rx.packets_surfaced
-
-
-def _make_tag_multi_receiver(num_readers):
-    """Build a MultiReceiver wired to ``TagInfraredDecoder``, which (unlike
-    ``AuraInfraredDecoder``) tracks packets_started/preamble_reject/etc., so
-    the sums below reflect real decoder state rather than fixed zeros."""
-    readers = [FakePulseReader() for _ in range(num_readers)]
-    rx = InfraredMultiReceiver(readers, TagInfraredDecoder)
-    return rx, readers
-
-
-def test_multi_receiver_telemetry_sums_preamble_reject_across_decoders():
+def test_receiver_telemetry_sums_decoder_counters_across_readers():
     bad_preamble = list(TAG_PREAMBLE)
     bad_preamble[1] = 4000  # invalid but below the inter-frame gap threshold
-    rx, readers = _make_tag_multi_receiver(2)
+    rx, readers = _make_receiver(2, TagInfraredDecoder)
     readers[0].load(bad_preamble)
     readers[1].load(bad_preamble)
 
@@ -1366,12 +831,20 @@ def test_multi_receiver_telemetry_sums_preamble_reject_across_decoders():
     assert rx.telemetry().preamble_reject == 2
 
 
-def test_multi_receiver_packets_completed_can_exceed_surfaced_on_simultaneous_wins():
+def test_receiver_telemetry_sums_buffer_full_on_poll_across_readers():
+    rx, readers = _make_receiver(3)
+    readers[0].buffer_full_on_poll = 2
+    readers[2].buffer_full_on_poll = 5
+
+    assert rx.telemetry().buffer_full_on_poll == 7
+
+
+def test_receiver_packets_completed_can_exceed_surfaced_on_simultaneous_wins():
     """Dedup, not loss: two decoders independently completing the same shot in
     one tick both count toward (summed) packets_completed, but only the
     lowest-error-margin winner surfaces from receive()."""
     pulses = list(TagInfraredEncoder().encode(bytearray([0x10])))
-    rx, readers = _make_tag_multi_receiver(3)
+    rx, readers = _make_receiver(3, TagInfraredDecoder)
     readers[0].load(pulses)
     readers[2].load(pulses)
 
@@ -1382,155 +855,20 @@ def test_multi_receiver_packets_completed_can_exceed_surfaced_on_simultaneous_wi
     assert snapshot.packets_surfaced == 1
 
 
-# ---------------------------------------------------------------------------
-# InfraredMultiReceiver — no per-tick allocation in polled path
-# ---------------------------------------------------------------------------
-
-
-def test_multi_receiver_receive_allocates_nothing_per_tick_when_no_packet():
-    """Calling receive() with no incoming pulses must not allocate heap objects.
-
-    Uses ``tracemalloc`` snapshot comparison rather than ``gc.get_count()`` so
-    that transient (immediately-freed) per-tick allocations are also detected.
-    Only allocations attributed to ``ir_transport.py`` are checked — this
-    filters out tracemalloc's own internal overhead.
-    """
-    rx, _ = _make_multi_receiver(3)
-
-    # Warm up: let any one-time setup allocations settle
-    for _ in range(5):
-        rx.receive()
-
-    tracemalloc.start()
-    before = tracemalloc.take_snapshot()
-
-    for _ in range(100):
-        rx.receive()
-
-    after = tracemalloc.take_snapshot()
-    tracemalloc.stop()
-
-    # Filter to lines inside ir_transport.py so tracemalloc's own bookkeeping
-    # overhead does not produce false positives.
-    diff = [
-        stat
-        for stat in after.compare_to(before, "lineno")
-        if "ir_transport.py" in stat.traceback[0].filename and stat.size_diff > 0
-    ]
-    assert not diff, f"Unexpected allocations in ir_transport.py during idle receive: {diff}"
-
-
-def test_multi_receiver_drop_path_allocates_nothing_per_tick():
-    """The gated drain-but-discard path must not allocate per tick either.
-
-    Uses readers with nothing buffered (the common steady-state tick while
-    emitting) so the only thing exercised repeatedly is the drain loop and
-    the gate check — not a growing counter, whose own integer-widening as it
-    crosses CPython's small-int cache is an unrelated, unavoidable artifact
-    of any incrementing counter and would otherwise produce a false positive.
-    """
-    gate = IrTransmitGate()
-    gate.begin_transmit()
-    rx, _ = _make_gated_multi_receiver(3, gate)
-
-    # Warm up: let any one-time setup allocations settle
-    for _ in range(5):
-        rx.receive()
-
-    tracemalloc.start()
-    before = tracemalloc.take_snapshot()
-
-    for _ in range(100):
-        rx.receive()
-
-    after = tracemalloc.take_snapshot()
-    tracemalloc.stop()
-
-    diff = [
-        stat
-        for stat in after.compare_to(before, "lineno")
-        if stat.traceback[0].filename.endswith("/ir_transport.py") and stat.size_diff > 0
-    ]
-    assert not diff, f"Unexpected allocations in ir_transport.py during drop receive: {diff}"
-
-
-# ---------------------------------------------------------------------------
-# InfraredMultiReceiver — set_decoder
-# ---------------------------------------------------------------------------
-
-
-def test_multi_receiver_set_decoder_decodes_through_the_new_decoder_type():
-    """A packet encoded for the Tag protocol only decodes once the
-    receiver's decoders are swapped from Aura to Tag — proof that receive()
-    runs each reader's pulses through the newly installed decoder type."""
-    payload = bytearray([0x10])
-    pulses = list(TagInfraredEncoder().encode(payload))
-    rx, readers = _make_multi_receiver(2)
-
-    rx.set_decoder(TagInfraredDecoder())
+def test_receiver_telemetry_survives_a_fields_reorder(monkeypatch):
+    """A ``FIELDS`` reorder (simulated here by an ``IrTelemetrySnapshot``
+    constructor with two parameters swapped) must not swap counters — proves
+    ``telemetry()`` builds the snapshot by keyword, not position."""
+    monkeypatch.setattr(IrTelemetrySnapshot, "__init__", _reordered_snapshot_init)
+    pulses = _encode_pulses(b"\xde\xad")
+    rx, readers = _make_receiver(1)
     readers[0].load(pulses)
 
-    assert rx.receive() == payload
-
-
-def test_multi_receiver_set_decoder_gives_each_reader_an_independent_decoder_instance():
-    """A partial decode left in progress on one reader must not corrupt an
-    independent, unrelated decode completing on another reader in the same
-    tick — proof set_decoder built one fresh decoder per reader rather than
-    sharing a single instance across them."""
-    payload = bytearray([0x30])
-    pulses = list(TagInfraredEncoder().encode(payload))
-    mid = len(pulses) // 2
-    rx, readers = _make_multi_receiver(2)
-    rx.set_decoder(TagInfraredDecoder())
-
-    readers[0].load(pulses[:mid])  # reader 0 left mid-decode, never completes
     rx.receive()
+    snapshot = rx.telemetry()
 
-    readers[1].load(pulses)  # reader 1's independent, complete packet
-    result = rx.receive()
-
-    assert result == payload
-
-
-def test_multi_receiver_set_decoder_still_picks_the_lowest_error_margin_winner():
-    """The core multi-receiver selection guarantee — lowest error margin
-    wins — must keep working with the decoders set_decoder installs."""
-    payload = bytearray([0x40])
-    encoder = TagInfraredEncoder()
-    pulses_good = list(encoder.encode(payload))
-    pulses_noisy = list(encoder.encode(payload))
-    pulses_noisy[3] += 80  # 80 µs deviation — still within TAG_ERROR_MARGIN
-
-    rx, readers = _make_multi_receiver(2)
-    rx.set_decoder(TagInfraredDecoder())
-    readers[0].load(pulses_noisy)
-    readers[1].load(pulses_good)
-
-    result = rx.receive()
-
-    assert result == payload
-    assert rx.last_error_margin == 0
-    assert rx.last_best_receiver is readers[1]
-
-
-# ---------------------------------------------------------------------------
-# IR telemetry field ownership (issue #730) — the reset bug is unrepresentable
-# ---------------------------------------------------------------------------
-
-
-def test_multi_receiver_reset_telemetry_zeroes_buffer_full_on_poll_across_readers():
-    """Regression: a multi-receiver reset must not leave buffer_full_on_poll
-    stale. Reading (telemetry()) and resetting (reset_telemetry()) both walk
-    every reader now, so a reset can no longer zero the decoders while
-    leaving the readers' counts to be reported as fresh."""
-    rx, readers = _make_multi_receiver(2)
-    readers[0].buffer_full_on_poll = 3
-    readers[1].buffer_full_on_poll = 4
-
-    rx.reset_telemetry()
-
-    assert rx.telemetry().buffer_full_on_poll == 0
+    assert snapshot.pulses_seen == len(pulses)
+    assert snapshot.packets_surfaced == 1
 
 
 def test_ir_telemetry_field_ownership_partitions_every_snapshot_field_with_no_overlap():
@@ -1552,28 +890,26 @@ def test_ir_telemetry_field_ownership_partitions_every_snapshot_field_with_no_ov
     assert union == set(IrTelemetrySnapshot.FIELDS)
 
 
-def _set_every_owned_counter_to(value, decoder, reader, receiver):
-    """Set every declared IR telemetry counter — across all three declared
-    owners — to *value*, without hand-listing the nine counter names."""
-    for name in InfraredDecoder.OWNED_TELEMETRY_FIELDS:
-        setattr(decoder, name, value)
-    for name in PulseReader.OWNED_TELEMETRY_FIELDS:
-        setattr(reader, name, value)
-    for name in InfraredReceiver.OWNED_TELEMETRY_FIELDS:
-        setattr(receiver, name, value)
-
-
-def test_single_receiver_reset_telemetry_zeroes_every_counter_telemetry_reports():
+@pytest.mark.parametrize("num_readers", [1, 2])
+def test_receiver_reset_telemetry_zeroes_every_counter_telemetry_reports(
+    num_readers, recording_tag_decoder
+):
     """Read/reset symmetry: whatever telemetry() reports, reset_telemetry()
-    zeroes — checked generically across every declared counter rather than
-    hand-listing them, so a newly added counter is covered automatically."""
-    reader = FakePulseReader()
-    decoder = TagInfraredDecoder()
-    rx = InfraredSingleReceiver(reader, decoder)
-    _set_every_owned_counter_to(7, decoder, reader, rx)
+    zeroes — checked generically across every declared counter on every
+    reader and decoder, so a newly added counter is covered automatically."""
+    decoder_class, built = recording_tag_decoder
+    rx, readers = _make_receiver(num_readers, decoder_class)
+    for name in InfraredDecoder.OWNED_TELEMETRY_FIELDS:
+        for decoder in built:
+            setattr(decoder, name, 7)
+    for name in PulseReader.OWNED_TELEMETRY_FIELDS:
+        for reader in readers:
+            setattr(reader, name, 7)
+    for name in InfraredReceiver.OWNED_TELEMETRY_FIELDS:
+        setattr(rx, name, 7)
 
     before = rx.telemetry()
-    assert all(getattr(before, field) == 7 for field in IrTelemetrySnapshot.FIELDS)
+    assert all(getattr(before, field) >= 7 for field in IrTelemetrySnapshot.FIELDS)
 
     rx.reset_telemetry()
 
@@ -1581,26 +917,253 @@ def test_single_receiver_reset_telemetry_zeroes_every_counter_telemetry_reports(
     assert all(getattr(after, field) == 0 for field in IrTelemetrySnapshot.FIELDS)
 
 
-def test_multi_receiver_with_one_source_reset_telemetry_zeroes_every_counter_telemetry_reports():
-    """The same read/reset symmetry check, run with N=1 — a one-source
-    multi-receiver is the same machinery as a single receiver, so the
-    guarantee must hold there too."""
-    reader = FakePulseReader()
-    decoders_built = []
+# ---------------------------------------------------------------------------
+# InfraredReceiver — telemetry_line() change-gating
+# ---------------------------------------------------------------------------
 
-    def decoder_factory():
-        decoder = TagInfraredDecoder()
-        decoders_built.append(decoder)
-        return decoder
 
-    rx = InfraredMultiReceiver([reader], decoder_factory)
-    decoder = decoders_built[0]
-    _set_every_owned_counter_to(7, decoder, reader, rx)
+def test_receiver_telemetry_line_reports_on_first_call():
+    """The very first call has no prior baseline, so it always reports."""
+    rx, _ = _make_receiver(1)
 
-    before = rx.telemetry()
-    assert all(getattr(before, field) == 7 for field in IrTelemetrySnapshot.FIELDS)
+    assert rx.telemetry_line() is not None
+
+
+def test_receiver_telemetry_line_is_none_when_nothing_changed():
+    rx, _ = _make_receiver(1)
+    rx.telemetry_line()
+
+    assert rx.telemetry_line() is None
+
+
+def test_receiver_telemetry_line_reports_the_pipeline_format_after_a_packet():
+    pulses = _encode_pulses(b"\x42")
+    rx, readers = _make_receiver(1)
+    readers[0].load(pulses)
+
+    rx.receive()
+    line = rx.telemetry_line()
+
+    assert line == (
+        "ir: pulses_seen=" + str(len(pulses)) + " buffer_full_on_poll=0 "
+        "packets_started=0 preamble_reject=0 mark_reject=0 space_reject=0 "
+        "packets_completed=0 packets_surfaced=1 pulses_dropped_transmitting=0"
+    )
+
+
+def test_receiver_telemetry_line_reports_again_after_reset_telemetry():
+    """reset_telemetry() clears the change-gate baseline along with the counters."""
+    rx, _ = _make_receiver(1)
+    rx.telemetry_line()
 
     rx.reset_telemetry()
 
-    after = rx.telemetry()
-    assert all(getattr(after, field) == 0 for field in IrTelemetrySnapshot.FIELDS)
+    assert rx.telemetry_line() is not None
+
+
+# ---------------------------------------------------------------------------
+# InfraredReceiver — gate-driven self-echo suppression
+# ---------------------------------------------------------------------------
+
+
+def test_receiver_drops_echo_on_every_reader_while_transmitting():
+    gate = IrTransmitGate()
+    gate.begin_transmit()
+    rx, readers = _make_receiver(3, gate=gate)
+    payload = b"\x33"
+    readers[0].load(_encode_pulses(payload))
+    readers[2].load(_encode_pulses(payload))
+
+    assert rx.receive() is None
+
+
+def test_receiver_counts_dropped_pulses_from_every_reader_apart_from_pulses_seen():
+    gate = IrTransmitGate()
+    gate.begin_transmit()
+    rx, readers = _make_receiver(2, gate=gate)
+    readers[0].load([100, 200])
+    readers[1].load([300, 400, 500])
+
+    rx.receive()
+
+    snapshot = rx.telemetry()
+    assert snapshot.pulses_dropped_transmitting == 5
+    assert snapshot.pulses_seen == 0
+
+
+def test_receiver_partial_decode_in_progress_when_transmit_begins_is_reset_on_every_reader():
+    pulses = _encode_pulses(b"\x44")
+    mid = len(pulses) // 2
+    gate = IrTransmitGate()
+    rx, readers = _make_receiver(2, gate=gate)
+    readers[0].load(pulses[:mid])
+    readers[1].load(pulses[:mid])
+    rx.receive()  # both readers mid-decode, gate idle
+
+    gate.begin_transmit()
+    rx.receive()  # the drop resets both decoders, even with nothing buffered
+    gate.end_transmit()
+    rx.receive()  # consume the flush
+
+    readers[0].load(pulses[mid:])
+    readers[1].load(pulses[mid:])
+    assert rx.receive() is None
+
+
+def test_receiver_partial_decode_in_progress_when_transmit_ends_is_reset():
+    """A decode mid-flight at the falling-edge flush does not survive it either."""
+    pulses = _encode_pulses(b"\xde\xad")
+    mid = len(pulses) // 2
+    gate = IrTransmitGate()
+    rx, readers = _make_receiver(1, gate=gate)
+
+    gate.begin_transmit()
+    readers[0].load(pulses[:mid])  # echo pulses captured mid-emission
+    rx.receive()
+
+    gate.end_transmit()
+    rx.receive()  # falling-edge flush resets the decoder
+
+    readers[0].load(pulses[mid:])
+    assert rx.receive() is None
+
+
+def test_receiver_falling_edge_discards_the_buffered_echo_tail():
+    gate = IrTransmitGate()
+    gate.begin_transmit()
+    gate.end_transmit()
+    rx, readers = _make_receiver(2, gate=gate)
+    readers[0].load([111, 222])  # buffered echo tail
+
+    rx.receive()
+
+    assert rx.telemetry().pulses_dropped_transmitting == 2
+
+
+def test_receiver_decodes_normally_after_the_one_shot_falling_edge_flush():
+    gate = IrTransmitGate()
+    gate.begin_transmit()
+    gate.end_transmit()
+    rx, readers = _make_receiver(2, gate=gate)
+    rx.receive()  # consumes the one-shot flush
+
+    payload = b"\x21"
+    readers[1].load(_encode_pulses(payload))
+    assert rx.receive() == bytearray(payload)
+
+
+# ---------------------------------------------------------------------------
+# InfraredReceiver — no per-tick allocation in polled path
+# ---------------------------------------------------------------------------
+
+
+def _allocations_in_ir_transport_over_100_receives(rx):
+    """Return the ir_transport.py allocation growth across 100 ``receive()`` calls.
+
+    Uses ``tracemalloc`` snapshot comparison rather than ``gc.get_count()`` so
+    that transient (immediately-freed) per-tick allocations are also detected.
+    Only allocations attributed to ``ir_transport.py`` are checked — this
+    filters out tracemalloc's own internal overhead.
+    """
+    # Warm up: let any one-time setup allocations settle
+    for _ in range(5):
+        rx.receive()
+
+    tracemalloc.start()
+    before = tracemalloc.take_snapshot()
+
+    for _ in range(100):
+        rx.receive()
+
+    after = tracemalloc.take_snapshot()
+    tracemalloc.stop()
+
+    return [
+        stat
+        for stat in after.compare_to(before, "lineno")
+        if stat.traceback[0].filename.endswith("/ir_transport.py") and stat.size_diff > 0
+    ]
+
+
+@pytest.mark.parametrize("num_readers", [1, 3])
+def test_receiver_receive_allocates_nothing_per_tick_when_no_packet(num_readers):
+    rx, _ = _make_receiver(num_readers)
+
+    diff = _allocations_in_ir_transport_over_100_receives(rx)
+
+    assert not diff, f"Unexpected allocations in ir_transport.py during idle receive: {diff}"
+
+
+def test_receiver_drop_path_allocates_nothing_per_tick():
+    """The gated drain-but-discard path must not allocate per tick either.
+
+    Uses readers with nothing buffered (the common steady-state tick while
+    emitting) so the only thing exercised repeatedly is the drain loop and
+    the gate check — not a growing counter, whose own integer-widening as it
+    crosses CPython's small-int cache is an unrelated, unavoidable artifact
+    of any incrementing counter and would otherwise produce a false positive.
+    """
+    gate = IrTransmitGate()
+    gate.begin_transmit()
+    rx, _ = _make_receiver(3, gate=gate)
+
+    diff = _allocations_in_ir_transport_over_100_receives(rx)
+
+    assert not diff, f"Unexpected allocations in ir_transport.py during drop receive: {diff}"
+
+
+# ---------------------------------------------------------------------------
+# InfraredReceiver — set_decoder
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("num_readers", [1, 2])
+def test_receiver_set_decoder_decodes_through_the_new_decoder_type(num_readers):
+    """A packet encoded for the Tag protocol only decodes once the receiver's
+    decoders are swapped from Aura to Tag."""
+    payload = bytearray([0x10])
+    rx, readers = _make_receiver(num_readers)
+
+    rx.set_decoder(TagInfraredDecoder())
+    readers[-1].load(list(TagInfraredEncoder().encode(payload)))
+
+    assert rx.receive() == payload
+
+
+def test_receiver_set_decoder_gives_each_reader_its_own_fresh_decoder(recording_tag_decoder):
+    """set_decoder builds one new decoder per reader and never installs the
+    instance it was handed, so no decode state is shared between readers."""
+    decoder_class, built = recording_tag_decoder
+    rx, _ = _make_receiver(2)
+    handed = decoder_class()
+
+    rx.set_decoder(handed)
+
+    built_by_receiver = [d for d in built if d is not handed]
+    assert len(built_by_receiver) == 2
+
+
+def test_receiver_set_decoder_keeps_a_partial_decode_on_one_reader_from_corrupting_another():
+    payload = bytearray([0x30])
+    pulses = list(TagInfraredEncoder().encode(payload))
+    mid = len(pulses) // 2
+    rx, readers = _make_receiver(2)
+    rx.set_decoder(TagInfraredDecoder())
+
+    readers[0].load(pulses[:mid])  # reader 0 left mid-decode, never completes
+    rx.receive()
+
+    readers[1].load(pulses)  # reader 1's independent, complete packet
+    assert rx.receive() == payload
+
+
+def test_receiver_set_decoder_reports_telemetry_from_the_new_decoders():
+    bad_preamble = list(TAG_PREAMBLE)
+    bad_preamble[1] = 4000  # invalid but below the inter-frame gap threshold
+    rx, readers = _make_receiver(1)
+    rx.set_decoder(TagInfraredDecoder())
+    readers[0].load(bad_preamble)
+
+    rx.receive()
+
+    assert rx.telemetry().preamble_reject == 1

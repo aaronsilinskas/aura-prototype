@@ -6,10 +6,10 @@ Assembly only: writer *selection* (the ``rp2pio`` import-probe inside
 ``_make_writer``) is exercised separately in ``test_setup_ir_pio.py``. These
 tests inject a trivial fake ``writer_factory`` so assembly is CPython-testable
 without stubbing ``rp2pio``/``pulseio`` for the writer path. This file also
-owns _setup_ir's receiver-class selection by resolved rx pin count (#672) --
-the one piece of assembly behavior that runs _setup_ir for real (via its
-default writer_factory) rather than through the fake, since none of those
-tests wire an emitter and so never reach the writer path at all.
+owns _setup_ir's one-reader-per-rx-pin wiring (#672) -- the one piece of
+assembly behavior that runs _setup_ir for real (via its default
+writer_factory) rather than through the fake, since none of those tests wire
+an emitter and so never reach the writer path at all.
 build_hardware-level radio and IR integration/narration coverage (config
 gating, hard-error and disabled/absent-section narration, and the ir/radio
 narration lines) lives in test_device_builder_radio_ir.py (#779) instead.
@@ -253,6 +253,21 @@ def test_setup_ir_transmitters_share_the_gate_with_receiver():
         assert transceiver._transmitters[emitter]._gate is gate
 
 
+def _wired_readers(transceiver: object) -> list:
+    """Return the private ``_readers`` list wired onto the transceiver's receiver.
+
+    InfraredTransceiver exposes no public getter for a receiver's readers or
+    decoders, so the tests below reach into those private fields, only through
+    these two helpers, to pin the internal wiring contract.
+    """
+    return transceiver._receiver._readers
+
+
+def _wired_decoders(transceiver: object) -> list:
+    """Return the private ``_decoders`` list. See :func:`_wired_readers`."""
+    return transceiver._receiver._decoders
+
+
 # ---------------------------------------------------------------------------
 # _setup_ir — receiver
 # ---------------------------------------------------------------------------
@@ -263,7 +278,7 @@ def test_setup_ir_receiver_is_wired_to_rx_pin():
     transceiver, _writer_kind = _setup_ir(
         [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
     )
-    pulsein = transceiver._receiver._reader._pulsein
+    pulsein = _wired_readers(transceiver)[0]._pulsein
     assert pulsein.pin is _RX_PIN
 
 
@@ -272,7 +287,7 @@ def test_setup_ir_receiver_pulsein_uses_active_low_idle_state():
     transceiver, _writer_kind = _setup_ir(
         [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
     )
-    pulsein = transceiver._receiver._reader._pulsein
+    pulsein = _wired_readers(transceiver)[0]._pulsein
     assert pulsein.idle_state is True
 
 
@@ -294,7 +309,7 @@ def test_setup_ir_defaults_to_aura_decoder_for_receiver():
     transceiver, _writer_kind = _setup_ir(
         [_RX_PIN], {LINE: _LINE_PIN}, writer_factory=_fake_writer_factory
     )
-    assert isinstance(transceiver._receiver._decoder, AuraInfraredDecoder)
+    assert isinstance(_wired_decoders(transceiver)[0], AuraInfraredDecoder)
 
 
 def test_setup_ir_wires_provided_encoder_into_transmitters():
@@ -311,66 +326,22 @@ def test_setup_ir_wires_provided_encoder_into_transmitters():
     assert transceiver._transmitters[AREA_OF_EFFECT]._encoder is encoder
 
 
-def test_setup_ir_wires_provided_decoder_into_receiver():
-    """A passed-in decoder is used by the receiver."""
+def test_setup_ir_wires_provided_decoder_type_into_receiver():
+    """The receiver decodes with the passed-in decoder's type."""
     decoder = TagInfraredDecoder()
     transceiver, _writer_kind = _setup_ir(
         [_RX_PIN], {LINE: _LINE_PIN}, decoder=decoder, writer_factory=_fake_writer_factory
     )
-    assert transceiver._receiver._decoder is decoder
+    assert type(_wired_decoders(transceiver)[0]) is TagInfraredDecoder
 
 
 # ---------------------------------------------------------------------------
-# _setup_ir chooses the receiver class by resolved rx pin count (#672)
+# _setup_ir wires one reader and one fresh decoder per resolved rx pin (#672)
 # ---------------------------------------------------------------------------
 
 
-def _wired_decoder(receiver: object) -> object:
-    """Return the private ``_decoder`` wired onto a single receiver.
-
-    InfraredTransceiver exposes no public getter for which decoder instance a
-    receiver holds, so the tests below reach into that private field to pin the
-    internal wiring contract.
-    """
-    return receiver._decoder
-
-
-def _wired_decoders(receiver: object) -> list:
-    """Return the private ``_decoders`` list wired onto a multi-receiver.
-
-    See :func:`_wired_decoder`.
-    """
-    return receiver._decoders
-
-
-def _wired_readers(receiver: object) -> list:
-    """Return the private ``_readers`` list wired onto a multi-receiver.
-
-    See :func:`_wired_decoder`.
-    """
-    return receiver._readers
-
-
-def test_setup_ir_single_rx_pin_builds_single_receiver_wired_with_passed_decoder() -> None:
-    from hardware.shared.ir_transport import InfraredSingleReceiver
-
-    decoder = MagicMock()
-
-    with ExitStack() as stack:
-        stack.enter_context(patch.dict(sys.modules, {"pulseio": MagicMock()}))
-
-        transceiver, _writer_kind = _setup_ir(
-            rx_pins=[MagicMock()], emitter_pins={}, decoder=decoder
-        )
-
-    receiver = transceiver._receiver
-    assert isinstance(receiver, InfraredSingleReceiver)
-    assert _wired_decoder(receiver) is decoder
-
-
-def test_setup_ir_multiple_rx_pins_builds_multi_receiver_with_one_reader_per_pin() -> None:
+def test_setup_ir_builds_one_pulsein_reader_per_rx_pin() -> None:
     from hardware.circuitpython.infrared_io import PulseInReader
-    from hardware.shared.ir_transport import InfraredMultiReceiver
 
     with ExitStack() as stack:
         stack.enter_context(patch.dict(sys.modules, {"pulseio": MagicMock()}))
@@ -379,14 +350,13 @@ def test_setup_ir_multiple_rx_pins_builds_multi_receiver_with_one_reader_per_pin
             rx_pins=[MagicMock(), MagicMock(), MagicMock()], emitter_pins={}
         )
 
-    receiver = transceiver._receiver
-    assert isinstance(receiver, InfraredMultiReceiver)
-    readers = _wired_readers(receiver)
+    readers = _wired_readers(transceiver)
     assert len(readers) == 3
     assert all(isinstance(reader, PulseInReader) for reader in readers)
 
 
-def test_setup_ir_multiple_rx_pins_gives_each_reader_a_fresh_decoder_of_the_same_class() -> None:
+@pytest.mark.parametrize("pin_count", [1, 2])
+def test_setup_ir_gives_each_reader_a_fresh_decoder_of_the_passed_class(pin_count) -> None:
     from hardware.shared.ir_codecs.aura import AuraInfraredDecoder
 
     decoder = AuraInfraredDecoder()
@@ -395,11 +365,11 @@ def test_setup_ir_multiple_rx_pins_gives_each_reader_a_fresh_decoder_of_the_same
         stack.enter_context(patch.dict(sys.modules, {"pulseio": MagicMock()}))
 
         transceiver, _writer_kind = _setup_ir(
-            rx_pins=[MagicMock(), MagicMock()], emitter_pins={}, decoder=decoder
+            rx_pins=[MagicMock() for _ in range(pin_count)], emitter_pins={}, decoder=decoder
         )
 
-    decoders = _wired_decoders(transceiver._receiver)
-    assert len(decoders) == 2
+    decoders = _wired_decoders(transceiver)
+    assert len(decoders) == pin_count
     for wired_decoder in decoders:
-        assert type(wired_decoder) is type(decoder)
+        assert type(wired_decoder) is AuraInfraredDecoder
         assert wired_decoder is not decoder

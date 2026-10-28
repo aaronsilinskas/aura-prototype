@@ -73,7 +73,7 @@ class InfraredDecoder:
     """
 
     # The IR receive-path telemetry counters this class owns — the read
-    # source ``InfraredSourceReceiver.telemetry()`` sums across every decoder
+    # source ``InfraredReceiver.telemetry()`` sums across every decoder
     # and the reset source ``reset_telemetry()`` zeroes on every decoder. An
     # explicit tuple, not derived from ``__slots__``, which also carries this
     # class's seven private decode-state slots.
