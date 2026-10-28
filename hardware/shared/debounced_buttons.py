@@ -5,6 +5,9 @@ except ImportError:
 
 from engine.input import ButtonData
 
+DEBOUNCE_INTERVAL = 0.05
+"""Seconds a pin level must hold before it is committed, unless a debouncer is given another."""
+
 
 class _ButtonState:
     """Per-button debounce state.
@@ -40,7 +43,7 @@ class DebouncedButtons:
     def __init__(
         self,
         buttons: "list[tuple[str, Callable[[], bool]]]",
-        interval: float = 0.05,
+        interval: float = DEBOUNCE_INTERVAL,
     ) -> None:
         self._interval = interval
         self._predicates = buttons

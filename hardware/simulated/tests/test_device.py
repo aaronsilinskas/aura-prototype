@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from engine.input import ButtonData
+from engine.log import Logger
 from engine.network import CONE, LINE
 from engine.state import Scope
 from hardware.shared.device_config import DeviceConfig, parse_device_config
@@ -446,3 +449,99 @@ def test_without_a_magnetometer_a_field_cannot_be_set():
 
     with pytest.raises(ValueError, match="no magnetometer"):
         sim_hw.magnetize(1.0, 2.0, 3.0)
+
+
+# ---------------------------------------------------------------------------
+# Booting through the Device assembly
+# ---------------------------------------------------------------------------
+
+_I2C_DISABLED = {"i2c": {"sda": "GP4", "scl": "GP5", "enabled": False}}
+
+
+@pytest.mark.parametrize("sensor", ["accelerometer", "magnetometer"])
+def test_a_sensor_declared_with_its_bus_disabled_is_rejected(sensor):
+    config = _config(**_I2C_DISABLED, **{sensor: {}})
+
+    with pytest.raises(RuntimeError, match="no I2C bus"):
+        SimulatedHardware(now=lambda: 0.0, config=config)
+
+
+def test_a_disabled_matrix_entry_boots():
+    config = parse_device_config(
+        {
+            "pixels": [
+                {"type": "matrix", "cols": 13, "scope_rows": {"personal": [0, 1]}, "enabled": False}
+            ]
+        }
+    )
+
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=config)
+
+    assert sim_hw.hw.outputs == []
+
+
+def test_a_declared_high_current_rail_boots_asserted():
+    logger, fragments = _recording_logger()
+
+    SimulatedHardware(
+        now=lambda: 0.0, config=_config(high_current_rail={"pin": "GP20"}), logger=logger
+    )
+
+    assert "[hw] high_current_rail pin=GP20 active_high=True asserted\n" in "".join(fragments)
+
+
+_PERSISTING = _config(**_MAGNETOMETER, accelerometer={}, sdcard={"cs": "GP9"})
+
+
+def test_a_reboot_rebuilds_the_outputs():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_PERSISTING)
+    before = sim_hw.hw.outputs
+
+    sim_hw.power_on()
+
+    assert not set(map(id, before)) & set(map(id, sim_hw.hw.outputs))
+
+
+def test_the_card_survives_a_reboot():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_PERSISTING)
+    assert sim_hw.hw.storage is not None
+    sim_hw.hw.storage.write_bytes("state.json", b"{}")
+
+    sim_hw.power_on()
+
+    assert sim_hw.hw.storage is not None
+    assert sim_hw.hw.storage.read_bytes("state.json") == b"{}"
+
+
+def test_the_sensors_keep_their_readings_through_a_reboot():
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_PERSISTING)
+    sim_hw.accelerate(1.0, 2.0, 3.0)
+    sim_hw.magnetize(4.0, 5.0, 6.0)
+
+    sim_hw.power_on()
+
+    assert sim_hw.hw.accelerometer.acceleration == (1.0, 2.0, 3.0)  # type: ignore[attr-defined]
+    assert sim_hw.hw.magnetometer.magnetic == (4.0, 5.0, 6.0)  # type: ignore[attr-defined]
+
+
+def _recording_logger() -> tuple[Logger, list[str]]:
+    fragments: list[str] = []
+    return Logger("[hw]", fragments.append), fragments
+
+
+def test_a_device_given_a_logger_narrates_a_full_boot_on_every_power_on():
+    logger, fragments = _recording_logger()
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(buttons=["GP2"]), logger=logger)
+
+    sim_hw.power_on()
+
+    text = "".join(fragments)
+    assert text.count("[hw] begin board=simulated\n") == 2
+    assert text.count("[hw] buttons A=GP2 ok\n") == 2
+    assert len(re.findall(r"^\[hw\] ready outputs=2 buttons=1 elapsed_s=", text, re.M)) == 2
+
+
+def test_a_device_without_a_logger_is_silent(capsys):
+    SimulatedHardware(now=lambda: 0.0, config=_config(buttons=["GP2"]))
+
+    assert capsys.readouterr().out == ""
