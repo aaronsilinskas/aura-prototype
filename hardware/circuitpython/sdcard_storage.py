@@ -1,8 +1,8 @@
 """CircuitPython adapter mounting an SD card as a live DeviceStorage.
 
-The only module that imports ``sdcardio`` and ``storage`` -- ``device_builder``
-reaches this module only through a deferred import inside its sdcard setup
-helper (mirroring the radio path's ``rfm69_radio_transport`` deferral), so a
+The only module that imports ``sdcardio`` and ``storage`` -- ``CircuitPythonParts``
+reaches this module only through a deferred import inside its storage part
+(mirroring the radio path's ``rfm69_radio_transport`` deferral), so a
 config with no ``sdcard`` section never requires either library to be
 installed.
 """
@@ -23,7 +23,7 @@ class SdCardStorage(DeviceStorage):
     read/write against the mount point.
 
     Args:
-        spi: The shared SPI bus (see ``device_builder._setup_spi``).
+        spi: The shared SPI bus (see ``CircuitPythonParts.spi_bus``).
         cs: Chip-select pin as a raw ``microcontroller.Pin`` -- unlike the
             radio path, ``sdcardio.SDCard`` takes the raw pin itself rather
             than a ``digitalio.DigitalInOut`` wrapper.

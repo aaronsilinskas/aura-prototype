@@ -66,7 +66,8 @@ packs/            Game-specific packs loaded at runtime (CircuitPython/MicroPyth
                   each has a scene.json and optional scene-local effects/ and rules/ subdirs
 
 hardware/         Hardware abstraction layer
-  circuitpython/  CircuitPython drivers (device_builder; circuitpython_parts:
+  circuitpython/  CircuitPython drivers (device_builder: build_hardware, the device
+                  entry point that runs the Device assembly; circuitpython_parts:
                   CircuitPythonParts, its DeviceParts adapter; is31fl3741_output,
                   drv2605_output, neopixel_output, audio_output, infrared_io,
                   pio_pulse_writer, counting_i2c, rfm69_radio_transport,

@@ -1,6 +1,6 @@
 """NeoPixel effect output — one strip, multiple scope segments.
 
-The ``neopixel`` import lives only in ``device_builder`` (which supplies
+The ``neopixel`` import lives only in ``circuitpython_parts`` (which supplies
 already-initialised strip objects), keeping this module testable under CPython.
 """
 

@@ -79,6 +79,7 @@ def test_an_absent_section_asks_for_no_part(section, section_config, part):
     _hw, parts = _assemble(_config())
 
     assert part not in parts.parts()
+    assert not re.search(rf"^\[hw\] {section}\b", _narration(_config()), re.MULTILINE)
 
 
 @pytest.mark.parametrize(("section", "section_config", "part"), _SECTIONS, ids=_SECTION_IDS)
@@ -91,6 +92,22 @@ def test_a_disabled_section_asks_for_no_part_and_narrates_disabled(section, sect
     assert re.search(rf"^\[hw\] {section}\b.* disabled$", _narration(config), re.MULTILINE)
 
 
+def test_a_config_disabling_every_gated_section_builds_no_optional_hardware():
+    config = _config(**{section: _disabled(c) for section, c, _part in _SECTIONS})
+
+    hw, _parts = _assemble(config)
+
+    assert (
+        hw.outputs,
+        hw.accelerometer,
+        hw.magnetometer,
+        hw.ir,
+        hw.radio,
+        hw.storage,
+        hw.audio_registry,
+    ) == ([], None, None, None, None, None, None)
+
+
 @pytest.mark.parametrize(
     ("section", "field"), [("accelerometer", "accelerometer"), ("magnetometer", "magnetometer")]
 )
@@ -100,6 +117,32 @@ def test_a_sensor_section_is_built_with_its_config_on_the_i2c_bus(section, field
     ((sensor_config, bus),) = parts.args_of(section)
     assert (sensor_config.address, bus.kind) == (0x19, "i2c")
     assert getattr(hw, field) is not None
+
+
+def test_haptics_are_built_with_their_config_on_the_i2c_bus():
+    _hw, parts = _assemble(_config(haptics={"address": 0x5B}))
+
+    ((haptics_config, bus),) = parts.args_of("haptic_output")
+    assert (haptics_config.address, bus.kind) == (0x5B, "i2c")
+
+
+def test_disabled_audio_builds_no_registry_and_no_audio_output():
+    hw, _parts = _assemble(_config(pixels=[_NEOPIXEL], audio=_disabled(_AUDIO)))
+
+    assert hw.audio_registry is None
+    assert [cast(Output, output).part for output in hw.outputs] == ["neopixel_strip"]
+
+
+def test_a_disabled_sdcard_builds_no_storage():
+    hw, _parts = _assemble(_config(sdcard=_disabled(_SDCARD)))
+
+    assert hw.storage is None
+
+
+def test_no_rail_section_drives_no_rail_pin():
+    _hw, parts = _assemble(_config())
+
+    assert "high_current_rail" not in parts.parts()
 
 
 @pytest.mark.parametrize("bus", ["i2c", "spi"])
@@ -158,6 +201,52 @@ def test_each_neopixel_strip_is_built_on_its_pin():
         ({"personal": range(0, 4)}, PinRef("GP0", "pixels.pin")),
         ({"ambient": range(0, 4)}, PinRef("GP1", "pixels.pin")),
     ]
+
+
+@pytest.mark.parametrize(
+    "entries",
+    [[_MATRIX, _NEOPIXEL], [_NEOPIXEL, _MATRIX]],
+    ids=["matrix-first", "neopixel-first"],
+)
+def test_pixel_outputs_follow_config_order(entries):
+    hw, _parts = _assemble(_config(pixels=entries))
+
+    expected = ["matrix_pixels" if e is _MATRIX else "neopixel_strip" for e in entries]
+    assert [cast(Output, output).part for output in hw.outputs] == expected
+
+
+def test_a_segmented_strip_is_one_strip_carrying_every_segment():
+    entry = {**_NEOPIXEL, "count": 20, "scope_pixels": {"personal": [0, 10], "ambient": [10, 20]}}
+
+    hw, parts = _assemble(_config(pixels=[entry]))
+
+    ((strip, pin),) = parts.args_of("neopixel_strip")
+    assert (strip.scope_pixels, pin) == (
+        {"personal": range(0, 10), "ambient": range(10, 20)},
+        PinRef("GP0", "pixels.pin"),
+    )
+    assert len(hw.outputs) == 1
+
+
+def test_a_legacy_entry_with_several_scopes_is_one_strip_per_scope_with_its_own_settings():
+    legacy = {
+        "type": "neopixel",
+        "scopes": {
+            "personal": {"pin": "GP2", "count": 10, "brightness": 0.5},
+            "directional": {"pin": "GP3", "count": 4, "order": "RGB"},
+        },
+    }
+
+    hw, parts = _assemble(_config(pixels=[legacy]))
+
+    assert [
+        (strip.scope_pixels, strip.brightness, strip.order, pin)
+        for strip, pin in parts.args_of("neopixel_strip")
+    ] == [
+        ({"personal": range(0, 10)}, 0.5, "GRB", PinRef("GP2", "pixels.scopes.personal.pin")),
+        ({"directional": range(0, 4)}, 1.0, "RGB", PinRef("GP3", "pixels.scopes.directional.pin")),
+    ]
+    assert len(hw.outputs) == 2
 
 
 def test_a_legacy_scope_entry_is_one_strip_per_scope_spanning_it():
@@ -306,6 +395,110 @@ def test_a_boot_narrates_begin_each_step_and_ready():
     assert re.fullmatch(r"\[hw\] ready outputs=1 buttons=2 elapsed_s=\d+\.\d{3}", lines[-1])
 
 
+_EVERY_SECTION = {
+    "high_current_rail": {"pin": "GP28", "active_high": True},
+    "i2c": {"sda": "GP4", "scl": "GP5"},
+    "spi": {"sck": "SCK", "mosi": "MOSI", "miso": "MISO"},
+    "pixels": [
+        {"type": "matrix", "cols": 13, "scope_rows": {"global.main": [0, 5]}},
+        {"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}},
+    ],
+    "buttons": ["D9"],
+    "accelerometer": {},
+    "magnetometer": {},
+    "audio": {
+        "voices": 1,
+        "max_volume": 0.5,
+        "i2s_bit_clock": "I2S_BIT_CLOCK",
+        "i2s_word_select": "I2S_WORD_SELECT",
+        "i2s_data": "I2S_DATA",
+    },
+    "haptics": {},
+    "radio": {"cs": "D24", "reset": "D25", "frequency": 915.0, "node": 1},
+    "sdcard": {"cs": "D26", "mount": "/sd"},
+    "ir": {"rx": "D11", "line": "D12"},
+}
+
+
+def test_a_config_declaring_every_section_narrates_each_built_in_build_order():
+    lines = _narration(parse_device_config(_EVERY_SECTION), writer_kind="pio").splitlines()
+
+    assert lines[:-1] == [
+        "[hw] begin board=test-board",
+        "[hw] high_current_rail pin=GP28 active_high=True asserted",
+        "[hw] i2c scl=GP5 sda=GP4 ok",
+        "[hw] spi sck=SCK mosi=MOSI miso=MISO ok",
+        "[hw] pixels[0] matrix cols=13 scope_rows=[global.main:0-5] brightness=1.00 ok",
+        "[hw] pixels[1] neopixel pin=D5 count=10 order=GRB scope=personal brightness=1.00 ok",
+        "[hw] buttons A=D9 ok",
+        "[hw] accelerometer lis3dh ok",
+        "[hw] magnetometer mmc5603 ok",
+        "[hw] audio voices=1 max_volume=0.50 i2s_bit_clock=I2S_BIT_CLOCK "
+        + "i2s_word_select=I2S_WORD_SELECT i2s_data=I2S_DATA ok",
+        "[hw] haptics drv2605 ok",
+        "[hw] radio frequency=915.0 node=1 cs=D24 reset=D25 ok",
+        "[hw] sdcard mount=/sd cs=D26 ok",
+        "[hw] ir rx=[D11] emitters=line:D12 writer=pio ok",
+    ]
+    assert re.fullmatch(r"\[hw\] ready outputs=4 buttons=1 elapsed_s=\d+\.\d{3}", lines[-1])
+
+
+def test_a_config_disabling_every_section_narrates_each_disabled_in_build_order():
+    every_disabled = {
+        name: section if name == "buttons" else _disabled(section)
+        for name, section in _EVERY_SECTION.items()
+        if name != "pixels"
+    }
+    every_disabled["pixels"] = [_disabled(entry) for entry in _EVERY_SECTION["pixels"]]
+
+    lines = _narration(parse_device_config(every_disabled)).splitlines()
+
+    assert lines[:-1] == [
+        "[hw] begin board=test-board",
+        "[hw] high_current_rail pin=GP28 active_high=True held off",
+        "[hw] i2c disabled",
+        "[hw] spi disabled",
+        "[hw] pixels[0] matrix disabled",
+        "[hw] pixels[1] neopixel disabled",
+        "[hw] buttons A=D9 ok",
+        "[hw] accelerometer lis3dh disabled",
+        "[hw] magnetometer mmc5603 disabled",
+        "[hw] audio disabled",
+        "[hw] haptics drv2605 disabled",
+        "[hw] radio frequency=915.0 node=1 cs=D24 reset=D25 disabled",
+        "[hw] sdcard mount=/sd cs=D26 disabled",
+        "[hw] ir rx=[D11] emitters=line:D12 disabled",
+    ]
+    assert re.fullmatch(r"\[hw\] ready outputs=0 buttons=1 elapsed_s=\d+\.\d{3}", lines[-1])
+
+
+def test_no_pixel_entries_narrate_no_pixel_lines():
+    assert "pixels[" not in _narration(_config())
+
+
+def test_the_current_budget_line_reports_limit_estimate_scale_and_strips_held_at_the_floor():
+    # 100 px @ 1.0 + 100 px @ 0.2 at 60 mA/px is a 7200 mA estimate; the dim
+    # strip is held at the 0.1 floor and the bright one scaled by 1400 / 6000.
+    config = _config(
+        pixels=[
+            {**_NEOPIXEL, "count": 100, "scope_pixels": {"personal": [0, 100]}},
+            {
+                **_NEOPIXEL,
+                "pin": "GP1",
+                "count": 100,
+                "brightness": 0.2,
+                "scope_pixels": {"ambient": [0, 100]},
+            },
+        ],
+        neopixel_current_budget={"current_limit_ma": 2000, "min_brightness": 0.1},
+    )
+
+    assert (
+        "[hw] neopixel_current_budget limit=2000mA estimate=7200mA scale=0.23 at_min_brightness=1\n"
+        in _narration(config)
+    )
+
+
 def test_a_disabled_pixel_entry_is_narrated_disabled():
     text = _narration(_config(pixels=[_disabled(_MATRIX)]))
 
@@ -327,8 +520,10 @@ def test_the_current_budget_is_reported_before_the_pixel_lines():
         ("accelerometer", _config(accelerometer={}), "[hw] accelerometer lis3dh FAILED\n"),
         ("storage", _config(sdcard=_SDCARD), "[hw] sdcard mount=/sd cs=GP15 FAILED\n"),
         ("ir_writer", _config(ir=_IR), "[hw] ir rx=[GP5] emitters=line:GP6 FAILED\n"),
+        ("button_reader", _config(buttons=["GP3"]), "[hw] buttons A=GP3 FAILED\n"),
+        ("haptic_output", _config(haptics={}), "[hw] haptics drv2605 FAILED\n"),
     ],
-    ids=["accelerometer", "storage", "ir_writer"],
+    ids=["accelerometer", "storage", "ir_writer", "button_reader", "haptic_output"],
 )
 def test_a_part_that_raises_fails_its_own_line_and_propagates(part, config, line):
     fragments: list[str] = []

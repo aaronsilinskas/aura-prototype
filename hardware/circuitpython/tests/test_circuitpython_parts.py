@@ -181,11 +181,16 @@ def test_i2c_bus_reports_no_bus_when_nothing_pulls_it_up(buses: None) -> None:
     assert parts.i2c_bus(None, None) is None
 
 
-def test_i2c_bus_is_the_injected_bus_when_one_is_held(buses: None) -> None:
+def test_i2c_bus_is_the_injected_bus_when_one_is_held(
+    buses: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    built: list[object] = []
+    monkeypatch.setattr(sys.modules["busio"], "I2C", lambda *pins: built.append(pins))
     injected = object()
     parts = CircuitPythonParts(_board("GP5", "GP4"), i2c=injected)
 
     assert parts.i2c_bus(PinRef("GP5", "i2c.scl"), PinRef("GP4", "i2c.sda")) is injected
+    assert built == []  # a built-then-discarded bus would still claim its pins
 
 
 def test_spi_bus_is_built_on_the_declared_pins(buses: None) -> None:
@@ -282,6 +287,18 @@ def test_neopixel_strip_drives_a_strip_on_its_pin_with_its_count_order_and_brigh
         0.25,
         False,
     )
+
+
+def test_neopixel_strip_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
+    neopixel: None,
+) -> None:
+    parts = CircuitPythonParts(_board("D5"))
+
+    expected = r"^pixels\.scopes\.personal\.pin: pin 'GP99' not found on board$"
+    with pytest.raises(ValueError, match=expected):
+        parts.neopixel_strip(
+            _strip({"personal": range(0, 4)}), PinRef("GP99", "pixels.scopes.personal.pin")
+        )
 
 
 def test_neopixel_strip_writes_each_scope_into_its_own_segment(neopixel: None) -> None:
@@ -381,10 +398,22 @@ def test_matrix_pixels_are_as_wide_as_the_configured_columns(matrix_driver: None
     assert output.min_resolution == 13
 
 
-def test_matrix_led_scaling_follows_the_configured_brightness(matrix_driver: None) -> None:
-    output = CircuitPythonParts(_board()).matrix_pixels(_matrix(brightness=0.2), object())
+@pytest.mark.parametrize(("brightness", "scaling"), [(0.2, 0x33), (1.0, 0xFF)])
+def test_matrix_led_scaling_follows_the_configured_brightness(
+    matrix_driver: None, brightness: float, scaling: int
+) -> None:
+    output = CircuitPythonParts(_board()).matrix_pixels(_matrix(brightness=brightness), object())
 
-    assert _driver(output).led_scaling == 0x33  # 0.2 * 0xFF
+    assert _driver(output).led_scaling == scaling
+
+
+@pytest.mark.parametrize("address", [None, 0x31])
+def test_matrix_driver_buffers_pixel_writes_until_show(
+    matrix_driver: None, address: int | None
+) -> None:
+    output = CircuitPythonParts(_board()).matrix_pixels(_matrix(address=address), object())
+
+    assert _driver(output).kwargs["allocate"] == sys.modules["adafruit_is31fl3741"].MUST_BUFFER
 
 
 def test_matrix_starts_enabled_at_full_global_current(matrix_driver: None) -> None:
@@ -765,6 +794,14 @@ def test_ir_reader_reads_pulses_received_on_its_pin(pulsein: None) -> None:
     assert (pulses.pin, received) == (board.GP7, [9000, 4500, None])
 
 
+def test_ir_reader_listens_for_an_idle_high_receiver_with_a_256_pulse_buffer(
+    pulsein: None,
+) -> None:
+    CircuitPythonParts(_board("GP7")).ir_reader(PinRef("GP7", "ir.rx"))
+
+    assert [(p.idle_state, p.maxlen) for p in _FakePulseIn.built] == [(True, 256)]
+
+
 def test_ir_reader_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
     pulsein: None,
 ) -> None:
@@ -804,7 +841,12 @@ class _FakeStateMachine:
         self, program: object, frequency: int, /, *, first_set_pin: object, **_kwargs: object
     ) -> None:
         self.pin = first_set_pin
+        self.writing = False
+        self.written: list[object] = []
         _FakeStateMachine.built.append(self)
+
+    def background_write(self, buffer: object) -> None:
+        self.written.append(buffer)
 
 
 @pytest.fixture
@@ -857,6 +899,25 @@ def test_ir_writer_on_pio_silicon_clocks_its_carrier_out_of_a_state_machine_on_i
     CircuitPythonParts(board).ir_writer("line", PinRef("GP8", "ir.line"))
 
     assert [sm.pin for sm in _FakeStateMachine.built] == [board.GP8]
+
+
+def test_ir_writer_on_pio_silicon_sends_pulses_through_its_state_machine(pio: None) -> None:
+    writer, _kind = CircuitPythonParts(_board("GP8")).ir_writer("line", PinRef("GP8", "ir.line"))
+
+    writer.write_pulses([9000, 4500, 560])
+
+    ((state_machine),) = _FakeStateMachine.built
+    assert len(state_machine.written) == 1
+
+
+def test_each_ir_writer_on_pio_silicon_gets_its_own_state_machine(pio: None) -> None:
+    board = _board("GP8", "GP9", "GP10")
+    parts = CircuitPythonParts(board)
+
+    for emitter, pin in (("line", "GP8"), ("cone", "GP9"), ("area_of_effect", "GP10")):
+        parts.ir_writer(emitter, PinRef(pin, f"ir.{emitter}"))
+
+    assert [sm.pin for sm in _FakeStateMachine.built] == [board.GP8, board.GP9, board.GP10]
 
 
 def test_ir_writer_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
@@ -930,6 +991,20 @@ def test_radio_chip_select_and_reset_are_gpios_on_their_referenced_pins(
     assert [g.pin for g in gpio] == [board.D10, board.D11]
 
 
+@pytest.mark.parametrize("unknown", range(2))
+def test_radio_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
+    rfm69: None, unknown: int
+) -> None:
+    pins = list(_RADIO_PINS)
+    field = pins[unknown].field
+    pins[unknown] = PinRef("NOPE", field)
+
+    with pytest.raises(ValueError, match=rf"^{field}: pin 'NOPE' not found on board$"):
+        CircuitPythonParts(_board("D10", "D11")).radio_transport(
+            RadioConfig("D10", "D11", 433.0, 7), object(), *pins
+        )
+
+
 # ---------------------------------------------------------------------------
 # Storage
 # ---------------------------------------------------------------------------
@@ -998,8 +1073,10 @@ def test_storage_whose_card_fails_to_mount_raises_sd_card_mount_error_naming_cs_
     setattr(fake, flag, False)
     parts = CircuitPythonParts(_board("D24"))
 
-    with pytest.raises(SdCardMountError, match=r"cs=D24 mount=/media"):
+    expected = r"^sdcard section is declared but the card at cs=D24 mount=/media failed to mount: "
+    with pytest.raises(SdCardMountError, match=expected) as raised:
         parts.storage(SDCardConfig("D24", "/media"), object(), PinRef("D24", "sdcard.cs"))
+    assert isinstance(raised.value.__cause__, OSError)
 
 
 # ---------------------------------------------------------------------------
@@ -1008,6 +1085,8 @@ def test_storage_whose_card_fails_to_mount_raises_sd_card_mount_error_naming_cs_
 
 
 _OPTIONAL_PARTS = {
+    "matrix_pixels": ("adafruit_is31fl3741", "adafruit_is31fl3741.adafruit_rgbmatrixqt"),
+    "neopixel_strip": ("neopixel",),
     "accelerometer": ("adafruit_lis3dh",),
     "magnetometer": ("adafruit_mmc56x3",),
     "haptic_output": ("adafruit_drv2605",),
@@ -1020,6 +1099,10 @@ _OPTIONAL_PARTS = {
 
 
 _REQUESTS: dict[str, Callable[[CircuitPythonParts], object]] = {
+    "matrix_pixels": lambda parts: parts.matrix_pixels(_matrix(), object()),
+    "neopixel_strip": lambda parts: parts.neopixel_strip(
+        _strip({"personal": range(0, 4)}), PinRef("D5", "pixels.pin")
+    ),
     "accelerometer": lambda parts: parts.accelerometer(I2CDeviceConfig(), object()),
     "magnetometer": lambda parts: parts.magnetometer(I2CDeviceConfig(), object()),
     "haptic_output": lambda parts: parts.haptic_output(I2CDeviceConfig(), object()),
@@ -1053,7 +1136,9 @@ def libraries_missing(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_requesting_a_part_whose_driver_library_is_missing_raises_import_error(
     libraries_missing: None, part: str
 ) -> None:
-    parts = CircuitPythonParts(_board("GP7", "GP8", "GP10", "GP11", "GP12", "D10", "D11", "D24"))
+    parts = CircuitPythonParts(
+        _board("GP7", "GP8", "GP10", "GP11", "GP12", "D5", "D10", "D11", "D24")
+    )
 
     with pytest.raises(ImportError):
         _REQUESTS[part](parts)

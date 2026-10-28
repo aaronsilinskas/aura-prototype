@@ -22,7 +22,7 @@ sys.modules.setdefault("microcontroller", _microcontroller_mod)
 _board = sys.modules["board"]
 
 # ---------------------------------------------------------------------------
-# adafruit_is31fl3741 stub — minimal for device_builder imports
+# adafruit_is31fl3741 stub — minimal for circuitpython_parts imports
 # ---------------------------------------------------------------------------
 
 _is31_mod = types.ModuleType("adafruit_is31fl3741")
