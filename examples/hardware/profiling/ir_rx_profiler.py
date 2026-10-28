@@ -2,7 +2,7 @@
 `ir_receive_component_costs` table in `docs/hardware/recorded-metrics.md` (see also
 `docs/hardware/calibration-guide.md`).
 
-Drives the real `InfraredMultiReceiver.receive()` polling loop over the fixed 4
+Drives the real `InfraredReceiver.receive()` polling loop over the fixed 4
 `PulseInReader`s using the **tunable-injected-load technique**: each frame, after
 polling the receivers, an artificial per-frame busy-loop (`INJECTED_LOAD_MS`) is
 executed to simulate co-located CPU load. `INJECTED_LOAD_MS` is swept upward across
@@ -53,7 +53,7 @@ import time
 
 from effects.performance import PerformanceTracker
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder
-from hardware.shared.ir_transport import InfraredMultiReceiver
+from hardware.shared.ir_transport import InfraredReceiver
 from hardware.shared.profiler_report import (
     print_profile_header,
     print_stats_line,
@@ -106,7 +106,7 @@ def _busy_wait_ms(duration_ms: float) -> None:
 def run() -> None:
     """Sweep injected per-frame load, reporting packet-loss rate vs. frame time."""
     readers = _build_readers()
-    receiver = InfraredMultiReceiver(readers, AuraInfraredDecoder)
+    receiver = InfraredReceiver(readers, AuraInfraredDecoder)
 
     print_profile_header(
         component="ir_rx",

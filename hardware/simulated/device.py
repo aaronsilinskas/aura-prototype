@@ -54,9 +54,7 @@ from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEnco
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_transport import (
-    InfraredMultiReceiver,
     InfraredReceiver,
-    InfraredSingleReceiver,
     InfraredTransmitter,
     IrTransmitGate,
     PulseReader,
@@ -618,11 +616,7 @@ class SimulatedHardware:
     def _build_ir(self) -> InfraredTransceiver:
         """Assemble the real IR stack the way ``device_builder`` does, on simulated pulses."""
         gate = IrTransmitGate()
-        receiver: InfraredReceiver
-        if len(self._ir_readers) == 1:
-            receiver = InfraredSingleReceiver(self._ir_readers[0], AuraInfraredDecoder(), gate)
-        else:
-            receiver = InfraredMultiReceiver(list(self._ir_readers), AuraInfraredDecoder, gate)
+        receiver = InfraredReceiver(list(self._ir_readers), AuraInfraredDecoder, gate)
         self._ir_receiver = receiver
         transmitters = {
             emitter: InfraredTransmitter(

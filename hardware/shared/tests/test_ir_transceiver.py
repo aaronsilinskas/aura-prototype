@@ -4,11 +4,11 @@ import pytest
 
 from engine.network import CONE, LINE
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
+from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 from hardware.shared.ir_telemetry import format_ir_telemetry_line
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_transport import (
     InfraredReceiver,
-    InfraredSingleReceiver,
     InfraredTransmitter,
     IrTransmitGate,
     PulseReader,
@@ -85,43 +85,6 @@ class _RecordingSetEncoderTransmitter:
         self._calls.append(encoder)
 
 
-class _RecordingReceiver(InfraredReceiver):
-    """Records each receive() call into a shared order list; returns nothing."""
-
-    def __init__(self, calls: list) -> None:
-        super().__init__()
-        self._calls = calls
-
-    def receive(self) -> bytearray | None:
-        self._calls.append("receive")
-        return None
-
-
-class _ScriptedReceiver(InfraredReceiver):
-    """Returns a pre-scripted sequence of receive() results, one per call."""
-
-    def __init__(self, results: list) -> None:
-        super().__init__()
-        self._results = list(results)
-
-    def receive(self) -> bytearray | None:
-        return self._results.pop(0) if self._results else None
-
-
-class _RecordingSetDecoderReceiver(InfraredReceiver):
-    """Records the decoder installed via set_decoder(); never decodes anything."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.decoder = None
-
-    def receive(self) -> bytearray | None:
-        return None  # not exercised by these tests
-
-    def set_decoder(self, decoder) -> None:
-        self.decoder = decoder
-
-
 class ControllableFakePulseWriter(PulseWriter):
     """Non-blocking fake writer whose busy state the test drives directly."""
 
@@ -156,8 +119,24 @@ class FakePulseReader(PulseReader):
         return None
 
 
+class _RecordingPulseReader(PulseReader):
+    """Records each read_pulse() call into a shared order list; never has a pulse."""
+
+    def __init__(self, calls: list) -> None:
+        self._calls = calls
+
+    def read_pulse(self) -> int | None:
+        self._calls.append("read")
+        return None
+
+
 def _encode_pulses(payload: bytes) -> list:
     return list(AuraInfraredEncoder().encode(payload))
+
+
+def _receiver_holding(pulses) -> InfraredReceiver:
+    """A real Aura-decoding receiver over one reader preloaded with *pulses*."""
+    return InfraredReceiver([FakePulseReader(pulses)], AuraInfraredDecoder)
 
 
 # ---------------------------------------------------------------------------
@@ -259,13 +238,14 @@ def test_busy_raises_for_unwired_emitter() -> None:
 
 def test_update_pumps_the_transmitter_before_receiving() -> None:
     calls: list = []
+    receiver = InfraredReceiver([_RecordingPulseReader(calls)], AuraInfraredDecoder)
     transceiver = InfraredTransceiver(
-        {LINE: _RecordingTransmitter(calls)}, _RecordingReceiver(calls), IrTransmitGate()
+        {LINE: _RecordingTransmitter(calls)}, receiver, IrTransmitGate()
     )
 
     transceiver.update()
 
-    assert calls == ["poll", "receive"]
+    assert calls == ["poll", "read"]
 
 
 def test_update_polls_every_wired_transmitter() -> None:
@@ -304,7 +284,7 @@ def test_update_with_no_transmitters_or_receiver_leaves_received_none() -> None:
 
 
 def test_received_is_none_when_the_receiver_decodes_nothing() -> None:
-    transceiver = InfraredTransceiver({}, _ScriptedReceiver([None]), IrTransmitGate())
+    transceiver = InfraredTransceiver({}, _receiver_holding([100, 200]), IrTransmitGate())
 
     transceiver.update()
 
@@ -313,16 +293,20 @@ def test_received_is_none_when_the_receiver_decodes_nothing() -> None:
 
 def test_received_holds_the_decoded_payload_on_a_decoding_tick() -> None:
     payload = bytearray(b"\xab\xcd")
-    transceiver = InfraredTransceiver({}, _ScriptedReceiver([payload]), IrTransmitGate())
+    transceiver = InfraredTransceiver(
+        {}, _receiver_holding(_encode_pulses(payload)), IrTransmitGate()
+    )
 
     transceiver.update()
 
-    assert transceiver.received is payload
+    assert transceiver.received == payload
 
 
 def test_received_resets_to_none_on_the_tick_after_a_decode() -> None:
     payload = bytearray(b"\x01")
-    transceiver = InfraredTransceiver({}, _ScriptedReceiver([payload, None]), IrTransmitGate())
+    transceiver = InfraredTransceiver(
+        {}, _receiver_holding(_encode_pulses(payload)), IrTransmitGate()
+    )
 
     transceiver.update()
     transceiver.update()
@@ -353,13 +337,16 @@ def test_apply_codec_fans_the_encoder_out_to_every_transmitter() -> None:
 
 
 def test_apply_codec_installs_the_decoder_on_the_receiver() -> None:
-    receiver = _RecordingSetDecoderReceiver()
-    decoder = AuraInfraredDecoder()
-    transceiver = InfraredTransceiver({}, receiver, IrTransmitGate())
+    """A Tag frame only decodes once the Tag decoder is installed."""
+    payload = bytearray([0x10])
+    receiver = _receiver_holding(TagInfraredEncoder().encode(payload))
+    tx, _ = _make_transmitter()
+    transceiver = InfraredTransceiver({LINE: tx}, receiver, IrTransmitGate())
 
-    transceiver.apply_codec(AuraInfraredEncoder(), decoder)
+    transceiver.apply_codec(TagInfraredEncoder(), TagInfraredDecoder())
+    transceiver.update()
 
-    assert receiver.decoder is decoder
+    assert transceiver.received == payload
 
 
 def test_apply_codec_still_fans_out_the_encoder_with_no_receiver_wired() -> None:
@@ -375,13 +362,14 @@ def test_apply_codec_still_fans_out_the_encoder_with_no_receiver_wired() -> None
 
 
 def test_apply_codec_still_installs_the_decoder_with_no_transmitters_wired() -> None:
-    receiver = _RecordingSetDecoderReceiver()
-    decoder = AuraInfraredDecoder()
+    payload = bytearray([0x20])
+    receiver = _receiver_holding(TagInfraredEncoder().encode(payload))
     transceiver = InfraredTransceiver({}, receiver, IrTransmitGate())
 
-    transceiver.apply_codec(AuraInfraredEncoder(), decoder)  # must not raise
+    transceiver.apply_codec(TagInfraredEncoder(), TagInfraredDecoder())  # must not raise
+    transceiver.update()
 
-    assert receiver.decoder is decoder
+    assert transceiver.received == payload
 
 
 def test_apply_codec_is_a_safe_noop_with_no_transmitters_and_no_receiver() -> None:
@@ -398,7 +386,7 @@ def test_apply_codec_is_a_safe_noop_with_no_transmitters_and_no_receiver() -> No
 def test_last_signal_strength_is_forwarded_from_the_receiver() -> None:
     payload = bytearray(b"\x42")
     reader = FakePulseReader(_encode_pulses(payload))
-    receiver = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+    receiver = InfraredReceiver([reader], AuraInfraredDecoder)
     transceiver = InfraredTransceiver({}, receiver, IrTransmitGate())
 
     transceiver.update()
@@ -409,7 +397,7 @@ def test_last_signal_strength_is_forwarded_from_the_receiver() -> None:
 def test_last_error_margin_is_forwarded_from_the_receiver() -> None:
     payload = bytearray(b"\x42")
     reader = FakePulseReader(_encode_pulses(payload))
-    receiver = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+    receiver = InfraredReceiver([reader], AuraInfraredDecoder)
     transceiver = InfraredTransceiver({}, receiver, IrTransmitGate())
 
     transceiver.update()
@@ -420,7 +408,7 @@ def test_last_error_margin_is_forwarded_from_the_receiver() -> None:
 def test_telemetry_line_is_forwarded_from_the_receiver() -> None:
     payload = bytearray(b"\x42")
     reader = FakePulseReader(_encode_pulses(payload))
-    receiver = InfraredSingleReceiver(reader, AuraInfraredDecoder())
+    receiver = InfraredReceiver([reader], AuraInfraredDecoder)
     transceiver = InfraredTransceiver({}, receiver, IrTransmitGate())
 
     transceiver.update()
@@ -459,7 +447,7 @@ def test_update_discards_self_echo_and_an_overlapping_real_shot_while_transmitti
     writer = ControllableFakePulseWriter()
     tx = InfraredTransmitter(writer, AuraInfraredEncoder(), gate)
     reader = FakePulseReader()
-    receiver = InfraredSingleReceiver(reader, AuraInfraredDecoder(), gate)
+    receiver = InfraredReceiver([reader], AuraInfraredDecoder, gate)
     transceiver = InfraredTransceiver({LINE: tx}, receiver, gate)
 
     tx.send(b"\xaa")  # non-blocking writer stays busy — gate armed across ticks
@@ -483,7 +471,7 @@ def test_update_falling_edge_flush_recovers_the_decoder_for_the_next_genuine_pac
     writer = ControllableFakePulseWriter()
     tx = InfraredTransmitter(writer, AuraInfraredEncoder(), gate)
     reader = FakePulseReader()
-    receiver = InfraredSingleReceiver(reader, AuraInfraredDecoder(), gate)
+    receiver = InfraredReceiver([reader], AuraInfraredDecoder, gate)
     transceiver = InfraredTransceiver({LINE: tx}, receiver, gate)
 
     tx.send(b"\xaa")  # gate armed
