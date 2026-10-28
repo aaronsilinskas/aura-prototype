@@ -22,13 +22,15 @@ from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
-from hardware.circuitpython.circuitpython_parts import CircuitPythonParts
+from hardware.circuitpython.circuitpython_parts import CircuitPythonParts, SdCardMountError
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.shared.device_config import (
     AudioConfig,
     I2CDeviceConfig,
     MatrixPixelsConfig,
     NeoPixelStripConfig,
+    RadioConfig,
+    SDCardConfig,
 )
 from hardware.shared.device_parts import PinRef
 
@@ -725,6 +727,272 @@ def test_audio_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
 
 
 # ---------------------------------------------------------------------------
+# IR pulse readers
+# ---------------------------------------------------------------------------
+
+
+class _FakePulseIn(list):
+    """A ``pulseio.PulseIn`` buffer of pulse durations, remembering how it was opened."""
+
+    built: ClassVar[list[_FakePulseIn]] = []
+
+    def __init__(self, pin: object, *, maxlen: int, idle_state: bool) -> None:
+        super().__init__()
+        self.pin = pin
+        self.maxlen = maxlen
+        self.idle_state = idle_state
+        _FakePulseIn.built.append(self)
+
+    def popleft(self) -> int:
+        return self.pop(0)
+
+
+@pytest.fixture
+def pulsein(monkeypatch: pytest.MonkeyPatch) -> None:
+    _FakePulseIn.built = []
+    monkeypatch.setattr(sys.modules["pulseio"], "PulseIn", _FakePulseIn, raising=False)
+
+
+def test_ir_reader_reads_pulses_received_on_its_pin(pulsein: None) -> None:
+    board = _board("GP7")
+
+    reader = CircuitPythonParts(board).ir_reader(PinRef("GP7", "ir.rx"))
+    (pulses,) = _FakePulseIn.built
+    pulses.extend([9000, 4500])
+
+    received = [reader.read_pulse() for _ in range(3)]
+
+    assert (pulses.pin, received) == (board.GP7, [9000, 4500, None])
+
+
+# ---------------------------------------------------------------------------
+# IR pulse writers
+# ---------------------------------------------------------------------------
+
+
+class _FakePulseOut:
+    """A ``pulseio.PulseOut`` carrier on a pin, recording every pulse train sent."""
+
+    built: ClassVar[list[_FakePulseOut]] = []
+
+    def __init__(self, pin: object, *, frequency: int, duty_cycle: int) -> None:
+        self.pin = pin
+        self.frequency = frequency
+        self.duty_cycle = duty_cycle
+        self.sent: list[list[int]] = []
+        _FakePulseOut.built.append(self)
+
+    def send(self, durations: list[int]) -> None:
+        self.sent.append(list(durations))
+
+
+class _FakeStateMachine:
+    """An ``rp2pio.StateMachine``; program and frequency are positional-only, as on the board."""
+
+    built: ClassVar[list[_FakeStateMachine]] = []
+
+    def __init__(
+        self, program: object, frequency: int, /, *, first_set_pin: object, **_kwargs: object
+    ) -> None:
+        self.pin = first_set_pin
+        _FakeStateMachine.built.append(self)
+
+
+@pytest.fixture
+def pulseout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fake ``pulseio.PulseOut`` on silicon without PIO (``rp2pio`` unimportable)."""
+    _FakePulseOut.built = []
+    monkeypatch.setattr(sys.modules["pulseio"], "PulseOut", _FakePulseOut, raising=False)
+    monkeypatch.setitem(sys.modules, "rp2pio", None)
+
+
+@pytest.fixture
+def pio(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fake ``rp2pio`` and ``adafruit_pioasm``, as on RP2040/RP2350 silicon."""
+    _FakeStateMachine.built = []
+    _install_library(monkeypatch, "rp2pio", StateMachine=_FakeStateMachine)
+    program = lambda source: SimpleNamespace(assembled=source)  # noqa: E731
+    _install_library(monkeypatch, "adafruit_pioasm", Program=program)
+
+
+def test_ir_writer_on_silicon_without_pio_reports_the_pulseio_kind(pulseout: None) -> None:
+    _writer, kind = CircuitPythonParts(_board("GP8")).ir_writer("line", PinRef("GP8", "ir.line"))
+
+    assert kind == "pulseio"
+
+
+def test_ir_writer_on_silicon_without_pio_sends_pulses_on_a_38khz_carrier_on_its_pin(
+    pulseout: None,
+) -> None:
+    board = _board("GP8")
+    writer, _kind = CircuitPythonParts(board).ir_writer("line", PinRef("GP8", "ir.line"))
+
+    writer.write_pulses([9000, 4500, 560])
+
+    assert [(p.pin, p.frequency, p.sent) for p in _FakePulseOut.built] == [
+        (board.GP8, 38000, [[9000, 4500, 560]])
+    ]
+
+
+def test_ir_writer_on_pio_silicon_reports_the_pio_kind(pio: None) -> None:
+    _writer, kind = CircuitPythonParts(_board("GP8")).ir_writer("line", PinRef("GP8", "ir.line"))
+
+    assert kind == "pio"
+
+
+def test_ir_writer_on_pio_silicon_clocks_its_carrier_out_of_a_state_machine_on_its_pin(
+    pio: None,
+) -> None:
+    board = _board("GP8")
+
+    CircuitPythonParts(board).ir_writer("line", PinRef("GP8", "ir.line"))
+
+    assert [sm.pin for sm in _FakeStateMachine.built] == [board.GP8]
+
+
+def test_ir_writer_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
+    pulseout: None,
+) -> None:
+    parts = CircuitPythonParts(_board("GP8"))
+
+    with pytest.raises(ValueError, match=r"^ir\.cone: pin 'GP99' not found on board$"):
+        parts.ir_writer("cone", PinRef("GP99", "ir.cone"))
+
+
+# ---------------------------------------------------------------------------
+# Radio transport
+# ---------------------------------------------------------------------------
+
+
+class _FakeRfm69:
+    """An ``adafruit_rfm69.RFM69`` chip, remembering how it was built and what it sent."""
+
+    built: ClassVar[list[_FakeRfm69]] = []
+
+    def __init__(self, spi: object, cs: object, reset: object, frequency: float) -> None:
+        self.spi = spi
+        self.cs = cs
+        self.reset = reset
+        self.frequency = frequency
+        self.node: int | None = None
+        self.receive_timeout: float | None = 0.5
+        self.sent: list[bytes] = []
+        _FakeRfm69.built.append(self)
+
+    def send(self, data: bytes, keep_listening: bool = False) -> None:
+        self.sent.append(data)
+
+
+@pytest.fixture
+def rfm69(monkeypatch: pytest.MonkeyPatch, gpio: list[_FakeDigitalInOut]) -> None:
+    _FakeRfm69.built = []
+    monkeypatch.setattr(sys.modules["adafruit_rfm69"], "RFM69", _FakeRfm69, raising=False)
+
+
+_RADIO_PINS = (PinRef("D10", "radio.cs"), PinRef("D11", "radio.reset"))
+
+
+def test_radio_transport_sends_through_an_rfm69_on_the_given_bus_at_its_frequency_and_node(
+    rfm69: None,
+) -> None:
+    bus = object()
+    transport = CircuitPythonParts(_board("D10", "D11")).radio_transport(
+        RadioConfig("D10", "D11", 433.0, 7), bus, *_RADIO_PINS
+    )
+
+    transport.send(b"hi")
+
+    assert [(r.spi, r.frequency, r.node, r.sent) for r in _FakeRfm69.built] == [
+        (bus, 433.0, 7, [b"hi"])
+    ]
+
+
+def test_radio_chip_select_and_reset_are_gpios_on_their_referenced_pins(
+    rfm69: None, gpio: list[_FakeDigitalInOut]
+) -> None:
+    board = _board("D10", "D11")
+
+    CircuitPythonParts(board).radio_transport(
+        RadioConfig("D10", "D11", 433.0, 7), object(), *_RADIO_PINS
+    )
+
+    (chip,) = _FakeRfm69.built
+    assert (chip.cs, chip.reset) == tuple(gpio)
+    assert [g.pin for g in gpio] == [board.D10, board.D11]
+
+
+# ---------------------------------------------------------------------------
+# Storage
+# ---------------------------------------------------------------------------
+
+
+class _FakeSDCard:
+    """An ``sdcardio.SDCard``; raises as the real one does when no card is fitted."""
+
+    fitted = True
+
+    def __init__(self, spi: object, cs: object) -> None:
+        if not _FakeSDCard.fitted:
+            raise OSError("no SD card")
+        self.spi = spi
+        self.cs = cs
+
+
+class _FakeVfsFat:
+    """A FAT filesystem on a card; raises as the real one does when the card has none."""
+
+    formatted = True
+
+    def __init__(self, card: _FakeSDCard) -> None:
+        if not _FakeVfsFat.formatted:
+            raise OSError("no FAT filesystem")
+        self.card = card
+
+
+@pytest.fixture
+def sd(monkeypatch: pytest.MonkeyPatch) -> list[tuple[_FakeVfsFat, str]]:
+    """Fake ``sdcardio`` and ``storage``; returns every ``(filesystem, mount point)`` mounted."""
+    _FakeSDCard.fitted = True
+    _FakeVfsFat.formatted = True
+    mounted: list[tuple[_FakeVfsFat, str]] = []
+    monkeypatch.setattr(sys.modules["sdcardio"], "SDCard", _FakeSDCard, raising=False)
+    storage = sys.modules["storage"]
+    monkeypatch.setattr(storage, "VfsFat", _FakeVfsFat, raising=False)
+    monkeypatch.setattr(
+        storage,
+        "mount",
+        lambda fs, mount, readonly=True: mounted.append((fs, mount)),
+        raising=False,
+    )
+    return mounted
+
+
+def test_storage_mounts_the_card_on_the_given_bus_and_chip_select_at_its_mount_point(
+    sd: list[tuple[_FakeVfsFat, str]],
+) -> None:
+    board = _board("D24")
+    bus = object()
+
+    CircuitPythonParts(board).storage(SDCardConfig("D24", "/sd"), bus, PinRef("D24", "sdcard.cs"))
+
+    assert [(fs.card.spi, fs.card.cs, mount) for fs, mount in sd] == [(bus, board.D24, "/sd")]
+
+
+@pytest.mark.parametrize("fault", ["no card fitted", "no FAT filesystem"])
+def test_storage_whose_card_fails_to_mount_raises_sd_mount_error_naming_cs_and_mount(
+    sd: list[tuple[_FakeVfsFat, str]], fault: str
+) -> None:
+    if fault == "no card fitted":
+        _FakeSDCard.fitted = False
+    else:
+        _FakeVfsFat.formatted = False
+    parts = CircuitPythonParts(_board("D24"))
+
+    with pytest.raises(SdCardMountError, match=r"cs=D24 mount=/media"):
+        parts.storage(SDCardConfig("D24", "/media"), object(), PinRef("D24", "sdcard.cs"))
+
+
+# ---------------------------------------------------------------------------
 # Optional driver libraries
 # ---------------------------------------------------------------------------
 
@@ -734,6 +1002,10 @@ _OPTIONAL_PARTS = {
     "magnetometer": ("adafruit_mmc56x3",),
     "haptic_output": ("adafruit_drv2605",),
     "audio_output": ("audiobusio", "audiocore", "audiomixer"),
+    "ir_reader": ("pulseio",),
+    "ir_writer": ("pulseio", "rp2pio"),
+    "radio_transport": ("adafruit_rfm69",),
+    "storage": ("sdcardio", "storage"),
 }
 
 
@@ -742,6 +1014,14 @@ _REQUESTS: dict[str, Callable[[CircuitPythonParts], object]] = {
     "magnetometer": lambda parts: parts.magnetometer(I2CDeviceConfig(), object()),
     "haptic_output": lambda parts: parts.haptic_output(I2CDeviceConfig(), object()),
     "audio_output": lambda parts: parts.audio_output(_audio(), AudioRegistry(), *_I2S_PINS),
+    "ir_reader": lambda parts: parts.ir_reader(PinRef("GP7", "ir.rx")),
+    "ir_writer": lambda parts: parts.ir_writer("line", PinRef("GP8", "ir.line")),
+    "radio_transport": lambda parts: parts.radio_transport(
+        RadioConfig("D10", "D11", 433.0, 7), object(), *_RADIO_PINS
+    ),
+    "storage": lambda parts: parts.storage(
+        SDCardConfig("D24"), object(), PinRef("D24", "sdcard.cs")
+    ),
 }
 
 
@@ -750,7 +1030,12 @@ def libraries_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make every optional part's driver library unimportable, as on a board without them."""
     for library in sum(_OPTIONAL_PARTS.values(), ()):
         monkeypatch.setitem(sys.modules, library, None)
-    for module in ("hardware.circuitpython.audio_output", "hardware.circuitpython.drv2605_output"):
+    for module in (
+        "hardware.circuitpython.audio_output",
+        "hardware.circuitpython.drv2605_output",
+        "hardware.circuitpython.rfm69_radio_transport",
+        "hardware.circuitpython.sdcard_storage",
+    ):
         monkeypatch.delitem(sys.modules, module, raising=False)
 
 
@@ -758,7 +1043,7 @@ def libraries_missing(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_requesting_a_part_whose_driver_library_is_missing_raises_import_error(
     libraries_missing: None, part: str
 ) -> None:
-    parts = CircuitPythonParts(_board("GP10", "GP11", "GP12"))
+    parts = CircuitPythonParts(_board("GP7", "GP8", "GP10", "GP11", "GP12", "D10", "D11", "D24"))
 
     with pytest.raises(ImportError):
         _REQUESTS[part](parts)
