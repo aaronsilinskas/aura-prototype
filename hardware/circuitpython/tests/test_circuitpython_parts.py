@@ -10,14 +10,24 @@ from __future__ import annotations
 
 import sys
 import time
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from typing import ClassVar
 
 import pytest
 
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectHaptic, HapticPattern
+from engine.audio import AudioRegistry
+from engine.effects.output import EffectOutput
+from engine.events import EffectEvent
+from engine.state import EffectReceipt
 from hardware.circuitpython.circuitpython_parts import CircuitPythonParts
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
-from hardware.shared.device_config import MatrixPixelsConfig, NeoPixelStripConfig
+from hardware.shared.device_config import (
+    AudioConfig,
+    I2CDeviceConfig,
+    MatrixPixelsConfig,
+    NeoPixelStripConfig,
+)
 from hardware.shared.device_parts import PinRef
 
 
@@ -394,3 +404,360 @@ def test_matrix_that_never_responds_raises_after_the_startup_window(matrix_drive
 
     with pytest.raises(RuntimeError, match="IS31FL3741 matrix did not respond within 3s"):
         parts.matrix_pixels(_matrix(), object())
+
+
+# ---------------------------------------------------------------------------
+# I2C sensors and haptics
+# ---------------------------------------------------------------------------
+
+
+class _FakeI2CChip:
+    """An I2C chip driver, remembering the bus and keywords it was built with."""
+
+    def __init__(self, i2c: object, **kwargs: object) -> None:
+        self.i2c = i2c
+        self.kwargs = kwargs
+
+
+def _install_library(
+    monkeypatch: pytest.MonkeyPatch, name: str, **attributes: object
+) -> ModuleType:
+    """Install a fake driver library at *name* for the duration of a test."""
+    module = ModuleType(name)
+    for attribute, value in attributes.items():
+        setattr(module, attribute, value)
+    monkeypatch.setitem(sys.modules, name, module)
+    return module
+
+
+@pytest.fixture
+def lis3dh(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_library(monkeypatch, "adafruit_lis3dh", LIS3DH_I2C=_FakeI2CChip)
+
+
+def test_accelerometer_is_a_lis3dh_on_the_given_bus_at_its_configured_address(
+    lis3dh: None,
+) -> None:
+    bus = object()
+
+    accelerometer = CircuitPythonParts(_board()).accelerometer(I2CDeviceConfig(address=0x19), bus)
+
+    assert isinstance(accelerometer, _FakeI2CChip)
+    assert (accelerometer.i2c, accelerometer.kwargs) == (bus, {"address": 0x19})
+
+
+def test_accelerometer_leaves_the_drivers_default_address_when_none_is_configured(
+    lis3dh: None,
+) -> None:
+    accelerometer = CircuitPythonParts(_board()).accelerometer(I2CDeviceConfig(), object())
+
+    assert isinstance(accelerometer, _FakeI2CChip)
+    assert accelerometer.kwargs == {}
+
+
+# The all-zero-register reading a dead MMC5603 that still ACKs the bus streams;
+# the on-device literal, not the module's constant.
+_DEAD_MAGNETOMETER_UT = (-3276.8, -3276.8, -3276.8)
+_LIVE_MAGNETOMETER_UT = (12.3, -4.5, 40.1)
+
+
+class _FakeMmc5603(_FakeI2CChip):
+    """An MMC5603 whose first ``dead_polls`` reads of ``.magnetic`` are the dead-chip reading."""
+
+    dead_polls = 0
+
+    def __init__(self, i2c: object, **kwargs: object) -> None:
+        super().__init__(i2c, **kwargs)
+        self.data_rate: int | None = None
+        self.continuous_mode = False
+        self.polls = 0
+
+    @property
+    def magnetic(self) -> tuple[float, float, float]:
+        self.polls += 1
+        if self.polls <= _FakeMmc5603.dead_polls:
+            return _DEAD_MAGNETOMETER_UT
+        return _LIVE_MAGNETOMETER_UT
+
+
+@pytest.fixture
+def mmc56x3(monkeypatch: pytest.MonkeyPatch) -> None:
+    _FakeMmc5603.dead_polls = 0
+    _install_library(monkeypatch, "adafruit_mmc56x3", MMC5603=_FakeMmc5603)
+    monkeypatch.setattr(time, "sleep", lambda _seconds: None)
+
+
+def _magnetometer() -> _FakeMmc5603:
+    magnetometer = CircuitPythonParts(_board()).magnetometer(I2CDeviceConfig(), object())
+    assert isinstance(magnetometer, _FakeMmc5603)
+    return magnetometer
+
+
+def test_magnetometer_is_an_mmc5603_on_the_given_bus_at_its_configured_address(
+    mmc56x3: None,
+) -> None:
+    bus = object()
+
+    magnetometer = CircuitPythonParts(_board()).magnetometer(I2CDeviceConfig(address=0x32), bus)
+
+    assert isinstance(magnetometer, _FakeMmc5603)
+    assert (magnetometer.i2c, magnetometer.kwargs) == (bus, {"address": 0x32})
+
+
+def test_magnetometer_leaves_the_drivers_default_address_when_none_is_configured(
+    mmc56x3: None,
+) -> None:
+    assert _magnetometer().kwargs == {}
+
+
+def test_magnetometer_free_runs_in_continuous_mode_at_100hz(mmc56x3: None) -> None:
+    magnetometer = _magnetometer()
+
+    assert (magnetometer.data_rate, magnetometer.continuous_mode) == (100, True)
+
+
+def test_magnetometer_that_reads_dead_on_every_axis_raises_a_wiring_fault(mmc56x3: None) -> None:
+    _FakeMmc5603.dead_polls = 1000
+
+    with pytest.raises(RuntimeError, match="check its power and ground wiring"):
+        _magnetometer()
+
+
+def test_magnetometer_whose_first_conversions_read_dead_is_used_once_one_reads_live(
+    mmc56x3: None,
+) -> None:
+    _FakeMmc5603.dead_polls = 2
+
+    assert _magnetometer().magnetic == _LIVE_MAGNETOMETER_UT
+
+
+class _FakeDrv2605(_FakeI2CChip):
+    """A DRV2605 haptic driver; counts how often it was told to play."""
+
+    built: ClassVar[list[_FakeDrv2605]] = []
+
+    def __init__(self, i2c: object, **kwargs: object) -> None:
+        super().__init__(i2c, **kwargs)
+        self.sequence: list[object] = [None] * 8
+        self.plays = 0
+        _FakeDrv2605.built.append(self)
+
+    def play(self) -> None:
+        self.plays += 1
+
+
+@pytest.fixture
+def drv2605(monkeypatch: pytest.MonkeyPatch) -> None:
+    _FakeDrv2605.built = []
+    monkeypatch.setattr(sys.modules["adafruit_drv2605"], "DRV2605", _FakeDrv2605, raising=False)
+
+
+def _buzz(output: EffectOutput) -> None:
+    effect = Effect(
+        name="buzz",
+        haptic=EffectHaptic(patterns={"start": HapticPattern([HapticPattern.STRONG_BUZZ])}),
+    )
+    output.handle_event(
+        EffectEvent("buzz", "haptic", "start"), frozenset({"all"}), effect, EffectReceipt(1)
+    )
+
+
+def test_haptic_output_plays_on_a_drv2605_on_the_given_bus_at_its_configured_address(
+    drv2605: None,
+) -> None:
+    bus = object()
+    output = CircuitPythonParts(_board()).haptic_output(I2CDeviceConfig(address=0x5B), bus)
+
+    _buzz(output)
+
+    assert [(d.i2c, d.kwargs, d.plays) for d in _FakeDrv2605.built] == [(bus, {"address": 0x5B}, 1)]
+
+
+def test_haptic_output_leaves_the_drivers_default_address_when_none_is_configured(
+    drv2605: None,
+) -> None:
+    CircuitPythonParts(_board()).haptic_output(I2CDeviceConfig(), object())
+
+    assert [d.kwargs for d in _FakeDrv2605.built] == [{}]
+
+
+# ---------------------------------------------------------------------------
+# Audio
+# ---------------------------------------------------------------------------
+
+
+class _FakeVoice:
+    def __init__(self) -> None:
+        self.level = 0.0
+        self.playing = False
+        self.wave: _FakeWaveFile | None = None
+
+    def play(self, wave: _FakeWaveFile, loop: bool = False) -> None:
+        self.wave = wave
+        self.playing = True
+
+    def stop(self) -> None:
+        self.playing = False
+
+
+class _FakeMixer:
+    def __init__(self, *, voice_count: int, **_format: object) -> None:
+        self.voice = [_FakeVoice() for _ in range(voice_count)]
+
+
+class _FakeI2SOut:
+    """An I2S amp on its three pins, remembering the mixer it plays."""
+
+    built: ClassVar[list[_FakeI2SOut]] = []
+
+    def __init__(self, bit_clock: object, word_select: object, data: object) -> None:
+        self.pins = (bit_clock, word_select, data)
+        self.mixer: _FakeMixer | None = None
+        _FakeI2SOut.built.append(self)
+
+    def play(self, mixer: _FakeMixer) -> None:
+        self.mixer = mixer
+
+
+class _FakeWaveFile:
+    def __init__(self, file: object) -> None:
+        self.path = getattr(file, "name", None)
+
+
+@pytest.fixture
+def audio_stack(monkeypatch: pytest.MonkeyPatch) -> None:
+    _FakeI2SOut.built = []
+    monkeypatch.setattr(sys.modules["audiobusio"], "I2SOut", _FakeI2SOut, raising=False)
+    monkeypatch.setattr(sys.modules["audiomixer"], "Mixer", _FakeMixer, raising=False)
+    monkeypatch.setattr(sys.modules["audiocore"], "WaveFile", _FakeWaveFile, raising=False)
+
+
+_I2S_PINS = (
+    PinRef("GP10", "audio.i2s_bit_clock"),
+    PinRef("GP11", "audio.i2s_word_select"),
+    PinRef("GP12", "audio.i2s_data"),
+)
+
+
+def _audio(voices: int = 2, max_volume: float = 0.5) -> AudioConfig:
+    return AudioConfig(voices, max_volume, "GP10", "GP11", "GP12")
+
+
+def _amp() -> _FakeI2SOut:
+    (amp,) = _FakeI2SOut.built
+    return amp
+
+
+def _mixer() -> _FakeMixer:
+    mixer = _amp().mixer
+    assert mixer is not None
+    return mixer
+
+
+def test_audio_output_plays_through_an_i2s_amp_on_the_referenced_pins(audio_stack: None) -> None:
+    board = _board("GP10", "GP11", "GP12")
+
+    CircuitPythonParts(board).audio_output(_audio(), AudioRegistry(), *_I2S_PINS)
+
+    assert _amp().pins == (board.GP10, board.GP11, board.GP12)
+
+
+def test_audio_output_mixes_as_many_voices_as_configured(audio_stack: None) -> None:
+    CircuitPythonParts(_board("GP10", "GP11", "GP12")).audio_output(
+        _audio(voices=3), AudioRegistry(), *_I2S_PINS
+    )
+
+    assert len(_mixer().voice) == 3
+
+
+def test_audio_output_caps_full_loudness_at_the_configured_max_volume(audio_stack: None) -> None:
+    output = CircuitPythonParts(_board("GP10", "GP11", "GP12")).audio_output(
+        _audio(max_volume=0.25), AudioRegistry(), *_I2S_PINS
+    )
+
+    output.set_loudness(0, 1.0)
+
+    assert _mixer().voice[0].level == 0.25
+
+
+def test_audio_output_resolves_clip_names_through_the_given_registry(
+    audio_stack: None, tmp_path: pytest.TempPathFactory
+) -> None:
+    clip = tmp_path / "zap.wav"
+    clip.write_bytes(b"RIFF")
+    registry = AudioRegistry()
+    registry.set_scene_sounds({"zap": str(clip)})
+    output = CircuitPythonParts(_board("GP10", "GP11", "GP12")).audio_output(
+        _audio(), registry, *_I2S_PINS
+    )
+    effect = Effect(
+        name="zap",
+        audio=EffectAudio(clips={"start": AudioPlaybackConfig(name="scene.zap", loop=False)}),
+    )
+
+    output.handle_event(
+        EffectEvent("zap", "audio", "start"), frozenset({"all"}), effect, EffectReceipt(1)
+    )
+
+    assert [v.wave.path for v in _mixer().voice if v.playing and v.wave] == [str(clip)]
+
+
+@pytest.mark.parametrize("unknown", range(3))
+def test_audio_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
+    audio_stack: None, unknown: int
+) -> None:
+    pins = list(_I2S_PINS)
+    field = pins[unknown].field
+    pins[unknown] = PinRef("GP99", field)
+    parts = CircuitPythonParts(_board("GP10", "GP11", "GP12"))
+
+    with pytest.raises(ValueError, match=rf"^{field}: pin 'GP99' not found on board$"):
+        parts.audio_output(_audio(), AudioRegistry(), *pins)
+
+
+# ---------------------------------------------------------------------------
+# Optional driver libraries
+# ---------------------------------------------------------------------------
+
+
+_OPTIONAL_PARTS = {
+    "accelerometer": ("adafruit_lis3dh",),
+    "magnetometer": ("adafruit_mmc56x3",),
+    "haptic_output": ("adafruit_drv2605",),
+    "audio_output": ("audiobusio", "audiocore", "audiomixer"),
+}
+
+
+def _request(parts: CircuitPythonParts, part: str) -> object:
+    if part == "audio_output":
+        return parts.audio_output(_audio(), AudioRegistry(), *_I2S_PINS)
+    return getattr(parts, part)(I2CDeviceConfig(), object())
+
+
+@pytest.fixture
+def libraries_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make every optional part's driver library unimportable, as on a board without them."""
+    for library in sum(_OPTIONAL_PARTS.values(), ()):
+        monkeypatch.setitem(sys.modules, library, None)
+    for module in ("hardware.circuitpython.audio_output", "hardware.circuitpython.drv2605_output"):
+        monkeypatch.delitem(sys.modules, module, raising=False)
+
+
+@pytest.mark.parametrize("part", _OPTIONAL_PARTS)
+def test_requesting_a_part_whose_driver_library_is_missing_raises_import_error(
+    libraries_missing: None, part: str
+) -> None:
+    parts = CircuitPythonParts(_board("GP10", "GP11", "GP12"))
+
+    with pytest.raises(ImportError):
+        _request(parts, part)
+
+
+def test_parts_that_need_no_optional_library_build_while_every_one_is_missing(
+    libraries_missing: None, gpio: list[_FakeDigitalInOut]
+) -> None:
+    parts = CircuitPythonParts(_board("D9"))
+
+    read = parts.button_reader(PinRef("D9", "buttons[0]"))
+
+    assert callable(read)
