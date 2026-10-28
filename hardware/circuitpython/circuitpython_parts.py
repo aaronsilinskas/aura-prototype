@@ -194,31 +194,16 @@ def _setup_drv2605(i2c: busio.I2C, address: int | None = None) -> object:
 
 
 def _make_writer(pin: microcontroller.Pin) -> tuple[PulseWriter, str]:
-    """Return the best non-blocking IR writer the silicon supports for *pin*,
-    paired with a short string naming which kind was chosen.
+    """Return the IR writer the silicon supports for *pin*, and its kind.
 
-    Selection is by import-probe: ``rp2pio`` is present only on RP2040/RP2350,
-    so an importable ``rp2pio`` means the board can clock the carrier out via
-    PIO/DMA — wire a :class:`PioPulseWriter` over its own state machine. On any
-    other board ``rp2pio`` is missing and the blocking ``pulseio``-backed
-    :class:`PulseOutWriter` is used. PIO availability is a property of the
-    silicon, so there is no config knob; the PIO-writer module is imported here
-    (not at module load) so it never executes on non-RP boards. The ``pulseio``
-    fallback import is deferred the same way, so a board that never reaches
-    this function (no IR section configured) never requires ``pulseio`` to be
-    installed.
+    An importable ``rp2pio`` (RP2040/RP2350 only) means the carrier can be
+    clocked out by PIO without blocking; any other board falls back to the
+    blocking ``pulseio`` writer. PIO support is a property of the silicon, so
+    there is no config knob.
 
-    The kind string (``"pio"``/``"pulseio"``) is returned alongside the writer
-    rather than left for a caller to re-derive: it is narrated on the ``ir``
-    boot line, and re-running the import-probe just for logging could diverge
-    from what was actually built.
-
-    Args:
-        pin: The transmit pin the emitter is wired to.
-
-    Returns:
-        A tuple of a :class:`PulseWriter` — a PIO-backed one on RP boards,
-        else blocking — and the kind string naming which one.
+    The kind (``"pio"``/``"pulseio"``) is returned alongside the writer rather
+    than re-derived for the ``ir`` boot line, which could then diverge from
+    what was actually built.
     """
     try:
         import rp2pio  # noqa: F401  # present only on RP2040/RP2350

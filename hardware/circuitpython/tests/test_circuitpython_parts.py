@@ -765,6 +765,15 @@ def test_ir_reader_reads_pulses_received_on_its_pin(pulsein: None) -> None:
     assert (pulses.pin, received) == (board.GP7, [9000, 4500, None])
 
 
+def test_ir_reader_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
+    pulsein: None,
+) -> None:
+    parts = CircuitPythonParts(_board("GP7"))
+
+    with pytest.raises(ValueError, match=r"^ir\.rx\[1\]: pin 'GP99' not found on board$"):
+        parts.ir_reader(PinRef("GP99", "ir.rx[1]"))
+
+
 # ---------------------------------------------------------------------------
 # IR pulse writers
 # ---------------------------------------------------------------------------
@@ -978,14 +987,15 @@ def test_storage_mounts_the_card_on_the_given_bus_and_chip_select_at_its_mount_p
     assert [(fs.card.spi, fs.card.cs, mount) for fs, mount in sd] == [(bus, board.D24, "/sd")]
 
 
-@pytest.mark.parametrize("fault", ["no card fitted", "no FAT filesystem"])
-def test_storage_whose_card_fails_to_mount_raises_sd_mount_error_naming_cs_and_mount(
-    sd: list[tuple[_FakeVfsFat, str]], fault: str
+@pytest.mark.parametrize(
+    ("fake", "flag"),
+    [(_FakeSDCard, "fitted"), (_FakeVfsFat, "formatted")],
+    ids=["absent", "unformatted"],
+)
+def test_storage_whose_card_fails_to_mount_raises_sd_card_mount_error_naming_cs_and_mount(
+    sd: list[tuple[_FakeVfsFat, str]], fake: type, flag: str
 ) -> None:
-    if fault == "no card fitted":
-        _FakeSDCard.fitted = False
-    else:
-        _FakeVfsFat.formatted = False
+    setattr(fake, flag, False)
     parts = CircuitPythonParts(_board("D24"))
 
     with pytest.raises(SdCardMountError, match=r"cs=D24 mount=/media"):
