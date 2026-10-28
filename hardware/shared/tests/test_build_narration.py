@@ -168,11 +168,11 @@ def test_describe_neopixel_current_budget_reports_limit_estimate_scale_and_floor
     )
 
 
-def _pixel_entry(entry: dict) -> MatrixPixelsConfig | NeoPixelPixelsConfig:
+def _pixel_entry(entry: dict[str, object]) -> MatrixPixelsConfig | NeoPixelPixelsConfig:
     return parse_device_config({"pixels": [entry]}).pixels[0]
 
 
-def _matrix_entry(**overrides) -> dict:
+def _matrix_entry(**overrides: object) -> dict[str, object]:
     return {
         "type": "matrix",
         "cols": 13,
@@ -293,7 +293,7 @@ def test_describe_haptics_pads_its_configured_address_to_two_hex_digits():
     assert describe_haptics(I2CDeviceConfig(address=0x05)) == "haptics drv2605 address=0x05"
 
 
-def _audio(**overrides) -> AudioConfig:
+def _audio(**overrides: object) -> AudioConfig:
     fields = {
         "voices": 4,
         "max_volume": 0.5,

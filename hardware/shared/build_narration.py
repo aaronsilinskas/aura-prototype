@@ -9,7 +9,9 @@ sequence once so a component block reduces to a single call.
 The ``describe_*`` functions build each boot step's description. Every one works
 from a config section's pin-name strings, never resolved pins, so a step's line
 opens before any of its pins resolve -- and a bad pin name fails that step's own
-line.
+line. Each returns the exact line the board prints for its section, so a
+section that narrates a bare name when disabled (``i2c``, ``spi``, ``audio``,
+``pixels[i] <kind>``) gets that form here too; the rest keep their detail.
 
 No ``board``/``busio`` imports, so this module is CPython-testable in isolation,
 like the rest of ``hardware/shared``.
@@ -98,13 +100,10 @@ def narrate_skip(logger: Logger, description: str, note: str) -> None:
 
 
 def describe_high_current_rail(rail: HighCurrentRailConfig) -> str:
-    """Return the ``high_current_rail`` step's description."""
     return f"high_current_rail pin={rail.pin} active_high={rail.active_high}"
 
 
 def describe_i2c(i2c: I2CConfig | None) -> str:
-    """Return the ``i2c`` step's description: the configured pins, ``default``
-    for no section (the board's own SCL/SDA), or bare ``i2c`` when disabled."""
     if i2c is None:
         return "i2c default"
     if not i2c.enabled:
@@ -113,8 +112,6 @@ def describe_i2c(i2c: I2CConfig | None) -> str:
 
 
 def describe_spi(spi: SPIConfig | None) -> str:
-    """Return the ``spi`` step's description: the configured pins, ``default``
-    for no section (the board's own SPI bus), or bare ``spi`` when disabled."""
     if spi is None:
         return "spi default"
     if not spi.enabled:
@@ -142,12 +139,7 @@ def _format_ranges(ranges: dict[str, range]) -> str:
 
 
 def _address_suffix(address: int | None) -> str:
-    """Return `` address=0xNN`` for a configured override, or `""` when *address* is `None`.
-
-    Shared by every description that documents an I2C device's optional
-    address override (the matrix pixel entry and the
-    accelerometer/magnetometer/haptics sections).
-    """
+    """Return `` address=0xNN`` for a configured override, or ``""`` when there is none."""
     return f" address=0x{address:02X}" if address is not None else ""
 
 
@@ -172,8 +164,6 @@ def _describe_neopixel_pixels(pixels: NeoPixelPixelsConfig) -> str:
 
 
 def describe_pixel_entry(index: int, pixels: MatrixPixelsConfig | NeoPixelPixelsConfig) -> str:
-    """Return the ``pixels[index]`` step's description, or just its index and
-    kind (``matrix``/``neopixel``) when the entry is disabled."""
     kind = "matrix" if isinstance(pixels, MatrixPixelsConfig) else "neopixel"
     if not pixels.enabled:
         return f"pixels[{index}] {kind}"
@@ -189,29 +179,24 @@ def describe_pixel_entry(index: int, pixels: MatrixPixelsConfig | NeoPixelPixels
 
 
 def describe_buttons(pin_names: list[str]) -> str:
-    """Return the ``buttons`` step's description, pairing each button's label
-    (``A``, ``B``, ...) with its declared pin name, e.g. ``buttons A=GP2 B=GP3``."""
+    """Label buttons ``A``, ``B``, ... in declaration order -- the labels the board assigns."""
     labelled = " ".join(f"{chr(ord('A') + i)}={name}" for i, name in enumerate(pin_names))
     return f"buttons {labelled}" if labelled else "buttons"
 
 
 def describe_accelerometer(accelerometer: I2CDeviceConfig) -> str:
-    """Return the ``accelerometer`` step's description."""
     return "accelerometer lis3dh" + _address_suffix(accelerometer.address)
 
 
 def describe_magnetometer(magnetometer: I2CDeviceConfig) -> str:
-    """Return the ``magnetometer`` step's description."""
     return "magnetometer mmc5603" + _address_suffix(magnetometer.address)
 
 
 def describe_haptics(haptics: I2CDeviceConfig) -> str:
-    """Return the ``haptics`` step's description."""
     return "haptics drv2605" + _address_suffix(haptics.address)
 
 
 def describe_audio(audio: AudioConfig) -> str:
-    """Return the ``audio`` step's description, or bare ``audio`` when disabled."""
     if not audio.enabled:
         return "audio"
     return (
@@ -222,7 +207,6 @@ def describe_audio(audio: AudioConfig) -> str:
 
 
 def describe_radio(radio: RadioConfig) -> str:
-    """Return the ``radio`` step's description."""
     return (
         f"radio frequency={radio.frequency} node={radio.node} "
         + f"cs={radio.cs} reset={radio.reset}"
@@ -230,21 +214,12 @@ def describe_radio(radio: RadioConfig) -> str:
 
 
 def describe_sdcard(sdcard: SDCardConfig) -> str:
-    """Return the ``sdcard`` step's description."""
     return f"sdcard mount={sdcard.mount} cs={sdcard.cs}"
 
 
 def describe_ir(ir: IRConfig) -> str:
-    """Return the ``ir`` step's description: its rx pins and wired emitters.
-
-    Two or more rx pins append the **IR multi-receiver** label (see
-    GLOSSARY.md), selected purely by pin count. Emitters are listed
-    ``key:pin`` in ``IR_EMITTERS`` order -- the order transmitters are wired
-    in, independent of the config's own key order -- or ``(none)``.
-
-    The writer kind (``writer=pio``/``writer=pulseio``) is not part of this:
-    it is only known once the IR subsystem is built, so it closes the line.
-    """
+    """Describe the ``ir`` step without its writer kind (``writer=pio``/``pulseio``),
+    which is only known once the IR subsystem is built, so it closes the line instead."""
     rx_desc = f"rx=[{' '.join(ir.rx)}]"
     if len(ir.rx) > 1:
         rx_desc += " (IR multi-receiver)"
