@@ -10,9 +10,6 @@ Design notes
 ------------
 - ``PulseReader`` and ``PulseWriter`` are plain base classes (not
   ``typing.Protocol``, which is unavailable on constrained runtimes).
-- ``InfraredReceiver.receive()`` is polled every tick.  All per-receiver
-  scratch structures are pre-allocated in ``__init__`` and reused each call —
-  the inner loop allocates nothing per tick.
 """
 
 from array import array
@@ -355,8 +352,8 @@ class InfraredReceiver:
     reception area. Multiple readers do **not** derive direction. A device
     with one ``rx`` pin runs the same loop as one with several.
 
-    ``receive()`` is polled every tick and must not allocate in the hot path.
-    All scratch structures are pre-allocated in ``__init__`` and reused.
+    ``receive()`` is polled every tick and must not allocate: CircuitPython's
+    garbage collector would otherwise run mid-game.
 
     Telemetry: :meth:`telemetry` and :meth:`reset_telemetry` walk
     ``OWNED_TELEMETRY_FIELDS`` declared on
@@ -406,14 +403,8 @@ class InfraredReceiver:
         self.packets_surfaced: int = 0
         self.pulses_dropped_transmitting: int = 0
 
-        # Pre-allocated per-reader scratch, reused every tick:
-        # _scratch_fired[i] is True when reader i produced a packet this tick,
-        # _scratch_margins[i] holds that packet's error margin.
-        self._scratch_margins: list[int] = [0] * self._count
-        self._scratch_fired: list[bool] = [False] * self._count
-        self._scratch_packets: list[bytearray | None] = [None] * self._count  # type: ignore[list-item]
-
-        # Snapshot of the last winning packet's decoder
+        # Held rather than read live from the winning decoder, which may go on
+        # to decode a losing packet or be reset by a drain-but-discard.
         self._last_signal_strength: float | None = None
         self._last_error_margin: int | None = None
         self._last_best_receiver: PulseReader | None = None
@@ -434,23 +425,12 @@ class InfraredReceiver:
             self._drain_discard_all()
             return None
 
-        # Hoist scratch lists to locals for fast access (avoids repeated attr lookup)
-        scratch_margins = self._scratch_margins
-        scratch_fired = self._scratch_fired
-        scratch_packets = self._scratch_packets
         readers = self._readers
         decoders = self._decoders
-        count = self._count
-
-        # Clear scratch — no allocation; mutate in place
-        for i in range(count):
-            scratch_fired[i] = False
-            scratch_margins[i] = 0
-            scratch_packets[i] = None
-
-        # Drain each reader and collect any completed packets
-        any_fired = False
-        for i in range(count):
+        best_i = -1
+        best_margin = 0
+        best_packet = None
+        for i in range(self._count):
             reader = readers[i]
             decoder = decoders[i]
             while True:
@@ -460,33 +440,24 @@ class InfraredReceiver:
                 self.pulses_seen += 1
                 packet = decoder.decode(pulse)
                 if packet is not None:
-                    scratch_fired[i] = True
-                    scratch_margins[i] = decoder.last_error_margin
-                    scratch_packets[i] = packet
-                    any_fired = True
+                    margin = decoder.last_error_margin
+                    # Strict < keeps the first reader on a tie
+                    if best_packet is None or margin < best_margin:
+                        best_i = i
+                        best_margin = margin
+                        best_packet = packet
                     break  # one packet per reader per tick
 
-        if not any_fired:
+        if best_packet is None:
             return None
 
-        # Pick the winner: lowest error margin among fired readers
-        best_i = -1
-        best_margin = None
-        for i in range(count):
-            if not scratch_fired[i]:
-                continue
-            margin = scratch_margins[i]
-            if best_margin is None or margin < best_margin:
-                best_margin = margin
-                best_i = i
-
         winning_decoder = decoders[best_i]
-        self._last_error_margin = winning_decoder.last_error_margin
+        self._last_error_margin = best_margin
         self._last_signal_strength = winning_decoder.last_signal_strength
         self._last_best_receiver = readers[best_i]
         self.packets_surfaced += 1
 
-        return scratch_packets[best_i]
+        return best_packet
 
     def set_decoder(self, decoder: InfraredDecoder) -> None:
         """Rebuild the per-reader decoder list from *decoder*'s type.

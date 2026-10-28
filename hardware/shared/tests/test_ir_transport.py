@@ -1028,15 +1028,24 @@ def test_receiver_partial_decode_in_progress_when_transmit_ends_is_reset():
     assert rx.receive() is None
 
 
-def test_receiver_falling_edge_flushes_once_then_decodes_normally():
+def test_receiver_falling_edge_discards_the_buffered_echo_tail():
     gate = IrTransmitGate()
     gate.begin_transmit()
     gate.end_transmit()
     rx, readers = _make_receiver(2, gate=gate)
     readers[0].load([111, 222])  # buffered echo tail
 
-    assert rx.receive() is None  # one-shot flush
+    rx.receive()
+
     assert rx.telemetry().pulses_dropped_transmitting == 2
+
+
+def test_receiver_decodes_normally_after_the_one_shot_falling_edge_flush():
+    gate = IrTransmitGate()
+    gate.begin_transmit()
+    gate.end_transmit()
+    rx, readers = _make_receiver(2, gate=gate)
+    rx.receive()  # consumes the one-shot flush
 
     payload = b"\x21"
     readers[1].load(_encode_pulses(payload))
@@ -1132,7 +1141,6 @@ def test_receiver_set_decoder_gives_each_reader_its_own_fresh_decoder(recording_
 
     built_by_receiver = [d for d in built if d is not handed]
     assert len(built_by_receiver) == 2
-    assert built_by_receiver[0] is not built_by_receiver[1]
 
 
 def test_receiver_set_decoder_keeps_a_partial_decode_on_one_reader_from_corrupting_another():

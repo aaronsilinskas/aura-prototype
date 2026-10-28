@@ -340,8 +340,7 @@ def test_apply_codec_installs_the_decoder_on_the_receiver() -> None:
     """A Tag frame only decodes once the Tag decoder is installed."""
     payload = bytearray([0x10])
     receiver = _receiver_holding(TagInfraredEncoder().encode(payload))
-    tx, _ = _make_transmitter()
-    transceiver = InfraredTransceiver({LINE: tx}, receiver, IrTransmitGate())
+    transceiver = InfraredTransceiver({}, receiver, IrTransmitGate())
 
     transceiver.apply_codec(TagInfraredEncoder(), TagInfraredDecoder())
     transceiver.update()
@@ -359,17 +358,6 @@ def test_apply_codec_still_fans_out_the_encoder_with_no_receiver_wired() -> None
     transceiver.apply_codec(encoder, AuraInfraredDecoder())  # must not raise
 
     assert calls == [encoder]
-
-
-def test_apply_codec_still_installs_the_decoder_with_no_transmitters_wired() -> None:
-    payload = bytearray([0x20])
-    receiver = _receiver_holding(TagInfraredEncoder().encode(payload))
-    transceiver = InfraredTransceiver({}, receiver, IrTransmitGate())
-
-    transceiver.apply_codec(TagInfraredEncoder(), TagInfraredDecoder())  # must not raise
-    transceiver.update()
-
-    assert transceiver.received == payload
 
 
 def test_apply_codec_is_a_safe_noop_with_no_transmitters_and_no_receiver() -> None:
