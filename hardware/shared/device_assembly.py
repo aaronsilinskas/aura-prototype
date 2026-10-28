@@ -46,6 +46,7 @@ from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
     AudioConfig,
     DeviceConfig,
+    I2CConfig,
     IRConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
@@ -59,12 +60,24 @@ from hardware.shared.ir_wiring import wire_ir
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.radio_transceiver import RadioTransceiver
 
-__all__ = ["assemble_device", "button_label"]
+__all__ = ["assemble_device", "button_label", "open_i2c"]
 
 
 def button_label(index: int) -> str:
     """The label of the button declared at *index*: ``A``, ``B``, … in declaration order."""
     return chr(ord("A") + index)
+
+
+def open_i2c(i2c_config: I2CConfig | None, parts: DeviceParts) -> object | None:
+    """Return the I2C bus *i2c_config* asks for: ``None`` when it is disabled or none can be built.
+
+    An absent section means the board's default pins.
+    """
+    if i2c_config is None:
+        return parts.i2c_bus(None, None)
+    if not i2c_config.enabled:
+        return None
+    return parts.i2c_bus(PinRef(i2c_config.scl, "i2c.scl"), PinRef(i2c_config.sda, "i2c.sda"))
 
 
 def _require_i2c(i2c: object | None, section: str) -> object:
@@ -174,12 +187,7 @@ def assemble_device(
     else:
 
         def _build_i2c() -> tuple[object | None, str]:
-            if i2c_config is None:
-                bus = parts.i2c_bus(None, None)
-            else:
-                bus = parts.i2c_bus(
-                    PinRef(i2c_config.scl, "i2c.scl"), PinRef(i2c_config.sda, "i2c.sda")
-                )
+            bus = open_i2c(i2c_config, parts)
             return bus, "no bus" if bus is None else "ok"
 
         i2c = narrate_step(logger, describe_i2c(i2c_config), _build_i2c)

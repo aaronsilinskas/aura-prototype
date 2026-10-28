@@ -79,6 +79,10 @@ def test_an_absent_section_asks_for_no_part(section, section_config, part):
     _hw, parts = _assemble(_config())
 
     assert part not in parts.parts()
+
+
+@pytest.mark.parametrize("section", _SECTION_IDS)
+def test_an_absent_section_narrates_no_line(section):
     assert not re.search(rf"^\[hw\] {section}\b", _narration(_config()), re.MULTILINE)
 
 

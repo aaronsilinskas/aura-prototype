@@ -181,7 +181,7 @@ def test_i2c_bus_reports_no_bus_when_nothing_pulls_it_up(buses: None) -> None:
     assert parts.i2c_bus(None, None) is None
 
 
-def test_i2c_bus_is_the_injected_bus_when_one_is_held(
+def test_i2c_bus_is_the_injected_bus_and_builds_none_when_one_is_held(
     buses: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     built: list[object] = []
@@ -407,8 +407,8 @@ def test_matrix_led_scaling_follows_the_configured_brightness(
     assert _driver(output).led_scaling == scaling
 
 
-@pytest.mark.parametrize("address", [None, 0x31])
-def test_matrix_driver_buffers_pixel_writes_until_show(
+@pytest.mark.parametrize("address", [None, 0x31], ids=["default-address", "configured-address"])
+def test_matrix_driver_buffers_pixel_writes_until_show_at_any_address(
     matrix_driver: None, address: int | None
 ) -> None:
     output = CircuitPythonParts(_board()).matrix_pixels(_matrix(address=address), object())
@@ -906,8 +906,8 @@ def test_ir_writer_on_pio_silicon_sends_pulses_through_its_state_machine(pio: No
 
     writer.write_pulses([9000, 4500, 560])
 
-    ((state_machine),) = _FakeStateMachine.built
-    assert len(state_machine.written) == 1
+    (state_machine,) = _FakeStateMachine.built
+    assert len(state_machine.written) == 1  # the encoding is test_pio_pulse_writer's
 
 
 def test_each_ir_writer_on_pio_silicon_gets_its_own_state_machine(pio: None) -> None:
@@ -991,13 +991,11 @@ def test_radio_chip_select_and_reset_are_gpios_on_their_referenced_pins(
     assert [g.pin for g in gpio] == [board.D10, board.D11]
 
 
-@pytest.mark.parametrize("unknown", range(2))
+@pytest.mark.parametrize("field", [pin.field for pin in _RADIO_PINS])
 def test_radio_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
-    rfm69: None, unknown: int
+    rfm69: None, field: str
 ) -> None:
-    pins = list(_RADIO_PINS)
-    field = pins[unknown].field
-    pins[unknown] = PinRef("NOPE", field)
+    pins = [PinRef("NOPE", field) if pin.field == field else pin for pin in _RADIO_PINS]
 
     with pytest.raises(ValueError, match=rf"^{field}: pin 'NOPE' not found on board$"):
         CircuitPythonParts(_board("D10", "D11")).radio_transport(
