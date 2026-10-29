@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from engine.audio import AudioOverlayAdmin
 from engine.engine import GameEngine
 from engine.pack_catalog import PackCatalog
@@ -14,9 +12,6 @@ from engine.state import (
     SceneReboot,
     ScopeValue,
 )
-
-if TYPE_CHECKING:
-    pass
 
 _STUB_RECEIPT_ID = 0
 
