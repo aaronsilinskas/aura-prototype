@@ -20,6 +20,7 @@ Matches the CircuitPython minor release in use.  Invoked as ``python -m mpy_cros
 import argparse
 import json
 import os
+import secrets
 import shutil
 import sys
 from pathlib import Path
@@ -148,15 +149,19 @@ def _sync_file(
 
 
 def _write_scene(mount: Path, scene: str) -> None:
-    """Set the ``default_scene`` key in ``aura-settings.json``, merging with any existing keys.
+    """Set ``default_scene`` and a fresh Scene deploy token in ``aura-settings.json``.
 
-    A board with no ``aura-settings.json`` gets one created fresh holding only
-    ``default_scene`` — unlike ``aura-device.json``, there is no sample template to
-    seed from (the settings file is trivially authored).
+    Merges with any existing keys. The token (``scene_deploy_token``) is new on
+    every call, so the device can tell this deploy from one it already applied
+    and clear a stale Persisted scene once. A board with no
+    ``aura-settings.json`` gets one created fresh holding only these two keys —
+    unlike ``aura-device.json``, there is no sample template to seed from (the
+    settings file is trivially authored).
     """
     settings_path = mount / "aura-settings.json"
     settings = json.loads(settings_path.read_text()) if settings_path.exists() else {}
     settings["default_scene"] = scene
+    settings["scene_deploy_token"] = secrets.token_hex(8)
     settings_path.write_text(json.dumps(settings, indent=2))
 
 
@@ -179,8 +184,8 @@ def deploy(
         source_root: Root of the source tree. Defaults to ``Path.cwd()``.
         dry_run: When True, skip mount validation and print what would be copied
             without writing any files.
-        scene: Scene name to record in ``aura-settings.json``'s ``default_scene`` key;
-            omit to leave it untouched.
+        scene: Scene name to record in ``aura-settings.json``'s ``default_scene`` key,
+            beside a fresh ``scene_deploy_token``; omit to leave the file untouched.
         compile: Callable ``(src, dest) -> None`` used to compile each ``.py`` file
             to ``.mpy`` in a staging tree before syncing.  Defaults to the real
             ``mpy_cross_compile`` (requires ``mpy-cross`` installed).  Pass a fake
@@ -353,8 +358,10 @@ def main() -> None:
         default=None,
         help=(
             "Scene name to record as default_scene in aura-settings.json on the mounted "
-            "volume. Combines deploying code and selecting the game into one step. "
-            "Omit to leave any existing aura-settings.json untouched."
+            "volume, with a fresh scene_deploy_token so the next boot clears any "
+            "Persisted scene on the card and boots this one. Combines deploying code "
+            "and selecting the game into one step. Omit to leave any existing "
+            "aura-settings.json untouched."
         ),
     )
     parser.add_argument(
