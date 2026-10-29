@@ -1,8 +1,6 @@
-"""PackRegistry — auto-discovers named packs from a directory and lazily loads items."""
+"""PackRegistry — named packs, filled by the pack catalog, whose items load lazily."""
 
 from __future__ import annotations
-
-import os
 
 import engine._path as _path
 from engine.version import Version
@@ -29,7 +27,7 @@ class RegistryError(ValueError):
 class UnknownPackError(RegistryError):
     """A ``pack_name`` has no registered pack.
 
-    Raised by ``PackRegistry.get``, ``items``, and ``check_version``.
+    Raised by ``PackRegistry.get`` and ``items``.
     """
 
     def __init__(self, pack_name: str) -> None:
@@ -150,33 +148,24 @@ class _PackEntry:
 
 
 class PackRegistry:
-    """Auto-discovers named packs from a directory and lazily loads items.
+    """Named packs of one kind (effects or rules) whose items load lazily.
 
-    Construction::
-
-        registry = PackRegistry(item_attr="BUILD")
-
-    Scanning::
-
-        registry.scan_dir("/path/to/packs", "packs.effects")
+    Built only by ``engine.pack_catalog.scan_pack_roots``, which discovers the
+    packs and sets the attribute their items export (``BUILD`` or ``RULE``).
+    ``PackRegistry()`` is a valid empty registry.
 
     Item access::
 
-        builder = registry.get("elements", "fire", EffectBuilder)
-
-    Version check::
-
-        registry.check_version("elements", Version(1, 2))
+        builder = catalog.effect_registry.get("elements", "fire", EffectBuilder)
     """
 
-    __slots__ = ("_cache", "_item_attr", "_packs", "_scanned_dirs")
+    __slots__ = ("_cache", "_item_attr", "_packs")
 
-    def __init__(self, item_attr: str | None = None) -> None:
-        # With no item_attr the registry stays empty, so get() never reads it.
-        self._item_attr = item_attr
+    def __init__(self) -> None:
+        # An empty registry has no export attribute; get() never reads it.
+        self._item_attr: str | None = None
         self._packs: dict[str, _PackEntry] = {}
         self._cache: dict[tuple[str, str], object] = {}
-        self._scanned_dirs: set[str] = set()
 
     @staticmethod
     def _from_packs(item_attr: str, packs: list[_PackEntry]) -> PackRegistry:
@@ -185,72 +174,18 @@ class PackRegistry:
         The ``PackCatalog`` construction path: the catalog has already scanned
         and validated every entry.
         """
-        registry = PackRegistry(item_attr)
+        registry = PackRegistry()
+        registry._item_attr = item_attr
         for entry in packs:
             registry._packs[entry.name] = entry
         return registry
-
-    def scan_dir(self, path: str, module_prefix: str) -> None:
-        """Scan *path* for subdirectories that contain ``version.txt``.
-
-        Each such subdirectory is registered as a pack.  The pack name is the
-        directory name; the stored module prefix is
-        ``module_prefix + "." + pack_name``; valid item names are all ``.py``
-        files in that directory excluding ``__init__.py``.
-
-        This method is idempotent: calling it a second time with the same
-        *path* is a no-op.  Discovering a pack name that was already registered
-        from a **different** source path raises ``ValueError``.
-        """
-        norm_path = _path.normpath(path)
-        if norm_path in self._scanned_dirs:
-            return
-        self._scanned_dirs.add(norm_path)
-
-        for entry in os.listdir(norm_path):
-            pack_dir = _path.join(norm_path, entry)
-            version_file = _path.join(pack_dir, "version.txt")
-            if not _path.isdir(pack_dir) or not _path.isfile(version_file):
-                continue
-
-            pack_name = entry
-
-            if pack_name == "scene":
-                raise ValueError(
-                    "'scene' is a reserved system-wide name and cannot be used as a "
-                    + f"pack name (found at '{pack_dir}')"
-                )
-
-            if pack_name in self._packs:
-                existing = self._packs[pack_name]
-                if existing.source_path != norm_path:
-                    raise ValueError(
-                        f"Pack '{pack_name}' already registered from "
-                        + f"'{existing.source_path}'; cannot register the same pack name "
-                        + f"from '{norm_path}'"
-                    )
-                continue
-
-            with open(version_file) as fh:
-                version_str = fh.readline().strip()
-
-            item_names = scan_item_names(pack_dir)
-
-            full_prefix = module_prefix + "." + pack_name
-            self._packs[pack_name] = _PackEntry(
-                name=pack_name,
-                version=Version.parse(version_str),
-                module_prefix=full_prefix,
-                item_names=item_names,
-                source_path=norm_path,
-            )
 
     def names(self) -> list[str]:
         """Return all registered pack names alphabetically."""
         return sorted(self._packs)
 
     def get(self, pack_name: str, item_name: str, expected_class: type[T]) -> T:
-        """Return the *item_attr* attribute of *item_name* from *pack_name*.
+        """Return the export (``BUILD`` or ``RULE``) of *item_name* from *pack_name*.
 
         The item is imported on first access and the result is cached.  On
         first load the value is verified with ``isinstance(value,
@@ -260,10 +195,8 @@ class PackRegistry:
             UnknownPackError: if *pack_name* is unknown.
             UnknownItemError: if *item_name* is not in the recorded set for the
                 pack (raised before any import attempt).
-            MissingItemAttributeError: if the module has no attribute named
-                *item_attr*.
-            ItemTypeError: if the attribute value is not an instance of
-                *expected_class*.
+            MissingItemAttributeError: if the module lacks the export.
+            ItemTypeError: if the export is not an instance of *expected_class*.
         """
         meta = self._packs.get(pack_name)
         if meta is None:
@@ -292,19 +225,3 @@ class PackRegistry:
         if meta is None:
             raise UnknownPackError(pack_name)
         return sorted(meta.item_names)
-
-    def check_version(self, pack_name: str, required: Version) -> None:
-        """Verify that the installed pack version satisfies the minimum required.
-
-        Delegates the MAJOR.MINOR compatibility check to
-        :meth:`Version.check_compatible`.
-
-        Raises:
-            UnknownPackError: if *pack_name* is unknown.
-            ValueError: if the installed version is not compatible.
-        """
-        meta = self._packs.get(pack_name)
-        if meta is None:
-            raise UnknownPackError(pack_name)
-
-        meta.version.check_compatible(pack_name, required.major, required.minor)

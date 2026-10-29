@@ -39,6 +39,10 @@ _Avoid_: calling a scene-local effect set a "pack" (a pack is shared, versioned,
 A named, versioned directory of rule items, each exporting a `GameRule`; shared and cross-scene.
 _Avoid_: calling a scene-local rule set a "pack" (a pack is shared, versioned, cross-scene)
 
+### PackCatalog
+Everything installed under a device's pack roots, discovered in one scan by `scan_pack_roots`: the effect and rule `PackRegistry`s, the `SceneRegistry` (with each scene's local items and sounds), and the pack sounds map. Every scene's pack declarations are checked before it is returned, so a misconfigured layout, version or declaration stops boot; item code is still imported lazily, at first use.
+_Avoid_: scanning packs, scenes or sounds anywhere else; re-checking scene declarations at load time
+
 ### DynamicValue
 `float | Callable[[], float]` — a value that may be constant or computed fresh each sample.
 
@@ -111,8 +115,8 @@ The **game-facing**, send-only network seam a rule holds via `GameState.network_
 _Avoid_: putting `poll_transmits()` or any per-tick pump on it (keep the seam send-only)
 
 ### SceneRegistry
-Auto-discovers JSON-described scenes from a directory tree and serves a fresh `Scene` per lookup, validating required fields and formats at scan time. Can also surface a scanned scene's declared codec name without constructing the `Scene`, for callers resolving hardware before building it.
-_Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); constructing after harness startup (scan once); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
+Serves a fresh `Scene` per lookup from the scenes the **PackCatalog** discovered and checked; it does no scanning of its own. Can also surface a scene's declared codec name without constructing the `Scene`, for callers resolving hardware before building it. `register` is a test-only escape hatch for in-memory scenes, which skip the catalog's declaration checks.
+_Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); calling `register` outside tests; changing a scene's initial data after the scan (pass overrides to the catalog scan); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
 
 ### SceneControls
 The rule-facing scene-transition seam (`load`, `overlay`, `pop`, `reboot_into`, `reboot_to_previous`); `SceneManager` is the live implementation.
@@ -246,24 +250,20 @@ The top-level `app/` package — the one place allowed to import both engine run
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### SceneRuntime / build_scene_runtime
-The board-free bundle `build_scene_runtime` wires and returns for the per-tick loop to drive — registries, managers, engine, and pass-through `ir`/`radio` handles. Discovers no scenes itself; takes a pre-scanned `SceneRegistry` from `scan_boot_scene_registry`.
-_Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing the transmit-then-receive order at a call site (drive `ir.update()`/`radio.update()`); scanning a second `SceneRegistry` when a caller already has one; expecting it to discover scenes
+The board-free bundle `build_scene_runtime` wires and returns for the per-tick loop to drive — registries, managers, engine, and pass-through `ir`/`radio` handles. Discovers nothing itself; takes the boot **PackCatalog** from `scan_boot_pack_catalog`.
+_Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing the transmit-then-receive order at a call site (drive `ir.update()`/`radio.update()`); scanning a second catalog or registry when a caller already has one; expecting it to discover packs or scenes
 
 ### build_scene_tick
 The board-free per-tick body shared by the device (`run_scene`) and the **Simulated device**: reads inputs, pumps IR/radio, queues events onto the active scene, then updates the scene and its effects. Built once per `SceneRuntime`; its buffers are allocated at build time and reused every tick.
 _Avoid_: copying the loop body into a harness or entry point; rebuilding it every tick (reallocates the per-tick buffers)
 
-### scan_boot_scene_registry
-The board-free builder of the shared boot `SceneRegistry`: scans both flash and the mounted card into one registry, so a card scene is a first-class boot target exactly like a flash one.
-_Avoid_: calling it before `build_hardware` (the card leg needs storage mounted); scanning scenes anywhere else once this exists
+### scan_boot_pack_catalog
+The board-free builder of the boot **PackCatalog**: chooses the pack roots (flash `packs`, plus the card's `aura_packs` when the mounted card carries one) and scans them, so card content is first-class exactly like flash content.
+_Avoid_: `scan_boot_scene_registry` (old name); calling it before `build_hardware` (the card leg needs storage mounted); scanning packs or scenes anywhere else once this exists
 
 ### resolve_boot_scene_name
 The boot-time seam that picks the scene to boot into (persisted SD `scene` → flash `default_scene` → raise) and guarantees the winner is registered.
 _Avoid_: calling `resolve_boot_scene` directly and skipping registry validation; calling it before `build_hardware` (the persisted leg needs storage mounted)
-
-### resolve_known_scene
-The boot-time known-scene guard: returns the scene name if the registry has it, else raises naming the known scenes. A thin wrapper over `SceneRegistry.resolve_known`, the single implementation of the check.
-_Avoid_: duplicating the known-scene check inline instead of calling `SceneRegistry.resolve_known`; assuming it runs ahead of `build_hardware` (it does not)
 
 ### resolve_ir_codec
 Resolves a scene's declared **wire-frame codec** name to its encoder/decoder class pair. Board-free, needing no built hardware to run.

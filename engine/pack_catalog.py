@@ -21,7 +21,6 @@ import os
 import sys
 
 import engine._path as _path
-from engine.audio import scan_sound_dir
 from engine.packs import PackRegistry, _PackEntry, scan_item_names
 from engine.scene import SceneLocalRegistry, SceneRegistry, _SceneEntry
 from engine.version import Version
@@ -30,6 +29,8 @@ _REQUIRED_SCENE_KEYS = ("version", "effect_packs", "rule_packs")
 
 # The attribute each kind's items export, in packs and scenes alike.
 _EXPORT_ATTR = {"effects": "BUILD", "rules": "RULE"}
+
+_SOUND_EXTENSIONS = (".wav",)
 
 
 class PackScanError(ValueError):
@@ -275,9 +276,14 @@ def _add_import_parent(parent: str) -> None:
 def _pack_sounds(effect_packs: list[_PackEntry]) -> dict[str, str]:
     sounds: dict[str, str] = {}
     for entry in effect_packs:
-        for stem, path in scan_sound_dir(_path.join(entry.source_path, "sounds")).items():
+        for stem, path in _scan_sounds(_path.join(entry.source_path, "sounds")).items():
             sounds[entry.name + "." + stem] = path
     return sounds
+
+
+def _scan_sounds(sound_dir: str) -> dict[str, str]:
+    # A missing sounds/ folder yields no sounds.
+    return _path.scan_stems(sound_dir, _SOUND_EXTENSIONS)
 
 
 def _scan_packs(root: str, root_name: str, kind: str, packs: list[_PackEntry]) -> None:
@@ -334,7 +340,7 @@ def _scan_scenes(
             ir_codec=_read_ir_codec(name, scene_json, data),
             local_rule_registry=_scan_local_items(scene_dir, scene_prefix, "rules"),
             local_effect_registry=_scan_local_items(scene_dir, scene_prefix, "effects"),
-            local_sound_map=scan_sound_dir(_path.join(scene_dir, "sounds")),
+            local_sound_map=_scan_sounds(_path.join(scene_dir, "sounds")),
         )
 
 
@@ -378,10 +384,9 @@ def _parse_version(value: object, path: str) -> Version:
 
 
 def _scan_local_items(scene_dir: str, scene_prefix: str, kind: str) -> SceneLocalRegistry:
-    item_attr = _EXPORT_ATTR[kind]
     item_dir = _path.join(scene_dir, kind)
     if not _path.isdir(item_dir):
-        return SceneLocalRegistry(item_attr)
+        return SceneLocalRegistry()
     return SceneLocalRegistry._from_items(
-        item_attr, scan_item_names(item_dir), scene_prefix + "." + kind
+        _EXPORT_ATTR[kind], scan_item_names(item_dir), scene_prefix + "." + kind
     )

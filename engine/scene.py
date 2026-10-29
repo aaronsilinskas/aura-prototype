@@ -2,8 +2,6 @@ from __future__ import annotations
 
 __all__ = ["Scene", "SceneLocalRegistry", "SceneManager", "SceneRegistry"]
 
-import json
-import os
 
 try:
     from collections.abc import Callable, Sequence
@@ -17,13 +15,10 @@ try:
 except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
-import engine._path as _path
-from engine.audio import AudioOverlayAdmin, scan_sound_dir
+from engine.audio import AudioOverlayAdmin
 from engine.engine import GameEngine, GameRule, Version
-from engine.packs import PackRegistry, UnknownItemError, load_item, scan_item_names
+from engine.packs import PackRegistry, UnknownItemError, load_item
 from engine.state import EffectAdmin, GameState, MergeStrategy, SceneControls, SceneReboot, Scope
-
-_REQUIRED_KEYS = frozenset(("version", "effect_packs", "rule_packs"))
 
 
 class SceneLocalRegistry:
@@ -33,21 +28,20 @@ class SceneLocalRegistry:
     attribute extraction, isinstance check, cache) with ``PackRegistry`` via
     ``load_item``.  No version concept.
 
-    Populated at scene discovery time via ``scan_dir``; accessed via
-    ``get`` and ``items``.
+    Built only by ``engine.pack_catalog.scan_pack_roots``, which discovers the
+    items and sets the attribute they export (``BUILD`` or ``RULE``).
+    ``SceneLocalRegistry()`` is a valid empty registry.
 
     Example::
 
-        registry = SceneLocalRegistry(item_attr="RULE")
-        registry.scan_dir("/path/to/scene/rules", "packs.scenes.forest.rules")
-        rule = registry.get("my_rule", GameRule)
+        rule = scene.local_rule_registry.get("my_rule", GameRule)
     """
 
     __slots__ = ("_cache", "_item_attr", "_item_names", "_module_prefix")
 
-    def __init__(self, item_attr: str | None = None) -> None:
-        # With no item_attr the registry stays empty, so get() never reads it.
-        self._item_attr = item_attr
+    def __init__(self) -> None:
+        # An empty registry has no export attribute; get() never reads it.
+        self._item_attr: str | None = None
         self._item_names: set[str] = set()
         self._module_prefix: str = ""
         self._cache: dict[str, object] = {}
@@ -58,29 +52,21 @@ class SceneLocalRegistry:
 
         The ``PackCatalog`` construction path.
         """
-        registry = SceneLocalRegistry(item_attr)
+        registry = SceneLocalRegistry()
+        registry._item_attr = item_attr
         registry._item_names = item_names
         registry._module_prefix = module_prefix
         return registry
 
-    def scan_dir(self, item_dir: str, module_prefix: str) -> None:
-        """Populate from item_dir using scan_item_names. Single-shot; missing/non-dir is a no-op."""
-        if not _path.isdir(item_dir):
-            return
-        self._item_names = scan_item_names(item_dir)
-        self._module_prefix = module_prefix
-
     def get(self, item_name: str, expected_class: type[T]) -> T:
-        """Return the *item_attr* attribute of *item_name*.
+        """Return the export (``BUILD`` or ``RULE``) of *item_name*.
 
         The item is imported on first access and the result is cached.
 
         Raises:
             UnknownItemError: if *item_name* is not in the recorded set.
-            MissingItemAttributeError: if the module has no attribute named
-                *item_attr*.
-            ItemTypeError: if the attribute value is not an instance of
-                *expected_class*.
+            MissingItemAttributeError: if the module lacks the export.
+            ItemTypeError: if the export is not an instance of *expected_class*.
         """
         if item_name not in self._item_names:
             raise UnknownItemError(item_name, sorted(self._item_names))
@@ -131,8 +117,8 @@ class Scene:
     once at discovery and shared across fresh ``Scene`` instances.
 
     ``local_sound_map`` is a bare-keyed ``{stem: path}`` map of this scene's
-    scene-local sounds (its ``sounds/`` subdirectory).  Built once at discovery
-    via ``scan_sound_dir``; unlike ``local_rule_registry``/``local_effect_registry``
+    scene-local sounds (its ``sounds/`` subdirectory).  Built once at discovery;
+    unlike ``local_rule_registry``/``local_effect_registry``
     it is a plain mutable dict rather than an encapsulated registry, so — like
     ``initial_data`` — each fresh ``Scene`` from ``SceneRegistry.get`` receives its
     own copy, keeping mutation from poisoning future loads.  Purely additive for
@@ -168,14 +154,10 @@ class Scene:
         self.version = version
         self.ir_codec = ir_codec
         self.local_rule_registry = (
-            local_rule_registry
-            if local_rule_registry is not None
-            else SceneLocalRegistry(item_attr="RULE")
+            local_rule_registry if local_rule_registry is not None else SceneLocalRegistry()
         )
         self.local_effect_registry = (
-            local_effect_registry
-            if local_effect_registry is not None
-            else SceneLocalRegistry(item_attr="BUILD")
+            local_effect_registry if local_effect_registry is not None else SceneLocalRegistry()
         )
         self.local_sound_map = local_sound_map if local_sound_map is not None else {}
 
@@ -219,15 +201,7 @@ class _SceneEntry:
 
 
 class SceneRegistry:
-    """Auto-discovers JSON-described scenes from a directory.
-
-    Construction::
-
-        registry = SceneRegistry()
-
-    Scanning::
-
-        registry.scan_dir("/path/to/scenes", "packs.scenes")
+    """The installed JSON-described scenes, built by ``scan_pack_roots``.
 
     Scene access::
 
@@ -238,12 +212,11 @@ class SceneRegistry:
         registry.register("test_scene", lambda: Scene(...))
     """
 
-    __slots__ = ("_factories", "_scanned_dirs", "_scenes")
+    __slots__ = ("_factories", "_scenes")
 
     def __init__(self) -> None:
         self._scenes: dict[str, _SceneEntry] = {}
         self._factories: dict[str, Callable[[], Scene]] = {}
-        self._scanned_dirs: set[str] = set()
 
     @staticmethod
     def _from_scenes(scenes: dict[str, _SceneEntry]) -> SceneRegistry:
@@ -255,120 +228,6 @@ class SceneRegistry:
         registry = SceneRegistry()
         registry._scenes = scenes
         return registry
-
-    def scan_dir(self, path: str, module_prefix: str) -> None:
-        """Scan *path* for subdirectories that contain a ``scene.json``.
-
-        Each such subdirectory is registered as a scene with the directory name
-        as its scene name.  If a scene folder contains a ``rules/`` subdirectory,
-        every ``.py`` file in it (except ``__init__.py`` and any ``tests/`` subdir)
-        is recorded as a scene-local rule item in that scene's
-        ``SceneLocalRegistry``.  The local module prefix for each item is derived
-        as ``module_prefix + "." + scene_name + ".rules"``.  If a scene folder
-        contains a ``sounds/`` subdirectory, every ``*.wav`` file in it is recorded
-        in that scene's bare-keyed ``local_sound_map`` (``stem`` → path).
-
-        *module_prefix* is the dotted import root for scene directories (e.g.
-        ``"packs.scenes"``).  It is required; path-relative derivation is
-        rejected as fragile.
-
-        An optional ``"ir_codec"`` string key names the scene's IR wire-frame
-        codec.  Absent, it defaults to ``"aura"``; present, it must be a
-        non-empty, non-whitespace string or scanning raises — it is not a
-        required key.
-
-        All validation (required fields, version format, ``ir_codec`` format)
-        happens here so that misconfigured scenes fail at startup.
-
-        This method is idempotent: calling it a second time with the same *path*
-        is a no-op.  Discovering a scene name that was already registered from a
-        **different** source path raises ``ValueError``.
-
-        Raises:
-            ValueError: if a required field (``version``, ``effect_packs``,
-                ``rule_packs``) is missing from ``scene.json``.
-            ValueError: if ``version`` cannot be parsed by ``Version.parse``.
-            ValueError: if ``ir_codec`` is present but empty, whitespace-only,
-                or not a string.
-            ValueError: if the same scene name is found in two different paths.
-        """
-        norm_path = _path.normpath(path)
-        if norm_path in self._scanned_dirs:
-            return
-        self._scanned_dirs.add(norm_path)
-
-        for entry in os.listdir(norm_path):
-            scene_dir = _path.join(norm_path, entry)
-            scene_json_path = _path.join(scene_dir, "scene.json")
-            if not _path.isdir(scene_dir) or not _path.isfile(scene_json_path):
-                continue
-
-            scene_name = entry
-
-            if scene_name in self._scenes:
-                existing = self._scenes[scene_name]
-                if existing.source_path != norm_path:
-                    raise ValueError(
-                        f"Scene '{scene_name}' already registered from "
-                        + f"'{existing.source_path}'; cannot register the same scene name "
-                        + f"from '{norm_path}'"
-                    )
-                continue
-
-            with open(scene_json_path) as fh:
-                data = json.load(fh)
-
-            for key in _REQUIRED_KEYS:
-                if key not in data:
-                    raise ValueError(
-                        f"Scene '{scene_name}' in '{norm_path}' is missing required key "
-                        + f"'{key}' in scene.json"
-                    )
-
-            try:
-                version = Version.parse(data["version"])
-            except ValueError as exc:
-                raise ValueError(
-                    f"Scene '{scene_name}' in '{norm_path}' has malformed version "
-                    + f"'{data['version']}': {exc}"
-                ) from exc
-
-            initial_data = data.get("initial_data")
-
-            if "ir_codec" in data:
-                raw_ir_codec = data["ir_codec"]
-                if not isinstance(raw_ir_codec, str) or not raw_ir_codec.strip():
-                    raise ValueError(
-                        f"Scene '{scene_name}' in '{norm_path}' has malformed ir_codec "
-                        + f"'{raw_ir_codec}': must be a non-empty string"
-                    )
-                ir_codec = raw_ir_codec
-            else:
-                ir_codec = "aura"
-
-            local_rule_registry = SceneLocalRegistry(item_attr="RULE")
-            local_rule_registry.scan_dir(
-                _path.join(scene_dir, "rules"),
-                module_prefix + "." + scene_name + ".rules",
-            )
-            local_effect_registry = SceneLocalRegistry(item_attr="BUILD")
-            local_effect_registry.scan_dir(
-                _path.join(scene_dir, "effects"),
-                module_prefix + "." + scene_name + ".effects",
-            )
-            local_sound_map = scan_sound_dir(_path.join(scene_dir, "sounds"))
-
-            self._scenes[scene_name] = _SceneEntry(
-                version=version,
-                effect_packs=data["effect_packs"],
-                rule_packs=data["rule_packs"],
-                initial_data=initial_data,
-                source_path=norm_path,
-                ir_codec=ir_codec,
-                local_rule_registry=local_rule_registry,
-                local_effect_registry=local_effect_registry,
-                local_sound_map=local_sound_map,
-            )
 
     def get(self, name: str) -> Scene:
         """Return a fresh ``Scene`` for *name*.
@@ -426,23 +285,6 @@ class SceneRegistry:
             return entry.ir_codec
 
         raise ValueError(f"Unknown scene '{name}'")
-
-    def override_initial_data(self, name: str, overrides: dict[str, object]) -> None:
-        """Merge *overrides* over scanned scene *name*'s ``initial_data``.
-
-        Every later ``get`` sees the merged keys; keys not named keep their
-        ``scene.json`` value.  The seam a simulated device boots a scene with
-        shortened tunables through (e.g. a two-round magazine).
-
-        Raises:
-            ValueError: if *name* is not a scanned scene.
-        """
-        entry = self._scenes.get(name)
-        if entry is None:
-            raise ValueError(f"Unknown scene '{name}'")
-        merged = dict(entry.initial_data or {})
-        merged.update(overrides)
-        entry.initial_data = merged
 
     def names(self) -> list[str]:
         """Return all registered scene names sorted alphabetically."""

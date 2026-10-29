@@ -41,7 +41,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   timer.py        Timer
   lerp.py         Integer/float interpolation helpers
   packs.py        PackRegistry
-  version.py      Pack semver parsing and comparison
+  version.py      Pack MAJOR.MINOR parsing
   input.py        ButtonData, AccelerationData, InputEvents
   audio.py        AudioRegistry
   network.py      NetworkEvents
@@ -165,7 +165,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
 | `EffectResolver` | `engine/effects/manager.py` | Resolves a qualified effect name to a builder |
 | `MergeStrategy` | `engine/state.py` | Per-scope compositing policy; subclasses in `engine/effects/merge.py` |
-| `PackRegistry` | `engine/packs.py` | Discovers versioned effect or rule packs in a directory and looks up their items by pack and item name |
+| `PackRegistry` | `engine/packs.py` | Looks up the items of versioned effect or rule packs by pack and item name; filled only by the catalog |
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
 | `Aura` | `magic/aura.py` | A player/object's magic pool + active `Spells` collection |

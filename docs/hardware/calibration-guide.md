@@ -229,7 +229,8 @@ one hardware-bundle delta followed by the stages the profiler still owns individ
 - **`hardware` Δ** — the heap the single `build_hardware` call retains (whichever
   pixels/audio/haptics-driver/IR sections the config declares, plus buttons/accelerometer
   it always wires but this profiler never reads).
-- **`registries` Δ** — the heap scanning the effect/rule/scene `PackRegistry`s retains.
+- **`registries` Δ** — the heap the pack catalog scan (effect/rule `PackRegistry`s and
+  `SceneRegistry`) retains.
 - **`engine` Δ** — the heap building `EffectManager` + `Timer` + `GameEngine` +
   `SceneManager` retains.
 - **`load` Δ** — the heap `SceneManager.load(scene_name)` retains (the scene graph:

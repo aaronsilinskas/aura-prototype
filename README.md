@@ -224,15 +224,16 @@ trigger scene transitions via `state.scene_controls`.
 ### Packs
 
 A **pack** is a directory containing a `version.txt` and one `.py` file per
-item. `PackRegistry` discovers packs via `scan_dir(path, module_prefix)` and
-imports items lazily on first use.
+item. `scan_pack_roots` (`engine/pack_catalog.py`) discovers every pack and
+scene under the pack roots in one scan; `PackRegistry` imports items lazily on
+first use.
 
 - **Effect pack** — each `.py` file exports `BUILD`: a `(config) → Effect` callable.
   Effect names use `"pack.effect"` format (e.g. `"elements.fire"`).
 - **Rule pack** — each `.py` file exports `RULE`: a `GameRule` instance.
 
 Version format is `MAJOR.MINOR`. A `Scene` declares minimum required versions;
-`SceneManager` validates at load time (same-major, installed-minor ≥ required-minor).
+the catalog scan checks them at boot (same-major, installed-minor ≥ required-minor).
 
 ### Scenes
 
