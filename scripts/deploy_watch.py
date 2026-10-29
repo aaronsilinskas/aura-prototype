@@ -11,6 +11,10 @@ Usage
     # Both: exits 0 on match, 2 on timeout-before-match:
     python scripts/deploy_watch.py examples/hardware/scene_demo.py --until READY --seconds 10
 
+    # Deploy with a scene (same meaning as deploy.py --scene), then watch:
+    python scripts/deploy_watch.py examples/hardware/scene_demo.py --scene hardware_test \
+        --seconds 10
+
 Exit codes
 ----------
     0  matched (marker found) or timed out without --until or stream ended without --until
@@ -321,7 +325,8 @@ def iter_serial_lines(
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
+def parse_args(argv: "list[str] | None" = None) -> argparse.Namespace:
+    """Parse CLI arguments (``sys.argv`` when *argv* is ``None``); exit on a usage error."""
     parser = argparse.ArgumentParser(
         description=(
             "Deploy a CircuitPython example and capture serial output "
@@ -364,6 +369,15 @@ def main() -> None:
         help="Bound the watch to N seconds.",
     )
     parser.add_argument(
+        "--scene",
+        default=None,
+        metavar="NAME",
+        help=(
+            "Scene to deploy, with the same meaning as deploy.py's --scene "
+            "(recorded in aura-settings.json); omit to leave the boot scene alone."
+        ),
+    )
+    parser.add_argument(
         "--reboot-timeout",
         type=float,
         default=_DEFAULT_REBOOT_TIMEOUT,
@@ -385,10 +399,21 @@ def main() -> None:
         ),
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.until is None and args.seconds is None:
         parser.error("at least one of --until or --seconds is required")
+
+    return args
+
+
+def run_deploy(args: argparse.Namespace, *, deploy: "Callable[..., int]" = deploy) -> int:
+    """Run the deploy step for parsed *args*, returning ``deploy``'s exit code."""
+    return deploy(args.example_file, args.mount, scene=args.scene)
+
+
+def main() -> None:
+    args = parse_args()
 
     # --- port discovery ---
     try:
@@ -406,7 +431,7 @@ def main() -> None:
     handle = SerialHandle(ser, port, args.baud)
     output_file = open(args.output, "w") if args.output is not None else None  # noqa: SIM115
     try:
-        rc = deploy(args.example_file, args.mount)
+        rc = run_deploy(args)
         if rc != 0:
             sys.exit(rc)
 
