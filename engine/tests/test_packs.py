@@ -63,6 +63,20 @@ def _make_registry(attr: str = "VALUE") -> PackRegistry:
 
 
 # ---------------------------------------------------------------------------
+# Construction
+# ---------------------------------------------------------------------------
+
+
+def test_pack_registry_with_no_arguments_is_a_valid_empty_registry() -> None:
+    registry = PackRegistry()
+
+    assert registry.names() == []
+    with pytest.raises(UnknownPackError) as excinfo:
+        registry.get("anything", "item", object)
+    assert excinfo.value.pack_name == "anything"
+
+
+# ---------------------------------------------------------------------------
 # scan_dir — discovery
 # ---------------------------------------------------------------------------
 

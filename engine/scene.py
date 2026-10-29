@@ -45,11 +45,23 @@ class SceneLocalRegistry:
 
     __slots__ = ("_cache", "_item_attr", "_item_names", "_module_prefix")
 
-    def __init__(self, item_attr: str) -> None:
+    def __init__(self, item_attr: str | None = None) -> None:
+        # With no item_attr the registry stays empty, so get() never reads it.
         self._item_attr = item_attr
         self._item_names: set[str] = set()
         self._module_prefix: str = ""
         self._cache: dict[str, object] = {}
+
+    @staticmethod
+    def _from_items(item_attr: str, item_names: set[str], module_prefix: str) -> SceneLocalRegistry:
+        """Return a registry of *item_names* under *module_prefix* exporting *item_attr*.
+
+        The ``PackCatalog`` construction path.
+        """
+        registry = SceneLocalRegistry(item_attr)
+        registry._item_names = item_names
+        registry._module_prefix = module_prefix
+        return registry
 
     def scan_dir(self, item_dir: str, module_prefix: str) -> None:
         """Populate from item_dir using scan_item_names. Single-shot; missing/non-dir is a no-op."""
@@ -232,6 +244,17 @@ class SceneRegistry:
         self._scenes: dict[str, _SceneEntry] = {}
         self._factories: dict[str, Callable[[], Scene]] = {}
         self._scanned_dirs: set[str] = set()
+
+    @staticmethod
+    def _from_scenes(scenes: dict[str, _SceneEntry]) -> SceneRegistry:
+        """Return a registry serving *scenes*, keyed by scene name.
+
+        The ``PackCatalog`` construction path: the catalog has already scanned
+        and validated every entry.
+        """
+        registry = SceneRegistry()
+        registry._scenes = scenes
+        return registry
 
     def scan_dir(self, path: str, module_prefix: str) -> None:
         """Scan *path* for subdirectories that contain a ``scene.json``.

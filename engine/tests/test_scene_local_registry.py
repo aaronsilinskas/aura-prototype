@@ -66,6 +66,15 @@ def test_scene_local_registry_items_is_empty_on_construction() -> None:
     assert registry.items() == []
 
 
+def test_scene_local_registry_with_no_arguments_is_a_valid_empty_registry() -> None:
+    registry = SceneLocalRegistry()
+
+    assert registry.items() == []
+    with pytest.raises(UnknownItemError) as excinfo:
+        registry.get("anything", object)
+    assert excinfo.value.item_name == "anything"
+
+
 # ---------------------------------------------------------------------------
 # SceneLocalRegistry.scan_dir — self-population
 # ---------------------------------------------------------------------------
