@@ -217,29 +217,37 @@ def _check_declarations(
     effect_packs: list[_PackEntry],
     rule_packs: list[_PackEntry],
 ) -> None:
-    installed_by_kind = (
-        ("effect", "effect_packs", {entry.name: entry.version for entry in effect_packs}),
-        ("rule", "rule_packs", {entry.name: entry.version for entry in rule_packs}),
-    )
+    installed_effects = {entry.name: entry.version for entry in effect_packs}
+    installed_rules = {entry.name: entry.version for entry in rule_packs}
     for scene, entry in scenes.items():
         scene_json = _path.join(entry.source_path, "scene.json")
-        for kind, key, installed in installed_by_kind:
-            declarations = getattr(entry, key)
-            if not isinstance(declarations, list):
-                raise MalformedSceneError(scene, scene_json, f"'{key}' is not a list")
-            for declaration in declarations:
-                if not _is_declaration(declaration):
-                    raise MalformedSceneError(
-                        scene,
-                        scene_json,
-                        f"'{key}' entry {declaration!r} is not [pack name, minimum version]",
-                    )
-                pack, minimum = declaration
-                required = _parse_version(minimum, scene_json)
-                if pack not in installed:
-                    raise UnknownDeclaredPackError(scene, pack, kind)
-                if not _is_compatible(installed[pack], required):
-                    raise IncompatiblePackError(scene, pack, installed[pack], required)
+        _check_kind(scene, scene_json, "effect", entry.effect_packs, installed_effects)
+        _check_kind(scene, scene_json, "rule", entry.rule_packs, installed_rules)
+
+
+def _check_kind(
+    scene: str,
+    scene_json: str,
+    kind: str,
+    declarations: object,
+    installed: dict[str, Version],
+) -> None:
+    key = kind + "_packs"
+    if not isinstance(declarations, list):
+        raise MalformedSceneError(scene, scene_json, f"'{key}' is not a list")
+    for declaration in declarations:
+        if not _is_declaration(declaration):
+            raise MalformedSceneError(
+                scene,
+                scene_json,
+                f"'{key}' entry {declaration!r} is not [pack name, minimum version]",
+            )
+        pack, minimum = declaration
+        required = _parse_version(minimum, scene_json)
+        if pack not in installed:
+            raise UnknownDeclaredPackError(scene, pack, kind)
+        if not _is_compatible(installed[pack], required):
+            raise IncompatiblePackError(scene, pack, installed[pack], required)
 
 
 def _is_compatible(installed: Version, required: Version) -> bool:

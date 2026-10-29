@@ -478,7 +478,11 @@ def test_a_rule_pack_declared_as_an_effect_pack_raises_unknown_declared_pack_err
     with pytest.raises(UnknownDeclaredPackError) as excinfo:
         scan_pack_roots([str(root)])
 
-    assert (excinfo.value.scene, excinfo.value.pack) == ("lobby", "core")
+    assert (excinfo.value.scene, excinfo.value.pack, excinfo.value.kind) == (
+        "lobby",
+        "core",
+        "effect",
+    )
 
 
 def test_a_flash_scene_may_declare_packs_installed_on_the_card(pack_tree) -> None:
@@ -516,17 +520,19 @@ def test_a_malformed_declaration_raises_malformed_scene_error(pack_tree, key, de
     assert excinfo.value.path == str(scene_dir / "scene.json")
 
 
+def _scene_declaring_pack(pack_tree, root, kind, *, installed, required):
+    """Install *kind* pack ``basic`` at *installed*; return scene ``lobby`` requiring *required*."""
+    make_pack = pack_tree.effect_pack if kind == "effect" else pack_tree.rule_pack
+    make_pack(root, "basic", version=installed)
+    return pack_tree.scene(root, "lobby", **{kind + "_packs": [["basic", required]]})
+
+
 @pytest.mark.parametrize("kind", ["effect", "rule"])
 def test_a_malformed_declared_minimum_raises_malformed_version_error_naming_scene_json(
     pack_tree, kind
 ) -> None:
     root = pack_tree.root("tc_flash")
-    if kind == "effect":
-        pack_tree.effect_pack(root, "basic")
-        scene_dir = pack_tree.scene(root, "lobby", effect_packs=[["basic", "1"]])
-    else:
-        pack_tree.rule_pack(root, "basic")
-        scene_dir = pack_tree.scene(root, "lobby", rule_packs=[["basic", "1"]])
+    scene_dir = _scene_declaring_pack(pack_tree, root, kind, installed="1.0", required="1")
 
     with pytest.raises(MalformedVersionError) as excinfo:
         scan_pack_roots([str(root)])
@@ -548,12 +554,7 @@ def test_an_incompatible_installed_pack_raises_incompatible_pack_error(
     pack_tree, kind, installed, required
 ) -> None:
     root = pack_tree.root("tc_flash")
-    if kind == "effect":
-        pack_tree.effect_pack(root, "basic", version=installed)
-        pack_tree.scene(root, "lobby", effect_packs=[["basic", required]])
-    else:
-        pack_tree.rule_pack(root, "basic", version=installed)
-        pack_tree.scene(root, "lobby", rule_packs=[["basic", required]])
+    _scene_declaring_pack(pack_tree, root, kind, installed=installed, required=required)
 
     with pytest.raises(IncompatiblePackError) as excinfo:
         scan_pack_roots([str(root)])
@@ -591,10 +592,27 @@ def test_a_pack_declared_twice_in_one_scene_is_checked_per_entry(pack_tree) -> N
     assert str(excinfo.value.required) == "1.4"
 
 
-def test_every_scene_declaration_error_is_a_pack_scan_error() -> None:
-    for error_type in (UnknownDeclaredPackError, IncompatiblePackError):
-        assert issubclass(error_type, SceneDeclarationError)
-    assert issubclass(SceneDeclarationError, PackScanError)
+@pytest.mark.parametrize(
+    ("installed", "required"),
+    [
+        pytest.param(None, "1.0", id="unknown-pack"),
+        pytest.param("2.0", "1.0", id="incompatible-pack"),
+    ],
+)
+def test_a_declaration_failure_is_caught_as_a_scene_declaration_pack_scan_error(
+    pack_tree, installed, required
+) -> None:
+    root = pack_tree.root("tc_flash")
+    if installed is None:
+        pack_tree.scene(root, "lobby", effect_packs=[["basic", required]])
+    else:
+        _scene_declaring_pack(pack_tree, root, "effect", installed=installed, required=required)
+
+    with pytest.raises(PackScanError) as excinfo:
+        scan_pack_roots([str(root)])
+
+    assert isinstance(excinfo.value, SceneDeclarationError)
+    assert (excinfo.value.scene, excinfo.value.pack) == ("lobby", "basic")
 
 
 # ---------------------------------------------------------------------------
