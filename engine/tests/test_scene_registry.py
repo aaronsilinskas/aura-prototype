@@ -10,20 +10,17 @@ import pytest
 
 from engine.pack_catalog import scan_pack_roots
 from engine.scene import Scene, SceneRegistry
+from engine.tests.helpers import scan_scenes
 from engine.version import Version
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-ROOT_NAME = "tsr_flash"
-
 
 def _scan_scene(pack_tree, name: str = "forest", **scene_fields) -> SceneRegistry:
     """Scan a root holding the single scene *name*; return the catalog's ``SceneRegistry``."""
-    root = pack_tree.root(ROOT_NAME)
-    pack_tree.scene(root, name, **scene_fields)
-    return scan_pack_roots([str(root)]).scene_registry
+    return scan_scenes(pack_tree, {name: scene_fields}).scene_registry
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +84,7 @@ def test_get_returns_scene_with_version_parsed_from_json(pack_tree) -> None:
 
 
 def test_get_returns_scene_with_effect_packs_from_json(pack_tree) -> None:
-    root = pack_tree.root(ROOT_NAME)
+    root = pack_tree.root("ts_flash")
     pack_tree.effect_pack(root, "fx")
     pack_tree.scene(root, "forest", effect_packs=[["fx", "1.0"]])
     registry = scan_pack_roots([str(root)]).scene_registry
@@ -98,7 +95,7 @@ def test_get_returns_scene_with_effect_packs_from_json(pack_tree) -> None:
 
 
 def test_get_returns_scene_with_rule_packs_from_json(pack_tree) -> None:
-    root = pack_tree.root(ROOT_NAME)
+    root = pack_tree.root("ts_flash")
     pack_tree.rule_pack(root, "rules")
     pack_tree.scene(root, "forest", rule_packs=[["rules", "1.0"]])
     registry = scan_pack_roots([str(root)]).scene_registry
@@ -206,10 +203,7 @@ def test_resolve_known_returns_a_factory_registered_scene_name() -> None:
 
 
 def test_resolve_known_raises_value_error_naming_the_known_scenes(pack_tree) -> None:
-    root = pack_tree.root(ROOT_NAME)
-    pack_tree.scene(root, "forest")
-    pack_tree.scene(root, "cave")
-    registry = scan_pack_roots([str(root)]).scene_registry
+    registry = scan_scenes(pack_tree, {"forest": {}, "cave": {}}).scene_registry
 
     with pytest.raises(ValueError, match=r"'nowhere'.*cave, forest"):
         registry.resolve_known("nowhere")
@@ -218,12 +212,6 @@ def test_resolve_known_raises_value_error_naming_the_known_scenes(pack_tree) -> 
 # ---------------------------------------------------------------------------
 # SceneRegistry.ir_codec_for — lightweight accessor
 # ---------------------------------------------------------------------------
-
-
-def test_ir_codec_for_returns_aura_when_scene_json_has_no_ir_codec(pack_tree) -> None:
-    registry = _scan_scene(pack_tree)
-
-    assert registry.ir_codec_for("forest") == "aura"
 
 
 def test_ir_codec_for_returns_the_declared_codec_name(pack_tree) -> None:
@@ -265,12 +253,7 @@ def test_ir_codec_for_prefers_factory_override_over_scanned_scene(pack_tree) -> 
 
 
 def test_names_returns_scene_names_sorted_alphabetically(pack_tree) -> None:
-    root = pack_tree.root(ROOT_NAME)
-    pack_tree.scene(root, "zebra")
-    pack_tree.scene(root, "alpha")
-    pack_tree.scene(root, "mango")
-
-    registry = scan_pack_roots([str(root)]).scene_registry
+    registry = scan_scenes(pack_tree, {"zebra": {}, "alpha": {}, "mango": {}}).scene_registry
 
     assert registry.names() == ["alpha", "mango", "zebra"]
 

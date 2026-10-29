@@ -170,17 +170,23 @@ def test_pack_sounds_qualify_each_effect_pack_clip_with_its_pack_name(pack_tree)
 
 
 def _item_dir_and_lister(pack_tree, root, owner):
-    """Return an item folder of *owner* (a pack or a scene) and a lister of its scanned items."""
+    """Return an item folder of *owner* (a pack, or a scene's rules or effects) and a
+    lister of its scanned items."""
     if owner == "pack":
         item_dir = pack_tree.effect_pack(root, "basic", items={"glow": "BUILD = 1"})
         return item_dir, lambda catalog: catalog.effect_registry.items("basic")
+    if owner == "scene_effects":
+        scene_dir = pack_tree.scene(root, "lobby", effects={"glow": "BUILD = 1"})
+        return scene_dir / "effects", lambda catalog: catalog.scene_registry.get(
+            "lobby"
+        ).local_effect_registry.items()
     scene_dir = pack_tree.scene(root, "lobby", rules={"glow": "RULE = 1"})
     return scene_dir / "rules", lambda catalog: catalog.scene_registry.get(
         "lobby"
     ).local_rule_registry.items()
 
 
-@pytest.mark.parametrize("owner", ["pack", "scene"])
+@pytest.mark.parametrize("owner", ["pack", "scene_rules", "scene_effects"])
 def test_mpy_item_files_count_like_py_files(pack_tree, owner) -> None:
     root = pack_tree.root("tc_flash")
     item_dir, scanned_items = _item_dir_and_lister(pack_tree, root, owner)
@@ -191,7 +197,7 @@ def test_mpy_item_files_count_like_py_files(pack_tree, owner) -> None:
     assert scanned_items(catalog) == ["glow", "spark"]
 
 
-@pytest.mark.parametrize("owner", ["pack", "scene"])
+@pytest.mark.parametrize("owner", ["pack", "scene_rules", "scene_effects"])
 def test_init_subdirectories_and_other_files_are_not_items(pack_tree, owner) -> None:
     root = pack_tree.root("tc_flash")
     item_dir, scanned_items = _item_dir_and_lister(pack_tree, root, owner)
@@ -708,3 +714,12 @@ def test_a_plain_file_in_the_scenes_folder_is_not_a_scene(pack_tree) -> None:
     catalog = scan_pack_roots([str(root)])
 
     assert catalog.scene_registry.names() == ["lobby"]
+
+
+def test_an_empty_scenes_folder_scans_to_no_scenes(pack_tree) -> None:
+    root = pack_tree.root("tc_flash")
+    (root / "scenes").mkdir()
+
+    catalog = scan_pack_roots([str(root)])
+
+    assert catalog.scene_registry.names() == []

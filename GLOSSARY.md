@@ -39,9 +39,17 @@ _Avoid_: calling a scene-local effect set a "pack" (a pack is shared, versioned,
 A named, versioned directory of rule items, each exporting a `GameRule`; shared and cross-scene.
 _Avoid_: calling a scene-local rule set a "pack" (a pack is shared, versioned, cross-scene)
 
+### Pack root
+A directory whose own name is its top-level import package (flash `packs`, the card's `aura_packs`), holding optional `effects/`, `rules/` and `scenes/` folders. A device has one or two, scanned in order.
+_Avoid_: pairing a root path with a hand-written import prefix (the prefix is the folder name); two roots with the same folder name; "pack dir" for a root (a pack dir is one pack inside it)
+
 ### PackCatalog
 Everything installed under a device's pack roots, discovered in one scan by `scan_pack_roots`: the effect and rule `PackRegistry`s, the `SceneRegistry` (with each scene's local items and sounds), and the pack sounds map. Every scene's pack declarations are checked before it is returned, so a misconfigured layout, version or declaration stops boot; item code is still imported lazily, at first use.
 _Avoid_: scanning packs, scenes or sounds anywhere else; re-checking scene declarations at load time
+
+### PackScanError
+The typed `ValueError` family raised while building a `PackCatalog`, when the files on disk are wrong (missing root, duplicate or reserved name, malformed version or `scene.json`, a scene declaring a pack that is missing or incompatible). Each carries the file, scene or pack at fault.
+_Avoid_: confusing with **Registry lookup errors** (a name not registered, after a good scan); classifying by message text
 
 ### DynamicValue
 `float | Callable[[], float]` — a value that may be constant or computed fresh each sample.
@@ -108,7 +116,7 @@ _Avoid_: modelling scene-local items as a synthetic single-pack `PackRegistry`
 
 ### Registry lookup errors
 The typed `ValueError` subclasses (`RegistryError` base; `UnknownPackError`, `UnknownItemError`, `MissingItemAttributeError`, `ItemTypeError`) that registries raise for lookup failures; `EffectResolver` dispatches on the exception **type**, so message wording stays a free display detail.
-_Avoid_: classifying a registry failure by `str(exc)`/`startswith` on the message
+_Avoid_: classifying a registry failure by `str(exc)`/`startswith` on the message; raising one for a bad disk layout (that is a **PackScanError**)
 
 ### NetworkControls
 The **game-facing**, send-only network seam a rule holds via `GameState.network_controls` (`send_ir`, `send_radio`); the runtime-facing per-tick IR pump lives entirely on `InfraredTransceiver.update()` instead.
@@ -122,8 +130,8 @@ _Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()
 The rule-facing scene-transition seam (`load`, `overlay`, `pop`, `reboot_into`, `reboot_to_previous`); `SceneManager` is the live implementation.
 
 ### SceneManager
-Owns the scene stack and drives scene transitions, routing every transition through the injected `EffectAdmin`/`AudioOverlayAdmin` seams and reboots through the injected `SceneReboot` port. The live `SceneControls`.
-_Avoid_: calling `register()` on it (removed); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); routing scene-transition sound calls through anything but the injected `AudioOverlayAdmin`
+Owns the scene stack and drives scene transitions, trusting the **PackCatalog** to have checked each scene's pack declarations, routing every transition through the injected `EffectAdmin`/`AudioOverlayAdmin` seams and reboots through the injected `SceneReboot` port. The live `SceneControls`.
+_Avoid_: calling `register()` on it (removed); validating pack versions on load or overlay (the catalog already did); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); routing scene-transition sound calls through anything but the injected `AudioOverlayAdmin`
 
 ### Reboot
 How a device switches scenes: the target is persisted to device storage, then the device resets and boots that scene. Only storage and what is physically happening to the device (held buttons, motion, where its IR points) carry across; game state, phases and output state do not, and nothing after the reset runs. A device with no SD card cannot persist a target, so it does not reboot.
@@ -263,7 +271,7 @@ _Avoid_: `scan_boot_scene_registry` (old name); calling it before `build_hardwar
 
 ### resolve_boot_scene_name
 The boot-time seam that picks the scene to boot into (persisted SD `scene` → flash `default_scene` → raise) and guarantees the winner is registered.
-_Avoid_: calling `resolve_boot_scene` directly and skipping registry validation; calling it before `build_hardware` (the persisted leg needs storage mounted)
+_Avoid_: calling `resolve_boot_scene` directly and skipping registry validation (`SceneRegistry.resolve_known`); calling it before `build_hardware` (the persisted leg needs storage mounted)
 
 ### resolve_ir_codec
 Resolves a scene's declared **wire-frame codec** name to its encoder/decoder class pair. Board-free, needing no built hardware to run.
