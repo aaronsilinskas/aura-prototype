@@ -916,6 +916,18 @@ def test_failed_set_effect_adds_no_effect(pack_tree) -> None:
     ]
 
 
+def test_failed_set_effect_takes_no_receipt_id(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+    first = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+
+    with pytest.raises(UnknownItemError):
+        manager.set_effect(Scope.PERSONAL, "stub.missing", {})
+    second = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+
+    assert second.id == first.id + 1
+
+
 # ---------------------------------------------------------------------------
 # Clips resolve when the effect is built (#1116)
 # ---------------------------------------------------------------------------

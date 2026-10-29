@@ -25,18 +25,28 @@ class EffectManager(EffectControls, EffectAdmin):
     """
 
     class _EffectEntry:
-        __slots__ = ("clips", "effect", "keys", "name", "output_buffers", "receipt")
+        __slots__ = (
+            "clips",
+            "effect",
+            "effect_name",
+            "keys",
+            "output_buffers",
+            "pack_name",
+            "receipt",
+        )
 
         def __init__(
             self,
             keys: tuple[str, ...],
-            name: str,
+            pack_name: str,
+            effect_name: str,
             receipt: EffectReceipt,
             output_buffers: list[dict[str, PixelBuffer] | None],
             effect: Effect | None,
         ) -> None:
             self.keys: tuple[str, ...] = keys
-            self.name: str = name
+            self.pack_name: str = pack_name
+            self.effect_name: str = effect_name
             self.receipt: EffectReceipt = receipt
             self.output_buffers: list[dict[str, PixelBuffer] | None] = output_buffers
             self.effect: Effect | None = effect
@@ -46,7 +56,8 @@ class EffectManager(EffectControls, EffectAdmin):
 
         def __repr__(self) -> str:
             rid = self.receipt.id
-            return f"_EffectEntry(name={self.name!r}, receipt_id={rid}, keys={self.keys!r})"
+            name = self.pack_name + "." + self.effect_name
+            return f"_EffectEntry(name={name!r}, receipt_id={rid}, keys={self.keys!r})"
 
     __slots__ = (
         "_effects",
@@ -88,18 +99,15 @@ class EffectManager(EffectControls, EffectAdmin):
             for o, key_set in zip(outputs, self._output_key_sets)
         ]
 
-    def _notify_listeners(
-        self,
-        event: EffectEvent,
-        event_keys: set[str],
-        effect: Effect | None,
-        receipt: EffectReceipt,
-    ) -> None:
-        """Notify outputs whose registered key sets intersect event_keys."""
+    def _emit(self, entry: EffectManager._EffectEntry, verb: str, event_keys: set[str]) -> None:
+        """Send *entry*'s *verb* event, with its resolved clip, to outputs serving event_keys."""
+        event = EffectEvent(entry.pack_name, entry.effect_name, verb, entry.clips.get(verb))
         for i in range(len(self._outputs)):
             matching = event_keys & self._output_key_sets[i]
             if matching:
-                self._outputs[i].handle_event(event, frozenset(matching), effect, receipt)
+                self._outputs[i].handle_event(
+                    event, frozenset(matching), entry.effect, entry.receipt
+                )
 
     def _build_effect(
         self,
@@ -131,15 +139,12 @@ class EffectManager(EffectControls, EffectAdmin):
             if matching_keys and output.min_resolution > resolution:
                 resolution = output.min_resolution
 
-        entry = EffectManager._EffectEntry(tuple(scope_key_set), name, receipt, [], None)
+        entry = EffectManager._EffectEntry(
+            tuple(scope_key_set), pack_name, effect_name, receipt, [], None
+        )
 
         def scoped_listener(event_name: str) -> None:
-            self._notify_listeners(
-                EffectEvent(pack_name, effect_name, event_name, entry.clips.get(event_name)),
-                set(entry.keys),
-                entry.effect,
-                receipt,
-            )
+            self._emit(entry, event_name, set(entry.keys))
 
         config = EffectConfig(resolution=resolution, options=options, listeners=[scoped_listener])
         entry.effect = builder(effect_name, config)
@@ -189,13 +194,7 @@ class EffectManager(EffectControls, EffectAdmin):
                 with their keys already narrowed to the post-stop state.
         """
         for entry, removed_keys in stopped:
-            pack_name, effect_name = entry.name.split(".", 1)
-            self._notify_listeners(
-                EffectEvent(pack_name, effect_name, "stop", entry.clips.get("stop")),
-                removed_keys,
-                entry.effect,
-                entry.receipt,
-            )
+            self._emit(entry, "stop", removed_keys)
 
         remaining_key_set: set[str] = set()
         for r in remaining:
@@ -278,13 +277,7 @@ class EffectManager(EffectControls, EffectAdmin):
         entry = self._build_effect(scope_key_set, name, options)
         self._remove_effects_in_scope(scope_key_set)
         self._effects.append(entry)
-        pack_name, effect_name = name.split(".", 1)
-        self._notify_listeners(
-            EffectEvent(pack_name, effect_name, "start", entry.clips.get("start")),
-            scope_key_set,
-            entry.effect,
-            entry.receipt,
-        )
+        self._emit(entry, "start", scope_key_set)
         return entry.receipt
 
     def add_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
@@ -296,13 +289,7 @@ class EffectManager(EffectControls, EffectAdmin):
         scope_key_set = set(scope.keys)
         entry = self._build_effect(scope_key_set, name, options)
         self._effects.append(entry)
-        pack_name, effect_name = name.split(".", 1)
-        self._notify_listeners(
-            EffectEvent(pack_name, effect_name, "start", entry.clips.get("start")),
-            scope_key_set,
-            entry.effect,
-            entry.receipt,
-        )
+        self._emit(entry, "start", scope_key_set)
         return entry.receipt
 
     def stop_effect(self, scope: ScopeValue) -> None:
