@@ -141,3 +141,22 @@ def test_a_magnetized_field_holds_through_a_reboot(simulation):
         device.tap("B")
 
     assert device.strip(Scope.PERSONAL).all_lit(0xFF0000)
+
+
+def test_a_card_less_device_redeployed_with_a_scene_boots_it(simulation):
+    device = simulation.add_device("red", scene="example_lobby", sd_card=False)
+
+    device.redeploy(scene="element_browser")
+
+    assert device.scene == "element_browser"
+
+
+def test_a_persisted_scene_still_outranks_a_redeployed_scene(simulation):
+    # Pins today's gap: a redeploy only changes the flash default_scene, which
+    # the Persisted scene on the card outranks. #1119 makes the redeploy win.
+    device = simulation.add_device("red", scene="example_lobby")
+    launch(device, "element_browser")
+
+    device.redeploy(scene="hardware_test")
+
+    assert device.scene == "element_browser"
