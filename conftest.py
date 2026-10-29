@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from engine.tests.pack_tree import PackTree
 from hardware.shared.device_storage import DeviceStorage
 
 if TYPE_CHECKING:
@@ -26,6 +27,26 @@ def simulation() -> Iterator[Simulation]:
 
     with Simulation() as simulation:
         yield simulation
+
+
+@pytest.fixture()
+def pack_tree(tmp_path: Path) -> Iterator[PackTree]:
+    """Yield a ``PackTree`` building pack roots under *tmp_path*.
+
+    A scan puts each root's parent on ``sys.path`` and item loads import
+    modules under the root's name, so teardown restores ``sys.path`` and
+    evicts every module imported under one of the tree's root names.
+    """
+    tree = PackTree(tmp_path)
+    saved_path = list(sys.path)
+    known_modules = set(sys.modules)
+
+    yield tree
+
+    for name in list(sys.modules):
+        if name not in known_modules and name.split(".")[0] in tree.root_names:
+            del sys.modules[name]
+    sys.path[:] = saved_path
 
 
 @pytest.fixture()

@@ -15,6 +15,9 @@ except ImportError:
     pass
 
 
+ITEM_EXTENSIONS = (".py", ".mpy")
+
+
 class RegistryError(ValueError):
     """Base class for typed registry lookup/load errors.
 
@@ -91,24 +94,11 @@ class ItemTypeError(RegistryError):
 
 
 def scan_item_names(path: str) -> set[str]:
-    """Return item names found in *path* under the canonical pack-item rule.
+    """Return item names found in *path*: its ``.py`` and ``.mpy`` stems.
 
-    Recognises ``.py`` and ``.mpy`` files; excludes ``__init__`` and directories.
+    See ``engine._path.scan_stems`` for the stem rule.
     """
-    names: set[str] = set()
-    for fname in os.listdir(path):
-        if fname.endswith(".mpy"):
-            stem = fname[:-4]
-        elif fname.endswith(".py"):
-            stem = fname[:-3]
-        else:
-            continue
-        if stem == "__init__":
-            continue
-        if _path.isdir(_path.join(path, fname)):
-            continue
-        names.add(stem)
-    return names
+    return set(_path.scan_stems(path, ITEM_EXTENSIONS))
 
 
 def load_item(
@@ -181,11 +171,24 @@ class PackRegistry:
 
     __slots__ = ("_cache", "_item_attr", "_packs", "_scanned_dirs")
 
-    def __init__(self, item_attr: str) -> None:
+    def __init__(self, item_attr: str | None = None) -> None:
+        # With no item_attr the registry stays empty, so get() never reads it.
         self._item_attr = item_attr
         self._packs: dict[str, _PackEntry] = {}
         self._cache: dict[tuple[str, str], object] = {}
         self._scanned_dirs: set[str] = set()
+
+    @staticmethod
+    def _from_packs(item_attr: str, packs: list[_PackEntry]) -> PackRegistry:
+        """Return a registry of *packs* whose items export *item_attr*.
+
+        The ``PackCatalog`` construction path: the catalog has already scanned
+        and validated every entry.
+        """
+        registry = PackRegistry(item_attr)
+        for entry in packs:
+            registry._packs[entry.name] = entry
+        return registry
 
     def scan_dir(self, path: str, module_prefix: str) -> None:
         """Scan *path* for subdirectories that contain ``version.txt``.
