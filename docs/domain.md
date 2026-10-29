@@ -82,8 +82,7 @@ hardware/         Hardware abstraction layer
                   device_assembly, device_parts)
   simulated/      Test-only Simulated device (device: SimulatedHardware; simulated_parts:
                   SimulatedParts, its DeviceParts adapter, whose card is the real
-                  DeviceStorage over a card directory; storage: FakeDeviceStorage,
-                  an in-memory double) — never deployed
+                  DeviceStorage over a card directory) — never deployed
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together

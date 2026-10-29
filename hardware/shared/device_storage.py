@@ -13,9 +13,8 @@ CircuitPython 10.x, and MicroPython. Mounting the card is someone else's
 job: the live adapter is ``hardware.circuitpython.sdcard_storage.SdCardStorage``,
 which mounts at construction time and then defers every read/write to this
 base class, since once mounted, plain ``os`` calls work identically across
-runtimes. A Simulated device's card is this class itself, over a card
-directory. ``FakeDeviceStorage``, the in-memory double, lives in
-``hardware/simulated/storage.py``.
+runtimes. Tests and the Simulated device's card run this same class over a
+real directory; there is no second implementation.
 
 ``read_json``/``write_json`` are a thin JSON convenience built on the bytes
 primitives, so they inherit ``read_bytes``/``write_bytes``'s escape-rejection
@@ -34,17 +33,15 @@ try:
 except ImportError:
     pass
 
-__all__ = ["DeviceStorage", "decode_json", "encode_json", "reject_escaping_path"]
+__all__ = ["DeviceStorage"]
 
 _TEMP_SUFFIX: Final = ".tmp"
 
 
-def reject_escaping_path(relative_path: str) -> None:
+def _reject_escaping_path(relative_path: str) -> None:
     """Raise ``ValueError`` if *relative_path* escapes a mount root.
 
-    Pure string logic shared by :meth:`DeviceStorage._resolve` and
-    ``FakeDeviceStorage``'s guard so the escape-rejection rule can't drift
-    between the real and fake implementations. Rejects an absolute
+    Pure string logic, so the rule is the same on every runtime. Rejects an absolute
     *relative_path* (a leading ``"/"``) and any ``..`` path segment,
     wherever it appears, even one that would net out to a location still
     under the root — simple and conservatively safe rather than clever.
@@ -54,27 +51,6 @@ def reject_escaping_path(relative_path: str) -> None:
     for segment in relative_path.split("/"):
         if segment == "..":
             raise ValueError(f"path escapes mount root: {relative_path!r}")
-
-
-def decode_json(data: bytes) -> dict:
-    """Parse UTF-8 JSON *data* into a mapping.
-
-    Shared by :meth:`DeviceStorage.read_json` and ``FakeDeviceStorage.read_json``
-    so the decoding can't drift between the real and fake implementations.
-
-    Raises:
-        json.JSONDecodeError: *data* is not valid JSON.
-    """
-    return json.loads(data.decode("utf-8"))
-
-
-def encode_json(mapping: dict) -> bytes:
-    """Serialise *mapping* to UTF-8 JSON bytes.
-
-    Shared by :meth:`DeviceStorage.write_json` and ``FakeDeviceStorage.write_json``
-    so the encoding can't drift between the real and fake implementations.
-    """
-    return json.dumps(mapping).encode("utf-8")
 
 
 class DeviceStorage:
@@ -241,7 +217,7 @@ class DeviceStorage:
         data = self.read_bytes(name)
         if data is None:
             return None
-        return decode_json(data)
+        return json.loads(data.decode("utf-8"))
 
     def write_json(self, name: str, mapping: dict) -> None:
         """Serialise *mapping* to JSON and durably replace *name* with it whole.
@@ -257,7 +233,7 @@ class DeviceStorage:
             ValueError: *name* escapes the mount root (``..`` or an
                 absolute path).
         """
-        self.write_bytes(name, encode_json(mapping))
+        self.write_bytes(name, json.dumps(mapping).encode("utf-8"))
 
     def path(self, subpath: str) -> str:
         """Return *subpath* resolved to a real filesystem path under the mount root.
@@ -330,10 +306,10 @@ class DeviceStorage:
         because that helper is identity on CircuitPython/MicroPython (no
         ``os.path`` to fall back to) and so does not collapse ``..`` there,
         even though it does on CPython — relying on it would make escape
-        rejection platform-dependent. See :func:`reject_escaping_path` for
+        rejection platform-dependent. See ``_reject_escaping_path`` for
         the guard rule itself.
         """
-        reject_escaping_path(relative_path)
+        _reject_escaping_path(relative_path)
         return self._mount_root + "/" + relative_path
 
     def _ensure_parent_dirs(self, relative_path: str) -> None:
