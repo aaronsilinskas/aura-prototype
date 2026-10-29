@@ -206,20 +206,7 @@ class Simulation:
                 ``aura_packs/`` and another device's already did.
         """
         radio_node = len(self.devices) + 1
-        if not sd_card:
-            if card is not None:
-                raise ValueError(f"{name} has no SD card to be handed {card}")
-            card_dir = None
-        elif card is None:
-            card_dir = Path(self._temp_dir.name) / f"card-{radio_node}"
-            card_dir.mkdir()
-        else:
-            card_dir = Path(card).resolve()
-            if card_dir in self._card_holders:
-                holder = self._card_holders[card_dir]
-                raise ValueError(f"{name} cannot share {holder}'s card {card_dir}")
-        if card_dir is not None:
-            self._card_holders[card_dir] = name
+        card_dir = self._card_for(name, sd_card, card, radio_node)
         device = SimulatedDevice(self, name, scene, scene_data or {}, card_dir, radio_node)
         self.devices.append(device)
         return device
@@ -241,6 +228,25 @@ class Simulation:
             if self.now >= deadline:
                 raise AssertionError(f"condition not met within {timeout}s of sim time")
             self.advance(TICK)
+
+    def _card_for(
+        self, name: str, sd_card: bool, card: str | Path | None, radio_node: int
+    ) -> Path | None:
+        """The resolved card directory device *name* gets, recorded so ``close`` can evict it."""
+        if not sd_card:
+            if card is not None:
+                raise ValueError(f"{name} has no SD card to be handed {card}")
+            return None
+        if card is None:
+            card_dir = (Path(self._temp_dir.name) / f"card-{radio_node}").resolve()
+            card_dir.mkdir()
+        else:
+            card_dir = Path(card).resolve()
+            if card_dir in self._card_holders:
+                holder = self._card_holders[card_dir]
+                raise ValueError(f"{name} cannot share {holder}'s card {card_dir}")
+        self._card_holders[card_dir] = name
+        return card_dir
 
     def _claim_card_packs(self, device: SimulatedDevice) -> None:
         """Bind ``aura_packs`` to *device*'s card if it carries one; raise if another card did."""

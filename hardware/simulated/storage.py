@@ -1,7 +1,6 @@
-"""An in-memory ``DeviceStorage`` double, a faithful copy of its contract.
+"""An in-memory ``DeviceStorage`` double for the ``hardware/shared`` storage tests.
 
-The Simulated device's card is no longer this: it is the real
-``DeviceStorage`` over a card directory.
+It stays a faithful copy of ``DeviceStorage``'s contract.
 """
 
 from __future__ import annotations
