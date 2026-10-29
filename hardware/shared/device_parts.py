@@ -92,7 +92,10 @@ class DeviceParts:
         """Return a raw read of the accelerometer: ``(x, y, z)`` in m/s², which may raise."""
         raise NotImplementedError
 
-    def magnetometer(self, magnetometer: I2CDeviceConfig, i2c: object) -> object:
+    def magnetometer(
+        self, magnetometer: I2CDeviceConfig, i2c: object
+    ) -> Callable[[], tuple[float, float, float]]:
+        """Return a raw read of the magnetometer: ``(x, y, z)`` in µT, which may raise."""
         raise NotImplementedError
 
     def audio_output(

@@ -24,7 +24,7 @@ import time
 
 from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
-from engine.input import AccelerationData
+from engine.input import AccelerationData, MagneticData
 from engine.log import Logger
 from hardware.shared.build_narration import (
     describe_accelerometer,
@@ -254,7 +254,13 @@ def assemble_device(
         logger,
         config.magnetometer,
         describe_magnetometer,
-        lambda c: (parts.magnetometer(c, _require_i2c(i2c, "magnetometer")), "ok"),
+        lambda c: (
+            PolledSensor(
+                parts.magnetometer(c, _require_i2c(i2c, "magnetometer")),
+                MagneticData(0.0, 0.0, 0.0),
+            ),
+            "ok",
+        ),
     )
 
     def _build_audio(audio: AudioConfig) -> tuple[tuple[AudioRegistry, EffectOutput], str]:

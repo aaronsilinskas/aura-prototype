@@ -364,10 +364,10 @@ class SimulatedHardware:
         return accelerometer
 
     def _require_magnetometer(self) -> SimulatedMagnetometer:
-        magnetometer = self.hw.magnetometer
-        if magnetometer is None:
+        if self.hw.magnetometer is None:
             raise ValueError("the config declares no magnetometer")
-        assert isinstance(magnetometer, SimulatedMagnetometer)
+        magnetometer = self._parts.scripted_magnetometer
+        assert magnetometer is not None
         return magnetometer
 
     def _schedule(self, buttons: tuple[str, ...], pressed: bool) -> None:

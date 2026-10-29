@@ -523,12 +523,14 @@ class _FakeMmc5603(_FakeI2CChip):
     """An MMC5603 whose first ``dead_polls`` reads of ``.magnetic`` are the dead-chip reading."""
 
     dead_polls = 0
+    built: ClassVar[list[_FakeMmc5603]] = []
 
     def __init__(self, i2c: object, **kwargs: object) -> None:
         super().__init__(i2c, **kwargs)
         self.data_rate: int | None = None
         self.continuous_mode = False
         self.polls = 0
+        _FakeMmc5603.built.append(self)
 
     @property
     def magnetic(self) -> tuple[float, float, float]:
@@ -541,14 +543,13 @@ class _FakeMmc5603(_FakeI2CChip):
 @pytest.fixture
 def mmc56x3(monkeypatch: pytest.MonkeyPatch) -> None:
     _FakeMmc5603.dead_polls = 0
+    _FakeMmc5603.built = []
     _install_library(monkeypatch, "adafruit_mmc56x3", MMC5603=_FakeMmc5603)
     monkeypatch.setattr(time, "sleep", lambda _seconds: None)
 
 
-def _magnetometer() -> _FakeMmc5603:
-    magnetometer = CircuitPythonParts(_board()).magnetometer(I2CDeviceConfig(), object())
-    assert isinstance(magnetometer, _FakeMmc5603)
-    return magnetometer
+def _magnetometer_read() -> Callable[[], tuple[float, float, float]]:
+    return CircuitPythonParts(_board()).magnetometer(I2CDeviceConfig(), object())
 
 
 def test_magnetometer_is_an_mmc5603_on_the_given_bus_at_its_configured_address(
@@ -556,29 +557,33 @@ def test_magnetometer_is_an_mmc5603_on_the_given_bus_at_its_configured_address(
 ) -> None:
     bus = object()
 
-    magnetometer = CircuitPythonParts(_board()).magnetometer(I2CDeviceConfig(address=0x32), bus)
+    CircuitPythonParts(_board()).magnetometer(I2CDeviceConfig(address=0x32), bus)
 
-    assert isinstance(magnetometer, _FakeMmc5603)
-    assert (magnetometer.i2c, magnetometer.kwargs) == (bus, {"address": 0x32})
+    (chip,) = _FakeMmc5603.built
+    assert (chip.i2c, chip.kwargs) == (bus, {"address": 0x32})
 
 
 def test_magnetometer_leaves_the_drivers_default_address_when_none_is_configured(
     mmc56x3: None,
 ) -> None:
-    assert _magnetometer().kwargs == {}
+    _magnetometer_read()
+
+    (chip,) = _FakeMmc5603.built
+    assert chip.kwargs == {}
 
 
 def test_magnetometer_free_runs_in_continuous_mode_at_100hz(mmc56x3: None) -> None:
-    magnetometer = _magnetometer()
+    _magnetometer_read()
 
-    assert (magnetometer.data_rate, magnetometer.continuous_mode) == (100, True)
+    (chip,) = _FakeMmc5603.built
+    assert (chip.data_rate, chip.continuous_mode) == (100, True)
 
 
 def test_magnetometer_that_reads_dead_on_every_axis_raises_a_wiring_fault(mmc56x3: None) -> None:
     _FakeMmc5603.dead_polls = 1000
 
     with pytest.raises(RuntimeError, match="check its power and ground wiring"):
-        _magnetometer()
+        _magnetometer_read()
 
 
 def test_magnetometer_whose_first_conversions_read_dead_is_used_once_one_reads_live(
@@ -586,7 +591,9 @@ def test_magnetometer_whose_first_conversions_read_dead_is_used_once_one_reads_l
 ) -> None:
     _FakeMmc5603.dead_polls = 2
 
-    assert _magnetometer().magnetic == _LIVE_MAGNETOMETER_UT
+    read = _magnetometer_read()
+
+    assert read() == _LIVE_MAGNETOMETER_UT
 
 
 class _FakeDrv2605(_FakeI2CChip):
