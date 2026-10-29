@@ -666,3 +666,18 @@ def test_an_initial_data_override_for_an_unscanned_scene_raises_a_plain_value_er
         scan_pack_roots([str(root)], initial_data_overrides={"forest": {"rounds": 2}})
 
     assert not isinstance(excinfo.value, PackScanError)
+
+
+# ---------------------------------------------------------------------------
+# Scene discovery
+# ---------------------------------------------------------------------------
+
+
+def test_a_plain_file_in_the_scenes_folder_is_not_a_scene(pack_tree) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_tree.scene(root, "lobby")
+    (root / "scenes" / "readme.txt").write_text("")
+
+    catalog = scan_pack_roots([str(root)])
+
+    assert catalog.scene_registry.names() == ["lobby"]

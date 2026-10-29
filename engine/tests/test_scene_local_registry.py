@@ -7,43 +7,16 @@ duplicated import/attr/isinstance/cache logic) but has no version concept.
 
 from __future__ import annotations
 
-import sys
-
 import pytest
 
+from engine.engine import GameRule
+from engine.pack_catalog import scan_pack_roots
 from engine.packs import ItemTypeError, MissingItemAttributeError, UnknownItemError
 from engine.scene import SceneLocalRegistry
 
 # ---------------------------------------------------------------------------
-# Helpers / fixtures
+# Helpers
 # ---------------------------------------------------------------------------
-
-
-MODULE_PREFIX = "tslr"
-
-
-@pytest.fixture()
-def local_env(tmp_path):
-    """Yield a directory rooted under tmp_path as the registry source.
-
-    ``tmp_path`` is inserted into ``sys.path`` so modules are importable.
-    All imported modules added during the test are removed on teardown.
-    """
-    root = tmp_path / MODULE_PREFIX
-    root.mkdir()
-    sys.path.insert(0, str(tmp_path))
-    known_modules = set(sys.modules)
-    yield root
-    for key in list(sys.modules):
-        if key not in known_modules:
-            del sys.modules[key]
-    sys.path.remove(str(tmp_path))
-
-
-def _make_local_rules(root, items: dict[str, str]) -> None:
-    """Create .py item files under *root*."""
-    for item_name, content in items.items():
-        (root / (item_name + ".py")).write_text(content)
 
 
 def _rule_module(name: str = "MyRule") -> str:
@@ -55,15 +28,23 @@ def _rule_module(name: str = "MyRule") -> str:
     )
 
 
+def _local_rules(
+    pack_tree, rules: dict[str, str] | None, *, rules_is_a_file: bool = False
+) -> SceneLocalRegistry:
+    """Scan one scene with local *rules*; return its local rule registry.
+
+    *rules_is_a_file* puts a plain file where the scene's ``rules/`` folder would be.
+    """
+    root = pack_tree.root("tslr_flash")
+    scene_dir = pack_tree.scene(root, "forest", rules=rules)
+    if rules_is_a_file:
+        (scene_dir / "rules").write_text("")
+    return scan_pack_roots([str(root)]).scene_registry.get("forest").local_rule_registry
+
+
 # ---------------------------------------------------------------------------
 # Construction
 # ---------------------------------------------------------------------------
-
-
-def test_scene_local_registry_items_is_empty_on_construction() -> None:
-    registry = SceneLocalRegistry(item_attr="RULE")
-
-    assert registry.items() == []
 
 
 def test_scene_local_registry_with_no_arguments_is_a_valid_empty_registry() -> None:
@@ -76,63 +57,47 @@ def test_scene_local_registry_with_no_arguments_is_a_valid_empty_registry() -> N
 
 
 # ---------------------------------------------------------------------------
-# SceneLocalRegistry.scan_dir — self-population
+# Population from the scanned scene's rules/ folder
 # ---------------------------------------------------------------------------
 
 
-def test_scan_dir_on_missing_directory_leaves_registry_empty_and_raises_nothing(
-    tmp_path,
+def test_a_scene_without_a_rules_folder_has_an_empty_local_rule_registry(pack_tree) -> None:
+    registry = _local_rules(pack_tree, None)
+
+    assert registry.items() == []
+
+
+def test_a_scene_whose_rules_entry_is_a_file_has_an_empty_local_rule_registry(
+    pack_tree,
 ) -> None:
-    registry = SceneLocalRegistry(item_attr="RULE")
-    missing = str(tmp_path / "does_not_exist")
-
-    registry.scan_dir(missing, MODULE_PREFIX)  # must not raise
+    registry = _local_rules(pack_tree, None, rules_is_a_file=True)
 
     assert registry.items() == []
 
 
-def test_scan_dir_on_file_path_leaves_registry_empty(tmp_path) -> None:
-    not_a_dir = tmp_path / "file.py"
-    not_a_dir.write_text("")
-    registry = SceneLocalRegistry(item_attr="RULE")
-
-    registry.scan_dir(str(not_a_dir), MODULE_PREFIX)
-
-    assert registry.items() == []
-
-
-def test_scan_dir_on_populated_directory_yields_expected_items(local_env) -> None:
-    _make_local_rules(local_env, {"alpha": _rule_module("Alpha"), "beta": _rule_module("Beta")})
-    registry = SceneLocalRegistry(item_attr="RULE")
-
-    registry.scan_dir(str(local_env), MODULE_PREFIX)
+def test_a_populated_rules_folder_yields_its_items(pack_tree) -> None:
+    registry = _local_rules(
+        pack_tree, {"alpha": _rule_module("Alpha"), "beta": _rule_module("Beta")}
+    )
 
     assert registry.items() == ["alpha", "beta"]
 
 
 # ---------------------------------------------------------------------------
-# SceneLocalRegistry.get — item loading (via scan_dir)
+# SceneLocalRegistry.get — item loading
 # ---------------------------------------------------------------------------
 
 
-def test_get_returns_game_rule_for_registered_item_name(local_env) -> None:
-    _make_local_rules(local_env, {"my_rule": _rule_module()})
-    from engine.engine import GameRule
-
-    registry = SceneLocalRegistry(item_attr="RULE")
-    registry.scan_dir(str(local_env), MODULE_PREFIX)
+def test_get_returns_game_rule_for_registered_item_name(pack_tree) -> None:
+    registry = _local_rules(pack_tree, {"my_rule": _rule_module()})
 
     result = registry.get("my_rule", GameRule)
 
     assert isinstance(result, GameRule)
 
 
-def test_get_returns_same_instance_on_repeated_calls(local_env) -> None:
-    _make_local_rules(local_env, {"my_rule": _rule_module()})
-    from engine.engine import GameRule
-
-    registry = SceneLocalRegistry(item_attr="RULE")
-    registry.scan_dir(str(local_env), MODULE_PREFIX)
+def test_get_returns_same_instance_on_repeated_calls(pack_tree) -> None:
+    registry = _local_rules(pack_tree, {"my_rule": _rule_module()})
 
     first = registry.get("my_rule", GameRule)
     second = registry.get("my_rule", GameRule)
@@ -140,10 +105,8 @@ def test_get_returns_same_instance_on_repeated_calls(local_env) -> None:
     assert first is second
 
 
-def test_get_raises_for_unknown_item_name(local_env) -> None:
-    registry = SceneLocalRegistry(item_attr="RULE")
-    registry.scan_dir(str(local_env), MODULE_PREFIX)
-    from engine.engine import GameRule
+def test_get_raises_for_unknown_item_name(pack_tree) -> None:
+    registry = _local_rules(pack_tree, None)
 
     with pytest.raises(UnknownItemError) as excinfo:
         registry.get("ghost", GameRule)
@@ -152,24 +115,16 @@ def test_get_raises_for_unknown_item_name(local_env) -> None:
     assert excinfo.value.available == []
 
 
-def test_get_raises_when_item_module_has_no_rule_attribute(local_env) -> None:
-    _make_local_rules(local_env, {"bad_rule": "WRONG_NAME = 1"})
-    from engine.engine import GameRule
-
-    registry = SceneLocalRegistry(item_attr="RULE")
-    registry.scan_dir(str(local_env), MODULE_PREFIX)
+def test_get_raises_when_item_module_has_no_rule_attribute(pack_tree) -> None:
+    registry = _local_rules(pack_tree, {"bad_rule": "WRONG_NAME = 1"})
 
     with pytest.raises(MissingItemAttributeError) as excinfo:
         registry.get("bad_rule", GameRule)
     assert excinfo.value.attr == "RULE"
 
 
-def test_get_raises_when_rule_attribute_is_not_a_game_rule(local_env) -> None:
-    _make_local_rules(local_env, {"bad_rule": "RULE = 'not_a_rule'"})
-    from engine.engine import GameRule
-
-    registry = SceneLocalRegistry(item_attr="RULE")
-    registry.scan_dir(str(local_env), MODULE_PREFIX)
+def test_get_raises_when_rule_attribute_is_not_a_game_rule(pack_tree) -> None:
+    registry = _local_rules(pack_tree, {"bad_rule": "RULE = 'not_a_rule'"})
 
     with pytest.raises(ItemTypeError) as excinfo:
         registry.get("bad_rule", GameRule)
@@ -181,17 +136,15 @@ def test_get_raises_when_rule_attribute_is_not_a_game_rule(local_env) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_items_returns_sorted_item_names(local_env) -> None:
-    _make_local_rules(
-        local_env,
+def test_items_returns_sorted_item_names(pack_tree) -> None:
+    registry = _local_rules(
+        pack_tree,
         {
             "zebra": _rule_module("Zebra"),
             "alpha": _rule_module("Alpha"),
             "mango": _rule_module("Mango"),
         },
     )
-    registry = SceneLocalRegistry(item_attr="RULE")
-    registry.scan_dir(str(local_env), MODULE_PREFIX)
 
     assert registry.items() == ["alpha", "mango", "zebra"]
 
@@ -206,7 +159,7 @@ def test_scene_local_registry_uses_slots() -> None:
 
 
 def test_scene_local_registry_does_not_allow_arbitrary_attributes() -> None:
-    registry = SceneLocalRegistry(item_attr="RULE")
+    registry = SceneLocalRegistry()
 
     with pytest.raises(AttributeError):
         registry.unexpected = "oops"  # type: ignore[attr-defined]

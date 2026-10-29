@@ -1,107 +1,68 @@
-"""Tests for scene-local sound discovery: SceneRegistry.scan_dir scanning each
+"""Tests for scene-local sound discovery: ``scan_pack_roots`` scanning each
 scene's sounds/ subdirectory into a per-scene, bare-keyed sound map carried on
 the Scene, mirroring local_effect_registry / local_rule_registry discovery.
 """
 
 from __future__ import annotations
 
-import json
+from engine.pack_catalog import scan_pack_roots
+from engine.scene import Scene
 
-import pytest
-
-from engine.scene import Scene, SceneRegistry
-
-MODULE_PREFIX = "tss"
-
-
-@pytest.fixture()
-def scene_env(tmp_path):
-    """Yield a ``tss/`` subdirectory of tmp_path as the scenes root."""
-    scenes_root = tmp_path / MODULE_PREFIX
-    scenes_root.mkdir()
-    return scenes_root
-
-
-def _write_scene_json(path, data: dict) -> None:
-    (path / "scene.json").write_text(json.dumps(data))
-
-
-def _minimal_scene_json(**overrides) -> dict:
-    base = {"version": "1.0", "effect_packs": [], "rule_packs": []}
-    base.update(overrides)
-    return base
-
-
-def _make_scene_dir(root, name: str, **json_overrides):
-    scene_dir = root / name
-    scene_dir.mkdir(parents=True, exist_ok=True)
-    _write_scene_json(scene_dir, _minimal_scene_json(**json_overrides))
-    return scene_dir
-
-
-def _make_sounds_subdir(scene_dir, stems: list[str]) -> None:
-    """Create a sounds/ subdir under *scene_dir* with a .wav file per stem."""
-    sounds_dir = scene_dir / "sounds"
-    sounds_dir.mkdir(exist_ok=True)
-    for stem in stems:
-        (sounds_dir / (stem + ".wav")).write_bytes(b"")
+ROOT_NAME = "tss_flash"
 
 
 # ---------------------------------------------------------------------------
-# scan_dir — sounds/ subdir discovery
+# sounds/ folder discovery
 # ---------------------------------------------------------------------------
 
 
-def test_scan_dir_exposes_sounds_subdir_wav_stems_via_local_sound_map(scene_env) -> None:
-    scene_dir = _make_scene_dir(scene_env, "forest")
-    _make_sounds_subdir(scene_dir, ["victory_sting"])
+def test_a_scenes_sounds_folder_wavs_are_in_its_local_sound_map(pack_tree) -> None:
+    root = pack_tree.root(ROOT_NAME)
+    pack_tree.scene(root, "forest", sounds=["victory_sting"])
 
-    registry = SceneRegistry()
-    registry.scan_dir(str(scene_env), MODULE_PREFIX)
+    registry = scan_pack_roots([str(root)]).scene_registry
 
     scene = registry.get("forest")
     assert "victory_sting" in scene.local_sound_map
 
 
-def test_scan_dir_local_sound_map_maps_stem_to_wav_path(scene_env) -> None:
-    scene_dir = _make_scene_dir(scene_env, "forest")
-    _make_sounds_subdir(scene_dir, ["victory_sting"])
+def test_a_local_sound_maps_its_bare_stem_to_its_wav_path(pack_tree) -> None:
+    root = pack_tree.root(ROOT_NAME)
+    scene_dir = pack_tree.scene(root, "forest", sounds=["victory_sting"])
 
-    registry = SceneRegistry()
-    registry.scan_dir(str(scene_env), MODULE_PREFIX)
+    registry = scan_pack_roots([str(root)]).scene_registry
 
     scene = registry.get("forest")
     expected_path = str(scene_dir / "sounds" / "victory_sting.wav")
     assert scene.local_sound_map["victory_sting"] == expected_path
 
 
-def test_scan_dir_scene_with_no_sounds_subdir_has_empty_local_sound_map(scene_env) -> None:
-    _make_scene_dir(scene_env, "bare_scene")
-    registry = SceneRegistry()
-    registry.scan_dir(str(scene_env), MODULE_PREFIX)
+def test_a_scene_without_a_sounds_folder_has_an_empty_local_sound_map(pack_tree) -> None:
+    root = pack_tree.root(ROOT_NAME)
+    pack_tree.scene(root, "bare_scene")
+
+    registry = scan_pack_roots([str(root)]).scene_registry
 
     scene = registry.get("bare_scene")
     assert scene.local_sound_map == {}
 
 
-def test_scan_dir_local_sound_map_same_content_across_fresh_scene_instances(scene_env) -> None:
-    scene_dir = _make_scene_dir(scene_env, "forest")
-    _make_sounds_subdir(scene_dir, ["chime"])
+def test_each_fresh_scene_gets_the_same_local_sound_map(pack_tree) -> None:
+    root = pack_tree.root(ROOT_NAME)
+    pack_tree.scene(root, "forest", sounds=["chime"])
 
-    registry = SceneRegistry()
-    registry.scan_dir(str(scene_env), MODULE_PREFIX)
+    registry = scan_pack_roots([str(root)]).scene_registry
 
     scene_a = registry.get("forest")
     scene_b = registry.get("forest")
     assert scene_a.local_sound_map == scene_b.local_sound_map
 
 
-def test_scan_dir_local_sound_map_mutation_does_not_affect_next_get(scene_env) -> None:
-    scene_dir = _make_scene_dir(scene_env, "forest")
-    _make_sounds_subdir(scene_dir, ["chime"])
+def test_mutating_a_local_sound_map_does_not_affect_the_next_get(pack_tree) -> None:
+    root = pack_tree.root(ROOT_NAME)
+    pack_tree.scene(root, "forest", sounds=["chime"])
 
-    registry = SceneRegistry()
-    registry.scan_dir(str(scene_env), MODULE_PREFIX)
+    registry = scan_pack_roots([str(root)]).scene_registry
 
     scene_a = registry.get("forest")
     scene_a.local_sound_map["chime"] = "/tampered/path.wav"
@@ -110,13 +71,12 @@ def test_scan_dir_local_sound_map_mutation_does_not_affect_next_get(scene_env) -
     assert scene_b.local_sound_map["chime"] != "/tampered/path.wav"
 
 
-def test_scan_dir_local_sounds_not_visible_to_other_scene(scene_env) -> None:
-    scene_a_dir = _make_scene_dir(scene_env, "forest")
-    _make_sounds_subdir(scene_a_dir, ["secret_chime"])
-    _make_scene_dir(scene_env, "cave")
+def test_a_scenes_local_sounds_are_not_visible_to_another_scene(pack_tree) -> None:
+    root = pack_tree.root(ROOT_NAME)
+    pack_tree.scene(root, "forest", sounds=["secret_chime"])
+    pack_tree.scene(root, "cave")
 
-    registry = SceneRegistry()
-    registry.scan_dir(str(scene_env), MODULE_PREFIX)
+    registry = scan_pack_roots([str(root)]).scene_registry
 
     cave_scene = registry.get("cave")
     assert "secret_chime" not in cave_scene.local_sound_map
