@@ -159,6 +159,7 @@ def build_scene_runtime(
     wall-clock ``Timer`` is built.
     """
     effect_registry = catalog.effect_registry
+    rule_registry = catalog.rule_registry
     scene_registry = catalog.scene_registry
     effect_manager = EffectManager(registry=effect_registry, outputs=hw.outputs)
 
@@ -186,7 +187,7 @@ def build_scene_runtime(
     manager = SceneManager(
         engine,
         effect_registry,
-        catalog.rule_registry,
+        rule_registry,
         scene_registry,
         effect_admin=effect_manager,
         audio_overlay_admin=audio_registry,

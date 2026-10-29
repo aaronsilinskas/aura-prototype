@@ -217,7 +217,7 @@ def test_a_card_without_aura_packs_scans_the_flash_root_alone(device_storage):
     assert sorted(catalog.scene_registry.names()) == _flash_scene_names()
 
 
-def test_a_card_with_aura_packs_scans_the_flash_root_then_the_card_root(device_storage):
+def test_a_card_with_aura_packs_scans_the_flash_root_and_the_card_root(device_storage):
     _make_card_scene(Path(device_storage.mount_root), "card_scene")
 
     catalog = scan_boot_pack_catalog(device_storage)
@@ -232,7 +232,7 @@ def test_a_misconfigured_card_scene_stops_boot_with_a_pack_scan_error(device_sto
         scan_boot_pack_catalog(device_storage)
 
 
-def test_scene_data_is_merged_over_the_named_scenes_initial_data():
+def test_scene_data_reaches_the_named_scenes_initial_data():
     catalog = scan_boot_pack_catalog(None, scene_data={"tag": {"max_ammo": 2}})
 
     initial_data = catalog.scene_registry.get("tag").initial_data
@@ -454,12 +454,12 @@ def test_build_scene_runtime_radio_is_none_when_the_hardware_bundle_has_no_radio
 
 
 # ---------------------------------------------------------------------------
-# Audio registry wiring: base scan + scene overlay (issue #804)
+# Audio registry wiring: pack sounds base + scene overlay (issue #804)
 # ---------------------------------------------------------------------------
 
 
-def test_build_scene_runtime_scans_effect_pack_sounds_into_the_devices_audio_registry():
-    """packs/effects/*/sounds is scanned into hw.audio_registry's base, qualified
+def test_build_scene_runtime_installs_the_catalogs_pack_sounds_in_the_devices_audio_registry():
+    """The catalog's packs/effects/*/sounds clips become hw.audio_registry's base, qualified
     by pack name, so basic.game_over_sting_start resolves once the runtime is built."""
     hw = _fake_hw(audio_registry=AudioRegistry())
 
@@ -489,9 +489,9 @@ def test_build_scene_runtime_installs_hardware_test_scenes_sounds_as_the_active_
     )
 
 
-def test_build_scene_runtime_with_no_audio_registry_skips_scan_and_still_activates_scene():
+def test_build_scene_runtime_with_no_audio_registry_still_activates_scene():
     """A device with no enabled audio section (hw.audio_registry is None) gets no
-    base scan and no overlay wiring, but scene activation is otherwise unaffected."""
+    pack sounds and no overlay wiring, but scene activation is otherwise unaffected."""
     hw = _fake_hw()
 
     runtime = build_scene_runtime(hw, "hardware_test", catalog=_boot_catalog())
@@ -529,7 +529,7 @@ def test_build_scene_runtime_installs_tag_scenes_sounds_as_the_active_overlay():
 
 def test_build_scene_runtime_resolves_tags_shared_game_over_sting_via_the_basic_pack():
     """tag's game_over_sting effect points at basic's shared clip rather than its
-    own -- it must resolve from the base scan, not from tag's sounds/ overlay."""
+    own -- it must resolve from the pack sounds base, not from tag's sounds/ overlay."""
     hw = _fake_hw(audio_registry=AudioRegistry())
 
     build_scene_runtime(hw, "tag", catalog=_boot_catalog())
@@ -570,7 +570,7 @@ def test_build_scene_runtime_installs_rlgls_sounds_as_the_active_overlay():
 
 def test_build_scene_runtime_resolves_rlgls_shared_game_over_sting_via_the_basic_pack():
     """rlgl's game_over_sting effect points at basic's shared clip rather than its
-    own -- it must resolve from the base scan, not from rlgl's sounds/ overlay."""
+    own -- it must resolve from the pack sounds base, not from rlgl's sounds/ overlay."""
     hw = _fake_hw(audio_registry=AudioRegistry())
 
     build_scene_runtime(hw, "red_light_green_light", catalog=_boot_catalog())
