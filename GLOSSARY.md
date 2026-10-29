@@ -151,11 +151,11 @@ _Avoid_: "scene switch" for a reboot (`load`/`overlay`/`pop` switch scenes witho
 
 ### Persisted scene
 The scene a device's card names in `aura-state.json` (`scene`, with its `return_to` companion), written by a **Reboot**. On boot it outranks the flash `default_scene`; a `deploy.py --scene` deploy clears it once, through a new **Scene deploy token**.
-_Avoid_: "saved scene", "override" for it; expecting it to name the running scene right after a `--scene` deploy (the card names none until the next Reboot)
+_Avoid_: "saved scene", "override" for it; expecting it to name the running scene right after a `--scene` deploy (the card names none until the next Reboot); treating it as host-authored (only the device writes it)
 
 ### Scene deploy token
 The per-deploy value `deploy.py --scene` writes as `scene_deploy_token` beside `default_scene` in `aura-settings.json`, new on every invocation. On boot, before the boot scene is resolved, a non-empty token that differs from the one recorded in the card's `aura-state.json` is applied: the **Persisted scene** and its `return_to` are removed and the token recorded, in one write, and one line is logged naming the deployed scene and the Persisted scene it cleared. So each `--scene` deploy wins once, and Reboots made after it keep persisting. The apply never checks the deployed scene against the registry: an unknown one is cleared to, then fails resolution naming the known scenes.
-_Avoid_: comparing scene names instead (a second deploy of the same scene would be mistaken for the first); copying the deployed scene onto the card; a separate inbox file; applying it outside the shared boot (`build_scene_boot`)
+_Avoid_: "nonce", "deploy id" for it; comparing scene names instead (a second deploy of the same scene would be mistaken for the first); copying the deployed scene onto the card; a separate inbox file; applying it outside the shared boot (`build_scene_boot`)
 
 ### SceneReboot
 The board-free port `SceneManager` reaches to persist a scene switch and reboot the device; live adapter `DeviceSceneReboot`.
