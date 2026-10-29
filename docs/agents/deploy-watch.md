@@ -24,6 +24,7 @@ At least one of `--seconds` or `--until` is required.
 | `--seconds N` | Stop after N seconds of serial output |
 | `--until TEXT` | Stop as soon as any output line contains TEXT (exit 0) |
 | `--output FILE` | Also write clean device output to FILE (no deploy chatter) |
+| `--scene NAME` | Deploy with this scene, same meaning as `deploy.py --scene` (recorded in `aura-settings.json`); omit to leave the boot scene alone |
 | `--port PORT` | Serial port; if omitted, auto-detects the board's console channel (works with the data channel enabled too) |
 | `--reboot-timeout N` | Seconds to wait for the CircuitPython soft-reboot banner (default 5) |
 
@@ -62,6 +63,11 @@ python -m scripts.deploy_watch examples/hardware/profiling/baseline_profiler.py 
 ```
 python -m scripts.deploy_watch examples/hardware/profiling/baseline_profiler.py \
     --until "__PROFILE" --seconds 15
+```
+
+**Deploy a scene and watch it boot:**
+```
+python -m scripts.deploy_watch examples/hardware/scene_demo.py --scene hardware_test --seconds 15
 ```
 
 **Capture clean output to file for later analysis:**

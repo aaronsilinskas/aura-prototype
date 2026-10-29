@@ -1,16 +1,23 @@
-"""Tests for deploy_watch: watch_stream, discard_until, exit codes, SplitWriter, port selection."""
+"""Tests for deploy_watch: watch_stream, discard_until, exit codes, SplitWriter, port selection,
+and the CLI's deploy step."""
 
+import functools
 import io
+import json
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 
+from scripts.deploy import deploy
 from scripts.deploy_watch import (
     ConsolePortError,
     SplitWriter,
     discard_until,
     exit_code_for,
     find_console_port,
+    parse_args,
+    run_deploy,
     select_console_port,
     watch_stream,
 )
@@ -374,3 +381,46 @@ def test_select_console_port_raises_listing_candidates_when_multiple_console_por
 
 def test_find_console_port_returns_an_explicit_port_unchanged() -> None:
     assert find_console_port(explicit_port="/dev/tty.explicit") == "/dev/tty.explicit"
+
+
+# ---------------------------------------------------------------------------
+# CLI deploy step
+# ---------------------------------------------------------------------------
+
+
+def _deploy_from_source(tmp_path: Path) -> "Callable[..., int]":
+    """The real ``deploy``, syncing raw source from a tiny tree under *tmp_path*."""
+    source = tmp_path / "source"
+    (source / "engine").mkdir(parents=True)
+    (source / "engine" / "timer.py").write_text("# timer")
+    return functools.partial(deploy, source_root=source, use_source=True)
+
+
+def _cli_args(tmp_path: Path, *extra: str) -> list[str]:
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    example = tmp_path / "example.py"
+    example.write_text("# example")
+    return [str(example), "--mount", str(mount), "--seconds", "1", *extra]
+
+
+def test_scene_flag_records_the_scene_as_default_scene_in_deployed_settings(
+    tmp_path: Path,
+) -> None:
+    args = parse_args(_cli_args(tmp_path, "--scene", "hardware_test"))
+
+    rc = run_deploy(args, deploy=_deploy_from_source(tmp_path))
+
+    assert rc == 0
+    settings = json.loads((tmp_path / "mount" / "aura-settings.json").read_text())
+    assert settings["default_scene"] == "hardware_test"
+
+
+def test_omitting_scene_flag_deploys_without_writing_settings(tmp_path: Path) -> None:
+    args = parse_args(_cli_args(tmp_path))
+
+    rc = run_deploy(args, deploy=_deploy_from_source(tmp_path))
+
+    assert rc == 0
+    assert (tmp_path / "mount" / "code.py").read_text() == "# example"
+    assert not (tmp_path / "mount" / "aura-settings.json").exists()
