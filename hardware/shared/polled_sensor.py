@@ -8,8 +8,12 @@ except ImportError:
     pass
 
 from engine.input import AccelerationData, MagneticData
+from engine.log import Logger
 
-__all__ = ["PolledSensor"]
+__all__ = ["RECOVERY_READS", "PolledSensor"]
+
+# Consecutive good reads that end a failing episode: about 2 s at the prop's frame rate.
+RECOVERY_READS = 50
 
 
 class PolledSensor:
@@ -26,24 +30,61 @@ class PolledSensor:
     read. It is typed as either buffer because ``typing.Generic`` is
     unavailable on CircuitPython; a caller needing one narrows it once, where
     it builds the sensor event.
+
+    Failures are logged to *logger* on transitions only, labelled with
+    *label*: one line carrying the error when a healthy sensor's read fails,
+    and one line with the episode's failed and total read counts once
+    :data:`RECOVERY_READS` consecutive reads succeed. A good read updates the
+    reading at once even while failing; only the recovery line waits.
+    ``failed_reads`` counts the current episode's failed reads, zero while
+    healthy.
     """
 
-    __slots__ = ("_read", "reading")
+    __slots__ = (
+        "_episode_reads",
+        "_good_run",
+        "_label",
+        "_logger",
+        "_read",
+        "failed_reads",
+        "reading",
+    )
 
     def __init__(
         self,
         read: Callable[[], tuple[float, float, float]],
         reading: AccelerationData | MagneticData,
+        label: str,
+        logger: Logger,
     ) -> None:
         self._read = read
         self.reading = reading
+        self._label = label
+        self._logger = logger
+        self.failed_reads = 0
+        self._episode_reads = 0
+        self._good_run = 0
 
     def update(self) -> None:
         try:
             x, y, z = self._read()
-        except Exception:
+        except Exception as error:
+            if self.failed_reads == 0:
+                self._logger.log(f"{self._label} read failing: {error!r}")
+            self.failed_reads += 1
+            self._episode_reads += 1
+            self._good_run = 0
             return
         reading = self.reading
         reading.x = x
         reading.y = y
         reading.z = z
+        if self.failed_reads:
+            self._episode_reads += 1
+            self._good_run += 1
+            if self._good_run == RECOVERY_READS:
+                failed, total = self.failed_reads, self._episode_reads
+                self._logger.log(f"{self._label} recovered: {failed} of {total} reads failed")
+                self.failed_reads = 0
+                self._episode_reads = 0
+                self._good_run = 0
