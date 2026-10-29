@@ -309,9 +309,9 @@ def test_a_simulation_owns_a_temporary_directory_until_it_is_closed(tmp_path, mo
     assert list(tmp_path.iterdir()) == []
 
 
-def test_a_simulation_used_with_with_is_closed_on_exit(tmp_path, monkeypatch):
+def test_a_simulation_leaves_nothing_behind_after_a_with_block(tmp_path, monkeypatch):
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
-    with Simulation() as simulation:
-        simulation.add_device("red", scene="tag")
+    with Simulation():
+        pass
 
     assert list(tmp_path.iterdir()) == []

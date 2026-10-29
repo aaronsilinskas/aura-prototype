@@ -132,9 +132,8 @@ class Simulation:
     Packets from several senders queue in sender add order, with no collision
     or loss, and a device reads one a tick.
 
-    It owns a temporary directory, which ``close`` removes, so a closed
-    simulation leaves nothing behind. Use it with ``with``, or the shared
-    ``simulation`` fixture, which closes it after the test.
+    Use it with ``with``, or the shared ``simulation`` fixture, which closes
+    it after the test.
     """
 
     def __init__(self) -> None:
