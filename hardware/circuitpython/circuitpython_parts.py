@@ -15,6 +15,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
+    from adafruit_lis3dh import LIS3DH_I2C
 
     from hardware.circuitpython.audio_output import AudioEffectOutput
     from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
@@ -124,7 +125,7 @@ def _construct_with_optional_address(
     return ctor(i2c, address=address)
 
 
-def _setup_accelerometer(i2c: busio.I2C, address: int | None = None) -> object:
+def _setup_accelerometer(i2c: busio.I2C, address: int | None = None) -> LIS3DH_I2C:
     """Return a LIS3DH on *i2c*."""
     import adafruit_lis3dh
 
@@ -285,8 +286,11 @@ class CircuitPythonParts(DeviceParts):
         button.switch_to_input(pull=digitalio.Pull.UP)
         return lambda: button.value
 
-    def accelerometer(self, accelerometer: I2CDeviceConfig, i2c: busio.I2C) -> object:
-        return _setup_accelerometer(i2c, accelerometer.address)
+    def accelerometer(
+        self, accelerometer: I2CDeviceConfig, i2c: busio.I2C
+    ) -> Callable[[], tuple[float, float, float]]:
+        chip = _setup_accelerometer(i2c, accelerometer.address)
+        return lambda: chip.acceleration
 
     def magnetometer(self, magnetometer: I2CDeviceConfig, i2c: busio.I2C) -> object:
         return _setup_magnetometer(i2c, magnetometer.address)

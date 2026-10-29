@@ -297,10 +297,12 @@ def _with_accelerometer(clock: _Clock) -> SimulatedHardware:
 
 
 def _acceleration(sim_hw: SimulatedHardware) -> Reading:
+    """Poll the accelerometer once, as a tick does, and return its reading."""
     accelerometer = sim_hw.hw.accelerometer
     assert accelerometer is not None
-    # DeviceHardware types every sensor as a bare ``object``, as the board's driver is untyped.
-    return accelerometer.acceleration  # type: ignore[attr-defined]
+    accelerometer.update()
+    reading = accelerometer.reading
+    return (reading.x, reading.y, reading.z)
 
 
 def _readings_over(sim_hw: SimulatedHardware, clock: _Clock, seconds: float) -> list[Reading]:
@@ -542,7 +544,7 @@ def test_the_sensors_keep_their_readings_through_a_reboot(tmp_path):
 
     sim_hw.power_on()
 
-    assert sim_hw.hw.accelerometer.acceleration == (1.0, 2.0, 3.0)  # type: ignore[attr-defined]
+    assert _acceleration(sim_hw) == (1.0, 2.0, 3.0)
     assert sim_hw.hw.magnetometer.magnetic == (4.0, 5.0, 6.0)  # type: ignore[attr-defined]
 
 

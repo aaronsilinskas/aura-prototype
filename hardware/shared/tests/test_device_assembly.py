@@ -14,6 +14,7 @@ from hardware.shared.device_assembly import assemble_device
 from hardware.shared.device_config import DeviceConfig, parse_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_parts import PinRef
+from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.radio_transceiver import RadioTransceiver
 from hardware.shared.tests.recording_parts import Output, PartError, RecordingParts
 
@@ -121,6 +122,24 @@ def test_a_sensor_section_is_built_with_its_config_on_the_i2c_bus(section, field
     ((sensor_config, bus),) = parts.args_of(section)
     assert (sensor_config.address, bus.kind) == (0x19, "i2c")
     assert getattr(hw, field) is not None
+
+
+def test_an_enabled_accelerometer_reads_zero_before_its_first_update():
+    hw, _parts = _assemble(_config(accelerometer={}))
+
+    assert hw.accelerometer is not None
+    reading = hw.accelerometer.reading
+    assert (reading.x, reading.y, reading.z) == (0.0, 0.0, 0.0)
+
+
+def test_an_enabled_accelerometer_section_is_a_polled_sensor_reading_its_part():
+    hw, parts = _assemble(_config(accelerometer={}))
+    parts.acceleration = (1.0, 2.0, 3.0)
+
+    assert isinstance(hw.accelerometer, PolledSensor)
+    hw.accelerometer.update()
+    reading = hw.accelerometer.reading
+    assert (reading.x, reading.y, reading.z) == (1.0, 2.0, 3.0)
 
 
 def test_haptics_are_built_with_their_config_on_the_i2c_bus():

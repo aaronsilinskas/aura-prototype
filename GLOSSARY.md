@@ -365,7 +365,7 @@ A hardware sensor providing 3-axis acceleration readings (x, y, z) in m/s²; opt
 _Avoid_: "IMU" (the LIS3DH has no gyroscope or magnetometer)
 
 ### PolledSensor
-The board-free owner of one 3-axis sensor's reading: polled once per tick, it refreshes its reading buffer from the raw chip, and a failed read keeps the last good reading. The accelerometer and magnetometer are each one; `None` in their place on `DeviceHardware` means the hardware is absent.
+The board-free owner of one 3-axis sensor's reading: polled once per tick, it refreshes its reading from its raw read source, and a failed read keeps the last good reading; the start and end of a run of failed reads are logged. The accelerometer and magnetometer are each one. A device with no such hardware has no PolledSensor in its place, which is distinct from a failed read.
 _Avoid_: `Sensor` (buttons and IR receivers are sensors too); swallowing read failures at the call site
 
 ### AccelerationData

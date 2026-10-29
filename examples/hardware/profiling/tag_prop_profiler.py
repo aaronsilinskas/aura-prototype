@@ -127,6 +127,7 @@ from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.shared.device_config import load_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
+from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.profiler_report import (
     print_profile_header,
     print_stats_line,
@@ -184,7 +185,7 @@ def _require_output(hardware: DeviceHardware, output_type: type[EffectOutput]) -
         )
 
 
-def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, object, object, int]:
+def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, PolledSensor, object, int]:
     """Stand up the whole reference tag prop and return its driving objects.
 
     Snapshots free heap before and after construction (with a GC collect on each
@@ -315,7 +316,9 @@ def run() -> None:
     print(f"__PROP footprint_bytes={footprint_bytes}, free_heap_bytes={gc.mem_free()}")
 
     _button_data = ButtonData({})
-    _acceleration = AccelerationData(0.0, 0.0, 0.0) if accelerometer is not None else None
+    _acceleration = accelerometer.reading
+    # Narrow PolledSensor.reading, typed as either buffer, to the acceleration one.
+    assert isinstance(_acceleration, AccelerationData)
     _input_event = InputEvents.Sensors(_button_data, _acceleration)
 
     start_injected = not AUTO_START
@@ -333,14 +336,7 @@ def run() -> None:
             _inject_press("A", _button_data)
             start_injected = True
 
-        if _acceleration is not None:
-            try:
-                ax, ay, az = accelerometer.acceleration
-                _acceleration.x = ax
-                _acceleration.y = ay
-                _acceleration.z = az
-            except Exception:
-                pass  # keep last good values
+        accelerometer.update()
 
         # Outside the active_state guard and before checking ir.received: a
         # send can be in flight across a scene transition, and ir.update()

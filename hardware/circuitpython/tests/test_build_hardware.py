@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sys
 from types import ModuleType, SimpleNamespace
+from typing import ClassVar
 
 import pytest
 
@@ -54,8 +55,13 @@ def test_importing_the_entry_point_imports_no_driver_library(
 
 
 class _FakeLis3dh:
+    """A LIS3DH remembering the bus it was built on; every one built lands in ``built``."""
+
+    built: ClassVar[list[_FakeLis3dh]] = []
+
     def __init__(self, i2c: object, **kwargs: object) -> None:
         self.i2c = i2c
+        _FakeLis3dh.built.append(self)
 
 
 @pytest.fixture
@@ -63,6 +69,7 @@ def lis3dh_board(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     """A board whose default SPI bus builds, with a fake LIS3DH library installed."""
     lis3dh = ModuleType("adafruit_lis3dh")
     lis3dh.LIS3DH_I2C = _FakeLis3dh  # type: ignore[attr-defined]
+    monkeypatch.setattr(_FakeLis3dh, "built", [])
     monkeypatch.setitem(sys.modules, "adafruit_lis3dh", lis3dh)
     return SimpleNamespace(SPI=object)
 
@@ -89,8 +96,9 @@ def test_an_injected_i2c_bus_is_the_bus_i2c_parts_are_built_on(
         parse_device_config({"accelerometer": {}}), board_module=lis3dh_board, i2c=injected
     )
 
-    assert isinstance(hw.accelerometer, _FakeLis3dh)
-    assert hw.accelerometer.i2c is injected
+    assert hw.accelerometer is not None
+    (chip,) = _FakeLis3dh.built
+    assert chip.i2c is injected
 
 
 def test_disabled_i2c_ignores_an_injected_bus(lis3dh_board: SimpleNamespace) -> None:

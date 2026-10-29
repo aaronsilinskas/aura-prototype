@@ -24,6 +24,7 @@ import time
 
 from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
+from engine.input import AccelerationData
 from engine.log import Logger
 from hardware.shared.build_narration import (
     describe_accelerometer,
@@ -58,6 +59,7 @@ from hardware.shared.device_parts import DeviceParts, PinRef
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_wiring import wire_ir
 from hardware.shared.network_controls import HardwareNetworkControls
+from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.radio_transceiver import RadioTransceiver
 
 __all__ = ["assemble_device", "button_label", "open_i2c"]
@@ -240,7 +242,13 @@ def assemble_device(
         logger,
         config.accelerometer,
         describe_accelerometer,
-        lambda c: (parts.accelerometer(c, _require_i2c(i2c, "accelerometer")), "ok"),
+        lambda c: (
+            PolledSensor(
+                parts.accelerometer(c, _require_i2c(i2c, "accelerometer")),
+                AccelerationData(0.0, 0.0, 0.0),
+            ),
+            "ok",
+        ),
     )
     magnetometer = _gated_step(
         logger,

@@ -268,7 +268,8 @@ class SimulatedParts(DeviceParts):
 
     The parts built fresh this boot are kept here for the device's scripting
     helpers to reach: ``strips``, ``audio``, ``ir_readers``, ``ir_emitters``
-    (in the order wired) and ``radio``.
+    (in the order wired) and ``radio``; ``scripted_accelerometer`` is the one
+    kept across reboots.
     """
 
     def __init__(self, device: SimulatedHardware, previous: SimulatedParts | None = None) -> None:
@@ -302,10 +303,18 @@ class SimulatedParts(DeviceParts):
     def button_reader(self, pin: PinRef) -> Callable[[], bool]:
         return lambda: self._device.pin_level(pin.name)
 
-    def accelerometer(self, accelerometer: I2CDeviceConfig, i2c: object) -> object:
+    @property
+    def scripted_accelerometer(self) -> SimulatedAccelerometer | None:
+        """The accelerometer the device scripts; ``None`` until a boot first builds one."""
+        return self._kept.accelerometer
+
+    def accelerometer(
+        self, accelerometer: I2CDeviceConfig, i2c: object
+    ) -> Callable[[], tuple[float, float, float]]:
         if self._kept.accelerometer is None:
             self._kept.accelerometer = SimulatedAccelerometer(self._device.now)
-        return self._kept.accelerometer
+        scripted = self._kept.accelerometer
+        return lambda: scripted.acceleration
 
     def magnetometer(self, magnetometer: I2CDeviceConfig, i2c: object) -> object:
         if self._kept.magnetometer is None:

@@ -406,10 +406,12 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     (:func:`app.scene_runtime.run_scene`, which adds only ``while True:`` and
     ``gc.collect()``) and the Simulated device, so neither copies it, as
     both share the boot that builds it (:func:`build_scene_boot`). Build it
-    once per runtime: the ``InputEvents.Sensors`` event, its
-    button/acceleration/magnetic buffers, and the telemetry gate are
-    allocated here and mutated in place every tick, so the steady-state tick
-    allocates nothing on-device.
+    once per runtime: the ``InputEvents.Sensors`` event, its button and
+    magnetic buffers, and the telemetry gate are allocated here (the
+    acceleration buffer is the accelerometer
+    :class:`~hardware.shared.polled_sensor.PolledSensor`'s own ``reading``)
+    and mutated in place every tick, so the steady-state tick allocates
+    nothing on-device.
 
     A caller with events of its own to inject queues them on
     ``runtime.manager.active_state`` before calling the tick; they are
@@ -418,7 +420,9 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     accelerometer = hw.accelerometer
     magnetometer = hw.magnetometer
     button_data = ButtonData({})
-    acceleration = AccelerationData(0.0, 0.0, 0.0) if accelerometer is not None else None
+    acceleration = accelerometer.reading if accelerometer is not None else None
+    # Narrow PolledSensor.reading, typed as either buffer, to the acceleration one.
+    assert acceleration is None or isinstance(acceleration, AccelerationData)
     magnetic = MagneticData(0.0, 0.0, 0.0) if magnetometer is not None else None
     input_event = InputEvents.Sensors(button_data, acceleration, magnetic)
     manager = runtime.manager
@@ -433,14 +437,8 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
 
         hw.buttons.update(timer.elapsed, button_data)
 
-        if acceleration is not None:
-            try:
-                ax, ay, az = accelerometer.acceleration
-                acceleration.x = ax
-                acceleration.y = ay
-                acceleration.z = az
-            except Exception:
-                pass  # keep last good values; None signals missing hardware, not read failure
+        if accelerometer is not None:
+            accelerometer.update()
 
         if magnetic is not None:
             try:

@@ -82,6 +82,8 @@ class RecordingParts(DeviceParts):
         self.requests: list[tuple[str, tuple]] = []
         self.pin_levels: dict[str, bool] = {}
         """Raw level each button pin reads, by pin name; ``True`` (released) unless set."""
+        self.acceleration: tuple[float, float, float] = (0.0, 0.0, 0.0)
+        """What the accelerometer reads."""
         self.writers: dict[str, Writer] = {}
         """Each emitter's writer, by emitter key."""
         self.transports: list[Transport] = []
@@ -129,9 +131,11 @@ class RecordingParts(DeviceParts):
         self._record("button_reader", pin)
         return lambda: self.pin_levels.get(pin.name, True)
 
-    def accelerometer(self, accelerometer: I2CDeviceConfig, i2c: object) -> object:
+    def accelerometer(
+        self, accelerometer: I2CDeviceConfig, i2c: object
+    ) -> Callable[[], tuple[float, float, float]]:
         self._record("accelerometer", accelerometer, i2c)
-        return object()
+        return lambda: self.acceleration
 
     def magnetometer(self, magnetometer: I2CDeviceConfig, i2c: object) -> object:
         self._record("magnetometer", magnetometer, i2c)
