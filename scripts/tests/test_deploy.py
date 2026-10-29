@@ -852,8 +852,9 @@ def test_scene_flag_writes_a_scene_deploy_token_beside_default_scene(tmp_path: P
 
     deploy(None, mount, source_root=source, compile=fake_compile, scene="hardware_test")
 
-    token = json.loads((mount / "aura-settings.json").read_text())["scene_deploy_token"]
-    assert isinstance(token, str) and token
+    settings = json.loads((mount / "aura-settings.json").read_text())
+    assert settings["default_scene"] == "hardware_test"
+    assert settings["scene_deploy_token"]
 
 
 def test_each_scene_flag_deploy_writes_a_new_scene_deploy_token(tmp_path: Path) -> None:

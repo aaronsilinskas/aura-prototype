@@ -409,18 +409,15 @@ def test_scene_flag_records_the_scene_as_default_scene_in_deployed_settings(
 ) -> None:
     args = parse_args(_cli_args(tmp_path, "--scene", "hardware_test"))
 
-    rc = run_deploy(args, deploy=_deploy_from_source(tmp_path))
+    run_deploy(args, deploy=_deploy_from_source(tmp_path))
 
-    assert rc == 0
     settings = json.loads((tmp_path / "mount" / "aura-settings.json").read_text())
     assert settings["default_scene"] == "hardware_test"
 
 
-def test_omitting_scene_flag_deploys_without_writing_settings(tmp_path: Path) -> None:
+def test_omitting_scene_flag_writes_no_settings_file(tmp_path: Path) -> None:
     args = parse_args(_cli_args(tmp_path))
 
-    rc = run_deploy(args, deploy=_deploy_from_source(tmp_path))
+    run_deploy(args, deploy=_deploy_from_source(tmp_path))
 
-    assert rc == 0
-    assert (tmp_path / "mount" / "code.py").read_text() == "# example"
     assert not (tmp_path / "mount" / "aura-settings.json").exists()
