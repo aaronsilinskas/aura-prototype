@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
+from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.sd_sync_protocol import Transport
 from hardware.shared.sd_sync_server import SdSyncServer
-from hardware.simulated.storage import FakeDeviceStorage
 from scripts.sd_sync import build_client, dispatch, parse_args
 from scripts.sd_sync_client import SdSyncNotFoundError
 from scripts.sd_sync_transport import SdSyncPortError, select_data_port
@@ -128,7 +128,7 @@ class _QueueTransport(Transport):
         return self._recv_q.get()
 
 
-def _loopback_client(storage: "FakeDeviceStorage | None"):
+def _loopback_client(storage: "DeviceStorage | None"):
     """Wire a real ``SdSyncClient`` to a fresh ``SdSyncServer(storage)`` over a loopback.
 
     The server runs on a background daemon thread dispatching by request verb
@@ -153,10 +153,11 @@ def _loopback_client(storage: "FakeDeviceStorage | None"):
     return build_client(client_transport)
 
 
-def test_dispatch_pull_writes_the_sd_file_to_the_given_host_path(tmp_path: Path) -> None:
-    storage = FakeDeviceStorage()
-    storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
-    client = _loopback_client(storage)
+def test_dispatch_pull_writes_the_sd_file_to_the_given_host_path(
+    device_storage: DeviceStorage, tmp_path: Path
+) -> None:
+    device_storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    client = _loopback_client(device_storage)
     host_path = tmp_path / "aura-state.json"
     args = parse_args(["pull", "aura-state.json", str(host_path)])
 
@@ -165,22 +166,22 @@ def test_dispatch_pull_writes_the_sd_file_to_the_given_host_path(tmp_path: Path)
     assert host_path.read_bytes() == b'{"scene": "tag"}'
 
 
-def test_dispatch_push_writes_the_host_file_to_the_given_sd_path(tmp_path: Path) -> None:
-    storage = FakeDeviceStorage()
-    client = _loopback_client(storage)
+def test_dispatch_push_writes_the_host_file_to_the_given_sd_path(
+    device_storage: DeviceStorage, tmp_path: Path
+) -> None:
+    client = _loopback_client(device_storage)
     host_path = tmp_path / "aura-state.json"
     host_path.write_bytes(b'{"scene": "lobby"}')
     args = parse_args(["push", str(host_path), "aura-state.json"])
 
     dispatch(args, client)
 
-    assert storage.read_bytes("aura-state.json") == b'{"scene": "lobby"}'
+    assert device_storage.read_bytes("aura-state.json") == b'{"scene": "lobby"}'
 
 
-def test_dispatch_list_prints_each_entry_as_tab_separated_path_and_size() -> None:
-    storage = FakeDeviceStorage()
-    storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
-    client = _loopback_client(storage)
+def test_dispatch_list_prints_each_entry_as_tab_separated_path_and_size(device_storage) -> None:
+    device_storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    client = _loopback_client(device_storage)
     args = parse_args(["list"])
     out = io.StringIO()
 
@@ -189,16 +190,17 @@ def test_dispatch_list_prints_each_entry_as_tab_separated_path_and_size() -> Non
     assert out.getvalue() == "aura-state.json\t16\n"
 
 
-def test_dispatch_returns_zero_on_success() -> None:
-    storage = FakeDeviceStorage()
-    client = _loopback_client(storage)
+def test_dispatch_returns_zero_on_success(device_storage) -> None:
+    client = _loopback_client(device_storage)
     args = parse_args(["list"])
 
     assert dispatch(args, client, out=io.StringIO()) == 0
 
 
-def test_dispatch_pull_of_a_missing_sd_path_raises_not_found(tmp_path: Path) -> None:
-    client = _loopback_client(FakeDeviceStorage())
+def test_dispatch_pull_of_a_missing_sd_path_raises_not_found(
+    device_storage: DeviceStorage, tmp_path: Path
+) -> None:
+    client = _loopback_client(device_storage)
     args = parse_args(["pull", "missing.json", str(tmp_path / "missing.json")])
 
     with pytest.raises(SdSyncNotFoundError):

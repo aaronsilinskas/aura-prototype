@@ -7,13 +7,13 @@ so a "reboot" only records what storage held at the moment it fired.
 from engine.log import Logger
 from hardware.shared.device_reboot import DeviceSceneReboot
 from hardware.shared.device_state import DeviceStateStore
-from hardware.simulated.storage import FakeDeviceStorage
+from hardware.shared.device_storage import DeviceStorage
 
 
 class RecordingReset:
     """A reset that records the persisted ``scene``/``return_to`` each time it is called."""
 
-    def __init__(self, storage: FakeDeviceStorage | None = None) -> None:
+    def __init__(self, storage: DeviceStorage | None = None) -> None:
         self._storage = storage
         self.calls: list[tuple[str | None, str | None]] = []
 
@@ -27,28 +27,25 @@ class RecordingReset:
 # ---------------------------------------------------------------------------
 
 
-def test_reboot_into_persists_target_as_scene():
-    storage = FakeDeviceStorage()
-    reboot = DeviceSceneReboot(storage, booted_scene="lobby", reset=RecordingReset())
+def test_reboot_into_persists_target_as_scene(device_storage):
+    reboot = DeviceSceneReboot(device_storage, booted_scene="lobby", reset=RecordingReset())
 
     reboot.reboot_into("tag")
 
-    assert DeviceStateStore(storage).get("scene") == "tag"
+    assert DeviceStateStore(device_storage).get("scene") == "tag"
 
 
-def test_reboot_into_records_the_booted_scene_as_return_to():
-    storage = FakeDeviceStorage()
-    reboot = DeviceSceneReboot(storage, booted_scene="lobby", reset=RecordingReset())
+def test_reboot_into_records_the_booted_scene_as_return_to(device_storage):
+    reboot = DeviceSceneReboot(device_storage, booted_scene="lobby", reset=RecordingReset())
 
     reboot.reboot_into("tag")
 
-    assert DeviceStateStore(storage).get("return_to") == "lobby"
+    assert DeviceStateStore(device_storage).get("return_to") == "lobby"
 
 
-def test_reboot_into_resets_once_after_persisting():
-    storage = FakeDeviceStorage()
-    reset = RecordingReset(storage)
-    reboot = DeviceSceneReboot(storage, booted_scene="lobby", reset=reset)
+def test_reboot_into_resets_once_after_persisting(device_storage):
+    reset = RecordingReset(device_storage)
+    reboot = DeviceSceneReboot(device_storage, booted_scene="lobby", reset=reset)
 
     reboot.reboot_into("tag")
 
@@ -80,50 +77,47 @@ def test_reboot_into_on_a_card_less_device_logs():
 # ---------------------------------------------------------------------------
 
 
-def test_reboot_to_previous_persists_the_recorded_return_to_as_scene():
-    storage = FakeDeviceStorage()
-    DeviceStateStore(storage).set("return_to", "lobby")
-    reboot = DeviceSceneReboot(storage, booted_scene="tag", reset=RecordingReset())
+def test_reboot_to_previous_persists_the_recorded_return_to_as_scene(device_storage):
+    DeviceStateStore(device_storage).set("return_to", "lobby")
+    reboot = DeviceSceneReboot(device_storage, booted_scene="tag", reset=RecordingReset())
 
     reboot.reboot_to_previous()
 
-    assert DeviceStateStore(storage).get("scene") == "lobby"
+    assert DeviceStateStore(device_storage).get("scene") == "lobby"
 
 
-def test_reboot_to_previous_clears_return_to():
-    storage = FakeDeviceStorage()
-    DeviceStateStore(storage).set("return_to", "lobby")
-    reboot = DeviceSceneReboot(storage, booted_scene="tag", reset=RecordingReset())
+def test_reboot_to_previous_clears_return_to(device_storage):
+    DeviceStateStore(device_storage).set("return_to", "lobby")
+    reboot = DeviceSceneReboot(device_storage, booted_scene="tag", reset=RecordingReset())
 
     reboot.reboot_to_previous()
 
-    assert DeviceStateStore(storage).get("return_to") is None
+    assert DeviceStateStore(device_storage).get("return_to") is None
 
 
-def test_reboot_to_previous_resets_once_after_persisting():
-    storage = FakeDeviceStorage()
-    DeviceStateStore(storage).set("return_to", "lobby")
-    reset = RecordingReset(storage)
-    reboot = DeviceSceneReboot(storage, booted_scene="tag", reset=reset)
+def test_reboot_to_previous_resets_once_after_persisting(device_storage):
+    DeviceStateStore(device_storage).set("return_to", "lobby")
+    reset = RecordingReset(device_storage)
+    reboot = DeviceSceneReboot(device_storage, booted_scene="tag", reset=reset)
 
     reboot.reboot_to_previous()
 
     assert reset.calls == [("lobby", None)]
 
 
-def test_reboot_to_previous_with_no_recorded_return_to_does_not_reset():
+def test_reboot_to_previous_with_no_recorded_return_to_does_not_reset(device_storage):
     reset = RecordingReset()
-    reboot = DeviceSceneReboot(FakeDeviceStorage(), booted_scene="tag", reset=reset)
+    reboot = DeviceSceneReboot(device_storage, booted_scene="tag", reset=reset)
 
     reboot.reboot_to_previous()
 
     assert reset.calls == []
 
 
-def test_reboot_to_previous_with_no_recorded_return_to_logs():
+def test_reboot_to_previous_with_no_recorded_return_to_logs(device_storage):
     lines = []
     reboot = DeviceSceneReboot(
-        FakeDeviceStorage(),
+        device_storage,
         booted_scene="tag",
         reset=RecordingReset(),
         logger=Logger("[reboot]", lines.append),
