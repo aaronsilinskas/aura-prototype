@@ -200,7 +200,7 @@ class Simulation:
         card from the first boot, and what the device writes lands there.
         Without *card* the card is a fresh empty directory this simulation
         owns; with *sd_card* false there is none, and the device reboots
-        only when redeployed. Its radio node is its place in add order, from 1.
+        only when reset or redeployed. Its radio node is its place in add order, from 1.
 
         Raises:
             ValueError: If *card* is given with *sd_card* false, or is
@@ -383,6 +383,14 @@ class SimulatedDevice:
         """
         self._flash_settings["default_scene"] = scene
         self._flash_settings["scene_deploy_token"] = secrets.token_hex(8)
+        self.reset()
+
+    def reset(self) -> None:
+        """Reset and boot at once with flash unchanged, as pressing the reset button does.
+
+        The device boots into whatever its card names, else its flash
+        ``default_scene``.
+        """
         self._sim_hw.power_on()
         self._boot()
 
@@ -557,5 +565,4 @@ class SimulatedDevice:
         try:
             self._scene_tick()
         except _Reset:
-            self._sim_hw.power_on()
-            self._boot()
+            self.reset()
