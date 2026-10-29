@@ -8,7 +8,6 @@ import pytest
 from hardware.shared.device_config import (
     DeviceConfig,
     MatrixPixelsConfig,
-    copy_with_enabled,
     load_device_config,
     parse_device_config,
     read_device_config_mapping,
@@ -1575,95 +1574,6 @@ def test_load_device_config_parses_valid_file(tmp_path, matrix_config):
 def test_load_device_config_raises_when_file_missing(tmp_path):
     with pytest.raises(RuntimeError, match="not found"):
         load_device_config(str(tmp_path / "missing.json"))
-
-
-# ---------------------------------------------------------------------------
-# copy_with_enabled — the single copy primitive behind isolate's disabled
-# copies (moved from profiler_report, #725)
-# ---------------------------------------------------------------------------
-
-
-def test_copy_with_enabled_returns_a_distinct_instance_with_enabled_forced():
-    config = parse_device_config({"haptics": {}})
-
-    copy = copy_with_enabled(config.haptics, enabled=False)
-
-    assert copy is not config.haptics
-    assert copy.enabled is False
-    assert config.haptics.enabled is True
-
-
-def test_copy_with_enabled_can_force_enabled_true_on_a_declared_disabled_section():
-    config = parse_device_config({"haptics": {"enabled": False}})
-
-    copy = copy_with_enabled(config.haptics, enabled=True)
-
-    assert copy.enabled is True
-    assert config.haptics.enabled is False
-
-
-def test_copy_with_enabled_preserves_every_other_field_of_a_pixels_entry():
-    config = parse_device_config(
-        {
-            "pixels": [
-                {
-                    "type": "matrix",
-                    "cols": 13,
-                    "scope_rows": {"personal": [0, 9]},
-                    "brightness": 0.5,
-                    "address": "0x31",
-                }
-            ]
-        }
-    )
-    original = config.pixels[0]
-
-    copy = copy_with_enabled(original, enabled=False)
-
-    assert copy.cols == original.cols
-    assert copy.scope_rows == original.scope_rows
-    assert copy.brightness == original.brightness
-    assert copy.address == original.address == 0x31
-    assert copy.enabled is False
-
-
-def test_copy_with_enabled_preserves_address_on_accelerometer_magnetometer_and_haptics():
-    config = parse_device_config(
-        {
-            "accelerometer": {"address": "0x19"},
-            "magnetometer": {"address": "0x32"},
-            "haptics": {"address": "0x5B"},
-        }
-    )
-
-    accelerometer_copy = copy_with_enabled(config.accelerometer, enabled=False)
-    magnetometer_copy = copy_with_enabled(config.magnetometer, enabled=False)
-    haptics_copy = copy_with_enabled(config.haptics, enabled=False)
-
-    assert accelerometer_copy.address == 0x19
-    assert magnetometer_copy.address == 0x32
-    assert haptics_copy.address == 0x5B
-
-
-def test_copy_with_enabled_shares_mutable_slot_values_with_the_original():
-    # The copy is shallow -- a mutable slot (scope_rows) is the *same* dict
-    # object on both, not a deep copy of it.
-    config = parse_device_config(
-        {
-            "pixels": [
-                {
-                    "type": "matrix",
-                    "cols": 13,
-                    "scope_rows": {"personal": [0, 9]},
-                }
-            ]
-        }
-    )
-    original = config.pixels[0]
-
-    copy = copy_with_enabled(original, enabled=False)
-
-    assert copy.scope_rows is original.scope_rows
 
 
 # ---------------------------------------------------------------------------

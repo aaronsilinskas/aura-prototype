@@ -25,7 +25,6 @@ __all__ = [
     "RadioConfig",
     "SDCardConfig",
     "SPIConfig",
-    "copy_with_enabled",
     "load_device_config",
     "parse_device_config",
     "read_device_config_mapping",
@@ -376,38 +375,23 @@ class NeoPixelCurrentBudgetConfig:
         self.at_min_brightness: int = at_min_brightness
 
 
-def copy_with_enabled(section: object, enabled: bool) -> object:
-    """Return a copy of *section* with ``enabled`` forced to *enabled*.
+def _disabled_copy(section: object) -> object:
+    """Return a copy of *section* with ``enabled`` forced to ``False``.
 
-    Reads every name in *section*'s ``__slots__`` off the instance via
-    ``getattr`` and passes them back as constructor keyword arguments,
-    overriding only ``enabled``. One implementation serves every isolatable
-    section class today because each of their ``__slots__`` tuples names
-    exactly its constructor's keyword arguments; a future class that breaks
-    that correspondence raises ``TypeError`` here instead of silently
-    dropping a field, which a per-class copy method would risk. Precedent:
-    ``ir_transport`` builds ``IrTelemetrySnapshot`` the same way, by
-    splatting slot-driven ``getattr`` reads.
+    Private to ``isolate`` (#715, #1071). It can only disable, never force a
+    section on: disabling only narrows, so the copy stays within the NeoPixel
+    current budget tuned at parse time, whereas enabling would skip
+    validation and the budget. To force a section on, set ``enabled`` in the
+    raw mapping and parse it again.
 
-    ``isolate`` calls this with ``enabled=False`` to disable every component
-    but the one it keeps (#715). Nothing should force a section *on* this
-    way: that skips validation and the NeoPixel current budget. Set
-    ``enabled`` in the raw mapping and parse it again instead.
-
-    Args:
-        section: A parsed, non-``None`` section instance (e.g. an
-            ``AudioConfig`` or a ``MatrixPixelsConfig``/``NeoPixelPixelsConfig``
-            pixels-list entry).
-        enabled: The ``enabled`` value the returned copy carries.
-
-    Returns:
-        A new instance of ``type(section)`` equal to *section* on every slot
-        except ``enabled``. The copy is shallow: any slot holding a mutable
-        value (e.g. a pixel entry's ``strips`` list) still shares that value
-        with *section*.
+    The copy is rebuilt from ``__slots__`` because every isolatable section's
+    slots name exactly its constructor's keyword arguments; a future class
+    that breaks that correspondence raises ``TypeError`` here instead of
+    silently dropping a field. The copy is shallow: a mutable slot (e.g. a
+    pixel entry's ``strips`` list) is shared with *section*.
     """
     kwargs = {name: getattr(section, name) for name in section.__slots__}
-    kwargs["enabled"] = enabled
+    kwargs["enabled"] = False
     return type(section)(**kwargs)
 
 
@@ -502,11 +486,11 @@ class DeviceConfig:
             if name in _ISOLATE_EXCLUDED_COMPONENTS or name == keep:
                 kwargs[name] = value
             elif name == "pixels":
-                kwargs[name] = [copy_with_enabled(entry, enabled=False) for entry in value]
+                kwargs[name] = [_disabled_copy(entry) for entry in value]
             elif value is None:
                 kwargs[name] = None
             else:
-                kwargs[name] = copy_with_enabled(value, enabled=False)
+                kwargs[name] = _disabled_copy(value)
         return DeviceConfig(**kwargs)
 
 
