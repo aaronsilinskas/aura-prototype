@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from engine.audio import AudioOverlayAdmin
+from engine.engine import GameEngine
+from engine.pack_catalog import PackCatalog, scan_pack_roots
+from engine.scene import SceneManager
 from engine.state import (
     EffectAdmin,
     EffectControls,
@@ -9,6 +14,9 @@ from engine.state import (
     SceneReboot,
     ScopeValue,
 )
+
+if TYPE_CHECKING:
+    from engine.tests.pack_tree import PackTree
 
 _STUB_RECEIPT_ID = 0
 
@@ -127,3 +135,39 @@ class RecordingSceneReboot(SceneReboot):
 
     def reboot_to_previous(self) -> None:
         self.reboot_to_previous_calls += 1
+
+
+def rule_source(class_name: str = "ARule") -> str:
+    """Return the source of a rule item whose ``RULE`` is an instance of a fresh *class_name*."""
+    return (
+        "from engine.engine import GameRule\n"
+        "class " + class_name + "(GameRule): pass\n"
+        "RULE = " + class_name + "()\n"
+    )
+
+
+def scan_scenes(pack_tree: PackTree, scenes: dict[str, dict]) -> PackCatalog:
+    """Scan one root holding *scenes*, each name mapped to its ``pack_tree.scene`` fields."""
+    root = pack_tree.root("ts_flash")
+    for name, fields in scenes.items():
+        pack_tree.scene(root, name, **fields)
+    return scan_pack_roots([str(root)])
+
+
+def make_scene_manager(
+    catalog: PackCatalog,
+    *,
+    engine: GameEngine | None = None,
+    effect_admin: SpyEffectAdmin | None = None,
+    audio_overlay_admin: SpyAudioOverlayAdmin | None = None,
+) -> SceneManager:
+    """Construct a ``SceneManager`` over *catalog*'s registries, with spies for every port."""
+    return SceneManager(
+        engine or GameEngine(effect_controls=SpyEffectControls()),
+        catalog.effect_registry,
+        catalog.rule_registry,
+        catalog.scene_registry,
+        effect_admin or SpyEffectAdmin(),
+        audio_overlay_admin or SpyAudioOverlayAdmin(),
+        RecordingSceneReboot(),
+    )

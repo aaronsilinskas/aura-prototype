@@ -13,33 +13,17 @@ from engine.engine import GameRule
 from engine.pack_catalog import scan_pack_roots
 from engine.packs import ItemTypeError, MissingItemAttributeError, UnknownItemError
 from engine.scene import SceneLocalRegistry
+from engine.tests.helpers import rule_source, scan_scenes
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _rule_module(name: str = "MyRule") -> str:
-    """Return Python source for a module that exposes a RULE GameRule."""
-    return (
-        "from engine.engine import GameRule\n"
-        "class " + name + "(GameRule): pass\n"
-        "RULE = " + name + "()\n"
-    )
-
-
-def _local_rules(
-    pack_tree, rules: dict[str, str] | None, *, rules_is_a_file: bool = False
-) -> SceneLocalRegistry:
-    """Scan one scene with local *rules*; return its local rule registry.
-
-    *rules_is_a_file* puts a plain file where the scene's ``rules/`` folder would be.
-    """
-    root = pack_tree.root("tslr_flash")
-    scene_dir = pack_tree.scene(root, "forest", rules=rules)
-    if rules_is_a_file:
-        (scene_dir / "rules").write_text("")
-    return scan_pack_roots([str(root)]).scene_registry.get("forest").local_rule_registry
+def _local_rules(pack_tree, rules: dict[str, str] | None) -> SceneLocalRegistry:
+    """Scan one scene with local *rules*; return its local rule registry."""
+    catalog = scan_scenes(pack_tree, {"forest": {"rules": rules}})
+    return catalog.scene_registry.get("forest").local_rule_registry
 
 
 # ---------------------------------------------------------------------------
@@ -70,15 +54,17 @@ def test_a_scene_without_a_rules_folder_has_an_empty_local_rule_registry(pack_tr
 def test_a_scene_whose_rules_entry_is_a_file_has_an_empty_local_rule_registry(
     pack_tree,
 ) -> None:
-    registry = _local_rules(pack_tree, None, rules_is_a_file=True)
+    root = pack_tree.root("ts_flash")
+    scene_dir = pack_tree.scene(root, "forest")
+    (scene_dir / "rules").write_text("")
 
-    assert registry.items() == []
+    scene = scan_pack_roots([str(root)]).scene_registry.get("forest")
+
+    assert scene.local_rule_registry.items() == []
 
 
 def test_a_populated_rules_folder_yields_its_items(pack_tree) -> None:
-    registry = _local_rules(
-        pack_tree, {"alpha": _rule_module("Alpha"), "beta": _rule_module("Beta")}
-    )
+    registry = _local_rules(pack_tree, {"alpha": rule_source("Alpha"), "beta": rule_source("Beta")})
 
     assert registry.items() == ["alpha", "beta"]
 
@@ -89,7 +75,7 @@ def test_a_populated_rules_folder_yields_its_items(pack_tree) -> None:
 
 
 def test_get_returns_game_rule_for_registered_item_name(pack_tree) -> None:
-    registry = _local_rules(pack_tree, {"my_rule": _rule_module()})
+    registry = _local_rules(pack_tree, {"my_rule": rule_source()})
 
     result = registry.get("my_rule", GameRule)
 
@@ -97,7 +83,7 @@ def test_get_returns_game_rule_for_registered_item_name(pack_tree) -> None:
 
 
 def test_get_returns_same_instance_on_repeated_calls(pack_tree) -> None:
-    registry = _local_rules(pack_tree, {"my_rule": _rule_module()})
+    registry = _local_rules(pack_tree, {"my_rule": rule_source()})
 
     first = registry.get("my_rule", GameRule)
     second = registry.get("my_rule", GameRule)
@@ -140,9 +126,9 @@ def test_items_returns_sorted_item_names(pack_tree) -> None:
     registry = _local_rules(
         pack_tree,
         {
-            "zebra": _rule_module("Zebra"),
-            "alpha": _rule_module("Alpha"),
-            "mango": _rule_module("Mango"),
+            "zebra": rule_source("Zebra"),
+            "alpha": rule_source("Alpha"),
+            "mango": rule_source("Mango"),
         },
     )
 
