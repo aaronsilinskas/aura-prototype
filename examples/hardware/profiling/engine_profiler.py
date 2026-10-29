@@ -77,7 +77,7 @@ from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
-from engine.packs import PackRegistry
+from engine.pack_catalog import scan_pack_roots
 from engine.state import GameState, SceneControls
 from hardware.shared.profiler_report import (
     linear_fit,
@@ -122,7 +122,7 @@ class _ProfilerRule(GameRule):
 
 
 def _build_engine(rule_count: int) -> tuple[GameEngine, GameState]:
-    registry = PackRegistry(item_attr="BUILD")
+    registry = scan_pack_roots(["packs"]).effect_registry
     effect_manager = EffectManager(registry=registry, outputs=[])
     game_engine = GameEngine(effect_controls=effect_manager)
     game_engine.set_rules([_ProfilerRule() for _ in range(rule_count)])
