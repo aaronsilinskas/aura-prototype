@@ -1,7 +1,7 @@
-"""The Simulated device's SD card: a ``DeviceStorage`` held in memory.
+"""An in-memory ``DeviceStorage`` double, a faithful copy of its contract.
 
-Also the in-memory double the ``hardware/shared`` storage, state and SD-sync
-tests use, so it stays a faithful copy of ``DeviceStorage``'s contract.
+The Simulated device's card is no longer this: it is the real
+``DeviceStorage`` over a card directory.
 """
 
 from __future__ import annotations

@@ -13,10 +13,16 @@ Its radio reaches every other device through the radio medium, with no aim;
 
 A device reboots as a board does (see ``SimulatedDevice``), so a test can
 follow the lobby into a game and back.
+
+A device's card is a real directory, so card scenes and card packs work as on
+a device. ``aura_packs`` is a regular package, bound to the first card that
+carried it until the simulation closes, so at most one card in a simulation
+may carry ``aura_packs/``.
 """
 
 from __future__ import annotations
 
+import sys
 import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -45,6 +51,9 @@ __all__ = ["TICK", "SimulatedDevice", "Simulation"]
 
 TICK = 1 / 60
 """Fixed simulation step. Every device in a ``Simulation`` ticks on it in lockstep."""
+
+_CARD_PACKS = "aura_packs"
+"""The package card scenes and packs import under, bound to the first card that carried it."""
 
 _SIMULATED_DEVICE_CONFIG = (
     Path(__file__).resolve().parents[2] / "examples" / "aura-device.simulated.json"
@@ -143,6 +152,9 @@ class Simulation:
         self._in_flight: list[_InFlight] = []
         self._radio_in_flight: list[_RadioInFlight] = []
         self._temp_dir = tempfile.TemporaryDirectory(prefix="aura-simulation-")
+        self._card_packs_carrier: SimulatedDevice | None = None
+        self._card_holders: dict[Path, str] = {}
+        """Every card handed out, resolved, and the name of the device it went to."""
 
     def __enter__(self) -> Simulation:
         return self
@@ -156,7 +168,18 @@ class Simulation:
         self.close()
 
     def close(self) -> None:
-        """Remove the temporary directory this simulation owns."""
+        """Remove what this simulation leaves behind, so no card reaches a later one.
+
+        Removes the temporary directory it owns (never a card a test handed
+        it), every ``aura_packs*`` module, and every device's card from
+        ``sys.path``.
+        """
+        for name in list(sys.modules):
+            if name.split(".")[0] == _CARD_PACKS:
+                del sys.modules[name]
+        for card in self._card_holders:
+            while str(card) in sys.path:
+                sys.path.remove(str(card))
         self._temp_dir.cleanup()
 
     def add_device(
@@ -165,16 +188,39 @@ class Simulation:
         scene: str,
         scene_data: dict[str, object] | None = None,
         sd_card: bool = True,
+        card: str | Path | None = None,
     ) -> SimulatedDevice:
         """Switch a new simulated device on into *scene*, its flash ``default_scene``.
 
         Every boot runs the scene the card names, else *scene*. *scene_data*
-        overrides *scene*'s tunables on every boot. The device's card starts
-        empty; with *sd_card* false it has none, and never reboots. Its radio
-        node is its place in add order, from 1.
+        overrides *scene*'s tunables on every boot. The device's card is
+        *card*, a directory the test prepared, used in place: it is on the
+        card from the first boot, and what the device writes lands there.
+        Without *card* the card is a fresh empty directory this simulation
+        owns; with *sd_card* false there is none, and the device never
+        reboots. Its radio node is its place in add order, from 1.
+
+        Raises:
+            ValueError: If *card* is given with *sd_card* false, or is
+                another device's card; or if this card carries
+                ``aura_packs/`` and another device's already did.
         """
         radio_node = len(self.devices) + 1
-        device = SimulatedDevice(self, name, scene, scene_data or {}, sd_card, radio_node)
+        if not sd_card:
+            if card is not None:
+                raise ValueError(f"{name} has no SD card to be handed {card}")
+            card_dir = None
+        elif card is None:
+            card_dir = Path(self._temp_dir.name) / f"card-{radio_node}"
+            card_dir.mkdir()
+        else:
+            card_dir = Path(card).resolve()
+            if card_dir in self._card_holders:
+                holder = self._card_holders[card_dir]
+                raise ValueError(f"{name} cannot share {holder}'s card {card_dir}")
+        if card_dir is not None:
+            self._card_holders[card_dir] = name
+        device = SimulatedDevice(self, name, scene, scene_data or {}, card_dir, radio_node)
         self.devices.append(device)
         return device
 
@@ -195,6 +241,18 @@ class Simulation:
             if self.now >= deadline:
                 raise AssertionError(f"condition not met within {timeout}s of sim time")
             self.advance(TICK)
+
+    def _claim_card_packs(self, device: SimulatedDevice) -> None:
+        """Bind ``aura_packs`` to *device*'s card if it carries one; raise if another card did."""
+        if device.card is None or not (device.card / _CARD_PACKS).is_dir():
+            return
+        carrier = self._card_packs_carrier
+        if carrier is None:
+            self._card_packs_carrier = device
+        elif carrier is not device:
+            raise ValueError(
+                f"{device.name}'s card carries aura_packs/, but {carrier.name}'s already does"
+            )
 
     def _aim(
         self,
@@ -253,6 +311,8 @@ class SimulatedDevice:
     it. The reset abandons the rest of the tick, and the device boots at once,
     within that same tick, into whatever its card names; it ticks the new
     scene from the next.
+    Its card is ``card``: a real directory, ``None`` when card-less, for a
+    test to write to between boots.
     A reboot carries over the card, the pins, the accelerometer and
     magnetometer readings, its aims, the IR and radio media, its radio node,
     and the recordings; game state is gone, outputs are dark and silent, and
@@ -266,10 +326,12 @@ class SimulatedDevice:
         name: str,
         scene: str,
         scene_data: dict[str, object],
-        sd_card: bool,
+        card: Path | None,
         radio_node: int,
     ) -> None:
         self.name = name
+        self.card = card
+        """The card's directory; ``None`` for a card-less device."""
         self.radio_node = radio_node
         """The node this device sends as: its place in add order, from 1."""
         self._sim = sim
@@ -277,14 +339,16 @@ class SimulatedDevice:
         self._scene_data = scene_data
         self._sim_hw = SimulatedHardware(
             now=lambda: sim.now,
-            config=_simulated_device_config(sd_card, radio_node),
+            config=_simulated_device_config(card is not None, radio_node),
             ir_sink=lambda emitter, pulses: sim._carry_ir(self, emitter, pulses),
             radio_sink=lambda payload: sim._carry_radio(self, payload),
+            card=None if card is None else str(card),
         )
         self._boot()
 
     def _boot(self) -> None:
         """Boot through ``build_scene_boot``, the boot ``run_scene`` uses."""
+        self._sim._claim_card_packs(self)
         scene, self._scene_tick = build_scene_boot(
             self._sim_hw.hw,
             {"default_scene": self._switched_on_into},

@@ -493,8 +493,8 @@ def test_a_declared_high_current_rail_boots_asserted():
 _PERSISTING = _config(**_MAGNETOMETER, accelerometer={}, sdcard={"cs": "GP9"})
 
 
-def test_a_reboot_rebuilds_the_outputs():
-    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_PERSISTING)
+def test_a_reboot_rebuilds_the_outputs(tmp_path):
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_PERSISTING, card=str(tmp_path))
     before = sim_hw.hw.outputs
 
     sim_hw.power_on()
@@ -502,8 +502,8 @@ def test_a_reboot_rebuilds_the_outputs():
     assert not set(map(id, before)) & set(map(id, sim_hw.hw.outputs))
 
 
-def test_the_card_survives_a_reboot():
-    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_PERSISTING)
+def test_the_card_survives_a_reboot(tmp_path):
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_PERSISTING, card=str(tmp_path))
     assert sim_hw.hw.storage is not None
     sim_hw.hw.storage.write_bytes("state.json", b"{}")
 
@@ -513,8 +513,30 @@ def test_the_card_survives_a_reboot():
     assert sim_hw.hw.storage.read_bytes("state.json") == b"{}"
 
 
-def test_the_sensors_keep_their_readings_through_a_reboot():
-    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_PERSISTING)
+def test_what_the_device_writes_lands_in_its_card_directory(tmp_path):
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_PERSISTING, card=str(tmp_path))
+    assert sim_hw.hw.storage is not None
+
+    sim_hw.hw.storage.write_bytes("state.json", b"{}")
+
+    assert (tmp_path / "state.json").read_bytes() == b"{}"
+
+
+def test_an_enabled_sdcard_section_with_no_card_directory_raises():
+    with pytest.raises(ValueError, match="card directory"):
+        SimulatedHardware(now=lambda: 0.0, config=_PERSISTING)
+
+
+def test_a_disabled_sdcard_section_needs_no_card_directory():
+    config = _config(sdcard={"cs": "GP9", "enabled": False})
+
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=config)
+
+    assert sim_hw.hw.storage is None
+
+
+def test_the_sensors_keep_their_readings_through_a_reboot(tmp_path):
+    sim_hw = SimulatedHardware(now=lambda: 0.0, config=_PERSISTING, card=str(tmp_path))
     sim_hw.accelerate(1.0, 2.0, 3.0)
     sim_hw.magnetize(4.0, 5.0, 6.0)
 
