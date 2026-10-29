@@ -41,14 +41,12 @@ def test_persisted_sd_scene_used_when_flash_default_is_absent(device_storage):
 
 
 def test_no_persisted_scene_falls_back_to_flash_default(device_storage):
-
     scene = resolve_boot_scene(device_storage, {"default_scene": "red_light_green_light"})
 
     assert scene == "red_light_green_light"
 
 
 def test_neither_persisted_nor_flash_scene_raises_naming_both_files(device_storage):
-
     with pytest.raises(ValueError, match=r"aura-state\.json.*aura-settings\.json"):
         resolve_boot_scene(device_storage, {})
 
@@ -70,7 +68,6 @@ def test_non_string_persisted_scene_falls_back_to_flash_default(device_storage):
 
 
 def test_non_string_flash_default_is_treated_as_absent_and_raises(device_storage):
-
     with pytest.raises(ValueError):
         resolve_boot_scene(device_storage, {"default_scene": 42})
 

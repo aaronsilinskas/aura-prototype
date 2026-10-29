@@ -5,20 +5,17 @@ root conftest, so a later inner test can observe what an earlier one's
 teardown left behind.
 """
 
-from pathlib import Path
 
-ROOT_CONFTEST = Path(__file__).resolve().parents[3] / "conftest.py"
-
-
-def _run_with_root_conftest(pytester, test_source: str):
-    pytester.makeconftest(ROOT_CONFTEST.read_text())
+def _run_with_root_conftest(pytester, pytestconfig, test_source: str):
+    pytester.makeconftest((pytestconfig.rootpath / "conftest.py").read_text())
     pytester.makepyfile(test_source)
     return pytester.runpytest("-p", "no:cacheprovider")
 
 
-def test_device_storage_is_rooted_at_a_card_directory_inside_tmp_path(pytester):
+def test_device_storage_is_rooted_at_a_card_directory_inside_tmp_path(pytester, pytestconfig):
     result = _run_with_root_conftest(
         pytester,
+        pytestconfig,
         """
         from pathlib import Path
 
@@ -31,9 +28,10 @@ def test_device_storage_is_rooted_at_a_card_directory_inside_tmp_path(pytester):
     result.assert_outcomes(passed=1)
 
 
-def test_a_card_pack_imported_during_a_test_is_evicted_after_it(pytester):
+def test_a_card_pack_imported_during_a_test_is_evicted_after_it(pytester, pytestconfig):
     result = _run_with_root_conftest(
         pytester,
+        pytestconfig,
         """
         import importlib
         import sys
