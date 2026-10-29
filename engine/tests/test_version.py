@@ -1,4 +1,7 @@
-"""Tests for engine.version.Version: strict parsing, str, and compatibility."""
+"""Tests for engine.version.Version: strict parsing and str.
+
+Pack compatibility is checked by the catalog; see ``test_pack_catalog.py``.
+"""
 
 from __future__ import annotations
 
@@ -54,27 +57,3 @@ def test_parse_raises_value_error_naming_non_string_value(bad: object) -> None:
         Version.parse(bad)
 
     assert str(bad) in str(excinfo.value)
-
-
-# ---------------------------------------------------------------------------
-# check_compatible
-# ---------------------------------------------------------------------------
-
-
-def test_check_compatible_accepts_equal_version() -> None:
-    Version(1, 2).check_compatible("basic", 1, 2)
-
-
-def test_check_compatible_accepts_newer_minor() -> None:
-    Version(1, 5).check_compatible("basic", 1, 2)
-
-
-def test_check_compatible_rejects_older_minor() -> None:
-    with pytest.raises(ValueError):
-        Version(1, 1).check_compatible("basic", 1, 2)
-
-
-@pytest.mark.parametrize("major", [0, 2])
-def test_check_compatible_rejects_different_major(major: int) -> None:
-    with pytest.raises(ValueError):
-        Version(major, 2).check_compatible("basic", 1, 2)

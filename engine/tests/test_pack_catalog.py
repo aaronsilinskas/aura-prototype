@@ -616,6 +616,23 @@ def test_a_declaration_failure_is_caught_as_a_scene_declaration_pack_scan_error(
 
 
 # ---------------------------------------------------------------------------
+# Moved from the PackRegistry suite
+# ---------------------------------------------------------------------------
+
+
+def test_the_scan_imports_no_item_module(pack_tree) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_tree.effect_pack(root, "basic", items={"glow": "BUILD = 1"})
+    pack_tree.rule_pack(root, "core", items={"tag": "RULE = 1"})
+    pack_tree.scene(root, "lobby", effects={"mist": "BUILD = 2"}, rules={"greet": "RULE = 2"})
+    known_before = set(sys.modules)
+
+    scan_pack_roots([str(root)])
+
+    assert set(sys.modules) - known_before == set()
+
+
+# ---------------------------------------------------------------------------
 # Initial-data overrides
 # ---------------------------------------------------------------------------
 
