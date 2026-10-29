@@ -25,7 +25,6 @@ __all__ = [
     "RadioConfig",
     "SDCardConfig",
     "SPIConfig",
-    "copy_with_enabled",
     "load_device_config",
     "parse_device_config",
     "read_device_config_mapping",
@@ -376,7 +375,7 @@ class NeoPixelCurrentBudgetConfig:
         self.at_min_brightness: int = at_min_brightness
 
 
-def copy_with_enabled(section: object, enabled: bool) -> object:
+def _copy_with_enabled(section: object, enabled: bool) -> object:
     """Return a copy of *section* with ``enabled`` forced to *enabled*.
 
     Reads every name in *section*'s ``__slots__`` off the instance via
@@ -389,10 +388,11 @@ def copy_with_enabled(section: object, enabled: bool) -> object:
     ``ir_transport`` builds ``IrTelemetrySnapshot`` the same way, by
     splatting slot-driven ``getattr`` reads.
 
-    ``isolate`` calls this with ``enabled=False`` to disable every component
-    but the one it keeps (#715). Nothing should force a section *on* this
-    way: that skips validation and the NeoPixel current budget. Set
-    ``enabled`` in the raw mapping and parse it again instead.
+    Private to ``isolate``, which calls it with ``enabled=False`` to disable
+    every component but the one it keeps (#715). Disabling only narrows, so
+    the copy stays within the NeoPixel current budget tuned at parse time.
+    Forcing a section *on* would skip validation and the budget: set
+    ``enabled`` in the raw mapping and parse it again instead (#1071).
 
     Args:
         section: A parsed, non-``None`` section instance (e.g. an
@@ -502,11 +502,11 @@ class DeviceConfig:
             if name in _ISOLATE_EXCLUDED_COMPONENTS or name == keep:
                 kwargs[name] = value
             elif name == "pixels":
-                kwargs[name] = [copy_with_enabled(entry, enabled=False) for entry in value]
+                kwargs[name] = [_copy_with_enabled(entry, enabled=False) for entry in value]
             elif value is None:
                 kwargs[name] = None
             else:
-                kwargs[name] = copy_with_enabled(value, enabled=False)
+                kwargs[name] = _copy_with_enabled(value, enabled=False)
         return DeviceConfig(**kwargs)
 
 

@@ -162,6 +162,22 @@ def test_isolate_carries_the_budget_through_and_never_offers_it_as_a_keep():
         config.isolate("neopixel_current_budget")
 
 
+def test_isolating_pixels_keeps_budgeted_strips_at_their_parse_time_tuned_brightness():
+    # 100 px @ 1.0 x 60 mA = 6000 mA against 2000 mA -> tuned to one third at
+    # parse; isolate narrows without re-budgeting or restoring the declared 1.0.
+    config = parse_device_config(
+        {
+            "pixels": [_strip("D5", 100, 1.0)],
+            "audio": {"i2s_bit_clock": "D1", "i2s_word_select": "D2", "i2s_data": "D3"},
+            "neopixel_current_budget": {"current_limit_ma": 2000},
+        }
+    )
+
+    isolated = config.isolate("pixels")
+
+    assert isolated.pixels[0].strips[0].brightness == pytest.approx(1 / 3)
+
+
 def test_strip_that_would_scale_below_the_floor_is_held_there_and_the_rest_absorb_the_cut():
     # #857's worked example: uniform scaling would put C at 0.056 < 0.1, so C is
     # held at 0.1 (600 mA) and A gets the remaining 1400 mA: 1400 / 6000.
