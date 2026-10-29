@@ -5,7 +5,7 @@ from effects.layers.layer import Layer
 from effects.level import clamp_level
 from effects.palette import Palette, PaletteLUT256
 from effects.shape import EffectShapeFunc, Shape
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 # fmt: off
 _LIGHTNING_PALETTE = bytes([  0,   0,   0,   0,

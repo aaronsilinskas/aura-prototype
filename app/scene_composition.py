@@ -34,6 +34,7 @@ except ImportError:
     pass  # collections.abc not available on all embedded runtimes
 
 __all__ = [
+    "SceneBoot",
     "SceneRuntime",
     "build_scene_boot",
     "build_scene_runtime",
@@ -74,6 +75,22 @@ class SceneRuntime:
         self.ir: InfraredTransceiver | None = ir
         self.radio: RadioTransceiver | None = radio
         self.namespace: ActiveSceneNamespace = namespace
+
+
+class SceneBoot:
+    """What ``build_scene_boot`` hands back: the booted scene, its tick and its runtime.
+
+    ``scene_name`` is the scene the device booted into, ``tick`` the per-tick
+    body to call once per tick, and ``runtime`` the live objects that body
+    drives (its ``namespace`` resolves names as the running game does).
+    """
+
+    __slots__ = ("runtime", "scene_name", "tick")
+
+    def __init__(self, scene_name: str, tick: Callable[[], None], runtime: SceneRuntime) -> None:
+        self.scene_name: str = scene_name
+        self.tick: Callable[[], None] = tick
+        self.runtime: SceneRuntime = runtime
 
 
 _TELEMETRY_PRINT_INTERVAL = 1.0  # seconds
@@ -205,8 +222,8 @@ def build_scene_boot(
     timer: Timer | None = None,
     logger: Logger | None = None,
     scene_data: dict[str, dict[str, object]] | None = None,
-) -> tuple[str, Callable[[], None], ActiveSceneNamespace]:
-    """Boot *hw* into its boot scene; return its name, per-tick body and namespace.
+) -> SceneBoot:
+    """Boot *hw* into its boot scene; return its name, per-tick body and runtime.
 
     The one boot shared by the device (:func:`app.scene_runtime.run_scene`)
     and the Simulated device, as :func:`build_scene_tick` is their one tick.
@@ -217,8 +234,8 @@ def build_scene_boot(
     *scene_data* maps a scene name to tunables merged over its
     ``initial_data``; the Simulated device boots shortened scenes through it.
 
-    The namespace is the runtime's own Active scene namespace, so the
-    Simulated device can resolve a clip name exactly as the game does.
+    The runtime's ``namespace`` is the game's own Active scene namespace, so
+    the Simulated device can resolve a clip name exactly as the game does.
     """
     catalog = scan_boot_pack_catalog(hw.storage, scene_data)
     scene_registry = catalog.scene_registry
@@ -229,7 +246,7 @@ def build_scene_boot(
         hw.storage, booted_scene=scene_name, reset=reset, logger=logger
     )
     runtime = build_scene_runtime(hw, scene_name, catalog, scene_reboot=scene_reboot, timer=timer)
-    return scene_name, build_scene_tick(hw, runtime), runtime.namespace
+    return SceneBoot(scene_name, build_scene_tick(hw, runtime), runtime)
 
 
 def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], None]:

@@ -16,7 +16,7 @@ from effects.effect import (
     EffectAudio,
     EffectConfig,
 )
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 _READY_SHOTS_AUDIO = EffectAudio(
     clips={

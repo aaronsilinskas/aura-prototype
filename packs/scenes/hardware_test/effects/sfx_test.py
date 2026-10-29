@@ -6,7 +6,7 @@ from effects.effect import (
     EffectHaptic,
     HapticPattern,
 )
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 _SFX_TEST_AUDIO = EffectAudio(
     clips={"start": AudioPlaybackConfig(name="scene.sfx_test_start", loop=False)}

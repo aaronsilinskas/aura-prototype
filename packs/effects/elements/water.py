@@ -5,7 +5,7 @@ from effects.layers.scroll import PhaseScroll
 from effects.layers.scroll_layer import ScrollLayer
 from effects.level import clamp_level, level_lerp
 from effects.palette import PaletteLUT256
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 # fmt: off
 _water_palette = bytes([0, 0, 0, 64,

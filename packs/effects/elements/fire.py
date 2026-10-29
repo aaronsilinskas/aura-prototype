@@ -3,7 +3,7 @@ from effects.layers.flame_layer import FlameLayer
 from effects.layers.renderer import LayerRenderer
 from effects.level import clamp_level, level_lerp
 from effects.palette import PaletteLUT256
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 # fmt: off
 _fire_palette = bytes([0, 32, 0, 0,

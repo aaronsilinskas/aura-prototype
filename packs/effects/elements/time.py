@@ -7,7 +7,7 @@ from effects.layers.shape_layer import ShapeLayer
 from effects.level import clamp_level, level_lerp
 from effects.palette import PaletteLUT256
 from effects.shape import Shape
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 # fmt: off
 _GRAYSCALE_PALETTE = bytes([  0,   0,   0,   0,

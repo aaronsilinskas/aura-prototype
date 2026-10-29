@@ -7,7 +7,7 @@ from effects.level import clamp_level, level_lerp
 from effects.palette import PaletteLUT256
 from effects.shape import EffectShapeFunc, Shape
 from effects.value import lerp
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 # fmt: off
 _AIR_PALETTE = bytes([

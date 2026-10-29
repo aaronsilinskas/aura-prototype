@@ -16,7 +16,7 @@ from effects.effect import (
     EffectHaptic,
     HapticPattern,
 )
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 _RELOAD_COMPLETE_AUDIO = EffectAudio(
     clips={

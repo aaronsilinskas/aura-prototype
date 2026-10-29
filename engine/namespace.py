@@ -8,6 +8,8 @@ Hardware must not import this module (import-linter enforces it).
 from __future__ import annotations
 
 __all__ = [
+    "CLIP",
+    "EFFECT",
     "ActiveSceneNamespace",
     "MissingPrefixError",
     "NoActiveSceneError",
@@ -19,13 +21,17 @@ try:
 except ImportError:
     TYPE_CHECKING = False
 
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 from engine.packs import PackRegistry, RegistryError, UnknownItemError, UnknownPackError
 
 if TYPE_CHECKING:
     from engine.scene import SceneLocalRegistry
 
 _SCENE_PREFIX = "scene"
+
+# The kinds of name the namespace resolves; each error's ``kind`` is one of these.
+EFFECT = "effect"
+CLIP = "clip"
 
 
 class NoActiveSceneError(RegistryError):
@@ -117,22 +123,22 @@ class ActiveSceneNamespace:
             ItemTypeError, MissingItemAttributeError: the item's ``BUILD`` is
                 bad or missing; propagated unchanged from the registry.
         """
-        pack_name, item_name = self._split(name, "effect")
+        pack_name, item_name, declared_packs = self._split(name, EFFECT)
         if pack_name == _SCENE_PREFIX:
             local_effects = self._local_effects
             if local_effects is None:
-                raise UnknownItemError(item_name, [], name=name, kind="effect")
+                raise UnknownItemError(item_name, [], name=name, kind=EFFECT)
             try:
                 builder = local_effects.get(item_name, EffectBuilder)
             except UnknownItemError as exc:
-                raise UnknownItemError(item_name, exc.available, name=name, kind="effect") from exc
+                raise UnknownItemError(item_name, exc.available, name=name, kind=EFFECT) from exc
         else:
-            self._check_pack(name, "effect", pack_name)
+            self._check_pack(name, EFFECT, pack_name, declared_packs)
             try:
                 builder = self._effect_registry.get(pack_name, item_name, EffectBuilder)
             except UnknownItemError as exc:
                 raise UnknownItemError(
-                    item_name, exc.available, pack_name=pack_name, name=name, kind="effect"
+                    item_name, exc.available, pack_name=pack_name, name=name, kind=EFFECT
                 ) from exc
         return builder, pack_name, item_name
 
@@ -152,35 +158,39 @@ class ActiveSceneNamespace:
             UnknownItemError: the scene or the pack has no such clip. A pack
                 with no sounds is still known, so it lands here too.
         """
-        pack_name, item_name = self._split(name, "clip")
+        pack_name, item_name, declared_packs = self._split(name, CLIP)
         if pack_name == _SCENE_PREFIX:
             path = self._local_sounds.get(item_name)
             if path is None:
-                raise UnknownItemError(
-                    item_name, sorted(self._local_sounds), name=name, kind="clip"
-                )
+                raise UnknownItemError(item_name, sorted(self._local_sounds), name=name, kind=CLIP)
             return path
-        self._check_pack(name, "clip", pack_name)
+        self._check_pack(name, CLIP, pack_name, declared_packs)
         path = self._pack_sounds.get(name)
         if path is None:
             prefix = pack_name + "."
             available = sorted(k[len(prefix) :] for k in self._pack_sounds if k.startswith(prefix))
-            raise UnknownItemError(
-                item_name, available, pack_name=pack_name, name=name, kind="clip"
-            )
+            raise UnknownItemError(item_name, available, pack_name=pack_name, name=name, kind=CLIP)
         return path
 
-    def _split(self, name: str, kind: str) -> tuple[str, str]:
-        """Split *name* into ``(prefix, item)``, failing before any scene check."""
+    def _split(self, name: str, kind: str) -> tuple[str, str, frozenset[str]]:
+        """Split *name* into ``(prefix, item, declared_packs)`` for the installed scene.
+
+        Raises ``MissingPrefixError`` for a name with no prefix, checked first
+        so it fails even before any install, then ``NoActiveSceneError`` when
+        no scene is installed.
+        """
         if "." not in name:
             raise MissingPrefixError(name, kind)
-        if self._declared_packs is None:
+        declared_packs = self._declared_packs
+        if declared_packs is None:
             raise NoActiveSceneError(name, kind)
         pack_name, item_name = name.split(".", 1)
-        return pack_name, item_name
+        return pack_name, item_name, declared_packs
 
-    def _check_pack(self, name: str, kind: str, pack_name: str) -> None:
+    def _check_pack(
+        self, name: str, kind: str, pack_name: str, declared_packs: frozenset[str]
+    ) -> None:
         if pack_name not in self._known_packs:
             raise UnknownPackError(pack_name, name=name, kind=kind)
-        if pack_name not in self._declared_packs:
+        if pack_name not in declared_packs:
             raise UndeclaredPackError(name, kind, pack_name)

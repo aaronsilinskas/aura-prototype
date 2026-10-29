@@ -1,6 +1,6 @@
 from effects.effect import Effect, EffectConfig
 from effects.layers.progress_layer import ProgressLayer
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 from packs.effects.basic.helpers.progress_effect import ProgressEffect
 
 

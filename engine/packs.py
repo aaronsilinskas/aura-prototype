@@ -29,8 +29,8 @@ class UnknownPackError(RegistryError):
 
     Raised by ``PackRegistry.get`` and ``items``, and by the Active scene
     namespace, which also passes the qualified *name* it was resolving and its
-    *kind* (``"effect"`` or ``"clip"``). Both stay ``None`` for a registry
-    lookup, which keeps the plain wording.
+    *kind* (``engine.namespace.EFFECT`` or ``CLIP``). Both stay ``None`` for a
+    registry lookup, which keeps the plain wording.
     """
 
     def __init__(self, pack_name: str, name: str | None = None, kind: str | None = None) -> None:
@@ -50,8 +50,9 @@ class UnknownItemError(RegistryError):
     Shared by ``PackRegistry.get`` (where *pack_name* names the owning pack)
     and ``SceneLocalRegistry.get`` (where *pack_name* is ``None`` — scene-local
     items have no pack namespace). The Active scene namespace also passes the
-    qualified *name* it was resolving and its *kind* (``"effect"`` or
-    ``"clip"``); both stay ``None`` for a registry lookup.
+    qualified *name* it was resolving and its *kind*
+    (``engine.namespace.EFFECT`` or ``CLIP``); both stay ``None`` for a
+    registry lookup.
     """
 
     def __init__(

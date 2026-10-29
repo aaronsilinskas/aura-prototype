@@ -2,10 +2,11 @@ from unittest.mock import ANY
 
 import pytest
 
-from engine.effects.manager import EffectBuilder, EffectManager
+from engine.effects.builder import EffectBuilder
+from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.events import EffectEvent
-from engine.namespace import ActiveSceneNamespace, MissingPrefixError, UndeclaredPackError
+from engine.namespace import CLIP, ActiveSceneNamespace, MissingPrefixError, UndeclaredPackError
 from engine.pack_catalog import PackCatalog
 from engine.packs import PackRegistry, UnknownItemError
 from engine.state import Scope
@@ -915,6 +916,18 @@ def test_failed_set_effect_adds_no_effect(pack_tree) -> None:
     ]
 
 
+def test_failed_set_effect_takes_no_receipt_id(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+    first = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+
+    with pytest.raises(UnknownItemError):
+        manager.set_effect(Scope.PERSONAL, "stub.missing", {})
+    second = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+
+    assert second.id == first.id + 1
+
+
 # ---------------------------------------------------------------------------
 # Clips resolve when the effect is built (#1116)
 # ---------------------------------------------------------------------------
@@ -1024,7 +1037,7 @@ def test_misspelled_clip_raises_from_set_effect_on_any_verb(pack_tree, verb) -> 
     with pytest.raises(UnknownItemError) as exc_info:
         manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
 
-    assert (exc_info.value.name, exc_info.value.kind) == ("sfx.bomm", "clip")
+    assert (exc_info.value.name, exc_info.value.kind) == ("sfx.bomm", CLIP)
 
 
 def test_misspelled_clip_on_a_custom_verb_leaves_the_scope_unchanged(pack_tree) -> None:
@@ -1391,7 +1404,7 @@ def test_effect_with_renders_pixels_false_skips_buffer_allocation(pack_tree) -> 
             "nopix": {
                 "event": (
                     "from effects.effect import Effect, EffectConfig\n"
-                    "from engine.effects.manager import EffectBuilder\n"
+                    "from engine.effects.builder import EffectBuilder\n"
                     "class _Builder(EffectBuilder):\n"
                     "    def __call__(self, name, config): return Effect(name=name)\n"
                     "BUILD = _Builder()\n"
@@ -1414,7 +1427,7 @@ def test_effect_with_renders_pixels_false_skips_update_pixels_but_calls_flush(pa
             "nopix": {
                 "event": (
                     "from effects.effect import Effect, EffectConfig\n"
-                    "from engine.effects.manager import EffectBuilder\n"
+                    "from engine.effects.builder import EffectBuilder\n"
                     "class _Builder(EffectBuilder):\n"
                     "    def __call__(self, name, config): return Effect(name=name)\n"
                     "BUILD = _Builder()\n"
