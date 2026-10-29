@@ -406,10 +406,10 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     (:func:`app.scene_runtime.run_scene`, which adds only ``while True:`` and
     ``gc.collect()``) and the Simulated device, so neither copies it, as
     both share the boot that builds it (:func:`build_scene_boot`). Build it
-    once per runtime: the ``InputEvents.Sensors`` event, its button and
-    magnetic buffers, and the telemetry gate are allocated here (the
-    acceleration buffer is the accelerometer
-    :class:`~hardware.shared.polled_sensor.PolledSensor`'s own ``reading``)
+    once per runtime: the ``InputEvents.Sensors`` event, its button buffer,
+    and the telemetry gate are allocated here (the acceleration and magnetic
+    buffers are each sensor's own
+    :class:`~hardware.shared.polled_sensor.PolledSensor` ``reading``)
     and mutated in place every tick, so the steady-state tick allocates
     nothing on-device.
 
@@ -421,9 +421,10 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     magnetometer = hw.magnetometer
     button_data = ButtonData({})
     acceleration = accelerometer.reading if accelerometer is not None else None
-    # Narrow PolledSensor.reading, typed as either buffer, to the acceleration one.
+    magnetic = magnetometer.reading if magnetometer is not None else None
+    # Narrow each PolledSensor.reading, typed as either buffer, to the one it holds.
     assert acceleration is None or isinstance(acceleration, AccelerationData)
-    magnetic = MagneticData(0.0, 0.0, 0.0) if magnetometer is not None else None
+    assert magnetic is None or isinstance(magnetic, MagneticData)
     input_event = InputEvents.Sensors(button_data, acceleration, magnetic)
     manager = runtime.manager
     effect_manager = runtime.effect_manager
@@ -440,14 +441,8 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
         if accelerometer is not None:
             accelerometer.update()
 
-        if magnetic is not None:
-            try:
-                mx, my, mz = magnetometer.magnetic
-                magnetic.x = mx
-                magnetic.y = my
-                magnetic.z = mz
-            except Exception:
-                pass  # keep last good values; None signals missing hardware, not read failure
+        if magnetometer is not None:
+            magnetometer.update()
 
         # Unconditional, before the active_state check: a send can be in
         # flight across a scene transition, and ir.update() always pumps so

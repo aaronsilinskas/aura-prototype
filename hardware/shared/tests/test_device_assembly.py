@@ -124,11 +124,13 @@ def test_a_sensor_section_is_built_with_its_config_on_the_i2c_bus(section, field
     assert getattr(hw, field) is not None
 
 
-def test_an_enabled_accelerometer_reads_zero_before_its_first_update():
-    hw, _parts = _assemble(_config(accelerometer={}))
+@pytest.mark.parametrize("sensor", ["accelerometer", "magnetometer"])
+def test_an_enabled_sensor_reads_zero_before_its_first_update(sensor):
+    hw, _parts = _assemble(_config(**{sensor: {}}))
 
-    assert hw.accelerometer is not None
-    reading = hw.accelerometer.reading
+    polled = getattr(hw, sensor)
+    assert polled is not None
+    reading = polled.reading
     assert (reading.x, reading.y, reading.z) == (0.0, 0.0, 0.0)
 
 
@@ -140,6 +142,16 @@ def test_an_enabled_accelerometer_section_is_a_polled_sensor_reading_its_part():
     hw.accelerometer.update()
     reading = hw.accelerometer.reading
     assert (reading.x, reading.y, reading.z) == (1.0, 2.0, 3.0)
+
+
+def test_an_enabled_magnetometer_section_is_a_polled_sensor_reading_its_part():
+    hw, parts = _assemble(_config(magnetometer={}))
+    parts.magnetic = (4.0, 5.0, 6.0)
+
+    assert isinstance(hw.magnetometer, PolledSensor)
+    hw.magnetometer.update()
+    reading = hw.magnetometer.reading
+    assert (reading.x, reading.y, reading.z) == (4.0, 5.0, 6.0)
 
 
 def test_haptics_are_built_with_their_config_on_the_i2c_bus():

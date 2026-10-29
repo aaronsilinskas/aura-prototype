@@ -268,8 +268,8 @@ class SimulatedParts(DeviceParts):
 
     The parts built fresh this boot are kept here for the device's scripting
     helpers to reach: ``strips``, ``audio``, ``ir_readers``, ``ir_emitters``
-    (in the order wired) and ``radio``; ``scripted_accelerometer`` is the one
-    kept across reboots.
+    (in the order wired) and ``radio``; ``scripted_accelerometer`` and
+    ``scripted_magnetometer`` are kept across reboots.
     """
 
     def __init__(self, device: SimulatedHardware, previous: SimulatedParts | None = None) -> None:
@@ -316,10 +316,18 @@ class SimulatedParts(DeviceParts):
         scripted = self._kept.accelerometer
         return lambda: scripted.acceleration
 
-    def magnetometer(self, magnetometer: I2CDeviceConfig, i2c: object) -> object:
+    @property
+    def scripted_magnetometer(self) -> SimulatedMagnetometer | None:
+        """The magnetometer the device scripts; ``None`` until a boot first builds one."""
+        return self._kept.magnetometer
+
+    def magnetometer(
+        self, magnetometer: I2CDeviceConfig, i2c: object
+    ) -> Callable[[], tuple[float, float, float]]:
         if self._kept.magnetometer is None:
             self._kept.magnetometer = SimulatedMagnetometer()
-        return self._kept.magnetometer
+        scripted = self._kept.magnetometer
+        return lambda: scripted.magnetic
 
     def audio_output(
         self,

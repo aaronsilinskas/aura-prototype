@@ -16,6 +16,7 @@ except ImportError:
 if TYPE_CHECKING:
     from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
     from adafruit_lis3dh import LIS3DH_I2C
+    from adafruit_mmc56x3 import MMC5603
 
     from hardware.circuitpython.audio_output import AudioEffectOutput
     from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
@@ -153,7 +154,7 @@ _MAGNETOMETER_PROBE_ATTEMPTS: Final = 20
 _MAGNETOMETER_PROBE_INTERVAL_S: Final = 0.005
 
 
-def _setup_magnetometer(i2c: busio.I2C, address: int | None = None) -> object:
+def _setup_magnetometer(i2c: busio.I2C, address: int | None = None) -> MMC5603:
     """Return an MMC5603 on *i2c*, free-running in continuous mode.
 
     The MMC5603 boots in one-shot mode, where each ``.magnetic`` read
@@ -292,8 +293,11 @@ class CircuitPythonParts(DeviceParts):
         chip = _setup_accelerometer(i2c, accelerometer.address)
         return lambda: chip.acceleration
 
-    def magnetometer(self, magnetometer: I2CDeviceConfig, i2c: busio.I2C) -> object:
-        return _setup_magnetometer(i2c, magnetometer.address)
+    def magnetometer(
+        self, magnetometer: I2CDeviceConfig, i2c: busio.I2C
+    ) -> Callable[[], tuple[float, float, float]]:
+        chip = _setup_magnetometer(i2c, magnetometer.address)
+        return lambda: chip.magnetic
 
     def haptic_output(self, haptics: I2CDeviceConfig, i2c: busio.I2C) -> Drv2605EffectOutput:
         driver = _setup_drv2605(i2c, haptics.address)

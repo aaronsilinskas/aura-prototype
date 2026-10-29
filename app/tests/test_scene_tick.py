@@ -8,7 +8,7 @@ from app.scene_composition import (
     scan_boot_scene_registry,
 )
 from engine.events import Event
-from engine.input import AccelerationData, ButtonData, InputEvents
+from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.network import LINE, NetworkEvents
 from engine.tests.helpers import SpyNetworkControls
 from engine.timer import Timer
@@ -109,29 +109,11 @@ def test_ticks_reuse_one_sensors_event_and_button_buffer_instead_of_allocating()
     assert all(event.buttons is first.buttons for event in rest)
 
 
-class _Sensor:
-    """Raw sensor stand-in: ``read`` replays scripted readings, where an
-    Exception entry makes that read raise; ``magnetic`` reads the same way, as
-    the magnetometer chip does."""
-
-    def __init__(self, *readings) -> None:
-        self._readings = list(readings)
-
-    def read(self):
-        reading = self._readings.pop(0)
-        if isinstance(reading, Exception):
-            raise reading
-        return reading
-
-    magnetic = property(read)
-
-
-def _accelerometer(*readings) -> PolledSensor:
-    return PolledSensor(_Sensor(*readings).read, AccelerationData(0.0, 0.0, 0.0))
-
-
 def test_the_sensors_event_carries_the_latest_accelerometer_and_magnetometer_readings():
-    hw = _hw(accelerometer=_accelerometer((1.0, 2.0, 3.0)), magnetometer=_Sensor((4.0, 5.0, 6.0)))
+    hw = _hw(
+        accelerometer=PolledSensor(lambda: (1.0, 2.0, 3.0), AccelerationData(0.0, 0.0, 0.0)),
+        magnetometer=PolledSensor(lambda: (4.0, 5.0, 6.0), MagneticData(0.0, 0.0, 0.0)),
+    )
     runtime = _runtime(hw)
     tick = build_scene_tick(hw, runtime)
 
@@ -139,18 +121,6 @@ def test_the_sensors_event_carries_the_latest_accelerometer_and_magnetometer_rea
 
     event = _sensors(runtime)[0]
     assert (event.acceleration.x, event.acceleration.y, event.acceleration.z) == (1.0, 2.0, 3.0)
-    assert (event.magnetic.x, event.magnetic.y, event.magnetic.z) == (4.0, 5.0, 6.0)
-
-
-def test_a_failed_magnetometer_read_keeps_the_last_good_reading():
-    hw = _hw(magnetometer=_Sensor((4.0, 5.0, 6.0), OSError("i2c")))
-    runtime = _runtime(hw)
-    tick = build_scene_tick(hw, runtime)
-
-    tick()
-    tick()
-
-    event = _sensors(runtime)[-1]
     assert (event.magnetic.x, event.magnetic.y, event.magnetic.z) == (4.0, 5.0, 6.0)
 
 

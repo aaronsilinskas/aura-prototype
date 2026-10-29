@@ -36,14 +36,10 @@ class DeviceHardware:
     ``AudioEffectOutput`` resolves clips through — ``None`` on a device with
     no ``audio`` section declared and enabled.
 
-    ``accelerometer`` is the
-    :class:`~hardware.shared.polled_sensor.PolledSensor` that owns the
-    acceleration reading — ``None`` on a device with no ``accelerometer`` section declared
-    and enabled, which is distinct from a failed read.
-
-    ``magnetometer`` is typed ``object | None`` (no concrete driver import
-    here) — ``None`` on a device with no ``magnetometer`` section declared
-    and enabled.
+    ``accelerometer`` and ``magnetometer`` are each the
+    :class:`~hardware.shared.polled_sensor.PolledSensor` that owns that
+    sensor's reading — ``None`` on a device with no such section declared and
+    enabled, which is distinct from a failed read.
     """
 
     __slots__ = (
@@ -63,7 +59,7 @@ class DeviceHardware:
         outputs: list[EffectOutput],
         buttons: DebouncedButtons,
         accelerometer: PolledSensor | None,
-        magnetometer: object | None,
+        magnetometer: PolledSensor | None,
         network_controls: NetworkControls,
         ir: InfraredTransceiver | None,
         radio: RadioTransceiver | None,
@@ -73,7 +69,7 @@ class DeviceHardware:
         self.outputs: list[EffectOutput] = outputs
         self.buttons: DebouncedButtons = buttons
         self.accelerometer: PolledSensor | None = accelerometer
-        self.magnetometer: object | None = magnetometer
+        self.magnetometer: PolledSensor | None = magnetometer
         self.network_controls: NetworkControls = network_controls
         self.ir: InfraredTransceiver | None = ir
         self.radio: RadioTransceiver | None = radio
