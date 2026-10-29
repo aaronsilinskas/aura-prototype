@@ -1406,8 +1406,8 @@ def test_parse_audio_non_integer_voices_raises_value_error(matrix_config):
 def test_parse_audio_section_with_no_clips_key_succeeds_and_carries_no_clips_attribute(
     matrix_config,
 ):
-    """AudioConfig no longer carries a clips map (#804) -- clip resolution moved
-    to AudioRegistry -- so a clips-free audio section parses with
+    """AudioConfig no longer carries a clips map (#804) -- clip names resolve
+    through the Active scene namespace -- so a clips-free audio section parses with
     voices/max_volume/I2S validation unaffected."""
     result = parse_device_config(matrix_config)
 
@@ -1548,9 +1548,9 @@ def test_committed_sample_device_config_matrix_and_magnetometer_no_longer_collid
 
 
 def test_committed_sample_device_config_carries_no_clips_map():
-    """hardware_test's sfx_test clip now resolves via AudioRegistry's
-    hardware_test/sounds/sfx_test_start.wav scene overlay (#804), not a
-    device-config clips map."""
+    """hardware_test's sfx_test clip resolves to its scene-local
+    hardware_test/sounds/sfx_test_start.wav (#804), not a device-config
+    clips map."""
     mapping = read_device_config_mapping(str(_SAMPLE_CONFIG_PATH))
 
     assert "clips" not in mapping["audio"]

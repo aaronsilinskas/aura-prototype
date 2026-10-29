@@ -109,8 +109,7 @@ def test_a_config_disabling_every_gated_section_builds_no_optional_hardware():
         hw.ir,
         hw.radio,
         hw.storage,
-        hw.audio_registry,
-    ) == ([], None, None, None, None, None, None)
+    ) == ([], None, None, None, None, None)
 
 
 @pytest.mark.parametrize(
@@ -179,10 +178,9 @@ def test_haptics_are_built_with_their_config_on_the_i2c_bus():
     assert (haptics_config.address, bus.kind) == (0x5B, "i2c")
 
 
-def test_disabled_audio_builds_no_registry_and_no_audio_output():
+def test_disabled_audio_builds_no_audio_output():
     hw, _parts = _assemble(_config(pixels=[_NEOPIXEL], audio=_disabled(_AUDIO)))
 
-    assert hw.audio_registry is None
     assert [cast(Output, output).part for output in hw.outputs] == ["neopixel_strip"]
 
 
@@ -721,11 +719,10 @@ def test_outputs_are_pixels_then_audio_then_haptics():
     ]
 
 
-def test_the_audio_registry_is_the_one_the_audio_output_resolves_through():
-    hw, parts = _assemble(_config(audio=_AUDIO))
+def test_the_audio_output_is_built_on_the_configured_i2s_pins():
+    _hw, parts = _assemble(_config(audio=_AUDIO))
 
-    ((_audio, registry, *pins),) = parts.args_of("audio_output")
-    assert hw.audio_registry is registry
+    ((_audio, *pins),) = parts.args_of("audio_output")
     assert pins == [
         PinRef("GP10", "audio.i2s_bit_clock"),
         PinRef("GP11", "audio.i2s_word_select"),
@@ -751,5 +748,4 @@ def test_a_bare_config_builds_no_optional_hardware():
         hw.ir,
         hw.radio,
         hw.storage,
-        hw.audio_registry,
-    ) == ([], None, None, None, None, None, None)
+    ) == ([], None, None, None, None, None)

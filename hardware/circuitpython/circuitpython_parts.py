@@ -30,7 +30,6 @@ import busio
 import digitalio
 import microcontroller
 
-from engine.audio import AudioRegistry
 from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
@@ -309,7 +308,6 @@ class CircuitPythonParts(DeviceParts):
     def audio_output(
         self,
         audio: AudioConfig,
-        registry: AudioRegistry,
         bit_clock: PinRef,
         word_select: PinRef,
         data: PinRef,
@@ -318,7 +316,6 @@ class CircuitPythonParts(DeviceParts):
         from hardware.circuitpython.audio_output import AudioEffectOutput
 
         return AudioEffectOutput(
-            registry,
             max_volume=audio.max_volume,
             num_voices=audio.voices,
             i2s_bit_clock=self._pin(bit_clock),

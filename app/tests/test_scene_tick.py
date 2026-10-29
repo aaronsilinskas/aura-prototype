@@ -10,7 +10,9 @@ from app.scene_composition import (
 from engine.events import Event
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
+from engine.namespace import ActiveSceneNamespace
 from engine.network import LINE, NetworkEvents
+from engine.packs import PackRegistry
 from engine.tests.helpers import SpyNetworkControls
 from engine.timer import Timer
 from hardware.shared.debounced_buttons import DebouncedButtons
@@ -29,7 +31,6 @@ def _hw(buttons=None, accelerometer=None, magnetometer=None, ir=None, radio=None
         ir=ir,
         radio=radio,
         storage=None,
-        audio_registry=None,
     )
 
 
@@ -73,6 +74,7 @@ def _runtime(hw: DeviceHardware, active: bool = True) -> SceneRuntime:
         timer=timer,
         ir=hw.ir,
         radio=hw.radio,
+        namespace=ActiveSceneNamespace(PackRegistry(), {}),
     )
 
 

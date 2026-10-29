@@ -15,7 +15,6 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
     ir = "fake-ir"
     radio = "fake-radio"
     storage = "fake-storage"
-    audio_registry = "fake-audio-registry"
 
     hardware = DeviceHardware(
         outputs=outputs,
@@ -26,7 +25,6 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
         ir=ir,
         radio=radio,
         storage=storage,
-        audio_registry=audio_registry,
     )
 
     assert hardware.outputs is outputs
@@ -37,7 +35,6 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
     assert hardware.ir is ir
     assert hardware.radio is radio
     assert hardware.storage is storage
-    assert hardware.audio_registry is audio_registry
 
 
 def test_device_hardware_rejects_attributes_outside_its_slots():
@@ -50,7 +47,6 @@ def test_device_hardware_rejects_attributes_outside_its_slots():
         ir=None,
         radio=None,
         storage=None,
-        audio_registry=None,
     )
 
     with pytest.raises(AttributeError):

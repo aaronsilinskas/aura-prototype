@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from engine.audio import AudioOverlayAdmin
 from engine.engine import GameEngine
 from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog
@@ -108,25 +107,6 @@ class RecordingNamespace(ActiveSceneNamespace):
         super().install(local_effects, local_sounds, declared_packs)
 
 
-class SpyAudioOverlayAdmin(AudioOverlayAdmin):
-    """Test recorder for the scene-transition ``AudioOverlayAdmin`` face.
-
-    Records every ``set_scene_sounds``/``set_allowed_packs`` push so
-    ``SceneManager`` transition tests can assert on them without wiring a
-    real ``AudioRegistry``.
-    """
-
-    def __init__(self) -> None:
-        self.scene_sounds_history: list[dict[str, str] | None] = []
-        self.allowed_packs_history: list[frozenset[str] | None] = []
-
-    def set_scene_sounds(self, sounds: dict[str, str] | None) -> None:
-        self.scene_sounds_history.append(sounds)
-
-    def set_allowed_packs(self, names: frozenset[str] | None) -> None:
-        self.allowed_packs_history.append(names)
-
-
 class RecordingSceneReboot(SceneReboot):
     """Test recorder for the board-free ``SceneReboot`` port.
 
@@ -162,7 +142,6 @@ def make_scene_manager(
     engine: GameEngine | None = None,
     effect_admin: SpyEffectAdmin | None = None,
     namespace: ActiveSceneNamespace | None = None,
-    audio_overlay_admin: SpyAudioOverlayAdmin | None = None,
 ) -> SceneManager:
     """Construct a ``SceneManager`` over *catalog*'s registries, with spies for every port."""
     return SceneManager(
@@ -172,6 +151,5 @@ def make_scene_manager(
         catalog.scene_registry,
         effect_admin or SpyEffectAdmin(),
         namespace or RecordingNamespace(),
-        audio_overlay_admin or SpyAudioOverlayAdmin(),
         RecordingSceneReboot(),
     )

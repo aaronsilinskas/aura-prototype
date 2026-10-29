@@ -46,7 +46,7 @@ def run_scene() -> None:
     hw_logger = Logger("[hw]")
     hw = build_hardware(load_device_config(), logger=hw_logger)
 
-    _scene_name, tick = build_scene_boot(
+    _scene_name, tick, _namespace = build_scene_boot(
         hw, read_settings_mapping(), reset=microcontroller.reset, logger=hw_logger
     )
 

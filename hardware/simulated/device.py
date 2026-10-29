@@ -45,7 +45,6 @@ from hardware.simulated.simulated_parts import (
     SimulatedMagnetometer,
     SimulatedParts,
     SimulatedRadioTransport,
-    wav_length,
 )
 
 __all__ = [
@@ -246,16 +245,10 @@ class SimulatedHardware:
         readers = self._parts.ir_readers
         return next((i for i, reader in enumerate(readers) if reader is best), None)
 
-    def clip_length(self, clip: str) -> float:
-        """Seconds *clip* plays for, read from the WAV header it plays from."""
-        registry = self.hw.audio_registry
-        if registry is None:
-            raise ValueError("the config declares no audio")
-        return wav_length(registry.path(clip))
-
-    def is_playing(self, clip: str) -> bool:
+    def is_playing(self, path: str) -> bool:
+        """Whether the clip at *path* is playing or looping now."""
         audio = self._parts.audio
-        return audio is not None and audio.is_clip_playing(clip)
+        return audio is not None and audio.is_path_playing(path)
 
     def registered(self, button: str) -> bool:
         """Whether every scheduled change of *button* has landed and the debouncer reads it.

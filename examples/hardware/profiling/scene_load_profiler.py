@@ -118,7 +118,7 @@ from __future__ import annotations
 
 import gc
 
-from app.scene_composition import install_pack_sounds, scan_boot_pack_catalog
+from app.scene_composition import scan_boot_pack_catalog
 from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
@@ -194,7 +194,6 @@ def _build_prop(scene_name: str, config: DeviceConfig) -> tuple[SceneManager, Ef
         scene_registry,
         effect_admin=effect_manager,
         namespace=namespace,
-        audio_overlay_admin=install_pack_sounds(hw, catalog),
         scene_reboot=SceneReboot(),
     )
     gc.collect()

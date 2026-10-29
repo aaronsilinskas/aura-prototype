@@ -17,8 +17,13 @@ from typing import ClassVar
 
 import pytest
 
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectHaptic, HapticPattern
-from engine.audio import AudioRegistry
+from effects.effect import (
+    AudioPlaybackConfig,
+    Effect,
+    EffectHaptic,
+    HapticPattern,
+    ResolvedClip,
+)
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
@@ -729,22 +734,20 @@ def _mixer() -> _FakeMixer:
 def test_audio_output_plays_through_an_i2s_amp_on_the_referenced_pins(audio_stack: None) -> None:
     board = _board("GP10", "GP11", "GP12")
 
-    CircuitPythonParts(board).audio_output(_audio(), AudioRegistry(), *_I2S_PINS)
+    CircuitPythonParts(board).audio_output(_audio(), *_I2S_PINS)
 
     assert _amp().pins == (board.GP10, board.GP11, board.GP12)
 
 
 def test_audio_output_mixes_as_many_voices_as_configured(audio_stack: None) -> None:
-    CircuitPythonParts(_board("GP10", "GP11", "GP12")).audio_output(
-        _audio(voices=3), AudioRegistry(), *_I2S_PINS
-    )
+    CircuitPythonParts(_board("GP10", "GP11", "GP12")).audio_output(_audio(voices=3), *_I2S_PINS)
 
     assert len(_mixer().voice) == 3
 
 
 def test_audio_output_caps_full_loudness_at_the_configured_max_volume(audio_stack: None) -> None:
     output = CircuitPythonParts(_board("GP10", "GP11", "GP12")).audio_output(
-        _audio(max_volume=0.25), AudioRegistry(), *_I2S_PINS
+        _audio(max_volume=0.25), *_I2S_PINS
     )
 
     output.set_loudness(0, 1.0)
@@ -752,23 +755,17 @@ def test_audio_output_caps_full_loudness_at_the_configured_max_volume(audio_stac
     assert _mixer().voice[0].level == 0.25
 
 
-def test_audio_output_resolves_clip_names_through_the_given_registry(
-    audio_stack: None, tmp_path: Path
-) -> None:
+def test_audio_output_plays_the_resolved_clips_path(audio_stack: None, tmp_path: Path) -> None:
     clip = tmp_path / "zap.wav"
     clip.write_bytes(b"RIFF")
-    registry = AudioRegistry()
-    registry.set_scene_sounds({"zap": str(clip)})
-    output = CircuitPythonParts(_board("GP10", "GP11", "GP12")).audio_output(
-        _audio(), registry, *_I2S_PINS
-    )
-    effect = Effect(
-        name="zap",
-        audio=EffectAudio(clips={"start": AudioPlaybackConfig(name="scene.zap", loop=False)}),
-    )
+    output = CircuitPythonParts(_board("GP10", "GP11", "GP12")).audio_output(_audio(), *_I2S_PINS)
+    resolved = ResolvedClip(AudioPlaybackConfig(name="scene.zap", loop=False), str(clip))
 
     output.handle_event(
-        EffectEvent("zap", "audio", "start"), frozenset({"all"}), effect, EffectReceipt(1)
+        EffectEvent("zap", "audio", "start", resolved),
+        frozenset({"all"}),
+        Effect(name="zap"),
+        EffectReceipt(1),
     )
 
     assert [v.wave.path for v in _mixer().voice if v.playing and v.wave] == [str(clip)]
@@ -784,7 +781,7 @@ def test_audio_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
     parts = CircuitPythonParts(_board("GP10", "GP11", "GP12"))
 
     with pytest.raises(ValueError, match=rf"^{field}: pin 'GP99' not found on board$"):
-        parts.audio_output(_audio(), AudioRegistry(), *pins)
+        parts.audio_output(_audio(), *pins)
 
 
 # ---------------------------------------------------------------------------
@@ -1136,7 +1133,7 @@ _REQUESTS: dict[str, Callable[[CircuitPythonParts], object]] = {
     "accelerometer": lambda parts: parts.accelerometer(I2CDeviceConfig(), object()),
     "magnetometer": lambda parts: parts.magnetometer(I2CDeviceConfig(), object()),
     "haptic_output": lambda parts: parts.haptic_output(I2CDeviceConfig(), object()),
-    "audio_output": lambda parts: parts.audio_output(_audio(), AudioRegistry(), *_I2S_PINS),
+    "audio_output": lambda parts: parts.audio_output(_audio(), *_I2S_PINS),
     "ir_reader": lambda parts: parts.ir_reader(PinRef("GP7", "ir.rx")),
     "ir_writer": lambda parts: parts.ir_writer("line", PinRef("GP8", "ir.line")),
     "radio_transport": lambda parts: parts.radio_transport(
