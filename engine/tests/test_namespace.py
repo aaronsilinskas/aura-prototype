@@ -1,9 +1,9 @@
-"""Effect lookups on the Active scene namespace.
+"""Effect and clip lookups on the Active scene namespace.
 
 Each test builds a namespace from a scanned Pack catalog, installs a scene
-view, and resolves names through ``resolve_effect``. Failures are checked by
-error type and the ``name``/``kind`` they carry; message wording is checked
-here once, because the namespace owns it.
+view, and resolves names through ``resolve_effect`` or ``resolve_clip``.
+Failures are checked by error type and the ``name``/``kind`` they carry;
+message wording is checked here once, because the namespace owns it.
 """
 
 from __future__ import annotations
@@ -207,3 +207,138 @@ def test_no_active_scene_error_is_worded_from_the_name_and_kind(pack_tree) -> No
         namespace.resolve_effect("elements.fire")
 
     assert str(exc_info.value) == "Cannot resolve effect 'elements.fire': no scene is active"
+
+
+# ---------------------------------------------------------------------------
+# Clip lookups
+# ---------------------------------------------------------------------------
+
+
+def _clip_catalog(pack_tree) -> PackCatalog:
+    """Scan pack ``elements`` (sound ``crackle``), pack ``basic`` (no sounds) and two scenes.
+
+    Scene ``arena`` has local sound ``cheer``; scene ``quiet`` has no sounds.
+    """
+    root = pack_tree.root("tp_clips")
+    pack_tree.effect_pack(root, "elements", items={"fire": STUB_EFFECT}, sounds=["crackle"])
+    pack_tree.effect_pack(root, "basic", items={"solid": STUB_EFFECT})
+    pack_tree.scene(root, "arena", sounds=["cheer"])
+    pack_tree.scene(root, "quiet")
+    return pack_tree.scan_roots(root)
+
+
+def _scene_sounds(catalog: PackCatalog, scene_name: str) -> dict[str, str]:
+    return catalog.scene_registry.get(scene_name).local_sound_map
+
+
+def test_scene_clip_resolves_against_installed_local_sounds(pack_tree) -> None:
+    catalog = _clip_catalog(pack_tree)
+    namespace = _namespace(catalog)
+    sounds = _scene_sounds(catalog, "arena")
+    namespace.install(None, sounds, frozenset())
+
+    assert namespace.resolve_clip("scene.cheer") == sounds["cheer"]
+
+
+def test_declared_pack_clip_resolves_against_pack_sounds(pack_tree) -> None:
+    catalog = _clip_catalog(pack_tree)
+    namespace = _namespace(catalog)
+    namespace.install(None, {}, frozenset({"elements"}))
+
+    assert namespace.resolve_clip("elements.crackle") == catalog.pack_sounds["elements.crackle"]
+
+
+@pytest.mark.parametrize(
+    ("name", "declared", "error_type"),
+    [
+        ("crackle", frozenset({"elements"}), MissingPrefixError),
+        ("elements.crackle", frozenset({"basic"}), UndeclaredPackError),
+        ("spells.zap", frozenset({"spells"}), UnknownPackError),
+        ("elements.hiss", frozenset({"elements"}), UnknownItemError),
+        ("scene.boo", frozenset(), UnknownItemError),
+    ],
+)
+def test_clip_lookup_failures_raise_typed_errors_naming_the_clip(
+    pack_tree, name, declared, error_type
+) -> None:
+    catalog = _clip_catalog(pack_tree)
+    namespace = _namespace(catalog)
+    namespace.install(None, _scene_sounds(catalog, "arena"), declared)
+
+    with pytest.raises(error_type) as exc_info:
+        namespace.resolve_clip(name)
+
+    error = exc_info.value
+    assert (error.name, error.kind) == (name, "clip")
+
+
+@pytest.mark.parametrize("name", ["scene.cheer", "elements.crackle"])
+def test_any_clip_lookup_before_install_raises_no_active_scene(pack_tree, name) -> None:
+    namespace = _namespace(_clip_catalog(pack_tree))
+
+    with pytest.raises(NoActiveSceneError) as exc_info:
+        namespace.resolve_clip(name)
+
+    error = exc_info.value
+    assert (error.name, error.kind) == (name, "clip")
+
+
+def test_scene_clip_in_a_scene_with_no_sounds_raises_unknown_item(pack_tree) -> None:
+    catalog = _clip_catalog(pack_tree)
+    namespace = _namespace(catalog)
+    namespace.install(None, _scene_sounds(catalog, "quiet"), frozenset({"elements"}))
+
+    with pytest.raises(UnknownItemError):
+        namespace.resolve_clip("scene.cheer")
+
+
+def test_clip_in_a_declared_pack_with_no_sounds_raises_unknown_item_not_unknown_pack(
+    pack_tree,
+) -> None:
+    namespace = _namespace(_clip_catalog(pack_tree))
+    namespace.install(None, {}, frozenset({"basic"}))
+
+    with pytest.raises(UnknownItemError) as exc_info:
+        namespace.resolve_clip("basic.thud")
+
+    assert exc_info.value.pack_name == "basic"
+
+
+def test_clip_in_a_pack_effect_resolves_against_the_active_scene_not_the_effect_pack(
+    pack_tree,
+) -> None:
+    namespace = _namespace(_clip_catalog(pack_tree))
+    namespace.install(None, {}, frozenset({"basic"}))
+
+    with pytest.raises(UndeclaredPackError):
+        namespace.resolve_clip("elements.crackle")
+
+
+@pytest.mark.parametrize(
+    ("name", "declared", "message"),
+    [
+        ("crackle", frozenset(), "Clip name 'crackle' has no 'scene.' or '<pack>.' prefix"),
+        (
+            "elements.crackle",
+            frozenset({"basic"}),
+            "Clip 'elements.crackle' uses pack 'elements', "
+            + "which the active scene does not declare in effect_packs",
+        ),
+        ("spells.zap", frozenset(), "Clip 'spells.zap' uses unknown pack 'spells'"),
+        (
+            "elements.hiss",
+            frozenset({"elements"}),
+            "Unknown clip 'elements.hiss'. Available: crackle",
+        ),
+        ("scene.boo", frozenset(), "Unknown clip 'scene.boo'. Available: cheer"),
+    ],
+)
+def test_clip_errors_are_worded_from_the_name_and_kind(pack_tree, name, declared, message) -> None:
+    catalog = _clip_catalog(pack_tree)
+    namespace = _namespace(catalog)
+    namespace.install(None, _scene_sounds(catalog, "arena"), declared)
+
+    with pytest.raises(RegistryError) as exc_info:
+        namespace.resolve_clip(name)
+
+    assert str(exc_info.value) == message
