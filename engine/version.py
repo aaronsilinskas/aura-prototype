@@ -1,11 +1,10 @@
-"""Version — parsed MAJOR.MINOR version with compatibility checking."""
+"""Version — a parsed MAJOR.MINOR version."""
 
 
 class Version:
     """Parsed MAJOR.MINOR version.
 
-    Build one directly, via :meth:`parse` from a string, and enforce a
-    minimum with :meth:`check_compatible`.
+    Build one directly or via :meth:`parse` from a string.
     """
 
     __slots__ = ("major", "minor")
@@ -26,25 +25,6 @@ class Version:
         if len(parts) != 2 or not all(_is_ascii_digits(part) for part in parts):
             raise ValueError(f"Malformed version {version_str!r}; expected a 'MAJOR.MINOR' string")
         return Version(int(parts[0]), int(parts[1]))
-
-    def check_compatible(self, name: str, required_major: int, required_minor: int) -> None:
-        """Raise ``ValueError`` if this version does not satisfy the minimum required.
-
-        Compatibility requires an equal major and a minor at least
-        ``required_minor``.
-        """
-        version_display = f"{self.major}.{self.minor}"
-        required_display = f"{required_major}.{required_minor}"
-        if self.major != required_major:
-            raise ValueError(
-                f"Pack '{name}' version {version_display} is incompatible with "
-                + f"required {required_display}"
-            )
-        if self.minor < required_minor:
-            raise ValueError(
-                f"Pack '{name}' version {version_display} is too old; upgrade the pack "
-                + f"to at least {required_display}"
-            )
 
     def __str__(self) -> str:
         return f"{self.major}.{self.minor}"

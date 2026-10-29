@@ -109,19 +109,19 @@ _TEST_PACK = "test_pack"
 
 
 def _register_wav(tmp_path, registry: AudioRegistry, name: str) -> str:
-    """Write ``<name>.wav`` under *tmp_path*, scan it into *registry*'s base
+    """Write ``<name>.wav`` under *tmp_path*, install it in *registry*'s base
     under the fixed ``test_pack`` prefix, and return the qualified clip name
     (``"test_pack.<name>"``) an ``AudioPlaybackConfig`` should reference.
 
-    Re-scans the whole directory on every call (``scan_pack_sounds`` merges
-    rather than replaces), so registering a second clip in the same
+    Installs every WAV in *tmp_path* on each call (``set_pack_sounds``
+    replaces the whole base), so registering a second clip in the same
     *tmp_path* never drops an earlier one. Also (re-)installs ``test_pack``
     as the allowed set, mirroring the ``SceneManager`` transition a real
     ``test_pack.<name>`` reference would have passed through.
     """
     wav = tmp_path / f"{name}.wav"
     wav.write_bytes(b"RIFF")
-    registry.scan_pack_sounds(_TEST_PACK, str(tmp_path))
+    registry.set_pack_sounds({f"{_TEST_PACK}.{p.stem}": str(p) for p in tmp_path.glob("*.wav")})
     registry.set_allowed_packs(frozenset({_TEST_PACK}))
     return f"{_TEST_PACK}.{name}"
 

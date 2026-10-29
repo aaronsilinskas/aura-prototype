@@ -1,11 +1,3 @@
-import engine._path as _path
-
-
-def scan_sound_dir(path: str) -> dict[str, str]:
-    """Return a stem → WAV path map for ``*.wav`` files in *path*; missing *path* yields ``{}``."""
-    return _path.scan_stems(path, (".wav",))
-
-
 class AudioOverlayAdmin:
     """Scene-transition-facing seam for swapping the active scene's sound overlay.
 
@@ -66,15 +58,6 @@ class AudioRegistry(AudioOverlayAdmin):
         self._base: dict[str, str] = {}
         self._overlay: dict[str, str] | None = None
         self._allowed_packs: frozenset[str] | None = None
-
-    def scan_pack_sounds(self, pack_name: str, path: str) -> None:
-        """Scan *path* and merge its clips into the base as ``<pack_name>.<stem>``.
-
-        Qualifying every stem with *pack_name* is what lets two packs each ship a
-        same-named clip (e.g. both a ``win.wav``) without colliding in the base.
-        """
-        for stem, clip_path in scan_sound_dir(path).items():
-            self._base[f"{pack_name}.{stem}"] = clip_path
 
     def set_pack_sounds(self, sounds: dict[str, str]) -> None:
         """Replace the whole base with *sounds* (``<pack>.<stem>`` → WAV path).
