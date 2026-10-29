@@ -168,11 +168,11 @@ def _no_reset() -> None:
 def test_boot_runs_the_scene_the_card_names_over_the_flash_default(device_storage):
     device_storage.write_json("aura-state.json", {"scene": "tag"})
 
-    scene_name, _tick, _namespace = build_scene_boot(
+    boot = build_scene_boot(
         _fake_hw(storage=device_storage), {"default_scene": "hardware_test"}, reset=_no_reset
     )
 
-    assert scene_name == "tag"
+    assert boot.scene_name == "tag"
 
 
 class _CodecRecordingIr:

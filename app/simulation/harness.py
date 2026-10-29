@@ -356,14 +356,16 @@ class SimulatedDevice:
     def _boot(self) -> None:
         """Boot through ``build_scene_boot``, the boot ``run_scene`` uses."""
         self._sim._claim_card_packs(self)
-        scene, self._scene_tick, self._namespace = build_scene_boot(
+        boot = build_scene_boot(
             self._sim_hw.hw,
             {"default_scene": self._switched_on_into},
             reset=_reset,
             timer=_SimulationClock(self._sim),
             scene_data={self._switched_on_into: self._scene_data} if self._scene_data else None,
         )
-        self.scene = scene
+        self._scene_tick = boot.tick
+        self._namespace = boot.runtime.namespace
+        self.scene = boot.scene_name
         """The scene the device is running now."""
 
     # -- inputs -------------------------------------------------------------
