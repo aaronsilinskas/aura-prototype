@@ -22,6 +22,7 @@ may carry ``aura_packs/``.
 
 from __future__ import annotations
 
+import secrets
 import sys
 import tempfile
 from collections.abc import Callable, Sequence
@@ -375,11 +376,13 @@ class SimulatedDevice:
     def redeploy(self, scene: str) -> None:
         """Redeploy with *scene* and reboot, as ``deploy.py --scene`` then a reset would.
 
-        *scene* becomes the flash ``default_scene``; every other flash setting
-        stays. The device boots at once, card-less or not, into whatever its
-        card names, else *scene*.
+        *scene* becomes the flash ``default_scene``, beside a fresh Scene
+        deploy token; every other flash setting stays. The device boots at
+        once, card-less or not, into *scene*: the new token clears the
+        Persisted scene its card held.
         """
         self._flash_settings["default_scene"] = scene
+        self._flash_settings["scene_deploy_token"] = secrets.token_hex(8)
         self._sim_hw.power_on()
         self._boot()
 

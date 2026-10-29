@@ -151,12 +151,10 @@ def test_a_card_less_device_redeployed_with_a_scene_boots_it(simulation):
     assert device.scene == "element_browser"
 
 
-def test_a_persisted_scene_still_outranks_a_redeployed_scene(simulation):
-    # Pins today's gap: a redeploy only changes the flash default_scene, which
-    # the Persisted scene on the card outranks. #1119 makes the redeploy win.
+def test_a_redeployed_scene_outranks_a_persisted_scene(simulation):
     device = simulation.add_device("red", scene="example_lobby")
     launch(device, "element_browser")
 
     device.redeploy(scene="hardware_test")
 
-    assert device.scene == "element_browser"
+    assert device.scene == "hardware_test"

@@ -26,7 +26,7 @@ from hardware.shared.ir_codecs import codec_for
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.radio_transceiver import RadioTransceiver
-from hardware.shared.scene_selection import resolve_boot_scene
+from hardware.shared.scene_selection import apply_scene_deploy, resolve_boot_scene
 
 try:
     from collections.abc import Callable
@@ -228,7 +228,10 @@ def build_scene_boot(
     The one boot shared by the device (:func:`app.scene_runtime.run_scene`)
     and the Simulated device, as :func:`build_scene_tick` is their one tick.
     The card's persisted ``scene`` wins over *settings_mapping*'s
-    ``default_scene``; an unknown name raises naming the known scenes. A
+    ``default_scene``, unless *settings_mapping* carries a Scene deploy token
+    the card has not yet applied: applying it clears the persisted scene
+    first (see :func:`~hardware.shared.scene_selection.apply_scene_deploy`).
+    An unknown name raises naming the known scenes. A
     reboot the scene asks for persists to ``hw.storage``, then calls *reset*.
 
     *scene_data* maps a scene name to tunables merged over its
@@ -239,6 +242,7 @@ def build_scene_boot(
     """
     catalog = scan_boot_pack_catalog(hw.storage, scene_data)
     scene_registry = catalog.scene_registry
+    apply_scene_deploy(hw.storage, settings_mapping, logger)
     scene_name = resolve_boot_scene_name(scene_registry, hw.storage, settings_mapping, logger)
     if hw.ir is not None:
         hw.ir.apply_codec(*resolve_ir_codec(scene_registry, scene_name))
