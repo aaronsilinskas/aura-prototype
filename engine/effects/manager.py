@@ -278,18 +278,6 @@ class EffectManager(EffectControls, EffectAdmin):
 
         return entry
 
-    def _append_new_effect(
-        self,
-        scope: ScopeValue,
-        scope_key_set: set[str],
-        name: str,
-        options: dict[str, object],
-    ) -> EffectManager._EffectEntry:
-        """Build, append, and return the new effect entry."""
-        entry = self._build_effect(scope_key_set, name, options)
-        self._effects.append(entry)
-        return entry
-
     def _update_output_buffers(self, entry: EffectManager._EffectEntry) -> None:
         """Remove keys no longer in entry.keys from per-output buffer dicts."""
         key_set = set(entry.keys)
@@ -423,10 +411,15 @@ class EffectManager(EffectControls, EffectAdmin):
         self._merge_strategies = snapshot
 
     def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
-        """Replace any running effect(s) in scope and start this one."""
+        """Replace any running effect(s) in scope and start this one.
+
+        The new effect is built before anything in scope is stopped, so a
+        name that fails to resolve raises with the scope left as it was.
+        """
         scope_key_set = set(scope.keys)
+        entry = self._build_effect(scope_key_set, name, options)
         self._remove_effects_in_scope(scope_key_set)
-        entry = self._append_new_effect(scope, scope_key_set, name, options)
+        self._effects.append(entry)
         pack_name, effect_name = name.split(".", 1)
         self._notify_listeners(
             EffectEvent(pack_name, effect_name, "start"), scope_key_set, entry.effect, entry.receipt
@@ -440,7 +433,8 @@ class EffectManager(EffectControls, EffectAdmin):
         The driver determines how layered effects are composited (e.g. splitting an LED strip).
         """
         scope_key_set = set(scope.keys)
-        entry = self._append_new_effect(scope, scope_key_set, name, options)
+        entry = self._build_effect(scope_key_set, name, options)
+        self._effects.append(entry)
         pack_name, effect_name = name.split(".", 1)
         self._notify_listeners(
             EffectEvent(pack_name, effect_name, "start"), scope_key_set, entry.effect, entry.receipt
