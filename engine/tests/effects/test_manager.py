@@ -2,7 +2,8 @@ from unittest.mock import ANY
 
 import pytest
 
-from engine.effects.manager import EffectBuilder, EffectManager
+from engine.effects.builder import EffectBuilder
+from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.events import EffectEvent
 from engine.namespace import ActiveSceneNamespace, MissingPrefixError, UndeclaredPackError
@@ -1391,7 +1392,7 @@ def test_effect_with_renders_pixels_false_skips_buffer_allocation(pack_tree) -> 
             "nopix": {
                 "event": (
                     "from effects.effect import Effect, EffectConfig\n"
-                    "from engine.effects.manager import EffectBuilder\n"
+                    "from engine.effects.builder import EffectBuilder\n"
                     "class _Builder(EffectBuilder):\n"
                     "    def __call__(self, name, config): return Effect(name=name)\n"
                     "BUILD = _Builder()\n"
@@ -1414,7 +1415,7 @@ def test_effect_with_renders_pixels_false_skips_update_pixels_but_calls_flush(pa
             "nopix": {
                 "event": (
                     "from effects.effect import Effect, EffectConfig\n"
-                    "from engine.effects.manager import EffectBuilder\n"
+                    "from engine.effects.builder import EffectBuilder\n"
                     "class _Builder(EffectBuilder):\n"
                     "    def __call__(self, name, config): return Effect(name=name)\n"
                     "BUILD = _Builder()\n"

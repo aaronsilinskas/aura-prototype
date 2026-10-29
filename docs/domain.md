@@ -48,7 +48,8 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   network.py      NetworkEvents
   log.py          Board-free, tag-prefixed line logger with an injectable sink
   effects/
-    manager.py    EffectManager, EffectBuilder
+    builder.py    EffectBuilder
+    manager.py    EffectManager
     output.py     EffectOutput (abstract hardware output port)
     merge.py      SplitMerge, AdditiveMerge (per-scope layered-buffer compositing;
                   subclass state.py's MergeStrategy)
@@ -151,7 +152,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `EffectAdmin` | `engine/state.py` | Merge-strategy snapshot seam, reserved for `SceneManager` |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output port |
-| `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → Effect`; one per effect item |
+| `EffectBuilder` | `engine/effects/builder.py` | Callable `(name, config) → Effect`; one per effect item |
 | `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop` plus `brightness`/`loudness` controls |
 | `ScopeValue` / `Scope` | `engine/state.py` | Output-agnostic routing keys (see glossary) |
 | `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam |

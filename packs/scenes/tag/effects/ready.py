@@ -19,7 +19,7 @@ from effects.layers.scroll_layer import ScrollLayer
 from effects.layers.shape_layer import ShapeLayer
 from effects.palette import PaletteLUT256
 from effects.shape import Shape
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 # Black -> red: the laser body lights up red, the dead zones stay dark.
 _RED_PALETTE: Final = bytes([0, 0, 0, 0, 255, 255, 0, 0])

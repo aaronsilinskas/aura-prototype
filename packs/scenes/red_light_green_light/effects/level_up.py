@@ -13,7 +13,7 @@ from effects.effect import (
 )
 from effects.layers.pulse_layer import PulseLayer
 from effects.palette import PaletteLUT256
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 from packs.effects.basic.helpers.pulse_effect import PulseEffect
 
 # Gold flash: black → #FFD700

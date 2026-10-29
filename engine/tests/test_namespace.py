@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 from engine.namespace import (
     ActiveSceneNamespace,
     MissingPrefixError,

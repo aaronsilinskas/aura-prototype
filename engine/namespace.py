@@ -19,7 +19,7 @@ try:
 except ImportError:
     TYPE_CHECKING = False
 
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 from engine.packs import PackRegistry, RegistryError, UnknownItemError, UnknownPackError
 
 if TYPE_CHECKING:

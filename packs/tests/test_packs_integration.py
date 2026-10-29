@@ -7,7 +7,8 @@ import os
 import pytest
 
 from effects.effect import EffectConfig
-from engine.effects.manager import EffectBuilder, EffectManager
+from engine.effects.builder import EffectBuilder
+from engine.effects.manager import EffectManager
 from engine.engine import GameEngine, GameRule
 from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog, scan_pack_roots

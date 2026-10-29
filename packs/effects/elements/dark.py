@@ -4,7 +4,7 @@ from effects.layers.sparkle_layer import SparkleLayer
 from effects.level import clamp_level, level_lerp
 from effects.palette import PaletteLUT256
 from effects.value import ValueGenerator as VG
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 # fmt: off
 _dark_palette = bytes([0, 0, 0, 0,

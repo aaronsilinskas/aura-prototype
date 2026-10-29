@@ -17,7 +17,7 @@ except ImportError:
     pass
 
 from effects.effect import Effect, EffectConfig
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 from packs.effects.basic.pulse import PulseBuilder
 
 _pulse = PulseBuilder()

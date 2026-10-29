@@ -1,45 +1,14 @@
 from __future__ import annotations
 
-try:
-    from typing import TYPE_CHECKING
-except ImportError:
-    TYPE_CHECKING = False
-
 from effects.effect import Effect, EffectConfig, PixelBuffer, ResolvedClip
 from engine.effects.merge import SPLIT
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
+from engine.namespace import ActiveSceneNamespace
 from engine.state import EffectAdmin, EffectControls, EffectReceipt, MergeStrategy, ScopeValue
 from engine.timer import Timer
 
-if TYPE_CHECKING:
-    # Type-only: engine.namespace imports EffectBuilder from this module.
-    from engine.namespace import ActiveSceneNamespace
-
 _DEFAULT_RESOLUTION = 16
-
-
-class EffectBuilder:
-    """Factory interface for constructing ``Effect`` instances by name.
-
-    Concrete implementations look up the named effect and return an effect
-    configured for the given ``EffectConfig``. Raise ``KeyError`` or
-    ``ValueError`` for unregistered names.
-    """
-
-    def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """Build an Effect for the named effect.
-
-        Args:
-            name: The registered effect name (e.g. ``"color.flash"``).
-            config: Runtime configuration for the render pass. ``config.get_option``
-                carries any effect-specific parameters (e.g. duration, color).
-                ``config.resolution`` describes the output hardware.
-
-        Returns:
-            A configured ``Effect`` ready to be advanced each frame.
-        """
-        raise NotImplementedError
 
 
 class EffectManager(EffectControls, EffectAdmin):

@@ -8,7 +8,7 @@ from effects.effect import (
 )
 from effects.layers.pulse_layer import PulseLayer
 from effects.palette import PaletteLUT256
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 _RED_PALETTE = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
 _GREEN_PALETTE = PaletteLUT256(bytes([0, 0, 0, 0, 255, 0, 255, 0]))

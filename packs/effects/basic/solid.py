@@ -1,5 +1,5 @@
 from effects.effect import Effect, EffectConfig, EffectPixels, PixelBuffer
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 
 class Solid(EffectPixels):

@@ -6,7 +6,7 @@ from effects.effect import (
     EffectHaptic,
     HapticPattern,
 )
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 _WIN_STING_HAPTIC = EffectHaptic(
     patterns={

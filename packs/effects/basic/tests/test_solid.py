@@ -23,7 +23,7 @@ def _render(pixel_count: int = 4, color: int | None = None):
 
 
 def test_solid_build_returns_effect_builder_instance() -> None:
-    from engine.effects.manager import EffectBuilder
+    from engine.effects.builder import EffectBuilder
     from packs.effects.basic.solid import BUILD
 
     assert isinstance(BUILD, EffectBuilder)
