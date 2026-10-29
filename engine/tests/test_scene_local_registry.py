@@ -3,7 +3,6 @@
 SceneLocalRegistry maps item name → module for one scene's local rules (or
 effects).  It shares its item-loading internals with PackRegistry (no
 duplicated import/attr/isinstance/cache logic) but has no version concept.
-Populated registries come from a scene scanned by ``scan_pack_roots``.
 """
 
 from __future__ import annotations
@@ -29,10 +28,17 @@ def _rule_module(name: str = "MyRule") -> str:
     )
 
 
-def _local_rules(pack_tree, rules: dict[str, str] | None) -> SceneLocalRegistry:
-    """Scan one scene with local *rules*; return its local rule registry."""
+def _local_rules(
+    pack_tree, rules: dict[str, str] | None, *, rules_is_a_file: bool = False
+) -> SceneLocalRegistry:
+    """Scan one scene with local *rules*; return its local rule registry.
+
+    *rules_is_a_file* puts a plain file where the scene's ``rules/`` folder would be.
+    """
     root = pack_tree.root("tslr_flash")
-    pack_tree.scene(root, "forest", rules=rules)
+    scene_dir = pack_tree.scene(root, "forest", rules=rules)
+    if rules_is_a_file:
+        (scene_dir / "rules").write_text("")
     return scan_pack_roots([str(root)]).scene_registry.get("forest").local_rule_registry
 
 
@@ -64,11 +70,7 @@ def test_a_scene_without_a_rules_folder_has_an_empty_local_rule_registry(pack_tr
 def test_a_scene_whose_rules_entry_is_a_file_has_an_empty_local_rule_registry(
     pack_tree,
 ) -> None:
-    root = pack_tree.root("tslr_flash")
-    scene_dir = pack_tree.scene(root, "forest")
-    (scene_dir / "rules").write_text("")
-
-    registry = scan_pack_roots([str(root)]).scene_registry.get("forest").local_rule_registry
+    registry = _local_rules(pack_tree, None, rules_is_a_file=True)
 
     assert registry.items() == []
 

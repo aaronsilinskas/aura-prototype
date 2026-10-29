@@ -30,11 +30,11 @@ def _rule_source(class_name: str = "ARule") -> str:
 
 
 # ---------------------------------------------------------------------------
-# rules/ subdir discovery
+# rules/ folder discovery
 # ---------------------------------------------------------------------------
 
 
-def test_scan_exposes_rules_subdir_items_via_local_rule_registry(pack_tree) -> None:
+def test_a_scenes_rules_folder_items_are_its_local_rules(pack_tree) -> None:
     root = pack_tree.root(ROOT_NAME)
     pack_tree.scene(root, "forest", rules={"ambush": _rule_source("Ambush")})
 
@@ -44,7 +44,7 @@ def test_scan_exposes_rules_subdir_items_via_local_rule_registry(pack_tree) -> N
     assert "ambush" in scene.local_rule_registry.items()
 
 
-def test_scan_scene_with_no_rules_subdir_has_empty_local_rule_registry(pack_tree) -> None:
+def test_a_scene_without_a_rules_folder_has_an_empty_local_rule_registry(pack_tree) -> None:
     root = pack_tree.root(ROOT_NAME)
     pack_tree.scene(root, "empty_scene")
 
@@ -54,7 +54,7 @@ def test_scan_scene_with_no_rules_subdir_has_empty_local_rule_registry(pack_tree
     assert scene.local_rule_registry.items() == []
 
 
-def test_scan_excludes_init_py_from_rule_item_names(pack_tree) -> None:
+def test_init_py_is_not_a_local_rule(pack_tree) -> None:
     root = pack_tree.root(ROOT_NAME)
     scene_dir = pack_tree.scene(root, "forest", rules={"my_rule": _rule_source()})
     (scene_dir / "rules" / "__init__.py").write_text("")
@@ -66,7 +66,7 @@ def test_scan_excludes_init_py_from_rule_item_names(pack_tree) -> None:
     assert "my_rule" in scene.local_rule_registry.items()
 
 
-def test_scan_excludes_tests_subdir_from_rule_item_names(pack_tree) -> None:
+def test_a_tests_subfolder_of_the_rules_folder_is_not_a_local_rule(pack_tree) -> None:
     root = pack_tree.root(ROOT_NAME)
     scene_dir = pack_tree.scene(root, "forest", rules={"my_rule": _rule_source()})
     tests_dir = scene_dir / "rules" / "tests"
@@ -80,7 +80,7 @@ def test_scan_excludes_tests_subdir_from_rule_item_names(pack_tree) -> None:
     assert "my_rule" in scene.local_rule_registry.items()
 
 
-def test_scan_ignores_helper_subpackages_in_rules_dir(pack_tree) -> None:
+def test_a_helper_subpackage_of_the_rules_folder_is_not_a_local_rule(pack_tree) -> None:
     root = pack_tree.root(ROOT_NAME)
     scene_dir = pack_tree.scene(root, "forest", rules={"my_rule": _rule_source()})
     helper_dir = scene_dir / "rules" / "helpers"
@@ -100,7 +100,7 @@ def test_scene_constructed_directly_has_empty_local_rule_registry() -> None:
     assert scene.local_rule_registry.items() == []
 
 
-def test_scan_local_registry_shared_across_fresh_scene_instances(pack_tree) -> None:
+def test_each_fresh_scene_shares_one_local_rule_registry(pack_tree) -> None:
     root = pack_tree.root(ROOT_NAME)
     pack_tree.scene(root, "forest", rules={"my_rule": _rule_source()})
 
@@ -112,7 +112,7 @@ def test_scan_local_registry_shared_across_fresh_scene_instances(pack_tree) -> N
     assert scene_a.local_rule_registry is scene_b.local_rule_registry
 
 
-def test_scan_local_rules_not_visible_to_other_scene(pack_tree) -> None:
+def test_a_scenes_local_rules_are_not_visible_to_another_scene(pack_tree) -> None:
     root = pack_tree.root(ROOT_NAME)
     pack_tree.scene(root, "forest", rules={"secret_rule": _rule_source()})
     pack_tree.scene(root, "cave")
@@ -138,9 +138,9 @@ def _make_engine() -> GameEngine:
 
 
 def _make_scene_manager(engine: GameEngine, catalog: PackCatalog) -> SceneManager:
-    """Construct a SceneManager over *catalog* with a SpyEffectAdmin/SpyAudioOverlayAdmin —
-    these tests only cover scene-local rule discovery, not local-effects/merge-strategy/
-    audio-overlay transitions."""
+    """Construct a SceneManager with a SpyEffectAdmin/SpyAudioOverlayAdmin — these tests
+    only cover scene-local rule discovery, not local-effects/merge-strategy/audio-overlay
+    transitions."""
     return SceneManager(
         engine,
         catalog.effect_registry,

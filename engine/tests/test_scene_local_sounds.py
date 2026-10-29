@@ -12,11 +12,11 @@ ROOT_NAME = "tss_flash"
 
 
 # ---------------------------------------------------------------------------
-# sounds/ subdir discovery
+# sounds/ folder discovery
 # ---------------------------------------------------------------------------
 
 
-def test_scan_exposes_sounds_subdir_wav_stems_via_local_sound_map(pack_tree) -> None:
+def test_a_scenes_sounds_folder_wavs_are_in_its_local_sound_map(pack_tree) -> None:
     root = pack_tree.root(ROOT_NAME)
     pack_tree.scene(root, "forest", sounds=["victory_sting"])
 
@@ -26,7 +26,7 @@ def test_scan_exposes_sounds_subdir_wav_stems_via_local_sound_map(pack_tree) -> 
     assert "victory_sting" in scene.local_sound_map
 
 
-def test_scan_local_sound_map_maps_stem_to_wav_path(pack_tree) -> None:
+def test_a_local_sound_maps_its_bare_stem_to_its_wav_path(pack_tree) -> None:
     root = pack_tree.root(ROOT_NAME)
     scene_dir = pack_tree.scene(root, "forest", sounds=["victory_sting"])
 
@@ -37,7 +37,7 @@ def test_scan_local_sound_map_maps_stem_to_wav_path(pack_tree) -> None:
     assert scene.local_sound_map["victory_sting"] == expected_path
 
 
-def test_scan_scene_with_no_sounds_subdir_has_empty_local_sound_map(pack_tree) -> None:
+def test_a_scene_without_a_sounds_folder_has_an_empty_local_sound_map(pack_tree) -> None:
     root = pack_tree.root(ROOT_NAME)
     pack_tree.scene(root, "bare_scene")
 
@@ -47,7 +47,7 @@ def test_scan_scene_with_no_sounds_subdir_has_empty_local_sound_map(pack_tree) -
     assert scene.local_sound_map == {}
 
 
-def test_scan_local_sound_map_same_content_across_fresh_scene_instances(pack_tree) -> None:
+def test_each_fresh_scene_gets_the_same_local_sound_map(pack_tree) -> None:
     root = pack_tree.root(ROOT_NAME)
     pack_tree.scene(root, "forest", sounds=["chime"])
 
@@ -58,7 +58,7 @@ def test_scan_local_sound_map_same_content_across_fresh_scene_instances(pack_tre
     assert scene_a.local_sound_map == scene_b.local_sound_map
 
 
-def test_scan_local_sound_map_mutation_does_not_affect_next_get(pack_tree) -> None:
+def test_mutating_a_local_sound_map_does_not_affect_the_next_get(pack_tree) -> None:
     root = pack_tree.root(ROOT_NAME)
     pack_tree.scene(root, "forest", sounds=["chime"])
 
@@ -71,7 +71,7 @@ def test_scan_local_sound_map_mutation_does_not_affect_next_get(pack_tree) -> No
     assert scene_b.local_sound_map["chime"] != "/tampered/path.wav"
 
 
-def test_scan_local_sounds_not_visible_to_other_scene(pack_tree) -> None:
+def test_a_scenes_local_sounds_are_not_visible_to_another_scene(pack_tree) -> None:
     root = pack_tree.root(ROOT_NAME)
     pack_tree.scene(root, "forest", sounds=["secret_chime"])
     pack_tree.scene(root, "cave")
