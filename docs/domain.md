@@ -22,7 +22,7 @@ Full game and hardware design lives in `~/dev/aura/aura-docs/` (an Obsidian vaul
 ```
 effects/          Animation engine (CircuitPython-safe)
   effect.py       EffectConfig, PixelBuffer, Effect, EffectPixels, EffectAudio, EffectHaptic,
-                  AudioPlaybackConfig, HapticPattern
+                  AudioPlaybackConfig, ResolvedClip, HapticPattern
   palette.py      Palette, PaletteLUT256 (pre-computed, immutable)
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
@@ -44,11 +44,11 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   pack_catalog.py scan_pack_roots, PackCatalog, PackScanError family (scan-time)
   version.py      Pack MAJOR.MINOR parsing
   input.py        ButtonData, AccelerationData, InputEvents
-  audio.py        AudioRegistry
+  namespace.py    ActiveSceneNamespace; NoActiveSceneError, MissingPrefixError, UndeclaredPackError
   network.py      NetworkEvents
   log.py          Board-free, tag-prefixed line logger with an injectable sink
   effects/
-    manager.py    EffectManager, EffectBuilder, EffectResolver
+    manager.py    EffectManager, EffectBuilder
     output.py     EffectOutput (abstract hardware output port)
     merge.py      SplitMerge, AdditiveMerge (per-scope layered-buffer compositing;
                   subclass state.py's MergeStrategy)
@@ -119,7 +119,9 @@ pre-commit hook on every commit):
 
 - `engine` must never import `hardware` (total, one-way).
 - `hardware` must never import engine runtime machinery — `engine.engine`,
-  `engine.scene`, `engine.packs`, `engine.timer`, `engine.effects.manager`.
+  `engine.scene`, `engine.packs`, `engine.namespace`, `engine.timer`,
+  `engine.effects.manager`. Hardware never resolves effect or clip names; it
+  plays the path on each event's resolved clip (ADR-0002).
 - `app/` is the sole sanctioned crossing point: the one place allowed to
   import both the engine's runtime machinery and `hardware.*` together (see
   **Composition layer (app/)** in `GLOSSARY.md`).
@@ -146,25 +148,24 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
 | `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
 | `EffectControls` | `engine/state.py` | Rule-facing effect seam |
-| `EffectAdmin` | `engine/state.py` | Scene-transition effect seam, reserved for `SceneManager` |
+| `EffectAdmin` | `engine/state.py` | Merge-strategy snapshot seam, reserved for `SceneManager` |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output port |
 | `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → Effect`; one per effect item |
 | `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop` plus `brightness`/`loudness` controls |
 | `ScopeValue` / `Scope` | `engine/state.py` | Output-agnostic routing keys (see glossary) |
 | `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam |
-| `AudioOverlayAdmin` | `engine/audio.py` | Scene-transition sound seam, reserved for `SceneManager` |
-| `AudioRegistry` | `engine/audio.py` | Concrete `AudioOverlayAdmin`; resolves clip names to WAV paths |
+| `ActiveSceneNamespace` | `engine/namespace.py` | Resolves effect names to builders and clip names to WAV paths for the active scene; installed by `SceneManager` per transition |
+| `ResolvedClip` | `effects/effect.py` | A declared `AudioPlaybackConfig` plus its resolved path, carried on `EffectEvent` |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update` tick |
 | `GameState` | `engine/state.py` | Per-tick game context passed to each rule |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
-| `SceneManager` | `engine/scene.py` | Drives scene transitions through injected `EffectAdmin`/`AudioOverlayAdmin`; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot` |
+| `SceneManager` | `engine/scene.py` | Drives scene transitions, installing each active scene into the `ActiveSceneNamespace` and snapshotting merge strategies through `EffectAdmin`; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot` |
 | `SceneReboot` | `engine/state.py` | Board-free port `SceneManager` reboots through; live adapter `DeviceSceneReboot` |
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
 | `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor for a phase machine's key + initial phase; registry of each phase's owning `PhaseRule` |
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
-| `EffectResolver` | `engine/effects/manager.py` | Resolves a qualified effect name to a builder |
 | `MergeStrategy` | `engine/state.py` | Per-scope compositing policy; subclasses in `engine/effects/merge.py` |
 | `PackRegistry` | `engine/packs.py` | Looks up the items of versioned effect or rule packs by pack and item name; filled only by the catalog |
 | `PackCatalog` | `engine/pack_catalog.py` | One scan of every pack root: effect/rule `PackRegistry`s, `SceneRegistry`, pack sounds map; scene declarations checked |
