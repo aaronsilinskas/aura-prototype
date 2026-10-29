@@ -16,8 +16,19 @@ class Version:
 
     @staticmethod
     def parse(version_str: str) -> "Version":
-        """Parse a ``'MAJOR.MINOR'`` string into a :class:`Version`."""
+        """Parse a ``'MAJOR.MINOR'`` string into a :class:`Version`.
+
+        Surrounding whitespace is ignored; each component must be digits only.
+
+        Raises:
+            ValueError: if *version_str* is not a string of exactly two
+                dot-separated digit components.
+        """
+        if not isinstance(version_str, str):
+            raise ValueError(f"Malformed version {version_str!r}; expected a 'MAJOR.MINOR' string")
         parts = version_str.strip().split(".")
+        if len(parts) != 2 or not all(part.isdigit() for part in parts):
+            raise ValueError(f"Malformed version {version_str!r}; expected 'MAJOR.MINOR'")
         return Version(int(parts[0]), int(parts[1]))
 
     def check_compatible(self, name: str, required_major: int, required_minor: int) -> None:
