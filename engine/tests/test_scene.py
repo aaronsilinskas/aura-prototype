@@ -435,7 +435,7 @@ def test_reboot_to_previous_delegates_to_the_injected_scene_reboot_port() -> Non
 
 def test_reboot_to_previous_delegates_without_registry_validation() -> None:
     """Unlike reboot_into, no scene name is validated here at all -- the
-    recorded return_to is checked at boot by resolve_known_scene instead."""
+    recorded return_to is checked at boot by SceneRegistry.resolve_known instead."""
     engine = _make_engine()
     scene_reboot = RecordingSceneReboot()
     manager = _make_scene_manager(engine, scene_registry=SceneRegistry(), scene_reboot=scene_reboot)
@@ -443,112 +443,6 @@ def test_reboot_to_previous_delegates_without_registry_validation() -> None:
     manager.reboot_to_previous()  # must not raise, even with an empty registry
 
     assert scene_reboot.reboot_to_previous_calls == 1
-
-
-# ---------------------------------------------------------------------------
-# SceneManager — pack version validation on load()
-# ---------------------------------------------------------------------------
-
-
-def test_load_raises_for_incompatible_effect_pack_version(pack_env) -> None:
-    _make_effect_pack(pack_env, "fx", "1.0")
-    effect_registry, rule_registry = _make_registries(str(pack_env))
-    engine = _make_engine()
-    scene_reg = _scene_registry(
-        ("main", _scene_factory(effect_packs=[("fx", "99.0")]))  # incompatible major version
-    )
-    manager = _make_scene_manager(
-        engine,
-        effect_registry=effect_registry,
-        rule_registry=rule_registry,
-        scene_registry=scene_reg,
-    )
-
-    with pytest.raises(ValueError):
-        manager.load("main")
-
-
-def test_load_leaves_stack_untouched_when_pack_version_is_incompatible(pack_env) -> None:
-    _make_effect_pack(pack_env, "fx", "1.0")
-    effect_registry, rule_registry = _make_registries(str(pack_env))
-    engine = _make_engine()
-    scene_reg = _scene_registry(
-        ("initial", _scene_factory()),
-        ("bad", _scene_factory(effect_packs=[("fx", "99.0")])),
-    )
-    manager = _make_scene_manager(
-        engine,
-        effect_registry=effect_registry,
-        rule_registry=rule_registry,
-        scene_registry=scene_reg,
-    )
-
-    # Load a valid initial scene first
-    manager.load("initial")
-    manager.update()
-
-    # Attempt to load a scene with incompatible effect pack
-    with pytest.raises(ValueError):
-        manager.load("bad")
-
-    # Manager should still be usable; loading initial again works
-    manager.load("initial")
-    manager.update()  # no error
-
-
-def test_load_raises_for_incompatible_rule_pack_version(pack_env) -> None:
-    _make_rule_pack(
-        pack_env,
-        "rules",
-        "1.0",
-        {"rule_a": ("from engine.engine import GameRule\nRULE = GameRule()\n")},
-    )
-    effect_registry, rule_registry = _make_registries(str(pack_env))
-    engine = _make_engine()
-    scene_reg = _scene_registry(
-        ("main", _scene_factory(rule_packs=[("rules", "99.0")]))  # incompatible major version
-    )
-    manager = _make_scene_manager(
-        engine,
-        effect_registry=effect_registry,
-        rule_registry=rule_registry,
-        scene_registry=scene_reg,
-    )
-
-    with pytest.raises(ValueError):
-        manager.load("main")
-
-
-# ---------------------------------------------------------------------------
-# SceneManager — pack version validation on overlay()
-# ---------------------------------------------------------------------------
-
-
-def test_overlay_validates_packs_before_suspending_active_scene(pack_env) -> None:
-    _make_effect_pack(pack_env, "fx", "1.0")
-    effect_registry, rule_registry = _make_registries(str(pack_env))
-    engine, controls = _make_engine_with_controls()
-    scene_reg = _scene_registry(
-        ("main", _scene_factory()),
-        ("overlay_scene", _scene_factory(effect_packs=[("fx", "99.0")])),
-    )
-    manager = _make_scene_manager(
-        engine,
-        effect_registry=effect_registry,
-        rule_registry=rule_registry,
-        scene_registry=scene_reg,
-    )
-
-    manager.load("main")
-    manager.update()
-    controls.stopped_scopes.clear()
-
-    with pytest.raises(ValueError):
-        manager.overlay("overlay_scene")
-
-    assert controls.stopped_scopes == [], (
-        "effects must not be stopped when overlay pack validation fails"
-    )
 
 
 # ---------------------------------------------------------------------------

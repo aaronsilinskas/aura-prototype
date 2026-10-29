@@ -5,7 +5,7 @@ from app.scene_composition import (
     SceneRuntime,
     build_scene_runtime,
     build_scene_tick,
-    scan_boot_scene_registry,
+    scan_boot_pack_catalog,
 )
 from engine.events import Event
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
@@ -215,9 +215,7 @@ def test_ticking_a_real_scene_delivers_the_sensors_event_to_its_rules():
     network_spy = SpyNetworkControls()
     hw = _hw()
     hw.network_controls = network_spy
-    runtime = build_scene_runtime(
-        hw, "ir_range_transmitter", scene_registry=scan_boot_scene_registry(None)
-    )
+    runtime = build_scene_runtime(hw, "ir_range_transmitter", catalog=scan_boot_pack_catalog(None))
     tick = build_scene_tick(hw, runtime)
 
     tick()

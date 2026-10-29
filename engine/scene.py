@@ -453,7 +453,7 @@ class SceneRegistry:
         """Return *name* if registered, else raise naming the known scenes.
 
         The single known-scene check, shared by
-        ``app.scene_composition.resolve_known_scene`` (the boot-time guard)
+        ``app.scene_composition.resolve_boot_scene_name`` (the boot-time guard)
         and ``SceneManager.reboot_into`` (the Button-B fail-fast guard) so the
         check and its message have exactly one implementation.
         """
@@ -595,18 +595,14 @@ class SceneManager(SceneControls):
     # ------------------------------------------------------------------
 
     def load(self, name: str) -> None:
-        """Record a load transition for *name*; raises immediately if unknown or packs invalid."""
-        scene = self._scene_registry.get(name)
-        self._validate_packs(scene)
-        self._pending = ("load", scene)
+        """Record a load transition for *name*; raises immediately if unknown."""
+        self._pending = ("load", self._scene_registry.get(name))
 
     def overlay(self, name: str) -> None:
         """Record an overlay transition for *name*; raises immediately if invalid."""
         if not self._stack:
             raise ValueError("Cannot overlay: no active scene on stack")
-        scene = self._scene_registry.get(name)
-        self._validate_packs(scene)
-        self._pending = ("overlay", scene)
+        self._pending = ("overlay", self._scene_registry.get(name))
 
     @property
     def active_state(self) -> GameState | None:
@@ -643,7 +639,7 @@ class SceneManager(SceneControls):
         """Delegate to the injected ``SceneReboot`` port, unvalidated.
 
         Unlike ``reboot_into``, the recorded ``return_to`` target is
-        validated at boot by ``resolve_known_scene``, exactly like the
+        validated at boot by ``SceneRegistry.resolve_known``, exactly like the
         persisted ``scene`` already is — duplicating that check here would
         only re-do work the boot path already does.
         """
@@ -676,13 +672,6 @@ class SceneManager(SceneControls):
     # ------------------------------------------------------------------
     # Internal transition helpers
     # ------------------------------------------------------------------
-
-    def _validate_packs(self, scene: Scene) -> None:
-        """Validate all pack versions; raises ``ValueError`` on mismatch."""
-        for pack_name, min_version in scene.effect_packs:
-            self._effect_registry.check_version(pack_name, Version.parse(min_version))
-        for pack_name, min_version in scene.rule_packs:
-            self._rule_registry.check_version(pack_name, Version.parse(min_version))
 
     def _resolve_rules(self, scene: Scene) -> list[GameRule]:
         """Return combined rules: shared-pack items first, scene-local items after."""
