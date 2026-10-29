@@ -121,6 +121,7 @@ import board
 from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
+from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import scan_pack_roots
 from engine.state import Scope
 from engine.timer import Timer
@@ -323,8 +324,13 @@ def _measure_point(
 
 def run() -> None:
     """Sweep pixel count, effect identity, and stack depth for `DRIVER`."""
-    registry = scan_pack_roots(["packs"]).effect_registry
+    catalog = scan_pack_roots(["packs"])
+    registry = catalog.effect_registry
     element_names = registry.items("elements")
+    # Standalone profiler, no SceneManager: install a scene view with no locals
+    # that declares every pack in the catalog.
+    namespace = ActiveSceneNamespace(registry, catalog.pack_sounds)
+    namespace.install(None, {}, frozenset(registry.names()))
 
     # Load the real, deployed aura-device.json and isolate the one component this
     # profiler drives -- the config-driven model #686 established for the scene-load
@@ -349,10 +355,7 @@ def run() -> None:
     i2c_bandwidth = 0.0
     if DRIVER == "is31fl3741_matrix":
         worst_output, _ = _build_sweep_output(DRIVER, pixel_output, PIXEL_COUNTS[-1], matrix_cols)
-        worst_manager = EffectManager(registry=registry, outputs=[worst_output])
-        # Standalone profiler, no SceneManager -- declare every scanned pack allowed
-        # (see issue #814: EffectAdmin.set_allowed_packs).
-        worst_manager.set_allowed_packs(frozenset(registry.names()))
+        worst_manager = EffectManager(namespace=namespace, outputs=[worst_output])
         i2c_transaction_bytes = _measure_i2c_transaction_bytes(
             worst_manager, Timer(), element_names[0], counting_i2c
         )
@@ -375,8 +378,7 @@ def run() -> None:
 
     for pixel_count in PIXEL_COUNTS:
         output, actual_count = _build_sweep_output(DRIVER, pixel_output, pixel_count, matrix_cols)
-        effect_manager = EffectManager(registry=registry, outputs=[output])
-        effect_manager.set_allowed_packs(frozenset(registry.names()))
+        effect_manager = EffectManager(namespace=namespace, outputs=[output])
         timer = Timer()
 
         for element in element_names:

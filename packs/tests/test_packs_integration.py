@@ -10,6 +10,7 @@ from effects.effect import EffectConfig
 from engine.audio import AudioRegistry
 from engine.effects.manager import EffectBuilder, EffectManager
 from engine.engine import GameEngine, GameRule
+from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog, scan_pack_roots
 from engine.scene import Scene, SceneManager, SceneRegistry
 from engine.state import SceneReboot
@@ -328,7 +329,8 @@ def test_red_light_green_light_scene_every_audio_playing_effects_clip_name_resol
 def loaded_debug_engine(catalog: PackCatalog):
     rule_registry = catalog.rule_registry
     effect_registry = catalog.effect_registry
-    effect_manager = EffectManager(registry=effect_registry, outputs=[])
+    namespace = ActiveSceneNamespace(effect_registry, catalog.pack_sounds)
+    effect_manager = EffectManager(namespace=namespace, outputs=[])
     engine = GameEngine(effect_manager)
     scene_registry = SceneRegistry()
     scene_registry.register(
@@ -341,6 +343,7 @@ def loaded_debug_engine(catalog: PackCatalog):
         rule_registry,
         scene_registry,
         effect_admin=effect_manager,
+        namespace=namespace,
         audio_overlay_admin=AudioRegistry(),
         scene_reboot=SceneReboot(),
     )
