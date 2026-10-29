@@ -32,8 +32,12 @@ _Avoid_: raw DRV2605L waveform IDs; `HapticConfig` (collides with the device-con
 Runtime configuration passed to effect builders at construction: `resolution`, effect-specific `options`, and `listeners`.
 
 ### Effect pack
-An `EffectBuilder` owning a named, versioned set of effects; shared and cross-scene.
+A named, versioned directory of effect items, each exporting an `EffectBuilder`; shared and cross-scene.
 _Avoid_: calling a scene-local effect set a "pack" (a pack is shared, versioned, cross-scene)
+
+### Rule pack
+A named, versioned directory of rule items, each exporting a `GameRule`; shared and cross-scene.
+_Avoid_: calling a scene-local rule set a "pack" (a pack is shared, versioned, cross-scene)
 
 ### DynamicValue
 `float | Callable[[], float]` — a value that may be constant or computed fresh each sample.

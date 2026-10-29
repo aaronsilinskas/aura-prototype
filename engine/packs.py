@@ -122,7 +122,7 @@ def load_item(
 
     *context* is a human-readable description of the owning registry entry used
     in error messages (e.g. ``"Pack 'rlgl' item 'fire'"`` or
-    ``"Scene 'forest' local item 'ambush'"``).  *full_module* is the dotted
+    ``"Local item 'ambush'"``).  *full_module* is the dotted
     import path; *item_attr* is the attribute name to read from the module.
 
     Raises:
