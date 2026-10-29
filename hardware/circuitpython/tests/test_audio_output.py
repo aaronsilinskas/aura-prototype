@@ -108,20 +108,11 @@ def _effect_oneshot_stops_effect(verb: str, clip_name: str) -> Effect:
 _TEST_PACK = "test_pack"
 
 
-def _register_wav(tmp_path, registry: AudioRegistry, name: str) -> str:
-    """Write ``<name>.wav`` under *tmp_path*, scan it into *registry*'s base
-    under the fixed ``test_pack`` prefix, and return the qualified clip name
-    (``"test_pack.<name>"``) an ``AudioPlaybackConfig`` should reference.
-
-    Re-scans the whole directory on every call (``scan_pack_sounds`` merges
-    rather than replaces), so registering a second clip in the same
-    *tmp_path* never drops an earlier one. Also (re-)installs ``test_pack``
-    as the allowed set, mirroring the ``SceneManager`` transition a real
-    ``test_pack.<name>`` reference would have passed through.
-    """
-    wav = tmp_path / f"{name}.wav"
-    wav.write_bytes(b"RIFF")
-    registry.scan_pack_sounds(_TEST_PACK, str(tmp_path))
+def _register_wav(pack_tree, registry: AudioRegistry, name: str) -> str:
+    """Install a scanned pack's ``<name>.wav`` in *registry*; return its qualified clip name."""
+    root = pack_tree.root("tao_flash")
+    pack_tree.effect_pack(root, _TEST_PACK, sounds=[name])
+    registry.set_pack_sounds(pack_tree.scan_roots(root).pack_sounds)
     registry.set_allowed_packs(frozenset({_TEST_PACK}))
     return f"{_TEST_PACK}.{name}"
 
@@ -270,10 +261,10 @@ def test_oserror_on_file_open_with_stops_effect_stops_receipt_immediately(tmp_pa
 # ---------------------------------------------------------------------------
 
 
-def test_valid_clip_plays_on_an_idle_voice(tmp_path) -> None:
+def test_valid_clip_plays_on_an_idle_voice(pack_tree) -> None:
     """A registered clip is opened and played on a mixer voice at the receipt's loudness."""
     registry = AudioRegistry()
-    clip_name = _register_wav(tmp_path, registry, "music")
+    clip_name = _register_wav(pack_tree, registry, "music")
     output, mixer = _make_output(registry, max_volume=0.4)
 
     output.handle_event(
@@ -288,14 +279,14 @@ def test_valid_clip_plays_on_an_idle_voice(tmp_path) -> None:
     assert mixer.voice[0].level == pytest.approx(0.2)
 
 
-def test_audio_only_effect_implicitly_stops_receipt_on_finish(tmp_path) -> None:
+def test_audio_only_effect_implicitly_stops_receipt_on_finish(pack_tree) -> None:
     """An effect with no pixels/haptic implicitly sets stops_receipt=True.
 
     Its receipt is stopped when the clip finishes naturally (audio is the
     whole effect).
     """
     registry = AudioRegistry()
-    clip_name = _register_wav(tmp_path, registry, "sting")
+    clip_name = _register_wav(pack_tree, registry, "sting")
     output, mixer = _make_output(registry)
     receipt = _make_receipt()
 
@@ -312,10 +303,10 @@ def test_audio_only_effect_implicitly_stops_receipt_on_finish(tmp_path) -> None:
     receipt.stop.assert_called_once()
 
 
-def test_clip_with_pixels_and_no_stops_effect_flag_leaves_receipt_to_rules(tmp_path) -> None:
+def test_clip_with_pixels_and_no_stops_effect_flag_leaves_receipt_to_rules(pack_tree) -> None:
     """An effect with pixels and no stops_effect flag leaves its receipt to rules on finish."""
     registry = AudioRegistry()
-    clip_name = _register_wav(tmp_path, registry, "sting")
+    clip_name = _register_wav(pack_tree, registry, "sting")
     output, mixer = _make_output(registry)
     receipt = _make_receipt()
 

@@ -10,7 +10,6 @@ import pytest
 
 from engine.pack_catalog import scan_pack_roots
 from engine.scene import Scene, SceneRegistry
-from engine.tests.helpers import scan_scenes
 from engine.version import Version
 
 # ---------------------------------------------------------------------------
@@ -20,7 +19,7 @@ from engine.version import Version
 
 def _scan_scene(pack_tree, name: str = "forest", **scene_fields) -> SceneRegistry:
     """Scan a root holding the single scene *name*; return the catalog's ``SceneRegistry``."""
-    return scan_scenes(pack_tree, {name: scene_fields}).scene_registry
+    return pack_tree.scan(scenes={name: scene_fields}).scene_registry
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +202,7 @@ def test_resolve_known_returns_a_factory_registered_scene_name() -> None:
 
 
 def test_resolve_known_raises_value_error_naming_the_known_scenes(pack_tree) -> None:
-    registry = scan_scenes(pack_tree, {"forest": {}, "cave": {}}).scene_registry
+    registry = pack_tree.scan(scenes={"forest": {}, "cave": {}}).scene_registry
 
     with pytest.raises(ValueError, match=r"'nowhere'.*cave, forest"):
         registry.resolve_known("nowhere")
@@ -253,7 +252,7 @@ def test_ir_codec_for_prefers_factory_override_over_scanned_scene(pack_tree) -> 
 
 
 def test_names_returns_scene_names_sorted_alphabetically(pack_tree) -> None:
-    registry = scan_scenes(pack_tree, {"zebra": {}, "alpha": {}, "mango": {}}).scene_registry
+    registry = pack_tree.scan(scenes={"zebra": {}, "alpha": {}, "mango": {}}).scene_registry
 
     assert registry.names() == ["alpha", "mango", "zebra"]
 

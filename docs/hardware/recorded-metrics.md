@@ -151,6 +151,10 @@ Per-board whole-board heap measurement. `total_free_heap_bytes` is the profiler'
 `gc.mem_free()` reading on the bare framework. `target_fps` (24 ceiling) and
 `headroom_reserve_percent` (20% default) are config inputs, not recordings.
 
+> The `total_free_heap_bytes` figures below predate the pack catalog scan
+> `baseline_profiler.py` now holds for its whole run (#1096): they were measured with an
+> empty pack registry, so a re-run will report less free heap.
+
 | Board | Runtime | Driver | `target_fps` | `total_free_heap_bytes` | `headroom_reserve_percent` |
 |-------|---------|--------|--------------|-------------------------|------------------------------|
 | adafruit_feather_rp2040_prop_maker | circuitpython_10_0_3 | - | 24 | 130576 | 20% |

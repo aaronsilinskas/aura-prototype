@@ -6,7 +6,6 @@ the Scene, mirroring local_effect_registry / local_rule_registry discovery.
 from __future__ import annotations
 
 from engine.scene import Scene
-from engine.tests.helpers import scan_scenes
 
 # ---------------------------------------------------------------------------
 # sounds/ folder discovery
@@ -14,14 +13,14 @@ from engine.tests.helpers import scan_scenes
 
 
 def test_a_scenes_sounds_folder_wavs_are_in_its_local_sound_map(pack_tree) -> None:
-    registry = scan_scenes(pack_tree, {"forest": {"sounds": ["victory_sting"]}}).scene_registry
+    registry = pack_tree.scan(scenes={"forest": {"sounds": ["victory_sting"]}}).scene_registry
 
     scene = registry.get("forest")
     assert "victory_sting" in scene.local_sound_map
 
 
 def test_each_fresh_scene_gets_the_same_local_sound_map(pack_tree) -> None:
-    registry = scan_scenes(pack_tree, {"forest": {"sounds": ["chime"]}}).scene_registry
+    registry = pack_tree.scan(scenes={"forest": {"sounds": ["chime"]}}).scene_registry
 
     scene_a = registry.get("forest")
     scene_b = registry.get("forest")
@@ -29,7 +28,7 @@ def test_each_fresh_scene_gets_the_same_local_sound_map(pack_tree) -> None:
 
 
 def test_mutating_a_local_sound_map_does_not_affect_the_next_get(pack_tree) -> None:
-    registry = scan_scenes(pack_tree, {"forest": {"sounds": ["chime"]}}).scene_registry
+    registry = pack_tree.scan(scenes={"forest": {"sounds": ["chime"]}}).scene_registry
 
     scene_a = registry.get("forest")
     scene_a.local_sound_map["chime"] = "/tampered/path.wav"
@@ -39,8 +38,8 @@ def test_mutating_a_local_sound_map_does_not_affect_the_next_get(pack_tree) -> N
 
 
 def test_a_scenes_local_sounds_are_not_visible_to_another_scene(pack_tree) -> None:
-    registry = scan_scenes(
-        pack_tree, {"forest": {"sounds": ["secret_chime"]}, "cave": {}}
+    registry = pack_tree.scan(
+        scenes={"forest": {"sounds": ["secret_chime"]}, "cave": {}}
     ).scene_registry
 
     cave_scene = registry.get("cave")

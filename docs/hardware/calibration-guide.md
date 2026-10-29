@@ -61,11 +61,11 @@ Copy the row into the matching table in [`recorded-metrics.md`](recorded-metrics
 
 Feeds the **Board profiles** and **Per-MCU baselines** tables.
 
-- `total_free_heap_bytes` is a `gc.mem_free()` reading on the **bare** framework (empty
-  registry, no packs, no scene), taken right after `print_profile_header` and emitted as
-  its own `board_profiles` row (not eyeballed from the header's "Mem Free" field — some
-  boards' USB CDC connection is unreliable right at the reboot boundary and can lose that
-  line). A real prop also loads a scene, which dominates its heap.
+- `total_free_heap_bytes` is a `gc.mem_free()` reading on the **bare** framework (flash
+  pack catalog scanned and held, no scene), taken right after `print_profile_header` and
+  emitted as its own `board_profiles` row (not eyeballed from the header's "Mem Free"
+  field — some boards' USB CDC connection is unreliable right at the reboot boundary and
+  can lose that line). A real prop also loads a scene, which dominates its heap.
 - `engine_host` mode profiles the rule-less `GameEngine.update(state)` tick; its
   `cpu_percent` is the engine-host baseline. `satellite` mode profiles the bare
   framework loop with no engine.
@@ -229,7 +229,8 @@ one hardware-bundle delta followed by the stages the profiler still owns individ
 - **`hardware` Δ** — the heap the single `build_hardware` call retains (whichever
   pixels/audio/haptics-driver/IR sections the config declares, plus buttons/accelerometer
   it always wires but this profiler never reads).
-- **`registries` Δ** — the heap scanning the effect/rule/scene `PackRegistry`s retains.
+- **`registries` Δ** — the heap the pack catalog scan (effect/rule `PackRegistry`s and
+  `SceneRegistry`) retains.
 - **`engine` Δ** — the heap building `EffectManager` + `Timer` + `GameEngine` +
   `SceneManager` retains.
 - **`load` Δ** — the heap `SceneManager.load(scene_name)` retains (the scene graph:

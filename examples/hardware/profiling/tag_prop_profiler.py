@@ -109,15 +109,14 @@ import time
 
 import board
 
+from app.scene_composition import install_pack_sounds, scan_boot_pack_catalog
 from effects.performance import PerformanceTracker
-from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.network import NetworkEvents
-from engine.packs import PackRegistry
-from engine.scene import SceneManager, SceneRegistry
+from engine.scene import SceneManager
 from engine.state import SceneReboot
 from engine.timer import Timer
 from hardware.circuitpython.audio_output import AudioEffectOutput
@@ -215,11 +214,11 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, PolledSen
     gc.collect()
     free_after_hardware = gc.mem_free()
 
-    effect_registry = PackRegistry(item_attr="BUILD")
-    effect_registry.scan_dir("packs/effects", "packs.effects")
-    rule_registry = PackRegistry(item_attr="RULE")
-    rule_registry.scan_dir("packs/rules", "packs.rules")
-    # Stage snapshot: scanned effect + rule pack registries (imported pack modules).
+    catalog = scan_boot_pack_catalog(hardware.storage)
+    effect_registry = catalog.effect_registry
+    rule_registry = catalog.rule_registry
+    scene_registry = catalog.scene_registry
+    # Stage snapshot: the pack catalog (effect, rule and scene registries).
     gc.collect()
     free_after_registries = gc.mem_free()
 
@@ -243,16 +242,13 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, PolledSen
     gc.collect()
     free_after_engine = gc.mem_free()
 
-    scene_registry = SceneRegistry()
-    scene_registry.scan_dir("packs/scenes", "packs.scenes")
-
     manager = SceneManager(
         engine,
         effect_registry,
         rule_registry,
         scene_registry,
         effect_admin=effect_manager,
-        audio_overlay_admin=AudioRegistry(),
+        audio_overlay_admin=install_pack_sounds(hardware, catalog),
         scene_reboot=SceneReboot(),
     )
     manager.load("tag")

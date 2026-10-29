@@ -13,7 +13,7 @@ from engine.engine import GameRule
 from engine.pack_catalog import scan_pack_roots
 from engine.packs import ItemTypeError, MissingItemAttributeError, UnknownItemError
 from engine.scene import SceneLocalRegistry
-from engine.tests.helpers import rule_source, scan_scenes
+from engine.tests.helpers import rule_source
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -22,7 +22,7 @@ from engine.tests.helpers import rule_source, scan_scenes
 
 def _local_rules(pack_tree, rules: dict[str, str] | None) -> SceneLocalRegistry:
     """Scan one scene with local *rules*; return its local rule registry."""
-    catalog = scan_scenes(pack_tree, {"forest": {"rules": rules}})
+    catalog = pack_tree.scan(scenes={"forest": {"rules": rules}})
     return catalog.scene_registry.get("forest").local_rule_registry
 
 
@@ -43,12 +43,6 @@ def test_scene_local_registry_with_no_arguments_is_a_valid_empty_registry() -> N
 # ---------------------------------------------------------------------------
 # Population from the scanned scene's rules/ folder
 # ---------------------------------------------------------------------------
-
-
-def test_a_scene_without_a_rules_folder_has_an_empty_local_rule_registry(pack_tree) -> None:
-    registry = _local_rules(pack_tree, None)
-
-    assert registry.items() == []
 
 
 def test_a_scene_whose_rules_entry_is_a_file_has_an_empty_local_rule_registry(

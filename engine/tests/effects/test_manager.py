@@ -1,4 +1,3 @@
-import sys
 from unittest.mock import ANY
 
 import pytest
@@ -21,31 +20,6 @@ from engine.timer import Timer
 # Fixtures and helpers
 # ---------------------------------------------------------------------------
 
-_MODULE_PREFIX = "tp"
-
-
-@pytest.fixture()
-def pack_env(tmp_path):
-    """Yield a packs-root directory and manage ``sys.path`` / ``sys.modules``."""
-    packs_root = tmp_path / _MODULE_PREFIX
-    packs_root.mkdir()
-    sys.path.insert(0, str(tmp_path))
-    known = set(sys.modules)
-    yield packs_root
-    for key in list(sys.modules):
-        if key not in known:
-            del sys.modules[key]
-    sys.path.remove(str(tmp_path))
-
-
-def _make_pack(root, name: str, items: dict[str, str]) -> None:
-    """Create a pack directory with *items* as ``{item_name: module_content}``."""
-    pack_dir = root / name
-    pack_dir.mkdir(exist_ok=True)
-    (pack_dir / "version.txt").write_text("1.0\n")
-    for item, content in items.items():
-        (pack_dir / f"{item}.py").write_text(content)
-
 
 def _stub_item() -> str:
     return (
@@ -57,16 +31,11 @@ def _spy_item() -> str:
     return "from engine.tests.effects.helpers import SpyEffectBuilder\nBUILD = SpyEffectBuilder()\n"
 
 
-def _make_stub_registry(pack_env) -> PackRegistry:
+def _make_stub_registry(pack_tree) -> PackRegistry:
     """Return a scanned PackRegistry with a 'stub' pack providing common test effects."""
-    _make_pack(
-        pack_env,
-        "stub",
-        {"fire": _stub_item(), "ice": _stub_item(), "shock": _stub_item()},
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
-    return registry
+    return pack_tree.scan(
+        effect_packs={"stub": {"fire": _stub_item(), "ice": _stub_item(), "shock": _stub_item()}}
+    ).effect_registry
 
 
 def _make_timer() -> Timer:
@@ -95,7 +64,7 @@ def _make_manager(registry, outputs, allowed=None) -> EffectManager:
 
 
 def test_manager_with_no_outputs_updates_without_error() -> None:
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[])
+    manager = _make_manager(registry=PackRegistry(), outputs=[])
     manager.update(_make_timer())
 
 
@@ -106,7 +75,7 @@ def test_manager_with_no_outputs_updates_without_error() -> None:
 
 def test_update_with_no_effects_sends_go_dark_to_output() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+    manager = _make_manager(registry=PackRegistry(), outputs=[output])
 
     manager.update(_make_timer())
 
@@ -117,7 +86,7 @@ def test_update_with_no_effects_sends_go_dark_to_output() -> None:
 def test_update_with_no_effects_sends_go_dark_to_all_outputs() -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[output_a, output_b])
+    manager = _make_manager(registry=PackRegistry(), outputs=[output_a, output_b])
 
     manager.update(_make_timer())
 
@@ -127,7 +96,7 @@ def test_update_with_no_effects_sends_go_dark_to_all_outputs() -> None:
 
 def test_update_sends_go_dark_every_tick_when_no_effects_are_active() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+    manager = _make_manager(registry=PackRegistry(), outputs=[output])
 
     manager.update(_make_timer())
     manager.update(_make_timer())
@@ -135,9 +104,9 @@ def test_update_sends_go_dark_every_tick_when_no_effects_are_active() -> None:
     assert output.clear_pixels_calls == ["personal", "personal"]
 
 
-def test_update_delivers_one_composed_frame_to_output_on_every_tick(pack_env) -> None:
+def test_update_delivers_one_composed_frame_to_output_on_every_tick(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
 
     manager.update(_make_timer())
@@ -151,9 +120,9 @@ def test_update_delivers_one_composed_frame_to_output_on_every_tick(pack_env) ->
 # ---------------------------------------------------------------------------
 
 
-def test_set_effect_delivers_one_frame_to_matching_output(pack_env) -> None:
+def test_set_effect_delivers_one_frame_to_matching_output(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
     manager.update(_make_timer())
@@ -161,10 +130,10 @@ def test_set_effect_delivers_one_frame_to_matching_output(pack_env) -> None:
     assert output.update_pixels_calls == [("personal", output.created_buffers[0])]
 
 
-def test_set_effect_nonmatching_output_receives_go_dark(pack_env) -> None:
+def test_set_effect_nonmatching_output_receives_go_dark(pack_tree) -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output_a, output_b])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output_a, output_b])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
     manager.update(_make_timer())
@@ -178,9 +147,9 @@ def test_set_effect_nonmatching_output_receives_go_dark(pack_env) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_set_effect_twice_replaces_effect(pack_env) -> None:
+def test_set_effect_twice_replaces_effect(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
     manager.set_effect(Scope.PERSONAL, "stub.ice", {})
@@ -189,15 +158,11 @@ def test_set_effect_twice_replaces_effect(pack_env) -> None:
     assert output.update_pixels_calls == [("personal", output.created_buffers[1])]
 
 
-def test_set_effect_twice_first_effect_not_advanced(pack_env) -> None:
+def test_set_effect_twice_first_effect_not_advanced(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    _make_pack(
-        pack_env,
-        "spy",
-        {"fire": _spy_item(), "ice": _spy_item()},
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    registry = pack_tree.scan(
+        effect_packs={"spy": {"fire": _spy_item(), "ice": _spy_item()}}
+    ).effect_registry
     manager = _make_manager(registry=registry, outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "spy.fire", {})
@@ -214,10 +179,10 @@ def test_set_effect_twice_first_effect_not_advanced(pack_env) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_out_of_scope_output_receives_go_dark_each_frame(pack_env) -> None:
+def test_out_of_scope_output_receives_go_dark_each_frame(pack_tree) -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output_a, output_b])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output_a, output_b])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
     manager.update(_make_timer())
@@ -232,19 +197,17 @@ def test_out_of_scope_output_receives_go_dark_each_frame(pack_env) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_effect_event_reaches_matching_scope_output(pack_env) -> None:
-    _make_pack(
-        pack_env,
-        "events",
-        {
-            "shock": (
-                "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
-                "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
-            )
-        },
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+def test_effect_event_reaches_matching_scope_output(pack_tree) -> None:
+    registry = pack_tree.scan(
+        effect_packs={
+            "events": {
+                "shock": (
+                    "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
+                    "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
+                )
+            }
+        }
+    ).effect_registry
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
 
@@ -257,19 +220,17 @@ def test_effect_event_reaches_matching_scope_output(pack_env) -> None:
     ]
 
 
-def test_effect_event_does_not_reach_out_of_scope_output(pack_env) -> None:
-    _make_pack(
-        pack_env,
-        "events",
-        {
-            "shock": (
-                "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
-                "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
-            )
-        },
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+def test_effect_event_does_not_reach_out_of_scope_output(pack_tree) -> None:
+    registry = pack_tree.scan(
+        effect_packs={
+            "events": {
+                "shock": (
+                    "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
+                    "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
+                )
+            }
+        }
+    ).effect_registry
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(registry=registry, outputs=[output_a, output_b])
@@ -285,19 +246,17 @@ def test_effect_event_does_not_reach_out_of_scope_output(pack_env) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_resolution_equals_max_min_resolution_of_matching_outputs(pack_env) -> None:
-    _make_pack(
-        pack_env,
-        "capture",
-        {
-            "fire": (
-                "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
-                "BUILD = CapturingEffectBuilder()\n"
-            )
-        },
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+def test_resolution_equals_max_min_resolution_of_matching_outputs(pack_tree) -> None:
+    registry = pack_tree.scan(
+        effect_packs={
+            "capture": {
+                "fire": (
+                    "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
+                    "BUILD = CapturingEffectBuilder()\n"
+                )
+            }
+        }
+    ).effect_registry
     output_a = SpyEffectOutput(min_resolution=32, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=64, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output_a, output_b])
@@ -308,19 +267,17 @@ def test_resolution_equals_max_min_resolution_of_matching_outputs(pack_env) -> N
     assert builder.last_config.resolution == 64
 
 
-def test_resolution_falls_back_to_default_when_no_outputs_match(pack_env) -> None:
-    _make_pack(
-        pack_env,
-        "capture",
-        {
-            "fire": (
-                "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
-                "BUILD = CapturingEffectBuilder()\n"
-            )
-        },
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+def test_resolution_falls_back_to_default_when_no_outputs_match(pack_tree) -> None:
+    registry = pack_tree.scan(
+        effect_packs={
+            "capture": {
+                "fire": (
+                    "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
+                    "BUILD = CapturingEffectBuilder()\n"
+                )
+            }
+        }
+    ).effect_registry
     manager = _make_manager(registry=registry, outputs=[])
 
     manager.set_effect(Scope.PERSONAL, "capture.fire", {})
@@ -334,9 +291,9 @@ def test_resolution_falls_back_to_default_when_no_outputs_match(pack_env) -> Non
 # ---------------------------------------------------------------------------
 
 
-def test_add_effect_after_set_effect_delivers_a_single_composed_frame(pack_env) -> None:
+def test_add_effect_after_set_effect_delivers_a_single_composed_frame(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
     manager.add_effect(Scope.PERSONAL, "stub.ice", {})
@@ -345,15 +302,11 @@ def test_add_effect_after_set_effect_delivers_a_single_composed_frame(pack_env) 
     assert len(output.update_pixels_calls) == 1
 
 
-def test_add_effect_both_effects_advanced_on_each_update(pack_env) -> None:
+def test_add_effect_both_effects_advanced_on_each_update(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    _make_pack(
-        pack_env,
-        "spy",
-        {"fire": _spy_item(), "ice": _spy_item()},
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    registry = pack_tree.scan(
+        effect_packs={"spy": {"fire": _spy_item(), "ice": _spy_item()}}
+    ).effect_registry
     manager = _make_manager(registry=registry, outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "spy.fire", {})
@@ -367,9 +320,9 @@ def test_add_effect_both_effects_advanced_on_each_update(pack_env) -> None:
     assert ice_builder.created[0].update_count == 2
 
 
-def test_add_effect_on_empty_scope_delivers_one_frame(pack_env) -> None:
+def test_add_effect_on_empty_scope_delivers_one_frame(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     manager.update(_make_timer())
@@ -377,28 +330,26 @@ def test_add_effect_on_empty_scope_delivers_one_frame(pack_env) -> None:
     assert len(output.update_pixels_calls) == 1
 
 
-def test_add_effect_layers_split_two_effects_side_by_side_in_one_buffer(pack_env) -> None:
+def test_add_effect_layers_split_two_effects_side_by_side_in_one_buffer(pack_tree) -> None:
     """Split routing: layering two effects on one scope shows both, oldest-first,
 
     each in its own contiguous slice of the composed region -- not just the
     topmost effect.
     """
-    _make_pack(
-        pack_env,
-        "color",
-        {
-            "red": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
-            ),
-            "blue": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
-            ),
-        },
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    registry = pack_tree.scan(
+        effect_packs={
+            "color": {
+                "red": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+                ),
+                "blue": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
+                ),
+            }
+        }
+    ).effect_registry
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
 
@@ -410,20 +361,18 @@ def test_add_effect_layers_split_two_effects_side_by_side_in_one_buffer(pack_env
     assert list(composed) == [0xFF0000] * 5 + [0x0000FF] * 5
 
 
-def test_render_runs_after_merge_strategy_sizes_the_buffer(pack_env) -> None:
+def test_render_runs_after_merge_strategy_sizes_the_buffer(pack_tree) -> None:
     """Split's prepare_buffers partitions each buffer before an effect renders into it."""
-    _make_pack(
-        pack_env,
-        "probe",
-        {
-            "beam": (
-                "from engine.tests.effects.helpers import RenderLengthProbeEffectBuilder\n"
-                "BUILD = RenderLengthProbeEffectBuilder()\n"
-            )
-        },
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    registry = pack_tree.scan(
+        effect_packs={
+            "probe": {
+                "beam": (
+                    "from engine.tests.effects.helpers import RenderLengthProbeEffectBuilder\n"
+                    "BUILD = RenderLengthProbeEffectBuilder()\n"
+                )
+            }
+        }
+    ).effect_registry
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
 
@@ -440,9 +389,9 @@ def test_render_runs_after_merge_strategy_sizes_the_buffer(pack_env) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_stop_effect_causes_go_dark_on_next_update(pack_env) -> None:
+def test_stop_effect_causes_go_dark_on_next_update(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
     manager.update(_make_timer())
@@ -453,9 +402,9 @@ def test_stop_effect_causes_go_dark_on_next_update(pack_env) -> None:
     assert output.clear_pixels_calls[-1] == "personal"
 
 
-def test_stop_effect_clears_stacked_effects(pack_env) -> None:
+def test_stop_effect_clears_stacked_effects(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
     manager.add_effect(Scope.PERSONAL, "stub.ice", {})
@@ -465,11 +414,11 @@ def test_stop_effect_clears_stacked_effects(pack_env) -> None:
     assert output.update_pixels_calls == []
 
 
-def test_stop_effect_does_not_affect_other_scopes(pack_env) -> None:
+def test_stop_effect_does_not_affect_other_scopes(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -488,11 +437,9 @@ def test_stop_effect_does_not_affect_other_scopes(pack_env) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_shared_effect_advanced_once_per_frame_for_composite_scope(pack_env) -> None:
+def test_shared_effect_advanced_once_per_frame_for_composite_scope(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.ALL])
-    _make_pack(pack_env, "spy", {"fire": _spy_item()})
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    registry = pack_tree.scan(effect_packs={"spy": {"fire": _spy_item()}}).effect_registry
     manager = _make_manager(registry=registry, outputs=[output])
 
     manager.set_effect(Scope.ALL, "spy.fire", {})
@@ -502,11 +449,11 @@ def test_shared_effect_advanced_once_per_frame_for_composite_scope(pack_env) -> 
     assert fire_builder.created[0].update_count == 1
 
 
-def test_each_output_receives_one_frame_for_composite_scope(pack_env) -> None:
+def test_each_output_receives_one_frame_for_composite_scope(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -517,11 +464,11 @@ def test_each_output_receives_one_frame_for_composite_scope(pack_env) -> None:
     assert len(output_directional.update_pixels_calls) == 1
 
 
-def test_each_output_gets_distinct_buffer_for_composite_scope(pack_env) -> None:
+def test_each_output_gets_distinct_buffer_for_composite_scope(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -533,11 +480,11 @@ def test_each_output_gets_distinct_buffer_for_composite_scope(pack_env) -> None:
     assert personal_buf is not directional_buf
 
 
-def test_stop_effect_all_sends_go_dark_to_every_output(pack_env) -> None:
+def test_stop_effect_all_sends_go_dark_to_every_output(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -557,12 +504,12 @@ def test_stop_effect_all_sends_go_dark_to_every_output(pack_env) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_set_effect_on_partial_scope_leaves_other_scope_effects_running(pack_env) -> None:
+def test_set_effect_on_partial_scope_leaves_other_scope_effects_running(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     output_global = SpyEffectOutput(min_resolution=10, scopes=[Scope.Global.MAIN])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional, output_global],
     )
 
@@ -575,11 +522,11 @@ def test_set_effect_on_partial_scope_leaves_other_scope_effects_running(pack_env
     assert len(output_global.update_pixels_calls) == 1
 
 
-def test_stop_effect_on_partial_scope_continues_rendering_on_remaining_scope(pack_env) -> None:
+def test_stop_effect_on_partial_scope_continues_rendering_on_remaining_scope(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -591,11 +538,11 @@ def test_stop_effect_on_partial_scope_continues_rendering_on_remaining_scope(pac
     assert len(output_directional.update_pixels_calls) == 1
 
 
-def test_stop_effect_with_broader_scope_removes_narrower_effect_completely(pack_env) -> None:
+def test_stop_effect_with_broader_scope_removes_narrower_effect_completely(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -607,11 +554,11 @@ def test_stop_effect_with_broader_scope_removes_narrower_effect_completely(pack_
     assert output_directional.update_pixels_calls == []
 
 
-def test_add_effect_does_not_stop_effects_already_running_in_scope(pack_env) -> None:
+def test_add_effect_does_not_stop_effects_already_running_in_scope(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -628,9 +575,9 @@ def test_add_effect_does_not_stop_effects_already_running_in_scope(pack_env) -> 
 # ---------------------------------------------------------------------------
 
 
-def test_two_add_effect_calls_return_different_receipts(pack_env) -> None:
+def test_two_add_effect_calls_return_different_receipts(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     receipt_a = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     receipt_b = manager.add_effect(Scope.PERSONAL, "stub.ice", {})
@@ -644,9 +591,9 @@ def test_two_add_effect_calls_return_different_receipts(pack_env) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_stop_effect_by_receipt_stops_the_matching_effect(pack_env) -> None:
+def test_stop_effect_by_receipt_stops_the_matching_effect(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     receipt.stop()
@@ -655,9 +602,9 @@ def test_stop_effect_by_receipt_stops_the_matching_effect(pack_env) -> None:
     assert output.update_pixels_calls == []
 
 
-def test_stop_effect_by_receipt_leaves_other_effects_running(pack_env) -> None:
+def test_stop_effect_by_receipt_leaves_other_effects_running(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     receipt_a = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     manager.add_effect(Scope.PERSONAL, "stub.ice", {})
@@ -667,9 +614,9 @@ def test_stop_effect_by_receipt_leaves_other_effects_running(pack_env) -> None:
     assert len(output.update_pixels_calls) == 1
 
 
-def test_stop_effect_by_receipt_with_stale_receipt_is_silent_noop(pack_env) -> None:
+def test_stop_effect_by_receipt_with_stale_receipt_is_silent_noop(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     receipt.stop()
@@ -684,9 +631,9 @@ def test_stop_effect_by_receipt_with_stale_receipt_is_silent_noop(pack_env) -> N
 # ---------------------------------------------------------------------------
 
 
-def test_add_effect_fires_start_event_to_matching_output(pack_env) -> None:
+def test_add_effect_fires_start_event_to_matching_output(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
 
@@ -695,19 +642,19 @@ def test_add_effect_fires_start_event_to_matching_output(pack_env) -> None:
     ]
 
 
-def test_add_effect_start_event_not_delivered_to_out_of_scope_output(pack_env) -> None:
+def test_add_effect_start_event_not_delivered_to_out_of_scope_output(pack_tree) -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output_a, output_b])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output_a, output_b])
 
     manager.add_effect(Scope.PERSONAL, "stub.fire", {})
 
     assert output_b.handle_event_calls == []
 
 
-def test_add_effect_does_not_fire_stop_for_existing_effects(pack_env) -> None:
+def test_add_effect_does_not_fire_stop_for_existing_effects(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     output.handle_event_calls.clear()
@@ -719,9 +666,9 @@ def test_add_effect_does_not_fire_stop_for_existing_effects(pack_env) -> None:
     ]
 
 
-def test_add_effect_fires_start_event_unconditionally_for_duplicate_name(pack_env) -> None:
+def test_add_effect_fires_start_event_unconditionally_for_duplicate_name(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     receipt_a = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     receipt_b = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
@@ -732,9 +679,9 @@ def test_add_effect_fires_start_event_unconditionally_for_duplicate_name(pack_en
     ]
 
 
-def test_stop_effect_fires_stop_event_to_matching_output(pack_env) -> None:
+def test_stop_effect_fires_stop_event_to_matching_output(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     output.handle_event_calls.clear()
@@ -746,9 +693,9 @@ def test_stop_effect_fires_stop_event_to_matching_output(pack_env) -> None:
     ]
 
 
-def test_stop_effect_fires_stop_for_each_effect_in_scope(pack_env) -> None:
+def test_stop_effect_fires_stop_for_each_effect_in_scope(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     fire_receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     ice_receipt = manager.add_effect(Scope.PERSONAL, "stub.ice", {})
@@ -762,9 +709,9 @@ def test_stop_effect_fires_stop_for_each_effect_in_scope(pack_env) -> None:
     ]
 
 
-def test_set_effect_fires_stop_then_start_when_replacing_effect(pack_env) -> None:
+def test_set_effect_fires_stop_then_start_when_replacing_effect(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     fire_receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     output.handle_event_calls.clear()
@@ -777,11 +724,11 @@ def test_set_effect_fires_stop_then_start_when_replacing_effect(pack_env) -> Non
     ]
 
 
-def test_set_effect_fires_stop_only_to_outputs_in_call_time_scope(pack_env) -> None:
+def test_set_effect_fires_stop_only_to_outputs_in_call_time_scope(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -798,11 +745,11 @@ def test_set_effect_fires_stop_only_to_outputs_in_call_time_scope(pack_env) -> N
     assert output_directional.handle_event_calls == []
 
 
-def test_stop_effect_with_broader_scope_fires_stop_to_all_matching_outputs(pack_env) -> None:
+def test_stop_effect_with_broader_scope_fires_stop_to_all_matching_outputs(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -820,9 +767,9 @@ def test_stop_effect_with_broader_scope_fires_stop_to_all_matching_outputs(pack_
     ]
 
 
-def test_stop_effect_by_receipt_fires_stop_event(pack_env) -> None:
+def test_stop_effect_by_receipt_fires_stop_event(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     output.handle_event_calls.clear()
@@ -835,11 +782,11 @@ def test_stop_effect_by_receipt_fires_stop_event(pack_env) -> None:
     ]
 
 
-def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect(pack_env) -> None:
+def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -864,9 +811,9 @@ def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect(p
 # ---------------------------------------------------------------------------
 
 
-def test_handle_event_receives_personal_scope_for_personal_effect(pack_env) -> None:
+def test_handle_event_receives_personal_scope_for_personal_effect(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
 
@@ -875,9 +822,9 @@ def test_handle_event_receives_personal_scope_for_personal_effect(pack_env) -> N
     ]
 
 
-def test_handle_event_receives_directional_scope_for_directional_effect(pack_env) -> None:
+def test_handle_event_receives_directional_scope_for_directional_effect(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     receipt = manager.add_effect(Scope.DIRECTIONAL, "stub.ice", {})
 
@@ -886,11 +833,11 @@ def test_handle_event_receives_directional_scope_for_directional_effect(pack_env
     ]
 
 
-def test_handle_event_receives_composite_scope_not_decomposed_leaf(pack_env) -> None:
+def test_handle_event_receives_composite_scope_not_decomposed_leaf(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -910,27 +857,24 @@ def test_handle_event_receives_composite_scope_not_decomposed_leaf(pack_env) -> 
 
 
 def test_missing_pack_prefix_raises_value_error() -> None:
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[])
+    manager = _make_manager(registry=PackRegistry(), outputs=[])
 
     with pytest.raises(ValueError, match="missing pack prefix"):
         manager.set_effect(Scope.PERSONAL, "fire", {})
 
 
-def test_unknown_pack_raises_value_error(pack_env) -> None:
-    """'spells' is declared allowed but never scanned into the registry --
+def test_unknown_pack_raises_value_error() -> None:
+    """'spells' is declared allowed but the registry has no packs --
     proving membership and registry lookup are genuinely separate checks."""
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    registry = PackRegistry()
     manager = _make_manager(registry=registry, outputs=[], allowed=frozenset({"spells"}))
 
     with pytest.raises(ValueError, match="Unknown effect pack 'spells'"):
         manager.set_effect(Scope.PERSONAL, "spells.fireball", {})
 
 
-def test_unknown_effect_in_known_pack_raises_value_error(pack_env) -> None:
-    _make_pack(pack_env, "elements", {"fire": _stub_item()})
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+def test_unknown_effect_in_known_pack_raises_value_error(pack_tree) -> None:
+    registry = pack_tree.scan(effect_packs={"elements": {"fire": _stub_item()}}).effect_registry
     manager = _make_manager(registry=registry, outputs=[])
 
     with pytest.raises(ValueError, match="Unknown effect 'flash' in pack 'elements'"):
@@ -944,8 +888,8 @@ def test_unknown_effect_in_known_pack_raises_value_error(pack_env) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_set_allowed_packs_undeclared_pack_raises_naming_the_pack(pack_env) -> None:
-    registry = _make_stub_registry(pack_env)
+def test_set_allowed_packs_undeclared_pack_raises_naming_the_pack(pack_tree) -> None:
+    registry = _make_stub_registry(pack_tree)
     manager = EffectManager(registry=registry, outputs=[])
     manager.set_allowed_packs(frozenset({"other"}))
 
@@ -953,8 +897,8 @@ def test_set_allowed_packs_undeclared_pack_raises_naming_the_pack(pack_env) -> N
         manager.set_effect(Scope.PERSONAL, "stub.fire", {})
 
 
-def test_set_allowed_packs_declared_pack_resolves(pack_env) -> None:
-    registry = _make_stub_registry(pack_env)
+def test_set_allowed_packs_declared_pack_resolves(pack_tree) -> None:
+    registry = _make_stub_registry(pack_tree)
     manager = EffectManager(registry=registry, outputs=[])
     manager.set_allowed_packs(frozenset({"stub"}))
 
@@ -963,8 +907,8 @@ def test_set_allowed_packs_declared_pack_resolves(pack_env) -> None:
     assert receipt is not None
 
 
-def test_no_allowed_packs_installed_raises_no_active_scene_error(pack_env) -> None:
-    registry = _make_stub_registry(pack_env)
+def test_no_allowed_packs_installed_raises_no_active_scene_error(pack_tree) -> None:
+    registry = _make_stub_registry(pack_tree)
     manager = EffectManager(registry=registry, outputs=[])
     # No set_allowed_packs call -- mirrors a manager that has never seen a scene transition.
 
@@ -974,10 +918,10 @@ def test_no_allowed_packs_installed_raises_no_active_scene_error(pack_env) -> No
 
 def test_scene_prefix_effect_unaffected_by_allowed_packs() -> None:
     """scene.-prefixed names bypass pack-membership entirely, per issue #814."""
-    registry = PackRegistry(item_attr="BUILD")
+    registry = PackRegistry()
     manager = EffectManager(registry=registry, outputs=[])
     manager.set_allowed_packs(frozenset())  # active scene declares zero effect_packs
-    local_registry = SceneLocalRegistry(item_attr="BUILD")
+    local_registry = SceneLocalRegistry()
     manager.set_local_effects(local_registry)
 
     # An empty allowed-pack set must not block scene.-prefixed resolution; the
@@ -993,7 +937,7 @@ def test_scene_prefix_effect_unaffected_by_allowed_packs() -> None:
 
 def test_update_calls_flush_when_no_effects_are_active() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+    manager = _make_manager(registry=PackRegistry(), outputs=[output])
 
     manager.update(_make_timer())
 
@@ -1002,7 +946,7 @@ def test_update_calls_flush_when_no_effects_are_active() -> None:
 
 def test_update_calls_flush_once_per_tick() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+    manager = _make_manager(registry=PackRegistry(), outputs=[output])
 
     manager.update(_make_timer())
     manager.update(_make_timer())
@@ -1014,7 +958,7 @@ def test_update_calls_flush_once_per_tick() -> None:
 def test_update_calls_flush_on_all_outputs_each_tick() -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[output_a, output_b])
+    manager = _make_manager(registry=PackRegistry(), outputs=[output_a, output_b])
 
     manager.update(_make_timer())
 
@@ -1027,9 +971,9 @@ def test_update_calls_flush_on_all_outputs_each_tick() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_stop_effect_calls_clear_pixels_when_last_effect_stops(pack_env) -> None:
+def test_stop_effect_calls_clear_pixels_when_last_effect_stops(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     manager.stop_effect(Scope.PERSONAL)
@@ -1037,9 +981,9 @@ def test_stop_effect_calls_clear_pixels_when_last_effect_stops(pack_env) -> None
     assert output.clear_pixels_calls == ["personal"]
 
 
-def test_stop_effect_by_receipt_calls_clear_pixels_when_last_effect_stops(pack_env) -> None:
+def test_stop_effect_by_receipt_calls_clear_pixels_when_last_effect_stops(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     receipt.stop()
@@ -1049,10 +993,10 @@ def test_stop_effect_by_receipt_calls_clear_pixels_when_last_effect_stops(pack_e
 
 
 def test_stop_effect_by_receipt_does_not_call_clear_pixels_when_layered_effect_remains(
-    pack_env,
+    pack_tree,
 ) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     fire_receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     manager.add_effect(Scope.PERSONAL, "stub.ice", {})
@@ -1062,11 +1006,11 @@ def test_stop_effect_by_receipt_does_not_call_clear_pixels_when_layered_effect_r
     assert output.clear_pixels_calls == []
 
 
-def test_clear_pixels_fires_for_narrowed_key_with_no_remaining_coverage(pack_env) -> None:
+def test_clear_pixels_fires_for_narrowed_key_with_no_remaining_coverage(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -1077,11 +1021,11 @@ def test_clear_pixels_fires_for_narrowed_key_with_no_remaining_coverage(pack_env
     assert output_directional.clear_pixels_calls == []
 
 
-def test_clear_pixels_not_fired_for_key_still_covered_after_narrowing(pack_env) -> None:
+def test_clear_pixels_not_fired_for_key_still_covered_after_narrowing(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -1096,9 +1040,9 @@ def test_clear_pixels_not_fired_for_key_still_covered_after_narrowing(pack_env) 
     assert output_directional.clear_pixels_calls == []
 
 
-def test_update_calls_flush_even_when_effects_are_active(pack_env) -> None:
+def test_update_calls_flush_even_when_effects_are_active(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
     manager.update(_make_timer())
@@ -1106,7 +1050,7 @@ def test_update_calls_flush_even_when_effects_are_active(pack_env) -> None:
     assert len(output.flush_calls) == 1
 
 
-def test_update_calls_flush_after_update_pixels_each_tick(pack_env) -> None:
+def test_update_calls_flush_after_update_pixels_each_tick(pack_tree) -> None:
     call_order: list[str] = []
 
     class OrderTrackingOutput(SpyEffectOutput):
@@ -1119,7 +1063,7 @@ def test_update_calls_flush_after_update_pixels_each_tick(pack_env) -> None:
             call_order.append("flush")
 
     output = OrderTrackingOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
     manager.update(_make_timer())
@@ -1140,7 +1084,7 @@ def test_update_calls_flush_after_clear_pixels_each_tick_when_no_effects_are_act
             call_order.append("flush")
 
     output = OrderTrackingOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+    manager = _make_manager(registry=PackRegistry(), outputs=[output])
 
     manager.update(_make_timer())
 
@@ -1152,20 +1096,20 @@ def test_update_calls_flush_after_clear_pixels_each_tick_when_no_effects_are_act
 # ---------------------------------------------------------------------------
 
 
-def test_create_buffer_called_with_scope_key_on_effect_start(pack_env) -> None:
+def test_create_buffer_called_with_scope_key_on_effect_start(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
 
     assert output.create_buffer_key_calls == ["personal"]
 
 
-def test_create_buffer_called_once_per_matching_key_for_composite_scope(pack_env) -> None:
+def test_create_buffer_called_once_per_matching_key_for_composite_scope(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -1175,11 +1119,11 @@ def test_create_buffer_called_once_per_matching_key_for_composite_scope(pack_env
     assert output_directional.create_buffer_key_calls == ["directional"]
 
 
-def test_create_buffer_not_called_for_out_of_scope_output(pack_env) -> None:
+def test_create_buffer_not_called_for_out_of_scope_output(pack_tree) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_personal, output_directional],
     )
 
@@ -1188,20 +1132,18 @@ def test_create_buffer_not_called_for_out_of_scope_output(pack_env) -> None:
     assert output_directional.create_buffer_key_calls == []
 
 
-def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_env) -> None:
+def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_tree) -> None:
     """Effect-triggered events after scope narrowing must reach only remaining-scope outputs."""
-    _make_pack(
-        pack_env,
-        "evt",
-        {
-            "shock": (
-                "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
-                "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
-            )
-        },
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    registry = pack_tree.scan(
+        effect_packs={
+            "evt": {
+                "shock": (
+                    "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
+                    "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
+                )
+            }
+        }
+    ).effect_registry
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(registry=registry, outputs=[output_personal, output_directional])
@@ -1230,9 +1172,9 @@ def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_env) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_update_pixels_called_once_per_registered_key_for_multi_key_output(pack_env) -> None:
+def test_update_pixels_called_once_per_registered_key_for_multi_key_output(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL, Scope.DIRECTIONAL])
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.set_effect(Scope.ALL, "stub.fire", {})
     manager.update(_make_timer())
@@ -1247,18 +1189,18 @@ def test_update_pixels_called_once_per_registered_key_for_multi_key_output(pack_
 # ---------------------------------------------------------------------------
 
 
-def test_output_with_receives_pixels_false_gets_no_create_buffer(pack_env) -> None:
+def test_output_with_receives_pixels_false_gets_no_create_buffer(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL], receives_pixels=False)
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
 
     assert output.create_buffer_key_calls == []
 
 
-def test_output_with_receives_pixels_false_gets_no_update_pixels(pack_env) -> None:
+def test_output_with_receives_pixels_false_gets_no_update_pixels(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL], receives_pixels=False)
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
     manager.update(_make_timer())
@@ -1266,9 +1208,9 @@ def test_output_with_receives_pixels_false_gets_no_update_pixels(pack_env) -> No
     assert output.update_pixels_calls == []
 
 
-def test_output_with_receives_pixels_false_still_gets_flush(pack_env) -> None:
+def test_output_with_receives_pixels_false_still_gets_flush(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL], receives_pixels=False)
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[output])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
     manager.update(_make_timer())
@@ -1278,7 +1220,7 @@ def test_output_with_receives_pixels_false_still_gets_flush(pack_env) -> None:
 
 def test_output_with_receives_pixels_false_flush_called_even_with_no_effects() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL], receives_pixels=False)
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+    manager = _make_manager(registry=PackRegistry(), outputs=[output])
 
     manager.update(_make_timer())
 
@@ -1286,13 +1228,13 @@ def test_output_with_receives_pixels_false_flush_called_even_with_no_effects() -
     assert output.update_pixels_calls == []
 
 
-def test_pixel_output_alongside_non_pixel_output_both_get_flush(pack_env) -> None:
+def test_pixel_output_alongside_non_pixel_output_both_get_flush(pack_tree) -> None:
     pixel_output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     non_pixel_output = SpyEffectOutput(
         min_resolution=10, scopes=[Scope.PERSONAL], receives_pixels=False
     )
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[pixel_output, non_pixel_output],
     )
 
@@ -1311,22 +1253,20 @@ def test_pixel_output_alongside_non_pixel_output_both_get_flush(pack_env) -> Non
 # ---------------------------------------------------------------------------
 
 
-def test_effect_with_renders_pixels_false_skips_buffer_allocation(pack_env) -> None:
-    _make_pack(
-        pack_env,
-        "nopix",
-        {
-            "event": (
-                "from effects.effect import Effect, EffectConfig\n"
-                "from engine.effects.manager import EffectBuilder\n"
-                "class _Builder(EffectBuilder):\n"
-                "    def __call__(self, name, config): return Effect(name=name)\n"
-                "BUILD = _Builder()\n"
-            )
-        },
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+def test_effect_with_renders_pixels_false_skips_buffer_allocation(pack_tree) -> None:
+    registry = pack_tree.scan(
+        effect_packs={
+            "nopix": {
+                "event": (
+                    "from effects.effect import Effect, EffectConfig\n"
+                    "from engine.effects.manager import EffectBuilder\n"
+                    "class _Builder(EffectBuilder):\n"
+                    "    def __call__(self, name, config): return Effect(name=name)\n"
+                    "BUILD = _Builder()\n"
+                )
+            }
+        }
+    ).effect_registry
 
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
@@ -1336,22 +1276,20 @@ def test_effect_with_renders_pixels_false_skips_buffer_allocation(pack_env) -> N
     assert output.create_buffer_key_calls == []
 
 
-def test_effect_with_renders_pixels_false_skips_update_pixels_but_calls_flush(pack_env) -> None:
-    _make_pack(
-        pack_env,
-        "nopix",
-        {
-            "event": (
-                "from effects.effect import Effect, EffectConfig\n"
-                "from engine.effects.manager import EffectBuilder\n"
-                "class _Builder(EffectBuilder):\n"
-                "    def __call__(self, name, config): return Effect(name=name)\n"
-                "BUILD = _Builder()\n"
-            )
-        },
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+def test_effect_with_renders_pixels_false_skips_update_pixels_but_calls_flush(pack_tree) -> None:
+    registry = pack_tree.scan(
+        effect_packs={
+            "nopix": {
+                "event": (
+                    "from effects.effect import Effect, EffectConfig\n"
+                    "from engine.effects.manager import EffectBuilder\n"
+                    "class _Builder(EffectBuilder):\n"
+                    "    def __call__(self, name, config): return Effect(name=name)\n"
+                    "BUILD = _Builder()\n"
+                )
+            }
+        }
+    ).effect_registry
 
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
@@ -1369,55 +1307,55 @@ def test_effect_with_renders_pixels_false_skips_update_pixels_but_calls_flush(pa
 # ---------------------------------------------------------------------------
 
 
-def test_set_effect_receipt_brightness_defaults_to_one(pack_env) -> None:
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[])
+def test_set_effect_receipt_brightness_defaults_to_one(pack_tree) -> None:
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[])
 
     receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
 
     assert receipt.brightness == 1.0
 
 
-def test_set_effect_receipt_loudness_defaults_to_one(pack_env) -> None:
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[])
+def test_set_effect_receipt_loudness_defaults_to_one(pack_tree) -> None:
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[])
 
     receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
 
     assert receipt.loudness == 1.0
 
 
-def test_set_effect_transfers_brightness_from_options(pack_env) -> None:
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[])
+def test_set_effect_transfers_brightness_from_options(pack_tree) -> None:
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[])
 
     receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {"brightness": 0.5})
 
     assert receipt.brightness == 0.5
 
 
-def test_set_effect_transfers_loudness_from_options(pack_env) -> None:
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[])
+def test_set_effect_transfers_loudness_from_options(pack_tree) -> None:
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[])
 
     receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {"loudness": 0.25})
 
     assert receipt.loudness == 0.25
 
 
-def test_add_effect_transfers_brightness_from_options(pack_env) -> None:
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[])
+def test_add_effect_transfers_brightness_from_options(pack_tree) -> None:
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[])
 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {"brightness": 0.75})
 
     assert receipt.brightness == 0.75
 
 
-def test_set_effect_rejects_out_of_range_brightness_option(pack_env) -> None:
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[])
+def test_set_effect_rejects_out_of_range_brightness_option(pack_tree) -> None:
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[])
 
     with pytest.raises(ValueError):
         manager.set_effect(Scope.PERSONAL, "stub.fire", {"brightness": 1.5})
 
 
-def test_set_effect_rejects_out_of_range_loudness_option(pack_env) -> None:
-    manager = _make_manager(registry=_make_stub_registry(pack_env), outputs=[])
+def test_set_effect_rejects_out_of_range_loudness_option(pack_tree) -> None:
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[])
 
     with pytest.raises(ValueError):
         manager.set_effect(Scope.PERSONAL, "stub.fire", {"loudness": -0.1})
@@ -1428,24 +1366,22 @@ def test_set_effect_rejects_out_of_range_loudness_option(pack_env) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_set_merge_strategy_takes_effect_starting_next_tick(pack_env) -> None:
+def test_set_merge_strategy_takes_effect_starting_next_tick(pack_tree) -> None:
     """Switching from Split to Additive mid-run blends from the very next tick onward."""
-    _make_pack(
-        pack_env,
-        "color",
-        {
-            "red": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
-            ),
-            "blue": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
-            ),
-        },
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    registry = pack_tree.scan(
+        effect_packs={
+            "color": {
+                "red": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+                ),
+                "blue": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
+                ),
+            }
+        }
+    ).effect_registry
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
     manager.add_effect(Scope.PERSONAL, "color.red", {})
@@ -1464,23 +1400,21 @@ def test_set_merge_strategy_takes_effect_starting_next_tick(pack_env) -> None:
     assert list(second_composed) == [0xFF00FF] * 10
 
 
-def test_set_merge_strategy_leaves_other_scopes_strategy_unchanged(pack_env) -> None:
-    _make_pack(
-        pack_env,
-        "color",
-        {
-            "red": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
-            ),
-            "blue": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
-            ),
-        },
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+def test_set_merge_strategy_leaves_other_scopes_strategy_unchanged(pack_tree) -> None:
+    registry = pack_tree.scan(
+        effect_packs={
+            "color": {
+                "red": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+                ),
+                "blue": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
+                ),
+            }
+        }
+    ).effect_registry
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
         registry=registry,
@@ -1501,11 +1435,11 @@ def test_set_merge_strategy_leaves_other_scopes_strategy_unchanged(pack_env) -> 
 # ---------------------------------------------------------------------------
 
 
-def test_two_outputs_sharing_scope_both_receive_frame_on_update(pack_env) -> None:
+def test_two_outputs_sharing_scope_both_receive_frame_on_update(pack_tree) -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_a, output_b],
     )
 
@@ -1516,11 +1450,11 @@ def test_two_outputs_sharing_scope_both_receive_frame_on_update(pack_env) -> Non
     assert len(output_b.update_pixels_calls) == 1
 
 
-def test_two_outputs_sharing_scope_each_gets_its_own_buffer(pack_env) -> None:
+def test_two_outputs_sharing_scope_each_gets_its_own_buffer(pack_tree) -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(
-        registry=_make_stub_registry(pack_env),
+        registry=_make_stub_registry(pack_tree),
         outputs=[output_a, output_b],
     )
 
@@ -1532,19 +1466,17 @@ def test_two_outputs_sharing_scope_each_gets_its_own_buffer(pack_env) -> None:
     assert buf_a is not buf_b
 
 
-def test_two_outputs_sharing_scope_both_reflect_the_same_receipts_brightness(pack_env) -> None:
-    _make_pack(
-        pack_env,
-        "color",
-        {
-            "red": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
-            )
-        },
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+def test_two_outputs_sharing_scope_both_reflect_the_same_receipts_brightness(pack_tree) -> None:
+    registry = pack_tree.scan(
+        effect_packs={
+            "color": {
+                "red": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+                )
+            }
+        }
+    ).effect_registry
     output_a = SpyEffectOutput(min_resolution=4, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=4, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output_a, output_b])
@@ -1566,14 +1498,14 @@ def test_two_outputs_sharing_scope_both_reflect_the_same_receipts_brightness(pac
 
 def test_capture_merge_strategies_defaults_every_registered_key_to_split() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL, Scope.DIRECTIONAL])
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+    manager = _make_manager(registry=PackRegistry(), outputs=[output])
 
     assert manager.capture_merge_strategies() == {"personal": SPLIT, "directional": SPLIT}
 
 
 def test_capture_merge_strategies_returns_a_copy_independent_of_later_live_map_mutations() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+    manager = _make_manager(registry=PackRegistry(), outputs=[output])
 
     snapshot = manager.capture_merge_strategies()
     manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
@@ -1583,7 +1515,7 @@ def test_capture_merge_strategies_returns_a_copy_independent_of_later_live_map_m
 
 def test_reset_merge_strategies_sets_every_registered_key_back_to_split() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL, Scope.DIRECTIONAL])
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+    manager = _make_manager(registry=PackRegistry(), outputs=[output])
     manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
     manager.set_merge_strategy(Scope.DIRECTIONAL, ADDITIVE)
 
@@ -1594,7 +1526,7 @@ def test_reset_merge_strategies_sets_every_registered_key_back_to_split() -> Non
 
 def test_apply_merge_strategies_installs_the_given_snapshot_as_the_live_map() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=PackRegistry(item_attr="BUILD"), outputs=[output])
+    manager = _make_manager(registry=PackRegistry(), outputs=[output])
     manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
     snapshot = {"personal": SPLIT}
 
@@ -1603,25 +1535,23 @@ def test_apply_merge_strategies_installs_the_given_snapshot_as_the_live_map() ->
     assert manager.capture_merge_strategies() == snapshot
 
 
-def test_apply_merge_strategies_takes_effect_on_the_very_next_tick(pack_env) -> None:
+def test_apply_merge_strategies_takes_effect_on_the_very_next_tick(pack_tree) -> None:
     """Direct-installing a captured Split snapshot over a live Additive choice
     must change the composed pixels from the very next update()."""
-    _make_pack(
-        pack_env,
-        "color",
-        {
-            "red": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
-            ),
-            "blue": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
-            ),
-        },
-    )
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(str(pack_env), _MODULE_PREFIX)
+    registry = pack_tree.scan(
+        effect_packs={
+            "color": {
+                "red": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+                ),
+                "blue": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
+                ),
+            }
+        }
+    ).effect_registry
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
     split_snapshot = manager.capture_merge_strategies()

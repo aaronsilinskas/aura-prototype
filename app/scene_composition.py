@@ -38,6 +38,7 @@ __all__ = [
     "build_scene_boot",
     "build_scene_runtime",
     "build_scene_tick",
+    "install_pack_sounds",
     "resolve_boot_scene_name",
     "resolve_ir_codec",
     "scan_boot_pack_catalog",
@@ -128,6 +129,22 @@ def scan_boot_pack_catalog(
     return scan_pack_roots(roots, initial_data_overrides=scene_data)
 
 
+def install_pack_sounds(hw: DeviceHardware, catalog: PackCatalog) -> AudioRegistry:
+    """Install *catalog*'s pack sounds on *hw*'s audio; return the registry ``SceneManager`` takes.
+
+    ``hw.audio_registry`` is the registry the device's audio output resolves
+    clips through, so installing the pack sounds as its base is what lets
+    ``scene.``/``<pack>.`` clip names resolve at runtime. A device with no
+    audio gets a fresh, unreachable ``AudioRegistry``: it satisfies
+    ``SceneManager``'s audio-overlay seam without pretending sounds resolve.
+    """
+    audio_registry = hw.audio_registry
+    if audio_registry is None:
+        return AudioRegistry()
+    audio_registry.set_pack_sounds(catalog.pack_sounds)
+    return audio_registry
+
+
 def build_scene_runtime(
     hw: DeviceHardware,
     scene_name: str,
@@ -171,26 +188,13 @@ def build_scene_runtime(
         timer=timer,
     )
 
-    # hw.audio_registry is the same AudioRegistry the device's AudioEffectOutput
-    # resolves clips through — installing the catalog's pack sounds as its base
-    # and it as SceneManager's audio-overlay admin here is what lets
-    # scene./<pack>.-prefixed clip names resolve at runtime. A device with no
-    # enabled audio section has nothing to wire into; a fresh, unreachable
-    # AudioRegistry keeps SceneManager's non-optional seam satisfied without
-    # pretending sound resolution works.
-    audio_registry = hw.audio_registry
-    if audio_registry is not None:
-        audio_registry.set_pack_sounds(catalog.pack_sounds)
-    else:
-        audio_registry = AudioRegistry()
-
     manager = SceneManager(
         engine,
         effect_registry,
         rule_registry,
         scene_registry,
         effect_admin=effect_manager,
-        audio_overlay_admin=audio_registry,
+        audio_overlay_admin=install_pack_sounds(hw, catalog),
         scene_reboot=scene_reboot if scene_reboot is not None else SceneReboot(),
     )
     manager.load(scene_registry.resolve_known(scene_name))

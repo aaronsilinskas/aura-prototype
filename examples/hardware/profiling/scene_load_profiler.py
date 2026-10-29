@@ -118,12 +118,11 @@ from __future__ import annotations
 
 import gc
 
+from app.scene_composition import install_pack_sounds, scan_boot_pack_catalog
 from effects.performance import PerformanceTracker
-from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
-from engine.packs import PackRegistry
-from engine.scene import SceneManager, SceneRegistry
+from engine.scene import SceneManager
 from engine.state import SceneReboot
 from engine.timer import Timer
 from hardware.circuitpython.device_builder import build_hardware
@@ -156,20 +155,6 @@ except ImportError:
 LOG_INTERVAL_SECONDS: Final = 5.0
 
 
-def _resolve_known_scene(scene_registry: SceneRegistry, scene_name: str) -> str:
-    """Return *scene_name* if registered, else raise naming the known scenes.
-
-    Mirrors ``app.scene_composition.resolve_known_scene`` (#684). This profiler
-    keeps its own inlined staged composition rather than delegating to
-    ``build_scene_runtime``, so it re-applies the same fail-loud rule -- no silent
-    fallback -- against its own scanned scene registry instead of inheriting it.
-    """
-    names = scene_registry.names()
-    if scene_name in names:
-        return scene_name
-    raise ValueError(f"unknown scene {scene_name!r}; known scenes: {', '.join(names)}")
-
-
 def _build_prop(scene_name: str, config: DeviceConfig) -> tuple[SceneManager, EffectManager, Timer]:
     """Stand up the deployed prop and load *scene_name* in situ.
 
@@ -186,12 +171,10 @@ def _build_prop(scene_name: str, config: DeviceConfig) -> tuple[SceneManager, Ef
     gc.collect()
     free_after_hardware = gc.mem_free()
 
-    effect_registry = PackRegistry(item_attr="BUILD")
-    effect_registry.scan_dir("packs/effects", "packs.effects")
-    rule_registry = PackRegistry(item_attr="RULE")
-    rule_registry.scan_dir("packs/rules", "packs.rules")
-    scene_registry = SceneRegistry()
-    scene_registry.scan_dir("packs/scenes", "packs.scenes")
+    catalog = scan_boot_pack_catalog(hw.storage)
+    effect_registry = catalog.effect_registry
+    rule_registry = catalog.rule_registry
+    scene_registry = catalog.scene_registry
     gc.collect()
     free_after_registries = gc.mem_free()
 
@@ -208,13 +191,13 @@ def _build_prop(scene_name: str, config: DeviceConfig) -> tuple[SceneManager, Ef
         rule_registry,
         scene_registry,
         effect_admin=effect_manager,
-        audio_overlay_admin=AudioRegistry(),
+        audio_overlay_admin=install_pack_sounds(hw, catalog),
         scene_reboot=SceneReboot(),
     )
     gc.collect()
     free_after_engine = gc.mem_free()
 
-    manager.load(_resolve_known_scene(scene_registry, scene_name))
+    manager.load(scene_registry.resolve_known(scene_name))
     gc.collect()
     free_after_load = gc.mem_free()
 

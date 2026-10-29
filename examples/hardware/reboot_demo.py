@@ -61,9 +61,8 @@ import time
 
 import microcontroller
 
-from app.scene_composition import resolve_boot_scene_name
+from app.scene_composition import resolve_boot_scene_name, scan_boot_pack_catalog
 from engine.log import Logger
-from engine.scene import SceneRegistry
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
 from hardware.shared.device_reboot import DeviceSceneReboot
 from hardware.shared.device_settings import read_settings_mapping
@@ -82,12 +81,11 @@ def _hold(logger: Logger, why: str) -> None:
     time.sleep(_HOLD_SECONDS)
 
 
-scene_registry = SceneRegistry()
-scene_registry.scan_dir("packs/scenes", "packs.scenes")
-
 config = load_device_config()
 hw_logger = Logger("[hw]")
 hw = build_hardware(config, logger=hw_logger)
+
+scene_registry = scan_boot_pack_catalog(hw.storage).scene_registry
 
 settings_mapping = read_settings_mapping()
 scene_name = resolve_boot_scene_name(scene_registry, hw.storage, settings_mapping, logger=hw_logger)
