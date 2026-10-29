@@ -115,6 +115,7 @@ from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
+from engine.namespace import ActiveSceneNamespace
 from engine.network import NetworkEvents
 from engine.scene import SceneManager
 from engine.state import SceneReboot
@@ -222,7 +223,8 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, PolledSen
     gc.collect()
     free_after_registries = gc.mem_free()
 
-    effect_manager = EffectManager(registry=effect_registry, outputs=hardware.outputs)
+    namespace = ActiveSceneNamespace(effect_registry, catalog.pack_sounds)
+    effect_manager = EffectManager(namespace=namespace, outputs=hardware.outputs)
     # Stage snapshot: EffectManager wrapping the bundle's outputs -- the one piece
     # of construction downstream of build_hardware that the profiler still owns
     # (the audio/matrix/haptic driver hardware itself is now inside the bundle above).
@@ -248,6 +250,7 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, PolledSen
         rule_registry,
         scene_registry,
         effect_admin=effect_manager,
+        namespace=namespace,
         audio_overlay_admin=install_pack_sounds(hardware, catalog),
         scene_reboot=SceneReboot(),
     )

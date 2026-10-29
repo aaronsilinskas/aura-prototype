@@ -5,8 +5,8 @@ import pytest
 from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.events import EffectEvent
-from engine.packs import PackRegistry
-from engine.scene import SceneLocalRegistry
+from engine.namespace import ActiveSceneNamespace, MissingPrefixError, UndeclaredPackError
+from engine.packs import PackRegistry, UnknownItemError
 from engine.state import Scope
 from engine.tests.effects.helpers import (
     CapturingEffectBuilder,
@@ -43,19 +43,16 @@ def _make_timer() -> Timer:
 
 
 def _make_manager(registry, outputs, allowed=None) -> EffectManager:
-    """Construct an EffectManager with every registered pack declared allowed.
+    """Construct an EffectManager over a namespace with a scene view installed.
 
-    Mirrors production: ``SceneManager`` installs the active scene's declared
-    ``effect_packs`` as the allowed set immediately on activation, before any
-    rule can call ``set_effect``/``add_effect``. Tests that build a manager
-    directly and start a pack-prefixed effect right away need the same
-    installed set, so this helper defaults it to every pack *registry*
-    already knows about. Pass *allowed* explicitly to exercise membership
-    enforcement itself (e.g. a pack name the registry never scanned).
+    Mirrors production: ``SceneManager`` installs the active scene into the
+    namespace on activation, before any rule can call ``set_effect``. The
+    installed view has no locals and declares every pack *registry* knows,
+    unless *allowed* names the declared packs instead.
     """
-    manager = EffectManager(registry=registry, outputs=outputs)
-    manager.set_allowed_packs(frozenset(registry.names()) if allowed is None else allowed)
-    return manager
+    namespace = ActiveSceneNamespace(registry, {})
+    namespace.install(None, {}, frozenset(registry.names()) if allowed is None else allowed)
+    return EffectManager(namespace=namespace, outputs=outputs)
 
 
 # ---------------------------------------------------------------------------
@@ -852,33 +849,25 @@ def test_handle_event_receives_composite_scope_not_decomposed_leaf(pack_tree) ->
 
 
 # ---------------------------------------------------------------------------
-# Error cases — malformed effect names
+# Name resolution errors reach the caller typed (routing lives in test_namespace.py)
 # ---------------------------------------------------------------------------
 
 
-def test_missing_pack_prefix_raises_value_error() -> None:
-    manager = _make_manager(registry=PackRegistry(), outputs=[])
+@pytest.mark.parametrize("method", ["set_effect", "add_effect"])
+def test_unresolvable_effect_name_raises_the_namespace_error(pack_tree, method) -> None:
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[])
 
-    with pytest.raises(ValueError, match="missing pack prefix"):
-        manager.set_effect(Scope.PERSONAL, "fire", {})
-
-
-def test_unknown_pack_raises_value_error() -> None:
-    """'spells' is declared allowed but the registry has no packs --
-    proving membership and registry lookup are genuinely separate checks."""
-    registry = PackRegistry()
-    manager = _make_manager(registry=registry, outputs=[], allowed=frozenset({"spells"}))
-
-    with pytest.raises(ValueError, match="Unknown effect pack 'spells'"):
-        manager.set_effect(Scope.PERSONAL, "spells.fireball", {})
+    with pytest.raises(MissingPrefixError):
+        getattr(manager, method)(Scope.PERSONAL, "fire", {})
 
 
-def test_unknown_effect_in_known_pack_raises_value_error(pack_tree) -> None:
-    registry = pack_tree.scan(effect_packs={"elements": {"fire": _stub_item()}}).effect_registry
-    manager = _make_manager(registry=registry, outputs=[])
+def test_effect_from_a_pack_the_scene_did_not_declare_raises_undeclared_pack(pack_tree) -> None:
+    manager = _make_manager(
+        registry=_make_stub_registry(pack_tree), outputs=[], allowed=frozenset()
+    )
 
-    with pytest.raises(ValueError, match="Unknown effect 'flash' in pack 'elements'"):
-        manager.set_effect(Scope.PERSONAL, "elements.flash", {})
+    with pytest.raises(UndeclaredPackError):
+        manager.set_effect(Scope.PERSONAL, "stub.fire", {})
 
 
 # ---------------------------------------------------------------------------
@@ -891,7 +880,7 @@ def test_failed_set_effect_keeps_the_running_effect_rendering(pack_tree) -> None
     manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
 
-    with pytest.raises(ValueError):
+    with pytest.raises(UnknownItemError):
         manager.set_effect(Scope.PERSONAL, "stub.missing", {})
     manager.update(_make_timer())
 
@@ -904,7 +893,7 @@ def test_failed_set_effect_fires_no_stop_event(pack_tree) -> None:
     manager.set_effect(Scope.PERSONAL, "stub.fire", {})
     output.handle_event_calls.clear()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(UnknownItemError):
         manager.set_effect(Scope.PERSONAL, "stub.missing", {})
 
     assert output.handle_event_calls == []
@@ -915,7 +904,7 @@ def test_failed_set_effect_adds_no_effect(pack_tree) -> None:
     manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
     fire_receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
 
-    with pytest.raises(ValueError):
+    with pytest.raises(UnknownItemError):
         manager.set_effect(Scope.PERSONAL, "stub.missing", {})
     output.handle_event_calls.clear()
     manager.stop_effect(Scope.PERSONAL)
@@ -923,55 +912,6 @@ def test_failed_set_effect_adds_no_effect(pack_tree) -> None:
     assert output.handle_event_calls == [
         (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, fire_receipt)
     ]
-
-
-# ---------------------------------------------------------------------------
-# Pack-membership enforcement (issue #814) -- EffectManager delegates the
-# allowed-pack set to EffectResolver; exhaustive resolve() semantics live in
-# test_effect_resolver.py, these confirm the delegation itself.
-# ---------------------------------------------------------------------------
-
-
-def test_set_allowed_packs_undeclared_pack_raises_naming_the_pack(pack_tree) -> None:
-    registry = _make_stub_registry(pack_tree)
-    manager = EffectManager(registry=registry, outputs=[])
-    manager.set_allowed_packs(frozenset({"other"}))
-
-    with pytest.raises(ValueError, match="stub"):
-        manager.set_effect(Scope.PERSONAL, "stub.fire", {})
-
-
-def test_set_allowed_packs_declared_pack_resolves(pack_tree) -> None:
-    registry = _make_stub_registry(pack_tree)
-    manager = EffectManager(registry=registry, outputs=[])
-    manager.set_allowed_packs(frozenset({"stub"}))
-
-    receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
-
-    assert receipt is not None
-
-
-def test_no_allowed_packs_installed_raises_no_active_scene_error(pack_tree) -> None:
-    registry = _make_stub_registry(pack_tree)
-    manager = EffectManager(registry=registry, outputs=[])
-    # No set_allowed_packs call -- mirrors a manager that has never seen a scene transition.
-
-    with pytest.raises(ValueError, match="no scene is active"):
-        manager.set_effect(Scope.PERSONAL, "stub.fire", {})
-
-
-def test_scene_prefix_effect_unaffected_by_allowed_packs() -> None:
-    """scene.-prefixed names bypass pack-membership entirely, per issue #814."""
-    registry = PackRegistry()
-    manager = EffectManager(registry=registry, outputs=[])
-    manager.set_allowed_packs(frozenset())  # active scene declares zero effect_packs
-    local_registry = SceneLocalRegistry()
-    manager.set_local_effects(local_registry)
-
-    # An empty allowed-pack set must not block scene.-prefixed resolution; the
-    # only failure here is the scene-local registry having no 'flash' item.
-    with pytest.raises(ValueError, match="Unknown scene-local effect 'flash'"):
-        manager.set_effect(Scope.PERSONAL, "scene.flash", {})
 
 
 # ---------------------------------------------------------------------------

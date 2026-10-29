@@ -14,6 +14,7 @@ from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
+from engine.namespace import ActiveSceneNamespace
 from engine.network import NetworkEvents
 from engine.pack_catalog import PackCatalog, scan_pack_roots
 from engine.scene import SceneManager, SceneRegistry
@@ -178,7 +179,8 @@ def build_scene_runtime(
     effect_registry = catalog.effect_registry
     rule_registry = catalog.rule_registry
     scene_registry = catalog.scene_registry
-    effect_manager = EffectManager(registry=effect_registry, outputs=hw.outputs)
+    namespace = ActiveSceneNamespace(effect_registry, catalog.pack_sounds)
+    effect_manager = EffectManager(namespace=namespace, outputs=hw.outputs)
 
     if timer is None:
         timer = Timer()
@@ -194,6 +196,7 @@ def build_scene_runtime(
         rule_registry,
         scene_registry,
         effect_admin=effect_manager,
+        namespace=namespace,
         audio_overlay_admin=install_pack_sounds(hw, catalog),
         scene_reboot=scene_reboot if scene_reboot is not None else SceneReboot(),
     )

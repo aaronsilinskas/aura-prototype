@@ -17,6 +17,7 @@ except ImportError:
 
 from engine.audio import AudioOverlayAdmin
 from engine.engine import GameEngine, GameRule, Version
+from engine.namespace import ActiveSceneNamespace
 from engine.packs import PackRegistry, UnknownItemError, load_item
 from engine.state import EffectAdmin, GameState, MergeStrategy, SceneControls, SceneReboot, Scope
 
@@ -351,6 +352,7 @@ class SceneManager(SceneControls):
             rule_registry,
             scene_registry,
             effect_admin,
+            namespace,
             audio_overlay_admin,
             scene_reboot,
         )
@@ -371,26 +373,21 @@ class SceneManager(SceneControls):
 
     *effect_admin* is the scene-transition face of the same effect system
     ``engine`` was built with (its ``EffectControls`` and ``EffectAdmin`` are
-    two faces of one ``EffectManager`` instance). Every local-effects push,
-    allowed-pack push, and merge-strategy reset/capture/apply routes through
-    *effect_admin*, never through a stack entry's ``state.effect_controls``.
-    The allowed-pack set — a ``frozenset`` of the active scene's declared
-    ``effect_packs`` names — is derived fresh at every transition and pushed
-    via ``set_allowed_packs`` right beside the local-effects push, so
-    ``pack.<effect>`` resolution tracks the top-of-stack scene through
-    load/overlay/pop in lockstep.
+    two faces of one ``EffectManager`` instance). Every merge-strategy
+    reset/capture/apply routes through *effect_admin*, never through a stack
+    entry's ``state.effect_controls``.
 
-    *audio_overlay_admin* is the analogous scene-transition seam for sounds —
-    typically the same ``AudioRegistry`` instance ``AudioEffectOutput`` resolves
-    clips through. Every scene transition installs the active scene's sound
-    overlay through it, right beside the *effect_admin* local-effects push, and
-    the *same* allowed-pack ``frozenset`` derived for *effect_admin* is pushed
-    to it too via ``set_allowed_packs`` — one derivation feeding both seams —
-    so ``pack.<clip>`` resolution tracks the top-of-stack scene in lockstep
-    with ``pack.<effect>`` resolution.
+    *namespace* is the Active scene namespace that same ``EffectManager``
+    resolves names through. Every activation (load, overlay, pop) makes one
+    ``install`` call with the top-of-stack scene's local effects, local
+    sounds and declared ``effect_packs`` names.
+
+    *audio_overlay_admin* is the scene-transition seam for sounds, typically
+    the ``AudioRegistry`` ``AudioEffectOutput`` resolves clips through. Each
+    activation also pushes the active scene's sounds and declared packs to it.
 
     *scene_reboot* is the injected ``SceneReboot`` port ``reboot_into``/
-    ``reboot_to_previous`` delegate to. Unlike *effect_admin*/
+    ``reboot_to_previous`` delegate to. Unlike *effect_admin*, *namespace* and
     *audio_overlay_admin* it plays no role in ``load``/``overlay``/``pop`` —
     it exists solely for the two reboot methods, which apply immediately and
     synchronously rather than joining the deferred-transition queue.
@@ -401,6 +398,7 @@ class SceneManager(SceneControls):
         "_effect_admin",
         "_effect_registry",
         "_engine",
+        "_namespace",
         "_pending",
         "_rule_registry",
         "_scene_reboot",
@@ -415,6 +413,7 @@ class SceneManager(SceneControls):
         rule_registry: PackRegistry,
         scene_registry: SceneRegistry,
         effect_admin: EffectAdmin,
+        namespace: ActiveSceneNamespace,
         audio_overlay_admin: AudioOverlayAdmin,
         scene_reboot: SceneReboot,
     ) -> None:
@@ -423,6 +422,7 @@ class SceneManager(SceneControls):
         self._rule_registry = rule_registry
         self._scene_registry = scene_registry
         self._effect_admin = effect_admin
+        self._namespace = namespace
         self._audio_overlay_admin = audio_overlay_admin
         self._scene_reboot = scene_reboot
         self._stack: list[_SceneStackEntry] = []
@@ -533,11 +533,11 @@ class SceneManager(SceneControls):
     def _activate(self, entry: _SceneStackEntry) -> None:
         self._engine.set_rules(entry.rules)
         entry.state.clear_queue()
-        self._effect_admin.set_local_effects(entry.scene.local_effect_registry)
-        allowed_packs = frozenset(pack_name for pack_name, _ in entry.scene.effect_packs)
-        self._effect_admin.set_allowed_packs(allowed_packs)
-        self._audio_overlay_admin.set_scene_sounds(entry.scene.local_sound_map or None)
-        self._audio_overlay_admin.set_allowed_packs(allowed_packs)
+        scene = entry.scene
+        declared_packs = frozenset(pack_name for pack_name, _ in scene.effect_packs)
+        self._namespace.install(scene.local_effect_registry, scene.local_sound_map, declared_packs)
+        self._audio_overlay_admin.set_scene_sounds(scene.local_sound_map or None)
+        self._audio_overlay_admin.set_allowed_packs(declared_packs)
 
     def _do_load(self, scene: Scene) -> None:
         """Replace the entire stack with a single fresh entry for *scene*."""

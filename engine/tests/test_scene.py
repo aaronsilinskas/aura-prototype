@@ -9,11 +9,17 @@ from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
+from engine.namespace import ActiveSceneNamespace
 from engine.packs import PackRegistry
 from engine.scene import Scene, SceneManager, SceneRegistry
 from engine.state import EffectAdmin, EffectControls, GameState, SceneControls, SceneReboot, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
-from engine.tests.helpers import RecordingSceneReboot, SpyAudioOverlayAdmin, SpyEffectAdmin
+from engine.tests.helpers import (
+    RecordingNamespace,
+    RecordingSceneReboot,
+    SpyAudioOverlayAdmin,
+    SpyEffectAdmin,
+)
 from engine.timer import Timer
 
 # ---------------------------------------------------------------------------
@@ -67,6 +73,7 @@ def _make_scene_manager(
     rule_registry: PackRegistry | None = None,
     scene_registry: SceneRegistry | None = None,
     effect_admin: EffectAdmin | None = None,
+    namespace: ActiveSceneNamespace | None = None,
     audio_overlay_admin: AudioOverlayAdmin | None = None,
     scene_reboot: SceneReboot | None = None,
 ) -> SceneManager:
@@ -82,6 +89,7 @@ def _make_scene_manager(
         rule_registry if rule_registry is not None else PackRegistry(),
         scene_registry if scene_registry is not None else SceneRegistry(),
         effect_admin if effect_admin is not None else SpyEffectAdmin(),
+        namespace if namespace is not None else RecordingNamespace(),
         audio_overlay_admin if audio_overlay_admin is not None else SpyAudioOverlayAdmin(),
         scene_reboot if scene_reboot is not None else RecordingSceneReboot(),
     )
@@ -997,9 +1005,9 @@ def test_unloaded_scene_is_not_retained_by_manager() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_pop_activates_revealed_entry_with_both_rules_and_local_effects(pack_tree) -> None:
+def test_pop_activates_revealed_entry_with_both_rules_and_its_namespace_view(pack_tree) -> None:
     """After load → overlay → pop, the revealed entry has rules on the engine
-    AND its local effect registry pushed to the effect controls (invariant: no half-activation)."""
+    AND its own view installed in the namespace (invariant: no half-activation)."""
     engine = _make_engine()
     base_local_registry = Scene(effect_packs=[], rule_packs=[]).local_effect_registry
     rule_registry = pack_tree.scan(
@@ -1020,16 +1028,15 @@ def test_pop_activates_revealed_entry_with_both_rules_and_local_effects(pack_tre
     scene_reg = SceneRegistry()
     scene_reg.register("base", base_factory)
     scene_reg.register("overlay_scene", _scene_factory())
-    effect_admin = SpyEffectAdmin()
+    namespace = RecordingNamespace()
     manager = _make_scene_manager(
-        engine, rule_registry=rule_registry, scene_registry=scene_reg, effect_admin=effect_admin
+        engine, rule_registry=rule_registry, scene_registry=scene_reg, namespace=namespace
     )
 
     manager.load("base")
     manager.update()
     manager.overlay("overlay_scene")
     manager.update()
-    effect_admin.local_effects_history.clear()
 
     manager.pop()
     manager.update()
@@ -1037,56 +1044,69 @@ def test_pop_activates_revealed_entry_with_both_rules_and_local_effects(pack_tre
     manager.active_state.queue_event(Event(_GROUP, "check"))
     manager.update()
     assert base_events, "base rules must be active on the engine after pop"
-    assert effect_admin.local_effects_history, (
-        "set_local_effects must be called when pop reveals the base entry"
-    )
-    assert effect_admin.local_effects_history[-1] is base_local_registry, (
-        "pop must push the revealed entry's own local_effect_registry"
-    )
+    assert namespace.installs[-1][0] is base_local_registry
 
 
-def test_allowed_packs_installed_in_lockstep_through_load_overlay_pop(pack_tree) -> None:
-    """set_allowed_packs must track the top-of-stack scene's declared effect_packs
-    through load, overlay, and pop -- installed right beside set_local_effects."""
+def test_each_transition_installs_the_active_scene_once(pack_tree) -> None:
     catalog = pack_tree.scan(effect_packs={"fx": {}, "gfx": {}})
-    effect_registry, rule_registry = catalog.effect_registry, catalog.rule_registry
-    engine = _make_engine()
     scene_reg = _scene_registry(
         ("base", _scene_factory(effect_packs=[("fx", "1.0")])),
         ("overlay_scene", _scene_factory(effect_packs=[("gfx", "1.0")])),
     )
-    effect_admin = SpyEffectAdmin()
+    namespace = RecordingNamespace()
     manager = _make_scene_manager(
-        engine,
-        effect_registry=effect_registry,
-        rule_registry=rule_registry,
+        _make_engine(),
+        effect_registry=catalog.effect_registry,
+        rule_registry=catalog.rule_registry,
         scene_registry=scene_reg,
-        effect_admin=effect_admin,
+        namespace=namespace,
     )
 
     manager.load("base")
     manager.update()
-    assert effect_admin.allowed_packs_history[-1] == frozenset({"fx"}), (
-        "load must install the loaded scene's own declared effect_packs"
-    )
-
     manager.overlay("overlay_scene")
     manager.update()
-    assert effect_admin.allowed_packs_history[-1] == frozenset({"gfx"}), (
-        "overlay must install the overlay scene's own declared effect_packs, not the base's"
+    manager.pop()
+    manager.update()
+
+    declared = [declared_packs for _, _, declared_packs in namespace.installs]
+    assert declared == [frozenset({"fx"}), frozenset({"gfx"}), frozenset({"fx"})]
+
+
+def test_pop_reinstalls_the_underlying_scene_view(pack_tree) -> None:
+    catalog = pack_tree.scan(
+        effect_packs={"fx": {}, "gfx": {}},
+        scenes={
+            "base": {"effect_packs": [["fx", "1.0"]], "sounds": ["win"]},
+            "overlay_scene": {"effect_packs": [["gfx", "1.0"]], "sounds": ["lose"]},
+        },
     )
+    namespace = RecordingNamespace()
+    manager = _make_scene_manager(
+        _make_engine(),
+        effect_registry=catalog.effect_registry,
+        rule_registry=catalog.rule_registry,
+        scene_registry=catalog.scene_registry,
+        namespace=namespace,
+    )
+    manager.load("base")
+    manager.update()
+    base_view = namespace.installs[-1]
+    manager.overlay("overlay_scene")
+    manager.update()
 
     manager.pop()
     manager.update()
-    assert effect_admin.allowed_packs_history[-1] == frozenset({"fx"}), (
-        "pop must restore the revealed base entry's declared effect_packs"
-    )
+
+    local_effects, local_sounds, declared_packs = namespace.installs[-1]
+    assert local_effects is base_view[0]
+    assert list(local_sounds) == ["win"]
+    assert declared_packs == frozenset({"fx"})
 
 
 def test_audio_allowed_packs_installed_in_lockstep_through_load_overlay_pop(pack_tree) -> None:
     """AudioOverlayAdmin.set_allowed_packs must track the top-of-stack scene's declared
-    effect_packs through load, overlay, and pop -- installed right beside set_scene_sounds,
-    reusing the same frozenset pushed to EffectAdmin.set_allowed_packs (not re-derived)."""
+    effect_packs through load, overlay, and pop -- installed right beside set_scene_sounds."""
     catalog = pack_tree.scan(effect_packs={"fx": {}, "gfx": {}})
     effect_registry, rule_registry = catalog.effect_registry, catalog.rule_registry
     engine = _make_engine()
@@ -1119,35 +1139,6 @@ def test_audio_allowed_packs_installed_in_lockstep_through_load_overlay_pop(pack
     manager.update()
     assert audio_overlay_admin.allowed_packs_history[-1] == frozenset({"fx"}), (
         "pop must restore the revealed base entry's declared effect_packs"
-    )
-
-
-def test_activate_pushes_the_same_allowed_packs_object_to_both_admin_seams(pack_tree) -> None:
-    """_activate must derive the allowed-pack frozenset once and reuse it for both
-    EffectAdmin.set_allowed_packs and AudioOverlayAdmin.set_allowed_packs -- not
-    derive it a second time for audio."""
-    catalog = pack_tree.scan(effect_packs={"fx": {}})
-    effect_registry, rule_registry = catalog.effect_registry, catalog.rule_registry
-    engine = _make_engine()
-    scene_reg = _scene_registry(("base", _scene_factory(effect_packs=[("fx", "1.0")])))
-    effect_admin = SpyEffectAdmin()
-    audio_overlay_admin = SpyAudioOverlayAdmin()
-    manager = _make_scene_manager(
-        engine,
-        effect_registry=effect_registry,
-        rule_registry=rule_registry,
-        scene_registry=scene_reg,
-        effect_admin=effect_admin,
-        audio_overlay_admin=audio_overlay_admin,
-    )
-
-    manager.load("base")
-    manager.update()
-
-    audio_allowed = audio_overlay_admin.allowed_packs_history[-1]
-    effect_allowed = effect_admin.allowed_packs_history[-1]
-    assert audio_allowed is effect_allowed, (
-        "the same frozenset instance must reach both admin seams"
     )
 
 
@@ -1229,12 +1220,13 @@ def _make_merge_strategy_scene_manager(pack_tree, scene_names):
     Wires a real ``EffectManager`` (not the recording stub) as the engine's
     effect controls, with a 'color' pack providing solid-fill 'red'/'blue'
     effects, so merge-strategy behaviour can be observed on composed pixels.
-    Every scene declares 'color' in its effect_packs so SceneManager's
-    per-transition allowed-pack push (issue #814) doesn't block it.
+    Every scene declares 'color' in its effect_packs so the namespace view
+    SceneManager installs on each transition resolves it.
     """
     effect_registry = pack_tree.scan(effect_packs={"color": _COLOR_EFFECTS}).effect_registry
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    effect_manager = EffectManager(registry=effect_registry, outputs=[output])
+    namespace = ActiveSceneNamespace(effect_registry, {})
+    effect_manager = EffectManager(namespace=namespace, outputs=[output])
     engine = GameEngine(effect_controls=effect_manager)
     scene_reg = _scene_registry(
         *[(name, _scene_factory(effect_packs=[("color", "1.0")])) for name in scene_names]
@@ -1244,6 +1236,7 @@ def _make_merge_strategy_scene_manager(pack_tree, scene_names):
         effect_registry=effect_registry,
         scene_registry=scene_reg,
         effect_admin=effect_manager,
+        namespace=namespace,
     )
     return scene_manager, effect_manager, output
 
