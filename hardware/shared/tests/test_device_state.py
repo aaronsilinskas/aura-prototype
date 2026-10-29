@@ -197,3 +197,13 @@ def test_no_storage_makes_update_a_silent_no_op():
     store.update({"scene_deploy_token": "a1b2"}, remove=("scene",))
 
     assert store.get("scene_deploy_token") is None
+
+
+def test_write_replaces_the_whole_persisted_state(device_storage):
+    store = DeviceStateStore(device_storage)
+    store.set("scene", "tag")
+
+    store.write({"return_to": "lobby"})
+
+    rebooted_store = DeviceStateStore(device_storage)
+    assert rebooted_store.read() == {"return_to": "lobby"}
