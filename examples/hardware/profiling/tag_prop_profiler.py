@@ -109,7 +109,7 @@ import time
 
 import board
 
-from app.scene_composition import install_pack_sounds, scan_boot_pack_catalog
+from app.scene_composition import scan_boot_pack_catalog
 from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
@@ -251,7 +251,6 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, PolledSen
         scene_registry,
         effect_admin=effect_manager,
         namespace=namespace,
-        audio_overlay_admin=install_pack_sounds(hardware, catalog),
         scene_reboot=SceneReboot(),
     )
     manager.load("tag")

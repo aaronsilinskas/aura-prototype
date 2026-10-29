@@ -144,8 +144,8 @@ class SceneControls:
 class SceneReboot:
     """Board-free port through which ``SceneManager`` persists-and-reboots.
 
-    Mirrors how ``SceneManager`` already reaches ``EffectAdmin``/
-    ``AudioOverlayAdmin`` through an injected seam: ``SceneManager``
+    Mirrors how ``SceneManager`` already reaches ``EffectAdmin`` through an
+    injected seam: ``SceneManager``
     validates ``reboot_into``'s *target* against its scene registry (a typo
     must never persist a name that would brick the next boot) and otherwise
     delegates both methods straight to this port. All the device work —

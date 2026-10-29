@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.state import NetworkControls
 from hardware.shared.debounced_buttons import DebouncedButtons
@@ -32,10 +31,6 @@ class DeviceHardware:
     ``SdCardStorage`` adapter — ``None`` on a device with no ``sdcard``
     section declared and enabled.
 
-    ``audio_registry`` is the same ``AudioRegistry`` instance the built
-    ``AudioEffectOutput`` resolves clips through — ``None`` on a device with
-    no ``audio`` section declared and enabled.
-
     ``accelerometer`` and ``magnetometer`` are each the
     :class:`~hardware.shared.polled_sensor.PolledSensor` that owns that
     sensor's reading — ``None`` on a device with no such section declared and
@@ -44,7 +39,6 @@ class DeviceHardware:
 
     __slots__ = (
         "accelerometer",
-        "audio_registry",
         "buttons",
         "ir",
         "magnetometer",
@@ -64,7 +58,6 @@ class DeviceHardware:
         ir: InfraredTransceiver | None,
         radio: RadioTransceiver | None,
         storage: DeviceStorage | None,
-        audio_registry: AudioRegistry | None,
     ) -> None:
         self.outputs: list[EffectOutput] = outputs
         self.buttons: DebouncedButtons = buttons
@@ -74,4 +67,3 @@ class DeviceHardware:
         self.ir: InfraredTransceiver | None = ir
         self.radio: RadioTransceiver | None = radio
         self.storage: DeviceStorage | None = storage
-        self.audio_registry: AudioRegistry | None = audio_registry

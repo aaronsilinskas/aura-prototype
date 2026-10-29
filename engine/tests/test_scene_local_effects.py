@@ -17,7 +17,6 @@ from engine.state import Scope
 from engine.tests.effects.helpers import SpyEffectOutput
 from engine.tests.helpers import (
     RecordingNamespace,
-    SpyAudioOverlayAdmin,
     make_scene_manager,
 )
 from engine.timer import Timer
@@ -166,50 +165,46 @@ def test_scene_manager_restores_base_local_effects_on_pop(pack_tree) -> None:
 
 
 # ---------------------------------------------------------------------------
-# SceneManager installs the active scene's sound overlay on transitions
+# SceneManager installs the active scene's local sounds on transitions
 # ---------------------------------------------------------------------------
 
 
-def test_scene_manager_installs_scene_sound_overlay_on_load(pack_tree) -> None:
+def test_scene_manager_installs_scene_sounds_on_load(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"forest": {"sounds": ["victory_sting"]}})
+    namespace = RecordingNamespace()
+    manager = make_scene_manager(catalog, namespace=namespace)
 
-    audio_overlay_admin = SpyAudioOverlayAdmin()
-    manager = make_scene_manager(catalog, audio_overlay_admin=audio_overlay_admin)
     manager.load("forest")
     manager.update()
 
-    assert len(audio_overlay_admin.scene_sounds_history) == 1
-    pushed = audio_overlay_admin.scene_sounds_history[0]
-    assert "victory_sting" in pushed
+    [(_, local_sounds, _)] = namespace.installs
+    assert list(local_sounds) == ["victory_sting"]
 
 
-def test_scene_manager_load_installs_none_overlay_for_scene_with_no_sounds(pack_tree) -> None:
+def test_scene_manager_installs_no_sounds_for_a_scene_with_none(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"bare_scene": {}})
+    namespace = RecordingNamespace()
+    manager = make_scene_manager(catalog, namespace=namespace)
 
-    audio_overlay_admin = SpyAudioOverlayAdmin()
-    manager = make_scene_manager(catalog, audio_overlay_admin=audio_overlay_admin)
     manager.load("bare_scene")
     manager.update()
 
-    assert audio_overlay_admin.scene_sounds_history == [None]
+    [(_, local_sounds, _)] = namespace.installs
+    assert local_sounds == {}
 
 
 def test_scene_manager_installs_overlay_scene_sounds_on_overlay(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"scene_b": {"sounds": ["b_sting"]}, "scene_a": {}})
-
-    audio_overlay_admin = SpyAudioOverlayAdmin()
-    manager = make_scene_manager(catalog, audio_overlay_admin=audio_overlay_admin)
-
+    namespace = RecordingNamespace()
+    manager = make_scene_manager(catalog, namespace=namespace)
     manager.load("scene_a")
     manager.update()
-    audio_overlay_admin.scene_sounds_history.clear()
 
     manager.overlay("scene_b")
     manager.update()
 
-    assert len(audio_overlay_admin.scene_sounds_history) == 1
-    pushed = audio_overlay_admin.scene_sounds_history[0]
-    assert "b_sting" in pushed
+    _, local_sounds, _ = namespace.installs[-1]
+    assert list(local_sounds) == ["b_sting"]
 
 
 def test_scene_manager_restores_base_scene_sounds_on_pop(pack_tree) -> None:
@@ -219,23 +214,18 @@ def test_scene_manager_restores_base_scene_sounds_on_pop(pack_tree) -> None:
             "scene_b": {"sounds": ["b_sting"]},
         },
     )
-
-    audio_overlay_admin = SpyAudioOverlayAdmin()
-    manager = make_scene_manager(catalog, audio_overlay_admin=audio_overlay_admin)
-
+    namespace = RecordingNamespace()
+    manager = make_scene_manager(catalog, namespace=namespace)
     manager.load("scene_a")
     manager.update()
     manager.overlay("scene_b")
     manager.update()
-    audio_overlay_admin.scene_sounds_history.clear()
 
     manager.pop()
     manager.update()
 
-    assert len(audio_overlay_admin.scene_sounds_history) == 1
-    pushed = audio_overlay_admin.scene_sounds_history[0]
-    assert "a_sting" in pushed
-    assert "b_sting" not in pushed
+    _, local_sounds, _ = namespace.installs[-1]
+    assert list(local_sounds) == ["a_sting"]
 
 
 # ---------------------------------------------------------------------------

@@ -10,7 +10,6 @@ from __future__ import annotations
 from array import array
 from collections.abc import Callable
 
-from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from hardware.shared.device_config import (
     AudioConfig,
@@ -148,12 +147,11 @@ class RecordingParts(DeviceParts):
     def audio_output(
         self,
         audio: AudioConfig,
-        registry: AudioRegistry,
         bit_clock: PinRef,
         word_select: PinRef,
         data: PinRef,
     ) -> EffectOutput:
-        self._record("audio_output", audio, registry, bit_clock, word_select, data)
+        self._record("audio_output", audio, bit_clock, word_select, data)
         return Output("audio_output")
 
     def haptic_output(self, haptics: I2CDeviceConfig, i2c: object) -> EffectOutput:

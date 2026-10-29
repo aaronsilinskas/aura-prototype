@@ -12,7 +12,6 @@ from app.scene_composition import (
     resolve_ir_codec,
     scan_boot_pack_catalog,
 )
-from engine.audio import AudioRegistry
 from engine.events import Event, EventGroup
 from engine.input import ButtonData, InputEvents
 from engine.network import LINE
@@ -26,7 +25,7 @@ from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEnco
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 
 
-def _fake_hw(ir=None, radio=None, audio_registry=None, storage=None, network_controls=None):
+def _fake_hw(ir=None, radio=None, storage=None, network_controls=None):
     """Return a DeviceHardware built entirely from CPython-safe fakes."""
     return DeviceHardware(
         outputs=[],
@@ -39,7 +38,6 @@ def _fake_hw(ir=None, radio=None, audio_registry=None, storage=None, network_con
         ir=ir,
         radio=radio,
         storage=storage,
-        audio_registry=audio_registry,
     )
 
 
@@ -170,7 +168,7 @@ def _no_reset() -> None:
 def test_boot_runs_the_scene_the_card_names_over_the_flash_default(device_storage):
     device_storage.write_json("aura-state.json", {"scene": "tag"})
 
-    scene_name, _tick = build_scene_boot(
+    scene_name, _tick, _namespace = build_scene_boot(
         _fake_hw(storage=device_storage), {"default_scene": "hardware_test"}, reset=_no_reset
     )
 
@@ -454,65 +452,56 @@ def test_build_scene_runtime_radio_is_none_when_the_hardware_bundle_has_no_radio
 
 
 # ---------------------------------------------------------------------------
-# Audio registry wiring: pack sounds base + scene overlay (issue #804)
+# Clip resolution: pack sounds and the active scene's sounds (issue #804)
 # ---------------------------------------------------------------------------
 
 
-def test_build_scene_runtime_installs_the_catalogs_pack_sounds_in_the_devices_audio_registry():
-    """The catalog's packs/effects/*/sounds clips become hw.audio_registry's base, qualified
-    by pack name, so basic.game_over_sting_start resolves once the runtime is built."""
-    hw = _fake_hw(audio_registry=AudioRegistry())
-
-    build_scene_runtime(hw, "hardware_test", catalog=_boot_catalog())
+def test_the_runtimes_namespace_resolves_the_catalogs_pack_sounds():
+    """The catalog's packs/effects/*/sounds clips resolve qualified by pack name,
+    so basic.game_over_sting_start resolves once the runtime is built."""
+    runtime = build_scene_runtime(_fake_hw(), "hardware_test", catalog=_boot_catalog())
 
     assert (
-        hw.audio_registry.path("basic.game_over_sting_start")
+        runtime.namespace.resolve_clip("basic.game_over_sting_start")
         == "packs/effects/basic/sounds/game_over_sting_start.wav"
     )
     assert (
-        hw.audio_registry.path("elements.lightning_strike")
+        runtime.namespace.resolve_clip("elements.lightning_strike")
         == "packs/effects/elements/sounds/lightning_strike.wav"
     )
 
 
-def test_build_scene_runtime_installs_hardware_test_scenes_sounds_as_the_active_overlay():
-    """Activating hardware_test installs its sounds/ folder as the AudioRegistry
-    overlay, so scene.sfx_test_start -- the clip sfx_test's audio references --
-    resolves through the same registry AudioEffectOutput would use on real hardware."""
-    hw = _fake_hw(audio_registry=AudioRegistry())
-
-    build_scene_runtime(hw, "hardware_test", catalog=_boot_catalog())
+def test_the_runtimes_namespace_resolves_hardware_test_scenes_own_sounds():
+    """Activating hardware_test installs its sounds/ folder in the namespace, so
+    scene.sfx_test_start -- the clip sfx_test's audio references -- resolves to
+    the file the audio output plays."""
+    runtime = build_scene_runtime(_fake_hw(), "hardware_test", catalog=_boot_catalog())
 
     assert (
-        hw.audio_registry.path("scene.sfx_test_start")
+        runtime.namespace.resolve_clip("scene.sfx_test_start")
         == "packs/scenes/hardware_test/sounds/sfx_test_start.wav"
     )
 
 
-def test_build_scene_runtime_with_no_audio_registry_still_activates_scene():
-    """A device with no enabled audio section (hw.audio_registry is None) gets no
-    pack sounds and no overlay wiring, but scene activation is otherwise unaffected."""
-    hw = _fake_hw()
+def test_a_device_with_no_audio_still_resolves_the_clips_of_the_effects_it_starts():
+    """Clips resolve the same with or without an audio output, so a device with
+    no audio section starts a clip-declaring effect with no special case."""
+    runtime = build_scene_runtime(_fake_hw(), "hardware_test", catalog=_boot_catalog())
 
-    runtime = build_scene_runtime(hw, "hardware_test", catalog=_boot_catalog())
-
-    assert hw.audio_registry is None
     receipt = runtime.effect_manager.set_effect(Scope.PERSONAL, "scene.sfx_test", {})
+
     assert receipt is not None
 
 
 # ---------------------------------------------------------------------------
-# Audio registry wiring: tag scene discovery (issue #805)
+# Clip resolution: tag scene discovery (issue #805)
 # ---------------------------------------------------------------------------
 
 
-def test_build_scene_runtime_installs_tag_scenes_sounds_as_the_active_overlay():
-    """Activating tag installs its sounds/ folder as the AudioRegistry overlay, so
-    every scene.<stem> clip a tag effect references resolves through the same
-    registry AudioEffectOutput would use on real hardware."""
-    hw = _fake_hw(audio_registry=AudioRegistry())
-
-    build_scene_runtime(hw, "tag", catalog=_boot_catalog())
+def test_the_runtimes_namespace_resolves_tag_scenes_own_sounds():
+    """Activating tag installs its sounds/ folder in the namespace, so every
+    scene.<stem> clip a tag effect references resolves."""
+    runtime = build_scene_runtime(_fake_hw(), "tag", catalog=_boot_catalog())
 
     for stem in (
         "fire_shot_start",
@@ -524,35 +513,31 @@ def test_build_scene_runtime_installs_tag_scenes_sounds_as_the_active_overlay():
         "warning_pulse_peak",
         "hit_start",
     ):
-        assert hw.audio_registry.path(f"scene.{stem}") == f"packs/scenes/tag/sounds/{stem}.wav"
+        assert (
+            runtime.namespace.resolve_clip(f"scene.{stem}") == f"packs/scenes/tag/sounds/{stem}.wav"
+        )
 
 
 def test_build_scene_runtime_resolves_tags_shared_game_over_sting_via_the_basic_pack():
     """tag's game_over_sting effect points at basic's shared clip rather than its
-    own -- it must resolve from the pack sounds base, not from tag's sounds/ overlay."""
-    hw = _fake_hw(audio_registry=AudioRegistry())
-
-    build_scene_runtime(hw, "tag", catalog=_boot_catalog())
+    own -- it must resolve from the basic pack's sounds, not from tag's sounds/."""
+    runtime = build_scene_runtime(_fake_hw(), "tag", catalog=_boot_catalog())
 
     assert (
-        hw.audio_registry.path("basic.game_over_sting_start")
+        runtime.namespace.resolve_clip("basic.game_over_sting_start")
         == "packs/effects/basic/sounds/game_over_sting_start.wav"
     )
 
 
 # ---------------------------------------------------------------------------
-# Audio registry wiring: red_light_green_light scene discovery (issue #806)
+# Clip resolution: red_light_green_light scene discovery (issue #806)
 # ---------------------------------------------------------------------------
 
 
-def test_build_scene_runtime_installs_rlgls_sounds_as_the_active_overlay():
-    """Activating red_light_green_light installs its sounds/ folder as the
-    AudioRegistry overlay, so every scene.<stem> clip an rlgl effect references
-    resolves through the same registry AudioEffectOutput would use on real
-    hardware."""
-    hw = _fake_hw(audio_registry=AudioRegistry())
-
-    build_scene_runtime(hw, "red_light_green_light", catalog=_boot_catalog())
+def test_the_runtimes_namespace_resolves_rlgls_own_sounds():
+    """Activating red_light_green_light installs its sounds/ folder in the
+    namespace, so every scene.<stem> clip an rlgl effect references resolves."""
+    runtime = build_scene_runtime(_fake_hw(), "red_light_green_light", catalog=_boot_catalog())
 
     for stem in (
         "green_light_music_start",
@@ -563,20 +548,18 @@ def test_build_scene_runtime_installs_rlgls_sounds_as_the_active_overlay():
         "warning_sting_peak",
     ):
         assert (
-            hw.audio_registry.path(f"scene.{stem}")
+            runtime.namespace.resolve_clip(f"scene.{stem}")
             == f"packs/scenes/red_light_green_light/sounds/{stem}.wav"
         )
 
 
 def test_build_scene_runtime_resolves_rlgls_shared_game_over_sting_via_the_basic_pack():
     """rlgl's game_over_sting effect points at basic's shared clip rather than its
-    own -- it must resolve from the pack sounds base, not from rlgl's sounds/ overlay."""
-    hw = _fake_hw(audio_registry=AudioRegistry())
-
-    build_scene_runtime(hw, "red_light_green_light", catalog=_boot_catalog())
+    own -- it must resolve from the basic pack's sounds, not from rlgl's sounds/."""
+    runtime = build_scene_runtime(_fake_hw(), "red_light_green_light", catalog=_boot_catalog())
 
     assert (
-        hw.audio_registry.path("basic.game_over_sting_start")
+        runtime.namespace.resolve_clip("basic.game_over_sting_start")
         == "packs/effects/basic/sounds/game_over_sting_start.wav"
     )
 
@@ -709,15 +692,15 @@ def test_card_scenes_local_effect_imports_off_the_card_and_resolves_at_runtime(d
 def test_card_scenes_bundled_sound_resolves_to_its_on_card_path(device_storage):
     """A card scene's sounds/ clip is recorded at its absolute on-card filesystem
     path -- resolved through the DeviceStorage port, never a re-derived '/sd' --
-    and reaches the same AudioRegistry a flash scene's clip resolves through."""
+    and resolves through the same namespace a flash scene's clip does."""
     scene_dir = _make_card_scene(Path(device_storage.mount_root), "card_scene")
     _add_card_scene_sound(scene_dir, "card_clip")
-    hw = _fake_hw(storage=device_storage, audio_registry=AudioRegistry())
+    hw = _fake_hw(storage=device_storage)
 
-    build_scene_runtime(hw, "card_scene", catalog=_boot_catalog(device_storage))
+    runtime = build_scene_runtime(hw, "card_scene", catalog=_boot_catalog(device_storage))
 
     expected_path = str(scene_dir / "sounds" / "card_clip.wav")
-    assert hw.audio_registry.path("scene.card_clip") == expected_path
+    assert runtime.namespace.resolve_clip("scene.card_clip") == expected_path
 
 
 def test_card_with_no_aura_packs_directory_still_activates_a_flash_scene(device_storage):
@@ -907,17 +890,17 @@ def test_card_effect_pack_resolves_and_builds_after_importing_off_the_card(devic
 
 def test_card_effect_packs_bundled_sound_resolves_to_its_on_card_path(device_storage):
     """A card effect pack's sounds/ clip is recorded at its absolute on-card
-    filesystem path and resolves through the same AudioRegistry a flash
-    effect-pack clip resolves through, keyed <pack>.<stem>."""
+    filesystem path and resolves through the same namespace a flash
+    effect-pack clip does, keyed <pack>.<stem>."""
     pack_dir = _make_card_effect_pack(Path(device_storage.mount_root), "card_pack")
     catalog = _boot_catalog(device_storage)
     _register_scene_declaring_effect_pack(catalog.scene_registry, "card_pack_scene", "card_pack")
-    hw = _fake_hw(storage=device_storage, audio_registry=AudioRegistry())
+    hw = _fake_hw(storage=device_storage)
 
-    build_scene_runtime(hw, "card_pack_scene", catalog=catalog)
+    runtime = build_scene_runtime(hw, "card_pack_scene", catalog=catalog)
 
     expected_path = str(pack_dir / "sounds" / "card_pack_clip.wav")
-    assert hw.audio_registry.path("card_pack.card_pack_clip") == expected_path
+    assert runtime.namespace.resolve_clip("card_pack.card_pack_clip") == expected_path
 
 
 def test_card_scene_resolves_a_card_effect_pack_end_to_end(device_storage):

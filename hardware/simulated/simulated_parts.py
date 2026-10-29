@@ -23,7 +23,6 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from effects.effect import Effect, PixelBuffer
-from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.input import AccelerationData
@@ -148,12 +147,11 @@ class SimulatedAudio(EffectOutput, VoiceSink):
     on a board.
     """
 
-    def __init__(self, device: SimulatedHardware, registry: AudioRegistry, voices: int) -> None:
+    def __init__(self, device: SimulatedHardware, voices: int) -> None:
         super().__init__(receives_pixels=False)
         self.min_resolution = 1
         self.scopes = [Scope.ALL]
         self._device = device
-        self._registry = registry
         self._pool = VoicePool(voices)
         self._voices: list[tuple[str, float] | None] = [None] * voices
         """Each voice's clip path and when it ends (``inf`` for a loop), or ``None`` while idle."""
@@ -161,18 +159,15 @@ class SimulatedAudio(EffectOutput, VoiceSink):
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
     ) -> None:
-        if effect.audio is None:
+        clip = event.clip
+        if clip is None:
             return
-        config = effect.audio.clips.get(event.verb)
-        if config is None:
-            return
-        stops_receipt = clip_stops_receipt(effect, config)
-        path = self._registry.path(config.name)
-        if self._pool.claim(self, path, config.loop, stops_receipt, receipt) != -1:
-            self._device.on_clip_played(config.name)
+        stops_receipt = clip_stops_receipt(effect, clip.config)
+        if self._pool.claim(self, clip.path, clip.config.loop, stops_receipt, receipt) != -1:
+            self._device.on_clip_played(clip.config.name)
 
-    def is_clip_playing(self, clip: str) -> bool:
-        path = self._registry.path(clip)
+    def is_path_playing(self, path: str) -> bool:
+        """Whether the clip at *path* is sounding on any voice now."""
         return any(
             voice is not None and voice[0] == path and self.is_playing(slot)
             for slot, voice in enumerate(self._voices)
@@ -332,12 +327,11 @@ class SimulatedParts(DeviceParts):
     def audio_output(
         self,
         audio: AudioConfig,
-        registry: AudioRegistry,
         bit_clock: PinRef,
         word_select: PinRef,
         data: PinRef,
     ) -> EffectOutput:
-        self.audio = SimulatedAudio(self._device, registry, audio.voices)
+        self.audio = SimulatedAudio(self._device, audio.voices)
         return self.audio
 
     def haptic_output(self, haptics: I2CDeviceConfig, i2c: object) -> EffectOutput:

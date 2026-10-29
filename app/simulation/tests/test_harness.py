@@ -13,6 +13,7 @@ import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
 from engine.network import LINE
+from engine.packs import UnknownItemError
 from engine.state import Scope
 from packs.scenes.tag.tag_data import TagData, encode_tag_data
 
@@ -171,11 +172,26 @@ def test_a_one_shot_clip_is_playing_until_it_runs_out(simulation):
     assert (still_playing, player.is_playing("scene.fire_shot_start")) == (True, False)
 
 
-def test_is_playing_rejects_a_clip_the_device_cannot_play(simulation):
+def test_is_playing_rejects_a_clip_the_active_scene_does_not_have(simulation):
     player = simulation.add_device("red", scene="tag")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(UnknownItemError):
         player.is_playing("scene.relaod")
+
+
+def test_clip_length_rejects_a_clip_the_active_scene_does_not_have(simulation):
+    player = simulation.add_device("red", scene="tag")
+
+    with pytest.raises(UnknownItemError):
+        player.clip_length("scene.relaod")
+
+
+def test_a_shared_pack_clip_resolves_through_the_active_scenes_declared_packs(simulation):
+    player = simulation.add_device("red", scene="tag")
+
+    # lightning_strike.wav: tag declares the elements pack, so its clip resolves
+    assert player.clip_length("elements.lightning_strike") > 0
+    assert not player.is_playing("elements.lightning_strike")
 
 
 def test_a_looping_clip_is_playing_until_its_effect_stops(simulation):

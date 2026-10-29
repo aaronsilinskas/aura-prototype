@@ -14,7 +14,6 @@ try:
 except ImportError:
     pass
 
-from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from hardware.shared.device_config import (
     AudioConfig,
@@ -101,12 +100,11 @@ class DeviceParts:
     def audio_output(
         self,
         audio: AudioConfig,
-        registry: AudioRegistry,
         bit_clock: PinRef,
         word_select: PinRef,
         data: PinRef,
     ) -> EffectOutput:
-        """Return the audio output, resolving clip names through *registry*."""
+        """Return the audio output; it plays the path on each event's resolved clip."""
         raise NotImplementedError
 
     def haptic_output(self, haptics: I2CDeviceConfig, i2c: object) -> EffectOutput:

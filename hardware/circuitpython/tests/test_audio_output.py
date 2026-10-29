@@ -15,8 +15,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectPixels
-from engine.audio import AudioRegistry
+from effects.effect import AudioPlaybackConfig, Effect, EffectPixels, ResolvedClip
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
 
@@ -37,9 +36,7 @@ _FAKE_WORD_SELECT = object()
 _FAKE_DATA = object()
 
 
-def _make_output(
-    audio_registry: AudioRegistry, max_volume: float = 0.2, num_voices: int = 2
-) -> tuple[object, MagicMock]:
+def _make_output(max_volume: float = 0.2, num_voices: int = 2) -> tuple[object, MagicMock]:
     """Build an AudioEffectOutput with all hardware deps patched out.
 
     Returns the output and the mock mixer it was constructed with, so tests can
@@ -58,7 +55,6 @@ def _make_output(
     from hardware.circuitpython.audio_output import AudioEffectOutput
 
     output = AudioEffectOutput(
-        audio_registry=audio_registry,
         max_volume=max_volume,
         num_voices=num_voices,
         i2s_bit_clock=_FAKE_BIT_CLOCK,
@@ -68,60 +64,26 @@ def _make_output(
     return output, mock_mixer
 
 
-def _effect_oneshot(verb: str, clip_name: str) -> Effect:
-    """One-shot effect with pixels (not audio-only)."""
-    return Effect(
-        name="test",
-        pixels=MagicMock(spec=EffectPixels),
-        audio=EffectAudio(clips={verb: AudioPlaybackConfig(name=clip_name, loop=False)}),
-    )
+def _with_pixels() -> Effect:
+    """An effect with pixels, so a clip's release leaves the receipt to rules."""
+    return Effect(name="test", pixels=MagicMock(spec=EffectPixels))
 
 
-def _effect_loop(verb: str, clip_name: str) -> Effect:
-    """Loop effect with pixels (not audio-only)."""
-    return Effect(
-        name="test",
-        pixels=MagicMock(spec=EffectPixels),
-        audio=EffectAudio(clips={verb: AudioPlaybackConfig(name=clip_name, loop=True)}),
-    )
+def _audio_only() -> Effect:
+    """An effect with no pixels or haptic: audio is the whole effect."""
+    return Effect(name="audio_only")
 
 
-def _effect_audio_only(verb: str, clip_name: str) -> Effect:
-    """One-shot effect with audio only (no pixels, no haptic)."""
-    return Effect(
-        name="audio_only",
-        audio=EffectAudio(clips={verb: AudioPlaybackConfig(name=clip_name, loop=False)}),
-    )
+def _event(path: str, loop: bool = False, stops_effect: bool = False) -> EffectEvent:
+    """A start event carrying a clip resolved to *path*."""
+    config = AudioPlaybackConfig(name="sfx.clip", loop=loop, stops_effect=stops_effect)
+    return EffectEvent("sfx", "effect", "start", ResolvedClip(config, path))
 
 
-def _effect_oneshot_stops_effect(verb: str, clip_name: str) -> Effect:
-    """One-shot effect with pixels and stops_effect=True."""
-    return Effect(
-        name="test",
-        pixels=MagicMock(spec=EffectPixels),
-        audio=EffectAudio(
-            clips={verb: AudioPlaybackConfig(name=clip_name, loop=False, stops_effect=True)}
-        ),
-    )
-
-
-_TEST_PACK = "test_pack"
-
-
-def _register_wav(pack_tree, registry: AudioRegistry, name: str) -> str:
-    """Install a scanned pack's ``<name>.wav`` in *registry*; return its qualified clip name."""
-    root = pack_tree.root("tao_flash")
-    pack_tree.effect_pack(root, _TEST_PACK, sounds=[name])
-    registry.set_pack_sounds(pack_tree.scan_roots(root).pack_sounds)
-    registry.set_allowed_packs(frozenset({_TEST_PACK}))
-    return f"{_TEST_PACK}.{name}"
-
-
-def _register_missing_path(registry: AudioRegistry, name: str, path: str) -> str:
-    """Point a scene-overlay clip at *path* without creating the file, for
-    OSError-on-open tests. Returns the qualified ``"scene.<name>"`` clip name."""
-    registry.set_scene_sounds({name: path})
-    return f"scene.{name}"
+def _wav(tmp_path, name: str = "clip") -> str:
+    wav = tmp_path / f"{name}.wav"
+    wav.write_bytes(b"RIFF")
+    return str(wav)
 
 
 # ---------------------------------------------------------------------------
@@ -133,8 +95,7 @@ def test_i2sout_constructed_with_caller_supplied_pins() -> None:
     """audiobusio.I2SOut is constructed with the caller-supplied I2S pins."""
     import audiobusio  # type: ignore[import]
 
-    registry = AudioRegistry()
-    _make_output(registry)
+    _make_output()
 
     audiobusio.I2SOut.assert_called_once_with(_FAKE_BIT_CLOCK, _FAKE_WORD_SELECT, _FAKE_DATA)
 
@@ -143,41 +104,24 @@ def test_mixer_constructed_with_num_voices() -> None:
     """audiomixer.Mixer is constructed with voice_count=num_voices."""
     import audiomixer  # type: ignore[import]
 
-    registry = AudioRegistry()
-    _make_output(registry, num_voices=4)
+    _make_output(num_voices=4)
 
     audiomixer.Mixer.assert_called_once()
     assert audiomixer.Mixer.call_args[1]["voice_count"] == 4
 
 
 # ---------------------------------------------------------------------------
-# handle_event — shell-routing guards (no claim → no playback)
+# handle_event — events with no playable clip
 # ---------------------------------------------------------------------------
 
 
-def test_handle_event_ignores_effect_with_no_audio() -> None:
-    """effect.audio is None → no play, no crash."""
-    output, mixer = _make_output(AudioRegistry())
-
-    output.handle_event(
-        EffectEvent("rlgl", "silent", "start"),
-        frozenset({"personal"}),
-        Effect(name="silent"),
-        _make_receipt(),
-    )
-
-    mixer.voice[0].play.assert_not_called()
-    mixer.voice[1].play.assert_not_called()
-
-
-def test_handle_event_ignores_unknown_verb() -> None:
-    """Verb not in clips → no play, no crash."""
-    output, mixer = _make_output(AudioRegistry())
+def test_an_event_with_no_clip_plays_nothing() -> None:
+    output, mixer = _make_output()
 
     output.handle_event(
         EffectEvent("rlgl", "effect", "stop"),
         frozenset({"personal"}),
-        _effect_oneshot("peak", "some_peak"),
+        _with_pixels(),
         _make_receipt(),
     )
 
@@ -185,35 +129,13 @@ def test_handle_event_ignores_unknown_verb() -> None:
     mixer.voice[1].play.assert_not_called()
 
 
-def test_handle_event_raises_when_clip_name_is_unregistered() -> None:
-    """A clip name AudioRegistry can't resolve propagates its ValueError (#804)
-    -- handle_event no longer swallows the resolution failure into a no-op."""
-    output, mixer = _make_output(AudioRegistry())
-
-    with pytest.raises(ValueError):
-        output.handle_event(
-            EffectEvent("rlgl", "effect", "start"),
-            frozenset({"personal"}),
-            _effect_oneshot("start", "test_pack.missing_clip"),
-            _make_receipt(),
-        )
-
-    mixer.voice[0].play.assert_not_called()
-    mixer.voice[1].play.assert_not_called()
-
-
-def test_handle_event_ignores_oserror_on_file_open(tmp_path) -> None:
-    """A registered path whose file can't be opened → no play, no crash --
-    distinct from an unresolvable clip name, this failure is VoicePool's own
-    OSError guard around open_source, not AudioRegistry.path raising."""
-    registry = AudioRegistry()
-    clip_name = _register_missing_path(registry, "missing", str(tmp_path / "nonexistent.wav"))
-    output, mixer = _make_output(registry)
+def test_a_clip_whose_file_cannot_be_opened_plays_nothing(tmp_path) -> None:
+    output, mixer = _make_output()
 
     output.handle_event(
-        EffectEvent("rlgl", "effect", "start"),
+        _event(str(tmp_path / "nonexistent.wav")),
         frozenset({"personal"}),
-        _effect_oneshot("start", clip_name),
+        _with_pixels(),
         _make_receipt(),
     )
 
@@ -221,35 +143,15 @@ def test_handle_event_ignores_oserror_on_file_open(tmp_path) -> None:
     mixer.voice[1].play.assert_not_called()
 
 
-def test_unregistered_clip_with_stops_effect_still_raises_instead_of_stopping_silently() -> None:
-    """Dropping the None guard (#804) means an unregistered clip's resolution
-    failure propagates even when stops_effect=True -- it no longer falls back
-    to a silent receipt.stop()."""
-    output, _mixer = _make_output(AudioRegistry())
-    receipt = _make_receipt()
-
-    with pytest.raises(ValueError):
-        output.handle_event(
-            EffectEvent("tag", "effect", "start"),
-            frozenset({"personal"}),
-            _effect_oneshot_stops_effect("start", "test_pack.missing_clip"),
-            receipt,
-        )
-
-    receipt.stop.assert_not_called()
-
-
-def test_oserror_on_file_open_with_stops_effect_stops_receipt_immediately(tmp_path) -> None:
+def test_a_stops_effect_clip_whose_file_cannot_be_opened_stops_the_receipt(tmp_path) -> None:
     """A stops_effect clip whose file fails to open must not run forever."""
-    registry = AudioRegistry()
-    clip_name = _register_missing_path(registry, "missing", str(tmp_path / "nonexistent.wav"))
-    output, _mixer = _make_output(registry)
+    output, _mixer = _make_output()
     receipt = _make_receipt()
 
     output.handle_event(
-        EffectEvent("tag", "effect", "start"),
+        _event(str(tmp_path / "nonexistent.wav"), stops_effect=True),
         frozenset({"personal"}),
-        _effect_oneshot_stops_effect("start", clip_name),
+        _with_pixels(),
         receipt,
     )
 
@@ -257,66 +159,65 @@ def test_oserror_on_file_open_with_stops_effect_stops_receipt_immediately(tmp_pa
 
 
 # ---------------------------------------------------------------------------
-# handle_event — routing a valid clip into the pool reaches the hardware
+# handle_event — playing the resolved clip's path
 # ---------------------------------------------------------------------------
 
 
-def test_valid_clip_plays_on_an_idle_voice(pack_tree) -> None:
-    """A registered clip is opened and played on a mixer voice at the receipt's loudness."""
-    registry = AudioRegistry()
-    clip_name = _register_wav(pack_tree, registry, "music")
-    output, mixer = _make_output(registry, max_volume=0.4)
+def test_the_resolved_clips_path_plays_on_an_idle_voice(tmp_path) -> None:
+    """The file at the event's resolved path is opened and played at the receipt's loudness."""
+    import audiocore  # type: ignore[import]
+
+    output, mixer = _make_output(max_volume=0.4)
+    path = _wav(tmp_path, "music")
 
     output.handle_event(
-        EffectEvent("rlgl", "music", "start"),
+        _event(path, loop=True),
         frozenset({"ambient"}),
-        _effect_loop("start", clip_name),
+        _with_pixels(),
         _make_receipt(loudness=0.5),
     )
 
+    opened_file = audiocore.WaveFile.call_args[0][0]
+    assert opened_file.name == path
     mixer.voice[0].play.assert_called_once()
     assert mixer.voice[0].play.call_args[1]["loop"] is True
     assert mixer.voice[0].level == pytest.approx(0.2)
+    output.stop(0)
 
 
-def test_audio_only_effect_implicitly_stops_receipt_on_finish(pack_tree) -> None:
-    """An effect with no pixels/haptic implicitly sets stops_receipt=True.
-
-    Its receipt is stopped when the clip finishes naturally (audio is the
-    whole effect).
-    """
-    registry = AudioRegistry()
-    clip_name = _register_wav(pack_tree, registry, "sting")
-    output, mixer = _make_output(registry)
+def test_a_finished_stops_effect_clip_stops_the_receipt(tmp_path) -> None:
+    """stops_effect is read from the event's resolved clip."""
+    output, mixer = _make_output()
     receipt = _make_receipt()
 
     output.handle_event(
-        EffectEvent("rlgl", "sting", "start"),
-        frozenset({"personal"}),
-        _effect_audio_only("start", clip_name),
-        receipt,
+        _event(_wav(tmp_path), stops_effect=True), frozenset({"personal"}), _with_pixels(), receipt
     )
-
     mixer.voice[0].playing = False
     output.flush()
 
     receipt.stop.assert_called_once()
 
 
-def test_clip_with_pixels_and_no_stops_effect_flag_leaves_receipt_to_rules(pack_tree) -> None:
-    """An effect with pixels and no stops_effect flag leaves its receipt to rules on finish."""
-    registry = AudioRegistry()
-    clip_name = _register_wav(pack_tree, registry, "sting")
-    output, mixer = _make_output(registry)
+def test_a_finished_clip_on_an_audio_only_effect_stops_the_receipt(tmp_path) -> None:
+    """With no pixels or haptic, audio is the whole effect, so its end ends the receipt."""
+    output, mixer = _make_output()
     receipt = _make_receipt()
 
-    output.handle_event(
-        EffectEvent("rlgl", "sting", "start"),
-        frozenset({"personal"}),
-        _effect_oneshot("start", clip_name),
-        receipt,
-    )
+    output.handle_event(_event(_wav(tmp_path)), frozenset({"personal"}), _audio_only(), receipt)
+    mixer.voice[0].playing = False
+    output.flush()
 
+    receipt.stop.assert_called_once()
+
+
+def test_a_finished_clip_with_pixels_and_no_stops_effect_leaves_the_receipt_to_rules(
+    tmp_path,
+) -> None:
+    output, mixer = _make_output()
+    receipt = _make_receipt()
+
+    output.handle_event(_event(_wav(tmp_path)), frozenset({"personal"}), _with_pixels(), receipt)
     mixer.voice[0].playing = False
     output.flush()
 
@@ -334,7 +235,7 @@ def test_open_source_opens_file_and_wraps_wavefile(tmp_path) -> None:
 
     wav = tmp_path / "clip.wav"
     wav.write_bytes(b"RIFF")
-    output, _ = _make_output(AudioRegistry())
+    output, _ = _make_output()
 
     source = output.open_source(str(wav))
 
@@ -347,7 +248,7 @@ def test_open_source_opens_file_and_wraps_wavefile(tmp_path) -> None:
 
 def test_open_source_returns_none_on_oserror(tmp_path) -> None:
     """open_source returns None when the file cannot be opened."""
-    output, _ = _make_output(AudioRegistry())
+    output, _ = _make_output()
 
     assert output.open_source(str(tmp_path / "nope.wav")) is None
 
@@ -356,7 +257,7 @@ def test_play_stores_source_and_plays_wave_with_loop(tmp_path) -> None:
     """play hands the WaveFile to the slot's voice with the loop flag."""
     wav = tmp_path / "clip.wav"
     wav.write_bytes(b"RIFF")
-    output, mixer = _make_output(AudioRegistry())
+    output, mixer = _make_output()
     source = output.open_source(str(wav))
     _, wave = source
 
@@ -370,7 +271,7 @@ def test_stop_stops_voice_and_closes_file(tmp_path) -> None:
     """stop stops the slot's voice and closes the open WAV file."""
     wav = tmp_path / "clip.wav"
     wav.write_bytes(b"RIFF")
-    output, mixer = _make_output(AudioRegistry())
+    output, mixer = _make_output()
     source = output.open_source(str(wav))
     f, _ = source
     output.play(0, source, loop=False)
@@ -383,7 +284,7 @@ def test_stop_stops_voice_and_closes_file(tmp_path) -> None:
 
 def test_stop_on_idle_slot_stops_voice_without_error(tmp_path) -> None:
     """stop on a slot with no open source still stops the voice and does not raise."""
-    output, mixer = _make_output(AudioRegistry())
+    output, mixer = _make_output()
 
     output.stop(0)
 
@@ -392,7 +293,7 @@ def test_stop_on_idle_slot_stops_voice_without_error(tmp_path) -> None:
 
 def test_set_loudness_applies_max_volume(tmp_path) -> None:
     """set_loudness sets the voice level to max_volume * loudness."""
-    output, mixer = _make_output(AudioRegistry(), max_volume=0.4)
+    output, mixer = _make_output(max_volume=0.4)
 
     output.set_loudness(0, 0.5)
 
@@ -401,7 +302,7 @@ def test_set_loudness_applies_max_volume(tmp_path) -> None:
 
 def test_is_playing_reads_voice_playing(tmp_path) -> None:
     """is_playing reports the slot voice's playing flag."""
-    output, mixer = _make_output(AudioRegistry())
+    output, mixer = _make_output()
 
     mixer.voice[0].playing = True
     mixer.voice[1].playing = False

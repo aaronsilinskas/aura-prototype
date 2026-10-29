@@ -9,7 +9,6 @@ needed because none of them carry board imports.
 from __future__ import annotations
 
 import engine._path as _path
-from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
@@ -39,7 +38,6 @@ __all__ = [
     "build_scene_boot",
     "build_scene_runtime",
     "build_scene_tick",
-    "install_pack_sounds",
     "resolve_boot_scene_name",
     "resolve_ir_codec",
     "scan_boot_pack_catalog",
@@ -55,9 +53,11 @@ class SceneRuntime:
     subsystem wired), and ``radio`` is the device's ``RadioTransceiver``
     (``None`` on a device with no radio peripheral wired) — both passed
     straight through from ``DeviceHardware``, no separate object built here.
+    ``namespace`` is the Active scene namespace ``manager`` installs each
+    scene into and ``effect_manager`` resolves names through.
     """
 
-    __slots__ = ("effect_manager", "ir", "manager", "radio", "timer")
+    __slots__ = ("effect_manager", "ir", "manager", "namespace", "radio", "timer")
 
     def __init__(
         self,
@@ -66,12 +66,14 @@ class SceneRuntime:
         timer: Timer,
         ir: InfraredTransceiver | None,
         radio: RadioTransceiver | None,
+        namespace: ActiveSceneNamespace,
     ) -> None:
         self.manager: SceneManager = manager
         self.effect_manager: EffectManager = effect_manager
         self.timer: Timer = timer
         self.ir: InfraredTransceiver | None = ir
         self.radio: RadioTransceiver | None = radio
+        self.namespace: ActiveSceneNamespace = namespace
 
 
 _TELEMETRY_PRINT_INTERVAL = 1.0  # seconds
@@ -130,22 +132,6 @@ def scan_boot_pack_catalog(
     return scan_pack_roots(roots, initial_data_overrides=scene_data)
 
 
-def install_pack_sounds(hw: DeviceHardware, catalog: PackCatalog) -> AudioRegistry:
-    """Install *catalog*'s pack sounds on *hw*'s audio; return the registry ``SceneManager`` takes.
-
-    ``hw.audio_registry`` is the registry the device's audio output resolves
-    clips through, so installing the pack sounds as its base is what lets
-    ``scene.``/``<pack>.`` clip names resolve at runtime. A device with no
-    audio gets a fresh, unreachable ``AudioRegistry``: it satisfies
-    ``SceneManager``'s audio-overlay seam without pretending sounds resolve.
-    """
-    audio_registry = hw.audio_registry
-    if audio_registry is None:
-        return AudioRegistry()
-    audio_registry.set_pack_sounds(catalog.pack_sounds)
-    return audio_registry
-
-
 def build_scene_runtime(
     hw: DeviceHardware,
     scene_name: str,
@@ -197,14 +183,18 @@ def build_scene_runtime(
         scene_registry,
         effect_admin=effect_manager,
         namespace=namespace,
-        audio_overlay_admin=install_pack_sounds(hw, catalog),
         scene_reboot=scene_reboot if scene_reboot is not None else SceneReboot(),
     )
     manager.load(scene_registry.resolve_known(scene_name))
     manager.update()  # applies the load transition; the scene is now active
 
     return SceneRuntime(
-        manager=manager, effect_manager=effect_manager, timer=timer, ir=hw.ir, radio=hw.radio
+        manager=manager,
+        effect_manager=effect_manager,
+        timer=timer,
+        ir=hw.ir,
+        radio=hw.radio,
+        namespace=namespace,
     )
 
 
@@ -215,8 +205,8 @@ def build_scene_boot(
     timer: Timer | None = None,
     logger: Logger | None = None,
     scene_data: dict[str, dict[str, object]] | None = None,
-) -> tuple[str, Callable[[], None]]:
-    """Boot *hw* into its boot scene; return the scene's name and its per-tick body.
+) -> tuple[str, Callable[[], None], ActiveSceneNamespace]:
+    """Boot *hw* into its boot scene; return its name, per-tick body and namespace.
 
     The one boot shared by the device (:func:`app.scene_runtime.run_scene`)
     and the Simulated device, as :func:`build_scene_tick` is their one tick.
@@ -226,6 +216,9 @@ def build_scene_boot(
 
     *scene_data* maps a scene name to tunables merged over its
     ``initial_data``; the Simulated device boots shortened scenes through it.
+
+    The namespace is the runtime's own Active scene namespace, so the
+    Simulated device can resolve a clip name exactly as the game does.
     """
     catalog = scan_boot_pack_catalog(hw.storage, scene_data)
     scene_registry = catalog.scene_registry
@@ -236,7 +229,7 @@ def build_scene_boot(
         hw.storage, booted_scene=scene_name, reset=reset, logger=logger
     )
     runtime = build_scene_runtime(hw, scene_name, catalog, scene_reboot=scene_reboot, timer=timer)
-    return scene_name, build_scene_tick(hw, runtime)
+    return scene_name, build_scene_tick(hw, runtime), runtime.namespace
 
 
 def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], None]:

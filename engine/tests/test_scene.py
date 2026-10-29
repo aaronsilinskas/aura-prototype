@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from engine.audio import AudioOverlayAdmin
 from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.engine import GameEngine, GameRule
@@ -17,7 +16,6 @@ from engine.tests.effects.helpers import SpyEffectOutput
 from engine.tests.helpers import (
     RecordingNamespace,
     RecordingSceneReboot,
-    SpyAudioOverlayAdmin,
     SpyEffectAdmin,
 )
 from engine.timer import Timer
@@ -74,12 +72,11 @@ def _make_scene_manager(
     scene_registry: SceneRegistry | None = None,
     effect_admin: EffectAdmin | None = None,
     namespace: ActiveSceneNamespace | None = None,
-    audio_overlay_admin: AudioOverlayAdmin | None = None,
     scene_reboot: SceneReboot | None = None,
 ) -> SceneManager:
     """Construct a SceneManager, defaulting any unspecified registry/admin/port.
 
-    Absorbs SceneManager's injected-EffectAdmin/AudioOverlayAdmin/SceneReboot
+    Absorbs SceneManager's injected-EffectAdmin/namespace/SceneReboot
     constructor parameters so most call sites only need to override the
     registries/admins/ports they actually care about.
     """
@@ -90,7 +87,6 @@ def _make_scene_manager(
         scene_registry if scene_registry is not None else SceneRegistry(),
         effect_admin if effect_admin is not None else SpyEffectAdmin(),
         namespace if namespace is not None else RecordingNamespace(),
-        audio_overlay_admin if audio_overlay_admin is not None else SpyAudioOverlayAdmin(),
         scene_reboot if scene_reboot is not None else RecordingSceneReboot(),
     )
 
@@ -1102,44 +1098,6 @@ def test_pop_reinstalls_the_underlying_scene_view(pack_tree) -> None:
     assert local_effects is base_view[0]
     assert list(local_sounds) == ["win"]
     assert declared_packs == frozenset({"fx"})
-
-
-def test_audio_allowed_packs_installed_in_lockstep_through_load_overlay_pop(pack_tree) -> None:
-    """AudioOverlayAdmin.set_allowed_packs must track the top-of-stack scene's declared
-    effect_packs through load, overlay, and pop -- installed right beside set_scene_sounds."""
-    catalog = pack_tree.scan(effect_packs={"fx": {}, "gfx": {}})
-    effect_registry, rule_registry = catalog.effect_registry, catalog.rule_registry
-    engine = _make_engine()
-    scene_reg = _scene_registry(
-        ("base", _scene_factory(effect_packs=[("fx", "1.0")])),
-        ("overlay_scene", _scene_factory(effect_packs=[("gfx", "1.0")])),
-    )
-    audio_overlay_admin = SpyAudioOverlayAdmin()
-    manager = _make_scene_manager(
-        engine,
-        effect_registry=effect_registry,
-        rule_registry=rule_registry,
-        scene_registry=scene_reg,
-        audio_overlay_admin=audio_overlay_admin,
-    )
-
-    manager.load("base")
-    manager.update()
-    assert audio_overlay_admin.allowed_packs_history[-1] == frozenset({"fx"}), (
-        "load must install the loaded scene's own declared effect_packs"
-    )
-
-    manager.overlay("overlay_scene")
-    manager.update()
-    assert audio_overlay_admin.allowed_packs_history[-1] == frozenset({"gfx"}), (
-        "overlay must install the overlay scene's own declared effect_packs, not the base's"
-    )
-
-    manager.pop()
-    manager.update()
-    assert audio_overlay_admin.allowed_packs_history[-1] == frozenset({"fx"}), (
-        "pop must restore the revealed base entry's declared effect_packs"
-    )
 
 
 # ---------------------------------------------------------------------------
