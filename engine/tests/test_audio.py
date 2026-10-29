@@ -93,6 +93,29 @@ def test_scan_pack_sounds_from_two_packs_sharing_a_stem_do_not_collide(tmp_path)
 
 
 # ---------------------------------------------------------------------------
+# AudioRegistry.set_pack_sounds — base population from a ready-made map
+# ---------------------------------------------------------------------------
+
+
+def test_set_pack_sounds_resolves_a_qualified_clip_to_its_given_path() -> None:
+    registry = AudioRegistry()
+    registry.set_pack_sounds({"basic.win": "packs/effects/basic/sounds/win.wav"})
+    registry.set_allowed_packs(frozenset({"basic"}))
+
+    assert registry.path("basic.win") == "packs/effects/basic/sounds/win.wav"
+
+
+def test_set_pack_sounds_replaces_every_clip_set_before() -> None:
+    registry = AudioRegistry()
+    registry.set_pack_sounds({"basic.win": "old/win.wav"})
+    registry.set_pack_sounds({"basic.lose": "new/lose.wav"})
+    registry.set_allowed_packs(frozenset({"basic"}))
+
+    with pytest.raises(ValueError, match=re.escape("basic.win")):
+        registry.path("basic.win")
+
+
+# ---------------------------------------------------------------------------
 # AudioRegistry.path — prefix routing
 # ---------------------------------------------------------------------------
 

@@ -76,6 +76,14 @@ class AudioRegistry(AudioOverlayAdmin):
         for stem, clip_path in scan_sound_dir(path).items():
             self._base[f"{pack_name}.{stem}"] = clip_path
 
+    def set_pack_sounds(self, sounds: dict[str, str]) -> None:
+        """Replace the whole base with *sounds* (``<pack>.<stem>`` → WAV path).
+
+        Takes ``PackCatalog.pack_sounds`` once at boot; the hardware builds this
+        registry before the catalog exists, so it cannot be a constructor argument.
+        """
+        self._base = sounds
+
     def set_scene_sounds(self, sounds: dict[str, str] | None) -> None:
         self._overlay = sounds
 
