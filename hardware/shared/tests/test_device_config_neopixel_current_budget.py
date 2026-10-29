@@ -162,9 +162,11 @@ def test_isolate_carries_the_budget_through_and_never_offers_it_as_a_keep():
         config.isolate("neopixel_current_budget")
 
 
-def test_isolating_pixels_keeps_budgeted_strips_at_their_parse_time_tuned_brightness():
+@pytest.mark.parametrize("keep", ["pixels", "audio"])
+def test_isolate_keeps_budgeted_strips_at_their_parse_time_tuned_brightness(keep):
     # 100 px @ 1.0 x 60 mA = 6000 mA against 2000 mA -> tuned to one third at
-    # parse; isolate narrows without re-budgeting or restoring the declared 1.0.
+    # parse; isolate narrows without re-budgeting or restoring the declared 1.0,
+    # whether the pixels entry is kept or disabled.
     config = parse_device_config(
         {
             "pixels": [_strip("D5", 100, 1.0)],
@@ -173,7 +175,7 @@ def test_isolating_pixels_keeps_budgeted_strips_at_their_parse_time_tuned_bright
         }
     )
 
-    isolated = config.isolate("pixels")
+    isolated = config.isolate(keep)
 
     assert isolated.pixels[0].strips[0].brightness == pytest.approx(1 / 3)
 
