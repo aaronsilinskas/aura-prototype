@@ -1,11 +1,14 @@
-"""Tests for engine.scene.SceneRegistry and Scene.version field."""
+"""Tests for engine.scene.SceneRegistry lookups and the Scene.version / ir_codec fields.
+
+Scanned registries come from ``scan_pack_roots`` over trees laid out by the
+shared ``pack_tree`` builder; scan failures are covered by the catalog tests.
+"""
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
+from engine.pack_catalog import scan_pack_roots
 from engine.scene import Scene, SceneRegistry
 from engine.version import Version
 
@@ -14,27 +17,11 @@ from engine.version import Version
 # ---------------------------------------------------------------------------
 
 
-def _write_scene_json(path, data: dict) -> None:
-    """Write *data* as JSON to *path* / scene.json."""
-    (path / "scene.json").write_text(json.dumps(data))
-
-
-def _minimal_scene_json(**overrides) -> dict:
-    """Return a minimal valid scene.json dict, with any *overrides* applied."""
-    base = {
-        "version": "1.0",
-        "effect_packs": [],
-        "rule_packs": [],
-    }
-    base.update(overrides)
-    return base
-
-
-def _make_scene_dir(root, name: str, **json_overrides) -> None:
-    """Create a named subdirectory under *root* with a valid scene.json."""
-    scene_dir = root / name
-    scene_dir.mkdir(parents=True, exist_ok=True)
-    _write_scene_json(scene_dir, _minimal_scene_json(**json_overrides))
+def _scan_scene(pack_tree, name: str = "forest", **scene_fields) -> SceneRegistry:
+    """Scan a root holding the single scene *name*; return the catalog's ``SceneRegistry``."""
+    root = pack_tree.root("tsr_flash")
+    pack_tree.scene(root, name, **scene_fields)
+    return scan_pack_roots([str(root)]).scene_registry
 
 
 # ---------------------------------------------------------------------------
@@ -84,206 +71,12 @@ def test_scene_registry_names_is_empty_on_construction() -> None:
 
 
 # ---------------------------------------------------------------------------
-# SceneRegistry.scan_dir — discovery
-# ---------------------------------------------------------------------------
-
-
-def test_scan_dir_discovers_subdirectory_with_scene_json(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest")
-    registry = SceneRegistry()
-
-    registry.scan_dir(str(tmp_path), "test.scenes")
-
-    assert "forest" in registry.names()
-
-
-def test_scan_dir_ignores_subdirectory_without_scene_json(tmp_path) -> None:
-    (tmp_path / "no_json").mkdir()
-    registry = SceneRegistry()
-
-    registry.scan_dir(str(tmp_path), "test.scenes")
-
-    assert registry.names() == []
-
-
-def test_scan_dir_ignores_plain_files_at_top_level(tmp_path) -> None:
-    (tmp_path / "readme.txt").write_text("hello")
-    _make_scene_dir(tmp_path, "cave")
-    registry = SceneRegistry()
-
-    registry.scan_dir(str(tmp_path), "test.scenes")
-
-    assert registry.names() == ["cave"]
-
-
-def test_scan_dir_discovers_multiple_scene_directories(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest")
-    _make_scene_dir(tmp_path, "cave")
-    _make_scene_dir(tmp_path, "arena")
-    registry = SceneRegistry()
-
-    registry.scan_dir(str(tmp_path), "test.scenes")
-
-    assert sorted(registry.names()) == ["arena", "cave", "forest"]
-
-
-def test_scan_dir_on_empty_directory_registers_no_scenes(tmp_path) -> None:
-    registry = SceneRegistry()
-
-    registry.scan_dir(str(tmp_path), "test.scenes")
-
-    assert registry.names() == []
-
-
-# ---------------------------------------------------------------------------
-# SceneRegistry.scan_dir — idempotency
-# ---------------------------------------------------------------------------
-
-
-def test_scan_dir_called_twice_with_same_path_is_a_no_op(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest")
-    registry = SceneRegistry()
-
-    registry.scan_dir(str(tmp_path), "test.scenes")
-    registry.scan_dir(str(tmp_path), "test.scenes")  # no-op
-
-    assert registry.names() == ["forest"]
-
-
-def test_scan_dir_second_call_does_not_pick_up_scenes_added_after_first_scan(
-    tmp_path,
-) -> None:
-    _make_scene_dir(tmp_path, "forest")
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
-
-    # Add a new scene after the first scan.
-    _make_scene_dir(tmp_path, "cave")
-    registry.scan_dir(str(tmp_path), "test.scenes")  # no-op
-
-    assert "cave" not in registry.names()
-
-
-# ---------------------------------------------------------------------------
-# SceneRegistry.scan_dir — name collision
-# ---------------------------------------------------------------------------
-
-
-def test_scan_dir_raises_when_same_scene_name_comes_from_different_directory(
-    tmp_path,
-) -> None:
-    src_a = tmp_path / "src_a"
-    src_b = tmp_path / "src_b"
-    src_a.mkdir()
-    src_b.mkdir()
-    _make_scene_dir(src_a, "forest")
-    _make_scene_dir(src_b, "forest")
-
-    registry = SceneRegistry()
-    registry.scan_dir(str(src_a), "test.scenes")
-
-    with pytest.raises(ValueError):
-        registry.scan_dir(str(src_b), "test.scenes")
-
-
-# ---------------------------------------------------------------------------
-# SceneRegistry.scan_dir — validation errors
-# ---------------------------------------------------------------------------
-
-
-def test_scan_dir_raises_when_version_field_is_missing(tmp_path) -> None:
-    scene_dir = tmp_path / "bad"
-    scene_dir.mkdir()
-    _write_scene_json(scene_dir, {"effect_packs": [], "rule_packs": []})
-    registry = SceneRegistry()
-
-    with pytest.raises(ValueError, match="version"):
-        registry.scan_dir(str(tmp_path), "test.scenes")
-
-
-def test_scan_dir_raises_when_version_is_malformed(tmp_path) -> None:
-    scene_dir = tmp_path / "bad"
-    scene_dir.mkdir()
-    _write_scene_json(
-        scene_dir,
-        {"version": "not-a-version", "effect_packs": [], "rule_packs": []},
-    )
-    registry = SceneRegistry()
-
-    with pytest.raises(ValueError):
-        registry.scan_dir(str(tmp_path), "test.scenes")
-
-
-def test_scan_dir_raises_malformed_version_when_version_is_json_number(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "bad", version=1.2)
-    registry = SceneRegistry()
-
-    with pytest.raises(ValueError, match="malformed version"):
-        registry.scan_dir(str(tmp_path), "test.scenes")
-
-
-def test_scan_dir_raises_when_effect_packs_field_is_missing(tmp_path) -> None:
-    scene_dir = tmp_path / "bad"
-    scene_dir.mkdir()
-    _write_scene_json(scene_dir, {"version": "1.0", "rule_packs": []})
-    registry = SceneRegistry()
-
-    with pytest.raises(ValueError, match="effect_packs"):
-        registry.scan_dir(str(tmp_path), "test.scenes")
-
-
-def test_scan_dir_raises_when_rule_packs_field_is_missing(tmp_path) -> None:
-    scene_dir = tmp_path / "bad"
-    scene_dir.mkdir()
-    _write_scene_json(scene_dir, {"version": "1.0", "effect_packs": []})
-    registry = SceneRegistry()
-
-    with pytest.raises(ValueError, match="rule_packs"):
-        registry.scan_dir(str(tmp_path), "test.scenes")
-
-
-def test_scan_dir_does_not_raise_when_ir_codec_field_is_missing(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest")
-    registry = SceneRegistry()
-
-    registry.scan_dir(str(tmp_path), "test.scenes")  # no ir_codec key; must not raise
-
-    assert "forest" in registry.names()
-
-
-def test_scan_dir_raises_when_ir_codec_is_empty_string(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "bad", ir_codec="")
-    registry = SceneRegistry()
-
-    with pytest.raises(ValueError, match="ir_codec"):
-        registry.scan_dir(str(tmp_path), "test.scenes")
-
-
-def test_scan_dir_raises_when_ir_codec_is_whitespace_only(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "bad", ir_codec="   ")
-    registry = SceneRegistry()
-
-    with pytest.raises(ValueError, match="ir_codec"):
-        registry.scan_dir(str(tmp_path), "test.scenes")
-
-
-def test_scan_dir_raises_when_ir_codec_is_not_a_string(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "bad", ir_codec=42)
-    registry = SceneRegistry()
-
-    with pytest.raises(ValueError, match="ir_codec"):
-        registry.scan_dir(str(tmp_path), "test.scenes")
-
-
-# ---------------------------------------------------------------------------
 # SceneRegistry.get — correct data returned
 # ---------------------------------------------------------------------------
 
 
-def test_get_returns_scene_with_version_parsed_from_json(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest", version="2.3")
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+def test_get_returns_scene_with_version_parsed_from_json(pack_tree) -> None:
+    registry = _scan_scene(pack_tree, version="2.3")
 
     scene = registry.get("forest")
 
@@ -291,60 +84,54 @@ def test_get_returns_scene_with_version_parsed_from_json(tmp_path) -> None:
     assert scene.version.minor == 3
 
 
-def test_get_returns_scene_with_effect_packs_from_json(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest", effect_packs=[["fx", "1.0"]])
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+def test_get_returns_scene_with_effect_packs_from_json(pack_tree) -> None:
+    root = pack_tree.root("tsr_flash")
+    pack_tree.effect_pack(root, "fx")
+    pack_tree.scene(root, "forest", effect_packs=[["fx", "1.0"]])
+    registry = scan_pack_roots([str(root)]).scene_registry
 
     scene = registry.get("forest")
 
     assert scene.effect_packs == [["fx", "1.0"]]
 
 
-def test_get_returns_scene_with_rule_packs_from_json(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest", rule_packs=[["rules", "1.0"]])
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+def test_get_returns_scene_with_rule_packs_from_json(pack_tree) -> None:
+    root = pack_tree.root("tsr_flash")
+    pack_tree.rule_pack(root, "rules")
+    pack_tree.scene(root, "forest", rule_packs=[["rules", "1.0"]])
+    registry = scan_pack_roots([str(root)]).scene_registry
 
     scene = registry.get("forest")
 
     assert scene.rule_packs == [["rules", "1.0"]]
 
 
-def test_get_returns_scene_with_initial_data_from_json(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest", initial_data={"score": 0, "level": 5})
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+def test_get_returns_scene_with_initial_data_from_json(pack_tree) -> None:
+    registry = _scan_scene(pack_tree, initial_data={"score": 0, "level": 5})
 
     scene = registry.get("forest")
 
     assert scene.initial_data == {"score": 0, "level": 5}
 
 
-def test_get_returns_scene_with_none_initial_data_when_not_in_json(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest")
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+def test_get_returns_scene_with_none_initial_data_when_not_in_json(pack_tree) -> None:
+    registry = _scan_scene(pack_tree)
 
     scene = registry.get("forest")
 
     assert scene.initial_data is None
 
 
-def test_get_returns_scene_with_default_ir_codec_when_not_in_json(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest")
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+def test_get_returns_scene_with_default_ir_codec_when_not_in_json(pack_tree) -> None:
+    registry = _scan_scene(pack_tree)
 
     scene = registry.get("forest")
 
     assert scene.ir_codec == "aura"
 
 
-def test_get_returns_scene_with_ir_codec_parsed_from_json(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest", ir_codec="tag")
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+def test_get_returns_scene_with_ir_codec_parsed_from_json(pack_tree) -> None:
+    registry = _scan_scene(pack_tree, ir_codec="tag")
 
     scene = registry.get("forest")
 
@@ -356,10 +143,8 @@ def test_get_returns_scene_with_ir_codec_parsed_from_json(tmp_path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_get_returns_fresh_scene_on_each_call(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest")
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+def test_get_returns_fresh_scene_on_each_call(pack_tree) -> None:
+    registry = _scan_scene(pack_tree)
 
     scene_a = registry.get("forest")
     scene_b = registry.get("forest")
@@ -367,10 +152,8 @@ def test_get_returns_fresh_scene_on_each_call(tmp_path) -> None:
     assert scene_a is not scene_b
 
 
-def test_get_returns_scenes_with_shared_version_instance(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest", version="1.0")
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+def test_get_returns_scenes_with_shared_version_instance(pack_tree) -> None:
+    registry = _scan_scene(pack_tree, version="1.0")
 
     scene_a = registry.get("forest")
     scene_b = registry.get("forest")
@@ -379,11 +162,9 @@ def test_get_returns_scenes_with_shared_version_instance(tmp_path) -> None:
 
 
 def test_get_returns_fresh_initial_data_so_mutation_does_not_affect_next_call(
-    tmp_path,
+    pack_tree,
 ) -> None:
-    _make_scene_dir(tmp_path, "forest", initial_data={"score": 0})
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+    registry = _scan_scene(pack_tree, initial_data={"score": 0})
 
     scene_a = registry.get("forest")
     scene_a.initial_data["score"] = 99
@@ -405,22 +186,46 @@ def test_get_raises_value_error_for_unknown_scene_name() -> None:
 
 
 # ---------------------------------------------------------------------------
+# SceneRegistry.resolve_known — known-scene check
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_known_returns_a_scanned_scene_name(pack_tree) -> None:
+    registry = _scan_scene(pack_tree)
+
+    assert registry.resolve_known("forest") == "forest"
+
+
+def test_resolve_known_returns_a_factory_registered_scene_name() -> None:
+    registry = SceneRegistry()
+    registry.register("in_memory", lambda: Scene(effect_packs=[], rule_packs=[]))
+
+    assert registry.resolve_known("in_memory") == "in_memory"
+
+
+def test_resolve_known_raises_value_error_naming_the_known_scenes(pack_tree) -> None:
+    root = pack_tree.root("tsr_flash")
+    pack_tree.scene(root, "forest")
+    pack_tree.scene(root, "cave")
+    registry = scan_pack_roots([str(root)]).scene_registry
+
+    with pytest.raises(ValueError, match=r"'nowhere'.*cave, forest"):
+        registry.resolve_known("nowhere")
+
+
+# ---------------------------------------------------------------------------
 # SceneRegistry.ir_codec_for — lightweight accessor
 # ---------------------------------------------------------------------------
 
 
-def test_ir_codec_for_returns_aura_when_scene_json_has_no_ir_codec(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest")
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+def test_ir_codec_for_returns_aura_when_scene_json_has_no_ir_codec(pack_tree) -> None:
+    registry = _scan_scene(pack_tree)
 
     assert registry.ir_codec_for("forest") == "aura"
 
 
-def test_ir_codec_for_returns_the_declared_codec_name(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "arena", ir_codec="tag")
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+def test_ir_codec_for_returns_the_declared_codec_name(pack_tree) -> None:
+    registry = _scan_scene(pack_tree, "arena", ir_codec="tag")
 
     assert registry.ir_codec_for("arena") == "tag"
 
@@ -442,10 +247,8 @@ def test_ir_codec_for_works_for_register_factory_scene() -> None:
     assert registry.ir_codec_for("in_memory") == "tag"
 
 
-def test_ir_codec_for_prefers_factory_override_over_scanned_scene(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest", ir_codec="tag")
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+def test_ir_codec_for_prefers_factory_override_over_scanned_scene(pack_tree) -> None:
+    registry = _scan_scene(pack_tree, ir_codec="tag")
     registry.register(
         "forest",
         lambda: Scene(effect_packs=[], rule_packs=[], ir_codec="aura"),
@@ -459,13 +262,13 @@ def test_ir_codec_for_prefers_factory_override_over_scanned_scene(tmp_path) -> N
 # ---------------------------------------------------------------------------
 
 
-def test_names_returns_scene_names_sorted_alphabetically(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "zebra")
-    _make_scene_dir(tmp_path, "alpha")
-    _make_scene_dir(tmp_path, "mango")
-    registry = SceneRegistry()
+def test_names_returns_scene_names_sorted_alphabetically(pack_tree) -> None:
+    root = pack_tree.root("tsr_flash")
+    pack_tree.scene(root, "zebra")
+    pack_tree.scene(root, "alpha")
+    pack_tree.scene(root, "mango")
 
-    registry.scan_dir(str(tmp_path), "test.scenes")
+    registry = scan_pack_roots([str(root)]).scene_registry
 
     assert registry.names() == ["alpha", "mango", "zebra"]
 
@@ -503,11 +306,9 @@ def test_register_factory_returns_fresh_scene_on_each_get() -> None:
 
 
 def test_register_factory_scene_exposes_same_version_field_as_json_scene(
-    tmp_path,
+    pack_tree,
 ) -> None:
-    _make_scene_dir(tmp_path, "from_disk", version="1.0")
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+    registry = _scan_scene(pack_tree, "from_disk", version="1.0")
     registry.register(
         "from_memory",
         lambda: Scene(effect_packs=[], rule_packs=[], version=Version(1, 0)),
@@ -521,43 +322,9 @@ def test_register_factory_scene_exposes_same_version_field_as_json_scene(
 
 
 def test_names_does_not_duplicate_when_factory_overrides_scanned_scene(
-    tmp_path,
+    pack_tree,
 ) -> None:
-    _make_scene_dir(tmp_path, "forest")
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
+    registry = _scan_scene(pack_tree)
     registry.register("forest", lambda: Scene(effect_packs=[], rule_packs=[]))
 
     assert registry.names().count("forest") == 1
-
-
-# ---------------------------------------------------------------------------
-# override_initial_data
-# ---------------------------------------------------------------------------
-
-
-def test_override_initial_data_replaces_named_keys_and_keeps_the_rest(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest", initial_data={"max_ammo": 10, "team": 0})
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
-
-    registry.override_initial_data("forest", {"max_ammo": 2})
-
-    assert registry.get("forest").initial_data == {"max_ammo": 2, "team": 0}
-
-
-def test_override_initial_data_adds_keys_to_a_scene_without_initial_data(tmp_path) -> None:
-    _make_scene_dir(tmp_path, "forest")
-    registry = SceneRegistry()
-    registry.scan_dir(str(tmp_path), "test.scenes")
-
-    registry.override_initial_data("forest", {"max_ammo": 2})
-
-    assert registry.get("forest").initial_data == {"max_ammo": 2}
-
-
-def test_override_initial_data_raises_value_error_for_unknown_scene_name() -> None:
-    registry = SceneRegistry()
-
-    with pytest.raises(ValueError, match="nowhere"):
-        registry.override_initial_data("nowhere", {"max_ammo": 2})
