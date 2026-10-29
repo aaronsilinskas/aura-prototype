@@ -14,7 +14,7 @@ job: the live adapter is ``hardware.circuitpython.sdcard_storage.SdCardStorage``
 which mounts at construction time and then defers every read/write to this
 base class, since once mounted, plain ``os`` calls work identically across
 runtimes. Tests and the Simulated device's card run this same class over a
-real directory; there is no second implementation.
+real directory.
 
 ``read_json``/``write_json`` are a thin JSON convenience built on the bytes
 primitives, so they inherit ``read_bytes``/``write_bytes``'s escape-rejection
@@ -41,10 +41,10 @@ _TEMP_SUFFIX: Final = ".tmp"
 def _reject_escaping_path(relative_path: str) -> None:
     """Raise ``ValueError`` if *relative_path* escapes a mount root.
 
-    Pure string logic, so the rule is the same on every runtime. Rejects an absolute
-    *relative_path* (a leading ``"/"``) and any ``..`` path segment,
-    wherever it appears, even one that would net out to a location still
-    under the root — simple and conservatively safe rather than clever.
+    Rejects an absolute *relative_path* (a leading ``"/"``) and any ``..``
+    path segment, wherever it appears, even one that would net out to a
+    location still under the root — simple and conservatively safe rather
+    than clever.
     """
     if relative_path.startswith("/"):
         raise ValueError(f"path escapes mount root: {relative_path!r}")
@@ -306,7 +306,7 @@ class DeviceStorage:
         because that helper is identity on CircuitPython/MicroPython (no
         ``os.path`` to fall back to) and so does not collapse ``..`` there,
         even though it does on CPython — relying on it would make escape
-        rejection platform-dependent. See ``_reject_escaping_path`` for
+        rejection platform-dependent. See :func:`_reject_escaping_path` for
         the guard rule itself.
         """
         _reject_escaping_path(relative_path)
