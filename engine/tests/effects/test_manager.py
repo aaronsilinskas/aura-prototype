@@ -6,7 +6,7 @@ from engine.effects.builder import EffectBuilder
 from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.events import EffectEvent
-from engine.namespace import ActiveSceneNamespace, MissingPrefixError, UndeclaredPackError
+from engine.namespace import CLIP, ActiveSceneNamespace, MissingPrefixError, UndeclaredPackError
 from engine.pack_catalog import PackCatalog
 from engine.packs import PackRegistry, UnknownItemError
 from engine.state import Scope
@@ -1025,7 +1025,7 @@ def test_misspelled_clip_raises_from_set_effect_on_any_verb(pack_tree, verb) -> 
     with pytest.raises(UnknownItemError) as exc_info:
         manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
 
-    assert (exc_info.value.name, exc_info.value.kind) == ("sfx.bomm", "clip")
+    assert (exc_info.value.name, exc_info.value.kind) == ("sfx.bomm", CLIP)
 
 
 def test_misspelled_clip_on_a_custom_verb_leaves_the_scope_unchanged(pack_tree) -> None:

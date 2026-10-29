@@ -12,6 +12,8 @@ import pytest
 
 from engine.effects.builder import EffectBuilder
 from engine.namespace import (
+    CLIP,
+    EFFECT,
     ActiveSceneNamespace,
     MissingPrefixError,
     NoActiveSceneError,
@@ -71,7 +73,7 @@ def test_installed_pack_the_scene_did_not_declare_raises_undeclared_pack(pack_tr
         namespace.resolve_effect("elements.fire")
 
     error = exc_info.value
-    assert (error.name, error.kind, error.pack_name) == ("elements.fire", "effect", "elements")
+    assert (error.name, error.kind, error.pack_name) == ("elements.fire", EFFECT, "elements")
 
 
 def test_pack_that_is_not_installed_raises_unknown_pack_even_when_declared(pack_tree) -> None:
@@ -82,7 +84,7 @@ def test_pack_that_is_not_installed_raises_unknown_pack_even_when_declared(pack_
         namespace.resolve_effect("spells.bolt")
 
     error = exc_info.value
-    assert (error.name, error.kind, error.pack_name) == ("spells.bolt", "effect", "spells")
+    assert (error.name, error.kind, error.pack_name) == ("spells.bolt", EFFECT, "spells")
 
 
 def test_unknown_pack_is_reported_before_the_declared_pack_check(pack_tree) -> None:
@@ -101,7 +103,7 @@ def test_unknown_effect_in_a_declared_pack_raises_unknown_item(pack_tree) -> Non
         namespace.resolve_effect("elements.frost")
 
     error = exc_info.value
-    assert (error.name, error.kind) == ("elements.frost", "effect")
+    assert (error.name, error.kind) == ("elements.frost", EFFECT)
 
 
 def test_unknown_scene_local_effect_raises_unknown_item(pack_tree) -> None:
@@ -113,7 +115,7 @@ def test_unknown_scene_local_effect_raises_unknown_item(pack_tree) -> None:
         namespace.resolve_effect("scene.lose")
 
     error = exc_info.value
-    assert (error.name, error.kind) == ("scene.lose", "effect")
+    assert (error.name, error.kind) == ("scene.lose", EFFECT)
 
 
 def test_scene_effect_in_a_scene_with_no_locals_raises_unknown_item(pack_tree) -> None:
@@ -132,7 +134,7 @@ def test_any_lookup_before_install_raises_no_active_scene(pack_tree, name) -> No
         namespace.resolve_effect(name)
 
     error = exc_info.value
-    assert (error.name, error.kind) == (name, "effect")
+    assert (error.name, error.kind) == (name, EFFECT)
 
 
 def test_name_without_a_prefix_raises_missing_prefix_even_before_install(pack_tree) -> None:
@@ -142,7 +144,7 @@ def test_name_without_a_prefix_raises_missing_prefix_even_before_install(pack_tr
         namespace.resolve_effect("fire")
 
     error = exc_info.value
-    assert (error.name, error.kind) == ("fire", "effect")
+    assert (error.name, error.kind) == ("fire", EFFECT)
 
 
 def test_reinstalling_replaces_the_previous_scene_view(pack_tree) -> None:
@@ -269,7 +271,7 @@ def test_clip_lookup_failures_raise_typed_errors_naming_the_clip(
         namespace.resolve_clip(name)
 
     error = exc_info.value
-    assert (error.name, error.kind) == (name, "clip")
+    assert (error.name, error.kind) == (name, CLIP)
 
 
 @pytest.mark.parametrize("name", ["scene.cheer", "elements.crackle"])
@@ -280,7 +282,7 @@ def test_any_clip_lookup_before_install_raises_no_active_scene(pack_tree, name) 
         namespace.resolve_clip(name)
 
     error = exc_info.value
-    assert (error.name, error.kind) == (name, "clip")
+    assert (error.name, error.kind) == (name, CLIP)
 
 
 def test_scene_clip_in_a_scene_with_no_sounds_raises_unknown_item(pack_tree) -> None:
