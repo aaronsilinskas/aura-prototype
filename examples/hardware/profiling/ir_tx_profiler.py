@@ -84,9 +84,13 @@ def _require_pin(
     ``IndexError``, ``KeyError``) is caught, so a real bug inside *getter* still
     propagates instead of being swallowed.
 
+    Args:
+        config: The parsed device config to read from.
+        getter: Callable extracting one field, e.g. ``lambda c: c.ir.emitters["line"]``.
+        field_label: Dotted config path used in the error message, e.g. ``"ir.line"``.
+
     Raises:
-        ValueError: If *getter* raises for an absent field or section, naming
-            *field_label* (e.g. ``"ir.line"``).
+        ValueError: If *getter* raises for an absent field or section.
     """
     try:
         return getter(config)

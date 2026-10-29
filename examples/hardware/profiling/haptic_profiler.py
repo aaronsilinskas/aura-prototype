@@ -118,14 +118,11 @@ def _require_drv2605_output(hardware: DeviceHardware) -> Drv2605EffectOutput:
 def _isolate_haptics_config(mapping: dict) -> DeviceConfig:
     """Parse *mapping* with `haptics` force-enabled, then isolate `haptics`.
 
-    This profiler drives the DRV2605L and nothing else, so everything but `haptics`
-    is disabled via `config.isolate(keep="haptics")` -- the non-destructive isolation
-    knob alongside dropping a section from aura-device.json outright. `haptics` itself
-    is force-enabled first, by setting `enabled` in the raw mapping and parsing it --
-    a parsed config is never changed: it is the real driver section this profiler
-    exists to exercise, so a config that merely declared it disabled would otherwise
-    silently defeat the measurement -- and `isolate` itself never forces the kept
-    component on.
+    `haptics` is the real driver section this profiler exists to exercise, so a
+    config that merely declared it disabled would otherwise silently defeat the
+    measurement -- and `isolate` never forces the kept component on. *mapping* is
+    parsed as declared first, so an invalid section fails with the parser's own
+    error before the override is written into it.
 
     Raises:
         ValueError: If *mapping* declares no `haptics` section at all -- there is no
@@ -133,7 +130,7 @@ def _isolate_haptics_config(mapping: dict) -> DeviceConfig:
             is gone); the real prop must declare its haptics driver. Also raised by
             parsing, if *mapping* fails validation.
     """
-    if "haptics" not in mapping:
+    if parse_device_config(mapping).haptics is None:
         raise ValueError(
             "haptics not declared in aura-device.json -- the haptic profiler measures"
             + " the real driver, not a synthesized stand-in"

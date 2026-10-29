@@ -165,27 +165,21 @@ MATRIX_ROWS: Final = 9
 I2C_FREQUENCY_HZ: Final = TARGET_FPS
 
 
-def _pixels_config(
+def _isolate_pixels_config(
     mapping: dict, driver: str, largest_count: int
 ) -> tuple[DeviceConfig, MatrixPixelsConfig | NeoPixelPixelsConfig]:
     """Parse *mapping* with only *driver*'s pixel entry enabled, isolated to `pixels`.
 
     The target is the first matrix entry, or the first NeoPixel entry with a
-    non-empty ``strips`` list (legacy ``scopes``-only entries are never chosen),
-    picked off a first parse of the unedited mapping. The edits then go on the
-    mapping, never on a parsed config: the target entry is enabled, every other
-    pixels entry is disabled (a config declaring both a matrix and a NeoPixel
-    strip has the other disabled), and for the NeoPixel driver the strip's
-    ``count`` is overridden to *largest_count* -- the swept max-length strip, the
-    one synthesized parameter this profiler layers on top of the loaded config.
-    Parsing the edited mapping re-runs validation and the current budget, so the
-    swept strip is dimmed to fit the rail. `isolate(keep="pixels")` then disables
-    `audio`/`ir`/`accelerometer`/`haptics`/`radio`; `isolate` narrows one
-    top-level component, not one entry among several sharing the `pixels` list,
-    so picking among those stays this function's job.
+    non-empty ``strips`` list (legacy ``scopes``-only entries are never chosen).
+    It is picked off a parse of the unedited mapping because the entry shapes
+    are only told apart by parsing; every override then goes on the mapping
+    (see "Hardware bring-up" above). `isolate` narrows one top-level component,
+    not one entry among several sharing the `pixels` list, so picking among
+    those stays this function's job.
 
     Returns:
-        The isolated config and its parsed target entry.
+        The isolated config and its target pixels entry.
 
     Raises:
         ValueError: If *driver* names a pixel kind aura-device.json declares no entry
@@ -337,7 +331,7 @@ def run() -> None:
     # profiler drives -- the config-driven model #686 established for the scene-load
     # profiler. buttons[0] (not gated by `enabled`) is read straight off the same
     # config build_hardware below consumes -- no separate pin harvest.
-    device_config, pixel_entry = _pixels_config(
+    device_config, pixel_entry = _isolate_pixels_config(
         read_device_config_mapping(), DRIVER, PIXEL_COUNTS[-1]
     )
     matrix_cols = pixel_entry.cols if isinstance(pixel_entry, MatrixPixelsConfig) else 0

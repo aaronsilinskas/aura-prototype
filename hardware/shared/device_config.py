@@ -390,12 +390,9 @@ def copy_with_enabled(section: object, enabled: bool) -> object:
     splatting slot-driven ``getattr`` reads.
 
     ``isolate`` calls this with ``enabled=False`` to disable every component
-    but the one it keeps -- the internal use this started as (#715). A
-    profiler reaches for it directly too, generalized to force either
-    direction, since a profiler sometimes needs a component forced *on*
-    (e.g. the haptic profiler's DRV2605 section) rather than off (#717):
-    ``enabled`` reads as an ordinary field once parsed, mutable only at
-    construction.
+    but the one it keeps (#715). Nothing should force a section *on* this
+    way: that skips validation and the NeoPixel current budget. Set
+    ``enabled`` in the raw mapping and parse it again instead.
 
     Args:
         section: A parsed, non-``None`` section instance (e.g. an
