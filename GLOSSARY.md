@@ -17,8 +17,12 @@ A capability declaring an effect's audio behaviour, mapping event verbs to playb
 _Avoid_: a `"stop"` clips key (teardown is `flush()`, not `handle_event`)
 
 ### AudioPlaybackConfig
-A value object for how one clip plays: which clip, whether it loops, and whether finishing it stops the whole owning effect (`stops_effect`).
-_Avoid_: `stop_on_finish`, `end_effect`; reading `stops_effect` as "the sound stops" (it names the effect's end); combining it with `loop=True` (rejected)
+A value object for how one clip plays: which clip (a qualified clip name, resolved by the **Active scene namespace** when the effect is built), whether it loops, and whether finishing it stops the whole owning effect (`stops_effect`). Declared once at module level and shared by every effect built from it.
+_Avoid_: `stop_on_finish`, `end_effect`; reading `stops_effect` as "the sound stops" (it names the effect's end); combining it with `loop=True` (rejected); writing a resolved path onto it (that is a **Resolved clip**)
+
+### Resolved clip
+A declared `AudioPlaybackConfig` paired with the WAV path its name resolved to, made when an effect is built and carried on that verb's `EffectEvent`. Owned by the running effect, never shared.
+_Avoid_: resolving a clip name in an output; mutating the declared config to hold the path
 
 ### EffectHaptic
 A capability declaring an effect's haptic behaviour, mapping event verbs to `HapticPattern`s; `None` means no haptic output.
@@ -107,16 +111,24 @@ An effect or rule loaded from an `effects/` or `rules/` subdirectory inside a sc
 _Avoid_: "private pack"; putting scene-only code under `packs/`
 
 ### Scene-local sound
-A bare `{stem: path}` map of `*.wav` files from a `sounds/` subdirectory inside a scene's own folder — a plain path lookup, not a `SceneLocalRegistry` (no module import, no `scene.` prefix stored). `SceneManager` installs it as the active scene's `AudioRegistry` overlay, addressed by the `scene.` prefix at resolution.
+A bare `{stem: path}` map of `*.wav` files from a `sounds/` subdirectory inside a scene's own folder — a plain path lookup, not a `SceneLocalRegistry` (no module import, no `scene.` prefix stored). `SceneManager` installs it into the **Active scene namespace**, where it is addressed by the `scene.` prefix.
 _Avoid_: confusing the bare stem key here with the `scene.`-prefixed name a clip is referenced by (the prefix is added at resolution, not stored on the map)
 
 ### SceneLocalRegistry
 A single-namespace registry for one scene's local effects (or rules), with the same `get`/`items` surface as `PackRegistry` but no version concept.
-_Avoid_: modelling scene-local items as a synthetic single-pack `PackRegistry`
+_Avoid_: modelling scene-local items as a synthetic single-pack `PackRegistry`; calling it a "namespace" (that is the **Active scene namespace**)
+
+### Active scene namespace
+The names the active scene can reach: its scene-local effects and sounds under `scene.`, plus the shared effect packs (and their sounds) it declares under `<pack>.`. Built once from the **PackCatalog**, reinstalled by `SceneManager` on every transition, and the one place that says which builder an effect name means and which file a clip name means. Every clip resolves against the active scene, including a pack effect's clips; an effect's own pack grants nothing extra.
+_Avoid_: "resolver", "registry" for it; a bypass or "allow everything" mode (demos install a view declaring every pack); resolving names anywhere in hardware
 
 ### Registry lookup errors
-The typed `ValueError` subclasses (`RegistryError` base; `UnknownPackError`, `UnknownItemError`, `MissingItemAttributeError`, `ItemTypeError`) that registries raise for lookup failures; `EffectResolver` dispatches on the exception **type**, so message wording stays a free display detail.
-_Avoid_: classifying a registry failure by `str(exc)`/`startswith` on the message; raising one for a bad disk layout (that is a **PackScanError**)
+The typed `ValueError` subclasses (`RegistryError` base; `UnknownPackError`, `UnknownItemError`, `MissingItemAttributeError`, `ItemTypeError`) that registries and the **Active scene namespace** raise for lookup failures, typed all the way to the caller so code dispatches on the exception **type** and message wording stays a free display detail.
+_Avoid_: classifying a registry failure by `str(exc)`/`startswith` on the message; re-wrapping one as a plain `ValueError`; raising one for a bad disk layout (that is a **PackScanError**)
+
+### Name resolution errors
+The **Registry lookup errors** the **Active scene namespace** raises (a grouping, not a class: catch them as `RegistryError`), each naming the full qualified name and its kind (`"effect"` or `"clip"`): `NoActiveSceneError` (no scene installed), `MissingPrefixError` (no `scene.`/`<pack>.` prefix), `UndeclaredPackError` (the pack is installed but the active scene does not declare it), and the shared `UnknownPackError` (no such effect pack installed) and `UnknownItemError` (the pack is known but has no such effect or clip). A clip pack is an effect pack: one with no sounds is still known.
+_Avoid_: reporting an undeclared pack as unknown, or the reverse; confusing `UndeclaredPackError` (a name uses a pack its scene did not declare) with `UnknownDeclaredPackError` (a scan-time **PackScanError**: a scene declares a pack that is not installed)
 
 ### NetworkControls
 The **game-facing**, send-only network seam a rule holds via `GameState.network_controls` (`send_ir`, `send_radio`); the runtime-facing per-tick IR pump lives entirely on `InfraredTransceiver.update()` instead.
@@ -130,8 +142,8 @@ _Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()
 The rule-facing scene-transition seam (`load`, `overlay`, `pop`, `reboot_into`, `reboot_to_previous`); `SceneManager` is the live implementation.
 
 ### SceneManager
-Owns the scene stack and drives scene transitions, trusting the **PackCatalog** to have checked each scene's pack declarations, routing every transition through the injected `EffectAdmin`/`AudioOverlayAdmin` seams and reboots through the injected `SceneReboot` port. The live `SceneControls`.
-_Avoid_: calling `register()` on it (removed); validating pack versions on load or overlay (the catalog already did); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); routing scene-transition sound calls through anything but the injected `AudioOverlayAdmin`
+Owns the scene stack and drives scene transitions, trusting the **PackCatalog** to have checked each scene's pack declarations, installing the active scene into the **Active scene namespace** once per transition, saving and restoring merge strategies through the injected `EffectAdmin`, and routing reboots through the injected `SceneReboot` port. The live `SceneControls`.
+_Avoid_: calling `register()` on it (removed); validating pack versions on load or overlay (the catalog already did); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); installing locals or declared packs piecemeal (one install per transition)
 
 ### Reboot
 How a device switches scenes: the target is persisted to device storage, then the device resets and boots that scene. Only storage and what is physically happening to the device (held buttons, motion, where its IR points) carry across; game state, phases and output state do not, and nothing after the reset runs. A device with no SD card cannot persist a target, so it does not reboot.
@@ -146,8 +158,8 @@ The **rule-facing** effect seam a rule holds via `GameState.effect_controls`: `s
 _Avoid_: adding `set_local_effects` or the merge-strategy snapshot lifecycle back onto it
 
 ### EffectAdmin
-The **scene-transition-facing** counterpart to `EffectControls`, reserved for `SceneManager`: it installs the active scene's local effects and its declared-pack allow-list (bounding `pack.` resolution the way locals bound `scene.` resolution) and owns the merge-strategy snapshot lifecycle. `EffectManager` implements both faces.
-_Avoid_: calling any `EffectAdmin` method from a `GameRule`; putting it in the rule-facing `EffectControls`
+The **scene-transition-facing** counterpart to `EffectControls`, reserved for `SceneManager`: it owns the merge-strategy snapshot lifecycle. `EffectManager` implements both faces.
+_Avoid_: calling any `EffectAdmin` method from a `GameRule`; putting it in the rule-facing `EffectControls`; installing scene locals or declared packs through it (that is the **Active scene namespace**)
 
 ### Scope
 Identifies what a game effect targets, output-agnostically. Leaf scopes: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN/BUFF/DEBUFF`, `AMBIENT`. Composite scopes: `Global.ALL`, `NON_AMBIENT`, `Scope.ALL` (everything — use for teardown).
@@ -158,12 +170,8 @@ A hardware or software output registered with the effect system; `receives_pixel
 _Avoid_: "output" (ambiguous in multi-output contexts); importing it from `engine.effects.manager` (import from `engine.effects.output`)
 
 ### EffectEvent
-A structured event payload (`pack`, `name`, `verb`) routed to every in-scope `EffectOutput.handle_event`; `"start"`/`"stop"` are emitted automatically, custom verbs (`"peak"`, `"strike"`) via `notify_listeners`.
+A structured event payload (`pack`, `name`, `verb`, plus the verb's **Resolved clip** or `None`) routed to every in-scope `EffectOutput.handle_event`; `"start"`/`"stop"` are emitted automatically, custom verbs (`"peak"`, `"strike"`) via `notify_listeners`. Its identity is `pack`, `name` and `verb`; the clip is payload.
 _Avoid_: confusing with `Event` (game-rule events); assuming only `"start"`/`"stop"` verbs exist
-
-### EffectResolver
-Maps a qualified effect name to its `EffectBuilder`: `scene.` names resolve against the active scene's locals, all others against shared packs gated by the declared-pack membership rule (an undeclared pack fails closed). Held by `EffectManager`.
-_Avoid_: putting the `scene.` rule in `EffectManager`; confusing with `EffectManager` (routing/rendering, not name resolution); reporting an undeclared pack as "unknown" (the pack exists in the registry — it just isn't declared)
 
 ### Merge strategy
 The per-scope policy deciding how a scope's stack of layered effect buffers becomes shown pixels; set per rule via `EffectControls.set_merge_strategy`, defaulting to **Split**. Two ship: **Split** and **Additive**.
@@ -205,17 +213,9 @@ _Avoid_: confusing with `Effect Level`; holding it as rule instance state
 One red→green cycle at a single Game Level (red warning → red → green warning → green); surviving its green phase advances the Game Level, or wins at `max_level`. A full game is `max_level` Rounds.
 _Avoid_: "phase" (a Round spans several); "level-up" (the celebratory beat between Rounds)
 
-### AudioRegistry
-Resolves a qualified clip name to a WAV path via **prefix routing** (a `scene.` overlay over shared `<pack>.` bases), mirroring `EffectResolver`; the concrete `AudioOverlayAdmin`.
-_Avoid_: returning `None` on a resolution miss (raise instead); a bare, unqualified base key (qualify with the pack name so two packs can share a stem); reporting an undeclared pack as "unknown" (it may genuinely exist in the base — it just isn't declared)
-
-### AudioOverlayAdmin
-The scene-transition-facing seam for swapping the active scene's sound overlay and declared-pack set, mirroring `EffectAdmin`. `AudioRegistry` implements it.
-_Avoid_: calling it from a `GameRule` (reserved for `SceneManager`); conflating with `EffectAdmin` (separate seam, separate concern)
-
 ### AudioEffectOutput
-A CircuitPython `EffectOutput` driving audio via I2S and the live `VoiceSink` adapter; owns the hardware (amp, mixer, WAV sources) but delegates voice-slot bookkeeping to a `VoicePool`.
-_Avoid_: stopping playback in `handle_event` on `"stop"`; assuming a fixed voice count or role-assigned slots; putting slot bookkeeping back in the output
+A CircuitPython `EffectOutput` driving audio via I2S and the live `VoiceSink` adapter: it plays the path on each event's **Resolved clip**, owns the hardware (amp, mixer, WAV sources) and delegates voice-slot bookkeeping to a `VoicePool`.
+_Avoid_: stopping playback in `handle_event` on `"stop"`; assuming a fixed voice count or role-assigned slots; putting slot bookkeeping back in the output; resolving clip names (the event already carries the path)
 
 ### VoicePool
 A hardware-agnostic owner of audio voice-slot bookkeeping (imports no CircuitPython), driving hardware through a `VoiceSink` port and evicting oldest-first when full.
