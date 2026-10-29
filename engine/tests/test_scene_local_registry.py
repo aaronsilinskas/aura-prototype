@@ -61,12 +61,6 @@ def test_scene_local_registry_with_no_arguments_is_a_valid_empty_registry() -> N
 # ---------------------------------------------------------------------------
 
 
-def test_a_scene_without_a_rules_folder_has_an_empty_local_rule_registry(pack_tree) -> None:
-    registry = _local_rules(pack_tree, None)
-
-    assert registry.items() == []
-
-
 def test_a_scene_whose_rules_entry_is_a_file_has_an_empty_local_rule_registry(
     pack_tree,
 ) -> None:

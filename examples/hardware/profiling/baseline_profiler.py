@@ -1,12 +1,14 @@
 """CircuitPython baseline profiler — measures each board's fixed framework tax.
 
-Runs the framework loop with zero rules, no loaded effects, and zero
+Runs the framework loop with zero rules, no running effects, and zero
 components, so the reported FPS/CPU/heap numbers represent the cost of the
-engine itself before any component-specific work is added. The installed packs
-are scanned into a pack catalog exactly as boot scans them, so the heap figure
-includes that scan. Every other
+engine itself before any component-specific work is added. Every other
 profiler under ``examples/hardware/profiling/`` should be compared against
 this baseline.
+
+The flash ``packs`` root is scanned into a pack catalog, as boot scans it, and
+the whole catalog is kept alive while the heap is measured, so the heap figure
+includes that scan.
 
 Two modes are available — set ``MODE`` below:
 
@@ -59,7 +61,7 @@ from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
 from engine.engine import GameEngine
-from engine.pack_catalog import scan_pack_roots
+from engine.pack_catalog import PackCatalog, scan_pack_roots
 from engine.state import GameState, SceneControls
 from engine.timer import Timer
 from hardware.shared.profiler_report import (
@@ -104,27 +106,28 @@ def _heap_tax(mem_free_before: int) -> int:
     return mem_free_before - gc.mem_free()
 
 
-def _build_engine_host() -> tuple[EffectManager, GameEngine, GameState, int]:
+def _build_engine_host() -> tuple[PackCatalog, EffectManager, GameEngine, GameState, int]:
     gc.collect()
     mem_free_before = gc.mem_free()
-    registry = scan_pack_roots(["packs"]).effect_registry
-    effect_manager = EffectManager(registry=registry, outputs=[])
+    catalog = scan_pack_roots(["packs"])
+    effect_manager = EffectManager(registry=catalog.effect_registry, outputs=[])
     game_engine = GameEngine(effect_controls=effect_manager)
     game_state = game_engine.create_state(SceneControls())
-    return effect_manager, game_engine, game_state, _heap_tax(mem_free_before)
+    return catalog, effect_manager, game_engine, game_state, _heap_tax(mem_free_before)
 
 
-def _build_satellite() -> tuple[EffectManager, int]:
+def _build_satellite() -> tuple[PackCatalog, EffectManager, int]:
     gc.collect()
     mem_free_before = gc.mem_free()
-    registry = scan_pack_roots(["packs"]).effect_registry
-    effect_manager = EffectManager(registry=registry, outputs=[NullEffectOutput()])
-    return effect_manager, _heap_tax(mem_free_before)
+    catalog = scan_pack_roots(["packs"])
+    effect_manager = EffectManager(registry=catalog.effect_registry, outputs=[NullEffectOutput()])
+    return catalog, effect_manager, _heap_tax(mem_free_before)
 
 
 def run_engine_host() -> None:
     """Run the bare-loop baseline with a rule-less GameEngine driving an EffectManager."""
-    effect_manager, game_engine, game_state, heap_bytes = _build_engine_host()
+    # The catalog is held for the whole run, as boot holds it.
+    _catalog, effect_manager, game_engine, game_state, heap_bytes = _build_engine_host()
     timer = Timer()
     perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
     # Bare-framework Mem Free, captured before the loop starts. Printed once
@@ -166,7 +169,8 @@ def run_engine_host() -> None:
 
 def run_satellite() -> None:
     """Run the bare-loop baseline with an EffectManager and command-receive scaffold."""
-    effect_manager, heap_bytes = _build_satellite()
+    # The catalog is held for the whole run, as boot holds it.
+    _catalog, effect_manager, heap_bytes = _build_satellite()
     timer = Timer()
     perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
     # Bare-framework Mem Free, captured before the loop starts. Printed once

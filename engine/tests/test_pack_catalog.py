@@ -209,7 +209,6 @@ def test_only_wav_files_count_as_pack_sounds(pack_tree) -> None:
     root = pack_tree.root("tc_flash")
     pack_dir = pack_tree.effect_pack(root, "basic", sounds=["win"])
     (pack_dir / "sounds" / "readme.txt").write_text("")
-    (pack_dir / "sounds" / "nested.wav").mkdir()
 
     catalog = scan_pack_roots([str(root)])
 
@@ -220,11 +219,39 @@ def test_only_wav_files_count_as_scene_sounds(pack_tree) -> None:
     root = pack_tree.root("tc_flash")
     scene_dir = pack_tree.scene(root, "lobby", sounds=["owl"])
     (scene_dir / "sounds" / "owl.mp3").write_bytes(b"")
-    (scene_dir / "sounds" / "nested.wav").mkdir()
 
     lobby = scan_pack_roots([str(root)]).scene_registry.get("lobby")
 
     assert list(lobby.local_sound_map) == ["owl"]
+
+
+def test_a_directory_named_like_a_wav_is_not_a_pack_sound(pack_tree) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_dir = pack_tree.effect_pack(root, "basic", sounds=["win"])
+    (pack_dir / "sounds" / "fake.wav").mkdir()
+
+    catalog = scan_pack_roots([str(root)])
+
+    assert list(catalog.pack_sounds) == ["basic.win"]
+
+
+def test_a_directory_named_like_a_wav_is_not_a_scene_sound(pack_tree) -> None:
+    root = pack_tree.root("tc_flash")
+    scene_dir = pack_tree.scene(root, "lobby", sounds=["owl"])
+    (scene_dir / "sounds" / "fake.wav").mkdir()
+
+    lobby = scan_pack_roots([str(root)]).scene_registry.get("lobby")
+
+    assert list(lobby.local_sound_map) == ["owl"]
+
+
+def test_an_effect_pack_without_a_sounds_folder_has_no_pack_sounds(pack_tree) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_tree.effect_pack(root, "basic", items={"glow": "BUILD = 1"})
+
+    catalog = scan_pack_roots([str(root)])
+
+    assert catalog.pack_sounds == {}
 
 
 def test_folders_without_a_marker_file_are_skipped(pack_tree) -> None:
