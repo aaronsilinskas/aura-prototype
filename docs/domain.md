@@ -60,7 +60,7 @@ magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
 
 packs/            Game-specific packs loaded at runtime (CircuitPython/MicroPython-safe)
   effects/        Shared, versioned effect packs (basic, elements) — each with a version.txt
-  rules/          Shared, versioned rule packs (debug, hw_test, lobby, return_to_lobby)
+  rules/          Shared, versioned rule packs (debug, lobby, return_to_lobby)
   scenes/         Scene definitions (element_browser, example_lobby, hardware_test,
                   ir_range_receiver, ir_range_transmitter, red_light_green_light, tag);
                   each has a scene.json and optional scene-local effects/ and rules/ subdirs
@@ -148,7 +148,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `EffectAdmin` | `engine/state.py` | Scene-transition effect seam, reserved for `SceneManager` |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output port |
-| `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → Effect`; one per effect pack |
+| `EffectBuilder` | `engine/effects/manager.py` | Callable `(name, config) → Effect`; one per effect item |
 | `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop` plus `brightness`/`loudness` controls |
 | `ScopeValue` / `Scope` | `engine/state.py` | Output-agnostic routing keys (see glossary) |
 | `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam |
@@ -165,7 +165,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
 | `EffectResolver` | `engine/effects/manager.py` | Resolves a qualified effect name to a builder |
 | `MergeStrategy` | `engine/state.py` | Per-scope compositing policy; subclasses in `engine/effects/merge.py` |
-| `PackRegistry` | `engine/packs.py` | Loads and looks up named packs (effects, rules, scenes) by entry point |
+| `PackRegistry` | `engine/packs.py` | Discovers versioned effect or rule packs in a directory and looks up their items by pack and item name |
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
 | `Aura` | `magic/aura.py` | A player/object's magic pool + active `Spells` collection |

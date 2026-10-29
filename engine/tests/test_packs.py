@@ -183,6 +183,48 @@ def test_scan_dir_raises_when_same_pack_name_comes_from_different_directory(
 
 
 # ---------------------------------------------------------------------------
+# PackRegistry.scan_dir — 'scene' is a reserved pack name
+# ---------------------------------------------------------------------------
+
+
+def test_pack_registry_scan_dir_raises_for_pack_named_scene(tmp_path) -> None:
+    scene_pack_dir = tmp_path / "scene"
+    scene_pack_dir.mkdir()
+    (scene_pack_dir / "version.txt").write_text("1.0\n")
+
+    registry = PackRegistry(item_attr="BUILD")
+
+    with pytest.raises(ValueError, match="reserved"):
+        registry.scan_dir(str(tmp_path), "tp")
+
+
+def test_pack_registry_scan_dir_raises_for_rule_pack_named_scene(tmp_path) -> None:
+    scene_pack_dir = tmp_path / "scene"
+    scene_pack_dir.mkdir()
+    (scene_pack_dir / "version.txt").write_text("1.0\n")
+
+    registry = PackRegistry(item_attr="RULE")
+
+    with pytest.raises(ValueError, match="reserved"):
+        registry.scan_dir(str(tmp_path), "tp")
+
+
+def test_pack_registry_scan_dir_non_reserved_pack_name_is_discovered_normally(
+    tmp_path,
+) -> None:
+    """A pack directory not named 'scene' scans without error."""
+    good_pack_dir = tmp_path / "elements"
+    good_pack_dir.mkdir()
+    (good_pack_dir / "version.txt").write_text("1.0\n")
+    (good_pack_dir / "fire.py").write_text("")
+
+    registry = PackRegistry(item_attr="BUILD")
+    registry.scan_dir(str(tmp_path), "tp")
+
+    assert "fire" in registry.items("elements")
+
+
+# ---------------------------------------------------------------------------
 # get — item lookup validation
 # ---------------------------------------------------------------------------
 
