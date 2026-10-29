@@ -35,7 +35,7 @@ RULE = _Light()
 
 _SOLID_EFFECT = """\
 from effects.effect import Effect, EffectConfig, EffectPixels, PixelBuffer
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 
 class _Solid(EffectPixels):

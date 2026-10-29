@@ -27,12 +27,21 @@ class RegistryError(ValueError):
 class UnknownPackError(RegistryError):
     """A ``pack_name`` has no registered pack.
 
-    Raised by ``PackRegistry.get`` and ``items``.
+    Raised by ``PackRegistry.get`` and ``items``, and by the Active scene
+    namespace, which also passes the qualified *name* it was resolving and its
+    *kind* (``engine.namespace.EFFECT`` or ``CLIP``). Both stay ``None`` for a
+    registry lookup, which keeps the plain wording.
     """
 
-    def __init__(self, pack_name: str) -> None:
+    def __init__(self, pack_name: str, name: str | None = None, kind: str | None = None) -> None:
         self.pack_name = pack_name
-        super().__init__(f"Unknown pack '{pack_name}'")
+        self.name = name
+        self.kind = kind
+        if name is None or kind is None:
+            message = f"Unknown pack '{pack_name}'"
+        else:
+            message = f"{kind.capitalize()} '{name}' uses unknown pack '{pack_name}'"
+        super().__init__(message)
 
 
 class UnknownItemError(RegistryError):
@@ -40,7 +49,10 @@ class UnknownItemError(RegistryError):
 
     Shared by ``PackRegistry.get`` (where *pack_name* names the owning pack)
     and ``SceneLocalRegistry.get`` (where *pack_name* is ``None`` — scene-local
-    items have no pack namespace).
+    items have no pack namespace). The Active scene namespace also passes the
+    qualified *name* it was resolving and its *kind*
+    (``engine.namespace.EFFECT`` or ``CLIP``); both stay ``None`` for a
+    registry lookup.
     """
 
     def __init__(
@@ -48,11 +60,17 @@ class UnknownItemError(RegistryError):
         item_name: str,
         available: list[str],
         pack_name: str | None = None,
+        name: str | None = None,
+        kind: str | None = None,
     ) -> None:
         self.item_name = item_name
         self.pack_name = pack_name
         self.available = available
-        if pack_name is None:
+        self.name = name
+        self.kind = kind
+        if name is not None and kind is not None:
+            message = f"Unknown {kind} '{name}'. Available: {', '.join(available)}"
+        elif pack_name is None:
             message = f"Unknown item '{item_name}'. Available: {', '.join(available)}"
         else:
             message = (

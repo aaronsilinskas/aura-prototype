@@ -61,6 +61,7 @@ from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
 from engine.engine import GameEngine
+from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog, scan_pack_roots
 from engine.state import GameState, SceneControls
 from engine.timer import Timer
@@ -110,7 +111,8 @@ def _build_engine_host() -> tuple[PackCatalog, EffectManager, GameEngine, GameSt
     gc.collect()
     mem_free_before = gc.mem_free()
     catalog = scan_pack_roots(["packs"])
-    effect_manager = EffectManager(registry=catalog.effect_registry, outputs=[])
+    namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
+    effect_manager = EffectManager(namespace=namespace, outputs=[])
     game_engine = GameEngine(effect_controls=effect_manager)
     game_state = game_engine.create_state(SceneControls())
     return catalog, effect_manager, game_engine, game_state, _heap_tax(mem_free_before)
@@ -120,7 +122,8 @@ def _build_satellite() -> tuple[PackCatalog, EffectManager, int]:
     gc.collect()
     mem_free_before = gc.mem_free()
     catalog = scan_pack_roots(["packs"])
-    effect_manager = EffectManager(registry=catalog.effect_registry, outputs=[NullEffectOutput()])
+    namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
+    effect_manager = EffectManager(namespace=namespace, outputs=[NullEffectOutput()])
     return catalog, effect_manager, _heap_tax(mem_free_before)
 
 

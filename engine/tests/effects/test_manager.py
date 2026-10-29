@@ -2,11 +2,13 @@ from unittest.mock import ANY
 
 import pytest
 
+from engine.effects.builder import EffectBuilder
 from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.events import EffectEvent
-from engine.packs import PackRegistry
-from engine.scene import SceneLocalRegistry
+from engine.namespace import CLIP, ActiveSceneNamespace, MissingPrefixError, UndeclaredPackError
+from engine.pack_catalog import PackCatalog
+from engine.packs import PackRegistry, UnknownItemError
 from engine.state import Scope
 from engine.tests.effects.helpers import (
     CapturingEffectBuilder,
@@ -43,19 +45,16 @@ def _make_timer() -> Timer:
 
 
 def _make_manager(registry, outputs, allowed=None) -> EffectManager:
-    """Construct an EffectManager with every registered pack declared allowed.
+    """Construct an EffectManager over a namespace with a scene view installed.
 
-    Mirrors production: ``SceneManager`` installs the active scene's declared
-    ``effect_packs`` as the allowed set immediately on activation, before any
-    rule can call ``set_effect``/``add_effect``. Tests that build a manager
-    directly and start a pack-prefixed effect right away need the same
-    installed set, so this helper defaults it to every pack *registry*
-    already knows about. Pass *allowed* explicitly to exercise membership
-    enforcement itself (e.g. a pack name the registry never scanned).
+    Mirrors production: ``SceneManager`` installs the active scene into the
+    namespace on activation, before any rule can call ``set_effect``. The
+    installed view has no locals and declares every pack *registry* knows,
+    unless *allowed* names the declared packs instead.
     """
-    manager = EffectManager(registry=registry, outputs=outputs)
-    manager.set_allowed_packs(frozenset(registry.names()) if allowed is None else allowed)
-    return manager
+    namespace = ActiveSceneNamespace(registry, {})
+    namespace.install(None, {}, frozenset(registry.names()) if allowed is None else allowed)
+    return EffectManager(namespace=namespace, outputs=outputs)
 
 
 # ---------------------------------------------------------------------------
@@ -852,82 +851,228 @@ def test_handle_event_receives_composite_scope_not_decomposed_leaf(pack_tree) ->
 
 
 # ---------------------------------------------------------------------------
-# Error cases — malformed effect names
+# Name resolution errors reach the caller typed (routing lives in test_namespace.py)
 # ---------------------------------------------------------------------------
 
 
-def test_missing_pack_prefix_raises_value_error() -> None:
-    manager = _make_manager(registry=PackRegistry(), outputs=[])
+@pytest.mark.parametrize("method", ["set_effect", "add_effect"])
+def test_unresolvable_effect_name_raises_the_namespace_error(pack_tree, method) -> None:
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[])
 
-    with pytest.raises(ValueError, match="missing pack prefix"):
-        manager.set_effect(Scope.PERSONAL, "fire", {})
-
-
-def test_unknown_pack_raises_value_error() -> None:
-    """'spells' is declared allowed but the registry has no packs --
-    proving membership and registry lookup are genuinely separate checks."""
-    registry = PackRegistry()
-    manager = _make_manager(registry=registry, outputs=[], allowed=frozenset({"spells"}))
-
-    with pytest.raises(ValueError, match="Unknown effect pack 'spells'"):
-        manager.set_effect(Scope.PERSONAL, "spells.fireball", {})
+    with pytest.raises(MissingPrefixError):
+        getattr(manager, method)(Scope.PERSONAL, "fire", {})
 
 
-def test_unknown_effect_in_known_pack_raises_value_error(pack_tree) -> None:
-    registry = pack_tree.scan(effect_packs={"elements": {"fire": _stub_item()}}).effect_registry
-    manager = _make_manager(registry=registry, outputs=[])
+def test_effect_from_a_pack_the_scene_did_not_declare_raises_undeclared_pack(pack_tree) -> None:
+    manager = _make_manager(
+        registry=_make_stub_registry(pack_tree), outputs=[], allowed=frozenset()
+    )
 
-    with pytest.raises(ValueError, match="Unknown effect 'flash' in pack 'elements'"):
-        manager.set_effect(Scope.PERSONAL, "elements.flash", {})
-
-
-# ---------------------------------------------------------------------------
-# Pack-membership enforcement (issue #814) -- EffectManager delegates the
-# allowed-pack set to EffectResolver; exhaustive resolve() semantics live in
-# test_effect_resolver.py, these confirm the delegation itself.
-# ---------------------------------------------------------------------------
-
-
-def test_set_allowed_packs_undeclared_pack_raises_naming_the_pack(pack_tree) -> None:
-    registry = _make_stub_registry(pack_tree)
-    manager = EffectManager(registry=registry, outputs=[])
-    manager.set_allowed_packs(frozenset({"other"}))
-
-    with pytest.raises(ValueError, match="stub"):
+    with pytest.raises(UndeclaredPackError):
         manager.set_effect(Scope.PERSONAL, "stub.fire", {})
 
 
-def test_set_allowed_packs_declared_pack_resolves(pack_tree) -> None:
-    registry = _make_stub_registry(pack_tree)
-    manager = EffectManager(registry=registry, outputs=[])
-    manager.set_allowed_packs(frozenset({"stub"}))
-
-    receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
-
-    assert receipt is not None
+# ---------------------------------------------------------------------------
+# A failed set_effect leaves the scope unchanged (#1114)
+# ---------------------------------------------------------------------------
 
 
-def test_no_allowed_packs_installed_raises_no_active_scene_error(pack_tree) -> None:
-    registry = _make_stub_registry(pack_tree)
-    manager = EffectManager(registry=registry, outputs=[])
-    # No set_allowed_packs call -- mirrors a manager that has never seen a scene transition.
+def test_failed_set_effect_keeps_the_running_effect_rendering(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+    manager.set_effect(Scope.PERSONAL, "stub.fire", {})
 
-    with pytest.raises(ValueError, match="no scene is active"):
-        manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+    with pytest.raises(UnknownItemError):
+        manager.set_effect(Scope.PERSONAL, "stub.missing", {})
+    manager.update(_make_timer())
+
+    assert output.update_pixels_calls == [("personal", output.created_buffers[0])]
 
 
-def test_scene_prefix_effect_unaffected_by_allowed_packs() -> None:
-    """scene.-prefixed names bypass pack-membership entirely, per issue #814."""
-    registry = PackRegistry()
-    manager = EffectManager(registry=registry, outputs=[])
-    manager.set_allowed_packs(frozenset())  # active scene declares zero effect_packs
-    local_registry = SceneLocalRegistry()
-    manager.set_local_effects(local_registry)
+def test_failed_set_effect_fires_no_stop_event(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+    manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+    output.handle_event_calls.clear()
 
-    # An empty allowed-pack set must not block scene.-prefixed resolution; the
-    # only failure here is the scene-local registry having no 'flash' item.
-    with pytest.raises(ValueError, match="Unknown scene-local effect 'flash'"):
-        manager.set_effect(Scope.PERSONAL, "scene.flash", {})
+    with pytest.raises(UnknownItemError):
+        manager.set_effect(Scope.PERSONAL, "stub.missing", {})
+
+    assert output.handle_event_calls == []
+
+
+def test_failed_set_effect_adds_no_effect(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+    fire_receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+
+    with pytest.raises(UnknownItemError):
+        manager.set_effect(Scope.PERSONAL, "stub.missing", {})
+    output.handle_event_calls.clear()
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert output.handle_event_calls == [
+        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, fire_receipt)
+    ]
+
+
+def test_failed_set_effect_takes_no_receipt_id(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+    first = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+
+    with pytest.raises(UnknownItemError):
+        manager.set_effect(Scope.PERSONAL, "stub.missing", {})
+    second = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+
+    assert second.id == first.id + 1
+
+
+# ---------------------------------------------------------------------------
+# Clips resolve when the effect is built (#1116)
+# ---------------------------------------------------------------------------
+
+
+def _clip_item(clips: dict[str, str], fires: str | None = None) -> str:
+    """Source for an effect item whose ``BUILD`` declares *clips* (verb → clip name)."""
+    return (
+        "from engine.tests.effects.helpers import AudioClipEffectBuilder\n"
+        + f"BUILD = AudioClipEffectBuilder({clips!r}, fires={fires!r})\n"
+    )
+
+
+def _make_clip_manager(
+    pack_tree, items: dict[str, str], outputs
+) -> tuple[EffectManager, PackCatalog]:
+    """Manager over pack ``sfx`` (sounds ``boom``, ``chime``) holding *items*.
+
+    The installed scene declares ``sfx`` and has local sound ``cheer``.
+    Returns the manager and the scanned catalog.
+    """
+    root = pack_tree.root("tp_sfx")
+    pack_tree.effect_pack(
+        root, "sfx", items={"plain": _stub_item(), **items}, sounds=["boom", "chime"]
+    )
+    pack_tree.scene(root, "arena", sounds=["cheer"])
+    catalog = pack_tree.scan_roots(root)
+    namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
+    local_sounds = catalog.scene_registry.get("arena").local_sound_map
+    namespace.install(None, local_sounds, frozenset({"sfx"}))
+    return EffectManager(namespace=namespace, outputs=outputs), catalog
+
+
+def _events(output: SpyEffectOutput) -> list[EffectEvent]:
+    return [call[0] for call in output.handle_event_calls]
+
+
+def test_start_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, catalog = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({"start": "sfx.boom"})}, [output]
+    )
+
+    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+    (start,) = _events(output)
+    assert start.clip.config.name == "sfx.boom"
+    assert start.clip.path == catalog.pack_sounds["sfx.boom"]
+
+
+def test_stop_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, catalog = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({"stop": "sfx.chime"})}, [output]
+    )
+    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+    manager.stop_effect(Scope.PERSONAL)
+
+    stop = _events(output)[-1]
+    assert stop.verb == "stop"
+    assert stop.clip.path == catalog.pack_sounds["sfx.chime"]
+
+
+def test_custom_verb_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, catalog = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({"peak": "scene.cheer"}, fires="peak")}, [output]
+    )
+    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+    manager.update(_make_timer())
+
+    peak = _events(output)[-1]
+    assert peak.verb == "peak"
+    assert peak.clip.path == catalog.scene_registry.get("arena").local_sound_map["cheer"]
+
+
+def test_verb_with_no_clip_emits_an_event_with_no_clip(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, _ = _make_clip_manager(pack_tree, {"bang": _clip_item({"peak": "sfx.boom"})}, [output])
+
+    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert [(event.verb, event.clip) for event in _events(output)] == [
+        ("start", None),
+        ("stop", None),
+    ]
+
+
+def test_effect_with_no_audio_emits_events_with_no_clip(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, _ = _make_clip_manager(pack_tree, {}, [output])
+
+    manager.set_effect(Scope.PERSONAL, "sfx.plain", {})
+
+    (start,) = _events(output)
+    assert start.clip is None
+
+
+@pytest.mark.parametrize("verb", ["start", "peak"])
+def test_misspelled_clip_raises_from_set_effect_on_any_verb(pack_tree, verb) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, _ = _make_clip_manager(pack_tree, {"bang": _clip_item({verb: "sfx.bomm"})}, [output])
+
+    with pytest.raises(UnknownItemError) as exc_info:
+        manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+    assert (exc_info.value.name, exc_info.value.kind) == ("sfx.bomm", CLIP)
+
+
+def test_misspelled_clip_on_a_custom_verb_leaves_the_scope_unchanged(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, _ = _make_clip_manager(pack_tree, {"bang": _clip_item({"peak": "sfx.bomm"})}, [output])
+    plain_receipt = manager.set_effect(Scope.PERSONAL, "sfx.plain", {})
+    output.handle_event_calls.clear()
+
+    with pytest.raises(UnknownItemError):
+        manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+    assert output.handle_event_calls == []
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert output.handle_event_calls == [
+        (EffectEvent("sfx", "plain", "stop"), frozenset({"personal"}), ANY, plain_receipt)
+    ]
+
+
+def test_building_leaves_the_shared_playback_configs_unchanged(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, catalog = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({"start": "sfx.boom"})}, [output]
+    )
+    builder = catalog.effect_registry.get("sfx", "bang", EffectBuilder)
+    declared = builder.clips["start"]
+
+    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+    manager.add_effect(Scope.PERSONAL, "sfx.bang", {})
+
+    assert builder.clips == {"start": declared}
+    assert (declared.name, declared.loop, declared.stops_effect) == ("sfx.boom", False, False)
+    starts = _events(output)
+    assert starts[0].clip.config is declared
+    assert starts[1].clip.config is declared
+    assert starts[0].clip is not starts[1].clip
 
 
 # ---------------------------------------------------------------------------
@@ -1259,7 +1404,7 @@ def test_effect_with_renders_pixels_false_skips_buffer_allocation(pack_tree) -> 
             "nopix": {
                 "event": (
                     "from effects.effect import Effect, EffectConfig\n"
-                    "from engine.effects.manager import EffectBuilder\n"
+                    "from engine.effects.builder import EffectBuilder\n"
                     "class _Builder(EffectBuilder):\n"
                     "    def __call__(self, name, config): return Effect(name=name)\n"
                     "BUILD = _Builder()\n"
@@ -1282,7 +1427,7 @@ def test_effect_with_renders_pixels_false_skips_update_pixels_but_calls_flush(pa
             "nopix": {
                 "event": (
                     "from effects.effect import Effect, EffectConfig\n"
-                    "from engine.effects.manager import EffectBuilder\n"
+                    "from engine.effects.builder import EffectBuilder\n"
                     "class _Builder(EffectBuilder):\n"
                     "    def __call__(self, name, config): return Effect(name=name)\n"
                     "BUILD = _Builder()\n"

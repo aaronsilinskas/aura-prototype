@@ -3,7 +3,6 @@ import audiocore
 import audiomixer
 
 from effects.effect import Effect
-from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.state import EffectReceipt, Scope
@@ -27,7 +26,6 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
 
     __slots__ = (
         "_audio",
-        "_audio_registry",
         "_max_volume",
         "_mixer",
         "_pool",
@@ -36,7 +34,6 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
 
     def __init__(
         self,
-        audio_registry: AudioRegistry,
         max_volume: float,
         num_voices: int,
         *,
@@ -47,7 +44,6 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
         super().__init__(receives_pixels=False)
         self.min_resolution = 1
         self.scopes = [Scope.ALL]
-        self._audio_registry = audio_registry
         self._max_volume = max_volume
         self._pool = VoicePool(num_voices)
         self._audio = audiobusio.I2SOut(i2s_bit_clock, i2s_word_select, i2s_data)
@@ -67,14 +63,11 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
     ) -> None:
-        if effect.audio is None:
+        clip = event.clip
+        if clip is None:
             return
-        config = effect.audio.clips.get(event.verb)
-        if config is None:
-            return
-        stops_receipt = clip_stops_receipt(effect, config)
-        path = self._audio_registry.path(config.name)
-        self._pool.claim(self, path, config.loop, stops_receipt, receipt)
+        stops_receipt = clip_stops_receipt(effect, clip.config)
+        self._pool.claim(self, clip.path, clip.config.loop, stops_receipt, receipt)
 
     def flush(self) -> None:
         self._pool.sweep(self)

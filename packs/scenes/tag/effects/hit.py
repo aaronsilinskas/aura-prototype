@@ -16,7 +16,7 @@ from effects.effect import (
     EffectHaptic,
     HapticPattern,
 )
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 from packs.effects.basic.pulse import PulseBuilder
 
 _pulse = PulseBuilder()

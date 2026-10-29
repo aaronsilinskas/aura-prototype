@@ -5,7 +5,7 @@ from effects.layers.sparkle_layer import SparkleLayer
 from effects.level import clamp_level, level_lerp, level_lerp_int
 from effects.palette import PaletteLUT256
 from effects.value import ValueGenerator as VG
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 # fmt: off
 _GRAYSCALE_PALETTE = bytes([  0,   0,   0,   0,

@@ -22,7 +22,6 @@ except ImportError:
 
 import time
 
-from engine.audio import AudioRegistry
 from engine.effects.output import EffectOutput
 from engine.input import AccelerationData, MagneticData
 from engine.log import Logger
@@ -267,21 +266,17 @@ def assemble_device(
         ),
     )
 
-    def _build_audio(audio: AudioConfig) -> tuple[tuple[AudioRegistry, EffectOutput], str]:
-        registry = AudioRegistry()
+    def _build_audio(audio: AudioConfig) -> tuple[EffectOutput, str]:
         output = parts.audio_output(
             audio,
-            registry,
             PinRef(audio.i2s_bit_clock, "audio.i2s_bit_clock"),
             PinRef(audio.i2s_word_select, "audio.i2s_word_select"),
             PinRef(audio.i2s_data, "audio.i2s_data"),
         )
-        return (registry, output), "ok"
+        return output, "ok"
 
-    audio = _gated_step(logger, config.audio, describe_audio, _build_audio)
-    audio_registry: AudioRegistry | None = None
-    if audio is not None:
-        audio_registry, audio_output = audio
+    audio_output = _gated_step(logger, config.audio, describe_audio, _build_audio)
+    if audio_output is not None:
         outputs.append(audio_output)
 
     haptic_output = _gated_step(
@@ -327,5 +322,4 @@ def assemble_device(
         ir=ir,
         radio=radio,
         storage=storage,
-        audio_registry=audio_registry,
     )

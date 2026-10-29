@@ -118,10 +118,11 @@ from __future__ import annotations
 
 import gc
 
-from app.scene_composition import install_pack_sounds, scan_boot_pack_catalog
+from app.scene_composition import scan_boot_pack_catalog
 from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
+from engine.namespace import ActiveSceneNamespace
 from engine.scene import SceneManager
 from engine.state import SceneReboot
 from engine.timer import Timer
@@ -178,7 +179,8 @@ def _build_prop(scene_name: str, config: DeviceConfig) -> tuple[SceneManager, Ef
     gc.collect()
     free_after_registries = gc.mem_free()
 
-    effect_manager = EffectManager(registry=effect_registry, outputs=hw.outputs)
+    namespace = ActiveSceneNamespace(effect_registry, catalog.pack_sounds)
+    effect_manager = EffectManager(namespace=namespace, outputs=hw.outputs)
     timer = Timer()
     engine = GameEngine(
         effect_controls=effect_manager,
@@ -191,7 +193,7 @@ def _build_prop(scene_name: str, config: DeviceConfig) -> tuple[SceneManager, Ef
         rule_registry,
         scene_registry,
         effect_admin=effect_manager,
-        audio_overlay_admin=install_pack_sounds(hw, catalog),
+        namespace=namespace,
         scene_reboot=SceneReboot(),
     )
     gc.collect()

@@ -25,7 +25,7 @@ def _render(effect, pixel_count: int = 10) -> list:
 
 
 def test_progress_build_returns_effect_builder_instance() -> None:
-    from engine.effects.manager import EffectBuilder
+    from engine.effects.builder import EffectBuilder
     from packs.effects.basic.progress import BUILD
 
     assert isinstance(BUILD, EffectBuilder)
@@ -135,7 +135,7 @@ def test_progress_render_is_deterministic() -> None:
 def test_progress_is_resolvable_via_pack_registry() -> None:
     import os
 
-    from engine.effects.manager import EffectBuilder
+    from engine.effects.builder import EffectBuilder
     from engine.pack_catalog import scan_pack_roots
 
     packs_root = os.path.join(os.path.dirname(__file__), "..", "..", "..")

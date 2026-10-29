@@ -11,6 +11,7 @@ from engine.effects.output import EffectOutput
 from engine.engine import GameEngine, GameRule
 from engine.events import EffectEvent, Event
 from engine.input import AccelerationData, ButtonData, InputEvents
+from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import scan_pack_roots
 from engine.state import EffectReceipt, GameState, SceneControls, Scope, ScopeValue
 from engine.timer import Timer
@@ -18,7 +19,11 @@ from engine.timer import Timer
 _packs_root = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packs")
 )
-_registry = scan_pack_roots([_packs_root]).effect_registry
+_catalog = scan_pack_roots([_packs_root])
+# Standalone demo, no SceneManager: install a scene view with no locals that
+# declares every pack in the catalog, so every pack.effect name below resolves.
+_namespace = ActiveSceneNamespace(_catalog.effect_registry, _catalog.pack_sounds)
+_namespace.install(None, {}, frozenset(_catalog.effect_registry.names()))
 
 
 BLOCK_HEIGHT = 2  # 1 pixel line (layered effects already split/merged into it) + 1 event line
@@ -73,10 +78,7 @@ class AnsiEffectOutput(EffectOutput):
 
 
 personal_output = AnsiEffectOutput(scopes=[Scope.PERSONAL])
-effect_manager = EffectManager(registry=_registry, outputs=[personal_output])
-# Standalone demo, no SceneManager -- declare every scanned pack allowed so
-# pack.effect names below resolve (see issue #814: EffectAdmin.set_allowed_packs).
-effect_manager.set_allowed_packs(frozenset(_registry.names()))
+effect_manager = EffectManager(namespace=_namespace, outputs=[personal_output])
 
 game_engine = GameEngine(effect_controls=effect_manager)
 game_state = game_engine.create_state(SceneControls())

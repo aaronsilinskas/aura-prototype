@@ -18,7 +18,7 @@ from effects.effect import (
     EffectHaptic,
     HapticPattern,
 )
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 _DRY_FIRE_AUDIO = EffectAudio(
     clips={

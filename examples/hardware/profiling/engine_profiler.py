@@ -77,6 +77,7 @@ from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
+from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog, scan_pack_roots
 from engine.state import GameState, SceneControls
 from hardware.shared.profiler_report import (
@@ -122,7 +123,8 @@ class _ProfilerRule(GameRule):
 
 
 def _build_engine(catalog: PackCatalog, rule_count: int) -> tuple[GameEngine, GameState]:
-    effect_manager = EffectManager(registry=catalog.effect_registry, outputs=[])
+    namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
+    effect_manager = EffectManager(namespace=namespace, outputs=[])
     game_engine = GameEngine(effect_controls=effect_manager)
     game_engine.set_rules([_ProfilerRule() for _ in range(rule_count)])
     game_state = game_engine.create_state(SceneControls())

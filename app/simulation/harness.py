@@ -46,6 +46,7 @@ from hardware.simulated.device import (
     SimulatedHardware,
     Strip,
 )
+from hardware.simulated.simulated_parts import wav_length
 
 __all__ = ["TICK", "SimulatedDevice", "Simulation"]
 
@@ -355,14 +356,16 @@ class SimulatedDevice:
     def _boot(self) -> None:
         """Boot through ``build_scene_boot``, the boot ``run_scene`` uses."""
         self._sim._claim_card_packs(self)
-        scene, self._scene_tick = build_scene_boot(
+        boot = build_scene_boot(
             self._sim_hw.hw,
             {"default_scene": self._switched_on_into},
             reset=_reset,
             timer=_SimulationClock(self._sim),
             scene_data={self._switched_on_into: self._scene_data} if self._scene_data else None,
         )
-        self.scene = scene
+        self._scene_tick = boot.tick
+        self._namespace = boot.runtime.namespace
+        self.scene = boot.scene_name
         """The scene the device is running now."""
 
     # -- inputs -------------------------------------------------------------
@@ -509,12 +512,18 @@ class SimulatedDevice:
         return any(p.clip == clip for p in self.played)
 
     def clip_length(self, clip: str) -> float:
-        """Seconds *clip* plays for, read from the WAV header the device plays it from."""
-        return self._sim_hw.clip_length(clip)
+        """Seconds *clip* plays for, read from the WAV header the device plays it from.
+
+        *clip* resolves against the scene active now, as the game would resolve it.
+        """
+        return wav_length(self._namespace.resolve_clip(clip))
 
     def is_playing(self, clip: str) -> bool:
-        """Whether *clip* is playing or looping now; false once it ran out or was stopped."""
-        return self._sim_hw.is_playing(clip)
+        """Whether *clip* is playing or looping now; false once it ran out or was stopped.
+
+        *clip* resolves against the scene active now, as the game would resolve it.
+        """
+        return self._sim_hw.is_playing(self._namespace.resolve_clip(clip))
 
     def forget(self) -> None:
         """Drop everything recorded so far, so later asserts see only what follows.

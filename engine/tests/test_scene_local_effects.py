@@ -10,13 +10,13 @@ import pytest
 
 from engine.effects.manager import EffectManager
 from engine.events import EffectEvent
-from engine.packs import PackRegistry
-from engine.scene import Scene, SceneLocalRegistry
-from engine.state import EffectAdmin, Scope
+from engine.namespace import ActiveSceneNamespace
+from engine.packs import PackRegistry, UnknownItemError
+from engine.scene import Scene
+from engine.state import Scope
 from engine.tests.effects.helpers import SpyEffectOutput
 from engine.tests.helpers import (
-    SpyAudioOverlayAdmin,
-    SpyEffectAdmin,
+    RecordingNamespace,
     make_scene_manager,
 )
 from engine.timer import Timer
@@ -37,8 +37,11 @@ def _local_effects(*names: str) -> dict[str, dict]:
     return {"effects": {name: _stub_effect_source() for name in names}}
 
 
-def _make_effect_manager(outputs=None) -> EffectManager:
-    return EffectManager(registry=PackRegistry(), outputs=outputs or [])
+def _make_effect_manager(scene: Scene, outputs=None) -> EffectManager:
+    """Return an EffectManager whose namespace has *scene*'s view installed."""
+    namespace = ActiveSceneNamespace(PackRegistry(), {})
+    namespace.install(scene.local_effect_registry, scene.local_sound_map, frozenset())
+    return EffectManager(namespace=namespace, outputs=outputs or [])
 
 
 # ---------------------------------------------------------------------------
@@ -85,68 +88,14 @@ def test_scene_constructed_directly_has_empty_local_effect_registry() -> None:
 
 
 # ---------------------------------------------------------------------------
-# EffectAdmin — base class raises, documented reserved for SceneManager
+# EffectManager — scene. names resolve through the installed scene view
 # ---------------------------------------------------------------------------
-
-
-def test_effect_admin_base_class_set_local_effects_raises_not_implemented_error() -> None:
-    admin = EffectAdmin()
-
-    with pytest.raises(NotImplementedError):
-        admin.set_local_effects(SceneLocalRegistry())
-
-
-# ---------------------------------------------------------------------------
-# EffectManager.set_local_effects — installs and replaces the active registry
-# ---------------------------------------------------------------------------
-
-
-def test_effect_manager_set_local_effects_enables_scene_prefix_resolution(
-    pack_tree,
-) -> None:
-    registry = pack_tree.scan(scenes={"forest": _local_effects("flash")}).scene_registry
-    scene = registry.get("forest")
-
-    manager = _make_effect_manager()
-    manager.set_local_effects(scene.local_effect_registry)
-
-    receipt = manager.set_effect(Scope.PERSONAL, "scene.flash", {})
-    assert receipt is not None
-
-
-def test_effect_manager_set_local_effects_none_causes_scene_prefix_to_fail(
-    pack_tree,
-) -> None:
-    registry = pack_tree.scan(scenes={"forest": _local_effects("flash")}).scene_registry
-    scene = registry.get("forest")
-
-    manager = _make_effect_manager()
-    manager.set_local_effects(scene.local_effect_registry)
-    manager.set_local_effects(None)
-
-    with pytest.raises(ValueError, match="no scene is active"):
-        manager.set_effect(Scope.PERSONAL, "scene.flash", {})
-
-
-# ---------------------------------------------------------------------------
-# EffectManager._build_effect — scene. prefix routing
-# ---------------------------------------------------------------------------
-
-
-def test_scene_prefix_with_no_active_scene_raises_at_set_effect() -> None:
-    manager = _make_effect_manager()
-
-    with pytest.raises(ValueError, match="no scene is active"):
-        manager.set_effect(Scope.PERSONAL, "scene.flash", {})
 
 
 def test_scene_prefix_resolves_local_effect_when_scene_is_active(pack_tree) -> None:
     registry = pack_tree.scan(scenes={"forest": _local_effects("flash")}).scene_registry
-
-    scene = registry.get("forest")
     output = SpyEffectOutput(min_resolution=16, scopes=[Scope.PERSONAL])
-    manager = EffectManager(registry=PackRegistry(), outputs=[output])
-    manager.set_local_effects(scene.local_effect_registry)
+    manager = _make_effect_manager(registry.get("forest"), outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "scene.flash", {})
     manager.update(Timer())
@@ -154,24 +103,10 @@ def test_scene_prefix_resolves_local_effect_when_scene_is_active(pack_tree) -> N
     assert output.update_pixels_calls == [("personal", output.created_buffers[0])]
 
 
-def test_scene_prefix_unknown_effect_raises_with_effect_name_in_message(pack_tree) -> None:
-    registry = pack_tree.scan(scenes={"forest": _local_effects("flash")}).scene_registry
-
-    scene = registry.get("forest")
-    manager = _make_effect_manager()
-    manager.set_local_effects(scene.local_effect_registry)
-
-    with pytest.raises(ValueError, match="missing_effect"):
-        manager.set_effect(Scope.PERSONAL, "scene.missing_effect", {})
-
-
 def test_scene_prefix_fires_start_event_with_pack_equals_scene(pack_tree) -> None:
     registry = pack_tree.scan(scenes={"forest": _local_effects("flash")}).scene_registry
-
-    scene = registry.get("forest")
     output = SpyEffectOutput(min_resolution=16, scopes=[Scope.PERSONAL])
-    manager = EffectManager(registry=PackRegistry(), outputs=[output])
-    manager.set_local_effects(scene.local_effect_registry)
+    manager = _make_effect_manager(registry.get("forest"), outputs=[output])
 
     receipt = manager.set_effect(Scope.PERSONAL, "scene.flash", {})
 
@@ -181,127 +116,95 @@ def test_scene_prefix_fires_start_event_with_pack_equals_scene(pack_tree) -> Non
 
 
 # ---------------------------------------------------------------------------
-# SceneManager pushes local effect registry on transitions
+# SceneManager installs the active scene's local effects on transitions
 # ---------------------------------------------------------------------------
 
 
-def test_scene_manager_pushes_local_effects_on_load(pack_tree) -> None:
+def test_scene_manager_installs_local_effects_on_load(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"forest": _local_effects("flash")})
+    namespace = RecordingNamespace()
+    manager = make_scene_manager(catalog, namespace=namespace)
 
-    effect_admin = SpyEffectAdmin()
-    manager = make_scene_manager(catalog, effect_admin=effect_admin)
     manager.load("forest")
     manager.update()
 
-    assert len(effect_admin.local_effects_history) == 1
-    pushed = effect_admin.local_effects_history[0]
-    assert isinstance(pushed, SceneLocalRegistry)
-    assert "flash" in pushed.items()
+    [(local_effects, _, _)] = namespace.installs
+    assert local_effects.items() == ["flash"]
 
 
-def test_scene_manager_load_replaces_active_scene_registry_with_new_scenes(pack_tree) -> None:
-    catalog = pack_tree.scan(scenes={"a": {}, "b": {}})
-
-    effect_admin = SpyEffectAdmin()
-    manager = make_scene_manager(catalog, effect_admin=effect_admin)
-
-    manager.load("a")
-    manager.update()
-    effect_admin.local_effects_history.clear()
-
-    manager.load("b")
-    manager.update()
-
-    # One push: the new scene b's (empty) local effect registry
-    assert len(effect_admin.local_effects_history) == 1
-
-
-def test_scene_manager_pushes_overlay_scene_local_effects_on_overlay(pack_tree) -> None:
+def test_scene_manager_installs_overlay_scene_local_effects_on_overlay(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"scene_b": _local_effects("b_flash"), "scene_a": {}})
-
-    effect_admin = SpyEffectAdmin()
-    manager = make_scene_manager(catalog, effect_admin=effect_admin)
-
+    namespace = RecordingNamespace()
+    manager = make_scene_manager(catalog, namespace=namespace)
     manager.load("scene_a")
     manager.update()
-    effect_admin.local_effects_history.clear()
 
     manager.overlay("scene_b")
     manager.update()
 
-    assert len(effect_admin.local_effects_history) == 1
-    pushed = effect_admin.local_effects_history[0]
-    assert "b_flash" in pushed.items()
+    local_effects, _, _ = namespace.installs[-1]
+    assert local_effects.items() == ["b_flash"]
 
 
 def test_scene_manager_restores_base_local_effects_on_pop(pack_tree) -> None:
     catalog = pack_tree.scan(
         scenes={"scene_a": _local_effects("a_flash"), "scene_b": _local_effects("b_flash")}
     )
-
-    effect_admin = SpyEffectAdmin()
-    manager = make_scene_manager(catalog, effect_admin=effect_admin)
-
+    namespace = RecordingNamespace()
+    manager = make_scene_manager(catalog, namespace=namespace)
     manager.load("scene_a")
     manager.update()
     manager.overlay("scene_b")
     manager.update()
-    effect_admin.local_effects_history.clear()
 
     manager.pop()
     manager.update()
 
-    assert len(effect_admin.local_effects_history) == 1
-    pushed = effect_admin.local_effects_history[0]
-    assert "a_flash" in pushed.items()
-    assert "b_flash" not in pushed.items()
+    local_effects, _, _ = namespace.installs[-1]
+    assert local_effects.items() == ["a_flash"]
 
 
 # ---------------------------------------------------------------------------
-# SceneManager installs the active scene's sound overlay on transitions
+# SceneManager installs the active scene's local sounds on transitions
 # ---------------------------------------------------------------------------
 
 
-def test_scene_manager_installs_scene_sound_overlay_on_load(pack_tree) -> None:
+def test_scene_manager_installs_scene_sounds_on_load(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"forest": {"sounds": ["victory_sting"]}})
+    namespace = RecordingNamespace()
+    manager = make_scene_manager(catalog, namespace=namespace)
 
-    audio_overlay_admin = SpyAudioOverlayAdmin()
-    manager = make_scene_manager(catalog, audio_overlay_admin=audio_overlay_admin)
     manager.load("forest")
     manager.update()
 
-    assert len(audio_overlay_admin.scene_sounds_history) == 1
-    pushed = audio_overlay_admin.scene_sounds_history[0]
-    assert "victory_sting" in pushed
+    [(_, local_sounds, _)] = namespace.installs
+    assert list(local_sounds) == ["victory_sting"]
 
 
-def test_scene_manager_load_installs_none_overlay_for_scene_with_no_sounds(pack_tree) -> None:
+def test_scene_manager_installs_no_sounds_for_a_scene_with_none(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"bare_scene": {}})
+    namespace = RecordingNamespace()
+    manager = make_scene_manager(catalog, namespace=namespace)
 
-    audio_overlay_admin = SpyAudioOverlayAdmin()
-    manager = make_scene_manager(catalog, audio_overlay_admin=audio_overlay_admin)
     manager.load("bare_scene")
     manager.update()
 
-    assert audio_overlay_admin.scene_sounds_history == [None]
+    [(_, local_sounds, _)] = namespace.installs
+    assert local_sounds == {}
 
 
 def test_scene_manager_installs_overlay_scene_sounds_on_overlay(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"scene_b": {"sounds": ["b_sting"]}, "scene_a": {}})
-
-    audio_overlay_admin = SpyAudioOverlayAdmin()
-    manager = make_scene_manager(catalog, audio_overlay_admin=audio_overlay_admin)
-
+    namespace = RecordingNamespace()
+    manager = make_scene_manager(catalog, namespace=namespace)
     manager.load("scene_a")
     manager.update()
-    audio_overlay_admin.scene_sounds_history.clear()
 
     manager.overlay("scene_b")
     manager.update()
 
-    assert len(audio_overlay_admin.scene_sounds_history) == 1
-    pushed = audio_overlay_admin.scene_sounds_history[0]
-    assert "b_sting" in pushed
+    _, local_sounds, _ = namespace.installs[-1]
+    assert list(local_sounds) == ["b_sting"]
 
 
 def test_scene_manager_restores_base_scene_sounds_on_pop(pack_tree) -> None:
@@ -311,23 +214,18 @@ def test_scene_manager_restores_base_scene_sounds_on_pop(pack_tree) -> None:
             "scene_b": {"sounds": ["b_sting"]},
         },
     )
-
-    audio_overlay_admin = SpyAudioOverlayAdmin()
-    manager = make_scene_manager(catalog, audio_overlay_admin=audio_overlay_admin)
-
+    namespace = RecordingNamespace()
+    manager = make_scene_manager(catalog, namespace=namespace)
     manager.load("scene_a")
     manager.update()
     manager.overlay("scene_b")
     manager.update()
-    audio_overlay_admin.scene_sounds_history.clear()
 
     manager.pop()
     manager.update()
 
-    assert len(audio_overlay_admin.scene_sounds_history) == 1
-    pushed = audio_overlay_admin.scene_sounds_history[0]
-    assert "a_sting" in pushed
-    assert "b_sting" not in pushed
+    _, local_sounds, _ = namespace.installs[-1]
+    assert list(local_sounds) == ["a_sting"]
 
 
 # ---------------------------------------------------------------------------
@@ -339,32 +237,7 @@ def test_loading_scene_b_after_a_does_not_expose_scene_a_locals(pack_tree) -> No
     scene_registry = pack_tree.scan(
         scenes={"scene_a": _local_effects("secret"), "scene_b": {}}
     ).scene_registry
+    manager = _make_effect_manager(scene_registry.get("scene_b"))
 
-    output = SpyEffectOutput(min_resolution=16, scopes=[Scope.PERSONAL])
-    manager = EffectManager(registry=PackRegistry(), outputs=[output])
-
-    scene_b = scene_registry.get("scene_b")
-    manager.set_local_effects(scene_b.local_effect_registry)
-
-    with pytest.raises(ValueError):
+    with pytest.raises(UnknownItemError):
         manager.set_effect(Scope.PERSONAL, "scene.secret", {})
-
-
-# ---------------------------------------------------------------------------
-# EffectEvent.pack == "scene" for scene-local effects
-# ---------------------------------------------------------------------------
-
-
-def test_effect_event_pack_is_scene_for_scene_local_effect(pack_tree) -> None:
-    scene_reg = pack_tree.scan(scenes={"forest": _local_effects("flash")}).scene_registry
-    scene = scene_reg.get("forest")
-
-    output = SpyEffectOutput(min_resolution=16, scopes=[Scope.PERSONAL])
-    manager = EffectManager(registry=PackRegistry(), outputs=[output])
-    manager.set_local_effects(scene.local_effect_registry)
-
-    manager.set_effect(Scope.PERSONAL, "scene.flash", {})
-
-    start_event = output.handle_event_calls[0][0]
-    assert start_event.pack == "scene"
-    assert start_event.name == "flash"

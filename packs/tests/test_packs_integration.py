@@ -7,9 +7,10 @@ import os
 import pytest
 
 from effects.effect import EffectConfig
-from engine.audio import AudioRegistry
-from engine.effects.manager import EffectBuilder, EffectManager
+from engine.effects.builder import EffectBuilder
+from engine.effects.manager import EffectManager
 from engine.engine import GameEngine, GameRule
+from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog, scan_pack_roots
 from engine.scene import Scene, SceneManager, SceneRegistry
 from engine.state import SceneReboot
@@ -257,30 +258,34 @@ def test_hardware_test_scene_json_does_not_list_debug_rule_pack(catalog: PackCat
     assert "debug" not in rule_pack_names
 
 
-# --- Tag scene audio discovery (issue #805) ---
-
-
-def test_tag_scene_every_audio_playing_effects_clip_name_resolves(catalog: PackCatalog) -> None:
-    """Every tag effect that plays audio names a clip AudioRegistry can resolve --
-    the shared basic sting via the base, everything else via tag's own sounds/
-    overlay -- so the scene can run end-to-end with no unresolved clip."""
-    scene_registry = catalog.scene_registry
-    scene = scene_registry.get("tag")
+def _resolve_every_local_clip(catalog: PackCatalog, scene_name: str) -> list[str]:
+    """Resolve every clip *scene_name*'s local effects declare, as the game would with it active."""
+    scene = catalog.scene_registry.get(scene_name)
     local_effects = scene.local_effect_registry
+    namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
+    namespace.install(
+        local_effects, scene.local_sound_map, frozenset(name for name, _ in scene.effect_packs)
+    )
 
-    audio_registry = AudioRegistry()
-    audio_registry.set_pack_sounds(catalog.pack_sounds)
-    audio_registry.set_scene_sounds(scene.local_sound_map)
-    audio_registry.set_allowed_packs(frozenset(name for name, _ in scene.effect_packs))
-
-    resolved_clip_names = []
+    resolved_paths = []
     for effect_name in local_effects.items():
         builder = local_effects.get(effect_name, EffectBuilder)
         effect = builder(effect_name, EffectConfig(resolution=16, options={}))
         if effect.audio is None:
             continue
         for clip in effect.audio.clips.values():
-            resolved_clip_names.append(audio_registry.path(clip.name))
+            resolved_paths.append(namespace.resolve_clip(clip.name))
+    return resolved_paths
+
+
+# --- Tag scene audio discovery (issue #805) ---
+
+
+def test_tag_scene_every_audio_playing_effects_clip_name_resolves(catalog: PackCatalog) -> None:
+    """Every tag effect that plays audio names a clip the active scene resolves --
+    the shared basic sting via the declared basic pack, everything else via tag's
+    own sounds/ -- so the scene can run end-to-end with no unresolved clip."""
+    resolved_clip_names = _resolve_every_local_clip(catalog, "tag")
 
     # Sanity check that the walk actually reached tag's audio-playing effects,
     # so a future scan/discovery regression collapsing this to zero effects
@@ -294,26 +299,10 @@ def test_tag_scene_every_audio_playing_effects_clip_name_resolves(catalog: PackC
 def test_red_light_green_light_scene_every_audio_playing_effects_clip_name_resolves(
     catalog: PackCatalog,
 ) -> None:
-    """Every rlgl effect that plays audio names a clip AudioRegistry can resolve --
-    the shared basic sting via the base, everything else via rlgl's own sounds/
-    overlay -- so the scene can run end-to-end with no unresolved clip."""
-    scene_registry = catalog.scene_registry
-    scene = scene_registry.get("red_light_green_light")
-    local_effects = scene.local_effect_registry
-
-    audio_registry = AudioRegistry()
-    audio_registry.set_pack_sounds(catalog.pack_sounds)
-    audio_registry.set_scene_sounds(scene.local_sound_map)
-    audio_registry.set_allowed_packs(frozenset(name for name, _ in scene.effect_packs))
-
-    resolved_clip_names = []
-    for effect_name in local_effects.items():
-        builder = local_effects.get(effect_name, EffectBuilder)
-        effect = builder(effect_name, EffectConfig(resolution=16, options={}))
-        if effect.audio is None:
-            continue
-        for clip in effect.audio.clips.values():
-            resolved_clip_names.append(audio_registry.path(clip.name))
+    """Every rlgl effect that plays audio names a clip the active scene resolves --
+    the shared basic sting via the declared basic pack, everything else via rlgl's
+    own sounds/ -- so the scene can run end-to-end with no unresolved clip."""
+    resolved_clip_names = _resolve_every_local_clip(catalog, "red_light_green_light")
 
     # Sanity check that the walk actually reached rlgl's audio-playing effects,
     # so a future scan/discovery regression collapsing this to zero effects
@@ -328,7 +317,8 @@ def test_red_light_green_light_scene_every_audio_playing_effects_clip_name_resol
 def loaded_debug_engine(catalog: PackCatalog):
     rule_registry = catalog.rule_registry
     effect_registry = catalog.effect_registry
-    effect_manager = EffectManager(registry=effect_registry, outputs=[])
+    namespace = ActiveSceneNamespace(effect_registry, catalog.pack_sounds)
+    effect_manager = EffectManager(namespace=namespace, outputs=[])
     engine = GameEngine(effect_manager)
     scene_registry = SceneRegistry()
     scene_registry.register(
@@ -341,7 +331,7 @@ def loaded_debug_engine(catalog: PackCatalog):
         rule_registry,
         scene_registry,
         effect_admin=effect_manager,
-        audio_overlay_admin=AudioRegistry(),
+        namespace=namespace,
         scene_reboot=SceneReboot(),
     )
     manager.load("test_scene")

@@ -168,9 +168,8 @@ class NeoPixelPixelsConfig:
 class AudioConfig:
     """Parsed audio configuration.
 
-    Carries no clip map -- clip resolution is ``AudioRegistry``'s job (base
-    scanned from ``packs/effects/*/sounds``, overlay installed per scene), not
-    a device-config concern.
+    Carries no clip map: clip names resolve through the Active scene
+    namespace when an effect is built, not through device config.
     """
 
     __slots__ = (

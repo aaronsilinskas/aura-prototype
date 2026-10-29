@@ -144,11 +144,11 @@ class SceneControls:
 class SceneReboot:
     """Board-free port through which ``SceneManager`` persists-and-reboots.
 
-    Mirrors how ``SceneManager`` already reaches ``EffectAdmin``/
-    ``AudioOverlayAdmin`` through an injected seam: ``SceneManager``
-    validates ``reboot_into``'s *target* against its scene registry (a typo
-    must never persist a name that would brick the next boot) and otherwise
-    delegates both methods straight to this port. All the device work —
+    Mirrors how ``SceneManager`` already reaches ``EffectAdmin`` through an
+    injected seam: ``SceneManager`` validates ``reboot_into``'s *target*
+    against its scene registry (a typo must never persist a name that would
+    brick the next boot) and otherwise delegates both methods straight to
+    this port. All the device work —
     writing the scene switch to durable storage and physically resetting the
     device — lives on the concrete implementation, since a reboot is
     inherently a hardware operation the board-free engine cannot perform
@@ -276,8 +276,8 @@ class EffectControls:
 
     Provides effect start/stop and merge-strategy operations only. The update()
     tick is intentionally excluded so rules cannot advance the effect loop.
-    Scene-transition operations (local effect registry swaps, merge-strategy
-    snapshot/reset/apply) live on the separate ``EffectAdmin`` face, reached
+    Scene-transition operations (merge-strategy snapshot/reset/apply) live on
+    the separate ``EffectAdmin`` face, reached
     through ``SceneManager`` rather than through this interface.
     """
 
@@ -308,12 +308,13 @@ class EffectAdmin:
     """Scene-transition-facing effect interface, reserved for ``SceneManager``.
 
     Carries the operations ``EffectControls`` deliberately sheds so rules never
-    see them: swapping the active scene's local effect registry and
-    snapshotting/resetting/applying the per-scope merge strategy map.
+    see them: the merge-strategy snapshot lifecycle (reset, capture, apply).
+    The active scene's local effects and declared packs go to the Active
+    scene namespace instead.
     ``SceneManager`` holds an injected ``EffectAdmin`` handle (wired to the same
     instance as ``state.effect_controls``, e.g. the single ``EffectManager``)
     and drives every transition call through it, never through
-    ``state.effect_controls``. All four methods raise ``NotImplementedError``
+    ``state.effect_controls``. All three methods raise ``NotImplementedError``
     by default.
     """
 
@@ -342,29 +343,6 @@ class EffectAdmin:
         Called by ``SceneManager._do_pop`` with the popped scene stack entry's
         saved snapshot, discarding any ``set_merge_strategy`` calls made during
         the popped overlay.
-        """
-        raise NotImplementedError
-
-    def set_local_effects(self, local_registry: object) -> None:
-        """Push the active scene's local effect registry into the effect system.
-
-        Called by ``SceneManager`` on every transition so that
-        ``scene.<effect>`` names resolve against the top-of-stack scene's
-        local effects. Pass ``None`` when the scene stack empties so that
-        ``scene.`` lookups fail immediately rather than resolving against a
-        stale registry.
-        """
-        raise NotImplementedError
-
-    def set_allowed_packs(self, names: frozenset[str] | None) -> None:
-        """Install the active scene's declared effect-pack names.
-
-        Called by ``SceneManager`` on every transition, right beside
-        ``set_local_effects``, so a ``pack.effect`` reference only resolves
-        when *pack* is one of the top-of-stack scene's declared
-        ``effect_packs``. Pass ``None`` when the scene stack empties so that
-        ``pack.`` lookups fail closed ("no active scene") rather than
-        resolving unrestricted. ``scene.``-prefixed names are unaffected.
         """
         raise NotImplementedError
 
@@ -563,8 +541,8 @@ class GameState:
     def clear_queue(self) -> None:
         """Discard all pending events without processing them.
 
-        Reserved for scene transitions (mirrors ``set_local_effects``); resets
-        the queue in place without allocating.
+        Reserved for scene transitions; resets the queue in place without
+        allocating.
         """
         self._reset_queue()
 

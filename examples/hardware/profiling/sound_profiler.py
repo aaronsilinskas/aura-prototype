@@ -57,10 +57,11 @@ import time
 
 import board
 
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, ResolvedClip
 from effects.performance import PerformanceTracker
-from engine.audio import AudioRegistry
 from engine.events import EffectEvent
+from engine.namespace import ActiveSceneNamespace
+from engine.packs import PackRegistry
 from engine.state import EffectReceipt
 from hardware.shared.profiler_report import (
     linear_fit,
@@ -97,11 +98,10 @@ _CLIP_NAME: Final = "profiler_loop"
 _EVENT_VERB: Final = "play"
 
 
-def _build_output(audio_registry: AudioRegistry) -> AudioEffectOutput:
+def _build_output() -> AudioEffectOutput:
     from hardware.circuitpython.audio_output import AudioEffectOutput
 
     return AudioEffectOutput(
-        audio_registry,
         max_volume=MAX_VOLUME,
         num_voices=NUM_VOICES,
         i2s_bit_clock=getattr(board, I2S_BIT_CLOCK_PIN_NAME),
@@ -112,16 +112,18 @@ def _build_output(audio_registry: AudioRegistry) -> AudioEffectOutput:
 
 def run() -> None:
     """Sweep concurrent voices, reporting per-frame mixer-fixed + per-voice cost."""
-    audio_registry = AudioRegistry()
-    audio_registry.set_scene_sounds({_CLIP_NAME: CLIP_PATH})
+    # Resolve the clip the way EffectManager does on a device: through a
+    # namespace with a scene installed whose one local sound is the clip.
+    namespace = ActiveSceneNamespace(PackRegistry(), {})
+    namespace.install(None, {_CLIP_NAME: CLIP_PATH}, frozenset())
+    clip = AudioPlaybackConfig(f"scene.{_CLIP_NAME}", loop=True)
 
-    output = _build_output(audio_registry)
+    output = _build_output()
 
-    looping_effect = Effect(
-        "profiler.loop",
-        audio=EffectAudio({_EVENT_VERB: AudioPlaybackConfig(f"scene.{_CLIP_NAME}", loop=True)}),
+    looping_effect = Effect("profiler.loop", audio=EffectAudio({_EVENT_VERB: clip}))
+    play_event = EffectEvent(
+        "profiler", "loop", _EVENT_VERB, ResolvedClip(clip, namespace.resolve_clip(clip.name))
     )
-    play_event = EffectEvent("profiler", "loop", _EVENT_VERB)
 
     print_profile_header(
         component="sound",

@@ -17,7 +17,7 @@ from effects.effect import (
     EffectHaptic,
     HapticPattern,
 )
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 _GO_AUDIO = EffectAudio(
     clips={"start": AudioPlaybackConfig(name="scene.go_start", loop=False, stops_effect=True)}

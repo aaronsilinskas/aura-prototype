@@ -1,149 +1,14 @@
 from __future__ import annotations
 
-from effects.effect import Effect, EffectConfig, PixelBuffer
+from effects.effect import Effect, EffectConfig, PixelBuffer, ResolvedClip
 from engine.effects.merge import SPLIT
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
-from engine.packs import (
-    ItemTypeError,
-    MissingItemAttributeError,
-    PackRegistry,
-    UnknownItemError,
-    UnknownPackError,
-)
-from engine.scene import SceneLocalRegistry
+from engine.namespace import ActiveSceneNamespace
 from engine.state import EffectAdmin, EffectControls, EffectReceipt, MergeStrategy, ScopeValue
 from engine.timer import Timer
 
 _DEFAULT_RESOLUTION = 16
-
-
-class EffectBuilder:
-    """Factory interface for constructing ``Effect`` instances by name.
-
-    Concrete implementations look up the named effect and return an effect
-    configured for the given ``EffectConfig``. Raise ``KeyError`` or
-    ``ValueError`` for unregistered names.
-    """
-
-    def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """Build an Effect for the named effect.
-
-        Args:
-            name: The registered effect name (e.g. ``"color.flash"``).
-            config: Runtime configuration for the render pass. ``config.get_option``
-                carries any effect-specific parameters (e.g. duration, color).
-                ``config.resolution`` describes the output hardware.
-
-        Returns:
-            A configured ``Effect`` ready to be advanced each frame.
-        """
-        raise NotImplementedError
-
-
-class EffectResolver:
-    """Maps a qualified effect name to an (builder, pack_name, effect_name) tuple.
-
-    Owns the ``scene.`` reserved-prefix rule, the ``pack.`` effect-pack
-    membership rule, the choice of registry for each name, and the
-    translation of typed registry errors (from ``engine.packs``) into
-    effect-facing messages.  ``EffectManager`` holds one resolver and calls
-    ``resolve`` once per effect start.
-
-    CircuitPython/MicroPython safe: no per-call allocations beyond what the
-    underlying registries already do; ``__slots__`` prevents ``__dict__``.
-    """
-
-    __slots__ = ("_allowed_packs", "_local_effects", "_registry")
-
-    def __init__(self, registry: PackRegistry) -> None:
-        self._registry: PackRegistry = registry
-        self._local_effects: SceneLocalRegistry | None = None
-        self._allowed_packs: frozenset[str] | None = None
-
-    def set_local_effects(self, local_registry: SceneLocalRegistry | None) -> None:
-        """Replace the active scene-local registry.  Pass ``None`` to clear."""
-        self._local_effects = local_registry
-
-    def set_allowed_packs(self, names: frozenset[str] | None) -> None:
-        """Replace the active scene's declared effect-pack names.
-
-        Pass ``None`` to fail closed — no ``pack.effect`` name resolves until
-        a scene installs its declared set.
-        """
-        self._allowed_packs = names
-
-    def resolve(self, name: str) -> tuple[EffectBuilder, str, str]:
-        """Return ``(builder, pack_name, effect_name)`` for *name*.
-
-        *name* must be in ``"pack.effect"`` or ``"scene.effect"`` format.
-        The ``scene.`` prefix routes to the currently-active scene-local
-        registry.  Any other prefix names a shared pack and is checked
-        against the active scene's declared ``effect_packs`` before routing
-        to the shared ``PackRegistry``.
-
-        Raises:
-            ValueError: for any resolution failure, with an effect-facing
-                message (missing prefix, no active scene, pack not declared
-                by the active scene, unknown pack, unknown effect,
-                invalid/missing ``BUILD``, ``scene.`` with no active scene,
-                unknown scene-local effect).
-        """
-        if "." not in name:
-            raise ValueError(f"Effect name '{name}' missing pack prefix (expected 'pack.effect')")
-        pack_name, effect_name = name.split(".", 1)
-
-        if pack_name == "scene":
-            builder = self._resolve_scene(name, effect_name)
-        else:
-            builder = self._resolve_pack(name, pack_name, effect_name)
-
-        return builder, pack_name, effect_name
-
-    def _resolve_scene(self, name: str, effect_name: str) -> EffectBuilder:
-        if self._local_effects is None:
-            raise ValueError(
-                f"Effect name '{name}' uses the reserved 'scene.' prefix but no scene is active"
-            )
-        try:
-            return self._local_effects.get(effect_name, EffectBuilder)
-        except UnknownItemError as exc:
-            raise ValueError(
-                f"Unknown scene-local effect '{effect_name}'. "
-                + f"Available: {', '.join(self._local_effects.items())}"
-            ) from exc
-        except ItemTypeError as exc:
-            raise ValueError(
-                f"Scene-local effect '{effect_name}' has an invalid BUILD attribute"
-            ) from exc
-        except MissingItemAttributeError as exc:
-            raise ValueError(
-                f"Scene-local effect '{effect_name}' is missing a BUILD attribute"
-            ) from exc
-
-    def _resolve_pack(self, name: str, pack_name: str, effect_name: str) -> EffectBuilder:
-        if self._allowed_packs is None:
-            raise ValueError(
-                f"Effect name '{name}' references pack '{pack_name}' but no scene is active"
-            )
-        if pack_name not in self._allowed_packs:
-            raise ValueError(
-                f"Effect pack '{pack_name}' is not declared in the active scene's effect_packs"
-            )
-        try:
-            return self._registry.get(pack_name, effect_name, EffectBuilder)
-        except UnknownPackError as exc:
-            raise ValueError(f"Unknown effect pack '{pack_name}'") from exc
-        except UnknownItemError as exc:
-            raise ValueError(f"Unknown effect '{effect_name}' in pack '{pack_name}'") from exc
-        except ItemTypeError as exc:
-            raise ValueError(
-                f"Effect '{effect_name}' in pack '{pack_name}' has an invalid BUILD attribute"
-            ) from exc
-        except MissingItemAttributeError as exc:
-            raise ValueError(
-                f"Effect pack '{pack_name}' item '{effect_name}' is missing a BUILD attribute"
-            ) from exc
 
 
 class EffectManager(EffectControls, EffectAdmin):
@@ -160,25 +25,39 @@ class EffectManager(EffectControls, EffectAdmin):
     """
 
     class _EffectEntry:
-        __slots__ = ("effect", "keys", "name", "output_buffers", "receipt")
+        __slots__ = (
+            "clips",
+            "effect",
+            "effect_name",
+            "keys",
+            "output_buffers",
+            "pack_name",
+            "receipt",
+        )
 
         def __init__(
             self,
             keys: tuple[str, ...],
-            name: str,
+            pack_name: str,
+            effect_name: str,
             receipt: EffectReceipt,
             output_buffers: list[dict[str, PixelBuffer] | None],
             effect: Effect | None,
         ) -> None:
             self.keys: tuple[str, ...] = keys
-            self.name: str = name
+            self.pack_name: str = pack_name
+            self.effect_name: str = effect_name
             self.receipt: EffectReceipt = receipt
             self.output_buffers: list[dict[str, PixelBuffer] | None] = output_buffers
             self.effect: Effect | None = effect
+            # Verb → Resolved clip, owned by this running effect. Never written
+            # back onto the effect's shared AudioPlaybackConfig declarations.
+            self.clips: dict[str, ResolvedClip] = {}
 
         def __repr__(self) -> str:
             rid = self.receipt.id
-            return f"_EffectEntry(name={self.name!r}, receipt_id={rid}, keys={self.keys!r})"
+            name = self.pack_name + "." + self.effect_name
+            return f"_EffectEntry(name={name!r}, receipt_id={rid}, keys={self.keys!r})"
 
     __slots__ = (
         "_effects",
@@ -186,14 +65,14 @@ class EffectManager(EffectControls, EffectAdmin):
         "_frame_effects",
         "_frame_receipts",
         "_merge_strategies",
+        "_namespace",
         "_next_id",
         "_output_key_sets",
         "_outputs",
-        "_resolver",
     )
 
-    def __init__(self, registry: PackRegistry, outputs: list[EffectOutput]) -> None:
-        self._resolver: EffectResolver = EffectResolver(registry)
+    def __init__(self, namespace: ActiveSceneNamespace, outputs: list[EffectOutput]) -> None:
+        self._namespace: ActiveSceneNamespace = namespace
         self._outputs: list[EffectOutput] = outputs
         self._effects: list[EffectManager._EffectEntry] = []
         self._next_id: int = 1
@@ -220,18 +99,15 @@ class EffectManager(EffectControls, EffectAdmin):
             for o, key_set in zip(outputs, self._output_key_sets)
         ]
 
-    def _notify_listeners(
-        self,
-        event: EffectEvent,
-        event_keys: set[str],
-        effect: Effect | None,
-        receipt: EffectReceipt,
-    ) -> None:
-        """Notify outputs whose registered key sets intersect event_keys."""
+    def _emit(self, entry: EffectManager._EffectEntry, verb: str, event_keys: set[str]) -> None:
+        """Send *entry*'s *verb* event, with its resolved clip, to outputs serving event_keys."""
+        event = EffectEvent(entry.pack_name, entry.effect_name, verb, entry.clips.get(verb))
         for i in range(len(self._outputs)):
             matching = event_keys & self._output_key_sets[i]
             if matching:
-                self._outputs[i].handle_event(event, frozenset(matching), effect, receipt)
+                self._outputs[i].handle_event(
+                    event, frozenset(matching), entry.effect, entry.receipt
+                )
 
     def _build_effect(
         self,
@@ -239,8 +115,18 @@ class EffectManager(EffectControls, EffectAdmin):
         name: str,
         options: dict[str, object],
     ) -> EffectManager._EffectEntry:
-        """Construct an Effect for the named effect."""
-        builder, pack_name, effect_name = self._resolver.resolve(name)
+        """Construct an Effect for the named effect and resolve every clip it declares.
+
+        Every verb's clip is resolved now, not when the verb first fires, so
+        a misspelled clip on a rarely fired verb fails here too. Nothing is
+        cached: each build resolves afresh against the active scene.
+
+        Raises:
+            RegistryError: the effect name, or one of the built effect's clip
+                names, does not resolve in the active scene namespace (see
+                ``ActiveSceneNamespace.resolve_effect`` and ``resolve_clip``).
+        """
+        builder, pack_name, effect_name = self._namespace.resolve_effect(name)
 
         receipt = EffectReceipt(self._next_id)
         self._next_id += 1
@@ -253,18 +139,21 @@ class EffectManager(EffectControls, EffectAdmin):
             if matching_keys and output.min_resolution > resolution:
                 resolution = output.min_resolution
 
-        entry = EffectManager._EffectEntry(tuple(scope_key_set), name, receipt, [], None)
+        entry = EffectManager._EffectEntry(
+            tuple(scope_key_set), pack_name, effect_name, receipt, [], None
+        )
 
         def scoped_listener(event_name: str) -> None:
-            self._notify_listeners(
-                EffectEvent(pack_name, effect_name, event_name),
-                set(entry.keys),
-                entry.effect,
-                receipt,
-            )
+            self._emit(entry, event_name, set(entry.keys))
 
         config = EffectConfig(resolution=resolution, options=options, listeners=[scoped_listener])
         entry.effect = builder(effect_name, config)
+
+        audio = entry.effect.audio
+        if audio is not None:
+            for verb, clip_config in audio.clips.items():
+                path = self._namespace.resolve_clip(clip_config.name)
+                entry.clips[verb] = ResolvedClip(clip_config, path)
 
         if entry.effect.pixels is not None:
             for i, output in enumerate(self._outputs):
@@ -276,18 +165,6 @@ class EffectManager(EffectControls, EffectAdmin):
         else:
             entry.output_buffers = [None] * len(self._outputs)
 
-        return entry
-
-    def _append_new_effect(
-        self,
-        scope: ScopeValue,
-        scope_key_set: set[str],
-        name: str,
-        options: dict[str, object],
-    ) -> EffectManager._EffectEntry:
-        """Build, append, and return the new effect entry."""
-        entry = self._build_effect(scope_key_set, name, options)
-        self._effects.append(entry)
         return entry
 
     def _update_output_buffers(self, entry: EffectManager._EffectEntry) -> None:
@@ -317,13 +194,7 @@ class EffectManager(EffectControls, EffectAdmin):
                 with their keys already narrowed to the post-stop state.
         """
         for entry, removed_keys in stopped:
-            pack_name, effect_name = entry.name.split(".", 1)
-            self._notify_listeners(
-                EffectEvent(pack_name, effect_name, "stop"),
-                removed_keys,
-                entry.effect,
-                entry.receipt,
-            )
+            self._emit(entry, "stop", removed_keys)
 
         remaining_key_set: set[str] = set()
         for r in remaining:
@@ -354,32 +225,6 @@ class EffectManager(EffectControls, EffectAdmin):
                 new_effects.append(entry)
         self._stop_entries(stopped, new_effects)
         self._effects = new_effects
-
-    def set_local_effects(self, local_registry: SceneLocalRegistry | None) -> None:
-        """Store the active scene's local effect registry.
-
-        Called by ``SceneManager`` at each scene transition so that
-        ``scene.<effect>`` names resolve against the top-of-stack scene's
-        local effects.  Pass ``None`` when the stack empties.
-
-        Reserved for ``SceneManager`` (via the ``EffectAdmin`` face) — rules
-        must not call this method.
-        """
-        self._resolver.set_local_effects(local_registry)
-
-    def set_allowed_packs(self, names: frozenset[str] | None) -> None:
-        """Store the active scene's declared effect-pack names.
-
-        Called by ``SceneManager`` at each scene transition, right beside
-        ``set_local_effects``, so that ``pack.<effect>`` names only resolve
-        for packs the active scene declared.  Pass ``None`` when the stack
-        empties so ``pack.`` lookups fail closed rather than resolving
-        unrestricted.
-
-        Reserved for ``SceneManager`` (via the ``EffectAdmin`` face) — rules
-        must not call this method.
-        """
-        self._resolver.set_allowed_packs(names)
 
     def set_merge_strategy(self, scope: ScopeValue, strategy: MergeStrategy) -> None:
         """Set the merge strategy for every key in scope.keys.
@@ -423,14 +268,16 @@ class EffectManager(EffectControls, EffectAdmin):
         self._merge_strategies = snapshot
 
     def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
-        """Replace any running effect(s) in scope and start this one."""
+        """Replace any running effect(s) in scope and start this one.
+
+        The new effect is built before anything in scope is stopped, so a
+        name that fails to resolve raises with the scope left as it was.
+        """
         scope_key_set = set(scope.keys)
+        entry = self._build_effect(scope_key_set, name, options)
         self._remove_effects_in_scope(scope_key_set)
-        entry = self._append_new_effect(scope, scope_key_set, name, options)
-        pack_name, effect_name = name.split(".", 1)
-        self._notify_listeners(
-            EffectEvent(pack_name, effect_name, "start"), scope_key_set, entry.effect, entry.receipt
-        )
+        self._effects.append(entry)
+        self._emit(entry, "start", scope_key_set)
         return entry.receipt
 
     def add_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
@@ -440,11 +287,9 @@ class EffectManager(EffectControls, EffectAdmin):
         The driver determines how layered effects are composited (e.g. splitting an LED strip).
         """
         scope_key_set = set(scope.keys)
-        entry = self._append_new_effect(scope, scope_key_set, name, options)
-        pack_name, effect_name = name.split(".", 1)
-        self._notify_listeners(
-            EffectEvent(pack_name, effect_name, "start"), scope_key_set, entry.effect, entry.receipt
-        )
+        entry = self._build_effect(scope_key_set, name, options)
+        self._effects.append(entry)
+        self._emit(entry, "start", scope_key_set)
         return entry.receipt
 
     def stop_effect(self, scope: ScopeValue) -> None:

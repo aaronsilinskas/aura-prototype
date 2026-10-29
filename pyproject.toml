@@ -84,6 +84,7 @@ forbidden_modules = [
     "engine.packs",
     "engine.timer",
     "engine.effects.manager",
+    "engine.namespace",
 ]
 # hardware.shared.tests.test_network_controls verifies HardwareNetworkControls'
 # wiring into GameEngine.create_state (issue #608) — a legitimate cross-layer

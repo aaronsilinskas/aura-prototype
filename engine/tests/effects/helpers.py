@@ -1,5 +1,12 @@
-from effects.effect import Effect, EffectConfig, EffectPixels, PixelBuffer
-from engine.effects.manager import EffectBuilder
+from effects.effect import (
+    AudioPlaybackConfig,
+    Effect,
+    EffectAudio,
+    EffectConfig,
+    EffectPixels,
+    PixelBuffer,
+)
+from engine.effects.builder import EffectBuilder
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
@@ -139,6 +146,34 @@ class RenderLengthProbeEffectBuilder(EffectBuilder):
                 observed.append(len(buf))
 
         return Effect(name=name, pixels=_ProbePixels())
+
+
+class AudioClipEffectBuilder(EffectBuilder):
+    """Builder whose effects declare the given verb → clip-name map as audio.
+
+    The ``AudioPlaybackConfig`` objects are made once, in ``clips``, and shared
+    by every effect it builds, like a real effect's module-level constants.
+    When *fires* is set, the effect fires that custom verb on every update.
+    """
+
+    def __init__(self, clips: dict[str, str], fires: str | None = None) -> None:
+        self.clips: dict[str, AudioPlaybackConfig] = {
+            verb: AudioPlaybackConfig(clip_name, loop=False) for verb, clip_name in clips.items()
+        }
+        self._fires = fires
+
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        fires = self._fires
+
+        class _ClipPixels(EffectPixels):
+            def update(self, elapsed: float) -> None:
+                if fires is not None:
+                    config.notify_listeners(fires)
+
+            def render(self, output: object) -> None:
+                pass
+
+        return Effect(name=name, pixels=_ClipPixels(), audio=EffectAudio(self.clips))
 
 
 class EventFiringEffectBuilder(EffectBuilder):

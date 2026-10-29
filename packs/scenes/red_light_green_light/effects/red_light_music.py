@@ -1,5 +1,5 @@
 from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig
-from engine.effects.manager import EffectBuilder
+from engine.effects.builder import EffectBuilder
 
 _RED_LIGHT_MUSIC_AUDIO = EffectAudio(
     clips={"start": AudioPlaybackConfig(name="scene.red_light_music_start", loop=True)}
