@@ -12,11 +12,14 @@ import pytest
 
 from engine.pack_catalog import (
     DuplicateNameError,
+    IncompatiblePackError,
     MalformedSceneError,
     MalformedVersionError,
     MissingRootError,
     PackScanError,
     ReservedNameError,
+    SceneDeclarationError,
+    UnknownDeclaredPackError,
     scan_pack_roots,
 )
 from engine.packs import MissingItemAttributeError
@@ -110,6 +113,8 @@ def test_a_scene_without_a_sounds_folder_has_no_local_sounds(pack_tree) -> None:
 
 def test_scanned_scene_carries_its_scene_json_fields(pack_tree) -> None:
     root = pack_tree.root("tc_flash")
+    pack_tree.effect_pack(root, "basic")
+    pack_tree.rule_pack(root, "core", version="1.2")
     pack_tree.scene(
         root,
         "tag",
@@ -432,3 +437,215 @@ def test_a_root_parent_already_on_the_import_path_is_not_added_again(pack_tree, 
     scan_pack_roots([str(root)])
 
     assert sys.path.count(str(tmp_path / "sd")) == 1
+
+
+# ---------------------------------------------------------------------------
+# Scene declarations
+# ---------------------------------------------------------------------------
+
+
+def test_a_scene_declaring_a_missing_effect_pack_raises_unknown_declared_pack_error(
+    pack_tree,
+) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_tree.scene(root, "lobby", effect_packs=[["basic", "1.0"]])
+
+    with pytest.raises(UnknownDeclaredPackError) as excinfo:
+        scan_pack_roots([str(root)])
+
+    assert (excinfo.value.scene, excinfo.value.pack) == ("lobby", "basic")
+
+
+def test_a_scene_declaring_a_missing_rule_pack_raises_unknown_declared_pack_error(
+    pack_tree,
+) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_tree.scene(root, "lobby", rule_packs=[["core", "1.0"]])
+
+    with pytest.raises(UnknownDeclaredPackError) as excinfo:
+        scan_pack_roots([str(root)])
+
+    assert (excinfo.value.scene, excinfo.value.pack) == ("lobby", "core")
+
+
+def test_a_rule_pack_declared_as_an_effect_pack_raises_unknown_declared_pack_error(
+    pack_tree,
+) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_tree.rule_pack(root, "core")
+    pack_tree.scene(root, "lobby", effect_packs=[["core", "1.0"]])
+
+    with pytest.raises(UnknownDeclaredPackError) as excinfo:
+        scan_pack_roots([str(root)])
+
+    assert (excinfo.value.scene, excinfo.value.pack, excinfo.value.kind) == (
+        "lobby",
+        "core",
+        "effect",
+    )
+
+
+def test_a_flash_scene_may_declare_packs_installed_on_the_card(pack_tree) -> None:
+    flash = pack_tree.root("tc_flash")
+    card = pack_tree.root("tc_card")
+    pack_tree.scene(flash, "lobby", effect_packs=[["extra", "1.0"]], rule_packs=[["bonus", "1.0"]])
+    pack_tree.effect_pack(card, "extra")
+    pack_tree.rule_pack(card, "bonus")
+
+    catalog = scan_pack_roots([str(flash), str(card)])
+
+    assert catalog.scene_registry.names() == ["lobby"]
+
+
+@pytest.mark.parametrize("key", ["effect_packs", "rule_packs"])
+@pytest.mark.parametrize(
+    "declarations",
+    [
+        pytest.param({"basic": "1.0"}, id="not-a-list"),
+        pytest.param(["basic"], id="bare-name"),
+        pytest.param([["basic"]], id="missing-minimum"),
+        pytest.param([["basic", "1.0", "extra"]], id="extra-field"),
+        pytest.param([["basic", 1.0]], id="non-string-minimum"),
+        pytest.param([[7, "1.0"]], id="non-string-name"),
+    ],
+)
+def test_a_malformed_declaration_raises_malformed_scene_error(pack_tree, key, declarations) -> None:
+    root = pack_tree.root("tc_flash")
+    scene_dir = pack_tree.scene(root, "lobby", **{key: declarations})
+
+    with pytest.raises(MalformedSceneError) as excinfo:
+        scan_pack_roots([str(root)])
+
+    assert excinfo.value.scene == "lobby"
+    assert excinfo.value.path == str(scene_dir / "scene.json")
+
+
+def _scene_declaring_pack(pack_tree, root, kind, *, installed, required):
+    """Install *kind* pack ``basic`` at *installed*; return scene ``lobby`` requiring *required*."""
+    make_pack = pack_tree.effect_pack if kind == "effect" else pack_tree.rule_pack
+    make_pack(root, "basic", version=installed)
+    return pack_tree.scene(root, "lobby", **{kind + "_packs": [["basic", required]]})
+
+
+@pytest.mark.parametrize("kind", ["effect", "rule"])
+def test_a_malformed_declared_minimum_raises_malformed_version_error_naming_scene_json(
+    pack_tree, kind
+) -> None:
+    root = pack_tree.root("tc_flash")
+    scene_dir = _scene_declaring_pack(pack_tree, root, kind, installed="1.0", required="1")
+
+    with pytest.raises(MalformedVersionError) as excinfo:
+        scan_pack_roots([str(root)])
+
+    assert excinfo.value.path == str(scene_dir / "scene.json")
+    assert excinfo.value.value == "1"
+
+
+@pytest.mark.parametrize(
+    ("installed", "required"),
+    [
+        pytest.param("2.0", "1.0", id="newer-major"),
+        pytest.param("1.5", "2.0", id="older-major"),
+        pytest.param("1.2", "1.3", id="older-minor"),
+    ],
+)
+@pytest.mark.parametrize("kind", ["effect", "rule"])
+def test_an_incompatible_installed_pack_raises_incompatible_pack_error(
+    pack_tree, kind, installed, required
+) -> None:
+    root = pack_tree.root("tc_flash")
+    _scene_declaring_pack(pack_tree, root, kind, installed=installed, required=required)
+
+    with pytest.raises(IncompatiblePackError) as excinfo:
+        scan_pack_roots([str(root)])
+
+    error = excinfo.value
+    assert (error.scene, error.pack, str(error.installed), str(error.required)) == (
+        "lobby",
+        "basic",
+        installed,
+        required,
+    )
+
+
+@pytest.mark.parametrize("installed", ["1.3", "1.7"])
+def test_an_installed_pack_with_the_same_major_and_at_least_the_minor_is_compatible(
+    pack_tree, installed
+) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_tree.effect_pack(root, "basic", version=installed)
+    pack_tree.scene(root, "lobby", effect_packs=[["basic", "1.3"]])
+
+    catalog = scan_pack_roots([str(root)])
+
+    assert catalog.scene_registry.names() == ["lobby"]
+
+
+def test_a_pack_declared_twice_in_one_scene_is_checked_per_entry(pack_tree) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_tree.effect_pack(root, "basic", version="1.2")
+    pack_tree.scene(root, "lobby", effect_packs=[["basic", "1.0"], ["basic", "1.4"]])
+
+    with pytest.raises(IncompatiblePackError) as excinfo:
+        scan_pack_roots([str(root)])
+
+    assert str(excinfo.value.required) == "1.4"
+
+
+@pytest.mark.parametrize(
+    ("installed", "required"),
+    [
+        pytest.param(None, "1.0", id="unknown-pack"),
+        pytest.param("2.0", "1.0", id="incompatible-pack"),
+    ],
+)
+def test_a_declaration_failure_is_caught_as_a_scene_declaration_pack_scan_error(
+    pack_tree, installed, required
+) -> None:
+    root = pack_tree.root("tc_flash")
+    if installed is None:
+        pack_tree.scene(root, "lobby", effect_packs=[["basic", required]])
+    else:
+        _scene_declaring_pack(pack_tree, root, "effect", installed=installed, required=required)
+
+    with pytest.raises(PackScanError) as excinfo:
+        scan_pack_roots([str(root)])
+
+    assert isinstance(excinfo.value, SceneDeclarationError)
+    assert (excinfo.value.scene, excinfo.value.pack) == ("lobby", "basic")
+
+
+# ---------------------------------------------------------------------------
+# Initial-data overrides
+# ---------------------------------------------------------------------------
+
+
+def test_an_initial_data_override_replaces_only_the_keys_it_names(pack_tree) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_tree.scene(root, "tag", initial_data={"rounds": 10, "lives": 3})
+
+    catalog = scan_pack_roots([str(root)], initial_data_overrides={"tag": {"rounds": 2}})
+
+    assert catalog.scene_registry.get("tag").initial_data == {"rounds": 2, "lives": 3}
+
+
+def test_an_initial_data_override_applies_to_a_scene_without_initial_data(pack_tree) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_tree.scene(root, "tag")
+
+    catalog = scan_pack_roots([str(root)], initial_data_overrides={"tag": {"rounds": 2}})
+
+    assert catalog.scene_registry.get("tag").initial_data == {"rounds": 2}
+
+
+def test_an_initial_data_override_for_an_unscanned_scene_raises_a_plain_value_error(
+    pack_tree,
+) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_tree.scene(root, "lobby")
+    pack_tree.scene(root, "tag")
+
+    with pytest.raises(ValueError, match=r"'forest'.*lobby, tag") as excinfo:
+        scan_pack_roots([str(root)], initial_data_overrides={"forest": {"rounds": 2}})
+
+    assert not isinstance(excinfo.value, PackScanError)
