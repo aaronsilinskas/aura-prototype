@@ -246,6 +246,8 @@ def assemble_device(
             PolledSensor(
                 parts.accelerometer(c, _require_i2c(i2c, "accelerometer")),
                 AccelerationData(0.0, 0.0, 0.0),
+                "accelerometer",
+                logger,
             ),
             "ok",
         ),
@@ -258,6 +260,8 @@ def assemble_device(
             PolledSensor(
                 parts.magnetometer(c, _require_i2c(i2c, "magnetometer")),
                 MagneticData(0.0, 0.0, 0.0),
+                "magnetometer",
+                logger,
             ),
             "ok",
         ),

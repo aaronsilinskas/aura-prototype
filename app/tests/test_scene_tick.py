@@ -9,6 +9,7 @@ from app.scene_composition import (
 )
 from engine.events import Event
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
+from engine.log import Logger
 from engine.network import LINE, NetworkEvents
 from engine.tests.helpers import SpyNetworkControls
 from engine.timer import Timer
@@ -111,8 +112,12 @@ def test_ticks_reuse_one_sensors_event_and_button_buffer_instead_of_allocating()
 
 def test_the_sensors_event_carries_the_latest_accelerometer_and_magnetometer_readings():
     hw = _hw(
-        accelerometer=PolledSensor(lambda: (1.0, 2.0, 3.0), AccelerationData(0.0, 0.0, 0.0)),
-        magnetometer=PolledSensor(lambda: (4.0, 5.0, 6.0), MagneticData(0.0, 0.0, 0.0)),
+        accelerometer=PolledSensor(
+            lambda: (1.0, 2.0, 3.0), AccelerationData(0.0, 0.0, 0.0), "accelerometer", Logger.SILENT
+        ),
+        magnetometer=PolledSensor(
+            lambda: (4.0, 5.0, 6.0), MagneticData(0.0, 0.0, 0.0), "magnetometer", Logger.SILENT
+        ),
     )
     runtime = _runtime(hw)
     tick = build_scene_tick(hw, runtime)

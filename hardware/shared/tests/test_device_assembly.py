@@ -154,6 +154,24 @@ def test_an_enabled_magnetometer_section_is_a_polled_sensor_reading_its_part():
     assert (reading.x, reading.y, reading.z) == (4.0, 5.0, 6.0)
 
 
+@pytest.mark.parametrize(
+    ("sensor", "reading_attr"),
+    [("accelerometer", "acceleration"), ("magnetometer", "magnetic")],
+)
+def test_a_sensor_logs_a_read_failing_line_under_its_section_name_to_the_assembly_logger(
+    sensor, reading_attr
+):
+    fragments: list[str] = []
+    parts = RecordingParts()
+    hw = assemble_device(_config(**{sensor: {}}), parts, Logger("[hw]", fragments.append))
+    setattr(parts, reading_attr, (1.0, 2.0))  # not 3-tuple: a failed read
+    del fragments[:]
+
+    getattr(hw, sensor).update()
+
+    assert "".join(fragments).startswith(f"[hw] {sensor} read failing: ValueError(")
+
+
 def test_haptics_are_built_with_their_config_on_the_i2c_bus():
     _hw, parts = _assemble(_config(haptics={"address": 0x5B}))
 
