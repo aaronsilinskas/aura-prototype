@@ -26,10 +26,12 @@ mode, but with a real pixel-producing output.
 Hardware bring-up
 -----------------
 Hardware is brought up through a single `build_hardware` call from the **real**,
-deployed `aura-device.json` (`load_device_config()`) -- the same config-driven model
-`scene_load_profiler.py` established (#686) -- rather than an in-file, hand-built
-`DeviceConfig`. The profiler drives exactly one pixel output, so every pixels-list
-entry that isn't the profiled `DRIVER`'s entry is disabled on the parsed config (a
+deployed `aura-device.json` (`read_device_config_mapping()`) -- the same config-driven
+model `scene_load_profiler.py` established (#686) -- rather than an in-file, hand-built
+`DeviceConfig`. A parsed config is never changed, so every override below is an edit
+to the raw mapping, which is then parsed (re-running validation and the NeoPixel
+current budget). The profiler drives exactly one pixel output, so every pixels-list
+entry that isn't the profiled `DRIVER`'s entry is disabled in the mapping (a
 config declaring both a matrix and a NeoPixel strip has the other disabled), and
 `config.isolate(keep="pixels")` (#715, #717) disables `audio`/`ir`/`accelerometer`/
 `haptics`/`radio` if declared -- this profiler never drives them, so they are
@@ -37,9 +39,18 @@ isolated out rather than left to perturb the measurement as a fixed heap/I2C off
 The **one** synthesized override layered on top of the loaded
 config is the NeoPixel driver's swept max-length strip: the found strip entry's `count`
 is bumped to the largest swept `PIXEL_COUNTS` value so every swept count addresses a
-prefix of the same physical strip; everything else (pin, order, brightness,
-scope_pixels, and for the matrix driver, `cols`) is the real prop's declared geometry,
-never hand-built here.
+prefix of the same physical strip; everything else (pin, order, scope_pixels, and for
+the matrix driver, `cols`) is the real prop's declared geometry, never hand-built here.
+
+Brightness is the *budgeted* one: if the config declares a `neopixel_current_budget`,
+parsing tunes the swept strip's brightness for the largest swept count, and every
+sweep point runs at that brightness -- what the device would actually run, dimmer
+than shorter counts alone would need. Numbers may therefore differ from earlier
+profiles taken at declared brightness (brightness below 1.0 can take a different
+pixel-buffer path). If the largest count can't fit the limit even at the budget's
+`min_brightness`, parsing raises the budget's own error and the profiler stops before
+bring-up; shorten `PIXEL_COUNTS` or raise the limit in the config -- the budget is
+never skipped or clamped here.
 
 `build_hardware` cannot be called in a loop -- it claims board pins without deiniting
 them -- so the profiler builds once and sweeps `pixel_count` by constructing a fresh
@@ -121,8 +132,8 @@ from hardware.shared.device_config import (
     DeviceConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
-    copy_with_enabled,
-    load_device_config,
+    parse_device_config,
+    read_device_config_mapping,
 )
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.profiler_report import (
@@ -154,33 +165,36 @@ MATRIX_ROWS: Final = 9
 I2C_FREQUENCY_HZ: Final = TARGET_FPS
 
 
-def _select_pixel_entry(
-    config: DeviceConfig, driver: str, largest_count: int
-) -> MatrixPixelsConfig | NeoPixelPixelsConfig:
-    """Return the real pixel entry *driver* profiles, disabling every other one.
+def _pixels_config(
+    mapping: dict, driver: str, largest_count: int
+) -> tuple[DeviceConfig, MatrixPixelsConfig | NeoPixelPixelsConfig]:
+    """Parse *mapping* with only *driver*'s pixel entry enabled, isolated to `pixels`.
 
-    Rebuilds *config*'s ``pixels`` list in place: every entry that isn't the profiled
-    driver's own entry becomes a disabled copy (a config declaring both a matrix and a
-    NeoPixel strip has the other disabled), and the target entry becomes an enabled
-    copy -- entries are derived via `copy_with_enabled` rather than flipped in place,
-    since `enabled` reads as an ordinary, construction-only field once parsed (#717).
-    Isolating everything outside `pixels` (`audio`/`ir`/`accelerometer`/`haptics`/
-    `radio`) is the caller's job via `config.isolate(keep="pixels")` -- `isolate`
-    isolates one top-level component, not one entry among several sharing the
-    `pixels` list, so picking among those stays this function's job.
+    The target is the first matrix entry, or the first NeoPixel entry with a
+    non-empty ``strips`` list (legacy ``scopes``-only entries are never chosen),
+    picked off a first parse of the unedited mapping. The edits then go on the
+    mapping, never on a parsed config: the target entry is enabled, every other
+    pixels entry is disabled (a config declaring both a matrix and a NeoPixel
+    strip has the other disabled), and for the NeoPixel driver the strip's
+    ``count`` is overridden to *largest_count* -- the swept max-length strip, the
+    one synthesized parameter this profiler layers on top of the loaded config.
+    Parsing the edited mapping re-runs validation and the current budget, so the
+    swept strip is dimmed to fit the rail. `isolate(keep="pixels")` then disables
+    `audio`/`ir`/`accelerometer`/`haptics`/`radio`; `isolate` narrows one
+    top-level component, not one entry among several sharing the `pixels` list,
+    so picking among those stays this function's job.
 
-    For the NeoPixel driver the found strip's ``count`` is overridden to *largest_count*
-    -- the swept max-length strip, the one synthesized parameter this profiler layers on
-    top of the loaded config. Everything else (pin, order, brightness, scope_pixels, and
-    for the matrix driver, ``cols``) stays the real prop's declared geometry.
+    Returns:
+        The isolated config and its parsed target entry.
 
     Raises:
         ValueError: If *driver* names a pixel kind aura-device.json declares no entry
-            for.
+            for, or the edited mapping fails validation -- including a swept count
+            the current budget can't fit even at its minimum brightness.
     """
     wanted = MatrixPixelsConfig if driver == "is31fl3741_matrix" else NeoPixelPixelsConfig
     target_index: int | None = None
-    for i, entry in enumerate(config.pixels):
+    for i, entry in enumerate(parse_device_config(mapping).pixels):
         is_candidate = isinstance(entry, wanted) and (wanted is MatrixPixelsConfig or entry.strips)
         if target_index is None and is_candidate:
             target_index = i
@@ -190,15 +204,14 @@ def _select_pixel_entry(
             f"no {kind} pixels entry declared in aura-device.json for DRIVER={driver!r}"
         )
 
-    target = copy_with_enabled(config.pixels[target_index], enabled=True)
-    if isinstance(target, NeoPixelPixelsConfig):
-        target.strips[0].count = largest_count
+    for i, entry in enumerate(mapping["pixels"]):
+        entry["enabled"] = i == target_index
+    if wanted is NeoPixelPixelsConfig:
+        # A strips-shaped entry is one flat strip: its `count` is strips[0]'s.
+        mapping["pixels"][target_index]["count"] = largest_count
 
-    config.pixels = [
-        target if i == target_index else copy_with_enabled(entry, enabled=False)
-        for i, entry in enumerate(config.pixels)
-    ]
-    return target
+    config = parse_device_config(mapping).isolate(keep="pixels")
+    return config, config.pixels[target_index]
 
 
 def _require_pixel_output(hardware: DeviceHardware, driver: str) -> EffectOutput:
@@ -324,9 +337,9 @@ def run() -> None:
     # profiler drives -- the config-driven model #686 established for the scene-load
     # profiler. buttons[0] (not gated by `enabled`) is read straight off the same
     # config build_hardware below consumes -- no separate pin harvest.
-    device_config = load_device_config()
-    pixel_entry = _select_pixel_entry(device_config, DRIVER, PIXEL_COUNTS[-1])
-    device_config = device_config.isolate(keep="pixels")
+    device_config, pixel_entry = _pixels_config(
+        read_device_config_mapping(), DRIVER, PIXEL_COUNTS[-1]
+    )
     matrix_cols = pixel_entry.cols if isinstance(pixel_entry, MatrixPixelsConfig) else 0
 
     # Build the device once: build_hardware claims pins without deiniting, so it cannot

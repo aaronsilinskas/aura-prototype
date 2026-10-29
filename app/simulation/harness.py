@@ -24,7 +24,11 @@ from pathlib import Path
 from app.scene_composition import build_scene_boot
 from engine.state import ScopeValue
 from engine.timer import Timer
-from hardware.shared.device_config import DeviceConfig, load_device_config
+from hardware.shared.device_config import (
+    DeviceConfig,
+    parse_device_config,
+    read_device_config_mapping,
+)
 from hardware.simulated.device import (
     DEFAULT_SWAY_STRENGTH,
     Buzzed,
@@ -46,12 +50,13 @@ _SIMULATED_DEVICE_CONFIG = (
 
 
 def _simulated_device_config(sd_card: bool, radio_node: int) -> DeviceConfig:
-    config = load_device_config(str(_SIMULATED_DEVICE_CONFIG))
+    mapping = read_device_config_mapping(str(_SIMULATED_DEVICE_CONFIG))
     if not sd_card:
-        config.sdcard = None
-    assert config.radio is not None  # the simulated config declares one
-    config.radio.node = radio_node
-    return config
+        # Deleting the key, not `enabled: false`, so nothing card-shaped is
+        # built or narrated.
+        del mapping["sdcard"]
+    mapping["radio"]["node"] = radio_node
+    return parse_device_config(mapping)
 
 
 class _Reset(BaseException):

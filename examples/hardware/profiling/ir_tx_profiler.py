@@ -38,7 +38,7 @@ Installation
 
 Configuration
 -------------
-- ir.line: read from `aura-device.json` (via `require_pin`) -- the board pin for
+- ir.line: read from `aura-device.json` (via `_require_pin`) -- the board pin for
   the LINE emitter's `pulseio.PulseOut`. A missing `ir.line` fails loudly.
 - RX_PIN: board pin for the (unused but required by `setup_ir`) IR receiver
 - PAYLOAD_LENGTHS: payload byte-lengths to sweep, in order
@@ -54,7 +54,7 @@ import time
 
 from effects.performance import PerformanceTracker
 from engine.network import LINE
-from hardware.shared.device_config import load_device_config, require_pin
+from hardware.shared.device_config import DeviceConfig, load_device_config
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.profiler_report import (
@@ -64,6 +64,7 @@ from hardware.shared.profiler_report import (
 )
 
 try:
+    from collections.abc import Callable
     from typing import Final
 except ImportError:
     pass
@@ -74,11 +75,30 @@ TARGET_FPS: Final = 24.0
 LOG_INTERVAL_SECONDS: Final = 5.0
 
 
+def _require_pin(
+    config: DeviceConfig, getter: Callable[[DeviceConfig], str], field_label: str
+) -> str:
+    """Return ``getter(config)``, raising a uniform error when it isn't declared.
+
+    Only the narrow tuple of "field absent" exceptions (``AttributeError``,
+    ``IndexError``, ``KeyError``) is caught, so a real bug inside *getter* still
+    propagates instead of being swallowed.
+
+    Raises:
+        ValueError: If *getter* raises for an absent field or section, naming
+            *field_label* (e.g. ``"ir.line"``).
+    """
+    try:
+        return getter(config)
+    except (AttributeError, IndexError, KeyError):
+        raise ValueError(f"{field_label} not declared in aura-device.json") from None
+
+
 def _build_network_controls() -> tuple[HardwareNetworkControls, InfraredTransceiver]:
     """Build the LINE transmitter directly (the same PulseOut + wrapper `setup_ir`
     constructs), but *without* the receiver -- the receiver's `PulseIn(maxlen=256)`
     belongs to the separate IR-rx component (`ir_rx_profiler.py`), not IR-tx. The
-    LINE pin is sourced from the real `aura-device.json` via `require_pin`, which
+    LINE pin is sourced from the real `aura-device.json` via `_require_pin`, which
     fails loudly with a "not declared" error if `ir.line` is absent -- this does
     NOT go through `build_hardware`, which would also allocate the receiver's
     `PulseIn(maxlen=256)` and pollute the transmit measurement.
@@ -96,7 +116,7 @@ def _build_network_controls() -> tuple[HardwareNetworkControls, InfraredTranscei
     from hardware.shared.ir_transport import InfraredTransmitter, IrTransmitGate
 
     config = load_device_config()
-    line_pin_name = require_pin(config, lambda c: c.ir.emitters["line"], "ir.line")
+    line_pin_name = _require_pin(config, lambda c: c.ir.emitters["line"], "ir.line")
     line_pin = getattr(board, line_pin_name)
     pulseout = pulseio.PulseOut(line_pin, frequency=38000, duty_cycle=0x8000)
     gate = IrTransmitGate()

@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 
 try:
-    from collections.abc import Callable
     from typing import Final
 except ImportError:
     pass
@@ -27,11 +26,9 @@ __all__ = [
     "SDCardConfig",
     "SPIConfig",
     "copy_with_enabled",
-    "first_neopixel_pin",
     "load_device_config",
     "parse_device_config",
     "read_device_config_mapping",
-    "require_pin",
     "validate_band_map",
 ]
 
@@ -66,11 +63,6 @@ _NEOPIXEL_CURRENT_BUDGET_ALLOWED_KEYS: Final = (
 _DEFAULT_CURRENT_LIMIT_MA: Final = 2000
 _DEFAULT_MAX_PIXEL_CURRENT_MA: Final = 60
 _DEFAULT_MIN_BRIGHTNESS: Final = 0.05
-
-# The tuner solves for a limit shrunk by this relative margin so float
-# rounding (~1e-16 per operation) can only land the tuned total under the
-# real limit, never over -- with no exact-summation primitive on device.
-_BUDGET_ROUNDING_MARGIN: Final = 1e-9
 
 # The one source of the I2C-device `DeviceConfig` slot names: `parse_device_config`
 # and `_parse_i2c_device`'s section-specific error messages both key off this
@@ -861,7 +853,7 @@ def _parse_ir(ir_raw: dict) -> IRConfig:
     # rx is the only required IR pin; every emitter (line/cone/area_of_effect)
     # is optional and validated uniformly by the loop below. A prop that
     # cannot transmit on a given emitter simply omits it; usage sites guard
-    # the absence via require_pin.
+    # the absence themselves.
     emitters: dict[str, str] = {}
     for key, pin in ir_raw.items():
         if key in ("rx", "enabled"):
@@ -1046,95 +1038,13 @@ def _parse_milliamps(budget_raw: dict, key: str, default: int) -> int:
     return value
 
 
-def _budgeted_strips(
-    pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig],
-) -> list[NeoPixelStripConfig | NeoPixelScopeConfig]:
-    """Every strip the current budget counts: enabled NeoPixel entries, both shapes."""
-    strips: list[NeoPixelStripConfig | NeoPixelScopeConfig] = []
-    for entry in pixels:
-        if isinstance(entry, NeoPixelPixelsConfig) and entry.enabled:
-            strips.extend(entry.strips)
-            strips.extend(entry.scopes.values())
-    return strips
-
-
-def _draw_ma(
-    strips: list[NeoPixelStripConfig | NeoPixelScopeConfig], max_pixel_current_ma: int
-) -> float:
-    """Worst-case draw of *strips* at full white, at their current brightness."""
-    total = 0.0
-    for strip in strips:
-        total += strip.count * strip.brightness * max_pixel_current_ma
-    return total
-
-
-def _tune_neopixel_brightness(
-    pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig],
-    current_limit_ma: int,
-    max_pixel_current_ma: int,
-    min_brightness: float,
-) -> tuple[float, float, int]:
-    """Dim every enabled NeoPixel strip in *pixels* to fit the limit, never below the floor.
-
-    Rewrites each strip's ``brightness`` in place; under the limit, nothing
-    changes.
-
-    Returns:
-        ``(estimate_ma, scale, at_min_brightness)``: the worst-case draw at
-        declared brightness, the factor applied to strips not held at the
-        floor (``1.0`` when under the limit), and how many strips were held.
-
-    Raises:
-        ValueError: If the strips exceed the limit even at the floor.
-    """
-    strips = _budgeted_strips(pixels)
-    estimate_ma = _draw_ma(strips, max_pixel_current_ma)
-    if estimate_ma <= current_limit_ma:
-        return estimate_ma, 1.0, 0
-
-    # A strip declared at or below the floor is held as declared, never scaled.
-    held = [strip for strip in strips if strip.brightness <= min_brightness]
-    unheld = sorted(
-        (strip for strip in strips if strip.brightness > min_brightness),
-        key=lambda strip: strip.brightness,
-    )
-
-    floor_ma = 0.0
-    for strip in strips:
-        floor_ma += strip.count * min(strip.brightness, min_brightness) * max_pixel_current_ma
-    if floor_ma > current_limit_ma:
-        raise ValueError(
-            f"neopixel_current_budget: NeoPixel strips draw {floor_ma:.1f} mA even at"
-            + f" min_brightness {min_brightness}, over current_limit_ma {current_limit_ma} mA"
-        )
-
-    # Holding a strip leaves less for the rest, so the shared scale only
-    # falls -- the dimmest unheld strip is always the next to cross the
-    # floor. Hold strips dimmest-first until the scale keeps the rest above it.
-    target_ma = current_limit_ma * (1 - _BUDGET_ROUNDING_MARGIN)
-    held_ma = _draw_ma(held, max_pixel_current_ma)
-    scale = 1.0
-    while unheld:
-        scale = max(0.0, (target_ma - held_ma) / _draw_ma(unheld, max_pixel_current_ma))
-        dimmest = unheld[0]
-        if dimmest.brightness * scale >= min_brightness:
-            break
-        unheld.pop(0)
-        dimmest.brightness = min_brightness
-        held_ma += _draw_ma([dimmest], max_pixel_current_ma)
-    # An empty `unheld` means the floor current is (within the rounding
-    # margin) the limit itself: the floor wins, and the last solved scale
-    # is kept for narration.
-
-    for strip in unheld:
-        strip.brightness *= scale
-    return estimate_ma, scale, len(strips) - len(unheld)
-
-
 def _parse_neopixel_current_budget(
     budget_raw: dict, pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig]
 ) -> NeoPixelCurrentBudgetConfig:
     """Parse the budget block and tune the already-parsed *pixels* to fit it."""
+    # Deferred: neopixel_current_budget imports this module's strip classes.
+    from hardware.shared.neopixel_current_budget import tune_neopixel_brightness
+
     _reject_unknown_keys(
         budget_raw, "neopixel_current_budget", allowed=_NEOPIXEL_CURRENT_BUDGET_ALLOWED_KEYS
     )
@@ -1148,7 +1058,7 @@ def _parse_neopixel_current_budget(
         else _DEFAULT_MIN_BRIGHTNESS
     )
 
-    estimate_ma, scale, at_min_brightness = _tune_neopixel_brightness(
+    estimate_ma, scale, at_min_brightness = tune_neopixel_brightness(
         pixels, current_limit_ma, max_pixel_current_ma, min_brightness
     )
     return NeoPixelCurrentBudgetConfig(
@@ -1306,57 +1216,3 @@ def load_device_config(path: str = "aura-device.json") -> DeviceConfig:
         ValueError: If *path*'s contents fail validation.
     """
     return parse_device_config(read_device_config_mapping(path))
-
-
-# ---------------------------------------------------------------------------
-# Pin-sourcing helpers — on-device profilers read individual pin names out of
-# a parsed DeviceConfig, failing loudly when a pin they need isn't declared.
-# ---------------------------------------------------------------------------
-
-
-def require_pin(
-    config: DeviceConfig, getter: Callable[[DeviceConfig], str], field_label: str
-) -> str:
-    """Return ``getter(config)``, raising a uniform error when it isn't declared.
-
-    *config* is always a real, already-parsed :class:`DeviceConfig` — callers
-    load it via a raising loader (:func:`load_device_config`), so there is no
-    ``None`` case to handle here. Only the narrow tuple of "field absent"
-    exceptions (``AttributeError``, ``IndexError``, ``KeyError``) is caught, so
-    a real bug inside *getter* still propagates instead of being swallowed.
-
-    Args:
-        config: The parsed device config to read from.
-        getter: Callable extracting one field, e.g. ``lambda c: c.ir.emitters["line"]``.
-        field_label: Dotted config path used in the error message, e.g.
-            ``"ir.line"`` or ``"buttons[0]"``.
-
-    Raises:
-        ValueError: If *getter* raises for an absent field or section.
-    """
-    try:
-        return getter(config)
-    except (AttributeError, IndexError, KeyError):
-        raise ValueError(f"{field_label} not declared in aura-device.json") from None
-
-
-def first_neopixel_pin(config: DeviceConfig) -> str:
-    """Return the pin of the first NeoPixel-type entry in ``config.pixels``.
-
-    Prefers the modern ``strips`` shape (``strips[0].pin``) over the legacy
-    one-strip-per-scope ``scopes`` shape within each NeoPixel entry, and
-    returns the first entry that has a pin either way.
-
-    Raises:
-        KeyError: If ``config.pixels`` has no NeoPixel entry with a pin, so
-            this composes as the *getter* passed to :func:`require_pin` and
-            surfaces the same "not declared" message as any other field.
-    """
-    for entry in config.pixels:
-        if not isinstance(entry, NeoPixelPixelsConfig):
-            continue
-        if entry.strips:
-            return entry.strips[0].pin
-        if entry.scopes:
-            return next(iter(entry.scopes.values())).pin
-    raise KeyError("no NeoPixel pixel entry declared")
