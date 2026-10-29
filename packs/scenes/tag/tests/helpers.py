@@ -24,11 +24,11 @@ SHOOTER = {"tag_expected_team": 2, "tag_expected_player": 3}
 """Pins the one team/player whose tags count against a device."""
 
 
-def start_game(sim: Simulation, *players: SimulatedDevice) -> None:
+def start_game(simulation: Simulation, *players: SimulatedDevice) -> None:
     """Ready -> Starting -> Playing through real input, then clear the record."""
     for player in players:
         player.tap("A")
-    sim.run_until(lambda: all(p.has_played("scene.go_start") for p in players))
+    simulation.run_until(lambda: all(p.has_played("scene.go_start") for p in players))
     for player in players:
         player.forget()
 
@@ -43,17 +43,17 @@ def shooters_tag(damage: int = 1) -> bytes:
     return tag_shot(SHOOTER["tag_expected_team"], SHOOTER["tag_expected_player"], damage)
 
 
-def hit(sim: Simulation, player: SimulatedDevice, payload: bytes) -> None:
+def hit(simulation: Simulation, player: SimulatedDevice, payload: bytes) -> None:
     """Land a tag shot on *player* and run the ticks that react to it.
 
     The first tick decodes the shot and plays the hit; the second is the
     first input pass to see the hitpoints it left.
     """
     player.receive_ir(payload)
-    sim.advance(2 * TICK)
+    simulation.advance(2 * TICK)
 
 
-def fire_together(sim: Simulation, *shooters: SimulatedDevice) -> None:
+def fire_together(simulation: Simulation, *shooters: SimulatedDevice) -> None:
     """Pull every shooter's trigger on the same tick, and run until their shots are decoded.
 
     A shot goes out on the tick its trigger registers and is decoded, wherever
@@ -62,10 +62,12 @@ def fire_together(sim: Simulation, *shooters: SimulatedDevice) -> None:
     sent = [len(shooter.ir_sent) for shooter in shooters]
     for shooter in shooters:
         shooter.schedule_hold("A")
-    sim.run_until(lambda: all(len(s.ir_sent) > n for s, n in zip(shooters, sent, strict=True)))
+    simulation.run_until(
+        lambda: all(len(s.ir_sent) > n for s, n in zip(shooters, sent, strict=True))
+    )
     for shooter in shooters:
         shooter.schedule_release("A")
-    sim.advance(TICK)
+    simulation.advance(TICK)
 
 
 def shots(player: SimulatedDevice) -> list[tuple[int, int, int]]:

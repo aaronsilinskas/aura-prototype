@@ -55,9 +55,9 @@ def gold(pixel: int) -> bool:
     return red > green > 0 and blue == 0
 
 
-def win_the_only_round(sim: Simulation, player: SimulatedDevice) -> None:
+def win_the_only_round(simulation: Simulation, player: SimulatedDevice) -> None:
     player.tap("A")
-    survive_round(sim, player)
+    survive_round(simulation, player)
 
 
 # ---------------------------------------------------------------------------
@@ -65,84 +65,84 @@ def win_the_only_round(sim: Simulation, player: SimulatedDevice) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_surviving_green_light_below_the_top_level_levels_up(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+def test_surviving_green_light_below_the_top_level_levels_up(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
     player.tap("A")
 
-    survive_round(sim, player)
+    survive_round(simulation, player)
 
     assert (player.has_played(LEVEL_UP_SOUND), player.has_played(WIN_STING)) == (True, False)
 
 
-def test_a_level_up_double_clicks_the_haptic(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+def test_a_level_up_double_clicks_the_haptic(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
     player.tap("A")
 
-    survive_round(sim, player)
+    survive_round(simulation, player)
 
     assert player.buzzed[-1].pattern == (HapticPattern.DOUBLE_CLICK,)
 
 
-def test_the_level_up_sound_plays_once(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=LONG_LEVEL_UP)
+def test_the_level_up_sound_plays_once(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=LONG_LEVEL_UP)
     player.tap("A")
-    survive_round(sim, player)
+    survive_round(simulation, player)
 
-    sim.advance(player.clip_length(LEVEL_UP_SOUND) + SLACK)
+    simulation.advance(player.clip_length(LEVEL_UP_SOUND) + SLACK)
 
     assert not player.is_playing(LEVEL_UP_SOUND)
 
 
-def test_a_level_up_flashes_gold_on_every_light_strip(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+def test_a_level_up_flashes_gold_on_every_light_strip(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
     player.tap("A")
-    survive_round(sim, player)
+    survive_round(simulation, player)
 
-    sim.advance(0.3)
+    simulation.advance(0.3)
 
     assert all(any(gold(p) for p in player.strip(scope).pixels) for scope in LIGHT_STRIPS)
 
 
-def test_a_level_up_shows_only_gold_on_the_light_strips(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+def test_a_level_up_shows_only_gold_on_the_light_strips(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
     player.tap("A")
-    survive_round(sim, player)
+    survive_round(simulation, player)
 
-    sim.advance(0.3)
+    simulation.advance(0.3)
 
     assert all(all(gold(p) for p in player.strip(scope).pixels) for scope in LIGHT_STRIPS)
 
 
-def test_a_level_up_grows_the_level_bar_by_one_level(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+def test_a_level_up_grows_the_level_bar_by_one_level(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
     player.tap("A")
 
-    survive_round(sim, player)
+    survive_round(simulation, player)
 
     assert player.strip(LEVEL_BAR).lit == 4
 
 
-def test_the_next_round_starts_once_the_level_up_is_over(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+def test_the_next_round_starts_once_the_level_up_is_over(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
     player.tap("A")
-    survive_round(sim, player)
+    survive_round(simulation, player)
 
-    wait_for(sim, player, RED_MUSIC)
+    wait_for(simulation, player, RED_MUSIC)
 
     level_up_and_warning = 1.0 + 3 * QUICK_WARNINGS["rlgl_warning_pulse_max"]
-    assert sim.now - last_played_at(player, LEVEL_UP_SOUND) == pytest.approx(
+    assert simulation.now - last_played_at(player, LEVEL_UP_SOUND) == pytest.approx(
         level_up_and_warning,
         abs=2 * SLACK,  # two timed phases, one after the other
     )
 
 
-def test_moving_during_a_level_up_is_not_caught(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+def test_moving_during_a_level_up_is_not_caught(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
     player.tap("A")
-    survive_round(sim, player)
+    survive_round(simulation, player)
 
     player.move()
-    wait_for(sim, player, RED_MUSIC)
+    wait_for(simulation, player, RED_MUSIC)
 
     assert not player.has_played(GAME_OVER_STING)
 
@@ -152,29 +152,29 @@ def test_moving_during_a_level_up_is_not_caught(sim):
 # ---------------------------------------------------------------------------
 
 
-def test_surviving_green_light_at_the_top_level_wins(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
+def test_surviving_green_light_at_the_top_level_wins(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
 
-    win_the_only_round(sim, player)
+    win_the_only_round(simulation, player)
 
     assert (player.has_played(WIN_STING), player.has_played(LEVEL_UP_SOUND)) == (True, False)
 
 
-def test_a_win_triple_clicks_the_haptic(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
+def test_a_win_triple_clicks_the_haptic(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
 
-    win_the_only_round(sim, player)
+    win_the_only_round(simulation, player)
 
     assert player.buzzed[-1].pattern == (HapticPattern.TRIPLE_CLICK,)
 
 
-def test_a_win_strikes_lightning_across_every_strip(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
-    win_the_only_round(sim, player)
+def test_a_win_strikes_lightning_across_every_strip(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
+    win_the_only_round(simulation, player)
 
     lit, dark = set(), set()
     for _ in range(int(2.0 / TICK)):
-        sim.advance(TICK)
+        simulation.advance(TICK)
         for scope in EVERY_STRIP:
             (dark if player.strip(scope).dark else lit).add(str(scope))
 
@@ -182,47 +182,47 @@ def test_a_win_strikes_lightning_across_every_strip(sim):
     assert (lit, dark) == (every, every)
 
 
-def test_the_device_returns_to_ready_the_moment_the_win_sting_ends(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
-    win_the_only_round(sim, player)
+def test_the_device_returns_to_ready_the_moment_the_win_sting_ends(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
+    win_the_only_round(simulation, player)
 
-    wait_for(sim, player, READY_SOUND)
+    wait_for(simulation, player, READY_SOUND)
 
     sting_length = player.clip_length(WIN_STING)
-    assert sim.now - last_played_at(player, WIN_STING) == pytest.approx(
+    assert simulation.now - last_played_at(player, WIN_STING) == pytest.approx(
         sting_length, abs=CLIP_END_SLACK
     )
 
 
-def test_moving_during_a_win_is_not_caught(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
-    win_the_only_round(sim, player)
+def test_moving_during_a_win_is_not_caught(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
+    win_the_only_round(simulation, player)
 
     player.move()
-    wait_for(sim, player, READY_SOUND)
+    wait_for(simulation, player, READY_SOUND)
 
     assert not player.has_played(GAME_OVER_STING)
 
 
-def test_a_full_game_levels_up_every_round_but_the_last_then_wins(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=THREE_LEVELS)
+def test_a_full_game_levels_up_every_round_but_the_last_then_wins(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=THREE_LEVELS)
     player.tap("A")
 
     for _ in range(3):
-        survive_round(sim, player)
+        survive_round(simulation, player)
 
     assert (times_played(player, LEVEL_UP_SOUND), times_played(player, WIN_STING)) == (2, 1)
 
 
-def test_a_game_after_a_win_starts_again_from_level_one(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=TWO_LEVELS)
+def test_a_game_after_a_win_starts_again_from_level_one(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=TWO_LEVELS)
     player.tap("A")
-    survive_round(sim, player)
-    survive_round(sim, player)
-    wait_for(sim, player, READY_SOUND)
+    survive_round(simulation, player)
+    survive_round(simulation, player)
+    wait_for(simulation, player, READY_SOUND)
     player.forget()
 
     player.tap("A")
-    survive_round(sim, player)
+    survive_round(simulation, player)
 
     assert (player.has_played(LEVEL_UP_SOUND), player.has_played(WIN_STING)) == (True, False)

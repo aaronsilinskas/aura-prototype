@@ -7,6 +7,8 @@ so a test sets the accelerometer up during Warning and watches Red.
 
 from __future__ import annotations
 
+import tempfile
+
 import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
@@ -14,20 +16,14 @@ from engine.network import LINE
 from engine.state import Scope
 from packs.scenes.tag.tag_data import TagData, encode_tag_data
 
-
-@pytest.fixture()
-def sim() -> Simulation:
-    return Simulation()
-
-
 ONE_ROUND = {"tag_max_ammo": 1, "tag_reload_duration": 1.0}
 """One round, so a fresh press after it starts a one-second reload."""
 
 
-def start_game(sim: Simulation, *players: SimulatedDevice) -> None:
+def start_game(simulation: Simulation, *players: SimulatedDevice) -> None:
     for player in players:
         player.tap("A")
-    sim.run_until(lambda: all(p.has_played("scene.go_start") for p in players))
+    simulation.run_until(lambda: all(p.has_played("scene.go_start") for p in players))
     for player in players:
         player.forget()
 
@@ -36,37 +32,37 @@ def shot_count(player: SimulatedDevice) -> int:
     return sum(1 for s in player.ir_sent if s.emitter == LINE)
 
 
-def reload_part_way(sim: Simulation, player: SimulatedDevice) -> None:
+def reload_part_way(simulation: Simulation, player: SimulatedDevice) -> None:
     """Fire the only round, then hold the trigger halfway through the reload."""
     player.tap("A")
     player.hold("A")
-    sim.advance(0.5)
+    simulation.advance(0.5)
 
 
 def start_red_light_warning(player: SimulatedDevice) -> None:
     player.tap("A")
 
 
-def reach_red_light(sim: Simulation, player: SimulatedDevice) -> None:
-    sim.run_until(lambda: player.has_played("scene.red_light_music_start"))
+def reach_red_light(simulation: Simulation, player: SimulatedDevice) -> None:
+    simulation.run_until(lambda: player.has_played("scene.red_light_music_start"))
 
 
 def caught_moving(player: SimulatedDevice) -> bool:
     return player.has_played("basic.game_over_sting_start")
 
 
-def test_tap_returns_once_the_press_has_registered(sim):
-    player = sim.add_device("red", scene="tag")
-    start_game(sim, player)
+def test_tap_returns_once_the_press_has_registered(simulation):
+    player = simulation.add_device("red", scene="tag")
+    start_game(simulation, player)
 
     player.tap("A")
 
     assert shot_count(player) == 1
 
 
-def test_tap_returns_once_the_release_has_registered(sim):
-    player = sim.add_device("red", scene="tag", scene_data={"tag_shot_cooldown": 0.0})
-    start_game(sim, player)
+def test_tap_returns_once_the_release_has_registered(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data={"tag_shot_cooldown": 0.0})
+    start_game(simulation, player)
 
     player.tap("A")
     player.tap("A")
@@ -74,10 +70,10 @@ def test_tap_returns_once_the_release_has_registered(sim):
     assert shot_count(player) == 2
 
 
-def test_tap_advances_every_device_in_lockstep(sim):
-    red = sim.add_device("red", scene="tag")
-    blue = sim.add_device("blue", scene="tag", scene_data={"tag_expected_team": 1})
-    start_game(sim, red, blue)
+def test_tap_advances_every_device_in_lockstep(simulation):
+    red = simulation.add_device("red", scene="tag")
+    blue = simulation.add_device("blue", scene="tag", scene_data={"tag_expected_team": 1})
+    start_game(simulation, red, blue)
 
     blue.schedule_hold("A")
     red.tap("A")
@@ -85,107 +81,107 @@ def test_tap_advances_every_device_in_lockstep(sim):
     assert shot_count(blue) == 1
 
 
-def test_hold_returns_once_the_press_has_registered(sim):
-    player = sim.add_device("red", scene="tag")
-    start_game(sim, player)
+def test_hold_returns_once_the_press_has_registered(simulation):
+    player = simulation.add_device("red", scene="tag")
+    start_game(simulation, player)
 
     player.hold("A")
 
     assert shot_count(player) == 1
 
 
-def test_release_returns_once_the_release_has_registered(sim):
-    player = sim.add_device("red", scene="tag", scene_data=ONE_ROUND)
-    start_game(sim, player)
-    reload_part_way(sim, player)
+def test_release_returns_once_the_release_has_registered(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data=ONE_ROUND)
+    start_game(simulation, player)
+    reload_part_way(simulation, player)
 
     player.release("A")
 
     assert not player.is_playing("scene.reload")
 
 
-def test_schedule_hold_and_schedule_release_only_schedule_the_pin_change(sim):
-    player = sim.add_device("red", scene="tag")
-    start_game(sim, player)
-    before = sim.now
+def test_schedule_hold_and_schedule_release_only_schedule_the_pin_change(simulation):
+    player = simulation.add_device("red", scene="tag")
+    start_game(simulation, player)
+    before = simulation.now
 
     player.schedule_hold("A")
     player.schedule_release("A")
 
-    assert sim.now == before
+    assert simulation.now == before
     assert shot_count(player) == 0
 
 
-def test_a_device_does_not_hear_its_own_shot(sim):
+def test_a_device_does_not_hear_its_own_shot(simulation):
     # Red's own shot is a matching tag for red, so hearing it would count as a hit.
-    player = sim.add_device("red", scene="tag")
-    start_game(sim, player)
+    player = simulation.add_device("red", scene="tag")
+    start_game(simulation, player)
 
     player.tap("A")
-    sim.advance(0.5)
+    simulation.advance(0.5)
 
     assert shot_count(player) == 1
     assert not player.has_played("scene.hit_start")
 
 
-def test_a_tag_device_records_the_tag_its_shot_carried(sim):
+def test_a_tag_device_records_the_tag_its_shot_carried(simulation):
     # Read back off the wire through the Tag wire-frame codec the scene installs.
-    player = sim.add_device(
+    player = simulation.add_device(
         "red", scene="tag", scene_data={"tag_expected_team": 2, "tag_expected_player": 3}
     )
-    start_game(sim, player)
+    start_game(simulation, player)
 
     player.tap("A")
 
     assert [s.payload for s in player.ir_sent] == [bytes(encode_tag_data(TagData(2, 3, 1)))]
 
 
-def test_payloads_received_together_arrive_on_successive_ticks(sim):
+def test_payloads_received_together_arrive_on_successive_ticks(simulation):
     # Each matching one-damage tag takes one of ten pips off the hitpoint bar.
-    player = sim.add_device("red", scene="tag", scene_data={"tag_starting_hitpoints": 10})
-    start_game(sim, player)
+    player = simulation.add_device("red", scene="tag", scene_data={"tag_starting_hitpoints": 10})
+    start_game(simulation, player)
 
     player.receive_ir(bytes(encode_tag_data(TagData(0, 1, 1))))
     player.receive_ir(bytes(encode_tag_data(TagData(0, 1, 1))))
-    sim.advance(TICK)
+    simulation.advance(TICK)
     after_first_tick = player.strip(Scope.PERSONAL).lit
-    sim.advance(TICK)
+    simulation.advance(TICK)
 
     assert (after_first_tick, player.strip(Scope.PERSONAL).lit) == (9, 8)
 
 
-def test_clip_length_reads_the_clips_wav_header(sim):
-    player = sim.add_device("red", scene="tag")
+def test_clip_length_reads_the_clips_wav_header(simulation):
+    player = simulation.add_device("red", scene="tag")
 
     # fire_shot_start.wav: 3456 frames of 11025 Hz mono
     assert player.clip_length("scene.fire_shot_start") == pytest.approx(3456 / 11025)
 
 
-def test_a_one_shot_clip_is_playing_until_it_runs_out(sim):
-    player = sim.add_device("red", scene="tag")
-    start_game(sim, player)
+def test_a_one_shot_clip_is_playing_until_it_runs_out(simulation):
+    player = simulation.add_device("red", scene="tag")
+    start_game(simulation, player)
     player.tap("A")
     (shot,) = player.played
     ends_at = shot.at + player.clip_length(shot.clip)
 
-    sim.advance(ends_at - sim.now - 2 * TICK)
+    simulation.advance(ends_at - simulation.now - 2 * TICK)
     still_playing = player.is_playing("scene.fire_shot_start")
-    sim.advance(2 * TICK)
+    simulation.advance(2 * TICK)
 
     assert (still_playing, player.is_playing("scene.fire_shot_start")) == (True, False)
 
 
-def test_is_playing_rejects_a_clip_the_device_cannot_play(sim):
-    player = sim.add_device("red", scene="tag")
+def test_is_playing_rejects_a_clip_the_device_cannot_play(simulation):
+    player = simulation.add_device("red", scene="tag")
 
     with pytest.raises(ValueError):
         player.is_playing("scene.relaod")
 
 
-def test_a_looping_clip_is_playing_until_its_effect_stops(sim):
-    player = sim.add_device("red", scene="tag", scene_data=ONE_ROUND)
-    start_game(sim, player)
-    reload_part_way(sim, player)
+def test_a_looping_clip_is_playing_until_its_effect_stops(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data=ONE_ROUND)
+    start_game(simulation, player)
+    reload_part_way(simulation, player)
 
     looping = player.is_playing("scene.reload")
     player.release("A")
@@ -198,46 +194,46 @@ def test_a_looping_clip_is_playing_until_its_effect_stops(sim):
 # ---------------------------------------------------------------------------
 
 
-def test_a_moving_device_reads_as_motion(sim):
-    player = sim.add_device("p1", scene="red_light_green_light")
+def test_a_moving_device_reads_as_motion(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light")
     start_red_light_warning(player)
-    reach_red_light(sim, player)
+    reach_red_light(simulation, player)
 
     player.move()
-    sim.advance(0.5)
+    simulation.advance(0.5)
 
     assert caught_moving(player)
 
 
-def test_a_still_device_does_not_read_as_motion(sim):
-    player = sim.add_device("p1", scene="red_light_green_light")
+def test_a_still_device_does_not_read_as_motion(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light")
     start_red_light_warning(player)
-    reach_red_light(sim, player)
+    reach_red_light(simulation, player)
 
-    sim.advance(2.0)
+    simulation.advance(2.0)
 
     assert not caught_moving(player)
 
 
-def test_a_held_tilt_does_not_read_as_motion(sim):
-    player = sim.add_device("p1", scene="red_light_green_light")
+def test_a_held_tilt_does_not_read_as_motion(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light")
     start_red_light_warning(player)
 
     player.accelerate(0.0, 4.0, 8.9)
-    reach_red_light(sim, player)
-    sim.advance(2.0)
+    reach_red_light(simulation, player)
+    simulation.advance(2.0)
 
     assert not caught_moving(player)
 
 
-def test_hold_still_stops_a_move(sim):
-    player = sim.add_device("p1", scene="red_light_green_light")
+def test_hold_still_stops_a_move(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light")
     start_red_light_warning(player)
     player.move()
 
     player.hold_still()
-    reach_red_light(sim, player)
-    sim.advance(2.0)
+    reach_red_light(simulation, player)
+    simulation.advance(2.0)
 
     assert not caught_moving(player)
 
@@ -259,21 +255,21 @@ def enter_magnetometer_mode(device: SimulatedDevice) -> None:
         device.tap("B")
 
 
-def test_magnetize_sets_each_axis_of_the_field_a_scene_reads(sim):
-    device = sim.add_device("red", scene="hardware_test")
+def test_magnetize_sets_each_axis_of_the_field_a_scene_reads(simulation):
+    device = simulation.add_device("red", scene="hardware_test")
     enter_magnetometer_mode(device)
 
     device.magnetize(MAG_MAX, MAG_MAX, -MAG_MAX)
-    sim.advance(TICK)
+    simulation.advance(TICK)
 
     assert device.strip(Scope.PERSONAL).all_lit(0xFF0000)
     assert device.strip(Scope.DIRECTIONAL).all_lit(0x00FF00)
     assert device.strip(Scope.Global.MAIN).all_lit(0xFFFF00)
 
 
-def test_a_device_switches_on_reading_a_zero_field(sim, capsys):
+def test_a_device_switches_on_reading_a_zero_field(simulation, capsys):
     # The mode logs the field only when the scene has one: no magnetometer reads as no line.
-    device = sim.add_device("red", scene="hardware_test")
+    device = simulation.add_device("red", scene="hardware_test")
     capsys.readouterr()
 
     enter_magnetometer_mode(device)
@@ -281,23 +277,41 @@ def test_a_device_switches_on_reading_a_zero_field(sim, capsys):
     assert "mag (0.0, 0.0, 0.0)" in capsys.readouterr().out
 
 
-def test_a_magnetized_field_holds_until_changed(sim):
-    device = sim.add_device("red", scene="hardware_test")
+def test_a_magnetized_field_holds_until_changed(simulation):
+    device = simulation.add_device("red", scene="hardware_test")
     enter_magnetometer_mode(device)
     device.magnetize(MAG_MAX, 0.0, 0.0)
 
-    sim.advance(2.0)
+    simulation.advance(2.0)
 
     assert device.strip(Scope.PERSONAL).all_lit(0xFF0000)
 
 
-def test_magnetizing_again_changes_the_field(sim):
-    device = sim.add_device("red", scene="hardware_test")
+def test_magnetizing_again_changes_the_field(simulation):
+    device = simulation.add_device("red", scene="hardware_test")
     enter_magnetometer_mode(device)
     device.magnetize(MAG_MAX, 0.0, 0.0)
-    sim.advance(TICK)
+    simulation.advance(TICK)
 
     device.magnetize(0.0, 0.0, 0.0)
-    sim.advance(TICK)
+    simulation.advance(TICK)
 
     assert device.strip(Scope.PERSONAL).dark
+
+
+def test_a_simulation_owns_a_temporary_directory_until_it_is_closed(tmp_path, monkeypatch):
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    simulation = Simulation()
+    assert [p.is_dir() for p in tmp_path.iterdir()] == [True]
+
+    simulation.close()
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_simulation_used_with_with_is_closed_on_exit(tmp_path, monkeypatch):
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    with Simulation() as simulation:
+        simulation.add_device("red", scene="tag")
+
+    assert list(tmp_path.iterdir()) == []

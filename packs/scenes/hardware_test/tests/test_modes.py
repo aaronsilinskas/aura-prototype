@@ -95,9 +95,9 @@ def shows_sfx(device: SimulatedDevice) -> bool:
     ids=["accelerometer", "magnetometer", "ir", "radio", "sfx", "back-to-rgb"],
 )
 def test_each_press_of_b_steps_one_mode_on(
-    sim, mode: int, is_in_mode: Callable[[SimulatedDevice], bool]
+    simulation, mode: int, is_in_mode: Callable[[SimulatedDevice], bool]
 ):
-    device = sim.add_device("red", scene="hardware_test")
+    device = simulation.add_device("red", scene="hardware_test")
     device.magnetize(*FIELD)
 
     press(device, "B", mode)
@@ -105,34 +105,34 @@ def test_each_press_of_b_steps_one_mode_on(
     assert is_in_mode(device)
 
 
-def test_an_ir_flash_cut_short_by_a_mode_change_does_not_light_a_later_mode(sim):
+def test_an_ir_flash_cut_short_by_a_mode_change_does_not_light_a_later_mode(simulation):
     # Two presses of B, from IR to SFX, take less than the flash. SFX leaves
     # the directional strip dark; the IR flash, had it outlived IR mode,
     # would end by lighting it white.
-    red = sim.add_device("red", scene="hardware_test")
-    blue = sim.add_device("blue", scene="hardware_test")
+    red = simulation.add_device("red", scene="hardware_test")
+    blue = simulation.add_device("blue", scene="hardware_test")
     press(red, "B", IR)
     press(blue, "B", IR)
     red.aim(LINE, at=blue)
-    send_on_a(sim, red)
+    send_on_a(simulation, red)
 
     press(blue, "B", SFX - IR)
-    sim.advance(FLASH_DURATION)
+    simulation.advance(FLASH_DURATION)
 
     assert blue.strip(Scope.DIRECTIONAL).dark
 
 
-def test_a_radio_flash_cut_short_by_a_mode_change_does_not_light_a_later_mode(sim):
+def test_a_radio_flash_cut_short_by_a_mode_change_does_not_light_a_later_mode(simulation):
     # One press of B, from Radio to SFX, takes less than the flash. SFX leaves
     # the global strips dark; the radio flash, had it outlived Radio mode,
     # would end by lighting them white.
-    red = sim.add_device("red", scene="hardware_test")
-    blue = sim.add_device("blue", scene="hardware_test")
+    red = simulation.add_device("red", scene="hardware_test")
+    blue = simulation.add_device("blue", scene="hardware_test")
     press(red, "B", RADIO)
     press(blue, "B", RADIO)
-    send_on_a(sim, red)
+    send_on_a(simulation, red)
 
     press(blue, "B", SFX - RADIO)
-    sim.advance(FLASH_DURATION)
+    simulation.advance(FLASH_DURATION)
 
     assert all(blue.strip(scope).dark for scope in GLOBAL_STRIPS)
