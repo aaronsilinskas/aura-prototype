@@ -57,7 +57,7 @@ whole watch shows no entry.
 """
 
 
-def watch_previews(sim: Simulation, device: SimulatedDevice) -> list[str | None]:
+def watch_previews(simulation: Simulation, device: SimulatedDevice) -> list[str | None]:
     """Watch every strip for ``WATCH``; return the entry each one previews, in ``STRIPS`` order.
 
     ``None`` for a strip that shows no one entry throughout.
@@ -65,7 +65,7 @@ def watch_previews(sim: Simulation, device: SimulatedDevice) -> list[str | None]
     candidates = {scope: set(_PREVIEWS) for scope in STRIPS}
     ever_lit = set()
     for _ in range(round(WATCH / TICK)):
-        sim.advance(TICK)
+        simulation.advance(TICK)
         for scope in STRIPS:
             strip = device.strip(scope)
             candidates[scope] &= {scene for scene, shows in _PREVIEWS.items() if shows(strip)}
@@ -78,10 +78,10 @@ def _sole_match(scenes: set[str]) -> str | None:
     return next(iter(scenes)) if len(scenes) == 1 else None
 
 
-def test_on_boot_every_strip_previews_from_the_first_entry_wrapping_past_the_last(sim):
-    device = sim.add_device("red", scene="example_lobby")
+def test_on_boot_every_strip_previews_from_the_first_entry_wrapping_past_the_last(simulation):
+    device = simulation.add_device("red", scene="example_lobby")
 
-    assert watch_previews(sim, device) == [
+    assert watch_previews(simulation, device) == [
         "hardware_test",
         "element_browser",
         "red_light_green_light",
@@ -91,12 +91,12 @@ def test_on_boot_every_strip_previews_from_the_first_entry_wrapping_past_the_las
     ]
 
 
-def test_a_steps_the_selection_and_every_strip_follows(sim):
-    device = sim.add_device("red", scene="example_lobby")
+def test_a_steps_the_selection_and_every_strip_follows(simulation):
+    device = simulation.add_device("red", scene="example_lobby")
 
     device.tap("A")
 
-    assert watch_previews(sim, device) == [
+    assert watch_previews(simulation, device) == [
         "element_browser",
         "red_light_green_light",
         "tag",
@@ -106,8 +106,8 @@ def test_a_steps_the_selection_and_every_strip_follows(sim):
     ]
 
 
-def test_a_on_the_last_entry_wraps_to_the_first(sim):
-    device = sim.add_device("red", scene="example_lobby")
+def test_a_on_the_last_entry_wraps_to_the_first(simulation):
+    device = simulation.add_device("red", scene="example_lobby")
     for _ in range(3):  # to tag, the last entry
         device.tap("A")
 
@@ -117,16 +117,16 @@ def test_a_on_the_last_entry_wraps_to_the_first(sim):
     assert device.scene == "hardware_test"
 
 
-def test_b_launches_the_first_entry_before_any_step(sim):
-    device = sim.add_device("red", scene="example_lobby")
+def test_b_launches_the_first_entry_before_any_step(simulation):
+    device = simulation.add_device("red", scene="example_lobby")
 
     device.tap("B")
 
     assert device.scene == "hardware_test"
 
 
-def test_b_launches_the_entry_a_stepped_to(sim):
-    device = sim.add_device("red", scene="example_lobby")
+def test_b_launches_the_entry_a_stepped_to(simulation):
+    device = simulation.add_device("red", scene="example_lobby")
     device.tap("A")
 
     device.tap("B")

@@ -44,113 +44,115 @@ CAUGHT_WITHIN = 0.1
 THREE_ROUNDS = {**SHORTENING, "rlgl_max_level": 3}
 
 
-def reach_red_light(sim: Simulation, player: SimulatedDevice) -> None:
+def reach_red_light(simulation: Simulation, player: SimulatedDevice) -> None:
     player.tap("A")
-    wait_for(sim, player, RED_MUSIC)
+    wait_for(simulation, player, RED_MUSIC)
 
 
-def wait_for_red_light_to_end(sim: Simulation, player: SimulatedDevice) -> None:
-    sim.run_until(lambda: not lit_in(player, RED))
+def wait_for_red_light_to_end(simulation: Simulation, player: SimulatedDevice) -> None:
+    simulation.run_until(lambda: not lit_in(player, RED))
 
 
-def test_red_light_shows_solid_red_on_every_light_strip(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+def test_red_light_shows_solid_red_on_every_light_strip(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
 
-    reach_red_light(sim, player)
+    reach_red_light(simulation, player)
 
     assert lit_in(player, RED)
 
 
-def test_red_light_keeps_the_level_bar_showing(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+def test_red_light_keeps_the_level_bar_showing(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
 
-    reach_red_light(sim, player)
+    reach_red_light(simulation, player)
 
     assert player.strip(LEVEL_BAR).lit == 2
 
 
-def test_red_light_loops_its_music(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
-    reach_red_light(sim, player)
+def test_red_light_loops_its_music(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    reach_red_light(simulation, player)
 
-    sim.advance(player.clip_length(RED_MUSIC) + 0.5)
+    simulation.advance(player.clip_length(RED_MUSIC) + 0.5)
 
     assert player.is_playing(RED_MUSIC)
 
 
-def test_holding_still_through_red_light_survives_into_the_green_warning(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
-    reach_red_light(sim, player)
+def test_holding_still_through_red_light_survives_into_the_green_warning(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    reach_red_light(simulation, player)
 
-    sim.run_until(lambda: last_played_at(player, WARNING_PEAK) > last_played_at(player, RED_MUSIC))
+    simulation.run_until(
+        lambda: last_played_at(player, WARNING_PEAK) > last_played_at(player, RED_MUSIC)
+    )
 
     assert not player.has_played(GAME_OVER_STING)
 
 
-def test_red_light_lasts_its_duration(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
-    reach_red_light(sim, player)
+def test_red_light_lasts_its_duration(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    reach_red_light(simulation, player)
 
-    wait_for_red_light_to_end(sim, player)
+    wait_for_red_light_to_end(simulation, player)
 
-    assert sim.now - last_played_at(player, RED_MUSIC) == pytest.approx(3.0, abs=SLACK)
+    assert simulation.now - last_played_at(player, RED_MUSIC) == pytest.approx(3.0, abs=SLACK)
 
 
-def test_the_red_music_stops_when_red_light_ends(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
-    reach_red_light(sim, player)
+def test_the_red_music_stops_when_red_light_ends(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    reach_red_light(simulation, player)
 
-    wait_for_red_light_to_end(sim, player)
+    wait_for_red_light_to_end(simulation, player)
 
     assert not player.is_playing(RED_MUSIC)
 
 
-def test_moving_on_red_light_ends_the_game(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
-    reach_red_light(sim, player)
+def test_moving_on_red_light_ends_the_game(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    reach_red_light(simulation, player)
 
     player.move()
-    sim.advance(0.5)
+    simulation.advance(0.5)
 
     assert player.has_played(GAME_OVER_STING)
 
 
-def test_a_slow_creep_on_red_light_ends_the_game(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
-    reach_red_light(sim, player)
+def test_a_slow_creep_on_red_light_ends_the_game(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    reach_red_light(simulation, player)
 
     player.move(strength=0.5)
-    sim.advance(0.5)
+    simulation.advance(0.5)
 
     assert player.has_played(GAME_OVER_STING)
 
 
-def test_red_light_catches_motion_at_once(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
-    reach_red_light(sim, player)
-    moved_at = sim.now
+def test_red_light_catches_motion_at_once(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    reach_red_light(simulation, player)
+    moved_at = simulation.now
 
     player.move()
-    wait_for(sim, player, GAME_OVER_STING)
+    wait_for(simulation, player, GAME_OVER_STING)
 
-    assert sim.now - moved_at <= CAUGHT_WITHIN
+    assert simulation.now - moved_at <= CAUGHT_WITHIN
 
 
-def test_a_one_tick_jolt_on_red_light_is_not_caught(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
-    reach_red_light(sim, player)
+def test_a_one_tick_jolt_on_red_light_is_not_caught(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    reach_red_light(simulation, player)
 
     player.accelerate(0.0, 0.0, AccelerationData.GRAVITY + 0.5)
-    sim.advance(TICK)
+    simulation.advance(TICK)
     player.hold_still()
-    sim.advance(1.0)
+    simulation.advance(1.0)
 
     assert not player.has_played(GAME_OVER_STING)
 
 
-def test_pressing_a_button_on_red_light_keeps_red_light_on(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
-    reach_red_light(sim, player)
+def test_pressing_a_button_on_red_light_keeps_red_light_on(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    reach_red_light(simulation, player)
 
     player.tap("A")
     player.tap("B")
@@ -158,24 +160,24 @@ def test_pressing_a_button_on_red_light_keeps_red_light_on(sim):
     assert lit_in(player, RED)
 
 
-def test_red_light_shortens_to_its_minimum_at_the_top_level(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=SHORTENING)
+def test_red_light_shortens_to_its_minimum_at_the_top_level(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=SHORTENING)
     player.tap("A")
-    survive_round(sim, player)
+    survive_round(simulation, player)
 
-    wait_for(sim, player, RED_MUSIC)
-    wait_for_red_light_to_end(sim, player)
+    wait_for(simulation, player, RED_MUSIC)
+    wait_for_red_light_to_end(simulation, player)
 
-    assert sim.now - last_played_at(player, RED_MUSIC) == pytest.approx(1.0, abs=SLACK)
+    assert simulation.now - last_played_at(player, RED_MUSIC) == pytest.approx(1.0, abs=SLACK)
 
 
-def test_a_tilt_between_rounds_is_not_caught_on_the_next_red_light(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=THREE_ROUNDS)
+def test_a_tilt_between_rounds_is_not_caught_on_the_next_red_light(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=THREE_ROUNDS)
     player.tap("A")
-    survive_round(sim, player)
+    survive_round(simulation, player)
 
     player.accelerate(0.0, 4.0, 8.9)
-    wait_for(sim, player, RED_MUSIC)
-    sim.advance(0.5)
+    wait_for(simulation, player, RED_MUSIC)
+    simulation.advance(0.5)
 
     assert not player.has_played(GAME_OVER_STING)

@@ -34,65 +34,67 @@ STRIP_BRIGHTER = 1.15
 
 
 def brightness(
-    sim: Simulation, device: SimulatedDevice, strips: list[ScopeValue] = ELEMENT_STRIPS
+    simulation: Simulation, device: SimulatedDevice, strips: list[ScopeValue] = ELEMENT_STRIPS
 ) -> int:
     """Watch for ``WATCH``; return the summed channels *strips* showed over it."""
     total = 0
     for _ in range(round(WATCH / TICK)):
-        sim.advance(TICK)
+        simulation.advance(TICK)
         for scope in strips:
             for pixel in device.strip(scope).pixels:
                 total += (pixel >> 16) + ((pixel >> 8) & 0xFF) + (pixel & 0xFF)
     return total
 
 
-def test_on_switch_on_the_personal_strip_shows_water_in_shades_of_blue(sim):
-    device = sim.add_device("red", scene="hardware_test")
+def test_on_switch_on_the_personal_strip_shows_water_in_shades_of_blue(simulation):
+    device = simulation.add_device("red", scene="hardware_test")
 
-    sim.advance(0.5)
+    simulation.advance(0.5)
 
     personal = device.strip(Scope.PERSONAL)
     assert not personal.dark and personal.shades_of(BLUE)
 
 
 @pytest.mark.parametrize("scope", ELEMENT_STRIPS, ids=lambda scope: scope.keys[0])
-def test_on_switch_on_every_element_strip_lights(sim, scope):
+def test_on_switch_on_every_element_strip_lights(simulation, scope):
     # Lightning strikes now and then, so a strip only has to light at some point.
-    device = sim.add_device("red", scene="hardware_test")
+    device = simulation.add_device("red", scene="hardware_test")
 
-    assert brightness(sim, device, [scope]) > 0
+    assert brightness(simulation, device, [scope]) > 0
 
 
-def test_on_switch_on_the_ambient_strip_stays_dark(sim):
-    device = sim.add_device("red", scene="hardware_test")
+def test_on_switch_on_the_ambient_strip_stays_dark(simulation):
+    device = simulation.add_device("red", scene="hardware_test")
 
-    assert brightness(sim, device, [Scope.AMBIENT]) == 0
+    assert brightness(simulation, device, [Scope.AMBIENT]) == 0
 
 
 @pytest.mark.parametrize("scope", ELEMENT_STRIPS, ids=lambda scope: scope.keys[0])
-def test_nine_presses_of_a_reach_the_top_level_where_every_element_burns_brighter(sim, scope):
-    device = sim.add_device("red", scene="hardware_test")
-    at_level_1 = brightness(sim, device, [scope])
+def test_nine_presses_of_a_reach_the_top_level_where_every_element_burns_brighter(
+    simulation, scope
+):
+    device = simulation.add_device("red", scene="hardware_test")
+    at_level_1 = brightness(simulation, device, [scope])
 
     press(device, "A", 9)
 
-    assert brightness(sim, device, [scope]) > STRIP_BRIGHTER * at_level_1
+    assert brightness(simulation, device, [scope]) > STRIP_BRIGHTER * at_level_1
 
 
-def test_a_tenth_press_wraps_the_level_back_to_1(sim):
-    device = sim.add_device("red", scene="hardware_test")
-    at_level_1 = brightness(sim, device)
+def test_a_tenth_press_wraps_the_level_back_to_1(simulation):
+    device = simulation.add_device("red", scene="hardware_test")
+    at_level_1 = brightness(simulation, device)
 
     press(device, "A", 10)
 
-    assert brightness(sim, device) < BRIGHTER * at_level_1
+    assert brightness(simulation, device) < BRIGHTER * at_level_1
 
 
-def test_coming_back_round_to_rgb_mode_starts_again_at_level_1(sim):
-    device = sim.add_device("red", scene="hardware_test")
-    at_level_1 = brightness(sim, device)
+def test_coming_back_round_to_rgb_mode_starts_again_at_level_1(simulation):
+    device = simulation.add_device("red", scene="hardware_test")
+    at_level_1 = brightness(simulation, device)
     press(device, "A", 9)
 
     press(device, "B", MODE_COUNT)
 
-    assert brightness(sim, device) < BRIGHTER * at_level_1
+    assert brightness(simulation, device) < BRIGHTER * at_level_1

@@ -17,9 +17,11 @@ follow the lobby into a game and back.
 
 from __future__ import annotations
 
+import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from types import TracebackType
 
 from app.scene_composition import build_scene_boot
 from engine.state import ScopeValue
@@ -129,6 +131,9 @@ class Simulation:
     that was in the simulation when it was sent.
     Packets from several senders queue in sender add order, with no collision
     or loss, and a device reads one a tick.
+
+    Use it with ``with``, or the shared ``simulation`` fixture, which closes
+    it after the test.
     """
 
     def __init__(self) -> None:
@@ -137,6 +142,22 @@ class Simulation:
         self._aims: dict[tuple[SimulatedDevice, str], tuple[_Reach, ...]] = {}
         self._in_flight: list[_InFlight] = []
         self._radio_in_flight: list[_RadioInFlight] = []
+        self._temp_dir = tempfile.TemporaryDirectory(prefix="aura-simulation-")
+
+    def __enter__(self) -> Simulation:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.close()
+
+    def close(self) -> None:
+        """Remove the temporary directory this simulation owns."""
+        self._temp_dir.cleanup()
 
     def add_device(
         self,

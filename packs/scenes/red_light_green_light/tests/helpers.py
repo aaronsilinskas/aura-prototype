@@ -55,10 +55,10 @@ def last_played_at(player: SimulatedDevice, clip: str) -> float:
     return [p.at for p in player.played if p.clip == clip][-1]
 
 
-def wait_for(sim: Simulation, player: SimulatedDevice, clip: str) -> None:
+def wait_for(simulation: Simulation, player: SimulatedDevice, clip: str) -> None:
     """Run until *clip* next starts playing on *player*."""
     before = times_played(player, clip)
-    sim.run_until(lambda: times_played(player, clip) > before, timeout=30.0)
+    simulation.run_until(lambda: times_played(player, clip) > before, timeout=30.0)
 
 
 def lit_in(player: SimulatedDevice, color: int) -> bool:
@@ -66,16 +66,16 @@ def lit_in(player: SimulatedDevice, color: int) -> bool:
     return all(player.strip(scope).all_lit(color) for scope in LIGHT_STRIPS)
 
 
-def survive_round(sim: Simulation, player: SimulatedDevice) -> None:
+def survive_round(simulation: Simulation, player: SimulatedDevice) -> None:
     """Hold still through Red Light and keep moving through Green Light until the round ends.
 
     Returns at the level-up or the win, with the device held still again.
     """
     player.hold_still()
-    wait_for(sim, player, GREEN_MUSIC)
+    wait_for(simulation, player, GREEN_MUSIC)
     player.move()
     ended = times_played(player, LEVEL_UP_SOUND) + times_played(player, WIN_STING)
-    sim.run_until(
+    simulation.run_until(
         lambda: times_played(player, LEVEL_UP_SOUND) + times_played(player, WIN_STING) > ended,
         timeout=30.0,
     )

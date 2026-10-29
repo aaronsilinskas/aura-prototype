@@ -11,22 +11,22 @@ from engine.network import LINE
 from packs.scenes.tag.tests.helpers import SHOOTER, fire_together, start_game
 
 
-def test_when_red_shoots_blue_blue_registers_the_hit(sim):
-    red = sim.add_device("red", scene="tag", scene_data=SHOOTER)
-    blue = sim.add_device("blue", scene="tag", scene_data=SHOOTER)
-    start_game(sim, red, blue)
+def test_when_red_shoots_blue_blue_registers_the_hit(simulation):
+    red = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
+    blue = simulation.add_device("blue", scene="tag", scene_data=SHOOTER)
+    start_game(simulation, red, blue)
 
     red.aim(LINE, at=blue)
-    fire_together(sim, red)
+    fire_together(simulation, red)
 
     assert blue.has_played("scene.hit_start")
 
 
-def test_a_shot_aimed_at_nobody_hits_no_one(sim):
-    red = sim.add_device("red", scene="tag", scene_data=SHOOTER)
-    blue = sim.add_device("blue", scene="tag", scene_data=SHOOTER)
-    start_game(sim, red, blue)
+def test_a_shot_aimed_at_nobody_hits_no_one(simulation):
+    red = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
+    blue = simulation.add_device("blue", scene="tag", scene_data=SHOOTER)
+    start_game(simulation, red, blue)
 
-    fire_together(sim, red)
+    fire_together(simulation, red)
 
     assert not blue.has_played("scene.hit_start")
