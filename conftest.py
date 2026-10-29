@@ -1,16 +1,35 @@
-"""Fixtures shared by every test tree."""
+"""Fixtures shared by every test tree: the harness's own tests and every pack's."""
+
+from __future__ import annotations
 
 import sys
+from collections.abc import Iterator
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from hardware.shared.device_storage import DeviceStorage
 
+if TYPE_CHECKING:
+    from app.simulation import Simulation
+
 pytest_plugins = ["pytester"]
 
 
-@pytest.fixture
-def device_storage(tmp_path):
+@pytest.fixture()
+def simulation() -> Iterator[Simulation]:
+    """A ``Simulation``, closed after the test so it leaves nothing behind."""
+    # Imported here, not at module level, so test trees that never simulate
+    # don't load the scene composition layer.
+    from app.simulation import Simulation
+
+    with Simulation() as simulation:
+        yield simulation
+
+
+@pytest.fixture()
+def device_storage(tmp_path: Path) -> Iterator[DeviceStorage]:
     """Yield a real ``DeviceStorage`` over a fresh ``card`` directory in *tmp_path*.
 
     Rooted below *tmp_path* rather than at it, so a host-side file the test

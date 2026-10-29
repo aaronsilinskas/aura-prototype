@@ -51,112 +51,130 @@ def peak_times(player: SimulatedDevice, after: float, before: float) -> list[flo
     return [p.at for p in player.played if p.clip == WARNING_PEAK and after < p.at < before]
 
 
-def test_the_red_warning_peaks_three_times_then_red_light_starts(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES)
+def test_the_red_warning_peaks_three_times_then_red_light_starts(simulation):
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+    )
 
     player.tap("A")
-    wait_for(sim, player, RED_MUSIC)
+    wait_for(simulation, player, RED_MUSIC)
 
     assert len(peak_times(player, 0.0, last_played_at(player, RED_MUSIC))) == 3
 
 
-def test_each_warning_peak_clicks_the_haptic(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES)
+def test_each_warning_peak_clicks_the_haptic(simulation):
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+    )
 
     player.tap("A")
-    wait_for(sim, player, RED_MUSIC)
+    wait_for(simulation, player, RED_MUSIC)
 
     assert [b.pattern for b in player.buzzed] == [(HapticPattern.STRONG_CLICK,)] * 3
 
 
-def test_each_warning_peak_sound_plays_once(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=ONE_SECOND_PULSES)
+def test_each_warning_peak_sound_plays_once(simulation):
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", scene_data=ONE_SECOND_PULSES
+    )
     player.tap("A")
-    wait_for(sim, player, WARNING_PEAK)
+    wait_for(simulation, player, WARNING_PEAK)
 
-    sim.advance(player.clip_length(WARNING_PEAK) + SLACK)
+    simulation.advance(player.clip_length(WARNING_PEAK) + SLACK)
 
     assert not player.is_playing(WARNING_PEAK)
 
 
-def test_the_red_warning_peaks_in_yellow_on_every_light_strip(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES)
+def test_the_red_warning_peaks_in_yellow_on_every_light_strip(simulation):
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+    )
 
     player.tap("A")
-    wait_for(sim, player, WARNING_PEAK)
+    wait_for(simulation, player, WARNING_PEAK)
 
     assert lit_in(player, YELLOW)
 
 
-def test_the_green_warning_peaks_in_yellow_on_every_light_strip(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES)
+def test_the_green_warning_peaks_in_yellow_on_every_light_strip(simulation):
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+    )
     player.tap("A")
-    wait_for(sim, player, RED_MUSIC)
+    wait_for(simulation, player, RED_MUSIC)
 
-    wait_for(sim, player, WARNING_PEAK)
+    wait_for(simulation, player, WARNING_PEAK)
 
     assert lit_in(player, YELLOW)
 
 
-def test_warning_peaks_come_one_pulse_apart(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES)
+def test_warning_peaks_come_one_pulse_apart(simulation):
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+    )
 
     player.tap("A")
-    wait_for(sim, player, RED_MUSIC)
+    wait_for(simulation, player, RED_MUSIC)
 
-    first, second, third = peak_times(player, 0.0, sim.now)
+    first, second, third = peak_times(player, 0.0, simulation.now)
     assert (second - first, third - second) == (
         pytest.approx(0.5, abs=SLACK),
         pytest.approx(0.5, abs=SLACK),
     )
 
 
-def test_warnings_start_at_the_maximum_pulse_at_level_one(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=QUICKENING)
+def test_warnings_start_at_the_maximum_pulse_at_level_one(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=QUICKENING)
 
     player.tap("A")
-    wait_for(sim, player, RED_MUSIC)
+    wait_for(simulation, player, RED_MUSIC)
 
-    first, second, _ = peak_times(player, 0.0, sim.now)
+    first, second, _ = peak_times(player, 0.0, simulation.now)
     assert second - first == pytest.approx(1.0, abs=SLACK)
 
 
-def test_warnings_quicken_to_the_minimum_pulse_at_the_top_level(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=QUICKENING)
+def test_warnings_quicken_to_the_minimum_pulse_at_the_top_level(simulation):
+    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=QUICKENING)
     player.tap("A")
-    survive_round(sim, player)
-    round_two = sim.now
+    survive_round(simulation, player)
+    round_two = simulation.now
 
-    wait_for(sim, player, RED_MUSIC)
+    wait_for(simulation, player, RED_MUSIC)
 
-    first, second, _ = peak_times(player, round_two, sim.now)
+    first, second, _ = peak_times(player, round_two, simulation.now)
     assert second - first == pytest.approx(0.4, abs=SLACK)
 
 
-def test_moving_through_the_red_warning_is_not_caught(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES)
+def test_moving_through_the_red_warning_is_not_caught(simulation):
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+    )
 
     player.tap("A")
     player.move()
-    wait_for(sim, player, RED_MUSIC)
+    wait_for(simulation, player, RED_MUSIC)
 
     assert not player.has_played(GAME_OVER_STING)
 
 
-def test_the_green_warning_peaks_three_times_between_red_and_green_light(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES)
+def test_the_green_warning_peaks_three_times_between_red_and_green_light(simulation):
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+    )
 
     player.tap("A")
-    wait_for(sim, player, GREEN_MUSIC)
+    wait_for(simulation, player, GREEN_MUSIC)
 
     red, green = last_played_at(player, RED_MUSIC), last_played_at(player, GREEN_MUSIC)
     assert len(peak_times(player, red, green)) == 3
 
 
-def test_holding_still_through_the_green_warning_is_not_caught(sim):
-    player = sim.add_device("p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES)
+def test_holding_still_through_the_green_warning_is_not_caught(simulation):
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+    )
 
     player.tap("A")
-    wait_for(sim, player, GREEN_MUSIC)
+    wait_for(simulation, player, GREEN_MUSIC)
 
     assert not player.has_played(GAME_OVER_STING)

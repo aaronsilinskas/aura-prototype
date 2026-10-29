@@ -25,34 +25,34 @@ TEN_HZ = {"irtx_send_rate_hz": 10.0}
 """A send every 0.1 s: well inside ``SILENCE_TIMEOUT``."""
 
 
-def test_a_receiver_the_transmitter_is_aimed_at_shows_solid_green(sim):
-    transmitter = sim.add_device("tx", scene="ir_range_transmitter", scene_data=TEN_HZ)
-    receiver = sim.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+def test_a_receiver_the_transmitter_is_aimed_at_shows_solid_green(simulation):
+    transmitter = simulation.add_device("tx", scene="ir_range_transmitter", scene_data=TEN_HZ)
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
 
     transmitter.aim(LINE, at=receiver)
-    sim.advance(0.5)
+    simulation.advance(0.5)
 
     assert receiver.strip(Scope.PERSONAL).all_lit(GREEN)
 
 
-def test_a_receiver_the_transmitter_turns_away_from_returns_to_solid_red(sim):
-    transmitter = sim.add_device("tx", scene="ir_range_transmitter", scene_data=TEN_HZ)
-    receiver = sim.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+def test_a_receiver_the_transmitter_turns_away_from_returns_to_solid_red(simulation):
+    transmitter = simulation.add_device("tx", scene="ir_range_transmitter", scene_data=TEN_HZ)
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
     transmitter.aim(LINE, at=receiver)
-    sim.advance(0.5)
+    simulation.advance(0.5)
 
     transmitter.aim(LINE, at=None)
-    sim.advance(SILENCE_TIMEOUT + 0.1)
+    simulation.advance(SILENCE_TIMEOUT + 0.1)
 
     assert receiver.strip(Scope.PERSONAL).all_lit(RED)
 
 
-def test_the_meter_ignores_which_receiver_heard_the_shot(sim):
-    transmitter = sim.add_device("tx", scene="ir_range_transmitter", scene_data=TEN_HZ)
-    receiver = sim.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+def test_the_meter_ignores_which_receiver_heard_the_shot(simulation):
+    transmitter = simulation.add_device("tx", scene="ir_range_transmitter", scene_data=TEN_HZ)
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
 
     for index in (0, 1, 2, 0, 1):  # each shot heard by a different receiver
         transmitter.aim(LINE, at=receiver, receivers=[index])
-        sim.advance(0.1)
+        simulation.advance(0.1)
 
     assert receiver.strip(Scope.PERSONAL).all_lit(GREEN)

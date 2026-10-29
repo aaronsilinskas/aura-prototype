@@ -32,20 +32,20 @@ MID_RELOAD = {**TWO_HITS_TO_LOSE, "tag_max_ammo": 1, "tag_reload_duration": 1.0}
 """One round, so a fresh press after it starts a reload."""
 
 
-def run_out_of_hitpoints(sim: Simulation, player: SimulatedDevice) -> None:
-    hit(sim, player, shooters_tag())
-    hit(sim, player, shooters_tag())
+def run_out_of_hitpoints(simulation: Simulation, player: SimulatedDevice) -> None:
+    hit(simulation, player, shooters_tag())
+    hit(simulation, player, shooters_tag())
 
 
-def start_reloading(sim: Simulation, player: SimulatedDevice) -> None:
+def start_reloading(simulation: Simulation, player: SimulatedDevice) -> None:
     """Fire the only round, then hold the trigger halfway through the reload."""
     player.tap("A")
     player.hold("A")
-    sim.advance(MID_RELOAD["tag_reload_duration"] / 2)
+    simulation.advance(MID_RELOAD["tag_reload_duration"] / 2)
 
 
-def sting_ends(sim: Simulation, player: SimulatedDevice) -> None:
-    sim.run_until(lambda: player.has_played("scene.ready_shots_start"))
+def sting_ends(simulation: Simulation, player: SimulatedDevice) -> None:
+    simulation.run_until(lambda: player.has_played("scene.ready_shots_start"))
 
 
 # ---------------------------------------------------------------------------
@@ -53,70 +53,70 @@ def sting_ends(sim: Simulation, player: SimulatedDevice) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_the_last_hitpoint_lost_plays_the_game_over_sting(sim):
-    player = sim.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
-    start_game(sim, player)
+def test_the_last_hitpoint_lost_plays_the_game_over_sting(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    start_game(simulation, player)
 
-    run_out_of_hitpoints(sim, player)
+    run_out_of_hitpoints(simulation, player)
 
     assert player.has_played(STING)
 
 
-def test_the_game_over_sting_buzzes_three_times(sim):
-    player = sim.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
-    start_game(sim, player)
+def test_the_game_over_sting_buzzes_three_times(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    start_game(simulation, player)
 
-    run_out_of_hitpoints(sim, player)
+    run_out_of_hitpoints(simulation, player)
 
     buzz, pause = HapticPattern.STRONG_BUZZ, HapticPattern.PAUSE_250
     assert player.buzzed[-1].pattern == (buzz, pause, buzz, pause, buzz)
 
 
-def test_a_hit_that_leaves_hitpoints_does_not_end_the_game(sim):
-    player = sim.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
-    start_game(sim, player)
+def test_a_hit_that_leaves_hitpoints_does_not_end_the_game(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    start_game(simulation, player)
 
-    hit(sim, player, shooters_tag())
+    hit(simulation, player, shooters_tag())
 
     assert not player.has_played(STING)
 
 
-def test_damage_past_zero_ends_the_game_too(sim):
-    player = sim.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
-    start_game(sim, player)
+def test_damage_past_zero_ends_the_game_too(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    start_game(simulation, player)
 
-    hit(sim, player, shooters_tag(damage=4))
+    hit(simulation, player, shooters_tag(damage=4))
 
     assert player.has_played(STING)
 
 
-def test_game_over_lights_every_pixel_of_every_strip(sim):
-    player = sim.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
-    start_game(sim, player)
+def test_game_over_lights_every_pixel_of_every_strip(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    start_game(simulation, player)
 
-    run_out_of_hitpoints(sim, player)
+    run_out_of_hitpoints(simulation, player)
 
     assert all(player.strip(scope).lit == player.strip(scope).size for scope in EVERY_STRIP)
 
 
-def test_a_reload_in_progress_when_the_game_ends_never_completes(sim):
-    player = sim.add_device("red", scene="tag", scene_data=MID_RELOAD)
-    start_game(sim, player)
-    start_reloading(sim, player)
+def test_a_reload_in_progress_when_the_game_ends_never_completes(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data=MID_RELOAD)
+    start_game(simulation, player)
+    start_reloading(simulation, player)
 
-    run_out_of_hitpoints(sim, player)
-    sim.advance(MID_RELOAD["tag_reload_duration"])
+    run_out_of_hitpoints(simulation, player)
+    simulation.advance(MID_RELOAD["tag_reload_duration"])
 
     assert not player.has_played("scene.reload_complete")
 
 
-def test_a_reload_in_progress_when_the_game_ends_stops_its_loop(sim):
-    player = sim.add_device("red", scene="tag", scene_data=MID_RELOAD)
-    start_game(sim, player)
-    start_reloading(sim, player)
+def test_a_reload_in_progress_when_the_game_ends_stops_its_loop(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data=MID_RELOAD)
+    start_game(simulation, player)
+    start_reloading(simulation, player)
     reloading = player.is_playing("scene.reload")
 
-    run_out_of_hitpoints(sim, player)
+    run_out_of_hitpoints(simulation, player)
 
     assert (reloading, player.is_playing("scene.reload")) == (True, False)
 
@@ -126,49 +126,49 @@ def test_a_reload_in_progress_when_the_game_ends_stops_its_loop(sim):
 # ---------------------------------------------------------------------------
 
 
-def test_the_device_returns_to_ready_the_moment_the_sting_ends(sim):
-    player = sim.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
-    start_game(sim, player)
-    run_out_of_hitpoints(sim, player)
+def test_the_device_returns_to_ready_the_moment_the_sting_ends(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    start_game(simulation, player)
+    run_out_of_hitpoints(simulation, player)
 
-    sting_ends(sim, player)
+    sting_ends(simulation, player)
 
     at = {p.clip: p.at for p in player.played}
     sting_length = player.clip_length(STING)
     assert at["scene.ready_shots_start"] - at[STING] == pytest.approx(sting_length, abs=2 * TICK)
 
 
-def test_after_the_sting_the_device_sweeps_red_again(sim):
-    player = sim.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
-    start_game(sim, player)
-    run_out_of_hitpoints(sim, player)
+def test_after_the_sting_the_device_sweeps_red_again(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    start_game(simulation, player)
+    run_out_of_hitpoints(simulation, player)
 
-    sting_ends(sim, player)
+    sting_ends(simulation, player)
 
     assert all(sweeping_red(player.strip(scope)) for scope in EVERY_STRIP)
 
 
-def test_a_press_after_game_over_starts_a_fresh_game(sim):
-    player = sim.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
-    start_game(sim, player)
-    run_out_of_hitpoints(sim, player)
-    sting_ends(sim, player)
+def test_a_press_after_game_over_starts_a_fresh_game(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    start_game(simulation, player)
+    run_out_of_hitpoints(simulation, player)
+    sting_ends(simulation, player)
 
-    start_game(sim, player)
+    start_game(simulation, player)
 
     assert player.strip(Scope.PERSONAL).all_lit(GREEN)
     assert player.strip(Scope.Global.BUFF).all_lit(AMMO_AMBER)
 
 
-def test_a_reload_cut_short_by_game_over_does_not_finish_in_the_next_game(sim):
-    player = sim.add_device("red", scene="tag", scene_data=MID_RELOAD)
-    start_game(sim, player)
-    start_reloading(sim, player)
-    run_out_of_hitpoints(sim, player)
+def test_a_reload_cut_short_by_game_over_does_not_finish_in_the_next_game(simulation):
+    player = simulation.add_device("red", scene="tag", scene_data=MID_RELOAD)
+    start_game(simulation, player)
+    start_reloading(simulation, player)
+    run_out_of_hitpoints(simulation, player)
     player.release("A")
-    sting_ends(sim, player)
+    sting_ends(simulation, player)
 
     player.tap("A")
-    sim.run_until(lambda: player.has_played("scene.go_start"))
+    simulation.run_until(lambda: player.has_played("scene.go_start"))
 
     assert not player.has_played("scene.reload_complete")

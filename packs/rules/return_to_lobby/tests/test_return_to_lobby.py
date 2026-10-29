@@ -41,14 +41,9 @@ def hold_seconds(scene: str) -> float:
     return _scene_json(scene)["initial_data"]["return_to_lobby"]["hold_seconds"]
 
 
-@pytest.fixture()
-def sim() -> Simulation:
-    return Simulation()
-
-
-def launch(sim: Simulation, scene: str) -> SimulatedDevice:
+def launch(simulation: Simulation, scene: str) -> SimulatedDevice:
     """Switch a device on into the lobby, step its selection to *scene*, and launch it with B."""
-    device = sim.add_device("red", scene="example_lobby")
+    device = simulation.add_device("red", scene="example_lobby")
     for _ in range(LOBBY_ENTRIES.index(scene)):
         device.tap("A")
     device.tap("B")
@@ -61,54 +56,54 @@ def test_discovery_finds_every_known_scene_that_ships_the_pack():
 
 
 @pytest.mark.parametrize("scene", SCENES)
-def test_holding_a_and_b_for_hold_seconds_returns_to_the_lobby(sim, scene):
-    device = launch(sim, scene)
+def test_holding_a_and_b_for_hold_seconds_returns_to_the_lobby(simulation, scene):
+    device = launch(simulation, scene)
 
     device.hold("A", "B")
-    sim.advance(hold_seconds(scene))
+    simulation.advance(hold_seconds(scene))
 
     assert device.scene == "example_lobby"
 
 
 @pytest.mark.parametrize("scene", SCENES)
-def test_a_hold_one_tick_short_of_hold_seconds_stays_in_the_scene(sim, scene):
-    device = launch(sim, scene)
+def test_a_hold_one_tick_short_of_hold_seconds_stays_in_the_scene(simulation, scene):
+    device = launch(simulation, scene)
 
     device.hold("A", "B")
-    sim.advance(hold_seconds(scene) - TICK)
+    simulation.advance(hold_seconds(scene) - TICK)
 
     assert device.scene == scene
 
 
 @pytest.mark.parametrize("scene", SCENES)
-def test_letting_go_part_way_starts_the_hold_over(sim, scene):
-    device = launch(sim, scene)
+def test_letting_go_part_way_starts_the_hold_over(simulation, scene):
+    device = launch(simulation, scene)
     three_quarters = hold_seconds(scene) * 3 / 4  # two of them add up past hold_seconds
 
     device.hold("A", "B")
-    sim.advance(three_quarters)
+    simulation.advance(three_quarters)
     device.release("A", "B")
     device.hold("A", "B")
-    sim.advance(three_quarters)
+    simulation.advance(three_quarters)
 
     assert device.scene == scene
 
 
 @pytest.mark.parametrize("scene", SCENES)
-def test_a_device_switched_on_into_the_scene_has_nothing_to_return_to(sim, scene):
-    device = sim.add_device("red", scene=scene)
+def test_a_device_switched_on_into_the_scene_has_nothing_to_return_to(simulation, scene):
+    device = simulation.add_device("red", scene=scene)
 
     device.hold("A", "B")
-    sim.advance(hold_seconds(scene))
+    simulation.advance(hold_seconds(scene))
 
     assert device.scene == scene
 
 
 @pytest.mark.parametrize("scene", SCENES)
-def test_a_card_less_device_stays_in_its_scene(sim, scene):
-    device = sim.add_device("red", scene=scene, sd_card=False)
+def test_a_card_less_device_stays_in_its_scene(simulation, scene):
+    device = simulation.add_device("red", scene=scene, sd_card=False)
 
     device.hold("A", "B")
-    sim.advance(hold_seconds(scene))
+    simulation.advance(hold_seconds(scene))
 
     assert device.scene == scene
