@@ -697,6 +697,7 @@ def test_card_scenes_local_effect_imports_off_the_card_and_resolves_at_runtime(d
     and resolves via the same scene. prefix a flash scene-local effect uses."""
     scene_dir = _make_card_scene(Path(device_storage.mount_root), "card_scene")
     _add_card_scene_effect(scene_dir, "card_effect", _CARD_EFFECT_SOURCE)
+    _add_card_scene_sound(scene_dir, "card_clip")
     hw = _fake_hw(storage=device_storage)
 
     runtime = build_scene_runtime(hw, "card_scene", catalog=_boot_catalog(device_storage))
@@ -855,7 +856,8 @@ def _make_card_effect_pack(mount_root: Path, pack_name: str, version: str = "1.0
     Mirrors ``_make_card_scene``'s package layout but for an effect pack: a
     ``version.txt`` (the marker the pack catalog requires)
     plus a single ``glow`` item whose ``BUILD`` returns an effect declaring an
-    audio clip qualified by *pack_name*, so a resolved effect proves both the
+    audio clip qualified by *pack_name*, and the ``sounds/card_pack_clip.wav``
+    that clip names (building the effect resolves it), so a resolved effect proves both the
     module imported off the card and its bundled ``sounds/`` clip is reachable
     under the same ``<pack>.<stem>`` name. Returns the pack directory.
     """
@@ -868,6 +870,7 @@ def _make_card_effect_pack(mount_root: Path, pack_name: str, version: str = "1.0
     (pack_dir / "__init__.py").touch()
     (pack_dir / "version.txt").write_text(version)
     (pack_dir / "glow.py").write_text(_CARD_EFFECT_PACK_BUILD_SOURCE.format(pack_name=pack_name))
+    _add_card_effect_pack_sound(pack_dir, "card_pack_clip")
     return pack_dir
 
 
@@ -907,7 +910,6 @@ def test_card_effect_packs_bundled_sound_resolves_to_its_on_card_path(device_sto
     filesystem path and resolves through the same AudioRegistry a flash
     effect-pack clip resolves through, keyed <pack>.<stem>."""
     pack_dir = _make_card_effect_pack(Path(device_storage.mount_root), "card_pack")
-    _add_card_effect_pack_sound(pack_dir, "card_pack_clip")
     catalog = _boot_catalog(device_storage)
     _register_scene_declaring_effect_pack(catalog.scene_registry, "card_pack_scene", "card_pack")
     hw = _fake_hw(storage=device_storage, audio_registry=AudioRegistry())

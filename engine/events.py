@@ -1,3 +1,14 @@
+from __future__ import annotations
+
+try:
+    from typing import TYPE_CHECKING
+except ImportError:
+    TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from effects.effect import ResolvedClip
+
+
 class EventGroup:
     """Namespace identifier for a family of related events."""
 
@@ -36,14 +47,19 @@ class EffectEvent:
 
     Constructed by ``EffectManager`` for lifecycle events (start/stop) and for
     effect-triggered signals (via ``EffectConfig.notify_listeners``).
+
+    ``clip`` is the verb's ``ResolvedClip``, or ``None`` when the effect
+    declares no clip for that verb. It is payload, not identity: equality,
+    hashing and ``repr`` use only ``pack``, ``name`` and ``verb``.
     """
 
-    __slots__ = ["name", "pack", "verb"]
+    __slots__ = ["clip", "name", "pack", "verb"]
 
-    def __init__(self, pack: str, name: str, verb: str) -> None:
+    def __init__(self, pack: str, name: str, verb: str, clip: ResolvedClip | None = None) -> None:
         self.pack: str = pack
         self.name: str = name
         self.verb: str = verb
+        self.clip: ResolvedClip | None = clip
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, EffectEvent):

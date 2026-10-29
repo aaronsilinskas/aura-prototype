@@ -136,6 +136,40 @@ class ActiveSceneNamespace:
                 ) from exc
         return builder, pack_name, item_name
 
+    def resolve_clip(self, name: str) -> str:
+        """Return the WAV path for the qualified clip *name*.
+
+        Routes like ``resolve_effect``: ``scene.<clip>`` against the installed
+        local sounds, ``<pack>.<clip>`` against a declared effect pack's
+        sounds. A clip inside a pack effect gets no allowance for that
+        effect's own pack; every clip resolves against the active scene.
+
+        Raises, in check order:
+            MissingPrefixError: *name* has no prefix (even before any install).
+            NoActiveSceneError: no scene has been installed.
+            UnknownPackError: the pack is not an installed effect pack.
+            UndeclaredPackError: the pack is installed but not declared.
+            UnknownItemError: the scene or the pack has no such clip. A pack
+                with no sounds is still known, so it lands here too.
+        """
+        pack_name, item_name = self._split(name, "clip")
+        if pack_name == _SCENE_PREFIX:
+            path = self._local_sounds.get(item_name)
+            if path is None:
+                raise UnknownItemError(
+                    item_name, sorted(self._local_sounds), name=name, kind="clip"
+                )
+            return path
+        self._check_pack(name, "clip", pack_name)
+        path = self._pack_sounds.get(name)
+        if path is None:
+            prefix = pack_name + "."
+            available = sorted(k[len(prefix) :] for k in self._pack_sounds if k.startswith(prefix))
+            raise UnknownItemError(
+                item_name, available, pack_name=pack_name, name=name, kind="clip"
+            )
+        return path
+
     def _split(self, name: str, kind: str) -> tuple[str, str]:
         """Split *name* into ``(prefix, item)``, failing before any scene check."""
         if "." not in name:

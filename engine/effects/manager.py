@@ -5,7 +5,7 @@ try:
 except ImportError:
     TYPE_CHECKING = False
 
-from effects.effect import Effect, EffectConfig, PixelBuffer
+from effects.effect import Effect, EffectConfig, PixelBuffer, ResolvedClip
 from engine.effects.merge import SPLIT
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
@@ -56,7 +56,7 @@ class EffectManager(EffectControls, EffectAdmin):
     """
 
     class _EffectEntry:
-        __slots__ = ("effect", "keys", "name", "output_buffers", "receipt")
+        __slots__ = ("clips", "effect", "keys", "name", "output_buffers", "receipt")
 
         def __init__(
             self,
@@ -71,6 +71,9 @@ class EffectManager(EffectControls, EffectAdmin):
             self.receipt: EffectReceipt = receipt
             self.output_buffers: list[dict[str, PixelBuffer] | None] = output_buffers
             self.effect: Effect | None = effect
+            # Verb → Resolved clip, owned by this running effect. Never written
+            # back onto the effect's shared AudioPlaybackConfig declarations.
+            self.clips: dict[str, ResolvedClip] = {}
 
         def __repr__(self) -> str:
             rid = self.receipt.id
@@ -135,11 +138,16 @@ class EffectManager(EffectControls, EffectAdmin):
         name: str,
         options: dict[str, object],
     ) -> EffectManager._EffectEntry:
-        """Construct an Effect for the named effect.
+        """Construct an Effect for the named effect and resolve every clip it declares.
+
+        Every verb's clip is resolved now, not when the verb first fires, so
+        a misspelled clip on a rarely fired verb fails here too. Nothing is
+        cached: each build resolves afresh against the active scene.
 
         Raises:
-            RegistryError: the name does not resolve in the active scene
-                namespace (see ``ActiveSceneNamespace.resolve_effect``).
+            RegistryError: the effect name, or one of the built effect's clip
+                names, does not resolve in the active scene namespace (see
+                ``ActiveSceneNamespace.resolve_effect`` and ``resolve_clip``).
         """
         builder, pack_name, effect_name = self._namespace.resolve_effect(name)
 
@@ -158,7 +166,7 @@ class EffectManager(EffectControls, EffectAdmin):
 
         def scoped_listener(event_name: str) -> None:
             self._notify_listeners(
-                EffectEvent(pack_name, effect_name, event_name),
+                EffectEvent(pack_name, effect_name, event_name, entry.clips.get(event_name)),
                 set(entry.keys),
                 entry.effect,
                 receipt,
@@ -166,6 +174,12 @@ class EffectManager(EffectControls, EffectAdmin):
 
         config = EffectConfig(resolution=resolution, options=options, listeners=[scoped_listener])
         entry.effect = builder(effect_name, config)
+
+        audio = entry.effect.audio
+        if audio is not None:
+            for verb, clip_config in audio.clips.items():
+                path = self._namespace.resolve_clip(clip_config.name)
+                entry.clips[verb] = ResolvedClip(clip_config, path)
 
         if entry.effect.pixels is not None:
             for i, output in enumerate(self._outputs):
@@ -208,7 +222,7 @@ class EffectManager(EffectControls, EffectAdmin):
         for entry, removed_keys in stopped:
             pack_name, effect_name = entry.name.split(".", 1)
             self._notify_listeners(
-                EffectEvent(pack_name, effect_name, "stop"),
+                EffectEvent(pack_name, effect_name, "stop", entry.clips.get("stop")),
                 removed_keys,
                 entry.effect,
                 entry.receipt,
@@ -297,7 +311,10 @@ class EffectManager(EffectControls, EffectAdmin):
         self._effects.append(entry)
         pack_name, effect_name = name.split(".", 1)
         self._notify_listeners(
-            EffectEvent(pack_name, effect_name, "start"), scope_key_set, entry.effect, entry.receipt
+            EffectEvent(pack_name, effect_name, "start", entry.clips.get("start")),
+            scope_key_set,
+            entry.effect,
+            entry.receipt,
         )
         return entry.receipt
 
@@ -312,7 +329,10 @@ class EffectManager(EffectControls, EffectAdmin):
         self._effects.append(entry)
         pack_name, effect_name = name.split(".", 1)
         self._notify_listeners(
-            EffectEvent(pack_name, effect_name, "start"), scope_key_set, entry.effect, entry.receipt
+            EffectEvent(pack_name, effect_name, "start", entry.clips.get("start")),
+            scope_key_set,
+            entry.effect,
+            entry.receipt,
         )
         return entry.receipt
 
