@@ -2,10 +2,11 @@ from unittest.mock import ANY
 
 import pytest
 
-from engine.effects.manager import EffectManager
+from engine.effects.manager import EffectBuilder, EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.events import EffectEvent
 from engine.namespace import ActiveSceneNamespace, MissingPrefixError, UndeclaredPackError
+from engine.pack_catalog import PackCatalog
 from engine.packs import PackRegistry, UnknownItemError
 from engine.state import Scope
 from engine.tests.effects.helpers import (
@@ -912,6 +913,153 @@ def test_failed_set_effect_adds_no_effect(pack_tree) -> None:
     assert output.handle_event_calls == [
         (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, fire_receipt)
     ]
+
+
+# ---------------------------------------------------------------------------
+# Clips resolve when the effect is built (#1116)
+# ---------------------------------------------------------------------------
+
+
+def _clip_item(clips: dict[str, str], fires: str | None = None) -> str:
+    """Source for an effect item whose ``BUILD`` declares *clips* (verb → clip name)."""
+    return (
+        "from engine.tests.effects.helpers import AudioClipEffectBuilder\n"
+        + f"BUILD = AudioClipEffectBuilder({clips!r}, fires={fires!r})\n"
+    )
+
+
+def _make_clip_manager(
+    pack_tree, items: dict[str, str], outputs
+) -> tuple[EffectManager, PackCatalog]:
+    """Manager over pack ``sfx`` (sounds ``boom``, ``chime``) holding *items*.
+
+    The installed scene declares ``sfx`` and has local sound ``cheer``.
+    Returns the manager and the scanned catalog.
+    """
+    root = pack_tree.root("tp_sfx")
+    pack_tree.effect_pack(
+        root, "sfx", items={"plain": _stub_item(), **items}, sounds=["boom", "chime"]
+    )
+    pack_tree.scene(root, "arena", sounds=["cheer"])
+    catalog = pack_tree.scan_roots(root)
+    namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
+    local_sounds = catalog.scene_registry.get("arena").local_sound_map
+    namespace.install(None, local_sounds, frozenset({"sfx"}))
+    return EffectManager(namespace=namespace, outputs=outputs), catalog
+
+
+def _events(output: SpyEffectOutput) -> list[EffectEvent]:
+    return [call[0] for call in output.handle_event_calls]
+
+
+def test_start_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, catalog = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({"start": "sfx.boom"})}, [output]
+    )
+
+    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+    (start,) = _events(output)
+    assert start.clip.config.name == "sfx.boom"
+    assert start.clip.path == catalog.pack_sounds["sfx.boom"]
+
+
+def test_stop_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, catalog = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({"stop": "sfx.chime"})}, [output]
+    )
+    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+    manager.stop_effect(Scope.PERSONAL)
+
+    stop = _events(output)[-1]
+    assert stop.verb == "stop"
+    assert stop.clip.path == catalog.pack_sounds["sfx.chime"]
+
+
+def test_custom_verb_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, catalog = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({"peak": "scene.cheer"}, fires="peak")}, [output]
+    )
+    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+    manager.update(_make_timer())
+
+    peak = _events(output)[-1]
+    assert peak.verb == "peak"
+    assert peak.clip.path == catalog.scene_registry.get("arena").local_sound_map["cheer"]
+
+
+def test_verb_with_no_clip_emits_an_event_with_no_clip(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, _ = _make_clip_manager(pack_tree, {"bang": _clip_item({"peak": "sfx.boom"})}, [output])
+
+    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert [(event.verb, event.clip) for event in _events(output)] == [
+        ("start", None),
+        ("stop", None),
+    ]
+
+
+def test_effect_with_no_audio_emits_events_with_no_clip(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, _ = _make_clip_manager(pack_tree, {}, [output])
+
+    manager.set_effect(Scope.PERSONAL, "sfx.plain", {})
+
+    (start,) = _events(output)
+    assert start.clip is None
+
+
+@pytest.mark.parametrize("verb", ["start", "peak"])
+def test_misspelled_clip_raises_from_set_effect_on_any_verb(pack_tree, verb) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, _ = _make_clip_manager(pack_tree, {"bang": _clip_item({verb: "sfx.bomm"})}, [output])
+
+    with pytest.raises(UnknownItemError) as exc_info:
+        manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+    assert (exc_info.value.name, exc_info.value.kind) == ("sfx.bomm", "clip")
+
+
+def test_misspelled_clip_on_a_custom_verb_leaves_the_scope_unchanged(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, _ = _make_clip_manager(pack_tree, {"bang": _clip_item({"peak": "sfx.bomm"})}, [output])
+    plain_receipt = manager.set_effect(Scope.PERSONAL, "sfx.plain", {})
+    output.handle_event_calls.clear()
+
+    with pytest.raises(UnknownItemError):
+        manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+    assert output.handle_event_calls == []
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert output.handle_event_calls == [
+        (EffectEvent("sfx", "plain", "stop"), frozenset({"personal"}), ANY, plain_receipt)
+    ]
+
+
+def test_building_leaves_the_shared_playback_configs_unchanged(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, catalog = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({"start": "sfx.boom"})}, [output]
+    )
+    builder = catalog.effect_registry.get("sfx", "bang", EffectBuilder)
+    declared = builder.clips["start"]
+
+    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+    manager.add_effect(Scope.PERSONAL, "sfx.bang", {})
+
+    assert builder.clips == {"start": declared}
+    assert (declared.name, declared.loop, declared.stops_effect) == ("sfx.boom", False, False)
+    starts = _events(output)
+    assert starts[0].clip.config is declared
+    assert starts[1].clip.config is declared
+    assert starts[0].clip is not starts[1].clip
 
 
 # ---------------------------------------------------------------------------

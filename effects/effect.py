@@ -41,7 +41,7 @@ class AudioPlaybackConfig:
     """Declares how a single audio clip should play.
 
     Fields:
-      - ``name``: the clip name looked up in ``AudioRegistry``.
+      - ``name``: the qualified clip name, resolved when the effect is built.
       - ``loop``: ``True`` → looping background; ``False`` → one-shot.
       - ``stops_effect``: ``False`` (default) → receipt lifecycle stays with rules;
         ``True`` → when this one-shot is released (natural finish or eviction) the
@@ -60,6 +60,21 @@ class AudioPlaybackConfig:
         self.name = name
         self.loop = loop
         self.stops_effect = stops_effect
+
+
+class ResolvedClip:
+    """A declared ``AudioPlaybackConfig`` paired with the WAV path its name resolved to.
+
+    Made by ``EffectManager`` when an effect is built and carried on that
+    verb's ``EffectEvent``. ``config`` is the declared object itself, shared
+    with every effect built from the same declaration, so it is never modified.
+    """
+
+    __slots__ = ["config", "path"]
+
+    def __init__(self, config: AudioPlaybackConfig, path: str) -> None:
+        self.config = config
+        self.path = path
 
 
 class EffectAudio:
