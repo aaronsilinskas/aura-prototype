@@ -12,7 +12,7 @@ What the assembly builds is real wherever it can be: a real ``DebouncedButtons``
 over scripted pins, a real ``VoicePool`` behind the recording audio, the real
 ``InfraredTransceiver`` over simulated pulse readers and writers, and the real
 ``RadioTransceiver`` over a simulated radio chip. An enabled ``sdcard`` section
-is an in-memory card.
+is the real ``DeviceStorage`` over a card directory its caller hands it.
 
 IR pulses are ideal: a write lands at exactly the codec's durations, with no
 noise, jitter, or airtime. What an emitter writes reaches the device's own
@@ -148,13 +148,15 @@ class SimulatedHardware:
     tick, before the tick reads the buttons. *ir_sink*, when given, is handed
     every emitter write as ``(emitter, pulses)``, and *radio_sink* every radio
     send's payload. *logger*, when given, narrates every boot; without one the
-    device is silent.
+    device is silent. *card* is the directory an enabled ``sdcard`` section
+    mounts, used in place; the device never creates one.
 
     ``power_on`` resets the device: see there for what it rebuilds.
 
     Raises:
         RuntimeError: If the config is one the Device assembly rejects.
-        ValueError: If the config has an enabled matrix pixel entry.
+        ValueError: If the config has an enabled matrix pixel entry, or an
+            enabled ``sdcard`` section with no *card*.
     """
 
     def __init__(
@@ -164,8 +166,10 @@ class SimulatedHardware:
         ir_sink: Callable[[str, list[int]], None] | None = None,
         radio_sink: Callable[[bytes], None] | None = None,
         logger: Logger | None = None,
+        card: str | None = None,
     ) -> None:
         self.now = now
+        self.card = card
         self._config = config
         self._ir_sink = ir_sink
         self._radio_sink = radio_sink

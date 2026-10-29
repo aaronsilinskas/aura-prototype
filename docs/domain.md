@@ -81,8 +81,9 @@ hardware/         Hardware abstraction layer
                   profiler_report, build_narration, device_reboot,
                   device_assembly, device_parts)
   simulated/      Test-only Simulated device (device: SimulatedHardware; simulated_parts:
-                  SimulatedParts, its DeviceParts adapter; storage: FakeDeviceStorage,
-                  its in-memory card) — never deployed
+                  SimulatedParts, its DeviceParts adapter, whose card is the real
+                  DeviceStorage over a card directory; storage: FakeDeviceStorage,
+                  an in-memory double) — never deployed
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together
@@ -93,7 +94,8 @@ app/              Composition layer — the one place allowed to import both the
                         the tick it returns)
   simulation/           Test-only Simulation test harness (Simulation, SimulatedDevice):
                         boots real scenes on simulated devices, reboots them
-                        through their in-memory cards (or not, when card-less),
+                        through their cards, real directories a test can put
+                        card scenes and packs on (or not, when card-less),
                         and carries aimed IR between them (the IR medium) and
                         radio to every other device (the radio medium) —
                         never deployed

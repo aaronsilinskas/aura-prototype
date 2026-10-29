@@ -6,7 +6,8 @@ physical world a reset leaves alone, so each is built the first time it is
 asked for and handed back on every later boot; pixels, audio, the IR readers
 and the radio chip are fresh each boot, as a reset clears them. The adapter
 never reads ``enabled`` or ``declared``: whatever the assembly asks for is
-what the config builds.
+what the config builds. The card is no stand-in: it is the real
+``DeviceStorage`` over the card directory the device was handed.
 
 Pin names and buses are ignored: a bus is a stand-in token, the high-current
 rail drives nothing, and there is no matrix.
@@ -40,7 +41,6 @@ from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transport import PulseReader, PulseWriter
 from hardware.shared.radio_transport import RadioTransport
 from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
-from hardware.simulated.storage import FakeDeviceStorage
 
 if TYPE_CHECKING:
     from hardware.simulated.device import SimulatedHardware
@@ -258,7 +258,7 @@ class _KeptParts:
     """The parts that outlive a reboot; each ``None`` until first asked for."""
 
     def __init__(self) -> None:
-        self.storage: FakeDeviceStorage | None = None
+        self.storage: DeviceStorage | None = None
         self.accelerometer: SimulatedAccelerometer | None = None
         self.magnetometer: SimulatedMagnetometer | None = None
 
@@ -342,5 +342,7 @@ class SimulatedParts(DeviceParts):
 
     def storage(self, sdcard: SDCardConfig, spi: object, cs: PinRef) -> DeviceStorage:
         if self._kept.storage is None:
-            self._kept.storage = FakeDeviceStorage()
+            if self._device.card is None:
+                raise ValueError("an enabled sdcard section needs a card directory")
+            self._kept.storage = DeviceStorage(self._device.card)
         return self._kept.storage
