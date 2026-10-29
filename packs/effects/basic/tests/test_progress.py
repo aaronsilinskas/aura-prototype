@@ -136,11 +136,10 @@ def test_progress_is_resolvable_via_pack_registry() -> None:
     import os
 
     from engine.effects.manager import EffectBuilder
-    from engine.packs import PackRegistry
+    from engine.pack_catalog import scan_pack_roots
 
-    packs_dir = os.path.join(os.path.dirname(__file__), "..", "..")
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir(os.path.normpath(packs_dir), "packs.effects")
+    packs_root = os.path.join(os.path.dirname(__file__), "..", "..", "..")
+    registry = scan_pack_roots([os.path.normpath(packs_root)]).effect_registry
 
     builder = registry.get("basic", "progress", EffectBuilder)
     effect = builder("basic.progress", _config({"progress": 1.0, "color": 0xFFFFFF}))

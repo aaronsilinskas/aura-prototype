@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
 import pytest
 
 from engine.audio import AudioOverlayAdmin
@@ -11,6 +9,7 @@ from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
+from engine.pack_catalog import scan_pack_roots
 from engine.packs import PackRegistry, _PackEntry
 from engine.scene import Scene, SceneManager, SceneRegistry
 from engine.state import EffectAdmin, EffectControls, GameState, SceneControls, SceneReboot, Scope
@@ -25,61 +24,38 @@ from engine.version import Version
 
 _GROUP = EventGroup("test")
 
-MODULE_PREFIX = "tp_scene"
-
-
-@pytest.fixture()
-def pack_env(tmp_path):
-    """Yield a packs root directory; insert into sys.path and clean up after."""
-    packs_root = tmp_path / MODULE_PREFIX
-    packs_root.mkdir()
-    sys.path.insert(0, str(tmp_path))
-    known_modules = set(sys.modules)
-    yield packs_root
-    for key in list(sys.modules):
-        if key not in known_modules:
-            del sys.modules[key]
-    sys.path.remove(str(tmp_path))
-
-
-def _make_rule_pack(root, pack_name: str, version: str, items: dict[str, str]) -> None:
-    """Create a rule pack directory with RULE-exporting items under *root*."""
-    pack_dir = root / pack_name
-    pack_dir.mkdir(parents=True, exist_ok=True)
-    (pack_dir / "version.txt").write_text(version + "\n")
-    for item_name, content in items.items():
-        (pack_dir / (item_name + ".py")).write_text(content)
-
-
-def _make_effect_pack(root, pack_name: str, version: str) -> None:
-    """Create a minimal effect pack directory with only version.txt."""
-    pack_dir = root / pack_name
-    pack_dir.mkdir(parents=True, exist_ok=True)
-    (pack_dir / "version.txt").write_text(version + "\n")
-
-
-def _make_color_effect_pack(root, pack_name: str) -> None:
-    """Create an effect pack with solid-fill 'red' and 'blue' effects for merge-strategy tests."""
-    pack_dir = root / pack_name
-    pack_dir.mkdir(parents=True, exist_ok=True)
-    (pack_dir / "version.txt").write_text("1.0\n")
-    (pack_dir / "red.py").write_text(
+_COLOR_EFFECTS = {
+    "red": (
         "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
         "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
-    )
-    (pack_dir / "blue.py").write_text(
+    ),
+    "blue": (
         "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
         "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
-    )
+    ),
+}
+"""Solid-fill 'red' and 'blue' effect items for merge-strategy tests."""
+
+_GAME_RULE_SOURCE = "from engine.engine import GameRule\nRULE = GameRule()\n"
 
 
-def _make_registries(pack_env_path: str):
-    """Return (effect_registry, rule_registry) scanned from *pack_env_path*."""
-    effect_registry = PackRegistry(item_attr="BUILD")
-    rule_registry = _TestPackRegistry(item_attr="RULE")
-    effect_registry.scan_dir(pack_env_path, MODULE_PREFIX)
-    rule_registry.scan_dir(pack_env_path, MODULE_PREFIX)
-    return effect_registry, rule_registry
+def _scan_registries(
+    pack_tree,
+    *,
+    effect_packs: dict[str, dict[str, str]] | None = None,
+    rule_packs: dict[str, dict[str, str]] | None = None,
+) -> tuple[PackRegistry, PackRegistry]:
+    """Scan one root holding the given packs (pack name → item name → source).
+
+    Returns the catalog's ``(effect_registry, rule_registry)``.
+    """
+    root = pack_tree.root("tp_scene")
+    for pack_name, items in (effect_packs or {}).items():
+        pack_tree.effect_pack(root, pack_name, items=items)
+    for pack_name, items in (rule_packs or {}).items():
+        pack_tree.rule_pack(root, pack_name, items=items)
+    catalog = scan_pack_roots([str(root)])
+    return catalog.effect_registry, catalog.rule_registry
 
 
 class _RecordingEffectControls(EffectControls):
@@ -123,8 +99,8 @@ def _make_scene_manager(
     """
     return SceneManager(
         engine,
-        effect_registry if effect_registry is not None else PackRegistry(item_attr="BUILD"),
-        rule_registry if rule_registry is not None else PackRegistry(item_attr="RULE"),
+        effect_registry if effect_registry is not None else PackRegistry(),
+        rule_registry if rule_registry is not None else PackRegistry(),
         scene_registry if scene_registry is not None else SceneRegistry(),
         effect_admin if effect_admin is not None else SpyEffectAdmin(),
         audio_overlay_admin if audio_overlay_admin is not None else SpyAudioOverlayAdmin(),
@@ -132,23 +108,25 @@ def _make_scene_manager(
     )
 
 
-class _TestPackRegistry(PackRegistry):
-    """PackRegistry subclass that supports registering pre-built instances for testing."""
+def _register_instance(
+    registry: PackRegistry, pack_name: str, item_name: str, instance: object
+) -> None:
+    """Make *registry* return the pre-built *instance* for ``pack_name.item_name``.
 
-    def register_instance(
-        self, pack_name: str, item_name: str, instance: object, version: str = "1.0"
-    ) -> None:
-        if pack_name not in self._packs:
-            self._packs[pack_name] = _PackEntry(
-                name=pack_name,
-                version=Version.parse(version),
-                module_prefix="",
-                item_names={item_name},
-                source_path="",
-            )
-        else:
-            self._packs[pack_name].item_names.add(item_name)
-        self._cache[(pack_name, item_name)] = instance
+    Lets SceneManager tests hand in rules defined inside the test, alongside
+    any packs the registry scanned from disk.
+    """
+    if pack_name not in registry._packs:
+        registry._packs[pack_name] = _PackEntry(
+            name=pack_name,
+            version=Version.parse("1.0"),
+            module_prefix="",
+            item_names={item_name},
+            source_path="",
+        )
+    else:
+        registry._packs[pack_name].item_names.add(item_name)
+    registry._cache[(pack_name, item_name)] = instance
 
 
 def _scene_factory(**kwargs):
@@ -276,8 +254,8 @@ def test_scene_rejects_unknown_attributes() -> None:
 
 def test_scene_manager_satisfies_scene_controls_interface() -> None:
     engine = _make_engine()
-    effect_registry = PackRegistry(item_attr="BUILD")
-    rule_registry = PackRegistry(item_attr="RULE")
+    effect_registry = PackRegistry()
+    rule_registry = PackRegistry()
     scene_registry = SceneRegistry()
 
     manager = _make_scene_manager(
@@ -666,7 +644,7 @@ def test_pop_stops_all_effects_on_the_popped_scene() -> None:
 
 def test_load_clears_suspended_state_queues_so_stale_events_do_not_outlive_the_stack() -> None:
     engine = _TrackingEngine(_RecordingEffectControls())
-    rule_registry = _TestPackRegistry(item_attr="RULE")
+    rule_registry = PackRegistry()
     base_events = []
 
     class _BaseRule(GameRule):
@@ -674,7 +652,7 @@ def test_load_clears_suspended_state_queues_so_stale_events_do_not_outlive_the_s
             base_events.append(event.name)
 
     base_rule = _BaseRule()
-    rule_registry.register_instance("stubs", "base_rule", base_rule)
+    _register_instance(rule_registry, "stubs", "base_rule", base_rule)
     scene_reg = _scene_registry(
         ("base", _scene_factory(rule_packs=[("stubs", "1.0")])),
         ("overlay_scene", _scene_factory()),
@@ -703,14 +681,10 @@ def test_load_clears_suspended_state_queues_so_stale_events_do_not_outlive_the_s
     assert "stale" not in base_events
 
 
-def test_load_dispatches_events_to_scene_rules_on_following_ticks(pack_env) -> None:
-    _make_rule_pack(
-        pack_env,
-        "rules",
-        "1.0",
-        {"rule_a": ("from engine.engine import GameRule\nRULE = GameRule()\n")},
+def test_load_dispatches_events_to_scene_rules_on_following_ticks(pack_tree) -> None:
+    effect_registry, rule_registry = _scan_registries(
+        pack_tree, rule_packs={"rules": {"rule_a": _GAME_RULE_SOURCE}}
     )
-    effect_registry, rule_registry = _make_registries(str(pack_env))
     engine = _TrackingEngine(_RecordingEffectControls())
 
     fired: list = []
@@ -723,7 +697,7 @@ def test_load_dispatches_events_to_scene_rules_on_following_ticks(pack_env) -> N
     pack_rule.on(Event, lambda e, s: fired.append("pack"))
 
     scene_r = _SceneRule()
-    rule_registry.register_instance("stubs", "scene_rule", scene_r)
+    _register_instance(rule_registry, "stubs", "scene_rule", scene_r)
     scene_reg = _scene_registry(
         ("main", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")]))
     )
@@ -744,14 +718,10 @@ def test_load_dispatches_events_to_scene_rules_on_following_ticks(pack_env) -> N
     assert "pack" in fired, "pack rule must receive events after load"
 
 
-def test_scene_rules_fire_before_pack_rules(pack_env) -> None:
-    _make_rule_pack(
-        pack_env,
-        "rules",
-        "1.0",
-        {"rule_a": ("from engine.engine import GameRule\nRULE = GameRule()\n")},
+def test_scene_rules_fire_before_pack_rules(pack_tree) -> None:
+    effect_registry, rule_registry = _scan_registries(
+        pack_tree, rule_packs={"rules": {"rule_a": _GAME_RULE_SOURCE}}
     )
-    effect_registry, rule_registry = _make_registries(str(pack_env))
     engine = _TrackingEngine(_RecordingEffectControls())
 
     fired: list = []
@@ -764,7 +734,7 @@ def test_scene_rules_fire_before_pack_rules(pack_env) -> None:
     pack_rule.on(Event, lambda e, s: fired.append("pack"))
 
     scene_r = _SceneRule()
-    rule_registry.register_instance("stubs", "scene_rule", scene_r)
+    _register_instance(rule_registry, "stubs", "scene_rule", scene_r)
     scene_reg = _scene_registry(
         ("main", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")]))
     )
@@ -815,7 +785,7 @@ def test_overlay_suspends_active_scene_and_pushes_without_clearing_stack() -> No
 
 def test_overlay_clears_suspended_base_state_queue_before_pushing() -> None:
     engine = _TrackingEngine(_RecordingEffectControls())
-    rule_registry = _TestPackRegistry(item_attr="RULE")
+    rule_registry = PackRegistry()
     base_events = []
 
     class _BaseRule(GameRule):
@@ -823,7 +793,7 @@ def test_overlay_clears_suspended_base_state_queue_before_pushing() -> None:
             base_events.append(event.name)
 
     base_rule = _BaseRule()
-    rule_registry.register_instance("stubs", "base_rule", base_rule)
+    _register_instance(rule_registry, "stubs", "base_rule", base_rule)
     scene_reg = _scene_registry(
         ("base", _scene_factory(rule_packs=[("stubs", "1.0")])),
         ("overlay_scene", _scene_factory()),
@@ -856,14 +826,10 @@ def test_overlay_clears_suspended_base_state_queue_before_pushing() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_env) -> None:
-    _make_rule_pack(
-        pack_env,
-        "rules",
-        "1.0",
-        {"rule_a": ("from engine.engine import GameRule\nRULE = GameRule()\n")},
+def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_tree) -> None:
+    effect_registry, rule_registry = _scan_registries(
+        pack_tree, rule_packs={"rules": {"rule_a": _GAME_RULE_SOURCE}}
     )
-    effect_registry, rule_registry = _make_registries(str(pack_env))
     engine = _TrackingEngine(_RecordingEffectControls())
 
     base_events: list = []
@@ -873,7 +839,7 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_env
             base_events.append(event.name)
 
     base_rule = _BaseRule()
-    rule_registry.register_instance("stubs", "base_rule", base_rule)
+    _register_instance(rule_registry, "stubs", "base_rule", base_rule)
     pack_rule = rule_registry.get("rules", "rule_a", GameRule)
     pack_events: list = []
     pack_rule.on(Event, lambda e, s: pack_events.append(e.name))
@@ -907,7 +873,7 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_env
 
 def test_pop_clears_restored_state_queue_so_suspended_events_do_not_replay() -> None:
     engine = _TrackingEngine(_RecordingEffectControls())
-    rule_registry = _TestPackRegistry(item_attr="RULE")
+    rule_registry = PackRegistry()
     base_events: list = []
 
     class _BaseRule(GameRule):
@@ -915,7 +881,7 @@ def test_pop_clears_restored_state_queue_so_suspended_events_do_not_replay() -> 
             base_events.append(event.name)
 
     base_rule = _BaseRule()
-    rule_registry.register_instance("stubs", "base_rule", base_rule)
+    _register_instance(rule_registry, "stubs", "base_rule", base_rule)
     scene_reg = _scene_registry(
         ("base", _scene_factory(rule_packs=[("stubs", "1.0")])),
         ("overlay_scene", _scene_factory()),
@@ -979,18 +945,17 @@ def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_rule_pack_items_all_receive_events_after_load(pack_env) -> None:
+def test_rule_pack_items_all_receive_events_after_load(pack_tree) -> None:
     rule_content = "from engine.engine import GameRule\nRULE = GameRule()\n"
-    _make_rule_pack(
-        pack_env,
-        "rules",
-        "1.0",
-        {
-            "rule_a": rule_content,
-            "rule_b": rule_content,
+    effect_registry, rule_registry = _scan_registries(
+        pack_tree,
+        rule_packs={
+            "rules": {
+                "rule_a": rule_content,
+                "rule_b": rule_content,
+            }
         },
     )
-    effect_registry, rule_registry = _make_registries(str(pack_env))
     engine = _TrackingEngine(_RecordingEffectControls())
 
     fired_by: list = []
@@ -1005,7 +970,7 @@ def test_rule_pack_items_all_receive_events_after_load(pack_env) -> None:
     pack_rule_b.on(Event, lambda e, s: fired_by.append("pack_b"))
 
     scene_r = _SceneRule()
-    rule_registry.register_instance("stubs", "scene_rule", scene_r)
+    _register_instance(rule_registry, "stubs", "scene_rule", scene_r)
     scene_reg = _scene_registry(
         ("main", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")]))
     )
@@ -1027,21 +992,20 @@ def test_rule_pack_items_all_receive_events_after_load(pack_env) -> None:
     assert "pack_b" in fired_by, "pack rule_b must fire"
 
 
-def test_rule_pack_items_loaded_in_alphabetical_order(pack_env) -> None:
+def test_rule_pack_items_loaded_in_alphabetical_order(pack_tree) -> None:
     rule_template = (
         "from engine.engine import GameRule\nimport engine.scene as _s\nRULE = GameRule()\n"
     )
-    _make_rule_pack(
-        pack_env,
-        "rules",
-        "1.0",
-        {
-            "z_rule": rule_template,
-            "a_rule": rule_template,
-            "m_rule": rule_template,
+    _effect_registry, rule_registry = _scan_registries(
+        pack_tree,
+        rule_packs={
+            "rules": {
+                "z_rule": rule_template,
+                "a_rule": rule_template,
+                "m_rule": rule_template,
+            }
         },
     )
-    _effect_registry, rule_registry = _make_registries(str(pack_env))
 
     # Verify items() returns alphabetical order
     items = rule_registry.items("rules")
@@ -1093,8 +1057,8 @@ def test_pop_activates_revealed_entry_with_both_rules_and_local_effects() -> Non
     engine = _make_engine()
     base_local_registry = Scene(effect_packs=[], rule_packs=[]).local_effect_registry
     base_rule = GameRule()
-    rule_registry = _TestPackRegistry(item_attr="RULE")
-    rule_registry.register_instance("stubs", "base_rule", base_rule)
+    rule_registry = PackRegistry()
+    _register_instance(rule_registry, "stubs", "base_rule", base_rule)
 
     base_events: list = []
     base_rule.on(Event, lambda e, s: base_events.append(e.name))
@@ -1134,12 +1098,10 @@ def test_pop_activates_revealed_entry_with_both_rules_and_local_effects() -> Non
     )
 
 
-def test_allowed_packs_installed_in_lockstep_through_load_overlay_pop(pack_env) -> None:
+def test_allowed_packs_installed_in_lockstep_through_load_overlay_pop(pack_tree) -> None:
     """set_allowed_packs must track the top-of-stack scene's declared effect_packs
     through load, overlay, and pop -- installed right beside set_local_effects."""
-    _make_effect_pack(pack_env, "fx", "1.0")
-    _make_effect_pack(pack_env, "gfx", "1.0")
-    effect_registry, rule_registry = _make_registries(str(pack_env))
+    effect_registry, rule_registry = _scan_registries(pack_tree, effect_packs={"fx": {}, "gfx": {}})
     engine = _make_engine()
     scene_reg = _scene_registry(
         ("base", _scene_factory(effect_packs=[("fx", "1.0")])),
@@ -1173,13 +1135,11 @@ def test_allowed_packs_installed_in_lockstep_through_load_overlay_pop(pack_env) 
     )
 
 
-def test_audio_allowed_packs_installed_in_lockstep_through_load_overlay_pop(pack_env) -> None:
+def test_audio_allowed_packs_installed_in_lockstep_through_load_overlay_pop(pack_tree) -> None:
     """AudioOverlayAdmin.set_allowed_packs must track the top-of-stack scene's declared
     effect_packs through load, overlay, and pop -- installed right beside set_scene_sounds,
     reusing the same frozenset pushed to EffectAdmin.set_allowed_packs (not re-derived)."""
-    _make_effect_pack(pack_env, "fx", "1.0")
-    _make_effect_pack(pack_env, "gfx", "1.0")
-    effect_registry, rule_registry = _make_registries(str(pack_env))
+    effect_registry, rule_registry = _scan_registries(pack_tree, effect_packs={"fx": {}, "gfx": {}})
     engine = _make_engine()
     scene_reg = _scene_registry(
         ("base", _scene_factory(effect_packs=[("fx", "1.0")])),
@@ -1213,12 +1173,11 @@ def test_audio_allowed_packs_installed_in_lockstep_through_load_overlay_pop(pack
     )
 
 
-def test_activate_pushes_the_same_allowed_packs_object_to_both_admin_seams(pack_env) -> None:
+def test_activate_pushes_the_same_allowed_packs_object_to_both_admin_seams(pack_tree) -> None:
     """_activate must derive the allowed-pack frozenset once and reuse it for both
     EffectAdmin.set_allowed_packs and AudioOverlayAdmin.set_allowed_packs -- not
     derive it a second time for audio."""
-    _make_effect_pack(pack_env, "fx", "1.0")
-    effect_registry, rule_registry = _make_registries(str(pack_env))
+    effect_registry, rule_registry = _scan_registries(pack_tree, effect_packs={"fx": {}})
     engine = _make_engine()
     scene_reg = _scene_registry(("base", _scene_factory(effect_packs=[("fx", "1.0")])))
     effect_admin = SpyEffectAdmin()
@@ -1250,9 +1209,9 @@ def test_activate_pushes_the_same_allowed_packs_object_to_both_admin_seams(pack_
 def test_load_whose_rule_resolution_fails_does_not_stop_effects_on_active_scene() -> None:
     """Rule resolution runs before teardown; a failure must leave the active scene untouched."""
     engine, controls = _make_engine_with_controls()
-    rule_registry = _TestPackRegistry(item_attr="RULE")
+    rule_registry = PackRegistry()
     existing_rule = GameRule()
-    rule_registry.register_instance("stubs", "existing_rule", existing_rule)
+    _register_instance(rule_registry, "stubs", "existing_rule", existing_rule)
 
     class _BrokenRegistry:
         def items(self):
@@ -1314,7 +1273,7 @@ def test_suspended_scene_remains_on_stack_after_overlay() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_merge_strategy_scene_manager(pack_env, scene_names):
+def _make_merge_strategy_scene_manager(pack_tree, scene_names):
     """Return (scene_manager, effect_manager, output).
 
     Wires a real ``EffectManager`` (not the recording stub) as the engine's
@@ -1323,9 +1282,9 @@ def _make_merge_strategy_scene_manager(pack_env, scene_names):
     Every scene declares 'color' in its effect_packs so SceneManager's
     per-transition allowed-pack push (issue #814) doesn't block it.
     """
-    _make_color_effect_pack(pack_env, "color")
-    effect_registry = PackRegistry(item_attr="BUILD")
-    effect_registry.scan_dir(str(pack_env), MODULE_PREFIX)
+    effect_registry, _rule_registry = _scan_registries(
+        pack_tree, effect_packs={"color": _COLOR_EFFECTS}
+    )
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     effect_manager = EffectManager(registry=effect_registry, outputs=[output])
     engine = GameEngine(effect_controls=effect_manager)
@@ -1354,9 +1313,9 @@ _SPLIT_RED_BLUE = [0xFF0000] * 5 + [0x0000FF] * 5
 _ADDITIVE_RED_BLUE = [0xFF00FF] * 10
 
 
-def test_scene_load_resets_merge_strategy_to_split(pack_env) -> None:
+def test_scene_load_resets_merge_strategy_to_split(pack_tree) -> None:
     scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_env, ["base", "next"]
+        pack_tree, ["base", "next"]
     )
     scene_manager.load("base")
     scene_manager.update()
@@ -1371,9 +1330,9 @@ def test_scene_load_resets_merge_strategy_to_split(pack_env) -> None:
     )
 
 
-def test_scene_overlay_inherits_the_underlying_scenes_live_merge_strategy(pack_env) -> None:
+def test_scene_overlay_inherits_the_underlying_scenes_live_merge_strategy(pack_tree) -> None:
     scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_env, ["base", "overlay_scene"]
+        pack_tree, ["base", "overlay_scene"]
     )
     scene_manager.load("base")
     scene_manager.update()
@@ -1387,9 +1346,9 @@ def test_scene_overlay_inherits_the_underlying_scenes_live_merge_strategy(pack_e
     )
 
 
-def test_scene_overlay_merge_strategy_change_takes_effect_the_next_tick(pack_env) -> None:
+def test_scene_overlay_merge_strategy_change_takes_effect_the_next_tick(pack_tree) -> None:
     scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_env, ["base", "overlay_scene"]
+        pack_tree, ["base", "overlay_scene"]
     )
     scene_manager.load("base")
     scene_manager.update()
@@ -1407,10 +1366,10 @@ def test_scene_overlay_merge_strategy_change_takes_effect_the_next_tick(pack_env
 
 
 def test_scene_pop_restores_pre_overlay_merge_strategy_discarding_overlay_changes(
-    pack_env,
+    pack_tree,
 ) -> None:
     scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_env, ["base", "overlay_scene"]
+        pack_tree, ["base", "overlay_scene"]
     )
     scene_manager.load("base")
     scene_manager.update()  # base starts at the default Split
@@ -1427,10 +1386,10 @@ def test_scene_pop_restores_pre_overlay_merge_strategy_discarding_overlay_change
 
 
 def test_nested_overlay_pop_merge_strategy_change_never_leaks_past_its_own_pop(
-    pack_env,
+    pack_tree,
 ) -> None:
     scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_env, ["base", "mid", "top"]
+        pack_tree, ["base", "mid", "top"]
     )
     scene_manager.load("base")
     scene_manager.update()  # base: Split
