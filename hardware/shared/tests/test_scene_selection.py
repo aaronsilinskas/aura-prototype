@@ -3,7 +3,6 @@
 import pytest
 
 from hardware.shared.scene_selection import resolve_boot_scene, resolve_scene_name
-from hardware.simulated.storage import FakeDeviceStorage
 
 
 def test_present_scene_name_is_used():
@@ -25,62 +24,52 @@ def test_non_string_scene_raises():
         resolve_scene_name({"default_scene": 42})
 
 
-def test_persisted_sd_scene_wins_over_flash_default():
-    storage = FakeDeviceStorage()
-    storage.write_json("aura-state.json", {"scene": "tag"})
+def test_persisted_sd_scene_wins_over_flash_default(device_storage):
+    device_storage.write_json("aura-state.json", {"scene": "tag"})
 
-    scene = resolve_boot_scene(storage, {"default_scene": "red_light_green_light"})
-
-    assert scene == "tag"
-
-
-def test_persisted_sd_scene_used_when_flash_default_is_absent():
-    storage = FakeDeviceStorage()
-    storage.write_json("aura-state.json", {"scene": "tag"})
-
-    scene = resolve_boot_scene(storage, {})
+    scene = resolve_boot_scene(device_storage, {"default_scene": "red_light_green_light"})
 
     assert scene == "tag"
 
 
-def test_no_persisted_scene_falls_back_to_flash_default():
-    storage = FakeDeviceStorage()
+def test_persisted_sd_scene_used_when_flash_default_is_absent(device_storage):
+    device_storage.write_json("aura-state.json", {"scene": "tag"})
 
-    scene = resolve_boot_scene(storage, {"default_scene": "red_light_green_light"})
+    scene = resolve_boot_scene(device_storage, {})
+
+    assert scene == "tag"
+
+
+def test_no_persisted_scene_falls_back_to_flash_default(device_storage):
+    scene = resolve_boot_scene(device_storage, {"default_scene": "red_light_green_light"})
 
     assert scene == "red_light_green_light"
 
 
-def test_neither_persisted_nor_flash_scene_raises_naming_both_files():
-    storage = FakeDeviceStorage()
-
+def test_neither_persisted_nor_flash_scene_raises_naming_both_files(device_storage):
     with pytest.raises(ValueError, match=r"aura-state\.json.*aura-settings\.json"):
-        resolve_boot_scene(storage, {})
+        resolve_boot_scene(device_storage, {})
 
 
-def test_empty_persisted_scene_falls_back_to_flash_default():
-    storage = FakeDeviceStorage()
-    storage.write_json("aura-state.json", {"scene": ""})
+def test_empty_persisted_scene_falls_back_to_flash_default(device_storage):
+    device_storage.write_json("aura-state.json", {"scene": ""})
 
-    scene = resolve_boot_scene(storage, {"default_scene": "red_light_green_light"})
-
-    assert scene == "red_light_green_light"
-
-
-def test_non_string_persisted_scene_falls_back_to_flash_default():
-    storage = FakeDeviceStorage()
-    storage.write_json("aura-state.json", {"scene": 42})
-
-    scene = resolve_boot_scene(storage, {"default_scene": "red_light_green_light"})
+    scene = resolve_boot_scene(device_storage, {"default_scene": "red_light_green_light"})
 
     assert scene == "red_light_green_light"
 
 
-def test_non_string_flash_default_is_treated_as_absent_and_raises():
-    storage = FakeDeviceStorage()
+def test_non_string_persisted_scene_falls_back_to_flash_default(device_storage):
+    device_storage.write_json("aura-state.json", {"scene": 42})
 
+    scene = resolve_boot_scene(device_storage, {"default_scene": "red_light_green_light"})
+
+    assert scene == "red_light_green_light"
+
+
+def test_non_string_flash_default_is_treated_as_absent_and_raises(device_storage):
     with pytest.raises(ValueError):
-        resolve_boot_scene(storage, {"default_scene": 42})
+        resolve_boot_scene(device_storage, {"default_scene": 42})
 
 
 def test_card_less_device_falls_back_to_flash_default():

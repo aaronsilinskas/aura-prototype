@@ -428,6 +428,13 @@ def test_walk_returns_an_empty_list_for_a_subtree_with_no_files(tmp_path):
     assert storage.walk("scenes/empty") == []
 
 
+def test_walk_returns_an_empty_list_for_a_subtree_that_does_not_exist(tmp_path):
+    storage = DeviceStorage(str(tmp_path))
+    storage.write_bytes("aura-state.json", b"{}")
+
+    assert storage.walk("aura_packs/scenes") == []
+
+
 @pytest.mark.parametrize("escaping_subpath", ESCAPING_NAMES)
 def test_walk_rejects_a_subpath_that_escapes_the_mount_root(tmp_path, escaping_subpath):
     storage = DeviceStorage(str(tmp_path))

@@ -281,9 +281,10 @@ class DeviceStorage:
         Files only -- directories are never reported as entries, only implied
         by the file paths beneath them. Each returned path is mount-relative
         (not relative to *subpath*), so it can be passed straight back into
-        :meth:`read_bytes`/:meth:`path`. There is no ``os.walk`` on
-        CircuitPython, so this recurses by hand via ``os.listdir`` +
-        ``os.stat``.
+        :meth:`read_bytes`/:meth:`path`. A *subpath* that does not exist
+        holds no files, so it walks to an empty list rather than raising.
+        There is no ``os.walk`` on CircuitPython, so this recurses by hand
+        via ``os.listdir`` + ``os.stat``.
 
         Args:
             subpath: Mount-relative subtree to enumerate; the default (empty
@@ -294,6 +295,12 @@ class DeviceStorage:
                 absolute path).
         """
         root = self._resolve(subpath)
+        try:
+            os.stat(root)
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise  # Anything but "no such subtree" is a real failure.
+            return []
         entries: list[tuple[str, int]] = []
         self._walk_into(root, subpath.rstrip("/"), entries)
         entries.sort()
