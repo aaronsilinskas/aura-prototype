@@ -882,6 +882,50 @@ def test_unknown_effect_in_known_pack_raises_value_error(pack_tree) -> None:
 
 
 # ---------------------------------------------------------------------------
+# A failed set_effect leaves the scope unchanged (#1114)
+# ---------------------------------------------------------------------------
+
+
+def test_failed_set_effect_keeps_the_running_effect_rendering(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+    manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+
+    with pytest.raises(ValueError):
+        manager.set_effect(Scope.PERSONAL, "stub.missing", {})
+    manager.update(_make_timer())
+
+    assert output.update_pixels_calls == [("personal", output.created_buffers[0])]
+
+
+def test_failed_set_effect_fires_no_stop_event(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+    manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+    output.handle_event_calls.clear()
+
+    with pytest.raises(ValueError):
+        manager.set_effect(Scope.PERSONAL, "stub.missing", {})
+
+    assert output.handle_event_calls == []
+
+
+def test_failed_set_effect_adds_no_effect(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+    fire_receipt = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+
+    with pytest.raises(ValueError):
+        manager.set_effect(Scope.PERSONAL, "stub.missing", {})
+    output.handle_event_calls.clear()
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert output.handle_event_calls == [
+        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, fire_receipt)
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Pack-membership enforcement (issue #814) -- EffectManager delegates the
 # allowed-pack set to EffectResolver; exhaustive resolve() semantics live in
 # test_effect_resolver.py, these confirm the delegation itself.
