@@ -616,7 +616,7 @@ def test_a_declaration_failure_is_caught_as_a_scene_declaration_pack_scan_error(
 
 
 # ---------------------------------------------------------------------------
-# Moved from the PackRegistry suite
+# Scan side effects
 # ---------------------------------------------------------------------------
 
 

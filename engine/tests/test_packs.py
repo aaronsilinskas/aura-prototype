@@ -24,7 +24,7 @@ from engine.packs import (
 
 
 def _effect_registry(pack_tree, packs: dict[str, dict[str, str]]) -> PackRegistry:
-    """Scan one root holding effect pack *name* → *items* for each of *packs*."""
+    """Scan one root holding the given effect packs (pack name → item name → source)."""
     root = pack_tree.root("tp_flash")
     for pack_name, items in packs.items():
         pack_tree.effect_pack(root, pack_name, items=items)
@@ -43,10 +43,6 @@ def test_pack_registry_with_no_arguments_is_a_valid_empty_registry() -> None:
     with pytest.raises(UnknownPackError) as excinfo:
         registry.get("anything", "item", object)
     assert excinfo.value.pack_name == "anything"
-
-
-def test_pack_registry_uses_slots() -> None:
-    assert hasattr(PackRegistry, "__slots__")
 
 
 def test_pack_registry_does_not_allow_arbitrary_attributes() -> None:
