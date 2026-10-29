@@ -76,6 +76,23 @@ class DeviceStateStore:
         del mapping[key]
         self._storage.write_json(_STATE_FILE_NAME, mapping)
 
+    def update(self, values: dict[str, str], remove: tuple[str, ...] = ()) -> None:
+        """Set every key in *values* and remove every key in *remove*, in one write.
+
+        One read-modify-write, mirroring :meth:`set` and :meth:`clear`, so
+        the changes land together in one replace of the file (as atomic as
+        DeviceStorage.write_json allows) rather than in separate writes a
+        power loss could split. Absent keys in *remove* are skipped; every
+        other key is left untouched. A no-op when *storage* is None.
+        """
+        if self._storage is None:
+            return
+        mapping = self._read_mapping()
+        for key in remove:
+            mapping.pop(key, None)
+        mapping.update(values)
+        self._storage.write_json(_STATE_FILE_NAME, mapping)
+
     def _read_mapping(self) -> dict:
         """Return the persisted state mapping, fail-soft on every bad case.
 

@@ -22,6 +22,7 @@ may carry ``aura_packs/``.
 
 from __future__ import annotations
 
+import secrets
 import sys
 import tempfile
 from collections.abc import Callable, Sequence
@@ -199,7 +200,7 @@ class Simulation:
         card from the first boot, and what the device writes lands there.
         Without *card* the card is a fresh empty directory this simulation
         owns; with *sd_card* false there is none, and the device reboots
-        only when redeployed. Its radio node is its place in add order, from 1.
+        only when reset or redeployed. Its radio node is its place in add order, from 1.
 
         Raises:
             ValueError: If *card* is given with *sd_card* false, or is
@@ -375,11 +376,21 @@ class SimulatedDevice:
     def redeploy(self, scene: str) -> None:
         """Redeploy with *scene* and reboot, as ``deploy.py --scene`` then a reset would.
 
-        *scene* becomes the flash ``default_scene``; every other flash setting
-        stays. The device boots at once, card-less or not, into whatever its
-        card names, else *scene*.
+        *scene* becomes the flash ``default_scene``, beside a fresh Scene
+        deploy token; every other flash setting stays. The device boots at
+        once, card-less or not, into *scene*: the new token clears the
+        Persisted scene its card held.
         """
         self._flash_settings["default_scene"] = scene
+        self._flash_settings["scene_deploy_token"] = secrets.token_hex(8)
+        self.reset()
+
+    def reset(self) -> None:
+        """Reset and boot at once with flash unchanged, as pressing the reset button does.
+
+        The device boots into whatever its card names, else its flash
+        ``default_scene``.
+        """
         self._sim_hw.power_on()
         self._boot()
 
@@ -554,5 +565,4 @@ class SimulatedDevice:
         try:
             self._scene_tick()
         except _Reset:
-            self._sim_hw.power_on()
-            self._boot()
+            self.reset()

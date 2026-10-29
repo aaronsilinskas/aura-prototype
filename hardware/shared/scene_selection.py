@@ -6,7 +6,7 @@ from engine.log import Logger
 from hardware.shared.device_state import DeviceStateStore
 from hardware.shared.device_storage import DeviceStorage
 
-__all__ = ["resolve_boot_scene", "resolve_scene_name"]
+__all__ = ["apply_scene_deploy", "resolve_boot_scene", "resolve_scene_name"]
 
 
 def _non_empty_string_or_none(value: object) -> str | None:
@@ -35,6 +35,44 @@ def resolve_scene_name(settings_mapping: dict) -> str:
     if scene is not None:
         return scene
     raise ValueError(f"aura-settings.json 'default_scene' must be a non-empty string, got {raw!r}")
+
+
+def apply_scene_deploy(
+    storage: DeviceStorage | None,
+    settings_mapping: dict,
+    logger: Logger | None = None,
+) -> None:
+    """Apply a pending Scene deploy token: clear the Persisted scene once per deploy.
+
+    ``deploy.py --scene`` writes a fresh ``scene_deploy_token`` beside
+    ``default_scene`` in *settings_mapping*. When that token is a non-empty
+    string that differs from the one recorded in the card's
+    ``aura-state.json``, the Persisted scene (``scene`` and ``return_to``) is
+    removed and the token recorded, in one write, so the next resolution
+    falls through to the deployed ``default_scene``. Applying logs one line;
+    an absent or invalid token, a card-less device, or an already-applied
+    token is a silent no-op. The deployed scene is not checked against any
+    registry -- an unknown one fails at resolution, as a bad
+    ``default_scene`` always has.
+
+    Args:
+        storage: The mounted ``DeviceStorage``, or None on a card-less device.
+        settings_mapping: The raw ``aura-settings.json`` mapping.
+        logger: Where the applied-token line and any fail-soft state read
+            are logged; omitted, nothing is logged.
+    """
+    token = _non_empty_string_or_none(settings_mapping.get("scene_deploy_token"))
+    if token is None or storage is None:
+        return
+    logger = logger if logger is not None else Logger.SILENT
+    store = DeviceStateStore(storage, logger)
+    if store.get("scene_deploy_token") == token:
+        return
+    persisted = store.get("scene")
+    store.update({"scene_deploy_token": token}, remove=("scene", "return_to"))
+    cleared = "no Persisted scene to clear" if persisted is None else f"cleared {persisted!r}"
+    deployed = settings_mapping.get("default_scene")
+    logger.log(f"scene deploy {token} applied: booting {deployed!r}, {cleared}")
 
 
 def resolve_boot_scene(
