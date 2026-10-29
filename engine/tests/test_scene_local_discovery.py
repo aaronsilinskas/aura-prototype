@@ -14,7 +14,6 @@ from engine.tests.helpers import (
     SpyEffectControls,
     make_scene_manager,
     rule_source,
-    scan_scenes,
 )
 
 _GROUP = EventGroup("test")
@@ -30,8 +29,8 @@ def _make_engine() -> GameEngine:
 
 
 def test_a_scenes_rules_folder_items_are_its_local_rules(pack_tree) -> None:
-    registry = scan_scenes(
-        pack_tree, {"forest": {"rules": {"ambush": rule_source("Ambush")}}}
+    registry = pack_tree.scan(
+        scenes={"forest": {"rules": {"ambush": rule_source("Ambush")}}}
     ).scene_registry
 
     scene = registry.get("forest")
@@ -45,8 +44,8 @@ def test_scene_constructed_directly_has_empty_local_rule_registry() -> None:
 
 
 def test_each_fresh_scene_shares_one_local_rule_registry(pack_tree) -> None:
-    registry = scan_scenes(
-        pack_tree, {"forest": {"rules": {"my_rule": rule_source()}}}
+    registry = pack_tree.scan(
+        scenes={"forest": {"rules": {"my_rule": rule_source()}}}
     ).scene_registry
 
     scene_a = registry.get("forest")
@@ -56,8 +55,8 @@ def test_each_fresh_scene_shares_one_local_rule_registry(pack_tree) -> None:
 
 
 def test_a_scenes_local_rules_are_not_visible_to_another_scene(pack_tree) -> None:
-    registry = scan_scenes(
-        pack_tree, {"forest": {"rules": {"secret_rule": rule_source()}}, "cave": {}}
+    registry = pack_tree.scan(
+        scenes={"forest": {"rules": {"secret_rule": rule_source()}}, "cave": {}}
     ).scene_registry
 
     cave_scene = registry.get("cave")
@@ -70,7 +69,7 @@ def test_a_scenes_local_rules_are_not_visible_to_another_scene(pack_tree) -> Non
 
 
 def test_scene_manager_load_includes_scene_local_rules_in_engine(pack_tree) -> None:
-    catalog = scan_scenes(pack_tree, {"my_scene": {"rules": {"local_rule": rule_source()}}})
+    catalog = pack_tree.scan(scenes={"my_scene": {"rules": {"local_rule": rule_source()}}})
 
     engine = _make_engine()
     manager = make_scene_manager(catalog, engine=engine)
@@ -108,7 +107,7 @@ def test_scene_manager_load_appends_local_rules_after_pack_rules(pack_tree) -> N
 def test_a_local_rule_without_a_rule_attribute_fails_when_the_scene_load_is_applied(
     pack_tree,
 ) -> None:
-    catalog = scan_scenes(pack_tree, {"my_scene": {"rules": {"broken_rule": "NOT_A_RULE = 1"}}})
+    catalog = pack_tree.scan(scenes={"my_scene": {"rules": {"broken_rule": "NOT_A_RULE = 1"}}})
 
     manager = make_scene_manager(catalog)
     manager.load("my_scene")
@@ -118,8 +117,8 @@ def test_a_local_rule_without_a_rule_attribute_fails_when_the_scene_load_is_appl
 
 
 def test_scene_manager_local_rules_are_not_active_for_other_loaded_scene(pack_tree) -> None:
-    catalog = scan_scenes(
-        pack_tree, {"scene_a": {"rules": {"local_rule": rule_source()}}, "scene_b": {}}
+    catalog = pack_tree.scan(
+        scenes={"scene_a": {"rules": {"local_rule": rule_source()}}, "scene_b": {}}
     )
 
     engine = _make_engine()
@@ -145,7 +144,7 @@ def test_local_rule_receives_events_after_scene_load(pack_tree) -> None:
         "\n"
         "RULE = RecorderRule()\n"
     )
-    catalog = scan_scenes(pack_tree, {"my_scene": {"rules": {"recorder": rule_src}}})
+    catalog = pack_tree.scan(scenes={"my_scene": {"rules": {"recorder": rule_src}}})
 
     engine = _make_engine()
     manager = make_scene_manager(catalog, engine=engine)

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from engine.audio import AudioOverlayAdmin
 from engine.engine import GameEngine
-from engine.pack_catalog import PackCatalog, scan_pack_roots
+from engine.pack_catalog import PackCatalog
 from engine.scene import SceneManager
 from engine.state import (
     EffectAdmin,
@@ -16,7 +16,7 @@ from engine.state import (
 )
 
 if TYPE_CHECKING:
-    from engine.tests.pack_tree import PackTree
+    pass
 
 _STUB_RECEIPT_ID = 0
 
@@ -144,14 +144,6 @@ def rule_source(class_name: str = "ARule") -> str:
         "class " + class_name + "(GameRule): pass\n"
         "RULE = " + class_name + "()\n"
     )
-
-
-def scan_scenes(pack_tree: PackTree, scenes: dict[str, dict]) -> PackCatalog:
-    """Scan one root holding *scenes*, each name mapped to its ``pack_tree.scene`` fields."""
-    root = pack_tree.root("ts_flash")
-    for name, fields in scenes.items():
-        pack_tree.scene(root, name, **fields)
-    return scan_pack_roots([str(root)])
 
 
 def make_scene_manager(
