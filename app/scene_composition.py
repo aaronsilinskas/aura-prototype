@@ -227,12 +227,11 @@ def build_scene_boot(
 
     The one boot shared by the device (:func:`app.scene_runtime.run_scene`)
     and the Simulated device, as :func:`build_scene_tick` is their one tick.
-    The card's persisted ``scene`` wins over *settings_mapping*'s
-    ``default_scene``, unless *settings_mapping* carries a Scene deploy token
-    the card has not yet applied: applying it clears the persisted scene
-    first (see :func:`~hardware.shared.scene_selection.apply_scene_deploy`).
-    An unknown name raises naming the known scenes. A
-    reboot the scene asks for persists to ``hw.storage``, then calls *reset*.
+    A pending Scene deploy token is applied first (see
+    :func:`~hardware.shared.scene_selection.apply_scene_deploy`); then the
+    card's Persisted scene wins over *settings_mapping*'s ``default_scene``.
+    An unknown name raises naming the known scenes. A reboot the scene asks for
+    persists to ``hw.storage``, then calls *reset*.
 
     *scene_data* maps a scene name to tunables merged over its
     ``initial_data``; the Simulated device boots shortened scenes through it.

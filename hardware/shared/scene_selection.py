@@ -42,21 +42,10 @@ def apply_scene_deploy(
     settings_mapping: dict,
     logger: Logger | None = None,
 ) -> None:
-    """Apply a pending Scene deploy token: clear the Persisted scene once per deploy.
-
-    ``deploy.py --scene`` writes a fresh ``scene_deploy_token`` beside
-    ``default_scene`` in *settings_mapping*. When that token is a non-empty
-    string that differs from the one recorded in the card's
-    ``aura-state.json``, the Persisted scene (``scene`` and ``return_to``) is
-    removed and the token recorded, in one write, so the next resolution
-    falls through to the deployed ``default_scene``. Applying logs one line;
-    an absent or invalid token, a card-less device, or an already-applied
-    token is a silent no-op. The deployed scene is not checked against any
-    registry -- an unknown one fails at resolution, as a bad
-    ``default_scene`` always has.
+    """Apply *settings_mapping*'s Scene deploy token to the card, if not yet applied.
 
     Args:
-        storage: The mounted ``DeviceStorage``, or None on a card-less device.
+        storage: The mounted ``DeviceStorage``, or ``None`` on a card-less device.
         settings_mapping: The raw ``aura-settings.json`` mapping.
         logger: Where the applied-token line and any fail-soft state read
             are logged; omitted, nothing is logged.
@@ -66,10 +55,13 @@ def apply_scene_deploy(
         return
     logger = logger if logger is not None else Logger.SILENT
     store = DeviceStateStore(storage, logger)
-    if store.get("scene_deploy_token") == token:
+    state = store.read()
+    if state.get("scene_deploy_token") == token:
         return
-    persisted = store.get("scene")
-    store.update({"scene_deploy_token": token}, remove=("scene", "return_to"))
+    persisted = state.pop("scene", None)
+    state.pop("return_to", None)
+    state["scene_deploy_token"] = token
+    store.write(state)
     cleared = "no Persisted scene to clear" if persisted is None else f"cleared {persisted!r}"
     deployed = settings_mapping.get("default_scene")
     logger.log(f"scene deploy {token} applied: booting {deployed!r}, {cleared}")
@@ -82,7 +74,7 @@ def resolve_boot_scene(
 ) -> str:
     """Resolve the boot scene: persisted SD ``scene`` -> flash ``default_scene`` -> raise.
 
-    Composes the SD-persisted override (read via a :class:`DeviceStateStore`
+    Composes the card's Persisted scene (read via a :class:`DeviceStateStore`
     over *storage*) with the flash-authored default (*settings_mapping*'s
     ``default_scene``, as read by :func:`read_settings_mapping`). The two
     files key the scene under different names, so each value independently
@@ -92,8 +84,8 @@ def resolve_boot_scene(
     wants when *both* legs are absent.
 
     Args:
-        storage: The mounted ``DeviceStorage`` to read the persisted override
-            through, or None on a card-less device (treated as no override).
+        storage: The mounted ``DeviceStorage`` to read the Persisted scene
+            through, or ``None`` on a card-less device (treated as having none).
         settings_mapping: The raw ``aura-settings.json`` mapping.
         logger: Where a fail-soft persisted-state read is logged; forwarded
             to :class:`DeviceStateStore`.

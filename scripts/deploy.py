@@ -151,12 +151,10 @@ def _sync_file(
 def _write_scene(mount: Path, scene: str) -> None:
     """Set ``default_scene`` and a fresh Scene deploy token in ``aura-settings.json``.
 
-    Merges with any existing keys. The token (``scene_deploy_token``) is new on
-    every call, so the device can tell this deploy from one it already applied
-    and clear a stale Persisted scene once. A board with no
-    ``aura-settings.json`` gets one created fresh holding only these two keys —
-    unlike ``aura-device.json``, there is no sample template to seed from (the
-    settings file is trivially authored).
+    Merges with any existing keys. A board with no ``aura-settings.json`` gets
+    one created fresh holding only these two keys — unlike ``aura-device.json``,
+    there is no sample template to seed from (the settings file is trivially
+    authored).
     """
     settings_path = mount / "aura-settings.json"
     settings = json.loads(settings_path.read_text()) if settings_path.exists() else {}
@@ -358,8 +356,8 @@ def main() -> None:
         default=None,
         help=(
             "Scene name to record as default_scene in aura-settings.json on the mounted "
-            "volume, with a fresh scene_deploy_token so the next boot clears any "
-            "Persisted scene on the card and boots this one. Combines deploying code "
+            "volume, with a fresh scene_deploy_token so the next boot boots this scene "
+            "over any Persisted scene on the card. Combines deploying code "
             "and selecting the game into one step. Omit to leave any existing "
             "aura-settings.json untouched."
         ),
