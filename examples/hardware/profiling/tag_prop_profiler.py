@@ -109,14 +109,13 @@ import time
 
 import board
 
+from app.scene_composition import install_pack_sounds, scan_boot_pack_catalog
 from effects.performance import PerformanceTracker
-from engine.audio import AudioRegistry
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.network import NetworkEvents
-from engine.pack_catalog import scan_pack_roots
 from engine.scene import SceneManager
 from engine.state import SceneReboot
 from engine.timer import Timer
@@ -215,7 +214,7 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, PolledSen
     gc.collect()
     free_after_hardware = gc.mem_free()
 
-    catalog = scan_pack_roots(["packs"])
+    catalog = scan_boot_pack_catalog(hardware.storage)
     effect_registry = catalog.effect_registry
     rule_registry = catalog.rule_registry
     scene_registry = catalog.scene_registry
@@ -243,21 +242,13 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, PolledSen
     gc.collect()
     free_after_engine = gc.mem_free()
 
-    # Pack sounds reach the output's AudioRegistry as boot installs them
-    # (``build_scene_runtime``); a config with no audio gets a fresh, unreachable one.
-    audio_registry = hardware.audio_registry
-    if audio_registry is not None:
-        audio_registry.set_pack_sounds(catalog.pack_sounds)
-    else:
-        audio_registry = AudioRegistry()
-
     manager = SceneManager(
         engine,
         effect_registry,
         rule_registry,
         scene_registry,
         effect_admin=effect_manager,
-        audio_overlay_admin=audio_registry,
+        audio_overlay_admin=install_pack_sounds(hardware, catalog),
         scene_reboot=SceneReboot(),
     )
     manager.load("tag")

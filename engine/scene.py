@@ -40,7 +40,8 @@ class SceneLocalRegistry:
     __slots__ = ("_cache", "_item_attr", "_item_names", "_module_prefix")
 
     def __init__(self) -> None:
-        # An empty registry has no export attribute; get() never reads it.
+        # Empty until ``_from_items`` fills it and sets the export attribute;
+        # until then every get() misses before reading it.
         self._item_attr: str | None = None
         self._item_names: set[str] = set()
         self._module_prefix: str = ""

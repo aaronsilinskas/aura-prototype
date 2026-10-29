@@ -282,7 +282,6 @@ def _pack_sounds(effect_packs: list[_PackEntry]) -> dict[str, str]:
 
 
 def _scan_sounds(sound_dir: str) -> dict[str, str]:
-    # A missing sounds/ folder yields no sounds.
     return _path.scan_stems(sound_dir, _SOUND_EXTENSIONS)
 
 

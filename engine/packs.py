@@ -162,7 +162,8 @@ class PackRegistry:
     __slots__ = ("_cache", "_item_attr", "_packs")
 
     def __init__(self) -> None:
-        # An empty registry has no export attribute; get() never reads it.
+        # Empty until ``_from_packs`` fills it and sets the export attribute;
+        # until then every get() misses before reading it.
         self._item_attr: str | None = None
         self._packs: dict[str, _PackEntry] = {}
         self._cache: dict[tuple[str, str], object] = {}

@@ -5,7 +5,6 @@ import pytest
 from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.events import EffectEvent
-from engine.pack_catalog import scan_pack_roots
 from engine.packs import PackRegistry
 from engine.scene import SceneLocalRegistry
 from engine.state import Scope
@@ -22,13 +21,6 @@ from engine.timer import Timer
 # ---------------------------------------------------------------------------
 
 
-def _effect_registry(pack_tree, pack_name: str, items: dict[str, str]) -> PackRegistry:
-    """Scan one root holding effect pack *pack_name* with *items* (item name → source)."""
-    root = pack_tree.root("tp_flash")
-    pack_tree.effect_pack(root, pack_name, items=items)
-    return scan_pack_roots([str(root)]).effect_registry
-
-
 def _stub_item() -> str:
     return (
         "from engine.tests.effects.helpers import StubEffectBuilder\nBUILD = StubEffectBuilder()\n"
@@ -41,9 +33,9 @@ def _spy_item() -> str:
 
 def _make_stub_registry(pack_tree) -> PackRegistry:
     """Return a scanned PackRegistry with a 'stub' pack providing common test effects."""
-    return _effect_registry(
-        pack_tree, "stub", {"fire": _stub_item(), "ice": _stub_item(), "shock": _stub_item()}
-    )
+    return pack_tree.scan(
+        effect_packs={"stub": {"fire": _stub_item(), "ice": _stub_item(), "shock": _stub_item()}}
+    ).effect_registry
 
 
 def _make_timer() -> Timer:
@@ -168,7 +160,9 @@ def test_set_effect_twice_replaces_effect(pack_tree) -> None:
 
 def test_set_effect_twice_first_effect_not_advanced(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    registry = _effect_registry(pack_tree, "spy", {"fire": _spy_item(), "ice": _spy_item()})
+    registry = pack_tree.scan(
+        effect_packs={"spy": {"fire": _spy_item(), "ice": _spy_item()}}
+    ).effect_registry
     manager = _make_manager(registry=registry, outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "spy.fire", {})
@@ -204,16 +198,16 @@ def test_out_of_scope_output_receives_go_dark_each_frame(pack_tree) -> None:
 
 
 def test_effect_event_reaches_matching_scope_output(pack_tree) -> None:
-    registry = _effect_registry(
-        pack_tree,
-        "events",
-        {
-            "shock": (
-                "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
-                "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
-            )
-        },
-    )
+    registry = pack_tree.scan(
+        effect_packs={
+            "events": {
+                "shock": (
+                    "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
+                    "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
+                )
+            }
+        }
+    ).effect_registry
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
 
@@ -227,16 +221,16 @@ def test_effect_event_reaches_matching_scope_output(pack_tree) -> None:
 
 
 def test_effect_event_does_not_reach_out_of_scope_output(pack_tree) -> None:
-    registry = _effect_registry(
-        pack_tree,
-        "events",
-        {
-            "shock": (
-                "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
-                "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
-            )
-        },
-    )
+    registry = pack_tree.scan(
+        effect_packs={
+            "events": {
+                "shock": (
+                    "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
+                    "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
+                )
+            }
+        }
+    ).effect_registry
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(registry=registry, outputs=[output_a, output_b])
@@ -253,16 +247,16 @@ def test_effect_event_does_not_reach_out_of_scope_output(pack_tree) -> None:
 
 
 def test_resolution_equals_max_min_resolution_of_matching_outputs(pack_tree) -> None:
-    registry = _effect_registry(
-        pack_tree,
-        "capture",
-        {
-            "fire": (
-                "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
-                "BUILD = CapturingEffectBuilder()\n"
-            )
-        },
-    )
+    registry = pack_tree.scan(
+        effect_packs={
+            "capture": {
+                "fire": (
+                    "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
+                    "BUILD = CapturingEffectBuilder()\n"
+                )
+            }
+        }
+    ).effect_registry
     output_a = SpyEffectOutput(min_resolution=32, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=64, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output_a, output_b])
@@ -274,16 +268,16 @@ def test_resolution_equals_max_min_resolution_of_matching_outputs(pack_tree) -> 
 
 
 def test_resolution_falls_back_to_default_when_no_outputs_match(pack_tree) -> None:
-    registry = _effect_registry(
-        pack_tree,
-        "capture",
-        {
-            "fire": (
-                "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
-                "BUILD = CapturingEffectBuilder()\n"
-            )
-        },
-    )
+    registry = pack_tree.scan(
+        effect_packs={
+            "capture": {
+                "fire": (
+                    "from engine.tests.effects.helpers import CapturingEffectBuilder\n"
+                    "BUILD = CapturingEffectBuilder()\n"
+                )
+            }
+        }
+    ).effect_registry
     manager = _make_manager(registry=registry, outputs=[])
 
     manager.set_effect(Scope.PERSONAL, "capture.fire", {})
@@ -310,7 +304,9 @@ def test_add_effect_after_set_effect_delivers_a_single_composed_frame(pack_tree)
 
 def test_add_effect_both_effects_advanced_on_each_update(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    registry = _effect_registry(pack_tree, "spy", {"fire": _spy_item(), "ice": _spy_item()})
+    registry = pack_tree.scan(
+        effect_packs={"spy": {"fire": _spy_item(), "ice": _spy_item()}}
+    ).effect_registry
     manager = _make_manager(registry=registry, outputs=[output])
 
     manager.set_effect(Scope.PERSONAL, "spy.fire", {})
@@ -340,20 +336,20 @@ def test_add_effect_layers_split_two_effects_side_by_side_in_one_buffer(pack_tre
     each in its own contiguous slice of the composed region -- not just the
     topmost effect.
     """
-    registry = _effect_registry(
-        pack_tree,
-        "color",
-        {
-            "red": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
-            ),
-            "blue": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
-            ),
-        },
-    )
+    registry = pack_tree.scan(
+        effect_packs={
+            "color": {
+                "red": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+                ),
+                "blue": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
+                ),
+            }
+        }
+    ).effect_registry
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
 
@@ -367,16 +363,16 @@ def test_add_effect_layers_split_two_effects_side_by_side_in_one_buffer(pack_tre
 
 def test_render_runs_after_merge_strategy_sizes_the_buffer(pack_tree) -> None:
     """Split's prepare_buffers partitions each buffer before an effect renders into it."""
-    registry = _effect_registry(
-        pack_tree,
-        "probe",
-        {
-            "beam": (
-                "from engine.tests.effects.helpers import RenderLengthProbeEffectBuilder\n"
-                "BUILD = RenderLengthProbeEffectBuilder()\n"
-            )
-        },
-    )
+    registry = pack_tree.scan(
+        effect_packs={
+            "probe": {
+                "beam": (
+                    "from engine.tests.effects.helpers import RenderLengthProbeEffectBuilder\n"
+                    "BUILD = RenderLengthProbeEffectBuilder()\n"
+                )
+            }
+        }
+    ).effect_registry
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
 
@@ -443,7 +439,7 @@ def test_stop_effect_does_not_affect_other_scopes(pack_tree) -> None:
 
 def test_shared_effect_advanced_once_per_frame_for_composite_scope(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.ALL])
-    registry = _effect_registry(pack_tree, "spy", {"fire": _spy_item()})
+    registry = pack_tree.scan(effect_packs={"spy": {"fire": _spy_item()}}).effect_registry
     manager = _make_manager(registry=registry, outputs=[output])
 
     manager.set_effect(Scope.ALL, "spy.fire", {})
@@ -878,7 +874,7 @@ def test_unknown_pack_raises_value_error() -> None:
 
 
 def test_unknown_effect_in_known_pack_raises_value_error(pack_tree) -> None:
-    registry = _effect_registry(pack_tree, "elements", {"fire": _stub_item()})
+    registry = pack_tree.scan(effect_packs={"elements": {"fire": _stub_item()}}).effect_registry
     manager = _make_manager(registry=registry, outputs=[])
 
     with pytest.raises(ValueError, match="Unknown effect 'flash' in pack 'elements'"):
@@ -1138,16 +1134,16 @@ def test_create_buffer_not_called_for_out_of_scope_output(pack_tree) -> None:
 
 def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_tree) -> None:
     """Effect-triggered events after scope narrowing must reach only remaining-scope outputs."""
-    registry = _effect_registry(
-        pack_tree,
-        "evt",
-        {
-            "shock": (
-                "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
-                "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
-            )
-        },
-    )
+    registry = pack_tree.scan(
+        effect_packs={
+            "evt": {
+                "shock": (
+                    "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
+                    "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
+                )
+            }
+        }
+    ).effect_registry
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(registry=registry, outputs=[output_personal, output_directional])
@@ -1258,19 +1254,19 @@ def test_pixel_output_alongside_non_pixel_output_both_get_flush(pack_tree) -> No
 
 
 def test_effect_with_renders_pixels_false_skips_buffer_allocation(pack_tree) -> None:
-    registry = _effect_registry(
-        pack_tree,
-        "nopix",
-        {
-            "event": (
-                "from effects.effect import Effect, EffectConfig\n"
-                "from engine.effects.manager import EffectBuilder\n"
-                "class _Builder(EffectBuilder):\n"
-                "    def __call__(self, name, config): return Effect(name=name)\n"
-                "BUILD = _Builder()\n"
-            )
-        },
-    )
+    registry = pack_tree.scan(
+        effect_packs={
+            "nopix": {
+                "event": (
+                    "from effects.effect import Effect, EffectConfig\n"
+                    "from engine.effects.manager import EffectBuilder\n"
+                    "class _Builder(EffectBuilder):\n"
+                    "    def __call__(self, name, config): return Effect(name=name)\n"
+                    "BUILD = _Builder()\n"
+                )
+            }
+        }
+    ).effect_registry
 
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
@@ -1281,19 +1277,19 @@ def test_effect_with_renders_pixels_false_skips_buffer_allocation(pack_tree) -> 
 
 
 def test_effect_with_renders_pixels_false_skips_update_pixels_but_calls_flush(pack_tree) -> None:
-    registry = _effect_registry(
-        pack_tree,
-        "nopix",
-        {
-            "event": (
-                "from effects.effect import Effect, EffectConfig\n"
-                "from engine.effects.manager import EffectBuilder\n"
-                "class _Builder(EffectBuilder):\n"
-                "    def __call__(self, name, config): return Effect(name=name)\n"
-                "BUILD = _Builder()\n"
-            )
-        },
-    )
+    registry = pack_tree.scan(
+        effect_packs={
+            "nopix": {
+                "event": (
+                    "from effects.effect import Effect, EffectConfig\n"
+                    "from engine.effects.manager import EffectBuilder\n"
+                    "class _Builder(EffectBuilder):\n"
+                    "    def __call__(self, name, config): return Effect(name=name)\n"
+                    "BUILD = _Builder()\n"
+                )
+            }
+        }
+    ).effect_registry
 
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
@@ -1372,20 +1368,20 @@ def test_set_effect_rejects_out_of_range_loudness_option(pack_tree) -> None:
 
 def test_set_merge_strategy_takes_effect_starting_next_tick(pack_tree) -> None:
     """Switching from Split to Additive mid-run blends from the very next tick onward."""
-    registry = _effect_registry(
-        pack_tree,
-        "color",
-        {
-            "red": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
-            ),
-            "blue": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
-            ),
-        },
-    )
+    registry = pack_tree.scan(
+        effect_packs={
+            "color": {
+                "red": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+                ),
+                "blue": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
+                ),
+            }
+        }
+    ).effect_registry
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
     manager.add_effect(Scope.PERSONAL, "color.red", {})
@@ -1405,20 +1401,20 @@ def test_set_merge_strategy_takes_effect_starting_next_tick(pack_tree) -> None:
 
 
 def test_set_merge_strategy_leaves_other_scopes_strategy_unchanged(pack_tree) -> None:
-    registry = _effect_registry(
-        pack_tree,
-        "color",
-        {
-            "red": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
-            ),
-            "blue": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
-            ),
-        },
-    )
+    registry = pack_tree.scan(
+        effect_packs={
+            "color": {
+                "red": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+                ),
+                "blue": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
+                ),
+            }
+        }
+    ).effect_registry
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
         registry=registry,
@@ -1471,16 +1467,16 @@ def test_two_outputs_sharing_scope_each_gets_its_own_buffer(pack_tree) -> None:
 
 
 def test_two_outputs_sharing_scope_both_reflect_the_same_receipts_brightness(pack_tree) -> None:
-    registry = _effect_registry(
-        pack_tree,
-        "color",
-        {
-            "red": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
-            )
-        },
-    )
+    registry = pack_tree.scan(
+        effect_packs={
+            "color": {
+                "red": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+                )
+            }
+        }
+    ).effect_registry
     output_a = SpyEffectOutput(min_resolution=4, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=4, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output_a, output_b])
@@ -1542,20 +1538,20 @@ def test_apply_merge_strategies_installs_the_given_snapshot_as_the_live_map() ->
 def test_apply_merge_strategies_takes_effect_on_the_very_next_tick(pack_tree) -> None:
     """Direct-installing a captured Split snapshot over a live Additive choice
     must change the composed pixels from the very next update()."""
-    registry = _effect_registry(
-        pack_tree,
-        "color",
-        {
-            "red": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
-            ),
-            "blue": (
-                "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-                "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
-            ),
-        },
-    )
+    registry = pack_tree.scan(
+        effect_packs={
+            "color": {
+                "red": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
+                ),
+                "blue": (
+                    "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
+                    "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
+                ),
+            }
+        }
+    ).effect_registry
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=registry, outputs=[output])
     split_snapshot = manager.capture_merge_strategies()

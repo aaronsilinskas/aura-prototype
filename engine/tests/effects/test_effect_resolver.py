@@ -8,7 +8,6 @@ They do not construct fake outputs or go through set_effect/add_effect.
 import pytest
 
 from engine.effects.manager import EffectBuilder, EffectResolver
-from engine.pack_catalog import scan_pack_roots
 from engine.packs import PackRegistry, UnknownItemError
 from engine.scene import SceneLocalRegistry
 
@@ -33,18 +32,10 @@ def _no_build_source() -> str:
     return "# no BUILD here\n"
 
 
-def _effect_registry(pack_tree, pack_name: str, items: dict[str, str]) -> PackRegistry:
-    """Scan one root holding effect pack *pack_name* with *items* (item name → source)."""
-    root = pack_tree.root("tr_flash")
-    pack_tree.effect_pack(root, pack_name, items=items)
-    return scan_pack_roots([str(root)]).effect_registry
-
-
 def _local_effects(pack_tree, scene_name: str, items: dict[str, str]) -> SceneLocalRegistry:
     """Scan one root holding scene *scene_name* with local effects *items*; return its registry."""
-    root = pack_tree.root("tr_flash")
-    pack_tree.scene(root, scene_name, effects=items)
-    return scan_pack_roots([str(root)]).scene_registry.get(scene_name).local_effect_registry
+    catalog = pack_tree.scan(scenes={scene_name: {"effects": items}})
+    return catalog.scene_registry.get(scene_name).local_effect_registry
 
 
 # ---------------------------------------------------------------------------
@@ -53,7 +44,9 @@ def _local_effects(pack_tree, scene_name: str, items: dict[str, str]) -> SceneLo
 
 
 def test_resolve_returns_builder_pack_and_effect_name_for_known_effect(pack_tree) -> None:
-    registry = _effect_registry(pack_tree, "elements", {"fire": _stub_item_source()})
+    registry = pack_tree.scan(
+        effect_packs={"elements": {"fire": _stub_item_source()}}
+    ).effect_registry
     resolver = EffectResolver(registry)
     resolver.set_allowed_packs(frozenset({"elements"}))
 
@@ -65,7 +58,9 @@ def test_resolve_returns_builder_pack_and_effect_name_for_known_effect(pack_tree
 
 
 def test_resolve_returns_same_builder_instance_on_repeated_calls(pack_tree) -> None:
-    registry = _effect_registry(pack_tree, "elements", {"fire": _stub_item_source()})
+    registry = pack_tree.scan(
+        effect_packs={"elements": {"fire": _stub_item_source()}}
+    ).effect_registry
     resolver = EffectResolver(registry)
     resolver.set_allowed_packs(frozenset({"elements"}))
 
@@ -138,7 +133,9 @@ def test_resolve_raises_for_unknown_pack() -> None:
 
 
 def test_resolve_raises_for_unknown_effect_in_known_pack(pack_tree) -> None:
-    registry = _effect_registry(pack_tree, "elements", {"fire": _stub_item_source()})
+    registry = pack_tree.scan(
+        effect_packs={"elements": {"fire": _stub_item_source()}}
+    ).effect_registry
     resolver = EffectResolver(registry)
     resolver.set_allowed_packs(frozenset({"elements"}))
 
@@ -152,7 +149,9 @@ def test_resolve_raises_for_unknown_effect_in_known_pack(pack_tree) -> None:
 
 
 def test_resolve_raises_for_invalid_build_attribute(pack_tree) -> None:
-    registry = _effect_registry(pack_tree, "elements", {"bad": _invalid_build_source()})
+    registry = pack_tree.scan(
+        effect_packs={"elements": {"bad": _invalid_build_source()}}
+    ).effect_registry
     resolver = EffectResolver(registry)
     resolver.set_allowed_packs(frozenset({"elements"}))
 
@@ -166,7 +165,9 @@ def test_resolve_raises_for_invalid_build_attribute(pack_tree) -> None:
 
 
 def test_resolve_raises_for_missing_build_attribute(pack_tree) -> None:
-    registry = _effect_registry(pack_tree, "elements", {"nobuild": _no_build_source()})
+    registry = pack_tree.scan(
+        effect_packs={"elements": {"nobuild": _no_build_source()}}
+    ).effect_registry
     resolver = EffectResolver(registry)
     resolver.set_allowed_packs(frozenset({"elements"}))
 
@@ -293,7 +294,9 @@ def test_set_local_effects_replaces_previous_registry_old_effects_no_longer_reso
 
 def test_resolve_raises_when_no_allowed_packs_installed(pack_tree) -> None:
     """A fresh resolver's allowed-pack set defaults to None — fail closed."""
-    registry = _effect_registry(pack_tree, "elements", {"fire": _stub_item_source()})
+    registry = pack_tree.scan(
+        effect_packs={"elements": {"fire": _stub_item_source()}}
+    ).effect_registry
     resolver = EffectResolver(registry)
 
     with pytest.raises(ValueError, match="no scene is active"):
@@ -301,7 +304,9 @@ def test_resolve_raises_when_no_allowed_packs_installed(pack_tree) -> None:
 
 
 def test_resolve_no_active_scene_error_includes_the_effect_name(pack_tree) -> None:
-    registry = _effect_registry(pack_tree, "elements", {"fire": _stub_item_source()})
+    registry = pack_tree.scan(
+        effect_packs={"elements": {"fire": _stub_item_source()}}
+    ).effect_registry
     resolver = EffectResolver(registry)
 
     with pytest.raises(ValueError, match=r"elements\.fire"):
@@ -309,7 +314,9 @@ def test_resolve_no_active_scene_error_includes_the_effect_name(pack_tree) -> No
 
 
 def test_resolve_raises_for_pack_not_declared_by_active_scene(pack_tree) -> None:
-    registry = _effect_registry(pack_tree, "elements", {"fire": _stub_item_source()})
+    registry = pack_tree.scan(
+        effect_packs={"elements": {"fire": _stub_item_source()}}
+    ).effect_registry
     resolver = EffectResolver(registry)
     resolver.set_allowed_packs(frozenset({"other"}))
 
@@ -321,7 +328,9 @@ def test_undeclared_pack_error_does_not_say_unknown_pack(pack_tree) -> None:
     """The pack exists in the registry — it just isn't declared by the active
     scene — so the message must be honest and distinct from 'Unknown effect pack'.
     """
-    registry = _effect_registry(pack_tree, "elements", {"fire": _stub_item_source()})
+    registry = pack_tree.scan(
+        effect_packs={"elements": {"fire": _stub_item_source()}}
+    ).effect_registry
     resolver = EffectResolver(registry)
     resolver.set_allowed_packs(frozenset({"other"}))
 
@@ -347,7 +356,9 @@ def test_resolve_membership_checked_before_registry_lookup() -> None:
 
 
 def test_resolve_succeeds_for_declared_pack(pack_tree) -> None:
-    registry = _effect_registry(pack_tree, "elements", {"fire": _stub_item_source()})
+    registry = pack_tree.scan(
+        effect_packs={"elements": {"fire": _stub_item_source()}}
+    ).effect_registry
     resolver = EffectResolver(registry)
     resolver.set_allowed_packs(frozenset({"elements"}))
 
@@ -359,7 +370,9 @@ def test_resolve_succeeds_for_declared_pack(pack_tree) -> None:
 
 
 def test_set_allowed_packs_none_clears_pack_prefix_resolution(pack_tree) -> None:
-    registry = _effect_registry(pack_tree, "elements", {"fire": _stub_item_source()})
+    registry = pack_tree.scan(
+        effect_packs={"elements": {"fire": _stub_item_source()}}
+    ).effect_registry
     resolver = EffectResolver(registry)
     resolver.set_allowed_packs(frozenset({"elements"}))
     resolver.set_allowed_packs(None)
@@ -369,7 +382,9 @@ def test_set_allowed_packs_none_clears_pack_prefix_resolution(pack_tree) -> None
 
 
 def test_set_allowed_packs_replaces_previous_set(pack_tree) -> None:
-    registry = _effect_registry(pack_tree, "elements", {"fire": _stub_item_source()})
+    registry = pack_tree.scan(
+        effect_packs={"elements": {"fire": _stub_item_source()}}
+    ).effect_registry
     resolver = EffectResolver(registry)
     resolver.set_allowed_packs(frozenset({"other"}))
     resolver.set_allowed_packs(frozenset({"elements"}))

@@ -10,6 +10,8 @@ import json
 from collections.abc import Iterable
 from pathlib import Path
 
+from engine.pack_catalog import PackCatalog, scan_pack_roots
+
 
 class PackTree:
     """Builds pack roots under *base*, each a real directory tree the catalog scans.
@@ -93,6 +95,31 @@ class PackTree:
         _write_items(scene_dir / "rules", rules)
         _write_sounds(scene_dir, sounds)
         return scene_dir
+
+    def scan(
+        self,
+        *,
+        effect_packs: dict[str, dict[str, str]] | None = None,
+        rule_packs: dict[str, dict[str, str]] | None = None,
+        scenes: dict[str, dict] | None = None,
+    ) -> PackCatalog:
+        """Lay out one root holding the given packs and scenes, and scan it.
+
+        Packs map a pack name to its *items*; *scenes* map a scene name to its
+        ``scene`` keyword arguments.
+        """
+        root = self.root("tp_tree")
+        for name, items in (effect_packs or {}).items():
+            self.effect_pack(root, name, items=items)
+        for name, items in (rule_packs or {}).items():
+            self.rule_pack(root, name, items=items)
+        for name, fields in (scenes or {}).items():
+            self.scene(root, name, **fields)
+        return self.scan_roots(root)
+
+    def scan_roots(self, *roots: Path) -> PackCatalog:
+        """Scan *roots*, in order, into a ``PackCatalog``."""
+        return scan_pack_roots([str(root) for root in roots])
 
     def _pack(self, pack_dir: Path, version: str | None, items: dict[str, str] | None) -> Path:
         pack_dir.mkdir(parents=True, exist_ok=True)

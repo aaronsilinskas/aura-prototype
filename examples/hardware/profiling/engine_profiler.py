@@ -77,7 +77,7 @@ from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
-from engine.pack_catalog import scan_pack_roots
+from engine.pack_catalog import PackCatalog, scan_pack_roots
 from engine.state import GameState, SceneControls
 from hardware.shared.profiler_report import (
     linear_fit,
@@ -121,23 +121,22 @@ class _ProfilerRule(GameRule):
         """No-op handler -- exists only to be dispatched to by the engine."""
 
 
-def _build_engine(rule_count: int) -> tuple[GameEngine, GameState]:
-    registry = scan_pack_roots(["packs"]).effect_registry
-    effect_manager = EffectManager(registry=registry, outputs=[])
+def _build_engine(catalog: PackCatalog, rule_count: int) -> tuple[GameEngine, GameState]:
+    effect_manager = EffectManager(registry=catalog.effect_registry, outputs=[])
     game_engine = GameEngine(effect_controls=effect_manager)
     game_engine.set_rules([_ProfilerRule() for _ in range(rule_count)])
     game_state = game_engine.create_state(SceneControls())
     return game_engine, game_state
 
 
-def _run_point(rule_count: int, events_per_tick: int) -> float:
+def _run_point(catalog: PackCatalog, rule_count: int, events_per_tick: int) -> float:
     """Run one steady-state sweep point and return its average Update Time (ms).
 
     Reports the uniform stats line each interval while the point runs, then
     returns the steady-state per-tick Update Time so the caller can fit the
     `tick_fixed_ms` / `per_rule_ms` / `per_event_ms` constants across the sweep.
     """
-    game_engine, game_state = _build_engine(rule_count)
+    game_engine, game_state = _build_engine(catalog, rule_count)
     perf = PerformanceTracker(log_interval=LOG_INTERVAL_SECONDS)
 
     # Pre-allocate the events queued each frame -- update() drains the queue
@@ -176,8 +175,11 @@ def _run_point(rule_count: int, events_per_tick: int) -> float:
 
 def run() -> None:
     """Sweep rule_count and events_per_tick independently, each at a fixed reference."""
+    # One scan, held for the whole sweep as boot holds it.
+    catalog = scan_pack_roots(["packs"])
+
     # (0, 0) point: tick_fixed_ms zero point, reproduces the engine-host baseline.
-    tick_fixed_ms = _run_point(rule_count=0, events_per_tick=0)
+    tick_fixed_ms = _run_point(catalog, rule_count=0, events_per_tick=0)
 
     # Sweep rule_count, holding events_per_tick at the reference -> per_rule_ms slope.
     rule_counts = []
@@ -186,7 +188,7 @@ def run() -> None:
         if rule_count == 0:
             continue  # already covered by the (0, 0) point above
         rule_counts.append(rule_count)
-        rule_update_ms.append(_run_point(rule_count, REFERENCE_EVENTS_PER_TICK))
+        rule_update_ms.append(_run_point(catalog, rule_count, REFERENCE_EVENTS_PER_TICK))
 
     # Sweep events_per_tick, holding rule_count at the reference -> per_event_ms slope.
     event_counts = []
@@ -195,7 +197,7 @@ def run() -> None:
         if events_per_tick == 0:
             continue  # already covered by the (0, 0) point above
         event_counts.append(events_per_tick)
-        event_update_ms.append(_run_point(REFERENCE_RULE_COUNT, events_per_tick))
+        event_update_ms.append(_run_point(catalog, REFERENCE_RULE_COUNT, events_per_tick))
 
     per_rule_ms, _ = linear_fit(rule_counts, rule_update_ms)
     per_event_ms, _ = linear_fit(event_counts, event_update_ms)
