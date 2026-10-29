@@ -286,3 +286,20 @@ def test_budget_counts_strips_held_at_their_declared_value_or_at_the_floor():
     )
 
     assert result.neopixel_current_budget.at_min_brightness == 2
+
+
+def test_strip_count_raised_beyond_its_declaration_is_budgeted_at_the_raised_count():
+    # Declared 10 px @ 1.0 (600 mA) fits 2000 mA as declared; raising the count
+    # to 100 px (6000 mA) in the mapping gets it dimmed to a third on re-parse.
+    mapping = {
+        "pixels": [_strip("D5", 10, 1.0)],
+        "neopixel_current_budget": {"current_limit_ma": 2000},
+    }
+    assert parse_device_config(mapping).pixels[0].strips[0].brightness == 1.0
+    mapping["pixels"][0]["count"] = 100
+
+    result = parse_device_config(mapping)
+
+    assert result.pixels[0].strips[0].count == 100
+    assert result.pixels[0].strips[0].brightness == pytest.approx(1 / 3)
+    assert result.neopixel_current_budget.estimate_ma == pytest.approx(6000)

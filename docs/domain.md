@@ -73,7 +73,8 @@ hardware/         Hardware abstraction layer
                   pio_pulse_writer, counting_i2c, rfm69_radio_transport,
                   sdcard_storage, usb_cdc_transport, boot)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
-                  device_config, device_settings, device_state, device_hardware,
+                  device_config, neopixel_current_budget, device_settings, device_state,
+                  device_hardware,
                   device_storage, network_controls, scene_selection, ir_transport,
                   ir_transceiver, ir_wiring, ir_codecs/ (base, aura, tag), ir_telemetry,
                   radio_transport, radio_transceiver, sd_sync_protocol, sd_sync_server,
@@ -174,7 +175,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `ValueWithModifiers` | `magic/values.py` | Base value + temporary multiplier stack |
 | `Duration` | `magic/values.py` | Expiry tracker |
 | `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; optional `pixels` list plus optional IR/audio/I2C/sensor/haptics sections |
-| `NeoPixelCurrentBudgetConfig` | `hardware/shared/device_config.py` | Opt-in `neopixel_current_budget` policy; the parser folds the tuned brightness into each NeoPixel strip config and records the estimate/scale for boot narration |
+| `NeoPixelCurrentBudgetConfig` | `hardware/shared/device_config.py` | Opt-in `neopixel_current_budget` policy; the parser calls `tune_neopixel_brightness` (`hardware/shared/neopixel_current_budget.py`) to fold the tuned brightness into each NeoPixel strip config, and records the estimate/scale for boot narration |
 | `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the Device assembly returns (outputs, sensors, network seam, `ir`, radio, storage) |
 | `assemble_device` | `hardware/shared/device_assembly.py` | The **Device assembly**: board-free `DeviceConfig` → `DeviceHardware`, owning gating, bus requirements, build order, narration, buttons, IR/radio wiring and network controls; reaches hardware only through `DeviceParts` |
 | `DeviceParts` / `PinRef` | `hardware/shared/device_parts.py` | Port the Device assembly builds each part through (one constructor per part), taking config sections and pin references (a pin name with its config field); adapters `SimulatedParts` (`hardware/simulated/simulated_parts.py`, which also decides what persists across a reboot) and `CircuitPythonParts` (`hardware/circuitpython/circuitpython_parts.py`) |
