@@ -1,11 +1,11 @@
 """SdSyncServer -- the board-free device side of the SD-sync protocol.
 
 Services requests against a :class:`~hardware.shared.device_storage.DeviceStorage`
-(the real ``SdCardStorage`` adapter on-device, ``FakeDeviceStorage`` under test),
-speaking only the frame vocabulary in :mod:`hardware.shared.sd_sync_protocol`. It
-owns no serial code -- ``Transport`` is an injected port, so the same server
-logic runs against the real device's data CDC channel or an in-memory loopback
-without change.
+(the real ``SdCardStorage`` adapter on-device; under test, a ``DeviceStorage``
+over a temporary directory), speaking only the frame vocabulary in
+:mod:`hardware.shared.sd_sync_protocol`. It owns no serial code --
+``Transport`` is an injected port, so the same server logic runs against the
+real device's data CDC channel or an in-memory loopback without change.
 
 Three verbs ship: ``pull`` (served by :meth:`serve_pull`), which streams a
 file's bytes chunk-by-chunk with a whole-file CRC-32 for the client to verify;
