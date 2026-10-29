@@ -2,11 +2,7 @@ import engine._path as _path
 
 
 def scan_sound_dir(path: str) -> dict[str, str]:
-    """Return a stem → WAV path map for every ``*.wav`` file directly in *path*.
-
-    Applies ``engine._path.scan_stems``'s stem rule to ``.wav`` files; a
-    missing or non-directory *path* yields an empty map.
-    """
+    """Return a stem → WAV path map for ``*.wav`` files in *path*; missing *path* yields ``{}``."""
     return _path.scan_stems(path, (".wav",))
 
 

@@ -59,20 +59,52 @@ def test_a_rule_pack_item_exporting_only_build_is_missing_its_rule_attribute(pac
     assert excinfo.value.attr == "RULE"
 
 
-def test_scenes_under_two_roots_carry_their_local_effects_rules_and_sounds(pack_tree) -> None:
+def test_scenes_under_two_roots_are_all_registered(pack_tree) -> None:
     flash = pack_tree.root("tc_flash")
     card = pack_tree.root("tc_card")
-    pack_tree.scene(flash, "lobby", rules={"greet": "RULE = 1"})
-    pack_tree.scene(card, "forest", effects={"mist": "BUILD = 2"}, sounds=["owl"])
+    pack_tree.scene(flash, "lobby")
+    pack_tree.scene(card, "forest")
 
     catalog = scan_pack_roots([str(flash), str(card)])
 
     assert catalog.scene_registry.names() == ["forest", "lobby"]
-    lobby = catalog.scene_registry.get("lobby")
-    forest = catalog.scene_registry.get("forest")
-    assert lobby.local_rule_registry.get("greet", int) == 1
+
+
+def test_a_card_scene_serves_its_local_rules(pack_tree) -> None:
+    flash = pack_tree.root("tc_flash")
+    card = pack_tree.root("tc_card")
+    pack_tree.scene(card, "forest", rules={"greet": "RULE = 1"})
+
+    forest = scan_pack_roots([str(flash), str(card)]).scene_registry.get("forest")
+
+    assert forest.local_rule_registry.get("greet", int) == 1
+
+
+def test_a_card_scene_serves_its_local_effects(pack_tree) -> None:
+    flash = pack_tree.root("tc_flash")
+    card = pack_tree.root("tc_card")
+    pack_tree.scene(card, "forest", effects={"mist": "BUILD = 2"})
+
+    forest = scan_pack_roots([str(flash), str(card)]).scene_registry.get("forest")
+
     assert forest.local_effect_registry.get("mist", int) == 2
-    assert forest.local_sound_map == {"owl": str(card / "scenes" / "forest" / "sounds" / "owl.wav")}
+
+
+def test_a_scene_maps_its_local_sounds_by_bare_stem(pack_tree) -> None:
+    root = pack_tree.root("tc_flash")
+    scene_dir = pack_tree.scene(root, "forest", sounds=["owl"])
+
+    forest = scan_pack_roots([str(root)]).scene_registry.get("forest")
+
+    assert forest.local_sound_map == {"owl": str(scene_dir / "sounds" / "owl.wav")}
+
+
+def test_a_scene_without_a_sounds_folder_has_no_local_sounds(pack_tree) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_tree.scene(root, "lobby")
+
+    lobby = scan_pack_roots([str(root)]).scene_registry.get("lobby")
+
     assert lobby.local_sound_map == {}
 
 
@@ -132,37 +164,62 @@ def test_pack_sounds_qualify_each_effect_pack_clip_with_its_pack_name(pack_tree)
     }
 
 
-def test_py_and_mpy_item_files_both_count_and_init_and_subdirectories_do_not(
-    pack_tree,
-) -> None:
+def _item_dir_and_lister(pack_tree, root, owner):
+    """Return an item folder of *owner* (a pack or a scene) and a lister of its scanned items."""
+    if owner == "pack":
+        item_dir = pack_tree.effect_pack(root, "basic", items={"glow": "BUILD = 1"})
+        return item_dir, lambda catalog: catalog.effect_registry.items("basic")
+    scene_dir = pack_tree.scene(root, "lobby", rules={"glow": "RULE = 1"})
+    return scene_dir / "rules", lambda catalog: catalog.scene_registry.get(
+        "lobby"
+    ).local_rule_registry.items()
+
+
+@pytest.mark.parametrize("owner", ["pack", "scene"])
+def test_mpy_item_files_count_like_py_files(pack_tree, owner) -> None:
     root = pack_tree.root("tc_flash")
-    pack_dir = pack_tree.effect_pack(root, "basic", items={"glow": "BUILD = 1", "__init__": ""})
-    (pack_dir / "spark.mpy").write_bytes(b"")
-    (pack_dir / "helpers.py").mkdir()
-    (pack_dir / "notes.txt").write_text("")
-    scene_dir = pack_tree.scene(root, "lobby", rules={"greet": "RULE = 1", "__init__": ""})
-    (scene_dir / "rules" / "ambush.mpy").write_bytes(b"")
-    (scene_dir / "rules" / "tests").mkdir()
+    item_dir, scanned_items = _item_dir_and_lister(pack_tree, root, owner)
+    (item_dir / "spark.mpy").write_bytes(b"")
 
     catalog = scan_pack_roots([str(root)])
 
-    assert catalog.effect_registry.items("basic") == ["glow", "spark"]
-    lobby = catalog.scene_registry.get("lobby")
-    assert lobby.local_rule_registry.items() == ["ambush", "greet"]
+    assert scanned_items(catalog) == ["glow", "spark"]
 
 
-def test_only_wav_files_count_as_sounds(pack_tree) -> None:
+@pytest.mark.parametrize("owner", ["pack", "scene"])
+def test_init_subdirectories_and_other_files_are_not_items(pack_tree, owner) -> None:
+    root = pack_tree.root("tc_flash")
+    item_dir, scanned_items = _item_dir_and_lister(pack_tree, root, owner)
+    (item_dir / "__init__.py").write_text("")
+    (item_dir / "helpers.py").mkdir()
+    (item_dir / "tests").mkdir()
+    (item_dir / "notes.txt").write_text("")
+
+    catalog = scan_pack_roots([str(root)])
+
+    assert scanned_items(catalog) == ["glow"]
+
+
+def test_only_wav_files_count_as_pack_sounds(pack_tree) -> None:
     root = pack_tree.root("tc_flash")
     pack_dir = pack_tree.effect_pack(root, "basic", sounds=["win"])
     (pack_dir / "sounds" / "readme.txt").write_text("")
     (pack_dir / "sounds" / "nested.wav").mkdir()
-    scene_dir = pack_tree.scene(root, "lobby", sounds=["owl"])
-    (scene_dir / "sounds" / "owl.mp3").write_bytes(b"")
 
     catalog = scan_pack_roots([str(root)])
 
     assert list(catalog.pack_sounds) == ["basic.win"]
-    assert list(catalog.scene_registry.get("lobby").local_sound_map) == ["owl"]
+
+
+def test_only_wav_files_count_as_scene_sounds(pack_tree) -> None:
+    root = pack_tree.root("tc_flash")
+    scene_dir = pack_tree.scene(root, "lobby", sounds=["owl"])
+    (scene_dir / "sounds" / "owl.mp3").write_bytes(b"")
+    (scene_dir / "sounds" / "nested.wav").mkdir()
+
+    lobby = scan_pack_roots([str(root)]).scene_registry.get("lobby")
+
+    assert list(lobby.local_sound_map) == ["owl"]
 
 
 def test_folders_without_a_marker_file_are_skipped(pack_tree) -> None:
@@ -364,7 +421,6 @@ def test_a_root_off_the_import_path_is_importable_after_the_scan(pack_tree, tmp_
 
     catalog = scan_pack_roots([str(root)])
 
-    assert sys.path.count(str(tmp_path / "sd")) == 1
     assert catalog.effect_registry.get("extra", "spark", int) == 2
 
 

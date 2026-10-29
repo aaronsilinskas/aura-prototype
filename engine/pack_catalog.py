@@ -25,6 +25,9 @@ from engine.version import Version
 
 _REQUIRED_SCENE_KEYS = ("version", "effect_packs", "rule_packs")
 
+# The attribute each kind's items export, in packs and scenes alike.
+_EXPORT_ATTR = {"effects": "BUILD", "rules": "RULE"}
+
 
 class PackScanError(ValueError):
     """Base class for every failure raised while scanning pack roots.
@@ -143,8 +146,8 @@ def scan_pack_roots(roots: list[str]) -> PackCatalog:
     for root_name, root in root_paths.items():
         _add_import_parent(root[: -len(root_name)])
     return PackCatalog(
-        PackRegistry._from_packs("BUILD", effect_packs),
-        PackRegistry._from_packs("RULE", rule_packs),
+        PackRegistry._from_packs(_EXPORT_ATTR["effects"], effect_packs),
+        PackRegistry._from_packs(_EXPORT_ATTR["rules"], rule_packs),
         SceneRegistry._from_scenes(scenes),
         _pack_sounds(effect_packs),
     )
@@ -214,8 +217,8 @@ def _scan_scenes(root: str, root_name: str, scenes: dict[str, _SceneEntry]) -> N
             initial_data=data.get("initial_data"),
             source_path=scene_dir,
             ir_codec=_read_ir_codec(name, scene_json, data),
-            local_rule_registry=_scan_local_items(scene_dir, scene_prefix, "rules", "RULE"),
-            local_effect_registry=_scan_local_items(scene_dir, scene_prefix, "effects", "BUILD"),
+            local_rule_registry=_scan_local_items(scene_dir, scene_prefix, "rules"),
+            local_effect_registry=_scan_local_items(scene_dir, scene_prefix, "effects"),
             local_sound_map=scan_sound_dir(_path.join(scene_dir, "sounds")),
         )
 
@@ -250,9 +253,8 @@ def _parse_version(value: object, path: str) -> Version:
         raise MalformedVersionError(path, value) from exc
 
 
-def _scan_local_items(
-    scene_dir: str, scene_prefix: str, kind: str, item_attr: str
-) -> SceneLocalRegistry:
+def _scan_local_items(scene_dir: str, scene_prefix: str, kind: str) -> SceneLocalRegistry:
+    item_attr = _EXPORT_ATTR[kind]
     item_dir = _path.join(scene_dir, kind)
     if not _path.isdir(item_dir):
         return SceneLocalRegistry(item_attr)
