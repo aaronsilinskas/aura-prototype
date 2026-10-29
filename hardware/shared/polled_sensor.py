@@ -13,7 +13,7 @@ from engine.log import Logger
 
 __all__ = ["RECOVERY_READS", "PolledSensor"]
 
-# Consecutive good reads that end a failing episode: about 2 s at the prop's frame rate.
+# Consecutive good reads that make a failing sensor recovered: about 2 s at the prop's frame rate.
 RECOVERY_READS: Final = 50
 
 
@@ -34,19 +34,19 @@ class PolledSensor:
 
     Failures are logged to *logger* on transitions only, labelled with
     *label*: one line carrying the error when a healthy sensor's read fails,
-    and one line with the episode's failed and total read counts once
-    :data:`RECOVERY_READS` consecutive reads succeed. A good read updates the
-    reading at once even while failing; only the recovery line waits.
-    ``failed_reads`` counts the current episode's failed reads, zero while
-    healthy.
+    and one line with how many reads failed out of all reads since it started
+    failing, once :data:`RECOVERY_READS` consecutive reads succeed. A good read
+    updates the reading at once even while failing; only the recovery line
+    waits. ``failed_reads`` counts failed reads since the sensor started
+    failing, zero while healthy.
     """
 
     __slots__ = (
-        "_episode_reads",
         "_good_run",
         "_label",
         "_logger",
         "_read",
+        "_reads_since_failing",
         "failed_reads",
         "reading",
     )
@@ -63,7 +63,7 @@ class PolledSensor:
         self._label = label
         self._logger = logger
         self.failed_reads = 0
-        self._episode_reads = 0
+        self._reads_since_failing = 0
         self._good_run = 0
 
     def update(self) -> None:
@@ -73,7 +73,7 @@ class PolledSensor:
             if self.failed_reads == 0:
                 self._logger.log(f"{self._label} read failing: {error!r}")
             self.failed_reads += 1
-            self._episode_reads += 1
+            self._reads_since_failing += 1
             self._good_run = 0
             return
         reading = self.reading
@@ -81,11 +81,11 @@ class PolledSensor:
         reading.y = y
         reading.z = z
         if self.failed_reads:
-            self._episode_reads += 1
+            self._reads_since_failing += 1
             self._good_run += 1
             if self._good_run == RECOVERY_READS:
-                failed, total = self.failed_reads, self._episode_reads
+                failed, total = self.failed_reads, self._reads_since_failing
                 self._logger.log(f"{self._label} recovered: {failed} of {total} reads failed")
                 self.failed_reads = 0
-                self._episode_reads = 0
+                self._reads_since_failing = 0
                 self._good_run = 0

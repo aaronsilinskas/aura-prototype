@@ -81,7 +81,7 @@ def test_a_run_of_failed_reads_logs_one_start_line_carrying_the_first_error():
     assert "".join(log) == "[hw] accelerometer read failing: OSError(5)\n"
 
 
-def test_a_full_run_of_good_reads_logs_one_recovery_line_with_the_episodes_counts():
+def test_a_full_run_of_good_reads_logs_one_recovery_line_with_the_failed_and_total_read_counts():
     good = (1.0, 2.0, 3.0)
     sensor, log = _sensor(OSError(5), OSError(5), OSError(5), *[good] * 60)
 
@@ -103,7 +103,7 @@ def test_alternating_good_and_bad_reads_log_no_recovery_until_a_full_run_of_good
     assert "".join(log) == "[hw] accelerometer read failing: OSError(5)\n"
 
 
-def test_a_good_read_during_a_failing_episode_still_updates_the_reading():
+def test_a_good_read_while_failing_still_updates_the_reading():
     sensor, _log = _sensor(OSError(5), (4.0, 5.0, 6.0))
 
     _update(sensor, 2)
@@ -119,7 +119,7 @@ def test_the_failure_count_is_zero_while_healthy():
     assert sensor.failed_reads == 0
 
 
-def test_the_failure_count_is_the_episodes_failed_reads_while_failing():
+def test_the_failure_count_is_the_failed_reads_since_the_sensor_started_failing():
     good = (1.0, 2.0, 3.0)
     sensor, _log = _sensor(OSError(5), good, OSError(5), good, good)
 
