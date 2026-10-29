@@ -141,3 +141,95 @@ def test_a_magnetized_field_holds_through_a_reboot(simulation):
         device.tap("B")
 
     assert device.strip(Scope.PERSONAL).all_lit(0xFF0000)
+
+
+def test_a_card_less_device_redeployed_with_a_scene_boots_it(simulation):
+    device = simulation.add_device("red", scene="example_lobby", sd_card=False)
+
+    device.redeploy(scene="element_browser")
+
+    assert device.scene == "element_browser"
+
+
+def test_a_redeployed_scene_outranks_a_persisted_scene(simulation):
+    device = simulation.add_device("red", scene="example_lobby")
+    launch(device, "element_browser")
+
+    device.redeploy(scene="hardware_test")
+
+    assert device.scene == "hardware_test"
+
+
+def test_an_on_device_reboot_after_a_redeploy_persists(simulation):
+    device = simulation.add_device("red", scene="example_lobby")
+    launch(device, "element_browser")
+    device.redeploy(scene="example_lobby")
+
+    launch(device, "tag")
+
+    assert device.scene == "tag"
+
+
+def test_redeploying_the_same_scene_after_navigating_away_boots_it_again(simulation):
+    device = simulation.add_device("red", scene="example_lobby")
+    device.redeploy(scene="example_lobby")
+    launch(device, "element_browser")
+
+    device.redeploy(scene="example_lobby")
+
+    assert device.scene == "example_lobby"
+
+
+def test_returning_right_after_a_redeploy_stays_in_the_deployed_scene(simulation):
+    # Launching tag from the lobby records the lobby to return to; the
+    # redeploy clears that, so A+B in the deployed scene has nowhere to go.
+    device = simulation.add_device("red", scene="example_lobby")
+    launch(device, "tag")
+    device.redeploy(scene="hardware_test")
+
+    hold_to_return(simulation, device)
+
+    assert device.scene == "hardware_test"
+
+
+def test_a_redeploy_over_a_malformed_card_state_boots_the_deployed_scene(simulation):
+    device = simulation.add_device("red", scene="example_lobby")
+    launch(device, "element_browser")
+    (device.card / "aura-state.json").write_text("{not valid json")
+
+    device.redeploy(scene="hardware_test")
+
+    assert device.scene == "hardware_test"
+
+
+def test_redeploying_an_unknown_scene_over_a_persisted_scene_fails_naming_the_known_scenes(
+    simulation,
+):
+    device = simulation.add_device("red", scene="example_lobby")
+    launch(device, "element_browser")
+
+    with pytest.raises(ValueError, match="unknown scene 'no_such_scene'; known scenes: "):
+        device.redeploy(scene="no_such_scene")
+
+
+def test_a_valid_redeploy_after_an_unknown_scene_boots_it(simulation):
+    device = simulation.add_device("red", scene="example_lobby")
+    launch(device, "element_browser")
+    with pytest.raises(ValueError):
+        device.redeploy(scene="no_such_scene")
+
+    device.redeploy(scene="hardware_test")
+
+    assert device.scene == "hardware_test"
+
+
+def test_a_reset_after_navigating_away_from_a_redeployed_scene_keeps_the_navigated_scene(
+    simulation,
+):
+    device = simulation.add_device("red", scene="example_lobby")
+    device.redeploy(scene="example_lobby")
+    launch(device, "element_browser")
+
+    device.reset()
+
+    assert device.scene == "element_browser"

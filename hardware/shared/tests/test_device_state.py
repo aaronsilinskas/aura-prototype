@@ -157,3 +157,53 @@ def test_no_storage_makes_clear_a_silent_no_op():
     store = DeviceStateStore(None)
 
     store.clear("return_to")  # must not raise
+
+
+def test_update_sets_and_removes_keys_in_one_call_preserving_every_other_key(device_storage):
+    store = DeviceStateStore(device_storage)
+    store.set("scene", "tag")
+    store.set("return_to", "lobby")
+    store.set("brightness", "high")
+
+    store.update({"scene_deploy_token": "a1b2"}, remove=("scene", "return_to"))
+
+    rebooted_store = DeviceStateStore(device_storage)
+    assert rebooted_store.get("scene_deploy_token") == "a1b2"
+    assert rebooted_store.get("scene") is None
+    assert rebooted_store.get("return_to") is None
+    assert rebooted_store.get("brightness") == "high"
+
+
+def test_update_removing_an_absent_key_still_sets_the_others(device_storage):
+    store = DeviceStateStore(device_storage)
+
+    store.update({"scene_deploy_token": "a1b2"}, remove=("scene",))
+
+    assert store.get("scene_deploy_token") == "a1b2"
+
+
+def test_update_over_malformed_json_writes_a_fresh_object(device_storage):
+    device_storage.write_bytes("aura-state.json", b"{not valid json")
+    store = DeviceStateStore(device_storage)
+
+    store.update({"scene_deploy_token": "a1b2"}, remove=("scene",))
+
+    assert store.get("scene_deploy_token") == "a1b2"
+
+
+def test_no_storage_makes_update_a_silent_no_op():
+    store = DeviceStateStore(None)
+
+    store.update({"scene_deploy_token": "a1b2"}, remove=("scene",))
+
+    assert store.get("scene_deploy_token") is None
+
+
+def test_write_replaces_the_whole_persisted_state(device_storage):
+    store = DeviceStateStore(device_storage)
+    store.set("scene", "tag")
+
+    store.write({"return_to": "lobby"})
+
+    rebooted_store = DeviceStateStore(device_storage)
+    assert rebooted_store.read() == {"return_to": "lobby"}

@@ -1,7 +1,8 @@
 """DeviceStateStore -- owns aura-state.json, the device-written SD state file.
 
 Persists small key/value state a device writes about itself (today: the
-scene selection override and its return_to companion) across a reboot. Built
+Persisted scene, its return_to companion, and the last applied Scene deploy
+token) across a reboot. Built
 entirely on the DeviceStorage port's read_json/write_json convenience, so
 this module has no board/sdcardio/storage import and is CPython-testable
 like the rest of hardware/shared -- the live adapter is whatever DeviceStorage
@@ -43,38 +44,61 @@ class DeviceStateStore:
         *key* within an otherwise-valid object all report the same absent
         result -- an unset key is an ordinary case, not an error.
         """
-        return self._read_mapping().get(key)
+        return self.read().get(key)
+
+    def read(self) -> dict:
+        """Return the whole persisted mapping, empty when there is none.
+
+        Fail-soft like :meth:`get`: a corrupt file is logged and reads as
+        empty. The result is the caller's own copy, so a caller that reads
+        once can change it and hand it to :meth:`write`.
+        """
+        return self._read_mapping()
+
+    def write(self, mapping: dict) -> None:
+        """Replace the persisted state with *mapping*, in one write.
+
+        A no-op when *storage* is ``None``.
+        """
+        if self._storage is None:
+            return
+        self._storage.write_json(_STATE_FILE_NAME, mapping)
 
     def set(self, key: str, value: str) -> None:
         """Durably persist *value* under *key*, leaving every other key untouched.
 
-        Read-modify-write of the whole aura-state.json object: the current
-        mapping (fail-soft per :meth:`_read_mapping`) is read, *key* is set
-        within it, and the whole object is written back via
-        DeviceStorage.write_json. A no-op when *storage* is None -- the
-        device has nowhere durable to write, so the call is silently
-        dropped rather than raising.
+        A no-op when *storage* is ``None`` -- the device has nowhere durable
+        to write, so the call is silently dropped rather than raising.
         """
-        if self._storage is None:
-            return
-        mapping = self._read_mapping()
-        mapping[key] = value
-        self._storage.write_json(_STATE_FILE_NAME, mapping)
+        self.update({key: value})
 
     def clear(self, key: str) -> None:
         """Remove *key* from the persisted state, leaving every other key untouched.
 
-        Read-modify-write, mirroring :meth:`set`. A no-op when *storage* is
-        None, or when *key* is already absent -- clearing an unset key is an
-        ordinary case, not an error.
+        A no-op when *storage* is ``None``, or when *key* is already absent --
+        clearing an unset key is an ordinary case, not an error.
+        """
+        self.update({}, remove=(key,))
+
+    def update(self, values: dict[str, str], remove: tuple[str, ...] = ()) -> None:
+        """Set every key in *values* and remove every key in *remove*, in one write.
+
+        One read-modify-write, so the changes land together in one replace
+        of the file (as atomic as :meth:`DeviceStorage.write_json` allows)
+        rather than in separate writes a power loss could split. Absent keys
+        in *remove* are skipped and every other key is left untouched; when
+        nothing changes, nothing is written. A no-op when *storage* is
+        ``None``.
         """
         if self._storage is None:
             return
         mapping = self._read_mapping()
-        if key not in mapping:
-            return
-        del mapping[key]
-        self._storage.write_json(_STATE_FILE_NAME, mapping)
+        before = dict(mapping)
+        for key in remove:
+            mapping.pop(key, None)
+        mapping.update(values)
+        if mapping != before:
+            self.write(mapping)
 
     def _read_mapping(self) -> dict:
         """Return the persisted state mapping, fail-soft on every bad case.

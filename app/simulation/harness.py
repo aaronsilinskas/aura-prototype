@@ -12,7 +12,7 @@ Its radio reaches every other device through the radio medium, with no aim;
 ``receive_radio`` stands in for an outside sender.
 
 A device reboots as a board does (see ``SimulatedDevice``), so a test can
-follow the lobby into a game and back.
+follow the lobby into a game and back, or redeploy it with a scene.
 
 A device's card is a real directory, so card scenes and card packs work as on
 a device. ``aura_packs`` is a regular package, bound to the first card that
@@ -22,6 +22,7 @@ may carry ``aura_packs/``.
 
 from __future__ import annotations
 
+import secrets
 import sys
 import tempfile
 from collections.abc import Callable, Sequence
@@ -198,8 +199,8 @@ class Simulation:
         *card*, a directory the test prepared, used in place: it is on the
         card from the first boot, and what the device writes lands there.
         Without *card* the card is a fresh empty directory this simulation
-        owns; with *sd_card* false there is none, and the device never
-        reboots. Its radio node is its place in add order, from 1.
+        owns; with *sd_card* false there is none, and the device reboots
+        only when reset or redeployed. Its radio node is its place in add order, from 1.
 
         Raises:
             ValueError: If *card* is given with *sd_card* false, or is
@@ -312,8 +313,9 @@ class SimulatedDevice:
     """A simulated device running a real scene: the handle a test talks to.
 
     It boots and ticks as a board does, through the same ``build_scene_boot``
-    and ``build_scene_tick``; the scene it was switched on into stands in for
-    the flash ``default_scene``. It reboots as a board does:
+    and ``build_scene_tick``, reading its own flash settings, which switching
+    it on seeds with that scene as ``default_scene`` and ``redeploy`` changes.
+    It reboots as a board does:
     ``DeviceSceneReboot`` persists the next scene to its card, then resets
     it. The reset abandons the rest of the tick, and the device boots at once,
     within that same tick, into whatever its card names; it ticks the new
@@ -343,6 +345,7 @@ class SimulatedDevice:
         """The node this device sends as: its place in add order, from 1."""
         self._sim = sim
         self._switched_on_into = scene
+        self._flash_settings: dict[str, object] = {"default_scene": scene}
         self._scene_data = scene_data
         self._sim_hw = SimulatedHardware(
             now=lambda: sim.now,
@@ -358,7 +361,7 @@ class SimulatedDevice:
         self._sim._claim_card_packs(self)
         boot = build_scene_boot(
             self._sim_hw.hw,
-            {"default_scene": self._switched_on_into},
+            dict(self._flash_settings),
             reset=_reset,
             timer=_SimulationClock(self._sim),
             scene_data={self._switched_on_into: self._scene_data} if self._scene_data else None,
@@ -367,6 +370,29 @@ class SimulatedDevice:
         self._namespace = boot.runtime.namespace
         self.scene = boot.scene_name
         """The scene the device is running now."""
+
+    # -- deploys ------------------------------------------------------------
+
+    def redeploy(self, scene: str) -> None:
+        """Redeploy with *scene* and reboot, as ``deploy.py --scene`` then a reset would.
+
+        *scene* becomes the flash ``default_scene``, beside a fresh Scene
+        deploy token; every other flash setting stays. The device boots at
+        once, card-less or not, into *scene*: the new token clears the
+        Persisted scene its card held.
+        """
+        self._flash_settings["default_scene"] = scene
+        self._flash_settings["scene_deploy_token"] = secrets.token_hex(8)
+        self.reset()
+
+    def reset(self) -> None:
+        """Reset and boot at once with flash unchanged, as pressing the reset button does.
+
+        The device boots into whatever its card names, else its flash
+        ``default_scene``.
+        """
+        self._sim_hw.power_on()
+        self._boot()
 
     # -- inputs -------------------------------------------------------------
 
@@ -539,5 +565,4 @@ class SimulatedDevice:
         try:
             self._scene_tick()
         except _Reset:
-            self._sim_hw.power_on()
-            self._boot()
+            self.reset()
