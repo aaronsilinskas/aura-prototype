@@ -86,7 +86,10 @@ class DeviceParts:
         """Return a raw-level read of a pulled-up button pin: ``True`` while not pressed."""
         raise NotImplementedError
 
-    def accelerometer(self, accelerometer: I2CDeviceConfig, i2c: object) -> object:
+    def accelerometer(
+        self, accelerometer: I2CDeviceConfig, i2c: object
+    ) -> Callable[[], tuple[float, float, float]]:
+        """Return a raw read of the accelerometer: ``(x, y, z)`` in m/s², which may raise."""
         raise NotImplementedError
 
     def magnetometer(self, magnetometer: I2CDeviceConfig, i2c: object) -> object:

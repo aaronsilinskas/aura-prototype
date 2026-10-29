@@ -8,6 +8,7 @@ from engine.state import NetworkControls
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transceiver import InfraredTransceiver
+from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.radio_transceiver import RadioTransceiver
 
 __all__ = ["DeviceHardware"]
@@ -35,9 +36,14 @@ class DeviceHardware:
     ``AudioEffectOutput`` resolves clips through — ``None`` on a device with
     no ``audio`` section declared and enabled.
 
-    ``magnetometer`` is typed like ``accelerometer`` (``object | None``, no
-    concrete driver import here) — ``None`` on a device with no
-    ``magnetometer`` section declared and enabled.
+    ``accelerometer`` is the
+    :class:`~hardware.shared.polled_sensor.PolledSensor` that owns the
+    acceleration reading — ``None`` on a device with no ``accelerometer`` section declared
+    and enabled, which is distinct from a failed read.
+
+    ``magnetometer`` is typed ``object | None`` (no concrete driver import
+    here) — ``None`` on a device with no ``magnetometer`` section declared
+    and enabled.
     """
 
     __slots__ = (
@@ -56,7 +62,7 @@ class DeviceHardware:
         self,
         outputs: list[EffectOutput],
         buttons: DebouncedButtons,
-        accelerometer: object | None,
+        accelerometer: PolledSensor | None,
         magnetometer: object | None,
         network_controls: NetworkControls,
         ir: InfraredTransceiver | None,
@@ -66,7 +72,7 @@ class DeviceHardware:
     ) -> None:
         self.outputs: list[EffectOutput] = outputs
         self.buttons: DebouncedButtons = buttons
-        self.accelerometer: object | None = accelerometer
+        self.accelerometer: PolledSensor | None = accelerometer
         self.magnetometer: object | None = magnetometer
         self.network_controls: NetworkControls = network_controls
         self.ir: InfraredTransceiver | None = ir

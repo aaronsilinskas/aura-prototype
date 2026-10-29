@@ -357,10 +357,10 @@ class SimulatedHardware:
         return radio
 
     def _require_accelerometer(self) -> SimulatedAccelerometer:
-        accelerometer = self.hw.accelerometer
-        if accelerometer is None:
+        if self.hw.accelerometer is None:
             raise ValueError("the config declares no accelerometer")
-        assert isinstance(accelerometer, SimulatedAccelerometer)
+        accelerometer = self._parts.scripted_accelerometer
+        assert accelerometer is not None
         return accelerometer
 
     def _require_magnetometer(self) -> SimulatedMagnetometer:

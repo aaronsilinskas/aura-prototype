@@ -463,29 +463,54 @@ def _install_library(
     return module
 
 
+class _FakeLis3dh(_FakeI2CChip):
+    """A LIS3DH whose ``acceleration`` reads whatever it was last set to."""
+
+    acceleration = (0.0, 0.0, 9.81)
+
+
 @pytest.fixture
-def lis3dh(monkeypatch: pytest.MonkeyPatch) -> None:
-    _install_library(monkeypatch, "adafruit_lis3dh", LIS3DH_I2C=_FakeI2CChip)
+def lis3dh(monkeypatch: pytest.MonkeyPatch) -> list[_FakeLis3dh]:
+    """Every LIS3DH built while the test runs, in order."""
+    built: list[_FakeLis3dh] = []
+
+    def construct(i2c: object, **kwargs: object) -> _FakeLis3dh:
+        built.append(_FakeLis3dh(i2c, **kwargs))
+        return built[-1]
+
+    _install_library(monkeypatch, "adafruit_lis3dh", LIS3DH_I2C=construct)
+    return built
 
 
 def test_accelerometer_is_a_lis3dh_on_the_given_bus_at_its_configured_address(
-    lis3dh: None,
+    lis3dh: list[_FakeLis3dh],
 ) -> None:
     bus = object()
 
-    accelerometer = CircuitPythonParts(_board()).accelerometer(I2CDeviceConfig(address=0x19), bus)
+    CircuitPythonParts(_board()).accelerometer(I2CDeviceConfig(address=0x19), bus)
 
-    assert isinstance(accelerometer, _FakeI2CChip)
-    assert (accelerometer.i2c, accelerometer.kwargs) == (bus, {"address": 0x19})
+    (chip,) = lis3dh
+    assert (chip.i2c, chip.kwargs) == (bus, {"address": 0x19})
 
 
 def test_accelerometer_leaves_the_drivers_default_address_when_none_is_configured(
-    lis3dh: None,
+    lis3dh: list[_FakeLis3dh],
 ) -> None:
-    accelerometer = CircuitPythonParts(_board()).accelerometer(I2CDeviceConfig(), object())
+    CircuitPythonParts(_board()).accelerometer(I2CDeviceConfig(), object())
 
-    assert isinstance(accelerometer, _FakeI2CChip)
-    assert accelerometer.kwargs == {}
+    (chip,) = lis3dh
+    assert chip.kwargs == {}
+
+
+def test_accelerometer_reads_the_lis3dhs_current_acceleration(
+    lis3dh: list[_FakeLis3dh],
+) -> None:
+    read = CircuitPythonParts(_board()).accelerometer(I2CDeviceConfig(), object())
+    (chip,) = lis3dh
+
+    chip.acceleration = (1.0, 2.0, 3.0)
+
+    assert read() == (1.0, 2.0, 3.0)
 
 
 # The all-zero-register reading a dead MMC5603 that still ACKs the bus streams;
