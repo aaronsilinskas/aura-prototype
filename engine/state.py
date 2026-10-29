@@ -145,10 +145,10 @@ class SceneReboot:
     """Board-free port through which ``SceneManager`` persists-and-reboots.
 
     Mirrors how ``SceneManager`` already reaches ``EffectAdmin`` through an
-    injected seam: ``SceneManager``
-    validates ``reboot_into``'s *target* against its scene registry (a typo
-    must never persist a name that would brick the next boot) and otherwise
-    delegates both methods straight to this port. All the device work —
+    injected seam: ``SceneManager`` validates ``reboot_into``'s *target*
+    against its scene registry (a typo must never persist a name that would
+    brick the next boot) and otherwise delegates both methods straight to
+    this port. All the device work —
     writing the scene switch to durable storage and physically resetting the
     device — lives on the concrete implementation, since a reboot is
     inherently a hardware operation the board-free engine cannot perform
@@ -541,8 +541,8 @@ class GameState:
     def clear_queue(self) -> None:
         """Discard all pending events without processing them.
 
-        Reserved for scene transitions; resets
-        the queue in place without allocating.
+        Reserved for scene transitions; resets the queue in place without
+        allocating.
         """
         self._reset_queue()
 
