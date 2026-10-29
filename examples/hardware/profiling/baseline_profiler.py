@@ -1,8 +1,10 @@
 """CircuitPython baseline profiler — measures each board's fixed framework tax.
 
-Runs the framework loop with zero rules, zero registered effect packs, and
-zero components, so the reported FPS/CPU/heap numbers represent the cost of
-the engine itself before any component-specific work is added. Every other
+Runs the framework loop with zero rules, no loaded effects, and zero
+components, so the reported FPS/CPU/heap numbers represent the cost of the
+engine itself before any component-specific work is added. The installed packs
+are scanned into a pack catalog exactly as boot scans them, so the heap figure
+includes that scan. Every other
 profiler under ``examples/hardware/profiling/`` should be compared against
 this baseline.
 
@@ -57,7 +59,7 @@ from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
 from engine.engine import GameEngine
-from engine.packs import PackRegistry
+from engine.pack_catalog import scan_pack_roots
 from engine.state import GameState, SceneControls
 from engine.timer import Timer
 from hardware.shared.profiler_report import (
@@ -105,7 +107,7 @@ def _heap_tax(mem_free_before: int) -> int:
 def _build_engine_host() -> tuple[EffectManager, GameEngine, GameState, int]:
     gc.collect()
     mem_free_before = gc.mem_free()
-    registry = PackRegistry(item_attr="BUILD")
+    registry = scan_pack_roots(["packs"]).effect_registry
     effect_manager = EffectManager(registry=registry, outputs=[])
     game_engine = GameEngine(effect_controls=effect_manager)
     game_state = game_engine.create_state(SceneControls())
@@ -115,7 +117,7 @@ def _build_engine_host() -> tuple[EffectManager, GameEngine, GameState, int]:
 def _build_satellite() -> tuple[EffectManager, int]:
     gc.collect()
     mem_free_before = gc.mem_free()
-    registry = PackRegistry(item_attr="BUILD")
+    registry = scan_pack_roots(["packs"]).effect_registry
     effect_manager = EffectManager(registry=registry, outputs=[NullEffectOutput()])
     return effect_manager, _heap_tax(mem_free_before)
 

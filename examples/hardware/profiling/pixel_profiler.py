@@ -121,7 +121,7 @@ import board
 from effects.performance import PerformanceTracker
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
-from engine.packs import PackRegistry
+from engine.pack_catalog import scan_pack_roots
 from engine.state import Scope
 from engine.timer import Timer
 from hardware.circuitpython.counting_i2c import CountingI2C
@@ -323,8 +323,7 @@ def _measure_point(
 
 def run() -> None:
     """Sweep pixel count, effect identity, and stack depth for `DRIVER`."""
-    registry = PackRegistry(item_attr="BUILD")
-    registry.scan_dir("packs/effects", "packs.effects")
+    registry = scan_pack_roots(["packs"]).effect_registry
     element_names = registry.items("elements")
 
     # Load the real, deployed aura-device.json and isolate the one component this

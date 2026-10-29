@@ -11,15 +11,14 @@ from engine.effects.output import EffectOutput
 from engine.engine import GameEngine, GameRule
 from engine.events import EffectEvent, Event
 from engine.input import AccelerationData, ButtonData, InputEvents
-from engine.packs import PackRegistry
+from engine.pack_catalog import scan_pack_roots
 from engine.state import EffectReceipt, GameState, SceneControls, Scope, ScopeValue
 from engine.timer import Timer
 
-_packs_dir = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packs", "effects")
+_packs_root = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packs")
 )
-_registry = PackRegistry(item_attr="BUILD")
-_registry.scan_dir(_packs_dir, "packs.effects")
+_registry = scan_pack_roots([_packs_root]).effect_registry
 
 
 BLOCK_HEIGHT = 2  # 1 pixel line (layered effects already split/merged into it) + 1 event line
