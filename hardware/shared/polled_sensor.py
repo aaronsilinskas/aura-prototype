@@ -4,6 +4,7 @@ from __future__ import annotations
 
 try:
     from collections.abc import Callable
+    from typing import Final
 except ImportError:
     pass
 
@@ -13,7 +14,7 @@ from engine.log import Logger
 __all__ = ["RECOVERY_READS", "PolledSensor"]
 
 # Consecutive good reads that end a failing episode: about 2 s at the prop's frame rate.
-RECOVERY_READS = 50
+RECOVERY_READS: Final = 50
 
 
 class PolledSensor:
