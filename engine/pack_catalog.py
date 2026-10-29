@@ -4,12 +4,15 @@ from __future__ import annotations
 
 __all__ = [
     "DuplicateNameError",
+    "IncompatiblePackError",
     "MalformedSceneError",
     "MalformedVersionError",
     "MissingRootError",
     "PackCatalog",
     "PackScanError",
     "ReservedNameError",
+    "SceneDeclarationError",
+    "UnknownDeclaredPackError",
     "scan_pack_roots",
 ]
 
@@ -88,6 +91,41 @@ class MalformedSceneError(PackScanError):
         super().__init__(f"Scene '{scene}' has a malformed '{path}': {reason}")
 
 
+class SceneDeclarationError(PackScanError):
+    """Scene *scene* declares *pack* in ``effect_packs`` or ``rule_packs`` and cannot have it."""
+
+    def __init__(self, scene: str, pack: str, message: str) -> None:
+        self.scene = scene
+        self.pack = pack
+        super().__init__(message)
+
+
+class UnknownDeclaredPackError(SceneDeclarationError):
+    """A scene declares a pack that is not installed as that kind (effect or rule)."""
+
+    def __init__(self, scene: str, pack: str, kind: str) -> None:
+        self.kind = kind
+        super().__init__(
+            scene, pack, f"Scene '{scene}' declares {kind} pack '{pack}', which is not installed"
+        )
+
+
+class IncompatiblePackError(SceneDeclarationError):
+    """A scene requires a pack version the installed one does not satisfy.
+
+    Compatible means an equal major and an installed minor at least the required one.
+    """
+
+    def __init__(self, scene: str, pack: str, installed: Version, required: Version) -> None:
+        self.installed = installed
+        self.required = required
+        super().__init__(
+            scene,
+            pack,
+            f"Scene '{scene}' requires pack '{pack}' {required}, but {installed} is installed",
+        )
+
+
 class PackCatalog:
     """Everything installed under a device's pack roots, as found by ``scan_pack_roots``."""
 
@@ -126,8 +164,22 @@ class PackCatalog:
         return dict(self._pack_sounds)
 
 
-def scan_pack_roots(roots: list[str]) -> PackCatalog:
-    """Scan the pack *roots*, in order, into one ``PackCatalog``."""
+def scan_pack_roots(
+    roots: list[str],
+    initial_data_overrides: dict[str, dict[str, object]] | None = None,
+) -> PackCatalog:
+    """Scan the pack *roots*, in order, into one ``PackCatalog``.
+
+    Every scene's ``effect_packs`` and ``rule_packs`` are checked against the
+    scanned packs before the catalog is returned. *initial_data_overrides*
+    (``{scene: {key: value}}``) is merged over each named scene's
+    ``initial_data``, which is how the Simulated device boots shortened scenes.
+
+    Raises:
+        PackScanError: the first problem found on disk (see its subclasses).
+        ValueError: an override names a scene that was not scanned.
+    """
+    overrides = initial_data_overrides or {}
     effect_packs: list[_PackEntry] = []
     rule_packs: list[_PackEntry] = []
     scenes: dict[str, _SceneEntry] = {}
@@ -142,7 +194,14 @@ def scan_pack_roots(roots: list[str]) -> PackCatalog:
         root_paths[root_name] = root
         _scan_packs(root, root_name, "effects", effect_packs)
         _scan_packs(root, root_name, "rules", rule_packs)
-        _scan_scenes(root, root_name, scenes)
+        _scan_scenes(root, root_name, scenes, overrides)
+    for scene in overrides:
+        if scene not in scenes:
+            raise ValueError(
+                f"initial-data override names unknown scene {scene!r}; "
+                + f"known scenes: {', '.join(sorted(scenes))}"
+            )
+    _check_declarations(scenes, effect_packs, rule_packs)
     for root_name, root in root_paths.items():
         _add_import_parent(root[: -len(root_name)])
     return PackCatalog(
@@ -150,6 +209,49 @@ def scan_pack_roots(roots: list[str]) -> PackCatalog:
         PackRegistry._from_packs(_EXPORT_ATTR["rules"], rule_packs),
         SceneRegistry._from_scenes(scenes),
         _pack_sounds(effect_packs),
+    )
+
+
+def _check_declarations(
+    scenes: dict[str, _SceneEntry],
+    effect_packs: list[_PackEntry],
+    rule_packs: list[_PackEntry],
+) -> None:
+    installed_by_kind = (
+        ("effect", "effect_packs", {entry.name: entry.version for entry in effect_packs}),
+        ("rule", "rule_packs", {entry.name: entry.version for entry in rule_packs}),
+    )
+    for scene, entry in scenes.items():
+        scene_json = _path.join(entry.source_path, "scene.json")
+        for kind, key, installed in installed_by_kind:
+            declarations = getattr(entry, key)
+            if not isinstance(declarations, list):
+                raise MalformedSceneError(scene, scene_json, f"'{key}' is not a list")
+            for declaration in declarations:
+                if not _is_declaration(declaration):
+                    raise MalformedSceneError(
+                        scene,
+                        scene_json,
+                        f"'{key}' entry {declaration!r} is not [pack name, minimum version]",
+                    )
+                pack, minimum = declaration
+                required = _parse_version(minimum, scene_json)
+                if pack not in installed:
+                    raise UnknownDeclaredPackError(scene, pack, kind)
+                if not _is_compatible(installed[pack], required):
+                    raise IncompatiblePackError(scene, pack, installed[pack], required)
+
+
+def _is_compatible(installed: Version, required: Version) -> bool:
+    return installed.major == required.major and installed.minor >= required.minor
+
+
+def _is_declaration(declaration: object) -> bool:
+    return (
+        isinstance(declaration, list)
+        and len(declaration) == 2
+        and isinstance(declaration[0], str)
+        and isinstance(declaration[1], str)
     )
 
 
@@ -197,7 +299,12 @@ def _scan_packs(root: str, root_name: str, kind: str, packs: list[_PackEntry]) -
         )
 
 
-def _scan_scenes(root: str, root_name: str, scenes: dict[str, _SceneEntry]) -> None:
+def _scan_scenes(
+    root: str,
+    root_name: str,
+    scenes: dict[str, _SceneEntry],
+    overrides: dict[str, dict[str, object]],
+) -> None:
     kind_dir = _path.join(root, "scenes")
     if not _path.isdir(kind_dir):
         return
@@ -214,13 +321,22 @@ def _scan_scenes(root: str, root_name: str, scenes: dict[str, _SceneEntry]) -> N
             version=_parse_version(data["version"], scene_json),
             effect_packs=data["effect_packs"],
             rule_packs=data["rule_packs"],
-            initial_data=data.get("initial_data"),
+            initial_data=_initial_data(data, overrides.get(name)),
             source_path=scene_dir,
             ir_codec=_read_ir_codec(name, scene_json, data),
             local_rule_registry=_scan_local_items(scene_dir, scene_prefix, "rules"),
             local_effect_registry=_scan_local_items(scene_dir, scene_prefix, "effects"),
             local_sound_map=scan_sound_dir(_path.join(scene_dir, "sounds")),
         )
+
+
+def _initial_data(data: dict, override: dict[str, object] | None) -> dict[str, object] | None:
+    initial_data = data.get("initial_data")
+    if override is None:
+        return initial_data
+    merged = dict(initial_data or {})
+    merged.update(override)
+    return merged
 
 
 def _read_scene_json(scene: str, path: str) -> dict:
