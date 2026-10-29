@@ -214,6 +214,14 @@ def test_scan_dir_raises_when_version_is_malformed(tmp_path) -> None:
         registry.scan_dir(str(tmp_path), "test.scenes")
 
 
+def test_scan_dir_raises_malformed_version_when_version_is_json_number(tmp_path) -> None:
+    _make_scene_dir(tmp_path, "bad", version=1.2)
+    registry = SceneRegistry()
+
+    with pytest.raises(ValueError, match="malformed version"):
+        registry.scan_dir(str(tmp_path), "test.scenes")
+
+
 def test_scan_dir_raises_when_effect_packs_field_is_missing(tmp_path) -> None:
     scene_dir = tmp_path / "bad"
     scene_dir.mkdir()

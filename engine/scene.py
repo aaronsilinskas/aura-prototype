@@ -304,7 +304,7 @@ class SceneRegistry:
 
             try:
                 version = Version.parse(data["version"])
-            except (ValueError, IndexError, TypeError) as exc:
+            except ValueError as exc:
                 raise ValueError(
                     f"Scene '{scene_name}' in '{norm_path}' has malformed version "
                     + f"'{data['version']}': {exc}"
