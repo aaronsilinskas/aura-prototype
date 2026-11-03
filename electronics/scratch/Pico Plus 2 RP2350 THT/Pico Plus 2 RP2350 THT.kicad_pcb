@@ -5069,7 +5069,7 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "2830a78d-5165-4651-8902-b7cb172dae3d")
-		(at 148 122.14 180)
+		(at 148 123 180)
 		(descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x02 2.54mm single row")
 		(property "Reference" "J9"
@@ -5506,7 +5506,7 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "2b771423-9a0e-432d-ae9a-5acfde2d2a2f")
-		(at 162.27 122.14 180)
+		(at 162.27 123 180)
 		(descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x02 2.54mm single row")
 		(property "Reference" "J10"
@@ -5735,7 +5735,7 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x09_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "33b5c89f-f824-460a-adc2-32aa4a0d97b2")
-		(at 90 99.16 180)
+		(at 90 70.5 180)
 		(descr "Through hole straight pin header, 1x09, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x09 2.54mm single row")
 		(property "Reference" "J5"
@@ -6917,11 +6917,11 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "47c15559-23f3-4e8a-b133-ca585cdc8f1d")
-		(at 112.5 122.04 180)
+		(at 112.5 123 180)
 		(descr "Through hole straight pin header, 1x03, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x03 2.54mm single row")
 		(property "Reference" "J12"
-			(at 0 -2.38 0)
+			(at 0 7.54 0)
 			(layer "F.SilkS")
 			(uuid "ceacf264-5421-442b-8cd4-386b3fedf010")
 			(effects
@@ -7365,7 +7365,7 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "484ec700-3394-4895-b2fa-bbb53667a42e")
-		(at 134 122.14 180)
+		(at 134 123 180)
 		(descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x02 2.54mm single row")
 		(property "Reference" "J8"
@@ -11587,11 +11587,11 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "cf928bbd-bb15-4897-8375-256646233619")
-		(at 107 122.04 180)
+		(at 107 123 180)
 		(descr "Through hole straight pin header, 1x03, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x03 2.54mm single row")
 		(property "Reference" "J13"
-			(at 0 -2.38 0)
+			(at 0 7.54 0)
 			(layer "F.SilkS")
 			(uuid "fb616cc1-8b21-4cb7-a0b8-c47f948a7c07")
 			(effects
@@ -12268,7 +12268,7 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x09_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "dbf2ce6b-17d2-425b-a159-b6a8b0c9a397")
-		(at 90 70.5 180)
+		(at 90 99.04 180)
 		(descr "Through hole straight pin header, 1x09, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x09 2.54mm single row")
 		(property "Reference" "J4"
@@ -13492,11 +13492,11 @@
 	(footprint "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical"
 		(layer "F.Cu")
 		(uuid "e8df2244-d723-4ea3-8a33-b04453a51f5f")
-		(at 118 122.04 180)
+		(at 118 123 180)
 		(descr "Through hole straight pin header, 1x03, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x03 2.54mm single row")
 		(property "Reference" "J11"
-			(at 0 -2.38 0)
+			(at 0 7.54 0)
 			(layer "F.SilkS")
 			(uuid "5742d5db-db0c-4b6a-8835-e8b112915b74")
 			(effects
@@ -14596,6 +14596,19 @@
 			(justify left bottom)
 		)
 	)
+	(gr_text "IRX 3"
+		(at 105 126.46 0)
+		(layer "F.SilkS")
+		(uuid "449c06d5-ce9c-45db-85f9-62989b4099b3")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.2)
+				(bold yes)
+			)
+			(justify left bottom)
+		)
+	)
 	(gr_text "D+"
 		(at 110 51.5 0)
 		(layer "F.SilkS")
@@ -14609,10 +14622,36 @@
 			(justify left bottom)
 		)
 	)
+	(gr_text "IRX 2"
+		(at 110.5 126.46 0)
+		(layer "F.SilkS")
+		(uuid "9e1acbd0-d824-4f9a-8ea2-863bd6107513")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.2)
+				(bold yes)
+			)
+			(justify left bottom)
+		)
+	)
 	(gr_text "D-"
 		(at 113 51.5 0)
 		(layer "F.SilkS")
 		(uuid "312b5bef-934b-40fb-94bb-f6e7a42150c8")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.2)
+				(bold yes)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "IRX 1"
+		(at 116 126.46 0)
+		(layer "F.SilkS")
+		(uuid "f9295074-a4bf-48a2-80cb-8aebf54f9a4f")
 		(effects
 			(font
 				(size 1 1)
@@ -14895,10 +14934,10 @@
 			(justify left bottom)
 		)
 	)
-	(gr_text "RFM69HCW Radio"
-		(at 92.5 54 270)
+	(gr_text "MicroSD"
+		(at 92.5 57.34 270)
 		(layer "F.SilkS")
-		(uuid "04c1d5f2-e45e-4b89-926b-5c613f9d0fbe")
+		(uuid "7a937ede-8e2d-490a-91da-60119ca55177")
 		(effects
 			(font
 				(size 1 1)
@@ -14908,10 +14947,10 @@
 			(justify left bottom)
 		)
 	)
-	(gr_text "MicroSD"
-		(at 92.5 86 270)
+	(gr_text "RFM69HCW Radio"
+		(at 92.5 82.46 270)
 		(layer "F.SilkS")
-		(uuid "7a937ede-8e2d-490a-91da-60119ca55177")
+		(uuid "04c1d5f2-e45e-4b89-926b-5c613f9d0fbe")
 		(effects
 			(font
 				(size 1 1)
