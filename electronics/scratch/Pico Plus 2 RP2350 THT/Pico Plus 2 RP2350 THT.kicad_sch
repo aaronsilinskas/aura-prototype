@@ -7431,15 +7431,15 @@
 		)
 		(uuid "fd522097-a01a-4a7e-ac67-02a240978cf0")
 	)
-	(label "RFM69 CS"
-		(at 17.78 50.8 0)
+	(label "I2S LRC"
+		(at 17.78 71.12 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "052a6a75-d63e-47ae-affe-8e710e5c2a4d")
+		(uuid "04fc3b5a-b709-4235-908d-593ee0be05b7")
 	)
 	(label "BUTTON A"
 		(at 232.41 99.06 0)
@@ -7460,16 +7460,6 @@
 			(justify left bottom)
 		)
 		(uuid "09692294-fcf5-4c16-b7da-b736b2c07646")
-	)
-	(label "SD CARD CS"
-		(at 80.01 66.04 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "1d5615e1-eb44-4684-ad79-41296176d9b6")
 	)
 	(label "EXTRA 2"
 		(at 80.01 78.74 0)
@@ -7551,16 +7541,6 @@
 		)
 		(uuid "34368324-6fcb-4c8d-9070-20d8b38f6add")
 	)
-	(label "IR TX CONE"
-		(at 17.78 76.2 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "37465559-f99d-4b60-aca2-53b890af7948")
-	)
 	(label "BUTTON B"
 		(at 257.81 99.06 0)
 		(effects
@@ -7591,15 +7571,15 @@
 		)
 		(uuid "3cd10d13-91bb-44e2-ae2c-557f6884ce6a")
 	)
-	(label "IR TX LINE"
-		(at 17.78 73.66 0)
+	(label "IR TX CONE"
+		(at 17.78 83.82 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "3ef7a4c7-05c3-41c5-b17a-be9a1377a613")
+		(uuid "41a50ab5-626d-461b-9283-5cd994661dc6")
 	)
 	(label "BUTTON B"
 		(at 80.01 63.5 0)
@@ -7661,6 +7641,16 @@
 		)
 		(uuid "56835da8-16a6-4c07-9cbf-0a5ef64f4f5b")
 	)
+	(label "IR RX 1"
+		(at 17.78 73.66 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "5835664d-208e-44f6-84b2-c3fdefda805b")
+	)
 	(label "EXTRA 1"
 		(at 80.01 76.2 0)
 		(effects
@@ -7711,6 +7701,26 @@
 		)
 		(uuid "628cc1e9-645c-4f1f-b1a1-5d45effdbb3b")
 	)
+	(label "RFM69 Reset"
+		(at 80.01 66.04 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "63f3b70f-1e04-4ce6-a11d-dc2490b9532c")
+	)
+	(label "IR TX AOE"
+		(at 17.78 86.36 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "65732d8b-f4b6-4fb6-ab9e-34acf36d701d")
+	)
 	(label "IR RX 1"
 		(at 233.68 26.67 0)
 		(effects
@@ -7731,16 +7741,6 @@
 		)
 		(uuid "69536526-d108-4b04-a76e-e563adbbd5a3")
 	)
-	(label "I2S Data"
-		(at 17.78 63.5 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "6acf6e3d-b785-4f62-acd6-e799c517dfec")
-	)
 	(label "LED SHIFTED 4"
 		(at 93.98 180.34 0)
 		(effects
@@ -7750,6 +7750,16 @@
 			(justify left bottom)
 		)
 		(uuid "6be0c744-d9d2-42de-90eb-d8402b8bc559")
+	)
+	(label "IR RX 3"
+		(at 17.78 78.74 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "6de38bb6-a769-4a02-b3dc-e47ed6bf95bd")
 	)
 	(label "LED SHIFTED 3"
 		(at 93.98 161.29 0)
@@ -7761,15 +7771,15 @@
 		)
 		(uuid "86f7b146-3db5-4997-a20c-4579b8cee466")
 	)
-	(label "IR RX 3"
-		(at 17.78 86.36 0)
+	(label "SD CARD CS"
+		(at 17.78 50.8 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "95cb45ed-699a-4336-9f81-6f7581c8bd0c")
+		(uuid "8ef69c56-ab76-45ad-9dfa-a97442237af8")
 	)
 	(label "BAT_LEVEL"
 		(at 266.7 140.97 0)
@@ -7791,16 +7801,6 @@
 		)
 		(uuid "98af011f-aafe-4c05-869c-94ca8a1c8f2e")
 	)
-	(label "RFM69 Reset"
-		(at 17.78 71.12 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "9bb22508-ee07-4fc1-9212-3fec093b4c73")
-	)
 	(label "IR RX 2"
 		(at 233.68 52.07 0)
 		(effects
@@ -7810,16 +7810,6 @@
 			(justify left bottom)
 		)
 		(uuid "9c18f8a2-0daf-4528-aa3a-be68b8ec9e2e")
-	)
-	(label "IR RX 1"
-		(at 17.78 81.28 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "9ce05373-f9f7-4a18-b362-01810f597c34")
 	)
 	(label "IR TX LINE"
 		(at 173.99 31.75 0)
@@ -7901,16 +7891,6 @@
 		)
 		(uuid "a8e45096-6566-4c3a-9143-d50817e31b05")
 	)
-	(label "IR RX 2"
-		(at 17.78 83.82 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "aa1a3c78-14ca-421a-b00f-981e2626afcd")
-	)
 	(label "EXTRA 1"
 		(at 142.24 106.68 0)
 		(effects
@@ -7951,6 +7931,16 @@
 		)
 		(uuid "b0a04f33-46c4-4a8b-90f6-bd04ea287366")
 	)
+	(label "I2S BCLK"
+		(at 17.78 68.58 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "b398e013-01f2-40ec-b791-f34741f1aec5")
+	)
 	(label "IR TX AOE"
 		(at 173.99 102.87 0)
 		(effects
@@ -7960,16 +7950,6 @@
 			(justify left bottom)
 		)
 		(uuid "b6dbf687-1638-4626-9c4f-51fa864a468c")
-	)
-	(label "I2S LRC"
-		(at 17.78 68.58 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "b7ead6f0-b433-4420-bac3-6d59e82fcfef")
 	)
 	(label "LED STRIP 2"
 		(at 20.32 139.7 0)
@@ -8001,6 +7981,16 @@
 		)
 		(uuid "bbbe758a-04cb-4b05-8b0a-b349ac7057ce")
 	)
+	(label "IR TX LINE"
+		(at 17.78 81.28 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "bc8b3b65-5843-426a-bcdb-4706dd1a6bf9")
+	)
 	(label "RFM69 Reset"
 		(at 107.95 45.72 0)
 		(effects
@@ -8031,16 +8021,6 @@
 		)
 		(uuid "ca82182c-9a70-42b1-85d0-467cbc6fa369")
 	)
-	(label "IR TX AOE"
-		(at 17.78 78.74 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "cbf2059f-67d6-4c15-97a8-fad69b98cf9e")
-	)
 	(label "I2S LRC"
 		(at 142.24 25.4 0)
 		(effects
@@ -8051,6 +8031,16 @@
 		)
 		(uuid "d3286db2-11d2-4229-af5b-04914a6343b0")
 	)
+	(label "IR RX 2"
+		(at 17.78 76.2 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "d3f75e71-bc8c-4b06-88fd-f6d2fa72630f")
+	)
 	(label "SCLK"
 		(at 107.95 35.56 0)
 		(effects
@@ -8060,6 +8050,16 @@
 			(justify left bottom)
 		)
 		(uuid "d7b8ee87-aa94-4960-81a3-5334a9190637")
+	)
+	(label "I2S Data"
+		(at 17.78 66.04 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "da666eeb-9121-4c8f-a71f-eac73c1acc33")
 	)
 	(label "IR TX CONE"
 		(at 173.99 67.31 0)
@@ -8101,6 +8101,16 @@
 		)
 		(uuid "e310bfff-2e8f-48fc-ae3c-faada1c3be9b")
 	)
+	(label "RFM69 CS"
+		(at 17.78 63.5 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "e545dee3-e131-4f6c-9409-4f02ce95ba36")
+	)
 	(label "I2S BCLK"
 		(at 142.24 27.94 0)
 		(effects
@@ -8130,16 +8140,6 @@
 			(justify left bottom)
 		)
 		(uuid "ed30f3d1-d9a4-42cb-83bf-01f55141c4e4")
-	)
-	(label "I2S BCLK"
-		(at 17.78 66.04 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "f1ea26a9-3451-47cb-8fe4-dcc2653c8015")
 	)
 	(label "MISO"
 		(at 17.78 48.26 0)
