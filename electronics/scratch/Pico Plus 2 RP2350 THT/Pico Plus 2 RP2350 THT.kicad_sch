@@ -4706,19 +4706,6 @@
 		(uuid "0afbf4b8-e3eb-488a-9604-8b2d369b75c0")
 	)
 	(rectangle
-		(start 137.795 90.805)
-		(end 160.909 94.615)
-		(stroke
-			(width 0)
-			(type default)
-			(color 194 0 0 1)
-		)
-		(fill
-			(type none)
-		)
-		(uuid "14bb6070-26a7-4b54-8c3e-8154b3c52463")
-	)
-	(rectangle
 		(start 172.085 47.625)
 		(end 227.965 81.915)
 		(stroke
@@ -4888,19 +4875,6 @@
 		(uuid "717f4ed9-99f2-4df1-98ef-9b925e9199b1")
 	)
 	(rectangle
-		(start 137.795 90.805)
-		(end 170.815 112.395)
-		(stroke
-			(width 0)
-			(type default)
-			(color 194 0 0 1)
-		)
-		(fill
-			(type none)
-		)
-		(uuid "72021200-53d1-4635-85fd-558fdba859f0")
-	)
-	(rectangle
 		(start 172.085 12.065)
 		(end 227.965 46.355)
 		(stroke
@@ -4912,19 +4886,6 @@
 			(type none)
 		)
 		(uuid "73d6e4e0-2b34-4670-9a23-633e9f7232cf")
-	)
-	(rectangle
-		(start 229.235 119.38)
-		(end 283.845 155.575)
-		(stroke
-			(width 0)
-			(type default)
-			(color 194 0 0 1)
-		)
-		(fill
-			(type none)
-		)
-		(uuid "8569d89d-b666-4fd9-8448-be1af83f27b4")
 	)
 	(rectangle
 		(start 137.795 12.065)
@@ -5029,19 +4990,6 @@
 			(type none)
 		)
 		(uuid "e2d87a53-28a3-4802-a6cc-e42366a339f9")
-	)
-	(rectangle
-		(start 229.235 119.38)
-		(end 252.349 123.19)
-		(stroke
-			(width 0)
-			(type default)
-			(color 194 0 0 1)
-		)
-		(fill
-			(type none)
-		)
-		(uuid "e97bc1c9-da7b-45da-85f0-0065a0ad9f9f")
 	)
 	(rectangle
 		(start 229.235 62.865)
@@ -5218,17 +5166,6 @@
 		)
 		(uuid "75d5db48-75e0-4064-a60f-3b74dff552fb")
 	)
-	(text "EXTRA PINS"
-		(exclude_from_sim no)
-		(at 144.526 93.218 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-				(color 194 0 0 1)
-			)
-		)
-		(uuid "850a3f58-a763-4666-92b2-f53bd3b7bcc7")
-	)
 	(text "IR RX 1"
 		(exclude_from_sim no)
 		(at 234.061 14.351 0)
@@ -5239,17 +5176,6 @@
 			)
 		)
 		(uuid "92f4c3f4-d433-4bf9-8d06-30c48b9b33be")
-	)
-	(text "BATTERY LEVEL"
-		(exclude_from_sim no)
-		(at 237.236 121.666 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-				(color 194 0 0 1)
-			)
-		)
-		(uuid "d843884d-7d12-4d8a-8777-6cdc20e982b4")
 	)
 	(text "LED STRIPS"
 		(exclude_from_sim no)
@@ -5308,12 +5234,6 @@
 		(uuid "076df254-8991-4669-9a62-3ed55a50e2ae")
 	)
 	(junction
-		(at 238.76 140.97)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "1a85a95c-8bc8-4d80-98b6-1cb18343da01")
-	)
-	(junction
 		(at 63.5 127)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -5360,12 +5280,6 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "71c57972-90f6-44c5-9abc-61be9c73e60f")
-	)
-	(junction
-		(at 254 140.97)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "7bbfc45d-4161-4818-9f0f-ed554f07ca56")
 	)
 	(junction
 		(at 195.58 102.87)
@@ -5643,16 +5557,6 @@
 	)
 	(wire
 		(pts
-			(xy 149.86 104.14) (xy 149.86 101.6)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "18d0678b-e066-4732-bbc6-2a338a764e11")
-	)
-	(wire
-		(pts
 			(xy 232.41 99.06) (xy 243.84 99.06)
 		)
 		(stroke
@@ -5733,16 +5637,6 @@
 	)
 	(wire
 		(pts
-			(xy 142.24 106.68) (xy 158.75 106.68)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "24ef10ff-d6d6-425d-9b1c-2ef4ce2fff7f")
-	)
-	(wire
-		(pts
 			(xy 16.51 137.16) (xy 16.51 144.78)
 		)
 		(stroke
@@ -5770,6 +5664,16 @@
 			(type default)
 		)
 		(uuid "278bfdc2-fd06-4005-b628-8de372b400ad")
+	)
+	(wire
+		(pts
+			(xy 17.78 81.28) (xy 31.75 81.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2a02d06a-72dc-4ee1-a1b7-0c1c37252804")
 	)
 	(wire
 		(pts
@@ -6223,16 +6127,6 @@
 	)
 	(wire
 		(pts
-			(xy 254 148.59) (xy 254 149.86)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "61aa1fb3-1548-4e5f-9308-a66130f00796")
-	)
-	(wire
-		(pts
 			(xy 111.76 149.86) (xy 111.76 151.13)
 		)
 		(stroke
@@ -6250,16 +6144,6 @@
 			(type default)
 		)
 		(uuid "62210338-65a8-4f2a-82b6-deb1650af7cf")
-	)
-	(wire
-		(pts
-			(xy 254 140.97) (xy 266.7 140.97)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "62817344-bbb7-4e0b-896c-5bce2c0cf0db")
 	)
 	(wire
 		(pts
@@ -6400,16 +6284,6 @@
 			(type default)
 		)
 		(uuid "7aa3c2ae-46b1-4330-a786-626f3328ca29")
-	)
-	(wire
-		(pts
-			(xy 158.75 104.14) (xy 149.86 104.14)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "7b320469-f2b6-4fa7-8951-2099be5c1851")
 	)
 	(wire
 		(pts
@@ -6573,16 +6447,6 @@
 	)
 	(wire
 		(pts
-			(xy 154.94 101.6) (xy 158.75 101.6)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "899118ce-be09-4e43-81c5-4a49226693c9")
-	)
-	(wire
-		(pts
 			(xy 187.96 130.81) (xy 205.74 130.81)
 		)
 		(stroke
@@ -6603,16 +6467,6 @@
 	)
 	(wire
 		(pts
-			(xy 142.24 109.22) (xy 158.75 109.22)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "8da5990f-95e3-4fdb-8c57-953b57e7e49f")
-	)
-	(wire
-		(pts
 			(xy 114.3 101.6) (xy 114.3 104.14)
 		)
 		(stroke
@@ -6630,16 +6484,6 @@
 			(type default)
 		)
 		(uuid "8ed6d724-27d6-4248-ab98-5ca95aac516a")
-	)
-	(wire
-		(pts
-			(xy 238.76 140.97) (xy 238.76 138.43)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "8f108e00-2216-4acd-b62c-77de953a7ce8")
 	)
 	(wire
 		(pts
@@ -6683,16 +6527,6 @@
 	)
 	(wire
 		(pts
-			(xy 254 140.97) (xy 238.76 140.97)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "94ef8b7a-95e3-44b1-b094-9d4216168426")
-	)
-	(wire
-		(pts
 			(xy 193.04 102.87) (xy 195.58 102.87)
 		)
 		(stroke
@@ -6710,16 +6544,6 @@
 			(type default)
 		)
 		(uuid "964d1480-df3a-41a7-aa90-8133326b3303")
-	)
-	(wire
-		(pts
-			(xy 17.78 81.28) (xy 31.75 81.28)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "98f44779-4266-47a7-bec6-62c15f04a9de")
 	)
 	(wire
 		(pts
@@ -6940,16 +6764,6 @@
 			(type default)
 		)
 		(uuid "b7f91497-a03b-4698-8005-8995c749e08f")
-	)
-	(wire
-		(pts
-			(xy 238.76 140.97) (xy 238.76 142.24)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b9fcfce3-d6d6-4ac5-b4a8-45595cfd2dc3")
 	)
 	(wire
 		(pts
@@ -7431,15 +7245,25 @@
 		)
 		(uuid "fd522097-a01a-4a7e-ac67-02a240978cf0")
 	)
-	(label "I2S LRC"
-		(at 17.78 71.12 0)
+	(label "RFM69 MOSI"
+		(at 107.95 40.64 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "04fc3b5a-b709-4235-908d-593ee0be05b7")
+		(uuid "0134965e-2129-4057-8e81-e1be56c91e98")
+	)
+	(label "RFM69 MOSI"
+		(at 17.78 86.36 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "043181f3-fcf7-42d0-b96c-2d136dc01d18")
 	)
 	(label "BUTTON A"
 		(at 232.41 99.06 0)
@@ -7461,47 +7285,67 @@
 		)
 		(uuid "09692294-fcf5-4c16-b7da-b736b2c07646")
 	)
-	(label "EXTRA 2"
-		(at 80.01 78.74 0)
+	(label "IR TX CONE"
+		(at 17.78 66.04 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "20860ae3-2163-45a4-89fd-5e35d3d8288b")
+		(uuid "0d0dfd96-958c-43f2-91d7-d75f1d0b99fb")
 	)
-	(label "EXTRA 2"
-		(at 142.24 109.22 0)
+	(label "LED STRIP 2"
+		(at 80.01 53.34 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "2137cb09-ba92-4780-82dd-a3dc373745e4")
+		(uuid "14fed4a2-c59c-4f0d-a8f5-3c77c959c278")
 	)
-	(label "BAT_LEVEL"
-		(at 80.01 81.28 0)
+	(label "RFM69 CS"
+		(at 17.78 81.28 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "2694afd9-d734-4a93-a05e-f5bd981d163d")
+		(uuid "16fa86c6-87ce-4088-af07-ceabd362ac45")
 	)
-	(label "LED STRIP 3"
-		(at 80.01 55.88 0)
+	(label "LED STRIP 4"
+		(at 80.01 58.42 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "27a45638-faf7-4212-9629-0713bd6e2a6d")
+		(uuid "1a7a7e0f-e2b3-497c-9ff5-d3fc60e08e41")
 	)
-	(label "MISO"
+	(label "IR TX LINE"
+		(at 17.78 63.5 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "1c6e3d69-6501-4c61-9844-3863d5bacdba")
+	)
+	(label "SD MOSI"
+		(at 107.95 74.93 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "1f050b6c-f1eb-476d-8e67-92832055d824")
+	)
+	(label "RFM69 MISO"
 		(at 107.95 38.1 0)
 		(effects
 			(font
@@ -7509,7 +7353,27 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "2fa661aa-fd29-4f0a-a586-5ca99ff71925")
+		(uuid "234f3acd-6602-4c0a-a936-02fc9f9e2e25")
+	)
+	(label "BUTTON A"
+		(at 80.01 76.2 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "2b51eb32-a613-4bc3-8e47-55db0cb3f4d4")
+	)
+	(label "IR TX AOE"
+		(at 17.78 68.58 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "2f3e611f-1845-4ce1-8d78-2c1317056ebc")
 	)
 	(label "LED STRIP 2"
 		(at 16.51 167.64 0)
@@ -7521,7 +7385,7 @@
 		)
 		(uuid "2ffc1af7-d9b3-40ab-a641-750c723467f7")
 	)
-	(label "SD CARD CS"
+	(label "SD CS"
 		(at 107.95 77.47 0)
 		(effects
 			(font
@@ -7551,16 +7415,6 @@
 		)
 		(uuid "37b884cc-66bb-49b2-bb7a-4ccdeb15d947")
 	)
-	(label "SCLK"
-		(at 107.95 69.85 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "3a4a67aa-2b40-4fe0-bd01-6ad6ce02638d")
-	)
 	(label "LED SHIFTED 2"
 		(at 20.32 142.24 0)
 		(effects
@@ -7570,26 +7424,6 @@
 			(justify left bottom)
 		)
 		(uuid "3cd10d13-91bb-44e2-ae2c-557f6884ce6a")
-	)
-	(label "IR TX CONE"
-		(at 17.78 83.82 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "41a50ab5-626d-461b-9283-5cd994661dc6")
-	)
-	(label "BUTTON B"
-		(at 80.01 63.5 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "4425f6d6-2f67-4880-8ddc-2f1d1913460b")
 	)
 	(label "SCL"
 		(at 107.95 109.22 0)
@@ -7611,6 +7445,16 @@
 		)
 		(uuid "4cfedd51-303e-4f80-a719-fa951c5855c6")
 	)
+	(label "IR RX 1"
+		(at 17.78 71.12 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "50a3f580-d4c2-4b2f-8e89-c30a93c80ca9")
+	)
 	(label "LED STRIP 1"
 		(at 16.51 160.02 0)
 		(effects
@@ -7631,35 +7475,15 @@
 		)
 		(uuid "53f3c51d-708f-4271-a7c1-d45a949fbbc2")
 	)
-	(label "MOSI"
-		(at 107.95 74.93 0)
+	(label "RFM69 SCLK"
+		(at 107.95 35.56 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "56835da8-16a6-4c07-9cbf-0a5ef64f4f5b")
-	)
-	(label "IR RX 1"
-		(at 17.78 73.66 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "5835664d-208e-44f6-84b2-c3fdefda805b")
-	)
-	(label "EXTRA 1"
-		(at 80.01 76.2 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "584fad17-4587-4710-ae51-bd01166ed703")
+		(uuid "55d3616c-ef9f-4d46-b9be-f1079dea9176")
 	)
 	(label "POWER_EN"
 		(at 187.96 149.86 0)
@@ -7671,15 +7495,15 @@
 		)
 		(uuid "5d3619a4-4ba0-4de3-881a-8a61fc7e7d87")
 	)
-	(label "MISO"
-		(at 107.95 72.39 0)
+	(label "SD SCLK"
+		(at 107.95 69.85 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "5f8bd755-816d-443c-9671-9ed08d284ff1")
+		(uuid "60ce3ee4-f5c7-4729-86b1-5e1f65245248")
 	)
 	(label "I2S Gain"
 		(at 142.24 33.02 0)
@@ -7700,26 +7524,6 @@
 			(justify left bottom)
 		)
 		(uuid "628cc1e9-645c-4f1f-b1a1-5d45effdbb3b")
-	)
-	(label "RFM69 Reset"
-		(at 80.01 66.04 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "63f3b70f-1e04-4ce6-a11d-dc2490b9532c")
-	)
-	(label "IR TX AOE"
-		(at 17.78 86.36 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "65732d8b-f4b6-4fb6-ab9e-34acf36d701d")
 	)
 	(label "IR RX 1"
 		(at 233.68 26.67 0)
@@ -7751,15 +7555,25 @@
 		)
 		(uuid "6be0c744-d9d2-42de-90eb-d8402b8bc559")
 	)
-	(label "IR RX 3"
-		(at 17.78 78.74 0)
+	(label "I2S BCLK"
+		(at 80.01 63.5 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "6de38bb6-a769-4a02-b3dc-e47ed6bf95bd")
+		(uuid "749aacb1-4771-4a0a-8397-259923fa8f0e")
+	)
+	(label "I2S LRC"
+		(at 80.01 66.04 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "85581438-a19f-4b8b-bdc7-968346e897cd")
 	)
 	(label "LED SHIFTED 3"
 		(at 93.98 161.29 0)
@@ -7771,7 +7585,17 @@
 		)
 		(uuid "86f7b146-3db5-4997-a20c-4579b8cee466")
 	)
-	(label "SD CARD CS"
+	(label "IR RX 2"
+		(at 17.78 73.66 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "89a87981-7f77-4f6f-ab4c-b6ce7e069ed5")
+	)
+	(label "SD CS"
 		(at 17.78 50.8 0)
 		(effects
 			(font
@@ -7781,15 +7605,25 @@
 		)
 		(uuid "8ef69c56-ab76-45ad-9dfa-a97442237af8")
 	)
-	(label "BAT_LEVEL"
-		(at 266.7 140.97 0)
+	(label "LED STRIP 1"
+		(at 80.01 50.8 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "964fb783-eca8-4679-ad26-f86162807c86")
+		(uuid "91ffb445-bd63-48a6-8502-2bae0710b205")
+	)
+	(label "IR RX 3"
+		(at 80.01 81.28 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "983a6b22-ecb0-4225-aa6a-0d60d0ede28f")
 	)
 	(label "LED STRIP 4"
 		(at 16.51 182.88 0)
@@ -7831,7 +7665,7 @@
 		)
 		(uuid "9ef232a4-1bd1-44c6-bb02-5289eff1eb9c")
 	)
-	(label "MOSI"
+	(label "SD MOSI"
 		(at 17.78 55.88 0)
 		(effects
 			(font
@@ -7840,36 +7674,6 @@
 			(justify left bottom)
 		)
 		(uuid "9f18f293-4e2f-4c3c-85e5-131b753bd0c6")
-	)
-	(label "MOSI"
-		(at 107.95 40.64 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "9f2cc616-d46a-4cd1-bcbe-890a055ec645")
-	)
-	(label "LED STRIP 1"
-		(at 80.01 50.8 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "a08a42e3-a314-4e81-be26-0ae5220056c5")
-	)
-	(label "LED STRIP 4"
-		(at 80.01 58.42 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "a2ac3d71-7d34-4452-8598-101469c430ac")
 	)
 	(label "SDA"
 		(at 107.95 106.68 0)
@@ -7891,17 +7695,7 @@
 		)
 		(uuid "a8e45096-6566-4c3a-9143-d50817e31b05")
 	)
-	(label "EXTRA 1"
-		(at 142.24 106.68 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "aa6748d1-5047-468c-ae0d-998939c1b218")
-	)
-	(label "SCLK"
+	(label "SD SCLK"
 		(at 17.78 53.34 0)
 		(effects
 			(font
@@ -7921,6 +7715,16 @@
 		)
 		(uuid "ae71efd0-3ddb-4aac-acfd-549e113d35cc")
 	)
+	(label "BUTTON B"
+		(at 80.01 78.74 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "b036dd76-da64-41d4-9839-6f0621644100")
+	)
 	(label "LED STRIP 4"
 		(at 63.5 134.62 0)
 		(effects
@@ -7930,16 +7734,6 @@
 			(justify left bottom)
 		)
 		(uuid "b0a04f33-46c4-4a8b-90f6-bd04ea287366")
-	)
-	(label "I2S BCLK"
-		(at 17.78 68.58 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "b398e013-01f2-40ec-b791-f34741f1aec5")
 	)
 	(label "IR TX AOE"
 		(at 173.99 102.87 0)
@@ -7981,16 +7775,6 @@
 		)
 		(uuid "bbbe758a-04cb-4b05-8b0a-b349ac7057ce")
 	)
-	(label "IR TX LINE"
-		(at 17.78 81.28 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "bc8b3b65-5843-426a-bcdb-4706dd1a6bf9")
-	)
 	(label "RFM69 Reset"
 		(at 107.95 45.72 0)
 		(effects
@@ -8011,15 +7795,15 @@
 		)
 		(uuid "c1952465-7588-40df-9072-9f8819675a85")
 	)
-	(label "BUTTON A"
-		(at 80.01 60.96 0)
+	(label "LED STRIP 3"
+		(at 80.01 55.88 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "ca82182c-9a70-42b1-85d0-467cbc6fa369")
+		(uuid "c980f2fd-91e7-4ad1-b153-f3ef84a2b9e8")
 	)
 	(label "I2S LRC"
 		(at 142.24 25.4 0)
@@ -8031,35 +7815,25 @@
 		)
 		(uuid "d3286db2-11d2-4229-af5b-04914a6343b0")
 	)
-	(label "IR RX 2"
-		(at 17.78 76.2 0)
+	(label "SD MISO"
+		(at 107.95 72.39 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "d3f75e71-bc8c-4b06-88fd-f6d2fa72630f")
+		(uuid "d8287c45-119b-46df-b681-2be1754056ce")
 	)
-	(label "SCLK"
-		(at 107.95 35.56 0)
+	(label "RFM69 MISO"
+		(at 17.78 78.74 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "d7b8ee87-aa94-4960-81a3-5334a9190637")
-	)
-	(label "I2S Data"
-		(at 17.78 66.04 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "da666eeb-9121-4c8f-a71f-eac73c1acc33")
+		(uuid "dc14aa78-1aff-403f-b954-2642bca456da")
 	)
 	(label "IR TX CONE"
 		(at 173.99 67.31 0)
@@ -8101,16 +7875,6 @@
 		)
 		(uuid "e310bfff-2e8f-48fc-ae3c-faada1c3be9b")
 	)
-	(label "RFM69 CS"
-		(at 17.78 63.5 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "e545dee3-e131-4f6c-9409-4f02ce95ba36")
-	)
 	(label "I2S BCLK"
 		(at 142.24 27.94 0)
 		(effects
@@ -8141,7 +7905,7 @@
 		)
 		(uuid "ed30f3d1-d9a4-42cb-83bf-01f55141c4e4")
 	)
-	(label "MISO"
+	(label "SD MISO"
 		(at 17.78 48.26 0)
 		(effects
 			(font
@@ -8151,15 +7915,35 @@
 		)
 		(uuid "f295986b-8527-47ae-ae5c-baf138b34b74")
 	)
-	(label "LED STRIP 2"
-		(at 80.01 53.34 0)
+	(label "I2S Data"
+		(at 80.01 60.96 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "fde4baf3-2b44-46b3-87b7-27c6200e07fc")
+		(uuid "f70dc8cd-9126-4c67-a7dd-11ca79a9b5fe")
+	)
+	(label "RFM69 Reset"
+		(at 17.78 76.2 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "f925fff2-f26c-4505-b129-953433cc8942")
+	)
+	(label "RFM69 SCLK"
+		(at 17.78 83.82 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "f96c7ae8-5c04-45a9-88ad-f8b082617d7f")
 	)
 	(symbol
 		(lib_id "power:GND")
@@ -8310,83 +8094,6 @@
 			(project "Pico Plus 2 RP2350 THT"
 				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
 					(reference "#PWR013")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 154.94 101.6 180)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "0a350657-3d6c-464d-b9e1-d8ad04ed2557")
-		(property "Reference" "#PWR033"
-			(at 154.94 95.25 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 154.94 97.79 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 154.94 101.6 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 154.94 101.6 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 154.94 101.6 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "064f40df-84f3-4ab1-bbf9-464e4909849d")
-		)
-		(instances
-			(project "Pico Plus 2 RP2350 THT"
-				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
-					(reference "#PWR033")
 					(unit 1)
 				)
 			)
@@ -8792,7 +8499,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "12043f26-f34c-489b-b89e-cb75afcb00fc")
 		(property "Reference" "J21"
 			(at 160.02 74.422 0)
@@ -9021,83 +8728,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:GND")
-		(at 238.76 149.86 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "170bcbb0-9af5-4d26-a081-25589c33868b")
-		(property "Reference" "#PWR010"
-			(at 238.76 156.21 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 238.76 153.67 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 238.76 149.86 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 238.76 149.86 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 238.76 149.86 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "3b61dc76-3025-4f8a-a9ac-5e462161ea2c")
-		)
-		(instances
-			(project "Pico Plus 2 RP2350 THT"
-				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
-					(reference "#PWR010")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:VBUS")
 		(at 220.98 147.32 180)
 		(unit 1)
@@ -9264,7 +8894,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "1ca57502-8467-41fa-b49d-7140389a8cc2")
 		(property "Reference" "J17"
@@ -9503,7 +9133,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "26488132-9387-4a1b-8a04-28fb0eeda4d0")
 		(property "Reference" "J12"
 			(at 256.54 53.3401 0)
@@ -9734,88 +9364,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:C")
-		(at 254 144.78 180)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "28cec052-66c6-42f0-ac8c-5215731e20d1")
-		(property "Reference" "C2"
-			(at 257.81 143.5099 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Value" "100nF"
-			(at 257.81 146.0499 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm"
-			(at 253.0348 140.97 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 254 144.78 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Unpolarized capacitor"
-			(at 254 144.78 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "f202eddf-6437-4472-add5-0e21a421abe5")
-		)
-		(pin "2"
-			(uuid "20cb6355-2791-4e62-af2e-b0443374732b")
-		)
-		(instances
-			(project "Pico Plus 2 RP2350 THT"
-				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
-					(reference "C2")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Connector:Conn_01x03_Pin")
 		(at 255.27 77.47 180)
 		(unit 1)
@@ -9824,7 +9372,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "2c64a489-9dbe-4584-afd8-d7612aedfecc")
 		(property "Reference" "J13"
 			(at 256.54 78.7401 0)
@@ -9894,83 +9442,6 @@
 			(project "Pico Plus 2 RP2350 THT"
 				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
 					(reference "J13")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:VBUS")
-		(at 238.76 130.81 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "3376b991-8a83-46ec-935d-b7f1f1cacb89")
-		(property "Reference" "#PWR045"
-			(at 238.76 134.62 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "VBAT"
-			(at 238.76 126.492 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 238.76 130.81 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 238.76 130.81 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"VBUS\""
-			(at 238.76 130.81 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "ac6483e6-428d-4812-8eb3-08303e517542")
-		)
-		(instances
-			(project "Pico Plus 2 RP2350 THT"
-				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
-					(reference "#PWR045")
 					(unit 1)
 				)
 			)
@@ -10064,7 +9535,7 @@
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "36cbfb96-2739-43d3-b152-15026b6e464b")
 		(property "Reference" "J4"
 			(at 128.524 19.558 0)
@@ -11174,7 +10645,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5041a1f8-7d99-425d-b411-f7e7ba67ee86")
 		(property "Reference" "J16"
@@ -11324,83 +10795,6 @@
 			(project "Pico Plus 2 RP2350 THT"
 				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
 					(reference "R15")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 254 149.86 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "5a9f0bed-ee3e-4b8e-a134-1fb69861c622")
-		(property "Reference" "#PWR032"
-			(at 254 156.21 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 254 153.67 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 254 149.86 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 254 149.86 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 254 149.86 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "e0bd0ae2-f79f-4da0-9d50-56639b447f84")
-		)
-		(instances
-			(project "Pico Plus 2 RP2350 THT"
-				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
-					(reference "#PWR032")
 					(unit 1)
 				)
 			)
@@ -11950,92 +11344,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Connector:Conn_01x04_Pin")
-		(at 163.83 104.14 0)
-		(mirror y)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp yes)
-		(uuid "73cdd933-0110-4b5c-a374-9b47c267a443")
-		(property "Reference" "J6"
-			(at 163.195 96.52 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "EXTRA"
-			(at 163.195 99.06 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"
-			(at 163.83 104.14 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 163.83 104.14 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Generic connector, single row, 01x04, script generated"
-			(at 163.83 104.14 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "d80c13f3-6280-431f-bde7-663b462156a9")
-		)
-		(pin "2"
-			(uuid "abe1f3c9-e4c4-4be4-911b-8483cc14179c")
-		)
-		(pin "4"
-			(uuid "faea1bb0-fa03-4032-be0d-111921b8e1c1")
-		)
-		(pin "3"
-			(uuid "78b66366-7bdf-4768-ad18-99f7b0fffb45")
-		)
-		(instances
-			(project "Pico Plus 2 RP2350 THT"
-				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
-					(reference "J6")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:VCC")
 		(at 191.77 58.42 0)
 		(unit 1)
@@ -12275,7 +11583,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "7be1c04e-8a13-42ff-8b78-8ad074ec247c")
 		(property "Reference" "J9"
 			(at 214.63 60.9601 0)
@@ -12435,7 +11743,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "7d71b463-19d3-4f7e-b18d-42c6490e9acb")
 		(property "Reference" "J3"
 			(at 128.905 96.52 0)
@@ -12583,88 +11891,6 @@
 			(project "Pico Plus 2 RP2350 THT"
 				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
 					(reference "#PWR046")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 238.76 134.62 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "7fef0895-43ce-4aa7-a9f4-822a64cc1a3c")
-		(property "Reference" "R9"
-			(at 241.3 133.3499 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "100K"
-			(at 241.3 135.8899 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal"
-			(at 236.982 134.62 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 238.76 134.62 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 238.76 134.62 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "eed0f264-662a-4665-82bc-aef2194813bb")
-		)
-		(pin "1"
-			(uuid "3ff1867e-33f0-4f51-9880-659a25bc6496")
-		)
-		(instances
-			(project "Pico Plus 2 RP2350 THT"
-				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
-					(reference "R9")
 					(unit 1)
 				)
 			)
@@ -12988,7 +12214,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "8e5f5b5e-7ec8-46ac-872e-521eead2b615")
 		(property "Reference" "J8"
 			(at 214.63 25.4001 0)
@@ -13253,7 +12479,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "941674c1-e226-41e5-bcc7-4020dc169290")
 		(property "Reference" "J15"
 			(at 273.05 105.4101 0)
@@ -13411,7 +12637,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "9a398b7c-c114-4a23-b4b4-7c6db2b48f2d")
 		(property "Reference" "J11"
 			(at 256.54 27.9401 0)
@@ -13730,7 +12956,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a5146db1-672d-44d2-8696-bffe45785847")
 		(property "Reference" "J18"
@@ -13894,7 +13120,7 @@
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "ab32c3a0-4b49-4007-932c-249a0b638a34")
 		(property "Reference" "J2"
 			(at 181.61 126.238 0)
@@ -13991,7 +13217,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "abe10a18-3ae2-4beb-8979-1c5b76960db1")
 		(property "Reference" "J10"
 			(at 214.63 96.5201 0)
@@ -14141,83 +13367,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:+3.3V")
-		(at 149.86 101.6 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "b15c9687-e447-4790-8e36-be93dab91d14")
-		(property "Reference" "#PWR034"
-			(at 149.86 105.41 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3.3V"
-			(at 149.606 97.79 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 149.86 101.6 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 149.86 101.6 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
-			(at 149.86 101.6 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "9aa3b7d3-2eb8-4901-8e91-e1b52edecf05")
-		)
-		(instances
-			(project "Pico Plus 2 RP2350 THT"
-				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
-					(reference "#PWR034")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Connector:Conn_01x09_Pin")
 		(at 130.81 74.93 0)
 		(mirror y)
@@ -14227,7 +13376,7 @@
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "b1e227ed-4b49-453e-a839-4422de40d909")
 		(property "Reference" "J5"
 			(at 128.524 58.928 0)
@@ -14672,7 +13821,7 @@
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "bc99991c-321c-473e-bdee-6ca0bdb2ede8")
 		(property "Reference" "J1"
 			(at 162.306 19.05 0)
@@ -15079,7 +14228,7 @@
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "c8438a5b-a50e-418e-820f-68dc6994c63a")
 		(property "Reference" "A1"
@@ -15354,7 +14503,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "d30b3f1b-5049-4f3f-8e50-4dbe014f352a")
 		(property "Reference" "J20"
 			(at 208.026 128.016 0)
@@ -15593,7 +14742,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "d9f87834-95c5-4d33-b8f7-ba87501aa719")
 		(property "Reference" "J14"
 			(at 250.19 105.4101 0)
@@ -15939,7 +15088,7 @@
 		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "df5a048f-26c8-46a1-b5b2-f249f8da8600")
 		(property "Reference" "J19"
@@ -16249,88 +15398,6 @@
 			(project "Pico Plus 2 RP2350 THT"
 				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
 					(reference "R6")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 238.76 146.05 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "efedb573-db21-455c-986e-18c41e719404")
-		(property "Reference" "R10"
-			(at 241.3 144.7799 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "100K"
-			(at 241.3 147.3199 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal"
-			(at 236.982 146.05 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 238.76 146.05 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 238.76 146.05 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "aad232ee-0706-4f06-b042-a799b47dea01")
-		)
-		(pin "1"
-			(uuid "dd4c7803-37ec-42db-8e5a-8a554c14e657")
-		)
-		(instances
-			(project "Pico Plus 2 RP2350 THT"
-				(path "/9fa6c116-224d-43f5-964c-c3b43fb62a58"
-					(reference "R10")
 					(unit 1)
 				)
 			)
