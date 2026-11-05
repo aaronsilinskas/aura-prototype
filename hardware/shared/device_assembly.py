@@ -44,10 +44,11 @@ from hardware.shared.build_narration import (
 )
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
-    _DEFAULT_BUS,
+    DEFAULT_BUS,
     AudioConfig,
     DeviceConfig,
     I2CConfig,
+    I2CDeviceConfig,
     IRConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
@@ -83,10 +84,12 @@ def open_i2c(name: str, declared: dict[str, I2CConfig], parts: DeviceParts) -> o
     return parts.i2c_bus(PinRef(i2c.scl, f"i2c.{name}.scl"), PinRef(i2c.sda, f"i2c.{name}.sda"))
 
 
-def _require_i2c(buses: dict[str, object | None], section: str, name: str) -> object:
-    bus = buses.get(name)
+def _require_i2c(
+    buses: dict[str, object | None], section: str, device: MatrixPixelsConfig | I2CDeviceConfig
+) -> object:
+    bus = buses.get(device.i2c)
     if bus is None:
-        raise RuntimeError(f"{section} joins I2C bus '{name}' but no I2C bus is available")
+        raise RuntimeError(f"{section} joins I2C bus '{device.i2c}' but no I2C bus is available")
     return bus
 
 
@@ -147,7 +150,7 @@ def _pixel_outputs(
     A legacy ``scopes`` entry is one strip per scope, spanning the whole scope.
     """
     if isinstance(pixels, MatrixPixelsConfig):
-        bus = _require_i2c(i2c, f"pixels[{index}]", pixels.i2c)
+        bus = _require_i2c(i2c, f"pixels[{index}]", pixels)
         return [parts.matrix_pixels(pixels, bus)]
     outputs = [
         parts.neopixel_strip(strip, PinRef(strip.pin, "pixels.pin")) for strip in pixels.strips
@@ -236,23 +239,20 @@ def assemble_device(
         narrate_step(logger, describe_high_current_rail(rail), _build_rail)
 
     def _open_i2c(name: str) -> object | None:
-        if name == _DEFAULT_BUS and default_i2c is not None:
+        if name == DEFAULT_BUS and default_i2c is not None:
             return default_i2c
         return open_i2c(name, config.i2c, parts)
 
-    i2c_devices = [p for p in config.pixels if isinstance(p, MatrixPixelsConfig)] + [
-        d for d in (config.accelerometer, config.magnetometer, config.haptics) if d is not None
-    ]
     i2c = _open_named_buses(
         logger,
-        [d.i2c for d in i2c_devices if d.enabled],
+        [d.i2c for d in config.i2c_devices()],
         lambda name: describe_i2c(name, config.i2c.get(name)),
         _open_i2c,
     )
 
     spi = _open_named_buses(
         logger,
-        [d.spi for d in (config.radio, config.sdcard) if d is not None and d.enabled],
+        [d.spi for d in config.spi_devices()],
         lambda name: describe_spi(name, config.spi.get(name)),
         lambda name: _open_spi(name, config.spi, parts),
     )
@@ -292,7 +292,7 @@ def assemble_device(
         describe_accelerometer,
         lambda c: (
             PolledSensor(
-                parts.accelerometer(c, _require_i2c(i2c, "accelerometer", c.i2c)),
+                parts.accelerometer(c, _require_i2c(i2c, "accelerometer", c)),
                 AccelerationData(0.0, 0.0, 0.0),
                 "accelerometer",
                 logger,
@@ -306,7 +306,7 @@ def assemble_device(
         describe_magnetometer,
         lambda c: (
             PolledSensor(
-                parts.magnetometer(c, _require_i2c(i2c, "magnetometer", c.i2c)),
+                parts.magnetometer(c, _require_i2c(i2c, "magnetometer", c)),
                 MagneticData(0.0, 0.0, 0.0),
                 "magnetometer",
                 logger,
@@ -332,7 +332,7 @@ def assemble_device(
         logger,
         config.haptics,
         describe_haptics,
-        lambda c: (parts.haptic_output(c, _require_i2c(i2c, "haptics", c.i2c)), "ok"),
+        lambda c: (parts.haptic_output(c, _require_i2c(i2c, "haptics", c)), "ok"),
     )
     if haptic_output is not None:
         outputs.append(haptic_output)
