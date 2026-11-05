@@ -7,9 +7,16 @@
     "scl": "GP5"
   },
   "spi": {
-    "sck": "GP2",
-    "mosi": "GP3",
-    "miso": "GP0"
+    "default": {
+      "sck": "GP2",
+      "mosi": "GP3",
+      "miso": "GP0"
+    },
+    "radio": {
+      "sck": "GP14",
+      "mosi": "GP15",
+      "miso": "GP12"
+    }
   },
   "pixels": [
     {
@@ -71,9 +78,10 @@
     "i2s_data": "GP20"
   },
   "radio": {
-    "enabled": false,
-    "cs": "GP1",
-    "reset": "GP9",
+    "enabled": true,
+    "spi": "radio",
+    "cs": "GP13",
+    "reset": "GP11",
     "frequency": 915.0,
     "node": 1
   },

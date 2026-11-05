@@ -137,20 +137,14 @@ def test_describe_i2c_disabled_is_the_bare_section_name():
     assert describe_i2c(I2CConfig(sda="GP4", scl="GP5", enabled=False)) == "i2c"
 
 
-def test_describe_spi_names_the_configured_sck_mosi_and_miso_pins():
-    spi = SPIConfig(sck="GP18", mosi="GP19", miso="GP16")
+def test_describe_spi_names_a_declared_bus_and_its_sck_mosi_and_miso_pins():
+    spi = SPIConfig(sck="GP14", mosi="GP15", miso="GP12")
 
-    assert describe_spi(spi) == "spi sck=GP18 mosi=GP19 miso=GP16"
-
-
-def test_describe_spi_without_a_section_names_the_board_default_bus():
-    assert describe_spi(None) == "spi default"
+    assert describe_spi("radio", spi) == "spi radio sck=GP14 mosi=GP15 miso=GP12"
 
 
-def test_describe_spi_disabled_is_the_bare_section_name():
-    spi = SPIConfig(sck="GP18", mosi="GP19", miso="GP16", enabled=False)
-
-    assert describe_spi(spi) == "spi"
+def test_describe_spi_of_an_undeclared_default_names_the_board_bus():
+    assert describe_spi("default", None) == "spi default board"
 
 
 def test_describe_neopixel_current_budget_reports_limit_estimate_scale_and_floor_count():

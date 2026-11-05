@@ -70,8 +70,13 @@ class DeviceParts:
         """
         raise NotImplementedError
 
-    def spi_bus(self, sck: PinRef | None, mosi: PinRef | None, miso: PinRef | None) -> object:
-        """Return an SPI bus on the given pins, or the board default when all are ``None``."""
+    def spi_bus(
+        self, sck: PinRef | None, mosi: PinRef | None, miso: PinRef | None
+    ) -> object | None:
+        """Return an SPI bus on the given pins, or the board default when all are ``None``.
+
+        ``None`` means the board has no default SPI bus.
+        """
         raise NotImplementedError
 
     def matrix_pixels(self, pixels: MatrixPixelsConfig, i2c: object) -> EffectOutput:

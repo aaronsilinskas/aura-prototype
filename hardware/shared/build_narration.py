@@ -10,7 +10,7 @@ The ``describe_*`` functions build each boot step's description. Every one works
 from a config section's pin-name strings, never resolved pins, so a step's line
 opens before any of its pins resolve -- and a bad pin name fails that step's own
 line. Each returns the exact line the board prints for its section, so a
-section that narrates a bare name when disabled (``i2c``, ``spi``, ``audio``,
+section that narrates a bare name when disabled (``i2c``, ``audio``,
 ``pixels[i] <kind>``) gets that form here too; the rest keep their detail.
 
 No ``board``/``busio`` imports, so this module is CPython-testable in isolation,
@@ -111,12 +111,11 @@ def describe_i2c(i2c: I2CConfig | None) -> str:
     return f"i2c scl={i2c.scl} sda={i2c.sda}"
 
 
-def describe_spi(spi: SPIConfig | None) -> str:
+def describe_spi(name: str, spi: SPIConfig | None) -> str:
+    """Describe opening the SPI bus *name*; *spi* ``None`` is the board's own bus."""
     if spi is None:
-        return "spi default"
-    if not spi.enabled:
-        return "spi"
-    return f"spi sck={spi.sck} mosi={spi.mosi} miso={spi.miso}"
+        return f"spi {name} board"
+    return f"spi {name} sck={spi.sck} mosi={spi.mosi} miso={spi.miso}"
 
 
 def describe_neopixel_current_budget(budget: NeoPixelCurrentBudgetConfig) -> str:

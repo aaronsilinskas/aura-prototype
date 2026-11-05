@@ -45,11 +45,15 @@ _I2C_PIN_FIELDS: Final = ("sda", "scl")
 
 _SPI_PIN_FIELDS: Final = ("sck", "mosi", "miso")
 
-_RADIO_ALLOWED_KEYS: Final = ("cs", "reset", "frequency", "node", "enabled")
+_RADIO_ALLOWED_KEYS: Final = ("spi", "cs", "reset", "frequency", "node", "enabled")
 
 _RADIO_PIN_FIELDS: Final = ("cs", "reset")
 
-_SDCARD_ALLOWED_KEYS: Final = ("cs", "mount", "enabled")
+_SDCARD_ALLOWED_KEYS: Final = ("spi", "cs", "mount", "enabled")
+
+# The bus a device joins when it names none. Always a valid reference: when no
+# bus of that name is declared, it is the board's own bus.
+_DEFAULT_BUS: Final = "default"
 
 _HIGH_CURRENT_RAIL_ALLOWED_KEYS: Final = ("pin", "active_high", "enabled")
 
@@ -232,21 +236,19 @@ class I2CConfig:
 
 
 class SPIConfig:
-    """Parsed shared SPI bus configuration.
+    """Parsed pins of one **Named bus** in the ``spi`` section.
 
-    Mirrors ``I2CConfig``: ``sck``/``mosi``/``miso`` are required together
-    when the ``spi`` section is present. Absent ``spi`` section means
-    the board's default SPI bus is used later; ``enabled=False``
-    builds no bus at all.
+    ``sck``/``mosi``/``miso`` are required together. There is no per-bus
+    ``enabled``: the Device assembly opens a bus only when an enabled device
+    names it.
     """
 
-    __slots__ = ("enabled", "miso", "mosi", "sck")
+    __slots__ = ("miso", "mosi", "sck")
 
-    def __init__(self, sck: str, mosi: str, miso: str, enabled: bool = True) -> None:
+    def __init__(self, sck: str, mosi: str, miso: str) -> None:
         self.sck: str = sck
         self.mosi: str = mosi
         self.miso: str = miso
-        self.enabled: bool = enabled
 
 
 class I2CDeviceConfig:
@@ -270,20 +272,25 @@ class I2CDeviceConfig:
 class RadioConfig:
     """Parsed RFM69 radio peripheral configuration.
 
-    Consumes the shared SPI bus (see ``SPIConfig``). ``frequency`` (MHz) is
-    board-variant-specific, so the parser only type-checks it — no fixed
-    valid range. ``node`` is this device's id on the radio network, ``0``
-    to ``254`` inclusive (``255`` is the RadioHead broadcast address).
-
-    A radio declared and enabled while ``spi`` is disabled is a *builder*-time
-    hard error, not checked here.
+    Joins the SPI **Named bus** named by ``spi`` (``"default"`` unless set).
+    ``frequency`` (MHz) is board-variant-specific, so the parser only
+    type-checks it — no fixed valid range. ``node`` is this device's id on
+    the radio network, ``0`` to ``254`` inclusive (``255`` is the RadioHead
+    broadcast address).
     """
 
-    __slots__ = ("cs", "enabled", "frequency", "node", "reset")
+    __slots__ = ("cs", "enabled", "frequency", "node", "reset", "spi")
 
     def __init__(
-        self, cs: str, reset: str, frequency: float, node: int, enabled: bool = True
+        self,
+        cs: str,
+        reset: str,
+        frequency: float,
+        node: int,
+        enabled: bool = True,
+        spi: str = _DEFAULT_BUS,
     ) -> None:
+        self.spi: str = spi
         self.cs: str = cs
         self.reset: str = reset
         self.frequency: float = frequency
@@ -294,16 +301,17 @@ class RadioConfig:
 class SDCardConfig:
     """Parsed SD card peripheral configuration.
 
-    Consumes the shared SPI bus (see ``SPIConfig``), like ``RadioConfig``.
-    ``mount`` is the on-device mount point, defaulting to ``"/sd"``.
-
-    An SD card declared and enabled while ``spi`` is disabled is a
-    *builder*-time hard error, not checked here.
+    Joins the SPI **Named bus** named by ``spi`` (``"default"`` unless set),
+    like ``RadioConfig``. ``mount`` is the on-device mount point, defaulting
+    to ``"/sd"``.
     """
 
-    __slots__ = ("cs", "enabled", "mount")
+    __slots__ = ("cs", "enabled", "mount", "spi")
 
-    def __init__(self, cs: str, mount: str = "/sd", enabled: bool = True) -> None:
+    def __init__(
+        self, cs: str, mount: str = "/sd", enabled: bool = True, spi: str = _DEFAULT_BUS
+    ) -> None:
+        self.spi: str = spi
         self.cs: str = cs
         self.mount: str = mount
         self.enabled: bool = enabled
@@ -422,7 +430,7 @@ class DeviceConfig:
         i2c: I2CConfig | None,
         accelerometer: I2CDeviceConfig | None,
         haptics: I2CDeviceConfig | None,
-        spi: SPIConfig | None,
+        spi: dict[str, SPIConfig],
         radio: RadioConfig | None,
         sdcard: SDCardConfig | None,
         high_current_rail: HighCurrentRailConfig | None,
@@ -436,7 +444,8 @@ class DeviceConfig:
         self.i2c: I2CConfig | None = i2c
         self.accelerometer: I2CDeviceConfig | None = accelerometer
         self.haptics: I2CDeviceConfig | None = haptics
-        self.spi: SPIConfig | None = spi
+        self.spi: dict[str, SPIConfig] = spi
+        """The declared **Named buses** of the ``spi`` section, by bus name."""
         self.radio: RadioConfig | None = radio
         self.sdcard: SDCardConfig | None = sdcard
         self.high_current_rail: HighCurrentRailConfig | None = high_current_rail
@@ -922,28 +931,60 @@ def _parse_i2c(i2c_raw: dict) -> I2CConfig:
     return I2CConfig(sda=i2c_raw["sda"], scl=i2c_raw["scl"], enabled=enabled)
 
 
-def _parse_spi(spi_raw: dict) -> SPIConfig:
+def _parse_spi(spi_raw: object) -> dict[str, SPIConfig]:
+    if not isinstance(spi_raw, dict):
+        raise ValueError("spi must be a mapping of bus name to sck/mosi/miso pins")
+    buses: dict[str, SPIConfig] = {}
+    for name, bus_raw in spi_raw.items():
+        if not isinstance(name, str) or not name:
+            raise ValueError(f"spi bus name must be a non-empty string, got {name!r}")
+        buses[name] = _parse_spi_bus(bus_raw, f"spi.{name}")
+    return buses
+
+
+def _parse_spi_bus(bus_raw: object, field: str) -> SPIConfig:
+    if not isinstance(bus_raw, dict):
+        raise ValueError(f"{field} must be a mapping of sck/mosi/miso pins")
+    _reject_unknown_keys(bus_raw, field, allowed=_SPI_PIN_FIELDS)
     # sck/mosi/miso are required-together, mirroring the i2c sda/scl pins: a
     # half-configured bus is exactly the case where one or two might be
     # missing, so every missing field is named in one error instead of
     # stopping at the first.
-    missing = [field for field in _SPI_PIN_FIELDS if field not in spi_raw]
+    missing = [pin for pin in _SPI_PIN_FIELDS if pin not in bus_raw]
     if missing:
-        names = ", ".join(f"spi.{field}" for field in missing)
-        raise ValueError(f"{names} required together when spi section is present")
+        names = ", ".join(f"{field}.{pin}" for pin in missing)
+        raise ValueError(f"{names} required together when {field} is declared")
 
-    for field in _SPI_PIN_FIELDS:
-        if not isinstance(spi_raw[field], str):
-            raise ValueError(f"spi.{field} must be a string pin name")
+    for pin in _SPI_PIN_FIELDS:
+        if not isinstance(bus_raw[pin], str):
+            raise ValueError(f"{field}.{pin} must be a string pin name")
 
-    enabled = _parse_enabled(spi_raw, "spi.enabled")
-    return SPIConfig(
-        sck=spi_raw["sck"], mosi=spi_raw["mosi"], miso=spi_raw["miso"], enabled=enabled
-    )
+    return SPIConfig(sck=bus_raw["sck"], mosi=bus_raw["mosi"], miso=bus_raw["miso"])
 
 
-def _parse_radio(radio_raw: dict) -> RadioConfig:
+def _parse_bus_reference(raw: dict, field: str, declared: dict[str, object]) -> str:
+    """Return the bus *raw* names under *field*'s key, ``"default"`` when it names none.
+
+    *field* is the dotted device field (e.g. ``radio.spi``); its last part is
+    both the key read from *raw* and the bus section *declared* came from.
+    ``"default"`` is always valid, declared or not.
+    """
+    kind = field.rsplit(".", 1)[1]
+    name = raw.get(kind, _DEFAULT_BUS)
+    if not isinstance(name, str):
+        raise ValueError(f"{field} must be a string bus name, got {name!r}")
+    if name != _DEFAULT_BUS and name not in declared:
+        valid = ", ".join(sorted({_DEFAULT_BUS, *declared}))
+        raise ValueError(
+            f"{field} names {kind.upper()} bus '{name}', which {kind} does not declare; "
+            + f"valid buses: {valid}"
+        )
+    return name
+
+
+def _parse_radio(radio_raw: dict, spi_buses: dict[str, SPIConfig]) -> RadioConfig:
     _reject_unknown_keys(radio_raw, "radio", allowed=_RADIO_ALLOWED_KEYS)
+    spi = _parse_bus_reference(radio_raw, "radio.spi", spi_buses)
 
     for field in _RADIO_PIN_FIELDS:
         if field not in radio_raw:
@@ -968,11 +1009,14 @@ def _parse_radio(radio_raw: dict) -> RadioConfig:
         raise ValueError(f"radio.node must be in [0, 254], got {node}")
 
     enabled = _parse_enabled(radio_raw, "radio.enabled")
-    return RadioConfig(cs=cs, reset=reset, frequency=float(frequency), node=node, enabled=enabled)
+    return RadioConfig(
+        cs=cs, reset=reset, frequency=float(frequency), node=node, enabled=enabled, spi=spi
+    )
 
 
-def _parse_sdcard(sdcard_raw: dict) -> SDCardConfig:
+def _parse_sdcard(sdcard_raw: dict, spi_buses: dict[str, SPIConfig]) -> SDCardConfig:
     _reject_unknown_keys(sdcard_raw, "sdcard", allowed=_SDCARD_ALLOWED_KEYS)
+    spi = _parse_bus_reference(sdcard_raw, "sdcard.spi", spi_buses)
 
     if "cs" not in sdcard_raw:
         raise ValueError("sdcard.cs is required")
@@ -987,7 +1031,7 @@ def _parse_sdcard(sdcard_raw: dict) -> SDCardConfig:
         )
 
     enabled = _parse_enabled(sdcard_raw, "sdcard.enabled")
-    return SDCardConfig(cs=cs, mount=mount, enabled=enabled)
+    return SDCardConfig(cs=cs, mount=mount, enabled=enabled, spi=spi)
 
 
 def _parse_high_current_rail(rail_raw: dict) -> HighCurrentRailConfig:
@@ -1120,17 +1164,17 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     if "i2c" in mapping:
         i2c = _parse_i2c(mapping["i2c"])
 
-    spi: SPIConfig | None = None
+    spi: dict[str, SPIConfig] = {}
     if "spi" in mapping:
         spi = _parse_spi(mapping["spi"])
 
     radio: RadioConfig | None = None
     if "radio" in mapping:
-        radio = _parse_radio(mapping["radio"])
+        radio = _parse_radio(mapping["radio"], spi)
 
     sdcard: SDCardConfig | None = None
     if "sdcard" in mapping:
-        sdcard = _parse_sdcard(mapping["sdcard"])
+        sdcard = _parse_sdcard(mapping["sdcard"], spi)
 
     # One parse call per `_I2C_DEVICE_SECTIONS` entry -- the same shared list
     # `_parse_i2c_device` keys its section-specific error messages off, so the

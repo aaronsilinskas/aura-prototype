@@ -52,6 +52,8 @@ from hardware.shared.device_config import (
     NeoPixelPixelsConfig,
     NeoPixelStripConfig,
     RadioConfig,
+    SDCardConfig,
+    SPIConfig,
 )
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_parts import DeviceParts, PinRef
@@ -87,10 +89,50 @@ def _require_i2c(i2c: object | None, section: str) -> object:
     return i2c
 
 
-def _require_spi(spi: object | None, section: str) -> object:
+def _open_named_buses(
+    logger: Logger,
+    names: list[str],
+    describe: Callable[[str], str],
+    open_bus: Callable[[str], object | None],
+) -> dict[str, object | None]:
+    """Open each **Named bus** in *names* once, in first-named order, one narrated line each.
+
+    *names* holds the bus each enabled device joins, so a declared bus no
+    enabled device names is never opened. A bus *open_bus* can't build is
+    ``None``, narrated ``no bus``; the device that needs it rejects it.
+    """
+    buses: dict[str, object | None] = {}
+    for name in names:
+        if name in buses:
+            continue
+
+        def _build(name: str = name) -> tuple[object | None, str]:
+            bus = open_bus(name)
+            return bus, "no bus" if bus is None else "ok"
+
+        buses[name] = narrate_step(logger, describe(name), _build)
+    return buses
+
+
+def _open_spi(name: str, declared: dict[str, SPIConfig], parts: DeviceParts) -> object | None:
+    """Open SPI bus *name*: its declared pins, or the board's own bus when undeclared."""
+    spi = declared.get(name)
     if spi is None:
-        raise RuntimeError(f"{section} section is declared but no SPI bus is available")
-    return spi
+        return parts.spi_bus(None, None, None)
+    return parts.spi_bus(
+        PinRef(spi.sck, f"spi.{name}.sck"),
+        PinRef(spi.mosi, f"spi.{name}.mosi"),
+        PinRef(spi.miso, f"spi.{name}.miso"),
+    )
+
+
+def _require_spi(
+    buses: dict[str, object | None], section: str, device: RadioConfig | SDCardConfig
+) -> object:
+    bus = buses.get(device.spi)
+    if bus is None:
+        raise RuntimeError(f"{section} joins SPI bus '{device.spi}' but no SPI bus is available")
+    return bus
 
 
 def _pixel_outputs(
@@ -161,9 +203,13 @@ def assemble_device(
     raises fails its own line and the exception propagates. *logger* omitted
     means silent.
 
+    SPI buses open on demand: only a **Named bus** an enabled device joins
+    is opened, once, and every device joining it gets that same bus.
+
     Raises:
         RuntimeError: If an enabled section needs an I2C or SPI bus and there
-            is none: the bus is disabled, or no I2C bus could be built.
+            is none: the I2C bus is disabled or could not be built, or the
+            board has no SPI bus of its own for an undeclared ``default``.
     """
     if logger is None:
         logger = Logger.SILENT
@@ -193,23 +239,12 @@ def assemble_device(
 
         i2c = narrate_step(logger, describe_i2c(i2c_config), _build_i2c)
 
-    spi_config = config.spi
-    spi: object | None = None
-    if spi_config is not None and not spi_config.enabled:
-        narrate_skip(logger, describe_spi(spi_config), "disabled")
-    else:
-
-        def _build_spi() -> tuple[object, str]:
-            if spi_config is None:
-                return parts.spi_bus(None, None, None), "ok"
-            bus = parts.spi_bus(
-                PinRef(spi_config.sck, "spi.sck"),
-                PinRef(spi_config.mosi, "spi.mosi"),
-                PinRef(spi_config.miso, "spi.miso"),
-            )
-            return bus, "ok"
-
-        spi = narrate_step(logger, describe_spi(spi_config), _build_spi)
+    spi = _open_named_buses(
+        logger,
+        [d.spi for d in (config.radio, config.sdcard) if d is not None and d.enabled],
+        lambda name: describe_spi(name, config.spi.get(name)),
+        lambda name: _open_spi(name, config.spi, parts),
+    )
 
     if config.neopixel_current_budget is not None:
         logger.log(describe_neopixel_current_budget(config.neopixel_current_budget))
@@ -291,7 +326,7 @@ def assemble_device(
     def _build_radio(radio: RadioConfig) -> tuple[RadioTransceiver, str]:
         transport = parts.radio_transport(
             radio,
-            _require_spi(spi, "radio"),
+            _require_spi(spi, "radio", radio),
             PinRef(radio.cs, "radio.cs"),
             PinRef(radio.reset, "radio.reset"),
         )
@@ -303,7 +338,10 @@ def assemble_device(
         logger,
         config.sdcard,
         describe_sdcard,
-        lambda c: (parts.storage(c, _require_spi(spi, "sdcard"), PinRef(c.cs, "sdcard.cs")), "ok"),
+        lambda c: (
+            parts.storage(c, _require_spi(spi, "sdcard", c), PinRef(c.cs, "sdcard.cs")),
+            "ok",
+        ),
     )
 
     ir = _gated_step(logger, config.ir, describe_ir, lambda c: _ir(c, parts))

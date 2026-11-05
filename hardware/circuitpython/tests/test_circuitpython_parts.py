@@ -218,6 +218,12 @@ def test_spi_bus_is_the_board_default_bus_when_no_pins_are_declared(buses: None)
     assert parts.spi_bus(None, None, None) is default_bus
 
 
+def test_spi_bus_reports_no_bus_when_the_board_has_no_default_spi_bus(buses: None) -> None:
+    parts = CircuitPythonParts(SimpleNamespace())
+
+    assert parts.spi_bus(None, None, None) is None
+
+
 # ---------------------------------------------------------------------------
 # Button pin readers
 # ---------------------------------------------------------------------------

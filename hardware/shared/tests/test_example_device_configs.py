@@ -23,6 +23,7 @@ from hardware.shared.device_config import (
 _EXAMPLES = Path(__file__).resolve().parents[3] / "examples"
 _EXAMPLE_CONFIGS = sorted(_EXAMPLES.glob("aura-device.*.json"))
 _SIMULATED_CONFIG = _EXAMPLES / "aura-device.simulated.json"
+_PICO_2_CONFIG = _EXAMPLES / "aura-device.pico-2.json"
 
 
 def _pixel_scopes(config: DeviceConfig) -> set[str]:
@@ -77,3 +78,16 @@ def test_the_simulated_config_lays_out_one_strip_per_scope_for_every_scope():
     assert len(strips) == len(config.pixels)
     assert sorted(key for strip in strips for key in strip.scope_pixels) == sorted(Scope.ALL.keys)
     assert all(len(strip.scope_pixels) == 1 for strip in strips)
+
+
+def test_the_pico_2_config_puts_the_enabled_radio_on_its_own_spi_bus_apart_from_the_sdcard():
+    config = load_device_config(str(_PICO_2_CONFIG))
+
+    assert config.radio is not None and config.radio.enabled
+    assert config.sdcard is not None
+    assert (config.radio.spi, config.sdcard.spi) == ("radio", "default")
+    assert {name: (bus.sck, bus.mosi, bus.miso) for name, bus in config.spi.items()} == {
+        "default": ("GP2", "GP3", "GP0"),
+        "radio": ("GP14", "GP15", "GP12"),
+    }
+    assert (config.radio.cs, config.radio.reset) == ("GP13", "GP11")
