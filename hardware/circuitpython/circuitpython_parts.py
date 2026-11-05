@@ -242,13 +242,15 @@ class CircuitPythonParts(DeviceParts):
         digitalio.DigitalInOut(self._pin(pin)).switch_to_output(value=level)
 
     def i2c_bus(self, scl: PinRef | None, sda: PinRef | None) -> busio.I2C | None:
-        """Return a new bus (``None`` with no pull-up).
+        """Return a new bus, or ``None`` with no pull-up or no board default.
 
         The board default ``SCL``/``SDA`` serve when no pins are declared; a
-        board without those aliases raises ``AttributeError``, the nudge to
-        declare an ``i2c`` section.
+        board without those aliases has no default bus, so ``i2c.default``
+        must be declared.
         """
         if scl is None or sda is None:
+            if not (hasattr(self._board, "SCL") and hasattr(self._board, "SDA")):
+                return None
             scl_pin, sda_pin = self._board.SCL, self._board.SDA
         else:
             scl_pin, sda_pin = self._pin(scl), self._pin(sda)

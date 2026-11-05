@@ -186,6 +186,12 @@ def test_i2c_bus_reports_no_bus_when_nothing_pulls_it_up(buses: None) -> None:
     assert parts.i2c_bus(None, None) is None
 
 
+def test_i2c_bus_reports_no_bus_when_the_board_has_no_default_i2c_bus(buses: None) -> None:
+    parts = CircuitPythonParts(SimpleNamespace())
+
+    assert parts.i2c_bus(None, None) is None
+
+
 def test_spi_bus_is_built_on_the_declared_pins(buses: None) -> None:
     board = _board("GP18", "GP19", "GP16")
     parts = CircuitPythonParts(board)
