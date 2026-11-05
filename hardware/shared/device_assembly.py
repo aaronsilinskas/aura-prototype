@@ -44,6 +44,7 @@ from hardware.shared.build_narration import (
 )
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
+    _DEFAULT_BUS,
     AudioConfig,
     DeviceConfig,
     I2CConfig,
@@ -71,22 +72,22 @@ def button_label(index: int) -> str:
     return chr(ord("A") + index)
 
 
-def open_i2c(i2c_config: I2CConfig | None, parts: DeviceParts) -> object | None:
-    """Return the I2C bus *i2c_config* asks for: ``None`` when it is disabled or none can be built.
+def open_i2c(name: str, declared: dict[str, I2CConfig], parts: DeviceParts) -> object | None:
+    """Open I2C bus *name*: its declared pins, or the board's own bus when undeclared.
 
-    An absent section means the board's default pins.
+    ``None`` when the bus can't be built (nothing pulls it up).
     """
-    if i2c_config is None:
-        return parts.i2c_bus(None, None)
-    if not i2c_config.enabled:
-        return None
-    return parts.i2c_bus(PinRef(i2c_config.scl, "i2c.scl"), PinRef(i2c_config.sda, "i2c.sda"))
-
-
-def _require_i2c(i2c: object | None, section: str) -> object:
+    i2c = declared.get(name)
     if i2c is None:
-        raise RuntimeError(f"{section} section is declared but no I2C bus is available")
-    return i2c
+        return parts.i2c_bus(None, None)
+    return parts.i2c_bus(PinRef(i2c.scl, f"i2c.{name}.scl"), PinRef(i2c.sda, f"i2c.{name}.sda"))
+
+
+def _require_i2c(buses: dict[str, object | None], section: str, name: str) -> object:
+    bus = buses.get(name)
+    if bus is None:
+        raise RuntimeError(f"{section} joins I2C bus '{name}' but no I2C bus is available")
+    return bus
 
 
 def _open_named_buses(
@@ -136,16 +137,18 @@ def _require_spi(
 
 
 def _pixel_outputs(
-    pixels: MatrixPixelsConfig | NeoPixelPixelsConfig, parts: DeviceParts, i2c: object | None
+    index: int,
+    pixels: MatrixPixelsConfig | NeoPixelPixelsConfig,
+    parts: DeviceParts,
+    i2c: dict[str, object | None],
 ) -> list[EffectOutput]:
-    """Build one enabled pixel entry: a matrix, or one output per NeoPixel strip.
+    """Build enabled pixel entry *index*: a matrix, or one output per NeoPixel strip.
 
     A legacy ``scopes`` entry is one strip per scope, spanning the whole scope.
     """
     if isinstance(pixels, MatrixPixelsConfig):
-        if i2c is None:
-            raise RuntimeError("pixels.type is 'matrix' but no I2C bus is available")
-        return [parts.matrix_pixels(pixels, i2c)]
+        bus = _require_i2c(i2c, f"pixels[{index}]", pixels.i2c)
+        return [parts.matrix_pixels(pixels, bus)]
     outputs = [
         parts.neopixel_strip(strip, PinRef(strip.pin, "pixels.pin")) for strip in pixels.strips
     ]
@@ -192,7 +195,10 @@ def _gated_step(
 
 
 def assemble_device(
-    config: DeviceConfig, parts: DeviceParts, logger: Logger | None = None
+    config: DeviceConfig,
+    parts: DeviceParts,
+    logger: Logger | None = None,
+    default_i2c: object | None = None,
 ) -> DeviceHardware:
     """Build *config*'s hardware through *parts*, narrating each step to *logger*.
 
@@ -203,13 +209,15 @@ def assemble_device(
     raises fails its own line and the exception propagates. *logger* omitted
     means silent.
 
-    SPI buses open on demand: only a **Named bus** an enabled device joins
-    is opened, once, and every device joining it gets that same bus.
+    I2C and SPI buses open on demand: only a **Named bus** an enabled device
+    joins is opened, once, and every device joining it gets that same bus.
+    *default_i2c*, if given, stands in for the ``default`` I2C bus instead of
+    opening it.
 
     Raises:
-        RuntimeError: If an enabled section needs an I2C or SPI bus and there
-            is none: the I2C bus is disabled or could not be built, or the
-            board has no SPI bus of its own for an undeclared ``default``.
+        RuntimeError: If an enabled section's bus is unavailable: its I2C bus
+            could not be built, or the board has no SPI bus of its own for an
+            undeclared ``default``.
     """
     if logger is None:
         logger = Logger.SILENT
@@ -227,17 +235,20 @@ def assemble_device(
 
         narrate_step(logger, describe_high_current_rail(rail), _build_rail)
 
-    i2c_config = config.i2c
-    i2c: object | None = None
-    if i2c_config is not None and not i2c_config.enabled:
-        narrate_skip(logger, describe_i2c(i2c_config), "disabled")
-    else:
+    def _open_i2c(name: str) -> object | None:
+        if name == _DEFAULT_BUS and default_i2c is not None:
+            return default_i2c
+        return open_i2c(name, config.i2c, parts)
 
-        def _build_i2c() -> tuple[object | None, str]:
-            bus = open_i2c(i2c_config, parts)
-            return bus, "no bus" if bus is None else "ok"
-
-        i2c = narrate_step(logger, describe_i2c(i2c_config), _build_i2c)
+    i2c_devices = [p for p in config.pixels if isinstance(p, MatrixPixelsConfig)] + [
+        d for d in (config.accelerometer, config.magnetometer, config.haptics) if d is not None
+    ]
+    i2c = _open_named_buses(
+        logger,
+        [d.i2c for d in i2c_devices if d.enabled],
+        lambda name: describe_i2c(name, config.i2c.get(name)),
+        _open_i2c,
+    )
 
     spi = _open_named_buses(
         logger,
@@ -259,7 +270,10 @@ def assemble_device(
             narrate_step(
                 logger,
                 description,
-                lambda pixels=pixels: (_pixel_outputs(pixels, parts, i2c), "ok"),
+                lambda index=index, pixels=pixels: (
+                    _pixel_outputs(index, pixels, parts, i2c),
+                    "ok",
+                ),
             )
         )
 
@@ -278,7 +292,7 @@ def assemble_device(
         describe_accelerometer,
         lambda c: (
             PolledSensor(
-                parts.accelerometer(c, _require_i2c(i2c, "accelerometer")),
+                parts.accelerometer(c, _require_i2c(i2c, "accelerometer", c.i2c)),
                 AccelerationData(0.0, 0.0, 0.0),
                 "accelerometer",
                 logger,
@@ -292,7 +306,7 @@ def assemble_device(
         describe_magnetometer,
         lambda c: (
             PolledSensor(
-                parts.magnetometer(c, _require_i2c(i2c, "magnetometer")),
+                parts.magnetometer(c, _require_i2c(i2c, "magnetometer", c.i2c)),
                 MagneticData(0.0, 0.0, 0.0),
                 "magnetometer",
                 logger,
@@ -318,7 +332,7 @@ def assemble_device(
         logger,
         config.haptics,
         describe_haptics,
-        lambda c: (parts.haptic_output(c, _require_i2c(i2c, "haptics")), "ok"),
+        lambda c: (parts.haptic_output(c, _require_i2c(i2c, "haptics", c.i2c)), "ok"),
     )
     if haptic_output is not None:
         outputs.append(haptic_output)

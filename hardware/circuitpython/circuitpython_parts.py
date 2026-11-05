@@ -223,15 +223,14 @@ def _make_writer(pin: microcontroller.Pin) -> tuple[PulseWriter, str]:
 
 
 class CircuitPythonParts(DeviceParts):
-    """Builds parts on *board_module*'s pins; *i2c*, if given, is the I2C bus handed out.
+    """Builds parts on *board_module*'s pins.
 
     Single-use: every pin is claimed without deiniting, so one adapter serves
     one boot.
     """
 
-    def __init__(self, board_module: object = board, i2c: busio.I2C | None = None) -> None:
+    def __init__(self, board_module: object = board) -> None:
         self._board = board_module
-        self._i2c = i2c
 
     def _pin(self, pin: PinRef) -> microcontroller.Pin:
         return _resolve_pin(self._board, pin.field, pin.name)
@@ -243,14 +242,12 @@ class CircuitPythonParts(DeviceParts):
         digitalio.DigitalInOut(self._pin(pin)).switch_to_output(value=level)
 
     def i2c_bus(self, scl: PinRef | None, sda: PinRef | None) -> busio.I2C | None:
-        """Return the injected bus if one is held, else a new bus (``None`` with no pull-up).
+        """Return a new bus (``None`` with no pull-up).
 
         The board default ``SCL``/``SDA`` serve when no pins are declared; a
         board without those aliases raises ``AttributeError``, the nudge to
         declare an ``i2c`` section.
         """
-        if self._i2c is not None:
-            return self._i2c
         if scl is None or sda is None:
             scl_pin, sda_pin = self._board.SCL, self._board.SDA
         else:

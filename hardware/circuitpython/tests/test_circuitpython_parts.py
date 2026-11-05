@@ -186,18 +186,6 @@ def test_i2c_bus_reports_no_bus_when_nothing_pulls_it_up(buses: None) -> None:
     assert parts.i2c_bus(None, None) is None
 
 
-def test_i2c_bus_is_the_injected_bus_and_builds_none_when_one_is_held(
-    buses: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    built: list[object] = []
-    monkeypatch.setattr(sys.modules["busio"], "I2C", lambda *pins: built.append(pins))
-    injected = object()
-    parts = CircuitPythonParts(_board("GP5", "GP4"), i2c=injected)
-
-    assert parts.i2c_bus(PinRef("GP5", "i2c.scl"), PinRef("GP4", "i2c.sda")) is injected
-    assert built == []  # a built-then-discarded bus would still claim its pins
-
-
 def test_spi_bus_is_built_on_the_declared_pins(buses: None) -> None:
     board = _board("GP18", "GP19", "GP16")
     parts = CircuitPythonParts(board)

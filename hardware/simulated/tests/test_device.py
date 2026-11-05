@@ -465,16 +465,6 @@ def test_without_a_magnetometer_a_field_cannot_be_set():
 # Booting through the Device assembly
 # ---------------------------------------------------------------------------
 
-_I2C_DISABLED = {"i2c": {"sda": "GP4", "scl": "GP5", "enabled": False}}
-
-
-@pytest.mark.parametrize("sensor", ["accelerometer", "magnetometer"])
-def test_a_sensor_declared_with_its_bus_disabled_is_rejected(sensor):
-    config = _config(**_I2C_DISABLED, **{sensor: {}})
-
-    with pytest.raises(RuntimeError, match="no I2C bus"):
-        SimulatedHardware(now=lambda: 0.0, config=config)
-
 
 def test_a_disabled_matrix_entry_boots():
     config = parse_device_config(
