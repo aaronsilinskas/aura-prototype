@@ -997,7 +997,7 @@ def _parse_bus_reference(raw: dict, section: str, kind: str, declared: dict[str,
     if not isinstance(name, str):
         raise ValueError(f"{field} must be a string bus name, got {name!r}")
     if name != DEFAULT_BUS and name not in declared:
-        valid = ", ".join(sorted({DEFAULT_BUS, *declared}))
+        valid = ", ".join(sorted(set(declared) | {DEFAULT_BUS}))
         raise ValueError(
             f"{field} names {kind.upper()} bus '{name}', which {kind} does not declare; "
             + f"valid buses: {valid}"
