@@ -2,7 +2,8 @@
 
 Each request lands in ``requests`` as ``(part, args)``, with ``args`` exactly as
 the assembly passed them. ``fail_on`` makes one part raise; ``no_i2c`` makes the
-I2C part report that no bus could be built.
+I2C part report that no bus could be built, and ``no_spi`` makes the SPI part
+report that the board has no SPI bus of its own.
 """
 
 from __future__ import annotations
@@ -76,7 +77,11 @@ class Transport(RadioTransport):
 
 class RecordingParts(DeviceParts):
     def __init__(
-        self, fail_on: str | None = None, no_i2c: bool = False, writer_kind: str = "fake"
+        self,
+        fail_on: str | None = None,
+        no_i2c: bool = False,
+        no_spi: bool = False,
+        writer_kind: str = "fake",
     ) -> None:
         self.requests: list[tuple[str, tuple]] = []
         self.pin_levels: dict[str, bool] = {}
@@ -90,6 +95,7 @@ class RecordingParts(DeviceParts):
         self.transports: list[Transport] = []
         self._fail_on = fail_on
         self._no_i2c = no_i2c
+        self._no_spi = no_spi
         self._writer_kind = writer_kind
 
     def parts(self) -> list[str]:
@@ -116,8 +122,12 @@ class RecordingParts(DeviceParts):
         self._record("i2c_bus", scl, sda)
         return None if self._no_i2c else Bus("i2c")
 
-    def spi_bus(self, sck: PinRef | None, mosi: PinRef | None, miso: PinRef | None) -> object:
+    def spi_bus(
+        self, sck: PinRef | None, mosi: PinRef | None, miso: PinRef | None
+    ) -> object | None:
         self._record("spi_bus", sck, mosi, miso)
+        if self._no_spi and sck is None:
+            return None
         return Bus("spi")
 
     def matrix_pixels(self, pixels: MatrixPixelsConfig, i2c: object) -> EffectOutput:

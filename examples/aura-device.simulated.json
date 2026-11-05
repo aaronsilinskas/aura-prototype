@@ -1,12 +1,16 @@
 {
   "i2c": {
-    "sda": "SIM_SDA",
-    "scl": "SIM_SCL"
+    "default": {
+      "sda": "SIM_SDA",
+      "scl": "SIM_SCL"
+    }
   },
   "spi": {
-    "sck": "SIM_SCK",
-    "mosi": "SIM_MOSI",
-    "miso": "SIM_MISO"
+    "default": {
+      "sck": "SIM_SCK",
+      "mosi": "SIM_MOSI",
+      "miso": "SIM_MISO"
+    }
   },
   "pixels": [
     {

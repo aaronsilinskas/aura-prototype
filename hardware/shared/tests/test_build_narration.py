@@ -125,32 +125,24 @@ def test_describe_high_current_rail_names_its_pin_and_polarity():
     assert describe_high_current_rail(rail) == "high_current_rail pin=D10 active_high=False"
 
 
-def test_describe_i2c_names_the_configured_scl_and_sda_pins():
-    assert describe_i2c(I2CConfig(sda="GP4", scl="GP5")) == "i2c scl=GP5 sda=GP4"
+def test_describe_i2c_names_a_declared_bus_and_its_scl_and_sda_pins():
+    i2c = I2CConfig(sda="GP6", scl="GP7")
+
+    assert describe_i2c("sensors", i2c) == "i2c sensors scl=GP7 sda=GP6"
 
 
-def test_describe_i2c_without_a_section_names_the_board_default_pins():
-    assert describe_i2c(None) == "i2c default"
+def test_describe_i2c_of_an_undeclared_default_names_the_board_bus():
+    assert describe_i2c("default", None) == "i2c default board"
 
 
-def test_describe_i2c_disabled_is_the_bare_section_name():
-    assert describe_i2c(I2CConfig(sda="GP4", scl="GP5", enabled=False)) == "i2c"
+def test_describe_spi_names_a_declared_bus_and_its_sck_mosi_and_miso_pins():
+    spi = SPIConfig(sck="GP14", mosi="GP15", miso="GP12")
+
+    assert describe_spi("radio", spi) == "spi radio sck=GP14 mosi=GP15 miso=GP12"
 
 
-def test_describe_spi_names_the_configured_sck_mosi_and_miso_pins():
-    spi = SPIConfig(sck="GP18", mosi="GP19", miso="GP16")
-
-    assert describe_spi(spi) == "spi sck=GP18 mosi=GP19 miso=GP16"
-
-
-def test_describe_spi_without_a_section_names_the_board_default_bus():
-    assert describe_spi(None) == "spi default"
-
-
-def test_describe_spi_disabled_is_the_bare_section_name():
-    spi = SPIConfig(sck="GP18", mosi="GP19", miso="GP16", enabled=False)
-
-    assert describe_spi(spi) == "spi"
+def test_describe_spi_of_an_undeclared_default_names_the_board_bus():
+    assert describe_spi("default", None) == "spi default board"
 
 
 def test_describe_neopixel_current_budget_reports_limit_estimate_scale_and_floor_count():

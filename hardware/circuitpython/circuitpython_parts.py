@@ -223,15 +223,14 @@ def _make_writer(pin: microcontroller.Pin) -> tuple[PulseWriter, str]:
 
 
 class CircuitPythonParts(DeviceParts):
-    """Builds parts on *board_module*'s pins; *i2c*, if given, is the I2C bus handed out.
+    """Builds parts on *board_module*'s pins.
 
     Single-use: every pin is claimed without deiniting, so one adapter serves
     one boot.
     """
 
-    def __init__(self, board_module: object = board, i2c: busio.I2C | None = None) -> None:
+    def __init__(self, board_module: object = board) -> None:
         self._board = board_module
-        self._i2c = i2c
 
     def _pin(self, pin: PinRef) -> microcontroller.Pin:
         return _resolve_pin(self._board, pin.field, pin.name)
@@ -243,15 +242,15 @@ class CircuitPythonParts(DeviceParts):
         digitalio.DigitalInOut(self._pin(pin)).switch_to_output(value=level)
 
     def i2c_bus(self, scl: PinRef | None, sda: PinRef | None) -> busio.I2C | None:
-        """Return the injected bus if one is held, else a new bus (``None`` with no pull-up).
+        """Return a new bus, or ``None`` with no pull-up or no board default.
 
         The board default ``SCL``/``SDA`` serve when no pins are declared; a
-        board without those aliases raises ``AttributeError``, the nudge to
-        declare an ``i2c`` section.
+        board without those aliases has no default bus, so ``i2c.default``
+        must be declared.
         """
-        if self._i2c is not None:
-            return self._i2c
         if scl is None or sda is None:
+            if not (hasattr(self._board, "SCL") and hasattr(self._board, "SDA")):
+                return None
             scl_pin, sda_pin = self._board.SCL, self._board.SDA
         else:
             scl_pin, sda_pin = self._pin(scl), self._pin(sda)
@@ -260,8 +259,12 @@ class CircuitPythonParts(DeviceParts):
         except RuntimeError:  # busio.I2C needs an attached device's pull-up to construct
             return None
 
-    def spi_bus(self, sck: PinRef | None, mosi: PinRef | None, miso: PinRef | None) -> busio.SPI:
+    def spi_bus(
+        self, sck: PinRef | None, mosi: PinRef | None, miso: PinRef | None
+    ) -> busio.SPI | None:
         if sck is None or mosi is None or miso is None:
+            if not hasattr(self._board, "SPI"):
+                return None
             return self._board.SPI()
         return busio.SPI(self._pin(sck), MOSI=self._pin(mosi), MISO=self._pin(miso))
 

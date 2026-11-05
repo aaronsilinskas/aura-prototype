@@ -285,7 +285,9 @@ class SimulatedParts(DeviceParts):
     def i2c_bus(self, scl: PinRef | None, sda: PinRef | None) -> object | None:
         return _STAND_IN_BUS
 
-    def spi_bus(self, sck: PinRef | None, mosi: PinRef | None, miso: PinRef | None) -> object:
+    def spi_bus(
+        self, sck: PinRef | None, mosi: PinRef | None, miso: PinRef | None
+    ) -> object | None:
         return _STAND_IN_BUS
 
     def matrix_pixels(self, pixels: MatrixPixelsConfig, i2c: object) -> EffectOutput:
