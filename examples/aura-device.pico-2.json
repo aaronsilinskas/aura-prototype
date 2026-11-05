@@ -1,9 +1,4 @@
 {
-  "high_current_rail": {
-    "enabled": true,
-    "pin": "GP28",
-    "active_high": true
-  },
   "neopixel_current_budget": {
     "current_limit_ma": 1000
   },
@@ -59,24 +54,24 @@
   },
   "ir": {
     "rx": [
-      "GP13",
-      "GP14",
-      "GP15"
+      "GP9",
+      "GP10",
+      "GP28"
     ],
-    "line": "GP10",
-    "cone": "GP11",
-    "area_of_effect": "GP12"
+    "line": "GP6",
+    "cone": "GP7",
+    "area_of_effect": "GP8"
   },
   "audio": {
     "enabled": true,
     "voices": 2,
     "max_volume": 0.2,
-    "i2s_bit_clock": "GP7",
-    "i2s_word_select": "GP8",
-    "i2s_data": "GP6"
+    "i2s_bit_clock": "GP21",
+    "i2s_word_select": "GP22",
+    "i2s_data": "GP20"
   },
   "radio": {
-    "enabled": true,
+    "enabled": false,
     "cs": "GP1",
     "reset": "GP9",
     "frequency": 915.0,
@@ -84,7 +79,7 @@
   },
   "sdcard": {
     "enabled": true,
-    "cs": "GP22",
+    "cs": "GP1",
     "mount": "/sd"
   }
 }
