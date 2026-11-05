@@ -160,8 +160,10 @@ def test_describe_neopixel_current_budget_reports_limit_estimate_scale_and_floor
     )
 
 
-def _pixel_entry(entry: dict[str, object]) -> MatrixPixelsConfig | NeoPixelPixelsConfig:
-    return parse_device_config({"pixels": [entry]}).pixels[0]
+def _pixel_entry(
+    entry: dict[str, object], **sections: object
+) -> MatrixPixelsConfig | NeoPixelPixelsConfig:
+    return parse_device_config({"pixels": [entry], **sections}).pixels[0]
 
 
 def _matrix_entry(**overrides: object) -> dict[str, object]:
@@ -179,6 +181,18 @@ def test_describe_pixel_entry_reports_a_matrix_entrys_cols_scope_rows_and_bright
 
     assert describe_pixel_entry(0, pixels) == (
         "pixels[0] matrix cols=13 scope_rows=[global.main:0-5 personal:5-9] brightness=0.50"
+    )
+
+
+def test_describe_pixel_entry_appends_a_matrix_entrys_non_default_i2c_bus_after_its_address():
+    pixels = _pixel_entry(
+        _matrix_entry(address=0x31, i2c="pixels"),
+        i2c={"pixels": {"sda": "GP4", "scl": "GP5"}},
+    )
+
+    assert describe_pixel_entry(0, pixels) == (
+        "pixels[0] matrix cols=13 scope_rows=[global.main:0-5 personal:5-9] brightness=0.50 "
+        + "address=0x31 i2c=pixels"
     )
 
 
@@ -317,6 +331,26 @@ def test_describe_sdcard_reports_its_mount_point_and_chip_select_pin():
     sdcard = SDCardConfig(cs="GP13", mount="/cards")
 
     assert describe_sdcard(sdcard) == "sdcard mount=/cards cs=GP13"
+
+
+def test_describe_radio_appends_the_spi_bus_it_joins_when_not_default():
+    radio = RadioConfig(cs="GP13", reset="GP11", frequency=915.0, node=1, spi="radio")
+
+    assert describe_radio(radio) == "radio frequency=915.0 node=1 cs=GP13 reset=GP11 spi=radio"
+
+
+def test_describe_sdcard_appends_the_spi_bus_it_joins_when_not_default():
+    sdcard = SDCardConfig(cs="GP1", spi="storage")
+
+    assert describe_sdcard(sdcard) == "sdcard mount=/sd cs=GP1 spi=storage"
+
+
+def test_describe_i2c_chips_append_the_i2c_bus_they_join_when_not_default():
+    sensors = I2CDeviceConfig(address=0x19, i2c="sensors")
+
+    assert describe_accelerometer(sensors) == "accelerometer lis3dh address=0x19 i2c=sensors"
+    assert describe_magnetometer(sensors) == "magnetometer mmc5603 address=0x19 i2c=sensors"
+    assert describe_haptics(sensors) == "haptics drv2605 address=0x19 i2c=sensors"
 
 
 def test_describe_ir_names_a_single_rx_pin_without_multi_receiver_wording():

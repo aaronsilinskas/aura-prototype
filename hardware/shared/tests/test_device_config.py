@@ -1037,6 +1037,16 @@ def test_an_spi_device_naming_an_undeclared_bus_raises_naming_the_field_and_bus(
         parse_device_config(matrix_config)
 
 
+def test_an_undeclared_bus_error_lists_the_declared_buses_and_default_sorted(matrix_config):
+    pins = {"sck": "GP14", "mosi": "GP15", "miso": "GP12"}
+    matrix_config["spi"] = {"storage": pins, "radio": pins}
+    matrix_config["radio"] = {"cs": "GP13", "reset": "GP11", "frequency": 915.0, "node": 1}
+    matrix_config["radio"]["spi"] = "radoi"
+
+    with pytest.raises(ValueError, match=r"valid buses: default, radio, storage$"):
+        parse_device_config(matrix_config)
+
+
 # ---------------------------------------------------------------------------
 # Radio validation
 # ---------------------------------------------------------------------------

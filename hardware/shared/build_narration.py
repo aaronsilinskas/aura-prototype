@@ -30,6 +30,7 @@ except ImportError:
 from engine.log import Logger
 from engine.network import IR_EMITTERS
 from hardware.shared.device_config import (
+    DEFAULT_BUS,
     AudioConfig,
     HighCurrentRailConfig,
     I2CConfig,
@@ -141,6 +142,14 @@ def _address_suffix(address: int | None) -> str:
     return f" address=0x{address:02X}" if address is not None else ""
 
 
+def _i2c_chip_suffix(chip: I2CDeviceConfig) -> str:
+    return _address_suffix(chip.address) + _bus_suffix("i2c", chip.i2c)
+
+
+def _bus_suffix(kind: str, name: str) -> str:
+    return f" {kind}={name}" if name != DEFAULT_BUS else ""
+
+
 def _describe_neopixel_pixels(pixels: NeoPixelPixelsConfig) -> str:
     """Return the pin/count/order/segmentation/brightness detail for a NeoPixel
     entry -- the ``strips`` form (one physical strip, segmented by
@@ -170,6 +179,7 @@ def describe_pixel_entry(index: int, pixels: MatrixPixelsConfig | NeoPixelPixels
             f"cols={pixels.cols} scope_rows=[{_format_ranges(pixels.scope_rows)}] "
             + f"brightness={pixels.brightness:.2f}"
             + _address_suffix(pixels.address)
+            + _bus_suffix("i2c", pixels.i2c)
         )
     else:
         detail = _describe_neopixel_pixels(pixels)
@@ -183,15 +193,15 @@ def describe_buttons(pin_names: list[str]) -> str:
 
 
 def describe_accelerometer(accelerometer: I2CDeviceConfig) -> str:
-    return "accelerometer lis3dh" + _address_suffix(accelerometer.address)
+    return "accelerometer lis3dh" + _i2c_chip_suffix(accelerometer)
 
 
 def describe_magnetometer(magnetometer: I2CDeviceConfig) -> str:
-    return "magnetometer mmc5603" + _address_suffix(magnetometer.address)
+    return "magnetometer mmc5603" + _i2c_chip_suffix(magnetometer)
 
 
 def describe_haptics(haptics: I2CDeviceConfig) -> str:
-    return "haptics drv2605" + _address_suffix(haptics.address)
+    return "haptics drv2605" + _i2c_chip_suffix(haptics)
 
 
 def describe_audio(audio: AudioConfig) -> str:
@@ -208,11 +218,12 @@ def describe_radio(radio: RadioConfig) -> str:
     return (
         f"radio frequency={radio.frequency} node={radio.node} "
         + f"cs={radio.cs} reset={radio.reset}"
+        + _bus_suffix("spi", radio.spi)
     )
 
 
 def describe_sdcard(sdcard: SDCardConfig) -> str:
-    return f"sdcard mount={sdcard.mount} cs={sdcard.cs}"
+    return f"sdcard mount={sdcard.mount} cs={sdcard.cs}" + _bus_suffix("spi", sdcard.spi)
 
 
 def describe_ir(ir: IRConfig) -> str:
