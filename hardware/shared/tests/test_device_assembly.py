@@ -196,33 +196,120 @@ def test_no_rail_section_drives_no_rail_pin():
     assert "high_current_rail" not in parts.parts()
 
 
-@pytest.mark.parametrize("bus", ["i2c", "spi"])
-def test_a_disabled_bus_is_not_built(bus):
-    pins = {"i2c": {"sda": "GP0", "scl": "GP1"}, "spi": {"sck": "A", "mosi": "B", "miso": "C"}}
+def test_a_disabled_i2c_bus_is_not_built():
+    _hw, parts = _assemble(_config(i2c=_disabled({"sda": "GP0", "scl": "GP1"})))
 
-    _hw, parts = _assemble(_config(**{bus: _disabled(pins[bus])}))
-
-    assert f"{bus}_bus" not in parts.parts()
+    assert "i2c_bus" not in parts.parts()
 
 
-def test_with_no_bus_sections_both_buses_are_built_on_the_board_defaults():
+def test_with_no_i2c_section_the_i2c_bus_is_built_on_the_board_default():
     _hw, parts = _assemble(_config())
 
     assert parts.args_of("i2c_bus") == [(None, None)]
+
+
+def test_declared_i2c_bus_pins_reach_the_bus_part_with_their_fields():
+    _hw, parts = _assemble(_config(i2c={"sda": "GP4", "scl": "GP5"}))
+
+    assert parts.args_of("i2c_bus") == [(PinRef("GP5", "i2c.scl"), PinRef("GP4", "i2c.sda"))]
+
+
+# ---------------------------------------------------------------------------
+# Named SPI buses
+# ---------------------------------------------------------------------------
+
+_SPI_BUSES = {
+    "default": {"sck": "GP2", "mosi": "GP3", "miso": "GP0"},
+    "radio": {"sck": "GP14", "mosi": "GP15", "miso": "GP12"},
+}
+
+
+def _spi_pins(bus: str, sck: str, mosi: str, miso: str) -> tuple[PinRef, PinRef, PinRef]:
+    return (
+        PinRef(sck, f"spi.{bus}.sck"),
+        PinRef(mosi, f"spi.{bus}.mosi"),
+        PinRef(miso, f"spi.{bus}.miso"),
+    )
+
+
+def test_spi_devices_on_different_buses_each_get_their_own_bus_on_its_own_pins():
+    _hw, parts = _assemble(
+        _config(spi=_SPI_BUSES, radio={**_RADIO, "spi": "radio"}, sdcard=_SDCARD)
+    )
+
+    ((_radio, radio_bus, *_radio_pins),) = parts.args_of("radio_transport")
+    ((_sdcard, sdcard_bus, _cs),) = parts.args_of("storage")
+    assert radio_bus is not sdcard_bus
+    assert parts.args_of("spi_bus") == [
+        _spi_pins("radio", "GP14", "GP15", "GP12"),
+        _spi_pins("default", "GP2", "GP3", "GP0"),
+    ]
+
+
+def test_spi_devices_naming_the_same_bus_share_one_bus_opened_once():
+    radio = {**_RADIO, "spi": "radio"}
+    _hw, parts = _assemble(_config(spi=_SPI_BUSES, radio=radio, sdcard={**_SDCARD, "spi": "radio"}))
+
+    ((_radio, radio_bus, *_radio_pins),) = parts.args_of("radio_transport")
+    ((_sdcard, sdcard_bus, _cs),) = parts.args_of("storage")
+    assert radio_bus is sdcard_bus
+    assert parts.args_of("spi_bus") == [_spi_pins("radio", "GP14", "GP15", "GP12")]
+
+
+def test_a_declared_spi_bus_no_enabled_device_names_is_neither_opened_nor_narrated():
+    config = _config(
+        spi=_SPI_BUSES, radio={**_RADIO, "spi": "radio", "enabled": False}, sdcard=_SDCARD
+    )
+
+    _hw, parts = _assemble(config)
+
+    assert parts.args_of("spi_bus") == [_spi_pins("default", "GP2", "GP3", "GP0")]
+    assert "spi radio" not in _narration(config)
+
+
+def test_with_no_spi_device_no_spi_bus_is_opened():
+    _hw, parts = _assemble(_config(spi=_SPI_BUSES))
+
+    assert "spi_bus" not in parts.parts()
+
+
+def test_an_undeclared_default_spi_bus_is_the_boards_own_bus():
+    _hw, parts = _assemble(_config(sdcard=_SDCARD))
+
     assert parts.args_of("spi_bus") == [(None, None, None)]
 
 
-def test_declared_bus_pins_reach_the_bus_parts_with_their_fields():
-    _hw, parts = _assemble(
-        _config(
-            i2c={"sda": "GP4", "scl": "GP5"}, spi={"sck": "GP18", "mosi": "GP19", "miso": "GP16"}
-        )
-    )
+@pytest.mark.parametrize(("section", "section_config"), [("radio", _RADIO), ("sdcard", _SDCARD)])
+def test_an_spi_device_on_an_undeclared_default_without_a_board_spi_bus_is_rejected(
+    section, section_config
+):
+    config = _config(**{section: section_config})
 
-    assert parts.args_of("i2c_bus") == [(PinRef("GP5", "i2c.scl"), PinRef("GP4", "i2c.sda"))]
-    assert parts.args_of("spi_bus") == [
-        (PinRef("GP18", "spi.sck"), PinRef("GP19", "spi.mosi"), PinRef("GP16", "spi.miso"))
-    ]
+    with pytest.raises(
+        RuntimeError, match=f"^{section} joins SPI bus 'default' but no SPI bus is available$"
+    ):
+        _assemble(config, no_spi=True)
+
+
+def test_isolating_the_radio_opens_only_the_radios_spi_bus():
+    config = _config(spi=_SPI_BUSES, radio={**_RADIO, "spi": "radio"}, sdcard=_SDCARD)
+
+    _hw, parts = _assemble(config.isolate(keep="radio"))
+
+    assert parts.args_of("spi_bus") == [_spi_pins("radio", "GP14", "GP15", "GP12")]
+
+
+def test_the_boot_narration_names_each_spi_bus_it_opens():
+    config = _config(spi=_SPI_BUSES, radio={**_RADIO, "spi": "radio"}, sdcard=_SDCARD)
+
+    text = _narration(config)
+
+    assert "[hw] spi radio sck=GP14 mosi=GP15 miso=GP12 ok\n" in text
+    assert "[hw] spi default sck=GP2 mosi=GP3 miso=GP0 ok\n" in text
+
+
+def test_an_undeclared_default_spi_bus_narrates_as_the_board_bus():
+    assert "[hw] spi default board ok\n" in _narration(_config(sdcard=_SDCARD))
 
 
 @pytest.mark.parametrize("entry", [_NEOPIXEL, _MATRIX], ids=["neopixel", "matrix"])
@@ -339,18 +426,6 @@ def test_an_enabled_matrix_entry_without_an_i2c_bus_is_rejected():
         _assemble(_config(pixels=[_MATRIX]), no_i2c=True)
 
 
-@pytest.mark.parametrize(("section", "section_config"), [("radio", _RADIO), ("sdcard", _SDCARD)])
-def test_an_spi_section_with_its_bus_disabled_is_rejected(section, section_config):
-    config = _config(
-        spi={"sck": "A", "mosi": "B", "miso": "C", "enabled": False}, **{section: section_config}
-    )
-
-    with pytest.raises(
-        RuntimeError, match=f"^{section} section is declared but no SPI bus is available$"
-    ):
-        _assemble(config)
-
-
 def test_an_unbuildable_i2c_bus_is_narrated_as_no_bus():
     assert "[hw] i2c default no bus\n" in _narration(_config(), no_i2c=True)
 
@@ -436,7 +511,6 @@ def test_a_boot_narrates_begin_each_step_and_ready():
     assert lines[:-1] == [
         "[hw] begin board=test-board",
         "[hw] i2c default ok",
-        "[hw] spi default ok",
         "[hw] pixels[0] neopixel pin=GP0 count=4 order=GRB "
         + "scope_pixels=[personal:0-4] brightness=1.00 ok",
         "[hw] buttons A=GP3 B=GP4 ok",
@@ -449,7 +523,7 @@ def test_a_boot_narrates_begin_each_step_and_ready():
 _EVERY_SECTION = {
     "high_current_rail": {"pin": "GP28", "active_high": True},
     "i2c": {"sda": "GP4", "scl": "GP5"},
-    "spi": {"sck": "SCK", "mosi": "MOSI", "miso": "MISO"},
+    "spi": {"default": {"sck": "SCK", "mosi": "MOSI", "miso": "MISO"}},
     "pixels": [
         {"type": "matrix", "cols": 13, "scope_rows": {"global.main": [0, 5]}},
         {"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}},
@@ -478,7 +552,7 @@ def test_a_config_declaring_every_section_narrates_each_built_in_build_order():
         "[hw] begin board=test-board",
         "[hw] high_current_rail pin=GP28 active_high=True asserted",
         "[hw] i2c scl=GP5 sda=GP4 ok",
-        "[hw] spi sck=SCK mosi=MOSI miso=MISO ok",
+        "[hw] spi default sck=SCK mosi=MOSI miso=MISO ok",
         "[hw] pixels[0] matrix cols=13 scope_rows=[global.main:0-5] brightness=1.00 ok",
         "[hw] pixels[1] neopixel pin=D5 count=10 order=GRB scope=personal brightness=1.00 ok",
         "[hw] buttons A=D9 ok",
@@ -496,7 +570,7 @@ def test_a_config_declaring_every_section_narrates_each_built_in_build_order():
 
 def test_a_config_disabling_every_section_narrates_each_disabled_in_build_order():
     every_disabled = {
-        name: section if name == "buttons" else _disabled(section)
+        name: section if name in ("buttons", "spi") else _disabled(section)
         for name, section in _EVERY_SECTION.items()
         if name != "pixels"
     }
@@ -508,7 +582,6 @@ def test_a_config_disabling_every_section_narrates_each_disabled_in_build_order(
         "[hw] begin board=test-board",
         "[hw] high_current_rail pin=GP28 active_high=True held off",
         "[hw] i2c disabled",
-        "[hw] spi disabled",
         "[hw] pixels[0] matrix disabled",
         "[hw] pixels[1] neopixel disabled",
         "[hw] buttons A=D9 ok",

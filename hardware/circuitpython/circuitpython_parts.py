@@ -260,8 +260,12 @@ class CircuitPythonParts(DeviceParts):
         except RuntimeError:  # busio.I2C needs an attached device's pull-up to construct
             return None
 
-    def spi_bus(self, sck: PinRef | None, mosi: PinRef | None, miso: PinRef | None) -> busio.SPI:
+    def spi_bus(
+        self, sck: PinRef | None, mosi: PinRef | None, miso: PinRef | None
+    ) -> busio.SPI | None:
         if sck is None or mosi is None or miso is None:
+            if not hasattr(self._board, "SPI"):
+                return None
             return self._board.SPI()
         return busio.SPI(self._pin(sck), MOSI=self._pin(mosi), MISO=self._pin(miso))
 

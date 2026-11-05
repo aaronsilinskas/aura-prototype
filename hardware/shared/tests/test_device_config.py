@@ -78,7 +78,7 @@ def full_isolatable_config(matrix_config):
     # is declared and enabled, giving `isolate` tests a config where
     # "disabled" and "absent" can never be confused for one another.
     matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5"}
-    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8"}
+    matrix_config["spi"] = {"default": {"sck": "GP6", "mosi": "GP7", "miso": "GP8"}}
     matrix_config["radio"] = {"cs": "GP13", "reset": "GP14", "frequency": 915.0, "node": 5}
     matrix_config["sdcard"] = {"cs": "GP15"}
     matrix_config["accelerometer"] = {"address": "0x19"}
@@ -930,93 +930,94 @@ def test_parse_i2c_non_boolean_enabled_raises_value_error_naming_field(matrix_co
 # ---------------------------------------------------------------------------
 
 
-def test_parse_spi_section_maps_sck_mosi_miso_pins(matrix_config):
-    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8"}
+def test_parse_spi_section_maps_each_named_bus_to_its_pins(matrix_config):
+    matrix_config["spi"] = {
+        "default": {"sck": "GP2", "mosi": "GP3", "miso": "GP0"},
+        "radio": {"sck": "GP14", "mosi": "GP15", "miso": "GP12"},
+    }
 
     result = parse_device_config(matrix_config)
 
-    assert result.spi is not None
-    assert result.spi.sck == "GP6"
-    assert result.spi.mosi == "GP7"
-    assert result.spi.miso == "GP8"
+    assert {name: (bus.sck, bus.mosi, bus.miso) for name, bus in result.spi.items()} == {
+        "default": ("GP2", "GP3", "GP0"),
+        "radio": ("GP14", "GP15", "GP12"),
+    }
 
 
-def test_parse_absent_spi_section_yields_none(matrix_config):
+def test_parse_spi_bus_missing_pins_names_each_with_its_bus_in_one_error(matrix_config):
+    matrix_config["spi"] = {"radio": {"mosi": "GP15"}}
+
+    with pytest.raises(
+        ValueError, match=r"^spi\.radio\.sck, spi\.radio\.miso required together when spi\.radio"
+    ):
+        parse_device_config(matrix_config)
+
+
+def test_parse_spi_bus_non_string_pin_raises_value_error_naming_the_bus(matrix_config):
+    matrix_config["spi"] = {"radio": {"sck": 14, "mosi": "GP15", "miso": "GP12"}}
+
+    with pytest.raises(ValueError, match=r"spi\.radio\.sck must be a string pin name"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_spi_bus_has_no_enabled_key(matrix_config):
+    matrix_config["spi"] = {"default": {"sck": "A", "mosi": "B", "miso": "C", "enabled": True}}
+
+    with pytest.raises(ValueError, match=r"spi\.default\.enabled is not a valid key"):
+        parse_device_config(matrix_config)
+
+
+def test_parse_absent_spi_section_declares_no_buses(matrix_config):
     result = parse_device_config(matrix_config)
 
-    assert result.spi is None
+    assert result.spi == {}
 
 
-def test_parse_spi_missing_sck_raises_value_error_naming_field(matrix_config):
-    matrix_config["spi"] = {"mosi": "GP7", "miso": "GP8"}
-
-    with pytest.raises(ValueError, match=r"spi\.sck"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_spi_missing_mosi_raises_value_error_naming_field(matrix_config):
-    matrix_config["spi"] = {"sck": "GP6", "miso": "GP8"}
-
-    with pytest.raises(ValueError, match=r"spi\.mosi"):
-        parse_device_config(matrix_config)
+_SPI_DEVICES = [
+    ("radio", {"cs": "GP13", "reset": "GP11", "frequency": 915.0, "node": 1}),
+    ("sdcard", {"cs": "GP1"}),
+]
+_SPI_DEVICE_IDS = [section for section, _raw in _SPI_DEVICES]
 
 
-def test_parse_spi_missing_miso_raises_value_error_naming_field(matrix_config):
-    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7"}
-
-    with pytest.raises(ValueError, match=r"spi\.miso"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_spi_missing_all_three_pins_names_all_in_one_error(matrix_config):
-    matrix_config["spi"] = {}
-
-    with pytest.raises(ValueError, match=r"spi\.sck.*spi\.mosi.*spi\.miso"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_spi_sck_non_string_raises_value_error(matrix_config):
-    matrix_config["spi"] = {"sck": 6, "mosi": "GP7", "miso": "GP8"}
-
-    with pytest.raises(ValueError, match=r"spi\.sck must be a string pin name"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_spi_mosi_non_string_raises_value_error(matrix_config):
-    matrix_config["spi"] = {"sck": "GP6", "mosi": 7, "miso": "GP8"}
-
-    with pytest.raises(ValueError, match=r"spi\.mosi must be a string pin name"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_spi_miso_non_string_raises_value_error(matrix_config):
-    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": 8}
-
-    with pytest.raises(ValueError, match=r"spi\.miso must be a string pin name"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_spi_absent_enabled_key_defaults_to_true(matrix_config):
-    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8"}
+@pytest.mark.parametrize(("section", "raw"), _SPI_DEVICES, ids=_SPI_DEVICE_IDS)
+def test_an_spi_device_naming_no_bus_joins_default(matrix_config, section, raw):
+    matrix_config[section] = raw
 
     result = parse_device_config(matrix_config)
 
-    assert result.spi.enabled is True
+    assert getattr(result, section).spi == "default"
 
 
-def test_parse_spi_enabled_false_retains_object_not_none(matrix_config):
-    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8", "enabled": False}
+@pytest.mark.parametrize(("section", "raw"), _SPI_DEVICES, ids=_SPI_DEVICE_IDS)
+def test_an_spi_device_may_name_default_explicitly_without_declaring_it(
+    matrix_config, section, raw
+):
+    matrix_config[section] = {**raw, "spi": "default"}
 
     result = parse_device_config(matrix_config)
 
-    assert result.spi is not None
-    assert result.spi.enabled is False
+    assert getattr(result, section).spi == "default"
 
 
-def test_parse_spi_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
-    matrix_config["spi"] = {"sck": "GP6", "mosi": "GP7", "miso": "GP8", "enabled": "yes"}
+@pytest.mark.parametrize(("section", "raw"), _SPI_DEVICES, ids=_SPI_DEVICE_IDS)
+def test_an_spi_device_joins_the_declared_bus_it_names(matrix_config, section, raw):
+    matrix_config["spi"] = {"radio": {"sck": "GP14", "mosi": "GP15", "miso": "GP12"}}
+    matrix_config[section] = {**raw, "spi": "radio"}
 
-    with pytest.raises(ValueError, match=r"spi\.enabled"):
+    result = parse_device_config(matrix_config)
+
+    assert getattr(result, section).spi == "radio"
+
+
+@pytest.mark.parametrize(("section", "raw"), _SPI_DEVICES, ids=_SPI_DEVICE_IDS)
+def test_an_spi_device_naming_an_undeclared_bus_raises_naming_the_field_and_bus(
+    matrix_config, section, raw
+):
+    matrix_config["spi"] = {"default": {"sck": "GP2", "mosi": "GP3", "miso": "GP0"}}
+    matrix_config[section] = {**raw, "spi": "radoi"}
+
+    with pytest.raises(ValueError, match=rf"^{section}\.spi names SPI bus 'radoi'"):
         parse_device_config(matrix_config)
 
 
@@ -1512,12 +1513,11 @@ def test_committed_sample_device_config_parses():
     result = parse_device_config(mapping)
 
     assert result.audio is not None
-    assert result.audio.i2s_bit_clock == "GP7"
-    assert result.audio.i2s_word_select == "GP8"
-    assert result.audio.i2s_data == "GP6"
+    assert result.audio.i2s_bit_clock == "GP21"
+    assert result.audio.i2s_word_select == "GP22"
+    assert result.audio.i2s_data == "GP20"
     assert result.accelerometer is not None
     assert result.haptics is not None
-    assert result.spi is not None
     assert result.radio is not None
 
 
@@ -1654,10 +1654,7 @@ def test_isolate_never_touches_i2c_spi_buttons_or_high_current_rail(full_isolata
     assert isolated.i2c.sda == config.i2c.sda
     assert isolated.i2c.scl == config.i2c.scl
     assert isolated.i2c.enabled == config.i2c.enabled
-    assert isolated.spi.sck == config.spi.sck
-    assert isolated.spi.mosi == config.spi.mosi
-    assert isolated.spi.miso == config.spi.miso
-    assert isolated.spi.enabled == config.spi.enabled
+    assert isolated.spi == config.spi
     assert isolated.buttons == config.buttons
     assert isolated.high_current_rail.pin == config.high_current_rail.pin
     assert isolated.high_current_rail.active_high == config.high_current_rail.active_high
