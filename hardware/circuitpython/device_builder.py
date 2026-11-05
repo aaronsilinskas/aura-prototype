@@ -13,7 +13,7 @@ import busio
 from engine.log import Logger
 from hardware.circuitpython.circuitpython_parts import CircuitPythonParts, SdCardMountError
 from hardware.shared.device_assembly import assemble_device, open_i2c
-from hardware.shared.device_config import _DEFAULT_BUS, DeviceConfig
+from hardware.shared.device_config import DEFAULT_BUS, DeviceConfig
 from hardware.shared.device_config import load_device_config as _load_shared_device_config
 from hardware.shared.device_hardware import DeviceHardware
 
@@ -33,7 +33,7 @@ def open_config_i2c(device_config: DeviceConfig, board_module: object = board) -
     ``never_reset`` ``board.STEMMA_I2C()``, so it is released on reload.
     ``None`` when nothing pulls the bus up.
     """
-    return open_i2c(_DEFAULT_BUS, device_config.i2c, CircuitPythonParts(board_module))
+    return open_i2c(DEFAULT_BUS, device_config.i2c, CircuitPythonParts(board_module))
 
 
 def load_device_config() -> DeviceConfig:

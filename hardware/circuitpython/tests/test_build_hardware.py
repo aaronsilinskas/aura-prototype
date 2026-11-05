@@ -104,6 +104,15 @@ def test_an_injected_i2c_bus_is_the_bus_i2c_parts_are_built_on(
     assert chip.i2c is injected
 
 
+def test_an_i2c_part_on_an_undeclared_default_without_a_board_i2c_bus_is_rejected(
+    lis3dh_board: SimpleNamespace,
+) -> None:
+    with pytest.raises(
+        RuntimeError, match=r"^accelerometer joins I2C bus 'default' but no I2C bus is available$"
+    ):
+        build_hardware(parse_device_config({"accelerometer": {}}), board_module=lis3dh_board)
+
+
 class _FakeI2C:
     """A ``busio.I2C`` on ``(scl, sda)``; raises as the real one does when nothing pulls it up."""
 

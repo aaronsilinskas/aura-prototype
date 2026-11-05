@@ -66,7 +66,8 @@ class DeviceParts:
     def i2c_bus(self, scl: PinRef | None, sda: PinRef | None) -> object | None:
         """Return an I2C bus on *scl*/*sda*, or the board default when both are ``None``.
 
-        ``None`` means no bus could be built (nothing on the bus to pull it up).
+        ``None`` means no bus could be built: nothing on the bus to pull it
+        up, or the board has no default I2C bus.
         """
         raise NotImplementedError
 
