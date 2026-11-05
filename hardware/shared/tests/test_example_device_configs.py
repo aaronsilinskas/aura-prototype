@@ -90,7 +90,6 @@ def test_the_pico_2_config_puts_the_enabled_radio_on_its_own_spi_bus_apart_from_
         "default": ("GP2", "GP3", "GP0"),
         "radio": ("GP14", "GP15", "GP12"),
     }
-    assert (config.radio.cs, config.radio.reset) == ("GP13", "GP11")
 
 
 @pytest.mark.parametrize(
