@@ -160,8 +160,10 @@ def test_describe_neopixel_current_budget_reports_limit_estimate_scale_and_floor
     )
 
 
-def _pixel_entry(entry: dict[str, object]) -> MatrixPixelsConfig | NeoPixelPixelsConfig:
-    return parse_device_config({"pixels": [entry]}).pixels[0]
+def _pixel_entry(
+    entry: dict[str, object], **sections: object
+) -> MatrixPixelsConfig | NeoPixelPixelsConfig:
+    return parse_device_config({"pixels": [entry], **sections}).pixels[0]
 
 
 def _matrix_entry(**overrides: object) -> dict[str, object]:
@@ -182,12 +184,16 @@ def test_describe_pixel_entry_reports_a_matrix_entrys_cols_scope_rows_and_bright
     )
 
 
-def test_describe_pixel_entry_appends_the_i2c_bus_a_matrix_entry_joins_when_not_default():
-    pixels = MatrixPixelsConfig(
-        cols=13, scope_rows={"global.main": range(0, 5)}, brightness=0.5, i2c="pixels"
+def test_describe_pixel_entry_appends_a_matrix_entrys_non_default_i2c_bus_after_its_address():
+    pixels = _pixel_entry(
+        _matrix_entry(address=0x31, i2c="pixels"),
+        i2c={"pixels": {"sda": "GP4", "scl": "GP5"}},
     )
 
-    assert describe_pixel_entry(0, pixels).endswith(" brightness=0.50 i2c=pixels")
+    assert describe_pixel_entry(0, pixels) == (
+        "pixels[0] matrix cols=13 scope_rows=[global.main:0-5 personal:5-9] brightness=0.50 "
+        + "address=0x31 i2c=pixels"
+    )
 
 
 def test_describe_pixel_entry_appends_a_matrix_entrys_configured_address():

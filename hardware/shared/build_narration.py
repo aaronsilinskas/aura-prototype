@@ -143,12 +143,10 @@ def _address_suffix(address: int | None) -> str:
 
 
 def _i2c_chip_suffix(chip: I2CDeviceConfig) -> str:
-    """Return an I2C chip's configured address and non-default bus, each only when set."""
     return _address_suffix(chip.address) + _bus_suffix("i2c", chip.i2c)
 
 
 def _bus_suffix(kind: str, name: str) -> str:
-    """Return `` <kind>=<name>`` for a device on a non-default bus, or ``""`` on ``default``."""
     return f" {kind}={name}" if name != DEFAULT_BUS else ""
 
 
