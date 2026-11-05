@@ -2,8 +2,9 @@
 
 What the assembly decides is tested in ``hardware/shared/tests/test_device_assembly.py``
 and each part in ``test_circuitpython_parts.py``; these tests cover only what the
-entry point adds: a driver-free import, the injected I2C bus, and ``open_config_i2c``,
-which opens the config's I2C bus ahead of a boot so a profiler can wrap and inject it.
+entry point adds: a driver-free import, the injected ``default`` I2C bus, and
+``open_config_i2c``, which opens the config's ``default`` I2C bus ahead of a boot so a
+profiler can wrap and inject it.
 """
 
 from __future__ import annotations
@@ -74,17 +75,19 @@ def lis3dh_board(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     return SimpleNamespace(SPI=object)
 
 
-def test_an_injected_i2c_bus_is_narrated_as_the_i2c_bus(lis3dh_board: SimpleNamespace) -> None:
+def test_an_injected_i2c_bus_is_narrated_as_the_default_i2c_bus(
+    lis3dh_board: SimpleNamespace,
+) -> None:
     fragments: list[str] = []
 
     build_hardware(
-        parse_device_config({}),
+        parse_device_config({"accelerometer": {}}),
         board_module=lis3dh_board,
         i2c=object(),
         logger=Logger("[hw]", fragments.append),
     )
 
-    assert "[hw] i2c default ok\n" in "".join(fragments)
+    assert "[hw] i2c default board ok\n" in "".join(fragments)
 
 
 def test_an_injected_i2c_bus_is_the_bus_i2c_parts_are_built_on(
@@ -99,16 +102,6 @@ def test_an_injected_i2c_bus_is_the_bus_i2c_parts_are_built_on(
     assert hw.accelerometer is not None
     (chip,) = _FakeLis3dh.built
     assert chip.i2c is injected
-
-
-def test_disabled_i2c_ignores_an_injected_bus(lis3dh_board: SimpleNamespace) -> None:
-    config = parse_device_config(
-        {"i2c": {"enabled": False, "scl": "GP5", "sda": "GP4"}, "accelerometer": {}}
-    )
-
-    expected = "^accelerometer section is declared but no I2C bus is available$"
-    with pytest.raises(RuntimeError, match=expected):
-        build_hardware(config, board_module=lis3dh_board, i2c=object())
 
 
 class _FakeI2C:
@@ -140,7 +133,22 @@ def _pins(*names: str) -> SimpleNamespace:
     return SimpleNamespace(**{name: object() for name in names})
 
 
-_DECLARED_I2C = {"i2c": {"sda": "GP4", "scl": "GP5"}}
+_DECLARED_I2C = {"i2c": {"default": {"sda": "GP4", "scl": "GP5"}}}
+
+
+def test_an_injected_i2c_bus_replaces_only_the_default_i2c_bus(
+    lis3dh_board: SimpleNamespace, i2c_buses: list[_FakeI2C]
+) -> None:
+    lis3dh_board.GP6, lis3dh_board.GP7 = object(), object()
+    config = parse_device_config(
+        {"i2c": {"sensors": {"sda": "GP6", "scl": "GP7"}}, "accelerometer": {"i2c": "sensors"}}
+    )
+
+    build_hardware(config, board_module=lis3dh_board, i2c=object())
+
+    (chip,) = _FakeLis3dh.built
+    assert i2c_buses == [chip.i2c]
+    assert chip.i2c.pins == (lis3dh_board.GP7, lis3dh_board.GP6)
 
 
 def test_open_config_i2c_opens_a_bus_on_the_declared_pins(i2c_buses: list[_FakeI2C]) -> None:
@@ -166,17 +174,24 @@ def test_open_config_i2c_opens_a_bus_on_the_board_defaults_without_an_i2c_sectio
 def test_open_config_i2c_with_an_unknown_pin_raises_value_error_naming_its_field(
     i2c_buses: list[_FakeI2C],
 ) -> None:
-    config = parse_device_config({"i2c": {"sda": "NONEXISTENT_PIN", "scl": "GP5"}})
+    config = parse_device_config({"i2c": {"default": {"sda": "NONEXISTENT_PIN", "scl": "GP5"}}})
 
-    with pytest.raises(ValueError, match=r"^i2c\.sda: pin 'NONEXISTENT_PIN' not found on board$"):
+    with pytest.raises(
+        ValueError, match=r"^i2c\.default\.sda: pin 'NONEXISTENT_PIN' not found on board$"
+    ):
         open_config_i2c(config, _pins("GP5"))
 
 
-def test_open_config_i2c_with_i2c_disabled_opens_no_bus(i2c_buses: list[_FakeI2C]) -> None:
-    config = parse_device_config({"i2c": {**_DECLARED_I2C["i2c"], "enabled": False}})
+def test_open_config_i2c_opens_only_the_default_bus(i2c_buses: list[_FakeI2C]) -> None:
+    board = _pins("GP4", "GP5", "GP6", "GP7")
+    config = parse_device_config(
+        {"i2c": {**_DECLARED_I2C["i2c"], "sensors": {"sda": "GP6", "scl": "GP7"}}}
+    )
 
-    assert open_config_i2c(config, _pins("GP4", "GP5", "SCL", "SDA")) is None
-    assert i2c_buses == []
+    bus = open_config_i2c(config, board)
+
+    assert i2c_buses == [bus]
+    assert bus.pins == (board.GP5, board.GP4)
 
 
 def test_open_config_i2c_with_nothing_pulling_the_bus_up_opens_no_bus(

@@ -1,6 +1,7 @@
 """Behaviour-driven tests for hardware/shared/device_config.py."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -77,7 +78,7 @@ def full_isolatable_config(matrix_config):
     # plus both excluded buses and the excluded high-current-rail section --
     # is declared and enabled, giving `isolate` tests a config where
     # "disabled" and "absent" can never be confused for one another.
-    matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5"}
+    matrix_config["i2c"] = {"default": {"sda": "GP4", "scl": "GP5"}}
     matrix_config["spi"] = {"default": {"sck": "GP6", "mosi": "GP7", "miso": "GP8"}}
     matrix_config["radio"] = {"cs": "GP13", "reset": "GP14", "frequency": 915.0, "node": 5}
     matrix_config["sdcard"] = {"cs": "GP15"}
@@ -850,79 +851,94 @@ def test_parse_i2c_device_bad_string_address_raises_value_error_naming_field(
 # ---------------------------------------------------------------------------
 
 
-def test_parse_i2c_section_maps_sda_and_scl_pins(matrix_config):
-    matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5"}
+def test_parse_i2c_section_maps_each_named_bus_to_its_pins(matrix_config):
+    matrix_config["i2c"] = {
+        "default": {"sda": "GP4", "scl": "GP5"},
+        "sensors": {"sda": "GP6", "scl": "GP7"},
+    }
 
     result = parse_device_config(matrix_config)
 
-    assert result.i2c is not None
-    assert result.i2c.sda == "GP4"
-    assert result.i2c.scl == "GP5"
+    assert {name: (bus.sda, bus.scl) for name, bus in result.i2c.items()} == {
+        "default": ("GP4", "GP5"),
+        "sensors": ("GP6", "GP7"),
+    }
 
 
-def test_parse_absent_i2c_section_yields_none(matrix_config):
+def test_parse_absent_i2c_section_declares_no_buses(matrix_config):
     result = parse_device_config(matrix_config)
 
-    assert result.i2c is None
+    assert result.i2c == {}
 
 
-def test_parse_i2c_missing_sda_raises_value_error_naming_field(matrix_config):
-    matrix_config["i2c"] = {"scl": "GP5"}
+def test_parse_i2c_bus_missing_pins_names_each_with_its_bus_in_one_error(matrix_config):
+    matrix_config["i2c"] = {"sensors": {}}
 
-    with pytest.raises(ValueError, match=r"i2c\.sda"):
+    with pytest.raises(
+        ValueError,
+        match=r"^i2c\.sensors\.sda, i2c\.sensors\.scl required together when i2c\.sensors",
+    ):
         parse_device_config(matrix_config)
 
 
-def test_parse_i2c_missing_scl_raises_value_error_naming_field(matrix_config):
-    matrix_config["i2c"] = {"sda": "GP4"}
+@pytest.mark.parametrize("pin", ["sda", "scl"])
+def test_parse_i2c_bus_non_string_pin_raises_value_error_naming_the_bus(matrix_config, pin):
+    matrix_config["i2c"] = {"sensors": {"sda": "GP6", "scl": "GP7", pin: 6}}
 
-    with pytest.raises(ValueError, match=r"i2c\.scl"):
+    with pytest.raises(ValueError, match=rf"i2c\.sensors\.{pin} must be a string pin name"):
         parse_device_config(matrix_config)
 
 
-def test_parse_i2c_missing_both_pins_names_both_in_one_error(matrix_config):
-    matrix_config["i2c"] = {}
+def test_parse_i2c_bus_has_no_enabled_key(matrix_config):
+    matrix_config["i2c"] = {"default": {"sda": "GP4", "scl": "GP5", "enabled": True}}
 
-    with pytest.raises(ValueError, match=r"i2c\.sda.*i2c\.scl"):
+    with pytest.raises(ValueError, match=r"i2c\.default\.enabled is not a valid key"):
         parse_device_config(matrix_config)
 
 
-def test_parse_i2c_sda_non_string_raises_value_error(matrix_config):
-    matrix_config["i2c"] = {"sda": 4, "scl": "GP5"}
+_MATRIX_ENTRY = {"type": "matrix", "cols": 13, "scope_rows": {"global.main": [0, 5]}}
 
-    with pytest.raises(ValueError, match=r"i2c\.sda must be a string pin name"):
-        parse_device_config(matrix_config)
-
-
-def test_parse_i2c_scl_non_string_raises_value_error(matrix_config):
-    matrix_config["i2c"] = {"sda": "GP4", "scl": 5}
-
-    with pytest.raises(ValueError, match=r"i2c\.scl must be a string pin name"):
-        parse_device_config(matrix_config)
+# (field, raw config with one I2C device naming no bus, the device's parsed config)
+_I2C_DEVICES = [
+    ("accelerometer", {"accelerometer": {}}, lambda c: c.accelerometer),
+    ("magnetometer", {"magnetometer": {}}, lambda c: c.magnetometer),
+    ("haptics", {"haptics": {}}, lambda c: c.haptics),
+    ("pixels[0]", {"pixels": [_MATRIX_ENTRY]}, lambda c: c.pixels[0]),
+]
+_I2C_DEVICE_IDS = [field for field, _raw, _device in _I2C_DEVICES]
 
 
-def test_parse_i2c_absent_enabled_key_defaults_to_true(matrix_config):
-    matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5"}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.i2c.enabled is True
-
-
-def test_parse_i2c_enabled_false_retains_object_not_none(matrix_config):
-    matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5", "enabled": False}
-
-    result = parse_device_config(matrix_config)
-
-    assert result.i2c is not None
-    assert result.i2c.enabled is False
+def _naming_i2c_bus(raw: dict, bus: str) -> dict:
+    """Return *raw* with its one I2C device naming *bus*."""
+    ((section, value),) = raw.items()
+    if section == "pixels":
+        return {"pixels": [{**value[0], "i2c": bus}]}
+    return {section: {**value, "i2c": bus}}
 
 
-def test_parse_i2c_non_boolean_enabled_raises_value_error_naming_field(matrix_config):
-    matrix_config["i2c"] = {"sda": "GP4", "scl": "GP5", "enabled": "yes"}
+@pytest.mark.parametrize(("field", "raw", "device"), _I2C_DEVICES, ids=_I2C_DEVICE_IDS)
+def test_an_i2c_device_naming_no_bus_joins_default(field, raw, device):
+    assert device(parse_device_config(raw)).i2c == "default"
 
-    with pytest.raises(ValueError, match=r"i2c\.enabled"):
-        parse_device_config(matrix_config)
+
+@pytest.mark.parametrize(("field", "raw", "device"), _I2C_DEVICES, ids=_I2C_DEVICE_IDS)
+def test_an_i2c_device_may_name_default_explicitly_without_declaring_it(field, raw, device):
+    assert device(parse_device_config(_naming_i2c_bus(raw, "default"))).i2c == "default"
+
+
+@pytest.mark.parametrize(("field", "raw", "device"), _I2C_DEVICES, ids=_I2C_DEVICE_IDS)
+def test_an_i2c_device_joins_the_declared_bus_it_names(field, raw, device):
+    config = {"i2c": {"sensors": {"sda": "GP6", "scl": "GP7"}}, **_naming_i2c_bus(raw, "sensors")}
+
+    assert device(parse_device_config(config)).i2c == "sensors"
+
+
+@pytest.mark.parametrize(("field", "raw", "device"), _I2C_DEVICES, ids=_I2C_DEVICE_IDS)
+def test_an_i2c_device_naming_an_undeclared_bus_raises_naming_the_field_and_bus(field, raw, device):
+    config = {"i2c": {"default": {"sda": "GP4", "scl": "GP5"}}, **_naming_i2c_bus(raw, "snesors")}
+
+    with pytest.raises(ValueError, match=rf"^{re.escape(field)}\.i2c names I2C bus 'snesors'"):
+        parse_device_config(config)
 
 
 # ---------------------------------------------------------------------------
@@ -1651,9 +1667,7 @@ def test_isolate_never_touches_i2c_spi_buttons_or_high_current_rail(full_isolata
 
     isolated = config.isolate(keep=keep)
 
-    assert isolated.i2c.sda == config.i2c.sda
-    assert isolated.i2c.scl == config.i2c.scl
-    assert isolated.i2c.enabled == config.i2c.enabled
+    assert isolated.i2c == config.i2c
     assert isolated.spi == config.spi
     assert isolated.buttons == config.buttons
     assert isolated.high_current_rail.pin == config.high_current_rail.pin

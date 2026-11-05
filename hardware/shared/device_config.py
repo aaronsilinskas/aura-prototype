@@ -93,9 +93,12 @@ _ISOLATE_EXCLUDED_COMPONENTS: Final = (
 
 
 class MatrixPixelsConfig:
-    """Parsed matrix pixels configuration."""
+    """Parsed matrix pixels configuration.
 
-    __slots__ = ("address", "brightness", "cols", "enabled", "scope_rows")
+    Joins the I2C **Named bus** named by ``i2c`` (``"default"`` unless set).
+    """
+
+    __slots__ = ("address", "brightness", "cols", "enabled", "i2c", "scope_rows")
 
     def __init__(
         self,
@@ -104,7 +107,9 @@ class MatrixPixelsConfig:
         brightness: float = 1.0,
         enabled: bool = True,
         address: int | None = None,
+        i2c: str = _DEFAULT_BUS,
     ) -> None:
+        self.i2c: str = i2c
         self.cols: int = cols
         self.scope_rows: dict[str, range] = scope_rows
         self.brightness: float = brightness
@@ -220,19 +225,17 @@ class IRConfig:
 
 
 class I2CConfig:
-    """Parsed I2C bus configuration.
+    """Parsed pins of one **Named bus** in the ``i2c`` section.
 
-    ``enabled=False`` means the Device assembly builds no I2C bus at all —
-    distinct from an absent ``i2c`` section, which still defaults to the
-    board's SCL/SDA pins.
+    ``sda``/``scl`` are required together. There is no per-bus ``enabled``:
+    the Device assembly opens a bus only when an enabled device names it.
     """
 
-    __slots__ = ("enabled", "scl", "sda")
+    __slots__ = ("scl", "sda")
 
-    def __init__(self, sda: str, scl: str, enabled: bool = True) -> None:
+    def __init__(self, sda: str, scl: str) -> None:
         self.sda: str = sda
         self.scl: str = scl
-        self.enabled: bool = enabled
 
 
 class SPIConfig:
@@ -256,15 +259,19 @@ class I2CDeviceConfig:
     magnetometer, haptics -- the sections named in ``_I2C_DEVICE_SECTIONS``).
 
     Presence alone gates that peripheral's build (see ``device_assembly``);
-    ``address`` optionally overrides the driver's default I2C address. The
+    ``address`` optionally overrides the driver's default I2C address, and
+    ``i2c`` names the I2C **Named bus** it joins (``"default"`` unless set). The
     three sections carry identical fields, so one class and one parser
     (``_parse_i2c_device``) serve all of them; only the error-message prefix
     differs per section.
     """
 
-    __slots__ = ("address", "enabled")
+    __slots__ = ("address", "enabled", "i2c")
 
-    def __init__(self, enabled: bool = True, address: int | None = None) -> None:
+    def __init__(
+        self, enabled: bool = True, address: int | None = None, i2c: str = _DEFAULT_BUS
+    ) -> None:
+        self.i2c: str = i2c
         self.enabled: bool = enabled
         self.address: int | None = address
 
@@ -427,7 +434,7 @@ class DeviceConfig:
         buttons: list[str],
         ir: IRConfig | None,
         audio: AudioConfig | None,
-        i2c: I2CConfig | None,
+        i2c: dict[str, I2CConfig],
         accelerometer: I2CDeviceConfig | None,
         haptics: I2CDeviceConfig | None,
         spi: dict[str, SPIConfig],
@@ -441,7 +448,8 @@ class DeviceConfig:
         self.buttons: list[str] = buttons
         self.ir: IRConfig | None = ir
         self.audio: AudioConfig | None = audio
-        self.i2c: I2CConfig | None = i2c
+        self.i2c: dict[str, I2CConfig] = i2c
+        """The declared **Named buses** of the ``i2c`` section, by bus name."""
         self.accelerometer: I2CDeviceConfig | None = accelerometer
         self.haptics: I2CDeviceConfig | None = haptics
         self.spi: dict[str, SPIConfig] = spi
@@ -677,8 +685,11 @@ def _parse_enabled(mapping: dict, field: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _parse_matrix_pixels(mapping: dict, entry_index: int) -> MatrixPixelsConfig:
+def _parse_matrix_pixels(
+    mapping: dict, entry_index: int, i2c_buses: dict[str, I2CConfig]
+) -> MatrixPixelsConfig:
     label = f"pixels[{entry_index}]"
+    i2c = _parse_bus_reference(mapping, f"{label}.i2c", i2c_buses)
     if "cols" not in mapping:
         raise ValueError(f"{label}.cols is required for matrix type")
     if "scope_rows" not in mapping:
@@ -702,6 +713,7 @@ def _parse_matrix_pixels(mapping: dict, entry_index: int) -> MatrixPixelsConfig:
         brightness=brightness,
         enabled=enabled,
         address=address,
+        i2c=i2c,
     )
 
 
@@ -784,11 +796,11 @@ def _parse_neopixel_pixels(mapping: dict, entry_index: int) -> NeoPixelPixelsCon
 
 
 def _parse_pixels_entry(
-    mapping: dict, entry_index: int
+    mapping: dict, entry_index: int, i2c_buses: dict[str, I2CConfig]
 ) -> MatrixPixelsConfig | NeoPixelPixelsConfig:
     pixels_type = mapping.get("type")
     if pixels_type == "matrix":
-        return _parse_matrix_pixels(mapping, entry_index)
+        return _parse_matrix_pixels(mapping, entry_index, i2c_buses)
     if pixels_type == "neopixel":
         return _parse_neopixel_pixels(mapping, entry_index)
     raise ValueError(
@@ -899,36 +911,50 @@ def _reject_unknown_keys(raw: dict, section: str, allowed: tuple[str, ...] = ())
         raise ValueError(f"{section}.{key} is not a valid key; {section} has no keys")
 
 
-def _parse_i2c_device(raw: dict, section: str) -> I2CDeviceConfig:
+def _parse_i2c_device(raw: dict, section: str, i2c_buses: dict[str, I2CConfig]) -> I2CDeviceConfig:
     """Parse one of the ``_I2C_DEVICE_SECTIONS`` sections (accelerometer,
     magnetometer, haptics) into a shared ``I2CDeviceConfig``.
 
     *section* is only used to key error messages (``<section>.address``,
-    ``<section>.enabled``, unknown-key naming) -- the three sections carry
-    identical fields, so one parser serves all of them.
+    ``<section>.enabled``, ``<section>.i2c``, unknown-key naming) -- the three
+    sections carry identical fields, so one parser serves all of them.
     """
-    _reject_unknown_keys(raw, section, allowed=("address", "enabled"))
+    _reject_unknown_keys(raw, section, allowed=("i2c", "address", "enabled"))
+    i2c = _parse_bus_reference(raw, f"{section}.i2c", i2c_buses)
     enabled = _parse_enabled(raw, f"{section}.enabled")
     address = _parse_address(raw, "address", f"{section}.address")
-    return I2CDeviceConfig(enabled=enabled, address=address)
+    return I2CDeviceConfig(enabled=enabled, address=address, i2c=i2c)
 
 
-def _parse_i2c(i2c_raw: dict) -> I2CConfig:
+def _parse_i2c(i2c_raw: object) -> dict[str, I2CConfig]:
+    if not isinstance(i2c_raw, dict):
+        raise ValueError("i2c must be a mapping of bus name to sda/scl pins")
+    buses: dict[str, I2CConfig] = {}
+    for name, bus_raw in i2c_raw.items():
+        if not isinstance(name, str) or not name:
+            raise ValueError(f"i2c bus name must be a non-empty string, got {name!r}")
+        buses[name] = _parse_i2c_bus(bus_raw, f"i2c.{name}")
+    return buses
+
+
+def _parse_i2c_bus(bus_raw: object, field: str) -> I2CConfig:
+    if not isinstance(bus_raw, dict):
+        raise ValueError(f"{field} must be a mapping of sda/scl pins")
+    _reject_unknown_keys(bus_raw, field, allowed=_I2C_PIN_FIELDS)
     # sda/scl are required-together, mirroring the audio I2S bus pins: a
     # half-configured bus is exactly the case where one might be missing, so
     # every missing field is named in one error instead of stopping at the
     # first.
-    missing = [field for field in _I2C_PIN_FIELDS if field not in i2c_raw]
+    missing = [pin for pin in _I2C_PIN_FIELDS if pin not in bus_raw]
     if missing:
-        names = ", ".join(f"i2c.{field}" for field in missing)
-        raise ValueError(f"{names} required together when i2c section is present")
+        names = ", ".join(f"{field}.{pin}" for pin in missing)
+        raise ValueError(f"{names} required together when {field} is declared")
 
-    for field in _I2C_PIN_FIELDS:
-        if not isinstance(i2c_raw[field], str):
-            raise ValueError(f"i2c.{field} must be a string pin name")
+    for pin in _I2C_PIN_FIELDS:
+        if not isinstance(bus_raw[pin], str):
+            raise ValueError(f"{field}.{pin} must be a string pin name")
 
-    enabled = _parse_enabled(i2c_raw, "i2c.enabled")
-    return I2CConfig(sda=i2c_raw["sda"], scl=i2c_raw["scl"], enabled=enabled)
+    return I2CConfig(sda=bus_raw["sda"], scl=bus_raw["scl"])
 
 
 def _parse_spi(spi_raw: object) -> dict[str, SPIConfig]:
@@ -1126,6 +1152,10 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     Raises:
         ValueError: If any required field is missing or invalid.
     """
+    i2c: dict[str, I2CConfig] = {}
+    if "i2c" in mapping:
+        i2c = _parse_i2c(mapping["i2c"])
+
     pixels_raw = mapping.get("pixels", [])
 
     if not isinstance(pixels_raw, list):
@@ -1135,7 +1165,7 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     matrix_count = 0
     seen_pins: set[str] = set()
     for i, entry in enumerate(pixels_raw):
-        parsed = _parse_pixels_entry(entry, i)
+        parsed = _parse_pixels_entry(entry, i, i2c)
         if isinstance(parsed, MatrixPixelsConfig):
             matrix_count += 1
             if matrix_count > 1:
@@ -1160,10 +1190,6 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     if "audio" in mapping:
         audio = _parse_audio(mapping["audio"])
 
-    i2c: I2CConfig | None = None
-    if "i2c" in mapping:
-        i2c = _parse_i2c(mapping["i2c"])
-
     spi: dict[str, SPIConfig] = {}
     if "spi" in mapping:
         spi = _parse_spi(mapping["spi"])
@@ -1184,7 +1210,7 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     i2c_devices: dict[str, I2CDeviceConfig | None] = dict.fromkeys(_I2C_DEVICE_SECTIONS)
     for section in _I2C_DEVICE_SECTIONS:
         if section in mapping:
-            i2c_devices[section] = _parse_i2c_device(mapping[section], section)
+            i2c_devices[section] = _parse_i2c_device(mapping[section], section, i2c)
 
     high_current_rail: HighCurrentRailConfig | None = None
     if "high_current_rail" in mapping:

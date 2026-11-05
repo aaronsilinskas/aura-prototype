@@ -91,3 +91,14 @@ def test_the_pico_2_config_puts_the_enabled_radio_on_its_own_spi_bus_apart_from_
         "radio": ("GP14", "GP15", "GP12"),
     }
     assert (config.radio.cs, config.radio.reset) == ("GP13", "GP11")
+
+
+@pytest.mark.parametrize(
+    ("path", "pins"),
+    [(_PICO_2_CONFIG, ("GP4", "GP5")), (_SIMULATED_CONFIG, ("SIM_SDA", "SIM_SCL"))],
+    ids=["pico-2", "simulated"],
+)
+def test_each_example_declares_one_default_i2c_bus_on_its_pins(path, pins):
+    config = load_device_config(str(path))
+
+    assert {name: (bus.sda, bus.scl) for name, bus in config.i2c.items()} == {"default": pins}

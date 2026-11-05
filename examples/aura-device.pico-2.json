@@ -3,8 +3,10 @@
     "current_limit_ma": 1000
   },
   "i2c": {
-    "sda": "GP4",
-    "scl": "GP5"
+    "default": {
+      "sda": "GP4",
+      "scl": "GP5"
+    }
   },
   "spi": {
     "default": {
