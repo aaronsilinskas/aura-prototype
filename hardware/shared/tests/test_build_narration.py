@@ -182,6 +182,14 @@ def test_describe_pixel_entry_reports_a_matrix_entrys_cols_scope_rows_and_bright
     )
 
 
+def test_describe_pixel_entry_appends_the_i2c_bus_a_matrix_entry_joins_when_not_default():
+    pixels = MatrixPixelsConfig(
+        cols=13, scope_rows={"global.main": range(0, 5)}, brightness=0.5, i2c="pixels"
+    )
+
+    assert describe_pixel_entry(0, pixels).endswith(" brightness=0.50 i2c=pixels")
+
+
 def test_describe_pixel_entry_appends_a_matrix_entrys_configured_address():
     pixels = _pixel_entry(_matrix_entry(address=0x31))
 
@@ -317,6 +325,26 @@ def test_describe_sdcard_reports_its_mount_point_and_chip_select_pin():
     sdcard = SDCardConfig(cs="GP13", mount="/cards")
 
     assert describe_sdcard(sdcard) == "sdcard mount=/cards cs=GP13"
+
+
+def test_describe_radio_appends_the_spi_bus_it_joins_when_not_default():
+    radio = RadioConfig(cs="GP13", reset="GP11", frequency=915.0, node=1, spi="radio")
+
+    assert describe_radio(radio) == "radio frequency=915.0 node=1 cs=GP13 reset=GP11 spi=radio"
+
+
+def test_describe_sdcard_appends_the_spi_bus_it_joins_when_not_default():
+    sdcard = SDCardConfig(cs="GP1", spi="storage")
+
+    assert describe_sdcard(sdcard) == "sdcard mount=/sd cs=GP1 spi=storage"
+
+
+def test_describe_i2c_chips_append_the_i2c_bus_they_join_when_not_default():
+    sensors = I2CDeviceConfig(address=0x19, i2c="sensors")
+
+    assert describe_accelerometer(sensors) == "accelerometer lis3dh address=0x19 i2c=sensors"
+    assert describe_magnetometer(sensors) == "magnetometer mmc5603 address=0x19 i2c=sensors"
+    assert describe_haptics(sensors) == "haptics drv2605 address=0x19 i2c=sensors"
 
 
 def test_describe_ir_names_a_single_rx_pin_without_multi_receiver_wording():
