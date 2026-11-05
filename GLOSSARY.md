@@ -258,8 +258,12 @@ The opt-in, parse-time cap on the total worst-case NeoPixel current (every enabl
 _Avoid_: `neopixel_power`/`power budget` (too generic, see `HighCurrentRailConfig`); reading it as a live current limit or measurement (it is a static arithmetic bound fixed at boot); counting the matrix or disabled strips against it; expecting relative brightness between strips to survive once a strip is held at the floor
 
 ### Component enabled toggle
-The optional `enabled` boolean on every hardware component config (default `True`); `enabled: false` keeps a fully-validated section but tells the **Device assembly** not to build it. `buttons` is a bare pin-name list and isn't gated; `high_current_rail` is the exception (still drives its pin deasserted — see `HighCurrentRailConfig`).
-_Avoid_: treating `enabled: false` as omitting the section at parse time (validation still runs in full); assuming `i2c`/`spi` `enabled: false` falls back to default pins (each builds no bus at all); writing `.enabled` after parse (to narrow, use `isolate`; to force a section on, set `enabled` in the mapping and parse again); assuming `high_current_rail`'s `enabled: false` means "build nothing" like every other section
+The optional `enabled` boolean on every hardware component config (default `True`); `enabled: false` keeps a fully-validated section but tells the **Device assembly** not to build it. `buttons` is a bare pin-name list and isn't gated; a **Named bus** has no toggle of its own; `high_current_rail` is the exception (still drives its pin deasserted — see `HighCurrentRailConfig`).
+_Avoid_: treating `enabled: false` as omitting the section at parse time (validation still runs in full); writing `.enabled` after parse (to narrow, use `isolate`; to force a section on, set `enabled` in the mapping and parse again); assuming `high_current_rail`'s `enabled: false` means "build nothing" like every other section
+
+### Named bus
+One physical I2C or SPI bus declared once, under a name, in the `i2c` or `spi` section of **aura-device.json**. A device joins a bus by naming it, and devices that name the same bus share it. A device that names no bus joins the bus named `default`, which is the board's own bus unless `default` is declared. Only buses that an enabled device names are opened.
+_Avoid_: repeating bus pins inside a device section; "shared bus" for the whole section (one section can declare several buses); calling a second bus an "override"; a per-bus `enabled` toggle (disable the bus's devices instead)
 
 ### Composition layer (app/)
 The top-level `app/` package — the one place allowed to import both engine runtime machinery and `hardware.*` together. It composes the board-free engine/effect/scene machinery (CPython-testable) and wires it to real hardware for the per-tick loop.
