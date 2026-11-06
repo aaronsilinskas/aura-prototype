@@ -36,11 +36,11 @@ _Avoid_: raw DRV2605L waveform IDs; `HapticConfig` (collides with the device-con
 Runtime configuration passed to effect builders at construction: `resolution`, effect-specific `options`, and `listeners`.
 
 ### Effect pack
-A named, versioned directory of effect items, each exporting an `EffectBuilder`; shared and cross-scene.
+A named, versioned directory of effect items, each exporting an `EffectBuilder`, whose **Pack manifest** states its version and declares its **Settings**; shared and cross-scene.
 _Avoid_: calling a scene-local effect set a "pack" (a pack is shared, versioned, cross-scene)
 
 ### Rule pack
-A named, versioned directory of rule items, each exporting a `GameRule`; shared and cross-scene.
+A named, versioned directory of rule items, each exporting a `GameRule`, whose **Pack manifest** states its version and declares its **Settings**; shared and cross-scene.
 _Avoid_: calling a scene-local rule set a "pack" (a pack is shared, versioned, cross-scene)
 
 ### Pack root
@@ -48,11 +48,11 @@ A directory whose own name is its top-level import package (flash `packs`, the c
 _Avoid_: pairing a root path with a hand-written import prefix (the prefix is the folder name); two roots with the same folder name; "pack dir" for a root (a pack dir is one pack inside it)
 
 ### PackCatalog
-Everything installed under a device's pack roots, discovered in one scan by `scan_pack_roots`: the effect and rule `PackRegistry`s, the `SceneRegistry` (with each scene's local items and sounds), and the pack sounds map. Every scene's pack declarations are checked before it is returned, so a misconfigured layout, version or declaration stops boot; item code is still imported lazily, at first use.
+Everything installed under a device's pack roots, discovered in one scan by `scan_pack_roots`: the effect and rule `PackRegistry`s, the `SceneRegistry` (with each scene's local items and sounds), and the pack sounds map. Every scene's pack declarations and **Setting overrides** are checked, and its **Settings** resolved, before it is returned, so a misconfigured layout, version, declaration or override stops boot; item code is still imported lazily, at first use.
 _Avoid_: scanning packs, scenes or sounds anywhere else; re-checking scene declarations at load time
 
 ### PackScanError
-The typed `ValueError` family raised while building a `PackCatalog`, when the files on disk are wrong (missing root, duplicate or reserved name, malformed version or `scene.json`, a scene declaring a pack that is missing or incompatible). Each carries the file, scene or pack at fault.
+The typed `ValueError` family raised while building a `PackCatalog`, when the files on disk are wrong (missing root, duplicate or reserved name, malformed version, `scene.json` or **Pack manifest**, a scene declaring a pack twice or declaring one that is missing or incompatible, a **Setting override** naming an undeclared Setting, giving the wrong type, or leaving a required Setting unset). Each carries the file, scene, pack or Setting at fault, so tests check the type and those fields, never the wording.
 _Avoid_: confusing with **Registry lookup errors** (a name not registered, after a good scan); classifying by message text
 
 ### DynamicValue
@@ -70,7 +70,7 @@ An event handler registered with `GameEngine`. **Game-data-stateless** — all g
 
 ### GameState
 The game context passed to every rule handler each tick: the control seams, the read-only clock, event queuing, and typed accessors for all mutable game data.
-_Avoid_: `clear_queue()` from rules (reserved for `SceneManager`); `get(key, None)` (use `get_or_none`)
+_Avoid_: `clear_queue()` from rules (reserved for `SceneManager`); `get(key, None)` (use `get_or_none`); storing a **Setting** in it
 
 ### Phase
 A named stage of a scene's game flow (e.g. Tag's Ready/Starting/Playing/Game Over), identified by a `PhaseKey`. A phase starts the moment it is entered, in the same tick, whatever order the scene's rules run in; its handlers first hear the event after the one that entered it.
@@ -96,15 +96,27 @@ _Avoid_: hand-rolled entry flags (use `on_enter`); reaching `super().on(...)` (b
 A `GameRule` whose handlers fire only while a given phase is active, with no lifecycle hooks and no transitions; any number may share a phase.
 _Avoid_: making it own or change phases (use `PhaseRule`)
 
+### Setting
+A named, typed, immutable start-up value that a scene or a pack declares, with a default unless it is required. Resolved once, when the **PackCatalog** is scanned; rules can read it but never change it, and it is kept apart from the runtime game data in `GameState`.
+_Avoid_: "tunable", "knob", "initial data", "config key"; keeping a Setting in `GameState`'s `get`/`set` store; seeding runtime game data from `scene.json` (rules seed their own); confusing with the boot values in `aura-boot.json`
+
+### Setting override
+A value that replaces a declared **Setting**'s default for one scene: written by the scene for a pack it declares, or supplied when the **Simulated device** boots.
+_Avoid_: "initial data"; changing a scene's resolved Settings after the scan
+
+### Pack manifest
+The JSON file in an **Effect pack** or **Rule pack** that states the pack's version and declares its **Settings**.
+_Avoid_: `version.txt`
+
 ### Scene Config
-A scene's tunable knobs (durations, thresholds, counts) resolved **once** into a single immutable object, cached in `GameState`. One per scene (`RlglConfig`, `TagConfig`).
-_Avoid_: confusing with `EffectConfig`; re-reading and re-defaulting these values every tick (build once, cache)
+A scene's derived, immutable helper object, built once from the scene's **Settings** — e.g. `RlglConfig` scaling durations by Game Level. One per scene (`RlglConfig`, `TagConfig`).
+_Avoid_: confusing with `EffectConfig`; calling the Settings themselves the Scene Config; re-deriving it every tick (build once, cache)
 
 ### Timer
 Owned internally by `GameEngine`. Rules access time only via `state.elapsed`/`state.total`, never by holding a `Timer` reference.
 
 ### Scene
-A declarative bundle of a self-contained game context: effect/rule packs, optional initial data, a `version`, a declared `ir_codec` name, and references to its scene-local effects/rules. Carries no mutable runtime state.
+A declarative bundle of a self-contained game context: effect/rule packs, its own declared **Settings** and its **Setting overrides** for the packs it declares, a `version`, a declared `ir_codec` name, and references to its scene-local effects/rules. Carries no mutable runtime state.
 
 ### Scene-local effect / Scene-local rule
 An effect or rule loaded from an `effects/` or `rules/` subdirectory inside a scene's own folder, private to it and addressed with the reserved `scene.` prefix. Unlike an **Effect pack** it has no version.
@@ -136,7 +148,7 @@ _Avoid_: putting `poll_transmits()` or any per-tick pump on it (keep the seam se
 
 ### SceneRegistry
 Serves a fresh `Scene` per lookup from the scenes the **PackCatalog** discovered and checked; it does no scanning of its own. Can also surface a scene's declared codec name without constructing the `Scene`, for callers resolving hardware before building it. `register` is a test-only escape hatch for in-memory scenes, which skip the catalog's declaration checks.
-_Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); calling `register` outside tests; changing a scene's initial data after the scan (pass overrides to the catalog scan); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
+_Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); calling `register` outside tests; changing a scene's Settings after the scan (pass **Setting overrides** to the catalog scan); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
 
 ### SceneControls
 The rule-facing scene-transition seam (`load`, `overlay`, `pop`, `reboot_into`, `reboot_to_previous`); `SceneManager` is the live implementation.
@@ -154,7 +166,7 @@ The scene a device's card names in `aura-state.json` (`scene`, with its `return_
 _Avoid_: "saved scene", "override" for it; expecting it to name the running scene right after a `--scene` deploy (the card names none until the next Reboot); treating it as host-authored (only the device writes it)
 
 ### Scene deploy token
-The per-deploy value `deploy.py --scene` writes as `scene_deploy_token` beside `default_scene` in `aura-settings.json`, new on every invocation. On boot, before the boot scene is resolved, a non-empty token that differs from the one recorded in the card's `aura-state.json` is applied: the **Persisted scene** and its `return_to` are removed and the token recorded, in one write, and one line is logged naming the deployed scene and the Persisted scene it cleared. So each `--scene` deploy wins once, and Reboots made after it keep persisting. The apply never checks the deployed scene against the registry: an unknown one is cleared to, then fails resolution naming the known scenes.
+The per-deploy value `deploy.py --scene` writes as `scene_deploy_token` beside `default_scene` in `aura-boot.json`, new on every invocation. On boot, before the boot scene is resolved, a non-empty token that differs from the one recorded in the card's `aura-state.json` is applied: the **Persisted scene** and its `return_to` are removed and the token recorded, in one write, and one line is logged naming the deployed scene and the Persisted scene it cleared. So each `--scene` deploy wins once, and Reboots made after it keep persisting. The apply never checks the deployed scene against the registry: an unknown one is cleared to, then fails resolution naming the known scenes.
 _Avoid_: "nonce", "deploy id" for it; comparing scene names instead (a second deploy of the same scene would be mistaken for the first); copying the deployed scene onto the card; a separate inbox file; applying it outside the shared boot (`build_scene_boot`)
 
 ### SceneReboot
@@ -238,12 +250,12 @@ A CircuitPython `EffectOutput` driving a DRV2605L haptic driver on all scopes (`
 _Avoid_: constructing with a `None` driver; reading `receipt.loudness` (the DRV2605L has no volume control); "motor" for the injected instance (use `driver`)
 
 ### aura-device.json
-The single **required** on-device file holding all hardware configuration; a missing file raises. Sections: `buttons`, `ir`, `pixels`, `audio`, `i2c`, `spi`, `radio`, `sdcard`, `high_current_rail`, `neopixel_current_budget`, `accelerometer`, `magnetometer`, `haptics`. `pixels` and `buttons` are each an optional, possibly-empty list. Pure hardware config — scene selection lives in **`aura-settings.json`** instead.
-_Avoid_: `settings.toml` (removed — unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`; a top-level `"scene"` key (moved to `aura-settings.json`)
+The single **required** on-device file holding all hardware configuration; a missing file raises. Sections: `buttons`, `ir`, `pixels`, `audio`, `i2c`, `spi`, `radio`, `sdcard`, `high_current_rail`, `neopixel_current_budget`, `accelerometer`, `magnetometer`, `haptics`. `pixels` and `buttons` are each an optional, possibly-empty list. Pure hardware config — scene selection lives in **`aura-boot.json`** instead.
+_Avoid_: `settings.toml` (removed — unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`; a top-level `"scene"` key (moved to `aura-boot.json`)
 
-### aura-settings.json
-The single **required** on-device flash file holding device settings, host-authored and drag-editable over USB alongside `aura-device.json`; a missing file raises. Carries the `default_scene` key — named for its *default*-selection role, since the card's **Persisted scene** layers on top of it — and, once `deploy.py --scene` has run, the **Scene deploy token** (`scene_deploy_token`, optional; hand-authored files omit it).
-_Avoid_: reading `default_scene` from `aura-device.json` (moved out); treating a stale `"scene"` key left in an old `aura-device.json` as meaningful (it is inert); hand-editing `default_scene` to change the boot scene (without a new token it does not displace a Persisted scene — `deploy.py --scene` is the supported path)
+### aura-boot.json
+The single **required** on-device flash file holding the device's **boot values**: start-up values, mostly written by `deploy.py`, that choose the boot scene and never reach `GameState`. Drag-editable over USB alongside `aura-device.json`; a missing file raises. Carries the `default_scene` key — named for its *default*-selection role, since the card's **Persisted scene** layers on top of it — and, once `deploy.py --scene` has run, the **Scene deploy token** (`scene_deploy_token`, optional; hand-authored files omit it).
+_Avoid_: reading `default_scene` from `aura-device.json` (moved out); treating a stale `"scene"` key left in an old `aura-device.json` as meaningful (it is inert); hand-editing `default_scene` to change the boot scene (without a new token it does not displace a Persisted scene — `deploy.py --scene` is the supported path); `aura-settings.json` (the old name, read nowhere: a board still carrying only it fails at boot until fixed by hand); "settings" or "device settings" for boot values (those words name a scene's or pack's **Setting**)
 
 ### DeviceConfig
 The validated value object parsed from an `aura-device.json` mapping — no `board` import, constructs no hardware. Can derive an isolated copy with every isolatable component but one disabled, for single-component bring-up. Never changed once parsed — a different config is a different mapping, parsed again, so every config satisfies its `NeoPixelCurrentBudgetConfig`; `isolate` is the one derivation, because it only narrows.
@@ -306,7 +318,7 @@ The board-free bundle `build_hardware` returns — a data holder for the built o
 _Avoid_: exposing raw transmitters (use `network_controls`/`ir`); exposing the raw `RadioTransport` (use `network_controls`/`radio`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### Simulated device
-A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz, and send. Its own emitters light its own receivers; its IR reaches other simulated devices only through the **IR medium**, where it is aimed, and its radio reaches every other one through the **radio medium**. Each has its own radio node, so a receiver can tell senders apart. Its shape comes from a `DeviceConfig` — the harness boots it from `examples/aura-device.simulated.json`, kept capability-equal to every other example config by a sync test. It has its own card, a real directory it can carry scenes and packs on, unless a test makes it card-less, and a **reboot** boots it again at once, within the tick that reset it. A test switches it on into a scene: that seeds its flash settings with that scene as `default_scene`, and every boot, the first included, reads those flash settings, picking the scene its card names and falling back to that default, as a real device does. A redeploy with a scene replaces that `default_scene` and adds a fresh **Scene deploy token**, then reboots it, as `deploy.py --scene` followed by a reset would; a plain reset keeps the flash settings it has. Its reboot is instant: a real device is away for a moment while it boots, and IR aimed at it then is lost, but a simulated one never is. Its reboot also keeps module-level state, which a real reset clears, so shipped code keeps none. When real hardware exposes a bug it missed, the simulated device is extended until that bug is visible.
+A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz, and send. Its own emitters light its own receivers; its IR reaches other simulated devices only through the **IR medium**, where it is aimed, and its radio reaches every other one through the **radio medium**. Each has its own radio node, so a receiver can tell senders apart. Its shape comes from a `DeviceConfig` — the harness boots it from `examples/aura-device.simulated.json`, kept capability-equal to every other example config by a sync test. It has its own card, a real directory it can carry scenes and packs on, unless a test makes it card-less, and a **reboot** boots it again at once, within the tick that reset it. A test switches it on into a scene: that seeds its boot values with that scene as `default_scene`, and every boot, the first included, reads those boot values, picking the scene its card names and falling back to that default, as a real device does. A redeploy with a scene replaces that `default_scene` and adds a fresh **Scene deploy token**, then reboots it, as `deploy.py --scene` followed by a reset would; a plain reset keeps the boot values it has. Its reboot is instant: a real device is away for a moment while it boots, and IR aimed at it then is lost, but a simulated one never is. Its reboot also keeps module-level state, which a real reset clears, so shipped code keeps none. When real hardware exposes a bug it missed, the simulated device is extended until that bug is visible.
 _Avoid_: mock device, virtual device, emulator (it does not run CircuitPython); faking the CircuitPython libraries beneath `device_builder`; hard-coding its hardware shape (declare it in the simulated config)
 
 ### Simulation test harness

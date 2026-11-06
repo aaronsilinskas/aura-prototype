@@ -61,8 +61,8 @@ magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
   spell/          Individual spell implementations (elemental/, combo/, ambient_magic_regen)
 
 packs/            Game-specific packs loaded at runtime (CircuitPython/MicroPython-safe)
-  effects/        Shared, versioned effect packs (basic, elements) — each with a version.txt
-  rules/          Shared, versioned rule packs (debug, lobby, return_to_lobby)
+  effects/        Shared, versioned effect packs (basic, elements) — each with an effects.json manifest
+  rules/          Shared, versioned rule packs (debug, lobby, return_to_lobby) — each with a rules.json manifest
   scenes/         Scene definitions (element_browser, example_lobby, hardware_test,
                   ir_range_receiver, ir_range_transmitter, red_light_green_light, tag);
                   each has a scene.json and optional scene-local effects/ and rules/ subdirs
@@ -75,7 +75,7 @@ hardware/         Hardware abstraction layer
                   pio_pulse_writer, counting_i2c, rfm69_radio_transport,
                   sdcard_storage, usb_cdc_transport, boot)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
-                  device_config, neopixel_current_budget, device_settings, device_state,
+                  device_config, neopixel_current_budget, device_boot, device_state,
                   device_hardware,
                   device_storage, network_controls, scene_selection, ir_transport,
                   ir_transceiver, ir_wiring, ir_codecs/ (base, aura, tag), ir_telemetry,
