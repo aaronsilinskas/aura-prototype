@@ -23,7 +23,7 @@ Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/doma
 
 1. `to-spec` _(user-run)_ — create the spec as a local document only (no GH issue yet). Ends by asking the user to run `grill-with-docs`.
 2. `grill-with-docs` _(user-run)_ — challenge the spec against the domain docs; update the local spec and the domain docs (`docs/domain.md` map + `GLOSSARY.md` glossary) inline as decisions crystallise. Keep looping until no open questions remain.
-3. Publish — at the tail of `grill-with-docs`, once the design has settled: the agent asks the user for the go-ahead, moves the spec to a GH issue and deletes the local file, then opens a PR with the domain-doc edits from grilling (`GLOSSARY.md`, `docs/domain.md`, `docs/adr/`) that references the spec issue. Tickets cite these entries, so the PR merges before `to-tickets` runs.
+3. Publish — at the tail of `grill-with-docs`, once the design has settled: the agent asks the user for the go-ahead, moves the spec to a GH issue and deletes the local file, then opens a PR with the domain-doc edits from grilling (`GLOSSARY.md`, `docs/domain.md`, `docs/adr/`) that references the spec issue, and merges it — the user's go-ahead covers the review. Tickets cite these entries, so they are on `main` before `to-tickets` runs.
 4. `to-tickets` _(user-run)_ — split the spec into independently-grabbable implementation tickets.
 5. `implement` — work tickets in dependency order. After each PR merges, switch back to `main`.
 6. When all child tickets are closed, verify acceptance criteria are met and close the spec issue.
