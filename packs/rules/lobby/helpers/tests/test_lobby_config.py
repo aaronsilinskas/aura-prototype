@@ -4,16 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from engine.engine import GameEngine
-from engine.state import GameState, SceneControls, Scope
-from engine.tests.helpers import SpyEffectControls
+from engine.settings import Settings
+from engine.state import Scope
 from packs.rules.lobby.helpers.lobby_config import LobbyConfig, LobbyEntry, scope_by_name
+from packs.tests.settings_helper import settings_for
 
 
-def _make_state(initial_data: dict | None = None) -> GameState:
-    spy = SpyEffectControls()
-    engine = GameEngine(spy)  # pyright: ignore[reportArgumentType]
-    return engine.create_state(SceneControls(), initial_data=initial_data or {})
+def _lobby_settings(scopes: list, entries: list) -> Settings:
+    return settings_for(rule_packs={"lobby": {"scopes": scopes, "entries": entries}})
 
 
 # ---------------------------------------------------------------------------
@@ -70,24 +68,20 @@ def test_construction_accepts_a_single_scope_and_single_entry():
 
 
 # ---------------------------------------------------------------------------
-# LobbyConfig.from_state
+# LobbyConfig.from_settings
 # ---------------------------------------------------------------------------
 
 
-def test_from_state_resolves_scopes_and_entries_in_order():
-    state = _make_state(
-        {
-            "lobby": {
-                "scopes": ["personal", "global.main"],
-                "entries": [
-                    {"scene": "hardware_test", "effect": "elements.fire", "options": {"level": 5}},
-                    {"scene": "tag", "effect": "elements.ice", "options": {"level": 3}},
-                ],
-            }
-        }
+def test_from_settings_resolves_scopes_and_entries_in_order():
+    settings = _lobby_settings(
+        ["personal", "global.main"],
+        [
+            {"scene": "hardware_test", "effect": "elements.fire", "options": {"level": 5}},
+            {"scene": "tag", "effect": "elements.ice", "options": {"level": 3}},
+        ],
     )
 
-    config = LobbyConfig.from_state(state, "lobby")
+    config = LobbyConfig.from_settings(settings)
 
     assert config.scopes == [Scope.PERSONAL, Scope.Global.MAIN]
     assert [e.scene for e in config.entries] == ["hardware_test", "tag"]
@@ -95,98 +89,55 @@ def test_from_state_resolves_scopes_and_entries_in_order():
     assert config.entries[0].options == {"level": 5}
 
 
-def test_from_state_defaults_missing_options_to_empty_dict():
-    state = _make_state(
-        {
-            "lobby": {
-                "scopes": ["personal"],
-                "entries": [{"scene": "hardware_test", "effect": "elements.fire"}],
-            }
-        }
+def test_from_settings_defaults_missing_options_to_empty_dict():
+    settings = _lobby_settings(
+        ["personal"], [{"scene": "hardware_test", "effect": "elements.fire"}]
     )
 
-    config = LobbyConfig.from_state(state, "lobby")
+    config = LobbyConfig.from_settings(settings)
 
     assert config.entries[0].options == {}
 
 
-def test_from_state_reads_a_custom_config_key():
-    state = _make_state(
-        {
-            "my_lobby": {
-                "scopes": ["personal"],
-                "entries": [{"scene": "hardware_test", "effect": "elements.fire"}],
-            }
-        }
-    )
-
-    config = LobbyConfig.from_state(state, "my_lobby")
-
-    assert config.scopes == [Scope.PERSONAL]
-
-
-def test_from_state_raises_when_config_key_is_absent():
-    state = _make_state({})
-
-    with pytest.raises(ValueError, match="lobby"):
-        LobbyConfig.from_state(state, "lobby")
-
-
-def test_from_state_raises_when_config_value_is_not_a_dict():
-    state = _make_state({"lobby": "not-a-dict"})
-
-    with pytest.raises(ValueError, match="lobby"):
-        LobbyConfig.from_state(state, "lobby")
-
-
-def test_from_state_raises_on_empty_scopes():
-    state = _make_state(
-        {
-            "lobby": {
-                "scopes": [],
-                "entries": [{"scene": "hardware_test", "effect": "elements.fire"}],
-            }
-        }
-    )
+def test_from_settings_raises_on_empty_scopes():
+    settings = _lobby_settings([], [{"scene": "hardware_test", "effect": "elements.fire"}])
 
     with pytest.raises(ValueError, match="scopes"):
-        LobbyConfig.from_state(state, "lobby")
+        LobbyConfig.from_settings(settings)
 
 
-def test_from_state_raises_on_empty_entries():
-    state = _make_state({"lobby": {"scopes": ["personal"], "entries": []}})
+def test_from_settings_raises_on_empty_entries():
+    settings = _lobby_settings(["personal"], [])
 
     with pytest.raises(ValueError, match="entries"):
-        LobbyConfig.from_state(state, "lobby")
+        LobbyConfig.from_settings(settings)
 
 
-def test_from_state_raises_on_unknown_scope_name():
-    state = _make_state(
-        {
-            "lobby": {
-                "scopes": ["not-a-real-scope"],
-                "entries": [{"scene": "hardware_test", "effect": "elements.fire"}],
-            }
-        }
+def test_from_settings_raises_on_unknown_scope_name():
+    settings = _lobby_settings(
+        ["not-a-real-scope"], [{"scene": "hardware_test", "effect": "elements.fire"}]
     )
 
     with pytest.raises(ValueError, match="not-a-real-scope"):
-        LobbyConfig.from_state(state, "lobby")
+        LobbyConfig.from_settings(settings)
 
 
-def test_from_state_raises_on_entry_missing_scene():
-    state = _make_state(
-        {"lobby": {"scopes": ["personal"], "entries": [{"effect": "elements.fire"}]}}
-    )
+def test_from_settings_raises_on_entry_missing_scene():
+    settings = _lobby_settings(["personal"], [{"effect": "elements.fire"}])
 
     with pytest.raises(ValueError, match="scene"):
-        LobbyConfig.from_state(state, "lobby")
+        LobbyConfig.from_settings(settings)
 
 
-def test_from_state_raises_on_entry_missing_effect():
-    state = _make_state(
-        {"lobby": {"scopes": ["personal"], "entries": [{"scene": "hardware_test"}]}}
-    )
+def test_from_settings_raises_on_entry_missing_effect():
+    settings = _lobby_settings(["personal"], [{"scene": "hardware_test"}])
 
     with pytest.raises(ValueError, match="effect"):
-        LobbyConfig.from_state(state, "lobby")
+        LobbyConfig.from_settings(settings)
+
+
+def test_from_settings_raises_on_an_entry_that_is_not_an_object():
+    settings = _lobby_settings(["personal"], ["hardware_test"])
+
+    with pytest.raises(ValueError, match="hardware_test"):
+        LobbyConfig.from_settings(settings)

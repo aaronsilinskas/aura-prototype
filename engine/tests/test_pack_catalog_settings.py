@@ -110,7 +110,7 @@ def test_an_int_default_is_accepted_for_a_float_declaration(pack_tree) -> None:
 
 @pytest.mark.parametrize(
     ("type_name", "value"),
-    [("int", 3), ("float", 0.5), ("bool", True), ("str", "red")],
+    [("int", 3), ("float", 0.5), ("bool", True), ("str", "red"), ("list", [1, "a", {"b": 2}])],
 )
 def test_each_type_resolves_a_value_of_that_type(pack_tree, type_name, value) -> None:
     root = _scene_with_rule_pack(
@@ -170,6 +170,41 @@ def test_a_bad_override_raises_setting_override_error_naming_it(
     assert _fields(excinfo.value) == ("game", "exit", setting)
 
 
+@pytest.mark.parametrize(
+    ("reference_settings", "setting_overrides"),
+    [({"hold_seconds": {"a": 1}}, None), (None, _exit_overrides(hold_seconds="1, 2"))],
+    ids=["scene-override", "scan-override"],
+)
+def test_a_non_list_value_for_a_list_setting_raises_setting_override_error(
+    pack_tree, reference_settings, setting_overrides
+) -> None:
+    root = _scene_with_rule_pack(
+        pack_tree, {"hold_seconds": {"type": "list", "default": []}}, reference_settings
+    )
+
+    with pytest.raises(SettingOverrideError) as excinfo:
+        pack_tree.scan_roots(root, setting_overrides=setting_overrides)
+
+    assert _fields(excinfo.value) == ("game", "exit", "hold_seconds")
+
+
+def test_a_list_setting_is_checked_at_the_top_level_only(pack_tree) -> None:
+    root = _scene_with_rule_pack(
+        pack_tree, {"hold_seconds": {"type": "list"}}, {"hold_seconds": [None, [[]], "x"]}
+    )
+
+    assert _hold(pack_tree.scan_roots(root)) == [None, [[]], "x"]
+
+
+def test_changing_a_resolved_list_setting_does_not_change_the_next_read(pack_tree) -> None:
+    root = _scene_with_rule_pack(pack_tree, {"hold_seconds": {"type": "list", "default": [1]}})
+    settings = pack_tree.scan_roots(root).scene_registry.get("game").settings
+
+    settings.get("exit", "hold_seconds").append(2)  # type: ignore[union-attr]
+
+    assert settings.get("exit", "hold_seconds") == [1]
+
+
 def test_a_scan_override_for_a_pack_the_scene_does_not_declare_raises(pack_tree) -> None:
     root = _scene_with_rule_pack(pack_tree, HOLD)
     pack_tree.rule_pack(root, "unused", settings=HOLD)
@@ -227,6 +262,7 @@ def test_a_setting_override_error_is_a_scene_declaration_error() -> None:
         {"hold_seconds": {"type": "float", "default": "5"}},
         {"hold_seconds": {"type": "int", "default": 5.5}},
         {"hold_seconds": {"type": "int", "default": True}},
+        {"hold_seconds": {"type": "list", "default": "a, b"}},
         {"hold_seconds": {"type": "bool", "default": 0}},
         {"hold_seconds": {"type": "float", "defualt": 5.0}},
         {"hold_seconds": {"type": "float", "description": 5}},
@@ -239,6 +275,7 @@ def test_a_setting_override_error_is_a_scene_declaration_error() -> None:
         "str-default-for-float",
         "float-default-for-int",
         "bool-default-for-int",
+        "str-default-for-list",
         "int-default-for-bool",
         "unknown-key",
         "non-str-description",

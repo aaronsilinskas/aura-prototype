@@ -1,1 +1,13 @@
-{"version": "1.0"}
+{
+  "version": "1.0",
+  "settings": {
+    "scopes": {
+      "type": "list",
+      "description": "Display scope names, in order; the first previews the scene Button B launches, the rest look ahead."
+    },
+    "entries": {
+      "type": "list",
+      "description": "Selectable scenes, in order, each {\"scene\", \"effect\", \"options\"?}; options go to set_effect."
+    }
+  }
+}

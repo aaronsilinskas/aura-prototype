@@ -18,10 +18,6 @@ from packs.tests.settings_helper import settings_for
 _SCENES_DIR = Path(__file__).resolve().parents[3] / "scenes"
 
 
-def _scene_json(scene: str) -> dict:
-    return json.loads((_SCENES_DIR / scene / "scene.json").read_text())
-
-
 def _scenes_with_the_pack() -> list[str]:
     return sorted(
         path.parent.name
@@ -35,7 +31,8 @@ def _scenes_with_the_pack() -> list[str]:
 SCENES = _scenes_with_the_pack()
 
 LOBBY_ENTRIES = [
-    entry["scene"] for entry in _scene_json("example_lobby")["initial_data"]["lobby"]["entries"]
+    entry["scene"]
+    for entry in settings_for("example_lobby").get("lobby", "entries")  # type: ignore[attr-defined]
 ]
 """``example_lobby``'s entries, in the order A steps through them."""
 
