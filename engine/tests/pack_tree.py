@@ -43,9 +43,13 @@ class PackTree:
         version: str | None = "1.0",
         items: dict[str, str] | None = None,
         sounds: Iterable[str] = (),
+        manifest: str | None = None,
     ) -> Path:
-        """Create effect pack *name* under *root*; ``version=None`` omits ``version.txt``."""
-        pack_dir = self._pack(root / "effects" / name, version, items)
+        """Create effect pack *name* under *root*, with ``effects.json`` stating *version*.
+
+        *manifest* gives the manifest's raw text instead; ``version=None`` omits it.
+        """
+        pack_dir = self._pack(root / "effects" / name, "effects.json", version, manifest, items)
         _write_sounds(pack_dir, sounds)
         return pack_dir
 
@@ -56,9 +60,13 @@ class PackTree:
         *,
         version: str | None = "1.0",
         items: dict[str, str] | None = None,
+        manifest: str | None = None,
     ) -> Path:
-        """Create rule pack *name* under *root*; ``version=None`` omits ``version.txt``."""
-        return self._pack(root / "rules" / name, version, items)
+        """Create rule pack *name* under *root*, with ``rules.json`` stating *version*.
+
+        *manifest* gives the manifest's raw text instead; ``version=None`` omits it.
+        """
+        return self._pack(root / "rules" / name, "rules.json", version, manifest, items)
 
     def scene(
         self,
@@ -121,10 +129,19 @@ class PackTree:
         """Scan *roots*, in order, into a ``PackCatalog``."""
         return scan_pack_roots([str(root) for root in roots])
 
-    def _pack(self, pack_dir: Path, version: str | None, items: dict[str, str] | None) -> Path:
+    def _pack(
+        self,
+        pack_dir: Path,
+        manifest_name: str,
+        version: str | None,
+        manifest: str | None,
+        items: dict[str, str] | None,
+    ) -> Path:
         pack_dir.mkdir(parents=True, exist_ok=True)
-        if version is not None:
-            (pack_dir / "version.txt").write_text(version + "\n")
+        if manifest is None and version is not None:
+            manifest = json.dumps({"version": version})
+        if manifest is not None:
+            (pack_dir / manifest_name).write_text(manifest)
         _write_items(pack_dir, items)
         return pack_dir
 

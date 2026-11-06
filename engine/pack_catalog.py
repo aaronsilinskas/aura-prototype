@@ -5,6 +5,7 @@ from __future__ import annotations
 __all__ = [
     "DuplicateNameError",
     "IncompatiblePackError",
+    "MalformedManifestError",
     "MalformedSceneError",
     "MalformedVersionError",
     "MissingRootError",
@@ -31,6 +32,9 @@ _PACK_REFERENCE_KEYS = ("name", "version", "settings")
 
 # The attribute each kind's items export, in packs and scenes alike.
 _EXPORT_ATTR = {"effects": "BUILD", "rules": "RULE"}
+
+# The Pack manifest each kind's packs carry; a folder without one is not a pack.
+_MANIFEST_NAME = {"effects": "effects.json", "rules": "rules.json"}
 
 _SOUND_EXTENSIONS = (".wav",)
 
@@ -76,12 +80,21 @@ class ReservedNameError(PackScanError):
 
 
 class MalformedVersionError(PackScanError):
-    """A version in *path* (``version.txt`` or ``scene.json``) is not ``'MAJOR.MINOR'``."""
+    """A version in *path* (a Pack manifest or ``scene.json``) is not ``'MAJOR.MINOR'``."""
 
     def __init__(self, path: str, value: object) -> None:
         self.path = path
         self.value = value
         super().__init__(f"Malformed version {value!r} in '{path}'; expected 'MAJOR.MINOR'")
+
+
+class MalformedManifestError(PackScanError):
+    """The Pack manifest at *path* cannot be used, for *reason*."""
+
+    def __init__(self, path: str, reason: str) -> None:
+        self.path = path
+        self.reason = reason
+        super().__init__(f"Malformed pack manifest '{path}': {reason}")
 
 
 class MalformedSceneError(PackScanError):
@@ -272,16 +285,16 @@ def _scan_packs(root: str, root_name: str, kind: str, packs: list[_PackEntry]) -
         return
     for name in os.listdir(kind_dir):
         pack_dir = _path.join(kind_dir, name)
-        version_file = _path.join(pack_dir, "version.txt")
-        if not _path.isfile(version_file):
+        manifest_path = _path.join(pack_dir, _MANIFEST_NAME[kind])
+        if not _path.isfile(manifest_path):
             continue
         if name == "scene":
             raise ReservedNameError(pack_dir)
         for entry in packs:
             if entry.name == name:
                 raise DuplicateNameError(name, entry.source_path, pack_dir)
-        with open(version_file) as fh:
-            version = _parse_version(fh.readline().strip(), version_file)
+        manifest = _read_manifest(manifest_path)
+        version = _parse_version(manifest.get("version"), manifest_path)
         packs.append(
             _PackEntry(
                 name=name,
@@ -331,6 +344,17 @@ def _initial_data(data: dict, override: dict[str, object] | None) -> dict[str, o
     merged = dict(initial_data or {})
     merged.update(override)
     return merged
+
+
+def _read_manifest(path: str) -> dict:
+    with open(path) as fh:
+        try:
+            data = json.load(fh)
+        except ValueError as exc:
+            raise MalformedManifestError(path, f"invalid JSON ({exc})") from exc
+    if not isinstance(data, dict):
+        raise MalformedManifestError(path, "top level is not a JSON object")
+    return data
 
 
 def _read_scene_json(scene: str, path: str) -> dict:

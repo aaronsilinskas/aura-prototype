@@ -411,7 +411,7 @@ def test_scene_flag_records_the_scene_as_default_scene_in_deployed_settings(
 
     run_deploy(args, deploy=_deploy_from_source(tmp_path))
 
-    settings = json.loads((tmp_path / "mount" / "aura-settings.json").read_text())
+    settings = json.loads((tmp_path / "mount" / "aura-boot.json").read_text())
     assert settings["default_scene"] == "hardware_test"
 
 
@@ -420,4 +420,4 @@ def test_omitting_scene_flag_writes_no_settings_file(tmp_path: Path) -> None:
 
     run_deploy(args, deploy=_deploy_from_source(tmp_path))
 
-    assert not (tmp_path / "mount" / "aura-settings.json").exists()
+    assert not (tmp_path / "mount" / "aura-boot.json").exists()

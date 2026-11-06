@@ -47,7 +47,7 @@ manually (Mu / ``tio`` / ``screen``) across the three boots::
 
     python scripts/deploy.py examples/hardware/reboot_demo.py
 
-Requires the same deployed ``aura-device.json`` + ``aura-settings.json`` as
+Requires the same deployed ``aura-device.json`` + ``aura-boot.json`` as
 ``scene_demo.py``, a mounted SD card (the whole point -- a card-less device
 logs and never reboots), and a ``TARGET_SCENE`` below that is present in the
 scene registry and differs from the ``default_scene`` so the boot-2 switch is
@@ -64,8 +64,8 @@ import microcontroller
 from app.scene_composition import resolve_boot_scene_name, scan_boot_pack_catalog
 from engine.log import Logger
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
+from hardware.shared.device_boot import read_boot_mapping
 from hardware.shared.device_reboot import DeviceSceneReboot
-from hardware.shared.device_settings import read_settings_mapping
 from hardware.shared.device_state import DeviceStateStore
 
 # The scene reboot_into() switches to. Must be in the registry and, for the
@@ -87,8 +87,8 @@ hw = build_hardware(config, logger=hw_logger)
 
 scene_registry = scan_boot_pack_catalog(hw.storage).scene_registry
 
-settings_mapping = read_settings_mapping()
-scene_name = resolve_boot_scene_name(scene_registry, hw.storage, settings_mapping, logger=hw_logger)
+boot_mapping = read_boot_mapping()
+scene_name = resolve_boot_scene_name(scene_registry, hw.storage, boot_mapping, logger=hw_logger)
 
 # This example owns reboot_demo_phase; return_to is the seam's own key, read
 # here only to print as proof (the adapter is what writes and clears it).

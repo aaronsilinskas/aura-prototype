@@ -119,7 +119,7 @@ required; there are no built-in defaults.
   is a complete example, tested on Pimoroni Pico 2 boards.
   [`examples/aura-device.simulated.json`](examples/aura-device.simulated.json)
   is for the test-only Simulated device, not for flashing to a board.
-- **`aura-settings.json`** picks the scene to boot, by its folder name under
+- **`aura-boot.json`** picks the scene to boot, by its folder name under
   `packs/scenes/`:
 
   ```json
@@ -223,14 +223,23 @@ trigger scene transitions via `state.scene_controls`.
 
 ### Packs
 
-A **pack** is a directory containing a `version.txt` and one `.py` file per
+A **pack** is a directory containing a **pack manifest** and one `.py` file per
 item. `scan_pack_roots` (`engine/pack_catalog.py`) discovers every pack and
 scene under the pack roots in one scan; `PackRegistry` imports items lazily on
 first use.
 
-- **Effect pack** — each `.py` file exports `BUILD`: a `(config) → Effect` callable.
-  Effect names use `"pack.effect"` format (e.g. `"elements.fire"`).
-- **Rule pack** — each `.py` file exports `RULE`: a `GameRule` instance.
+- **Effect pack** — manifest `effects.json`; each `.py` file exports `BUILD`: a
+  `(config) → Effect` callable. Effect names use `"pack.effect"` format (e.g. `"elements.fire"`).
+- **Rule pack** — manifest `rules.json`; each `.py` file exports `RULE`: a `GameRule` instance.
+
+The manifest is a JSON object stating the pack's version:
+
+```json
+{"version": "1.0"}
+```
+
+A folder without a manifest is not a pack and is skipped. A manifest that is
+not a JSON object fails the scan with `MalformedManifestError`.
 
 Version format is `MAJOR.MINOR`. A `Scene` declares minimum required versions;
 the catalog scan checks them at boot (same-major, installed-minor ≥ required-minor).

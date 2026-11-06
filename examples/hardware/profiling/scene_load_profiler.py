@@ -4,7 +4,7 @@ This is the diagnostic half of the capacity teardown (#460): it stands up **what
 prop the deployed ``aura-device.json`` describes** -- the same
 ``read_device_config_mapping`` -> ``parse_device_config`` -> ``build_hardware`` path
 ``examples/hardware/scene_demo.py`` drives via ``app.scene_runtime.run_scene`` -- loads
-the scene named by the deployed ``aura-settings.json``, and reports the heap consumed in
+the scene named by the deployed ``aura-boot.json``, and reports the heap consumed in
 two headline stages (see "Hardware bring-up" below for the finer breakdown the
 ``__SCENE_STAGES`` line prints around them):
 
@@ -83,9 +83,9 @@ Installation
      adafruit_drv2605.mpy  (optional - required only when a DRV2605L is wired up)
 
 3. Deploy an ``aura-device.json`` registering the scene's clips/scopes -- see
-   ``examples/aura-device.pico-2.json`` -- and an ``aura-settings.json`` naming the
-   scene to measure (its ``"default_scene"`` key) -- see ``examples/aura-settings.json``.
-   Both files are required; a missing or invalid config, settings file, or
+   ``examples/aura-device.pico-2.json`` -- and an ``aura-boot.json`` naming the
+   scene to measure (its ``"default_scene"`` key) -- see ``examples/aura-boot.json``.
+   Both files are required; a missing or invalid config, boot file, or
    unregistered scene name fails loudly at import time, naming the known scenes.
 
 4. Run the deploy script to copy all source files and set code.py:
@@ -94,8 +94,8 @@ Installation
 
 How to use
 ----------
-- Set the deployed ``aura-settings.json``'s ``"default_scene"`` key to the scene you
-  want to measure -- CircuitPython has no argv, so the deployed settings file is the
+- Set the deployed ``aura-boot.json``'s ``"default_scene"`` key to the scene you
+  want to measure -- CircuitPython has no argv, so the deployed boot file is the
   only per-boot selector. A scene name absent from the scanned scene registry fails
   loud, naming the known scenes.
 - Confirm the deployed ``aura-device.json`` registers that scene's clips and wires the
@@ -109,7 +109,7 @@ Configuration
 -------------
 - aura-device.json: the single source of truth for the prop under test. Edit it, not
   this file, to change what hardware is measured.
-- aura-settings.json: the single source of truth for the scene to measure (its
+- aura-boot.json: the single source of truth for the scene to measure (its
   ``"default_scene"`` key). Edit it, not this file, to change which scene is measured.
 - LOG_INTERVAL_SECONDS: how often the post-load stats line is printed.
 """
@@ -128,12 +128,12 @@ from engine.state import SceneReboot
 from engine.timer import Timer
 from hardware.circuitpython.device_builder import build_hardware
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
+from hardware.shared.device_boot import read_boot_mapping
 from hardware.shared.device_config import (
     DeviceConfig,
     parse_device_config,
     read_device_config_mapping,
 )
-from hardware.shared.device_settings import read_settings_mapping
 from hardware.shared.profiler_report import (
     metrics_harness_label,
     print_profile_header,
@@ -150,7 +150,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Configuration -- how often the post-load stats line is printed. Everything
 # else this profiler measures comes from the deployed aura-device.json (the
-# prop) and aura-settings.json (the scene to measure).
+# prop) and aura-boot.json (the scene to measure).
 # ---------------------------------------------------------------------------
 
 LOG_INTERVAL_SECONDS: Final = 5.0
@@ -233,7 +233,7 @@ def _build_prop(scene_name: str, config: DeviceConfig) -> tuple[SceneManager, Ef
 def run() -> None:
     """Measure the deployed config's scene in-situ load/first-tick heap, then keep ticking."""
     config = parse_device_config(read_device_config_mapping())
-    scene_name = resolve_scene_name(read_settings_mapping())
+    scene_name = resolve_scene_name(read_boot_mapping())
 
     print_profile_header(
         component=f"scene_load.{scene_name}",

@@ -95,7 +95,7 @@ def install_card_scene(
 def install_card_effect_pack(card: Path, pack: str) -> None:
     """Put effect pack *pack*, version 1.0, on *card*: its ``solid`` lights every pixel."""
     pack_dir = _card_pack_dir(card, "effects", pack)
-    (pack_dir / "version.txt").write_text("1.0")
+    (pack_dir / "effects.json").write_text(json.dumps({"version": "1.0"}))
     (pack_dir / "solid.py").write_text(_SOLID_EFFECT)
 
 

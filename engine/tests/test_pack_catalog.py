@@ -13,6 +13,7 @@ import pytest
 from engine.pack_catalog import (
     DuplicateNameError,
     IncompatiblePackError,
+    MalformedManifestError,
     MalformedSceneError,
     MalformedVersionError,
     MissingRootError,
@@ -265,6 +266,7 @@ def test_an_effect_pack_without_a_sounds_folder_has_no_pack_sounds(pack_tree) ->
 
 
 def test_folders_without_a_marker_file_are_skipped(pack_tree) -> None:
+    """A pack folder needs its manifest; a scene folder needs ``scene.json``."""
     root = pack_tree.root("tc_flash")
     pack_tree.effect_pack(root, "helpers", version=None, items={"util": "BUILD = 1"})
     pack_tree.rule_pack(root, "leftover", version=None)
@@ -376,6 +378,7 @@ def test_every_scan_error_is_a_pack_scan_error_and_a_value_error() -> None:
         DuplicateNameError,
         ReservedNameError,
         MalformedVersionError,
+        MalformedManifestError,
         MalformedSceneError,
     ):
         assert issubclass(error_type, PackScanError)
@@ -383,7 +386,7 @@ def test_every_scan_error_is_a_pack_scan_error_and_a_value_error() -> None:
 
 
 @pytest.mark.parametrize("kind", ["effect", "rule"])
-def test_a_malformed_version_txt_raises_malformed_version_error_naming_the_file(
+def test_a_malformed_manifest_version_raises_malformed_version_error_naming_the_manifest(
     pack_tree, kind
 ) -> None:
     root = pack_tree.root("tc_flash")
@@ -393,8 +396,40 @@ def test_a_malformed_version_txt_raises_malformed_version_error_naming_the_file(
     with pytest.raises(MalformedVersionError) as excinfo:
         scan_pack_roots([str(root)])
 
-    assert excinfo.value.path == str(pack_dir / "version.txt")
+    assert excinfo.value.path == str(pack_dir / (kind + "s.json"))
     assert excinfo.value.value == "1"
+
+
+@pytest.mark.parametrize("kind", ["effect", "rule"])
+def test_a_pack_reads_its_version_from_its_manifest(pack_tree, kind) -> None:
+    root = pack_tree.root("tc_flash")
+    make_pack = pack_tree.effect_pack if kind == "effect" else pack_tree.rule_pack
+    make_pack(root, "basic", version="1.3")
+    pack_tree.scene(root, "lobby", **{kind + "_packs": [["basic", "1.3"]]})
+
+    catalog = scan_pack_roots([str(root)])
+
+    assert catalog.scene_registry.names() == ["lobby"]
+
+
+@pytest.mark.parametrize("kind", ["effect", "rule"])
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        pytest.param("{not json", id="invalid-json"),
+        pytest.param('["1.0"]', id="not-an-object"),
+    ],
+)
+def test_an_unreadable_manifest_raises_malformed_manifest_error(pack_tree, kind, manifest) -> None:
+    root = pack_tree.root("tc_flash")
+    make_pack = pack_tree.effect_pack if kind == "effect" else pack_tree.rule_pack
+    pack_dir = make_pack(root, "basic", manifest=manifest)
+
+    with pytest.raises(MalformedManifestError) as excinfo:
+        scan_pack_roots([str(root)])
+
+    assert excinfo.value.path == str(pack_dir / (kind + "s.json"))
+    assert excinfo.value.reason
 
 
 @pytest.mark.parametrize("version", ["1", "one.two", 1.0])
@@ -453,7 +488,7 @@ def test_the_scan_stops_at_the_first_failure_in_root_order(pack_tree) -> None:
     with pytest.raises(MalformedVersionError) as excinfo:
         scan_pack_roots([str(flash), str(card)])
 
-    assert excinfo.value.path == str(flash_pack / "version.txt")
+    assert excinfo.value.path == str(flash_pack / "effects.json")
 
 
 def test_a_root_off_the_import_path_is_importable_after_the_scan(pack_tree, tmp_path) -> None:

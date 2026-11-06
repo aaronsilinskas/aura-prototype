@@ -149,18 +149,18 @@ def _sync_file(
 
 
 def _write_scene(mount: Path, scene: str) -> None:
-    """Set ``default_scene`` and a fresh Scene deploy token in ``aura-settings.json``.
+    """Set ``default_scene`` and a fresh Scene deploy token in ``aura-boot.json``.
 
-    Merges with any existing keys. A board with no ``aura-settings.json`` gets
+    Merges with any existing keys. A board with no ``aura-boot.json`` gets
     one created fresh holding only these two keys — unlike ``aura-device.json``,
-    there is no sample template to seed from (the settings file is trivially
+    there is no sample template to seed from (the boot file is trivially
     authored).
     """
-    settings_path = mount / "aura-settings.json"
-    settings = json.loads(settings_path.read_text()) if settings_path.exists() else {}
-    settings["default_scene"] = scene
-    settings["scene_deploy_token"] = secrets.token_hex(8)
-    settings_path.write_text(json.dumps(settings, indent=2))
+    boot_path = mount / "aura-boot.json"
+    boot_values = json.loads(boot_path.read_text()) if boot_path.exists() else {}
+    boot_values["default_scene"] = scene
+    boot_values["scene_deploy_token"] = secrets.token_hex(8)
+    boot_path.write_text(json.dumps(boot_values, indent=2))
 
 
 def deploy(
@@ -182,7 +182,7 @@ def deploy(
         source_root: Root of the source tree. Defaults to ``Path.cwd()``.
         dry_run: When True, skip mount validation and print what would be copied
             without writing any files.
-        scene: Scene name to record in ``aura-settings.json``'s ``default_scene`` key,
+        scene: Scene name to record in ``aura-boot.json``'s ``default_scene`` key,
             beside a fresh ``scene_deploy_token``; omit to leave the file untouched.
         compile: Callable ``(src, dest) -> None`` used to compile each ``.py`` file
             to ``.mpy`` in a staging tree before syncing.  Defaults to the real
@@ -355,11 +355,11 @@ def main() -> None:
         type=str,
         default=None,
         help=(
-            "Scene name to record as default_scene in aura-settings.json on the mounted "
+            "Scene name to record as default_scene in aura-boot.json on the mounted "
             "volume, with a fresh scene_deploy_token so the next boot boots this scene "
             "over any Persisted scene on the card. Combines deploying code "
             "and selecting the game into one step. Omit to leave any existing "
-            "aura-settings.json untouched."
+            "aura-boot.json untouched."
         ),
     )
     parser.add_argument(

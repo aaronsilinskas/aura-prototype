@@ -24,7 +24,7 @@ At least one of `--seconds` or `--until` is required.
 | `--seconds N` | Stop after N seconds of serial output |
 | `--until TEXT` | Stop as soon as any output line contains TEXT (exit 0) |
 | `--output FILE` | Also write clean device output to FILE (no deploy chatter) |
-| `--scene NAME` | Deploy with this scene, same meaning as `deploy.py --scene` (recorded in `aura-settings.json`); omit to leave the boot scene alone |
+| `--scene NAME` | Deploy with this scene, same meaning as `deploy.py --scene` (recorded in `aura-boot.json`); omit to leave the boot scene alone |
 | `--port PORT` | Serial port; if omitted, auto-detects the board's console channel (works with the data channel enabled too) |
 | `--reboot-timeout N` | Seconds to wait for the CircuitPython soft-reboot banner (default 5) |
 

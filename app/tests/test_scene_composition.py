@@ -60,7 +60,7 @@ def test_ir_range_receiver_scene_boots_and_activates_via_the_standard_pipeline()
     """ir_range_receiver (issue #918) needs no special-casing -- it discovers
     and activates through the same build_scene_runtime path as every other
     scene, proving scene_demo.py can boot straight into it via
-    aura-settings.json's default_scene."""
+    aura-boot.json's default_scene."""
     runtime = build_scene_runtime(_fake_hw(), "ir_range_receiver", catalog=_boot_catalog())
 
     assert runtime.manager.active_state is not None
@@ -141,7 +141,7 @@ def test_neither_persisted_nor_flash_scene_raises_naming_both_files(device_stora
     silently picking a scene -- the same contract resolve_boot_scene documents."""
     scene_registry = _scene_registry_with("red_light_green_light")
 
-    with pytest.raises(ValueError, match=r"aura-state\.json.*aura-settings\.json"):
+    with pytest.raises(ValueError, match=r"aura-state\.json.*aura-boot\.json"):
         resolve_boot_scene_name(scene_registry, device_storage, {})
 
 
@@ -754,8 +754,8 @@ def _make_card_rule_pack(
 ) -> Path:
     """Create aura_packs/rules/<pack_name>/ under *mount_root* with one rule item.
 
-    Mirrors packs/rules/debug/'s on-flash layout: a version.txt whose first
-    line is the MAJOR.MINOR version, plus an empty __init__.py at every
+    Mirrors packs/rules/debug/'s on-flash layout: a rules.json manifest stating
+    the MAJOR.MINOR version, plus an empty __init__.py at every
     package level and the rule module itself. Returns the pack directory.
     """
     aura_packs = mount_root / "aura_packs"
@@ -765,7 +765,7 @@ def _make_card_rule_pack(
     (aura_packs / "__init__.py").touch()
     (rules / "__init__.py").touch()
     (pack_dir / "__init__.py").touch()
-    (pack_dir / "version.txt").write_text(version + "\n")
+    (pack_dir / "rules.json").write_text(json.dumps({"version": version}))
     (pack_dir / f"{item_name}.py").write_text(content)
     return pack_dir
 
@@ -840,7 +840,7 @@ def _make_card_effect_pack(mount_root: Path, pack_name: str, version: str = "1.0
     """Create aura_packs/effects/<pack_name>/ under *mount_root* with one item.
 
     Mirrors ``_make_card_scene``'s package layout but for an effect pack: a
-    ``version.txt`` (the marker the pack catalog requires)
+    ``effects.json`` manifest (the marker the pack catalog requires)
     plus a single ``glow`` item whose ``BUILD`` returns an effect declaring an
     audio clip qualified by *pack_name*, and the ``sounds/card_pack_clip.wav``
     that clip names (building the effect resolves it), so a resolved effect proves both the
@@ -854,7 +854,7 @@ def _make_card_effect_pack(mount_root: Path, pack_name: str, version: str = "1.0
     (aura_packs / "__init__.py").touch()
     (effects / "__init__.py").touch()
     (pack_dir / "__init__.py").touch()
-    (pack_dir / "version.txt").write_text(version)
+    (pack_dir / "effects.json").write_text(json.dumps({"version": version}))
     (pack_dir / "glow.py").write_text(_CARD_EFFECT_PACK_BUILD_SOURCE.format(pack_name=pack_name))
     _add_card_effect_pack_sound(pack_dir, "card_pack_clip")
     return pack_dir
