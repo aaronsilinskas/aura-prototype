@@ -22,11 +22,11 @@ class _StubTimer:
         pass
 
 
-def _make_state(initial_data: dict | None = None):
+def _make_state():
     spy = SpyEffectControls()
     timer = _StubTimer()
     engine = GameEngine(spy, timer=timer)  # pyright: ignore[reportArgumentType]
-    return engine.create_state(SceneControls(), initial_data=initial_data or {})
+    return engine.create_state(SceneControls())
 
 
 # ---------------------------------------------------------------------------

@@ -10,8 +10,6 @@ from __future__ import annotations
 from app.simulation import TICK, SimulatedDevice, Simulation
 from engine.state import Scope
 
-SECOND_PAGE = {"page": 1}
-
 WATCH = 0.5
 """How long ``watch_tickers`` watches: long enough for every ticker to cross a pixel."""
 
@@ -31,6 +29,14 @@ def watch_tickers(simulation: Simulation, device: SimulatedDevice) -> int:
     return most
 
 
+def browse_to(device: SimulatedDevice, page: int, level: int) -> None:
+    """From boot, tap A to reach *page* and B to raise the level to *level*."""
+    for _ in range(page):
+        device.tap("A")
+    for _ in range(level - 1):
+        device.tap("B")
+
+
 def watch_for_first_page(simulation: Simulation, device: SimulatedDevice) -> bool:
     """Watch the directional strip for ``WATCH``: whether it shows fire, lit with no ticker."""
     return watch_tickers(simulation, device) == 0 and not device.strip(Scope.DIRECTIONAL).dark
@@ -42,21 +48,7 @@ def test_on_boot_the_first_page_shows(simulation):
     assert watch_for_first_page(simulation, device)
 
 
-def test_on_boot_the_level_is_1(simulation):
-    device = simulation.add_device("red", scene="element_browser", scene_data=SECOND_PAGE)
-
-    assert watch_tickers(simulation, device) == 1
-
-
-def test_on_boot_the_level_is_the_one_scene_data_sets(simulation):
-    device = simulation.add_device(
-        "red", scene="element_browser", scene_data={"page": 1, "level": 4}
-    )
-
-    assert watch_tickers(simulation, device) == 4
-
-
-def test_a_advances_to_the_next_page(simulation):
+def test_a_advances_to_the_next_page_at_the_boot_level_of_1(simulation):
     device = simulation.add_device("red", scene="element_browser")
 
     device.tap("A")
@@ -65,7 +57,8 @@ def test_a_advances_to_the_next_page(simulation):
 
 
 def test_a_keeps_the_level(simulation):
-    device = simulation.add_device("red", scene="element_browser", scene_data={"level": 4})
+    device = simulation.add_device("red", scene="element_browser")
+    browse_to(device, page=0, level=4)
 
     device.tap("A")
 
@@ -73,7 +66,8 @@ def test_a_keeps_the_level(simulation):
 
 
 def test_a_wraps_from_the_last_page_to_the_first(simulation):
-    device = simulation.add_device("red", scene="element_browser", scene_data=SECOND_PAGE)
+    device = simulation.add_device("red", scene="element_browser")
+    browse_to(device, page=1, level=1)
 
     device.tap("A")
 
@@ -81,7 +75,8 @@ def test_a_wraps_from_the_last_page_to_the_first(simulation):
 
 
 def test_b_raises_the_level(simulation):
-    device = simulation.add_device("red", scene="element_browser", scene_data=SECOND_PAGE)
+    device = simulation.add_device("red", scene="element_browser")
+    browse_to(device, page=1, level=1)
 
     device.tap("B")
 
@@ -97,9 +92,8 @@ def test_b_keeps_the_first_page(simulation):
 
 
 def test_b_wraps_the_level_from_10_to_1(simulation):
-    device = simulation.add_device(
-        "red", scene="element_browser", scene_data={"page": 1, "level": 10}
-    )
+    device = simulation.add_device("red", scene="element_browser")
+    browse_to(device, page=1, level=10)
 
     device.tap("B")
 
@@ -107,9 +101,8 @@ def test_b_wraps_the_level_from_10_to_1(simulation):
 
 
 def test_with_no_button_pressed_the_display_stays_as_it_is(simulation):
-    device = simulation.add_device(
-        "red", scene="element_browser", scene_data={"page": 1, "level": 3}
-    )
+    device = simulation.add_device("red", scene="element_browser")
+    browse_to(device, page=1, level=3)
     before = watch_tickers(simulation, device)
 
     simulation.advance(3.0)

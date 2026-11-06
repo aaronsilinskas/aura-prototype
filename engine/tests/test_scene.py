@@ -11,6 +11,7 @@ from engine.events import Event, EventGroup
 from engine.namespace import ActiveSceneNamespace
 from engine.packs import PackRegistry
 from engine.scene import PackReference, Scene, SceneManager, SceneRegistry
+from engine.settings import Settings
 from engine.state import EffectAdmin, EffectControls, GameState, SceneControls, SceneReboot, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
 from engine.tests.helpers import (
@@ -104,10 +105,15 @@ def _scene_factory(**kwargs):
         return Scene(
             effect_packs=kwargs.get("effect_packs", []),
             rule_packs=kwargs.get("rule_packs", []),
-            initial_data=kwargs.get("initial_data"),
+            settings=kwargs.get("settings"),
         )
 
     return factory
+
+
+def _which(name: str) -> Settings:
+    """Settings telling a scene's state apart: scene Setting ``which`` is *name*."""
+    return Settings({"scene": {"which": name}})
 
 
 def _scene_registry(*entries) -> SceneRegistry:
@@ -193,19 +199,6 @@ def test_scene_rule_packs_accessible_after_construction() -> None:
     scene = Scene(effect_packs=[], rule_packs=rule_packs)
 
     assert scene.rule_packs is rule_packs
-
-
-def test_scene_initial_data_defaults_to_none() -> None:
-    scene = Scene(effect_packs=[], rule_packs=[])
-
-    assert scene.initial_data is None
-
-
-def test_scene_initial_data_accessible_when_provided() -> None:
-    data = {"score": 0}
-    scene = Scene(effect_packs=[], rule_packs=[], initial_data=data)
-
-    assert scene.initial_data is data
 
 
 def test_scene_rejects_unknown_attributes() -> None:
@@ -461,8 +454,8 @@ def test_transition_applies_after_engine_update_in_same_tick() -> None:
 def test_last_pending_transition_wins_within_one_tick() -> None:
     engine = _make_engine()
     scene_reg = _scene_registry(
-        ("scene_a", _scene_factory(initial_data={"which": "a"})),
-        ("scene_b", _scene_factory(initial_data={"which": "b"})),
+        ("scene_a", _scene_factory(settings=_which("a"))),
+        ("scene_b", _scene_factory(settings=_which("b"))),
     )
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
@@ -472,7 +465,7 @@ def test_last_pending_transition_wins_within_one_tick() -> None:
     manager.update()
     manager.update()  # engine.update(active_state)
 
-    assert manager.active_state.get_or_none("which", str) == "b", (
+    assert manager.active_state.settings.get("scene", "which") == "b", (
         "last load() call in tick should win"
     )
 
@@ -480,9 +473,9 @@ def test_last_pending_transition_wins_within_one_tick() -> None:
 def test_overlay_wins_when_load_and_overlay_both_called_in_same_tick() -> None:
     engine = _make_engine()
     scene_reg = _scene_registry(
-        ("base", _scene_factory(initial_data={"which": "base"})),
+        ("base", _scene_factory(settings=_which("base"))),
         ("new", _scene_factory()),
-        ("overlay_scene", _scene_factory(initial_data={"which": "overlay"})),
+        ("overlay_scene", _scene_factory(settings=_which("overlay"))),
     )
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
@@ -498,12 +491,12 @@ def test_overlay_wins_when_load_and_overlay_both_called_in_same_tick() -> None:
     manager.update()  # tick on overlay
 
     # overlay was applied: the overlay scene is on top of base
-    assert manager.active_state.get_or_none("which", str) == "overlay"
+    assert manager.active_state.settings.get("scene", "which") == "overlay"
     # popping returns to the suspended base, proving overlay suspended (not replaced) it
     manager.pop()
     manager.update()
     manager.update()
-    assert manager.active_state.get_or_none("which", str) == "base"
+    assert manager.active_state.settings.get("scene", "which") == "base"
 
 
 # ---------------------------------------------------------------------------
@@ -522,15 +515,16 @@ def test_load_passes_scene_manager_as_scene_controls_in_active_state() -> None:
     assert engine._last_state.scene_controls is manager
 
 
-def test_load_seeds_active_state_data_from_scene_initial_data() -> None:
+def test_load_gives_the_active_state_the_scenes_settings() -> None:
     engine = _TrackingEngine(_RecordingEffectControls())
-    scene_reg = _scene_registry(("main", _scene_factory(initial_data={"level": 5})))
+    settings = _which("main")
+    scene_reg = _scene_registry(("main", _scene_factory(settings=settings)))
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.load("main")
-    manager.update()  # load fires; state created with initial_data
+    manager.update()  # load fires; state created with the scene's Settings
     manager.update()  # engine.update(active_state); _last_state is now set
 
-    assert engine._last_state.get_or_none("level", int) == 5
+    assert engine._last_state.settings is settings
 
 
 def test_load_stops_all_effects_on_the_outgoing_scene() -> None:
@@ -725,8 +719,8 @@ def test_scene_rules_fire_before_pack_rules(pack_tree) -> None:
 def test_overlay_suspends_active_scene_and_pushes_without_clearing_stack() -> None:
     engine = _make_engine()
     scene_reg = _scene_registry(
-        ("base", _scene_factory(initial_data={"which": "base"})),
-        ("overlay_scene", _scene_factory(initial_data={"which": "overlay"})),
+        ("base", _scene_factory(settings=_which("base"))),
+        ("overlay_scene", _scene_factory(settings=_which("overlay"))),
     )
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
@@ -737,13 +731,13 @@ def test_overlay_suspends_active_scene_and_pushes_without_clearing_stack() -> No
     manager.overlay("overlay_scene")
     manager.update()
     manager.update()  # tick on overlay
-    assert manager.active_state.get_or_none("which", str) == "overlay"
+    assert manager.active_state.settings.get("scene", "which") == "overlay"
 
     # base was suspended (not cleared): popping restores it
     manager.pop()
     manager.update()
     manager.update()
-    assert manager.active_state.get_or_none("which", str) == "base"
+    assert manager.active_state.settings.get("scene", "which") == "base"
 
 
 def test_overlay_clears_suspended_base_state_queue_before_pushing(pack_tree) -> None:
@@ -867,9 +861,9 @@ def test_pop_clears_restored_state_queue_so_suspended_events_do_not_replay(pack_
 def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
     engine = _make_engine()
     scene_reg = _scene_registry(
-        ("base", _scene_factory(initial_data={"which": "base"})),
-        ("mid", _scene_factory(initial_data={"which": "mid"})),
-        ("top", _scene_factory(initial_data={"which": "top"})),
+        ("base", _scene_factory(settings=_which("base"))),
+        ("mid", _scene_factory(settings=_which("mid"))),
+        ("top", _scene_factory(settings=_which("top"))),
     )
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
@@ -885,7 +879,7 @@ def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
     manager.update()
     manager.update()  # tick on restored scene
 
-    assert manager.active_state.get_or_none("which", str) == "mid", (
+    assert manager.active_state.settings.get("scene", "which") == "mid", (
         "pop from 3-layer stack must restore the scene directly below"
     )
 
@@ -893,7 +887,7 @@ def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
     manager.update()
     manager.update()
 
-    assert manager.active_state.get_or_none("which", str) == "base"
+    assert manager.active_state.settings.get("scene", "which") == "base"
 
 
 # ---------------------------------------------------------------------------

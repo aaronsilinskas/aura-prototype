@@ -41,7 +41,7 @@ class ReturnToLobbyRule(GameRule):
             return
 
         held = state.get(_HELD_KEY, 0.0) + state.elapsed
-        if held >= state.settings.get(NAMESPACE, "hold_seconds"):  # type: ignore[operator]
+        if held >= state.settings.get_float(NAMESPACE, "hold_seconds"):
             state.set(_HELD_KEY, 0.0)
             state.scene_controls.reboot_to_previous()
         else:

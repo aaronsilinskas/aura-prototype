@@ -139,10 +139,10 @@ class Scene:
     ``local_sound_map`` is a bare-keyed ``{stem: path}`` map of this scene's
     scene-local sounds (its ``sounds/`` subdirectory).  Built once at discovery;
     unlike ``local_rule_registry``/``local_effect_registry``
-    it is a plain mutable dict rather than an encapsulated registry, so — like
-    ``initial_data`` — each fresh ``Scene`` from ``SceneRegistry.get`` receives its
-    own copy, keeping mutation from poisoning future loads.  Purely additive for
-    now — no consumer resolves it yet.
+    it is a plain mutable dict rather than an encapsulated registry, so each
+    fresh ``Scene`` from ``SceneRegistry.get`` receives its own copy, keeping
+    mutation from poisoning future loads.  Purely additive for now — no
+    consumer resolves it yet.
 
     ``settings`` is the scene's resolved, read-only ``Settings``, which
     ``SceneManager`` hands to each ``GameState`` it creates for the scene.
@@ -153,7 +153,6 @@ class Scene:
     __slots__ = (
         "__weakref__",
         "effect_packs",
-        "initial_data",
         "ir_codec",
         "local_effect_registry",
         "local_rule_registry",
@@ -167,7 +166,6 @@ class Scene:
         self,
         effect_packs: Sequence[PackReference],
         rule_packs: Sequence[PackReference],
-        initial_data: dict[str, object] | None = None,
         version: Version | None = None,
         ir_codec: str = "aura",
         local_rule_registry: SceneLocalRegistry | None = None,
@@ -178,7 +176,6 @@ class Scene:
         self.settings = settings if settings is not None else Settings()
         self.effect_packs = effect_packs
         self.rule_packs = rule_packs
-        self.initial_data = initial_data
         self.version = version
         self.ir_codec = ir_codec
         self.local_rule_registry = (
@@ -196,7 +193,6 @@ class _SceneEntry:
     __slots__ = (
         "declarations",
         "effect_packs",
-        "initial_data",
         "ir_codec",
         "local_effect_registry",
         "local_rule_registry",
@@ -212,7 +208,6 @@ class _SceneEntry:
         version: Version,
         effect_packs: Sequence[PackReference],
         rule_packs: Sequence[PackReference],
-        initial_data: dict[str, object] | None,
         source_path: str,
         ir_codec: str,
         local_rule_registry: SceneLocalRegistry,
@@ -227,7 +222,6 @@ class _SceneEntry:
         self.version = version
         self.effect_packs = effect_packs
         self.rule_packs = rule_packs
-        self.initial_data = initial_data
         self.source_path = source_path
         self.ir_codec = ir_codec
         self.local_rule_registry = local_rule_registry
@@ -268,7 +262,7 @@ class SceneRegistry:
         """Return a fresh ``Scene`` for *name*.
 
         JSON-discovered scenes share the parsed ``Version`` across calls but
-        receive their own copy of ``initial_data`` and ``local_sound_map`` so
+        receive their own copy of ``local_sound_map`` so
         that mutations cannot poison future loads.  Factory-registered scenes
         return whatever the factory produces.
 
@@ -283,11 +277,9 @@ class SceneRegistry:
         if entry is None:
             raise ValueError(f"Unknown scene '{name}'")
 
-        initial_data = dict(entry.initial_data) if entry.initial_data is not None else None
         return Scene(
             effect_packs=entry.effect_packs,
             rule_packs=entry.rule_packs,
-            initial_data=initial_data,
             version=entry.version,
             ir_codec=entry.ir_codec,
             local_rule_registry=entry.local_rule_registry,
@@ -571,7 +563,7 @@ class SceneManager(SceneControls):
             self._deactivate(self._stack[i])
 
         self._stack = []
-        state = self._engine.create_state(self, scene.initial_data, scene.settings)
+        state = self._engine.create_state(self, scene.settings)
         entry = _SceneStackEntry(scene, state, combined_rules, saved_merge=None)
         self._stack.append(entry)
         self._effect_admin.reset_merge_strategies()
@@ -584,7 +576,7 @@ class SceneManager(SceneControls):
         self._deactivate(self._stack[-1])
         saved_merge = self._effect_admin.capture_merge_strategies()
 
-        state = self._engine.create_state(self, scene.initial_data, scene.settings)
+        state = self._engine.create_state(self, scene.settings)
         entry = _SceneStackEntry(scene, state, combined_rules, saved_merge=saved_merge)
         self._stack.append(entry)
         self._activate(entry)
