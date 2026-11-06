@@ -23,10 +23,12 @@ import sys
 
 import engine._path as _path
 from engine.packs import PackRegistry, _PackEntry, scan_item_names
-from engine.scene import SceneLocalRegistry, SceneRegistry, _SceneEntry
+from engine.scene import PackReference, SceneLocalRegistry, SceneRegistry, _SceneEntry
 from engine.version import Version
 
 _REQUIRED_SCENE_KEYS = ("version", "effect_packs", "rule_packs")
+
+_PACK_REFERENCE_KEYS = ("name", "version", "settings")
 
 # The attribute each kind's items export, in packs and scenes alike.
 _EXPORT_ATTR = {"effects": "BUILD", "rules": "RULE"}
@@ -234,47 +236,26 @@ def _check_declarations(
     installed_effects = {entry.name: entry.version for entry in effect_packs}
     installed_rules = {entry.name: entry.version for entry in rule_packs}
     for scene, entry in scenes.items():
-        scene_json = _path.join(entry.source_path, "scene.json")
-        _check_kind(scene, scene_json, "effect", entry.effect_packs, installed_effects)
-        _check_kind(scene, scene_json, "rule", entry.rule_packs, installed_rules)
+        _check_kind(scene, "effect", entry.effect_packs, installed_effects)
+        _check_kind(scene, "rule", entry.rule_packs, installed_rules)
 
 
 def _check_kind(
     scene: str,
-    scene_json: str,
     kind: str,
-    declarations: object,
+    references: list[PackReference],
     installed: dict[str, Version],
 ) -> None:
-    key = kind + "_packs"
-    if not isinstance(declarations, list):
-        raise MalformedSceneError(scene, scene_json, f"'{key}' is not a list")
-    for declaration in declarations:
-        if not _is_declaration(declaration):
-            raise MalformedSceneError(
-                scene,
-                scene_json,
-                f"'{key}' entry {declaration!r} is not [pack name, minimum version]",
-            )
-        pack, minimum = declaration
-        required = _parse_version(minimum, scene_json)
+    for reference in references:
+        pack = reference.name
         if pack not in installed:
             raise UnknownDeclaredPackError(scene, pack, kind)
-        if not _is_compatible(installed[pack], required):
-            raise IncompatiblePackError(scene, pack, installed[pack], required)
+        if not _is_compatible(installed[pack], reference.version):
+            raise IncompatiblePackError(scene, pack, installed[pack], reference.version)
 
 
 def _is_compatible(installed: Version, required: Version) -> bool:
     return installed.major == required.major and installed.minor >= required.minor
-
-
-def _is_declaration(declaration: object) -> bool:
-    return (
-        isinstance(declaration, list)
-        and len(declaration) == 2
-        and isinstance(declaration[0], str)
-        and isinstance(declaration[1], str)
-    )
 
 
 def _add_import_parent(parent: str) -> None:
@@ -345,8 +326,8 @@ def _scan_scenes(
         scene_prefix = root_name + ".scenes." + name
         scenes[name] = _SceneEntry(
             version=_parse_version(data["version"], scene_json),
-            effect_packs=data["effect_packs"],
-            rule_packs=data["rule_packs"],
+            effect_packs=_read_pack_references(name, scene_json, data, "effect_packs"),
+            rule_packs=_read_pack_references(name, scene_json, data, "rule_packs"),
             initial_data=_initial_data(data, overrides.get(name)),
             source_path=scene_dir,
             ir_codec=_read_ir_codec(name, scene_json, data),
@@ -388,6 +369,41 @@ def _read_scene_json(scene: str, path: str) -> dict:
         if key not in data:
             raise MalformedSceneError(scene, path, f"missing required key '{key}'")
     return data
+
+
+def _read_pack_references(scene: str, path: str, data: dict, key: str) -> list[PackReference]:
+    entries = data[key]
+    if not isinstance(entries, list):
+        raise MalformedSceneError(scene, path, f"'{key}' is not a list")
+    references: list[PackReference] = []
+    for entry in entries:
+        reference = _read_pack_reference(scene, path, key, entry)
+        for earlier in references:
+            if earlier.name == reference.name:
+                raise MalformedSceneError(
+                    scene, path, f"'{key}' declares pack '{reference.name}' twice"
+                )
+        references.append(reference)
+    return references
+
+
+def _read_pack_reference(scene: str, path: str, key: str, entry: object) -> PackReference:
+    if not isinstance(entry, dict):
+        raise MalformedSceneError(scene, path, f"'{key}' entry {entry!r} is not an object")
+    for field in entry:
+        if field not in _PACK_REFERENCE_KEYS:
+            raise MalformedSceneError(scene, path, f"'{key}' entry has unknown key {field!r}")
+    name = entry.get("name")
+    if not isinstance(name, str):
+        raise MalformedSceneError(scene, path, f"'{key}' entry {entry!r} has no string 'name'")
+    if "version" not in entry:
+        raise MalformedSceneError(scene, path, f"'{key}' entry for '{name}' has no 'version'")
+    settings = entry.get("settings", {})
+    if not isinstance(settings, dict):
+        raise MalformedSceneError(
+            scene, path, f"'{key}' entry for '{name}' has 'settings' that is not an object"
+        )
+    return PackReference(name, _parse_version(entry["version"], path), settings)
 
 
 def _read_ir_codec(scene: str, path: str, data: dict) -> str:

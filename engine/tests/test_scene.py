@@ -10,7 +10,7 @@ from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
 from engine.namespace import ActiveSceneNamespace
 from engine.packs import PackRegistry
-from engine.scene import Scene, SceneManager, SceneRegistry
+from engine.scene import PackReference, Scene, SceneManager, SceneRegistry
 from engine.state import EffectAdmin, EffectControls, GameState, SceneControls, SceneReboot, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
 from engine.tests.helpers import (
@@ -19,6 +19,7 @@ from engine.tests.helpers import (
     SpyEffectAdmin,
 )
 from engine.timer import Timer
+from engine.version import Version
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -89,6 +90,11 @@ def _make_scene_manager(
         namespace if namespace is not None else RecordingNamespace(),
         scene_reboot if scene_reboot is not None else RecordingSceneReboot(),
     )
+
+
+def _ref(name: str) -> PackReference:
+    """A reference to pack *name* at minimum version 1.0."""
+    return PackReference(name, Version(1, 0))
 
 
 def _scene_factory(**kwargs):
@@ -176,14 +182,14 @@ def test_scene_reboot_reboot_to_previous_raises_not_implemented_error() -> None:
 
 
 def test_scene_effect_packs_accessible_after_construction() -> None:
-    effect_packs = [("fx", "1.0")]
+    effect_packs = [_ref("fx")]
     scene = Scene(effect_packs=effect_packs, rule_packs=[])
 
     assert scene.effect_packs is effect_packs
 
 
 def test_scene_rule_packs_accessible_after_construction() -> None:
-    rule_packs = [("rules", "2.0")]
+    rule_packs = [_ref("rules")]
     scene = Scene(effect_packs=[], rule_packs=rule_packs)
 
     assert scene.rule_packs is rule_packs
@@ -615,7 +621,7 @@ def test_load_clears_suspended_state_queues_so_stale_events_do_not_outlive_the_s
     base_rule = rule_registry.get("stubs", "base_rule", GameRule)
     base_rule.on(Event, lambda e, s: base_events.append(e.name))
     scene_reg = _scene_registry(
-        ("base", _scene_factory(rule_packs=[("stubs", "1.0")])),
+        ("base", _scene_factory(rule_packs=[_ref("stubs")])),
         ("overlay_scene", _scene_factory()),
         ("new", _scene_factory()),
     )
@@ -659,9 +665,7 @@ def test_load_dispatches_events_to_scene_rules_on_following_ticks(pack_tree) -> 
 
     scene_rule = rule_registry.get("stubs", "scene_rule", GameRule)
     scene_rule.on(Event, lambda e, s: fired.append("scene"))
-    scene_reg = _scene_registry(
-        ("main", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")]))
-    )
+    scene_reg = _scene_registry(("main", _scene_factory(rule_packs=[_ref("stubs"), _ref("rules")])))
     manager = _make_scene_manager(
         engine,
         effect_registry=effect_registry,
@@ -696,9 +700,7 @@ def test_scene_rules_fire_before_pack_rules(pack_tree) -> None:
 
     scene_rule = rule_registry.get("stubs", "scene_rule", GameRule)
     scene_rule.on(Event, lambda e, s: fired.append("scene"))
-    scene_reg = _scene_registry(
-        ("main", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")]))
-    )
+    scene_reg = _scene_registry(("main", _scene_factory(rule_packs=[_ref("stubs"), _ref("rules")])))
     manager = _make_scene_manager(
         engine,
         effect_registry=effect_registry,
@@ -753,7 +755,7 @@ def test_overlay_clears_suspended_base_state_queue_before_pushing(pack_tree) -> 
     base_rule = rule_registry.get("stubs", "base_rule", GameRule)
     base_rule.on(Event, lambda e, s: base_events.append(e.name))
     scene_reg = _scene_registry(
-        ("base", _scene_factory(rule_packs=[("stubs", "1.0")])),
+        ("base", _scene_factory(rule_packs=[_ref("stubs")])),
         ("overlay_scene", _scene_factory()),
     )
     manager = _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
@@ -802,7 +804,7 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_tre
     pack_rule.on(Event, lambda e, s: pack_events.append(e.name))
 
     scene_reg = _scene_registry(
-        ("base", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")])),
+        ("base", _scene_factory(rule_packs=[_ref("stubs"), _ref("rules")])),
         ("overlay_scene", _scene_factory()),
     )
     manager = _make_scene_manager(
@@ -837,7 +839,7 @@ def test_pop_clears_restored_state_queue_so_suspended_events_do_not_replay(pack_
     base_rule = rule_registry.get("stubs", "base_rule", GameRule)
     base_rule.on(Event, lambda e, s: base_events.append(e.name))
     scene_reg = _scene_registry(
-        ("base", _scene_factory(rule_packs=[("stubs", "1.0")])),
+        ("base", _scene_factory(rule_packs=[_ref("stubs")])),
         ("overlay_scene", _scene_factory()),
     )
     manager = _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
@@ -922,9 +924,7 @@ def test_rule_pack_items_all_receive_events_after_load(pack_tree) -> None:
 
     scene_rule = rule_registry.get("stubs", "scene_rule", GameRule)
     scene_rule.on(Event, lambda e, s: fired_by.append("scene"))
-    scene_reg = _scene_registry(
-        ("main", _scene_factory(rule_packs=[("stubs", "1.0"), ("rules", "1.0")]))
-    )
+    scene_reg = _scene_registry(("main", _scene_factory(rule_packs=[_ref("stubs"), _ref("rules")])))
     manager = _make_scene_manager(
         engine,
         effect_registry=effect_registry,
@@ -1017,7 +1017,7 @@ def test_pop_activates_revealed_entry_with_both_rules_and_its_namespace_view(pac
     def base_factory():
         return Scene(
             effect_packs=[],
-            rule_packs=[("stubs", "1.0")],
+            rule_packs=[_ref("stubs")],
             local_effect_registry=base_local_registry,
         )
 
@@ -1046,8 +1046,8 @@ def test_pop_activates_revealed_entry_with_both_rules_and_its_namespace_view(pac
 def test_each_transition_installs_the_active_scene_once(pack_tree) -> None:
     catalog = pack_tree.scan(effect_packs={"fx": {}, "gfx": {}})
     scene_reg = _scene_registry(
-        ("base", _scene_factory(effect_packs=[("fx", "1.0")])),
-        ("overlay_scene", _scene_factory(effect_packs=[("gfx", "1.0")])),
+        ("base", _scene_factory(effect_packs=[_ref("fx")])),
+        ("overlay_scene", _scene_factory(effect_packs=[_ref("gfx")])),
     )
     namespace = RecordingNamespace()
     manager = _make_scene_manager(
@@ -1073,8 +1073,11 @@ def test_pop_reinstalls_the_underlying_scene_view(pack_tree) -> None:
     catalog = pack_tree.scan(
         effect_packs={"fx": {}, "gfx": {}},
         scenes={
-            "base": {"effect_packs": [["fx", "1.0"]], "sounds": ["win"]},
-            "overlay_scene": {"effect_packs": [["gfx", "1.0"]], "sounds": ["lose"]},
+            "base": {"effect_packs": [{"name": "fx", "version": "1.0"}], "sounds": ["win"]},
+            "overlay_scene": {
+                "effect_packs": [{"name": "gfx", "version": "1.0"}],
+                "sounds": ["lose"],
+            },
         },
     )
     namespace = RecordingNamespace()
@@ -1122,7 +1125,7 @@ def test_load_whose_rule_resolution_fails_does_not_stop_effects_on_active_scene(
         return scene
 
     scene_reg = SceneRegistry()
-    scene_reg.register("initial", _scene_factory(rule_packs=[("stubs", "1.0")]))
+    scene_reg.register("initial", _scene_factory(rule_packs=[_ref("stubs")]))
     scene_reg.register("bad", bad_factory)
     manager = _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
 
@@ -1187,7 +1190,7 @@ def _make_merge_strategy_scene_manager(pack_tree, scene_names):
     effect_manager = EffectManager(namespace=namespace, outputs=[output])
     engine = GameEngine(effect_controls=effect_manager)
     scene_reg = _scene_registry(
-        *[(name, _scene_factory(effect_packs=[("color", "1.0")])) for name in scene_names]
+        *[(name, _scene_factory(effect_packs=[_ref("color")])) for name in scene_names]
     )
     scene_manager = _make_scene_manager(
         engine,

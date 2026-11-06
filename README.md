@@ -248,8 +248,8 @@ the catalog scan checks them at boot (same-major, installed-minor ≥ required-m
 
 A **Scene** is a declarative bundle:
 
-- `effect_packs: list[tuple[str, str]]` — `(pack_name, min_version)` pairs; version-validated at load
-- `rule_packs: list[tuple[str, str]]` — `(pack_name, min_version)` pairs; all rules loaded and appended
+- `effect_packs` — ordered `{"name": ..., "version": ...}` objects (an optional `settings` object holds that pack's Setting overrides); `version` is the minimum compatible version, same major, checked at scan
+- `rule_packs` — the same object form; all rules loaded and appended in declared order
 - Optional `initial_data: dict` — seed values for `GameState.data`
 
 `SceneManager` owns a scene stack. `load(name)` replaces the stack; `overlay(name)` pushes

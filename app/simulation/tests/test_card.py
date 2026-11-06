@@ -80,7 +80,13 @@ def install_card_scene(
     """Put *scene* on *card*: it lights the personal strip *color* with *effect*."""
     scene_dir = _card_pack_dir(card, "scenes", scene)
     (scene_dir / "scene.json").write_text(
-        json.dumps({"version": "1.0", "effect_packs": [list(effect_pack)], "rule_packs": []})
+        json.dumps(
+            {
+                "version": "1.0",
+                "effect_packs": [{"name": effect_pack[0], "version": effect_pack[1]}],
+                "rule_packs": [],
+            }
+        )
     )
     rules = _package(scene_dir / "rules")
     (rules / "light.py").write_text(_LIGHTING_RULE.format(effect=effect, color=color))

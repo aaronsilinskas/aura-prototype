@@ -12,8 +12,9 @@ from engine.effects.manager import EffectManager
 from engine.engine import GameEngine, GameRule
 from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog, scan_pack_roots
-from engine.scene import Scene, SceneManager, SceneRegistry
+from engine.scene import PackReference, Scene, SceneManager, SceneRegistry
 from engine.state import SceneReboot
+from engine.version import Version
 from packs.rules.debug.event_logger import EventLoggerRule
 
 _PACKS_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
@@ -101,9 +102,9 @@ def test_red_light_green_light_scene_json_does_not_list_own_effect_or_rule_packs
 
     scene = scene_registry.get("red_light_green_light")
 
-    pack_names = [name for name, _ in scene.effect_packs]
+    pack_names = [pack.name for pack in scene.effect_packs]
     assert "red_light_green_light" not in pack_names
-    rule_pack_names = [name for name, _ in scene.rule_packs]
+    rule_pack_names = [pack.name for pack in scene.rule_packs]
     assert "red_light_green_light" not in rule_pack_names
 
 
@@ -147,8 +148,8 @@ def test_non_lobby_scene_declares_the_return_to_lobby_rule_pack(
 
     scene = scene_registry.get(scene_name)
 
-    rule_pack_names = [tuple(entry) for entry in scene.rule_packs]
-    assert ("return_to_lobby", "1.0") in rule_pack_names
+    rule_pack_names = [pack.name for pack in scene.rule_packs]
+    assert "return_to_lobby" in rule_pack_names
 
 
 @pytest.mark.parametrize(
@@ -182,7 +183,7 @@ def test_ir_range_receiver_scene_declares_the_basic_effect_pack(catalog: PackCat
 
     scene = scene_registry.get("ir_range_receiver")
 
-    pack_names = [name for name, _ in scene.effect_packs]
+    pack_names = [pack.name for pack in scene.effect_packs]
     assert "basic" in pack_names
 
 
@@ -194,7 +195,7 @@ def test_ir_range_receiver_scene_declares_no_return_to_lobby_rule_pack(
 
     scene = scene_registry.get("ir_range_receiver")
 
-    rule_pack_names = [name for name, _ in scene.rule_packs]
+    rule_pack_names = [pack.name for pack in scene.rule_packs]
     assert rule_pack_names == []
 
 
@@ -236,7 +237,7 @@ def test_hardware_test_scene_json_does_not_list_own_effect_pack(catalog: PackCat
 
     scene = scene_registry.get("hardware_test")
 
-    pack_names = [name for name, _ in scene.effect_packs]
+    pack_names = [pack.name for pack in scene.effect_packs]
     assert "hardware_test" not in pack_names
 
 
@@ -245,7 +246,7 @@ def test_hardware_test_scene_json_does_not_list_own_rule_pack(catalog: PackCatal
 
     scene = scene_registry.get("hardware_test")
 
-    rule_pack_names = [name for name, _ in scene.rule_packs]
+    rule_pack_names = [pack.name for pack in scene.rule_packs]
     assert "hardware_test" not in rule_pack_names
 
 
@@ -254,7 +255,7 @@ def test_hardware_test_scene_json_does_not_list_debug_rule_pack(catalog: PackCat
 
     scene = scene_registry.get("hardware_test")
 
-    rule_pack_names = [name for name, _ in scene.rule_packs]
+    rule_pack_names = [pack.name for pack in scene.rule_packs]
     assert "debug" not in rule_pack_names
 
 
@@ -264,7 +265,7 @@ def _resolve_every_local_clip(catalog: PackCatalog, scene_name: str) -> list[str
     local_effects = scene.local_effect_registry
     namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
     namespace.install(
-        local_effects, scene.local_sound_map, frozenset(name for name, _ in scene.effect_packs)
+        local_effects, scene.local_sound_map, frozenset(pack.name for pack in scene.effect_packs)
     )
 
     resolved_paths = []
@@ -323,7 +324,7 @@ def loaded_debug_engine(catalog: PackCatalog):
     scene_registry = SceneRegistry()
     scene_registry.register(
         "test_scene",
-        lambda: Scene(effect_packs=[], rule_packs=[("debug", "1.0")]),
+        lambda: Scene(effect_packs=[], rule_packs=[PackReference("debug", Version(1, 0))]),
     )
     manager = SceneManager(
         engine,
