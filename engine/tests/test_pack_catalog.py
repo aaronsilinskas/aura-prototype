@@ -405,7 +405,7 @@ def test_a_pack_reads_its_version_from_its_manifest(pack_tree, kind) -> None:
     root = pack_tree.root("tc_flash")
     make_pack = pack_tree.effect_pack if kind == "effect" else pack_tree.rule_pack
     make_pack(root, "basic", version="1.3")
-    pack_tree.scene(root, "lobby", **{kind + "_packs": [["basic", "1.3"]]})
+    pack_tree.scene(root, "lobby", **{kind + "_packs": [{"name": "basic", "version": "1.3"}]})
 
     catalog = scan_pack_roots([str(root)])
 
