@@ -3,7 +3,7 @@
 On entry, increments the Game Level, updates the ``Scope.AMBIENT`` progress
 bar to the new level's fraction, and replaces Green Light on
 ``Scope.NON_AMBIENT`` with the level-up flash.
-Transitions back to Red Warning after ``rlgl_level_up_duration``.
+Transitions back to Red Warning after ``level_up_duration``.
 """
 
 from __future__ import annotations

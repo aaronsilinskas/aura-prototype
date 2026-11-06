@@ -1,7 +1,7 @@
 """RLGL scene Game Over phase rule.
 
 On entry, plays ``elements.fire`` and adds the game-over sting, both on
-``Scope.ALL``. Transitions back to Ready after ``rlgl_game_over_duration``.
+``Scope.ALL``. Transitions back to Ready after ``game_over_duration``.
 """
 
 from __future__ import annotations

@@ -21,27 +21,28 @@ from packs.scenes.red_light_green_light.tests.helpers import (
     WARNING_PEAK,
     last_played_at,
     lit_in,
+    overrides,
     survive_round,
     wait_for,
 )
 
-RED_LIGHT = {**QUICK_WARNINGS, "rlgl_red_duration": 3.0, "rlgl_max_level": 5}
+RED_LIGHT = {**QUICK_WARNINGS, "red_duration_max": 3.0, "max_level": 5}
 """A three-second Red Light, longer than its music clip, with five levels."""
 
 SHORTENING = {
     **QUICK_WARNINGS,
-    "rlgl_max_level": 2,
-    "rlgl_red_duration": 3.0,
-    "rlgl_red_duration_min": 1.0,
-    "rlgl_green_duration": 1.0,
-    "rlgl_level_up_duration": 0.5,
+    "max_level": 2,
+    "red_duration_max": 3.0,
+    "red_duration_min": 1.0,
+    "green_duration_max": 1.0,
+    "level_up_duration": 0.5,
 }
 """Red Light lasts 3.0 s at level one and 1.0 s at the top level, level two."""
 
 CAUGHT_WITHIN = 0.1
 """A handful of ticks: as long as ``move``'s sway takes to clear the smoothed red threshold."""
 
-THREE_ROUNDS = {**SHORTENING, "rlgl_max_level": 3}
+THREE_ROUNDS = {**SHORTENING, "max_level": 3}
 
 
 def reach_red_light(simulation: Simulation, player: SimulatedDevice) -> None:
@@ -54,7 +55,9 @@ def wait_for_red_light_to_end(simulation: Simulation, player: SimulatedDevice) -
 
 
 def test_red_light_shows_solid_red_on_every_light_strip(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
+    )
 
     reach_red_light(simulation, player)
 
@@ -62,7 +65,9 @@ def test_red_light_shows_solid_red_on_every_light_strip(simulation):
 
 
 def test_red_light_keeps_the_level_bar_showing(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
+    )
 
     reach_red_light(simulation, player)
 
@@ -70,7 +75,9 @@ def test_red_light_keeps_the_level_bar_showing(simulation):
 
 
 def test_red_light_loops_its_music(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
+    )
     reach_red_light(simulation, player)
 
     simulation.advance(player.clip_length(RED_MUSIC) + 0.5)
@@ -79,7 +86,9 @@ def test_red_light_loops_its_music(simulation):
 
 
 def test_holding_still_through_red_light_survives_into_the_green_warning(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
+    )
     reach_red_light(simulation, player)
 
     simulation.run_until(
@@ -90,7 +99,9 @@ def test_holding_still_through_red_light_survives_into_the_green_warning(simulat
 
 
 def test_red_light_lasts_its_duration(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
+    )
     reach_red_light(simulation, player)
 
     wait_for_red_light_to_end(simulation, player)
@@ -99,7 +110,9 @@ def test_red_light_lasts_its_duration(simulation):
 
 
 def test_the_red_music_stops_when_red_light_ends(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
+    )
     reach_red_light(simulation, player)
 
     wait_for_red_light_to_end(simulation, player)
@@ -108,7 +121,9 @@ def test_the_red_music_stops_when_red_light_ends(simulation):
 
 
 def test_moving_on_red_light_ends_the_game(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
+    )
     reach_red_light(simulation, player)
 
     player.move()
@@ -118,7 +133,9 @@ def test_moving_on_red_light_ends_the_game(simulation):
 
 
 def test_a_slow_creep_on_red_light_ends_the_game(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
+    )
     reach_red_light(simulation, player)
 
     player.move(strength=0.5)
@@ -128,7 +145,9 @@ def test_a_slow_creep_on_red_light_ends_the_game(simulation):
 
 
 def test_red_light_catches_motion_at_once(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
+    )
     reach_red_light(simulation, player)
     moved_at = simulation.now
 
@@ -139,7 +158,9 @@ def test_red_light_catches_motion_at_once(simulation):
 
 
 def test_a_one_tick_jolt_on_red_light_is_not_caught(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
+    )
     reach_red_light(simulation, player)
 
     player.accelerate(0.0, 0.0, AccelerationData.GRAVITY + 0.5)
@@ -151,7 +172,9 @@ def test_a_one_tick_jolt_on_red_light_is_not_caught(simulation):
 
 
 def test_pressing_a_button_on_red_light_keeps_red_light_on(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=RED_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
+    )
     reach_red_light(simulation, player)
 
     player.tap("A")
@@ -161,7 +184,9 @@ def test_pressing_a_button_on_red_light_keeps_red_light_on(simulation):
 
 
 def test_red_light_shortens_to_its_minimum_at_the_top_level(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=SHORTENING)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(SHORTENING)
+    )
     player.tap("A")
     survive_round(simulation, player)
 
@@ -172,7 +197,9 @@ def test_red_light_shortens_to_its_minimum_at_the_top_level(simulation):
 
 
 def test_a_tilt_between_rounds_is_not_caught_on_the_next_red_light(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=THREE_ROUNDS)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(THREE_ROUNDS)
+    )
     player.tap("A")
     survive_round(simulation, player)
 

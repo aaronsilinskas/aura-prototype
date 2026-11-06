@@ -44,7 +44,7 @@ class RlglReadyRule(PhaseRule):
         """Initialise a new game at level 1 and transition to Red Warning.
 
         Sets the Game Level to 1 and starts the ``Scope.AMBIENT`` progress bar at
-        ``1 / max_level`` (denominator from ``rlgl_max_level``, default 10).
+        ``1 / max_level`` (denominator from the ``max_level`` Setting).
         """
         phase_state = rlgl_phase_state(state)
         phase_state.level = _STARTING_LEVEL
