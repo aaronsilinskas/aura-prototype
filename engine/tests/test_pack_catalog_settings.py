@@ -12,6 +12,7 @@ import pytest
 
 from engine.pack_catalog import (
     MalformedManifestError,
+    MalformedSceneError,
     PackCatalog,
     PackScanError,
     SceneDeclarationError,
@@ -278,3 +279,83 @@ def test_misshapen_setting_overrides_raise_a_plain_value_error(
         pack_tree.scan_roots(root, setting_overrides=setting_overrides)
 
     assert not isinstance(excinfo.value, PackScanError)
+
+
+AMMO = {"max_ammo": {"type": "int", "default": 6, "description": "Shots per reload."}}
+
+
+def _scene_declaring(pack_tree, settings: object) -> Path:
+    """Lay out scene ``game`` declaring its own *settings* in ``scene.json``."""
+    root = pack_tree.root("ts_flash")
+    pack_tree.scene(root, "game", settings=settings)
+    return root
+
+
+def _max_ammo(catalog: PackCatalog) -> object:
+    return catalog.scene_registry.get("game").settings.get("scene", "max_ammo")
+
+
+def test_a_scene_setting_resolves_to_its_declared_default(pack_tree) -> None:
+    root = _scene_declaring(pack_tree, AMMO)
+
+    assert _max_ammo(pack_tree.scan_roots(root)) == 6
+
+
+def test_a_scan_setting_override_replaces_a_scene_setting_default(pack_tree) -> None:
+    root = _scene_declaring(pack_tree, AMMO)
+
+    catalog = pack_tree.scan_roots(root, setting_overrides={"game": {"settings": {"max_ammo": 3}}})
+
+    assert _max_ammo(catalog) == 3
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {"max_ammo": {"type": "int"}},
+        {"max_ammo": {"type": "int"}, "speed": {"type": "float", "default": 1.0}},
+    ],
+    ids=["only-setting", "beside-a-defaulted-one"],
+)
+def test_a_required_scene_setting_left_unset_raises_naming_the_scene_namespace(
+    pack_tree, settings
+) -> None:
+    root = _scene_declaring(pack_tree, settings)
+
+    with pytest.raises(SettingOverrideError) as excinfo:
+        pack_tree.scan_roots(root)
+
+    assert _fields(excinfo.value) == ("game", "scene", "max_ammo")
+
+
+def test_a_scan_override_of_a_scene_setting_with_the_wrong_type_raises(pack_tree) -> None:
+    root = _scene_declaring(pack_tree, AMMO)
+
+    with pytest.raises(SettingOverrideError) as excinfo:
+        pack_tree.scan_roots(root, setting_overrides={"game": {"settings": {"max_ammo": "3"}}})
+
+    assert _fields(excinfo.value) == ("game", "scene", "max_ammo")
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {"max_ammo": {"type": "ammo", "default": 6}},
+        {"max_ammo": {"type": "int", "default": 6.5}},
+        {"max_ammo": {"type": "int", "deafult": 6}},
+        ["max_ammo"],
+    ],
+    ids=["unknown-type", "default-of-wrong-type", "unknown-key", "section-not-an-object"],
+)
+def test_a_bad_scene_declaration_raises_malformed_scene_error_naming_scene_json(
+    pack_tree, settings
+) -> None:
+    root = _scene_declaring(pack_tree, settings)
+
+    with pytest.raises(MalformedSceneError) as excinfo:
+        pack_tree.scan_roots(root)
+
+    assert (excinfo.value.scene, excinfo.value.path) == (
+        "game",
+        str(root / "scenes" / "game" / "scene.json"),
+    )

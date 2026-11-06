@@ -288,8 +288,9 @@ def _resolve_settings(
     rule_declarations = {entry.name: entry.declarations for entry in rule_packs}
     for scene, entry in scenes.items():
         own, effects, rules = _read_setting_overrides(scene, setting_overrides.get(scene, {}))
-        # The scene declares no Settings of its own yet; any override of one fails.
-        values = {_SCENE_NAMESPACE: _resolve_namespace(scene, _SCENE_NAMESPACE, {}, [own])}
+        values = {
+            _SCENE_NAMESPACE: _resolve_namespace(scene, _SCENE_NAMESPACE, entry.declarations, [own])
+        }
         # Effect-pack Settings are checked, but effects do not receive them yet.
         _resolve_kind(scene, entry.effect_packs, effect_declarations, effects)
         values.update(_resolve_kind(scene, entry.rule_packs, rule_declarations, rules))
@@ -461,6 +462,7 @@ def _scan_scenes(
             local_rule_registry=_scan_local_items(scene_dir, scene_prefix, "rules"),
             local_effect_registry=_scan_local_items(scene_dir, scene_prefix, "effects"),
             local_sound_map=_scan_sounds(_path.join(scene_dir, "sounds")),
+            declarations=_read_scene_declarations(name, scene_json, data),
         )
 
 
@@ -508,6 +510,13 @@ def _read_scene_json(scene: str, path: str) -> dict:
         if key not in data:
             raise MalformedSceneError(scene, path, f"missing required key '{key}'")
     return data
+
+
+def _read_scene_declarations(scene: str, path: str, data: dict) -> dict[str, SettingDeclaration]:
+    try:
+        return parse_declarations(data.get("settings", {}))
+    except ValueError as exc:
+        raise MalformedSceneError(scene, path, str(exc)) from exc
 
 
 def _read_pack_references(scene: str, path: str, data: dict, key: str) -> list[PackReference]:

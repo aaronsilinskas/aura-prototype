@@ -270,6 +270,10 @@ A **Scene** is a declarative bundle:
 
 - `effect_packs` — ordered `{"name": ..., "version": ...}` objects (an optional `settings` object holds that pack's Setting overrides, checked at scan; effects do not receive them yet); `version` is the minimum compatible version, same major, checked at scan
 - `rule_packs` — the same object form; all rules loaded and appended in declared order
+- Optional `settings` — the scene's own Setting declarations, in the manifest's shape; rules
+  read them in the `scene` namespace, and a Scene Config builds from them with the typed reads
+  (`state.settings.get_float("scene", "window_seconds")`). A bad declaration fails the scan
+  with `MalformedSceneError`
 - Optional `initial_data: dict` — seed values for `GameState.data`
 
 `SceneManager` owns a scene stack. `load(name)` replaces the stack; `overlay(name)` pushes

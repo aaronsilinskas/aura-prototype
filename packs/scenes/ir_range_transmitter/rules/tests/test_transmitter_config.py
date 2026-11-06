@@ -1,56 +1,39 @@
-"""Tests for ``TransmitterConfig`` — resolution from seeded state, and the
-``transmitter_config`` get-or-create accessor."""
+"""Tests for ``TransmitterConfig`` — built from the scene's declared Settings,
+its derived values, and the ``transmitter_config`` get-or-create accessor."""
 
 from __future__ import annotations
 
 import pytest
 
-from engine.engine import GameEngine
-from engine.state import SceneControls
-from engine.tests.helpers import SpyEffectControls
+from engine.settings import Settings
+from engine.state import EffectControls, GameState, SceneControls
 from packs.scenes.ir_range_transmitter.rules.helpers.transmitter_config import (
     TransmitterConfig,
     transmitter_config,
 )
+from packs.tests.settings_helper import settings_for
 
 
-class _StubTimer:
-    def __init__(self) -> None:
-        self.elapsed: float = 0.0
-        self.total: float = 0.0
-
-    def update(self) -> None:
-        pass
-
-
-def _make_state(initial_data: dict | None = None):
-    spy = SpyEffectControls()
-    timer = _StubTimer()
-    engine = GameEngine(spy, timer=timer)  # pyright: ignore[reportArgumentType]
-    return engine.create_state(SceneControls(), initial_data=initial_data or {})
+def _settings(**values: object) -> Settings:
+    return settings_for("ir_range_transmitter", settings=values)
 
 
 # ---------------------------------------------------------------------------
-# from_state — defaults and overrides
+# from_settings
 # ---------------------------------------------------------------------------
 
 
-def test_from_state_applies_defaults_when_unseeded():
-    state = _make_state()
-
-    config = TransmitterConfig.from_state(state)
-
-    assert config.send_rate_hz == pytest.approx(5.0)
-    assert config.payload_size == 4
-
-
-def test_from_state_reads_seeded_overrides():
-    state = _make_state(initial_data={"irtx_send_rate_hz": 10.0, "irtx_payload_size": 8})
-
-    config = TransmitterConfig.from_state(state)
+def test_from_settings_reads_each_field_from_its_scene_setting():
+    config = TransmitterConfig.from_settings(_settings(send_rate_hz=10.0, payload_size=8))
 
     assert config.send_rate_hz == pytest.approx(10.0)
     assert config.payload_size == 8
+
+
+def test_from_settings_builds_from_the_declared_defaults_alone():
+    config = TransmitterConfig.from_settings(_settings())
+
+    assert config.send_period_seconds == pytest.approx(1.0 / config.send_rate_hz)
 
 
 # ---------------------------------------------------------------------------
@@ -75,28 +58,13 @@ def test_payload_padding_carries_a_fixed_non_zero_marker_in_every_padding_byte()
 # ---------------------------------------------------------------------------
 
 
-def test_transmitter_config_reflects_seeded_overrides_on_first_build():
-    state = _make_state(initial_data={"irtx_payload_size": 8})
+def test_transmitter_config_builds_from_the_state_settings():
+    state = GameState(EffectControls(), SceneControls(), settings=_settings(payload_size=8))
 
     assert transmitter_config(state).payload_size == 8
 
 
 def test_transmitter_config_caches_the_same_instance_across_calls():
-    state = _make_state(initial_data={"irtx_send_rate_hz": 10.0})
+    state = GameState(EffectControls(), SceneControls(), settings=_settings())
 
-    first = transmitter_config(state)
-    second = transmitter_config(state)
-
-    assert first is second
-
-
-def test_transmitter_config_does_not_reflect_state_changes_after_first_build():
-    """The config is built once and cached — later state mutations are not re-read."""
-    state = _make_state(initial_data={"irtx_send_rate_hz": 10.0})
-
-    config = transmitter_config(state)
-    assert config.send_rate_hz == pytest.approx(10.0)
-
-    state.set("irtx_send_rate_hz", 1.0)
-
-    assert transmitter_config(state).send_rate_hz == pytest.approx(10.0)
+    assert transmitter_config(state) is transmitter_config(state)

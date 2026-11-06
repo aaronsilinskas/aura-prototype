@@ -18,7 +18,7 @@ except ImportError:
 from engine.engine import GameEngine, GameRule, Version
 from engine.namespace import ActiveSceneNamespace
 from engine.packs import PackRegistry, UnknownItemError, load_item
-from engine.settings import Settings
+from engine.settings import SettingDeclaration, Settings
 from engine.state import EffectAdmin, GameState, MergeStrategy, SceneControls, SceneReboot, Scope
 
 
@@ -194,6 +194,7 @@ class _SceneEntry:
     """Stored metadata for a single discovered scene.  Internal use only."""
 
     __slots__ = (
+        "declarations",
         "effect_packs",
         "initial_data",
         "ir_codec",
@@ -217,7 +218,10 @@ class _SceneEntry:
         local_rule_registry: SceneLocalRegistry,
         local_effect_registry: SceneLocalRegistry,
         local_sound_map: dict[str, str],
+        declarations: dict[str, SettingDeclaration] | None = None,
     ) -> None:
+        # The scene's own Setting declarations, from scene.json's ``settings``.
+        self.declarations = declarations or {}
         # Resolved by the catalog once every pack is scanned.
         self.settings = Settings()
         self.version = version

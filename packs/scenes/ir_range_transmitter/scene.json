@@ -2,8 +2,16 @@
   "version": "1.0",
   "effect_packs": [],
   "rule_packs": [],
-  "initial_data": {
-    "irtx_send_rate_hz": 5.0,
-    "irtx_payload_size": 4
+  "settings": {
+    "send_rate_hz": {
+      "type": "float",
+      "default": 5.0,
+      "description": "IR packets sent per second."
+    },
+    "payload_size": {
+      "type": "int",
+      "default": 4,
+      "description": "Bytes per IR packet: the sequence number, then fixed padding."
+    }
   }
 }
