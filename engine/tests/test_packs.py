@@ -263,7 +263,7 @@ def test_scan_item_names_excludes_directory_whose_name_ends_in_py(tmp_path) -> N
 def test_scan_item_names_returns_empty_set_for_directory_with_no_py_files(
     tmp_path,
 ) -> None:
-    (tmp_path / "version.txt").write_text("1.0\n")
+    (tmp_path / "effects.json").write_text('{"version": "1.0"}')
     (tmp_path / "sounds").mkdir()
 
     result = scan_item_names(str(tmp_path))
