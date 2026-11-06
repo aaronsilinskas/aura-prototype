@@ -45,15 +45,6 @@ class Settings:
             raise UnknownSettingError(namespace, name)
         return _copy_value(names[name])
 
-
-def _copy_value(value: object) -> object:
-    """Return *value*, with any list or object in it copied, so a reader can't change a Setting."""
-    if isinstance(value, list):
-        return [_copy_value(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _copy_value(item) for key, item in value.items()}
-    return value
-
     # The typed reads below let a Scene Config take each Setting as its field
     # type, with no cast. A TypeError means the code asks for the wrong type.
 
@@ -104,6 +95,15 @@ def _copy_value(value: object) -> object:
         if not isinstance(value, str):
             raise _wrong_type(namespace, name, value, "str")
         return value
+
+
+def _copy_value(value: object) -> object:
+    """Return *value*, with any list or object in it copied, so a reader can't change a Setting."""
+    if isinstance(value, list):
+        return [_copy_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _copy_value(item) for key, item in value.items()}
+    return value
 
 
 def _wrong_type(namespace: str, name: str, value: object, type_name: str) -> TypeError:
