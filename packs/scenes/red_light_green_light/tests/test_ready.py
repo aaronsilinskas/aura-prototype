@@ -17,10 +17,11 @@ from packs.scenes.red_light_green_light.tests.helpers import (
     RED,
     SLACK,
     WARNING_PEAK,
+    overrides,
     wait_for,
 )
 
-FIVE_LEVELS = {"rlgl_max_level": 5}
+FIVE_LEVELS = {"max_level": 5}
 """Each level fills two of the level bar's ten pixels."""
 
 READY_PULSE = 1.0
@@ -96,7 +97,9 @@ def test_pressing_either_button_in_ready_starts_the_red_warning(simulation, butt
 
 
 def test_a_new_game_starts_the_level_bar_at_level_one(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(FIVE_LEVELS)
+    )
 
     player.tap("A")
 

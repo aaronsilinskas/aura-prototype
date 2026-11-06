@@ -1,53 +1,21 @@
-"""Tests for ``RlglConfig`` — warning sting options, ``from_state`` defaults,
-and the ``rlgl_config`` get-or-create accessor."""
+"""Tests for ``RlglConfig`` -- warning sting options, building from the scene's
+declared Settings, and the ``rlgl_config`` get-or-create accessor."""
 
 from __future__ import annotations
 
 import pytest
 
-from engine.engine import GameEngine
-from engine.state import SceneControls
-from engine.tests.helpers import SpyEffectControls
+from engine.settings import Settings
+from engine.state import EffectControls, GameState, SceneControls
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_config import (
     RlglConfig,
     rlgl_config,
 )
+from packs.tests.settings_helper import settings_for
 
 
-class _StubTimer:
-    def __init__(self) -> None:
-        self.elapsed: float = 0.0
-        self.total: float = 0.0
-
-    def update(self) -> None:
-        pass
-
-
-def _make_state(initial_data: dict | None = None):
-    spy = SpyEffectControls()
-    timer = _StubTimer()
-    engine = GameEngine(spy, timer=timer)  # pyright: ignore[reportArgumentType]
-    return engine.create_state(SceneControls(), initial_data=initial_data or {})
-
-
-def _config(**overrides) -> RlglConfig:
-    """Build an ``RlglConfig`` directly with sensible defaults, no ``GameState``."""
-    defaults = {
-        "red_duration_max": 5.0,
-        "red_duration_min": 2.0,
-        "green_duration_max": 5.0,
-        "green_duration_min": 2.0,
-        "warning_pulse_max": 1.0,
-        "warning_pulse_min": 0.4,
-        "game_over_duration": 3.0,
-        "green_still_timeout": 0.75,
-        "level_up_duration": 1.0,
-        "max_level": 10,
-        "motion_smoothing": 0.35,
-        "gravity_beta": 0.1,
-    }
-    defaults.update(overrides)
-    return RlglConfig(**defaults)
+def _settings(**values: object) -> Settings:
+    return settings_for("red_light_green_light", settings=values)
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +24,9 @@ def _config(**overrides) -> RlglConfig:
 
 
 def test_warning_sting_opts_uses_breathe_cycle_ratios_of_pulse_duration():
-    config = _config(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10)
+    config = RlglConfig.from_settings(
+        _settings(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10)
+    )
 
     opts = config.warning_sting_opts(1)
 
@@ -69,7 +39,9 @@ def test_warning_sting_opts_uses_breathe_cycle_ratios_of_pulse_duration():
 
 
 def test_warning_sting_opts_scales_sub_durations_with_level():
-    config = _config(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10)
+    config = RlglConfig.from_settings(
+        _settings(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10)
+    )
 
     opts = config.warning_sting_opts(10)
 
@@ -80,43 +52,76 @@ def test_warning_sting_opts_scales_sub_durations_with_level():
 
 
 # ---------------------------------------------------------------------------
-# from_state — defaults and overrides
+# from_settings
 # ---------------------------------------------------------------------------
 
 
-def test_from_state_applies_defaults_when_unseeded():
-    state = _make_state()
+def test_from_settings_reads_each_field_from_its_scene_setting():
+    settings = _settings(
+        red_duration_max=6.0,
+        red_duration_min=2.5,
+        green_duration_max=7.0,
+        green_duration_min=3.0,
+        warning_pulse_max=1.5,
+        warning_pulse_min=0.5,
+        game_over_duration=4.0,
+        green_still_timeout=0.6,
+        level_up_duration=2.0,
+        max_level=7,
+        motion_smoothing=0.5,
+        gravity_beta=0.2,
+    )
 
-    config = RlglConfig.from_state(state)
+    config = RlglConfig.from_settings(settings)
 
-    assert config.red_duration_max == pytest.approx(5.0)
-    assert config.red_duration_min == pytest.approx(2.0)
-    assert config.green_duration_max == pytest.approx(5.0)
-    assert config.green_duration_min == pytest.approx(2.0)
-    assert config.warning_pulse_max == pytest.approx(1.0)
-    assert config.warning_pulse_min == pytest.approx(0.4)
-    assert config.game_over_duration == pytest.approx(3.0)
-    assert config.green_still_timeout == pytest.approx(0.75)
-    assert config.level_up_duration == pytest.approx(1.0)
-    assert config.max_level == 10
+    assert config.red_duration_max == pytest.approx(6.0)
+    assert config.red_duration_min == pytest.approx(2.5)
+    assert config.green_duration_max == pytest.approx(7.0)
+    assert config.green_duration_min == pytest.approx(3.0)
+    assert config.warning_pulse_max == pytest.approx(1.5)
+    assert config.warning_pulse_min == pytest.approx(0.5)
+    assert config.game_over_duration == pytest.approx(4.0)
+    assert config.green_still_timeout == pytest.approx(0.6)
+    assert config.level_up_duration == pytest.approx(2.0)
+    assert config.max_level == 7
+    assert config.motion_smoothing == pytest.approx(0.5)
+    assert config.gravity_beta == pytest.approx(0.2)
+
+
+def test_from_settings_builds_from_the_declared_defaults_alone():
+    config = RlglConfig.from_settings(_settings())
+
+    assert isinstance(config.max_level, int)
+
+
+def test_the_declared_gravity_tracking_is_slower_than_motion_smoothing():
+    """Gravity must track slower than the motion signal, or real motion is
+    absorbed into the gravity estimate before it ever registers."""
+    config = RlglConfig.from_settings(_settings())
+
+    assert config.gravity_beta < config.motion_smoothing
+
+
+@pytest.mark.parametrize("gravity_beta", [0.3, 0.4])
+def test_from_settings_rejects_gravity_beta_not_below_motion_smoothing(gravity_beta):
+    settings = _settings(motion_smoothing=0.3, gravity_beta=gravity_beta)
+
+    with pytest.raises(ValueError):
+        RlglConfig.from_settings(settings)
+
+
+# ---------------------------------------------------------------------------
+# rlgl_config accessor
+# ---------------------------------------------------------------------------
+
+
+def test_rlgl_config_builds_from_the_state_settings():
+    state = GameState(EffectControls(), SceneControls(), settings=_settings(red_duration_max=9.0))
+
+    assert rlgl_config(state).red_duration_max == pytest.approx(9.0)
 
 
 def test_rlgl_config_caches_the_same_instance_across_calls():
-    state = _make_state(initial_data={"rlgl_red_duration": 9.0})
+    state = GameState(EffectControls(), SceneControls(), settings=_settings())
 
-    first = rlgl_config(state)
-    second = rlgl_config(state)
-
-    assert first is second
-
-
-def test_rlgl_config_does_not_reflect_state_changes_after_first_build():
-    """The config is built once and cached — later state mutations are not re-read."""
-    state = _make_state(initial_data={"rlgl_red_duration": 9.0})
-
-    config = rlgl_config(state)
-    assert config.red_duration_max == pytest.approx(9.0)
-
-    state.set("rlgl_red_duration", 1.0)
-
-    assert rlgl_config(state).red_duration_max == pytest.approx(9.0)
+    assert rlgl_config(state) is rlgl_config(state)

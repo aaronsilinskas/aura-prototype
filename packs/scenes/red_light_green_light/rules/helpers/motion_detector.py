@@ -25,23 +25,6 @@ RED_MAX_MOTION_THRESHOLD: Final = 0.35
 GREEN_MIN_MOTION_THRESHOLD: Final = 2.0
 """Player must exceed this magnitude (m/s²) to count as moving on Green Light."""
 
-MOTION_EMA_ALPHA: Final = 0.35
-"""Default smoothing factor for the motion signal (0 < alpha ≤ 1).
-
-Lower values average over more samples — stronger spike rejection but slower to
-react; 1.0 disables smoothing entirely.  Tunable per scene via the
-``rlgl_motion_smoothing`` GameState key.
-"""
-
-GRAVITY_LOWPASS_BETA: Final = 0.1
-"""Tracking rate for the gravity estimate (0 < beta ≤ 1).
-
-Each axis eases toward the raw reading by this fraction per sample, so gravity
-follows slow orientation changes while leaving brief motion in the residual.
-Must stay well below ``MOTION_EMA_ALPHA`` or real motion gets absorbed into the
-gravity estimate before it registers.  Tunable via ``rlgl_gravity_beta``.
-"""
-
 
 def low_pass(previous: float, sample: float, factor: float) -> float:
     """Ease ``previous`` toward ``sample`` by ``factor`` (a one-pole low-pass / EMA).

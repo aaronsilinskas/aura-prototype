@@ -24,6 +24,7 @@ from packs.scenes.red_light_green_light.tests.helpers import (
     SLACK,
     WIN_STING,
     last_played_at,
+    overrides,
     survive_round,
     times_played,
     wait_for,
@@ -31,23 +32,23 @@ from packs.scenes.red_light_green_light.tests.helpers import (
 
 ROUNDS = {
     **QUICK_WARNINGS,
-    "rlgl_red_duration": 1.0,
-    "rlgl_green_duration": 1.0,
-    "rlgl_level_up_duration": 1.0,
+    "red_duration_max": 1.0,
+    "green_duration_max": 1.0,
+    "level_up_duration": 1.0,
 }
 
-FIVE_LEVELS = {**ROUNDS, "rlgl_max_level": 5}
+FIVE_LEVELS = {**ROUNDS, "max_level": 5}
 """Each level fills two of the level bar's ten pixels."""
 
-LONG_LEVEL_UP = {**FIVE_LEVELS, "rlgl_level_up_duration": 3.0}
+LONG_LEVEL_UP = {**FIVE_LEVELS, "level_up_duration": 3.0}
 """A Level Up outlasting its sound."""
 
-ONE_LEVEL = {**ROUNDS, "rlgl_max_level": 1}
+ONE_LEVEL = {**ROUNDS, "max_level": 1}
 """The first round is the last, so surviving it wins."""
 
-TWO_LEVELS = {**ROUNDS, "rlgl_max_level": 2}
+TWO_LEVELS = {**ROUNDS, "max_level": 2}
 
-THREE_LEVELS = {**ROUNDS, "rlgl_max_level": 3}
+THREE_LEVELS = {**ROUNDS, "max_level": 3}
 
 
 def gold(pixel: int) -> bool:
@@ -66,7 +67,9 @@ def win_the_only_round(simulation: Simulation, player: SimulatedDevice) -> None:
 
 
 def test_surviving_green_light_below_the_top_level_levels_up(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(FIVE_LEVELS)
+    )
     player.tap("A")
 
     survive_round(simulation, player)
@@ -75,7 +78,9 @@ def test_surviving_green_light_below_the_top_level_levels_up(simulation):
 
 
 def test_a_level_up_double_clicks_the_haptic(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(FIVE_LEVELS)
+    )
     player.tap("A")
 
     survive_round(simulation, player)
@@ -84,7 +89,9 @@ def test_a_level_up_double_clicks_the_haptic(simulation):
 
 
 def test_the_level_up_sound_plays_once(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=LONG_LEVEL_UP)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(LONG_LEVEL_UP)
+    )
     player.tap("A")
     survive_round(simulation, player)
 
@@ -94,7 +101,9 @@ def test_the_level_up_sound_plays_once(simulation):
 
 
 def test_a_level_up_flashes_gold_on_every_light_strip(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(FIVE_LEVELS)
+    )
     player.tap("A")
     survive_round(simulation, player)
 
@@ -104,7 +113,9 @@ def test_a_level_up_flashes_gold_on_every_light_strip(simulation):
 
 
 def test_a_level_up_shows_only_gold_on_the_light_strips(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(FIVE_LEVELS)
+    )
     player.tap("A")
     survive_round(simulation, player)
 
@@ -114,7 +125,9 @@ def test_a_level_up_shows_only_gold_on_the_light_strips(simulation):
 
 
 def test_a_level_up_grows_the_level_bar_by_one_level(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(FIVE_LEVELS)
+    )
     player.tap("A")
 
     survive_round(simulation, player)
@@ -123,13 +136,15 @@ def test_a_level_up_grows_the_level_bar_by_one_level(simulation):
 
 
 def test_the_next_round_starts_once_the_level_up_is_over(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(FIVE_LEVELS)
+    )
     player.tap("A")
     survive_round(simulation, player)
 
     wait_for(simulation, player, RED_MUSIC)
 
-    level_up_and_warning = 1.0 + 3 * QUICK_WARNINGS["rlgl_warning_pulse_max"]
+    level_up_and_warning = 1.0 + 3 * QUICK_WARNINGS["warning_pulse_max"]
     assert simulation.now - last_played_at(player, LEVEL_UP_SOUND) == pytest.approx(
         level_up_and_warning,
         abs=2 * SLACK,  # two timed phases, one after the other
@@ -137,7 +152,9 @@ def test_the_next_round_starts_once_the_level_up_is_over(simulation):
 
 
 def test_moving_during_a_level_up_is_not_caught(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=FIVE_LEVELS)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(FIVE_LEVELS)
+    )
     player.tap("A")
     survive_round(simulation, player)
 
@@ -153,7 +170,9 @@ def test_moving_during_a_level_up_is_not_caught(simulation):
 
 
 def test_surviving_green_light_at_the_top_level_wins(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(ONE_LEVEL)
+    )
 
     win_the_only_round(simulation, player)
 
@@ -161,7 +180,9 @@ def test_surviving_green_light_at_the_top_level_wins(simulation):
 
 
 def test_a_win_triple_clicks_the_haptic(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(ONE_LEVEL)
+    )
 
     win_the_only_round(simulation, player)
 
@@ -169,7 +190,9 @@ def test_a_win_triple_clicks_the_haptic(simulation):
 
 
 def test_a_win_strikes_lightning_across_every_strip(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(ONE_LEVEL)
+    )
     win_the_only_round(simulation, player)
 
     lit, dark = set(), set()
@@ -183,7 +206,9 @@ def test_a_win_strikes_lightning_across_every_strip(simulation):
 
 
 def test_the_device_returns_to_ready_the_moment_the_win_sting_ends(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(ONE_LEVEL)
+    )
     win_the_only_round(simulation, player)
 
     wait_for(simulation, player, READY_SOUND)
@@ -195,7 +220,9 @@ def test_the_device_returns_to_ready_the_moment_the_win_sting_ends(simulation):
 
 
 def test_moving_during_a_win_is_not_caught(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=ONE_LEVEL)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(ONE_LEVEL)
+    )
     win_the_only_round(simulation, player)
 
     player.move()
@@ -205,7 +232,9 @@ def test_moving_during_a_win_is_not_caught(simulation):
 
 
 def test_a_full_game_levels_up_every_round_but_the_last_then_wins(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=THREE_LEVELS)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(THREE_LEVELS)
+    )
     player.tap("A")
 
     for _ in range(3):
@@ -215,7 +244,9 @@ def test_a_full_game_levels_up_every_round_but_the_last_then_wins(simulation):
 
 
 def test_a_game_after_a_win_starts_again_from_level_one(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=TWO_LEVELS)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(TWO_LEVELS)
+    )
     player.tap("A")
     survive_round(simulation, player)
     survive_round(simulation, player)
