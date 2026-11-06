@@ -45,6 +45,61 @@ class Settings:
             raise UnknownSettingError(namespace, name)
         return names[name]
 
+    # The typed reads below let a Scene Config take each Setting as its field
+    # type, with no cast. A TypeError means the code asks for the wrong type.
+
+    def get_int(self, namespace: str, name: str) -> int:
+        """Return ``int`` Setting *name* of *namespace*.
+
+        Raises:
+            UnknownSettingError: *namespace* declares no Setting *name*.
+            TypeError: the Setting is not an ``int``.
+        """
+        value = self.get(namespace, name)
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise _wrong_type(namespace, name, value, "int")
+        return value
+
+    def get_float(self, namespace: str, name: str) -> float:
+        """Return ``float`` Setting *name* of *namespace*; an ``int`` reads as a float.
+
+        Raises:
+            UnknownSettingError: *namespace* declares no Setting *name*.
+            TypeError: the Setting is not a ``float``.
+        """
+        value = self.get(namespace, name)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise _wrong_type(namespace, name, value, "float")
+        return float(value)
+
+    def get_bool(self, namespace: str, name: str) -> bool:
+        """Return ``bool`` Setting *name* of *namespace*.
+
+        Raises:
+            UnknownSettingError: *namespace* declares no Setting *name*.
+            TypeError: the Setting is not a ``bool``.
+        """
+        value = self.get(namespace, name)
+        if not isinstance(value, bool):
+            raise _wrong_type(namespace, name, value, "bool")
+        return value
+
+    def get_str(self, namespace: str, name: str) -> str:
+        """Return ``str`` Setting *name* of *namespace*.
+
+        Raises:
+            UnknownSettingError: *namespace* declares no Setting *name*.
+            TypeError: the Setting is not a ``str``.
+        """
+        value = self.get(namespace, name)
+        if not isinstance(value, str):
+            raise _wrong_type(namespace, name, value, "str")
+        return value
+
+
+def _wrong_type(namespace: str, name: str, value: object, type_name: str) -> TypeError:
+    return TypeError(f"Setting '{namespace}.{name}' is {value!r}, not a {type_name}")
+
 
 # The types a Setting can be declared as.
 _TYPES = ("int", "float", "bool", "str")

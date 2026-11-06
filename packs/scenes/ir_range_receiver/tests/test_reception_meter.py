@@ -3,7 +3,7 @@
 Shots land through ``receive_ir`` and the real IR stack, each carrying its
 sequence number in byte 0 as the transmitter sends it. Every assertion reads
 what the device's strips show. A test that depends on a tunable pins it with
-``scene_data`` rather than restating the scene's default.
+``setting_overrides`` rather than restating the scene's default.
 """
 
 from __future__ import annotations
@@ -28,9 +28,13 @@ METER_STRIPS = [
 SILENCE_TIMEOUT = 0.5
 
 METER = {
-    "ir_range_window_seconds": 1.0,
-    "ir_range_silence_timeout": SILENCE_TIMEOUT,
-    "ir_range_green_threshold": 1.0,
+    "ir_range_receiver": {
+        "settings": {
+            "window_seconds": 1.0,
+            "silence_timeout": SILENCE_TIMEOUT,
+            "green_threshold": 1.0,
+        }
+    }
 }
 """A one-second window that goes quiet after ``SILENCE_TIMEOUT``, green only when nothing drops."""
 
@@ -56,7 +60,7 @@ def meter_lines(out: str) -> list[str]:
 
 
 def test_a_device_that_has_heard_nothing_shows_solid_red(simulation):
-    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", setting_overrides=METER)
 
     simulation.advance(SHOT_SPACING)
 
@@ -64,7 +68,7 @@ def test_a_device_that_has_heard_nothing_shows_solid_red(simulation):
 
 
 def test_an_unbroken_run_of_shots_shows_solid_green(simulation):
-    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", setting_overrides=METER)
 
     land(simulation, receiver, 0, 1, 2)
 
@@ -72,7 +76,7 @@ def test_an_unbroken_run_of_shots_shows_solid_green(simulation):
 
 
 def test_the_meter_shows_on_every_strip_but_ambient(simulation):
-    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", setting_overrides=METER)
 
     land(simulation, receiver, 0, 1, 2)
 
@@ -81,7 +85,7 @@ def test_the_meter_shows_on_every_strip_but_ambient(simulation):
 
 
 def test_dropped_shots_show_a_yellow_bar_at_the_share_that_arrived(simulation):
-    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", setting_overrides=METER)
 
     land(simulation, receiver, 0, 5)  # 1 to 4 dropped: 2 of 6 arrived
 
@@ -89,7 +93,7 @@ def test_dropped_shots_show_a_yellow_bar_at_the_share_that_arrived(simulation):
 
 
 def test_the_bar_grows_as_shots_arrive_unbroken_again(simulation):
-    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", setting_overrides=METER)
     land(simulation, receiver, 0, 5)  # 2 of 6 arrived
 
     land(simulation, receiver, 6)  # 3 of 7 arrived
@@ -98,7 +102,7 @@ def test_the_bar_grows_as_shots_arrive_unbroken_again(simulation):
 
 
 def test_dropped_shots_age_out_of_the_window_back_to_green(simulation):
-    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", setting_overrides=METER)
     land(simulation, receiver, 0, 5)
 
     land(simulation, receiver, *range(6, 20))  # 1.4 s of unbroken shots: the gap leaves the window
@@ -107,7 +111,7 @@ def test_dropped_shots_age_out_of_the_window_back_to_green(simulation):
 
 
 def test_silence_past_the_timeout_returns_to_solid_red(simulation):
-    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", setting_overrides=METER)
     land(simulation, receiver, 0, 1, 2)
 
     simulation.advance(SILENCE_TIMEOUT + SHOT_SPACING)
@@ -116,7 +120,7 @@ def test_silence_past_the_timeout_returns_to_solid_red(simulation):
 
 
 def test_a_short_pause_inside_the_timeout_stays_green(simulation):
-    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", setting_overrides=METER)
     land(simulation, receiver, 0, 1, 2)
 
     simulation.advance(SILENCE_TIMEOUT - 2 * SHOT_SPACING)
@@ -125,7 +129,7 @@ def test_a_short_pause_inside_the_timeout_stays_green(simulation):
 
 
 def test_the_sequence_number_wraps_from_255_without_reading_as_a_drop(simulation):
-    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", setting_overrides=METER)
 
     land(simulation, receiver, 254, 255, 0, 1)
 
@@ -133,7 +137,7 @@ def test_the_sequence_number_wraps_from_255_without_reading_as_a_drop(simulation
 
 
 def test_a_serial_line_reports_the_state_and_drops_once_a_second(simulation, capsys):
-    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", setting_overrides=METER)
     land(simulation, receiver, 0, 1)  # the boot line prints on the first tick, before any shot
     capsys.readouterr()
 

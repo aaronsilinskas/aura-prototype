@@ -4,9 +4,21 @@
     { "name": "basic", "version": "1.1" }
   ],
   "rule_packs": [],
-  "initial_data": {
-    "ir_range_window_seconds": 1.0,
-    "ir_range_silence_timeout": 0.5,
-    "ir_range_green_threshold": 1.0
+  "settings": {
+    "window_seconds": {
+      "type": "float",
+      "default": 1.0,
+      "description": "Seconds of recent shots the reception meter scores."
+    },
+    "silence_timeout": {
+      "type": "float",
+      "default": 0.5,
+      "description": "Seconds with no shot before the meter reads silent."
+    },
+    "green_threshold": {
+      "type": "float",
+      "default": 1.0,
+      "description": "Reception fraction at or above which the meter shows green."
+    }
   }
 }

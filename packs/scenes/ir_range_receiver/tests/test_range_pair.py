@@ -15,19 +15,25 @@ GREEN = 0x00FF00
 SILENCE_TIMEOUT = 0.5
 
 METER = {
-    "ir_range_window_seconds": 1.0,
-    "ir_range_silence_timeout": SILENCE_TIMEOUT,
-    "ir_range_green_threshold": 1.0,
+    "ir_range_receiver": {
+        "settings": {
+            "window_seconds": 1.0,
+            "silence_timeout": SILENCE_TIMEOUT,
+            "green_threshold": 1.0,
+        }
+    }
 }
 """A one-second window that goes quiet after ``SILENCE_TIMEOUT``, green only when nothing drops."""
 
-TEN_HZ = {"irtx_send_rate_hz": 10.0}
+TEN_HZ = {"ir_range_transmitter": {"settings": {"send_rate_hz": 10.0}}}
 """A send every 0.1 s: well inside ``SILENCE_TIMEOUT``."""
 
 
 def test_a_receiver_the_transmitter_is_aimed_at_shows_solid_green(simulation):
-    transmitter = simulation.add_device("tx", scene="ir_range_transmitter", scene_data=TEN_HZ)
-    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+    transmitter = simulation.add_device(
+        "tx", scene="ir_range_transmitter", setting_overrides=TEN_HZ
+    )
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", setting_overrides=METER)
 
     transmitter.aim(LINE, at=receiver)
     simulation.advance(0.5)
@@ -36,8 +42,10 @@ def test_a_receiver_the_transmitter_is_aimed_at_shows_solid_green(simulation):
 
 
 def test_a_receiver_the_transmitter_turns_away_from_returns_to_solid_red(simulation):
-    transmitter = simulation.add_device("tx", scene="ir_range_transmitter", scene_data=TEN_HZ)
-    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+    transmitter = simulation.add_device(
+        "tx", scene="ir_range_transmitter", setting_overrides=TEN_HZ
+    )
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", setting_overrides=METER)
     transmitter.aim(LINE, at=receiver)
     simulation.advance(0.5)
 
@@ -48,8 +56,10 @@ def test_a_receiver_the_transmitter_turns_away_from_returns_to_solid_red(simulat
 
 
 def test_the_meter_ignores_which_receiver_heard_the_shot(simulation):
-    transmitter = simulation.add_device("tx", scene="ir_range_transmitter", scene_data=TEN_HZ)
-    receiver = simulation.add_device("rx", scene="ir_range_receiver", scene_data=METER)
+    transmitter = simulation.add_device(
+        "tx", scene="ir_range_transmitter", setting_overrides=TEN_HZ
+    )
+    receiver = simulation.add_device("rx", scene="ir_range_receiver", setting_overrides=METER)
 
     for index in (0, 1, 2, 0, 1):  # each shot heard by a different receiver
         transmitter.aim(LINE, at=receiver, receivers=[index])
