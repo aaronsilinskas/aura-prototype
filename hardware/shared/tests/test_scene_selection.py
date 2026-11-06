@@ -52,7 +52,7 @@ def test_no_persisted_scene_falls_back_to_flash_default(device_storage):
 
 
 def test_neither_persisted_nor_flash_scene_raises_naming_both_files(device_storage):
-    with pytest.raises(ValueError, match=r"aura-state\.json.*aura-settings\.json"):
+    with pytest.raises(ValueError, match=r"aura-state\.json.*aura-boot\.json"):
         resolve_boot_scene(device_storage, {})
 
 
@@ -101,10 +101,10 @@ def test_an_empty_or_non_string_scene_deploy_token_keeps_the_persisted_scene_and
     device_storage, token
 ):
     device_storage.write_json("aura-state.json", {"scene": "tag"})
-    settings = {"default_scene": "red_light_green_light", "scene_deploy_token": token}
+    boot_values = {"default_scene": "red_light_green_light", "scene_deploy_token": token}
     lines = []
 
-    apply_scene_deploy(device_storage, settings, Logger("[boot]", sink=lines.append))
+    apply_scene_deploy(device_storage, boot_values, Logger("[boot]", sink=lines.append))
 
-    assert resolve_boot_scene(device_storage, settings) == "tag"
+    assert resolve_boot_scene(device_storage, boot_values) == "tag"
     assert lines == []

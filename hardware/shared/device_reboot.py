@@ -29,7 +29,7 @@ class DeviceSceneReboot(SceneReboot):
     (``storage is None``, where ``DeviceStateStore.set`` is a silent no-op)
     this adapter does not reboot at all for either method — it logs and
     returns, leaving the caller running, since persisting nothing and then
-    resetting would boot into whatever ``aura-settings.json`` already
+    resetting would boot into whatever ``aura-boot.json`` already
     defaults to and silently discard the request (v1 gives no on-device
     visual for this failure).
 

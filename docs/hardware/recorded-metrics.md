@@ -185,7 +185,7 @@ Per-scene heap measured **in situ** on the deployed prop by
 profiler builds its prop from the deployed `aura-device.json` (via
 `read_device_config_mapping` → `parse_device_config` → `build_hardware`, the same
 config-driven seam `run_scene` uses), loads the scene named by the deployed
-`aura-settings.json`'s `default_scene` key (via `read_settings_mapping` →
+`aura-boot.json`'s `default_scene` key (via `read_boot_mapping` →
 `resolve_scene_name`) against those real outputs (whichever pixels/audio/IR sections the
 config declares), and reports the staged heap it retains. The two columns below are split
 into a staged `load` Δ

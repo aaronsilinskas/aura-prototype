@@ -15,7 +15,7 @@ import microcontroller
 from app.scene_composition import build_scene_boot
 from engine.log import Logger
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
-from hardware.shared.device_settings import read_settings_mapping
+from hardware.shared.device_boot import read_boot_mapping
 
 __all__ = ["run_scene"]
 
@@ -26,8 +26,8 @@ def run_scene() -> None:
     Builds the hardware first, so that ``hw.storage`` reflects whatever SD
     card is mounted, then boots through
     :func:`app.scene_composition.build_scene_boot`, the board-free boot the
-    Simulated device shares, with the flash ``aura-settings.json`` as the
-    settings and ``microcontroller.reset`` as the reset. That the card can
+    Simulated device shares, with the flash ``aura-boot.json`` as the
+    boot values and ``microcontroller.reset`` as the reset. That the card can
     name the scene is why hardware always comes up before a scene name is
     known to be valid.
 
@@ -47,7 +47,7 @@ def run_scene() -> None:
     hw = build_hardware(load_device_config(), logger=hw_logger)
 
     tick = build_scene_boot(
-        hw, read_settings_mapping(), reset=microcontroller.reset, logger=hw_logger
+        hw, read_boot_mapping(), reset=microcontroller.reset, logger=hw_logger
     ).tick
 
     while True:

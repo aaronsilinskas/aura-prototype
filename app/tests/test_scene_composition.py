@@ -59,7 +59,7 @@ def test_ir_range_receiver_scene_boots_and_activates_via_the_standard_pipeline()
     """ir_range_receiver (issue #918) needs no special-casing -- it discovers
     and activates through the same build_scene_runtime path as every other
     scene, proving scene_demo.py can boot straight into it via
-    aura-settings.json's default_scene."""
+    aura-boot.json's default_scene."""
     runtime = build_scene_runtime(_fake_hw(), "ir_range_receiver", catalog=_boot_catalog())
 
     assert runtime.manager.active_state is not None
@@ -140,7 +140,7 @@ def test_neither_persisted_nor_flash_scene_raises_naming_both_files(device_stora
     silently picking a scene -- the same contract resolve_boot_scene documents."""
     scene_registry = _scene_registry_with("red_light_green_light")
 
-    with pytest.raises(ValueError, match=r"aura-state\.json.*aura-settings\.json"):
+    with pytest.raises(ValueError, match=r"aura-state\.json.*aura-boot\.json"):
         resolve_boot_scene_name(scene_registry, device_storage, {})
 
 

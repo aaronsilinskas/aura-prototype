@@ -797,7 +797,7 @@ def test_summary_includes_pruned_count(tmp_path: Path, capsys) -> None:
 
 
 # ---------------------------------------------------------------------------
-# --scene flag: write default_scene to aura-settings.json (#880)
+# --scene flag: write default_scene to aura-boot.json (#880)
 # ---------------------------------------------------------------------------
 
 
@@ -807,11 +807,11 @@ def test_scene_flag_sets_default_scene_in_existing_settings_file(tmp_path: Path)
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    (mount / "aura-settings.json").write_text(json.dumps({"default_scene": "tag"}))
+    (mount / "aura-boot.json").write_text(json.dumps({"default_scene": "tag"}))
 
     deploy(None, mount, source_root=source, compile=fake_compile, scene="red_light_green_light")
 
-    result = json.loads((mount / "aura-settings.json").read_text())
+    result = json.loads((mount / "aura-boot.json").read_text())
     assert result["default_scene"] == "red_light_green_light"
 
 
@@ -822,11 +822,11 @@ def test_scene_flag_preserves_other_settings_keys_when_scene_is_set(tmp_path: Pa
     mount = tmp_path / "mount"
     mount.mkdir()
     existing_settings = {"default_scene": "tag", "brightness": 0.8}
-    (mount / "aura-settings.json").write_text(json.dumps(existing_settings))
+    (mount / "aura-boot.json").write_text(json.dumps(existing_settings))
 
     deploy(None, mount, source_root=source, compile=fake_compile, scene="hardware_test")
 
-    result = json.loads((mount / "aura-settings.json").read_text())
+    result = json.loads((mount / "aura-boot.json").read_text())
     assert result["brightness"] == 0.8
 
 
@@ -839,7 +839,7 @@ def test_scene_flag_creates_settings_file_fresh_when_absent(tmp_path: Path) -> N
 
     deploy(None, mount, source_root=source, compile=fake_compile, scene="hardware_test")
 
-    result = json.loads((mount / "aura-settings.json").read_text())
+    result = json.loads((mount / "aura-boot.json").read_text())
     assert result["default_scene"] == "hardware_test"
 
 
@@ -852,9 +852,24 @@ def test_scene_flag_writes_a_scene_deploy_token_beside_default_scene(tmp_path: P
 
     deploy(None, mount, source_root=source, compile=fake_compile, scene="hardware_test")
 
-    settings = json.loads((mount / "aura-settings.json").read_text())
+    settings = json.loads((mount / "aura-boot.json").read_text())
     assert settings["default_scene"] == "hardware_test"
     assert settings["scene_deploy_token"]
+
+
+def test_scene_flag_leaves_an_old_aura_settings_json_untouched(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    original_content = json.dumps({"default_scene": "tag"})
+    old_path = mount / "aura-settings.json"
+    old_path.write_text(original_content)
+
+    deploy(None, mount, source_root=source, compile=fake_compile, scene="hardware_test")
+
+    assert old_path.read_text() == original_content
 
 
 def test_each_scene_flag_deploy_writes_a_new_scene_deploy_token(tmp_path: Path) -> None:
@@ -863,7 +878,7 @@ def test_each_scene_flag_deploy_writes_a_new_scene_deploy_token(tmp_path: Path) 
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    settings_path = mount / "aura-settings.json"
+    settings_path = mount / "aura-boot.json"
 
     deploy(None, mount, source_root=source, compile=fake_compile, scene="tag")
     first = json.loads(settings_path.read_text())["scene_deploy_token"]
@@ -899,7 +914,7 @@ def test_omitting_scene_flag_leaves_existing_settings_file_untouched(tmp_path: P
     mount = tmp_path / "mount"
     mount.mkdir()
     original_content = json.dumps({"default_scene": "tag", "scene_deploy_token": "a1b2"})
-    settings_path = mount / "aura-settings.json"
+    settings_path = mount / "aura-boot.json"
     settings_path.write_text(original_content)
 
     deploy(None, mount, source_root=source, compile=fake_compile)
@@ -914,7 +929,7 @@ def test_scene_flag_with_dry_run_leaves_settings_file_untouched(tmp_path: Path) 
     mount = tmp_path / "mount"
     mount.mkdir()
     original_content = json.dumps({"default_scene": "tag"})
-    settings_path = mount / "aura-settings.json"
+    settings_path = mount / "aura-boot.json"
     settings_path.write_text(original_content)
 
     deploy(
@@ -935,7 +950,7 @@ def test_scene_flag_with_dry_run_creates_no_settings_file_when_absent(tmp_path: 
         None, mount, source_root=source, compile=fake_compile, scene="hardware_test", dry_run=True
     )
 
-    assert not (mount / "aura-settings.json").exists()
+    assert not (mount / "aura-boot.json").exists()
 
 
 # ---------------------------------------------------------------------------
