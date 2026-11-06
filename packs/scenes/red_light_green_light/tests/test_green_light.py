@@ -21,29 +21,30 @@ from packs.scenes.red_light_green_light.tests.helpers import (
     WIN_STING,
     last_played_at,
     lit_in,
+    overrides,
     survive_round,
     wait_for,
 )
 
 GREEN_LIGHT = {
     **QUICK_WARNINGS,
-    "rlgl_red_duration": 1.0,
-    "rlgl_green_duration": 3.0,
-    "rlgl_green_still_timeout": 0.75,
-    "rlgl_max_level": 5,
+    "red_duration_max": 1.0,
+    "green_duration_max": 3.0,
+    "green_still_timeout": 0.75,
+    "max_level": 5,
 }
 
 SETTLING = 0.1
 """How long the smoothed motion takes to fall below the move threshold once ``move`` stops."""
 
-LONG_GREEN_LIGHT = {**GREEN_LIGHT, "rlgl_green_duration": 6.0}
+LONG_GREEN_LIGHT = {**GREEN_LIGHT, "green_duration_max": 6.0}
 """Green Light outlasting its music clip."""
 
 SHORTENING = {
     **GREEN_LIGHT,
-    "rlgl_max_level": 2,
-    "rlgl_green_duration_min": 1.0,
-    "rlgl_level_up_duration": 0.5,
+    "max_level": 2,
+    "green_duration_min": 1.0,
+    "level_up_duration": 0.5,
 }
 """Green Light lasts 3.0 s at level one and 1.0 s at the top level, level two."""
 
@@ -54,7 +55,9 @@ def reach_green_light(simulation: Simulation, player: SimulatedDevice) -> None:
 
 
 def test_green_light_shows_solid_green_on_every_light_strip(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GREEN_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GREEN_LIGHT)
+    )
 
     reach_green_light(simulation, player)
 
@@ -62,7 +65,9 @@ def test_green_light_shows_solid_green_on_every_light_strip(simulation):
 
 
 def test_green_light_loops_its_music(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=LONG_GREEN_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(LONG_GREEN_LIGHT)
+    )
     reach_green_light(simulation, player)
 
     player.move()
@@ -72,7 +77,9 @@ def test_green_light_loops_its_music(simulation):
 
 
 def test_moving_through_green_light_survives_it(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GREEN_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GREEN_LIGHT)
+    )
     reach_green_light(simulation, player)
 
     player.move()
@@ -82,7 +89,9 @@ def test_moving_through_green_light_survives_it(simulation):
 
 
 def test_holding_still_on_green_light_ends_the_game_after_the_still_timeout(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GREEN_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GREEN_LIGHT)
+    )
     reach_green_light(simulation, player)
 
     wait_for(simulation, player, GAME_OVER_STING)
@@ -91,7 +100,9 @@ def test_holding_still_on_green_light_ends_the_game_after_the_still_timeout(simu
 
 
 def test_stopping_on_green_light_ends_the_game_a_still_timeout_later(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GREEN_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GREEN_LIGHT)
+    )
     reach_green_light(simulation, player)
     player.move()
     simulation.advance(1.0)
@@ -104,7 +115,9 @@ def test_stopping_on_green_light_ends_the_game_a_still_timeout_later(simulation)
 
 
 def test_a_pause_shorter_than_the_still_timeout_is_forgiven(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GREEN_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GREEN_LIGHT)
+    )
     reach_green_light(simulation, player)
     player.move()
     simulation.advance(0.5)
@@ -118,7 +131,9 @@ def test_a_pause_shorter_than_the_still_timeout_is_forgiven(simulation):
 
 
 def test_a_gentle_sway_on_green_light_counts_as_still(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GREEN_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GREEN_LIGHT)
+    )
     reach_green_light(simulation, player)
 
     player.move(strength=1.0)
@@ -128,7 +143,9 @@ def test_a_gentle_sway_on_green_light_counts_as_still(simulation):
 
 
 def test_a_one_tick_jolt_on_green_light_does_not_count_as_moving(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GREEN_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GREEN_LIGHT)
+    )
     reach_green_light(simulation, player)
     simulation.advance(0.5)
 
@@ -141,7 +158,9 @@ def test_a_one_tick_jolt_on_green_light_does_not_count_as_moving(simulation):
 
 
 def test_green_light_lasts_its_duration(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GREEN_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GREEN_LIGHT)
+    )
     reach_green_light(simulation, player)
 
     player.move()
@@ -151,7 +170,9 @@ def test_green_light_lasts_its_duration(simulation):
 
 
 def test_the_green_music_stops_when_green_light_ends(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GREEN_LIGHT)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GREEN_LIGHT)
+    )
     reach_green_light(simulation, player)
 
     player.move()
@@ -161,7 +182,9 @@ def test_the_green_music_stops_when_green_light_ends(simulation):
 
 
 def test_green_light_shortens_to_its_minimum_at_the_top_level(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=SHORTENING)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(SHORTENING)
+    )
     player.tap("A")
     survive_round(simulation, player)
 

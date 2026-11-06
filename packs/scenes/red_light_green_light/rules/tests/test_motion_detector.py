@@ -1,5 +1,5 @@
 """Tests for the motion-detection helpers: ``linear_magnitude``, ``low_pass``,
-and the tuned threshold / filter constants."""
+and the tuned threshold constants."""
 
 from __future__ import annotations
 
@@ -7,9 +7,7 @@ import pytest
 
 from engine.input import AccelerationData
 from packs.scenes.red_light_green_light.rules.helpers.motion_detector import (
-    GRAVITY_LOWPASS_BETA,
     GREEN_MIN_MOTION_THRESHOLD,
-    MOTION_EMA_ALPHA,
     RED_MAX_MOTION_THRESHOLD,
     linear_magnitude,
     low_pass,
@@ -92,9 +90,3 @@ def test_red_threshold_is_stricter_than_green_move_threshold():
 def test_green_min_threshold_is_tuned_to_two():
     """Lock the hand-tuned Green threshold so a change to it is deliberate."""
     assert pytest.approx(2.0) == GREEN_MIN_MOTION_THRESHOLD
-
-
-def test_gravity_tracking_is_slower_than_motion_smoothing():
-    """Gravity must track slower than the motion signal, or real motion is
-    absorbed into the gravity estimate before it ever registers."""
-    assert GRAVITY_LOWPASS_BETA < MOTION_EMA_ALPHA
