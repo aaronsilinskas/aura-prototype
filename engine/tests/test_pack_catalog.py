@@ -123,7 +123,6 @@ def test_scanned_scene_carries_its_scene_json_fields(pack_tree) -> None:
         effect_packs=[{"name": "basic", "version": "1.0"}],
         rule_packs=[{"name": "core", "version": "1.2", "settings": {"lives": 3}}],
         ir_codec="nec",
-        initial_data={"lives": 3},
     )
 
     scene = scan_pack_roots([str(root)]).scene_registry.get("tag")
@@ -136,7 +135,6 @@ def test_scanned_scene_carries_its_scene_json_fields(pack_tree) -> None:
         ("core", "1.2", {"lives": 3})
     ]
     assert scene.ir_codec == "nec"
-    assert scene.initial_data == {"lives": 3}
 
 
 def test_scene_without_ir_codec_defaults_to_aura(pack_tree) -> None:
@@ -467,6 +465,18 @@ def test_an_unreadable_scene_json_raises_malformed_scene_error(pack_tree, scene_
     assert excinfo.value.path == str(scene_dir / "scene.json")
 
 
+@pytest.mark.parametrize("key", ["initial_data", "setings"])
+def test_a_scene_json_key_outside_the_schema_raises_malformed_scene_error(pack_tree, key) -> None:
+    root = pack_tree.root("tc_flash")
+    scene_dir = pack_tree.scene(root, "lobby", **{key: {"lives": 3}})
+
+    with pytest.raises(MalformedSceneError, match=key) as excinfo:
+        scan_pack_roots([str(root)])
+
+    assert excinfo.value.scene == "lobby"
+    assert excinfo.value.path == str(scene_dir / "scene.json")
+
+
 @pytest.mark.parametrize("ir_codec", ["", "   ", 7, None])
 def test_a_malformed_ir_codec_raises_malformed_scene_error(pack_tree, ir_codec) -> None:
     root = pack_tree.root("tc_flash")
@@ -710,42 +720,6 @@ def test_the_scan_imports_no_item_module(pack_tree) -> None:
     scan_pack_roots([str(root)])
 
     assert set(sys.modules) - known_before == set()
-
-
-# ---------------------------------------------------------------------------
-# Initial-data overrides
-# ---------------------------------------------------------------------------
-
-
-def test_an_initial_data_override_replaces_only_the_keys_it_names(pack_tree) -> None:
-    root = pack_tree.root("tc_flash")
-    pack_tree.scene(root, "tag", initial_data={"rounds": 10, "lives": 3})
-
-    catalog = scan_pack_roots([str(root)], initial_data_overrides={"tag": {"rounds": 2}})
-
-    assert catalog.scene_registry.get("tag").initial_data == {"rounds": 2, "lives": 3}
-
-
-def test_an_initial_data_override_applies_to_a_scene_without_initial_data(pack_tree) -> None:
-    root = pack_tree.root("tc_flash")
-    pack_tree.scene(root, "tag")
-
-    catalog = scan_pack_roots([str(root)], initial_data_overrides={"tag": {"rounds": 2}})
-
-    assert catalog.scene_registry.get("tag").initial_data == {"rounds": 2}
-
-
-def test_an_initial_data_override_for_an_unscanned_scene_raises_a_plain_value_error(
-    pack_tree,
-) -> None:
-    root = pack_tree.root("tc_flash")
-    pack_tree.scene(root, "lobby")
-    pack_tree.scene(root, "tag")
-
-    with pytest.raises(ValueError, match=r"'forest'.*lobby, tag") as excinfo:
-        scan_pack_roots([str(root)], initial_data_overrides={"forest": {"rounds": 2}})
-
-    assert not isinstance(excinfo.value, PackScanError)
 
 
 # ---------------------------------------------------------------------------

@@ -38,7 +38,7 @@ LOBBY_ENTRIES = [
 
 
 def hold_seconds(scene: str) -> float:
-    return settings_for(scene).get("return_to_lobby", "hold_seconds")  # type: ignore[return-value]
+    return settings_for(scene).get_float("return_to_lobby", "hold_seconds")
 
 
 def launch(simulation: Simulation, scene: str) -> SimulatedDevice:

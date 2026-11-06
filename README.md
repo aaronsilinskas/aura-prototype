@@ -247,12 +247,14 @@ declaring the pack's **Settings**:
 A Setting's `type` is `int`, `float` (an `int` value is accepted), `bool`,
 `str` or `list`. A `list` is checked at the top level only; the pack's code
 checks what is inside it. A Setting with no `default` is required: every scene declaring the pack
-must set it. A scene sets a pack's Settings in that pack's reference, under
-`settings`; the scan checks each override and resolves every Setting (the
-default, then the scene's override, then any `setting_overrides` passed to the
-scan), raising `SettingOverrideError` naming the scene, pack and Setting.
-Rules read them through `state.settings.get(<pack>, <name>)`, which has no
-default argument and no write path.
+must set it. A scene sets a pack's Settings inline, in that pack's reference
+in `scene.json` (see [Scenes](#scenes)); the scan checks each override and
+resolves every Setting (the default, then the scene's override, then any
+`setting_overrides` passed to the scan), raising `SettingOverrideError` naming
+the scene, pack and Setting. Rules read them through
+`state.settings.get(<pack>, <name>)` or its typed forms (`get_int`,
+`get_float`, `get_bool`, `get_str`), which have no default argument and no
+write path. Settings never enter `GameState`'s `get`/`set` store.
 
 A folder without a manifest is not a pack and is skipped. A manifest that is
 not a JSON object, or declares a Setting with an unknown type or a default of
@@ -267,15 +269,32 @@ the catalog scan checks them at boot (same-major, installed-minor ≥ required-m
 
 ### Scenes
 
-A **Scene** is a declarative bundle:
+A **Scene** is a declarative bundle, described by its `scene.json`:
 
+```json
+{
+  "version": "1.0",
+  "effect_packs": [{"name": "elements", "version": "1.0"}],
+  "rule_packs": [
+    {"name": "return_to_lobby", "version": "1.0", "settings": {"hold_seconds": 2.0}}
+  ],
+  "settings": {
+    "window_seconds": {"type": "float", "default": 3.0, "description": "Seconds per window."}
+  }
+}
+```
+
+- `version` — the scene's own `MAJOR.MINOR` version
 - `effect_packs` — ordered `{"name": ..., "version": ...}` objects (an optional `settings` object holds that pack's Setting overrides, checked at scan; effects do not receive them yet); `version` is the minimum compatible version, same major, checked at scan
 - `rule_packs` — the same object form; all rules loaded and appended in declared order
 - Optional `settings` — the scene's own Setting declarations, in the manifest's shape; rules
   read them in the `scene` namespace, and a Scene Config builds from them with the typed reads
   (`state.settings.get_float("scene", "window_seconds")`). A bad declaration fails the scan
   with `MalformedSceneError`
-- Optional `initial_data: dict` — seed values for `GameState.data`
+- Optional `ir_codec` — the IR codec the scene runs (default `"aura"`)
+
+Any other key fails the scan with `MalformedSceneError`. A scene carries no
+starting data: rules seed their own runtime state through `state.get`/`state.set`.
 
 `SceneManager` owns a scene stack. `load(name)` replaces the stack; `overlay(name)` pushes
 on top (suspending the current scene); `pop()` restores the previous scene. Transitions are

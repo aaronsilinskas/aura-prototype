@@ -282,15 +282,7 @@ def test_create_state_wires_scene_controls() -> None:
     assert state.scene_controls is scene_controls
 
 
-def test_create_state_seeds_data_from_initial_data() -> None:
-    engine = GameEngine(effect_controls=_make_effect_controls())
-
-    state = engine.create_state(_make_scene_controls(), initial_data={"score": 0})
-
-    assert state.get_or_none("score", int) == 0
-
-
-def test_create_state_returns_empty_data_when_no_initial_data_provided() -> None:
+def test_create_state_starts_with_no_data() -> None:
     engine = GameEngine(effect_controls=_make_effect_controls())
 
     state = engine.create_state(_make_scene_controls())

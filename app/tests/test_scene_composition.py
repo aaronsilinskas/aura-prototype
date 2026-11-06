@@ -231,12 +231,13 @@ def test_a_misconfigured_card_scene_stops_boot_with_a_pack_scan_error(device_sto
         scan_boot_pack_catalog(device_storage)
 
 
-def test_scene_data_reaches_the_named_scenes_initial_data():
-    catalog = scan_boot_pack_catalog(None, scene_data={"tag": {"max_ammo": 2}})
+def test_setting_overrides_reach_the_named_scenes_settings():
+    catalog = scan_boot_pack_catalog(
+        None, setting_overrides={"tag": {"settings": {"starting_hitpoints": 2}}}
+    )
 
-    initial_data = catalog.scene_registry.get("tag").initial_data
-    assert initial_data is not None
-    assert initial_data["max_ammo"] == 2
+    settings = catalog.scene_registry.get("tag").settings
+    assert settings.get_int("scene", "starting_hitpoints") == 2
 
 
 def test_a_card_scene_named_as_the_persisted_sd_scene_resolves(device_storage):

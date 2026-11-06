@@ -93,7 +93,7 @@ class PackTree:
         """Create scene *name* under *root* and return its directory.
 
         ``scene.json`` is built from *version*, *effect_packs*, *rule_packs* and
-        any extra *fields* (``ir_codec``, ``initial_data``), unless *scene_json*
+        any extra *fields* (``ir_codec``, ``settings``), unless *scene_json*
         gives its raw text instead.
         """
         scene_dir = root / "scenes" / name

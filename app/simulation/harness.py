@@ -188,15 +188,13 @@ class Simulation:
         self,
         name: str,
         scene: str,
-        scene_data: dict[str, object] | None = None,
         sd_card: bool = True,
         card: str | Path | None = None,
         setting_overrides: dict[str, dict[str, dict]] | None = None,
     ) -> SimulatedDevice:
         """Switch a new simulated device on into *scene*, its flash ``default_scene``.
 
-        Every boot runs the scene the card names, else *scene*. *scene_data*
-        overrides *scene*'s ``initial_data`` on every boot. *setting_overrides*
+        Every boot runs the scene the card names, else *scene*. *setting_overrides*
         overrides Settings of any scene, on every boot, shaped per scene as
         ``scene.json`` and keyed by pack name::
 
@@ -218,9 +216,7 @@ class Simulation:
         """
         radio_node = len(self.devices) + 1
         card_dir = self._card_for(name, sd_card, card, radio_node)
-        device = SimulatedDevice(
-            self, name, scene, scene_data or {}, card_dir, radio_node, setting_overrides
-        )
+        device = SimulatedDevice(self, name, scene, card_dir, radio_node, setting_overrides)
         self.devices.append(device)
         return device
 
@@ -345,7 +341,6 @@ class SimulatedDevice:
         sim: Simulation,
         name: str,
         scene: str,
-        scene_data: dict[str, object],
         card: Path | None,
         radio_node: int,
         setting_overrides: dict[str, dict[str, dict]] | None = None,
@@ -358,7 +353,6 @@ class SimulatedDevice:
         self._sim = sim
         self._switched_on_into = scene
         self._flash_settings: dict[str, object] = {"default_scene": scene}
-        self._scene_data = scene_data
         self._setting_overrides = setting_overrides
         self._sim_hw = SimulatedHardware(
             now=lambda: sim.now,
@@ -377,7 +371,6 @@ class SimulatedDevice:
             dict(self._flash_settings),
             reset=_reset,
             timer=_SimulationClock(self._sim),
-            scene_data={self._switched_on_into: self._scene_data} if self._scene_data else None,
             setting_overrides=self._setting_overrides,
         )
         self._scene_tick = boot.tick

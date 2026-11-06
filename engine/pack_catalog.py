@@ -37,6 +37,8 @@ from engine.version import Version
 
 _REQUIRED_SCENE_KEYS = ("version", "effect_packs", "rule_packs")
 
+_SCENE_KEYS = (*_REQUIRED_SCENE_KEYS, "settings", "ir_codec")
+
 _PACK_REFERENCE_KEYS = ("name", "version", "settings")
 
 # The attribute each kind's items export, in packs and scenes alike.
@@ -212,7 +214,6 @@ class PackCatalog:
 
 def scan_pack_roots(
     roots: list[str],
-    initial_data_overrides: dict[str, dict[str, object]] | None = None,
     setting_overrides: dict[str, dict[str, dict]] | None = None,
 ) -> PackCatalog:
     """Scan the pack *roots*, in order, into one ``PackCatalog``.
@@ -230,16 +231,14 @@ def scan_pack_roots(
 
     Every key is optional. It is checked like the scene's own overrides; it is
     how the Simulated device and tests boot shortened scenes.
-    *initial_data_overrides* (``{scene: {key: value}}``) is merged over each
-    named scene's ``initial_data``, for values that are not yet Settings.
 
     Raises:
         PackScanError: the first problem found on disk or in
             *setting_overrides* (see its subclasses).
-        ValueError: an override names a scene that was not scanned, or a
-            scene's *setting_overrides* is not shaped as above.
+        ValueError: *setting_overrides* names a scene that was not scanned,
+            or a scene's overrides are not shaped as above.
     """
-    overrides = initial_data_overrides or {}
+    overrides = setting_overrides or {}
     effect_packs: list[_PackEntry] = []
     rule_packs: list[_PackEntry] = []
     scenes: dict[str, _SceneEntry] = {}
@@ -254,11 +253,10 @@ def scan_pack_roots(
         root_paths[root_name] = root
         _scan_packs(root, root_name, "effects", effect_packs)
         _scan_packs(root, root_name, "rules", rule_packs)
-        _scan_scenes(root, root_name, scenes, overrides)
-    _check_override_scenes("initial-data", overrides, scenes)
-    _check_override_scenes("setting", setting_overrides or {}, scenes)
+        _scan_scenes(root, root_name, scenes)
+    _check_override_scenes(overrides, scenes)
     _check_declarations(scenes, effect_packs, rule_packs)
-    _resolve_settings(scenes, effect_packs, rule_packs, setting_overrides or {})
+    _resolve_settings(scenes, effect_packs, rule_packs, overrides)
     for root_name, root in root_paths.items():
         _add_import_parent(root[: -len(root_name)])
     return PackCatalog(
@@ -269,11 +267,11 @@ def scan_pack_roots(
     )
 
 
-def _check_override_scenes(what: str, overrides: dict, scenes: dict[str, _SceneEntry]) -> None:
+def _check_override_scenes(overrides: dict, scenes: dict[str, _SceneEntry]) -> None:
     for scene in overrides:
         if scene not in scenes:
             raise ValueError(
-                f"{what} override names unknown scene {scene!r}; "
+                f"setting override names unknown scene {scene!r}; "
                 + f"known scenes: {', '.join(sorted(scenes))}"
             )
 
@@ -438,7 +436,6 @@ def _scan_scenes(
     root: str,
     root_name: str,
     scenes: dict[str, _SceneEntry],
-    overrides: dict[str, dict[str, object]],
 ) -> None:
     kind_dir = _path.join(root, "scenes")
     if not _path.isdir(kind_dir):
@@ -456,7 +453,6 @@ def _scan_scenes(
             version=_parse_version(data["version"], scene_json),
             effect_packs=_read_pack_references(name, scene_json, data, "effect_packs"),
             rule_packs=_read_pack_references(name, scene_json, data, "rule_packs"),
-            initial_data=_initial_data(data, overrides.get(name)),
             source_path=scene_dir,
             ir_codec=_read_ir_codec(name, scene_json, data),
             local_rule_registry=_scan_local_items(scene_dir, scene_prefix, "rules"),
@@ -464,15 +460,6 @@ def _scan_scenes(
             local_sound_map=_scan_sounds(_path.join(scene_dir, "sounds")),
             declarations=_read_scene_declarations(name, scene_json, data),
         )
-
-
-def _initial_data(data: dict, override: dict[str, object] | None) -> dict[str, object] | None:
-    initial_data = data.get("initial_data")
-    if override is None:
-        return initial_data
-    merged = dict(initial_data or {})
-    merged.update(override)
-    return merged
 
 
 def _read_manifest(path: str) -> dict:
@@ -509,6 +496,9 @@ def _read_scene_json(scene: str, path: str) -> dict:
     for key in _REQUIRED_SCENE_KEYS:
         if key not in data:
             raise MalformedSceneError(scene, path, f"missing required key '{key}'")
+    for key in data:
+        if key not in _SCENE_KEYS:
+            raise MalformedSceneError(scene, path, f"unknown key {key!r}")
     return data
 
 

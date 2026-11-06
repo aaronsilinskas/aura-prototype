@@ -104,22 +104,6 @@ def test_get_returns_scene_with_rule_packs_from_json(pack_tree) -> None:
     assert [(pack.name, str(pack.version)) for pack in scene.rule_packs] == [("rules", "1.0")]
 
 
-def test_get_returns_scene_with_initial_data_from_json(pack_tree) -> None:
-    registry = _scan_scene(pack_tree, initial_data={"score": 0, "level": 5})
-
-    scene = registry.get("forest")
-
-    assert scene.initial_data == {"score": 0, "level": 5}
-
-
-def test_get_returns_scene_with_none_initial_data_when_not_in_json(pack_tree) -> None:
-    registry = _scan_scene(pack_tree)
-
-    scene = registry.get("forest")
-
-    assert scene.initial_data is None
-
-
 def test_get_returns_scene_with_default_ir_codec_when_not_in_json(pack_tree) -> None:
     registry = _scan_scene(pack_tree)
 
@@ -157,18 +141,6 @@ def test_get_returns_scenes_with_shared_version_instance(pack_tree) -> None:
     scene_b = registry.get("forest")
 
     assert scene_a.version is scene_b.version
-
-
-def test_get_returns_fresh_initial_data_so_mutation_does_not_affect_next_call(
-    pack_tree,
-) -> None:
-    registry = _scan_scene(pack_tree, initial_data={"score": 0})
-
-    scene_a = registry.get("forest")
-    scene_a.initial_data["score"] = 99
-
-    scene_b = registry.get("forest")
-    assert scene_b.initial_data["score"] == 0
 
 
 # ---------------------------------------------------------------------------
