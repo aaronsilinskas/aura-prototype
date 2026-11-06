@@ -43,7 +43,16 @@ class Settings:
         names = self._values.get(namespace)
         if names is None or name not in names:
             raise UnknownSettingError(namespace, name)
-        return names[name]
+        return _copy_value(names[name])
+
+
+def _copy_value(value: object) -> object:
+    """Return *value*, with any list or object in it copied, so a reader can't change a Setting."""
+    if isinstance(value, list):
+        return [_copy_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _copy_value(item) for key, item in value.items()}
+    return value
 
     # The typed reads below let a Scene Config take each Setting as its field
     # type, with no cast. A TypeError means the code asks for the wrong type.
@@ -102,7 +111,8 @@ def _wrong_type(namespace: str, name: str, value: object, type_name: str) -> Typ
 
 
 # The types a Setting can be declared as.
-_TYPES = ("int", "float", "bool", "str")
+# A ``list`` is checked at the top level only; its items are the pack's to check.
+_TYPES = ("int", "float", "bool", "str", "list")
 
 _DECLARATION_KEYS = ("type", "default", "description")
 
@@ -200,10 +210,12 @@ def _matches(type_name: str, value: object) -> bool:
         return isinstance(value, (int, float))
     if type_name == "str":
         return isinstance(value, str)
+    if type_name == "list":
+        return isinstance(value, list)
     return False
 
 
 def _coerce(type_name: str, value: object) -> object:
     if type_name == "float":
         return float(value)  # type: ignore[arg-type]
-    return value
+    return _copy_value(value)

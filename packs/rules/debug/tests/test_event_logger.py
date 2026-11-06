@@ -1,7 +1,7 @@
 """The event logger on the Simulation test harness, through the element browser.
 
 The element browser loads the ``debug`` pack, so its logger runs on every
-event, but logs nothing until ``event_logging_enabled`` is set.
+event, but logs nothing until the pack's ``event_logging_enabled`` Setting is on.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import pytest
 
 from app.simulation import TICK
 
-LOGGING_ON = {"event_logging_enabled": True}
+LOGGING_ON = {"element_browser": {"rule_packs": {"debug": {"event_logging_enabled": True}}}}
 
 
 def logged(capsys: pytest.CaptureFixture[str]) -> list[str]:
@@ -32,7 +32,7 @@ def test_nothing_is_logged_by_default(simulation, capsys):
 
 
 def test_each_input_event_logs_one_line(simulation, capsys):
-    simulation.add_device("red", scene="element_browser", scene_data=LOGGING_ON)
+    simulation.add_device("red", scene="element_browser", setting_overrides=LOGGING_ON)
     capsys.readouterr()
 
     simulation.advance(10 * TICK)
@@ -41,7 +41,7 @@ def test_each_input_event_logs_one_line(simulation, capsys):
 
 
 def test_the_line_shows_the_button_states(simulation, capsys):
-    device = simulation.add_device("red", scene="element_browser", scene_data=LOGGING_ON)
+    device = simulation.add_device("red", scene="element_browser", setting_overrides=LOGGING_ON)
     device.hold("A")
     capsys.readouterr()
 
@@ -51,7 +51,7 @@ def test_the_line_shows_the_button_states(simulation, capsys):
 
 
 def test_the_line_shows_the_acceleration(simulation, capsys):
-    device = simulation.add_device("red", scene="element_browser", scene_data=LOGGING_ON)
+    device = simulation.add_device("red", scene="element_browser", setting_overrides=LOGGING_ON)
     device.accelerate(1.0, 2.0, 3.0)
     capsys.readouterr()
 
@@ -61,7 +61,7 @@ def test_the_line_shows_the_acceleration(simulation, capsys):
 
 
 def test_the_line_shows_the_time_the_scene_has_run(simulation, capsys):
-    simulation.add_device("red", scene="element_browser", scene_data=LOGGING_ON)
+    simulation.add_device("red", scene="element_browser", setting_overrides=LOGGING_ON)
     simulation.advance(1.0 - TICK)
     capsys.readouterr()
 

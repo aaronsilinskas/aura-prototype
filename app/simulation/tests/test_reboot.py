@@ -7,9 +7,6 @@ this one. ``return_to_lobby``'s own behaviour is pinned in its pack's tests.
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
@@ -18,14 +15,10 @@ from engine.pack_catalog import SettingOverrideError
 from engine.state import Scope
 from packs.tests.settings_helper import settings_for
 
-_SCENES_DIR = Path(__file__).resolve().parents[3] / "packs" / "scenes"
-
-
-def _initial_data(scene: str) -> dict:
-    return json.loads((_SCENES_DIR / scene / "scene.json").read_text())["initial_data"]
-
-
-LOBBY_ENTRIES = [entry["scene"] for entry in _initial_data("example_lobby")["lobby"]["entries"]]
+LOBBY_ENTRIES = [
+    entry["scene"]
+    for entry in settings_for("example_lobby").get("lobby", "entries")  # type: ignore[attr-defined]
+]
 """``example_lobby``'s entries, in the order A steps through them."""
 
 
@@ -137,7 +130,11 @@ def test_a_button_held_through_a_reboot_gives_no_new_press(simulation):
 
 
 def test_a_rule_failure_inside_a_tick_still_fails(simulation):
-    simulation.add_device("red", scene="example_lobby", scene_data={"lobby": {"entries": []}})
+    simulation.add_device(
+        "red",
+        scene="example_lobby",
+        setting_overrides={"example_lobby": {"rule_packs": {"lobby": {"scopes": []}}}},
+    )
 
     with pytest.raises(ValueError, match="scopes"):
         simulation.advance(TICK)

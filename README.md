@@ -244,8 +244,9 @@ declaring the pack's **Settings**:
 }
 ```
 
-A Setting's `type` is `int`, `float` (an `int` value is accepted), `bool` or
-`str`. A Setting with no `default` is required: every scene declaring the pack
+A Setting's `type` is `int`, `float` (an `int` value is accepted), `bool`,
+`str` or `list`. A `list` is checked at the top level only; the pack's code
+checks what is inside it. A Setting with no `default` is required: every scene declaring the pack
 must set it. A scene sets a pack's Settings in that pack's reference, under
 `settings`; the scan checks each override and resolves every Setting (the
 default, then the scene's override, then any `setting_overrides` passed to the

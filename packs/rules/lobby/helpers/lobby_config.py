@@ -1,14 +1,14 @@
 """``LobbyConfig`` — resolved, validated configuration for ``LobbySelectRule``.
 
-Holds the ordered display scopes and ordered selectable entries read from a
-scene's ``initial_data`` (see ``LobbySelectRule`` for the raw config shape).
-``LobbyConfig.__init__`` takes already-resolved values so it is unit-testable
-directly with no ``GameState`` involved; ``from_state`` is the factory that
-reads the raw dict seeded at a given state key and resolves each scope string
-to its engine ``ScopeValue`` via ``scope_by_name``. Lobby config has no
-sensible per-field defaults (a missing entry list can't default to "no
-scenes"), so a missing or malformed ``scopes``/``entries`` list raises rather
-than silently falling back to something that would show the wrong scenes.
+Holds the ordered display scopes and ordered selectable entries the ``lobby``
+pack declares as its ``scopes`` and ``entries`` Settings (see
+``LobbySelectRule`` for their shape). The scan checks only that each is a
+list; the deep checks live here. ``LobbyConfig.__init__`` takes
+already-resolved values so it is unit-testable directly; ``from_settings`` is
+the factory that reads the Settings view and resolves each scope string to its
+engine ``ScopeValue`` via ``scope_by_name``. Both Settings are required, with
+no default (a missing entry list can't default to "no scenes"), and an empty
+or malformed one raises rather than showing the wrong scenes.
 
 ``scope_by_name`` is a small, lobby-local resolver: there is no engine-wide
 ``Scope.by_name`` today, and only this one consumer needs config strings
@@ -25,7 +25,10 @@ try:
 except ImportError:
     pass  # Not available on CircuitPython
 
-from engine.state import GameState, Scope, ScopeValue
+from engine.settings import Settings
+from engine.state import Scope, ScopeValue
+
+NAMESPACE: Final = "lobby"
 
 _SCOPE_BY_NAME: Final = {
     str(Scope.PERSONAL): Scope.PERSONAL,
@@ -63,7 +66,9 @@ class LobbyEntry:
         self.options = options
 
 
-def _parse_entry(entry: dict[str, object]) -> LobbyEntry:
+def _parse_entry(entry: object) -> LobbyEntry:
+    if not isinstance(entry, dict):
+        raise ValueError(f"Lobby entry is not an object: {entry!r}")
     scene = entry.get("scene")
     effect = entry.get("effect")
     if not scene or not effect:
@@ -75,9 +80,9 @@ def _parse_entry(entry: dict[str, object]) -> LobbyEntry:
 class LobbyConfig:
     """Resolved, validated lobby configuration: ordered display scopes plus ordered entries.
 
-    All values are already-resolved (no ``GameState`` knowledge), so this can
-    be constructed directly in tests. Use :meth:`from_state` to build one from
-    a scene's seeded ``initial_data``.
+    All values are already-resolved (no Settings knowledge), so this can
+    be constructed directly in tests. Use :meth:`from_settings` to build one
+    from a scene's Settings.
 
     Raises:
         ValueError: if *scopes* or *entries* is empty.
@@ -94,18 +99,17 @@ class LobbyConfig:
         self.entries = entries
 
     @classmethod
-    def from_state(cls, state: GameState, config_key: str) -> LobbyConfig:
-        """Build from the raw dict seeded at *config_key* in *state*.
+    def from_settings(cls, settings: Settings) -> LobbyConfig:
+        """Build from the ``lobby`` pack's ``scopes`` and ``entries`` Settings.
 
         Raises:
-            ValueError: if *config_key* is absent or not a dict, if
-                ``scopes``/``entries`` is missing or empty, if any scope name
-                is unknown, or if an entry is missing ``scene``/``effect``.
+            ValueError: if ``scopes``/``entries`` is empty, if any scope name
+                is unknown, or if an entry is not an object or is missing
+                ``scene``/``effect``.
         """
-        raw = state.get_or_none(config_key, dict)
-        if raw is None:
-            raise ValueError(f"Lobby config key {config_key!r} is missing or not a dict")
-
-        scopes = [scope_by_name(name) for name in raw.get("scopes", [])]
-        entries = [_parse_entry(entry) for entry in raw.get("entries", [])]
-        return cls(scopes, entries)
+        scopes = settings.get(NAMESPACE, "scopes")
+        entries = settings.get(NAMESPACE, "entries")
+        return cls(
+            [scope_by_name(name) for name in scopes],  # type: ignore[attr-defined]
+            [_parse_entry(entry) for entry in entries],  # type: ignore[attr-defined]
+        )
