@@ -49,3 +49,13 @@ def settings_for(
         declarations = read_manifest_declarations(manifest, str(manifest_path))
         values[pack] = resolve_settings(declarations, [overrides_for_pack])
     return Settings(values)
+
+
+def declared_scene_defaults(scene: str) -> dict[str, object]:
+    """Return each of *scene*'s own Settings' ``default``, read straight from its ``scene.json``.
+
+    It reads the file without the engine, so a test can check what the scan
+    resolves against the declaration itself.
+    """
+    data = json.loads((_PACKS_ROOT / "scenes" / scene / "scene.json").read_text())
+    return {name: declaration["default"] for name, declaration in data["settings"].items()}

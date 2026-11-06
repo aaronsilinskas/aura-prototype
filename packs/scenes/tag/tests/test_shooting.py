@@ -2,7 +2,7 @@
 
 Each test boots the real Tag scene, walks it into Playing through real button
 presses, and asserts on what the device observably did: IR sent, clips
-played, haptics, strip pixels. A test that depends on a tunable pins it with
+played, haptics, strip pixels. A test that depends on a Setting pins it with
 ``setting_overrides`` rather than restating the scene's default.
 """
 

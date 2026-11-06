@@ -2,7 +2,7 @@
 
 Shots land through ``receive_ir`` and the real IR stack, each carrying its
 sequence number in byte 0 as the transmitter sends it. Every assertion reads
-what the device's strips show. A test that depends on a tunable pins it with
+what the device's strips show. A test that depends on a Setting pins it with
 ``setting_overrides`` rather than restating the scene's default.
 """
 

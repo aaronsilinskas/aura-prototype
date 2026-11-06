@@ -11,7 +11,7 @@ from packs.scenes.ir_range_transmitter.rules.helpers.transmitter_config import (
     TransmitterConfig,
     transmitter_config,
 )
-from packs.tests.settings_helper import settings_for
+from packs.tests.settings_helper import declared_scene_defaults, settings_for
 
 
 def _settings(**values: object) -> Settings:
@@ -23,17 +23,19 @@ def _settings(**values: object) -> Settings:
 # ---------------------------------------------------------------------------
 
 
-def test_from_settings_reads_each_field_from_its_scene_setting():
+def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
     config = TransmitterConfig.from_settings(_settings(send_rate_hz=10.0, payload_size=8))
 
     assert config.send_rate_hz == pytest.approx(10.0)
     assert config.payload_size == 8
 
 
-def test_from_settings_builds_from_the_declared_defaults_alone():
+def test_with_no_overrides_each_field_holds_its_declared_default():
+    defaults = declared_scene_defaults("ir_range_transmitter")
+
     config = TransmitterConfig.from_settings(_settings())
 
-    assert config.send_period_seconds == pytest.approx(1.0 / config.send_rate_hz)
+    assert {name: getattr(config, name) for name in defaults} == defaults
 
 
 # ---------------------------------------------------------------------------

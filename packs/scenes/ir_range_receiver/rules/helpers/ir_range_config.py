@@ -19,12 +19,10 @@ try:
 except ImportError:
     pass
 
-from engine.settings import Settings
+from engine.settings import SCENE_NAMESPACE, Settings
 from engine.state import GameState, StateSlot
 
 _CONFIG_KEY: Final = "ir_range_config"
-
-NAMESPACE: Final = "scene"
 
 
 class IrRangeConfig:
@@ -47,9 +45,9 @@ class IrRangeConfig:
     def from_settings(cls, settings: Settings) -> IrRangeConfig:
         """Build a config from the scene's Settings, each named as its field."""
         return cls(
-            window_seconds=settings.get_float(NAMESPACE, "window_seconds"),
-            silence_timeout=settings.get_float(NAMESPACE, "silence_timeout"),
-            green_threshold=settings.get_float(NAMESPACE, "green_threshold"),
+            window_seconds=settings.get_float(SCENE_NAMESPACE, "window_seconds"),
+            silence_timeout=settings.get_float(SCENE_NAMESPACE, "silence_timeout"),
+            green_threshold=settings.get_float(SCENE_NAMESPACE, "green_threshold"),
         )
 
 

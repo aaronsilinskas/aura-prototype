@@ -13,6 +13,7 @@ import pytest
 from engine.pack_catalog import (
     MalformedManifestError,
     MalformedSceneError,
+    OverrideOfUndeclaredPackError,
     PackCatalog,
     PackScanError,
     SceneDeclarationError,
@@ -206,16 +207,34 @@ def test_changing_a_resolved_list_setting_does_not_change_the_next_read(pack_tre
     assert settings.get("exit", "hold_seconds") == [1]
 
 
-def test_a_scan_override_for_a_pack_the_scene_does_not_declare_raises(pack_tree) -> None:
+@pytest.mark.parametrize(
+    ("kind", "values"),
+    [
+        ("rule", {"hold_seconds": 1.0}),
+        ("rule", {}),
+        ("effect", {"hold_seconds": 1.0}),
+        ("effect", {}),
+    ],
+    ids=[
+        "rule-pack-with-values",
+        "rule-pack-empty",
+        "effect-pack-with-values",
+        "effect-pack-empty",
+    ],
+)
+def test_a_scan_override_for_a_pack_the_scene_does_not_declare_raises(
+    pack_tree, kind: str, values: dict
+) -> None:
     root = _scene_with_rule_pack(pack_tree, HOLD)
-    pack_tree.rule_pack(root, "unused", settings=HOLD)
+    getattr(pack_tree, kind + "_pack")(root, "unused", settings=HOLD)
 
-    with pytest.raises(SettingOverrideError) as excinfo:
+    with pytest.raises(OverrideOfUndeclaredPackError) as excinfo:
         pack_tree.scan_roots(
-            root, setting_overrides={"game": {"rule_packs": {"unused": {"hold_seconds": 1.0}}}}
+            root, setting_overrides={"game": {kind + "_packs": {"unused": values}}}
         )
 
-    assert _fields(excinfo.value) == ("game", "unused", "hold_seconds")
+    error = excinfo.value
+    assert (error.scene, error.pack, error.kind) == ("game", "unused", kind)
 
 
 def test_a_scan_override_of_an_undeclared_scene_setting_raises(pack_tree) -> None:

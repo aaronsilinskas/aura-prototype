@@ -21,12 +21,10 @@ except ImportError:
     pass
 
 from engine.lerp import level_lerp
-from engine.settings import Settings
+from engine.settings import SCENE_NAMESPACE, Settings
 from engine.state import GameState, StateSlot
 
 _CONFIG_KEY: Final = "rlgl_config"
-
-NAMESPACE: Final = "scene"
 
 # Level-1 warning pulse sub-duration ratios (brighten / on / darken = 0.3 / 0.4 / 0.3)
 _WARNING_BRIGHTEN_RATIO: Final = 0.3
@@ -101,18 +99,18 @@ class RlglConfig:
             ValueError: ``gravity_beta`` is not below ``motion_smoothing``.
         """
         return cls(
-            red_duration_max=settings.get_float(NAMESPACE, "red_duration_max"),
-            red_duration_min=settings.get_float(NAMESPACE, "red_duration_min"),
-            green_duration_max=settings.get_float(NAMESPACE, "green_duration_max"),
-            green_duration_min=settings.get_float(NAMESPACE, "green_duration_min"),
-            warning_pulse_max=settings.get_float(NAMESPACE, "warning_pulse_max"),
-            warning_pulse_min=settings.get_float(NAMESPACE, "warning_pulse_min"),
-            game_over_duration=settings.get_float(NAMESPACE, "game_over_duration"),
-            green_still_timeout=settings.get_float(NAMESPACE, "green_still_timeout"),
-            level_up_duration=settings.get_float(NAMESPACE, "level_up_duration"),
-            max_level=settings.get_int(NAMESPACE, "max_level"),
-            motion_smoothing=settings.get_float(NAMESPACE, "motion_smoothing"),
-            gravity_beta=settings.get_float(NAMESPACE, "gravity_beta"),
+            red_duration_max=settings.get_float(SCENE_NAMESPACE, "red_duration_max"),
+            red_duration_min=settings.get_float(SCENE_NAMESPACE, "red_duration_min"),
+            green_duration_max=settings.get_float(SCENE_NAMESPACE, "green_duration_max"),
+            green_duration_min=settings.get_float(SCENE_NAMESPACE, "green_duration_min"),
+            warning_pulse_max=settings.get_float(SCENE_NAMESPACE, "warning_pulse_max"),
+            warning_pulse_min=settings.get_float(SCENE_NAMESPACE, "warning_pulse_min"),
+            game_over_duration=settings.get_float(SCENE_NAMESPACE, "game_over_duration"),
+            green_still_timeout=settings.get_float(SCENE_NAMESPACE, "green_still_timeout"),
+            level_up_duration=settings.get_float(SCENE_NAMESPACE, "level_up_duration"),
+            max_level=settings.get_int(SCENE_NAMESPACE, "max_level"),
+            motion_smoothing=settings.get_float(SCENE_NAMESPACE, "motion_smoothing"),
+            gravity_beta=settings.get_float(SCENE_NAMESPACE, "gravity_beta"),
         )
 
     def red_duration(self, level: int) -> float:

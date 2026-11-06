@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.simulation import TICK, SimulatedDevice, Simulation, Strip
 from engine.network import LINE
+from engine.pack_catalog import SettingOverrides
 from engine.state import Scope
 from packs.scenes.tag.tag_data import TagData, decode_tag_data, encode_tag_data
 
@@ -24,7 +25,7 @@ SHOOTER = {"expected_team": 2, "expected_player": 3}
 """Pins the one team/player whose tags count against a device."""
 
 
-def tag_settings(settings: dict[str, object]) -> dict[str, dict[str, dict[str, object]]]:
+def tag_settings(settings: dict[str, object]) -> SettingOverrides:
     """The ``setting_overrides`` that boot Tag with *settings* in its scene namespace."""
     return {"tag": {"settings": settings}}
 

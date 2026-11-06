@@ -1,7 +1,7 @@
 """The IR range transmitter's sends, played on a simulated device.
 
 Every assertion reads ``ir_sent``: what reached the wire, when, and on which
-emitter. A test that depends on a tunable pins it with ``setting_overrides`` rather
+emitter. A test that depends on a Setting pins it with ``setting_overrides`` rather
 than restating the scene's default.
 """
 

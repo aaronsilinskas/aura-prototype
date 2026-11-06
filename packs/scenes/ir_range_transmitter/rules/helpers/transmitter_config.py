@@ -18,12 +18,10 @@ try:
 except ImportError:
     pass
 
-from engine.settings import Settings
+from engine.settings import SCENE_NAMESPACE, Settings
 from engine.state import GameState, StateSlot
 
 _CONFIG_KEY: Final = "irtx_config"
-
-NAMESPACE: Final = "scene"
 
 # Fixed non-zero padding marker, matching ir_rx_packet_source.py: byte i
 # (i >= 1) carries 0xA0 | (i & 0x0F), so the encoded frame is never a
@@ -38,7 +36,7 @@ def _build_payload_padding(payload_size: int) -> bytes:
 
 
 class TransmitterConfig:
-    """Immutable tunable configuration for the IR range transmitter scene.
+    """Immutable configuration for the IR range transmitter scene.
 
     All values are already-resolved, so this can be constructed directly in
     tests. Use :meth:`from_settings` to build one from the scene's Settings.
@@ -56,8 +54,8 @@ class TransmitterConfig:
     def from_settings(cls, settings: Settings) -> TransmitterConfig:
         """Build a config from the scene's Settings, each named as its field."""
         return cls(
-            send_rate_hz=settings.get_float(NAMESPACE, "send_rate_hz"),
-            payload_size=settings.get_int(NAMESPACE, "payload_size"),
+            send_rate_hz=settings.get_float(SCENE_NAMESPACE, "send_rate_hz"),
+            payload_size=settings.get_int(SCENE_NAMESPACE, "payload_size"),
         )
 
 

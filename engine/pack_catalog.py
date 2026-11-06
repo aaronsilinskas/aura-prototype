@@ -9,11 +9,13 @@ __all__ = [
     "MalformedSceneError",
     "MalformedVersionError",
     "MissingRootError",
+    "OverrideOfUndeclaredPackError",
     "PackCatalog",
     "PackScanError",
     "ReservedNameError",
     "SceneDeclarationError",
     "SettingOverrideError",
+    "SettingOverrides",
     "UnknownDeclaredPackError",
     "read_manifest_declarations",
     "scan_pack_roots",
@@ -27,6 +29,7 @@ import engine._path as _path
 from engine.packs import PackRegistry, _PackEntry, scan_item_names
 from engine.scene import PackReference, SceneLocalRegistry, SceneRegistry, _SceneEntry
 from engine.settings import (
+    SCENE_NAMESPACE,
     SettingDeclaration,
     Settings,
     SettingValueError,
@@ -34,6 +37,11 @@ from engine.settings import (
     resolve_settings,
 )
 from engine.version import Version
+
+try:
+    from typing import TypeAlias
+except ImportError:
+    pass  # Not available on CircuitPython
 
 _REQUIRED_SCENE_KEYS = ("version", "effect_packs", "rule_packs")
 
@@ -49,8 +57,8 @@ _MANIFEST_NAME = {"effects": "effects.json", "rules": "rules.json"}
 
 _SOUND_EXTENSIONS = (".wav",)
 
-# The namespace of a scene's own Settings; no pack may take the name.
-_SCENE_NAMESPACE = "scene"
+SettingOverrides: TypeAlias = "dict[str, dict[str, dict]]"
+"""Setting overrides given to the scan, per scene, shaped as ``scan_pack_roots`` describes."""
 
 # What one scene's ``setting_overrides`` may hold, mirroring ``scene.json``.
 _OVERRIDE_KEYS = ("settings", "effect_packs", "rule_packs")
@@ -159,6 +167,19 @@ class IncompatiblePackError(SceneDeclarationError):
         )
 
 
+class OverrideOfUndeclaredPackError(SceneDeclarationError):
+    """The scan's Setting overrides name a *kind* (effect or rule) pack the scene lacks."""
+
+    def __init__(self, scene: str, pack: str, kind: str) -> None:
+        self.kind = kind
+        super().__init__(
+            scene,
+            pack,
+            f"Setting overrides for scene '{scene}' name {kind} pack '{pack}', "
+            + "which the scene does not declare",
+        )
+
+
 class SettingOverrideError(SceneDeclarationError):
     """Scene *scene* cannot set Setting *setting* of *pack* (or ``"scene"``), for *reason*.
 
@@ -214,7 +235,7 @@ class PackCatalog:
 
 def scan_pack_roots(
     roots: list[str],
-    setting_overrides: dict[str, dict[str, dict]] | None = None,
+    setting_overrides: SettingOverrides | None = None,
 ) -> PackCatalog:
     """Scan the pack *roots*, in order, into one ``PackCatalog``.
 
@@ -267,7 +288,7 @@ def scan_pack_roots(
     )
 
 
-def _check_override_scenes(overrides: dict, scenes: dict[str, _SceneEntry]) -> None:
+def _check_override_scenes(overrides: SettingOverrides, scenes: dict[str, _SceneEntry]) -> None:
     for scene in overrides:
         if scene not in scenes:
             raise ValueError(
@@ -280,18 +301,18 @@ def _resolve_settings(
     scenes: dict[str, _SceneEntry],
     effect_packs: list[_PackEntry],
     rule_packs: list[_PackEntry],
-    setting_overrides: dict[str, dict[str, dict]],
+    setting_overrides: SettingOverrides,
 ) -> None:
     effect_declarations = {entry.name: entry.declarations for entry in effect_packs}
     rule_declarations = {entry.name: entry.declarations for entry in rule_packs}
     for scene, entry in scenes.items():
         own, effects, rules = _read_setting_overrides(scene, setting_overrides.get(scene, {}))
         values = {
-            _SCENE_NAMESPACE: _resolve_namespace(scene, _SCENE_NAMESPACE, entry.declarations, [own])
+            SCENE_NAMESPACE: _resolve_namespace(scene, SCENE_NAMESPACE, entry.declarations, [own])
         }
         # Effect-pack Settings are checked, but effects do not receive them yet.
-        _resolve_kind(scene, entry.effect_packs, effect_declarations, effects)
-        values.update(_resolve_kind(scene, entry.rule_packs, rule_declarations, rules))
+        _resolve_kind(scene, "effect", entry.effect_packs, effect_declarations, effects)
+        values.update(_resolve_kind(scene, "rule", entry.rule_packs, rule_declarations, rules))
         entry.settings = Settings(values)
 
 
@@ -321,15 +342,15 @@ def _read_setting_overrides(
 
 def _resolve_kind(
     scene: str,
+    kind: str,
     references: list[PackReference],
     declarations: dict[str, dict[str, SettingDeclaration]],
     given: dict[str, dict],
 ) -> dict[str, dict[str, object]]:
     declared = [reference.name for reference in references]
-    for pack, values in given.items():
+    for pack in given:
         if pack not in declared:
-            for setting in values:
-                raise SettingOverrideError(scene, pack, setting, "the scene does not declare it")
+            raise OverrideOfUndeclaredPackError(scene, pack, kind)
     return {
         reference.name: _resolve_namespace(
             scene,
@@ -413,7 +434,7 @@ def _scan_packs(root: str, root_name: str, kind: str, packs: list[_PackEntry]) -
         manifest_path = _path.join(pack_dir, _MANIFEST_NAME[kind])
         if not _path.isfile(manifest_path):
             continue
-        if name == "scene":
+        if name == SCENE_NAMESPACE:
             raise ReservedNameError(pack_dir)
         for entry in packs:
             if entry.name == name:

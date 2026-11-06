@@ -5,14 +5,12 @@ import time
 from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState
+from packs.rules.debug import NAMESPACE
 
 try:
     from collections.abc import Callable
-    from typing import Final
 except ImportError:
     pass
-
-NAMESPACE: Final = "debug"
 
 
 class FpsLoggerRule(GameRule):
@@ -36,7 +34,7 @@ class FpsLoggerRule(GameRule):
         self.on(InputEvents.Sensors, self._handle)
 
     def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
-        if not state.settings.get(NAMESPACE, "fps_logging_enabled"):
+        if not state.settings.get_bool(NAMESPACE, "fps_logging_enabled"):
             return
         self._frames += 1
         now = self._clock()

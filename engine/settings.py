@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 __all__ = [
+    "SCENE_NAMESPACE",
     "SettingDeclaration",
     "SettingValueError",
     "Settings",
@@ -10,6 +11,14 @@ __all__ = [
     "parse_declarations",
     "resolve_settings",
 ]
+
+try:
+    from typing import Final
+except ImportError:
+    pass  # Not available on CircuitPython
+
+SCENE_NAMESPACE: Final = "scene"
+"""The namespace of a scene's own Settings; no pack may take the name."""
 
 
 class UnknownSettingError(LookupError):
@@ -94,6 +103,18 @@ class Settings:
         value = self.get(namespace, name)
         if not isinstance(value, str):
             raise _wrong_type(namespace, name, value, "str")
+        return value
+
+    def get_list(self, namespace: str, name: str) -> list[object]:
+        """Return a copy of ``list`` Setting *name* of *namespace*.
+
+        Raises:
+            UnknownSettingError: *namespace* declares no Setting *name*.
+            TypeError: the Setting is not a ``list``.
+        """
+        value = self.get(namespace, name)
+        if not isinstance(value, list):
+            raise _wrong_type(namespace, name, value, "list")
         return value
 
 
@@ -216,6 +237,6 @@ def _matches(type_name: str, value: object) -> bool:
 
 
 def _coerce(type_name: str, value: object) -> object:
-    if type_name == "float":
-        return float(value)  # type: ignore[arg-type]
+    if type_name == "float" and isinstance(value, (int, float)):
+        return float(value)
     return _copy_value(value)
