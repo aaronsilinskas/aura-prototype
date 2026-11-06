@@ -374,7 +374,7 @@ def parse_args(argv: "list[str] | None" = None) -> argparse.Namespace:
         metavar="NAME",
         help=(
             "Scene to deploy, with the same meaning as deploy.py's --scene "
-            "(recorded in aura-settings.json); omit to leave the boot scene alone."
+            "(recorded in aura-boot.json); omit to leave the boot scene alone."
         ),
     )
     parser.add_argument(

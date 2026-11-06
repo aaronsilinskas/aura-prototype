@@ -101,7 +101,7 @@ _CARD_PACKS_ROOT = "aura_packs"
 def resolve_boot_scene_name(
     scene_registry: SceneRegistry,
     storage: DeviceStorage | None,
-    settings_mapping: dict,
+    boot_mapping: dict,
     logger: Logger | None = None,
 ) -> str:
     """Resolve the boot scene name and validate it against *scene_registry*.
@@ -113,7 +113,7 @@ def resolve_boot_scene_name(
     *storage* is treated as no persisted override, leaving the flash
     ``default_scene`` to win.
     """
-    scene_name = resolve_boot_scene(storage, settings_mapping, logger)
+    scene_name = resolve_boot_scene(storage, boot_mapping, logger)
     return scene_registry.resolve_known(scene_name)
 
 
@@ -217,7 +217,7 @@ def build_scene_runtime(
 
 def build_scene_boot(
     hw: DeviceHardware,
-    settings_mapping: dict,
+    boot_mapping: dict,
     reset: Callable[[], None],
     timer: Timer | None = None,
     logger: Logger | None = None,
@@ -229,7 +229,7 @@ def build_scene_boot(
     and the Simulated device, as :func:`build_scene_tick` is their one tick.
     A pending Scene deploy token is applied first (see
     :func:`~hardware.shared.scene_selection.apply_scene_deploy`); then the
-    card's Persisted scene wins over *settings_mapping*'s ``default_scene``.
+    card's Persisted scene wins over *boot_mapping*'s ``default_scene``.
     An unknown name raises naming the known scenes. A reboot the scene asks for
     persists to ``hw.storage``, then calls *reset*.
 
@@ -241,8 +241,8 @@ def build_scene_boot(
     """
     catalog = scan_boot_pack_catalog(hw.storage, scene_data)
     scene_registry = catalog.scene_registry
-    apply_scene_deploy(hw.storage, settings_mapping, logger)
-    scene_name = resolve_boot_scene_name(scene_registry, hw.storage, settings_mapping, logger)
+    apply_scene_deploy(hw.storage, boot_mapping, logger)
+    scene_name = resolve_boot_scene_name(scene_registry, hw.storage, boot_mapping, logger)
     if hw.ir is not None:
         hw.ir.apply_codec(*resolve_ir_codec(scene_registry, scene_name))
     scene_reboot = DeviceSceneReboot(

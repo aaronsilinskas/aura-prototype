@@ -119,7 +119,7 @@ required; there are no built-in defaults.
   is a complete example, tested on Pimoroni Pico 2 boards.
   [`examples/aura-device.simulated.json`](examples/aura-device.simulated.json)
   is for the test-only Simulated device, not for flashing to a board.
-- **`aura-settings.json`** picks the scene to boot, by its folder name under
+- **`aura-boot.json`** picks the scene to boot, by its folder name under
   `packs/scenes/`:
 
   ```json
