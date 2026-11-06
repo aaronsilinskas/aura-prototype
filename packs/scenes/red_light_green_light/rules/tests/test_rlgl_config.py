@@ -11,7 +11,7 @@ from packs.scenes.red_light_green_light.rules.helpers.rlgl_config import (
     RlglConfig,
     rlgl_config,
 )
-from packs.tests.settings_helper import settings_for
+from packs.tests.settings_helper import declared_scene_defaults, settings_for
 
 
 def _settings(**values: object) -> Settings:
@@ -56,7 +56,7 @@ def test_warning_sting_opts_scales_sub_durations_with_level():
 # ---------------------------------------------------------------------------
 
 
-def test_from_settings_reads_each_field_from_its_scene_setting():
+def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
     settings = _settings(
         red_duration_max=6.0,
         red_duration_min=2.5,
@@ -88,10 +88,12 @@ def test_from_settings_reads_each_field_from_its_scene_setting():
     assert config.gravity_beta == pytest.approx(0.2)
 
 
-def test_from_settings_builds_from_the_declared_defaults_alone():
+def test_with_no_overrides_each_field_holds_its_declared_default():
+    defaults = declared_scene_defaults("red_light_green_light")
+
     config = RlglConfig.from_settings(_settings())
 
-    assert isinstance(config.max_level, int)
+    assert {name: getattr(config, name) for name in defaults} == defaults
 
 
 def test_the_declared_gravity_tracking_is_slower_than_motion_smoothing():

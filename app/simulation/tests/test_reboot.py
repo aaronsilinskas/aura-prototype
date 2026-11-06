@@ -13,11 +13,11 @@ from app.simulation import TICK, SimulatedDevice, Simulation
 from engine.network import LINE
 from engine.pack_catalog import SettingOverrideError
 from engine.state import Scope
+from packs.rules.lobby.helpers.lobby_config import LobbyConfig
 from packs.tests.settings_helper import settings_for
 
 LOBBY_ENTRIES = [
-    entry["scene"]
-    for entry in settings_for("example_lobby").get("lobby", "entries")  # type: ignore[attr-defined]
+    entry.scene for entry in LobbyConfig.from_settings(settings_for("example_lobby")).entries
 ]
 """``example_lobby``'s entries, in the order A steps through them."""
 

@@ -11,7 +11,7 @@ from packs.scenes.tag.rules.helpers.tag_config import (
     TagConfig,
     tag_config,
 )
-from packs.tests.settings_helper import settings_for
+from packs.tests.settings_helper import declared_scene_defaults, settings_for
 
 
 def _settings(**values: object) -> Settings:
@@ -23,7 +23,7 @@ def _settings(**values: object) -> Settings:
 # ---------------------------------------------------------------------------
 
 
-def test_from_settings_reads_each_field_from_its_scene_setting():
+def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
     config = TagConfig.from_settings(
         _settings(
             starting_hitpoints=20,
@@ -47,12 +47,12 @@ def test_from_settings_reads_each_field_from_its_scene_setting():
     assert config.reload_duration == pytest.approx(2.5)
 
 
-def test_from_settings_builds_from_the_declared_defaults_alone():
+def test_with_no_overrides_each_field_holds_its_declared_default():
+    defaults = declared_scene_defaults("tag")
+
     config = TagConfig.from_settings(_settings())
 
-    assert config.warning_duration() == pytest.approx(
-        config.warning_pulse_count * config.warning_pulse_duration
-    )
+    assert {name: getattr(config, name) for name in defaults} == defaults
 
 
 # ---------------------------------------------------------------------------

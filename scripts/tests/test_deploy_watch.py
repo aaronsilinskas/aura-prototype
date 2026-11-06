@@ -404,18 +404,18 @@ def _cli_args(tmp_path: Path, *extra: str) -> list[str]:
     return [str(example), "--mount", str(mount), "--seconds", "1", *extra]
 
 
-def test_scene_flag_records_the_scene_as_default_scene_in_deployed_settings(
+def test_scene_flag_records_the_scene_as_default_scene_in_deployed_boot_file(
     tmp_path: Path,
 ) -> None:
     args = parse_args(_cli_args(tmp_path, "--scene", "hardware_test"))
 
     run_deploy(args, deploy=_deploy_from_source(tmp_path))
 
-    settings = json.loads((tmp_path / "mount" / "aura-boot.json").read_text())
-    assert settings["default_scene"] == "hardware_test"
+    boot_values = json.loads((tmp_path / "mount" / "aura-boot.json").read_text())
+    assert boot_values["default_scene"] == "hardware_test"
 
 
-def test_omitting_scene_flag_writes_no_settings_file(tmp_path: Path) -> None:
+def test_omitting_scene_flag_writes_no_boot_file(tmp_path: Path) -> None:
     args = parse_args(_cli_args(tmp_path))
 
     run_deploy(args, deploy=_deploy_from_source(tmp_path))

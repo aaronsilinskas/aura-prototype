@@ -11,14 +11,14 @@ from packs.scenes.ir_range_receiver.rules.helpers.ir_range_config import (
     IrRangeConfig,
     ir_range_config,
 )
-from packs.tests.settings_helper import settings_for
+from packs.tests.settings_helper import declared_scene_defaults, settings_for
 
 
 def _settings(**values: object) -> Settings:
     return settings_for("ir_range_receiver", settings=values)
 
 
-def test_from_settings_reads_each_field_from_its_scene_setting():
+def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
     settings = _settings(window_seconds=2.0, silence_timeout=0.75, green_threshold=0.95)
 
     config = IrRangeConfig.from_settings(settings)
@@ -28,10 +28,12 @@ def test_from_settings_reads_each_field_from_its_scene_setting():
     assert config.green_threshold == pytest.approx(0.95)
 
 
-def test_from_settings_builds_from_the_declared_defaults_alone():
+def test_with_no_overrides_each_field_holds_its_declared_default():
+    defaults = declared_scene_defaults("ir_range_receiver")
+
     config = IrRangeConfig.from_settings(_settings())
 
-    assert isinstance(config.window_seconds, float)
+    assert {name: getattr(config, name) for name in defaults} == defaults
 
 
 def test_ir_range_config_builds_from_the_state_settings():

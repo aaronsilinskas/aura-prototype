@@ -43,13 +43,13 @@ _SCOPE_BY_NAME: Final = {
 }
 
 
-def scope_by_name(name: str) -> ScopeValue:
+def scope_by_name(name: object) -> ScopeValue:
     """Resolve a lobby config scope string to its engine ``ScopeValue``.
 
     Raises:
         ValueError: if *name* does not match any known ``ScopeValue``.
     """
-    scope = _SCOPE_BY_NAME.get(name)
+    scope = _SCOPE_BY_NAME.get(name) if isinstance(name, str) else None
     if scope is None:
         raise ValueError(f"Unknown lobby scope name: {name!r}")
     return scope
@@ -107,9 +107,9 @@ class LobbyConfig:
                 is unknown, or if an entry is not an object or is missing
                 ``scene``/``effect``.
         """
-        scopes = settings.get(NAMESPACE, "scopes")
-        entries = settings.get(NAMESPACE, "entries")
+        scopes = settings.get_list(NAMESPACE, "scopes")
+        entries = settings.get_list(NAMESPACE, "entries")
         return cls(
-            [scope_by_name(name) for name in scopes],  # type: ignore[attr-defined]
-            [_parse_entry(entry) for entry in entries],  # type: ignore[attr-defined]
+            [scope_by_name(name) for name in scopes],
+            [_parse_entry(entry) for entry in entries],
         )

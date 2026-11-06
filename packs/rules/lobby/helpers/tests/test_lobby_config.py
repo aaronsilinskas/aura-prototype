@@ -42,6 +42,12 @@ def test_scope_by_name_raises_naming_the_unknown_scope():
         scope_by_name("not-a-real-scope")
 
 
+@pytest.mark.parametrize("name", [3, ["personal"]], ids=["int", "list"])
+def test_scope_by_name_raises_value_error_for_a_scope_that_is_not_a_string(name):
+    with pytest.raises(ValueError):
+        scope_by_name(name)
+
+
 # ---------------------------------------------------------------------------
 # LobbyConfig.__init__ — direct construction validation
 # ---------------------------------------------------------------------------

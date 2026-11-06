@@ -52,7 +52,7 @@ Everything installed under a device's pack roots, discovered in one scan by `sca
 _Avoid_: scanning packs, scenes or sounds anywhere else; re-checking scene declarations at load time
 
 ### PackScanError
-The typed `ValueError` family raised while building a `PackCatalog`, when the files on disk are wrong (missing root, duplicate or reserved name, malformed version, `scene.json` or **Pack manifest**, a scene declaring a pack twice or declaring one that is missing or incompatible, a **Setting override** naming an undeclared Setting, giving the wrong type, or leaving a required Setting unset). Each carries the file, scene, pack or Setting at fault, so tests check the type and those fields, never the wording.
+The typed `ValueError` family raised while building a `PackCatalog`, when the files on disk are wrong (missing root, duplicate or reserved name, malformed version, `scene.json` or **Pack manifest**, a scene declaring a pack twice or declaring one that is missing or incompatible, a **Setting override** naming a pack its scene does not declare or an undeclared Setting, giving the wrong type, or leaving a required Setting unset). Each carries the file, scene, pack or Setting at fault, so tests check the type and those fields, never the wording.
 _Avoid_: confusing with **Registry lookup errors** (a name not registered, after a good scan); classifying by message text
 
 ### DynamicValue

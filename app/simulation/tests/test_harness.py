@@ -13,6 +13,7 @@ import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
 from engine.network import LINE
+from engine.pack_catalog import SettingOverrides
 from engine.packs import UnknownItemError
 from engine.state import Scope
 from packs.scenes.tag.tag_data import TagData, encode_tag_data
@@ -21,7 +22,7 @@ ONE_ROUND = {"max_ammo": 1, "reload_duration": 1.0}
 """One round, so a fresh press after it starts a one-second reload."""
 
 
-def tag_settings(settings: dict[str, object]) -> dict[str, dict[str, dict[str, object]]]:
+def tag_settings(settings: dict[str, object]) -> SettingOverrides:
     """The ``setting_overrides`` that boot Tag with *settings* in its scene namespace."""
     return {"tag": {"settings": settings}}
 

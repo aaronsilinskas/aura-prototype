@@ -15,7 +15,7 @@ from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
 from engine.namespace import ActiveSceneNamespace
 from engine.network import NetworkEvents
-from engine.pack_catalog import PackCatalog, scan_pack_roots
+from engine.pack_catalog import PackCatalog, SettingOverrides, scan_pack_roots
 from engine.scene import SceneManager, SceneRegistry
 from engine.state import SceneReboot
 from engine.timer import Timer
@@ -130,7 +130,7 @@ def resolve_ir_codec(
 
 def scan_boot_pack_catalog(
     storage: DeviceStorage | None,
-    setting_overrides: dict[str, dict[str, dict]] | None = None,
+    setting_overrides: SettingOverrides | None = None,
 ) -> PackCatalog:
     """Scan the device's pack roots into the one ``PackCatalog`` boot runs on.
 
@@ -222,7 +222,7 @@ def build_scene_boot(
     reset: Callable[[], None],
     timer: Timer | None = None,
     logger: Logger | None = None,
-    setting_overrides: dict[str, dict[str, dict]] | None = None,
+    setting_overrides: SettingOverrides | None = None,
 ) -> SceneBoot:
     """Boot *hw* into its boot scene; return its name, per-tick body and runtime.
 

@@ -10,6 +10,7 @@ import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
 from engine.network import LINE
+from engine.pack_catalog import SettingOverrides
 from engine.state import Scope
 
 # SHOOTER, tag_settings and start_game copy Tag's test helpers: the harness's
@@ -23,7 +24,7 @@ BYSTANDER: dict[str, object] = {"expected_team": 1, "expected_player": 1}
 RED = 0xFF0000
 
 
-def tag_settings(settings: dict[str, object]) -> dict[str, dict[str, dict[str, object]]]:
+def tag_settings(settings: dict[str, object]) -> SettingOverrides:
     return {"tag": {"settings": settings}}
 
 

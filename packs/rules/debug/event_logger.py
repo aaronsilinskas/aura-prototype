@@ -3,13 +3,7 @@ from __future__ import annotations
 from engine.engine import GameRule
 from engine.events import Event
 from engine.state import GameState
-
-try:
-    from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython/MicroPython
-
-NAMESPACE: Final = "debug"
+from packs.rules.debug import NAMESPACE
 
 
 class EventLoggerRule(GameRule):
@@ -22,7 +16,7 @@ class EventLoggerRule(GameRule):
     __slots__ = ()
 
     def handle_event(self, event: Event, state: GameState) -> None:
-        if not state.settings.get(NAMESPACE, "event_logging_enabled"):
+        if not state.settings.get_bool(NAMESPACE, "event_logging_enabled"):
             return
         parts = []
         cls = type(event)

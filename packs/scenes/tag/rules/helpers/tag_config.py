@@ -16,16 +16,14 @@ try:
 except ImportError:
     pass
 
-from engine.settings import Settings
+from engine.settings import SCENE_NAMESPACE, Settings
 from engine.state import GameState, StateSlot
 
 _CONFIG_KEY: Final = "tag_config"
 
-NAMESPACE: Final = "scene"
-
 
 class TagConfig:
-    """Immutable tunable configuration for the Tag scene.
+    """Immutable configuration for the Tag scene.
 
     All values are already-resolved, so this can be constructed directly in
     tests. Use :meth:`from_settings` to build one from the scene's Settings.
@@ -66,14 +64,14 @@ class TagConfig:
     def from_settings(cls, settings: Settings) -> TagConfig:
         """Build a config from the scene's Settings, each named as its field."""
         return cls(
-            starting_hitpoints=settings.get_int(NAMESPACE, "starting_hitpoints"),
-            expected_team=settings.get_int(NAMESPACE, "expected_team"),
-            expected_player=settings.get_int(NAMESPACE, "expected_player"),
-            warning_pulse_count=settings.get_int(NAMESPACE, "warning_pulse_count"),
-            warning_pulse_duration=settings.get_float(NAMESPACE, "warning_pulse_duration"),
-            max_ammo=settings.get_int(NAMESPACE, "max_ammo"),
-            shot_cooldown=settings.get_float(NAMESPACE, "shot_cooldown"),
-            reload_duration=settings.get_float(NAMESPACE, "reload_duration"),
+            starting_hitpoints=settings.get_int(SCENE_NAMESPACE, "starting_hitpoints"),
+            expected_team=settings.get_int(SCENE_NAMESPACE, "expected_team"),
+            expected_player=settings.get_int(SCENE_NAMESPACE, "expected_player"),
+            warning_pulse_count=settings.get_int(SCENE_NAMESPACE, "warning_pulse_count"),
+            warning_pulse_duration=settings.get_float(SCENE_NAMESPACE, "warning_pulse_duration"),
+            max_ammo=settings.get_int(SCENE_NAMESPACE, "max_ammo"),
+            shot_cooldown=settings.get_float(SCENE_NAMESPACE, "shot_cooldown"),
+            reload_duration=settings.get_float(SCENE_NAMESPACE, "reload_duration"),
         )
 
     def warning_duration(self) -> float:

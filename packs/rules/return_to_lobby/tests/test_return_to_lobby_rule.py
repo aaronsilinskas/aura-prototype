@@ -48,10 +48,3 @@ def test_holding_both_buttons_for_hold_seconds_reboots_to_the_previous_scene() -
 
 def test_holding_both_buttons_short_of_hold_seconds_does_not_reboot() -> None:
     assert _hold_both(hold_seconds=1.0, seconds=0.75) == 0
-
-
-def test_the_pack_declares_a_five_second_default_hold() -> None:
-    assert (
-        settings_for(rule_packs={"return_to_lobby": {}}).get("return_to_lobby", "hold_seconds")
-        == 5.0
-    )

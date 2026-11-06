@@ -107,7 +107,7 @@ class PackReference:
 
 
 class Scene:
-    """Declarative bundle describing a scene's rules, packs, and initial data.
+    """Declarative bundle describing a scene's rules, packs, and Settings.
 
     Carries no mutable runtime state.  Pass a zero-arg factory that returns a
     fresh ``Scene`` to ``SceneManager.register``; ``SceneManager`` calls the
