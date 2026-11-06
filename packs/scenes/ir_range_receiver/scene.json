@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "effect_packs": [
-    ["basic", "1.1"]
+    { "name": "basic", "version": "1.1" }
   ],
   "rule_packs": [],
   "initial_data": {

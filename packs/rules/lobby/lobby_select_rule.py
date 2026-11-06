@@ -1,7 +1,7 @@
 """``LobbySelectRule`` — multi-scope scene picker, config-driven via ``initial_data``.
 
-A lobby scene needs no Python of its own: it declares a ``rule_packs: [["lobby",
-"1.0"]]`` entry and seeds ``initial_data`` with a ``lobby`` dict::
+A lobby scene needs no Python of its own: it declares a ``rule_packs: [{"name":
+"lobby", "version": "1.0"}]`` entry and seeds ``initial_data`` with a ``lobby`` dict::
 
     "initial_data": {
       "lobby": {

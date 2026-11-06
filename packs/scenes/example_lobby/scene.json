@@ -1,11 +1,11 @@
 {
   "version": "1.0",
   "effect_packs": [
-    ["elements", "1.0"],
-    ["basic", "1.1"]
+    { "name": "elements", "version": "1.0" },
+    { "name": "basic", "version": "1.1" }
   ],
   "rule_packs": [
-    ["lobby", "1.0"]
+    { "name": "lobby", "version": "1.0" }
   ],
   "initial_data": {
     "lobby": {

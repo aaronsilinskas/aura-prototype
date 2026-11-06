@@ -16,9 +16,10 @@ from engine.events import Event, EventGroup
 from engine.input import ButtonData, InputEvents
 from engine.network import LINE
 from engine.pack_catalog import PackCatalog, PackScanError, scan_pack_roots
-from engine.scene import Scene, SceneRegistry
+from engine.scene import PackReference, Scene, SceneRegistry
 from engine.state import Scope
 from engine.tests.helpers import RecordingSceneReboot, SpyNetworkControls
+from engine.version import Version
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
@@ -781,7 +782,7 @@ def test_flash_scene_can_reference_and_run_a_card_rule_packs_rule(device_storage
     catalog = _boot_catalog(device_storage)
     catalog.scene_registry.register(
         "card_pack_scene",
-        lambda: Scene(effect_packs=[], rule_packs=[["card_pack", "1.0"]]),
+        lambda: Scene(effect_packs=[], rule_packs=[PackReference("card_pack", Version(1, 0))]),
     )
     hw = _fake_hw(storage=device_storage)
 
@@ -797,7 +798,9 @@ def test_card_scene_can_reference_and_run_a_card_rule_packs_rule(device_storage)
     (aura_packs/rules) in its own rule_packs resolves and runs it end to
     end -- both card slices merge into the same shared registries."""
     _make_card_scene(
-        Path(device_storage.mount_root), "card_scene", rule_packs=[["card_pack", "1.0"]]
+        Path(device_storage.mount_root),
+        "card_scene",
+        rule_packs=[{"name": "card_pack", "version": "1.0"}],
     )
     _make_card_rule_pack(
         Path(device_storage.mount_root), "card_pack", "card_rule", _CARD_RULE_PACK_SOURCE
@@ -868,7 +871,9 @@ def _register_scene_declaring_effect_pack(
 ) -> None:
     scene_registry.register(
         scene_name,
-        lambda: Scene(effect_packs=[(pack_name, version)], rule_packs=[]),
+        lambda: Scene(
+            effect_packs=[PackReference(pack_name, Version.parse(version))], rule_packs=[]
+        ),
     )
 
 
@@ -913,7 +918,7 @@ def test_card_scene_resolves_a_card_effect_pack_end_to_end(device_storage):
     _make_card_scene(
         mount_root,
         "card_scene",
-        effect_packs=[["card_pack", "1.0"]],
+        effect_packs=[{"name": "card_pack", "version": "1.0"}],
     )
     hw = _fake_hw(storage=device_storage)
 

@@ -85,23 +85,23 @@ def test_get_returns_scene_with_version_parsed_from_json(pack_tree) -> None:
 def test_get_returns_scene_with_effect_packs_from_json(pack_tree) -> None:
     root = pack_tree.root("ts_flash")
     pack_tree.effect_pack(root, "fx")
-    pack_tree.scene(root, "forest", effect_packs=[["fx", "1.0"]])
+    pack_tree.scene(root, "forest", effect_packs=[{"name": "fx", "version": "1.0"}])
     registry = scan_pack_roots([str(root)]).scene_registry
 
     scene = registry.get("forest")
 
-    assert scene.effect_packs == [["fx", "1.0"]]
+    assert [(pack.name, str(pack.version)) for pack in scene.effect_packs] == [("fx", "1.0")]
 
 
 def test_get_returns_scene_with_rule_packs_from_json(pack_tree) -> None:
     root = pack_tree.root("ts_flash")
     pack_tree.rule_pack(root, "rules")
-    pack_tree.scene(root, "forest", rule_packs=[["rules", "1.0"]])
+    pack_tree.scene(root, "forest", rule_packs=[{"name": "rules", "version": "1.0"}])
     registry = scan_pack_roots([str(root)]).scene_registry
 
     scene = registry.get("forest")
 
-    assert scene.rule_packs == [["rules", "1.0"]]
+    assert [(pack.name, str(pack.version)) for pack in scene.rule_packs] == [("rules", "1.0")]
 
 
 def test_get_returns_scene_with_initial_data_from_json(pack_tree) -> None:

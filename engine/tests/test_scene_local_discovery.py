@@ -86,7 +86,7 @@ def test_scene_manager_load_appends_local_rules_after_pack_rules(pack_tree) -> N
     pack_tree.scene(
         root,
         "my_scene",
-        rule_packs=[["pack_rules", "1.0"]],
+        rule_packs=[{"name": "pack_rules", "version": "1.0"}],
         rules={"local_rule": rule_source("LocalRule")},
     )
     catalog = scan_pack_roots([str(root)])

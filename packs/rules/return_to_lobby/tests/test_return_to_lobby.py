@@ -25,7 +25,9 @@ def _scenes_with_the_pack() -> list[str]:
     return sorted(
         path.parent.name
         for path in _SCENES_DIR.glob("*/scene.json")
-        if any(pack == "return_to_lobby" for pack, _ in json.loads(path.read_text())["rule_packs"])
+        if any(
+            pack["name"] == "return_to_lobby" for pack in json.loads(path.read_text())["rule_packs"]
+        )
     )
 
 

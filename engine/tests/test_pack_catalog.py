@@ -119,8 +119,8 @@ def test_scanned_scene_carries_its_scene_json_fields(pack_tree) -> None:
         root,
         "tag",
         version="2.1",
-        effect_packs=[["basic", "1.0"]],
-        rule_packs=[["core", "1.2"]],
+        effect_packs=[{"name": "basic", "version": "1.0"}],
+        rule_packs=[{"name": "core", "version": "1.2", "settings": {"lives": 3}}],
         ir_codec="nec",
         initial_data={"lives": 3},
     )
@@ -128,8 +128,12 @@ def test_scanned_scene_carries_its_scene_json_fields(pack_tree) -> None:
     scene = scan_pack_roots([str(root)]).scene_registry.get("tag")
 
     assert (scene.version.major, scene.version.minor) == (2, 1)
-    assert scene.effect_packs == [["basic", "1.0"]]
-    assert scene.rule_packs == [["core", "1.2"]]
+    assert [(ref.name, str(ref.version), ref.settings) for ref in scene.effect_packs] == [
+        ("basic", "1.0", {})
+    ]
+    assert [(ref.name, str(ref.version), ref.settings) for ref in scene.rule_packs] == [
+        ("core", "1.2", {"lives": 3})
+    ]
     assert scene.ir_codec == "nec"
     assert scene.initial_data == {"lives": 3}
 
@@ -481,7 +485,7 @@ def test_a_scene_declaring_a_missing_effect_pack_raises_unknown_declared_pack_er
     pack_tree,
 ) -> None:
     root = pack_tree.root("tc_flash")
-    pack_tree.scene(root, "lobby", effect_packs=[["basic", "1.0"]])
+    pack_tree.scene(root, "lobby", effect_packs=[{"name": "basic", "version": "1.0"}])
 
     with pytest.raises(UnknownDeclaredPackError) as excinfo:
         scan_pack_roots([str(root)])
@@ -493,7 +497,7 @@ def test_a_scene_declaring_a_missing_rule_pack_raises_unknown_declared_pack_erro
     pack_tree,
 ) -> None:
     root = pack_tree.root("tc_flash")
-    pack_tree.scene(root, "lobby", rule_packs=[["core", "1.0"]])
+    pack_tree.scene(root, "lobby", rule_packs=[{"name": "core", "version": "1.0"}])
 
     with pytest.raises(UnknownDeclaredPackError) as excinfo:
         scan_pack_roots([str(root)])
@@ -506,7 +510,7 @@ def test_a_rule_pack_declared_as_an_effect_pack_raises_unknown_declared_pack_err
 ) -> None:
     root = pack_tree.root("tc_flash")
     pack_tree.rule_pack(root, "core")
-    pack_tree.scene(root, "lobby", effect_packs=[["core", "1.0"]])
+    pack_tree.scene(root, "lobby", effect_packs=[{"name": "core", "version": "1.0"}])
 
     with pytest.raises(UnknownDeclaredPackError) as excinfo:
         scan_pack_roots([str(root)])
@@ -521,7 +525,12 @@ def test_a_rule_pack_declared_as_an_effect_pack_raises_unknown_declared_pack_err
 def test_a_flash_scene_may_declare_packs_installed_on_the_card(pack_tree) -> None:
     flash = pack_tree.root("tc_flash")
     card = pack_tree.root("tc_card")
-    pack_tree.scene(flash, "lobby", effect_packs=[["extra", "1.0"]], rule_packs=[["bonus", "1.0"]])
+    pack_tree.scene(
+        flash,
+        "lobby",
+        effect_packs=[{"name": "extra", "version": "1.0"}],
+        rule_packs=[{"name": "bonus", "version": "1.0"}],
+    )
     pack_tree.effect_pack(card, "extra")
     pack_tree.rule_pack(card, "bonus")
 
@@ -536,10 +545,22 @@ def test_a_flash_scene_may_declare_packs_installed_on_the_card(pack_tree) -> Non
     [
         pytest.param({"basic": "1.0"}, id="not-a-list"),
         pytest.param(["basic"], id="bare-name"),
-        pytest.param([["basic"]], id="missing-minimum"),
-        pytest.param([["basic", "1.0", "extra"]], id="extra-field"),
-        pytest.param([["basic", 1.0]], id="non-string-minimum"),
-        pytest.param([[7, "1.0"]], id="non-string-name"),
+        pytest.param([["basic", "1.0"]], id="pair-form"),
+        pytest.param([{"version": "1.0"}], id="missing-name"),
+        pytest.param([{"name": "basic"}], id="missing-version"),
+        pytest.param([{"name": "basic", "version": "1.0", "minimum": "1.0"}], id="unknown-key"),
+        pytest.param([{"name": 7, "version": "1.0"}], id="non-string-name"),
+        pytest.param(
+            [{"name": "basic", "version": "1.0", "settings": []}], id="settings-not-object"
+        ),
+        pytest.param(
+            [{"name": "basic", "version": "1.0"}, {"name": "basic", "version": "1.0"}],
+            id="declared-twice",
+        ),
+        pytest.param(
+            [{"name": "basic", "version": "1.0"}, {"name": "basic", "version": "1.4"}],
+            id="declared-twice-at-different-versions",
+        ),
     ],
 )
 def test_a_malformed_declaration_raises_malformed_scene_error(pack_tree, key, declarations) -> None:
@@ -557,7 +578,9 @@ def _scene_declaring_pack(pack_tree, root, kind, *, installed, required):
     """Install *kind* pack ``basic`` at *installed*; return scene ``lobby`` requiring *required*."""
     make_pack = pack_tree.effect_pack if kind == "effect" else pack_tree.rule_pack
     make_pack(root, "basic", version=installed)
-    return pack_tree.scene(root, "lobby", **{kind + "_packs": [["basic", required]]})
+    return pack_tree.scene(
+        root, "lobby", **{kind + "_packs": [{"name": "basic", "version": required}]}
+    )
 
 
 @pytest.mark.parametrize("kind", ["effect", "rule"])
@@ -607,22 +630,11 @@ def test_an_installed_pack_with_the_same_major_and_at_least_the_minor_is_compati
 ) -> None:
     root = pack_tree.root("tc_flash")
     pack_tree.effect_pack(root, "basic", version=installed)
-    pack_tree.scene(root, "lobby", effect_packs=[["basic", "1.3"]])
+    pack_tree.scene(root, "lobby", effect_packs=[{"name": "basic", "version": "1.3"}])
 
     catalog = scan_pack_roots([str(root)])
 
     assert catalog.scene_registry.names() == ["lobby"]
-
-
-def test_a_pack_declared_twice_in_one_scene_is_checked_per_entry(pack_tree) -> None:
-    root = pack_tree.root("tc_flash")
-    pack_tree.effect_pack(root, "basic", version="1.2")
-    pack_tree.scene(root, "lobby", effect_packs=[["basic", "1.0"], ["basic", "1.4"]])
-
-    with pytest.raises(IncompatiblePackError) as excinfo:
-        scan_pack_roots([str(root)])
-
-    assert str(excinfo.value.required) == "1.4"
 
 
 @pytest.mark.parametrize(
@@ -637,7 +649,7 @@ def test_a_declaration_failure_is_caught_as_a_scene_declaration_pack_scan_error(
 ) -> None:
     root = pack_tree.root("tc_flash")
     if installed is None:
-        pack_tree.scene(root, "lobby", effect_packs=[["basic", required]])
+        pack_tree.scene(root, "lobby", effect_packs=[{"name": "basic", "version": required}])
     else:
         _scene_declaring_pack(pack_tree, root, "effect", installed=installed, required=required)
 
