@@ -155,14 +155,12 @@ def test_non_lobby_scene_declares_the_return_to_lobby_rule_pack(
 @pytest.mark.parametrize(
     "scene_name", ["hardware_test", "element_browser", "red_light_green_light", "tag"]
 )
-def test_non_lobby_scene_configures_return_to_lobby_hold_seconds(
+def test_non_lobby_scene_holds_five_seconds_to_return_to_lobby(
     scene_name: str, catalog: PackCatalog
 ) -> None:
-    scene_registry = catalog.scene_registry
+    scene = catalog.scene_registry.get(scene_name)
 
-    scene = scene_registry.get(scene_name)
-
-    assert scene.initial_data["return_to_lobby"] == {"hold_seconds": 5.0}
+    assert scene.settings.get("return_to_lobby", "hold_seconds") == 5.0
 
 
 # --- ir_range_receiver scene discovery (issue #918) ---

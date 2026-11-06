@@ -115,7 +115,7 @@ def test_a_scene_without_a_sounds_folder_has_no_local_sounds(pack_tree) -> None:
 def test_scanned_scene_carries_its_scene_json_fields(pack_tree) -> None:
     root = pack_tree.root("tc_flash")
     pack_tree.effect_pack(root, "basic")
-    pack_tree.rule_pack(root, "core", version="1.2")
+    pack_tree.rule_pack(root, "core", version="1.2", settings={"lives": {"type": "int"}})
     pack_tree.scene(
         root,
         "tag",

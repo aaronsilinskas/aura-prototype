@@ -9,6 +9,7 @@ except ImportError:
     pass  # No typing support on CircuitPython yet
 
 from engine.events import Event
+from engine.settings import Settings
 from engine.state import EffectControls, GameState, NetworkControls, SceneControls
 from engine.timer import Timer
 from engine.version import Version
@@ -86,16 +87,21 @@ class GameEngine:
         self,
         scene_controls: SceneControls,
         initial_data: dict[str, object] | None = None,
+        settings: Settings | None = None,
     ) -> GameState:
         """Create a ``GameState`` pre-wired with this engine's effect controls
         and the given ``scene_controls``.
 
         The optional ``initial_data`` dict seeds the state's internal store with
         starting values accessible via the typed accessor API; the dict is used
-        directly (no copy).
+        directly (no copy). *settings* is the scene's resolved Settings.
         """
         return GameState(
-            self._effect_controls, scene_controls, self._network_controls, initial_data
+            self._effect_controls,
+            scene_controls,
+            self._network_controls,
+            initial_data,
+            settings=settings,
         )
 
     def update(self, state: GameState) -> None:

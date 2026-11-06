@@ -18,6 +18,7 @@ except ImportError:
 from engine.engine import GameEngine, GameRule, Version
 from engine.namespace import ActiveSceneNamespace
 from engine.packs import PackRegistry, UnknownItemError, load_item
+from engine.settings import Settings
 from engine.state import EffectAdmin, GameState, MergeStrategy, SceneControls, SceneReboot, Scope
 
 
@@ -92,7 +93,7 @@ class PackReference:
     *version* is the minimum compatible version: the installed pack must have
     the same major and at least this minor. *settings* holds the scene's
     Setting overrides for the pack, exactly as written in ``scene.json``; the
-    scan does not check them yet.
+    scan checks them when it resolves the scene's Settings.
     """
 
     __slots__ = ("name", "settings", "version")
@@ -142,6 +143,11 @@ class Scene:
     ``initial_data`` — each fresh ``Scene`` from ``SceneRegistry.get`` receives its
     own copy, keeping mutation from poisoning future loads.  Purely additive for
     now — no consumer resolves it yet.
+
+    ``settings`` is the scene's resolved, read-only ``Settings``, which
+    ``SceneManager`` hands to each ``GameState`` it creates for the scene.
+    Scanned scenes share one across fresh ``Scene`` instances; an in-memory
+    scene without one declares no Settings.
     """
 
     __slots__ = (
@@ -153,6 +159,7 @@ class Scene:
         "local_rule_registry",
         "local_sound_map",
         "rule_packs",
+        "settings",
         "version",
     )
 
@@ -166,7 +173,9 @@ class Scene:
         local_rule_registry: SceneLocalRegistry | None = None,
         local_effect_registry: SceneLocalRegistry | None = None,
         local_sound_map: dict[str, str] | None = None,
+        settings: Settings | None = None,
     ) -> None:
+        self.settings = settings if settings is not None else Settings()
         self.effect_packs = effect_packs
         self.rule_packs = rule_packs
         self.initial_data = initial_data
@@ -192,6 +201,7 @@ class _SceneEntry:
         "local_rule_registry",
         "local_sound_map",
         "rule_packs",
+        "settings",
         "source_path",
         "version",
     )
@@ -208,6 +218,8 @@ class _SceneEntry:
         local_effect_registry: SceneLocalRegistry,
         local_sound_map: dict[str, str],
     ) -> None:
+        # Resolved by the catalog once every pack is scanned.
+        self.settings = Settings()
         self.version = version
         self.effect_packs = effect_packs
         self.rule_packs = rule_packs
@@ -277,6 +289,7 @@ class SceneRegistry:
             local_rule_registry=entry.local_rule_registry,
             local_effect_registry=entry.local_effect_registry,
             local_sound_map=dict(entry.local_sound_map),
+            settings=entry.settings,
         )
 
     def ir_codec_for(self, name: str) -> str:
@@ -554,7 +567,7 @@ class SceneManager(SceneControls):
             self._deactivate(self._stack[i])
 
         self._stack = []
-        state = self._engine.create_state(self, scene.initial_data)
+        state = self._engine.create_state(self, scene.initial_data, scene.settings)
         entry = _SceneStackEntry(scene, state, combined_rules, saved_merge=None)
         self._stack.append(entry)
         self._effect_admin.reset_merge_strategies()
@@ -567,7 +580,7 @@ class SceneManager(SceneControls):
         self._deactivate(self._stack[-1])
         saved_merge = self._effect_admin.capture_merge_strategies()
 
-        state = self._engine.create_state(self, scene.initial_data)
+        state = self._engine.create_state(self, scene.initial_data, scene.settings)
         entry = _SceneStackEntry(scene, state, combined_rules, saved_merge=saved_merge)
         self._stack.append(entry)
         self._activate(entry)

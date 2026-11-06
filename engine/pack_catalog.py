@@ -13,7 +13,9 @@ __all__ = [
     "PackScanError",
     "ReservedNameError",
     "SceneDeclarationError",
+    "SettingOverrideError",
     "UnknownDeclaredPackError",
+    "read_manifest_declarations",
     "scan_pack_roots",
 ]
 
@@ -24,6 +26,13 @@ import sys
 import engine._path as _path
 from engine.packs import PackRegistry, _PackEntry, scan_item_names
 from engine.scene import PackReference, SceneLocalRegistry, SceneRegistry, _SceneEntry
+from engine.settings import (
+    SettingDeclaration,
+    Settings,
+    SettingValueError,
+    parse_declarations,
+    resolve_settings,
+)
 from engine.version import Version
 
 _REQUIRED_SCENE_KEYS = ("version", "effect_packs", "rule_packs")
@@ -37,6 +46,12 @@ _EXPORT_ATTR = {"effects": "BUILD", "rules": "RULE"}
 _MANIFEST_NAME = {"effects": "effects.json", "rules": "rules.json"}
 
 _SOUND_EXTENSIONS = (".wav",)
+
+# The namespace of a scene's own Settings; no pack may take the name.
+_SCENE_NAMESPACE = "scene"
+
+# What one scene's ``setting_overrides`` may hold, mirroring ``scene.json``.
+_OVERRIDE_KEYS = ("settings", "effect_packs", "rule_packs")
 
 
 class PackScanError(ValueError):
@@ -142,6 +157,21 @@ class IncompatiblePackError(SceneDeclarationError):
         )
 
 
+class SettingOverrideError(SceneDeclarationError):
+    """Scene *scene* cannot set Setting *setting* of *pack* (or ``"scene"``), for *reason*.
+
+    The override names an undeclared Setting or gives a value of the wrong
+    type, or the Setting is required and nothing set it.
+    """
+
+    def __init__(self, scene: str, pack: str, setting: str, reason: str) -> None:
+        self.setting = setting
+        self.reason = reason
+        super().__init__(
+            scene, pack, f"Scene '{scene}' cannot resolve {pack} Setting '{setting}': {reason}"
+        )
+
+
 class PackCatalog:
     """Everything installed under a device's pack roots, as found by ``scan_pack_roots``."""
 
@@ -183,17 +213,31 @@ class PackCatalog:
 def scan_pack_roots(
     roots: list[str],
     initial_data_overrides: dict[str, dict[str, object]] | None = None,
+    setting_overrides: dict[str, dict[str, dict]] | None = None,
 ) -> PackCatalog:
     """Scan the pack *roots*, in order, into one ``PackCatalog``.
 
     Every scene's ``effect_packs`` and ``rule_packs`` are checked against the
-    scanned packs before the catalog is returned. *initial_data_overrides*
-    (``{scene: {key: value}}``) is merged over each named scene's
-    ``initial_data``, which is how the Simulated device boots shortened scenes.
+    scanned packs, and its Settings resolved, before the catalog is returned.
+    A Setting resolves to its declared default, then the scene's override in
+    its pack reference, then *setting_overrides*.
+
+    *setting_overrides* mirrors ``scene.json`` per scene, keyed by pack name::
+
+        {scene: {"settings": {name: value},
+                 "rule_packs": {pack: {name: value}},
+                 "effect_packs": {pack: {name: value}}}}
+
+    Every key is optional. It is checked like the scene's own overrides; it is
+    how the Simulated device and tests boot shortened scenes.
+    *initial_data_overrides* (``{scene: {key: value}}``) is merged over each
+    named scene's ``initial_data``, for values that are not yet Settings.
 
     Raises:
-        PackScanError: the first problem found on disk (see its subclasses).
-        ValueError: an override names a scene that was not scanned.
+        PackScanError: the first problem found on disk or in
+            *setting_overrides* (see its subclasses).
+        ValueError: an override names a scene that was not scanned, or a
+            scene's *setting_overrides* is not shaped as above.
     """
     overrides = initial_data_overrides or {}
     effect_packs: list[_PackEntry] = []
@@ -211,13 +255,10 @@ def scan_pack_roots(
         _scan_packs(root, root_name, "effects", effect_packs)
         _scan_packs(root, root_name, "rules", rule_packs)
         _scan_scenes(root, root_name, scenes, overrides)
-    for scene in overrides:
-        if scene not in scenes:
-            raise ValueError(
-                f"initial-data override names unknown scene {scene!r}; "
-                + f"known scenes: {', '.join(sorted(scenes))}"
-            )
+    _check_override_scenes("initial-data", overrides, scenes)
+    _check_override_scenes("setting", setting_overrides or {}, scenes)
     _check_declarations(scenes, effect_packs, rule_packs)
+    _resolve_settings(scenes, effect_packs, rule_packs, setting_overrides or {})
     for root_name, root in root_paths.items():
         _add_import_parent(root[: -len(root_name)])
     return PackCatalog(
@@ -226,6 +267,91 @@ def scan_pack_roots(
         SceneRegistry._from_scenes(scenes),
         _pack_sounds(effect_packs),
     )
+
+
+def _check_override_scenes(what: str, overrides: dict, scenes: dict[str, _SceneEntry]) -> None:
+    for scene in overrides:
+        if scene not in scenes:
+            raise ValueError(
+                f"{what} override names unknown scene {scene!r}; "
+                + f"known scenes: {', '.join(sorted(scenes))}"
+            )
+
+
+def _resolve_settings(
+    scenes: dict[str, _SceneEntry],
+    effect_packs: list[_PackEntry],
+    rule_packs: list[_PackEntry],
+    setting_overrides: dict[str, dict[str, dict]],
+) -> None:
+    effect_declarations = {entry.name: entry.declarations for entry in effect_packs}
+    rule_declarations = {entry.name: entry.declarations for entry in rule_packs}
+    for scene, entry in scenes.items():
+        own, effects, rules = _read_setting_overrides(scene, setting_overrides.get(scene, {}))
+        # The scene declares no Settings of its own yet; any override of one fails.
+        values = {_SCENE_NAMESPACE: _resolve_namespace(scene, _SCENE_NAMESPACE, {}, [own])}
+        # Effect-pack Settings are checked, but effects do not receive them yet.
+        _resolve_kind(scene, entry.effect_packs, effect_declarations, effects)
+        values.update(_resolve_kind(scene, entry.rule_packs, rule_declarations, rules))
+        entry.settings = Settings(values)
+
+
+def _read_setting_overrides(
+    scene: str, given: object
+) -> tuple[dict[str, object], dict[str, dict], dict[str, dict]]:
+    """Return *scene*'s ``settings``, ``effect_packs`` and ``rule_packs`` overrides."""
+    if not isinstance(given, dict):
+        raise ValueError(f"setting overrides for scene {scene!r} are not a dict")
+    for key in given:
+        if key not in _OVERRIDE_KEYS:
+            raise ValueError(f"setting overrides for scene {scene!r} have unknown key {key!r}")
+    parts = []
+    for key in _OVERRIDE_KEYS:
+        part = given.get(key, {})
+        if not isinstance(part, dict):
+            raise ValueError(f"setting overrides {key!r} for scene {scene!r} are not a dict")
+        if key != "settings":
+            for pack, values in part.items():
+                if not isinstance(values, dict):
+                    raise ValueError(
+                        f"setting overrides for {key} {pack!r} of scene {scene!r} are not a dict"
+                    )
+        parts.append(part)
+    return parts[0], parts[1], parts[2]
+
+
+def _resolve_kind(
+    scene: str,
+    references: list[PackReference],
+    declarations: dict[str, dict[str, SettingDeclaration]],
+    given: dict[str, dict],
+) -> dict[str, dict[str, object]]:
+    declared = [reference.name for reference in references]
+    for pack, values in given.items():
+        if pack not in declared:
+            for setting in values:
+                raise SettingOverrideError(scene, pack, setting, "the scene does not declare it")
+    return {
+        reference.name: _resolve_namespace(
+            scene,
+            reference.name,
+            declarations[reference.name],
+            [reference.settings, given.get(reference.name, {})],
+        )
+        for reference in references
+    }
+
+
+def _resolve_namespace(
+    scene: str,
+    namespace: str,
+    declarations: dict[str, SettingDeclaration],
+    layers: list[dict[str, object]],
+) -> dict[str, object]:
+    try:
+        return resolve_settings(declarations, layers)
+    except SettingValueError as exc:
+        raise SettingOverrideError(scene, namespace, exc.setting, exc.reason) from exc
 
 
 def _check_declarations(
@@ -302,6 +428,7 @@ def _scan_packs(root: str, root_name: str, kind: str, packs: list[_PackEntry]) -
                 module_prefix=root_name + "." + kind + "." + name,
                 item_names=scan_item_names(pack_dir),
                 source_path=pack_dir,
+                declarations=read_manifest_declarations(manifest, manifest_path),
             )
         )
 
@@ -355,6 +482,18 @@ def _read_manifest(path: str) -> dict:
     if not isinstance(data, dict):
         raise MalformedManifestError(path, "top level is not a JSON object")
     return data
+
+
+def read_manifest_declarations(manifest: dict, path: str) -> dict[str, SettingDeclaration]:
+    """Return the Setting declarations in the Pack *manifest* read from *path*.
+
+    Raises:
+        MalformedManifestError: its ``settings`` section is malformed.
+    """
+    try:
+        return parse_declarations(manifest.get("settings", {}))
+    except ValueError as exc:
+        raise MalformedManifestError(path, str(exc)) from exc
 
 
 def _read_scene_json(scene: str, path: str) -> dict:

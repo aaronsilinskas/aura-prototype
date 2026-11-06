@@ -42,6 +42,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   lerp.py         Integer/float interpolation helpers
   packs.py        PackRegistry, RegistryError family (lookup-time)
   pack_catalog.py scan_pack_roots, PackCatalog, PackScanError family (scan-time)
+  settings.py     Settings (read-only view), Setting declaration parsing and resolution
   version.py      Pack MAJOR.MINOR parsing
   input.py        ButtonData, AccelerationData, InputEvents
   namespace.py    ActiveSceneNamespace; NoActiveSceneError, MissingPrefixError, UndeclaredPackError
@@ -159,7 +160,8 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `ActiveSceneNamespace` | `engine/namespace.py` | Resolves effect names to builders and clip names to WAV paths for the active scene; installed by `SceneManager` per transition |
 | `ResolvedClip` | `effects/effect.py` | A declared `AudioPlaybackConfig` plus its resolved path, carried on `EffectEvent` |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update` tick |
-| `GameState` | `engine/state.py` | Per-tick game context passed to each rule |
+| `GameState` | `engine/state.py` | Per-tick game context passed to each rule; `settings` is its scene's read-only `Settings` |
+| `Settings` | `engine/settings.py` | One scene's resolved Settings, read by namespace (`scene` or a pack name) and name; built by the catalog scan |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
 | `SceneManager` | `engine/scene.py` | Drives scene transitions, installing each active scene into the `ActiveSceneNamespace` and snapshotting merge strategies through `EffectAdmin`; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot` |
@@ -169,7 +171,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
 | `MergeStrategy` | `engine/state.py` | Per-scope compositing policy; subclasses in `engine/effects/merge.py` |
 | `PackRegistry` | `engine/packs.py` | Looks up the items of versioned effect or rule packs by pack and item name; filled only by the catalog |
-| `PackCatalog` | `engine/pack_catalog.py` | One scan of every pack root: effect/rule `PackRegistry`s, `SceneRegistry`, pack sounds map; scene declarations checked |
+| `PackCatalog` | `engine/pack_catalog.py` | One scan of every pack root: effect/rule `PackRegistry`s, `SceneRegistry`, pack sounds map; scene declarations and Setting overrides checked, Settings resolved |
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
 | `Aura` | `magic/aura.py` | A player/object's magic pool + active `Spells` collection |

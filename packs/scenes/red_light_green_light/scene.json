@@ -6,8 +6,5 @@
   ],
   "rule_packs": [
     { "name": "return_to_lobby", "version": "1.0" }
-  ],
-  "initial_data": {
-    "return_to_lobby": { "hold_seconds": 5.0 }
-  }
+  ]
 }
