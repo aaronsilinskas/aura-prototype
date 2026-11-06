@@ -20,8 +20,13 @@ EVERY_STRIP = [
     Scope.AMBIENT,
 ]
 
-SHOOTER = {"tag_expected_team": 2, "tag_expected_player": 3}
+SHOOTER = {"expected_team": 2, "expected_player": 3}
 """Pins the one team/player whose tags count against a device."""
+
+
+def tag_settings(settings: dict[str, object]) -> dict[str, dict[str, dict[str, object]]]:
+    """The ``setting_overrides`` that boot Tag with *settings* in its scene namespace."""
+    return {"tag": {"settings": settings}}
 
 
 def start_game(simulation: Simulation, *players: SimulatedDevice) -> None:
@@ -40,7 +45,7 @@ def tag_shot(team: int, player: int, damage: int) -> bytes:
 
 def shooters_tag(damage: int = 1) -> bytes:
     """A tag shot from the pinned ``SHOOTER``."""
-    return tag_shot(SHOOTER["tag_expected_team"], SHOOTER["tag_expected_player"], damage)
+    return tag_shot(SHOOTER["expected_team"], SHOOTER["expected_player"], damage)
 
 
 def hit(simulation: Simulation, player: SimulatedDevice, payload: bytes) -> None:

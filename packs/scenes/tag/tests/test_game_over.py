@@ -21,14 +21,15 @@ from packs.scenes.tag.tests.helpers import (
     shooters_tag,
     start_game,
     sweeping_red,
+    tag_settings,
 )
 
 STING = "basic.game_over_sting_start"
 
-TWO_HITS_TO_LOSE = {**SHOOTER, "tag_starting_hitpoints": 2}
+TWO_HITS_TO_LOSE = {**SHOOTER, "starting_hitpoints": 2}
 """Two one-damage tags from the pinned shooter end the game."""
 
-MID_RELOAD = {**TWO_HITS_TO_LOSE, "tag_max_ammo": 1, "tag_reload_duration": 1.0}
+MID_RELOAD = {**TWO_HITS_TO_LOSE, "max_ammo": 1, "reload_duration": 1.0}
 """One round, so a fresh press after it starts a reload."""
 
 
@@ -41,7 +42,7 @@ def start_reloading(simulation: Simulation, player: SimulatedDevice) -> None:
     """Fire the only round, then hold the trigger halfway through the reload."""
     player.tap("A")
     player.hold("A")
-    simulation.advance(MID_RELOAD["tag_reload_duration"] / 2)
+    simulation.advance(MID_RELOAD["reload_duration"] / 2)
 
 
 def sting_ends(simulation: Simulation, player: SimulatedDevice) -> None:
@@ -54,7 +55,9 @@ def sting_ends(simulation: Simulation, player: SimulatedDevice) -> None:
 
 
 def test_the_last_hitpoint_lost_plays_the_game_over_sting(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings(TWO_HITS_TO_LOSE)
+    )
     start_game(simulation, player)
 
     run_out_of_hitpoints(simulation, player)
@@ -63,7 +66,9 @@ def test_the_last_hitpoint_lost_plays_the_game_over_sting(simulation):
 
 
 def test_the_game_over_sting_buzzes_three_times(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings(TWO_HITS_TO_LOSE)
+    )
     start_game(simulation, player)
 
     run_out_of_hitpoints(simulation, player)
@@ -73,7 +78,9 @@ def test_the_game_over_sting_buzzes_three_times(simulation):
 
 
 def test_a_hit_that_leaves_hitpoints_does_not_end_the_game(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings(TWO_HITS_TO_LOSE)
+    )
     start_game(simulation, player)
 
     hit(simulation, player, shooters_tag())
@@ -82,7 +89,9 @@ def test_a_hit_that_leaves_hitpoints_does_not_end_the_game(simulation):
 
 
 def test_damage_past_zero_ends_the_game_too(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings(TWO_HITS_TO_LOSE)
+    )
     start_game(simulation, player)
 
     hit(simulation, player, shooters_tag(damage=4))
@@ -91,7 +100,9 @@ def test_damage_past_zero_ends_the_game_too(simulation):
 
 
 def test_game_over_lights_every_pixel_of_every_strip(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings(TWO_HITS_TO_LOSE)
+    )
     start_game(simulation, player)
 
     run_out_of_hitpoints(simulation, player)
@@ -100,18 +111,18 @@ def test_game_over_lights_every_pixel_of_every_strip(simulation):
 
 
 def test_a_reload_in_progress_when_the_game_ends_never_completes(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=MID_RELOAD)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(MID_RELOAD))
     start_game(simulation, player)
     start_reloading(simulation, player)
 
     run_out_of_hitpoints(simulation, player)
-    simulation.advance(MID_RELOAD["tag_reload_duration"])
+    simulation.advance(MID_RELOAD["reload_duration"])
 
     assert not player.has_played("scene.reload_complete")
 
 
 def test_a_reload_in_progress_when_the_game_ends_stops_its_loop(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=MID_RELOAD)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(MID_RELOAD))
     start_game(simulation, player)
     start_reloading(simulation, player)
     reloading = player.is_playing("scene.reload")
@@ -127,7 +138,9 @@ def test_a_reload_in_progress_when_the_game_ends_stops_its_loop(simulation):
 
 
 def test_the_device_returns_to_ready_the_moment_the_sting_ends(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings(TWO_HITS_TO_LOSE)
+    )
     start_game(simulation, player)
     run_out_of_hitpoints(simulation, player)
 
@@ -139,7 +152,9 @@ def test_the_device_returns_to_ready_the_moment_the_sting_ends(simulation):
 
 
 def test_after_the_sting_the_device_sweeps_red_again(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings(TWO_HITS_TO_LOSE)
+    )
     start_game(simulation, player)
     run_out_of_hitpoints(simulation, player)
 
@@ -149,7 +164,9 @@ def test_after_the_sting_the_device_sweeps_red_again(simulation):
 
 
 def test_a_press_after_game_over_starts_a_fresh_game(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_HITS_TO_LOSE)
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings(TWO_HITS_TO_LOSE)
+    )
     start_game(simulation, player)
     run_out_of_hitpoints(simulation, player)
     sting_ends(simulation, player)
@@ -161,7 +178,7 @@ def test_a_press_after_game_over_starts_a_fresh_game(simulation):
 
 
 def test_a_reload_cut_short_by_game_over_does_not_finish_in_the_next_game(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=MID_RELOAD)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(MID_RELOAD))
     start_game(simulation, player)
     start_reloading(simulation, player)
     run_out_of_hitpoints(simulation, player)

@@ -7,5 +7,47 @@
   ],
   "rule_packs": [
     { "name": "return_to_lobby", "version": "1.0" }
-  ]
+  ],
+  "settings": {
+    "starting_hitpoints": {
+      "type": "int",
+      "default": 10,
+      "description": "Hitpoints a player starts each game with."
+    },
+    "expected_team": {
+      "type": "int",
+      "default": 0,
+      "description": "Team of the only shooter whose tags land."
+    },
+    "expected_player": {
+      "type": "int",
+      "default": 1,
+      "description": "Player number of the only shooter whose tags land."
+    },
+    "warning_pulse_count": {
+      "type": "int",
+      "default": 5,
+      "description": "Warning pulses in the Starting countdown."
+    },
+    "warning_pulse_duration": {
+      "type": "float",
+      "default": 0.6,
+      "description": "Seconds per Starting countdown pulse."
+    },
+    "max_ammo": {
+      "type": "int",
+      "default": 10,
+      "description": "Shots in a full magazine."
+    },
+    "shot_cooldown": {
+      "type": "float",
+      "default": 0.3,
+      "description": "Minimum seconds between shots."
+    },
+    "reload_duration": {
+      "type": "float",
+      "default": 3.0,
+      "description": "Seconds an empty magazine takes to reload."
+    }
+  }
 }
