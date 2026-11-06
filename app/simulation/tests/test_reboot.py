@@ -14,7 +14,9 @@ import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
 from engine.network import LINE
+from engine.pack_catalog import SettingOverrideError
 from engine.state import Scope
+from packs.tests.settings_helper import settings_for
 
 _SCENES_DIR = Path(__file__).resolve().parents[3] / "packs" / "scenes"
 
@@ -44,7 +46,33 @@ def launch(device: SimulatedDevice, scene: str) -> None:
 def hold_to_return(simulation: Simulation, device: SimulatedDevice) -> None:
     """Hold A+B for the scene's ``hold_seconds``, rebooting back to the lobby; A and B stay down."""
     device.hold("A", "B")
-    simulation.advance(_initial_data(device.scene)["return_to_lobby"]["hold_seconds"])
+    simulation.advance(settings_for(device.scene).get("return_to_lobby", "hold_seconds"))
+
+
+def test_setting_overrides_change_a_launched_scenes_hold_seconds(simulation):
+    device = simulation.add_device(
+        "red",
+        scene="example_lobby",
+        setting_overrides={"tag": {"rule_packs": {"return_to_lobby": {"hold_seconds": 1.0}}}},
+    )
+    launch(device, "tag")
+
+    device.hold("A", "B")
+    simulation.advance(1.0)
+
+    assert device.scene == "example_lobby"
+
+
+def test_a_misspelled_setting_override_fails_the_boot(simulation):
+    with pytest.raises(SettingOverrideError) as excinfo:
+        simulation.add_device(
+            "red",
+            scene="tag",
+            setting_overrides={"tag": {"rule_packs": {"return_to_lobby": {"hold_secs": 1.0}}}},
+        )
+
+    error = excinfo.value
+    assert (error.scene, error.pack, error.setting) == ("tag", "return_to_lobby", "hold_secs")
 
 
 def test_the_lobbys_b_reboots_into_the_selected_scene(simulation):

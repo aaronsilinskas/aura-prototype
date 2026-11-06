@@ -191,11 +191,18 @@ class Simulation:
         scene_data: dict[str, object] | None = None,
         sd_card: bool = True,
         card: str | Path | None = None,
+        setting_overrides: dict[str, dict[str, dict]] | None = None,
     ) -> SimulatedDevice:
         """Switch a new simulated device on into *scene*, its flash ``default_scene``.
 
         Every boot runs the scene the card names, else *scene*. *scene_data*
-        overrides *scene*'s tunables on every boot. The device's card is
+        overrides *scene*'s ``initial_data`` on every boot. *setting_overrides*
+        overrides Settings of any scene, on every boot, shaped per scene as
+        ``scene.json`` and keyed by pack name::
+
+            {"tag": {"rule_packs": {"return_to_lobby": {"hold_seconds": 1.0}}}}
+
+        It is checked as the scan checks ``scene.json``. The device's card is
         *card*, a directory the test prepared, used in place: it is on the
         card from the first boot, and what the device writes lands there.
         Without *card* the card is a fresh empty directory this simulation
@@ -203,13 +210,17 @@ class Simulation:
         only when reset or redeployed. Its radio node is its place in add order, from 1.
 
         Raises:
+            SettingOverrideError: *setting_overrides* names an undeclared
+                Setting, gives the wrong type, or leaves one unset.
             ValueError: If *card* is given with *sd_card* false, or is
                 another device's card; or if this card carries
                 ``aura_packs/`` and another device's already did.
         """
         radio_node = len(self.devices) + 1
         card_dir = self._card_for(name, sd_card, card, radio_node)
-        device = SimulatedDevice(self, name, scene, scene_data or {}, card_dir, radio_node)
+        device = SimulatedDevice(
+            self, name, scene, scene_data or {}, card_dir, radio_node, setting_overrides
+        )
         self.devices.append(device)
         return device
 
@@ -337,6 +348,7 @@ class SimulatedDevice:
         scene_data: dict[str, object],
         card: Path | None,
         radio_node: int,
+        setting_overrides: dict[str, dict[str, dict]] | None = None,
     ) -> None:
         self.name = name
         self.card = card
@@ -347,6 +359,7 @@ class SimulatedDevice:
         self._switched_on_into = scene
         self._flash_settings: dict[str, object] = {"default_scene": scene}
         self._scene_data = scene_data
+        self._setting_overrides = setting_overrides
         self._sim_hw = SimulatedHardware(
             now=lambda: sim.now,
             config=_simulated_device_config(card is not None, radio_node),
@@ -365,6 +378,7 @@ class SimulatedDevice:
             reset=_reset,
             timer=_SimulationClock(self._sim),
             scene_data={self._switched_on_into: self._scene_data} if self._scene_data else None,
+            setting_overrides=self._setting_overrides,
         )
         self._scene_tick = boot.tick
         self._namespace = boot.runtime.namespace

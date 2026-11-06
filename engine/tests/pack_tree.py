@@ -43,13 +43,18 @@ class PackTree:
         version: str | None = "1.0",
         items: dict[str, str] | None = None,
         sounds: Iterable[str] = (),
+        settings: dict[str, object] | None = None,
         manifest: str | None = None,
     ) -> Path:
         """Create effect pack *name* under *root*, with ``effects.json`` stating *version*.
 
-        *manifest* gives the manifest's raw text instead; ``version=None`` omits it.
+        *settings* is the manifest's ``settings`` section, the pack's Setting
+        declarations. *manifest* gives the manifest's raw text instead;
+        ``version=None`` omits the version.
         """
-        pack_dir = self._pack(root / "effects" / name, "effects.json", version, manifest, items)
+        pack_dir = self._pack(
+            root / "effects" / name, "effects.json", version, settings, manifest, items
+        )
         _write_sounds(pack_dir, sounds)
         return pack_dir
 
@@ -60,13 +65,16 @@ class PackTree:
         *,
         version: str | None = "1.0",
         items: dict[str, str] | None = None,
+        settings: dict[str, object] | None = None,
         manifest: str | None = None,
     ) -> Path:
         """Create rule pack *name* under *root*, with ``rules.json`` stating *version*.
 
-        *manifest* gives the manifest's raw text instead; ``version=None`` omits it.
+        *settings* is the manifest's ``settings`` section, the pack's Setting
+        declarations. *manifest* gives the manifest's raw text instead;
+        ``version=None`` omits the version.
         """
-        return self._pack(root / "rules" / name, "rules.json", version, manifest, items)
+        return self._pack(root / "rules" / name, "rules.json", version, settings, manifest, items)
 
     def scene(
         self,
@@ -125,21 +133,30 @@ class PackTree:
             self.scene(root, name, **fields)
         return self.scan_roots(root)
 
-    def scan_roots(self, *roots: Path) -> PackCatalog:
-        """Scan *roots*, in order, into a ``PackCatalog``."""
-        return scan_pack_roots([str(root) for root in roots])
+    def scan_roots(
+        self, *roots: Path, setting_overrides: dict[str, dict] | None = None
+    ) -> PackCatalog:
+        """Scan *roots*, in order, into a ``PackCatalog``, with *setting_overrides*."""
+        return scan_pack_roots([str(root) for root in roots], setting_overrides=setting_overrides)
 
     def _pack(
         self,
         pack_dir: Path,
         manifest_name: str,
         version: str | None,
+        settings: dict[str, object] | None,
         manifest: str | None,
         items: dict[str, str] | None,
     ) -> Path:
         pack_dir.mkdir(parents=True, exist_ok=True)
-        if manifest is None and version is not None:
-            manifest = json.dumps({"version": version})
+        if manifest is None:
+            data: dict[str, object] = {}
+            if version is not None:
+                data["version"] = version
+            if settings is not None:
+                data["settings"] = settings
+            if data:
+                manifest = json.dumps(data)
         if manifest is not None:
             (pack_dir / manifest_name).write_text(manifest)
         _write_items(pack_dir, items)

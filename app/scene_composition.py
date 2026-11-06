@@ -131,12 +131,14 @@ def resolve_ir_codec(
 def scan_boot_pack_catalog(
     storage: DeviceStorage | None,
     scene_data: dict[str, dict[str, object]] | None = None,
+    setting_overrides: dict[str, dict[str, dict]] | None = None,
 ) -> PackCatalog:
     """Scan the device's pack roots into the one ``PackCatalog`` boot runs on.
 
     Flash ``packs`` always; the card's ``aura_packs`` only when *storage* is
     mounted and carries that folder. Call it after storage mounts.
-    *scene_data* is passed through as the catalog's initial-data overrides.
+    *scene_data* is passed through as the catalog's initial-data overrides,
+    and *setting_overrides* as its Setting overrides (see ``scan_pack_roots``).
 
     Raises:
         PackScanError: a pack or scene under either root is misconfigured.
@@ -146,7 +148,9 @@ def scan_boot_pack_catalog(
         card_root = storage.path(_CARD_PACKS_ROOT)
         if _path.isdir(card_root):
             roots.append(card_root)
-    return scan_pack_roots(roots, initial_data_overrides=scene_data)
+    return scan_pack_roots(
+        roots, initial_data_overrides=scene_data, setting_overrides=setting_overrides
+    )
 
 
 def build_scene_runtime(
@@ -222,6 +226,7 @@ def build_scene_boot(
     timer: Timer | None = None,
     logger: Logger | None = None,
     scene_data: dict[str, dict[str, object]] | None = None,
+    setting_overrides: dict[str, dict[str, dict]] | None = None,
 ) -> SceneBoot:
     """Boot *hw* into its boot scene; return its name, per-tick body and runtime.
 
@@ -234,12 +239,14 @@ def build_scene_boot(
     persists to ``hw.storage``, then calls *reset*.
 
     *scene_data* maps a scene name to tunables merged over its
-    ``initial_data``; the Simulated device boots shortened scenes through it.
+    ``initial_data``, and *setting_overrides* overrides scenes' Settings
+    (shaped as for ``scan_pack_roots``); the Simulated device boots shortened
+    scenes through them.
 
     The runtime's ``namespace`` is the game's own Active scene namespace, so
     the Simulated device can resolve a clip name exactly as the game does.
     """
-    catalog = scan_boot_pack_catalog(hw.storage, scene_data)
+    catalog = scan_boot_pack_catalog(hw.storage, scene_data, setting_overrides)
     scene_registry = catalog.scene_registry
     apply_scene_deploy(hw.storage, boot_mapping, logger)
     scene_name = resolve_boot_scene_name(scene_registry, hw.storage, boot_mapping, logger)

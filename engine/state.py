@@ -24,6 +24,7 @@ except ImportError:
 
 from effects.effect import PixelBuffer
 from engine.events import Event
+from engine.settings import Settings
 
 
 class ScopeValue:
@@ -403,6 +404,7 @@ class GameState:
         "_elapsed",
         "_len",
         "_queue",
+        "_settings",
         "_total",
         "effect_controls",
         "network_controls",
@@ -416,6 +418,7 @@ class GameState:
         network_controls: NetworkControls | None = None,
         data: dict[str, object] | None = None,
         queue_capacity: int = 8,
+        settings: Settings | None = None,
     ) -> None:
         self.effect_controls = effect_controls
         self.scene_controls = scene_controls
@@ -425,9 +428,15 @@ class GameState:
         self._queue: list[Event | None] = [None] * queue_capacity
         self._len: int = 0
         self._data: dict[str, object] = data if data is not None else {}
+        self._settings: Settings = settings if settings is not None else Settings()
         self._elapsed: float = 0.0
         self._total: float = 0.0
         self._dispatch_count: int = 0
+
+    @property
+    def settings(self) -> Settings:
+        """The scene's resolved Settings: read-only, and apart from ``get``/``set`` data."""
+        return self._settings
 
     @property
     def elapsed(self) -> float:

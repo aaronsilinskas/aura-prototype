@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
+from packs.tests.settings_helper import settings_for
 
 _SCENES_DIR = Path(__file__).resolve().parents[3] / "scenes"
 
@@ -40,7 +41,7 @@ LOBBY_ENTRIES = [
 
 
 def hold_seconds(scene: str) -> float:
-    return _scene_json(scene)["initial_data"]["return_to_lobby"]["hold_seconds"]
+    return settings_for(scene).get("return_to_lobby", "hold_seconds")  # type: ignore[return-value]
 
 
 def launch(simulation: Simulation, scene: str) -> SimulatedDevice:

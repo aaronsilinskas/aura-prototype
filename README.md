@@ -232,14 +232,34 @@ first use.
   `(config) → Effect` callable. Effect names use `"pack.effect"` format (e.g. `"elements.fire"`).
 - **Rule pack** — manifest `rules.json`; each `.py` file exports `RULE`: a `GameRule` instance.
 
-The manifest is a JSON object stating the pack's version:
+The manifest is a JSON object stating the pack's version and, optionally,
+declaring the pack's **Settings**:
 
 ```json
-{"version": "1.0"}
+{
+  "version": "1.0",
+  "settings": {
+    "hold_seconds": {"type": "float", "default": 5.0, "description": "Seconds to hold."}
+  }
+}
 ```
 
+A Setting's `type` is `int`, `float` (an `int` value is accepted), `bool` or
+`str`. A Setting with no `default` is required: every scene declaring the pack
+must set it. A scene sets a pack's Settings in that pack's reference, under
+`settings`; the scan checks each override and resolves every Setting (the
+default, then the scene's override, then any `setting_overrides` passed to the
+scan), raising `SettingOverrideError` naming the scene, pack and Setting.
+Rules read them through `state.settings.get(<pack>, <name>)`, which has no
+default argument and no write path.
+
 A folder without a manifest is not a pack and is skipped. A manifest that is
-not a JSON object fails the scan with `MalformedManifestError`.
+not a JSON object, or declares a Setting with an unknown type or a default of
+the wrong type, fails the scan with `MalformedManifestError`.
+
+A pack's Settings are part of its versioned interface: adding a Setting with a
+default is a minor bump; adding a required Setting, or removing, renaming or
+retyping one, is a major bump. The scan does not enforce this.
 
 Version format is `MAJOR.MINOR`. A `Scene` declares minimum required versions;
 the catalog scan checks them at boot (same-major, installed-minor ≥ required-minor).
@@ -248,7 +268,7 @@ the catalog scan checks them at boot (same-major, installed-minor ≥ required-m
 
 A **Scene** is a declarative bundle:
 
-- `effect_packs` — ordered `{"name": ..., "version": ...}` objects (an optional `settings` object holds that pack's Setting overrides); `version` is the minimum compatible version, same major, checked at scan
+- `effect_packs` — ordered `{"name": ..., "version": ...}` objects (an optional `settings` object holds that pack's Setting overrides, checked at scan; effects do not receive them yet); `version` is the minimum compatible version, same major, checked at scan
 - `rule_packs` — the same object form; all rules loaded and appended in declared order
 - Optional `initial_data: dict` — seed values for `GameState.data`
 
