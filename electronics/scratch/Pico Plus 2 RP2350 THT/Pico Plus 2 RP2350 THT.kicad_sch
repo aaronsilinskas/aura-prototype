@@ -7305,16 +7305,6 @@
 		)
 		(uuid "14fed4a2-c59c-4f0d-a8f5-3c77c959c278")
 	)
-	(label "RFM69 CS"
-		(at 17.78 81.28 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "16fa86c6-87ce-4088-af07-ceabd362ac45")
-	)
 	(label "LED STRIP 4"
 		(at 80.01 58.42 0)
 		(effects
@@ -7395,16 +7385,6 @@
 		)
 		(uuid "32f966f5-168a-4628-aa3b-583d3170332a")
 	)
-	(label "LED STRIP 1"
-		(at 20.32 132.08 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "34368324-6fcb-4c8d-9070-20d8b38f6add")
-	)
 	(label "BUTTON B"
 		(at 257.81 99.06 0)
 		(effects
@@ -7415,15 +7395,15 @@
 		)
 		(uuid "37b884cc-66bb-49b2-bb7a-4ccdeb15d947")
 	)
-	(label "LED SHIFTED 2"
-		(at 20.32 142.24 0)
+	(label "LED SHIFTED 3"
+		(at 63.5 137.16 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "3cd10d13-91bb-44e2-ae2c-557f6884ce6a")
+		(uuid "38cd0970-a1a5-4dd6-b4da-0a41e3744eac")
 	)
 	(label "SCL"
 		(at 107.95 109.22 0)
@@ -7444,6 +7424,16 @@
 			(justify left bottom)
 		)
 		(uuid "4cfedd51-303e-4f80-a719-fa951c5855c6")
+	)
+	(label "RFM69 CS"
+		(at 17.78 76.2 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "4e51eb5b-2c50-4e92-ab12-7f4eee3f07bf")
 	)
 	(label "IR RX 1"
 		(at 17.78 71.12 0)
@@ -7485,6 +7475,26 @@
 		)
 		(uuid "55d3616c-ef9f-4d46-b9be-f1079dea9176")
 	)
+	(label "LED SHIFTED 1"
+		(at 63.5 144.78 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "56156aa2-e59d-41a4-856d-445801851af5")
+	)
+	(label "LED SHIFTED 2"
+		(at 20.32 142.24 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "59aadce6-8ee9-43ce-bd70-6431645a4081")
+	)
 	(label "POWER_EN"
 		(at 187.96 149.86 0)
 		(effects
@@ -7494,6 +7504,16 @@
 			(justify left bottom)
 		)
 		(uuid "5d3619a4-4ba0-4de3-881a-8a61fc7e7d87")
+	)
+	(label "LED STRIP 2"
+		(at 20.32 139.7 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "5ee06aed-08f7-48a6-8c28-dcae55bb6478")
 	)
 	(label "SD SCLK"
 		(at 107.95 69.85 0)
@@ -7515,16 +7535,6 @@
 		)
 		(uuid "60eb8dea-4cac-4e29-b7d4-95bbe1fb3f64")
 	)
-	(label "LED SHIFTED 3"
-		(at 63.5 144.78 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "628cc1e9-645c-4f1f-b1a1-5d45effdbb3b")
-	)
 	(label "IR RX 1"
 		(at 233.68 26.67 0)
 		(effects
@@ -7534,16 +7544,6 @@
 			(justify left bottom)
 		)
 		(uuid "66d1a7ef-8a8e-4a79-b4f5-6ad6a56d2639")
-	)
-	(label "LED SHIFTED 1"
-		(at 20.32 134.62 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "69536526-d108-4b04-a76e-e563adbbd5a3")
 	)
 	(label "LED SHIFTED 4"
 		(at 93.98 180.34 0)
@@ -7564,6 +7564,26 @@
 			(justify left bottom)
 		)
 		(uuid "749aacb1-4771-4a0a-8397-259923fa8f0e")
+	)
+	(label "LED SHIFTED 4"
+		(at 20.32 134.62 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "7948d10a-5625-4f1b-b8ec-b3de92c1ed0b")
+	)
+	(label "LED STRIP 3"
+		(at 63.5 134.62 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "81491712-ddb8-4286-b7c0-bf0651a8773f")
 	)
 	(label "I2S LRC"
 		(at 80.01 66.04 0)
@@ -7725,16 +7745,6 @@
 		)
 		(uuid "b036dd76-da64-41d4-9839-6f0621644100")
 	)
-	(label "LED STRIP 4"
-		(at 63.5 134.62 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "b0a04f33-46c4-4a8b-90f6-bd04ea287366")
-	)
 	(label "IR TX AOE"
 		(at 173.99 102.87 0)
 		(effects
@@ -7744,26 +7754,6 @@
 			(justify left bottom)
 		)
 		(uuid "b6dbf687-1638-4626-9c4f-51fa864a468c")
-	)
-	(label "LED STRIP 2"
-		(at 20.32 139.7 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "b8d2519d-6a34-46c9-b33c-1b899b1c5508")
-	)
-	(label "LED SHIFTED 4"
-		(at 63.5 137.16 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "bacd2f3e-4474-4072-8bc3-0b3ed2c66798")
 	)
 	(label "LED STRIP 3"
 		(at 16.51 175.26 0)
@@ -7784,6 +7774,16 @@
 			(justify left bottom)
 		)
 		(uuid "bcdc0a5e-cd20-4f81-90b6-65ba88ea5d6a")
+	)
+	(label "LED STRIP 1"
+		(at 63.5 142.24 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "bdf6e54a-2890-4f04-a6b0-962551617a2a")
 	)
 	(label "SCL"
 		(at 17.78 60.96 0)
@@ -7855,15 +7855,15 @@
 		)
 		(uuid "dddd51ad-2a24-490c-87eb-d3160ff98df3")
 	)
-	(label "LED STRIP 3"
-		(at 63.5 142.24 0)
+	(label "RFM69 Reset"
+		(at 17.78 81.28 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify left bottom)
 		)
-		(uuid "e114b4dc-ef6d-41d9-a0f4-2edc9fbbcf4f")
+		(uuid "df5524d1-5e7f-44a3-846b-5ba3a68a3f0d")
 	)
 	(label "IR RX 3"
 		(at 233.68 77.47 0)
@@ -7874,6 +7874,16 @@
 			(justify left bottom)
 		)
 		(uuid "e310bfff-2e8f-48fc-ae3c-faada1c3be9b")
+	)
+	(label "LED STRIP 4"
+		(at 20.32 132.08 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "e6850038-6cd6-4ab8-860f-922086855c2a")
 	)
 	(label "I2S BCLK"
 		(at 142.24 27.94 0)
@@ -7924,16 +7934,6 @@
 			(justify left bottom)
 		)
 		(uuid "f70dc8cd-9126-4c67-a7dd-11ca79a9b5fe")
-	)
-	(label "RFM69 Reset"
-		(at 17.78 76.2 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "f925fff2-f26c-4505-b129-953433cc8942")
 	)
 	(label "RFM69 SCLK"
 		(at 17.78 83.82 0)
