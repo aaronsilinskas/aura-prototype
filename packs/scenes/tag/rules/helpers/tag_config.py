@@ -1,14 +1,12 @@
-"""``TagConfig`` — immutable scene configuration for the Tag scene.
+"""``TagConfig`` — the Tag scene's Scene Config.
 
-Holds the tunables seeded via ``initial_data`` (all ``tag_*`` seed keys).
-``TagConfig.__init__`` takes already-resolved values so it is unit-testable
-directly with no ``GameState`` involved; ``from_state`` is the factory that
-reads the flat seeded ``tag_*`` keys and applies defaults.
+Holds the scene's Settings, declared in its ``scene.json``, and the values
+derived from them. ``TagConfig.__init__`` takes already-resolved values so it
+is unit-testable directly; ``from_settings`` builds one from the Settings view.
 
 ``tag_config`` is a :class:`engine.state.StateSlot` callable accessor: it lazily
-builds the config from ``state`` on first use and caches it under a single
-``GameState`` key, mirroring the ``rlgl_config`` precedent in the
-red_light_green_light scene.
+builds the config from ``state.settings`` on first use and caches it under a
+single ``GameState`` key.
 """
 
 from __future__ import annotations
@@ -18,17 +16,17 @@ try:
 except ImportError:
     pass
 
+from engine.settings import SCENE_NAMESPACE, Settings
 from engine.state import GameState, StateSlot
 
 _CONFIG_KEY: Final = "tag_config"
 
 
 class TagConfig:
-    """Immutable tunable configuration for the Tag scene.
+    """Immutable configuration for the Tag scene.
 
-    All values are already-resolved (no ``GameState`` knowledge), so this can
-    be constructed directly in tests. Use :meth:`from_state` to build one
-    from a seeded ``GameState``.
+    All values are already-resolved, so this can be constructed directly in
+    tests. Use :meth:`from_settings` to build one from the scene's Settings.
     """
 
     __slots__ = (
@@ -63,17 +61,17 @@ class TagConfig:
         self.reload_duration = reload_duration
 
     @classmethod
-    def from_state(cls, state: GameState) -> TagConfig:
-        """Build a config from the flat seeded ``tag_*`` keys, applying defaults."""
+    def from_settings(cls, settings: Settings) -> TagConfig:
+        """Build a config from the scene's Settings, each named as its field."""
         return cls(
-            starting_hitpoints=state.get("tag_starting_hitpoints", 10),
-            expected_team=state.get("tag_expected_team", 0),
-            expected_player=state.get("tag_expected_player", 1),
-            warning_pulse_count=state.get("tag_warning_pulse_count", 5),
-            warning_pulse_duration=state.get("tag_warning_pulse_duration", 0.6),
-            max_ammo=state.get("tag_max_ammo", 10),
-            shot_cooldown=state.get("tag_shot_cooldown", 0.3),
-            reload_duration=state.get("tag_reload_duration", 3.0),
+            starting_hitpoints=settings.get_int(SCENE_NAMESPACE, "starting_hitpoints"),
+            expected_team=settings.get_int(SCENE_NAMESPACE, "expected_team"),
+            expected_player=settings.get_int(SCENE_NAMESPACE, "expected_player"),
+            warning_pulse_count=settings.get_int(SCENE_NAMESPACE, "warning_pulse_count"),
+            warning_pulse_duration=settings.get_float(SCENE_NAMESPACE, "warning_pulse_duration"),
+            max_ammo=settings.get_int(SCENE_NAMESPACE, "max_ammo"),
+            shot_cooldown=settings.get_float(SCENE_NAMESPACE, "shot_cooldown"),
+            reload_duration=settings.get_float(SCENE_NAMESPACE, "reload_duration"),
         )
 
     def warning_duration(self) -> float:
@@ -81,4 +79,8 @@ class TagConfig:
         return self.warning_pulse_count * self.warning_pulse_duration
 
 
-tag_config: StateSlot = StateSlot(_CONFIG_KEY, TagConfig.from_state, TagConfig)
+def _from_state(state: GameState) -> TagConfig:
+    return TagConfig.from_settings(state.settings)
+
+
+tag_config: StateSlot = StateSlot(_CONFIG_KEY, _from_state, TagConfig)

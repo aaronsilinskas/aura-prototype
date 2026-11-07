@@ -9,6 +9,7 @@ except ImportError:
     pass  # No typing support on CircuitPython yet
 
 from engine.events import Event
+from engine.settings import Settings
 from engine.state import EffectControls, GameState, NetworkControls, SceneControls
 from engine.timer import Timer
 from engine.version import Version
@@ -55,8 +56,9 @@ class GameEngine:
     An optional ``timer`` argument may be injected at construction time for
     test-time clock control; production code uses the default ``Timer()``.
 
-    Use ``create_state(scene_controls, initial_data)`` to create a ``GameState``
-    pre-wired with this engine's effect controls and the given scene controls.
+    Use ``create_state(scene_controls, settings)`` to create a ``GameState``
+    pre-wired with this engine's effect controls, the given scene controls and
+    the scene's Settings.
     """
 
     __slots__ = ("_effect_controls", "_network_controls", "_rules", "_timer")
@@ -85,17 +87,19 @@ class GameEngine:
     def create_state(
         self,
         scene_controls: SceneControls,
-        initial_data: dict[str, object] | None = None,
+        settings: Settings | None = None,
     ) -> GameState:
-        """Create a ``GameState`` pre-wired with this engine's effect controls
-        and the given ``scene_controls``.
+        """Create an empty ``GameState`` pre-wired with this engine's effect
+        controls and the given ``scene_controls``.
 
-        The optional ``initial_data`` dict seeds the state's internal store with
-        starting values accessible via the typed accessor API; the dict is used
-        directly (no copy).
+        *settings* is the scene's resolved Settings; the ``get``/``set`` store
+        starts empty, for rules to seed their own runtime state.
         """
         return GameState(
-            self._effect_controls, scene_controls, self._network_controls, initial_data
+            self._effect_controls,
+            scene_controls,
+            self._network_controls,
+            settings=settings,
         )
 
     def update(self, state: GameState) -> None:

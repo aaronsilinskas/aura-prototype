@@ -2,8 +2,8 @@
 
 Each test boots the real Tag scene, walks it into Playing through real button
 presses, and asserts on what the device observably did: IR sent, clips
-played, haptics, strip pixels. A test that depends on a tunable pins it with
-``scene_data`` rather than restating the scene's default.
+played, haptics, strip pixels. A test that depends on a Setting pins it with
+``setting_overrides`` rather than restating the scene's default.
 """
 
 from __future__ import annotations
@@ -11,9 +11,9 @@ from __future__ import annotations
 from app.simulation import SimulatedDevice, Simulation, Strip
 from effects.effect import HapticPattern
 from engine.state import Scope
-from packs.scenes.tag.tests.helpers import AMMO_AMBER, RED, SHOOTER, shots, start_game
+from packs.scenes.tag.tests.helpers import AMMO_AMBER, RED, SHOOTER, shots, start_game, tag_settings
 
-TWO_ROUNDS = {"tag_max_ammo": 2, "tag_shot_cooldown": 0.3, "tag_reload_duration": 1.0}
+TWO_ROUNDS = {"max_ammo": 2, "shot_cooldown": 0.3, "reload_duration": 1.0}
 """A short magazine and reload, so running dry and reloading stay quick."""
 
 
@@ -23,7 +23,7 @@ TWO_ROUNDS = {"tag_max_ammo": 2, "tag_shot_cooldown": 0.3, "tag_reload_duration"
 
 
 def test_pressing_a_fires_the_players_own_tag_on_the_line_emitter(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
     start_game(simulation, player)
 
     player.tap("A")
@@ -69,7 +69,9 @@ def test_the_fire_flash_goes_dark_when_the_fire_sound_ends(simulation):
 
 
 def test_a_shot_drains_one_pip_from_the_full_amber_ammo_bar(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data={"tag_max_ammo": 10})
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings({"max_ammo": 10})
+    )
     start_game(simulation, player)
 
     player.tap("A")
@@ -91,7 +93,7 @@ def test_an_idle_trigger_sends_nothing(simulation):
 
 def test_pressing_a_before_the_game_starts_counts_down_instead_of_firing(simulation):
     player = simulation.add_device(
-        "red", scene="tag", scene_data={"tag_warning_pulse_duration": 0.6}
+        "red", scene="tag", setting_overrides=tag_settings({"warning_pulse_duration": 0.6})
     )
 
     player.tap("A")
@@ -107,7 +109,9 @@ def test_pressing_a_before_the_game_starts_counts_down_instead_of_firing(simulat
 
 
 def test_a_second_press_inside_the_cooldown_is_swallowed(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data={"tag_shot_cooldown": 1.0})
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings({"shot_cooldown": 1.0})
+    )
     start_game(simulation, player)
 
     player.tap("A")
@@ -117,7 +121,9 @@ def test_a_second_press_inside_the_cooldown_is_swallowed(simulation):
 
 
 def test_a_press_after_the_cooldown_fires_again(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data={"tag_shot_cooldown": 0.3})
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings({"shot_cooldown": 0.3})
+    )
     start_game(simulation, player)
 
     player.tap("A")
@@ -133,23 +139,23 @@ def test_a_press_after_the_cooldown_fires_again(simulation):
 
 
 def empty_the_magazine(simulation: Simulation, player: SimulatedDevice) -> None:
-    for _ in range(TWO_ROUNDS["tag_max_ammo"]):
+    for _ in range(TWO_ROUNDS["max_ammo"]):
         player.tap("A")
-        simulation.advance(TWO_ROUNDS["tag_shot_cooldown"])
+        simulation.advance(TWO_ROUNDS["shot_cooldown"])
     player.forget()
 
 
 def reload_fully(simulation: Simulation, player: SimulatedDevice) -> None:
     player.hold("A")
-    simulation.advance(TWO_ROUNDS["tag_reload_duration"])
+    simulation.advance(TWO_ROUNDS["reload_duration"])
     player.release("A")
 
 
 def abandon_reload(simulation: Simulation, player: SimulatedDevice) -> None:
     player.hold("A")
-    simulation.advance(TWO_ROUNDS["tag_reload_duration"] / 2)
+    simulation.advance(TWO_ROUNDS["reload_duration"] / 2)
     player.release("A")
-    simulation.advance(TWO_ROUNDS["tag_reload_duration"])
+    simulation.advance(TWO_ROUNDS["reload_duration"])
 
 
 def pulsing_red(strip: Strip) -> bool:
@@ -157,7 +163,7 @@ def pulsing_red(strip: Strip) -> bool:
 
 
 def test_firing_the_last_round_pulses_the_ammo_bar_red(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(TWO_ROUNDS))
     start_game(simulation, player)
 
     empty_the_magazine(simulation, player)
@@ -166,7 +172,7 @@ def test_firing_the_last_round_pulses_the_ammo_bar_red(simulation):
 
 
 def test_pressing_with_an_empty_magazine_dry_fires_instead_of_shooting(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(TWO_ROUNDS))
     start_game(simulation, player)
     empty_the_magazine(simulation, player)
 
@@ -177,7 +183,7 @@ def test_pressing_with_an_empty_magazine_dry_fires_instead_of_shooting(simulatio
 
 
 def test_a_dry_fire_bumps_the_haptic_softly(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(TWO_ROUNDS))
     start_game(simulation, player)
     empty_the_magazine(simulation, player)
 
@@ -187,7 +193,7 @@ def test_a_dry_fire_bumps_the_haptic_softly(simulation):
 
 
 def test_pressing_with_an_empty_magazine_starts_reloading(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(TWO_ROUNDS))
     start_game(simulation, player)
     empty_the_magazine(simulation, player)
 
@@ -198,7 +204,7 @@ def test_pressing_with_an_empty_magazine_starts_reloading(simulation):
 
 def test_holding_the_trigger_that_fired_the_last_round_does_not_start_a_reload(simulation):
     player = simulation.add_device(
-        "red", scene="tag", scene_data={"tag_max_ammo": 1, "tag_shot_cooldown": 0.3}
+        "red", scene="tag", setting_overrides=tag_settings({"max_ammo": 1, "shot_cooldown": 0.3})
     )
     start_game(simulation, player)
 
@@ -211,7 +217,7 @@ def test_holding_the_trigger_that_fired_the_last_round_does_not_start_a_reload(s
 
 def test_a_fresh_press_right_after_the_last_round_reloads_despite_the_cooldown(simulation):
     player = simulation.add_device(
-        "red", scene="tag", scene_data={"tag_max_ammo": 1, "tag_shot_cooldown": 1.0}
+        "red", scene="tag", setting_overrides=tag_settings({"max_ammo": 1, "shot_cooldown": 1.0})
     )
     start_game(simulation, player)
 
@@ -223,7 +229,7 @@ def test_a_fresh_press_right_after_the_last_round_reloads_despite_the_cooldown(s
 
 
 def test_holding_through_the_reload_plays_the_reload_complete_sound(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(TWO_ROUNDS))
     start_game(simulation, player)
     empty_the_magazine(simulation, player)
 
@@ -233,7 +239,7 @@ def test_holding_through_the_reload_plays_the_reload_complete_sound(simulation):
 
 
 def test_holding_through_the_reload_double_clicks_the_haptic(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(TWO_ROUNDS))
     start_game(simulation, player)
     empty_the_magazine(simulation, player)
 
@@ -243,14 +249,14 @@ def test_holding_through_the_reload_double_clicks_the_haptic(simulation):
 
 
 def test_the_ammo_bar_fills_red_as_the_reload_is_held(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(TWO_ROUNDS))
     start_game(simulation, player)
     empty_the_magazine(simulation, player)
 
     player.hold("A")
-    simulation.advance(TWO_ROUNDS["tag_reload_duration"] / 4)
+    simulation.advance(TWO_ROUNDS["reload_duration"] / 4)
     early = player.strip(Scope.Global.BUFF)
-    simulation.advance(TWO_ROUNDS["tag_reload_duration"] / 2)
+    simulation.advance(TWO_ROUNDS["reload_duration"] / 2)
     later = player.strip(Scope.Global.BUFF)
 
     assert 0 < early.lit < later.lit < later.size
@@ -258,7 +264,7 @@ def test_the_ammo_bar_fills_red_as_the_reload_is_held(simulation):
 
 
 def test_holding_through_the_reload_refills_the_amber_ammo_bar(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(TWO_ROUNDS))
     start_game(simulation, player)
     empty_the_magazine(simulation, player)
 
@@ -268,7 +274,7 @@ def test_holding_through_the_reload_refills_the_amber_ammo_bar(simulation):
 
 
 def test_a_press_after_a_full_reload_fires_again(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(TWO_ROUNDS))
     start_game(simulation, player)
     empty_the_magazine(simulation, player)
     reload_fully(simulation, player)
@@ -279,18 +285,18 @@ def test_a_press_after_a_full_reload_fires_again(simulation):
 
 
 def test_the_trigger_still_held_after_a_reload_does_not_auto_fire(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(TWO_ROUNDS))
     start_game(simulation, player)
     empty_the_magazine(simulation, player)
 
     player.hold("A")
-    simulation.advance(TWO_ROUNDS["tag_reload_duration"] + 2.0)
+    simulation.advance(TWO_ROUNDS["reload_duration"] + 2.0)
 
     assert shots(player) == []
 
 
 def test_letting_go_before_the_reload_finishes_never_completes_it(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(TWO_ROUNDS))
     start_game(simulation, player)
     empty_the_magazine(simulation, player)
 
@@ -300,7 +306,7 @@ def test_letting_go_before_the_reload_finishes_never_completes_it(simulation):
 
 
 def test_letting_go_before_the_reload_finishes_returns_the_bar_to_pulsing_red(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(TWO_ROUNDS))
     start_game(simulation, player)
     empty_the_magazine(simulation, player)
 
@@ -310,7 +316,7 @@ def test_letting_go_before_the_reload_finishes_returns_the_bar_to_pulsing_red(si
 
 
 def test_a_press_after_an_abandoned_reload_dry_fires(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TWO_ROUNDS)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(TWO_ROUNDS))
     start_game(simulation, player)
     empty_the_magazine(simulation, player)
     abandon_reload(simulation, player)
@@ -328,8 +334,10 @@ def test_a_press_after_an_abandoned_reload_dry_fires(simulation):
 
 
 def test_one_players_trigger_never_fires_another_players_blaster(simulation):
-    red = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
-    blue = simulation.add_device("blue", scene="tag", scene_data={"tag_expected_team": 1})
+    red = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
+    blue = simulation.add_device(
+        "blue", scene="tag", setting_overrides=tag_settings({"expected_team": 1})
+    )
     start_game(simulation, red, blue)
 
     red.tap("A")

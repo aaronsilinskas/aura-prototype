@@ -22,23 +22,24 @@ from packs.scenes.red_light_green_light.tests.helpers import (
     RED_MUSIC,
     SLACK,
     last_played_at,
+    overrides,
     survive_round,
     wait_for,
 )
 
 GAME = {
     **QUICK_WARNINGS,
-    "rlgl_red_duration": 1.0,
-    "rlgl_green_duration": 1.0,
-    "rlgl_level_up_duration": 0.5,
-    "rlgl_green_still_timeout": 0.5,
-    "rlgl_game_over_duration": 2.0,
-    "rlgl_max_level": 5,
+    "red_duration_max": 1.0,
+    "green_duration_max": 1.0,
+    "level_up_duration": 0.5,
+    "green_still_timeout": 0.5,
+    "game_over_duration": 2.0,
+    "max_level": 5,
 }
 """Five levels, each filling two of the level bar's ten pixels."""
 
 
-LONG_GAME_OVER = {**GAME, "rlgl_game_over_duration": 5.0}
+LONG_GAME_OVER = {**GAME, "game_over_duration": 5.0}
 """A game-over pause outlasting the sting."""
 
 
@@ -57,7 +58,9 @@ def caught_on_green_light(simulation: Simulation, player: SimulatedDevice) -> No
 
 
 def test_the_game_over_sting_buzzes_three_times(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GAME)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GAME)
+    )
     player.tap("A")
 
     caught_on_red_light(simulation, player)
@@ -67,7 +70,9 @@ def test_the_game_over_sting_buzzes_three_times(simulation):
 
 
 def test_the_game_over_sting_plays_once(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=LONG_GAME_OVER)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(LONG_GAME_OVER)
+    )
     player.tap("A")
     caught_on_red_light(simulation, player)
 
@@ -77,7 +82,9 @@ def test_the_game_over_sting_plays_once(simulation):
 
 
 def test_game_over_burns_fire_across_every_pixel_of_every_strip(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GAME)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GAME)
+    )
     player.tap("A")
     caught_on_red_light(simulation, player)
 
@@ -92,7 +99,9 @@ def test_game_over_burns_fire_across_every_pixel_of_every_strip(simulation):
     ids=["red", "green"],
 )
 def test_being_caught_stops_the_lights_music(simulation, get_caught, music):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GAME)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GAME)
+    )
     player.tap("A")
 
     get_caught(simulation, player)
@@ -101,7 +110,9 @@ def test_being_caught_stops_the_lights_music(simulation, get_caught, music):
 
 
 def test_being_caught_on_green_light_does_not_level_up(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GAME)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GAME)
+    )
     player.tap("A")
     caught_on_green_light(simulation, player)
 
@@ -111,7 +122,9 @@ def test_being_caught_on_green_light_does_not_level_up(simulation):
 
 
 def test_the_device_returns_to_ready_after_the_game_over_pause(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GAME)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GAME)
+    )
     player.tap("A")
     caught_on_red_light(simulation, player)
 
@@ -121,7 +134,9 @@ def test_the_device_returns_to_ready_after_the_game_over_pause(simulation):
 
 
 def test_a_game_after_game_over_starts_again_from_level_one(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=GAME)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(GAME)
+    )
     player.tap("A")
     survive_round(simulation, player)
     caught_on_red_light(simulation, player)

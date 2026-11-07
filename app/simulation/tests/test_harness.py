@@ -13,12 +13,18 @@ import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
 from engine.network import LINE
+from engine.pack_catalog import SettingOverrides
 from engine.packs import UnknownItemError
 from engine.state import Scope
 from packs.scenes.tag.tag_data import TagData, encode_tag_data
 
-ONE_ROUND = {"tag_max_ammo": 1, "tag_reload_duration": 1.0}
+ONE_ROUND = {"max_ammo": 1, "reload_duration": 1.0}
 """One round, so a fresh press after it starts a one-second reload."""
+
+
+def tag_settings(settings: dict[str, object]) -> SettingOverrides:
+    """The ``setting_overrides`` that boot Tag with *settings* in its scene namespace."""
+    return {"tag": {"settings": settings}}
 
 
 def start_game(simulation: Simulation, *players: SimulatedDevice) -> None:
@@ -62,7 +68,9 @@ def test_tap_returns_once_the_press_has_registered(simulation):
 
 
 def test_tap_returns_once_the_release_has_registered(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data={"tag_shot_cooldown": 0.0})
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings({"shot_cooldown": 0.0})
+    )
     start_game(simulation, player)
 
     player.tap("A")
@@ -73,7 +81,9 @@ def test_tap_returns_once_the_release_has_registered(simulation):
 
 def test_tap_advances_every_device_in_lockstep(simulation):
     red = simulation.add_device("red", scene="tag")
-    blue = simulation.add_device("blue", scene="tag", scene_data={"tag_expected_team": 1})
+    blue = simulation.add_device(
+        "blue", scene="tag", setting_overrides=tag_settings({"expected_team": 1})
+    )
     start_game(simulation, red, blue)
 
     blue.schedule_hold("A")
@@ -92,7 +102,7 @@ def test_hold_returns_once_the_press_has_registered(simulation):
 
 
 def test_release_returns_once_the_release_has_registered(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=ONE_ROUND)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(ONE_ROUND))
     start_game(simulation, player)
     reload_part_way(simulation, player)
 
@@ -128,7 +138,9 @@ def test_a_device_does_not_hear_its_own_shot(simulation):
 def test_a_tag_device_records_the_tag_its_shot_carried(simulation):
     # Read back off the wire through the Tag wire-frame codec the scene installs.
     player = simulation.add_device(
-        "red", scene="tag", scene_data={"tag_expected_team": 2, "tag_expected_player": 3}
+        "red",
+        scene="tag",
+        setting_overrides=tag_settings({"expected_team": 2, "expected_player": 3}),
     )
     start_game(simulation, player)
 
@@ -139,7 +151,9 @@ def test_a_tag_device_records_the_tag_its_shot_carried(simulation):
 
 def test_payloads_received_together_arrive_on_successive_ticks(simulation):
     # Each matching one-damage tag takes one of ten pips off the hitpoint bar.
-    player = simulation.add_device("red", scene="tag", scene_data={"tag_starting_hitpoints": 10})
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings({"starting_hitpoints": 10})
+    )
     start_game(simulation, player)
 
     player.receive_ir(bytes(encode_tag_data(TagData(0, 1, 1))))
@@ -195,7 +209,7 @@ def test_a_shared_pack_clip_resolves_through_the_active_scenes_declared_packs(si
 
 
 def test_a_looping_clip_is_playing_until_its_effect_stops(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=ONE_ROUND)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(ONE_ROUND))
     start_game(simulation, player)
     reload_part_way(simulation, player)
 

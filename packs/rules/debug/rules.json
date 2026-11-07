@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "settings": {
+    "fps_logging_enabled": {
+      "type": "bool",
+      "default": false,
+      "description": "Print the average frame rate to the console every few seconds."
+    },
+    "event_logging_enabled": {
+      "type": "bool",
+      "default": false,
+      "description": "Print every event the scene receives, with all its attributes."
+    }
+  }
+}

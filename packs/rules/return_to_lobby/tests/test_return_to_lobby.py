@@ -13,32 +13,32 @@ from pathlib import Path
 import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
+from packs.tests.settings_helper import settings_for
 
 _SCENES_DIR = Path(__file__).resolve().parents[3] / "scenes"
-
-
-def _scene_json(scene: str) -> dict:
-    return json.loads((_SCENES_DIR / scene / "scene.json").read_text())
 
 
 def _scenes_with_the_pack() -> list[str]:
     return sorted(
         path.parent.name
         for path in _SCENES_DIR.glob("*/scene.json")
-        if any(pack == "return_to_lobby" for pack, _ in json.loads(path.read_text())["rule_packs"])
+        if any(
+            pack["name"] == "return_to_lobby" for pack in json.loads(path.read_text())["rule_packs"]
+        )
     )
 
 
 SCENES = _scenes_with_the_pack()
 
 LOBBY_ENTRIES = [
-    entry["scene"] for entry in _scene_json("example_lobby")["initial_data"]["lobby"]["entries"]
+    entry["scene"]
+    for entry in settings_for("example_lobby").get("lobby", "entries")  # type: ignore[attr-defined]
 ]
 """``example_lobby``'s entries, in the order A steps through them."""
 
 
 def hold_seconds(scene: str) -> float:
-    return _scene_json(scene)["initial_data"]["return_to_lobby"]["hold_seconds"]
+    return settings_for(scene).get_float("return_to_lobby", "hold_seconds")
 
 
 def launch(simulation: Simulation, scene: str) -> SimulatedDevice:

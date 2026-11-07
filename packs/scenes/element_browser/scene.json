@@ -1,16 +1,10 @@
 {
   "version": "1.0",
   "effect_packs": [
-    ["elements", "1.0"]
+    { "name": "elements", "version": "1.0" }
   ],
   "rule_packs": [
-    ["debug", "1.0"],
-    ["return_to_lobby", "1.0"]
-  ],
-  "initial_data": {
-    "page": 0,
-    "level": 1,
-    "fps_logging_enabled": true,
-    "return_to_lobby": { "hold_seconds": 5.0 }
-  }
+    { "name": "debug", "version": "1.0", "settings": { "fps_logging_enabled": true } },
+    { "name": "return_to_lobby", "version": "1.0" }
+  ]
 }

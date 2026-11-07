@@ -10,13 +10,20 @@ import pytest
 
 from app.simulation import TICK, Strip
 from effects.effect import HapticPattern
+from engine.pack_catalog import SettingOverrideError
 from engine.state import Scope
-from packs.scenes.tag.tests.helpers import AMMO_AMBER, EVERY_STRIP, GREEN, sweeping_red
+from packs.scenes.tag.tests.helpers import (
+    AMMO_AMBER,
+    EVERY_STRIP,
+    GREEN,
+    sweeping_red,
+    tag_settings,
+)
 
 BAR_FREE_STRIPS = [Scope.Global.DEBUFF, Scope.Global.MAIN, Scope.DIRECTIONAL, Scope.AMBIENT]
 """The strips Playing shows no bar on."""
 
-ONE_PULSE = {"tag_warning_pulse_duration": 0.6}
+ONE_PULSE = {"warning_pulse_duration": 0.6}
 
 
 def lit_positions(strip: Strip) -> set[int]:
@@ -25,6 +32,19 @@ def lit_positions(strip: Strip) -> set[int]:
 
 def peaks_before_go(clips: list[str]) -> int:
     return clips[: clips.index("scene.go_start")].count("scene.warning_pulse_peak")
+
+
+# ---------------------------------------------------------------------------
+# Booting
+# ---------------------------------------------------------------------------
+
+
+def test_a_misspelled_tag_setting_fails_the_boot(simulation):
+    with pytest.raises(SettingOverrideError) as excinfo:
+        simulation.add_device("red", scene="tag", setting_overrides=tag_settings({"max_amo": 1}))
+
+    error = excinfo.value
+    assert (error.scene, error.pack, error.setting) == ("tag", "scene", "max_amo")
 
 
 # ---------------------------------------------------------------------------
@@ -62,10 +82,10 @@ def test_an_idle_device_plays_the_ready_shots_only_once(simulation):
 
 @pytest.mark.parametrize("button", ["A", "B"])
 def test_pressing_either_button_in_ready_starts_the_countdown(simulation, button):
-    player = simulation.add_device("red", scene="tag", scene_data=ONE_PULSE)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(ONE_PULSE))
 
     player.tap(button)
-    simulation.advance(ONE_PULSE["tag_warning_pulse_duration"])
+    simulation.advance(ONE_PULSE["warning_pulse_duration"])
 
     assert player.has_played("scene.warning_pulse_peak")
 
@@ -76,27 +96,27 @@ def test_pressing_either_button_in_ready_starts_the_countdown(simulation, button
 
 
 def test_each_countdown_pulse_clicks_the_haptic(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=ONE_PULSE)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(ONE_PULSE))
 
     player.tap("A")
-    simulation.advance(ONE_PULSE["tag_warning_pulse_duration"])
+    simulation.advance(ONE_PULSE["warning_pulse_duration"])
 
     assert [b.pattern for b in player.buzzed] == [(HapticPattern.SHARP_CLICK,)]
 
 
 def test_the_countdown_pulses_every_strip(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=ONE_PULSE)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(ONE_PULSE))
 
     player.tap("A")
-    simulation.advance(ONE_PULSE["tag_warning_pulse_duration"])
+    simulation.advance(ONE_PULSE["warning_pulse_duration"])
 
     assert all(not player.strip(scope).dark for scope in EVERY_STRIP)
 
 
 @pytest.mark.parametrize("count", [3, 7])
 def test_the_countdown_runs_its_pulse_count_then_the_game_starts(simulation, count):
-    countdown = {"tag_warning_pulse_count": count, "tag_warning_pulse_duration": 0.4}
-    player = simulation.add_device("red", scene="tag", scene_data=countdown)
+    countdown = {"warning_pulse_count": count, "warning_pulse_duration": 0.4}
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(countdown))
 
     player.tap("A")
     simulation.run_until(lambda: player.has_played("scene.go_start"))
@@ -105,8 +125,8 @@ def test_the_countdown_runs_its_pulse_count_then_the_game_starts(simulation, cou
 
 
 def test_pressing_during_the_countdown_does_not_restart_it(simulation):
-    countdown = {"tag_warning_pulse_count": 3, "tag_warning_pulse_duration": 0.4}
-    player = simulation.add_device("red", scene="tag", scene_data=countdown)
+    countdown = {"warning_pulse_count": 3, "warning_pulse_duration": 0.4}
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(countdown))
     player.tap("A")
     simulation.run_until(lambda: player.has_played("scene.warning_pulse_peak"))
 

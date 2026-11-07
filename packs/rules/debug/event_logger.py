@@ -3,21 +3,20 @@ from __future__ import annotations
 from engine.engine import GameRule
 from engine.events import Event
 from engine.state import GameState
-
-_ENABLED_KEY = "event_logging_enabled"
+from packs.rules.debug import NAMESPACE
 
 
 class EventLoggerRule(GameRule):
     """Logs every received event along with all its attributes.
 
-    Logging is off by default. Set ``"event_logging_enabled"`` to ``True`` in a
-    scene's ``initial_data`` to log that scene's events.
+    Off by default. Set the ``debug`` pack's ``event_logging_enabled`` Setting to
+    ``true`` in a scene's pack reference to log that scene's events.
     """
 
     __slots__ = ()
 
     def handle_event(self, event: Event, state: GameState) -> None:
-        if not state.get(_ENABLED_KEY, False):
+        if not state.settings.get_bool(NAMESPACE, "event_logging_enabled"):
             return
         parts = []
         cls = type(event)

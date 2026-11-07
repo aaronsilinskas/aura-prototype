@@ -119,7 +119,7 @@ required; there are no built-in defaults.
   is a complete example, tested on Pimoroni Pico 2 boards.
   [`examples/aura-device.simulated.json`](examples/aura-device.simulated.json)
   is for the test-only Simulated device, not for flashing to a board.
-- **`aura-settings.json`** picks the scene to boot, by its folder name under
+- **`aura-boot.json`** picks the scene to boot, by its folder name under
   `packs/scenes/`:
 
   ```json
@@ -223,25 +223,78 @@ trigger scene transitions via `state.scene_controls`.
 
 ### Packs
 
-A **pack** is a directory containing a `version.txt` and one `.py` file per
+A **pack** is a directory containing a **pack manifest** and one `.py` file per
 item. `scan_pack_roots` (`engine/pack_catalog.py`) discovers every pack and
 scene under the pack roots in one scan; `PackRegistry` imports items lazily on
 first use.
 
-- **Effect pack** — each `.py` file exports `BUILD`: a `(config) → Effect` callable.
-  Effect names use `"pack.effect"` format (e.g. `"elements.fire"`).
-- **Rule pack** — each `.py` file exports `RULE`: a `GameRule` instance.
+- **Effect pack** — manifest `effects.json`; each `.py` file exports `BUILD`: a
+  `(config) → Effect` callable. Effect names use `"pack.effect"` format (e.g. `"elements.fire"`).
+- **Rule pack** — manifest `rules.json`; each `.py` file exports `RULE`: a `GameRule` instance.
+
+The manifest is a JSON object stating the pack's version and, optionally,
+declaring the pack's **Settings**:
+
+```json
+{
+  "version": "1.0",
+  "settings": {
+    "hold_seconds": {"type": "float", "default": 5.0, "description": "Seconds to hold."}
+  }
+}
+```
+
+A Setting's `type` is `int`, `float` (an `int` value is accepted), `bool`,
+`str` or `list`. A `list` is checked at the top level only; the pack's code
+checks what is inside it. A Setting with no `default` is required: every scene declaring the pack
+must set it. A scene sets a pack's Settings inline, in that pack's reference
+in `scene.json` (see [Scenes](#scenes)); the scan checks each override and
+resolves every Setting (the default, then the scene's override, then any
+`setting_overrides` passed to the scan), raising `SettingOverrideError` naming
+the scene, pack and Setting. Rules read them through
+`state.settings.get(<pack>, <name>)` or its typed forms (`get_int`,
+`get_float`, `get_bool`, `get_str`), which have no default argument and no
+write path. Settings never enter `GameState`'s `get`/`set` store.
+
+A folder without a manifest is not a pack and is skipped. A manifest that is
+not a JSON object, or declares a Setting with an unknown type or a default of
+the wrong type, fails the scan with `MalformedManifestError`.
+
+A pack's Settings are part of its versioned interface: adding a Setting with a
+default is a minor bump; adding a required Setting, or removing, renaming or
+retyping one, is a major bump. The scan does not enforce this.
 
 Version format is `MAJOR.MINOR`. A `Scene` declares minimum required versions;
 the catalog scan checks them at boot (same-major, installed-minor ≥ required-minor).
 
 ### Scenes
 
-A **Scene** is a declarative bundle:
+A **Scene** is a declarative bundle, described by its `scene.json`:
 
-- `effect_packs: list[tuple[str, str]]` — `(pack_name, min_version)` pairs; version-validated at load
-- `rule_packs: list[tuple[str, str]]` — `(pack_name, min_version)` pairs; all rules loaded and appended
-- Optional `initial_data: dict` — seed values for `GameState.data`
+```json
+{
+  "version": "1.0",
+  "effect_packs": [{"name": "elements", "version": "1.0"}],
+  "rule_packs": [
+    {"name": "return_to_lobby", "version": "1.0", "settings": {"hold_seconds": 2.0}}
+  ],
+  "settings": {
+    "window_seconds": {"type": "float", "default": 3.0, "description": "Seconds per window."}
+  }
+}
+```
+
+- `version` — the scene's own `MAJOR.MINOR` version
+- `effect_packs` — ordered `{"name": ..., "version": ...}` objects (an optional `settings` object holds that pack's Setting overrides, checked at scan; effects do not receive them yet); `version` is the minimum compatible version, same major, checked at scan
+- `rule_packs` — the same object form; all rules loaded and appended in declared order
+- Optional `settings` — the scene's own Setting declarations, in the manifest's shape; rules
+  read them in the `scene` namespace, and a Scene Config builds from them with the typed reads
+  (`state.settings.get_float("scene", "window_seconds")`). A bad declaration fails the scan
+  with `MalformedSceneError`
+- Optional `ir_codec` — the IR codec the scene runs (default `"aura"`)
+
+Any other key fails the scan with `MalformedSceneError`. A scene carries no
+starting data: rules seed their own runtime state through `state.get`/`state.set`.
 
 `SceneManager` owns a scene stack. `load(name)` replaces the stack; `overlay(name)` pushes
 on top (suspending the current scene); `pop()` restores the previous scene. Transitions are

@@ -1,12 +1,12 @@
-"""``RlglConfig`` — immutable scene configuration for Red Light Green Light.
+"""``RlglConfig`` — the Red Light Green Light Scene Config.
 
-Holds the duration/threshold knobs tunable via ``initial_data`` (all ``rlgl_``
-seed keys).  ``RlglConfig.__init__`` takes already-resolved values so it is
-unit-testable directly with no ``GameState`` involved; ``from_state`` is the
-factory that reads the flat seeded ``rlgl_*`` keys and applies defaults.
+Holds the scene's twelve Settings, declared in its ``scene.json``, each named
+as its field.  ``RlglConfig.__init__`` takes already-resolved values and checks
+that ``gravity_beta`` stays below ``motion_smoothing``; ``from_settings`` builds
+one from the Settings view.
 
 ``rlgl_config`` is a :class:`engine.state.StateSlot` callable accessor: it lazily
-builds the config from ``state`` on first use and caches it under a single
+builds the config from ``state.settings`` on first use and caches it under a single
 ``GameState`` key, mirroring the ``current_mode(state)`` precedent in the
 hardware_test scene.  Game Level is read separately each tick (it changes during play), so
 the level-scaled methods below take ``level`` as a parameter and the config
@@ -21,11 +21,8 @@ except ImportError:
     pass
 
 from engine.lerp import level_lerp
+from engine.settings import SCENE_NAMESPACE, Settings
 from engine.state import GameState, StateSlot
-from packs.scenes.red_light_green_light.rules.helpers.motion_detector import (
-    GRAVITY_LOWPASS_BETA,
-    MOTION_EMA_ALPHA,
-)
 
 _CONFIG_KEY: Final = "rlgl_config"
 
@@ -38,9 +35,7 @@ _WARNING_DARKEN_RATIO: Final = 0.3
 class RlglConfig:
     """Immutable duration/threshold configuration for the RLGL scene.
 
-    All values are already-resolved (no ``GameState`` knowledge), so this can
-    be constructed directly in tests.  Use :meth:`from_state` to build one
-    from a seeded ``GameState``.
+    Use :meth:`from_settings` to build one from the scene's Settings.
     """
 
     __slots__ = (
@@ -73,6 +68,16 @@ class RlglConfig:
         motion_smoothing: float,
         gravity_beta: float,
     ) -> None:
+        """Store already-resolved values.
+
+        Raises:
+            ValueError: ``gravity_beta`` is not below ``motion_smoothing``, so
+                real motion would be absorbed into the gravity estimate.
+        """
+        if gravity_beta >= motion_smoothing:
+            raise ValueError(
+                f"gravity_beta ({gravity_beta}) must be below motion_smoothing ({motion_smoothing})"
+            )
         self.red_duration_max = red_duration_max
         self.red_duration_min = red_duration_min
         self.green_duration_max = green_duration_max
@@ -87,21 +92,25 @@ class RlglConfig:
         self.gravity_beta = gravity_beta
 
     @classmethod
-    def from_state(cls, state: GameState) -> RlglConfig:
-        """Build a config from the flat seeded ``rlgl_*`` keys, applying defaults."""
+    def from_settings(cls, settings: Settings) -> RlglConfig:
+        """Build a config from the scene's Settings, each named as its field.
+
+        Raises:
+            ValueError: ``gravity_beta`` is not below ``motion_smoothing``.
+        """
         return cls(
-            red_duration_max=state.get("rlgl_red_duration", 5.0),
-            red_duration_min=state.get("rlgl_red_duration_min", 2.0),
-            green_duration_max=state.get("rlgl_green_duration", 5.0),
-            green_duration_min=state.get("rlgl_green_duration_min", 2.0),
-            warning_pulse_max=state.get("rlgl_warning_pulse_max", 1.0),
-            warning_pulse_min=state.get("rlgl_warning_pulse_min", 0.4),
-            game_over_duration=state.get("rlgl_game_over_duration", 3.0),
-            green_still_timeout=state.get("rlgl_green_still_timeout", 0.75),
-            level_up_duration=state.get("rlgl_level_up_duration", 1.0),
-            max_level=state.get("rlgl_max_level", 10),
-            motion_smoothing=state.get("rlgl_motion_smoothing", MOTION_EMA_ALPHA),
-            gravity_beta=state.get("rlgl_gravity_beta", GRAVITY_LOWPASS_BETA),
+            red_duration_max=settings.get_float(SCENE_NAMESPACE, "red_duration_max"),
+            red_duration_min=settings.get_float(SCENE_NAMESPACE, "red_duration_min"),
+            green_duration_max=settings.get_float(SCENE_NAMESPACE, "green_duration_max"),
+            green_duration_min=settings.get_float(SCENE_NAMESPACE, "green_duration_min"),
+            warning_pulse_max=settings.get_float(SCENE_NAMESPACE, "warning_pulse_max"),
+            warning_pulse_min=settings.get_float(SCENE_NAMESPACE, "warning_pulse_min"),
+            game_over_duration=settings.get_float(SCENE_NAMESPACE, "game_over_duration"),
+            green_still_timeout=settings.get_float(SCENE_NAMESPACE, "green_still_timeout"),
+            level_up_duration=settings.get_float(SCENE_NAMESPACE, "level_up_duration"),
+            max_level=settings.get_int(SCENE_NAMESPACE, "max_level"),
+            motion_smoothing=settings.get_float(SCENE_NAMESPACE, "motion_smoothing"),
+            gravity_beta=settings.get_float(SCENE_NAMESPACE, "gravity_beta"),
         )
 
     def red_duration(self, level: int) -> float:
@@ -133,4 +142,8 @@ class RlglConfig:
         }
 
 
-rlgl_config: StateSlot = StateSlot(_CONFIG_KEY, RlglConfig.from_state, RlglConfig)
+def _from_state(state: GameState) -> RlglConfig:
+    return RlglConfig.from_settings(state.settings)
+
+
+rlgl_config: StateSlot = StateSlot(_CONFIG_KEY, _from_state, RlglConfig)

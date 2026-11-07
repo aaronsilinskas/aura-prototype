@@ -1,6 +1,7 @@
 """An engine and a logger for the FPS logger's unit tests, which inject its output and clock."""
 
 from engine.engine import GameEngine
+from engine.settings import Settings
 from engine.state import EffectControls, GameState, SceneControls
 
 
@@ -15,11 +16,11 @@ class CapturingLogger:
 
 
 class EngineFixture:
-    """Pre-wired engine for rule integration tests."""
+    """Pre-wired engine for rule integration tests, its state built with *settings*."""
 
-    def __init__(self) -> None:
+    def __init__(self, settings: Settings) -> None:
         self.game_engine = GameEngine(EffectControls())
-        self.state: GameState = self.game_engine.create_state(SceneControls())
+        self.state: GameState = self.game_engine.create_state(SceneControls(), settings=settings)
 
     def update_engine(self) -> None:
         self.game_engine.update(self.state)

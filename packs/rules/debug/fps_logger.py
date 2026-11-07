@@ -5,6 +5,7 @@ import time
 from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState
+from packs.rules.debug import NAMESPACE
 
 try:
     from collections.abc import Callable
@@ -12,14 +13,11 @@ except ImportError:
     pass
 
 
-_ENABLED_KEY = "fps_logging_enabled"
-
-
 class FpsLoggerRule(GameRule):
     """Prints the average frame rate to the console every few seconds.
 
-    Set ``"fps_logging_enabled"`` to ``True`` in a scene's ``initial_data`` to
-    enable logging for that scene.
+    Off by default. Set the ``debug`` pack's ``fps_logging_enabled`` Setting to
+    ``true`` in a scene's pack reference to log that scene's frame rate.
     """
 
     __slots__ = ["_clock", "_frames", "_output", "_window_start"]
@@ -36,7 +34,7 @@ class FpsLoggerRule(GameRule):
         self.on(InputEvents.Sensors, self._handle)
 
     def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
-        if not state.get(_ENABLED_KEY, False):
+        if not state.settings.get_bool(NAMESPACE, "fps_logging_enabled"):
             return
         self._frames += 1
         now = self._clock()

@@ -1,13 +1,13 @@
-"""``TransmitterConfig`` — immutable scene configuration for the IR range transmitter.
+"""``TransmitterConfig`` — the IR range transmitter's Scene Config.
 
-Holds the tunables seeded via ``initial_data`` (all ``irtx_`` seed keys).
-``TransmitterConfig.__init__`` takes already-resolved values so it is
-unit-testable directly with no ``GameState`` involved; ``from_state`` is the
-factory that reads the flat seeded ``irtx_*`` keys and applies defaults.
+Holds the scene's Settings, declared in its ``scene.json``, and the values
+derived from them. ``TransmitterConfig.__init__`` takes already-resolved
+values so it is unit-testable directly; ``from_settings`` builds one from the
+Settings view.
 
 ``transmitter_config`` is a :class:`engine.state.StateSlot` callable accessor:
-it lazily builds the config from ``state`` on first use and caches it under a
-single ``GameState`` key, mirroring the ``rlgl_config``/``tag_config``
+it lazily builds the config from ``state.settings`` on first use and caches it
+under a single ``GameState`` key, mirroring the ``rlgl_config``/``tag_config``
 precedent in the red_light_green_light and tag scenes.
 """
 
@@ -18,12 +18,10 @@ try:
 except ImportError:
     pass
 
+from engine.settings import SCENE_NAMESPACE, Settings
 from engine.state import GameState, StateSlot
 
 _CONFIG_KEY: Final = "irtx_config"
-
-_DEFAULT_SEND_RATE_HZ: Final = 5.0
-_DEFAULT_PAYLOAD_SIZE: Final = 4
 
 # Fixed non-zero padding marker, matching ir_rx_packet_source.py: byte i
 # (i >= 1) carries 0xA0 | (i & 0x0F), so the encoded frame is never a
@@ -38,11 +36,10 @@ def _build_payload_padding(payload_size: int) -> bytes:
 
 
 class TransmitterConfig:
-    """Immutable tunable configuration for the IR range transmitter scene.
+    """Immutable configuration for the IR range transmitter scene.
 
-    All values are already-resolved (no ``GameState`` knowledge), so this can
-    be constructed directly in tests. Use :meth:`from_state` to build one
-    from a seeded ``GameState``.
+    All values are already-resolved, so this can be constructed directly in
+    tests. Use :meth:`from_settings` to build one from the scene's Settings.
     """
 
     __slots__ = ("payload_padding", "payload_size", "send_period_seconds", "send_rate_hz")
@@ -54,14 +51,16 @@ class TransmitterConfig:
         self.payload_padding = _build_payload_padding(payload_size)
 
     @classmethod
-    def from_state(cls, state: GameState) -> TransmitterConfig:
-        """Build a config from the flat seeded ``irtx_*`` keys, applying defaults."""
+    def from_settings(cls, settings: Settings) -> TransmitterConfig:
+        """Build a config from the scene's Settings, each named as its field."""
         return cls(
-            send_rate_hz=state.get("irtx_send_rate_hz", _DEFAULT_SEND_RATE_HZ),
-            payload_size=state.get("irtx_payload_size", _DEFAULT_PAYLOAD_SIZE),
+            send_rate_hz=settings.get_float(SCENE_NAMESPACE, "send_rate_hz"),
+            payload_size=settings.get_int(SCENE_NAMESPACE, "payload_size"),
         )
 
 
-transmitter_config: StateSlot = StateSlot(
-    _CONFIG_KEY, TransmitterConfig.from_state, TransmitterConfig
-)
+def _from_state(state: GameState) -> TransmitterConfig:
+    return TransmitterConfig.from_settings(state.settings)
+
+
+transmitter_config: StateSlot = StateSlot(_CONFIG_KEY, _from_state, TransmitterConfig)

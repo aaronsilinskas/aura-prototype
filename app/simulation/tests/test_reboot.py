@@ -7,23 +7,18 @@ this one. ``return_to_lobby``'s own behaviour is pinned in its pack's tests.
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
 from engine.network import LINE
+from engine.pack_catalog import SettingOverrideError
 from engine.state import Scope
+from packs.rules.lobby.helpers.lobby_config import LobbyConfig
+from packs.tests.settings_helper import settings_for
 
-_SCENES_DIR = Path(__file__).resolve().parents[3] / "packs" / "scenes"
-
-
-def _initial_data(scene: str) -> dict:
-    return json.loads((_SCENES_DIR / scene / "scene.json").read_text())["initial_data"]
-
-
-LOBBY_ENTRIES = [entry["scene"] for entry in _initial_data("example_lobby")["lobby"]["entries"]]
+LOBBY_ENTRIES = [
+    entry.scene for entry in LobbyConfig.from_settings(settings_for("example_lobby")).entries
+]
 """``example_lobby``'s entries, in the order A steps through them."""
 
 
@@ -44,7 +39,33 @@ def launch(device: SimulatedDevice, scene: str) -> None:
 def hold_to_return(simulation: Simulation, device: SimulatedDevice) -> None:
     """Hold A+B for the scene's ``hold_seconds``, rebooting back to the lobby; A and B stay down."""
     device.hold("A", "B")
-    simulation.advance(_initial_data(device.scene)["return_to_lobby"]["hold_seconds"])
+    simulation.advance(settings_for(device.scene).get("return_to_lobby", "hold_seconds"))
+
+
+def test_setting_overrides_change_a_launched_scenes_hold_seconds(simulation):
+    device = simulation.add_device(
+        "red",
+        scene="example_lobby",
+        setting_overrides={"tag": {"rule_packs": {"return_to_lobby": {"hold_seconds": 1.0}}}},
+    )
+    launch(device, "tag")
+
+    device.hold("A", "B")
+    simulation.advance(1.0)
+
+    assert device.scene == "example_lobby"
+
+
+def test_a_misspelled_setting_override_fails_the_boot(simulation):
+    with pytest.raises(SettingOverrideError) as excinfo:
+        simulation.add_device(
+            "red",
+            scene="tag",
+            setting_overrides={"tag": {"rule_packs": {"return_to_lobby": {"hold_secs": 1.0}}}},
+        )
+
+    error = excinfo.value
+    assert (error.scene, error.pack, error.setting) == ("tag", "return_to_lobby", "hold_secs")
 
 
 def test_the_lobbys_b_reboots_into_the_selected_scene(simulation):
@@ -109,7 +130,11 @@ def test_a_button_held_through_a_reboot_gives_no_new_press(simulation):
 
 
 def test_a_rule_failure_inside_a_tick_still_fails(simulation):
-    simulation.add_device("red", scene="example_lobby", scene_data={"lobby": {"entries": []}})
+    simulation.add_device(
+        "red",
+        scene="example_lobby",
+        setting_overrides={"example_lobby": {"rule_packs": {"lobby": {"scopes": []}}}},
+    )
 
     with pytest.raises(ValueError, match="scopes"):
         simulation.advance(TICK)

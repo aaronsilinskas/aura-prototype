@@ -11,8 +11,6 @@ import pytest
 from app.simulation import Simulation
 from engine.state import Scope
 
-_SCENES_DIR = Path(__file__).resolve().parents[3] / "packs" / "scenes"
-
 _GREEN = 0x00FF00
 _BLUE = 0x0000FF
 
@@ -80,7 +78,13 @@ def install_card_scene(
     """Put *scene* on *card*: it lights the personal strip *color* with *effect*."""
     scene_dir = _card_pack_dir(card, "scenes", scene)
     (scene_dir / "scene.json").write_text(
-        json.dumps({"version": "1.0", "effect_packs": [list(effect_pack)], "rule_packs": []})
+        json.dumps(
+            {
+                "version": "1.0",
+                "effect_packs": [{"name": effect_pack[0], "version": effect_pack[1]}],
+                "rule_packs": [],
+            }
+        )
     )
     rules = _package(scene_dir / "rules")
     (rules / "light.py").write_text(_LIGHTING_RULE.format(effect=effect, color=color))
@@ -89,24 +93,22 @@ def install_card_scene(
 def install_card_effect_pack(card: Path, pack: str) -> None:
     """Put effect pack *pack*, version 1.0, on *card*: its ``solid`` lights every pixel."""
     pack_dir = _card_pack_dir(card, "effects", pack)
-    (pack_dir / "version.txt").write_text("1.0")
+    (pack_dir / "effects.json").write_text(json.dumps({"version": "1.0"}))
     (pack_dir / "solid.py").write_text(_SOLID_EFFECT)
 
 
-def lobby_of(*scenes: str) -> dict[str, object]:
-    """``example_lobby``'s tunables with *scenes* as its only entries."""
-    lobby = json.loads((_SCENES_DIR / "example_lobby" / "scene.json").read_text())
-    lobby = lobby["initial_data"]["lobby"]
-    lobby["entries"] = [
+def lobby_of(*scenes: str) -> dict[str, dict]:
+    """Setting overrides giving ``example_lobby`` *scenes* as its only entries."""
+    entries = [
         {"scene": scene, "effect": "basic.solid", "options": {"color": _BLUE}} for scene in scenes
     ]
-    return {"lobby": lobby}
+    return {"example_lobby": {"rule_packs": {"lobby": {"entries": entries}}}}
 
 
 def test_a_device_reboots_into_a_card_scene_and_plays_it(simulation, tmp_path):
     install_card_scene(tmp_path, "card_scene")
     device = simulation.add_device(
-        "red", scene="example_lobby", scene_data=lobby_of("card_scene"), card=tmp_path
+        "red", scene="example_lobby", setting_overrides=lobby_of("card_scene"), card=tmp_path
     )
 
     device.tap("B")
@@ -146,7 +148,7 @@ def test_a_card_less_device_has_no_card(simulation):
 
 def test_the_next_scene_a_device_persists_is_on_the_card_it_was_handed(simulation, tmp_path):
     device = simulation.add_device(
-        "red", scene="example_lobby", scene_data=lobby_of("element_browser"), card=tmp_path
+        "red", scene="example_lobby", setting_overrides=lobby_of("element_browser"), card=tmp_path
     )
 
     device.tap("B")

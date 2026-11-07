@@ -18,14 +18,15 @@ from packs.scenes.tag.tests.helpers import (
     hit,
     shooters_tag,
     start_game,
+    tag_settings,
     tag_shot,
 )
 
-TEN_HITPOINTS = {**SHOOTER, "tag_starting_hitpoints": 10}
+TEN_HITPOINTS = {**SHOOTER, "starting_hitpoints": 10}
 
 
 def test_a_tag_from_the_expected_shooter_plays_the_hit_on_the_main_strip(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
     start_game(simulation, player)
 
     hit(simulation, player, shooters_tag())
@@ -35,7 +36,7 @@ def test_a_tag_from_the_expected_shooter_plays_the_hit_on_the_main_strip(simulat
 
 
 def test_a_hit_buzzes_the_hit_haptic(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
     start_game(simulation, player)
 
     hit(simulation, player, shooters_tag())
@@ -46,7 +47,7 @@ def test_a_hit_buzzes_the_hit_haptic(simulation):
 
 
 def test_the_hit_flash_goes_dark_when_the_hit_sound_ends(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
     start_game(simulation, player)
 
     hit(simulation, player, shooters_tag())
@@ -58,7 +59,9 @@ def test_the_hit_flash_goes_dark_when_the_hit_sound_ends(simulation):
 
 
 def test_a_hit_drains_the_green_hitpoints_bar_by_its_damage(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TEN_HITPOINTS)
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings(TEN_HITPOINTS)
+    )
     start_game(simulation, player)
 
     hit(simulation, player, shooters_tag(damage=4))
@@ -69,7 +72,9 @@ def test_a_hit_drains_the_green_hitpoints_bar_by_its_damage(simulation):
 
 
 def test_a_hit_on_the_first_tick_of_playing_costs_a_hitpoint(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TEN_HITPOINTS)
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings(TEN_HITPOINTS)
+    )
     player.tap("A")
 
     # A tag every tick through the countdown: the first to play the hit is the
@@ -85,7 +90,9 @@ def test_a_hit_on_the_first_tick_of_playing_costs_a_hitpoint(simulation):
 
 
 def test_successive_hits_keep_draining_the_hitpoints_bar(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=TEN_HITPOINTS)
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings(TEN_HITPOINTS)
+    )
     start_game(simulation, player)
 
     for _ in range(3):
@@ -101,7 +108,7 @@ def test_successive_hits_keep_draining_the_hitpoints_bar(simulation):
     ids=["another team", "another player"],
 )
 def test_a_tag_from_anyone_but_the_expected_shooter_does_no_harm(simulation, shot):
-    player = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
     start_game(simulation, player)
 
     hit(simulation, player, shot)
@@ -111,7 +118,7 @@ def test_a_tag_from_anyone_but_the_expected_shooter_does_no_harm(simulation, sho
 
 
 def test_a_players_own_shot_never_hits_themselves(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
     start_game(simulation, player)
 
     player.tap("A")  # the shot carries the shooter's tag and lights the device's own receivers
@@ -122,7 +129,7 @@ def test_a_players_own_shot_never_hits_themselves(simulation):
 
 
 def test_a_tag_before_the_game_starts_does_nothing(simulation):
-    player = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
+    player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
 
     hit(simulation, player, shooters_tag())
 
@@ -130,16 +137,18 @@ def test_a_tag_before_the_game_starts_does_nothing(simulation):
 
 
 def test_a_hit_mid_reload_does_not_interrupt_the_reload(simulation):
-    one_round = {"tag_max_ammo": 1, "tag_reload_duration": 1.0}
-    player = simulation.add_device("red", scene="tag", scene_data={**TEN_HITPOINTS, **one_round})
+    one_round = {"max_ammo": 1, "reload_duration": 1.0}
+    player = simulation.add_device(
+        "red", scene="tag", setting_overrides=tag_settings({**TEN_HITPOINTS, **one_round})
+    )
     start_game(simulation, player)
     player.tap("A")  # fires the only round
 
     player.hold("A")
-    simulation.advance(one_round["tag_reload_duration"] / 2)
+    simulation.advance(one_round["reload_duration"] / 2)
     hit(simulation, player, shooters_tag())
 
     simulation.run_until(
         lambda: player.has_played("scene.reload_complete"),
-        timeout=one_round["tag_reload_duration"],
+        timeout=one_round["reload_duration"],
     )

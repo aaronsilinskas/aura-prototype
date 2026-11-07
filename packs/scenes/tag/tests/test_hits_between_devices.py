@@ -8,12 +8,12 @@ single-device ``receive_ir`` tests in ``test_hit.py``.
 from __future__ import annotations
 
 from engine.network import LINE
-from packs.scenes.tag.tests.helpers import SHOOTER, fire_together, start_game
+from packs.scenes.tag.tests.helpers import SHOOTER, fire_together, start_game, tag_settings
 
 
 def test_when_red_shoots_blue_blue_registers_the_hit(simulation):
-    red = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
-    blue = simulation.add_device("blue", scene="tag", scene_data=SHOOTER)
+    red = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
+    blue = simulation.add_device("blue", scene="tag", setting_overrides=tag_settings(SHOOTER))
     start_game(simulation, red, blue)
 
     red.aim(LINE, at=blue)
@@ -23,8 +23,8 @@ def test_when_red_shoots_blue_blue_registers_the_hit(simulation):
 
 
 def test_a_shot_aimed_at_nobody_hits_no_one(simulation):
-    red = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
-    blue = simulation.add_device("blue", scene="tag", scene_data=SHOOTER)
+    red = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
+    blue = simulation.add_device("blue", scene="tag", setting_overrides=tag_settings(SHOOTER))
     start_game(simulation, red, blue)
 
     fire_together(simulation, red)

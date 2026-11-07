@@ -10,25 +10,15 @@ from __future__ import annotations
 
 from engine.engine import GameRule
 from engine.input import InputEvents
-from engine.state import GameState, StateSlot
+from engine.state import GameState
 
 try:
     from typing import Final
 except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
+NAMESPACE: Final = "return_to_lobby"
 _HELD_KEY: Final = "return_to_lobby_held"
-_CONFIG_KEY: Final = "return_to_lobby"
-_HOLD_SECONDS_KEY: Final = "_return_to_lobby_hold_seconds"
-_DEFAULT_HOLD_SECONDS: Final = 5.0
-
-
-def _resolve_hold_seconds(state: GameState) -> float:
-    """Read ``hold_seconds`` from the scene's ``initial_data["return_to_lobby"]``."""
-    return state.get(_CONFIG_KEY, {}).get("hold_seconds", _DEFAULT_HOLD_SECONDS)
-
-
-_hold_seconds: StateSlot = StateSlot(_HOLD_SECONDS_KEY, _resolve_hold_seconds, float)
 
 
 class ReturnToLobbyRule(GameRule):
@@ -36,10 +26,9 @@ class ReturnToLobbyRule(GameRule):
 
     Accumulates both-buttons-held elapsed time in ``GameState`` -- the rule
     itself is game-data-stateless -- resetting to zero the instant either
-    button releases. Reaching the ``hold_seconds`` threshold (read from a
-    scene's ``initial_data["return_to_lobby"]["hold_seconds"]``, default
-    5.0) calls ``state.scene_controls.reboot_to_previous()``, rebooting back
-    to whichever scene launched the current one. No visual feedback in v1.
+    button releases. Reaching the pack's ``hold_seconds`` Setting calls
+    ``state.scene_controls.reboot_to_previous()``, rebooting back to
+    whichever scene launched the current one. No visual feedback in v1.
     """
 
     def __init__(self) -> None:
@@ -52,7 +41,7 @@ class ReturnToLobbyRule(GameRule):
             return
 
         held = state.get(_HELD_KEY, 0.0) + state.elapsed
-        if held >= _hold_seconds(state):
+        if held >= state.settings.get_float(NAMESPACE, "hold_seconds"):
             state.set(_HELD_KEY, 0.0)
             state.scene_controls.reboot_to_previous()
         else:

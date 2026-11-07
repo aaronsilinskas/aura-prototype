@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import engine._path as _path
+from engine.settings import SettingDeclaration
 from engine.version import Version
 
 try:
@@ -148,7 +149,7 @@ def load_item(
 class _PackEntry:
     """Metadata for a single discovered pack. Internal use only."""
 
-    __slots__ = ("item_names", "module_prefix", "name", "source_path", "version")
+    __slots__ = ("declarations", "item_names", "module_prefix", "name", "source_path", "version")
 
     def __init__(
         self,
@@ -157,7 +158,9 @@ class _PackEntry:
         module_prefix: str,
         item_names: set[str],
         source_path: str,
+        declarations: dict[str, SettingDeclaration] | None = None,
     ) -> None:
+        self.declarations = declarations if declarations is not None else {}
         self.name = name
         self.version = version
         self.module_prefix = module_prefix

@@ -20,29 +20,30 @@ from packs.scenes.red_light_green_light.tests.helpers import (
     YELLOW,
     last_played_at,
     lit_in,
+    overrides,
     survive_round,
     wait_for,
 )
 
 HALF_SECOND_PULSES = {
-    "rlgl_warning_pulse_max": 0.5,
-    "rlgl_warning_pulse_min": 0.5,
-    "rlgl_red_duration": 1.0,
+    "warning_pulse_max": 0.5,
+    "warning_pulse_min": 0.5,
+    "red_duration_max": 1.0,
 }
 
 ONE_SECOND_PULSES = {
-    "rlgl_warning_pulse_max": 1.0,
-    "rlgl_warning_pulse_min": 1.0,
+    "warning_pulse_max": 1.0,
+    "warning_pulse_min": 1.0,
 }
 """Peaks far enough apart that one peak's sound ends well before the next."""
 
 QUICKENING = {
-    "rlgl_max_level": 2,
-    "rlgl_warning_pulse_max": 1.0,
-    "rlgl_warning_pulse_min": 0.4,
-    "rlgl_red_duration": 1.0,
-    "rlgl_green_duration": 1.0,
-    "rlgl_level_up_duration": 0.5,
+    "max_level": 2,
+    "warning_pulse_max": 1.0,
+    "warning_pulse_min": 0.4,
+    "red_duration_max": 1.0,
+    "green_duration_max": 1.0,
+    "level_up_duration": 0.5,
 }
 """A 1.0 s pulse at level one, quickening to 0.4 s at the top level, level two."""
 
@@ -53,7 +54,7 @@ def peak_times(player: SimulatedDevice, after: float, before: float) -> list[flo
 
 def test_the_red_warning_peaks_three_times_then_red_light_starts(simulation):
     player = simulation.add_device(
-        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+        "p1", scene="red_light_green_light", setting_overrides=overrides(HALF_SECOND_PULSES)
     )
 
     player.tap("A")
@@ -64,7 +65,7 @@ def test_the_red_warning_peaks_three_times_then_red_light_starts(simulation):
 
 def test_each_warning_peak_clicks_the_haptic(simulation):
     player = simulation.add_device(
-        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+        "p1", scene="red_light_green_light", setting_overrides=overrides(HALF_SECOND_PULSES)
     )
 
     player.tap("A")
@@ -75,7 +76,7 @@ def test_each_warning_peak_clicks_the_haptic(simulation):
 
 def test_each_warning_peak_sound_plays_once(simulation):
     player = simulation.add_device(
-        "p1", scene="red_light_green_light", scene_data=ONE_SECOND_PULSES
+        "p1", scene="red_light_green_light", setting_overrides=overrides(ONE_SECOND_PULSES)
     )
     player.tap("A")
     wait_for(simulation, player, WARNING_PEAK)
@@ -87,7 +88,7 @@ def test_each_warning_peak_sound_plays_once(simulation):
 
 def test_the_red_warning_peaks_in_yellow_on_every_light_strip(simulation):
     player = simulation.add_device(
-        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+        "p1", scene="red_light_green_light", setting_overrides=overrides(HALF_SECOND_PULSES)
     )
 
     player.tap("A")
@@ -98,7 +99,7 @@ def test_the_red_warning_peaks_in_yellow_on_every_light_strip(simulation):
 
 def test_the_green_warning_peaks_in_yellow_on_every_light_strip(simulation):
     player = simulation.add_device(
-        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+        "p1", scene="red_light_green_light", setting_overrides=overrides(HALF_SECOND_PULSES)
     )
     player.tap("A")
     wait_for(simulation, player, RED_MUSIC)
@@ -110,7 +111,7 @@ def test_the_green_warning_peaks_in_yellow_on_every_light_strip(simulation):
 
 def test_warning_peaks_come_one_pulse_apart(simulation):
     player = simulation.add_device(
-        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+        "p1", scene="red_light_green_light", setting_overrides=overrides(HALF_SECOND_PULSES)
     )
 
     player.tap("A")
@@ -124,7 +125,9 @@ def test_warning_peaks_come_one_pulse_apart(simulation):
 
 
 def test_warnings_start_at_the_maximum_pulse_at_level_one(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=QUICKENING)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(QUICKENING)
+    )
 
     player.tap("A")
     wait_for(simulation, player, RED_MUSIC)
@@ -134,7 +137,9 @@ def test_warnings_start_at_the_maximum_pulse_at_level_one(simulation):
 
 
 def test_warnings_quicken_to_the_minimum_pulse_at_the_top_level(simulation):
-    player = simulation.add_device("p1", scene="red_light_green_light", scene_data=QUICKENING)
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(QUICKENING)
+    )
     player.tap("A")
     survive_round(simulation, player)
     round_two = simulation.now
@@ -147,7 +152,7 @@ def test_warnings_quicken_to_the_minimum_pulse_at_the_top_level(simulation):
 
 def test_moving_through_the_red_warning_is_not_caught(simulation):
     player = simulation.add_device(
-        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+        "p1", scene="red_light_green_light", setting_overrides=overrides(HALF_SECOND_PULSES)
     )
 
     player.tap("A")
@@ -159,7 +164,7 @@ def test_moving_through_the_red_warning_is_not_caught(simulation):
 
 def test_the_green_warning_peaks_three_times_between_red_and_green_light(simulation):
     player = simulation.add_device(
-        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+        "p1", scene="red_light_green_light", setting_overrides=overrides(HALF_SECOND_PULSES)
     )
 
     player.tap("A")
@@ -171,7 +176,7 @@ def test_the_green_warning_peaks_three_times_between_red_and_green_light(simulat
 
 def test_holding_still_through_the_green_warning_is_not_caught(simulation):
     player = simulation.add_device(
-        "p1", scene="red_light_green_light", scene_data=HALF_SECOND_PULSES
+        "p1", scene="red_light_green_light", setting_overrides=overrides(HALF_SECOND_PULSES)
     )
 
     player.tap("A")

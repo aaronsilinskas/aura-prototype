@@ -7,7 +7,7 @@ resolution, and the main loop.
 
 Scene selection
 ---------------
-Add a ``"default_scene"`` string to ``aura-settings.json``, kept alongside
+Add a ``"default_scene"`` string to ``aura-boot.json``, kept alongside
 ``aura-device.json`` on CIRCUITPY::
 
     {
@@ -43,9 +43,9 @@ Installation
      adafruit_drv2605.mpy  (optional)
 
 3. Place ``aura-device.json`` in CIRCUITPY/ to declare pin/geometry, and
-   ``aura-settings.json`` to select a scene via the ``"default_scene"`` key.
+   ``aura-boot.json`` to select a scene via the ``"default_scene"`` key.
    Both are required — the device has no built-in default for either. Copy
-   ``examples/aura-device.pico-2.json`` and ``examples/aura-settings.json``
+   ``examples/aura-device.pico-2.json`` and ``examples/aura-boot.json``
    as starting points.
 
 4. Run the deploy script to copy all source files and set code.py:

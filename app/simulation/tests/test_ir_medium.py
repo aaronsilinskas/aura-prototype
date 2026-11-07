@@ -10,16 +10,22 @@ import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
 from engine.network import LINE
+from engine.pack_catalog import SettingOverrides
 from engine.state import Scope
 
-# SHOOTER and start_game copy Tag's test helpers: the harness's tests stand on no scene's tests.
-SHOOTER: dict[str, object] = {"tag_expected_team": 2, "tag_expected_player": 3}
+# SHOOTER, tag_settings and start_game copy Tag's test helpers: the harness's
+# tests stand on no scene's tests.
+SHOOTER: dict[str, object] = {"expected_team": 2, "expected_player": 3}
 """The team/player a Tag device both fires as and counts hits from."""
 
-BYSTANDER: dict[str, object] = {"tag_expected_team": 1, "tag_expected_player": 1}
+BYSTANDER: dict[str, object] = {"expected_team": 1, "expected_player": 1}
 """Fires a tag a ``SHOOTER`` device ignores."""
 
 RED = 0xFF0000
+
+
+def tag_settings(settings: dict[str, object]) -> SettingOverrides:
+    return {"tag": {"settings": settings}}
 
 
 def start_game(simulation: Simulation, *players: SimulatedDevice) -> None:
@@ -49,11 +55,11 @@ def add_in_order(
 ) -> tuple[SimulatedDevice, SimulatedDevice]:
     """A red shooter and the blue device it aims at, added in the order given."""
     if receiver_first:
-        blue = simulation.add_device("blue", scene="tag", scene_data=SHOOTER)
-        red = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
+        blue = simulation.add_device("blue", scene="tag", setting_overrides=tag_settings(SHOOTER))
+        red = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
     else:
-        red = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
-        blue = simulation.add_device("blue", scene="tag", scene_data=SHOOTER)
+        red = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
+        blue = simulation.add_device("blue", scene="tag", setting_overrides=tag_settings(SHOOTER))
     return red, blue
 
 
@@ -78,10 +84,10 @@ def test_a_shot_is_decoded_on_the_tick_after_it_was_sent_whatever_the_add_order(
 
 def test_two_senders_shots_on_one_tick_both_decode(simulation):
     # Each matching one-damage tag takes one of ten pips off the hitpoint bar.
-    red = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
-    green = simulation.add_device("green", scene="tag", scene_data=SHOOTER)
+    red = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
+    green = simulation.add_device("green", scene="tag", setting_overrides=tag_settings(SHOOTER))
     blue = simulation.add_device(
-        "blue", scene="tag", scene_data={**SHOOTER, "tag_starting_hitpoints": 10}
+        "blue", scene="tag", setting_overrides=tag_settings({**SHOOTER, "starting_hitpoints": 10})
     )
     start_game(simulation, red, green, blue)
     red.aim(LINE, at=blue)
@@ -100,12 +106,20 @@ def test_two_senders_shots_on_one_tick_both_decode(simulation):
 )
 def test_shots_sent_on_one_tick_decode_in_sender_add_order(simulation, matching_first, ticks_late):
     if matching_first:
-        matching = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
-        other = simulation.add_device("green", scene="tag", scene_data=BYSTANDER)
+        matching = simulation.add_device(
+            "red", scene="tag", setting_overrides=tag_settings(SHOOTER)
+        )
+        other = simulation.add_device(
+            "green", scene="tag", setting_overrides=tag_settings(BYSTANDER)
+        )
     else:
-        other = simulation.add_device("green", scene="tag", scene_data=BYSTANDER)
-        matching = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
-    blue = simulation.add_device("blue", scene="tag", scene_data=SHOOTER)
+        other = simulation.add_device(
+            "green", scene="tag", setting_overrides=tag_settings(BYSTANDER)
+        )
+        matching = simulation.add_device(
+            "red", scene="tag", setting_overrides=tag_settings(SHOOTER)
+        )
+    blue = simulation.add_device("blue", scene="tag", setting_overrides=tag_settings(SHOOTER))
     start_game(simulation, matching, other, blue)
     matching.aim(LINE, at=blue)
     other.aim(LINE, at=blue)
@@ -129,9 +143,9 @@ def test_a_shot_already_in_flight_lands_where_it_was_aimed(simulation):
 
 
 def test_an_aim_at_several_devices_reaches_each_of_them(simulation):
-    red = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
-    blue = simulation.add_device("blue", scene="tag", scene_data=SHOOTER)
-    green = simulation.add_device("green", scene="tag", scene_data=SHOOTER)
+    red = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
+    blue = simulation.add_device("blue", scene="tag", setting_overrides=tag_settings(SHOOTER))
+    green = simulation.add_device("green", scene="tag", setting_overrides=tag_settings(SHOOTER))
     start_game(simulation, red, blue, green)
 
     red.aim(LINE, at=[blue, green])
@@ -155,8 +169,8 @@ def test_a_receiver_subset_surfaces_as_the_best_receiver(simulation):
 def test_a_shot_in_another_wire_frame_codec_is_not_decoded(simulation):
     # Tag speaks the Tag wire-frame; the range receiver decodes only the Aura
     # one. Blue, hit by the same shot, shows it did land.
-    red = simulation.add_device("red", scene="tag", scene_data=SHOOTER)
-    blue = simulation.add_device("blue", scene="tag", scene_data=SHOOTER)
+    red = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
+    blue = simulation.add_device("blue", scene="tag", setting_overrides=tag_settings(SHOOTER))
     receiver = simulation.add_device("rx", scene="ir_range_receiver")
     start_game(simulation, red, blue)
 

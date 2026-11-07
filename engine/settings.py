@@ -1,0 +1,242 @@
+"""Settings — the resolved, read-only start-up values a scene and its packs declare."""
+
+from __future__ import annotations
+
+__all__ = [
+    "SCENE_NAMESPACE",
+    "SettingDeclaration",
+    "SettingValueError",
+    "Settings",
+    "UnknownSettingError",
+    "parse_declarations",
+    "resolve_settings",
+]
+
+try:
+    from typing import Final
+except ImportError:
+    pass  # Not available on CircuitPython
+
+SCENE_NAMESPACE: Final = "scene"
+"""The namespace of a scene's own Settings; no pack may take the name."""
+
+
+class UnknownSettingError(LookupError):
+    """No Setting *name* is declared in *namespace* for this scene."""
+
+    def __init__(self, namespace: str, name: str) -> None:
+        self.namespace = namespace
+        self.name = name
+        super().__init__(f"No Setting '{name}' is declared in namespace '{namespace}'")
+
+
+class Settings:
+    """One scene's resolved Settings, read by namespace and name.
+
+    The namespace is ``scene`` for the scene's own Settings, or a pack's
+    folder name for that pack's. Built once by the ``PackCatalog`` scan; there
+    is no write path.
+    """
+
+    __slots__ = ("_values",)
+
+    def __init__(self, values: dict[str, dict[str, object]] | None = None) -> None:
+        self._values = {namespace: dict(names) for namespace, names in (values or {}).items()}
+
+    def get(self, namespace: str, name: str) -> object:
+        """Return Setting *name* of *namespace*.
+
+        Raises:
+            UnknownSettingError: *namespace* declares no Setting *name*.
+        """
+        names = self._values.get(namespace)
+        if names is None or name not in names:
+            raise UnknownSettingError(namespace, name)
+        return _copy_value(names[name])
+
+    # The typed reads below let a Scene Config take each Setting as its field
+    # type, with no cast. A TypeError means the code asks for the wrong type.
+
+    def get_int(self, namespace: str, name: str) -> int:
+        """Return ``int`` Setting *name* of *namespace*.
+
+        Raises:
+            UnknownSettingError: *namespace* declares no Setting *name*.
+            TypeError: the Setting is not an ``int``.
+        """
+        value = self.get(namespace, name)
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise _wrong_type(namespace, name, value, "int")
+        return value
+
+    def get_float(self, namespace: str, name: str) -> float:
+        """Return ``float`` Setting *name* of *namespace*; an ``int`` reads as a float.
+
+        Raises:
+            UnknownSettingError: *namespace* declares no Setting *name*.
+            TypeError: the Setting is not a ``float``.
+        """
+        value = self.get(namespace, name)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise _wrong_type(namespace, name, value, "float")
+        return float(value)
+
+    def get_bool(self, namespace: str, name: str) -> bool:
+        """Return ``bool`` Setting *name* of *namespace*.
+
+        Raises:
+            UnknownSettingError: *namespace* declares no Setting *name*.
+            TypeError: the Setting is not a ``bool``.
+        """
+        value = self.get(namespace, name)
+        if not isinstance(value, bool):
+            raise _wrong_type(namespace, name, value, "bool")
+        return value
+
+    def get_str(self, namespace: str, name: str) -> str:
+        """Return ``str`` Setting *name* of *namespace*.
+
+        Raises:
+            UnknownSettingError: *namespace* declares no Setting *name*.
+            TypeError: the Setting is not a ``str``.
+        """
+        value = self.get(namespace, name)
+        if not isinstance(value, str):
+            raise _wrong_type(namespace, name, value, "str")
+        return value
+
+    def get_list(self, namespace: str, name: str) -> list[object]:
+        """Return a copy of ``list`` Setting *name* of *namespace*.
+
+        Raises:
+            UnknownSettingError: *namespace* declares no Setting *name*.
+            TypeError: the Setting is not a ``list``.
+        """
+        value = self.get(namespace, name)
+        if not isinstance(value, list):
+            raise _wrong_type(namespace, name, value, "list")
+        return value
+
+
+def _copy_value(value: object) -> object:
+    """Return *value*, with any list or object in it copied, so a reader can't change a Setting."""
+    if isinstance(value, list):
+        return [_copy_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _copy_value(item) for key, item in value.items()}
+    return value
+
+
+def _wrong_type(namespace: str, name: str, value: object, type_name: str) -> TypeError:
+    return TypeError(f"Setting '{namespace}.{name}' is {value!r}, not a {type_name}")
+
+
+# The types a Setting can be declared as.
+# A ``list`` is checked at the top level only; its items are the pack's to check.
+_TYPES = ("int", "float", "bool", "str", "list")
+
+_DECLARATION_KEYS = ("type", "default", "description")
+
+
+class SettingDeclaration:
+    """One declared Setting: its type and its default, or none when *required*."""
+
+    __slots__ = ("default", "required", "type_name")
+
+    def __init__(self, type_name: str, default: object = None, required: bool = True) -> None:
+        self.type_name = type_name
+        self.default = default
+        self.required = required
+
+
+class SettingValueError(ValueError):
+    """Setting *setting* cannot take the value given or resolve, for *reason*."""
+
+    def __init__(self, setting: str, reason: str) -> None:
+        self.setting = setting
+        self.reason = reason
+        super().__init__(f"Setting '{setting}': {reason}")
+
+
+def parse_declarations(section: object) -> dict[str, SettingDeclaration]:
+    """Parse a ``settings`` section, ``{name: {"type", "default"?, "description"?}}``.
+
+    A declaration with no ``default`` is required.
+
+    Raises:
+        ValueError: the section, or a declaration in it, is malformed; the
+            message is the reason, for the caller to wrap with its file.
+    """
+    if not isinstance(section, dict):
+        raise ValueError("'settings' is not an object")
+    declarations: dict[str, SettingDeclaration] = {}
+    for name, raw in section.items():
+        declarations[name] = _parse_declaration(name, raw)
+    return declarations
+
+
+def _parse_declaration(name: str, raw: object) -> SettingDeclaration:
+    if not isinstance(raw, dict):
+        raise ValueError(f"Setting '{name}' is not an object")
+    for key in raw:
+        if key not in _DECLARATION_KEYS:
+            raise ValueError(f"Setting '{name}' has unknown key {key!r}")
+    type_name = raw.get("type")
+    if type_name not in _TYPES:
+        raise ValueError(f"Setting '{name}' has unknown type {type_name!r}")
+    if "description" in raw and not isinstance(raw["description"], str):
+        raise ValueError(f"Setting '{name}' has a description that is not a string")
+    if "default" not in raw:
+        return SettingDeclaration(type_name)
+    default = raw["default"]
+    if not _matches(type_name, default):
+        raise ValueError(f"Setting '{name}' default {default!r} is not a {type_name}")
+    return SettingDeclaration(type_name, _coerce(type_name, default), required=False)
+
+
+def resolve_settings(
+    declarations: dict[str, SettingDeclaration], overrides: list[dict[str, object]]
+) -> dict[str, object]:
+    """Resolve every declared Setting: its default, then each of *overrides* in order.
+
+    Raises:
+        SettingValueError: an override names an undeclared Setting or gives a
+            value of the wrong type, or a required Setting is left unset.
+    """
+    resolved: dict[str, object] = {}
+    for name, declaration in declarations.items():
+        if not declaration.required:
+            resolved[name] = declaration.default
+    for layer in overrides:
+        for name, value in layer.items():
+            declaration = declarations.get(name)
+            if declaration is None:
+                raise SettingValueError(name, "is not declared")
+            if not _matches(declaration.type_name, value):
+                raise SettingValueError(name, f"{value!r} is not a {declaration.type_name}")
+            resolved[name] = _coerce(declaration.type_name, value)
+    for name in declarations:
+        if name not in resolved:
+            raise SettingValueError(name, "is required and was not set")
+    return resolved
+
+
+def _matches(type_name: str, value: object) -> bool:
+    # bool is an int subclass in Python, but never a valid int or float Setting.
+    if isinstance(value, bool):
+        return type_name == "bool"
+    if type_name == "int":
+        return isinstance(value, int)
+    if type_name == "float":
+        return isinstance(value, (int, float))
+    if type_name == "str":
+        return isinstance(value, str)
+    if type_name == "list":
+        return isinstance(value, list)
+    return False
+
+
+def _coerce(type_name: str, value: object) -> object:
+    if type_name == "float" and isinstance(value, (int, float)):
+        return float(value)
+    return _copy_value(value)

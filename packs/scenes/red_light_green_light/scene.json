@@ -1,13 +1,72 @@
 {
   "version": "1.0",
   "effect_packs": [
-    ["elements", "1.0"],
-    ["basic", "1.1"]
+    { "name": "elements", "version": "1.0" },
+    { "name": "basic", "version": "1.1" }
   ],
   "rule_packs": [
-    ["return_to_lobby", "1.0"]
+    { "name": "return_to_lobby", "version": "1.0" }
   ],
-  "initial_data": {
-    "return_to_lobby": { "hold_seconds": 5.0 }
+  "settings": {
+    "red_duration_max": {
+      "type": "float",
+      "default": 5.0,
+      "description": "Seconds Red Light lasts at level 1."
+    },
+    "red_duration_min": {
+      "type": "float",
+      "default": 2.0,
+      "description": "Seconds Red Light lasts at max_level."
+    },
+    "green_duration_max": {
+      "type": "float",
+      "default": 5.0,
+      "description": "Seconds Green Light lasts at level 1."
+    },
+    "green_duration_min": {
+      "type": "float",
+      "default": 2.0,
+      "description": "Seconds Green Light lasts at max_level."
+    },
+    "warning_pulse_max": {
+      "type": "float",
+      "default": 1.0,
+      "description": "Seconds each of a warning's three pulses lasts at level 1."
+    },
+    "warning_pulse_min": {
+      "type": "float",
+      "default": 0.4,
+      "description": "Seconds each of a warning's three pulses lasts at max_level."
+    },
+    "game_over_duration": {
+      "type": "float",
+      "default": 3.0,
+      "description": "Seconds Game Over lasts before returning to Ready."
+    },
+    "green_still_timeout": {
+      "type": "float",
+      "default": 0.75,
+      "description": "Seconds a player may hold still during Green Light before the game is over."
+    },
+    "level_up_duration": {
+      "type": "float",
+      "default": 1.0,
+      "description": "Seconds Level Up lasts before the next round's red warning."
+    },
+    "max_level": {
+      "type": "int",
+      "default": 10,
+      "description": "Game Level whose round, once survived, wins; phase durations shorten toward it."
+    },
+    "motion_smoothing": {
+      "type": "float",
+      "default": 0.35,
+      "description": "Smoothing factor (0 < alpha <= 1) for the motion signal. Lower rejects spikes more but reacts slower; 1.0 disables smoothing."
+    },
+    "gravity_beta": {
+      "type": "float",
+      "default": 0.1,
+      "description": "Tracking rate (0 < beta <= 1) of the gravity estimate. Must stay below motion_smoothing, or real motion is absorbed into the gravity estimate before it registers."
+    }
   }
 }

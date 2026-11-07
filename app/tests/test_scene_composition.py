@@ -16,9 +16,10 @@ from engine.events import Event, EventGroup
 from engine.input import ButtonData, InputEvents
 from engine.network import LINE
 from engine.pack_catalog import PackCatalog, PackScanError, scan_pack_roots
-from engine.scene import Scene, SceneRegistry
+from engine.scene import PackReference, Scene, SceneRegistry
 from engine.state import Scope
 from engine.tests.helpers import RecordingSceneReboot, SpyNetworkControls
+from engine.version import Version
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
@@ -59,7 +60,7 @@ def test_ir_range_receiver_scene_boots_and_activates_via_the_standard_pipeline()
     """ir_range_receiver (issue #918) needs no special-casing -- it discovers
     and activates through the same build_scene_runtime path as every other
     scene, proving scene_demo.py can boot straight into it via
-    aura-settings.json's default_scene."""
+    aura-boot.json's default_scene."""
     runtime = build_scene_runtime(_fake_hw(), "ir_range_receiver", catalog=_boot_catalog())
 
     assert runtime.manager.active_state is not None
@@ -140,7 +141,7 @@ def test_neither_persisted_nor_flash_scene_raises_naming_both_files(device_stora
     silently picking a scene -- the same contract resolve_boot_scene documents."""
     scene_registry = _scene_registry_with("red_light_green_light")
 
-    with pytest.raises(ValueError, match=r"aura-state\.json.*aura-settings\.json"):
+    with pytest.raises(ValueError, match=r"aura-state\.json.*aura-boot\.json"):
         resolve_boot_scene_name(scene_registry, device_storage, {})
 
 
@@ -230,12 +231,13 @@ def test_a_misconfigured_card_scene_stops_boot_with_a_pack_scan_error(device_sto
         scan_boot_pack_catalog(device_storage)
 
 
-def test_scene_data_reaches_the_named_scenes_initial_data():
-    catalog = scan_boot_pack_catalog(None, scene_data={"tag": {"max_ammo": 2}})
+def test_setting_overrides_reach_the_named_scenes_settings():
+    catalog = scan_boot_pack_catalog(
+        None, setting_overrides={"tag": {"settings": {"starting_hitpoints": 2}}}
+    )
 
-    initial_data = catalog.scene_registry.get("tag").initial_data
-    assert initial_data is not None
-    assert initial_data["max_ammo"] == 2
+    settings = catalog.scene_registry.get("tag").settings
+    assert settings.get_int("scene", "starting_hitpoints") == 2
 
 
 def test_a_card_scene_named_as_the_persisted_sd_scene_resolves(device_storage):
@@ -753,8 +755,8 @@ def _make_card_rule_pack(
 ) -> Path:
     """Create aura_packs/rules/<pack_name>/ under *mount_root* with one rule item.
 
-    Mirrors packs/rules/debug/'s on-flash layout: a version.txt whose first
-    line is the MAJOR.MINOR version, plus an empty __init__.py at every
+    Mirrors packs/rules/debug/'s on-flash layout: a rules.json manifest stating
+    the MAJOR.MINOR version, plus an empty __init__.py at every
     package level and the rule module itself. Returns the pack directory.
     """
     aura_packs = mount_root / "aura_packs"
@@ -764,7 +766,7 @@ def _make_card_rule_pack(
     (aura_packs / "__init__.py").touch()
     (rules / "__init__.py").touch()
     (pack_dir / "__init__.py").touch()
-    (pack_dir / "version.txt").write_text(version + "\n")
+    (pack_dir / "rules.json").write_text(json.dumps({"version": version}))
     (pack_dir / f"{item_name}.py").write_text(content)
     return pack_dir
 
@@ -781,7 +783,7 @@ def test_flash_scene_can_reference_and_run_a_card_rule_packs_rule(device_storage
     catalog = _boot_catalog(device_storage)
     catalog.scene_registry.register(
         "card_pack_scene",
-        lambda: Scene(effect_packs=[], rule_packs=[["card_pack", "1.0"]]),
+        lambda: Scene(effect_packs=[], rule_packs=[PackReference("card_pack", Version(1, 0))]),
     )
     hw = _fake_hw(storage=device_storage)
 
@@ -797,7 +799,9 @@ def test_card_scene_can_reference_and_run_a_card_rule_packs_rule(device_storage)
     (aura_packs/rules) in its own rule_packs resolves and runs it end to
     end -- both card slices merge into the same shared registries."""
     _make_card_scene(
-        Path(device_storage.mount_root), "card_scene", rule_packs=[["card_pack", "1.0"]]
+        Path(device_storage.mount_root),
+        "card_scene",
+        rule_packs=[{"name": "card_pack", "version": "1.0"}],
     )
     _make_card_rule_pack(
         Path(device_storage.mount_root), "card_pack", "card_rule", _CARD_RULE_PACK_SOURCE
@@ -837,7 +841,7 @@ def _make_card_effect_pack(mount_root: Path, pack_name: str, version: str = "1.0
     """Create aura_packs/effects/<pack_name>/ under *mount_root* with one item.
 
     Mirrors ``_make_card_scene``'s package layout but for an effect pack: a
-    ``version.txt`` (the marker the pack catalog requires)
+    ``effects.json`` manifest (the marker the pack catalog requires)
     plus a single ``glow`` item whose ``BUILD`` returns an effect declaring an
     audio clip qualified by *pack_name*, and the ``sounds/card_pack_clip.wav``
     that clip names (building the effect resolves it), so a resolved effect proves both the
@@ -851,7 +855,7 @@ def _make_card_effect_pack(mount_root: Path, pack_name: str, version: str = "1.0
     (aura_packs / "__init__.py").touch()
     (effects / "__init__.py").touch()
     (pack_dir / "__init__.py").touch()
-    (pack_dir / "version.txt").write_text(version)
+    (pack_dir / "effects.json").write_text(json.dumps({"version": version}))
     (pack_dir / "glow.py").write_text(_CARD_EFFECT_PACK_BUILD_SOURCE.format(pack_name=pack_name))
     _add_card_effect_pack_sound(pack_dir, "card_pack_clip")
     return pack_dir
@@ -868,7 +872,9 @@ def _register_scene_declaring_effect_pack(
 ) -> None:
     scene_registry.register(
         scene_name,
-        lambda: Scene(effect_packs=[(pack_name, version)], rule_packs=[]),
+        lambda: Scene(
+            effect_packs=[PackReference(pack_name, Version.parse(version))], rule_packs=[]
+        ),
     )
 
 
@@ -913,7 +919,7 @@ def test_card_scene_resolves_a_card_effect_pack_end_to_end(device_storage):
     _make_card_scene(
         mount_root,
         "card_scene",
-        effect_packs=[["card_pack", "1.0"]],
+        effect_packs=[{"name": "card_pack", "version": "1.0"}],
     )
     hw = _fake_hw(storage=device_storage)
 

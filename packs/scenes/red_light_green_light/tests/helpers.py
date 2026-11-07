@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from app.simulation import TICK, SimulatedDevice, Simulation
+from engine.pack_catalog import SettingOverrides
 from engine.state import Scope
 
 RED = 0xFF0000
@@ -29,7 +32,7 @@ WIN_STING = "scene.win_sting_start"
 GAME_OVER_STING = "basic.game_over_sting_start"
 
 SLACK = TICK
-"""How far a timed phase change, or a clip running out, may trail its tunable.
+"""How far a timed phase change, or a clip running out, may trail the Setting that times it.
 
 Both are checked once a tick, so they land on the first tick at or past it.
 One that falls on a tick boundary can land a tick later still: the clock sums
@@ -43,8 +46,13 @@ The clip is seen to have run out on the first tick at or past its end, and the
 phase changes on the tick after that one.
 """
 
-QUICK_WARNINGS = {"rlgl_warning_pulse_max": 0.2, "rlgl_warning_pulse_min": 0.2}
+QUICK_WARNINGS = {"warning_pulse_max": 0.2, "warning_pulse_min": 0.2}
 """Three 0.2 s pulses, so a warning is over in 0.6 s at every level."""
+
+
+def overrides(settings: Mapping[str, object]) -> SettingOverrides:
+    """``setting_overrides`` booting Red Light Green Light with *settings* over its defaults."""
+    return {"red_light_green_light": {"settings": dict(settings)}}
 
 
 def times_played(player: SimulatedDevice, clip: str) -> int:

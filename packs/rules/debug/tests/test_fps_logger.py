@@ -1,18 +1,18 @@
 from engine.input import ButtonData, InputEvents
 from packs.rules.debug.fps_logger import FpsLoggerRule
 from packs.rules.debug.tests.helpers import CapturingLogger, EngineFixture
+from packs.tests.settings_helper import settings_for
 
 _NO_BUTTONS = ButtonData(states={})
 _WINDOW = 3.0
 
 
 def _make_fixture_with_logger(start_time: float = 0.0):
-    fixture = EngineFixture()
+    fixture = EngineFixture(settings_for(rule_packs={"debug": {"fps_logging_enabled": True}}))
     logger = CapturingLogger()
     clock_time = [start_time]
     rule = FpsLoggerRule(output=logger, clock=lambda: clock_time[0])
     fixture.game_engine.add_rules(rule)
-    fixture.state.set("fps_logging_enabled", True)
     return fixture, logger, clock_time
 
 
@@ -23,7 +23,7 @@ def _dispatch(fixture: EngineFixture, n: int = 1) -> None:
 
 
 def test_no_output_by_default():
-    fixture = EngineFixture()
+    fixture = EngineFixture(settings_for(rule_packs={"debug": {}}))
     logger = CapturingLogger()
     clock_time = [_WINDOW]
     fixture.game_engine.add_rules(FpsLoggerRule(output=logger, clock=lambda: clock_time[0]))
@@ -83,3 +83,7 @@ def test_prints_once_per_window_not_every_frame():
     _dispatch(fixture, 20)
 
     assert len(logger.logs) == 1
+
+
+def test_the_element_browser_turns_fps_logging_on_in_its_debug_pack_reference():
+    assert settings_for("element_browser").get("debug", "fps_logging_enabled") is True

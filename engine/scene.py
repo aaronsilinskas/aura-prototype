@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["Scene", "SceneLocalRegistry", "SceneManager", "SceneRegistry"]
+__all__ = ["PackReference", "Scene", "SceneLocalRegistry", "SceneManager", "SceneRegistry"]
 
 
 try:
@@ -18,6 +18,7 @@ except ImportError:
 from engine.engine import GameEngine, GameRule, Version
 from engine.namespace import ActiveSceneNamespace
 from engine.packs import PackRegistry, UnknownItemError, load_item
+from engine.settings import SettingDeclaration, Settings
 from engine.state import EffectAdmin, GameState, MergeStrategy, SceneControls, SceneReboot, Scope
 
 
@@ -86,17 +87,35 @@ class SceneLocalRegistry:
         return sorted(self._item_names)
 
 
+class PackReference:
+    """One entry of a scene's ``effect_packs`` or ``rule_packs``.
+
+    *version* is the minimum compatible version: the installed pack must have
+    the same major and at least this minor. *settings* holds the scene's
+    Setting overrides for the pack, exactly as written in ``scene.json``; the
+    scan checks them when it resolves the scene's Settings.
+    """
+
+    __slots__ = ("name", "settings", "version")
+
+    def __init__(
+        self, name: str, version: Version, settings: dict[str, object] | None = None
+    ) -> None:
+        self.name = name
+        self.version = version
+        self.settings = settings if settings is not None else {}
+
+
 class Scene:
-    """Declarative bundle describing a scene's rules, packs, and initial data.
+    """Declarative bundle describing a scene's rules, packs, and Settings.
 
     Carries no mutable runtime state.  Pass a zero-arg factory that returns a
     fresh ``Scene`` to ``SceneManager.register``; ``SceneManager`` calls the
     factory when the scene is first loaded so each load gets a clean instance.
 
-    ``effect_packs`` and ``rule_packs`` are sequences of ``(pack_name, "MAJOR.MINOR")``
-    pairs referencing packs registered in the respective ``PackRegistry``.  JSON
-    discovery yields lists-of-lists; factory-built scenes may pass tuples — hence
-    the ``Sequence[Sequence[str]]`` typing.
+    ``effect_packs`` and ``rule_packs`` are ordered ``PackReference`` sequences
+    naming packs in the respective ``PackRegistry``.  ``rule_packs`` order sets
+    the order of rules across packs.
 
     ``version`` is the scene's own declared version, parsed from ``scene.json`` at
     discovery time.  It is informational for now — format-validated and stored, but
@@ -120,38 +139,43 @@ class Scene:
     ``local_sound_map`` is a bare-keyed ``{stem: path}`` map of this scene's
     scene-local sounds (its ``sounds/`` subdirectory).  Built once at discovery;
     unlike ``local_rule_registry``/``local_effect_registry``
-    it is a plain mutable dict rather than an encapsulated registry, so — like
-    ``initial_data`` — each fresh ``Scene`` from ``SceneRegistry.get`` receives its
-    own copy, keeping mutation from poisoning future loads.  Purely additive for
-    now — no consumer resolves it yet.
+    it is a plain mutable dict rather than an encapsulated registry, so each
+    fresh ``Scene`` from ``SceneRegistry.get`` receives its own copy, keeping
+    mutation from poisoning future loads.  Purely additive for now — no
+    consumer resolves it yet.
+
+    ``settings`` is the scene's resolved, read-only ``Settings``, which
+    ``SceneManager`` hands to each ``GameState`` it creates for the scene.
+    Scanned scenes share one across fresh ``Scene`` instances; an in-memory
+    scene without one declares no Settings.
     """
 
     __slots__ = (
         "__weakref__",
         "effect_packs",
-        "initial_data",
         "ir_codec",
         "local_effect_registry",
         "local_rule_registry",
         "local_sound_map",
         "rule_packs",
+        "settings",
         "version",
     )
 
     def __init__(
         self,
-        effect_packs: Sequence[Sequence[str]],
-        rule_packs: Sequence[Sequence[str]],
-        initial_data: dict[str, object] | None = None,
+        effect_packs: Sequence[PackReference],
+        rule_packs: Sequence[PackReference],
         version: Version | None = None,
         ir_codec: str = "aura",
         local_rule_registry: SceneLocalRegistry | None = None,
         local_effect_registry: SceneLocalRegistry | None = None,
         local_sound_map: dict[str, str] | None = None,
+        settings: Settings | None = None,
     ) -> None:
+        self.settings = settings if settings is not None else Settings()
         self.effect_packs = effect_packs
         self.rule_packs = rule_packs
-        self.initial_data = initial_data
         self.version = version
         self.ir_codec = ir_codec
         self.local_rule_registry = (
@@ -167,13 +191,14 @@ class _SceneEntry:
     """Stored metadata for a single discovered scene.  Internal use only."""
 
     __slots__ = (
+        "declarations",
         "effect_packs",
-        "initial_data",
         "ir_codec",
         "local_effect_registry",
         "local_rule_registry",
         "local_sound_map",
         "rule_packs",
+        "settings",
         "source_path",
         "version",
     )
@@ -181,19 +206,22 @@ class _SceneEntry:
     def __init__(
         self,
         version: Version,
-        effect_packs: Sequence[Sequence[str]],
-        rule_packs: Sequence[Sequence[str]],
-        initial_data: dict[str, object] | None,
+        effect_packs: Sequence[PackReference],
+        rule_packs: Sequence[PackReference],
         source_path: str,
         ir_codec: str,
         local_rule_registry: SceneLocalRegistry,
         local_effect_registry: SceneLocalRegistry,
         local_sound_map: dict[str, str],
+        declarations: dict[str, SettingDeclaration] | None = None,
     ) -> None:
+        # The scene's own Setting declarations, from scene.json's ``settings``.
+        self.declarations = declarations or {}
+        # Resolved by the catalog once every pack is scanned.
+        self.settings = Settings()
         self.version = version
         self.effect_packs = effect_packs
         self.rule_packs = rule_packs
-        self.initial_data = initial_data
         self.source_path = source_path
         self.ir_codec = ir_codec
         self.local_rule_registry = local_rule_registry
@@ -234,7 +262,7 @@ class SceneRegistry:
         """Return a fresh ``Scene`` for *name*.
 
         JSON-discovered scenes share the parsed ``Version`` across calls but
-        receive their own copy of ``initial_data`` and ``local_sound_map`` so
+        receive their own copy of ``local_sound_map`` so
         that mutations cannot poison future loads.  Factory-registered scenes
         return whatever the factory produces.
 
@@ -249,16 +277,15 @@ class SceneRegistry:
         if entry is None:
             raise ValueError(f"Unknown scene '{name}'")
 
-        initial_data = dict(entry.initial_data) if entry.initial_data is not None else None
         return Scene(
             effect_packs=entry.effect_packs,
             rule_packs=entry.rule_packs,
-            initial_data=initial_data,
             version=entry.version,
             ir_codec=entry.ir_codec,
             local_rule_registry=entry.local_rule_registry,
             local_effect_registry=entry.local_effect_registry,
             local_sound_map=dict(entry.local_sound_map),
+            settings=entry.settings,
         )
 
     def ir_codec_for(self, name: str) -> str:
@@ -510,9 +537,9 @@ class SceneManager(SceneControls):
     def _resolve_rules(self, scene: Scene) -> list[GameRule]:
         """Return combined rules: shared-pack items first, scene-local items after."""
         combined = []
-        for pack_name, _ in scene.rule_packs:
-            for item_name in self._rule_registry.items(pack_name):
-                combined.append(self._rule_registry.get(pack_name, item_name, GameRule))
+        for pack in scene.rule_packs:
+            for item_name in self._rule_registry.items(pack.name):
+                combined.append(self._rule_registry.get(pack.name, item_name, GameRule))
         for item_name in scene.local_rule_registry.items():
             combined.append(scene.local_rule_registry.get(item_name, GameRule))
         return combined
@@ -525,7 +552,7 @@ class SceneManager(SceneControls):
         self._engine.set_rules(entry.rules)
         entry.state.clear_queue()
         scene = entry.scene
-        declared_packs = frozenset(pack_name for pack_name, _ in scene.effect_packs)
+        declared_packs = frozenset(pack.name for pack in scene.effect_packs)
         self._namespace.install(scene.local_effect_registry, scene.local_sound_map, declared_packs)
 
     def _do_load(self, scene: Scene) -> None:
@@ -536,7 +563,7 @@ class SceneManager(SceneControls):
             self._deactivate(self._stack[i])
 
         self._stack = []
-        state = self._engine.create_state(self, scene.initial_data)
+        state = self._engine.create_state(self, scene.settings)
         entry = _SceneStackEntry(scene, state, combined_rules, saved_merge=None)
         self._stack.append(entry)
         self._effect_admin.reset_merge_strategies()
@@ -549,7 +576,7 @@ class SceneManager(SceneControls):
         self._deactivate(self._stack[-1])
         saved_merge = self._effect_admin.capture_merge_strategies()
 
-        state = self._engine.create_state(self, scene.initial_data)
+        state = self._engine.create_state(self, scene.settings)
         entry = _SceneStackEntry(scene, state, combined_rules, saved_merge=saved_merge)
         self._stack.append(entry)
         self._activate(entry)

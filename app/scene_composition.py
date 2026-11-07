@@ -15,7 +15,7 @@ from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
 from engine.namespace import ActiveSceneNamespace
 from engine.network import NetworkEvents
-from engine.pack_catalog import PackCatalog, scan_pack_roots
+from engine.pack_catalog import PackCatalog, SettingOverrides, scan_pack_roots
 from engine.scene import SceneManager, SceneRegistry
 from engine.state import SceneReboot
 from engine.timer import Timer
@@ -101,7 +101,7 @@ _CARD_PACKS_ROOT = "aura_packs"
 def resolve_boot_scene_name(
     scene_registry: SceneRegistry,
     storage: DeviceStorage | None,
-    settings_mapping: dict,
+    boot_mapping: dict,
     logger: Logger | None = None,
 ) -> str:
     """Resolve the boot scene name and validate it against *scene_registry*.
@@ -113,7 +113,7 @@ def resolve_boot_scene_name(
     *storage* is treated as no persisted override, leaving the flash
     ``default_scene`` to win.
     """
-    scene_name = resolve_boot_scene(storage, settings_mapping, logger)
+    scene_name = resolve_boot_scene(storage, boot_mapping, logger)
     return scene_registry.resolve_known(scene_name)
 
 
@@ -130,13 +130,14 @@ def resolve_ir_codec(
 
 def scan_boot_pack_catalog(
     storage: DeviceStorage | None,
-    scene_data: dict[str, dict[str, object]] | None = None,
+    setting_overrides: SettingOverrides | None = None,
 ) -> PackCatalog:
     """Scan the device's pack roots into the one ``PackCatalog`` boot runs on.
 
     Flash ``packs`` always; the card's ``aura_packs`` only when *storage* is
     mounted and carries that folder. Call it after storage mounts.
-    *scene_data* is passed through as the catalog's initial-data overrides.
+    *setting_overrides* is passed through as the catalog's Setting overrides
+    (see ``scan_pack_roots``).
 
     Raises:
         PackScanError: a pack or scene under either root is misconfigured.
@@ -146,7 +147,7 @@ def scan_boot_pack_catalog(
         card_root = storage.path(_CARD_PACKS_ROOT)
         if _path.isdir(card_root):
             roots.append(card_root)
-    return scan_pack_roots(roots, initial_data_overrides=scene_data)
+    return scan_pack_roots(roots, setting_overrides=setting_overrides)
 
 
 def build_scene_runtime(
@@ -217,11 +218,11 @@ def build_scene_runtime(
 
 def build_scene_boot(
     hw: DeviceHardware,
-    settings_mapping: dict,
+    boot_mapping: dict,
     reset: Callable[[], None],
     timer: Timer | None = None,
     logger: Logger | None = None,
-    scene_data: dict[str, dict[str, object]] | None = None,
+    setting_overrides: SettingOverrides | None = None,
 ) -> SceneBoot:
     """Boot *hw* into its boot scene; return its name, per-tick body and runtime.
 
@@ -229,20 +230,21 @@ def build_scene_boot(
     and the Simulated device, as :func:`build_scene_tick` is their one tick.
     A pending Scene deploy token is applied first (see
     :func:`~hardware.shared.scene_selection.apply_scene_deploy`); then the
-    card's Persisted scene wins over *settings_mapping*'s ``default_scene``.
+    card's Persisted scene wins over *boot_mapping*'s ``default_scene``.
     An unknown name raises naming the known scenes. A reboot the scene asks for
     persists to ``hw.storage``, then calls *reset*.
 
-    *scene_data* maps a scene name to tunables merged over its
-    ``initial_data``; the Simulated device boots shortened scenes through it.
+    *setting_overrides* overrides scenes' Settings (shaped as for
+    ``scan_pack_roots``); the Simulated device boots shortened scenes through
+    it.
 
     The runtime's ``namespace`` is the game's own Active scene namespace, so
     the Simulated device can resolve a clip name exactly as the game does.
     """
-    catalog = scan_boot_pack_catalog(hw.storage, scene_data)
+    catalog = scan_boot_pack_catalog(hw.storage, setting_overrides)
     scene_registry = catalog.scene_registry
-    apply_scene_deploy(hw.storage, settings_mapping, logger)
-    scene_name = resolve_boot_scene_name(scene_registry, hw.storage, settings_mapping, logger)
+    apply_scene_deploy(hw.storage, boot_mapping, logger)
+    scene_name = resolve_boot_scene_name(scene_registry, hw.storage, boot_mapping, logger)
     if hw.ir is not None:
         hw.ir.apply_codec(*resolve_ir_codec(scene_registry, scene_name))
     scene_reboot = DeviceSceneReboot(

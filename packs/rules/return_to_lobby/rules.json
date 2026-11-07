@@ -1,0 +1,10 @@
+{
+  "version": "1.0",
+  "settings": {
+    "hold_seconds": {
+      "type": "float",
+      "default": 5.0,
+      "description": "Seconds A and B must be held together to reboot back to the launching scene."
+    }
+  }
+}

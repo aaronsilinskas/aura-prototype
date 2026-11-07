@@ -85,39 +85,23 @@ def test_get_returns_scene_with_version_parsed_from_json(pack_tree) -> None:
 def test_get_returns_scene_with_effect_packs_from_json(pack_tree) -> None:
     root = pack_tree.root("ts_flash")
     pack_tree.effect_pack(root, "fx")
-    pack_tree.scene(root, "forest", effect_packs=[["fx", "1.0"]])
+    pack_tree.scene(root, "forest", effect_packs=[{"name": "fx", "version": "1.0"}])
     registry = scan_pack_roots([str(root)]).scene_registry
 
     scene = registry.get("forest")
 
-    assert scene.effect_packs == [["fx", "1.0"]]
+    assert [(pack.name, str(pack.version)) for pack in scene.effect_packs] == [("fx", "1.0")]
 
 
 def test_get_returns_scene_with_rule_packs_from_json(pack_tree) -> None:
     root = pack_tree.root("ts_flash")
     pack_tree.rule_pack(root, "rules")
-    pack_tree.scene(root, "forest", rule_packs=[["rules", "1.0"]])
+    pack_tree.scene(root, "forest", rule_packs=[{"name": "rules", "version": "1.0"}])
     registry = scan_pack_roots([str(root)]).scene_registry
 
     scene = registry.get("forest")
 
-    assert scene.rule_packs == [["rules", "1.0"]]
-
-
-def test_get_returns_scene_with_initial_data_from_json(pack_tree) -> None:
-    registry = _scan_scene(pack_tree, initial_data={"score": 0, "level": 5})
-
-    scene = registry.get("forest")
-
-    assert scene.initial_data == {"score": 0, "level": 5}
-
-
-def test_get_returns_scene_with_none_initial_data_when_not_in_json(pack_tree) -> None:
-    registry = _scan_scene(pack_tree)
-
-    scene = registry.get("forest")
-
-    assert scene.initial_data is None
+    assert [(pack.name, str(pack.version)) for pack in scene.rule_packs] == [("rules", "1.0")]
 
 
 def test_get_returns_scene_with_default_ir_codec_when_not_in_json(pack_tree) -> None:
@@ -157,18 +141,6 @@ def test_get_returns_scenes_with_shared_version_instance(pack_tree) -> None:
     scene_b = registry.get("forest")
 
     assert scene_a.version is scene_b.version
-
-
-def test_get_returns_fresh_initial_data_so_mutation_does_not_affect_next_call(
-    pack_tree,
-) -> None:
-    registry = _scan_scene(pack_tree, initial_data={"score": 0})
-
-    scene_a = registry.get("forest")
-    scene_a.initial_data["score"] = 99
-
-    scene_b = registry.get("forest")
-    assert scene_b.initial_data["score"] == 0
 
 
 # ---------------------------------------------------------------------------

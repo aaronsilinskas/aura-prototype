@@ -1,17 +1,18 @@
-"""``LobbySelectRule`` — multi-scope scene picker, config-driven via ``initial_data``.
+"""``LobbySelectRule`` — multi-scope scene picker, configured by the ``lobby`` pack's Settings.
 
-A lobby scene needs no Python of its own: it declares a ``rule_packs: [["lobby",
-"1.0"]]`` entry and seeds ``initial_data`` with a ``lobby`` dict::
+A lobby scene needs no Python of its own: it declares the ``lobby`` rule pack
+and sets the pack's two required Settings in that pack reference::
 
-    "initial_data": {
-      "lobby": {
+    "rule_packs": [{
+      "name": "lobby", "version": "1.0",
+      "settings": {
         "scopes": ["personal", "global.main", "directional"],
         "entries": [
           {"scene": "hardware_test", "effect": "elements.fire", "options": {"level": 5}},
           ...
         ]
       }
-    }
+    }]
 
 ``scopes`` is an ordered list of display Scopes ``[S0, S1, ..., Sk]``;
 ``entries`` is an ordered list of ``{scene, effect, options}`` selectable
@@ -36,21 +37,20 @@ try:
 except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
-_CONFIG_KEY: Final = "lobby"
 _INDEX_KEY: Final = "lobby_index"
 
 _config: StateSlot = StateSlot(
-    "lobby_resolved", lambda state: LobbyConfig.from_state(state, _CONFIG_KEY), LobbyConfig
+    "lobby_resolved", lambda state: LobbyConfig.from_settings(state.settings), LobbyConfig
 )
 
 
 class LobbySelectRule(GameRule):
     """Cycles a scene selection across a wrapping look-ahead window of scopes.
 
-    Reads its scopes/entries config from a scene's ``initial_data["lobby"]``
-    via a :class:`engine.state.StateSlot` (the ``rlgl_config``/``tag_config``
-    precedent), which resolves and caches a ``LobbyConfig`` in ``GameState``
-    on first read (see ``LobbyConfig.from_state``), so an empty or malformed
+    Reads its scopes/entries config from the pack's Settings via a
+    :class:`engine.state.StateSlot`, which resolves and caches a
+    ``LobbyConfig`` in ``GameState`` on first read (see
+    ``LobbyConfig.from_settings``), so an empty or malformed
     config raises there rather than at construction time (this rule is built
     with no ``GameState`` available yet -- see the pack's ``RULE`` singleton
     below).

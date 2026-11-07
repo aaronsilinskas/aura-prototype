@@ -31,6 +31,7 @@ from pathlib import Path
 from types import TracebackType
 
 from app.scene_composition import build_scene_boot
+from engine.pack_catalog import SettingOverrides
 from engine.state import ScopeValue
 from engine.timer import Timer
 from hardware.shared.device_config import (
@@ -188,14 +189,19 @@ class Simulation:
         self,
         name: str,
         scene: str,
-        scene_data: dict[str, object] | None = None,
         sd_card: bool = True,
         card: str | Path | None = None,
+        setting_overrides: SettingOverrides | None = None,
     ) -> SimulatedDevice:
         """Switch a new simulated device on into *scene*, its flash ``default_scene``.
 
-        Every boot runs the scene the card names, else *scene*. *scene_data*
-        overrides *scene*'s tunables on every boot. The device's card is
+        Every boot runs the scene the card names, else *scene*. *setting_overrides*
+        overrides Settings of any scene, on every boot, shaped per scene as
+        ``scene.json`` and keyed by pack name::
+
+            {"tag": {"rule_packs": {"return_to_lobby": {"hold_seconds": 1.0}}}}
+
+        It is checked as the scan checks ``scene.json``. The device's card is
         *card*, a directory the test prepared, used in place: it is on the
         card from the first boot, and what the device writes lands there.
         Without *card* the card is a fresh empty directory this simulation
@@ -203,13 +209,17 @@ class Simulation:
         only when reset or redeployed. Its radio node is its place in add order, from 1.
 
         Raises:
+            SettingOverrideError: *setting_overrides* names an undeclared
+                Setting, gives the wrong type, or leaves one unset.
+            OverrideOfUndeclaredPackError: *setting_overrides* names a pack
+                the scene does not declare.
             ValueError: If *card* is given with *sd_card* false, or is
                 another device's card; or if this card carries
                 ``aura_packs/`` and another device's already did.
         """
         radio_node = len(self.devices) + 1
         card_dir = self._card_for(name, sd_card, card, radio_node)
-        device = SimulatedDevice(self, name, scene, scene_data or {}, card_dir, radio_node)
+        device = SimulatedDevice(self, name, scene, card_dir, radio_node, setting_overrides)
         self.devices.append(device)
         return device
 
@@ -313,7 +323,7 @@ class SimulatedDevice:
     """A simulated device running a real scene: the handle a test talks to.
 
     It boots and ticks as a board does, through the same ``build_scene_boot``
-    and ``build_scene_tick``, reading its own flash settings, which switching
+    and ``build_scene_tick``, reading its own boot values, which switching
     it on seeds with that scene as ``default_scene`` and ``redeploy`` changes.
     It reboots as a board does:
     ``DeviceSceneReboot`` persists the next scene to its card, then resets
@@ -334,9 +344,9 @@ class SimulatedDevice:
         sim: Simulation,
         name: str,
         scene: str,
-        scene_data: dict[str, object],
         card: Path | None,
         radio_node: int,
+        setting_overrides: SettingOverrides | None = None,
     ) -> None:
         self.name = name
         self.card = card
@@ -345,8 +355,8 @@ class SimulatedDevice:
         """The node this device sends as: its place in add order, from 1."""
         self._sim = sim
         self._switched_on_into = scene
-        self._flash_settings: dict[str, object] = {"default_scene": scene}
-        self._scene_data = scene_data
+        self._boot_values: dict[str, object] = {"default_scene": scene}
+        self._setting_overrides = setting_overrides
         self._sim_hw = SimulatedHardware(
             now=lambda: sim.now,
             config=_simulated_device_config(card is not None, radio_node),
@@ -361,10 +371,10 @@ class SimulatedDevice:
         self._sim._claim_card_packs(self)
         boot = build_scene_boot(
             self._sim_hw.hw,
-            dict(self._flash_settings),
+            dict(self._boot_values),
             reset=_reset,
             timer=_SimulationClock(self._sim),
-            scene_data={self._switched_on_into: self._scene_data} if self._scene_data else None,
+            setting_overrides=self._setting_overrides,
         )
         self._scene_tick = boot.tick
         self._namespace = boot.runtime.namespace
@@ -377,12 +387,12 @@ class SimulatedDevice:
         """Redeploy with *scene* and reboot, as ``deploy.py --scene`` then a reset would.
 
         *scene* becomes the flash ``default_scene``, beside a fresh Scene
-        deploy token; every other flash setting stays. The device boots at
+        deploy token; every other boot value stays. The device boots at
         once, card-less or not, into *scene*: the new token clears the
         Persisted scene its card held.
         """
-        self._flash_settings["default_scene"] = scene
-        self._flash_settings["scene_deploy_token"] = secrets.token_hex(8)
+        self._boot_values["default_scene"] = scene
+        self._boot_values["scene_deploy_token"] = secrets.token_hex(8)
         self.reset()
 
     def reset(self) -> None:
