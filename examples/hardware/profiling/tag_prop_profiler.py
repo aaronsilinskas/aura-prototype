@@ -314,7 +314,7 @@ def run() -> None:
     )
     print(f"__PROP footprint_bytes={footprint_bytes}, free_heap_bytes={gc.mem_free()}")
 
-    _button_data = ButtonData({})
+    _button_data = buttons.reading
     _acceleration = accelerometer.reading
     # Narrow PolledSensor.reading, typed as either buffer, to the acceleration one.
     assert isinstance(_acceleration, AccelerationData)
@@ -330,7 +330,7 @@ def run() -> None:
         perf.start_update_time()
         elapsed = timer.elapsed
 
-        buttons.update(elapsed, _button_data)
+        buttons.update(elapsed)
         if not start_injected:
             _inject_press("A", _button_data)
             start_injected = True

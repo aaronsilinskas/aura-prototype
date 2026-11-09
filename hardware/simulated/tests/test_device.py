@@ -41,10 +41,9 @@ def _config(**sections: object) -> DeviceConfig:
 
 def _read_buttons(sim_hw: SimulatedHardware) -> ButtonData:
     """Apply due pin changes, then read the buttons once a debounce interval has passed."""
-    out = ButtonData(states={})
     sim_hw.settle_pins()
-    sim_hw.hw.buttons.update(0.5, out)
-    return out
+    sim_hw.hw.buttons.update(0.5)
+    return sim_hw.hw.buttons.reading
 
 
 def test_each_scope_strip_is_as_long_as_its_configured_segment():
