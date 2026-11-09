@@ -514,7 +514,7 @@ _Avoid_: assuming it coincides with the deploy finishing (it lags behind it); ca
 
 ### Start anchor
 The known substring marking the **reload boundary** (CircuitPython's soft-reboot banner); capture discards lines until it appears, and fails if it never arrives rather than capturing stale data.
-_Avoid_: anchoring on the profiler's `__PROFILE` header (downstream content); proceeding silently when it is missing
+_Avoid_: anchoring on content the deployed program prints (downstream of the boundary); proceeding silently when it is missing
 
 ### Stop marker
 The substring that ends a capture, matched only on **post-anchor** output so it reflects the freshly deployed run; a plain substring, no regex.
