@@ -315,13 +315,10 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
         nonlocal last_telemetry_print_total
 
         elapsed = timer.elapsed
-        # Every Polled part, IR and radio included, is polled unconditionally,
-        # before the active_state check: a send can be in flight across a
-        # scene transition, and ir.update() always pumps so a deferred
-        # end_transmit still arms the flush latch its own receive consumes
-        # this same tick. A packet received while no scene is active is
-        # drained-and-dropped here rather than left to overflow; only the
-        # queuing below is conditional on a scene being active.
+        # Polled before the active_state check, so a send in flight across a
+        # scene transition still completes and a packet received with no scene
+        # active is drained and dropped rather than left to overflow; only the
+        # queuing below waits on a scene.
         for part in polled:
             part.update(elapsed)
 

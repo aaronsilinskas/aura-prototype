@@ -209,9 +209,9 @@ def _polled_sensor(
     read_part: Callable[[I2CDeviceConfig, object], Callable[[], tuple[float, float, float]]],
     reading: AccelerationData | MagneticData,
 ) -> PolledSensor | None:
-    """Build the I2C sensor *name* as a **PolledSensor** over *reading*, gated like any section.
+    """Build the I2C sensor ``name`` as a **PolledSensor** over ``reading``, gated like any section.
 
-    *read_part* is the ``DeviceParts`` method building its raw read; the
+    ``read_part`` is the ``DeviceParts`` method building its raw read; the
     sensor's I2C bus must be open.
     """
     return _gated_step(
@@ -226,7 +226,7 @@ def _polled_sensor(
 
 
 def _append_built(polled: list[PolledPart], part: PolledPart | None) -> None:
-    """List *part* as a **Polled part** if it was built; an absent part is never polled."""
+    """List ``part`` as a **Polled part** if it was built; an absent part is never polled."""
     if part is not None:
         polled.append(part)
 

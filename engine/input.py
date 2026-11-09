@@ -80,7 +80,25 @@ class ButtonData:
         return f"ButtonData({parts})"
 
 
-class AccelerationData:
+class _AxisReading:
+    """The ``x``/``y``/``z`` buffer a sensor reading overwrites in place each poll."""
+
+    __slots__ = ("x", "y", "z")
+
+    def __init__(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> None:
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def assign(self, raw: tuple[float, float, float]) -> None:
+        """Overwrite this reading in place with a raw ``(x, y, z)`` read, allocating nothing."""
+        self.x, self.y, self.z = raw
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}(x={self.x}, y={self.y}, z={self.z})"
+
+
+class AccelerationData(_AxisReading):
     """Reusable buffer of accelerometer readings, overwritten in place each poll.
 
     Unit of measure is meters per second squared (m/s²). Axes follow the
@@ -89,24 +107,12 @@ class AccelerationData:
     the last good reading rather than replacing the buffer with ``None``.
     """
 
-    __slots__ = ("x", "y", "z")
+    __slots__ = ()
 
     GRAVITY: Final = 9.81  # m/s²
 
-    def __init__(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> None:
-        self.x = x
-        self.y = y
-        self.z = z
 
-    def assign(self, raw: tuple[float, float, float]) -> None:
-        """Overwrite this reading in place with a raw ``(x, y, z)`` read, allocating nothing."""
-        self.x, self.y, self.z = raw
-
-    def __str__(self) -> str:
-        return f"AccelerationData(x={self.x}, y={self.y}, z={self.z})"
-
-
-class MagneticData:
+class MagneticData(_AxisReading):
     """Reusable buffer of magnetometer readings, overwritten in place each poll.
 
     Unit of measure is microteslas (µT). Axes are the magnetometer's raw
@@ -115,19 +121,7 @@ class MagneticData:
     present — not "zero field" and not "read failed".
     """
 
-    __slots__ = ("x", "y", "z")
-
-    def __init__(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> None:
-        self.x = x
-        self.y = y
-        self.z = z
-
-    def assign(self, raw: tuple[float, float, float]) -> None:
-        """Overwrite this reading in place with a raw ``(x, y, z)`` read, allocating nothing."""
-        self.x, self.y, self.z = raw
-
-    def __str__(self) -> str:
-        return f"MagneticData(x={self.x}, y={self.y}, z={self.z})"
+    __slots__ = ()
 
 
 class InputEvents:
