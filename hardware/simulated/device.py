@@ -275,7 +275,11 @@ class SimulatedHardware:
         self._require_magnetometer().magnetic = (x, y, z)
 
     def hold(self, *buttons: str) -> None:
-        """Schedule a press of every one of *buttons*, all at the same moment."""
+        """Schedule a press of every one of *buttons*, all at the same moment.
+
+        Raises:
+            ValueError: If the config declares no button with one of these labels.
+        """
         self._schedule(buttons, True)
 
     def release(self, *buttons: str) -> None:
@@ -364,6 +368,9 @@ class SimulatedHardware:
         return magnetometer
 
     def _schedule(self, buttons: tuple[str, ...], pressed: bool) -> None:
+        for button in buttons:
+            if button not in self._pin_changes:
+                raise ValueError(f"the config declares no button {button!r}")
         # Queued behind the previous change of every button, so back-to-back
         # calls never land inside the debounce window and get swallowed.
         at = max([self.now(), *(self._pin_free_at[button] for button in buttons)])

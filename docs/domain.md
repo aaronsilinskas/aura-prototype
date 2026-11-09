@@ -100,10 +100,12 @@ app/              Composition layer — the one place allowed to import both the
   simulation/           Test-only Simulation test harness (Simulation, SimulatedDevice):
                         boots real scenes on simulated devices, reboots them
                         through their cards, real directories a test can put
-                        card scenes and packs on (or not, when card-less),
-                        and carries aimed IR between them (the IR medium) and
-                        radio to every other device (the radio medium) —
-                        never deployed
+                        card scenes and packs on, and carries aimed IR
+                        between them (the IR medium) and radio to every other
+                        device with a radio (the radio medium); add_device(
+                        without={...}) drops Capabilities from the simulated
+                        config (without={"storage"} is card-less) — never
+                        deployed
 
 examples/         Runnable CircuitPython entry points; deploy-watch's flash targets
 
@@ -188,12 +190,12 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `Duration` | `magic/values.py` | Expiry tracker |
 | `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; optional `pixels` list plus optional IR/audio/sensor/haptics sections, and **Named bus** maps for I2C and SPI that devices join by name |
 | `NeoPixelCurrentBudgetConfig` | `hardware/shared/device_config.py` | Opt-in `neopixel_current_budget` policy; the parser calls `tune_neopixel_brightness` (`hardware/shared/neopixel_current_budget.py`) to fold the tuned brightness into each NeoPixel strip config, and records the estimate/scale for boot narration |
-| `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the Device assembly returns (outputs, sensors, network seam, `ir`, radio, storage) |
+| `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the Device assembly returns (outputs, sensors, network seam, `ir`, radio, storage, and `capabilities`: the frozenset of Capabilities read off the parts it built, so a disabled, isolated or absent component is not had) |
 | `assemble_device` | `hardware/shared/device_assembly.py` | The **Device assembly**: board-free `DeviceConfig` → `DeviceHardware`, owning gating, on-demand bus opening (only buses an enabled device names), build order, narration, buttons, IR/radio wiring and network controls; reaches hardware only through `DeviceParts` |
 | `DeviceParts` / `PinRef` | `hardware/shared/device_parts.py` | Port the Device assembly builds each part through (one constructor per part), taking config sections and pin references (a pin name with its config field); adapters `SimulatedParts` (`hardware/simulated/simulated_parts.py`, which also decides what persists across a reboot) and `CircuitPythonParts` (`hardware/circuitpython/circuitpython_parts.py`) |
 | `PolledSensor` | `hardware/shared/polled_sensor.py` | Board-free owner of one 3-axis sensor's reading (`DeviceHardware.accelerometer` / `.magnetometer`): wraps a `DeviceParts` raw read callable, refreshes its engine reading buffer once per tick, keeps the last good reading on a failed read and logs the start and end of each run of failures |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter |
-| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, receiver, shared transmit gate); wired only by `wire_ir` (`hardware/shared/ir_wiring.py`), for the device and the Simulated device alike |
+| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, an optional receiver, shared transmit gate; `emitters` and `receives` say what is wired); wired only by `wire_ir` (`hardware/shared/ir_wiring.py`), for the device and the Simulated device alike |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |
 | `SceneRuntime` | `app/scene_composition.py` | Bundle from `build_scene_runtime` that `build_scene_tick` drives |

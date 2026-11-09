@@ -35,11 +35,16 @@ class DeviceHardware:
     :class:`~hardware.shared.polled_sensor.PolledSensor` that owns that
     sensor's reading — ``None`` on a device with no such section declared and
     enabled, which is distinct from a failed read.
+
+    ``capabilities`` is the immutable set of **Capabilities** the Device
+    assembly built: named only for parts that exist on this bundle, never
+    read off the config.
     """
 
     __slots__ = (
         "accelerometer",
         "buttons",
+        "capabilities",
         "ir",
         "magnetometer",
         "network_controls",
@@ -58,6 +63,7 @@ class DeviceHardware:
         ir: InfraredTransceiver | None,
         radio: RadioTransceiver | None,
         storage: DeviceStorage | None,
+        capabilities: frozenset[str],
     ) -> None:
         self.outputs: list[EffectOutput] = outputs
         self.buttons: DebouncedButtons = buttons
@@ -67,3 +73,4 @@ class DeviceHardware:
         self.ir: InfraredTransceiver | None = ir
         self.radio: RadioTransceiver | None = radio
         self.storage: DeviceStorage | None = storage
+        self.capabilities: frozenset[str] = capabilities

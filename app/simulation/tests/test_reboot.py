@@ -77,7 +77,7 @@ def test_the_lobbys_b_reboots_into_the_selected_scene(simulation):
 
 
 def test_a_card_less_device_stays_in_its_scene(simulation):
-    device = simulation.add_device("red", scene="example_lobby", sd_card=False)
+    device = simulation.add_device("red", scene="example_lobby", without={"storage"})
 
     launch(device, "element_browser")
 
@@ -169,7 +169,7 @@ def test_a_magnetized_field_holds_through_a_reboot(simulation):
 
 
 def test_a_card_less_device_redeployed_with_a_scene_boots_it(simulation):
-    device = simulation.add_device("red", scene="example_lobby", sd_card=False)
+    device = simulation.add_device("red", scene="example_lobby", without={"storage"})
 
     device.redeploy(scene="element_browser")
 

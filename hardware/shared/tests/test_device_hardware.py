@@ -25,6 +25,7 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
         ir=ir,
         radio=radio,
         storage=storage,
+        capabilities=frozenset(),
     )
 
     assert hardware.outputs is outputs
@@ -47,6 +48,7 @@ def test_device_hardware_rejects_attributes_outside_its_slots():
         ir=None,
         radio=None,
         storage=None,
+        capabilities=frozenset(),
     )
 
     with pytest.raises(AttributeError):

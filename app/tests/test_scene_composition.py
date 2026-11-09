@@ -39,6 +39,7 @@ def _fake_hw(ir=None, radio=None, storage=None, network_controls=None):
         ir=ir,
         radio=radio,
         storage=storage,
+        capabilities=frozenset(),
     )
 
 

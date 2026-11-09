@@ -101,7 +101,7 @@ def test_a_device_switched_on_into_the_scene_has_nothing_to_return_to(simulation
 
 @pytest.mark.parametrize("scene", SCENES)
 def test_a_card_less_device_stays_in_its_scene(simulation, scene):
-    device = simulation.add_device("red", scene=scene, sd_card=False)
+    device = simulation.add_device("red", scene=scene, without={"storage"})
 
     device.hold("A", "B")
     simulation.advance(hold_seconds(scene))

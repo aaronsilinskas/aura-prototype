@@ -141,7 +141,7 @@ def test_a_scene_using_a_card_effect_pack_plays_it(simulation, tmp_path):
 
 
 def test_a_card_less_device_has_no_card(simulation):
-    device = simulation.add_device("red", scene="example_lobby", sd_card=False)
+    device = simulation.add_device("red", scene="example_lobby", without={"storage"})
 
     assert device.card is None
 
