@@ -7,7 +7,8 @@ Issues and specs for this repo live as GitHub issues in `aaronsilinskas/aura-pro
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
 - **Read an issue**: `gh issue view <number> --json number,title,body,labels,comments`.
 - **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
-- **Make an issue a sub-issue of a parent**: `gh issue create --parent <parent> ...`, or `gh issue edit <parent> --add-sub-issue <child>` afterwards (`gh` 2.94+). Older `gh`: `gh api --method POST repos/<owner>/<repo>/issues/<parent>/sub_issues -F sub_issue_id=<child-db-id>` (database id, as in **Blocking** below). Without sub-issues, put `Part of #<parent>` at the top of the child body.
+- **Make an issue a sub-issue of a parent**: `gh issue create --parent <parent> ...`, or `gh issue edit <parent> --add-sub-issue <child>` afterwards.
+- **Publish a batch of tickets** (`to-tickets`): write each body to a file and list the tickets in a manifest, then run `uv run python scripts/publish_tickets.py <manifest.json>` (`--dry-run` checks it first). It creates them in order under the parent, adds the blocking edges, and prints a read-back table to compare against the approved breakdown. The manifest shape is in the script's docstring.
 - **Comment on an issue**: `gh issue comment <number> --body "..."`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
@@ -37,7 +38,7 @@ Read it as in **Read an issue** above.
 ## Issue relationships
 
 - **Hierarchy (parent/child)**: a child issue is a GitHub sub-issue of its parent (see **Make an issue a sub-issue of a parent**).
-- **Blocking**: GitHub's **native issue dependencies**. Add an edge with `gh api --method POST repos/<owner>/<repo>/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`, where `<blocker-db-id>` is the blocker's numeric **database id** (`gh api repos/<owner>/<repo>/issues/<n> --jq .id`, _not_ the `#number` or `node_id`). GitHub reports `issue_dependencies_summary.blocked_by` (open blockers only, the live gate). Older issues in this repo name blockers with a `Blocked by #42, #57` line in the body instead; honour both. An issue is unblocked when every blocker is closed.
+- **Blocking**: GitHub's **native issue dependencies**. Add edges with `gh issue edit <child> --add-blocked-by <n>[,<n>...]` (issue numbers). GitHub reports `issue_dependencies_summary.blocked_by` (open blockers only, the live gate). Older issues in this repo name blockers with a `Blocked by #42, #57` line in the body instead; honour both. An issue is unblocked when every blocker is closed.
 
 ## Wayfinding operations
 
