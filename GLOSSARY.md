@@ -5,15 +5,19 @@ The canonical code-facing vocabulary for the Aura animation and game-logic engin
 ## Glossary
 
 ### Effect
-A descriptor declaring what capabilities an effect has (pixels, audio, haptic). Builders return plain `Effect` instances — subclass only when there is genuine logic to add.
-_Avoid_: `renders_pixels` (use `effect.pixels is not None`); calling `update()`/`render()` directly; an `Effect` subclass that only holds a name
+A descriptor declaring which **Modalities** an effect has (pixels, audio, haptic). Builders return plain `Effect` instances — subclass only when there is genuine logic to add.
+_Avoid_: `renders_pixels` (use `effect.pixels is not None`); calling `update()`/`render()` directly; an `Effect` subclass that only holds a name; "capabilities" for its modalities (a **Capability** is hardware a device has)
+
+### Modality
+One human sense an **Effect** reaches — sight (`EffectPixels`), sound (`EffectAudio`) or touch (`EffectHaptic`). An effect has up to three; a `None` modality means the effect does not reach that sense.
+_Avoid_: "capability" (a **Capability** is hardware a device has); "channel" (names a **Console channel** or **Data channel**); "output" (an `EffectOutput` is the hardware side that plays a modality)
 
 ### EffectPixels
-The capability that owns pixel simulation and rendering for an effect; `pixels is None` means no pixel output.
+The **Modality** (sight) that owns pixel simulation and rendering for an effect; `pixels is None` means no pixel output.
 _Avoid_: calling `update`/`render` on the `Effect` shell; putting `name` on a compositor (it belongs on `Effect`)
 
 ### EffectAudio
-A capability declaring an effect's audio behaviour, mapping event verbs to playback configs; `None` means no audio.
+The **Modality** (sound) declaring an effect's audio behaviour, mapping event verbs to playback configs; `None` means no audio.
 _Avoid_: a `"stop"` clips key (teardown is `flush()`, not `handle_event`)
 
 ### AudioPlaybackConfig
@@ -25,7 +29,7 @@ A declared `AudioPlaybackConfig` paired with the WAV path its name resolved to, 
 _Avoid_: resolving a clip name in an output; mutating the declared config to hold the path
 
 ### EffectHaptic
-A capability declaring an effect's haptic behaviour, mapping event verbs to `HapticPattern`s; `None` means no haptic output.
+The **Modality** (touch) declaring an effect's haptic behaviour, mapping event verbs to `HapticPattern`s; `None` means no haptic output.
 _Avoid_: raw DRV2605L waveform IDs as values (hardware IDs live in the output); "vibration" (use `haptic`)
 
 ### HapticPattern
@@ -40,7 +44,7 @@ A named, versioned directory of effect items, each exporting an `EffectBuilder`,
 _Avoid_: calling a scene-local effect set a "pack" (a pack is shared, versioned, cross-scene)
 
 ### Rule pack
-A named, versioned directory of rule items, each exporting a `GameRule`, whose **Pack manifest** states its version and declares its **Settings**; shared and cross-scene.
+A named, versioned directory of rule items, each exporting a `GameRule`, whose **Pack manifest** states its version, declares its **Settings** and lists its **Required capabilities**; shared and cross-scene.
 _Avoid_: calling a scene-local rule set a "pack" (a pack is shared, versioned, cross-scene)
 
 ### Pack root
@@ -52,8 +56,8 @@ Everything installed under a device's pack roots, discovered in one scan by `sca
 _Avoid_: scanning packs, scenes or sounds anywhere else; re-checking scene declarations at load time
 
 ### PackScanError
-The typed `ValueError` family raised while building a `PackCatalog`, when the files on disk are wrong (missing root, duplicate or reserved name, malformed version, `scene.json` or **Pack manifest**, a scene declaring a pack twice or declaring one that is missing or incompatible, a **Setting override** naming a pack its scene does not declare or an undeclared Setting, giving the wrong type, or leaving a required Setting unset). Each carries the file, scene, pack or Setting at fault, so tests check the type and those fields, never the wording.
-_Avoid_: confusing with **Registry lookup errors** (a name not registered, after a good scan); classifying by message text
+The typed `ValueError` family raised while building a `PackCatalog`, when the files on disk are wrong (missing root, duplicate or reserved name, malformed version, `scene.json` or **Pack manifest**, a scene declaring a pack twice or declaring one that is missing or incompatible, a **Setting override** naming a pack its scene does not declare or an undeclared Setting, giving the wrong type, or leaving a required Setting unset, or a `requires` list naming an unknown **Capability**). Each carries the file, scene, pack or Setting at fault, so tests check the type and those fields, never the wording.
+_Avoid_: confusing with **Registry lookup errors** (a name not registered, after a good scan); classifying by message text; raising one because the device lacks a scene's **Required capabilities** (the scan never looks at hardware)
 
 ### DynamicValue
 `float | Callable[[], float]` — a value that may be constant or computed fresh each sample.
@@ -105,7 +109,7 @@ A value that replaces a declared **Setting**'s default for one scene: written by
 _Avoid_: "initial data"; changing a scene's resolved Settings after the scan
 
 ### Pack manifest
-The JSON file in an **Effect pack** or **Rule pack** that states the pack's version and declares its **Settings**.
+The JSON file in an **Effect pack** or **Rule pack** that states the pack's version and declares its **Settings**; a Rule pack's also lists its **Required capabilities**, which are part of its versioned interface.
 _Avoid_: `version.txt`
 
 ### Scene Config
@@ -116,7 +120,19 @@ _Avoid_: confusing with `EffectConfig`; calling the Settings themselves the Scen
 Owned internally by `GameEngine`. Rules access time only via `state.elapsed`/`state.total`, never by holding a `Timer` reference.
 
 ### Scene
-A declarative bundle of a self-contained game context: effect/rule packs, its own declared **Settings** and its **Setting overrides** for the packs it declares, a `version`, a declared `ir_codec` name, and references to its scene-local effects/rules. Carries no mutable runtime state.
+A declarative bundle of a self-contained game context: effect/rule packs, its own declared **Settings** and its **Setting overrides** for the packs it declares, a `version`, a declared `ir_codec` name, its own **Required capabilities**, and references to its scene-local effects/rules. Carries no mutable runtime state.
+
+### Capability
+One thing a device has that a scene can depend on, named from a fixed vocabulary: a button by label (`button.A`, `button.B`, …), an IR emitter by name (`ir.line`, `ir.cone`, `ir.area_of_effect`), any IR receiver (`ir.receive`), `radio`, `storage`, `accelerometer`, `magnetometer`. A device **has** a capability when what it built provides it — a component declared but not built (disabled, isolated, or its bus failed to open) is not had. Named by component, never by bus or part: an accelerometer on I2C and one on SPI are the same capability.
+_Avoid_: "requirement" for one entry (a scene *requires* capabilities); "need", "feature"; naming a bus or part number; "capability" for an **Effect**'s **Modalities**; capabilities for pixels, audio or haptics (effects already cope without them)
+
+### Required capabilities
+The **Capabilities** a scene cannot be played without: its own `requires` list in `scene.json` combined with the `requires` of every **Rule pack** it declares (effect packs require nothing). Checked against the device only when the scene is about to run — at boot, and on every transition into it — never for every installed scene at once, so a card can carry scenes for props it is not in. A scene that copes without something simply leaves it out and asks at run time. Adding one to a Rule pack is a major version bump; removing one is minor.
+_Avoid_: an "optional" or "uses" list; checking every installed scene at boot; reading a missing capability as a reason to skip game logic in a rule that required it (the check already guaranteed it)
+
+### Capability errors
+`UnknownCapabilityError`, a **PackScanError** raised when a `requires` list names something outside the **Capability** vocabulary, carrying the file and the name; and `MissingCapabilityError` (a `ValueError`), raised when the device lacks capabilities something needs right now, carrying the missing capabilities and the scene (`None` for a send). Raised by the boot check once every boot candidate has failed, by a transition into a scene the device cannot run (before anything is persisted or reset), and by `send_ir`/`send_radio` when the emitter or radio is absent.
+_Avoid_: classifying by message text; a silent no-op for a send on missing hardware; raising it for a **Persisted scene** the boot can fall back from
 
 ### Scene-local effect / Scene-local rule
 An effect or rule loaded from an `effects/` or `rules/` subdirectory inside a scene's own folder, private to it and addressed with the reserved `scene.` prefix. Unlike an **Effect pack** it has no version.
@@ -143,15 +159,15 @@ The **Registry lookup errors** the **Active scene namespace** raises (a grouping
 _Avoid_: reporting an undeclared pack as unknown, or the reverse; confusing `UndeclaredPackError` (a name uses a pack its scene did not declare) with `UnknownDeclaredPackError` (a scan-time **PackScanError**: a scene declares a pack that is not installed)
 
 ### NetworkControls
-The **game-facing**, send-only network seam a rule holds via `GameState.network_controls` (`send_ir`, `send_radio`); the runtime-facing per-tick IR pump lives entirely on `InfraredTransceiver.update()` instead.
-_Avoid_: putting `poll_transmits()` or any per-tick pump on it (keep the seam send-only)
+The **game-facing**, send-only network seam a rule holds via `GameState.network_controls` (`send_ir`, `send_radio`); the runtime-facing per-tick IR pump lives entirely on `InfraredTransceiver.update()` instead. Both sends raise `MissingCapabilityError` when the emitter or radio is absent.
+_Avoid_: putting `poll_transmits()` or any per-tick pump on it (keep the seam send-only); a send that silently does nothing on missing hardware (a rule that copes asks `state.capabilities.has` first)
 
 ### SceneRegistry
 Serves a fresh `Scene` per lookup from the scenes the **PackCatalog** discovered and checked; it does no scanning of its own. Can also surface a scene's declared codec name without constructing the `Scene`, for callers resolving hardware before building it. `register` is a test-only escape hatch for in-memory scenes, which skip the catalog's declaration checks.
 _Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); calling `register` outside tests; changing a scene's Settings after the scan (pass **Setting overrides** to the catalog scan); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
 
 ### SceneControls
-The rule-facing scene-transition seam (`load`, `overlay`, `pop`, `reboot_into`, `reboot_to_previous`); `SceneManager` is the live implementation.
+The rule-facing scene-transition seam (`load`, `overlay`, `pop`, `reboot_into`, `reboot_to_previous`); `SceneManager` is the live implementation. Every transition into a scene first checks its **Required capabilities** against the device, and rules can ask whether the device can run a scene before offering it.
 
 ### SceneManager
 Owns the scene stack and drives scene transitions, trusting the **PackCatalog** to have checked each scene's pack declarations, installing the active scene into the **Active scene namespace** once per transition, saving and restoring merge strategies through the injected `EffectAdmin`, and routing reboots through the injected `SceneReboot` port. The live `SceneControls`.
@@ -162,8 +178,8 @@ How a device switches scenes: the target is persisted to device storage, then th
 _Avoid_: "scene switch" for a reboot (`load`/`overlay`/`pop` switch scenes without one); "restart", "reload" (reload is CircuitPython's soft reboot after a deploy)
 
 ### Persisted scene
-The scene a device's card names in `aura-state.json` (`scene`, with its `return_to` companion), written by a **Reboot**. On boot it outranks the flash `default_scene`; a `deploy.py --scene` deploy clears it once, through a new **Scene deploy token**.
-_Avoid_: "saved scene", "override" for it; expecting it to name the running scene right after a `--scene` deploy (the card names none until the next Reboot); treating it as host-authored (only the device writes it)
+The scene a device's card names in `aura-state.json` (`scene`, with its `return_to` companion), written by a **Reboot**. On boot it outranks the flash `default_scene`; a `deploy.py --scene` deploy clears it once, through a new **Scene deploy token**. One the device lacks the **Required capabilities** for is skipped at boot, left on the card, and logged.
+_Avoid_: "saved scene", "override" for it; clearing it because this device cannot run it (the card may go back to a prop that can); expecting it to name the running scene right after a `--scene` deploy (the card names none until the next Reboot); treating it as host-authored (only the device writes it)
 
 ### Scene deploy token
 The per-deploy value `deploy.py --scene` writes as `scene_deploy_token` beside `default_scene` in `aura-boot.json`, new on every invocation. On boot, before the boot scene is resolved, a non-empty token that differs from the one recorded in the card's `aura-state.json` is applied: the **Persisted scene** and its `return_to` are removed and the token recorded, in one write, and one line is logged naming the deployed scene and the Persisted scene it cleared. So each `--scene` deploy wins once, and Reboots made after it keep persisting. The apply never checks the deployed scene against the registry: an unknown one is cleared to, then fails resolution naming the known scenes.
@@ -294,7 +310,7 @@ The board-free builder of the boot **PackCatalog**: chooses the pack roots (flas
 _Avoid_: `scan_boot_scene_registry` (old name); calling it before `build_hardware` (the card leg needs storage mounted); scanning packs or scenes anywhere else once this exists
 
 ### resolve_boot_scene_name
-The boot-time seam that picks the scene to boot into (**Persisted scene** → flash `default_scene` → raise) and guarantees the winner is registered. `build_scene_boot` applies any pending **Scene deploy token** just before it.
+The boot-time seam that picks the scene to boot into (**Persisted scene** → flash `default_scene` → raise), skipping a candidate the device lacks the **Required capabilities** for, and guarantees the winner is registered. `build_scene_boot` applies any pending **Scene deploy token** just before it.
 _Avoid_: calling `resolve_boot_scene` directly and skipping registry validation (`SceneRegistry.resolve_known`); calling it before `build_hardware` (the persisted leg needs storage mounted)
 
 ### resolve_ir_codec
@@ -314,7 +330,7 @@ The device-only entry point that runs **Device assembly** with `CircuitPythonPar
 _Avoid_: returning a bare tuple/dict (return `DeviceHardware`); putting config parsing here (lives in the pure parser); calling it twice in one process
 
 ### DeviceHardware
-The board-free bundle `build_hardware` returns — a data holder for the built outputs, buttons, sensors, network seam, `ir`, `radio`, and storage. Ports are typed as their abstract port, never the concrete adapter, keeping the module board-free.
+The board-free bundle `build_hardware` returns — a data holder for the built outputs, buttons, sensors, network seam, `ir`, `radio`, and storage, plus the **Capabilities** the device has, worked out once by **Device assembly** from what it built. Ports are typed as their abstract port, never the concrete adapter, keeping the module board-free.
 _Avoid_: exposing raw transmitters (use `network_controls`/`ir`); exposing the raw `RadioTransport` (use `network_controls`/`radio`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### Simulated device
@@ -322,7 +338,7 @@ A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` 
 _Avoid_: mock device, virtual device, emulator (it does not run CircuitPython); faking the CircuitPython libraries beneath `device_builder`; hard-coding its hardware shape (declare it in the simulated config)
 
 ### Simulation test harness
-The test-only fixture layer that boots real scenes on one or more **simulated devices**, drives them through scripted inputs and time, and answers questions about what each device observably did. Tests written on it state behaviour, not the engine calls that produce it. A test can make a device card-less or hand it a card it prepared, follow it through each **reboot** into the scene it runs next, and redeploy it with a scene. At most one card in a simulation may carry packs, and a closed simulation leaves no trace of its cards for the next.
+The test-only fixture layer that boots real scenes on one or more **simulated devices**, drives them through scripted inputs and time, and answers questions about what each device observably did. Tests written on it state behaviour, not the engine calls that produce it. A test can build a device without some **Capabilities** (without `storage` it is card-less) or hand it a card it prepared, follow it through each **reboot** into the scene it runs next, and redeploy it with a scene. At most one card in a simulation may carry packs, and a closed simulation leaves no trace of its cards for the next.
 _Avoid_: device harness, scene harness (both read as runtime code); asserting on which effect names a rule passed to `EffectControls`
 
 ### Aim
