@@ -149,7 +149,15 @@ def load_item(
 class _PackEntry:
     """Metadata for a single discovered pack. Internal use only."""
 
-    __slots__ = ("declarations", "item_names", "module_prefix", "name", "source_path", "version")
+    __slots__ = (
+        "declarations",
+        "item_names",
+        "module_prefix",
+        "name",
+        "requires",
+        "source_path",
+        "version",
+    )
 
     def __init__(
         self,
@@ -159,8 +167,11 @@ class _PackEntry:
         item_names: set[str],
         source_path: str,
         declarations: dict[str, SettingDeclaration] | None = None,
+        requires: frozenset[str] = frozenset(),
     ) -> None:
         self.declarations = declarations if declarations is not None else {}
+        # The Capabilities a Rule pack's manifest lists; effect packs list none.
+        self.requires = requires
         self.name = name
         self.version = version
         self.module_prefix = module_prefix

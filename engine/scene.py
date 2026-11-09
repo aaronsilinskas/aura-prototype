@@ -197,6 +197,8 @@ class _SceneEntry:
         "local_effect_registry",
         "local_rule_registry",
         "local_sound_map",
+        "required_capabilities",
+        "requires",
         "rule_packs",
         "settings",
         "source_path",
@@ -214,9 +216,14 @@ class _SceneEntry:
         local_effect_registry: SceneLocalRegistry,
         local_sound_map: dict[str, str],
         declarations: dict[str, SettingDeclaration] | None = None,
+        requires: frozenset[str] = frozenset(),
     ) -> None:
         # The scene's own Setting declarations, from scene.json's ``settings``.
         self.declarations = declarations or {}
+        # The Capabilities scene.json's ``requires`` lists.
+        self.requires = requires
+        # Combined with its rule packs' by the catalog once every pack is scanned.
+        self.required_capabilities = requires
         # Resolved by the catalog once every pack is scanned.
         self.settings = Settings()
         self.version = version
@@ -311,6 +318,25 @@ class SceneRegistry:
         entry = self._scenes.get(name)
         if entry is not None:
             return entry.ir_codec
+
+        raise ValueError(f"Unknown scene '{name}'")
+
+    def required_capabilities(self, name: str) -> frozenset[str]:
+        """Return *name*'s Required capabilities, without constructing a ``Scene``.
+
+        A scanned scene requires what its ``scene.json`` lists plus what every
+        rule pack it declares lists. A scene registered in memory through
+        ``register`` requires nothing, even when it shadows a scanned one.
+
+        Raises:
+            ValueError: if *name* is not registered.
+        """
+        if name in self._factories:
+            return frozenset()
+
+        entry = self._scenes.get(name)
+        if entry is not None:
+            return entry.required_capabilities
 
         raise ValueError(f"Unknown scene '{name}'")
 
