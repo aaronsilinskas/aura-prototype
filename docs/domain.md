@@ -94,7 +94,10 @@ app/              Composition layer — the one place allowed to import both the
                   runtime machinery and hardware.* together
   scene_composition.py  build_scene_boot, build_scene_runtime, build_scene_tick (board-free,
                         CPython-testable); the device and the Simulated device share
-                        both the boot and the tick
+                        both the boot and the tick. resolve_boot_scene_name boots the
+                        Persisted scene, else flash default_scene, skipping one the
+                        device lacks the Required capabilities for (raises
+                        MissingCapabilityError when none fits)
   scene_runtime.py      run_scene (device-only: bring-up, build_scene_boot, then loops
                         the tick it returns)
   simulation/           Test-only Simulation test harness (Simulation, SimulatedDevice):
@@ -178,7 +181,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `PackRegistry` | `engine/packs.py` | Looks up the items of versioned effect or rule packs by pack and item name; filled only by the catalog |
 | `PackCatalog` | `engine/pack_catalog.py` | One scan of every pack root: effect/rule `PackRegistry`s, `SceneRegistry`, pack sounds map; scene declarations, Setting overrides and `requires` names checked, Settings resolved |
 | `SceneRegistry` | `engine/scene.py` | The scanned scenes (plus in-memory test scenes); `required_capabilities(name)` reads a scene's Required capabilities without constructing it |
-| `UnknownCapabilityError` / `MissingCapabilityError` | `engine/capabilities.py` | The Capability errors: a `requires` name outside the vocabulary (a `PackScanError`), and a device lacking what a scene or send needs |
+| `UnknownCapabilityError` / `MissingCapabilityError` | `engine/capabilities.py` | The Capability errors: a `requires` name outside the vocabulary (a `PackScanError`), and a device lacking what a scene or send needs (raised at boot when neither the Persisted scene nor `default_scene` fits) |
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
 | `Aura` | `magic/aura.py` | A player/object's magic pool + active `Spells` collection |

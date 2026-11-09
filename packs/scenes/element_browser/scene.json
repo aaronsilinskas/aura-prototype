@@ -1,5 +1,6 @@
 {
   "version": "1.0",
+  "requires": ["button.A", "button.B"],
   "effect_packs": [
     { "name": "elements", "version": "1.0" }
   ],

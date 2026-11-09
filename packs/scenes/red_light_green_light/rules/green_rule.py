@@ -61,15 +61,14 @@ class RlglGreenRule(PhaseRule):
                 self.transition_to(state, PHASE_WIN)
             return
 
-        if event.acceleration is not None:
-            motion = rlgl_motion(state)
-            ema = motion.update(event.acceleration, config.gravity_beta, config.motion_smoothing)
-            if ema >= GREEN_MIN_MOTION_THRESHOLD:
-                motion.last_motion_time = state.total
-            else:
-                still_timeout = config.green_still_timeout
-                if state.total - motion.last_motion_time >= still_timeout:
-                    self.transition_to(state, PHASE_GAME_OVER)
+        motion = rlgl_motion(state)
+        ema = motion.update(event.acceleration, config.gravity_beta, config.motion_smoothing)
+        if ema >= GREEN_MIN_MOTION_THRESHOLD:
+            motion.last_motion_time = state.total
+        else:
+            still_timeout = config.green_still_timeout
+            if state.total - motion.last_motion_time >= still_timeout:
+                self.transition_to(state, PHASE_GAME_OVER)
 
 
 RULE = RlglGreenRule()
