@@ -22,7 +22,7 @@ EffectListenerFunc: TypeAlias = "Callable[[str], None]"
 
 
 class EffectPixels:
-    """Abstract base class for pixel simulation and rendering.
+    """The sight **Modality**: abstract base for pixel simulation and rendering.
 
     ``EffectManager`` drives the per-frame ``update``/``render`` contract
     directly on ``effect.pixels``; the ``Effect`` shell is not involved.
@@ -78,7 +78,7 @@ class ResolvedClip:
 
 
 class EffectAudio:
-    """Capability object declaring the audio behaviour of an effect.
+    """The sound **Modality**: declares the audio behaviour of an effect.
 
     ``clips`` maps event verbs to ``AudioPlaybackConfig`` instances.
     Set on ``Effect.audio``; if ``None``, the effect produces no audio.
@@ -118,7 +118,7 @@ class HapticPattern:
 
 
 class EffectHaptic:
-    """Capability object declaring the haptic behaviour of an effect.
+    """The touch **Modality**: declares the haptic behaviour of an effect.
 
     ``patterns`` maps event verbs to ``HapticPattern`` instances.
     Set on ``Effect.haptic``; if ``None``, the effect produces no haptic output.
@@ -215,9 +215,9 @@ class PixelBuffer:
 
 
 class Effect:
-    """A descriptor declaring what capabilities an effect has.
+    """A descriptor declaring which modalities (sight, sound, touch) an effect has.
 
-    ``EffectManager`` inspects each capability field each tick:
+    ``EffectManager`` inspects each modality field each tick:
       - ``pixels is None`` → no pixel buffer allocated, no render pass.
       - ``audio``/``haptic`` are passed to outputs via ``handle_event``.
     Builders return plain ``Effect`` instances — subclassing is only appropriate

@@ -197,7 +197,7 @@ def test_indexing_still_reaches_positions_beyond_shrunken_logical_length() -> No
 
 
 # ---------------------------------------------------------------------------
-# Effect — capability container
+# Effect — modality container
 # ---------------------------------------------------------------------------
 
 
