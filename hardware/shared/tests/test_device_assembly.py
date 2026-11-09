@@ -7,7 +7,6 @@ from typing import Any, cast
 
 import pytest
 
-from engine.input import ButtonData
 from engine.log import Logger
 from engine.network import AREA_OF_EFFECT, CONE, LINE
 from hardware.shared.device_assembly import assemble_device
@@ -760,11 +759,10 @@ def test_each_button_pin_is_read_with_its_field_in_declared_order():
 def test_buttons_are_labelled_a_onward_in_declared_order_over_their_pins():
     hw, parts = _assemble(_config(buttons=["GP3", "GP7"]))
     parts.pin_levels["GP7"] = False  # pulled low: pressed
-    out = ButtonData(states={})
 
-    hw.buttons.update(0.5, out)
+    hw.buttons.update(0.5)
 
-    assert (out.is_pressed("A"), out.is_pressed("B")) == (False, True)
+    assert (hw.buttons.reading.is_pressed("A"), hw.buttons.reading.is_pressed("B")) == (False, True)
 
 
 # ---------------------------------------------------------------------------

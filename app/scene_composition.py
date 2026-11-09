@@ -12,7 +12,7 @@ import engine._path as _path
 from engine.capabilities import MissingCapabilityError, describe_capabilities
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
-from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
+from engine.input import AccelerationData, InputEvents, MagneticData
 from engine.log import Logger
 from engine.namespace import ActiveSceneNamespace
 from engine.network import NetworkEvents
@@ -283,10 +283,9 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     (:func:`app.scene_runtime.run_scene`, which adds only ``while True:`` and
     ``gc.collect()``) and the Simulated device, so neither copies it, as
     both share the boot that builds it (:func:`build_scene_boot`). Build it
-    once per runtime: the ``InputEvents.Sensors`` event, its button buffer,
-    and the telemetry gate are allocated here (the acceleration and magnetic
-    buffers are each sensor's own
-    :class:`~hardware.shared.polled_sensor.PolledSensor` ``reading``)
+    once per runtime: the ``InputEvents.Sensors`` event and the telemetry
+    gate are allocated here (the button, acceleration and magnetic buffers
+    are each part's own ``reading``)
     and mutated in place every tick, so the steady-state tick allocates
     nothing on-device.
 
@@ -296,7 +295,7 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     """
     accelerometer = hw.accelerometer
     magnetometer = hw.magnetometer
-    button_data = ButtonData({})
+    button_data = hw.buttons.reading
     acceleration = accelerometer.reading if accelerometer is not None else None
     magnetic = magnetometer.reading if magnetometer is not None else None
     # Narrow each PolledSensor.reading, typed as either buffer, to the one it holds.
@@ -313,7 +312,7 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     def tick() -> None:
         nonlocal last_telemetry_print_total
 
-        hw.buttons.update(timer.elapsed, button_data)
+        hw.buttons.update(timer.elapsed)
 
         if accelerometer is not None:
             accelerometer.update()
