@@ -1,5 +1,6 @@
 import pytest
 
+from engine.capabilities import MissingCapabilityError
 from engine.engine import GameEngine
 from engine.network import CONE, LINE
 from engine.state import EffectControls, SceneControls
@@ -60,17 +61,39 @@ def test_hardware_network_controls_send_ir_dispatches_correct_data() -> None:
     assert writer.calls[0] == [0xAB, 0xCD]
 
 
-def test_hardware_network_controls_send_ir_raises_when_no_transceiver_is_wired() -> None:
+def test_send_ir_with_no_ir_raises_missing_capability_for_the_emitter() -> None:
     controls = HardwareNetworkControls(None)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(MissingCapabilityError) as raised:
         controls.send_ir(b"x", LINE)
+
+    assert (raised.value.capabilities, raised.value.scene) == ({"ir.line"}, None)
+
+
+def test_send_ir_on_an_emitter_not_wired_raises_missing_capability_for_it() -> None:
+    tx, _ = _make_transmitter()
+    controls = HardwareNetworkControls(_make_transceiver(**{CONE: tx}))
+
+    with pytest.raises(MissingCapabilityError) as raised:
+        controls.send_ir(b"x", LINE)
+
+    assert (raised.value.capabilities, raised.value.scene) == ({"ir.line"}, None)
+
+
+def test_send_ir_on_an_unknown_emitter_raises_value_error_naming_it() -> None:
+    tx, _ = _make_transmitter()
+    controls = HardwareNetworkControls(_make_transceiver(**{CONE: tx}))
+
+    with pytest.raises(ValueError, match="laser"):
+        controls.send_ir(b"x", "laser")
 
 
 class _RecordingIrTransceiver:
     """Fake transceiver that just records send() calls -- isolates
     HardwareNetworkControls.send_ir's delegation from InfraredTransceiver's
     own send() behaviour (covered separately in test_ir_transceiver.py)."""
+
+    emitters = (LINE,)
 
     def __init__(self) -> None:
         self.calls: list[tuple[bytes, str]] = []
@@ -100,9 +123,13 @@ class _RecordingRadioTransceiver:
         self.sent.append(data)
 
 
-def test_hardware_network_controls_send_radio_is_a_noop_with_no_radio_wired() -> None:
+def test_send_radio_with_no_radio_raises_missing_capability() -> None:
     controls = HardwareNetworkControls(None)
-    controls.send_radio(b"x")  # must not raise
+
+    with pytest.raises(MissingCapabilityError) as raised:
+        controls.send_radio(b"x")
+
+    assert (raised.value.capabilities, raised.value.scene) == ({"radio"}, None)
 
 
 def test_hardware_network_controls_send_radio_delegates_to_the_wired_transceiver() -> None:

@@ -43,8 +43,9 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   packs.py        PackRegistry, RegistryError family (lookup-time)
   pack_catalog.py scan_pack_roots, PackCatalog, PackScanError family (scan-time)
   scan_error.py   PackScanError base, kept apart so capabilities.py stays importable by hardware
-  capabilities.py Capability vocabulary (is_capability), UnknownCapabilityError,
-                  MissingCapabilityError (board-free; shared by scan, device and harness)
+  capabilities.py Capability vocabulary (is_capability), the Capabilities view rules ask,
+                  UnknownCapabilityError, MissingCapabilityError (board-free; shared by
+                  scan, device, GameState and harness)
   settings.py     Settings (read-only view), Setting declaration parsing and resolution
   version.py      Pack MAJOR.MINOR parsing
   input.py        ButtonData, AccelerationData, InputEvents
@@ -164,11 +165,12 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `EffectBuilder` | `engine/effects/builder.py` | Callable `(name, config) → Effect`; one per effect item |
 | `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop` plus `brightness`/`loudness` controls |
 | `ScopeValue` / `Scope` | `engine/state.py` | Output-agnostic routing keys (see glossary) |
-| `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam |
+| `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam; a send on missing hardware raises `MissingCapabilityError` |
 | `ActiveSceneNamespace` | `engine/namespace.py` | Resolves effect names to builders and clip names to WAV paths for the active scene; installed by `SceneManager` per transition |
 | `ResolvedClip` | `effects/effect.py` | A declared `AudioPlaybackConfig` plus its resolved path, carried on `EffectEvent` |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update` tick |
-| `GameState` | `engine/state.py` | Per-tick game context passed to each rule; `settings` is its scene's read-only `Settings` |
+| `GameState` | `engine/state.py` | Per-tick game context passed to each rule; `settings` is its scene's read-only `Settings`; `capabilities` is the device's read-only `Capabilities` (`has(name)`, raising for a name outside the vocabulary), handed through `GameEngine` from `DeviceHardware.capabilities` |
+| `Capabilities` | `engine/capabilities.py` | Read-only view of the device's Capabilities that rules ask with `has(name)` |
 | `Settings` | `engine/settings.py` | One scene's resolved Settings, read by namespace (`scene` or a pack name) and name; built by the catalog scan |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
@@ -197,7 +199,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `assemble_device` | `hardware/shared/device_assembly.py` | The **Device assembly**: board-free `DeviceConfig` → `DeviceHardware`, owning gating, on-demand bus opening (only buses an enabled device names), build order, narration, buttons, IR/radio wiring and network controls; reaches hardware only through `DeviceParts` |
 | `DeviceParts` / `PinRef` | `hardware/shared/device_parts.py` | Port the Device assembly builds each part through (one constructor per part), taking config sections and pin references (a pin name with its config field); adapters `SimulatedParts` (`hardware/simulated/simulated_parts.py`, which also decides what persists across a reboot) and `CircuitPythonParts` (`hardware/circuitpython/circuitpython_parts.py`) |
 | `PolledSensor` | `hardware/shared/polled_sensor.py` | Board-free owner of one 3-axis sensor's reading (`DeviceHardware.accelerometer` / `.magnetometer`): wraps a `DeviceParts` raw read callable, refreshes its engine reading buffer once per tick, keeps the last good reading on a failed read and logs the start and end of each run of failures |
-| `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter |
+| `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter; `send_ir` raises `MissingCapabilityError` when IR or the emitter is absent, `send_radio` when the radio is |
 | `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, an optional receiver, shared transmit gate; `emitters` and `receives` say what is wired); wired only by `wire_ir` (`hardware/shared/ir_wiring.py`), for the device and the Simulated device alike |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |

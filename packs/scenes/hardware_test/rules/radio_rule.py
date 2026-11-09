@@ -5,7 +5,11 @@ from engine.network import NetworkEvents
 from engine.state import GameState, Scope
 from packs.scenes.hardware_test.rules.helpers.flash import radio_flash
 from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import HwModeRule
-from packs.scenes.hardware_test.rules.helpers.mode import HW_TEST_PAYLOAD, RECEIVE_FLASH_COLOR
+from packs.scenes.hardware_test.rules.helpers.mode import (
+    HW_TEST_PAYLOAD,
+    RECEIVE_FLASH_COLOR,
+    UNAVAILABLE_COLOR,
+)
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_RADIO
 
 
@@ -18,6 +22,9 @@ class HwTestRadioRule(HwModeRule):
     packet flashes ``Scope.Global.ALL`` green and records the
     receipt/timestamp so the shared ``HwModeRule`` flash-expiry can restore
     the idle effect.
+
+    On a device without a radio, the entry effect is red instead and
+    Button A sends nothing.
     """
 
     def __init__(self) -> None:
@@ -25,10 +32,13 @@ class HwTestRadioRule(HwModeRule):
         self.on(NetworkEvents.RadioReceived, self._handle_radio_received)
 
     def on_enter(self, state: GameState) -> None:
-        state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": 0xFFFFFF})
+        color = 0xFFFFFF if state.capabilities.has("radio") else UNAVAILABLE_COLOR
+        state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": color})
 
     def on_input_event(self, event: InputEvents.Sensors, state: GameState) -> None:
         if not event.buttons.is_pressed("A"):
+            return
+        if not state.capabilities.has("radio"):
             return
 
         state.network_controls.send_radio(HW_TEST_PAYLOAD)

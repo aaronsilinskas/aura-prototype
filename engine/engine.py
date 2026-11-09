@@ -61,15 +61,17 @@ class GameEngine:
     the scene's Settings.
     """
 
-    __slots__ = ("_effect_controls", "_network_controls", "_rules", "_timer")
+    __slots__ = ("_capabilities", "_effect_controls", "_network_controls", "_rules", "_timer")
 
     def __init__(
         self,
         effect_controls: EffectControls,
         timer: Timer | None = None,
         network_controls: NetworkControls | None = None,
+        capabilities: frozenset[str] = frozenset(),
     ) -> None:
         self._effect_controls = effect_controls
+        self._capabilities = capabilities
         self._network_controls = (
             network_controls if network_controls is not None else NetworkControls()
         )
@@ -90,7 +92,7 @@ class GameEngine:
         settings: Settings | None = None,
     ) -> GameState:
         """Create an empty ``GameState`` pre-wired with this engine's effect
-        controls and the given ``scene_controls``.
+        controls, network controls and Capabilities, and the given ``scene_controls``.
 
         *settings* is the scene's resolved Settings; the ``get``/``set`` store
         starts empty, for rules to seed their own runtime state.
@@ -100,6 +102,7 @@ class GameEngine:
             scene_controls,
             self._network_controls,
             settings=settings,
+            capabilities=self._capabilities,
         )
 
     def update(self, state: GameState) -> None:

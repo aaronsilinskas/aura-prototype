@@ -13,7 +13,10 @@ from packs.scenes.hardware_test.tests.helpers import (
     GREEN,
     IR,
     RADIO,
+    RED,
     WHITE,
+    WITHOUT_RADIO_OR_LINE,
+    all_lit,
     all_white,
     every_global_strip_lit,
     press,
@@ -148,3 +151,20 @@ def test_a_packet_received_outside_radio_mode_does_not_flash(simulation):
     simulation.advance(TICK)
 
     assert all_white(blue)
+
+
+def test_without_a_radio_radio_mode_lights_every_strip_red(simulation):
+    device = simulation.add_device("red", scene="hardware_test", without=WITHOUT_RADIO_OR_LINE)
+
+    press(device, "B", RADIO)
+
+    assert all_lit(device, RED)
+
+
+def test_without_a_radio_a_sends_nothing(simulation):
+    device = simulation.add_device("red", scene="hardware_test", without=WITHOUT_RADIO_OR_LINE)
+    press(device, "B", RADIO)
+
+    device.tap("A")
+
+    assert device.radio_sent == []
