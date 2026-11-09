@@ -192,6 +192,7 @@ def build_scene_runtime(
         effect_controls=effect_manager,
         network_controls=hw.network_controls,
         timer=timer,
+        capabilities=hw.capabilities,
     )
 
     manager = SceneManager(

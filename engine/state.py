@@ -23,6 +23,7 @@ except ImportError:
     pass  # Not available on CircuitPython
 
 from effects.effect import PixelBuffer
+from engine.capabilities import Capabilities
 from engine.events import Event
 from engine.settings import Settings
 
@@ -399,6 +400,7 @@ class GameState:
     """
 
     __slots__ = (
+        "_capabilities",
         "_data",
         "_dispatch_count",
         "_elapsed",
@@ -419,6 +421,7 @@ class GameState:
         data: dict[str, object] | None = None,
         queue_capacity: int = 8,
         settings: Settings | None = None,
+        capabilities: frozenset[str] = frozenset(),
     ) -> None:
         self.effect_controls = effect_controls
         self.scene_controls = scene_controls
@@ -429,6 +432,7 @@ class GameState:
         self._len: int = 0
         self._data: dict[str, object] = data if data is not None else {}
         self._settings: Settings = settings if settings is not None else Settings()
+        self._capabilities: Capabilities = Capabilities(capabilities)
         self._elapsed: float = 0.0
         self._total: float = 0.0
         self._dispatch_count: int = 0
@@ -437,6 +441,11 @@ class GameState:
     def settings(self) -> Settings:
         """The scene's resolved Settings: read-only, and apart from ``get``/``set`` data."""
         return self._settings
+
+    @property
+    def capabilities(self) -> Capabilities:
+        """The device's Capabilities, read-only: ``state.capabilities.has(name)``."""
+        return self._capabilities
 
     @property
     def elapsed(self) -> float:

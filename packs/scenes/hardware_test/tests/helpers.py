@@ -41,8 +41,16 @@ def strips_but(*scopes: ScopeValue) -> list[ScopeValue]:
     return [other for other in EVERY_STRIP if other not in scopes]
 
 
+WITHOUT_RADIO_OR_LINE = frozenset(("radio", "ir.line"))
+"""A lesser device: no radio and no line emitter, so radio and IR modes have nothing to send on."""
+
+
+def all_lit(device: SimulatedDevice, color: int) -> bool:
+    return all(device.strip(scope).all_lit(color) for scope in EVERY_STRIP)
+
+
 def all_white(device: SimulatedDevice) -> bool:
-    return all(device.strip(scope).all_lit(WHITE) for scope in EVERY_STRIP)
+    return all_lit(device, WHITE)
 
 
 def every_global_strip_lit(device: SimulatedDevice, color: int) -> bool:

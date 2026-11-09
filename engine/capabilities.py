@@ -7,6 +7,7 @@ Simulation test harness all name Capabilities through this module.
 from __future__ import annotations
 
 __all__ = [
+    "Capabilities",
     "MissingCapabilityError",
     "UnknownCapabilityError",
     "is_capability",
@@ -44,6 +45,29 @@ def is_capability(name: object) -> bool:
         return False
     label = name[len(_BUTTON_PREFIX) :]
     return len(label) == 1 and "A" <= label <= "Z"
+
+
+class Capabilities:
+    """A read-only view of the Capabilities a device has, for rules to ask about.
+
+    Reached as ``state.capabilities``.
+    """
+
+    __slots__ = ("_names",)
+
+    def __init__(self, names: frozenset[str] = frozenset()) -> None:
+        self._names = names
+
+    def has(self, name: str) -> bool:
+        """Whether the device has the Capability *name*.
+
+        Raises:
+            ValueError: if *name* is not in the Capability vocabulary, so a
+                misspelt name never reads as absent hardware.
+        """
+        if not is_capability(name):
+            raise ValueError(f"{name!r} is not a Capability")
+        return name in self._names
 
 
 class UnknownCapabilityError(PackScanError):

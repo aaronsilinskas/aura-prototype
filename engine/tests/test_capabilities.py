@@ -6,11 +6,15 @@ observed through the scanned catalog's ``SceneRegistry``.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from engine.capabilities import MissingCapabilityError, UnknownCapabilityError
+from engine.engine import GameEngine
 from engine.pack_catalog import MalformedManifestError, MalformedSceneError, PackScanError
 from engine.scene import Scene, SceneRegistry
+from engine.state import EffectControls, GameState, SceneControls
 
 # ---------------------------------------------------------------------------
 # Required capabilities
@@ -208,3 +212,46 @@ def test_missing_capability_error_from_a_send_names_no_scene() -> None:
     error = MissingCapabilityError(frozenset({"ir.cone"}), None)
 
     assert (error.capabilities, error.scene) == ({"ir.cone"}, None)
+
+
+# ---------------------------------------------------------------------------
+# state.capabilities: rules ask what the device has
+# ---------------------------------------------------------------------------
+
+
+def _state_with(*names: str) -> GameState:
+    return GameState(EffectControls(), SceneControls(), capabilities=frozenset(names))
+
+
+def test_a_rule_sees_a_capability_the_device_has() -> None:
+    state = _state_with("radio", "button.A")
+
+    assert state.capabilities.has("radio")
+
+
+def test_a_rule_sees_a_capability_the_device_lacks_as_absent() -> None:
+    state = _state_with("radio")
+
+    assert not state.capabilities.has("ir.line")
+
+
+def test_a_state_given_no_capabilities_has_none() -> None:
+    state = GameState(EffectControls(), SceneControls())
+
+    assert not state.capabilities.has("button.A")
+
+
+@pytest.mark.parametrize("name", ["laser", "button.a", "ir", 7])
+def test_asking_about_a_name_outside_the_vocabulary_raises(name) -> None:
+    state = _state_with("radio")
+
+    with pytest.raises(ValueError, match=re.escape(repr(name))):
+        state.capabilities.has(name)
+
+
+def test_an_engine_hands_its_capabilities_to_the_states_it_creates() -> None:
+    engine = GameEngine(EffectControls(), capabilities=frozenset(("magnetometer",)))
+
+    state = engine.create_state(SceneControls())
+
+    assert state.capabilities.has("magnetometer")

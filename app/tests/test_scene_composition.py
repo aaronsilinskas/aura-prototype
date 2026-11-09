@@ -26,7 +26,7 @@ from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEnco
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 
 
-def _fake_hw(ir=None, radio=None, storage=None, network_controls=None):
+def _fake_hw(ir=None, radio=None, storage=None, network_controls=None, capabilities=frozenset()):
     """Return a DeviceHardware built entirely from CPython-safe fakes."""
     return DeviceHardware(
         outputs=[],
@@ -39,7 +39,7 @@ def _fake_hw(ir=None, radio=None, storage=None, network_controls=None):
         ir=ir,
         radio=radio,
         storage=storage,
-        capabilities=frozenset(),
+        capabilities=capabilities,
     )
 
 
@@ -65,6 +65,15 @@ def test_ir_range_receiver_scene_boots_and_activates_via_the_standard_pipeline()
     runtime = build_scene_runtime(_fake_hw(), "ir_range_receiver", catalog=_boot_catalog())
 
     assert runtime.manager.active_state is not None
+
+
+def test_the_active_scenes_rules_see_the_devices_capabilities():
+    hw = _fake_hw(capabilities=frozenset(("radio", "button.A")))
+
+    runtime = build_scene_runtime(hw, "hardware_test", catalog=_boot_catalog())
+
+    capabilities = runtime.manager.active_state.capabilities
+    assert (capabilities.has("radio"), capabilities.has("ir.line")) == (True, False)
 
 
 def test_unknown_scene_name_raises_naming_the_known_scenes():

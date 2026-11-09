@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from engine.capabilities import MissingCapabilityError
+from engine.network import IR_EMITTERS
 from engine.state import NetworkControls
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.radio_transceiver import RadioTransceiver
@@ -17,10 +19,9 @@ class HardwareNetworkControls(NetworkControls):
     :meth:`RadioTransceiver.update`, reached by the runtime loop through
     ``DeviceHardware.ir`` and ``DeviceHardware.radio`` rather than this seam.
 
-    Missing-transceiver behavior is asymmetric: :meth:`send_ir` raises
-    because each call names an emitter that cannot be honored, while
-    :meth:`send_radio` is a silent no-op — radio is present or absent as a
-    whole, with no emitter name to fail on.
+    A send on hardware the device lacks raises ``MissingCapabilityError``
+    with ``scene`` set to ``None``: :meth:`send_ir` when IR or that emitter is
+    absent, :meth:`send_radio` when the radio is.
 
     Args:
         ir: The wired :class:`InfraredTransceiver`, or ``None`` on a device
@@ -52,21 +53,27 @@ class HardwareNetworkControls(NetworkControls):
                 ``AREA_OF_EFFECT``.
 
         Raises:
-            ValueError: If no transceiver is wired, or *emitter* has no
-                transmitter wired on the transceiver.
+            ValueError: If *emitter* is not an emitter constant.
+            MissingCapabilityError: If no transceiver is wired, or *emitter*
+                has no transmitter wired on it.
         """
-        if self._ir is None:
-            raise ValueError(f"No IR transceiver wired; cannot send on emitter: {emitter}")
+        if emitter not in IR_EMITTERS:
+            raise ValueError(f"Unknown IR emitter: {emitter!r}")
+        if self._ir is None or emitter not in self._ir.emitters:
+            raise MissingCapabilityError(frozenset(("ir." + emitter,)), None)
         self._ir.send(data, emitter)
 
     def send_radio(self, data: bytes) -> None:
         """Transmit *data* via the wired :class:`RadioTransceiver`.
 
-        Fire-and-forget, matching ``send_ir``. A silent no-op when no radio
-        peripheral is wired (``radio=None`` at construction).
+        Fire-and-forget, matching ``send_ir``.
 
         Args:
             data: Opaque payload bytes to transmit.
+
+        Raises:
+            MissingCapabilityError: If no radio is wired.
         """
-        if self._radio is not None:
-            self._radio.send(data)
+        if self._radio is None:
+            raise MissingCapabilityError(frozenset(("radio",)), None)
+        self._radio.send(data)
