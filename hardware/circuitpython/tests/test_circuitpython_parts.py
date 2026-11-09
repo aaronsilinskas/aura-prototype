@@ -97,6 +97,23 @@ def test_board_name_is_the_running_boards_id(monkeypatch: pytest.MonkeyPatch) ->
     assert CircuitPythonParts(_board()).board_name() == "pimoroni_pico_plus2w"
 
 
+def test_board_name_is_unknown_board_when_the_board_module_has_no_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delattr(sys.modules["board"], "board_id", raising=False)
+
+    assert CircuitPythonParts(_board()).board_name() == "unknown-board"
+
+
+def test_board_name_is_the_platform_when_the_board_module_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    parts = CircuitPythonParts(_board())
+    monkeypatch.setitem(sys.modules, "board", None)
+
+    assert parts.board_name() == sys.platform
+
+
 # ---------------------------------------------------------------------------
 # Pin references
 # ---------------------------------------------------------------------------
