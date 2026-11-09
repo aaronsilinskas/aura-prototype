@@ -28,7 +28,6 @@ from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
 from hardware.circuitpython.circuitpython_parts import CircuitPythonParts, SdCardMountError
-from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.shared.device_config import (
     AudioConfig,
     I2CDeviceConfig,
@@ -255,10 +254,14 @@ def test_button_reader_reads_the_pins_current_raw_level(gpio: list[_FakeDigitalI
 class _FakeNeoPixel(list):
     """A strip's pixel list, remembering how it was constructed."""
 
+    built: _FakeNeoPixel | None = None
+    """The most recently constructed strip."""
+
     def __init__(
         self, pin: object, n: int, *, pixel_order: str, brightness: float, auto_write: bool
     ) -> None:
         super().__init__([0] * n)
+        _FakeNeoPixel.built = self
         self.pin = pin
         self.pixel_order = pixel_order
         self.brightness = brightness
@@ -267,6 +270,7 @@ class _FakeNeoPixel(list):
 
 @pytest.fixture
 def neopixel(monkeypatch: pytest.MonkeyPatch) -> None:
+    _FakeNeoPixel.built = None
     monkeypatch.setattr(sys.modules["neopixel"], "NeoPixel", _FakeNeoPixel, raising=False)
 
 
@@ -281,10 +285,10 @@ def test_neopixel_strip_drives_a_strip_on_its_pin_with_its_count_order_and_brigh
     board = _board("D5")
     parts = CircuitPythonParts(board)
 
-    output = parts.neopixel_strip(_strip({"personal": range(0, 10)}), PinRef("D5", "pixels.pin"))
+    parts.neopixel_strip(_strip({"personal": range(0, 10)}), PinRef("D5", "pixels.pin"))
 
-    strip = output.strip
-    assert isinstance(strip, _FakeNeoPixel)
+    strip = _FakeNeoPixel.built
+    assert strip is not None
     assert (strip.pin, len(strip), strip.pixel_order, strip.brightness, strip.auto_write) == (
         board.D5,
         10,
@@ -316,9 +320,7 @@ def test_neopixel_strip_writes_each_scope_into_its_own_segment(neopixel: None) -
 
     output.update_pixels("ambient", buffer)
 
-    strip = output.strip
-    assert isinstance(strip, _FakeNeoPixel)
-    assert list(strip) == [0, 0, 0x112233, 0x445566]
+    assert list(_FakeNeoPixel.built or []) == [0, 0, 0x112233, 0x445566]
 
 
 # ---------------------------------------------------------------------------
@@ -343,6 +345,10 @@ class _FakeMatrixDriver:
         self.led_scaling: int | None = None
         self.global_current = 0
         self.enable = False
+        self.shown = False
+
+    def show(self) -> None:
+        self.shown = True
 
     def set_led_scaling(self, scaling: int) -> None:
         self.led_scaling = scaling
@@ -373,9 +379,9 @@ def _matrix(brightness: float = 1.0, address: int | None = None) -> MatrixPixels
     return MatrixPixelsConfig(13, {"personal": range(0, 9)}, brightness=brightness, address=address)
 
 
-def _driver(output: IS31FL3741EffectOutput) -> _FakeMatrixDriver:
-    driver = output.matrix
-    assert isinstance(driver, _FakeMatrixDriver)
+def _driver() -> _FakeMatrixDriver:
+    driver = _FakeMatrixDriver.responded
+    assert driver is not None
     return driver
 
 
@@ -383,18 +389,18 @@ def test_matrix_pixels_drive_a_matrix_on_the_given_bus_at_its_configured_address
     matrix_driver: None,
 ) -> None:
     bus = object()
-    output = CircuitPythonParts(_board()).matrix_pixels(_matrix(address=0x31), bus)
+    CircuitPythonParts(_board()).matrix_pixels(_matrix(address=0x31), bus)
 
-    driver = _driver(output)
+    driver = _driver()
     assert (driver.i2c, driver.kwargs["address"]) == (bus, 0x31)
 
 
 def test_matrix_pixels_leave_the_drivers_default_address_when_none_is_configured(
     matrix_driver: None,
 ) -> None:
-    output = CircuitPythonParts(_board()).matrix_pixels(_matrix(address=None), object())
+    CircuitPythonParts(_board()).matrix_pixels(_matrix(address=None), object())
 
-    assert "address" not in _driver(output).kwargs
+    assert "address" not in _driver().kwargs
 
 
 def test_matrix_pixels_are_as_wide_as_the_configured_columns(matrix_driver: None) -> None:
@@ -407,24 +413,24 @@ def test_matrix_pixels_are_as_wide_as_the_configured_columns(matrix_driver: None
 def test_matrix_led_scaling_follows_the_configured_brightness(
     matrix_driver: None, brightness: float, scaling: int
 ) -> None:
-    output = CircuitPythonParts(_board()).matrix_pixels(_matrix(brightness=brightness), object())
+    CircuitPythonParts(_board()).matrix_pixels(_matrix(brightness=brightness), object())
 
-    assert _driver(output).led_scaling == scaling
+    assert _driver().led_scaling == scaling
 
 
 @pytest.mark.parametrize("address", [None, 0x31], ids=["default-address", "configured-address"])
 def test_matrix_driver_buffers_pixel_writes_until_show_at_any_address(
     matrix_driver: None, address: int | None
 ) -> None:
-    output = CircuitPythonParts(_board()).matrix_pixels(_matrix(address=address), object())
+    CircuitPythonParts(_board()).matrix_pixels(_matrix(address=address), object())
 
-    assert _driver(output).kwargs["allocate"] == sys.modules["adafruit_is31fl3741"].MUST_BUFFER
+    assert _driver().kwargs["allocate"] == sys.modules["adafruit_is31fl3741"].MUST_BUFFER
 
 
 def test_matrix_starts_enabled_at_full_global_current(matrix_driver: None) -> None:
-    output = CircuitPythonParts(_board()).matrix_pixels(_matrix(), object())
+    CircuitPythonParts(_board()).matrix_pixels(_matrix(), object())
 
-    driver = _driver(output)
+    driver = _driver()
     assert (driver.global_current, driver.enable) == (0xFF, True)
 
 
@@ -433,7 +439,8 @@ def test_matrix_that_responds_within_the_startup_window_is_used(matrix_driver: N
 
     output = CircuitPythonParts(_board()).matrix_pixels(_matrix(), object())
 
-    assert output.matrix is _FakeMatrixDriver.responded
+    output.flush()
+    assert _driver().shown
 
 
 def test_matrix_that_never_responds_raises_after_the_startup_window(matrix_driver: None) -> None:

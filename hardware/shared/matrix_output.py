@@ -12,8 +12,8 @@ class MatrixEffectOutput(EffectOutput):
     last-mile hardware calls.
     """
 
-    # ``_matrix`` is set by subclasses (read via the ``matrix`` property); it is
-    # declared here so the whole matrix-output family stays slotted.
+    # ``_matrix`` is set by subclasses; it is declared here so the whole
+    # matrix-output family stays slotted.
     __slots__ = ("_cols", "_matrix", "_scope_rows", "_zero_buffer")
 
     def __init__(self, cols: int, scope_rows: dict[str, range]) -> None:
@@ -21,16 +21,6 @@ class MatrixEffectOutput(EffectOutput):
         self._cols = cols
         self._scope_rows = scope_rows
         self._zero_buffer = PixelBuffer(cols)
-
-    @property
-    def matrix(self) -> object:
-        """The underlying hardware matrix driver this output writes to.
-
-        Read-only. Lets a caller reach the one shared driver to build further
-        outputs around it (e.g. the pixel profiler sweeping row bands) without
-        re-probing hardware or touching a private attribute.
-        """
-        return self._matrix
 
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         """Return a PixelBuffer sized for one row of the matrix (``cols`` pixels)."""
