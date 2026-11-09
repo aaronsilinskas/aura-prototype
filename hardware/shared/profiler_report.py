@@ -78,7 +78,7 @@ def print_table_row(table: str, cells: list[object], driver: str = "-") -> None:
     """
     # Concatenation, not [a, b, *cells]: CircuitPython's parser rejects star
     # unpacking inside a list literal.
-    row = format_table_row([board_id(), runtime_id(), driver] + list(cells))  # noqa: RUF005
+    row = format_table_row([board_id(), runtime_id(), driver] + list(cells))
     print(f"__TABLE_ROW table={table}")
     print(row)
 
