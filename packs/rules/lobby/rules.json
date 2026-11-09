@@ -1,5 +1,6 @@
 {
-  "version": "1.0",
+  "version": "2.0",
+  "requires": ["button.A", "button.B", "storage"],
   "settings": {
     "scopes": {
       "type": "list",

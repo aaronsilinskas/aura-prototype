@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from engine.capabilities import ir_emitter_capability
 from engine.input import InputEvents
 from engine.network import LINE, NetworkEvents
 from engine.state import GameState, Scope
@@ -18,14 +19,19 @@ class HwTestIrRule(HwModeRule):
     packet flashes ``Scope.DIRECTIONAL`` green and records the
     receipt/timestamp so the shared ``HwModeRule`` flash-expiry can restore
     the idle effect.
+
+    On a device without the LINE emitter, the entry effect is red instead
+    and Button A sends nothing.
     """
 
     def __init__(self) -> None:
-        super().__init__(MODE_IR)
+        super().__init__(MODE_IR, ir_emitter_capability(LINE))
         self.on(NetworkEvents.IRReceived, self._handle_ir_received)
 
     def on_enter(self, state: GameState) -> None:
-        state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": 0xFFFFFF})
+        state.effect_controls.set_effect(
+            Scope.ALL, "basic.solid", {"color": self.idle_color(state)}
+        )
 
     def on_input_event(self, event: InputEvents.Sensors, state: GameState) -> None:
         if not event.buttons.is_pressed("A"):

@@ -14,6 +14,7 @@ from app.scene_composition import (
 )
 from engine.events import Event, EventGroup
 from engine.input import ButtonData, InputEvents
+from engine.log import Logger
 from engine.network import LINE
 from engine.pack_catalog import PackCatalog, PackScanError, scan_pack_roots
 from engine.scene import PackReference, Scene, SceneRegistry
@@ -25,8 +26,24 @@ from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 
+_FULL = frozenset(
+    (
+        "button.A",
+        "button.B",
+        "accelerometer",
+        "magnetometer",
+        "radio",
+        "storage",
+        "ir.line",
+        "ir.cone",
+        "ir.area_of_effect",
+        "ir.receive",
+    )
+)
+"""Every Capability a fully built simulated device has."""
 
-def _fake_hw(ir=None, radio=None, storage=None, network_controls=None):
+
+def _fake_hw(ir=None, radio=None, storage=None, network_controls=None, capabilities=_FULL):
     """Return a DeviceHardware built entirely from CPython-safe fakes."""
     return DeviceHardware(
         outputs=[],
@@ -39,6 +56,7 @@ def _fake_hw(ir=None, radio=None, storage=None, network_controls=None):
         ir=ir,
         radio=radio,
         storage=storage,
+        capabilities=capabilities,
     )
 
 
@@ -64,6 +82,15 @@ def test_ir_range_receiver_scene_boots_and_activates_via_the_standard_pipeline()
     runtime = build_scene_runtime(_fake_hw(), "ir_range_receiver", catalog=_boot_catalog())
 
     assert runtime.manager.active_state is not None
+
+
+def test_the_active_scenes_rules_see_the_devices_capabilities():
+    hw = _fake_hw(capabilities=frozenset(("radio", "button.A", "button.B", "storage")))
+
+    runtime = build_scene_runtime(hw, "hardware_test", catalog=_boot_catalog())
+
+    capabilities = runtime.manager.active_state.capabilities
+    assert (capabilities.has("radio"), capabilities.has("ir.line")) == (True, False)
 
 
 def test_unknown_scene_name_raises_naming_the_known_scenes():
@@ -113,12 +140,12 @@ def _scene_registry_with(*scene_names: str) -> SceneRegistry:
 
 def test_persisted_sd_scene_overrides_flash_default_when_both_are_known_scenes(device_storage):
     """A persisted SD override wins even though the flash default is also valid --
-    proving resolve_boot_scene's precedence survives the registry-validation wrap."""
+    proving boot_scene_candidates' precedence survives the registry-validation wrap."""
     scene_registry = _scene_registry_with("tag", "red_light_green_light")
     device_storage.write_json("aura-state.json", {"scene": "tag"})
 
     scene_name = resolve_boot_scene_name(
-        scene_registry, device_storage, {"default_scene": "red_light_green_light"}
+        scene_registry, device_storage, {"default_scene": "red_light_green_light"}, _FULL
     )
 
     assert scene_name == "tag"
@@ -130,7 +157,7 @@ def test_card_less_device_boots_the_flash_default_scene():
     scene_registry = _scene_registry_with("red_light_green_light")
 
     scene_name = resolve_boot_scene_name(
-        scene_registry, None, {"default_scene": "red_light_green_light"}
+        scene_registry, None, {"default_scene": "red_light_green_light"}, _FULL
     )
 
     assert scene_name == "red_light_green_light"
@@ -138,23 +165,41 @@ def test_card_less_device_boots_the_flash_default_scene():
 
 def test_neither_persisted_nor_flash_scene_raises_naming_both_files(device_storage):
     """With no SD override and no flash default, boot fails loudly rather than
-    silently picking a scene -- the same contract resolve_boot_scene documents."""
+    silently picking a scene -- the same contract boot_scene_candidates documents."""
     scene_registry = _scene_registry_with("red_light_green_light")
 
     with pytest.raises(ValueError, match=r"aura-state\.json.*aura-boot\.json"):
-        resolve_boot_scene_name(scene_registry, device_storage, {})
+        resolve_boot_scene_name(scene_registry, device_storage, {}, _FULL)
 
 
 def test_persisted_scene_unknown_to_the_registry_raises_naming_the_known_scenes(device_storage):
     """A persisted SD scene name with no matching registry entry fails loudly by
-    name here -- the registry-validation step resolve_boot_scene itself skips."""
+    name here -- the registry-validation step boot_scene_candidates itself skips."""
     scene_registry = _scene_registry_with("red_light_green_light")
     device_storage.write_json("aura-state.json", {"scene": "not-a-real-scene"})
 
     with pytest.raises(ValueError, match="red_light_green_light"):
         resolve_boot_scene_name(
-            scene_registry, device_storage, {"default_scene": "red_light_green_light"}
+            scene_registry, device_storage, {"default_scene": "red_light_green_light"}, _FULL
         )
+
+
+def test_skipping_a_persisted_scene_logs_one_line_naming_it_and_what_it_lacks(device_storage):
+    scene_registry = scan_boot_pack_catalog(None).scene_registry
+    device_storage.write_json("aura-state.json", {"scene": "red_light_green_light"})
+    lines: list[str] = []
+
+    resolve_boot_scene_name(
+        scene_registry,
+        device_storage,
+        {"default_scene": "hardware_test"},
+        _FULL - {"accelerometer"},
+        Logger("[boot]", sink=lines.append),
+    )
+
+    assert len(lines) == 1
+    assert "red_light_green_light" in lines[0]
+    assert "accelerometer" in lines[0]
 
 
 # ---------------------------------------------------------------------------
@@ -249,7 +294,7 @@ def test_a_card_scene_named_as_the_persisted_sd_scene_resolves(device_storage):
     device_storage.write_json("aura-state.json", {"scene": "card_scene"})
 
     scene_registry = scan_boot_pack_catalog(device_storage).scene_registry
-    scene_name = resolve_boot_scene_name(scene_registry, device_storage, {})
+    scene_name = resolve_boot_scene_name(scene_registry, device_storage, {}, _FULL)
 
     assert scene_name == "card_scene"
 
@@ -261,7 +306,7 @@ def test_a_card_scene_named_as_the_flash_default_scene_resolves(device_storage):
 
     scene_registry = scan_boot_pack_catalog(device_storage).scene_registry
     scene_name = resolve_boot_scene_name(
-        scene_registry, device_storage, {"default_scene": "card_scene"}
+        scene_registry, device_storage, {"default_scene": "card_scene"}, _FULL
     )
 
     assert scene_name == "card_scene"
@@ -276,7 +321,9 @@ def test_a_persisted_card_scene_wins_over_a_flash_default_scene(device_storage):
     device_storage.write_json("aura-state.json", {"scene": "card_scene"})
 
     scene_registry = scan_boot_pack_catalog(device_storage).scene_registry
-    scene_name = resolve_boot_scene_name(scene_registry, device_storage, {"default_scene": "tag"})
+    scene_name = resolve_boot_scene_name(
+        scene_registry, device_storage, {"default_scene": "tag"}, _FULL
+    )
 
     assert scene_name == "card_scene"
 
@@ -289,7 +336,7 @@ def test_unknown_boot_scene_name_raises_naming_both_flash_and_card_scenes(device
 
     with pytest.raises(ValueError) as exc_info:
         resolve_boot_scene_name(
-            scene_registry, device_storage, {"default_scene": "not-a-real-scene"}
+            scene_registry, device_storage, {"default_scene": "not-a-real-scene"}, _FULL
         )
 
     assert "card_scene" in str(exc_info.value)

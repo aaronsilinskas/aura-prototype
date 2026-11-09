@@ -6,7 +6,11 @@ from engine.log import Logger
 from hardware.shared.device_state import DeviceStateStore
 from hardware.shared.device_storage import DeviceStorage
 
-__all__ = ["apply_scene_deploy", "resolve_boot_scene", "resolve_scene_name"]
+__all__ = [
+    "apply_scene_deploy",
+    "boot_scene_candidates",
+    "resolve_scene_name",
+]
 
 
 def _non_empty_string_or_none(value: object) -> str | None:
@@ -67,21 +71,16 @@ def apply_scene_deploy(
     logger.log(f"scene deploy {token} applied: booting {deployed!r}, {cleared}")
 
 
-def resolve_boot_scene(
+def boot_scene_candidates(
     storage: DeviceStorage | None,
     boot_mapping: dict,
     logger: Logger | None = None,
-) -> str:
-    """Resolve the boot scene: persisted SD ``scene`` -> flash ``default_scene`` -> raise.
+) -> tuple[str | None, str]:
+    """Return ``(persisted, fallback)``: the boot scene to try first, and the one to boot otherwise.
 
-    Composes the card's Persisted scene (read via a :class:`DeviceStateStore`
-    over *storage*) with the flash-authored default (*boot_mapping*'s
-    ``default_scene``, as read by :func:`read_boot_mapping`). The two
-    files key the scene under different names, so each value independently
-    goes through :func:`_non_empty_string_or_none` rather than delegating to
-    :func:`resolve_scene_name`, which is hardwired to the flash key and
-    always raises when its key is absent — behaviour this resolver only
-    wants when *both* legs are absent.
+    *fallback* is flash ``default_scene``, or the Persisted scene when no
+    default is set. *persisted* is the Persisted scene when a different
+    default stands behind it, else ``None``.
 
     Args:
         storage: The mounted ``DeviceStorage`` to read the Persisted scene
@@ -95,12 +94,12 @@ def resolve_boot_scene(
             ``default_scene`` is a non-empty string.
     """
     persisted = _non_empty_string_or_none(DeviceStateStore(storage, logger).get("scene"))
-    if persisted is not None:
-        return persisted
     default = _non_empty_string_or_none(boot_mapping.get("default_scene"))
-    if default is not None:
-        return default
-    raise ValueError(
-        "no boot scene: neither a persisted SD 'scene' (aura-state.json) nor a flash "
-        + "'default_scene' (aura-boot.json) is set"
-    )
+    if default is None or default == persisted:
+        if persisted is None:
+            raise ValueError(
+                "no boot scene: neither a persisted SD 'scene' (aura-state.json) nor a flash "
+                + "'default_scene' (aura-boot.json) is set"
+            )
+        return None, persisted
+    return persisted, default

@@ -9,6 +9,7 @@ needed because none of them carry board imports.
 from __future__ import annotations
 
 import engine._path as _path
+from engine.capabilities import MissingCapabilityError, describe_capabilities
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
@@ -26,7 +27,7 @@ from hardware.shared.ir_codecs import codec_for
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.radio_transceiver import RadioTransceiver
-from hardware.shared.scene_selection import apply_scene_deploy, resolve_boot_scene
+from hardware.shared.scene_selection import apply_scene_deploy, boot_scene_candidates
 
 try:
     from collections.abc import Callable
@@ -102,19 +103,37 @@ def resolve_boot_scene_name(
     scene_registry: SceneRegistry,
     storage: DeviceStorage | None,
     boot_mapping: dict,
+    capabilities: frozenset[str],
     logger: Logger | None = None,
 ) -> str:
-    """Resolve the boot scene name and validate it against *scene_registry*.
+    """Return the registered boot scene whose Required capabilities are all in *capabilities*.
 
-    ``resolve_boot_scene`` decides only source precedence (persisted SD
-    ``scene`` -> flash ``default_scene`` -> raise), never registry membership,
-    so its result is validated here via ``SceneRegistry.resolve_known`` -- an unknown
-    name, from either source, raises naming the known scenes. A ``None``
-    *storage* is treated as no persisted override, leaving the flash
-    ``default_scene`` to win.
+    Tries the card's Persisted scene, then flash ``default_scene`` (see
+    ``boot_scene_candidates``); a ``None`` *storage* has no Persisted scene.
+    A candidate unknown to *scene_registry* raises ``ValueError`` naming the
+    known scenes. A Persisted scene the device can't run is skipped and
+    logged once to *logger*, and left on the card.
+
+    Raises:
+        MissingCapabilityError: No candidate fits; names the last one tried
+            and what it is missing.
     """
-    scene_name = resolve_boot_scene(storage, boot_mapping, logger)
-    return scene_registry.resolve_known(scene_name)
+    logger = logger if logger is not None else Logger.SILENT
+    persisted, fallback = boot_scene_candidates(storage, boot_mapping, logger)
+    if persisted is not None:
+        scene_name = scene_registry.resolve_known(persisted)
+        missing = scene_registry.missing_capabilities(scene_name, capabilities)
+        if not missing:
+            return scene_name
+        logger.log(
+            f"skipping Persisted scene {scene_name!r}: the device lacks "
+            + describe_capabilities(missing)
+        )
+    scene_name = scene_registry.resolve_known(fallback)
+    missing = scene_registry.missing_capabilities(scene_name, capabilities)
+    if missing:
+        raise MissingCapabilityError(missing, scene_name)
+    return scene_name
 
 
 def resolve_ir_codec(
@@ -192,6 +211,7 @@ def build_scene_runtime(
         effect_controls=effect_manager,
         network_controls=hw.network_controls,
         timer=timer,
+        capabilities=hw.capabilities,
     )
 
     manager = SceneManager(
@@ -244,7 +264,9 @@ def build_scene_boot(
     catalog = scan_boot_pack_catalog(hw.storage, setting_overrides)
     scene_registry = catalog.scene_registry
     apply_scene_deploy(hw.storage, boot_mapping, logger)
-    scene_name = resolve_boot_scene_name(scene_registry, hw.storage, boot_mapping, logger)
+    scene_name = resolve_boot_scene_name(
+        scene_registry, hw.storage, boot_mapping, hw.capabilities, logger
+    )
     if hw.ir is not None:
         hw.ir.apply_codec(*resolve_ir_codec(scene_registry, scene_name))
     scene_reboot = DeviceSceneReboot(

@@ -25,7 +25,8 @@ class InfraredTransceiver:
     """Owns and drives the whole IR subsystem for one device.
 
     The transmitter map is never exposed as a raw collection; reach a
-    transmitter only through :meth:`send` and :meth:`busy`.
+    transmitter only through :meth:`send` and :meth:`busy`. :attr:`emitters`
+    and :attr:`receives` say what is wired.
 
     Args:
         transmitters: Map from emitter constant (``LINE``, ``CONE``,
@@ -55,6 +56,16 @@ class InfraredTransceiver:
             AuraInfraredDecoder,
         )
         self.received: bytearray | None = None
+
+    @property
+    def emitters(self) -> tuple[str, ...]:
+        """The emitter constants a transmitter is wired to, in wiring order."""
+        return tuple(self._transmitters)
+
+    @property
+    def receives(self) -> bool:
+        """Whether a receiver is wired."""
+        return self._receiver is not None
 
     def send(self, data: bytes, emitter: str) -> None:
         """Route *data* to the transmitter wired to *emitter*.

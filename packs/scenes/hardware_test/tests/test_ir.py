@@ -14,7 +14,10 @@ from packs.scenes.hardware_test.rules.helpers.mode import HW_TEST_PAYLOAD
 from packs.scenes.hardware_test.tests.helpers import (
     GREEN,
     IR,
+    RED,
     WHITE,
+    WITHOUT_RADIO_OR_LINE,
+    all_lit,
     all_white,
     press,
     send_on_a,
@@ -127,3 +130,20 @@ def test_a_shot_received_outside_ir_mode_does_not_flash(simulation):
     send_on_a(simulation, red)
 
     assert not blue.strip(Scope.DIRECTIONAL).all_lit(GREEN)
+
+
+def test_without_a_line_emitter_ir_mode_lights_every_strip_red(simulation):
+    device = simulation.add_device("red", scene="hardware_test", without=WITHOUT_RADIO_OR_LINE)
+
+    press(device, "B", IR)
+
+    assert all_lit(device, RED)
+
+
+def test_without_a_line_emitter_a_sends_nothing(simulation):
+    device = simulation.add_device("red", scene="hardware_test", without=WITHOUT_RADIO_OR_LINE)
+    press(device, "B", IR)
+
+    device.tap("A")
+
+    assert device.ir_sent == []

@@ -186,7 +186,7 @@ The per-deploy value `deploy.py --scene` writes as `scene_deploy_token` beside `
 _Avoid_: "nonce", "deploy id" for it; comparing scene names instead (a second deploy of the same scene would be mistaken for the first); copying the deployed scene onto the card; a separate inbox file; applying it outside the shared boot (`build_scene_boot`)
 
 ### SceneReboot
-The board-free port `SceneManager` reaches to persist a scene switch and reboot the device; live adapter `DeviceSceneReboot`.
+The board-free port `SceneManager` reaches to persist a scene switch and reboot the device; live adapter `DeviceSceneReboot`. Its `previous_scene` names the scene `reboot_to_previous` would boot, so `SceneManager` can check that scene's **Required capabilities** before anything is persisted.
 _Avoid_: validating the target here (that is `SceneManager.reboot_into`'s job); calling `microcontroller.reset()` anywhere but `run_scene` (and the on-device `reboot_demo` example), which inject it into `DeviceSceneReboot`
 
 ### EffectControls
@@ -311,7 +311,7 @@ _Avoid_: `scan_boot_scene_registry` (old name); calling it before `build_hardwar
 
 ### resolve_boot_scene_name
 The boot-time seam that picks the scene to boot into (**Persisted scene** → flash `default_scene` → raise), skipping a candidate the device lacks the **Required capabilities** for, and guarantees the winner is registered. `build_scene_boot` applies any pending **Scene deploy token** just before it.
-_Avoid_: calling `resolve_boot_scene` directly and skipping registry validation (`SceneRegistry.resolve_known`); calling it before `build_hardware` (the persisted leg needs storage mounted)
+_Avoid_: calling `boot_scene_candidates` directly and skipping registry validation (`SceneRegistry.resolve_known`); calling it before `build_hardware` (the persisted leg needs storage mounted)
 
 ### resolve_ir_codec
 Resolves a scene's declared **wire-frame codec** name to its encoder/decoder class pair. Board-free, needing no built hardware to run.

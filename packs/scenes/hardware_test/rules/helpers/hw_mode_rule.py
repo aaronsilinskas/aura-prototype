@@ -26,6 +26,7 @@ from engine.input import InputEvents
 from engine.phase import PhaseKey, PhaseRule
 from engine.state import GameState, Scope, ScopeValue, StateSlot
 from packs.scenes.hardware_test.rules.helpers.flash import ir_flash, radio_flash
+from packs.scenes.hardware_test.rules.helpers.mode import UNAVAILABLE_COLOR
 from packs.scenes.hardware_test.rules.helpers.phases import (
     MODE_ORDER,
     hw_phase,
@@ -43,17 +44,30 @@ class HwModeRule(PhaseRule):
     base owns the Button-B "advance to next mode" transition and the
     IR/radio receive-flash expiry, both of which run on every dispatch
     regardless of which button (if any) was pressed.
+
+    A mode testing one piece of hardware names its Capability as
+    *capability*: on a device without it, :meth:`on_input_event` is never
+    called and :meth:`idle_color` is ``UNAVAILABLE_COLOR``.
     """
 
-    def __init__(self, phase: PhaseKey) -> None:
+    def __init__(self, phase: PhaseKey, capability: str | None = None) -> None:
         super().__init__(phase, hw_phase)
+        self._capability = capability
         self.on(InputEvents.Sensors, self._handle)
 
     def on_input_event(self, event: InputEvents.Sensors, state: GameState) -> None:
         """Per-mode handling of the whole input event. No-op by default."""
 
+    def idle_color(self, state: GameState) -> int:
+        """White, or ``UNAVAILABLE_COLOR`` when the device lacks this mode's hardware."""
+        return 0xFFFFFF if self._has_hardware(state) else UNAVAILABLE_COLOR
+
+    def _has_hardware(self, state: GameState) -> bool:
+        return self._capability is None or state.capabilities.has(self._capability)
+
     def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
-        self.on_input_event(event, state)
+        if self._has_hardware(state):
+            self.on_input_event(event, state)
 
         self._check_flash_expiry(state)
 

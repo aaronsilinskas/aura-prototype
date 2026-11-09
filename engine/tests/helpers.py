@@ -113,18 +113,22 @@ class RecordingSceneReboot(SceneReboot):
     Records every ``reboot_into``/``reboot_to_previous`` call instead of
     touching storage or resetting anything, so ``SceneManager``'s
     validate-then-delegate behaviour is testable without a live
-    ``DeviceSceneReboot``.
+    ``DeviceSceneReboot``. ``previous_scene`` answers *previous*.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, previous: str | None = None) -> None:
         self.reboot_into_calls: list[str] = []
         self.reboot_to_previous_calls: int = 0
+        self._previous = previous
 
     def reboot_into(self, target: str) -> None:
         self.reboot_into_calls.append(target)
 
     def reboot_to_previous(self) -> None:
         self.reboot_to_previous_calls += 1
+
+    def previous_scene(self) -> str | None:
+        return self._previous
 
 
 def rule_source(class_name: str = "ARule") -> str:

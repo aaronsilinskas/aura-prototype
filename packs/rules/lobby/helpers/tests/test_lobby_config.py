@@ -14,6 +14,10 @@ def _lobby_settings(scopes: list, entries: list) -> Settings:
     return settings_for(rule_packs={"lobby": {"scopes": scopes, "entries": entries}})
 
 
+def _runs_anything(scene: str) -> bool:
+    return True
+
+
 # ---------------------------------------------------------------------------
 # scope_by_name
 # ---------------------------------------------------------------------------
@@ -87,7 +91,7 @@ def test_from_settings_resolves_scopes_and_entries_in_order():
         ],
     )
 
-    config = LobbyConfig.from_settings(settings)
+    config = LobbyConfig.from_settings(settings, _runs_anything)
 
     assert config.scopes == [Scope.PERSONAL, Scope.Global.MAIN]
     assert [e.scene for e in config.entries] == ["hardware_test", "tag"]
@@ -100,7 +104,7 @@ def test_from_settings_defaults_missing_options_to_empty_dict():
         ["personal"], [{"scene": "hardware_test", "effect": "elements.fire"}]
     )
 
-    config = LobbyConfig.from_settings(settings)
+    config = LobbyConfig.from_settings(settings, _runs_anything)
 
     assert config.entries[0].options == {}
 
@@ -109,14 +113,14 @@ def test_from_settings_raises_on_empty_scopes():
     settings = _lobby_settings([], [{"scene": "hardware_test", "effect": "elements.fire"}])
 
     with pytest.raises(ValueError, match="scopes"):
-        LobbyConfig.from_settings(settings)
+        LobbyConfig.from_settings(settings, _runs_anything)
 
 
 def test_from_settings_raises_on_empty_entries():
     settings = _lobby_settings(["personal"], [])
 
     with pytest.raises(ValueError, match="entries"):
-        LobbyConfig.from_settings(settings)
+        LobbyConfig.from_settings(settings, _runs_anything)
 
 
 def test_from_settings_raises_on_unknown_scope_name():
@@ -125,25 +129,54 @@ def test_from_settings_raises_on_unknown_scope_name():
     )
 
     with pytest.raises(ValueError, match="not-a-real-scope"):
-        LobbyConfig.from_settings(settings)
+        LobbyConfig.from_settings(settings, _runs_anything)
 
 
 def test_from_settings_raises_on_entry_missing_scene():
     settings = _lobby_settings(["personal"], [{"effect": "elements.fire"}])
 
     with pytest.raises(ValueError, match="scene"):
-        LobbyConfig.from_settings(settings)
+        LobbyConfig.from_settings(settings, _runs_anything)
 
 
 def test_from_settings_raises_on_entry_missing_effect():
     settings = _lobby_settings(["personal"], [{"scene": "hardware_test"}])
 
     with pytest.raises(ValueError, match="effect"):
-        LobbyConfig.from_settings(settings)
+        LobbyConfig.from_settings(settings, _runs_anything)
 
 
 def test_from_settings_raises_on_an_entry_that_is_not_an_object():
     settings = _lobby_settings(["personal"], ["hardware_test"])
 
     with pytest.raises(ValueError, match="hardware_test"):
-        LobbyConfig.from_settings(settings)
+        LobbyConfig.from_settings(settings, _runs_anything)
+
+
+_THREE_ENTRIES = [
+    {"scene": "hardware_test", "effect": "elements.lightning"},
+    {"scene": "red_light_green_light", "effect": "elements.fire"},
+    {"scene": "tag", "effect": "basic.solid"},
+]
+
+
+def test_from_settings_leaves_out_entries_the_device_cannot_run_keeping_the_order():
+    settings = _lobby_settings(["personal"], _THREE_ENTRIES)
+
+    config = LobbyConfig.from_settings(settings, lambda scene: scene != "red_light_green_light")
+
+    assert [e.scene for e in config.entries] == ["hardware_test", "tag"]
+
+
+def test_from_settings_raises_when_the_device_can_run_no_entry():
+    settings = _lobby_settings(["personal"], _THREE_ENTRIES)
+
+    with pytest.raises(ValueError, match="entries"):
+        LobbyConfig.from_settings(settings, lambda scene: False)
+
+
+def test_from_settings_checks_every_entry_before_asking_whether_the_device_can_run_it():
+    settings = _lobby_settings(["personal"], [*_THREE_ENTRIES, {"scene": "tag"}])
+
+    with pytest.raises(ValueError, match="effect"):
+        LobbyConfig.from_settings(settings, lambda scene: False)

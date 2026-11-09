@@ -18,14 +18,19 @@ class HwTestRadioRule(HwModeRule):
     packet flashes ``Scope.Global.ALL`` green and records the
     receipt/timestamp so the shared ``HwModeRule`` flash-expiry can restore
     the idle effect.
+
+    On a device without a radio, the entry effect is red instead and
+    Button A sends nothing.
     """
 
     def __init__(self) -> None:
-        super().__init__(MODE_RADIO)
+        super().__init__(MODE_RADIO, "radio")
         self.on(NetworkEvents.RadioReceived, self._handle_radio_received)
 
     def on_enter(self, state: GameState) -> None:
-        state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": 0xFFFFFF})
+        state.effect_controls.set_effect(
+            Scope.ALL, "basic.solid", {"color": self.idle_color(state)}
+        )
 
     def on_input_event(self, event: InputEvents.Sensors, state: GameState) -> None:
         if not event.buttons.is_pressed("A"):

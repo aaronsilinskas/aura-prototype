@@ -42,6 +42,10 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   lerp.py         Integer/float interpolation helpers
   packs.py        PackRegistry, RegistryError family (lookup-time)
   pack_catalog.py scan_pack_roots, PackCatalog, PackScanError family (scan-time)
+  scan_error.py   PackScanError base, kept apart so capabilities.py stays importable by hardware
+  capabilities.py Capability vocabulary (is_capability), the Capabilities view rules ask,
+                  UnknownCapabilityError, MissingCapabilityError (board-free; shared by
+                  scan, device, GameState and harness)
   settings.py     Settings (read-only view), Setting declaration parsing and resolution
   version.py      Pack MAJOR.MINOR parsing
   input.py        ButtonData, AccelerationData, InputEvents
@@ -63,7 +67,9 @@ magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
 
 packs/            Game-specific packs loaded at runtime (CircuitPython/MicroPython-safe)
   effects/        Shared, versioned effect packs (basic, elements) — each with an effects.json manifest
-  rules/          Shared, versioned rule packs (debug, lobby, return_to_lobby) — each with a rules.json manifest
+  rules/          Shared, versioned rule packs (debug, lobby, return_to_lobby) — each with a rules.json manifest;
+                  lobby and return_to_lobby require button.A, button.B and storage, and the lobby
+                  offers only the entries SceneControls.can_run accepts
   scenes/         Scene definitions (element_browser, example_lobby, hardware_test,
                   ir_range_receiver, ir_range_transmitter, red_light_green_light, tag);
                   each has a scene.json and optional scene-local effects/ and rules/ subdirs
@@ -91,16 +97,21 @@ app/              Composition layer — the one place allowed to import both the
                   runtime machinery and hardware.* together
   scene_composition.py  build_scene_boot, build_scene_runtime, build_scene_tick (board-free,
                         CPython-testable); the device and the Simulated device share
-                        both the boot and the tick
+                        both the boot and the tick. resolve_boot_scene_name boots the
+                        Persisted scene, else flash default_scene, skipping one the
+                        device lacks the Required capabilities for (raises
+                        MissingCapabilityError when none fits)
   scene_runtime.py      run_scene (device-only: bring-up, build_scene_boot, then loops
                         the tick it returns)
   simulation/           Test-only Simulation test harness (Simulation, SimulatedDevice):
                         boots real scenes on simulated devices, reboots them
                         through their cards, real directories a test can put
-                        card scenes and packs on (or not, when card-less),
-                        and carries aimed IR between them (the IR medium) and
-                        radio to every other device (the radio medium) —
-                        never deployed
+                        card scenes and packs on, and carries aimed IR
+                        between them (the IR medium) and radio to every other
+                        device with a radio (the radio medium); add_device(
+                        without={...}) drops Capabilities from the simulated
+                        config (without={"storage"} is card-less) — never
+                        deployed
 
 examples/         Runnable CircuitPython entry points; deploy-watch's flash targets
 
@@ -156,22 +167,26 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `EffectBuilder` | `engine/effects/builder.py` | Callable `(name, config) → Effect`; one per effect item |
 | `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop` plus `brightness`/`loudness` controls |
 | `ScopeValue` / `Scope` | `engine/state.py` | Output-agnostic routing keys (see glossary) |
-| `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam |
+| `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam; a send on missing hardware raises `MissingCapabilityError` |
 | `ActiveSceneNamespace` | `engine/namespace.py` | Resolves effect names to builders and clip names to WAV paths for the active scene; installed by `SceneManager` per transition |
 | `ResolvedClip` | `effects/effect.py` | A declared `AudioPlaybackConfig` plus its resolved path, carried on `EffectEvent` |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update` tick |
-| `GameState` | `engine/state.py` | Per-tick game context passed to each rule; `settings` is its scene's read-only `Settings` |
+| `GameState` | `engine/state.py` | Per-tick game context passed to each rule; `settings` is its scene's read-only `Settings`; `capabilities` is the device's read-only `Capabilities` (`has(name)`, raising for a name outside the vocabulary), handed through `GameEngine` from `DeviceHardware.capabilities` |
+| `Capabilities` | `engine/capabilities.py` | Read-only view of the device's Capabilities that rules ask with `has(name)` |
 | `Settings` | `engine/settings.py` | One scene's resolved Settings, read by namespace (`scene` or a pack name) and name; built by the catalog scan |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
-| `SceneManager` | `engine/scene.py` | Drives scene transitions, installing each active scene into the `ActiveSceneNamespace` and snapshotting merge strategies through `EffectAdmin`; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot` |
-| `SceneReboot` | `engine/state.py` | Board-free port `SceneManager` reboots through; live adapter `DeviceSceneReboot` |
+| `SceneControls` | `engine/state.py` | Rule-facing transition seam (`load`, `overlay`, `pop`, `reboot_into`, `reboot_to_previous`) plus `can_run(name)`, which the `lobby` pack asks to leave out entries the device can't play |
+| `SceneManager` | `engine/scene.py` | The live `SceneControls`. Drives scene transitions, installing each active scene into the `ActiveSceneNamespace` and snapshotting merge strategies through `EffectAdmin`; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot`. `load`, `overlay`, `reboot_into` and `reboot_to_previous` raise `MissingCapabilityError` before recording, persisting or resetting anything when the target's Required capabilities aren't all in `GameEngine.capabilities`; `pop` does not check |
+| `SceneReboot` | `engine/state.py` | Board-free port `SceneManager` reboots through; `previous_scene()` names the scene `reboot_to_previous` would boot, so it is checked first; live adapter `DeviceSceneReboot` |
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
 | `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor for a phase machine's key + initial phase; registry of each phase's owning `PhaseRule` |
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
 | `MergeStrategy` | `engine/state.py` | Per-scope compositing policy; subclasses in `engine/effects/merge.py` |
 | `PackRegistry` | `engine/packs.py` | Looks up the items of versioned effect or rule packs by pack and item name; filled only by the catalog |
-| `PackCatalog` | `engine/pack_catalog.py` | One scan of every pack root: effect/rule `PackRegistry`s, `SceneRegistry`, pack sounds map; scene declarations and Setting overrides checked, Settings resolved |
+| `PackCatalog` | `engine/pack_catalog.py` | One scan of every pack root: effect/rule `PackRegistry`s, `SceneRegistry`, pack sounds map; scene declarations, Setting overrides and `requires` names checked, Settings resolved |
+| `SceneRegistry` | `engine/scene.py` | The scanned scenes (plus in-memory test scenes); `required_capabilities(name)` reads a scene's Required capabilities without constructing it |
+| `UnknownCapabilityError` / `MissingCapabilityError` | `engine/capabilities.py` | The Capability errors: a `requires` name outside the vocabulary (a `PackScanError`), and a device lacking what a scene or send needs (raised at boot when neither the Persisted scene nor `default_scene` fits, and by a transition into a scene the device can't run) |
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
 | `Aura` | `magic/aura.py` | A player/object's magic pool + active `Spells` collection |
@@ -183,12 +198,12 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `Duration` | `magic/values.py` | Expiry tracker |
 | `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; optional `pixels` list plus optional IR/audio/sensor/haptics sections, and **Named bus** maps for I2C and SPI that devices join by name |
 | `NeoPixelCurrentBudgetConfig` | `hardware/shared/device_config.py` | Opt-in `neopixel_current_budget` policy; the parser calls `tune_neopixel_brightness` (`hardware/shared/neopixel_current_budget.py`) to fold the tuned brightness into each NeoPixel strip config, and records the estimate/scale for boot narration |
-| `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the Device assembly returns (outputs, sensors, network seam, `ir`, radio, storage) |
+| `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the Device assembly returns (outputs, sensors, network seam, `ir`, radio, storage, and `capabilities`: the frozenset of Capabilities read off the parts it built, so a disabled, isolated or absent component is not had) |
 | `assemble_device` | `hardware/shared/device_assembly.py` | The **Device assembly**: board-free `DeviceConfig` → `DeviceHardware`, owning gating, on-demand bus opening (only buses an enabled device names), build order, narration, buttons, IR/radio wiring and network controls; reaches hardware only through `DeviceParts` |
 | `DeviceParts` / `PinRef` | `hardware/shared/device_parts.py` | Port the Device assembly builds each part through (one constructor per part), taking config sections and pin references (a pin name with its config field); adapters `SimulatedParts` (`hardware/simulated/simulated_parts.py`, which also decides what persists across a reboot) and `CircuitPythonParts` (`hardware/circuitpython/circuitpython_parts.py`) |
 | `PolledSensor` | `hardware/shared/polled_sensor.py` | Board-free owner of one 3-axis sensor's reading (`DeviceHardware.accelerometer` / `.magnetometer`): wraps a `DeviceParts` raw read callable, refreshes its engine reading buffer once per tick, keeps the last good reading on a failed read and logs the start and end of each run of failures |
-| `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter |
-| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, receiver, shared transmit gate); wired only by `wire_ir` (`hardware/shared/ir_wiring.py`), for the device and the Simulated device alike |
+| `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter; `send_ir` raises `MissingCapabilityError` when IR or the emitter is absent, `send_radio` when the radio is |
+| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, an optional receiver, shared transmit gate; `emitters` and `receives` say what is wired); wired only by `wire_ir` (`hardware/shared/ir_wiring.py`), for the device and the Simulated device alike |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |
 | `SceneRuntime` | `app/scene_composition.py` | Bundle from `build_scene_runtime` that `build_scene_tick` drives |

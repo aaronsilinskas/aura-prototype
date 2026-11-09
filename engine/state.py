@@ -23,6 +23,7 @@ except ImportError:
     pass  # Not available on CircuitPython
 
 from effects.effect import PixelBuffer
+from engine.capabilities import Capabilities
 from engine.events import Event
 from engine.settings import Settings
 
@@ -141,6 +142,15 @@ class SceneControls:
         """
         raise NotImplementedError
 
+    def can_run(self, name: str) -> bool:
+        """Whether this device has every Required capability of scene *name*.
+
+        Ask before offering a scene: ``load``, ``overlay``, ``reboot_into``
+        and ``reboot_to_previous`` raise ``MissingCapabilityError`` for a
+        scene this answers ``False`` for.
+        """
+        raise NotImplementedError
+
 
 class SceneReboot:
     """Board-free port through which ``SceneManager`` persists-and-reboots.
@@ -148,12 +158,13 @@ class SceneReboot:
     Mirrors how ``SceneManager`` already reaches ``EffectAdmin`` through an
     injected seam: ``SceneManager`` validates ``reboot_into``'s *target*
     against its scene registry (a typo must never persist a name that would
-    brick the next boot) and otherwise delegates both methods straight to
-    this port. All the device work —
+    brick the next boot), checks the target's Required capabilities (reading
+    ``reboot_to_previous``'s target from ``previous_scene``), and otherwise
+    delegates both reboots straight to this port. All the device work —
     writing the scene switch to durable storage and physically resetting the
     device — lives on the concrete implementation, since a reboot is
     inherently a hardware operation the board-free engine cannot perform
-    itself. Both methods raise ``NotImplementedError`` by default;
+    itself. Every method raises ``NotImplementedError`` by default;
     ``DeviceSceneReboot`` (``hardware.shared.device_reboot``) is the
     live implementation, and a recording fake stands in for CPython tests.
     """
@@ -166,6 +177,14 @@ class SceneReboot:
 
     def reboot_to_previous(self) -> None:
         """Persist the recorded ``return_to`` scene and reboot immediately."""
+        raise NotImplementedError
+
+    def previous_scene(self) -> str | None:
+        """The recorded ``return_to`` scene ``reboot_to_previous`` would boot, or ``None``.
+
+        ``None`` when nothing was recorded, or when there is no storage to
+        record it in.
+        """
         raise NotImplementedError
 
 
@@ -399,6 +418,7 @@ class GameState:
     """
 
     __slots__ = (
+        "_capabilities",
         "_data",
         "_dispatch_count",
         "_elapsed",
@@ -419,6 +439,7 @@ class GameState:
         data: dict[str, object] | None = None,
         queue_capacity: int = 8,
         settings: Settings | None = None,
+        capabilities: frozenset[str] = frozenset(),
     ) -> None:
         self.effect_controls = effect_controls
         self.scene_controls = scene_controls
@@ -429,6 +450,7 @@ class GameState:
         self._len: int = 0
         self._data: dict[str, object] = data if data is not None else {}
         self._settings: Settings = settings if settings is not None else Settings()
+        self._capabilities: Capabilities = Capabilities(capabilities)
         self._elapsed: float = 0.0
         self._total: float = 0.0
         self._dispatch_count: int = 0
@@ -437,6 +459,11 @@ class GameState:
     def settings(self) -> Settings:
         """The scene's resolved Settings: read-only, and apart from ``get``/``set`` data."""
         return self._settings
+
+    @property
+    def capabilities(self) -> Capabilities:
+        """The device's Capabilities, read-only: ``state.capabilities.has(name)``."""
+        return self._capabilities
 
     @property
     def elapsed(self) -> float:

@@ -8,7 +8,9 @@ already-resolved values so it is unit-testable directly; ``from_settings`` is
 the factory that reads the Settings view and resolves each scope string to its
 engine ``ScopeValue`` via ``scope_by_name``. Both Settings are required, with
 no default (a missing entry list can't default to "no scenes"), and an empty
-or malformed one raises rather than showing the wrong scenes.
+or malformed one raises rather than showing the wrong scenes. So does an entry
+list the device can run none of: a lobby with nothing to offer fails loudly
+rather than sitting dark.
 
 ``scope_by_name`` is a small, lobby-local resolver: there is no engine-wide
 ``Scope.by_name`` today, and only this one consumer needs config strings
@@ -21,6 +23,7 @@ string representation fails loudly here instead of silently drifting.
 from __future__ import annotations
 
 try:
+    from collections.abc import Callable
     from typing import Final
 except ImportError:
     pass  # Not available on CircuitPython
@@ -99,17 +102,23 @@ class LobbyConfig:
         self.entries = entries
 
     @classmethod
-    def from_settings(cls, settings: Settings) -> LobbyConfig:
+    def from_settings(cls, settings: Settings, can_run: Callable[[str], bool]) -> LobbyConfig:
         """Build from the ``lobby`` pack's ``scopes`` and ``entries`` Settings.
 
+        Keeps, in order, only the entries whose scene *can_run* accepts
+        (``SceneControls.can_run`` on a device), so the lobby offers only
+        scenes this prop can play. Every entry is checked before any is left
+        out.
+
         Raises:
-            ValueError: if ``scopes``/``entries`` is empty, if any scope name
-                is unknown, or if an entry is not an object or is missing
-                ``scene``/``effect``.
+            ValueError: if ``scopes`` is empty, if any scope name is unknown,
+                if an entry is not an object or is missing ``scene``/``effect``,
+                or if no entry is left: none was declared, or the device can
+                run none of them.
         """
         scopes = settings.get_list(NAMESPACE, "scopes")
-        entries = settings.get_list(NAMESPACE, "entries")
-        return cls(
-            [scope_by_name(name) for name in scopes],
-            [_parse_entry(entry) for entry in entries],
-        )
+        entries = [_parse_entry(entry) for entry in settings.get_list(NAMESPACE, "entries")]
+        playable = [entry for entry in entries if can_run(entry.scene)]
+        if entries and not playable:
+            raise ValueError("Lobby config 'entries' has no scene this device can run")
+        return cls([scope_by_name(name) for name in scopes], playable)

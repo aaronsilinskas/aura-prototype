@@ -145,7 +145,7 @@ def test_a_button_held_through_a_reset_stays_registered():
 def test_a_button_the_config_does_not_declare_cannot_be_held():
     sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(buttons=["GP2"]))
 
-    with pytest.raises(KeyError):
+    with pytest.raises(ValueError, match="'B'"):
         sim_hw.hold("B")
 
 

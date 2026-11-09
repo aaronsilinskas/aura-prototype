@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
+from engine.capabilities import MissingCapabilityError
 from engine.network import LINE
 from engine.pack_catalog import SettingOverrideError
 from engine.state import Scope
@@ -17,9 +18,10 @@ from packs.rules.lobby.helpers.lobby_config import LobbyConfig
 from packs.tests.settings_helper import settings_for
 
 LOBBY_ENTRIES = [
-    entry.scene for entry in LobbyConfig.from_settings(settings_for("example_lobby")).entries
+    entry.scene
+    for entry in LobbyConfig.from_settings(settings_for("example_lobby"), lambda _: True).entries
 ]
-"""``example_lobby``'s entries, in the order A steps through them."""
+"""``example_lobby``'s entries, in the order A steps through them on a fully built device."""
 
 
 def start_game(simulation: Simulation, *players: SimulatedDevice) -> None:
@@ -76,12 +78,12 @@ def test_the_lobbys_b_reboots_into_the_selected_scene(simulation):
     assert device.scene == "element_browser"
 
 
-def test_a_card_less_device_stays_in_its_scene(simulation):
-    device = simulation.add_device("red", scene="example_lobby", sd_card=False)
+@pytest.mark.parametrize("lacking", ["button.B", "storage"])
+def test_a_device_lacking_what_the_lobby_requires_does_not_start_it(simulation, lacking):
+    with pytest.raises(MissingCapabilityError) as excinfo:
+        simulation.add_device("red", scene="example_lobby", without={lacking})
 
-    launch(device, "element_browser")
-
-    assert device.scene == "example_lobby"
+    assert lacking in excinfo.value.capabilities
 
 
 def test_after_a_reboot_into_tag_the_device_speaks_tags_wire_frame(simulation):
@@ -169,11 +171,12 @@ def test_a_magnetized_field_holds_through_a_reboot(simulation):
 
 
 def test_a_card_less_device_redeployed_with_a_scene_boots_it(simulation):
-    device = simulation.add_device("red", scene="example_lobby", sd_card=False)
+    # The IR range scenes are the shipped scenes that need no card.
+    device = simulation.add_device("red", scene="ir_range_receiver", without={"storage"})
 
-    device.redeploy(scene="element_browser")
+    device.redeploy(scene="ir_range_transmitter")
 
-    assert device.scene == "element_browser"
+    assert device.scene == "ir_range_transmitter"
 
 
 def test_a_redeployed_scene_outranks_a_persisted_scene(simulation):

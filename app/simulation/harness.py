@@ -25,12 +25,13 @@ from __future__ import annotations
 import secrets
 import sys
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
 
 from app.scene_composition import build_scene_boot
+from engine.capabilities import IR_RECEIVE, button_label_of, ir_emitter_of, unknown_capabilities
 from engine.pack_catalog import SettingOverrides
 from engine.state import ScopeValue
 from engine.timer import Timer
@@ -63,13 +64,48 @@ _SIMULATED_DEVICE_CONFIG = (
 )
 
 
-def _simulated_device_config(sd_card: bool, radio_node: int) -> DeviceConfig:
+_SECTION_OF = {
+    "accelerometer": "accelerometer",
+    "magnetometer": "magnetometer",
+    "radio": "radio",
+    "storage": "sdcard",
+}
+"""The config section each whole-component Capability is."""
+
+
+def _check_capabilities(names: Collection[str]) -> frozenset[str]:
+    """*names* as a frozenset; raise ``ValueError`` for one outside the Capability vocabulary."""
+    unknown = unknown_capabilities(list(names))
+    if unknown:
+        raise ValueError(f"{unknown[0]!r} is not a Capability")
+    return frozenset(names)
+
+
+def _drop(mapping: dict, capability: str) -> None:
+    """Remove from the raw config *mapping* the parts that give the device *capability*.
+
+    Deleting keys, not ``enabled: false``, so nothing dropped is built or narrated.
+    """
+    label = button_label_of(capability)
+    emitter = ir_emitter_of(capability)
+    if label is not None:
+        # Labels follow declaration order, so lacking B means lacking B onward.
+        mapping["buttons"] = mapping["buttons"][: ord(label) - ord("A")]
+    elif emitter is not None or capability == IR_RECEIVE:
+        ir = mapping.get("ir", {})
+        ir.pop("rx" if emitter is None else emitter, None)
+        if not set(ir) - {"enabled"}:
+            mapping.pop("ir", None)
+    else:
+        mapping.pop(_SECTION_OF[capability], None)
+
+
+def _simulated_device_config(without: frozenset[str], radio_node: int) -> DeviceConfig:
     mapping = read_device_config_mapping(str(_SIMULATED_DEVICE_CONFIG))
-    if not sd_card:
-        # Deleting the key, not `enabled: false`, so nothing card-shaped is
-        # built or narrated.
-        del mapping["sdcard"]
-    mapping["radio"]["node"] = radio_node
+    for capability in without:
+        _drop(mapping, capability)
+    if "radio" in mapping:
+        mapping["radio"]["node"] = radio_node
     return parse_device_config(mapping)
 
 
@@ -140,7 +176,7 @@ class Simulation:
 
     The radio medium keeps the same time, with no aim: a packet sent during
     one tick lands at the start of the next on every device but its sender
-    that was in the simulation when it was sent.
+    that was in the simulation when it was sent and has a radio.
     Packets from several senders queue in sender add order, with no collision
     or loss, and a device reads one a tick.
 
@@ -189,9 +225,9 @@ class Simulation:
         self,
         name: str,
         scene: str,
-        sd_card: bool = True,
         card: str | Path | None = None,
         setting_overrides: SettingOverrides | None = None,
+        without: Collection[str] = (),
     ) -> SimulatedDevice:
         """Switch a new simulated device on into *scene*, its flash ``default_scene``.
 
@@ -205,21 +241,32 @@ class Simulation:
         *card*, a directory the test prepared, used in place: it is on the
         card from the first boot, and what the device writes lands there.
         Without *card* the card is a fresh empty directory this simulation
-        owns; with *sd_card* false there is none, and the device reboots
-        only when reset or redeployed. Its radio node is its place in add order, from 1.
+        owns. Its radio node is its place in add order, from 1.
+
+        *without* names Capabilities the device lacks: the matching parts of
+        ``aura-device.simulated.json`` are removed before it is parsed.
+        ``button.B`` drops the buttons from B onward; ``ir.cone`` drops that
+        emitter and ``ir.receive`` every receiver, and dropping every IR item
+        drops the ``ir`` section. Without ``storage`` there is no card, and
+        the device reboots only when reset or redeployed; without ``radio``
+        it hears no packet other devices send.
 
         Raises:
             SettingOverrideError: *setting_overrides* names an undeclared
                 Setting, gives the wrong type, or leaves one unset.
             OverrideOfUndeclaredPackError: *setting_overrides* names a pack
                 the scene does not declare.
-            ValueError: If *card* is given with *sd_card* false, or is
-                another device's card; or if this card carries
-                ``aura_packs/`` and another device's already did.
+            ValueError: If *without* names something that is not a Capability;
+                if *card* is given without ``storage``, or is another device's
+                card; or if this card carries ``aura_packs/`` and another
+                device's already did.
         """
+        lacks = _check_capabilities(without)
         radio_node = len(self.devices) + 1
-        card_dir = self._card_for(name, sd_card, card, radio_node)
-        device = SimulatedDevice(self, name, scene, card_dir, radio_node, setting_overrides)
+        card_dir = self._card_for(name, "storage" not in lacks, card, radio_node)
+        device = SimulatedDevice(
+            self, name, scene, card_dir, radio_node, setting_overrides, without=lacks
+        )
         self.devices.append(device)
         return device
 
@@ -242,10 +289,10 @@ class Simulation:
             self.advance(TICK)
 
     def _card_for(
-        self, name: str, sd_card: bool, card: str | Path | None, radio_node: int
+        self, name: str, has_storage: bool, card: str | Path | None, radio_node: int
     ) -> Path | None:
         """The resolved card directory device *name* gets, recorded so ``close`` can evict it."""
-        if not sd_card:
+        if not has_storage:
             if card is not None:
                 raise ValueError(f"{name} has no SD card to be handed {card}")
             return None
@@ -301,7 +348,11 @@ class Simulation:
             self._in_flight.append(_InFlight(sender, reaches, pulses))
 
     def _carry_radio(self, sender: SimulatedDevice, payload: bytes) -> None:
-        receivers = tuple(device for device in self.devices if device is not sender)
+        receivers = tuple(
+            device
+            for device in self.devices
+            if device is not sender and "radio" in device.capabilities
+        )
         self._radio_in_flight.append(_RadioInFlight(sender, receivers, payload))
 
     def _land_in_flight_radio(self) -> None:
@@ -347,6 +398,7 @@ class SimulatedDevice:
         card: Path | None,
         radio_node: int,
         setting_overrides: SettingOverrides | None = None,
+        without: frozenset[str] = frozenset(),
     ) -> None:
         self.name = name
         self.card = card
@@ -359,7 +411,7 @@ class SimulatedDevice:
         self._setting_overrides = setting_overrides
         self._sim_hw = SimulatedHardware(
             now=lambda: sim.now,
-            config=_simulated_device_config(card is not None, radio_node),
+            config=_simulated_device_config(without, radio_node),
             ir_sink=lambda emitter, pulses: sim._carry_ir(self, emitter, pulses),
             radio_sink=lambda payload: sim._carry_radio(self, payload),
             card=None if card is None else str(card),
@@ -519,6 +571,11 @@ class SimulatedDevice:
         self._sim_hw.land_radio(payload, sender)
 
     # -- queries ------------------------------------------------------------
+
+    @property
+    def capabilities(self) -> frozenset[str]:
+        """The Capabilities the Device assembly built for this device."""
+        return self._sim_hw.hw.capabilities
 
     @property
     def ir_sent(self) -> list[IrSent]:

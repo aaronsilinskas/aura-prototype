@@ -26,7 +26,9 @@ import os
 import sys
 
 import engine._path as _path
+from engine.capabilities import UnknownCapabilityError, unknown_capabilities
 from engine.packs import PackRegistry, _PackEntry, scan_item_names
+from engine.scan_error import PackScanError
 from engine.scene import PackReference, SceneLocalRegistry, SceneRegistry, _SceneEntry
 from engine.settings import (
     SCENE_NAMESPACE,
@@ -39,13 +41,14 @@ from engine.settings import (
 from engine.version import Version
 
 try:
+    from collections.abc import Callable
     from typing import TypeAlias
 except ImportError:
     pass  # Not available on CircuitPython
 
 _REQUIRED_SCENE_KEYS = ("version", "effect_packs", "rule_packs")
 
-_SCENE_KEYS = _REQUIRED_SCENE_KEYS + ("settings", "ir_codec")
+_SCENE_KEYS = _REQUIRED_SCENE_KEYS + ("settings", "ir_codec", "requires")
 
 _PACK_REFERENCE_KEYS = ("name", "version", "settings")
 
@@ -62,14 +65,6 @@ SettingOverrides: TypeAlias = "dict[str, dict[str, dict]]"
 
 # What one scene's ``setting_overrides`` may hold, mirroring ``scene.json``.
 _OVERRIDE_KEYS = ("settings", "effect_packs", "rule_packs")
-
-
-class PackScanError(ValueError):
-    """Base class for every failure raised while scanning pack roots.
-
-    The files on disk are wrong; unrelated to the lookup-time ``RegistryError``
-    family, raised after a good scan.
-    """
 
 
 class MissingRootError(PackScanError):
@@ -277,6 +272,7 @@ def scan_pack_roots(
         _scan_scenes(root, root_name, scenes)
     _check_override_scenes(overrides, scenes)
     _check_declarations(scenes, effect_packs, rule_packs)
+    _combine_required_capabilities(scenes, rule_packs)
     _resolve_settings(scenes, effect_packs, rule_packs, overrides)
     for root_name, root in root_paths.items():
         _add_import_parent(root[: -len(root_name)])
@@ -400,6 +396,17 @@ def _check_kind(
             raise IncompatiblePackError(scene, pack, installed[pack], reference.version)
 
 
+def _combine_required_capabilities(
+    scenes: dict[str, _SceneEntry], rule_packs: list[_PackEntry]
+) -> None:
+    pack_requires = {entry.name: entry.requires for entry in rule_packs}
+    for entry in scenes.values():
+        required = set(entry.required_capabilities)
+        for reference in entry.rule_packs:
+            required.update(pack_requires[reference.name])
+        entry.required_capabilities = frozenset(required)
+
+
 def _is_compatible(installed: Version, required: Version) -> bool:
     return installed.major == required.major and installed.minor >= required.minor
 
@@ -440,6 +447,8 @@ def _scan_packs(root: str, root_name: str, kind: str, packs: list[_PackEntry]) -
             if entry.name == name:
                 raise DuplicateNameError(name, entry.source_path, pack_dir)
         manifest = _read_manifest(manifest_path)
+        if kind == "effects" and "requires" in manifest:
+            raise MalformedManifestError(manifest_path, "an effect pack cannot list 'requires'")
         version = _parse_version(manifest.get("version"), manifest_path)
         packs.append(
             _PackEntry(
@@ -449,6 +458,7 @@ def _scan_packs(root: str, root_name: str, kind: str, packs: list[_PackEntry]) -
                 item_names=scan_item_names(pack_dir),
                 source_path=pack_dir,
                 declarations=read_manifest_declarations(manifest, manifest_path),
+                requires=_read_requires(manifest, manifest_path, MalformedManifestError),
             )
         )
 
@@ -480,6 +490,7 @@ def _scan_scenes(
             local_effect_registry=_scan_local_items(scene_dir, scene_prefix, "effects"),
             local_sound_map=_scan_sounds(_path.join(scene_dir, "sounds")),
             declarations=_read_scene_declarations(name, scene_json, data),
+            requires=_read_scene_requires(name, scene_json, data),
         )
 
 
@@ -504,6 +515,26 @@ def read_manifest_declarations(manifest: dict, path: str) -> dict[str, SettingDe
         return parse_declarations(manifest.get("settings", {}))
     except ValueError as exc:
         raise MalformedManifestError(path, str(exc)) from exc
+
+
+def _read_requires(
+    data: dict, path: str, malformed: Callable[[str, str], PackScanError]
+) -> frozenset[str]:
+    """Return the Capabilities in *data*'s optional ``requires`` list, read from *path*.
+
+    ``malformed(path, reason)`` builds the error for a ``requires`` that is not a list.
+    """
+    names = data.get("requires", [])
+    if not isinstance(names, list):
+        raise malformed(path, "'requires' is not a list")
+    unknown = unknown_capabilities(names)
+    if unknown:
+        raise UnknownCapabilityError(path, unknown[0])
+    return frozenset(names)
+
+
+def _read_scene_requires(scene: str, path: str, data: dict) -> frozenset[str]:
+    return _read_requires(data, path, lambda path, reason: MalformedSceneError(scene, path, reason))
 
 
 def _read_scene_json(scene: str, path: str) -> dict:

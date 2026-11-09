@@ -171,3 +171,9 @@ def test_a_button_the_debouncer_does_not_watch_has_no_settled_state():
 
     with pytest.raises(KeyError):
         buttons.is_down("B")
+
+
+def test_the_debouncer_lists_the_labels_it_watches_in_declaration_order():
+    buttons = DebouncedButtons([("A", lambda: True), ("B", lambda: True)], interval=0)
+
+    assert buttons.labels() == ["A", "B"]

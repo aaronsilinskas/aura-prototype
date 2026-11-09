@@ -22,6 +22,7 @@ except ImportError:
 
 import time
 
+from engine.capabilities import IR_RECEIVE, button_capability, ir_emitter_capability
 from engine.effects.output import EffectOutput
 from engine.input import AccelerationData, MagneticData
 from engine.log import Logger
@@ -59,6 +60,7 @@ from hardware.shared.device_config import (
 )
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_parts import DeviceParts, PinRef
+from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_wiring import wire_ir
 from hardware.shared.network_controls import HardwareNetworkControls
@@ -195,6 +197,35 @@ def _gated_step(
         narrate_skip(logger, description, "disabled")
         return None
     return narrate_step(logger, description, lambda: build(section))
+
+
+def _capabilities(
+    buttons: DebouncedButtons,
+    accelerometer: PolledSensor | None,
+    magnetometer: PolledSensor | None,
+    radio: RadioTransceiver | None,
+    storage: DeviceStorage | None,
+    ir: InfraredTransceiver | None,
+) -> frozenset[str]:
+    """The **Capabilities** of what was built; a part that is ``None`` contributes nothing.
+
+    Read off the built parts, never the config, so a declared component that
+    was not built is never counted.
+    """
+    names = [button_capability(label) for label in buttons.labels()]
+    for name, part in (
+        ("accelerometer", accelerometer),
+        ("magnetometer", magnetometer),
+        ("radio", radio),
+        ("storage", storage),
+    ):
+        if part is not None:
+            names.append(name)
+    if ir is not None:
+        names.extend(ir_emitter_capability(emitter) for emitter in ir.emitters)
+        if ir.receives:
+            names.append(IR_RECEIVE)
+    return frozenset(names)
 
 
 def assemble_device(
@@ -366,6 +397,7 @@ def assemble_device(
     )
 
     return DeviceHardware(
+        capabilities=_capabilities(buttons, accelerometer, magnetometer, radio, storage, ir),
         outputs=outputs,
         buttons=buttons,
         accelerometer=accelerometer,

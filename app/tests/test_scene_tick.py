@@ -20,7 +20,7 @@ from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.polled_sensor import PolledSensor
 
 
-def _hw(buttons=None, accelerometer=None, magnetometer=None, ir=None, radio=None):
+def _hw(buttons=None, accelerometer=None, magnetometer=None, ir=None, radio=None, capabilities=()):
     """Return a DeviceHardware built entirely from CPython-safe fakes."""
     return DeviceHardware(
         outputs=[],
@@ -31,6 +31,7 @@ def _hw(buttons=None, accelerometer=None, magnetometer=None, ir=None, radio=None
         ir=ir,
         radio=radio,
         storage=None,
+        capabilities=frozenset(capabilities),
     )
 
 
@@ -215,7 +216,7 @@ def test_ticking_a_real_scene_delivers_the_sensors_event_to_its_rules():
     """ir_range_transmitter sends on LINE as soon as it sees a sensors event, so
     one tick proves the event reached the scene's rules through manager.update()."""
     network_spy = SpyNetworkControls()
-    hw = _hw()
+    hw = _hw(capabilities={"ir.line"})
     hw.network_controls = network_spy
     runtime = build_scene_runtime(hw, "ir_range_transmitter", catalog=scan_boot_pack_catalog(None))
     tick = build_scene_tick(hw, runtime)
