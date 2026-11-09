@@ -12,9 +12,7 @@ class MatrixEffectOutput(EffectOutput):
     last-mile hardware calls.
     """
 
-    # ``_matrix`` is set by subclasses; it is declared here so the whole
-    # matrix-output family stays slotted.
-    __slots__ = ("_cols", "_matrix", "_scope_rows", "_zero_buffer")
+    __slots__ = ("_cols", "_scope_rows", "_zero_buffer")
 
     def __init__(self, cols: int, scope_rows: dict[str, range]) -> None:
         self.min_resolution = cols
