@@ -2,9 +2,8 @@
 
 What the assembly decides is tested in ``hardware/shared/tests/test_device_assembly.py``
 and each part in ``test_circuitpython_parts.py``; these tests cover only what the
-entry point adds: a driver-free import, the injected ``default`` I2C bus, and
-``open_config_i2c``, which opens the config's ``default`` I2C bus ahead of a boot so a
-profiler can wrap and inject it.
+entry point adds: a driver-free import, and a boot that opens its own board's
+``default`` I2C bus.
 """
 
 from __future__ import annotations
@@ -16,7 +15,7 @@ from typing import ClassVar
 import pytest
 
 from engine.log import Logger
-from hardware.circuitpython.device_builder import build_hardware, open_config_i2c
+from hardware.circuitpython.device_builder import build_hardware
 from hardware.shared.device_config import parse_device_config
 
 _DRIVER_LIBRARIES = (
@@ -75,35 +74,6 @@ def lis3dh_board(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     return SimpleNamespace(SPI=object)
 
 
-def test_an_injected_i2c_bus_is_narrated_as_the_default_i2c_bus(
-    lis3dh_board: SimpleNamespace,
-) -> None:
-    fragments: list[str] = []
-
-    build_hardware(
-        parse_device_config({"accelerometer": {}}),
-        board_module=lis3dh_board,
-        i2c=object(),
-        logger=Logger("[hw]", fragments.append),
-    )
-
-    assert "[hw] i2c default board ok\n" in "".join(fragments)
-
-
-def test_an_injected_i2c_bus_is_the_bus_i2c_parts_are_built_on(
-    lis3dh_board: SimpleNamespace,
-) -> None:
-    injected = object()
-
-    hw = build_hardware(
-        parse_device_config({"accelerometer": {}}), board_module=lis3dh_board, i2c=injected
-    )
-
-    assert hw.accelerometer is not None
-    (chip,) = _FakeLis3dh.built
-    assert chip.i2c is injected
-
-
 def test_an_i2c_part_on_an_undeclared_default_without_a_board_i2c_bus_is_rejected(
     lis3dh_board: SimpleNamespace,
 ) -> None:
@@ -114,20 +84,15 @@ def test_an_i2c_part_on_an_undeclared_default_without_a_board_i2c_bus_is_rejecte
 
 
 class _FakeI2C:
-    """A ``busio.I2C`` on ``(scl, sda)``; raises as the real one does when nothing pulls it up."""
-
-    pulled_up = True
+    """A ``busio.I2C`` remembering the ``(scl, sda)`` pins it was opened on."""
 
     def __init__(self, scl: object, sda: object) -> None:
-        if not _FakeI2C.pulled_up:
-            raise RuntimeError("No pull up found on SDA or SCL; check your wiring")
         self.pins = (scl, sda)
 
 
 @pytest.fixture
 def i2c_buses(monkeypatch: pytest.MonkeyPatch) -> list[_FakeI2C]:
     """Fake ``busio.I2C``; returns every bus built."""
-    _FakeI2C.pulled_up = True
     built: list[_FakeI2C] = []
 
     def _i2c(scl: object, sda: object) -> _FakeI2C:
@@ -138,85 +103,28 @@ def i2c_buses(monkeypatch: pytest.MonkeyPatch) -> list[_FakeI2C]:
     return built
 
 
-def _pins(*names: str) -> SimpleNamespace:
-    return SimpleNamespace(**{name: object() for name in names})
-
-
-_DECLARED_I2C = {"i2c": {"default": {"sda": "GP4", "scl": "GP5"}}}
-
-
-def test_an_injected_i2c_bus_replaces_only_the_default_i2c_bus(
+def test_i2c_parts_are_built_on_the_default_bus_the_boot_opens_on_the_board_pins(
     lis3dh_board: SimpleNamespace, i2c_buses: list[_FakeI2C]
 ) -> None:
-    lis3dh_board.GP6, lis3dh_board.GP7 = object(), object()
-    config = parse_device_config(
-        {"i2c": {"sensors": {"sda": "GP6", "scl": "GP7"}}, "accelerometer": {"i2c": "sensors"}}
-    )
+    lis3dh_board.SCL, lis3dh_board.SDA = object(), object()
 
-    build_hardware(config, board_module=lis3dh_board, i2c=object())
+    build_hardware(parse_device_config({"accelerometer": {}}), board_module=lis3dh_board)
 
     (chip,) = _FakeLis3dh.built
     assert i2c_buses == [chip.i2c]
-    assert chip.i2c.pins == (lis3dh_board.GP7, lis3dh_board.GP6)
+    assert chip.i2c.pins == (lis3dh_board.SCL, lis3dh_board.SDA)
 
 
-def test_open_config_i2c_opens_a_bus_on_the_declared_pins(i2c_buses: list[_FakeI2C]) -> None:
-    board = _pins("GP4", "GP5")
-
-    bus = open_config_i2c(parse_device_config(_DECLARED_I2C), board)
-
-    assert i2c_buses == [bus]
-    assert bus.pins == (board.GP5, board.GP4)
-
-
-def test_open_config_i2c_opens_a_bus_on_the_board_defaults_without_an_i2c_section(
-    i2c_buses: list[_FakeI2C],
+def test_the_default_i2c_bus_the_boot_opens_on_the_board_pins_is_narrated_as_the_board_bus(
+    lis3dh_board: SimpleNamespace, i2c_buses: list[_FakeI2C]
 ) -> None:
-    board = _pins("SCL", "SDA")
+    lis3dh_board.SCL, lis3dh_board.SDA = object(), object()
+    fragments: list[str] = []
 
-    bus = open_config_i2c(parse_device_config({}), board)
-
-    assert isinstance(bus, _FakeI2C)
-    assert bus.pins == (board.SCL, board.SDA)
-
-
-def test_open_config_i2c_with_an_unknown_pin_raises_value_error_naming_its_field(
-    i2c_buses: list[_FakeI2C],
-) -> None:
-    config = parse_device_config({"i2c": {"default": {"sda": "NONEXISTENT_PIN", "scl": "GP5"}}})
-
-    with pytest.raises(
-        ValueError, match=r"^i2c\.default\.sda: pin 'NONEXISTENT_PIN' not found on board$"
-    ):
-        open_config_i2c(config, _pins("GP5"))
-
-
-def test_open_config_i2c_opens_only_the_default_bus(i2c_buses: list[_FakeI2C]) -> None:
-    board = _pins("GP4", "GP5", "GP6", "GP7")
-    config = parse_device_config(
-        {"i2c": {**_DECLARED_I2C["i2c"], "sensors": {"sda": "GP6", "scl": "GP7"}}}
+    build_hardware(
+        parse_device_config({"accelerometer": {}}),
+        board_module=lis3dh_board,
+        logger=Logger("[hw]", fragments.append),
     )
 
-    bus = open_config_i2c(config, board)
-
-    assert i2c_buses == [bus]
-    assert bus.pins == (board.GP5, board.GP4)
-
-
-def test_open_config_i2c_with_nothing_pulling_the_bus_up_opens_no_bus(
-    i2c_buses: list[_FakeI2C],
-) -> None:
-    _FakeI2C.pulled_up = False
-
-    assert open_config_i2c(parse_device_config({}), _pins("SCL", "SDA")) is None
-
-
-def test_open_config_i2c_never_opens_the_never_reset_stemma_bus(i2c_buses: list[_FakeI2C]) -> None:
-    stemma_calls: list[None] = []
-    board = _pins("GP4", "GP5")
-    board.STEMMA_I2C = lambda: stemma_calls.append(None)
-
-    bus = open_config_i2c(parse_device_config(_DECLARED_I2C), board)
-
-    assert stemma_calls == []
-    assert i2c_buses == [bus]
+    assert "[hw] i2c default board ok\n" in "".join(fragments)
