@@ -39,9 +39,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.8,
-          "height": 1.27,
-          "width": 1.27
+          "drill": 3.2,
+          "height": 5.6,
+          "width": 5.6
         },
         "silk_line_width": 0.15,
         "silk_text_italic": false,
@@ -76,9 +76,9 @@
           "width": 0.0
         },
         {
-          "gap": 0.2,
+          "gap": 0.1524,
           "via_gap": 0.0,
-          "width": 0.3
+          "width": 0.77
         }
       ],
       "drc_exclusions": [],
@@ -220,6 +220,7 @@
       "track_widths": [
         0.0,
         0.3,
+        0.6,
         2.0
       ],
       "tuning_pattern_settings": {
@@ -548,12 +549,21 @@
         "microvia_drill": 0.1,
         "name": "Power",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 0,
+        "priority": 1,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 0.6,
         "tuning_profile": "",
         "via_diameter": 0.6,
         "via_drill": 0.3
+      },
+      {
+        "diff_pair_gap": 0.1524,
+        "diff_pair_width": 0.3,
+        "name": "USB90ohm",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 0,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "tuning_profile": ""
       }
     ],
     "meta": {
@@ -561,7 +571,16 @@
     },
     "net_colors": {},
     "netclass_assignments": {},
-    "netclass_patterns": []
+    "netclass_patterns": [
+      {
+        "netclass": "USB90ohm",
+        "pattern": "/USB D*"
+      },
+      {
+        "netclass": "USB90ohm",
+        "pattern": "/USB D(+|-)"
+      }
+    ]
   },
   "pcbnew": {
     "last_paths": {
@@ -704,7 +723,7 @@
         "uuid": "9fa6c116-224d-43f5-964c-c3b43fb62a58"
       }
     ],
-    "used_designators": "#FLG1-3,#PWR1-60,#PWR71,A1,C1-2,D2,J1-22,Q1-8,R1-22,U1-2",
+    "used_designators": "#FLG1-3,#PWR1-61,#PWR71,A1,C1-5,D2,H1-2,J1-22,Q1-8,R1-22,TP1-2,U1-2",
     "variants": []
   },
   "sheets": [
