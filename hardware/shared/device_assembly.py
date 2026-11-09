@@ -199,6 +199,31 @@ def _gated_step(
     return narrate_step(logger, description, lambda: build(section))
 
 
+def _polled_sensor(
+    logger: Logger,
+    i2c: dict[str, object | None],
+    name: str,
+    section: I2CDeviceConfig | None,
+    describe: Callable[[I2CDeviceConfig], str],
+    read_part: Callable[[I2CDeviceConfig, object], Callable[[], tuple[float, float, float]]],
+    reading: AccelerationData | MagneticData,
+) -> PolledSensor | None:
+    """Build the I2C sensor *name* as a **PolledSensor** over *reading*, gated like any section.
+
+    *read_part* is the ``DeviceParts`` method building its raw read; the
+    sensor's I2C bus must be open.
+    """
+    return _gated_step(
+        logger,
+        section,
+        describe,
+        lambda c: (
+            PolledSensor(read_part(c, _require_i2c(i2c, name, c)), reading, name, logger),
+            "ok",
+        ),
+    )
+
+
 def _capabilities(
     buttons: DebouncedButtons,
     accelerometer: PolledSensor | None,
@@ -317,33 +342,23 @@ def assemble_device(
 
     buttons = narrate_step(logger, describe_buttons(config.buttons), _build_buttons)
 
-    accelerometer = _gated_step(
+    accelerometer = _polled_sensor(
         logger,
+        i2c,
+        "accelerometer",
         config.accelerometer,
         describe_accelerometer,
-        lambda c: (
-            PolledSensor(
-                parts.accelerometer(c, _require_i2c(i2c, "accelerometer", c)),
-                AccelerationData(0.0, 0.0, 0.0),
-                "accelerometer",
-                logger,
-            ),
-            "ok",
-        ),
+        parts.accelerometer,
+        AccelerationData(0.0, 0.0, 0.0),
     )
-    magnetometer = _gated_step(
+    magnetometer = _polled_sensor(
         logger,
+        i2c,
+        "magnetometer",
         config.magnetometer,
         describe_magnetometer,
-        lambda c: (
-            PolledSensor(
-                parts.magnetometer(c, _require_i2c(i2c, "magnetometer", c)),
-                MagneticData(0.0, 0.0, 0.0),
-                "magnetometer",
-                logger,
-            ),
-            "ok",
-        ),
+        parts.magnetometer,
+        MagneticData(0.0, 0.0, 0.0),
     )
 
     def _build_audio(audio: AudioConfig) -> tuple[EffectOutput, str]:

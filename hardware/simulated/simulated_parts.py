@@ -20,7 +20,7 @@ import wave
 from array import array
 from collections import deque
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from effects.effect import Effect, PixelBuffer
 from engine.effects.output import EffectOutput
@@ -55,6 +55,8 @@ __all__ = [
     "SimulatedRadioTransport",
     "wav_length",
 ]
+
+Sensor = TypeVar("Sensor", "SimulatedAccelerometer", "SimulatedMagnetometer")
 
 _AT_REST = (0.0, 0.0, AccelerationData.GRAVITY)
 DEFAULT_SWAY_STRENGTH = 4.0
@@ -308,10 +310,11 @@ class SimulatedParts(DeviceParts):
     def accelerometer(
         self, accelerometer: I2CDeviceConfig, i2c: object
     ) -> Callable[[], tuple[float, float, float]]:
-        if self._kept.accelerometer is None:
-            self._kept.accelerometer = SimulatedAccelerometer(self._device.now)
-        scripted = self._kept.accelerometer
-        return lambda: scripted.acceleration
+        return self._kept_sensor(
+            "accelerometer",
+            lambda: SimulatedAccelerometer(self._device.now),
+            lambda sensor: sensor.acceleration,
+        )
 
     @property
     def scripted_magnetometer(self) -> SimulatedMagnetometer | None:
@@ -321,10 +324,22 @@ class SimulatedParts(DeviceParts):
     def magnetometer(
         self, magnetometer: I2CDeviceConfig, i2c: object
     ) -> Callable[[], tuple[float, float, float]]:
-        if self._kept.magnetometer is None:
-            self._kept.magnetometer = SimulatedMagnetometer()
-        scripted = self._kept.magnetometer
-        return lambda: scripted.magnetic
+        return self._kept_sensor(
+            "magnetometer", SimulatedMagnetometer, lambda sensor: sensor.magnetic
+        )
+
+    def _kept_sensor(
+        self,
+        slot: str,
+        make: Callable[[], Sensor],
+        read: Callable[[Sensor], tuple[float, float, float]],
+    ) -> Callable[[], tuple[float, float, float]]:
+        """A raw read of the scripted sensor kept in *slot*, made the first time it is asked for."""
+        sensor = getattr(self._kept, slot)
+        if sensor is None:
+            sensor = make()
+            setattr(self._kept, slot, sensor)
+        return lambda: read(sensor)
 
     def audio_output(
         self,

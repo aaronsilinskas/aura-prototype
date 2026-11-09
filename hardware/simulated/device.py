@@ -33,6 +33,7 @@ from __future__ import annotations
 from array import array
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from typing import TypeVar
 
 from engine.log import Logger
 from engine.state import ScopeValue
@@ -88,6 +89,21 @@ class Played:
 class Buzzed:
     at: float
     pattern: tuple[int, ...]
+
+
+Part = TypeVar("Part")
+
+
+def _declared(name: str, built: object | None, scripted: Part | None) -> Part:
+    """The scripted stand-in for part *name*, refusing a config that built no such part.
+
+    Raises:
+        ValueError: If *built* is ``None``: the config declares no *name*.
+    """
+    if built is None:
+        raise ValueError(f"the config declares no {name}")
+    assert scripted is not None  # building the part made its stand-in
+    return scripted
 
 
 def _channels(pixel: int) -> tuple[int, int, int]:
@@ -348,24 +364,13 @@ class SimulatedHardware:
         raise ValueError(f"the {decoder.__class__.__name__} cannot read back what was sent")
 
     def _require_radio(self) -> SimulatedRadioTransport:
-        radio = self._parts.radio
-        if radio is None:
-            raise ValueError("the config declares no radio")
-        return radio
+        return _declared("radio", self._parts.radio, self._parts.radio)
 
     def _require_accelerometer(self) -> SimulatedAccelerometer:
-        if self.hw.accelerometer is None:
-            raise ValueError("the config declares no accelerometer")
-        accelerometer = self._parts.scripted_accelerometer
-        assert accelerometer is not None
-        return accelerometer
+        return _declared("accelerometer", self.hw.accelerometer, self._parts.scripted_accelerometer)
 
     def _require_magnetometer(self) -> SimulatedMagnetometer:
-        if self.hw.magnetometer is None:
-            raise ValueError("the config declares no magnetometer")
-        magnetometer = self._parts.scripted_magnetometer
-        assert magnetometer is not None
-        return magnetometer
+        return _declared("magnetometer", self.hw.magnetometer, self._parts.scripted_magnetometer)
 
     def _schedule(self, buttons: tuple[str, ...], pressed: bool) -> None:
         for button in buttons:
