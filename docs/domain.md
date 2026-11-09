@@ -79,7 +79,7 @@ hardware/         Hardware abstraction layer
                   entry point that runs the Device assembly; circuitpython_parts:
                   CircuitPythonParts, its DeviceParts adapter; is31fl3741_output,
                   drv2605_output, neopixel_output, audio_output, infrared_io,
-                  pio_pulse_writer, counting_i2c, rfm69_radio_transport,
+                  pio_pulse_writer, rfm69_radio_transport,
                   sdcard_storage, usb_cdc_transport, boot)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
                   device_config, neopixel_current_budget, device_boot, device_state,
