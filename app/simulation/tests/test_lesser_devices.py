@@ -156,3 +156,25 @@ def test_boot_raises_when_neither_the_persisted_nor_the_default_scene_fits(simul
         )
 
     assert (excinfo.value.scene, excinfo.value.capabilities) == ("tag", {"ir.line"})
+
+
+# ---------------------------------------------------------------------------
+# A shipped scene won't start on a device lacking what it requires
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("scene", "without"),
+    [
+        ("red_light_green_light", "accelerometer"),
+        ("tag", "ir.line"),
+        ("tag", "ir.receive"),
+    ],
+)
+def test_a_shipped_scene_wont_start_on_a_device_lacking_a_capability_it_requires(
+    simulation, scene, without
+):
+    with pytest.raises(MissingCapabilityError) as excinfo:
+        simulation.add_device("red", scene=scene, without={without})
+
+    assert (excinfo.value.scene, excinfo.value.capabilities) == (scene, {without})
