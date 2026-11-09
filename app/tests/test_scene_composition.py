@@ -21,6 +21,7 @@ from engine.scene import PackReference, Scene, SceneRegistry
 from engine.state import Scope
 from engine.tests.helpers import RecordingSceneReboot, SpyNetworkControls
 from engine.version import Version
+from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
@@ -47,7 +48,7 @@ def _fake_hw(ir=None, radio=None, storage=None, network_controls=None, capabilit
     """Return a DeviceHardware built entirely from CPython-safe fakes."""
     return DeviceHardware(
         outputs=[],
-        buttons="fake-buttons",
+        buttons=DebouncedButtons([]),
         accelerometer=None,
         magnetometer=None,
         network_controls=(
@@ -57,6 +58,7 @@ def _fake_hw(ir=None, radio=None, storage=None, network_controls=None, capabilit
         radio=radio,
         storage=storage,
         capabilities=capabilities,
+        polled=(),
     )
 
 

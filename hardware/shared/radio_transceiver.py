@@ -14,12 +14,13 @@ building a ``NetworkEvents.RadioReceived`` itself — it imports no
 only later, at ``run_scene``, which builds the event next to the IR block.
 """
 
+from hardware.shared.polled_part import PolledPart
 from hardware.shared.radio_transport import RadioTransport
 
 __all__ = ["RadioTransceiver"]
 
 
-class RadioTransceiver:
+class RadioTransceiver(PolledPart):
     """Owns the per-tick radio receive poll and the fire-and-forget send.
 
     Constructed with the same ``radio`` transport seam intended for
@@ -54,7 +55,7 @@ class RadioTransceiver:
         if self._transport is not None:
             self._transport.send(data)
 
-    def update(self) -> None:
+    def update(self, elapsed: float) -> None:
         """Poll the transport once and refresh :attr:`received`/:attr:`last_sender`.
 
         Receive only. This does not pump or gate anything: the chip is

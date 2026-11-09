@@ -1,4 +1,4 @@
-"""PolledSensor — the board-free owner of one 3-axis sensor's reading. No board imports."""
+"""PolledSensor — the board-free owner of one sensor's reading. No board imports."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ except ImportError:
 
 from engine.input import AccelerationData, MagneticData
 from engine.log import Logger
+from hardware.shared.polled_part import PolledPart
 
 __all__ = ["RECOVERY_READS", "PolledSensor"]
 
@@ -17,12 +18,13 @@ __all__ = ["RECOVERY_READS", "PolledSensor"]
 RECOVERY_READS: Final = 50
 
 
-class PolledSensor:
-    """Refreshes one 3-axis sensor's reading from its raw read source, once per ``update()``.
+class PolledSensor(PolledPart):
+    """Refreshes one sensor's reading from its raw read source, once per ``update(elapsed)``.
 
     *read* is a :class:`~hardware.shared.device_parts.DeviceParts` raw read
-    source: it returns ``(x, y, z)`` and may raise. Any ``Exception`` it
-    raises leaves the reading untouched, so a glitch keeps the last good
+    source and may raise. Its result goes to the reading's ``assign``, so the
+    sensor never knows the reading's shape. Any ``Exception`` the read raises
+    leaves the reading untouched, so a glitch keeps the last good
     reading and never takes down the frame loop.
 
     ``reading`` is the *reading* buffer passed in, the same object for the
@@ -66,9 +68,9 @@ class PolledSensor:
         self._reads_since_failing = 0
         self._good_run = 0
 
-    def update(self) -> None:
+    def update(self, elapsed: float) -> None:
         try:
-            x, y, z = self._read()
+            self.reading.assign(self._read())
         except Exception as error:
             if self.failed_reads == 0:
                 self._logger.log(f"{self._label} read failing: {error!r}")
@@ -76,10 +78,6 @@ class PolledSensor:
             self._reads_since_failing += 1
             self._good_run = 0
             return
-        reading = self.reading
-        reading.x = x
-        reading.y = y
-        reading.z = z
         if self.failed_reads:
             self._reads_since_failing += 1
             self._good_run += 1

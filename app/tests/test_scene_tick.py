@@ -17,14 +17,29 @@ from engine.tests.helpers import SpyNetworkControls
 from engine.timer import Timer
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_hardware import DeviceHardware
+from hardware.shared.polled_part import PolledPart
 from hardware.shared.polled_sensor import PolledSensor
 
 
-def _hw(buttons=None, accelerometer=None, magnetometer=None, ir=None, radio=None, capabilities=()):
-    """Return a DeviceHardware built entirely from CPython-safe fakes."""
+def _hw(
+    buttons=None,
+    accelerometer=None,
+    magnetometer=None,
+    ir=None,
+    radio=None,
+    capabilities=(),
+    other_polled=(),
+):
+    """Return a DeviceHardware built entirely from CPython-safe fakes.
+
+    Its ``polled`` lists every part given, as the Device assembly lists what it
+    built, followed by ``other_polled``.
+    """
+    buttons = buttons if buttons is not None else DebouncedButtons([])
+    built = (buttons, accelerometer, magnetometer, radio, ir)
     return DeviceHardware(
         outputs=[],
-        buttons=buttons if buttons is not None else DebouncedButtons([]),
+        buttons=buttons,
         accelerometer=accelerometer,
         magnetometer=magnetometer,
         network_controls="fake-network-controls",
@@ -32,6 +47,7 @@ def _hw(buttons=None, accelerometer=None, magnetometer=None, ir=None, radio=None
         radio=radio,
         storage=None,
         capabilities=frozenset(capabilities),
+        polled=tuple(part for part in built if part is not None) + tuple(other_polled),
     )
 
 
@@ -155,7 +171,7 @@ class _FakeIr:
         self.update_count = 0
         self.telemetry_calls = 0
 
-    def update(self) -> None:
+    def update(self, elapsed: float) -> None:
         self.update_count += 1
 
     def telemetry_line(self) -> str | None:
@@ -171,7 +187,7 @@ class _FakeRadio:
         self.last_sender = last_sender
         self.update_count = 0
 
-    def update(self) -> None:
+    def update(self, elapsed: float) -> None:
         self.update_count += 1
 
 
@@ -210,6 +226,28 @@ def test_ir_and_radio_are_pumped_every_tick_even_with_no_active_scene():
 
     assert hw.ir.update_count == 2
     assert hw.radio.update_count == 2
+
+
+class _CountingPart(PolledPart):
+    """A Polled part the tick has never heard of: counts its updates."""
+
+    def __init__(self) -> None:
+        self.update_count = 0
+
+    def update(self, elapsed: float) -> None:
+        self.update_count += 1
+
+
+def test_every_polled_part_is_updated_once_per_tick_without_the_tick_naming_it():
+    part = _CountingPart()
+    hw = _hw(other_polled=(part,))
+    runtime = _runtime(hw)
+    tick = build_scene_tick(hw, runtime)
+
+    tick()
+    tick()
+
+    assert part.update_count == 2
 
 
 def test_ticking_a_real_scene_delivers_the_sensors_event_to_its_rules():

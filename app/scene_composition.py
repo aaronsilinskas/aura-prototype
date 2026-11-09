@@ -12,7 +12,7 @@ import engine._path as _path
 from engine.capabilities import MissingCapabilityError, describe_capabilities
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
-from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
+from engine.input import AccelerationData, InputEvents, MagneticData
 from engine.log import Logger
 from engine.namespace import ActiveSceneNamespace
 from engine.network import NetworkEvents
@@ -282,21 +282,22 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     The one loop body shared by the device
     (:func:`app.scene_runtime.run_scene`, which adds only ``while True:`` and
     ``gc.collect()``) and the Simulated device, so neither copies it, as
-    both share the boot that builds it (:func:`build_scene_boot`). Build it
-    once per runtime: the ``InputEvents.Sensors`` event, its button buffer,
-    and the telemetry gate are allocated here (the acceleration and magnetic
-    buffers are each sensor's own
-    :class:`~hardware.shared.polled_sensor.PolledSensor` ``reading``)
-    and mutated in place every tick, so the steady-state tick allocates
-    nothing on-device.
+    both share the boot that builds it (:func:`build_scene_boot`). Each tick
+    updates every Polled part in ``hw.polled``, naming none, then builds
+    the events from their state. Build it once per runtime: the
+    ``InputEvents.Sensors`` event and the telemetry gate are allocated here
+    (the button, acceleration and magnetic buffers are each part's own
+    ``reading``) and mutated in place every tick, so the steady-state tick
+    allocates nothing on-device.
 
     A caller with events of its own to inject queues them on
     ``runtime.manager.active_state`` before calling the tick; they are
     dispatched in that tick's ``manager.update()``.
     """
+    polled = hw.polled
     accelerometer = hw.accelerometer
     magnetometer = hw.magnetometer
-    button_data = ButtonData({})
+    button_data = hw.buttons.reading
     acceleration = accelerometer.reading if accelerometer is not None else None
     magnetic = magnetometer.reading if magnetometer is not None else None
     # Narrow each PolledSensor.reading, typed as either buffer, to the one it holds.
@@ -313,32 +314,13 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     def tick() -> None:
         nonlocal last_telemetry_print_total
 
-        hw.buttons.update(timer.elapsed, button_data)
-
-        if accelerometer is not None:
-            accelerometer.update()
-
-        if magnetometer is not None:
-            magnetometer.update()
-
-        # Unconditional, before the active_state check: a send can be in
-        # flight across a scene transition, and ir.update() always pumps so
-        # a deferred end_transmit still arms the flush latch its own receive
-        # consumes this same tick. It also always receives when a receiver
-        # is wired, so a packet decoded while no scene is active is
-        # drained-and-dropped here rather than left to overflow — only the
-        # queuing below is conditional on a scene being active. A no-op
-        # when no ir section is wired at all (ir is None).
-        if ir is not None:
-            ir.update()
-
-        # Same unconditional rationale as ir.update() above: radio.update()
-        # always polls for a waiting packet regardless of whether a scene is
-        # active, so a packet decoded with no active scene is simply never
-        # queued below rather than left to build up in the transport. A
-        # no-op when no radio peripheral is wired at all (radio is None).
-        if radio is not None:
-            radio.update()
+        elapsed = timer.elapsed
+        # Polled before the active_state check, so a send in flight across a
+        # scene transition still completes and a packet received with no scene
+        # active is drained and dropped rather than left to overflow; only the
+        # queuing below waits on a scene.
+        for part in polled:
+            part.update(elapsed)
 
         active_state = manager.active_state
 

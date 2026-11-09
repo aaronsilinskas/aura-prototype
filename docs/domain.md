@@ -97,7 +97,8 @@ app/              Composition layer — the one place allowed to import both the
                   runtime machinery and hardware.* together
   scene_composition.py  build_scene_boot, build_scene_runtime, build_scene_tick (board-free,
                         CPython-testable); the device and the Simulated device share
-                        both the boot and the tick. resolve_boot_scene_name boots the
+                        both the boot and the tick, which polls DeviceHardware.polled.
+                        resolve_boot_scene_name boots the
                         Persisted scene, else flash default_scene, skipping one the
                         device lacks the Required capabilities for (raises
                         MissingCapabilityError when none fits)
@@ -198,15 +199,16 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `Duration` | `magic/values.py` | Expiry tracker |
 | `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; optional `pixels` list plus optional IR/audio/sensor/haptics sections, and **Named bus** maps for I2C and SPI that devices join by name |
 | `NeoPixelCurrentBudgetConfig` | `hardware/shared/device_config.py` | Opt-in `neopixel_current_budget` policy; the parser calls `tune_neopixel_brightness` (`hardware/shared/neopixel_current_budget.py`) to fold the tuned brightness into each NeoPixel strip config, and records the estimate/scale for boot narration |
-| `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the Device assembly returns (outputs, sensors, network seam, `ir`, radio, storage, and `capabilities`: the frozenset of Capabilities read off the parts it built, so a disabled, isolated or absent component is not had) |
+| `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the Device assembly returns (outputs, sensors, network seam, `ir`, radio, storage, `capabilities`: the frozenset of Capabilities read off the parts it built, so a disabled, isolated or absent component is not had, and `polled`: the ordered tuple of **Polled parts** it built (buttons, sensors, radio, IR), each a `PolledPart` (`hardware/shared/polled_part.py`), so a part that is not built is not polled) |
 | `assemble_device` | `hardware/shared/device_assembly.py` | The **Device assembly**: board-free `DeviceConfig` → `DeviceHardware`, owning gating, on-demand bus opening (only buses an enabled device names), build order, narration, buttons, IR/radio wiring and network controls; reaches hardware only through `DeviceParts` |
 | `DeviceParts` / `PinRef` | `hardware/shared/device_parts.py` | Port the Device assembly builds each part through (one constructor per part), taking config sections and pin references (a pin name with its config field); adapters `SimulatedParts` (`hardware/simulated/simulated_parts.py`, which also decides what persists across a reboot) and `CircuitPythonParts` (`hardware/circuitpython/circuitpython_parts.py`) |
-| `PolledSensor` | `hardware/shared/polled_sensor.py` | Board-free owner of one 3-axis sensor's reading (`DeviceHardware.accelerometer` / `.magnetometer`): wraps a `DeviceParts` raw read callable, refreshes its engine reading buffer once per tick, keeps the last good reading on a failed read and logs the start and end of each run of failures |
+| `PolledSensor` | `hardware/shared/polled_sensor.py` | Board-free **Polled part** owning one sensor's reading (`DeviceHardware.accelerometer` / `.magnetometer`): wraps a `DeviceParts` raw read callable and, on each `update(elapsed)`, hands the raw read to the reading's `assign` (`AccelerationData` / `MagneticData`), which overwrites it in place, so the sensor never knows the reading's shape; keeps the last good reading on a failed read and logs the start and end of each run of failures |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter; `send_ir` raises `MissingCapabilityError` when IR or the emitter is absent, `send_radio` when the radio is |
 | `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, an optional receiver, shared transmit gate; `emitters` and `receives` say what is wired); wired only by `wire_ir` (`hardware/shared/ir_wiring.py`), for the device and the Simulated device alike |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |
 | `SceneRuntime` | `app/scene_composition.py` | Bundle from `build_scene_runtime` that `build_scene_tick` drives |
+| `build_scene_tick` | `app/scene_composition.py` | The scene tick shared by the device and the Simulated device: each tick calls `update(elapsed)` on every part in `DeviceHardware.polled` (IR and radio included, before the active-scene check) without naming any, then queues `InputEvents.Sensors` and the IR/radio received events from the parts' state; allocates nothing per tick |
 | `DeviceSceneReboot` | `hardware/shared/device_reboot.py` | Live `SceneReboot` adapter; persists the target, then calls its injected `reset` (`build_scene_boot` wires it; `run_scene` passes `microcontroller.reset`) |
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol |

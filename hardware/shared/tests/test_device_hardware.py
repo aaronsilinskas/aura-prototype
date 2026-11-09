@@ -15,6 +15,7 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
     ir = "fake-ir"
     radio = "fake-radio"
     storage = "fake-storage"
+    polled = ("fake-buttons", "fake-ir")
 
     hardware = DeviceHardware(
         outputs=outputs,
@@ -26,6 +27,7 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
         radio=radio,
         storage=storage,
         capabilities=frozenset(),
+        polled=polled,
     )
 
     assert hardware.outputs is outputs
@@ -36,6 +38,7 @@ def test_device_hardware_is_constructible_under_cpython_with_plain_fakes():
     assert hardware.ir is ir
     assert hardware.radio is radio
     assert hardware.storage is storage
+    assert hardware.polled is polled
 
 
 def test_device_hardware_rejects_attributes_outside_its_slots():
@@ -49,6 +52,7 @@ def test_device_hardware_rejects_attributes_outside_its_slots():
         radio=None,
         storage=None,
         capabilities=frozenset(),
+        polled=(),
     )
 
     with pytest.raises(AttributeError):

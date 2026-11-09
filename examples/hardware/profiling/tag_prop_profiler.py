@@ -127,7 +127,6 @@ from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.shared.device_config import load_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
-from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.profiler_report import (
     print_profile_header,
     print_stats_line,
@@ -185,7 +184,7 @@ def _require_output(hardware: DeviceHardware, output_type: type[EffectOutput]) -
         )
 
 
-def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, PolledSensor, object, int]:
+def _build_prop() -> tuple[SceneManager, EffectManager, Timer, DeviceHardware, int]:
     """Stand up the whole reference tag prop and return its driving objects.
 
     Snapshots free heap before and after construction (with a GC collect on each
@@ -274,15 +273,7 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, PolledSen
         + f"engine={free_after_effect_manager - free_after_engine}, "
         + f"scene={free_after_engine - free_after_scene}"
     )
-    return (
-        manager,
-        effect_manager,
-        timer,
-        hardware.buttons,
-        hardware.accelerometer,
-        hardware.ir,
-        footprint_bytes,
-    )
+    return manager, effect_manager, timer, hardware, footprint_bytes
 
 
 def _inject_press(name: str, out: ButtonData) -> None:
@@ -292,15 +283,11 @@ def _inject_press(name: str, out: ButtonData) -> None:
 
 def run() -> None:
     """Run the assembled tag prop end to end, reporting the #401 validation numbers."""
-    (
-        manager,
-        effect_manager,
-        timer,
-        buttons,
-        accelerometer,
-        ir,
-        footprint_bytes,
-    ) = _build_prop()
+    manager, effect_manager, timer, hardware, footprint_bytes = _build_prop()
+    ir = hardware.ir
+    accelerometer = hardware.accelerometer
+    # _build_prop refuses a bundle missing either.
+    assert ir is not None and accelerometer is not None
 
     frame_budget_ms = 1000.0 / TARGET_FPS
     usable_cpu_percent = 100.0 - ENGINE_HOST_BASELINE_CPU_PERCENT - HEADROOM_RESERVE_PERCENT
@@ -314,7 +301,7 @@ def run() -> None:
     )
     print(f"__PROP footprint_bytes={footprint_bytes}, free_heap_bytes={gc.mem_free()}")
 
-    _button_data = ButtonData({})
+    _button_data = hardware.buttons.reading
     _acceleration = accelerometer.reading
     # Narrow PolledSensor.reading, typed as either buffer, to the acceleration one.
     assert isinstance(_acceleration, AccelerationData)
@@ -330,18 +317,14 @@ def run() -> None:
         perf.start_update_time()
         elapsed = timer.elapsed
 
-        buttons.update(elapsed, _button_data)
+        # Polled before the active_state check, so a send in flight across a
+        # scene transition still completes; only the queuing below waits on a scene.
+        for part in hardware.polled:
+            part.update(elapsed)
+
         if not start_injected:
             _inject_press("A", _button_data)
             start_injected = True
-
-        accelerometer.update()
-
-        # Outside the active_state guard and before checking ir.received: a
-        # send can be in flight across a scene transition, and ir.update()
-        # always pumps every transmitter before it receives, owning that
-        # order intrinsically (see InfraredTransceiver).
-        ir.update()
 
         if manager.active_state is not None:
             if ir.received is not None:

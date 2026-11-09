@@ -20,7 +20,7 @@ import wave
 from array import array
 from collections import deque
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from effects.effect import Effect, PixelBuffer
 from engine.effects.output import EffectOutput
@@ -55,6 +55,8 @@ __all__ = [
     "SimulatedRadioTransport",
     "wav_length",
 ]
+
+ScriptedSensor = TypeVar("ScriptedSensor", "SimulatedAccelerometer", "SimulatedMagnetometer")
 
 _AT_REST = (0.0, 0.0, AccelerationData.GRAVITY)
 DEFAULT_SWAY_STRENGTH = 4.0
@@ -249,6 +251,13 @@ class SimulatedMagnetometer:
         self.magnetic = (0.0, 0.0, 0.0)
 
 
+def _kept_or_made(
+    kept: ScriptedSensor | None, make: Callable[[], ScriptedSensor]
+) -> ScriptedSensor:
+    """The scripted sensor ``kept`` from an earlier boot, or one ``make`` builds the first time."""
+    return kept if kept is not None else make()
+
+
 class _KeptParts:
     """The parts that outlive a reboot; each ``None`` until first asked for."""
 
@@ -308,9 +317,10 @@ class SimulatedParts(DeviceParts):
     def accelerometer(
         self, accelerometer: I2CDeviceConfig, i2c: object
     ) -> Callable[[], tuple[float, float, float]]:
-        if self._kept.accelerometer is None:
-            self._kept.accelerometer = SimulatedAccelerometer(self._device.now)
-        scripted = self._kept.accelerometer
+        kept = self._kept
+        scripted = kept.accelerometer = _kept_or_made(
+            kept.accelerometer, lambda: SimulatedAccelerometer(self._device.now)
+        )
         return lambda: scripted.acceleration
 
     @property
@@ -321,9 +331,8 @@ class SimulatedParts(DeviceParts):
     def magnetometer(
         self, magnetometer: I2CDeviceConfig, i2c: object
     ) -> Callable[[], tuple[float, float, float]]:
-        if self._kept.magnetometer is None:
-            self._kept.magnetometer = SimulatedMagnetometer()
-        scripted = self._kept.magnetometer
+        kept = self._kept
+        scripted = kept.magnetometer = _kept_or_made(kept.magnetometer, SimulatedMagnetometer)
         return lambda: scripted.magnetic
 
     def audio_output(

@@ -39,7 +39,7 @@ class _RecordingTransport(RadioTransport):
 def test_update_with_no_transport_is_a_noop():
     transceiver = RadioTransceiver(None)
 
-    transceiver.update()  # must not raise
+    transceiver.update(0.0)  # must not raise
 
     assert transceiver.received is None
     assert transceiver.last_sender is None
@@ -53,7 +53,7 @@ def test_update_with_no_transport_is_a_noop():
 def test_received_and_last_sender_are_none_when_the_transport_has_nothing_waiting():
     transceiver = RadioTransceiver(_RecordingTransport())
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.received is None
     assert transceiver.last_sender is None
@@ -62,7 +62,7 @@ def test_received_and_last_sender_are_none_when_the_transport_has_nothing_waitin
 def test_received_and_last_sender_are_set_together_on_a_receiving_tick():
     transceiver = RadioTransceiver(_RecordingTransport([(42, b"\xab\xcd")]))
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.received == b"\xab\xcd"
     assert transceiver.last_sender == 42
@@ -71,8 +71,8 @@ def test_received_and_last_sender_are_set_together_on_a_receiving_tick():
 def test_received_and_last_sender_reset_to_none_on_the_tick_after_a_receive():
     transceiver = RadioTransceiver(_RecordingTransport([(3, b"\xab"), None]))
 
-    transceiver.update()
-    transceiver.update()
+    transceiver.update(0.0)
+    transceiver.update(0.0)
 
     assert transceiver.received is None
     assert transceiver.last_sender is None
@@ -87,7 +87,7 @@ def test_received_payload_passes_through_untouched():
     payload = b"\xab\xcd\xef"
     transceiver = RadioTransceiver(_RecordingTransport([(3, payload)]))
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.received == payload
 
@@ -95,7 +95,7 @@ def test_received_payload_passes_through_untouched():
 def test_last_sender_holds_the_from_byte_at_its_upper_boundary():
     transceiver = RadioTransceiver(_RecordingTransport([(254, b"\x01")]))
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.last_sender == 254
 
@@ -103,7 +103,7 @@ def test_last_sender_holds_the_from_byte_at_its_upper_boundary():
 def test_last_sender_holds_the_from_byte_at_its_lower_boundary():
     transceiver = RadioTransceiver(_RecordingTransport([(0, b"\x01")]))
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.last_sender == 0
 
@@ -117,8 +117,8 @@ def test_update_polls_the_transport_receive_exactly_once_per_tick():
     transport = _RecordingTransport([None, None])
     transceiver = RadioTransceiver(transport)
 
-    transceiver.update()
-    transceiver.update()
+    transceiver.update(0.0)
+    transceiver.update(0.0)
 
     assert transport.receive_calls == 2
 
@@ -152,7 +152,7 @@ def test_received_is_the_raw_payload_not_a_network_event():
     payload = b"\xab"
     transceiver = RadioTransceiver(_RecordingTransport([(3, payload)]))
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     # The raw decoded payload is handed back verbatim, with no game
     # vocabulary wrapped around it: it equals the transport's bytes exactly,

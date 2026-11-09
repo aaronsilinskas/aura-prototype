@@ -4,6 +4,7 @@ except ImportError:
     pass
 
 from engine.input import ButtonData
+from hardware.shared.polled_part import PolledPart
 
 DEBOUNCE_INTERVAL = 0.05
 """Seconds a pin level must hold before it is committed, unless a debouncer is given another."""
@@ -23,7 +24,7 @@ class _ButtonState:
         self.candidate_time = 0.0
 
 
-class DebouncedButtons:
+class DebouncedButtons(PolledPart):
     """Time-based button debouncer using pull-up semantics.
 
     Accepts a list of (label, predicate) pairs where each predicate returns the
@@ -36,9 +37,12 @@ class DebouncedButtons:
 
     Each predicate is sampled once at construction to seed the settled state,
     preventing spurious ``PRESSED`` events for buttons already held at boot.
+
+    A **Polled part**: ``update`` refreshes ``reading`` in place, so the same
+    :class:`ButtonData` is read every frame.
     """
 
-    __slots__ = ("_interval", "_predicates", "_states")
+    __slots__ = ("_interval", "_predicates", "_states", "reading")
 
     def __init__(
         self,
@@ -48,6 +52,7 @@ class DebouncedButtons:
         self._interval = interval
         self._predicates = buttons
         self._states = [_ButtonState(pred()) for _, pred in buttons]
+        self.reading = ButtonData({})
 
     def labels(self) -> list[str]:
         """The labels of the buttons watched, in the order they were given."""
@@ -60,11 +65,9 @@ class DebouncedButtons:
                 return not self._states[i].settled
         raise KeyError(label)
 
-    def update(self, elapsed: float, out: ButtonData) -> None:
-        """Advance debounce state by ``elapsed`` seconds and write results into *out*.
-
-        The caller pre-creates *out* before the loop and passes the same instance every frame.
-        """
+    def update(self, elapsed: float) -> None:
+        """Advance debouncing by ``elapsed`` seconds; each button's state lands in ``reading``."""
+        out = self.reading
         for i, (label, pred) in enumerate(self._predicates):
             state = self._states[i]
             current = pred()

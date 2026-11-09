@@ -7,7 +7,6 @@ from typing import Any, cast
 
 import pytest
 
-from engine.input import ButtonData
 from engine.log import Logger
 from engine.network import AREA_OF_EFFECT, CONE, LINE
 from hardware.shared.device_assembly import assemble_device
@@ -138,7 +137,7 @@ def test_an_enabled_accelerometer_section_is_a_polled_sensor_reading_its_part():
     parts.acceleration = (1.0, 2.0, 3.0)
 
     assert isinstance(hw.accelerometer, PolledSensor)
-    hw.accelerometer.update()
+    hw.accelerometer.update(0.0)
     reading = hw.accelerometer.reading
     assert (reading.x, reading.y, reading.z) == (1.0, 2.0, 3.0)
 
@@ -148,7 +147,7 @@ def test_an_enabled_magnetometer_section_is_a_polled_sensor_reading_its_part():
     parts.magnetic = (4.0, 5.0, 6.0)
 
     assert isinstance(hw.magnetometer, PolledSensor)
-    hw.magnetometer.update()
+    hw.magnetometer.update(0.0)
     reading = hw.magnetometer.reading
     assert (reading.x, reading.y, reading.z) == (4.0, 5.0, 6.0)
 
@@ -166,7 +165,7 @@ def test_a_sensor_logs_a_read_failing_line_under_its_section_name_to_the_assembl
     setattr(parts, reading_attr, (1.0, 2.0))  # not 3-tuple: a failed read
     del fragments[:]
 
-    getattr(hw, sensor).update()
+    getattr(hw, sensor).update(0.0)
 
     assert "".join(fragments).startswith(f"[hw] {sensor} read failing: ValueError(")
 
@@ -760,11 +759,10 @@ def test_each_button_pin_is_read_with_its_field_in_declared_order():
 def test_buttons_are_labelled_a_onward_in_declared_order_over_their_pins():
     hw, parts = _assemble(_config(buttons=["GP3", "GP7"]))
     parts.pin_levels["GP7"] = False  # pulled low: pressed
-    out = ButtonData(states={})
 
-    hw.buttons.update(0.5, out)
+    hw.buttons.update(0.5)
 
-    assert (out.is_pressed("A"), out.is_pressed("B")) == (False, True)
+    assert (hw.buttons.reading.is_pressed("A"), hw.buttons.reading.is_pressed("B")) == (False, True)
 
 
 # ---------------------------------------------------------------------------
@@ -975,3 +973,39 @@ def test_an_isolated_device_has_only_its_kept_component_and_its_buttons():
     hw, _parts = _assemble(_config(**_FULL_SECTIONS).isolate(keep="radio"))
 
     assert hw.capabilities == {"button.A", "button.B", "radio"}
+
+
+# ---------------------------------------------------------------------------
+# Polled parts
+# ---------------------------------------------------------------------------
+
+
+def test_a_fully_built_device_polls_buttons_sensors_radio_and_ir_in_build_order():
+    hw, _parts = _assemble(_config(**_FULL_SECTIONS))
+
+    assert hw.polled == (hw.buttons, hw.accelerometer, hw.magnetometer, hw.radio, hw.ir)
+
+
+def test_a_bare_config_polls_only_its_buttons():
+    hw, _parts = _assemble(_config())
+
+    assert hw.polled == (hw.buttons,)
+
+
+@pytest.mark.parametrize("section", ["accelerometer", "magnetometer", "radio", "ir"])
+def test_a_disabled_component_is_not_polled(section):
+    sections = dict(_FULL_SECTIONS)
+    sections[section] = _disabled(cast(dict, sections[section]))
+
+    hw, _parts = _assemble(_config(**sections))
+
+    kept = [p for p in ("buttons", "accelerometer", "magnetometer", "radio", "ir") if p != section]
+    assert getattr(hw, section) is None
+    assert hw.polled == tuple(getattr(hw, part) for part in kept)
+
+
+def test_an_isolated_device_polls_only_its_buttons_and_kept_component():
+    hw, _parts = _assemble(_config(**_FULL_SECTIONS).isolate(keep="magnetometer"))
+
+    assert hw.polled == (hw.buttons, hw.magnetometer)
+    assert hw.magnetometer is not None

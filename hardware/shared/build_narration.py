@@ -142,8 +142,9 @@ def _address_suffix(address: int | None) -> str:
     return f" address=0x{address:02X}" if address is not None else ""
 
 
-def _i2c_chip_suffix(chip: I2CDeviceConfig) -> str:
-    return _address_suffix(chip.address) + _bus_suffix("i2c", chip.i2c)
+def _describe_i2c_chip(part: str, chip: str, config: I2CDeviceConfig) -> str:
+    """Describe an I2C ``part`` by its ``chip``, with its configured address and bus."""
+    return f"{part} {chip}" + _address_suffix(config.address) + _bus_suffix("i2c", config.i2c)
 
 
 def _bus_suffix(kind: str, name: str) -> str:
@@ -193,15 +194,15 @@ def describe_buttons(pin_names: list[str]) -> str:
 
 
 def describe_accelerometer(accelerometer: I2CDeviceConfig) -> str:
-    return "accelerometer lis3dh" + _i2c_chip_suffix(accelerometer)
+    return _describe_i2c_chip("accelerometer", "lis3dh", accelerometer)
 
 
 def describe_magnetometer(magnetometer: I2CDeviceConfig) -> str:
-    return "magnetometer mmc5603" + _i2c_chip_suffix(magnetometer)
+    return _describe_i2c_chip("magnetometer", "mmc5603", magnetometer)
 
 
 def describe_haptics(haptics: I2CDeviceConfig) -> str:
-    return "haptics drv2605" + _i2c_chip_suffix(haptics)
+    return _describe_i2c_chip("haptics", "drv2605", haptics)
 
 
 def describe_audio(audio: AudioConfig) -> str:

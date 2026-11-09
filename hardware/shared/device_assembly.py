@@ -64,6 +64,7 @@ from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_wiring import wire_ir
 from hardware.shared.network_controls import HardwareNetworkControls
+from hardware.shared.polled_part import PolledPart
 from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.radio_transceiver import RadioTransceiver
 
@@ -199,6 +200,37 @@ def _gated_step(
     return narrate_step(logger, description, lambda: build(section))
 
 
+def _polled_sensor(
+    logger: Logger,
+    i2c: dict[str, object | None],
+    name: str,
+    section: I2CDeviceConfig | None,
+    describe: Callable[[I2CDeviceConfig], str],
+    read_part: Callable[[I2CDeviceConfig, object], Callable[[], tuple[float, float, float]]],
+    reading: AccelerationData | MagneticData,
+) -> PolledSensor | None:
+    """Build the I2C sensor ``name`` as a **PolledSensor** over ``reading``, gated like any section.
+
+    ``read_part`` is the ``DeviceParts`` method building its raw read; the
+    sensor's I2C bus must be open.
+    """
+    return _gated_step(
+        logger,
+        section,
+        describe,
+        lambda c: (
+            PolledSensor(read_part(c, _require_i2c(i2c, name, c)), reading, name, logger),
+            "ok",
+        ),
+    )
+
+
+def _append_built(polled: list[PolledPart], part: PolledPart | None) -> None:
+    """List ``part`` as a **Polled part** if it was built; an absent part is never polled."""
+    if part is not None:
+        polled.append(part)
+
+
 def _capabilities(
     buttons: DebouncedButtons,
     accelerometer: PolledSensor | None,
@@ -316,35 +348,28 @@ def assemble_device(
         return DebouncedButtons(readers), "ok"
 
     buttons = narrate_step(logger, describe_buttons(config.buttons), _build_buttons)
+    polled: list[PolledPart] = [buttons]
 
-    accelerometer = _gated_step(
+    accelerometer = _polled_sensor(
         logger,
+        i2c,
+        "accelerometer",
         config.accelerometer,
         describe_accelerometer,
-        lambda c: (
-            PolledSensor(
-                parts.accelerometer(c, _require_i2c(i2c, "accelerometer", c)),
-                AccelerationData(0.0, 0.0, 0.0),
-                "accelerometer",
-                logger,
-            ),
-            "ok",
-        ),
+        parts.accelerometer,
+        AccelerationData(0.0, 0.0, 0.0),
     )
-    magnetometer = _gated_step(
+    magnetometer = _polled_sensor(
         logger,
+        i2c,
+        "magnetometer",
         config.magnetometer,
         describe_magnetometer,
-        lambda c: (
-            PolledSensor(
-                parts.magnetometer(c, _require_i2c(i2c, "magnetometer", c)),
-                MagneticData(0.0, 0.0, 0.0),
-                "magnetometer",
-                logger,
-            ),
-            "ok",
-        ),
+        parts.magnetometer,
+        MagneticData(0.0, 0.0, 0.0),
     )
+    _append_built(polled, accelerometer)
+    _append_built(polled, magnetometer)
 
     def _build_audio(audio: AudioConfig) -> tuple[EffectOutput, str]:
         output = parts.audio_output(
@@ -378,6 +403,7 @@ def assemble_device(
         return RadioTransceiver(transport), "ok"
 
     radio = _gated_step(logger, config.radio, describe_radio, _build_radio)
+    _append_built(polled, radio)
 
     storage = _gated_step(
         logger,
@@ -390,6 +416,7 @@ def assemble_device(
     )
 
     ir = _gated_step(logger, config.ir, describe_ir, lambda c: _ir(c, parts))
+    _append_built(polled, ir)
 
     elapsed = time.monotonic() - start
     logger.log(
@@ -406,4 +433,5 @@ def assemble_device(
         ir=ir,
         radio=radio,
         storage=storage,
+        polled=tuple(polled),
     )
