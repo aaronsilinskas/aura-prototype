@@ -97,7 +97,7 @@ def test_the_receiver_decodes_an_aura_shot_landing_on_its_readers(reader_count):
     for reader in readers:
         reader.pulses.extend(AuraInfraredEncoder().encode(b"\x2a"))
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.received == bytearray(b"\x2a")
 
@@ -107,7 +107,7 @@ def test_the_receiver_reads_every_reader_not_just_the_first():
     transceiver, _kind = wire_ir(readers, {}, _WriterFactory())
     readers[1].pulses.extend(AuraInfraredEncoder().encode(b"\x2a"))
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.received == bytearray(b"\x2a")
 
@@ -121,6 +121,6 @@ def test_every_emitter_shares_the_gate_so_the_device_never_hears_itself(emitter)
     )
 
     transceiver.send(b"\x2a", emitter)
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.received is None

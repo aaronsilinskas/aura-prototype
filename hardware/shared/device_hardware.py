@@ -7,6 +7,7 @@ from engine.state import NetworkControls
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transceiver import InfraredTransceiver
+from hardware.shared.polled_part import PolledPart
 from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.radio_transceiver import RadioTransceiver
 
@@ -39,6 +40,10 @@ class DeviceHardware:
     ``capabilities`` is the immutable set of **Capabilities** the Device
     assembly built: named only for parts that exist on this bundle, never
     read off the config.
+
+    ``polled`` is every **Polled part** the Device assembly built, in build
+    order (buttons, sensors, radio, IR); a part that was not built is absent.
+    The tick updates each one once per tick through this tuple, never by name.
     """
 
     __slots__ = (
@@ -49,6 +54,7 @@ class DeviceHardware:
         "magnetometer",
         "network_controls",
         "outputs",
+        "polled",
         "radio",
         "storage",
     )
@@ -64,6 +70,7 @@ class DeviceHardware:
         radio: RadioTransceiver | None,
         storage: DeviceStorage | None,
         capabilities: frozenset[str],
+        polled: tuple[PolledPart, ...],
     ) -> None:
         self.outputs: list[EffectOutput] = outputs
         self.buttons: DebouncedButtons = buttons
@@ -74,3 +81,4 @@ class DeviceHardware:
         self.radio: RadioTransceiver | None = radio
         self.storage: DeviceStorage | None = storage
         self.capabilities: frozenset[str] = capabilities
+        self.polled: tuple[PolledPart, ...] = polled

@@ -127,6 +127,7 @@ from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.shared.device_config import load_device_config
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
+from hardware.shared.polled_part import PolledPart
 from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.profiler_report import (
     print_profile_header,
@@ -185,7 +186,9 @@ def _require_output(hardware: DeviceHardware, output_type: type[EffectOutput]) -
         )
 
 
-def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, PolledSensor, object, int]:
+def _build_prop() -> tuple[
+    SceneManager, EffectManager, Timer, tuple[PolledPart, ...], object, PolledSensor, object, int
+]:
     """Stand up the whole reference tag prop and return its driving objects.
 
     Snapshots free heap before and after construction (with a GC collect on each
@@ -278,6 +281,7 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, PolledSen
         manager,
         effect_manager,
         timer,
+        hardware.polled,
         hardware.buttons,
         hardware.accelerometer,
         hardware.ir,
@@ -296,6 +300,7 @@ def run() -> None:
         manager,
         effect_manager,
         timer,
+        polled,
         buttons,
         accelerometer,
         ir,
@@ -330,18 +335,16 @@ def run() -> None:
         perf.start_update_time()
         elapsed = timer.elapsed
 
-        buttons.update(elapsed)
+        # Every Polled part, IR included, outside the active_state guard and
+        # before checking ir.received: a send can be in flight across a scene
+        # transition, and ir.update() always pumps every transmitter before it
+        # receives, owning that order intrinsically (see InfraredTransceiver).
+        for part in polled:
+            part.update(elapsed)
+
         if not start_injected:
             _inject_press("A", _button_data)
             start_injected = True
-
-        accelerometer.update(elapsed)
-
-        # Outside the active_state guard and before checking ir.received: a
-        # send can be in flight across a scene transition, and ir.update()
-        # always pumps every transmitter before it receives, owning that
-        # order intrinsically (see InfraredTransceiver).
-        ir.update()
 
         if manager.active_state is not None:
             if ir.received is not None:

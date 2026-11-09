@@ -243,7 +243,7 @@ def test_update_pumps_the_transmitter_before_receiving() -> None:
         {LINE: _RecordingTransmitter(calls)}, receiver, IrTransmitGate()
     )
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert calls == ["poll", "read"]
 
@@ -256,7 +256,7 @@ def test_update_polls_every_wired_transmitter() -> None:
         IrTransmitGate(),
     )
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert calls == ["poll", "poll"]
 
@@ -265,7 +265,7 @@ def test_update_with_no_receiver_still_polls_transmitters() -> None:
     calls: list = []
     transceiver = InfraredTransceiver({LINE: _RecordingTransmitter(calls)}, None, IrTransmitGate())
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert calls == ["poll"]
 
@@ -273,7 +273,7 @@ def test_update_with_no_receiver_still_polls_transmitters() -> None:
 def test_update_with_no_transmitters_or_receiver_leaves_received_none() -> None:
     transceiver = InfraredTransceiver({}, None, IrTransmitGate())
 
-    transceiver.update()  # must not raise
+    transceiver.update(0.0)  # must not raise
 
     assert transceiver.received is None
 
@@ -286,7 +286,7 @@ def test_update_with_no_transmitters_or_receiver_leaves_received_none() -> None:
 def test_received_is_none_when_the_receiver_decodes_nothing() -> None:
     transceiver = InfraredTransceiver({}, _receiver_holding([100, 200]), IrTransmitGate())
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.received is None
 
@@ -297,7 +297,7 @@ def test_received_holds_the_decoded_payload_on_a_decoding_tick() -> None:
         {}, _receiver_holding(_encode_pulses(payload)), IrTransmitGate()
     )
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.received == payload
 
@@ -308,8 +308,8 @@ def test_received_resets_to_none_on_the_tick_after_a_decode() -> None:
         {}, _receiver_holding(_encode_pulses(payload)), IrTransmitGate()
     )
 
-    transceiver.update()
-    transceiver.update()
+    transceiver.update(0.0)
+    transceiver.update(0.0)
 
     assert transceiver.received is None
 
@@ -344,7 +344,7 @@ def test_apply_codec_installs_the_decoder_on_the_receiver() -> None:
     transceiver = InfraredTransceiver({}, receiver, IrTransmitGate())
 
     transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.received == payload
 
@@ -404,7 +404,7 @@ def test_last_signal_strength_is_forwarded_from_the_receiver() -> None:
     receiver = InfraredReceiver([reader], AuraInfraredDecoder)
     transceiver = InfraredTransceiver({}, receiver, IrTransmitGate())
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.last_signal_strength == receiver.last_signal_strength == 1.0
 
@@ -415,7 +415,7 @@ def test_last_error_margin_is_forwarded_from_the_receiver() -> None:
     receiver = InfraredReceiver([reader], AuraInfraredDecoder)
     transceiver = InfraredTransceiver({}, receiver, IrTransmitGate())
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.last_error_margin == receiver.last_error_margin == 0
 
@@ -426,7 +426,7 @@ def test_telemetry_line_is_forwarded_from_the_receiver() -> None:
     receiver = InfraredReceiver([reader], AuraInfraredDecoder)
     transceiver = InfraredTransceiver({}, receiver, IrTransmitGate())
 
-    transceiver.update()
+    transceiver.update(0.0)
     line = transceiver.telemetry_line()
 
     # Proves forwarding: the transceiver hands back exactly the receiver's own
@@ -440,7 +440,7 @@ def test_last_best_receiver_is_forwarded_from_the_receiver() -> None:
         {}, InfraredReceiver(readers, AuraInfraredDecoder), IrTransmitGate()
     )
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.last_best_receiver is readers[1]
 
@@ -486,7 +486,7 @@ def test_update_discards_self_echo_and_an_overlapping_real_shot_while_transmitti
     overlapping_shot_pulses = _encode_pulses(b"\xbb")
     reader.load(echo_pulses + overlapping_shot_pulses)
 
-    transceiver.update()
+    transceiver.update(0.0)
 
     assert transceiver.received is None
     assert receiver.telemetry().pulses_dropped_transmitting == (
@@ -507,17 +507,17 @@ def test_update_falling_edge_flush_recovers_the_decoder_for_the_next_genuine_pac
 
     tx.send(b"\xaa")  # gate armed
     reader.load(_encode_pulses(b"\xaa"))  # self-echo captured while transmitting
-    transceiver.update()
+    transceiver.update(0.0)
     assert transceiver.received is None
 
     writer.set_busy(False)  # hardware signals the write completed
     reader.load([111])  # buffered echo tail still sitting in the reader
-    transceiver.update()  # releases the gate; falling-edge flush drains the tail
+    transceiver.update(0.0)  # releases the gate; falling-edge flush drains the tail
     assert transceiver.received is None
     assert receiver.telemetry().pulses_dropped_transmitting > 0
 
     payload = b"\x07"
     reader.load(_encode_pulses(payload))
-    transceiver.update()  # gate now fully idle — decodes normally
+    transceiver.update(0.0)  # gate now fully idle — decodes normally
 
     assert transceiver.received == bytearray(payload)

@@ -58,6 +58,7 @@ def _fake_hw(ir=None, radio=None, storage=None, network_controls=None, capabilit
         radio=radio,
         storage=storage,
         capabilities=capabilities,
+        polled=(),
     )
 
 

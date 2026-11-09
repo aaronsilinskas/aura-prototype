@@ -17,11 +17,12 @@ from hardware.shared.ir_transport import (
     IrTransmitGate,
     PulseReader,
 )
+from hardware.shared.polled_part import PolledPart
 
 __all__ = ["InfraredTransceiver"]
 
 
-class InfraredTransceiver:
+class InfraredTransceiver(PolledPart):
     """Owns and drives the whole IR subsystem for one device.
 
     The transmitter map is never exposed as a raw collection; reach a
@@ -105,7 +106,7 @@ class InfraredTransceiver:
             raise ValueError(f"No transmitter wired for emitter: {emitter}")
         return tx.poll()
 
-    def update(self) -> None:
+    def update(self, elapsed: float) -> None:
         """Pump every transmitter, then receive — in that order, every tick.
 
         Pumping runs unconditionally, even with no receiver wired: a
@@ -113,7 +114,8 @@ class InfraredTransceiver:
         same tick, and a later gate check must see it released promptly. Sets
         :attr:`received` to this tick's decoded packet, or ``None`` when
         nothing decoded or no receiver is wired — never left stale from a
-        previous tick.
+        previous tick. *elapsed* is ignored; it keeps the signature every
+        Polled part shares.
         """
         for tx in self._transmitters.values():
             tx.poll()
