@@ -9,8 +9,7 @@ testable under plain CPython. Those contracts are first-party-to-first-party
 whole family sharing an ``adafruit_`` prefix (each chip ships its own PyPI
 name), so it cannot express this seam. This module parses every
 ``hardware/shared`` module -- top-level and under its ``ir_codecs/``
-subpackage, but not ``tests/`` -- with ``ast`` instead, mirroring
-``scripts/tests/test_profiler_import_guard.py``'s approach, and asserts none
+subpackage, but not ``tests/`` -- with ``ast`` instead, and asserts none
 of them imports ``board``, ``busio``, ``pulseio``, ``digitalio``,
 ``microcontroller``, or any ``adafruit_*`` package -- except
 ``profiler_report.board_id``'s own defensive ``board`` import, which reads
