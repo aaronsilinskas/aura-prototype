@@ -225,9 +225,8 @@ def _make_writer(pin: microcontroller.Pin) -> tuple[PulseWriter, str]:
 def _board_id() -> str:
     """Return the running board's ``board.board_id``.
 
-    Re-imports ``board`` rather than using ``self._board``, which may be a pin
-    namespace without an id. Falls back to ``sys.platform`` when ``board`` is
-    missing (off-device), and to ``"unknown-board"`` when it carries no id.
+    Imports the real ``board`` module because the pin namespace an adapter is
+    built on may carry no id.
     """
     try:
         import board as running_board

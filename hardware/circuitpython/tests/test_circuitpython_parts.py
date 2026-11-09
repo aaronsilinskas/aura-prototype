@@ -271,8 +271,7 @@ def test_button_reader_reads_the_pins_current_raw_level(gpio: list[_FakeDigitalI
 class _FakeNeoPixel(list):
     """A strip's pixel list, remembering how it was constructed."""
 
-    built: _FakeNeoPixel | None = None
-    """The most recently constructed strip."""
+    built: ClassVar[_FakeNeoPixel | None] = None
 
     def __init__(
         self, pin: object, n: int, *, pixel_order: str, brightness: float, auto_write: bool
@@ -348,9 +347,8 @@ def test_neopixel_strip_writes_each_scope_into_its_own_segment(neopixel: None) -
 class _FakeMatrixDriver:
     """An IS31FL3741 driver; the first ``unresponsive_attempts`` constructions raise."""
 
-    unresponsive_attempts = 0
-    responded: _FakeMatrixDriver | None = None
-    """The driver that answered, once one has."""
+    unresponsive_attempts: ClassVar[int] = 0
+    responded: ClassVar[_FakeMatrixDriver | None] = None
 
     def __init__(self, i2c: object, **kwargs: object) -> None:
         if _FakeMatrixDriver.unresponsive_attempts > 0:
