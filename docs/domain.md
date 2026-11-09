@@ -87,7 +87,7 @@ hardware/         Hardware abstraction layer
                   device_storage, network_controls, scene_selection, ir_transport,
                   ir_transceiver, ir_wiring, ir_codecs/ (base, aura, tag), ir_telemetry,
                   radio_transport, radio_transceiver, sd_sync_protocol, sd_sync_server,
-                  profiler_report, build_narration, device_reboot,
+                  build_narration, device_reboot,
                   device_assembly, device_parts)
   simulated/      Test-only Simulated device (device: SimulatedHardware; simulated_parts:
                   SimulatedParts, its DeviceParts adapter, whose card is the real
