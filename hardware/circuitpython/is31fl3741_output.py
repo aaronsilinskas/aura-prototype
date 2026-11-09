@@ -71,7 +71,7 @@ def build_offset_table(rowmap: list[int], cols: int) -> array[int]:
 class IS31FL3741EffectOutput(MatrixEffectOutput):
     """EffectOutput for the IS31FL3741 13×9 RGB LED matrix."""
 
-    __slots__ = ("_offsets",)
+    __slots__ = ("_matrix", "_offsets")
 
     # Logical row -> physical driver row: the panel's rows are not wired in
     # natural top-to-bottom order.

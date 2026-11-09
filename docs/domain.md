@@ -27,7 +27,6 @@ effects/          Animation engine (CircuitPython-safe)
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
   value.py        DynamicValue, ValueGenerator, lerp
-  performance.py  PerformanceTracker
   layers/         Layer base class + scroll, flame, drift_noise, sparkle, shape, progress, pulse
                   layers and the renderer compositors
 
@@ -79,7 +78,7 @@ hardware/         Hardware abstraction layer
                   entry point that runs the Device assembly; circuitpython_parts:
                   CircuitPythonParts, its DeviceParts adapter; is31fl3741_output,
                   drv2605_output, neopixel_output, audio_output, infrared_io,
-                  pio_pulse_writer, counting_i2c, rfm69_radio_transport,
+                  pio_pulse_writer, rfm69_radio_transport,
                   sdcard_storage, usb_cdc_transport, boot)
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
                   device_config, neopixel_current_budget, device_boot, device_state,
@@ -87,7 +86,7 @@ hardware/         Hardware abstraction layer
                   device_storage, network_controls, scene_selection, ir_transport,
                   ir_transceiver, ir_wiring, ir_codecs/ (base, aura, tag), ir_telemetry,
                   radio_transport, radio_transceiver, sd_sync_protocol, sd_sync_server,
-                  profiler_report, build_narration, device_reboot,
+                  build_narration, device_reboot,
                   device_assembly, device_parts)
   simulated/      Test-only Simulated device (device: SimulatedHardware; simulated_parts:
                   SimulatedParts, its DeviceParts adapter, whose card is the real

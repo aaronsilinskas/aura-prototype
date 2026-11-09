@@ -98,9 +98,7 @@ device's config file declares, and leaves out the rest:
 | Radio | RFM69HCW at 915 MHz |
 | Storage | SD card over SPI |
 
-Measurements taken on real hardware are in
-[`docs/hardware/recorded-metrics.md`](docs/hardware/recorded-metrics.md). The
-infrared and radio links were tested with two separate tools,
+The infrared and radio links were tested with two separate tools,
 [infrared-analyzer](https://github.com/aaronsilinskas/infrared-analyzer) and
 [rfm69-analyzer](https://github.com/aaronsilinskas/rfm69-analyzer).
 

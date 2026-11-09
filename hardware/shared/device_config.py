@@ -1254,8 +1254,7 @@ def load_device_config(path: str = "aura-device.json") -> DeviceConfig:
     """Read and parse *path* into a :class:`DeviceConfig`.
 
     Board-free pair of :func:`read_device_config_mapping` and
-    :func:`parse_device_config`, so profilers and other CPython-side callers
-    don't each duplicate it.
+    :func:`parse_device_config`, so callers don't each duplicate it.
 
     Raises:
         RuntimeError: If *path* does not exist.

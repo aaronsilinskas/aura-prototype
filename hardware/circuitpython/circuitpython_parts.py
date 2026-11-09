@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from hardware.circuitpython.rfm69_radio_transport import Rfm69RadioTransport
     from hardware.circuitpython.sdcard_storage import SdCardStorage
 
+import sys
 import time
 
 import board
@@ -43,7 +44,6 @@ from hardware.shared.device_config import (
 )
 from hardware.shared.device_parts import DeviceParts, PinRef
 from hardware.shared.ir_transport import PulseWriter
-from hardware.shared.profiler_report import board_id
 
 __all__ = ["CircuitPythonParts", "SdCardMountError"]
 
@@ -222,6 +222,19 @@ def _make_writer(pin: microcontroller.Pin) -> tuple[PulseWriter, str]:
     return PioPulseWriter(make_state_machine(pin)), "pio"
 
 
+def _board_id() -> str:
+    """Return the running board's ``board.board_id``.
+
+    Imports the real ``board`` module because the pin namespace an adapter is
+    built on may carry no id.
+    """
+    try:
+        import board as running_board
+    except ImportError:
+        return sys.platform
+    return getattr(running_board, "board_id", "unknown-board")
+
+
 class CircuitPythonParts(DeviceParts):
     """Builds parts on *board_module*'s pins.
 
@@ -236,7 +249,7 @@ class CircuitPythonParts(DeviceParts):
         return _resolve_pin(self._board, pin.field, pin.name)
 
     def board_name(self) -> str:
-        return board_id()
+        return _board_id()
 
     def high_current_rail(self, pin: PinRef, level: bool) -> None:
         digitalio.DigitalInOut(self._pin(pin)).switch_to_output(value=level)

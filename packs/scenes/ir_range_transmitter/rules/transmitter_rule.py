@@ -14,9 +14,9 @@ holds no mutable attributes of its own beyond the ``on()`` registration done
 at construction.
 
 The rule-facing ``NetworkControls`` seam is send-only (no ``busy`` check), so
-time-gating on ``state.total`` is the whole rate-control mechanism -- see the
-module docstring in ``ir_rx_packet_source.py`` for why a 4-byte send's
-blocking duration on real hardware caps the ceiling regardless.
+time-gating on ``state.total`` is the whole rate-control mechanism. On real
+hardware a send blocks for the whole frame, so frame length also caps the
+achievable rate whatever ``send_rate_hz`` asks for.
 """
 
 from __future__ import annotations

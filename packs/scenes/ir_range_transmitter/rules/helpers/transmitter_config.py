@@ -23,7 +23,7 @@ from engine.state import GameState, StateSlot
 
 _CONFIG_KEY: Final = "irtx_config"
 
-# Fixed non-zero padding marker, matching ir_rx_packet_source.py: byte i
+# Fixed non-zero padding marker: byte i
 # (i >= 1) carries 0xA0 | (i & 0x0F), so the encoded frame is never a
 # degenerate run of zeros.
 _PADDING_MARKER_BASE: Final = 0xA0

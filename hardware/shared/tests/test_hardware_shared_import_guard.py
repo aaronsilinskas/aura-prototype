@@ -9,12 +9,9 @@ testable under plain CPython. Those contracts are first-party-to-first-party
 whole family sharing an ``adafruit_`` prefix (each chip ships its own PyPI
 name), so it cannot express this seam. This module parses every
 ``hardware/shared`` module -- top-level and under its ``ir_codecs/``
-subpackage, but not ``tests/`` -- with ``ast`` instead, mirroring
-``scripts/tests/test_profiler_import_guard.py``'s approach, and asserts none
+subpackage, but not ``tests/`` -- with ``ast`` instead, and asserts none
 of them imports ``board``, ``busio``, ``pulseio``, ``digitalio``,
-``microcontroller``, or any ``adafruit_*`` package -- except
-``profiler_report.board_id``'s own defensive ``board`` import, which reads
-board identity for a report header, not to construct hardware (#725).
+``microcontroller``, or any ``adafruit_*`` package. There are no exceptions.
 """
 
 from __future__ import annotations
@@ -29,9 +26,6 @@ _HARDWARE_SHARED_DIR = _REPO_ROOT / "hardware" / "shared"
 
 _FORBIDDEN_ROOTS = frozenset({"board", "busio", "pulseio", "digitalio", "microcontroller"})
 
-_CARVE_OUT_MODULE = "profiler_report.py"
-_CARVE_OUT_FUNCTION = "board_id"
-
 
 def is_forbidden_root(name: str) -> bool:
     """Whether *name* is a module root this guard forbids under hardware/shared.
@@ -44,39 +38,22 @@ def is_forbidden_root(name: str) -> bool:
     return name in _FORBIDDEN_ROOTS or name.startswith("adafruit_")
 
 
-def board_id_carve_out_lines(source: str) -> set[int]:
-    """Line numbers spanned by a top-level ``board_id`` function's body, if any.
-
-    The only carve-out this guard grants: a module's ``board_id`` function is
-    allowed its own defensive ``board`` import. Callers apply this only to
-    ``profiler_report.py`` -- every other module gets no carve-out even if
-    it happened to define a same-named function.
-    """
-    lines: set[int] = set()
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.FunctionDef) and node.name == _CARVE_OUT_FUNCTION:
-            lines.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
-    return lines
-
-
-def forbidden_imports(source: str, carve_out_lines: frozenset[int] = frozenset()) -> list[str]:
+def forbidden_imports(source: str) -> list[str]:
     """Dotted names of every forbidden-root import in *source*.
 
     Walks the whole tree so an import nested inside a function (e.g. a
     deferred device-library import) is caught alongside a module-level one.
-    An import whose line number falls in *carve_out_lines* is skipped --
-    the one seam this guard grants, via :func:`board_id_carve_out_lines`.
     """
     violations: list[str] = []
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 root = alias.name.split(".")[0]
-                if is_forbidden_root(root) and node.lineno not in carve_out_lines:
+                if is_forbidden_root(root):
                     violations.append(alias.name)
         elif isinstance(node, ast.ImportFrom) and node.module:
             root = node.module.split(".")[0]
-            if is_forbidden_root(root) and node.lineno not in carve_out_lines:
+            if is_forbidden_root(root):
                 violations.append(node.module)
     return violations
 
@@ -112,25 +89,6 @@ def test_is_forbidden_root_excludes_first_party_and_stdlib_names() -> None:
 
 
 # ---------------------------------------------------------------------------
-# board_id_carve_out_lines
-# ---------------------------------------------------------------------------
-
-
-def test_board_id_carve_out_lines_covers_the_functions_body() -> None:
-    source = "def board_id():\n    import board\n    return board.board_id\n"
-
-    lines = board_id_carve_out_lines(source)
-
-    assert 2 in lines
-
-
-def test_board_id_carve_out_lines_empty_when_no_board_id_function_defined() -> None:
-    source = "def other():\n    import board\n    return board\n"
-
-    assert board_id_carve_out_lines(source) == set()
-
-
-# ---------------------------------------------------------------------------
 # forbidden_imports
 # ---------------------------------------------------------------------------
 
@@ -157,21 +115,8 @@ def test_forbidden_imports_collects_import_nested_inside_a_function() -> None:
     assert forbidden_imports(source) == ["busio"]
 
 
-def test_forbidden_imports_skips_a_line_in_carve_out_lines() -> None:
-    source = "import board\n"
-
-    assert forbidden_imports(source, carve_out_lines=frozenset({1})) == []
-
-
-def test_forbidden_imports_still_flags_a_forbidden_import_outside_carve_out_lines() -> None:
-    source = "import os\nimport board\n"
-
-    assert forbidden_imports(source, carve_out_lines=frozenset({1})) == ["board"]
-
-
 # ---------------------------------------------------------------------------
-# Guard: no hardware/shared module imports a device-only library, except
-# profiler_report.board_id's own board import
+# Guard: no hardware/shared module imports a device-only library
 # ---------------------------------------------------------------------------
 
 
@@ -185,25 +130,9 @@ def test_hardware_shared_modules_are_discovered() -> None:
     ids=lambda p: str(p.relative_to(_HARDWARE_SHARED_DIR)),
 )
 def test_hardware_shared_module_has_no_forbidden_import(path: Path) -> None:
-    source = path.read_text()
-    carve_out = (
-        frozenset(board_id_carve_out_lines(source))
-        if path.name == _CARVE_OUT_MODULE
-        else frozenset()
-    )
-
-    violations = forbidden_imports(source, carve_out_lines=carve_out)
+    violations = forbidden_imports(path.read_text())
 
     assert not violations, (
         f"{path.name} imports device-only module(s) {violations} -- hardware/shared must stay "
-        "board-free except profiler_report.board_id's own board import"
+        "board-free"
     )
-
-
-def test_profiler_report_board_import_outside_board_id_is_still_flagged() -> None:
-    source = "def board_id():\n    import board\n    return board\n\nimport board\n"
-    carve_out = frozenset(board_id_carve_out_lines(source))
-
-    violations = forbidden_imports(source, carve_out_lines=carve_out)
-
-    assert violations == ["board"]

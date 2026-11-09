@@ -1,7 +1,7 @@
 # deploy-watch skill
 
 Use this skill whenever you need to deploy a CircuitPython example to the device and
-capture or interpret its serial output — including profiling runs, hardware tests, or
+capture or interpret its serial output — including hardware tests, or
 any time you want to observe what the device prints after a deploy.
 
 ---
@@ -50,19 +50,19 @@ Done. 1 copied, 185 skipped, 0 pruned.
 ```
 
 The `--output FILE` flag captures only the post-banner device lines — no deploy
-chatter — which is useful for parsing profiler output in a subsequent step.
+chatter — which is useful for parsing device output in a subsequent step.
 
 ## Common patterns
 
-**Profiling run (fixed time window):**
+**Fixed time window:**
 ```
-python -m scripts.deploy_watch examples/hardware/profiling/baseline_profiler.py --seconds 30
+python -m scripts.deploy_watch examples/hardware/scene_demo.py --seconds 30
 ```
 
-**Wait for a specific marker:**
+**Stop early on a specific marker (here, a crash):**
 ```
-python -m scripts.deploy_watch examples/hardware/profiling/baseline_profiler.py \
-    --until "__PROFILE" --seconds 15
+python -m scripts.deploy_watch examples/hardware/scene_demo.py \
+    --until "Traceback" --seconds 30
 ```
 
 **Deploy a scene and watch it boot:**
@@ -72,20 +72,9 @@ python -m scripts.deploy_watch examples/hardware/scene_demo.py --scene hardware_
 
 **Capture clean output to file for later analysis:**
 ```
-python -m scripts.deploy_watch examples/hardware/profiling/baseline_profiler.py \
-    --seconds 30 --output /tmp/profile_run.txt
+python -m scripts.deploy_watch examples/hardware/scene_demo.py \
+    --seconds 30 --output /tmp/scene_demo_run.txt
 ```
-
-## Interpreting profiler output
-
-Lines prefixed with `__PROFILE` are emitted once at startup and describe the run
-configuration (component, board, firmware version, free memory).
-
-Lines prefixed with `__STATS` are periodic snapshots with FPS, update/render time,
-memory usage, and CPU percent.
-
-Lines prefixed with `__TABLE_ROW` contain pipe-delimited data rows intended for
-aggregation into comparison tables.
 
 ## Troubleshooting
 

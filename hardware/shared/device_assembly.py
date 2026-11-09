@@ -45,7 +45,6 @@ from hardware.shared.build_narration import (
 )
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
-    DEFAULT_BUS,
     AudioConfig,
     DeviceConfig,
     I2CConfig,
@@ -264,7 +263,6 @@ def assemble_device(
     config: DeviceConfig,
     parts: DeviceParts,
     logger: Logger | None = None,
-    default_i2c: object | None = None,
 ) -> DeviceHardware:
     """Build *config*'s hardware through *parts*, narrating each step to *logger*.
 
@@ -277,8 +275,6 @@ def assemble_device(
 
     I2C and SPI buses open on demand: only a **Named bus** an enabled device
     joins is opened, once, and every device joining it gets that same bus.
-    *default_i2c*, if given, stands in for the ``default`` I2C bus instead of
-    opening it.
 
     Raises:
         RuntimeError: If an enabled section's bus is unavailable: its I2C bus
@@ -301,16 +297,11 @@ def assemble_device(
 
         narrate_step(logger, describe_high_current_rail(rail), _build_rail)
 
-    def _open_i2c(name: str) -> object | None:
-        if name == DEFAULT_BUS and default_i2c is not None:
-            return default_i2c
-        return open_i2c(name, config.i2c, parts)
-
     i2c = _open_named_buses(
         logger,
         [d.i2c for d in config.i2c_devices()],
         lambda name: describe_i2c(name, config.i2c.get(name)),
-        _open_i2c,
+        lambda name: open_i2c(name, config.i2c, parts),
     )
 
     spi = _open_named_buses(
