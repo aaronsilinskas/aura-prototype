@@ -9,7 +9,7 @@ needed because none of them carry board imports.
 from __future__ import annotations
 
 import engine._path as _path
-from engine.capabilities import MissingCapabilityError
+from engine.capabilities import MissingCapabilityError, describe_capabilities
 from engine.effects.manager import EffectManager
 from engine.engine import GameEngine
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
@@ -119,18 +119,18 @@ def resolve_boot_scene_name(
             and what it is missing.
     """
     logger = logger if logger is not None else Logger.SILENT
-    candidates = boot_scene_candidates(storage, boot_mapping, logger)
-    for persisted in candidates[:-1]:
+    persisted, fallback = boot_scene_candidates(storage, boot_mapping, logger)
+    if persisted is not None:
         scene_name = scene_registry.resolve_known(persisted)
-        missing = scene_registry.required_capabilities(scene_name) - capabilities
+        missing = scene_registry.missing_capabilities(scene_name, capabilities)
         if not missing:
             return scene_name
         logger.log(
             f"skipping Persisted scene {scene_name!r}: the device lacks "
-            + ", ".join(sorted(missing))
+            + describe_capabilities(missing)
         )
-    scene_name = scene_registry.resolve_known(candidates[-1])
-    missing = scene_registry.required_capabilities(scene_name) - capabilities
+    scene_name = scene_registry.resolve_known(fallback)
+    missing = scene_registry.missing_capabilities(scene_name, capabilities)
     if missing:
         raise MissingCapabilityError(missing, scene_name)
     return scene_name

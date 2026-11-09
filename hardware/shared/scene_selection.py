@@ -9,7 +9,6 @@ from hardware.shared.device_storage import DeviceStorage
 __all__ = [
     "apply_scene_deploy",
     "boot_scene_candidates",
-    "resolve_boot_scene",
     "resolve_scene_name",
 ]
 
@@ -72,21 +71,16 @@ def apply_scene_deploy(
     logger.log(f"scene deploy {token} applied: booting {deployed!r}, {cleared}")
 
 
-def resolve_boot_scene(
+def boot_scene_candidates(
     storage: DeviceStorage | None,
     boot_mapping: dict,
     logger: Logger | None = None,
-) -> str:
-    """Resolve the boot scene: persisted SD ``scene`` -> flash ``default_scene`` -> raise.
+) -> tuple[str | None, str]:
+    """Return ``(persisted, fallback)``: the boot scene to try first, and the one to boot otherwise.
 
-    Composes the card's Persisted scene (read via a :class:`DeviceStateStore`
-    over *storage*) with the flash-authored default (*boot_mapping*'s
-    ``default_scene``, as read by :func:`read_boot_mapping`). The two
-    files key the scene under different names, so each value independently
-    goes through :func:`_non_empty_string_or_none` rather than delegating to
-    :func:`resolve_scene_name`, which is hardwired to the flash key and
-    always raises when its key is absent — behaviour this resolver only
-    wants when *both* legs are absent.
+    *fallback* is flash ``default_scene``, or the Persisted scene when no
+    default is set. *persisted* is the Persisted scene when a different
+    default stands behind it, else ``None``.
 
     Args:
         storage: The mounted ``DeviceStorage`` to read the Persisted scene
@@ -99,33 +93,13 @@ def resolve_boot_scene(
         ValueError: Neither a persisted SD ``scene`` nor a flash
             ``default_scene`` is a non-empty string.
     """
-    return boot_scene_candidates(storage, boot_mapping, logger)[0]
-
-
-def boot_scene_candidates(
-    storage: DeviceStorage | None,
-    boot_mapping: dict,
-    logger: Logger | None = None,
-) -> list[str]:
-    """Return the boot scenes to try in order: the Persisted scene, then flash ``default_scene``.
-
-    Each is included only when set, and the default only when it differs
-    from the Persisted scene. Arguments are as for :func:`resolve_boot_scene`.
-
-    Raises:
-        ValueError: Neither a persisted SD ``scene`` nor a flash
-            ``default_scene`` is a non-empty string.
-    """
-    candidates = []
     persisted = _non_empty_string_or_none(DeviceStateStore(storage, logger).get("scene"))
-    if persisted is not None:
-        candidates.append(persisted)
     default = _non_empty_string_or_none(boot_mapping.get("default_scene"))
-    if default is not None and default != persisted:
-        candidates.append(default)
-    if candidates:
-        return candidates
-    raise ValueError(
-        "no boot scene: neither a persisted SD 'scene' (aura-state.json) nor a flash "
-        + "'default_scene' (aura-boot.json) is set"
-    )
+    if default is None or default == persisted:
+        if persisted is None:
+            raise ValueError(
+                "no boot scene: neither a persisted SD 'scene' (aura-state.json) nor a flash "
+                + "'default_scene' (aura-boot.json) is set"
+            )
+        return None, persisted
+    return persisted, default

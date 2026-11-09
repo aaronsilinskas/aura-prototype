@@ -140,7 +140,7 @@ def _scene_registry_with(*scene_names: str) -> SceneRegistry:
 
 def test_persisted_sd_scene_overrides_flash_default_when_both_are_known_scenes(device_storage):
     """A persisted SD override wins even though the flash default is also valid --
-    proving resolve_boot_scene's precedence survives the registry-validation wrap."""
+    proving boot_scene_candidates' precedence survives the registry-validation wrap."""
     scene_registry = _scene_registry_with("tag", "red_light_green_light")
     device_storage.write_json("aura-state.json", {"scene": "tag"})
 
@@ -165,7 +165,7 @@ def test_card_less_device_boots_the_flash_default_scene():
 
 def test_neither_persisted_nor_flash_scene_raises_naming_both_files(device_storage):
     """With no SD override and no flash default, boot fails loudly rather than
-    silently picking a scene -- the same contract resolve_boot_scene documents."""
+    silently picking a scene -- the same contract boot_scene_candidates documents."""
     scene_registry = _scene_registry_with("red_light_green_light")
 
     with pytest.raises(ValueError, match=r"aura-state\.json.*aura-boot\.json"):
@@ -174,7 +174,7 @@ def test_neither_persisted_nor_flash_scene_raises_naming_both_files(device_stora
 
 def test_persisted_scene_unknown_to_the_registry_raises_naming_the_known_scenes(device_storage):
     """A persisted SD scene name with no matching registry entry fails loudly by
-    name here -- the registry-validation step resolve_boot_scene itself skips."""
+    name here -- the registry-validation step boot_scene_candidates itself skips."""
     scene_registry = _scene_registry_with("red_light_green_light")
     device_storage.write_json("aura-state.json", {"scene": "not-a-real-scene"})
 
