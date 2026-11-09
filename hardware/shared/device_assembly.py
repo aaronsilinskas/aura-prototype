@@ -197,6 +197,35 @@ def _gated_step(
     return narrate_step(logger, description, lambda: build(section))
 
 
+def _capabilities(
+    button_count: int,
+    accelerometer: object | None,
+    magnetometer: object | None,
+    radio: object | None,
+    storage: object | None,
+    ir: InfraredTransceiver | None,
+) -> frozenset[str]:
+    """The **Capabilities** of what was built; a part that is ``None`` contributes nothing.
+
+    Read off the built parts, never the config, so a declared component that
+    was not built is never counted.
+    """
+    names = ["button." + button_label(i) for i in range(button_count)]
+    for name, part in (
+        ("accelerometer", accelerometer),
+        ("magnetometer", magnetometer),
+        ("radio", radio),
+        ("storage", storage),
+    ):
+        if part is not None:
+            names.append(name)
+    if ir is not None:
+        names.extend("ir." + emitter for emitter in ir.emitters)
+        if ir.receives:
+            names.append("ir.receive")
+    return frozenset(names)
+
+
 def assemble_device(
     config: DeviceConfig,
     parts: DeviceParts,
@@ -366,6 +395,9 @@ def assemble_device(
     )
 
     return DeviceHardware(
+        capabilities=_capabilities(
+            len(config.buttons), accelerometer, magnetometer, radio, storage, ir
+        ),
         outputs=outputs,
         buttons=buttons,
         accelerometer=accelerometer,

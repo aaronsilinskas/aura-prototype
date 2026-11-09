@@ -631,11 +631,13 @@ def test_parse_non_string_button_pin_raises_value_error(matrix_config):
 # ---------------------------------------------------------------------------
 
 
-def test_parse_ir_without_rx_raises_value_error(matrix_config):
+def test_parse_ir_without_rx_declares_no_receivers(matrix_config):
     del matrix_config["ir"]["rx"]
 
-    with pytest.raises(ValueError, match=r"ir\.rx"):
-        parse_device_config(matrix_config)
+    result = parse_device_config(matrix_config)
+
+    assert result.ir is not None
+    assert result.ir.rx == []
 
 
 def test_parse_ir_without_line_omits_line_emitter(matrix_config):

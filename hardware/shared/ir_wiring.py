@@ -42,7 +42,7 @@ def wire_ir(
     :meth:`~hardware.shared.ir_transceiver.InfraredTransceiver.apply_codec`.
 
     Args:
-        readers: One pulse reader per IR receiver; never empty.
+        readers: One pulse reader per IR receiver; empty wires no receiver.
         emitter_pins: Emitter key (a member of ``IR_EMITTERS``) to whatever
             the platform's *writer_factory* needs to build that emitter's
             writer. An emitter absent from it is not wired.
@@ -56,7 +56,7 @@ def wire_ir(
         one kind describes them all.
     """
     gate = IrTransmitGate()
-    receiver = InfraredReceiver(readers, AuraInfraredDecoder, gate)
+    receiver = InfraredReceiver(readers, AuraInfraredDecoder, gate) if readers else None
     encoder = AuraInfraredEncoder()
     transmitters: dict[str, InfraredTransmitter] = {}
     writer_kind: str | None = None

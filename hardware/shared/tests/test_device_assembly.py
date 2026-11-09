@@ -811,6 +811,14 @@ def test_ir_with_no_emitters_narrates_plain_ok():
     assert "[hw] ir rx=[GP5] emitters=(none) ok\n" in _narration(_config(ir={"rx": "GP5"}))
 
 
+def test_ir_with_no_receivers_narrates_none_and_reads_no_pin():
+    narration = _narration(_config(ir={"line": "GP6"}))
+    _hw, parts = _assemble(_config(ir={"line": "GP6"}))
+
+    assert "[hw] ir rx=(none) emitters=line:GP6 " in narration
+    assert "ir_reader" not in parts.parts()
+
+
 # ---------------------------------------------------------------------------
 # Radio and network controls
 # ---------------------------------------------------------------------------
@@ -889,3 +897,87 @@ def test_a_bare_config_builds_no_optional_hardware():
         hw.radio,
         hw.storage,
     ) == ([], None, None, None, None, None)
+
+
+# ---------------------------------------------------------------------------
+# Capabilities
+# ---------------------------------------------------------------------------
+
+_FULL_IR = {"rx": "GP5", "line": "GP6", "cone": "GP7", "area_of_effect": "GP8"}
+_FULL_SECTIONS: dict[str, object] = {
+    "buttons": ["GP1", "GP2"],
+    "accelerometer": {},
+    "magnetometer": {},
+    "radio": _RADIO,
+    "sdcard": _SDCARD,
+    "ir": _FULL_IR,
+}
+_FULL_CAPABILITIES = frozenset(
+    (
+        "button.A",
+        "button.B",
+        "accelerometer",
+        "magnetometer",
+        "radio",
+        "storage",
+        "ir.line",
+        "ir.cone",
+        "ir.area_of_effect",
+        "ir.receive",
+    )
+)
+
+
+def test_a_fully_built_device_has_every_capability_its_config_builds():
+    hw, _parts = _assemble(_config(**_FULL_SECTIONS))
+
+    assert hw.capabilities == _FULL_CAPABILITIES
+
+
+def test_a_device_has_one_button_capability_per_declared_button():
+    hw, _parts = _assemble(_config(buttons=["GP1", "GP2", "GP3"]))
+
+    assert hw.capabilities == {"button.A", "button.B", "button.C"}
+
+
+def test_a_device_has_only_the_ir_emitters_its_config_wires():
+    hw, _parts = _assemble(_config(ir={"rx": "GP5", "cone": "GP7"}))
+
+    assert hw.capabilities == {"ir.cone", "ir.receive"}
+
+
+def test_an_ir_section_without_receivers_has_no_ir_receive():
+    hw, _parts = _assemble(_config(ir={"line": "GP6"}))
+
+    assert hw.capabilities == {"ir.line"}
+
+
+@pytest.mark.parametrize(
+    ("section", "lost"),
+    [
+        ("accelerometer", {"accelerometer"}),
+        ("magnetometer", {"magnetometer"}),
+        ("radio", {"radio"}),
+        ("sdcard", {"storage"}),
+        ("ir", {"ir.line", "ir.cone", "ir.area_of_effect", "ir.receive"}),
+    ],
+)
+def test_a_disabled_component_is_not_a_capability(section, lost):
+    sections = dict(_FULL_SECTIONS)
+    sections[section] = _disabled(cast(dict, sections[section]))
+
+    hw, _parts = _assemble(_config(**sections))
+
+    assert hw.capabilities == _FULL_CAPABILITIES - lost
+
+
+def test_an_isolated_device_has_only_its_kept_component_and_its_buttons():
+    hw, _parts = _assemble(_config(**_FULL_SECTIONS).isolate(keep="radio"))
+
+    assert hw.capabilities == {"button.A", "button.B", "radio"}
+
+
+def test_the_capabilities_are_immutable():
+    hw, _parts = _assemble(_config(**_FULL_SECTIONS))
+
+    assert isinstance(hw.capabilities, frozenset)

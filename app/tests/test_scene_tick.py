@@ -31,6 +31,7 @@ def _hw(buttons=None, accelerometer=None, magnetometer=None, ir=None, radio=None
         ir=ir,
         radio=radio,
         storage=None,
+        capabilities=frozenset(),
     )
 
 

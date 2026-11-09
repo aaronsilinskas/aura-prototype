@@ -215,10 +215,11 @@ class AudioConfig:
 class IRConfig:
     """Parsed IR configuration.
 
-    ``rx`` is always a non-empty list of one or more pin names, regardless of
-    whether ``aura-device.json`` declared ``ir.rx`` as a single string (the
+    ``rx`` is always a list of pin names, regardless of whether
+    ``aura-device.json`` declared ``ir.rx`` as a single string (the
     single-receiver shape) or a list of strings (the multi-receiver shape) —
-    callers deal with one representation either way.
+    callers deal with one representation either way. It is empty only when
+    ``ir.rx`` is left out: an emitter-only section with no receiver.
     """
 
     __slots__ = ("emitters", "enabled", "rx")
@@ -864,14 +865,11 @@ def _parse_ir_rx(rx_raw: object) -> list[str]:
 
 
 def _parse_ir(ir_raw: dict) -> IRConfig:
-    if "rx" not in ir_raw:
-        raise ValueError("ir.rx is required")
-    rx = _parse_ir_rx(ir_raw["rx"])
+    rx = _parse_ir_rx(ir_raw["rx"]) if "rx" in ir_raw else []
 
-    # rx is the only required IR pin; every emitter (line/cone/area_of_effect)
-    # is optional and validated uniformly by the loop below. A prop that
-    # cannot transmit on a given emitter simply omits it; usage sites guard
-    # the absence themselves.
+    # Every IR item is optional: a prop with no receiver omits rx, and one
+    # that cannot transmit on a given emitter (line/cone/area_of_effect)
+    # omits it. Emitters are validated uniformly by the loop below.
     emitters: dict[str, str] = {}
     for key, pin in ir_raw.items():
         if key in ("rx", "enabled"):
