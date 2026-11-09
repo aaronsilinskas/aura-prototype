@@ -53,6 +53,7 @@ ignore = [
     "N817",   # VG is an established abbreviation for ValueGenerator throughout the codebase
     "RUF002", # mathematical symbols (×, –) in docstrings are intentional
     "RUF003", # mathematical symbols (×, –) in comments are intentional
+    "RUF005", # (*a, b) unpacking in literals — mpy-cross rejects it; use concatenation
     "SIM105", # try/except/pass is clearer than contextlib.suppress for CircuitPython compat blocks
 ]
 

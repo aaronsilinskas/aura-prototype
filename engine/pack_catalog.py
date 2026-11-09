@@ -45,7 +45,7 @@ except ImportError:
 
 _REQUIRED_SCENE_KEYS = ("version", "effect_packs", "rule_packs")
 
-_SCENE_KEYS = (*_REQUIRED_SCENE_KEYS, "settings", "ir_codec")
+_SCENE_KEYS = _REQUIRED_SCENE_KEYS + ("settings", "ir_codec")
 
 _PACK_REFERENCE_KEYS = ("name", "version", "settings")
 
