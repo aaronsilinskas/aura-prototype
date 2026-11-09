@@ -199,7 +199,6 @@ class _SceneEntry:
         "local_rule_registry",
         "local_sound_map",
         "required_capabilities",
-        "requires",
         "rule_packs",
         "settings",
         "source_path",
@@ -221,9 +220,8 @@ class _SceneEntry:
     ) -> None:
         # The scene's own Setting declarations, from scene.json's ``settings``.
         self.declarations = declarations or {}
-        # The Capabilities scene.json's ``requires`` lists.
-        self.requires = requires
-        # Combined with its rule packs' by the catalog once every pack is scanned.
+        # scene.json's ``requires``; the catalog adds its rule packs' once
+        # every pack is scanned.
         self.required_capabilities = requires
         # Resolved by the catalog once every pack is scanned.
         self.settings = Settings()
@@ -340,6 +338,14 @@ class SceneRegistry:
             return entry.required_capabilities
 
         raise ValueError(f"Unknown scene '{name}'")
+
+    def missing_capabilities(self, name: str, capabilities: frozenset[str]) -> frozenset[str]:
+        """Return the Required capabilities of *name* that are not in *capabilities*.
+
+        Raises:
+            ValueError: if *name* is not registered.
+        """
+        return self.required_capabilities(name) - capabilities
 
     def names(self) -> list[str]:
         """Return all registered scene names sorted alphabetically."""
@@ -520,13 +526,10 @@ class SceneManager(SceneControls):
         Raises:
             ValueError: if *name* is not a registered scene.
         """
-        return not self._missing_capabilities(name)
-
-    def _missing_capabilities(self, name: str) -> frozenset[str]:
-        return self._scene_registry.required_capabilities(name) - self._engine.capabilities
+        return not self._scene_registry.missing_capabilities(name, self._engine.capabilities)
 
     def _require_runnable(self, name: str) -> None:
-        missing = self._missing_capabilities(name)
+        missing = self._scene_registry.missing_capabilities(name, self._engine.capabilities)
         if missing:
             raise MissingCapabilityError(missing, name)
 

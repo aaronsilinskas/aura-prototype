@@ -1,18 +1,13 @@
 from __future__ import annotations
 
+from engine.capabilities import ir_emitter_capability
 from engine.input import InputEvents
 from engine.network import LINE, NetworkEvents
 from engine.state import GameState, Scope
 from packs.scenes.hardware_test.rules.helpers.flash import ir_flash
 from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import HwModeRule
-from packs.scenes.hardware_test.rules.helpers.mode import (
-    HW_TEST_PAYLOAD,
-    RECEIVE_FLASH_COLOR,
-    UNAVAILABLE_COLOR,
-)
+from packs.scenes.hardware_test.rules.helpers.mode import HW_TEST_PAYLOAD, RECEIVE_FLASH_COLOR
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_IR
-
-_LINE_EMITTER = "ir." + LINE
 
 
 class HwTestIrRule(HwModeRule):
@@ -30,17 +25,16 @@ class HwTestIrRule(HwModeRule):
     """
 
     def __init__(self) -> None:
-        super().__init__(MODE_IR)
+        super().__init__(MODE_IR, ir_emitter_capability(LINE))
         self.on(NetworkEvents.IRReceived, self._handle_ir_received)
 
     def on_enter(self, state: GameState) -> None:
-        color = 0xFFFFFF if state.capabilities.has(_LINE_EMITTER) else UNAVAILABLE_COLOR
-        state.effect_controls.set_effect(Scope.ALL, "basic.solid", {"color": color})
+        state.effect_controls.set_effect(
+            Scope.ALL, "basic.solid", {"color": self.idle_color(state)}
+        )
 
     def on_input_event(self, event: InputEvents.Sensors, state: GameState) -> None:
         if not event.buttons.is_pressed("A"):
-            return
-        if not state.capabilities.has(_LINE_EMITTER):
             return
 
         state.network_controls.send_ir(HW_TEST_PAYLOAD, LINE)
