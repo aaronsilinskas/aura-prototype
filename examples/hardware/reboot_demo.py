@@ -88,7 +88,9 @@ hw = build_hardware(config, logger=hw_logger)
 scene_registry = scan_boot_pack_catalog(hw.storage).scene_registry
 
 boot_mapping = read_boot_mapping()
-scene_name = resolve_boot_scene_name(scene_registry, hw.storage, boot_mapping, logger=hw_logger)
+scene_name = resolve_boot_scene_name(
+    scene_registry, hw.storage, boot_mapping, hw.capabilities, logger=hw_logger
+)
 
 # This example owns reboot_demo_phase; return_to is the seam's own key, read
 # here only to print as proof (the adapter is what writes and clears it).

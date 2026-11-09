@@ -53,13 +53,12 @@ class RlglRedRule(PhaseRule):
             self.transition_to(state, PHASE_GREEN_WARNING)
             return
 
-        if event.acceleration is not None:
-            config = rlgl_config(state)
-            ema = rlgl_motion(state).update(
-                event.acceleration, config.gravity_beta, config.motion_smoothing
-            )
-            if ema > RED_MAX_MOTION_THRESHOLD:
-                self.transition_to(state, PHASE_GAME_OVER)
+        config = rlgl_config(state)
+        ema = rlgl_motion(state).update(
+            event.acceleration, config.gravity_beta, config.motion_smoothing
+        )
+        if ema > RED_MAX_MOTION_THRESHOLD:
+            self.transition_to(state, PHASE_GAME_OVER)
 
 
 RULE = RlglRedRule()

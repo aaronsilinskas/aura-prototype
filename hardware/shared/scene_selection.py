@@ -6,7 +6,12 @@ from engine.log import Logger
 from hardware.shared.device_state import DeviceStateStore
 from hardware.shared.device_storage import DeviceStorage
 
-__all__ = ["apply_scene_deploy", "resolve_boot_scene", "resolve_scene_name"]
+__all__ = [
+    "apply_scene_deploy",
+    "boot_scene_candidates",
+    "resolve_boot_scene",
+    "resolve_scene_name",
+]
 
 
 def _non_empty_string_or_none(value: object) -> str | None:
@@ -94,12 +99,32 @@ def resolve_boot_scene(
         ValueError: Neither a persisted SD ``scene`` nor a flash
             ``default_scene`` is a non-empty string.
     """
+    return boot_scene_candidates(storage, boot_mapping, logger)[0]
+
+
+def boot_scene_candidates(
+    storage: DeviceStorage | None,
+    boot_mapping: dict,
+    logger: Logger | None = None,
+) -> list[str]:
+    """Return the boot scenes to try in order: the Persisted scene, then flash ``default_scene``.
+
+    Each is included only when set, and the default only when it differs
+    from the Persisted scene. Arguments are as for :func:`resolve_boot_scene`.
+
+    Raises:
+        ValueError: Neither a persisted SD ``scene`` nor a flash
+            ``default_scene`` is a non-empty string.
+    """
+    candidates = []
     persisted = _non_empty_string_or_none(DeviceStateStore(storage, logger).get("scene"))
     if persisted is not None:
-        return persisted
+        candidates.append(persisted)
     default = _non_empty_string_or_none(boot_mapping.get("default_scene"))
-    if default is not None:
-        return default
+    if default is not None and default != persisted:
+        candidates.append(default)
+    if candidates:
+        return candidates
     raise ValueError(
         "no boot scene: neither a persisted SD 'scene' (aura-state.json) nor a flash "
         + "'default_scene' (aura-boot.json) is set"

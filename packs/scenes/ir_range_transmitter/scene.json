@@ -1,5 +1,6 @@
 {
   "version": "1.0",
+  "requires": ["ir.line"],
   "effect_packs": [],
   "rule_packs": [],
   "settings": {

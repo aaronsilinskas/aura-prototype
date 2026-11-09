@@ -1,14 +1,20 @@
 """A Simulated device that lacks some Capabilities: ``add_device(without=...)``.
 
 Booted into hardware_test, which requires nothing of its own, so a device
-lacking any hardware still boots it.
+lacking any hardware still boots it; boot itself runs only a scene the
+device has the Required capabilities for.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from app.simulation import Simulation
+from engine.capabilities import MissingCapabilityError
+from engine.pack_catalog import scan_pack_roots
 
 _FULL = frozenset(
     (
@@ -96,3 +102,49 @@ def test_pressing_a_button_the_device_lacks_raises_naming_it(simulation):
 
     with pytest.raises(ValueError, match="'B'"):
         device.tap("B")
+
+
+# ---------------------------------------------------------------------------
+# Boot runs only a scene the device can run (issue #1164)
+# ---------------------------------------------------------------------------
+
+
+def _persist(card: Path, scene: str) -> None:
+    (card / "aura-state.json").write_text(json.dumps({"scene": scene}))
+
+
+@pytest.mark.parametrize("scene", sorted(scan_pack_roots(["packs"]).scene_registry.names()))
+def test_a_fully_built_device_boots_every_shipped_scene(simulation, scene):
+    device = simulation.add_device("red", scene=scene)
+
+    assert device.scene == scene
+
+
+def test_a_persisted_scene_the_device_cannot_run_boots_the_default_scene(simulation, tmp_path):
+    _persist(tmp_path, "red_light_green_light")
+
+    device = simulation.add_device(
+        "red", scene="hardware_test", card=tmp_path, without={"accelerometer"}
+    )
+
+    assert device.scene == "hardware_test"
+
+
+def test_a_persisted_scene_the_device_cannot_run_is_left_on_the_card(simulation, tmp_path):
+    _persist(tmp_path, "red_light_green_light")
+
+    simulation.add_device("red", scene="hardware_test", card=tmp_path, without={"accelerometer"})
+
+    state = json.loads((tmp_path / "aura-state.json").read_text())
+    assert state["scene"] == "red_light_green_light"
+
+
+def test_boot_raises_when_neither_the_persisted_nor_the_default_scene_fits(simulation, tmp_path):
+    _persist(tmp_path, "red_light_green_light")
+
+    with pytest.raises(MissingCapabilityError) as excinfo:
+        simulation.add_device(
+            "red", scene="tag", card=tmp_path, without={"accelerometer", "ir.line"}
+        )
+
+    assert (excinfo.value.scene, excinfo.value.capabilities) == ("tag", {"ir.line"})
