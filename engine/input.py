@@ -98,6 +98,10 @@ class AccelerationData:
         self.y = y
         self.z = z
 
+    def assign(self, raw: tuple[float, float, float]) -> None:
+        """Overwrite this reading in place with a raw ``(x, y, z)`` read, allocating nothing."""
+        self.x, self.y, self.z = raw
+
     def __str__(self) -> str:
         return f"AccelerationData(x={self.x}, y={self.y}, z={self.z})"
 
@@ -117,6 +121,10 @@ class MagneticData:
         self.x = x
         self.y = y
         self.z = z
+
+    def assign(self, raw: tuple[float, float, float]) -> None:
+        """Overwrite this reading in place with a raw ``(x, y, z)`` read, allocating nothing."""
+        self.x, self.y, self.z = raw
 
     def __str__(self) -> str:
         return f"MagneticData(x={self.x}, y={self.y}, z={self.z})"

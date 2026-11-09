@@ -1,4 +1,4 @@
-from engine.input import AccelerationData
+from engine.input import AccelerationData, MagneticData
 from engine.log import Logger
 from hardware.shared.polled_sensor import PolledSensor
 
@@ -30,7 +30,7 @@ def _sensor(*reads) -> tuple[PolledSensor, list[str]]:
 
 def _update(sensor: PolledSensor, times: int) -> None:
     for _ in range(times):
-        sensor.update()
+        sensor.update(0.0)
 
 
 def _xyz(sensor: PolledSensor) -> tuple[float, float, float]:
@@ -40,17 +40,28 @@ def _xyz(sensor: PolledSensor) -> tuple[float, float, float]:
 def test_the_reading_is_the_latest_successful_read():
     sensor, _log = _sensor((1.0, 2.0, 3.0), (4.0, 5.0, 6.0))
 
-    sensor.update()
-    sensor.update()
+    sensor.update(0.0)
+    sensor.update(0.0)
 
     assert _xyz(sensor) == (4.0, 5.0, 6.0)
+
+
+def test_a_good_read_updates_a_magnetic_reading_in_place():
+    reading = MagneticData(0.0, 0.0, 0.0)
+    read = _replaying((7.0, 8.0, 9.0))
+    sensor = PolledSensor(read, reading, "magnetometer", Logger("[hw]", print))
+
+    sensor.update(0.0)
+
+    assert sensor.reading is reading
+    assert (reading.x, reading.y, reading.z) == (7.0, 8.0, 9.0)
 
 
 def test_a_raising_read_keeps_the_previous_reading():
     sensor, _log = _sensor((1.0, 2.0, 3.0), OSError(5))
 
-    sensor.update()
-    sensor.update()
+    sensor.update(0.0)
+    sensor.update(0.0)
 
     assert _xyz(sensor) == (1.0, 2.0, 3.0)
 
@@ -58,7 +69,7 @@ def test_a_raising_read_keeps_the_previous_reading():
 def test_a_failed_first_read_leaves_the_reading_zero():
     sensor, _log = _sensor(OSError(5))
 
-    sensor.update()
+    sensor.update(0.0)
 
     assert _xyz(sensor) == (0.0, 0.0, 0.0)
 
@@ -67,8 +78,8 @@ def test_the_reading_is_the_same_object_across_updates():
     sensor, _log = _sensor((1.0, 2.0, 3.0), OSError(5))
     reading = sensor.reading
 
-    sensor.update()
-    sensor.update()
+    sensor.update(0.0)
+    sensor.update(0.0)
 
     assert sensor.reading is reading
 
