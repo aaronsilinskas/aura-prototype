@@ -7,10 +7,17 @@ Simulation test harness all name Capabilities through this module.
 from __future__ import annotations
 
 __all__ = [
+    "IR_RECEIVE",
     "Capabilities",
     "MissingCapabilityError",
     "UnknownCapabilityError",
+    "button_capability",
+    "button_label_of",
+    "describe_capabilities",
+    "ir_emitter_capability",
+    "ir_emitter_of",
     "is_capability",
+    "unknown_capabilities",
 ]
 
 from engine.scan_error import PackScanError
@@ -29,7 +36,35 @@ _FIXED_CAPABILITIES = frozenset(
     )
 )
 
+IR_RECEIVE = "ir.receive"
+
 _BUTTON_PREFIX = "button."
+_IR_PREFIX = "ir."
+
+
+def button_capability(label: str) -> str:
+    """The Capability of having the button labelled *label*."""
+    return _BUTTON_PREFIX + label
+
+
+def button_label_of(name: str) -> str | None:
+    """The button label in the ``button.<label>`` Capability *name*; ``None`` for any other."""
+    if not name.startswith(_BUTTON_PREFIX):
+        return None
+    label = name[len(_BUTTON_PREFIX) :]
+    return label if len(label) == 1 and "A" <= label <= "Z" else None
+
+
+def ir_emitter_capability(emitter: str) -> str:
+    """The Capability of having IR emitter *emitter* (``engine.network.LINE`` and the like)."""
+    return _IR_PREFIX + emitter
+
+
+def ir_emitter_of(name: str) -> str | None:
+    """The IR emitter in the ``ir.<emitter>`` Capability *name*; ``None`` for any other."""
+    if name == IR_RECEIVE or name not in _FIXED_CAPABILITIES or not name.startswith(_IR_PREFIX):
+        return None
+    return name[len(_IR_PREFIX) :]
 
 
 def is_capability(name: object) -> bool:
@@ -39,12 +74,17 @@ def is_capability(name: object) -> bool:
     """
     if not isinstance(name, str):
         return False
-    if name in _FIXED_CAPABILITIES:
-        return True
-    if not name.startswith(_BUTTON_PREFIX):
-        return False
-    label = name[len(_BUTTON_PREFIX) :]
-    return len(label) == 1 and "A" <= label <= "Z"
+    return name in _FIXED_CAPABILITIES or button_label_of(name) is not None
+
+
+def unknown_capabilities(names: list) -> list:
+    """The items of *names* outside the Capability vocabulary, in order."""
+    return [name for name in names if not is_capability(name)]
+
+
+def describe_capabilities(names: frozenset[str]) -> str:
+    """*names* sorted and comma-joined, for a message."""
+    return ", ".join(sorted(names))
 
 
 class Capabilities:
@@ -85,7 +125,7 @@ class MissingCapabilityError(ValueError):
     def __init__(self, capabilities: frozenset[str], scene: str | None) -> None:
         self.capabilities = capabilities
         self.scene = scene
-        missing = ", ".join(sorted(capabilities))
+        missing = describe_capabilities(capabilities)
         if scene is None:
             super().__init__(f"The device lacks {missing}")
         else:

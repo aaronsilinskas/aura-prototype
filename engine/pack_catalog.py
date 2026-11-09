@@ -26,7 +26,7 @@ import os
 import sys
 
 import engine._path as _path
-from engine.capabilities import UnknownCapabilityError, is_capability
+from engine.capabilities import UnknownCapabilityError, unknown_capabilities
 from engine.packs import PackRegistry, _PackEntry, scan_item_names
 from engine.scan_error import PackScanError
 from engine.scene import PackReference, SceneLocalRegistry, SceneRegistry, _SceneEntry
@@ -41,6 +41,7 @@ from engine.settings import (
 from engine.version import Version
 
 try:
+    from collections.abc import Callable
     from typing import TypeAlias
 except ImportError:
     pass  # Not available on CircuitPython
@@ -400,7 +401,7 @@ def _combine_required_capabilities(
 ) -> None:
     pack_requires = {entry.name: entry.requires for entry in rule_packs}
     for entry in scenes.values():
-        required = set(entry.requires)
+        required = set(entry.required_capabilities)
         for reference in entry.rule_packs:
             required.update(pack_requires[reference.name])
         entry.required_capabilities = frozenset(required)
@@ -448,8 +449,6 @@ def _scan_packs(root: str, root_name: str, kind: str, packs: list[_PackEntry]) -
         manifest = _read_manifest(manifest_path)
         if kind == "effects" and "requires" in manifest:
             raise MalformedManifestError(manifest_path, "an effect pack cannot list 'requires'")
-        if not isinstance(manifest.get("requires", []), list):
-            raise MalformedManifestError(manifest_path, "'requires' is not a list")
         version = _parse_version(manifest.get("version"), manifest_path)
         packs.append(
             _PackEntry(
@@ -459,7 +458,7 @@ def _scan_packs(root: str, root_name: str, kind: str, packs: list[_PackEntry]) -
                 item_names=scan_item_names(pack_dir),
                 source_path=pack_dir,
                 declarations=read_manifest_declarations(manifest, manifest_path),
-                requires=_read_requires(manifest, manifest_path),
+                requires=_read_requires(manifest, manifest_path, MalformedManifestError),
             )
         )
 
@@ -491,7 +490,7 @@ def _scan_scenes(
             local_effect_registry=_scan_local_items(scene_dir, scene_prefix, "effects"),
             local_sound_map=_scan_sounds(_path.join(scene_dir, "sounds")),
             declarations=_read_scene_declarations(name, scene_json, data),
-            requires=_read_requires(data, scene_json),
+            requires=_read_scene_requires(name, scene_json, data),
         )
 
 
@@ -518,16 +517,24 @@ def read_manifest_declarations(manifest: dict, path: str) -> dict[str, SettingDe
         raise MalformedManifestError(path, str(exc)) from exc
 
 
-def _read_requires(data: dict, path: str) -> frozenset[str]:
+def _read_requires(
+    data: dict, path: str, malformed: Callable[[str, str], PackScanError]
+) -> frozenset[str]:
     """Return the Capabilities in *data*'s optional ``requires`` list, read from *path*.
 
-    The caller has checked that ``requires``, if present, is a list.
+    ``malformed(path, reason)`` builds the error for a ``requires`` that is not a list.
     """
     names = data.get("requires", [])
-    for name in names:
-        if not is_capability(name):
-            raise UnknownCapabilityError(path, name)
+    if not isinstance(names, list):
+        raise malformed(path, "'requires' is not a list")
+    unknown = unknown_capabilities(names)
+    if unknown:
+        raise UnknownCapabilityError(path, unknown[0])
     return frozenset(names)
+
+
+def _read_scene_requires(scene: str, path: str, data: dict) -> frozenset[str]:
+    return _read_requires(data, path, lambda path, reason: MalformedSceneError(scene, path, reason))
 
 
 def _read_scene_json(scene: str, path: str) -> dict:
@@ -544,8 +551,6 @@ def _read_scene_json(scene: str, path: str) -> dict:
     for key in data:
         if key not in _SCENE_KEYS:
             raise MalformedSceneError(scene, path, f"unknown key {key!r}")
-    if not isinstance(data.get("requires", []), list):
-        raise MalformedSceneError(scene, path, "'requires' is not a list")
     return data
 
 

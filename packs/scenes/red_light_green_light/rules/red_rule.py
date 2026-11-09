@@ -53,10 +53,10 @@ class RlglRedRule(PhaseRule):
             self.transition_to(state, PHASE_GREEN_WARNING)
             return
 
+        acceleration = event.acceleration
+        assert acceleration is not None, "scene.json requires accelerometer"
         config = rlgl_config(state)
-        ema = rlgl_motion(state).update(
-            event.acceleration, config.gravity_beta, config.motion_smoothing
-        )
+        ema = rlgl_motion(state).update(acceleration, config.gravity_beta, config.motion_smoothing)
         if ema > RED_MAX_MOTION_THRESHOLD:
             self.transition_to(state, PHASE_GAME_OVER)
 

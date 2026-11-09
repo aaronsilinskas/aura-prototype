@@ -233,11 +233,13 @@ first use.
 - **Rule pack** — manifest `rules.json`; each `.py` file exports `RULE`: a `GameRule` instance.
 
 The manifest is a JSON object stating the pack's version and, optionally,
-declaring the pack's **Settings**:
+declaring the pack's **Settings** and, for a Rule pack, the **Capabilities**
+it requires:
 
 ```json
 {
   "version": "1.0",
+  "requires": ["button.A", "button.B"],
   "settings": {
     "hold_seconds": {"type": "float", "default": 5.0, "description": "Seconds to hold."}
   }
@@ -263,6 +265,31 @@ the wrong type, fails the scan with `MalformedManifestError`.
 A pack's Settings are part of its versioned interface: adding a Setting with a
 default is a minor bump; adding a required Setting, or removing, renaming or
 retyping one, is a major bump. The scan does not enforce this.
+
+#### Capabilities
+
+A **Capability** is hardware a device has, named from a fixed vocabulary:
+
+- `button.A` … `button.Z` — the button with that label (labels follow the order
+  `buttons` declares them in the device config)
+- `ir.line`, `ir.cone`, `ir.area_of_effect` — that IR emitter
+- `ir.receive` — any IR receiver
+- `radio`, `storage`, `accelerometer`, `magnetometer`
+
+Pixels, audio and haptics are not Capabilities: effects already cope without
+them. A device has a Capability only when Device assembly built it, never
+merely because the config declares it.
+
+A Rule pack's optional `requires` list names the Capabilities its rules cannot
+run without; an effect pack cannot list one (`MalformedManifestError`). A name
+outside the vocabulary fails the scan with `UnknownCapabilityError`, and a
+`requires` that is not a list with `MalformedManifestError`. The scan checks
+only the names, never the device: see [Scenes](#scenes) for when they are
+compared with what the device has.
+
+A Rule pack's `requires` is part of its versioned interface: adding a
+Capability is a major bump, and removing one is a minor bump. The scan does
+not enforce this.
 
 Version format is `MAJOR.MINOR`. A `Scene` declares minimum required versions;
 the catalog scan checks them at boot (same-major, installed-minor ≥ required-minor).
@@ -292,8 +319,23 @@ A **Scene** is a declarative bundle, described by its `scene.json`:
   (`state.settings.get_float("scene", "window_seconds")`). A bad declaration fails the scan
   with `MalformedSceneError`
 - Optional `ir_codec` — the IR codec the scene runs (default `"aura"`)
+- Optional `requires` — the [Capabilities](#capabilities) the scene cannot be
+  played without, e.g. `["accelerometer", "button.A"]`. The scene's **Required
+  capabilities** are this list plus the `requires` of every rule pack it
+  declares. A name outside the vocabulary fails the scan with
+  `UnknownCapabilityError`; a value that is not a list with `MalformedSceneError`
 
-Any other key fails the scan with `MalformedSceneError`. A scene carries no
+Any other key fails the scan with `MalformedSceneError`.
+
+Required capabilities are compared with the device only for the scene about to
+run. At boot, a Persisted scene the device can't run is skipped (and logged,
+but left on the card) in favour of the flash `default_scene`; boot raises
+`MissingCapabilityError` when neither fits. `load`, `overlay`, `reboot_into`
+and `reboot_to_previous` raise `MissingCapabilityError` for a scene the device
+can't run, before anything is recorded, persisted or reset;
+`state.scene_controls.can_run(name)` asks the same without raising. A scene
+that copes without some hardware leaves it out of `requires` and asks
+`state.capabilities.has(name)` before using it. A scene carries no
 starting data: rules seed their own runtime state through `state.get`/`state.set`.
 
 `SceneManager` owns a scene stack. `load(name)` replaces the stack; `overlay(name)` pushes

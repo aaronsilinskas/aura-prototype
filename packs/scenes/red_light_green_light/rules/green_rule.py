@@ -61,8 +61,10 @@ class RlglGreenRule(PhaseRule):
                 self.transition_to(state, PHASE_WIN)
             return
 
+        acceleration = event.acceleration
+        assert acceleration is not None, "scene.json requires accelerometer"
         motion = rlgl_motion(state)
-        ema = motion.update(event.acceleration, config.gravity_beta, config.motion_smoothing)
+        ema = motion.update(acceleration, config.gravity_beta, config.motion_smoothing)
         if ema >= GREEN_MIN_MOTION_THRESHOLD:
             motion.last_motion_time = state.total
         else:

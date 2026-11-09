@@ -1344,10 +1344,16 @@ def test_scene_reboot_previous_scene_raises_not_implemented_error() -> None:
         SceneReboot().previous_scene()
 
 
-def test_can_run_answers_whether_the_device_has_a_scenes_required_capabilities(pack_tree):
+def test_can_run_a_scene_whose_required_capabilities_the_device_has(pack_tree):
     manager = _capability_manager(pack_tree)
 
-    assert (manager.can_run("home"), manager.can_run("tilt")) == (True, False)
+    assert manager.can_run("home")
+
+
+def test_cannot_run_a_scene_requiring_a_capability_the_device_lacks(pack_tree):
+    manager = _capability_manager(pack_tree)
+
+    assert not manager.can_run("tilt")
 
 
 def test_can_run_raises_for_an_unknown_scene(pack_tree):

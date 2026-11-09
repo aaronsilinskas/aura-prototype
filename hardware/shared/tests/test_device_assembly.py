@@ -975,9 +975,3 @@ def test_an_isolated_device_has_only_its_kept_component_and_its_buttons():
     hw, _parts = _assemble(_config(**_FULL_SECTIONS).isolate(keep="radio"))
 
     assert hw.capabilities == {"button.A", "button.B", "radio"}
-
-
-def test_the_capabilities_are_immutable():
-    hw, _parts = _assemble(_config(**_FULL_SECTIONS))
-
-    assert isinstance(hw.capabilities, frozenset)

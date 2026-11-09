@@ -311,7 +311,7 @@ _Avoid_: `scan_boot_scene_registry` (old name); calling it before `build_hardwar
 
 ### resolve_boot_scene_name
 The boot-time seam that picks the scene to boot into (**Persisted scene** → flash `default_scene` → raise), skipping a candidate the device lacks the **Required capabilities** for, and guarantees the winner is registered. `build_scene_boot` applies any pending **Scene deploy token** just before it.
-_Avoid_: calling `resolve_boot_scene` directly and skipping registry validation (`SceneRegistry.resolve_known`); calling it before `build_hardware` (the persisted leg needs storage mounted)
+_Avoid_: calling `boot_scene_candidates` directly and skipping registry validation (`SceneRegistry.resolve_known`); calling it before `build_hardware` (the persisted leg needs storage mounted)
 
 ### resolve_ir_codec
 Resolves a scene's declared **wire-frame codec** name to its encoder/decoder class pair. Board-free, needing no built hardware to run.

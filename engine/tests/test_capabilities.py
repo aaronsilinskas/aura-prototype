@@ -10,8 +10,16 @@ import re
 
 import pytest
 
-from engine.capabilities import MissingCapabilityError, UnknownCapabilityError
+from engine.capabilities import (
+    MissingCapabilityError,
+    UnknownCapabilityError,
+    button_capability,
+    button_label_of,
+    ir_emitter_capability,
+    ir_emitter_of,
+)
 from engine.engine import GameEngine
+from engine.network import AREA_OF_EFFECT, CONE
 from engine.pack_catalog import MalformedManifestError, MalformedSceneError, PackScanError
 from engine.scene import Scene, SceneRegistry
 from engine.state import EffectControls, GameState, SceneControls
@@ -96,6 +104,12 @@ def test_every_name_in_the_vocabulary_may_be_required(pack_tree, name) -> None:
     catalog = pack_tree.scan(scenes={"tag": {"requires": [name]}})
 
     assert catalog.scene_registry.required_capabilities("tag") == {name}
+
+
+def test_a_scenes_missing_capabilities_are_the_required_ones_the_device_lacks(pack_tree) -> None:
+    registry = pack_tree.scan(scenes={"tag": {"requires": ["radio", "ir.line"]}}).scene_registry
+
+    assert registry.missing_capabilities("tag", frozenset(("radio", "storage"))) == {"ir.line"}
 
 
 def test_a_scene_registered_in_memory_requires_nothing() -> None:
@@ -194,6 +208,39 @@ def test_an_effect_pack_listing_requires_raises_malformed_manifest_error(pack_tr
         pack_tree.scan_roots(root)
 
     assert excinfo.value.path == str(pack_dir / "effects.json")
+
+
+# ---------------------------------------------------------------------------
+# Capability names for buttons and IR emitters
+# ---------------------------------------------------------------------------
+
+
+def test_a_button_label_names_its_button_capability() -> None:
+    assert button_capability("B") == "button.B"
+
+
+@pytest.mark.parametrize(
+    ("name", "label"), [("button.C", "C"), ("radio", None), ("button.c", None)]
+)
+def test_the_button_label_is_read_back_only_from_a_button_capability(name, label) -> None:
+    assert button_label_of(name) == label
+
+
+def test_an_ir_emitter_names_its_ir_capability() -> None:
+    assert ir_emitter_capability(CONE) == "ir.cone"
+
+
+@pytest.mark.parametrize(
+    ("name", "emitter"),
+    [
+        ("ir.area_of_effect", AREA_OF_EFFECT),
+        ("ir.receive", None),
+        ("ir.laser", None),
+        ("radio", None),
+    ],
+)
+def test_the_ir_emitter_is_read_back_only_from_an_emitter_capability(name, emitter) -> None:
+    assert ir_emitter_of(name) == emitter
 
 
 # ---------------------------------------------------------------------------

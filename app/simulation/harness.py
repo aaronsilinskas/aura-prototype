@@ -31,7 +31,7 @@ from pathlib import Path
 from types import TracebackType
 
 from app.scene_composition import build_scene_boot
-from engine.capabilities import is_capability
+from engine.capabilities import IR_RECEIVE, button_label_of, ir_emitter_of, unknown_capabilities
 from engine.pack_catalog import SettingOverrides
 from engine.state import ScopeValue
 from engine.timer import Timer
@@ -75,9 +75,9 @@ _SECTION_OF = {
 
 def _check_capabilities(names: Collection[str]) -> frozenset[str]:
     """*names* as a frozenset; raise ``ValueError`` for one outside the Capability vocabulary."""
-    for name in names:
-        if not is_capability(name):
-            raise ValueError(f"{name!r} is not a Capability")
+    unknown = unknown_capabilities(list(names))
+    if unknown:
+        raise ValueError(f"{unknown[0]!r} is not a Capability")
     return frozenset(names)
 
 
@@ -86,13 +86,14 @@ def _drop(mapping: dict, capability: str) -> None:
 
     Deleting keys, not ``enabled: false``, so nothing dropped is built or narrated.
     """
-    if capability.startswith("button."):
+    label = button_label_of(capability)
+    emitter = ir_emitter_of(capability)
+    if label is not None:
         # Labels follow declaration order, so lacking B means lacking B onward.
-        index = ord(capability[len("button.") :]) - ord("A")
-        mapping["buttons"] = mapping["buttons"][:index]
-    elif capability.startswith("ir."):
+        mapping["buttons"] = mapping["buttons"][: ord(label) - ord("A")]
+    elif emitter is not None or capability == IR_RECEIVE:
         ir = mapping.get("ir", {})
-        ir.pop("rx" if capability == "ir.receive" else capability[len("ir.") :], None)
+        ir.pop("rx" if emitter is None else emitter, None)
         if not set(ir) - {"enabled"}:
             mapping.pop("ir", None)
     else:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from engine.capabilities import MissingCapabilityError
+from engine.capabilities import MissingCapabilityError, ir_emitter_capability
 from engine.network import IR_EMITTERS
 from engine.state import NetworkControls
 from hardware.shared.ir_transceiver import InfraredTransceiver
@@ -60,7 +60,7 @@ class HardwareNetworkControls(NetworkControls):
         if emitter not in IR_EMITTERS:
             raise ValueError(f"Unknown IR emitter: {emitter!r}")
         if self._ir is None or emitter not in self._ir.emitters:
-            raise MissingCapabilityError(frozenset(("ir." + emitter,)), None)
+            raise MissingCapabilityError(frozenset((ir_emitter_capability(emitter),)), None)
         self._ir.send(data, emitter)
 
     def send_radio(self, data: bytes) -> None:
