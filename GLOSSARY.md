@@ -330,7 +330,7 @@ The device-only entry point that runs **Device assembly** with `CircuitPythonPar
 _Avoid_: returning a bare tuple/dict (return `DeviceHardware`); putting config parsing here (lives in the pure parser); calling it twice in one process
 
 ### DeviceHardware
-The board-free bundle `build_hardware` returns — a data holder for the built outputs, buttons, sensors, network seam, `ir`, `radio`, and storage, plus the **Capabilities** the device has, worked out once by **Device assembly** from what it built. Ports are typed as their abstract port, never the concrete adapter, keeping the module board-free.
+The board-free bundle `build_hardware` returns — a data holder for the built outputs, buttons, sensors, network seam, `ir`, `radio`, and storage, plus the **Capabilities** the device has and the ordered **Polled parts**, both worked out once by **Device assembly** from what it built. Ports are typed as their abstract port, never the concrete adapter, keeping the module board-free.
 _Avoid_: exposing raw transmitters (use `network_controls`/`ir`); exposing the raw `RadioTransport` (use `network_controls`/`radio`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### Simulated device
@@ -416,9 +416,13 @@ _Avoid_: the old per-scope shape (one strip per `Scope`); conflating segment len
 A hardware sensor providing 3-axis acceleration readings (x, y, z) in m/s²; optional, absent when hardware is not present.
 _Avoid_: "IMU" (the LIS3DH has no gyroscope or magnetometer)
 
+### Polled part
+A built part the tick refreshes exactly once per tick by calling `update(elapsed)`, after which it holds its own state for the tick to read: buttons, accelerometer and magnetometer hold a standing `reading`; IR and radio hold this tick's `received` packet, or `None`. **Device assembly** lists each Polled part as it builds it, and the tick polls that list rather than naming parts, so a part that is built is a part that is polled. Polled parts never depend on the order they are polled in within a tick.
+_Avoid_: passing a caller-owned buffer into `update` (the part owns its state); polling a part by name in the tick; one Polled part reading another's state within the same poll
+
 ### PolledSensor
-The board-free owner of one 3-axis sensor's reading: polled once per tick, it refreshes its reading from its raw read source, and a failed read keeps the last good reading; the start and end of a run of failed reads are logged. The accelerometer and magnetometer are each one. A device with no such hardware has no PolledSensor in its place, which is distinct from a failed read.
-_Avoid_: `Sensor` (buttons and IR receivers are sensors too); swallowing read failures at the call site
+The board-free **Polled part** wrapping one sensor's raw read: each poll refreshes its `reading` in place from the raw read, and a failed read keeps the last good reading; the start and end of a run of failed reads are logged. It does not know the reading's shape — the reading assigns a raw read to itself — so one PolledSensor serves the accelerometer and the magnetometer alike. A device with no such hardware has no PolledSensor in its place, which is distinct from a failed read.
+_Avoid_: `Sensor` (buttons and IR receivers are sensors too); swallowing read failures at the call site; allocating a new reading per poll
 
 ### AccelerationData
 A snapshot of 3-axis accelerometer readings; `None` when no accelerometer is present — signals "no sensor data," not "device at rest."
