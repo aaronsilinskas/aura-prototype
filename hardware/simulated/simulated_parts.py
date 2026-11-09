@@ -56,7 +56,7 @@ __all__ = [
     "wav_length",
 ]
 
-Sensor = TypeVar("Sensor", "SimulatedAccelerometer", "SimulatedMagnetometer")
+ScriptedSensor = TypeVar("ScriptedSensor", "SimulatedAccelerometer", "SimulatedMagnetometer")
 
 _AT_REST = (0.0, 0.0, AccelerationData.GRAVITY)
 DEFAULT_SWAY_STRENGTH = 4.0
@@ -251,6 +251,13 @@ class SimulatedMagnetometer:
         self.magnetic = (0.0, 0.0, 0.0)
 
 
+def _kept_or_made(
+    kept: ScriptedSensor | None, make: Callable[[], ScriptedSensor]
+) -> ScriptedSensor:
+    """The scripted sensor ``kept`` from an earlier boot, or one ``make`` builds the first time."""
+    return kept if kept is not None else make()
+
+
 class _KeptParts:
     """The parts that outlive a reboot; each ``None`` until first asked for."""
 
@@ -310,11 +317,11 @@ class SimulatedParts(DeviceParts):
     def accelerometer(
         self, accelerometer: I2CDeviceConfig, i2c: object
     ) -> Callable[[], tuple[float, float, float]]:
-        return self._kept_sensor(
-            "accelerometer",
-            lambda: SimulatedAccelerometer(self._device.now),
-            lambda sensor: sensor.acceleration,
+        kept = self._kept
+        scripted = kept.accelerometer = _kept_or_made(
+            kept.accelerometer, lambda: SimulatedAccelerometer(self._device.now)
         )
+        return lambda: scripted.acceleration
 
     @property
     def scripted_magnetometer(self) -> SimulatedMagnetometer | None:
@@ -324,22 +331,9 @@ class SimulatedParts(DeviceParts):
     def magnetometer(
         self, magnetometer: I2CDeviceConfig, i2c: object
     ) -> Callable[[], tuple[float, float, float]]:
-        return self._kept_sensor(
-            "magnetometer", SimulatedMagnetometer, lambda sensor: sensor.magnetic
-        )
-
-    def _kept_sensor(
-        self,
-        slot: str,
-        make: Callable[[], Sensor],
-        read: Callable[[Sensor], tuple[float, float, float]],
-    ) -> Callable[[], tuple[float, float, float]]:
-        """A raw read of the scripted sensor kept in *slot*, made the first time it is asked for."""
-        sensor = getattr(self._kept, slot)
-        if sensor is None:
-            sensor = make()
-            setattr(self._kept, slot, sensor)
-        return lambda: read(sensor)
+        kept = self._kept
+        scripted = kept.magnetometer = _kept_or_made(kept.magnetometer, SimulatedMagnetometer)
+        return lambda: scripted.magnetic
 
     def audio_output(
         self,

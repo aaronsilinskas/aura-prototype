@@ -114,8 +114,7 @@ class InfraredTransceiver(PolledPart):
         same tick, and a later gate check must see it released promptly. Sets
         :attr:`received` to this tick's decoded packet, or ``None`` when
         nothing decoded or no receiver is wired — never left stale from a
-        previous tick. *elapsed* is ignored; it keeps the signature every
-        Polled part shares.
+        previous tick.
         """
         for tx in self._transmitters.values():
             tx.poll()

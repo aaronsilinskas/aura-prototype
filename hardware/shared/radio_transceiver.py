@@ -67,8 +67,7 @@ class RadioTransceiver(PolledPart):
         Sets :attr:`received` and :attr:`last_sender` together to this
         tick's decoded payload and RadioHead "From" byte, or both to
         ``None`` when nothing decoded or no transport is wired — never left
-        stale from a previous tick. *elapsed* is ignored; it keeps the
-        signature every Polled part shares.
+        stale from a previous tick.
         """
         transport = self._transport
         packet = transport.receive() if transport is not None else None

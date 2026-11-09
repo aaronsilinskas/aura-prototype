@@ -33,7 +33,7 @@ def _hw(
     """Return a DeviceHardware built entirely from CPython-safe fakes.
 
     Its ``polled`` lists every part given, as the Device assembly lists what it
-    built, followed by *other_polled*.
+    built, followed by ``other_polled``.
     """
     buttons = buttons if buttons is not None else DebouncedButtons([])
     built = (buttons, accelerometer, magnetometer, radio, ir)

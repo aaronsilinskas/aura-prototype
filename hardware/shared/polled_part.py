@@ -16,5 +16,9 @@ class PolledPart:
     __slots__ = ()
 
     def update(self, elapsed: float) -> None:
-        """Refresh this part's state; *elapsed* is the seconds since the last tick."""
+        """Refresh this part's state; ``elapsed`` is the seconds since the last tick.
+
+        Every Polled part takes ``elapsed`` so the tick can poll them alike; a
+        part that keeps no time of its own ignores it.
+        """
         raise NotImplementedError

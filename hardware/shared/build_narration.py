@@ -143,7 +143,7 @@ def _address_suffix(address: int | None) -> str:
 
 
 def _describe_i2c_chip(part: str, chip: str, config: I2CDeviceConfig) -> str:
-    """Describe an I2C *part* by its *chip*, with its configured address and bus."""
+    """Describe an I2C ``part`` by its ``chip``, with its configured address and bus."""
     return f"{part} {chip}" + _address_suffix(config.address) + _bus_suffix("i2c", config.i2c)
 
 

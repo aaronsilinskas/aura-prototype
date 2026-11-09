@@ -95,10 +95,10 @@ Part = TypeVar("Part")
 
 
 def _declared(name: str, built: object | None, scripted: Part | None) -> Part:
-    """The scripted stand-in for part *name*, refusing a config that built no such part.
+    """The ``scripted`` stand-in for the ``built`` part ``name``, refusing a config that built none.
 
     Raises:
-        ValueError: If *built* is ``None``: the config declares no *name*.
+        ValueError: If ``built`` is ``None``: the config declares no ``name``.
     """
     if built is None:
         raise ValueError(f"the config declares no {name}")
@@ -364,7 +364,7 @@ class SimulatedHardware:
         raise ValueError(f"the {decoder.__class__.__name__} cannot read back what was sent")
 
     def _require_radio(self) -> SimulatedRadioTransport:
-        return _declared("radio", self._parts.radio, self._parts.radio)
+        return _declared("radio", self.hw.radio, self._parts.radio)
 
     def _require_accelerometer(self) -> SimulatedAccelerometer:
         return _declared("accelerometer", self.hw.accelerometer, self._parts.scripted_accelerometer)

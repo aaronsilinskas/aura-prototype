@@ -23,9 +23,8 @@ class PolledSensor(PolledPart):
 
     *read* is a :class:`~hardware.shared.device_parts.DeviceParts` raw read
     source and may raise. Its result goes to the reading's ``assign``, so the
-    sensor never knows the reading's shape. *elapsed* is ignored; it keeps the
-    signature every Polled part shares. Any ``Exception`` the read
-    raises leaves the reading untouched, so a glitch keeps the last good
+    sensor never knows the reading's shape. Any ``Exception`` the read raises
+    leaves the reading untouched, so a glitch keeps the last good
     reading and never takes down the frame loop.
 
     ``reading`` is the *reading* buffer passed in, the same object for the
