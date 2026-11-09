@@ -27,7 +27,6 @@ effects/          Animation engine (CircuitPython-safe)
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
   value.py        DynamicValue, ValueGenerator, lerp
-  performance.py  PerformanceTracker
   layers/         Layer base class + scroll, flame, drift_noise, sparkle, shape, progress, pulse
                   layers and the renderer compositors
 
