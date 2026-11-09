@@ -4,7 +4,7 @@ A lobby scene needs no Python of its own: it declares the ``lobby`` rule pack
 and sets the pack's two required Settings in that pack reference::
 
     "rule_packs": [{
-      "name": "lobby", "version": "1.0",
+      "name": "lobby", "version": "2.0",
       "settings": {
         "scopes": ["personal", "global.main", "directional"],
         "entries": [
@@ -17,8 +17,10 @@ and sets the pack's two required Settings in that pack reference::
 ``scopes`` is an ordered list of display Scopes ``[S0, S1, ..., Sk]``;
 ``entries`` is an ordered list of ``{scene, effect, options}`` selectable
 scenes (``options`` is passed straight through to ``set_effect`` -- ``level``
-is just one of its keys, nothing special). With the current selection at
-index ``i`` and ``N`` entries, scope ``Sj`` always previews ``entries[(i +
+is just one of its keys, nothing special). Entries whose scene this device
+can't run (``state.scene_controls.can_run``) are left out, so ``N`` counts
+only the playable ones. With the current selection at index ``i`` and ``N``
+entries, scope ``Sj`` always previews ``entries[(i +
 j) % N]``, so ``S0`` shows the scene Button B would launch right now and the
 rest look ahead, wrapping. Button A advances the selection and repaints every
 scope; Button B reboots into the current selection via
@@ -40,7 +42,9 @@ except ImportError:
 _INDEX_KEY: Final = "lobby_index"
 
 _config: StateSlot = StateSlot(
-    "lobby_resolved", lambda state: LobbyConfig.from_settings(state.settings), LobbyConfig
+    "lobby_resolved",
+    lambda state: LobbyConfig.from_settings(state.settings, state.scene_controls.can_run),
+    LobbyConfig,
 )
 
 

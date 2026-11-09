@@ -67,7 +67,9 @@ magic/            Spell and aura game logic (CircuitPython/MicroPython-safe)
 
 packs/            Game-specific packs loaded at runtime (CircuitPython/MicroPython-safe)
   effects/        Shared, versioned effect packs (basic, elements) — each with an effects.json manifest
-  rules/          Shared, versioned rule packs (debug, lobby, return_to_lobby) — each with a rules.json manifest
+  rules/          Shared, versioned rule packs (debug, lobby, return_to_lobby) — each with a rules.json manifest;
+                  lobby and return_to_lobby require button.A, button.B and storage, and the lobby
+                  offers only the entries SceneControls.can_run accepts
   scenes/         Scene definitions (element_browser, example_lobby, hardware_test,
                   ir_range_receiver, ir_range_transmitter, red_light_green_light, tag);
                   each has a scene.json and optional scene-local effects/ and rules/ subdirs
@@ -174,8 +176,9 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `Settings` | `engine/settings.py` | One scene's resolved Settings, read by namespace (`scene` or a pack name) and name; built by the catalog scan |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
-| `SceneManager` | `engine/scene.py` | Drives scene transitions, installing each active scene into the `ActiveSceneNamespace` and snapshotting merge strategies through `EffectAdmin`; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot` |
-| `SceneReboot` | `engine/state.py` | Board-free port `SceneManager` reboots through; live adapter `DeviceSceneReboot` |
+| `SceneControls` | `engine/state.py` | Rule-facing transition seam (`load`, `overlay`, `pop`, `reboot_into`, `reboot_to_previous`) plus `can_run(name)`, which the `lobby` pack asks to leave out entries the device can't play |
+| `SceneManager` | `engine/scene.py` | The live `SceneControls`. Drives scene transitions, installing each active scene into the `ActiveSceneNamespace` and snapshotting merge strategies through `EffectAdmin`; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot`. `load`, `overlay`, `reboot_into` and `reboot_to_previous` raise `MissingCapabilityError` before recording, persisting or resetting anything when the target's Required capabilities aren't all in `GameEngine.capabilities`; `pop` does not check |
+| `SceneReboot` | `engine/state.py` | Board-free port `SceneManager` reboots through; `previous_scene()` names the scene `reboot_to_previous` would boot, so it is checked first; live adapter `DeviceSceneReboot` |
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
 | `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor for a phase machine's key + initial phase; registry of each phase's owning `PhaseRule` |
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
@@ -183,7 +186,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `PackRegistry` | `engine/packs.py` | Looks up the items of versioned effect or rule packs by pack and item name; filled only by the catalog |
 | `PackCatalog` | `engine/pack_catalog.py` | One scan of every pack root: effect/rule `PackRegistry`s, `SceneRegistry`, pack sounds map; scene declarations, Setting overrides and `requires` names checked, Settings resolved |
 | `SceneRegistry` | `engine/scene.py` | The scanned scenes (plus in-memory test scenes); `required_capabilities(name)` reads a scene's Required capabilities without constructing it |
-| `UnknownCapabilityError` / `MissingCapabilityError` | `engine/capabilities.py` | The Capability errors: a `requires` name outside the vocabulary (a `PackScanError`), and a device lacking what a scene or send needs (raised at boot when neither the Persisted scene nor `default_scene` fits) |
+| `UnknownCapabilityError` / `MissingCapabilityError` | `engine/capabilities.py` | The Capability errors: a `requires` name outside the vocabulary (a `PackScanError`), and a device lacking what a scene or send needs (raised at boot when neither the Persisted scene nor `default_scene` fits, and by a transition into a scene the device can't run) |
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
 | `Aura` | `magic/aura.py` | A player/object's magic pool + active `Spells` collection |

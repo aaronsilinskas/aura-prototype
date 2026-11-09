@@ -132,3 +132,26 @@ def test_b_launches_the_entry_a_stepped_to(simulation):
     device.tap("B")
 
     assert device.scene == "element_browser"
+
+
+def test_a_device_without_an_accelerometer_previews_no_red_light_green_light(simulation):
+    device = simulation.add_device("red", scene="example_lobby", without={"accelerometer"})
+
+    assert watch_previews(simulation, device) == [
+        "hardware_test",
+        "element_browser",
+        "tag",
+        "hardware_test",
+        "element_browser",
+        "tag",
+    ]
+
+
+def test_a_steps_past_an_entry_the_device_cannot_run(simulation):
+    device = simulation.add_device("red", scene="example_lobby", without={"accelerometer"})
+    device.tap("A")
+
+    device.tap("A")
+    device.tap("B")
+
+    assert device.scene == "tag"

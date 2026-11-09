@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
+from engine.capabilities import MissingCapabilityError
 from packs.tests.settings_helper import settings_for
 
 _SCENES_DIR = Path(__file__).resolve().parents[3] / "scenes"
@@ -99,11 +100,27 @@ def test_a_device_switched_on_into_the_scene_has_nothing_to_return_to(simulation
     assert device.scene == scene
 
 
+@pytest.mark.parametrize("lacking", ["button.B", "storage"])
 @pytest.mark.parametrize("scene", SCENES)
-def test_a_card_less_device_stays_in_its_scene(simulation, scene):
-    device = simulation.add_device("red", scene=scene, without={"storage"})
+def test_a_device_lacking_what_the_pack_requires_does_not_start_the_scene(
+    simulation, scene, lacking
+):
+    with pytest.raises(MissingCapabilityError) as excinfo:
+        simulation.add_device("red", scene=scene, without={lacking})
+
+    assert lacking in excinfo.value.capabilities
+
+
+def test_a_hold_does_not_return_to_a_scene_the_device_cannot_run(simulation, tmp_path):
+    state_file = tmp_path / "aura-state.json"
+    state_file.write_text(json.dumps({"return_to": "red_light_green_light"}))
+    device = simulation.add_device(
+        "red", scene="element_browser", card=tmp_path, without={"accelerometer"}
+    )
 
     device.hold("A", "B")
-    simulation.advance(hold_seconds(scene))
+    with pytest.raises(MissingCapabilityError) as excinfo:
+        simulation.advance(hold_seconds("element_browser"))
 
-    assert device.scene == scene
+    assert excinfo.value.scene == "red_light_green_light"
+    assert json.loads(state_file.read_text()) == {"return_to": "red_light_green_light"}

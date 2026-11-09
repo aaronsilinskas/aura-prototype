@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from app.simulation import Simulation
+from engine.capabilities import MissingCapabilityError
 from engine.state import Scope
 
 _GREEN = 0x00FF00
@@ -57,6 +58,25 @@ BUILD = _Builder()
 """
 
 
+_REBOOT_ON_A_RULE = """\
+from engine.engine import GameRule
+from engine.input import InputEvents
+from engine.state import GameState
+
+
+class _Launch(GameRule):
+    def __init__(self) -> None:
+        self.on(InputEvents.Sensors, self._handle)
+
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
+        if event.buttons.is_pressed("A"):
+            state.scene_controls.reboot_into({target!r})
+
+
+RULE = _Launch()
+"""
+
+
 def _package(directory: Path) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "__init__.py").touch()
@@ -88,6 +108,16 @@ def install_card_scene(
     )
     rules = _package(scene_dir / "rules")
     (rules / "light.py").write_text(_LIGHTING_RULE.format(effect=effect, color=color))
+
+
+def install_card_launcher(card: Path, scene: str, target: str) -> None:
+    """Put *scene* on *card*: Button A reboots into *target*."""
+    scene_dir = _card_pack_dir(card, "scenes", scene)
+    (scene_dir / "scene.json").write_text(
+        json.dumps({"version": "1.0", "effect_packs": [], "rule_packs": []})
+    )
+    rules = _package(scene_dir / "rules")
+    (rules / "launch.py").write_text(_REBOOT_ON_A_RULE.format(target=target))
 
 
 def install_card_effect_pack(card: Path, pack: str) -> None:
@@ -140,10 +170,33 @@ def test_a_scene_using_a_card_effect_pack_plays_it(simulation, tmp_path):
     assert device.strip(Scope.PERSONAL).all_lit(_GREEN)
 
 
-def test_a_card_less_device_has_no_card(simulation):
-    device = simulation.add_device("red", scene="example_lobby", without={"storage"})
+def test_rebooting_into_a_scene_the_device_cannot_run_raises_and_persists_nothing(
+    simulation, tmp_path
+):
+    install_card_launcher(tmp_path, "launcher", target="red_light_green_light")
+    device = simulation.add_device(
+        "red", scene="launcher", card=tmp_path, without={"accelerometer"}
+    )
+    state_file = tmp_path / "aura-state.json"
+    before = state_file.read_text() if state_file.exists() else None
 
-    assert device.card is None
+    with pytest.raises(MissingCapabilityError) as excinfo:
+        device.tap("A")
+
+    assert excinfo.value.scene == "red_light_green_light"
+    assert (state_file.read_text() if state_file.exists() else None) == before
+
+
+def test_a_refused_reboot_leaves_the_device_running_its_scene(simulation, tmp_path):
+    install_card_launcher(tmp_path, "launcher", target="red_light_green_light")
+    device = simulation.add_device(
+        "red", scene="launcher", card=tmp_path, without={"accelerometer"}
+    )
+
+    with pytest.raises(MissingCapabilityError):
+        device.tap("A")
+
+    assert device.scene == "launcher"
 
 
 def test_the_next_scene_a_device_persists_is_on_the_card_it_was_handed(simulation, tmp_path):

@@ -85,7 +85,7 @@ def test_ir_range_receiver_scene_boots_and_activates_via_the_standard_pipeline()
 
 
 def test_the_active_scenes_rules_see_the_devices_capabilities():
-    hw = _fake_hw(capabilities=frozenset(("radio", "button.A")))
+    hw = _fake_hw(capabilities=frozenset(("radio", "button.A", "button.B", "storage")))
 
     runtime = build_scene_runtime(hw, "hardware_test", catalog=_boot_catalog())
 

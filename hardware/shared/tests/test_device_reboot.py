@@ -146,3 +146,27 @@ def test_reboot_to_previous_on_a_card_less_device_logs():
     reboot.reboot_to_previous()
 
     assert lines
+
+
+# ---------------------------------------------------------------------------
+# previous_scene — the scene reboot_to_previous would boot
+# ---------------------------------------------------------------------------
+
+
+def test_previous_scene_is_the_recorded_return_to(device_storage):
+    DeviceStateStore(device_storage).set("return_to", "lobby")
+    reboot = DeviceSceneReboot(device_storage, booted_scene="tag", reset=RecordingReset())
+
+    assert reboot.previous_scene() == "lobby"
+
+
+def test_previous_scene_is_none_when_no_return_to_is_recorded(device_storage):
+    reboot = DeviceSceneReboot(device_storage, booted_scene="tag", reset=RecordingReset())
+
+    assert reboot.previous_scene() is None
+
+
+def test_previous_scene_is_none_on_a_card_less_device():
+    reboot = DeviceSceneReboot(None, booted_scene="tag", reset=RecordingReset())
+
+    assert reboot.previous_scene() is None

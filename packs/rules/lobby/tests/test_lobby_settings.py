@@ -17,7 +17,7 @@ ENTRIES = [{"scene": "tag", "effect": "elements.fire"}]
 def _scan_lobby_scene(pack_tree, settings: dict[str, object]) -> None:
     """Scan the real packs plus scene ``bare_lobby``, declaring ``lobby`` with *settings*."""
     root = pack_tree.root("ts_flash")
-    reference = {"name": "lobby", "version": "1.0", "settings": settings}
+    reference = {"name": "lobby", "version": "2.0", "settings": settings}
     pack_tree.scene(root, "bare_lobby", rule_packs=[reference])
     pack_tree.scan_roots(_PACKS_ROOT, root)
 

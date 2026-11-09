@@ -186,7 +186,7 @@ The per-deploy value `deploy.py --scene` writes as `scene_deploy_token` beside `
 _Avoid_: "nonce", "deploy id" for it; comparing scene names instead (a second deploy of the same scene would be mistaken for the first); copying the deployed scene onto the card; a separate inbox file; applying it outside the shared boot (`build_scene_boot`)
 
 ### SceneReboot
-The board-free port `SceneManager` reaches to persist a scene switch and reboot the device; live adapter `DeviceSceneReboot`.
+The board-free port `SceneManager` reaches to persist a scene switch and reboot the device; live adapter `DeviceSceneReboot`. Its `previous_scene` names the scene `reboot_to_previous` would boot, so `SceneManager` can check that scene's **Required capabilities** before anything is persisted.
 _Avoid_: validating the target here (that is `SceneManager.reboot_into`'s job); calling `microcontroller.reset()` anywhere but `run_scene` (and the on-device `reboot_demo` example), which inject it into `DeviceSceneReboot`
 
 ### EffectControls

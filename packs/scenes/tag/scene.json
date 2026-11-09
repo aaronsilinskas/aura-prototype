@@ -7,7 +7,7 @@
     { "name": "elements", "version": "1.0" }
   ],
   "rule_packs": [
-    { "name": "return_to_lobby", "version": "1.0" }
+    { "name": "return_to_lobby", "version": "2.0" }
   ],
   "settings": {
     "starting_hitpoints": {

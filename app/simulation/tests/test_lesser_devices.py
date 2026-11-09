@@ -1,8 +1,9 @@
 """A Simulated device that lacks some Capabilities: ``add_device(without=...)``.
 
-Booted into hardware_test, which requires nothing of its own, so a device
-lacking any hardware still boots it; boot itself runs only a scene the
-device has the Required capabilities for.
+Booted into hardware_test, which requires nothing of its own beyond what
+``return_to_lobby`` does (buttons A and B, and storage); a device lacking one
+of those boots ir_range_receiver instead, which requires only ``ir.receive``.
+Boot itself runs only a scene the device has the Required capabilities for.
 """
 
 from __future__ import annotations
@@ -33,6 +34,13 @@ _FULL = frozenset(
 _IR = frozenset(("ir.line", "ir.cone", "ir.area_of_effect", "ir.receive"))
 RADIO_MODE = 4
 """Presses of B from switch-on that reach hardware_test's radio mode, where A sends."""
+LESSER_SCENE = "ir_range_receiver"
+"""A shipped scene a device lacking buttons or storage boots: it requires only ``ir.receive``."""
+
+
+def _boots(without: str) -> str:
+    """hardware_test, unless the device lacks what it requires; then ``LESSER_SCENE``."""
+    return LESSER_SCENE if without in ("button.A", "button.B", "storage") else "hardware_test"
 
 
 def test_a_fully_built_simulated_device_has_every_capability(simulation):
@@ -58,7 +66,7 @@ def test_a_fully_built_simulated_device_has_every_capability(simulation):
     ],
 )
 def test_without_a_capability_the_device_lacks_it_and_keeps_the_rest(simulation, without, lost):
-    device = simulation.add_device("red", scene="hardware_test", without={without})
+    device = simulation.add_device("red", scene=_boots(without), without={without})
 
     assert device.capabilities == _FULL - lost
 
@@ -75,14 +83,14 @@ def test_without_a_name_outside_the_vocabulary_raises(simulation):
 
 
 def test_without_storage_the_device_has_no_card(simulation):
-    device = simulation.add_device("red", scene="hardware_test", without={"storage"})
+    device = simulation.add_device("red", scene=LESSER_SCENE, without={"storage"})
 
     assert device.card is None
 
 
 def test_a_card_handed_to_a_device_without_storage_raises(simulation, tmp_path):
     with pytest.raises(ValueError, match="no SD card"):
-        simulation.add_device("red", scene="hardware_test", without={"storage"}, card=tmp_path)
+        simulation.add_device("red", scene=LESSER_SCENE, without={"storage"}, card=tmp_path)
 
 
 def test_a_device_without_a_radio_ignores_packets_others_send(simulation: Simulation):
@@ -98,7 +106,7 @@ def test_a_device_without_a_radio_ignores_packets_others_send(simulation: Simula
 
 
 def test_pressing_a_button_the_device_lacks_raises_naming_it(simulation):
-    device = simulation.add_device("red", scene="hardware_test", without={"button.B"})
+    device = simulation.add_device("red", scene=LESSER_SCENE, without={"button.B"})
 
     with pytest.raises(ValueError, match="'B'"):
         device.tap("B")

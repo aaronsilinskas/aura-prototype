@@ -186,6 +186,7 @@ def _build_prop(scene_name: str, config: DeviceConfig) -> tuple[SceneManager, Ef
         effect_controls=effect_manager,
         timer=timer,
         network_controls=hw.network_controls,
+        capabilities=hw.capabilities,
     )
     manager = SceneManager(
         engine,

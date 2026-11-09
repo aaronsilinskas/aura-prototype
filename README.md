@@ -276,7 +276,7 @@ A **Scene** is a declarative bundle, described by its `scene.json`:
   "version": "1.0",
   "effect_packs": [{"name": "elements", "version": "1.0"}],
   "rule_packs": [
-    {"name": "return_to_lobby", "version": "1.0", "settings": {"hold_seconds": 2.0}}
+    {"name": "return_to_lobby", "version": "2.0", "settings": {"hold_seconds": 2.0}}
   ],
   "settings": {
     "window_seconds": {"type": "float", "default": 3.0, "description": "Seconds per window."}
