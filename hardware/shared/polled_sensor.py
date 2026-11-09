@@ -10,6 +10,7 @@ except ImportError:
 
 from engine.input import AccelerationData, MagneticData
 from engine.log import Logger
+from hardware.shared.polled_part import PolledPart
 
 __all__ = ["RECOVERY_READS", "PolledSensor"]
 
@@ -17,7 +18,7 @@ __all__ = ["RECOVERY_READS", "PolledSensor"]
 RECOVERY_READS: Final = 50
 
 
-class PolledSensor:
+class PolledSensor(PolledPart):
     """Refreshes one sensor's reading from its raw read source, once per ``update(elapsed)``.
 
     *read* is a :class:`~hardware.shared.device_parts.DeviceParts` raw read

@@ -64,6 +64,7 @@ from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_wiring import wire_ir
 from hardware.shared.network_controls import HardwareNetworkControls
+from hardware.shared.polled_part import PolledPart
 from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.radio_transceiver import RadioTransceiver
 
@@ -224,6 +225,12 @@ def _polled_sensor(
     )
 
 
+def _append_built(polled: list[PolledPart], part: PolledPart | None) -> None:
+    """List *part* as a **Polled part** if it was built; an absent part is never polled."""
+    if part is not None:
+        polled.append(part)
+
+
 def _capabilities(
     buttons: DebouncedButtons,
     accelerometer: PolledSensor | None,
@@ -341,6 +348,7 @@ def assemble_device(
         return DebouncedButtons(readers), "ok"
 
     buttons = narrate_step(logger, describe_buttons(config.buttons), _build_buttons)
+    polled: list[PolledPart] = [buttons]
 
     accelerometer = _polled_sensor(
         logger,
@@ -360,6 +368,8 @@ def assemble_device(
         parts.magnetometer,
         MagneticData(0.0, 0.0, 0.0),
     )
+    _append_built(polled, accelerometer)
+    _append_built(polled, magnetometer)
 
     def _build_audio(audio: AudioConfig) -> tuple[EffectOutput, str]:
         output = parts.audio_output(
@@ -393,6 +403,7 @@ def assemble_device(
         return RadioTransceiver(transport), "ok"
 
     radio = _gated_step(logger, config.radio, describe_radio, _build_radio)
+    _append_built(polled, radio)
 
     storage = _gated_step(
         logger,
@@ -405,6 +416,7 @@ def assemble_device(
     )
 
     ir = _gated_step(logger, config.ir, describe_ir, lambda c: _ir(c, parts))
+    _append_built(polled, ir)
 
     elapsed = time.monotonic() - start
     logger.log(
@@ -421,4 +433,5 @@ def assemble_device(
         ir=ir,
         radio=radio,
         storage=storage,
+        polled=tuple(polled),
     )

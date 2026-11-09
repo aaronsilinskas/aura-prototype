@@ -4,6 +4,7 @@ except ImportError:
     pass
 
 from engine.input import ButtonData
+from hardware.shared.polled_part import PolledPart
 
 DEBOUNCE_INTERVAL = 0.05
 """Seconds a pin level must hold before it is committed, unless a debouncer is given another."""
@@ -23,7 +24,7 @@ class _ButtonState:
         self.candidate_time = 0.0
 
 
-class DebouncedButtons:
+class DebouncedButtons(PolledPart):
     """Time-based button debouncer using pull-up semantics.
 
     Accepts a list of (label, predicate) pairs where each predicate returns the

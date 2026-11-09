@@ -109,7 +109,7 @@ def _build_network_controls() -> tuple[HardwareNetworkControls, InfraredTranscei
 
     Returns both the send-only `HardwareNetworkControls` seam and the
     `InfraredTransceiver` it delegates to -- `run()` pumps the transceiver
-    directly (`transceiver.update()`) since the pump lifecycle no longer
+    directly (`transceiver.update`) since the pump lifecycle no longer
     lives on `HardwareNetworkControls`.
     """
     import board
@@ -153,7 +153,7 @@ def run() -> None:
             send_start = time.monotonic()
             network_controls.send_ir(payload, LINE)
             blocking_send_ms = (time.monotonic() - send_start) * 1000.0
-            transceiver.update()
+            transceiver.update(0.0)
             perf.add_update_time()
 
             if blocking_send_ms > worst_blocking_send_ms:

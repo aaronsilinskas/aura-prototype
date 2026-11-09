@@ -206,7 +206,7 @@ def test_a_received_payload_decodes_on_the_next_transceiver_update(rx):
     sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir={"rx": rx}))
 
     sim_hw.receive_ir(b"\x12\x34")
-    _ir(sim_hw).update()
+    _ir(sim_hw).update(0.0)
 
     assert _ir(sim_hw).received == b"\x12\x34"
 
@@ -223,7 +223,7 @@ def test_a_received_payload_reports_full_signal_strength():
     sim_hw = SimulatedHardware(now=lambda: 0.0, config=_config(ir=LINE_ONLY_IR))
 
     sim_hw.receive_ir(b"\x12")
-    _ir(sim_hw).update()
+    _ir(sim_hw).update(0.0)
 
     assert _ir(sim_hw).last_signal_strength == 1.0
 
@@ -233,7 +233,7 @@ def test_a_received_payload_travels_the_installed_codecs_wire():
     _ir(sim_hw).apply_codec(TagInfraredEncoder, TagInfraredDecoder)
 
     sim_hw.receive_ir(b"\xff\x01")
-    _ir(sim_hw).update()
+    _ir(sim_hw).update(0.0)
 
     assert _ir(sim_hw).received == b"\x7f"
 
@@ -245,7 +245,7 @@ def test_payloads_received_together_decode_one_per_update():
     sim_hw.receive_ir(b"\x02")
     received = []
     for _ in range(3):
-        _ir(sim_hw).update()
+        _ir(sim_hw).update(0.0)
         received.append(_ir(sim_hw).received)
 
     assert received == [b"\x01", b"\x02", None]
@@ -257,7 +257,7 @@ def test_a_device_never_decodes_its_own_send():
     sim_hw.hw.network_controls.send_ir(b"\x01", LINE)
     received = []
     for _ in range(2):
-        _ir(sim_hw).update()
+        _ir(sim_hw).update(0.0)
         received.append(_ir(sim_hw).received)
 
     assert received == [None, None]
@@ -268,7 +268,7 @@ def test_a_payload_landing_with_the_devices_own_send_is_dropped_with_it():
 
     sim_hw.hw.network_controls.send_ir(b"\x01", LINE)
     sim_hw.receive_ir(b"\x02")
-    _ir(sim_hw).update()
+    _ir(sim_hw).update(0.0)
 
     assert _ir(sim_hw).received is None
 
@@ -402,7 +402,7 @@ def test_a_landed_radio_packet_is_read_with_its_sender():
     assert radio is not None
 
     sim_hw.land_radio(b"ping", sender=4)
-    radio.update()
+    radio.update(0.0)
 
     assert radio.received == b"ping"
     assert radio.last_sender == 4
@@ -415,7 +415,7 @@ def test_a_reset_loses_radio_packets_not_yet_read():
     sim_hw.power_on()
     radio = sim_hw.hw.radio
     assert radio is not None
-    radio.update()
+    radio.update(0.0)
 
     assert radio.received is None
 

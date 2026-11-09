@@ -282,17 +282,19 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     The one loop body shared by the device
     (:func:`app.scene_runtime.run_scene`, which adds only ``while True:`` and
     ``gc.collect()``) and the Simulated device, so neither copies it, as
-    both share the boot that builds it (:func:`build_scene_boot`). Build it
-    once per runtime: the ``InputEvents.Sensors`` event and the telemetry
-    gate are allocated here (the button, acceleration and magnetic buffers
-    are each part's own ``reading``)
-    and mutated in place every tick, so the steady-state tick allocates
-    nothing on-device.
+    both share the boot that builds it (:func:`build_scene_boot`). Each tick
+    updates every Polled part in ``hw.polled``, naming none, then builds
+    the events from their state. Build it once per runtime: the
+    ``InputEvents.Sensors`` event and the telemetry gate are allocated here
+    (the button, acceleration and magnetic buffers are each part's own
+    ``reading``) and mutated in place every tick, so the steady-state tick
+    allocates nothing on-device.
 
     A caller with events of its own to inject queues them on
     ``runtime.manager.active_state`` before calling the tick; they are
     dispatched in that tick's ``manager.update()``.
     """
+    polled = hw.polled
     accelerometer = hw.accelerometer
     magnetometer = hw.magnetometer
     button_data = hw.buttons.reading
@@ -313,32 +315,15 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
         nonlocal last_telemetry_print_total
 
         elapsed = timer.elapsed
-        hw.buttons.update(elapsed)
-
-        if accelerometer is not None:
-            accelerometer.update(elapsed)
-
-        if magnetometer is not None:
-            magnetometer.update(elapsed)
-
-        # Unconditional, before the active_state check: a send can be in
-        # flight across a scene transition, and ir.update() always pumps so
-        # a deferred end_transmit still arms the flush latch its own receive
-        # consumes this same tick. It also always receives when a receiver
-        # is wired, so a packet decoded while no scene is active is
-        # drained-and-dropped here rather than left to overflow — only the
-        # queuing below is conditional on a scene being active. A no-op
-        # when no ir section is wired at all (ir is None).
-        if ir is not None:
-            ir.update()
-
-        # Same unconditional rationale as ir.update() above: radio.update()
-        # always polls for a waiting packet regardless of whether a scene is
-        # active, so a packet decoded with no active scene is simply never
-        # queued below rather than left to build up in the transport. A
-        # no-op when no radio peripheral is wired at all (radio is None).
-        if radio is not None:
-            radio.update()
+        # Every Polled part, IR and radio included, is polled unconditionally,
+        # before the active_state check: a send can be in flight across a
+        # scene transition, and ir.update() always pumps so a deferred
+        # end_transmit still arms the flush latch its own receive consumes
+        # this same tick. A packet received while no scene is active is
+        # drained-and-dropped here rather than left to overflow; only the
+        # queuing below is conditional on a scene being active.
+        for part in polled:
+            part.update(elapsed)
 
         active_state = manager.active_state
 
