@@ -335,7 +335,7 @@ def run() -> None:
             _inject_press("A", _button_data)
             start_injected = True
 
-        accelerometer.update()
+        accelerometer.update(elapsed)
 
         # Outside the active_state guard and before checking ir.received: a
         # send can be in flight across a scene transition, and ir.update()

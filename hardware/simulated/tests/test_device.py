@@ -300,7 +300,7 @@ def _with_accelerometer(clock: _Clock) -> SimulatedHardware:
 def _poll(sensor: PolledSensor | None) -> tuple[float, float, float]:
     """Poll *sensor* once, as a tick does, and return its reading."""
     assert sensor is not None
-    sensor.update()
+    sensor.update(0.0)
     reading = sensor.reading
     return (reading.x, reading.y, reading.z)
 

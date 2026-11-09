@@ -138,7 +138,7 @@ def test_an_enabled_accelerometer_section_is_a_polled_sensor_reading_its_part():
     parts.acceleration = (1.0, 2.0, 3.0)
 
     assert isinstance(hw.accelerometer, PolledSensor)
-    hw.accelerometer.update()
+    hw.accelerometer.update(0.0)
     reading = hw.accelerometer.reading
     assert (reading.x, reading.y, reading.z) == (1.0, 2.0, 3.0)
 
@@ -148,7 +148,7 @@ def test_an_enabled_magnetometer_section_is_a_polled_sensor_reading_its_part():
     parts.magnetic = (4.0, 5.0, 6.0)
 
     assert isinstance(hw.magnetometer, PolledSensor)
-    hw.magnetometer.update()
+    hw.magnetometer.update(0.0)
     reading = hw.magnetometer.reading
     assert (reading.x, reading.y, reading.z) == (4.0, 5.0, 6.0)
 
@@ -166,7 +166,7 @@ def test_a_sensor_logs_a_read_failing_line_under_its_section_name_to_the_assembl
     setattr(parts, reading_attr, (1.0, 2.0))  # not 3-tuple: a failed read
     del fragments[:]
 
-    getattr(hw, sensor).update()
+    getattr(hw, sensor).update(0.0)
 
     assert "".join(fragments).startswith(f"[hw] {sensor} read failing: ValueError(")
 

@@ -313,13 +313,14 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     def tick() -> None:
         nonlocal last_telemetry_print_total
 
-        hw.buttons.update(timer.elapsed, button_data)
+        elapsed = timer.elapsed
+        hw.buttons.update(elapsed, button_data)
 
         if accelerometer is not None:
-            accelerometer.update()
+            accelerometer.update(elapsed)
 
         if magnetometer is not None:
-            magnetometer.update()
+            magnetometer.update(elapsed)
 
         # Unconditional, before the active_state check: a send can be in
         # flight across a scene transition, and ir.update() always pumps so
