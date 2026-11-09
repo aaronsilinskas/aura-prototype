@@ -4,7 +4,7 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-- **`GLOSSARY.md`** at the repo root: canonical code-facing terms and the words to avoid.
+- **`GLOSSARY.md`** at the repo root: canonical code-facing terms and the words to avoid. It is long: list its terms with `grep -n "^### " GLOSSARY.md`, then read just the entries you need by line range.
 - **`docs/domain.md`**: the domain map (module layout, key types, constraints). Term meanings live in the glossary, not here.
 - **`docs/adr/`**: read ADRs that touch the area you're about to work in.
 - **`~/dev/aura/aura-docs/`** (Obsidian vault): game and hardware design, including magic-system vocabulary (elements, auras, spells). Read the relevant notes when a task touches game rules or props.
