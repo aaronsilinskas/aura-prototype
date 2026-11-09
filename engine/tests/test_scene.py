@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from engine.capabilities import MissingCapabilityError
 from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.engine import GameEngine, GameRule
@@ -1309,3 +1310,103 @@ def test_nested_overlay_pop_merge_strategy_change_never_leaks_past_its_own_pop(
     assert _fill_personal_and_tick(effect_manager, output) == _SPLIT_RED_BLUE, (
         "base's original Split choice must be restored once every overlay above it is popped"
     )
+
+
+# ---------------------------------------------------------------------------
+# SceneManager — every transition into a scene checks its Required capabilities
+# ---------------------------------------------------------------------------
+
+_HAS_BUTTONS = frozenset(("button.A", "button.B"))
+
+
+def _capability_manager(pack_tree, scene_reboot: SceneReboot | None = None) -> SceneManager:
+    """A manager on a device with only buttons A and B, whose ``home`` scene is active.
+
+    ``home`` requires nothing; ``tilt`` requires the accelerometer the device lacks.
+    """
+    catalog = pack_tree.scan(scenes={"home": {}, "tilt": {"requires": ["accelerometer"]}})
+    engine = GameEngine(effect_controls=_RecordingEffectControls(), capabilities=_HAS_BUTTONS)
+    manager = _make_scene_manager(
+        engine, scene_registry=catalog.scene_registry, scene_reboot=scene_reboot
+    )
+    manager.load("home")
+    manager.update()
+    return manager
+
+
+def test_scene_controls_can_run_raises_not_implemented_error() -> None:
+    with pytest.raises(NotImplementedError):
+        SceneControls().can_run("any")
+
+
+def test_scene_reboot_previous_scene_raises_not_implemented_error() -> None:
+    with pytest.raises(NotImplementedError):
+        SceneReboot().previous_scene()
+
+
+def test_can_run_answers_whether_the_device_has_a_scenes_required_capabilities(pack_tree):
+    manager = _capability_manager(pack_tree)
+
+    assert (manager.can_run("home"), manager.can_run("tilt")) == (True, False)
+
+
+def test_can_run_raises_for_an_unknown_scene(pack_tree):
+    manager = _capability_manager(pack_tree)
+
+    with pytest.raises(ValueError, match="nonexistent"):
+        manager.can_run("nonexistent")
+
+
+@pytest.mark.parametrize("transition", ["load", "overlay"])
+def test_a_deferred_transition_into_a_scene_the_device_cannot_run_raises(pack_tree, transition):
+    manager = _capability_manager(pack_tree)
+
+    with pytest.raises(MissingCapabilityError) as excinfo:
+        getattr(manager, transition)("tilt")
+
+    assert (excinfo.value.scene, excinfo.value.capabilities) == ("tilt", {"accelerometer"})
+
+
+@pytest.mark.parametrize("transition", ["load", "overlay"])
+def test_a_refused_deferred_transition_leaves_the_active_scene_in_place(pack_tree, transition):
+    manager = _capability_manager(pack_tree)
+    before = manager.active_state
+
+    with pytest.raises(MissingCapabilityError):
+        getattr(manager, transition)("tilt")
+    manager.update()
+
+    assert manager.active_state is before
+
+
+def test_reboot_into_a_scene_the_device_cannot_run_raises_and_never_reaches_the_port(pack_tree):
+    scene_reboot = RecordingSceneReboot()
+    manager = _capability_manager(pack_tree, scene_reboot)
+
+    with pytest.raises(MissingCapabilityError) as excinfo:
+        manager.reboot_into("tilt")
+
+    assert excinfo.value.scene == "tilt"
+    assert scene_reboot.reboot_into_calls == []
+
+
+def test_reboot_to_previous_into_a_scene_the_device_cannot_run_raises_and_never_reaches_the_port(
+    pack_tree,
+):
+    scene_reboot = RecordingSceneReboot(previous="tilt")
+    manager = _capability_manager(pack_tree, scene_reboot)
+
+    with pytest.raises(MissingCapabilityError) as excinfo:
+        manager.reboot_to_previous()
+
+    assert excinfo.value.scene == "tilt"
+    assert scene_reboot.reboot_to_previous_calls == 0
+
+
+def test_reboot_to_previous_into_a_scene_the_device_can_run_reaches_the_port(pack_tree):
+    scene_reboot = RecordingSceneReboot(previous="home")
+    manager = _capability_manager(pack_tree, scene_reboot)
+
+    manager.reboot_to_previous()
+
+    assert scene_reboot.reboot_to_previous_calls == 1

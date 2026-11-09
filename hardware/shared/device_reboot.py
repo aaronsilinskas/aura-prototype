@@ -83,10 +83,14 @@ class DeviceSceneReboot(SceneReboot):
         if self._storage is None:
             self._logger.log("no SD card mounted; not rebooting to the previous scene")
             return
-        return_to = self._state_store.get("return_to")
+        return_to = self.previous_scene()
         if return_to is None:
             self._logger.log("no return_to recorded; not rebooting")
             return
         self._state_store.set("scene", return_to)
         self._state_store.clear("return_to")
         self._reset()
+
+    def previous_scene(self) -> str | None:
+        """The recorded ``return_to``, or ``None`` when none is, or on a card-less device."""
+        return self._state_store.get("return_to")

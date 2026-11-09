@@ -15,6 +15,7 @@ try:
 except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
+from engine.capabilities import MissingCapabilityError
 from engine.engine import GameEngine, GameRule, Version
 from engine.namespace import ActiveSceneNamespace
 from engine.packs import PackRegistry, UnknownItemError, load_item
@@ -422,6 +423,13 @@ class SceneManager(SceneControls):
     ``overlay`` call ``scene_registry.get(name)``; ``load`` raises
     ``ValueError`` for unknown names because ``SceneRegistry.get`` does.
 
+    The device's Capabilities are ``engine.capabilities``. Every transition
+    into a scene (``load``, ``overlay``, ``reboot_into``,
+    ``reboot_to_previous``) checks the target's Required capabilities against
+    them and raises ``MissingCapabilityError`` before recording, persisting
+    or resetting anything; ``pop`` returns to a scene that already ran and
+    does not check. ``can_run`` asks the same question without raising.
+
     *effect_admin* is the scene-transition face of the same effect system
     ``engine`` was built with (its ``EffectControls`` and ``EffectAdmin`` are
     two faces of one ``EffectManager`` instance). Every merge-strategy
@@ -434,9 +442,10 @@ class SceneManager(SceneControls):
     sounds and declared ``effect_packs`` names.
 
     *scene_reboot* is the injected ``SceneReboot`` port ``reboot_into``/
-    ``reboot_to_previous`` delegate to. Unlike *effect_admin* and *namespace*
-    it plays no role in ``load``/``overlay``/``pop`` — it exists solely for
-    the two reboot methods, which apply immediately and synchronously rather
+    ``reboot_to_previous`` delegate to (its ``previous_scene`` names the
+    target ``reboot_to_previous`` checks). Unlike *effect_admin* and
+    *namespace* it plays no role in ``load``/``overlay``/``pop`` — it exists
+    solely for the two reboot methods, which apply immediately and synchronously rather
     than joining the deferred-transition queue.
     """
 
@@ -482,14 +491,44 @@ class SceneManager(SceneControls):
     # ------------------------------------------------------------------
 
     def load(self, name: str) -> None:
-        """Record a load transition for *name*; raises immediately if unknown."""
-        self._pending = ("load", self._scene_registry.get(name))
+        """Record a load transition for *name*; raises immediately if unknown.
+
+        Raises:
+            MissingCapabilityError: the device can't run *name*; nothing is
+                recorded.
+        """
+        scene = self._scene_registry.get(name)
+        self._require_runnable(name)
+        self._pending = ("load", scene)
 
     def overlay(self, name: str) -> None:
-        """Record an overlay transition for *name*; raises immediately if invalid."""
+        """Record an overlay transition for *name*; raises immediately if invalid.
+
+        Raises:
+            MissingCapabilityError: the device can't run *name*; nothing is
+                recorded.
+        """
         if not self._stack:
             raise ValueError("Cannot overlay: no active scene on stack")
-        self._pending = ("overlay", self._scene_registry.get(name))
+        scene = self._scene_registry.get(name)
+        self._require_runnable(name)
+        self._pending = ("overlay", scene)
+
+    def can_run(self, name: str) -> bool:
+        """Whether the engine's device has every Required capability of *name*.
+
+        Raises:
+            ValueError: if *name* is not a registered scene.
+        """
+        return not self._missing_capabilities(name)
+
+    def _missing_capabilities(self, name: str) -> frozenset[str]:
+        return self._scene_registry.required_capabilities(name) - self._engine.capabilities
+
+    def _require_runnable(self, name: str) -> None:
+        missing = self._missing_capabilities(name)
+        if missing:
+            raise MissingCapabilityError(missing, name)
 
     @property
     def active_state(self) -> GameState | None:
@@ -516,20 +555,32 @@ class SceneManager(SceneControls):
         when *target* is not in the scene registry — a typo caught here
         (e.g. at the Button-B press) never reaches the port, so it never
         persists a name that would brick the next boot. A known *target*
-        delegates straight through; ``SceneReboot.reboot_into`` reboots and
-        never returns.
+        the device can run delegates straight through;
+        ``SceneReboot.reboot_into`` reboots and never returns.
+
+        Raises:
+            MissingCapabilityError: the device can't run *target*; nothing
+                is persisted and the device doesn't reset.
         """
         self._scene_registry.resolve_known(target)
+        self._require_runnable(target)
         self._scene_reboot.reboot_into(target)
 
     def reboot_to_previous(self) -> None:
-        """Delegate to the injected ``SceneReboot`` port, unvalidated.
+        """Check the port's ``previous_scene``, then delegate to the port.
 
-        Unlike ``reboot_into``, the recorded ``return_to`` target is
-        validated at boot by ``SceneRegistry.resolve_known``, exactly like the
-        persisted ``scene`` already is — duplicating that check here would
-        only re-do work the boot path already does.
+        With nothing recorded the port's own no-op handles it. A recorded
+        scene is not checked against the registry here: an unknown one is
+        caught at boot by ``SceneRegistry.resolve_known``, exactly like the
+        Persisted scene.
+
+        Raises:
+            MissingCapabilityError: the device can't run the recorded scene;
+                nothing is persisted and the device doesn't reset.
         """
+        previous = self._scene_reboot.previous_scene()
+        if previous is not None and previous in self._scene_registry.names():
+            self._require_runnable(previous)
         self._scene_reboot.reboot_to_previous()
 
     # ------------------------------------------------------------------

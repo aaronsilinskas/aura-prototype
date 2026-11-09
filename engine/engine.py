@@ -78,6 +78,11 @@ class GameEngine:
         self._timer = timer if timer is not None else Timer()
         self._rules: list[GameRule] = []
 
+    @property
+    def capabilities(self) -> frozenset[str]:
+        """The Capabilities of the device this engine runs on."""
+        return self._capabilities
+
     def set_rules(self, rules: list[GameRule]) -> None:
         """Replace the current rule list in full.
 

@@ -239,6 +239,7 @@ def _build_prop() -> tuple[SceneManager, EffectManager, Timer, object, PolledSen
         effect_controls=effect_manager,
         timer=timer,
         network_controls=hardware.network_controls,
+        capabilities=hardware.capabilities,
     )
     # Stage snapshot: Timer + GameEngine.
     gc.collect()
