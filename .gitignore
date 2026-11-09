@@ -35,3 +35,6 @@ fp-info-cache
 *.kicad_prl
 *.lck
 ~*
+
+# Agent worktrees (Claude Code)
+.claude/worktrees/
