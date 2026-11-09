@@ -44,16 +44,17 @@ class PackTree:
         items: dict[str, str] | None = None,
         sounds: Iterable[str] = (),
         settings: dict[str, object] | None = None,
+        requires: object = None,
         manifest: str | None = None,
     ) -> Path:
         """Create effect pack *name* under *root*, with ``effects.json`` stating *version*.
 
         *settings* is the manifest's ``settings`` section, the pack's Setting
-        declarations. *manifest* gives the manifest's raw text instead;
-        ``version=None`` omits the version.
+        declarations; *requires*, when given, its ``requires`` list. *manifest*
+        gives the manifest's raw text instead; ``version=None`` omits the version.
         """
         pack_dir = self._pack(
-            root / "effects" / name, "effects.json", version, settings, manifest, items
+            root / "effects" / name, "effects.json", version, settings, requires, manifest, items
         )
         _write_sounds(pack_dir, sounds)
         return pack_dir
@@ -66,15 +67,18 @@ class PackTree:
         version: str | None = "1.0",
         items: dict[str, str] | None = None,
         settings: dict[str, object] | None = None,
+        requires: object = None,
         manifest: str | None = None,
     ) -> Path:
         """Create rule pack *name* under *root*, with ``rules.json`` stating *version*.
 
         *settings* is the manifest's ``settings`` section, the pack's Setting
-        declarations. *manifest* gives the manifest's raw text instead;
-        ``version=None`` omits the version.
+        declarations; *requires*, when given, its ``requires`` list. *manifest*
+        gives the manifest's raw text instead; ``version=None`` omits the version.
         """
-        return self._pack(root / "rules" / name, "rules.json", version, settings, manifest, items)
+        return self._pack(
+            root / "rules" / name, "rules.json", version, settings, requires, manifest, items
+        )
 
     def scene(
         self,
@@ -93,7 +97,7 @@ class PackTree:
         """Create scene *name* under *root* and return its directory.
 
         ``scene.json`` is built from *version*, *effect_packs*, *rule_packs* and
-        any extra *fields* (``ir_codec``, ``settings``), unless *scene_json*
+        any extra *fields* (``ir_codec``, ``settings``, ``requires``), unless *scene_json*
         gives its raw text instead.
         """
         scene_dir = root / "scenes" / name
@@ -145,6 +149,7 @@ class PackTree:
         manifest_name: str,
         version: str | None,
         settings: dict[str, object] | None,
+        requires: object,
         manifest: str | None,
         items: dict[str, str] | None,
     ) -> Path:
@@ -155,6 +160,8 @@ class PackTree:
                 data["version"] = version
             if settings is not None:
                 data["settings"] = settings
+            if requires is not None:
+                data["requires"] = requires
             if data:
                 manifest = json.dumps(data)
         if manifest is not None:

@@ -42,6 +42,9 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   lerp.py         Integer/float interpolation helpers
   packs.py        PackRegistry, RegistryError family (lookup-time)
   pack_catalog.py scan_pack_roots, PackCatalog, PackScanError family (scan-time)
+  scan_error.py   PackScanError base, kept apart so capabilities.py stays importable by hardware
+  capabilities.py Capability vocabulary (is_capability), UnknownCapabilityError,
+                  MissingCapabilityError (board-free; shared by scan, device and harness)
   settings.py     Settings (read-only view), Setting declaration parsing and resolution
   version.py      Pack MAJOR.MINOR parsing
   input.py        ButtonData, AccelerationData, InputEvents
@@ -171,7 +174,9 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `PhaseRule` / `InPhaseRule` | `engine/phase.py` | Phase-owning rule (lifecycle + transitions) vs. phase-gated reactor |
 | `MergeStrategy` | `engine/state.py` | Per-scope compositing policy; subclasses in `engine/effects/merge.py` |
 | `PackRegistry` | `engine/packs.py` | Looks up the items of versioned effect or rule packs by pack and item name; filled only by the catalog |
-| `PackCatalog` | `engine/pack_catalog.py` | One scan of every pack root: effect/rule `PackRegistry`s, `SceneRegistry`, pack sounds map; scene declarations and Setting overrides checked, Settings resolved |
+| `PackCatalog` | `engine/pack_catalog.py` | One scan of every pack root: effect/rule `PackRegistry`s, `SceneRegistry`, pack sounds map; scene declarations, Setting overrides and `requires` names checked, Settings resolved |
+| `SceneRegistry` | `engine/scene.py` | The scanned scenes (plus in-memory test scenes); `required_capabilities(name)` reads a scene's Required capabilities without constructing it |
+| `UnknownCapabilityError` / `MissingCapabilityError` | `engine/capabilities.py` | The Capability errors: a `requires` name outside the vocabulary (a `PackScanError`), and a device lacking what a scene or send needs |
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
 | `Aura` | `magic/aura.py` | A player/object's magic pool + active `Spells` collection |
