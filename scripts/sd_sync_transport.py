@@ -19,12 +19,17 @@ output never contains one. Unlike ``deploy_watch``'s own
 here: SD-sync frames are protocol bytes, not REPL text.
 """
 
+from collections.abc import Sequence
 from typing import Final
 
 from adafruit_board_toolkit import circuitpython_serial
 
 from hardware.shared.sd_sync_protocol import Transport
 from scripts.deploy_watch import SerialHandle, open_serial_with_retry
+
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from serial.tools.list_ports_common import ListPortInfo
 
 __all__ = ["SdSyncPortError", "SerialTransport", "find_data_port", "open_serial_transport"]
 
@@ -36,7 +41,9 @@ class SdSyncPortError(Exception):
     """Zero or more than one data-channel port was found and none was named explicitly."""
 
 
-def select_data_port(comports: "list[object]", *, explicit_port: "str | None" = None) -> str:
+def select_data_port(
+    comports: "Sequence[ListPortInfo]", *, explicit_port: "str | None" = None
+) -> str:
     """Pick the data-channel port from *comports* (each exposing a ``.device`` path).
 
     *explicit_port* always wins when given, bypassing auto-detect entirely.

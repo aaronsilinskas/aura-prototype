@@ -27,6 +27,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.15.1",
     "ruff>=0.15.6",
+    "types-pyserial>=3.5.0.20261104",
 ]
 
 [tool.pytest.ini_options]

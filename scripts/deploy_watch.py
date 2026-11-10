@@ -26,11 +26,16 @@ Exit codes
 import argparse
 import sys
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
-from typing import IO, Final
+from typing import IO, Final, Protocol
 
 from scripts.deploy import _DEFAULT_MOUNT, deploy
+
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from serial import Serial
+    from serial.tools.list_ports_common import ListPortInfo
 
 _DEFAULT_BAUD: Final = 115200
 _OPEN_RETRY_SECONDS: Final = 10.0
@@ -42,6 +47,12 @@ _CIRCUITPYTHON_BANNER: Final = "soft reboot"
 # ---------------------------------------------------------------------------
 # SplitWriter
 # ---------------------------------------------------------------------------
+
+
+class TextSink(Protocol):
+    """A text stream ``watch_stream`` echoes to: a file, ``sys.stdout`` or a ``SplitWriter``."""
+
+    def write(self, s: str, /) -> int: ...
 
 
 class SplitWriter:
@@ -107,7 +118,7 @@ def watch_stream(
     until: str | None = None,
     timeout: float | None = None,
     clock: Callable[[], float] = time.monotonic,
-    out: IO[str] | None = None,
+    out: TextSink | None = None,
 ) -> WatchResult:
     """Consume *lines*, echo each to *out*, and stop on exit condition.
 
@@ -184,7 +195,7 @@ class ConsolePortError(Exception):
     """Zero or more than one console-channel port was found and none was named explicitly."""
 
 
-def select_console_port(comports: "list[object]") -> str:
+def select_console_port(comports: "Sequence[ListPortInfo]") -> str:
     """Pick the console-channel port from *comports* (each exposing a ``.device`` path).
 
     Exactly one comport must be present -- zero or several (more than one
@@ -231,13 +242,13 @@ def open_serial_with_retry(
     *,
     window: float = _OPEN_RETRY_SECONDS,
     interval: float = _OPEN_RETRY_INTERVAL,
-) -> object:  # serial.Serial — typed as object to avoid a top-level pyserial import
+) -> "Serial":
     """Open a serial port, retrying for *window* seconds on failure.
 
     Returns the open ``serial.Serial`` object or raises ``OSError`` if the
     port cannot be opened within the retry window.
     """
-    import serial  # type: ignore[import-untyped]
+    import serial
 
     deadline = time.monotonic() + window
     last_exc: Exception | None = None
@@ -265,7 +276,7 @@ class SerialHandle:
 
     __slots__ = ("baud", "port", "ser")
 
-    def __init__(self, ser: object, port: str, baud: int) -> None:
+    def __init__(self, ser: "Serial", port: str, baud: int) -> None:
         self.ser = ser
         self.port = port
         self.baud = baud
@@ -298,7 +309,7 @@ def iter_serial_lines(
     every byte read is either emitted in a line or held over for the next
     one.
     """
-    import serial  # type: ignore[import-untyped]
+    import serial
 
     buffer = bytearray()
     while True:
@@ -443,7 +454,7 @@ def main() -> None:
         # soft reload from that prompt; it is a harmless no-op if the board
         # is instead already mid-run (unread stdin most user code never
         # checks for).
-        import serial  # type: ignore[import-untyped]
+        import serial
 
         try:
             handle.ser.write(b"\x04")
@@ -464,7 +475,7 @@ def main() -> None:
             )
             sys.exit(exit_code_for("banner_missing", until=args.until))
 
-        watch_out: IO[str] = (
+        watch_out: TextSink = (
             SplitWriter(sys.stdout, output_file) if output_file is not None else sys.stdout
         )
         result = watch_stream(
