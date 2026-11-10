@@ -214,6 +214,10 @@ _Avoid_: "output" (ambiguous in multi-output contexts); importing it from `engin
 A structured event payload (`pack`, `name`, `verb`, plus the verb's **Resolved clip** or `None`) routed to every in-scope `EffectOutput.handle_event`; `"start"`/`"stop"` are emitted automatically, custom verbs (`"peak"`, `"strike"`) via `notify_listeners`. Its identity is `pack`, `name` and `verb`; the clip is payload.
 _Avoid_: confusing with `Event` (game-rule events); assuming only `"start"`/`"stop"` verbs exist
 
+### EffectVerb
+A named moment an **Effect** announces to its outputs, and the key for `clips` and `patterns`: `EffectVerb.START`/`STOP` from the engine, plus the custom verbs its sight modality declares (`PulseEffect.PEAK`, `LightningEffect.STRIKE`). Matched by identity, so only the declared instance counts. Heard by outputs, never by rules. An effect pack's declared verbs are part of its versioned interface.
+_Avoid_: string keys; a hand-made `EffectVerb("…")` outside its emitter; "event name"; "verb" unqualified where SD-sync protocol verbs are nearby; treating an **Overlay**'s hold/restore as verbs; reusing it for game-rule `Event`s (rules match those by class)
+
 ### Merge strategy
 The per-scope policy deciding how a scope's stack of layered effect buffers becomes shown pixels; set per rule via `EffectControls.set_merge_strategy`, defaulting to **Split**. A booted scene and every **Overlay** start on Split; popping an overlay puts back the strategies of the scene it covered. Two ship: **Split** and **Additive**.
 _Avoid_: making it a per-output or `aura-device.json` choice; holding merge state on the output; a global (non-per-scope) strategy
