@@ -125,6 +125,28 @@ class ColorFillEffectBuilder(EffectBuilder):
         return Effect(name=name, pixels=_ColorFillPixels())
 
 
+class UpdateCountFillEffectBuilder(EffectBuilder):
+    """Builder whose effect fills its buffer with the number of updates it has had.
+
+    A composed frame then shows how far the effect has advanced, so a test can
+    tell an effect that froze from one that kept running.
+    """
+
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        class _UpdateCountPixels(EffectPixels):
+            def __init__(self) -> None:
+                self.updates = 0
+
+            def update(self, elapsed: float) -> None:
+                self.updates += 1
+
+            def render(self, buf: PixelBuffer) -> None:
+                for i in range(len(buf)):
+                    buf[i] = self.updates
+
+        return Effect(name=name, pixels=_UpdateCountPixels())
+
+
 class RenderLengthProbeEffectBuilder(EffectBuilder):
     """Builder whose effect records the buffer length seen at each ``render`` call.
 

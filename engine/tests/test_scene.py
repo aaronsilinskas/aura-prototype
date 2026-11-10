@@ -526,7 +526,7 @@ def test_activating_the_boot_scene_stops_no_effects() -> None:
     assert controls.stopped_scopes == [], "no outgoing scene means nothing to stop"
 
 
-def test_overlay_stops_all_effects_on_the_suspended_scene() -> None:
+def test_overlay_stops_none_of_the_covered_scenes_effects() -> None:
     engine, controls = _make_engine_with_controls()
     scene_reg = _scene_registry(("main", _scene_factory()), ("overlay_scene", _scene_factory()))
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
@@ -536,7 +536,7 @@ def test_overlay_stops_all_effects_on_the_suspended_scene() -> None:
     manager.overlay("overlay_scene")
     manager.update()
 
-    assert controls.stopped_scopes == [Scope.ALL]
+    assert controls.stopped_scopes == []
 
 
 def test_pop_stops_all_effects_on_the_popped_scene() -> None:
@@ -1046,7 +1046,7 @@ _SPLIT_RED_BLUE = [0xFF0000] * 5 + [0x0000FF] * 5
 _ADDITIVE_RED_BLUE = [0xFF00FF] * 10
 
 
-def test_scene_overlay_inherits_the_underlying_scenes_live_merge_strategy(pack_tree) -> None:
+def test_an_overlay_starts_on_split_whatever_the_covered_scene_chose(pack_tree) -> None:
     scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
         pack_tree, ["base", "overlay_scene"]
     )
@@ -1056,9 +1056,102 @@ def test_scene_overlay_inherits_the_underlying_scenes_live_merge_strategy(pack_t
     scene_manager.overlay("overlay_scene")
     scene_manager.update()
 
-    assert _fill_personal_and_tick(effect_manager, output) == _ADDITIVE_RED_BLUE, (
-        "overlay must start seeing exactly the underlying scene's current choice"
+    assert _fill_personal_and_tick(effect_manager, output) == _SPLIT_RED_BLUE
+
+
+def test_pop_restores_the_covered_scenes_additive_merge_strategy(pack_tree) -> None:
+    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
+        pack_tree, ["base", "overlay_scene"]
     )
+    scene_manager.activate_boot_scene("base")
+    effect_manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+    scene_manager.overlay("overlay_scene")
+    scene_manager.update()
+
+    scene_manager.pop()
+    scene_manager.update()
+
+    assert _fill_personal_and_tick(effect_manager, output) == _ADDITIVE_RED_BLUE
+
+
+def test_while_covered_the_covered_scenes_effects_are_not_drawn(pack_tree) -> None:
+    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
+        pack_tree, ["base", "overlay_scene"]
+    )
+    scene_manager.activate_boot_scene("base")
+    effect_manager.set_effect(Scope.PERSONAL, "color.red", {})
+
+    scene_manager.overlay("overlay_scene")
+    scene_manager.update()
+    output.update_pixels_calls.clear()
+    effect_manager.update(Timer())
+
+    assert output.update_pixels_calls == []
+
+
+def test_after_pop_the_covered_scenes_effects_are_drawn_again_under_the_same_receipt(
+    pack_tree,
+) -> None:
+    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
+        pack_tree, ["base", "overlay_scene"]
+    )
+    scene_manager.activate_boot_scene("base")
+    receipt = effect_manager.set_effect(Scope.PERSONAL, "color.red", {})
+    scene_manager.overlay("overlay_scene")
+    scene_manager.update()
+    effect_manager.set_effect(Scope.PERSONAL, "color.blue", {})  # the overlay's own
+
+    scene_manager.pop()
+    scene_manager.update()
+    receipt.brightness = 0.5
+    effect_manager.update(Timer())
+
+    _, composed = output.update_pixels_calls[-1]
+    assert list(composed) == [0x7F0000] * 10
+
+
+def test_an_overlays_stop_on_every_scope_leaves_the_covered_scenes_effects(pack_tree) -> None:
+    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
+        pack_tree, ["base", "overlay_scene"]
+    )
+    scene_manager.activate_boot_scene("base")
+    effect_manager.set_effect(Scope.PERSONAL, "color.red", {})
+    scene_manager.overlay("overlay_scene")
+    scene_manager.update()
+
+    effect_manager.stop_effect(Scope.ALL)
+    scene_manager.pop()
+    scene_manager.update()
+    effect_manager.update(Timer())
+
+    _, composed = output.update_pixels_calls[-1]
+    assert list(composed) == [0xFF0000] * 10
+
+
+def test_stacked_overlays_each_give_back_the_scene_directly_beneath(pack_tree) -> None:
+    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
+        pack_tree, ["base", "mid", "top"]
+    )
+    scene_manager.activate_boot_scene("base")
+    effect_manager.set_effect(Scope.PERSONAL, "color.red", {})
+    scene_manager.overlay("mid")
+    scene_manager.update()
+    effect_manager.set_effect(Scope.PERSONAL, "color.blue", {})
+    scene_manager.overlay("top")
+    scene_manager.update()
+
+    scene_manager.pop()
+    scene_manager.update()
+    effect_manager.update(Timer())
+    _, mid_frame = output.update_pixels_calls[-1]
+    mid_pixels = list(mid_frame)
+    scene_manager.pop()
+    scene_manager.update()
+    effect_manager.update(Timer())
+
+    _, base_frame = output.update_pixels_calls[-1]
+    assert mid_pixels == [0x0000FF] * 10
+    assert list(base_frame) == [0xFF0000] * 10
 
 
 def test_scene_overlay_merge_strategy_change_takes_effect_the_next_tick(pack_tree) -> None:

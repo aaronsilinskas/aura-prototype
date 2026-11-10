@@ -20,7 +20,7 @@ from engine.engine import GameEngine, GameRule, Version
 from engine.namespace import ActiveSceneNamespace
 from engine.packs import PackRegistry, UnknownItemError, load_item
 from engine.settings import SettingDeclaration, Settings
-from engine.state import EffectAdmin, GameState, MergeStrategy, SceneControls, SceneReboot, Scope
+from engine.state import EffectAdmin, GameState, HeldEffects, SceneControls, SceneReboot, Scope
 
 
 class SceneLocalRegistry:
@@ -377,27 +377,26 @@ class SceneRegistry:
 class _SceneStackEntry:
     """One entry in ``SceneManager``'s scene stack.  Internal use only.
 
-    ``saved_merge`` is the merge-strategy snapshot to restore via
-    ``EffectAdmin.apply_merge_strategies`` when this entry is popped — ``None``
-    for the boot scene's base entry (nothing to restore), and the
-    captured live map for an entry pushed by ``overlay``.  Folding the
-    snapshot into the same entry as the scene stack means the two stacks
-    can never desync.
+    ``held`` is the covered scene's effects and merge strategies, set aside
+    by ``EffectAdmin.set_aside`` when ``overlay`` pushed this entry and put
+    back by ``EffectAdmin.put_back`` when it is popped — ``None`` for the
+    boot scene's base entry, which covers nothing.  Folding the bundle into
+    the same entry as the scene stack means the two stacks can never desync.
     """
 
-    __slots__ = ("rules", "saved_merge", "scene", "state")
+    __slots__ = ("held", "rules", "scene", "state")
 
     def __init__(
         self,
         scene: Scene,
         state: GameState,
         rules: list[GameRule],
-        saved_merge: dict[str, MergeStrategy] | None,
+        held: HeldEffects | None,
     ) -> None:
         self.scene = scene
         self.state = state
         self.rules = rules
-        self.saved_merge = saved_merge
+        self.held = held
 
 
 class SceneManager(SceneControls):
@@ -442,9 +441,12 @@ class SceneManager(SceneControls):
 
     *effect_admin* is the scene-transition face of the same effect system
     ``engine`` was built with (its ``EffectControls`` and ``EffectAdmin`` are
-    two faces of one ``EffectManager`` instance). Every merge-strategy
-    reset/capture/apply routes through *effect_admin*, never through a stack
-    entry's ``state.effect_controls``.
+    two faces of one ``EffectManager`` instance). ``overlay`` sets the
+    covered scene's effects and merge strategies aside through it, ``pop``
+    stops the overlay's own effects and puts the bundle back, and the boot
+    scene is reset to Split through it, never through a stack entry's
+    ``state.effect_controls``. The IR codec is not touched by ``overlay`` or
+    ``pop``: an overlay runs on the covered scene's codec (ADR-0005).
 
     *namespace* is the Active scene namespace that same ``EffectManager``
     resolves names through. Every activation (boot scene, overlay, pop) makes one
@@ -513,7 +515,7 @@ class SceneManager(SceneControls):
         self._require_runnable(name)
         rules = self._resolve_rules(scene)
         state = self._engine.create_state(self, scene.settings)
-        entry = _SceneStackEntry(scene, state, rules, saved_merge=None)
+        entry = _SceneStackEntry(scene, state, rules, held=None)
         self._stack.append(entry)
         self._effect_admin.reset_merge_strategies()
         self._activate(entry)
@@ -637,10 +639,6 @@ class SceneManager(SceneControls):
             combined.append(scene.local_rule_registry.get(item_name, GameRule))
         return combined
 
-    def _deactivate(self, entry: _SceneStackEntry) -> None:
-        entry.state.effect_controls.stop_effect(Scope.ALL)
-        entry.state.clear_queue()
-
     def _activate(self, entry: _SceneStackEntry) -> None:
         self._engine.set_rules(entry.rules)
         entry.state.clear_queue()
@@ -649,25 +647,26 @@ class SceneManager(SceneControls):
         self._namespace.install(scene.local_effect_registry, scene.local_sound_map, declared_packs)
 
     def _do_overlay(self, scene: Scene) -> None:
-        """Suspend the current top and push *scene* above it."""
+        """Suspend the current top, setting its effects aside, and push *scene* above it."""
         combined_rules = self._resolve_rules(scene)
 
-        self._deactivate(self._stack[-1])
-        saved_merge = self._effect_admin.capture_merge_strategies()
+        self._stack[-1].state.clear_queue()
+        held = self._effect_admin.set_aside()
 
         state = self._engine.create_state(self, scene.settings)
-        entry = _SceneStackEntry(scene, state, combined_rules, saved_merge=saved_merge)
+        entry = _SceneStackEntry(scene, state, combined_rules, held=held)
         self._stack.append(entry)
         self._activate(entry)
 
     def _do_pop(self) -> None:
-        """Remove the top entry and restore the entry below it."""
-        self._deactivate(self._stack[-1])
+        """Remove the top entry, stopping its effects, and give back the scene below it."""
         popped = self._stack.pop()
+        popped.state.effect_controls.stop_effect(Scope.ALL)
+        popped.state.clear_queue()
         # pop() rejects a stack of size <= 1, so the popped entry is always one
-        # overlay() pushed — never the boot scene's base entry, whose
-        # saved_merge is None. Narrows the type for apply_merge_strategies.
-        assert popped.saved_merge is not None
-        self._effect_admin.apply_merge_strategies(popped.saved_merge)
+        # overlay() pushed — never the boot scene's base entry, whose held is
+        # None. Narrows the type for put_back.
+        assert popped.held is not None
+        self._effect_admin.put_back(popped.held)
 
         self._activate(self._stack[-1])
