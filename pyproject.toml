@@ -13,6 +13,7 @@ dependencies = []
 [dependency-groups]
 dev = [
     "adafruit-board-toolkit>=1.1.2",
+    "basedpyright==1.40.2",
     "import-linter>=2.3",
     # mpy-cross is NOT on PyPI for CircuitPython — the PyPI package is MicroPython's.
     # Download the CircuitPython binary via: scripts/setup_mpy_cross.sh
@@ -102,3 +103,13 @@ protected_modules = ["app.simulation", "hardware.simulated"]
 # scene's tests may play it on the Simulation test harness, which itself builds
 # on the Simulated device. Nothing else may import either.
 allowed_importers = ["**.tests", "app.simulation"]
+
+[tool.basedpyright]
+include = ["app", "effects", "engine", "hardware", "magic", "packs", "scripts"]
+exclude = ["**/tests/**", "**/__pycache__"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.14"
+typeCheckingMode = "standard"
+# Stubs in typings/ stand in for CircuitPython-only modules, which have no source off-device.
+reportMissingModuleSource = "none"
