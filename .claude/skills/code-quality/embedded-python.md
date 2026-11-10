@@ -84,6 +84,23 @@ def shape(position):
 
 Prefer multiply over divide when the denominator is fixed. In hot paths, always use `x * x` instead of `x ** 2`. The `**` operator has meaningful overhead on embedded devices even with compile-time constant exponents.
 
+## Native Code (`@micropython.native`)
+
+`@micropython.native` compiles one function to machine code, at a cost in flash and RAM. A function earns it only by a measured gain:
+
+- **Keep rule:** decorate a function only when median FPS rises by at least 5 % at 60 pixels on at least one benchmark scene (`tag`, `element_browser`) and drops on neither. Revert a decoration below the bar. 144-pixel numbers are recorded for information only.
+- **The PR records** the median FPS before and after, per scene and pixel count; the `.mpy` size change; and `gc.mem_free()` at scene start. Read `gc.mem_free()` with a throwaway, uncommitted print after `build_scene_boot` in `app/scene_runtime.py`: no timing or reporting helper is committed (#1180).
+- **Spelling:** `import micropython`, then `@micropython.native`. `mpy-cross` recognizes the decorator only by that exact spelling, so `from micropython import native` never compiles native. On the host, tests and mypy import the root `micropython.py` stand-in, whose `native` returns the function unchanged.
+- **Per function only:** whole-module native (`-X emit=native`) and `@micropython.viper` stay out of production code.
+
+Measure on the Core2350B under deploy-watch:
+
+1. Back up CIRCUITPY's `aura-device.json`.
+2. Set every enabled NeoPixel strip's `count` to 60, then to 144, and spread its `scope_pixels` bands evenly over the new count. Effects render only scope pixels, so raising `count` alone adds no per-pixel work. The matrix stays out.
+3. Run `tag` and `element_browser` (`--scene`, `--seconds 75`) with the `debug` pack's `fps_logging_enabled` Setting on. `element_browser`'s `scene.json` sets it. For `tag`, add the `debug` pack reference with that Setting to its `scene.json` for the run only.
+4. Take the median of the last 10 three-second `FpsLoggerRule` windows (`FPS:` lines) per scene and count. The first ~20 s run slower. `tag` can shift ~4 % between identical runs, so run it three times and use the median of the run medians.
+5. Restore the backup, revert the `tag` edit and redeploy.
+
 ## CircuitPython and MicroPython Compatibility
 
 This reference targets the **latest stable releases** of CircuitPython and MicroPython. Do not flag features as unavailable unless they are absent from current releases.
@@ -168,7 +185,7 @@ When using an exception, still annotate with the best available fallback type an
 
 ## Stub Defects
 
-When `circuitpython-stubs` is wrong about a call the firmware accepts, suppress the error at the call site with `# type: ignore[code]` and a reason comment that links an upstream adafruit/circuitpython issue reporting the defect. File the issue first: the `shared-bindings` file and line, the wrong and corrected signatures, and evidence that the firmware accepts the call. Never patch or shadow the stub with a local copy.
+When `circuitpython-stubs` is wrong about a call the firmware accepts, suppress the error at the call site with `# type: ignore[code]` and a reason comment that links an upstream adafruit/circuitpython issue reporting the defect. File the issue first: the `shared-bindings` file and line, the wrong and corrected signatures, and evidence that the firmware accepts the call. Never patch or shadow the stub with a local copy. The one exception is the root `micropython.py` (see Native Code): `native` is consumed by the compiler and never exists at runtime, so the stub isn't wrong to omit it.
 
 ```python
 # Stub defect: circuitpython-stubs marks WaveFile's buffer required, but the
@@ -253,3 +270,4 @@ class _Data:
 - [ ] Every stub-defect `# type: ignore[code]` links its upstream adafruit/circuitpython issue; no local copy of a stub `circuitpython-stubs` provides
 - [ ] Class-level constants annotated with `Final` (unquoted, no type parameter; import guarded with `try/except ImportError`)
 - [ ] No imports from unavailable stdlib modules
+- [ ] Every `@micropython.native` (spelled exactly so, after `import micropython`) meets the keep rule, and its PR records the FPS numbers, `.mpy` size change and `gc.mem_free()`
