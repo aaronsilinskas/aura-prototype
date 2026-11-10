@@ -172,5 +172,5 @@ def test_dry_run_version_error_message_mentions_expected_version() -> None:
 
 
 def test_expected_circuitpython_major_matches_setup_script_default() -> None:
-    # setup_mpy_cross.sh defaults to 10.2.1 → major = 10
+    # setup_mpy_cross.sh defaults to 10.3.1 → major = 10
     assert EXPECTED_CIRCUITPYTHON_MAJOR == 10
