@@ -118,6 +118,10 @@ examples/         Runnable CircuitPython entry points; deploy-watch's flash targ
 
 scripts/          Deploy and maintenance scripts (CPython-only)
 
+micropython.py    Host-only stand-in for the device's built-in micropython module
+                  (native, const), so tests, the Simulated device and mypy can import
+                  code that uses @micropython.native — never deployed
+
 electronics/      PCB design source (KiCad) — scratch/, pcbs/, libraries/, each with
                   its own README.md. Distinct from the hardware/ firmware package
                   above: electronics/ is design source, not Python, contains no

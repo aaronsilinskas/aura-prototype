@@ -7,6 +7,8 @@ import pytest
 
 from scripts.build import BuildError, build
 
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -245,6 +247,15 @@ def test_conftest_py_is_not_in_staging_tree(tmp_path: Path) -> None:
 
     assert not (staging / "rules" / "conftest.mpy").exists()
     assert not (staging / "rules" / "conftest.py").exists()
+
+
+def test_host_only_micropython_module_is_not_in_staging_tree(tmp_path: Path) -> None:
+    # Builds the real repo, so the test guards wherever the module actually lives.
+    staging = tmp_path / "build"
+
+    build(source_root=_REPO_ROOT, staging_root=staging, compile=fake_compile)
+
+    assert sorted(staging.rglob("micropython.*")) == []
 
 
 # ---------------------------------------------------------------------------
