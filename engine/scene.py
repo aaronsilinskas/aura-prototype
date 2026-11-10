@@ -379,7 +379,7 @@ class _SceneStackEntry:
 
     ``saved_merge`` is the merge-strategy snapshot to restore via
     ``EffectAdmin.apply_merge_strategies`` when this entry is popped — ``None``
-    for the base entry a ``load`` creates (nothing to restore), and the
+    for the boot scene's base entry (nothing to restore), and the
     captured live map for an entry pushed by ``overlay``.  Folding the
     snapshot into the same entry as the scene stack means the two stacks
     can never desync.
@@ -420,17 +420,21 @@ class SceneManager(SceneControls):
         while running:
             manager.update()
 
-    Scene transitions (``load``, ``overlay``, ``pop``) are deferred: they
+    The boot composition makes the first scene active with
+    ``activate_boot_scene``, which applies at once and is not on
+    ``SceneControls``: rules change scene by Reboot (ADR-0005).
+
+    Scene transitions (``overlay``, ``pop``) are deferred: they
     record a pending transition and the last call per tick wins.  The
     transition executes at the end of ``update()`` after ``engine.update``
     has processed all queued events.
 
-    Scene lookup delegates entirely to *scene_registry*: ``load`` and
-    ``overlay`` call ``scene_registry.get(name)``; ``load`` raises
-    ``ValueError`` for unknown names because ``SceneRegistry.get`` does.
+    Scene lookup delegates entirely to *scene_registry*:
+    ``activate_boot_scene`` and ``overlay`` call ``scene_registry.get(name)``,
+    which raises ``ValueError`` for unknown names.
 
     The device's Capabilities are ``engine.capabilities``. Every transition
-    into a scene (``load``, ``overlay``, ``reboot_into``,
+    into a scene (``activate_boot_scene``, ``overlay``, ``reboot_into``,
     ``reboot_to_previous``) checks the target's Required capabilities against
     them and raises ``MissingCapabilityError`` before recording, persisting
     or resetting anything; ``pop`` returns to a scene that already ran and
@@ -443,14 +447,14 @@ class SceneManager(SceneControls):
     entry's ``state.effect_controls``.
 
     *namespace* is the Active scene namespace that same ``EffectManager``
-    resolves names through. Every activation (load, overlay, pop) makes one
+    resolves names through. Every activation (boot scene, overlay, pop) makes one
     ``install`` call with the top-of-stack scene's local effects, local
     sounds and declared ``effect_packs`` names.
 
     *scene_reboot* is the injected ``SceneReboot`` port ``reboot_into``/
     ``reboot_to_previous`` delegate to (its ``previous_scene`` names the
     target ``reboot_to_previous`` checks). Unlike *effect_admin* and
-    *namespace* it plays no role in ``load``/``overlay``/``pop`` — it exists
+    *namespace* it plays no role in activation, ``overlay`` or ``pop`` — it exists
     solely for the two reboot methods, which apply immediately and synchronously rather
     than joining the deferred-transition queue.
     """
@@ -485,27 +489,38 @@ class SceneManager(SceneControls):
         self._namespace = namespace
         self._scene_reboot = scene_reboot
         self._stack: list[_SceneStackEntry] = []
-        self._pending: (
-            tuple[Literal["load"], Scene]
-            | tuple[Literal["overlay"], Scene]
-            | tuple[Literal["pop"]]
-            | None
-        ) = None
+        self._pending: tuple[Literal["overlay"], Scene] | tuple[Literal["pop"]] | None = None
+
+    # ------------------------------------------------------------------
+    # Boot — not on SceneControls, so rules can't reach it
+    # ------------------------------------------------------------------
+
+    def activate_boot_scene(self, name: str) -> None:
+        """Make *name* the active scene, at once, on Split for every scope.
+
+        Called once by the boot composition; a rule changes scene by
+        Reboot instead.
+
+        Raises:
+            ValueError: *name* is not a registered scene, or a scene is
+                already active.
+            MissingCapabilityError: the device can't run *name*; nothing is
+                activated.
+        """
+        if self._stack:
+            raise ValueError("Cannot activate boot scene: a scene is already active")
+        scene = self._scene_registry.get(name)
+        self._require_runnable(name)
+        rules = self._resolve_rules(scene)
+        state = self._engine.create_state(self, scene.settings)
+        entry = _SceneStackEntry(scene, state, rules, saved_merge=None)
+        self._stack.append(entry)
+        self._effect_admin.reset_merge_strategies()
+        self._activate(entry)
 
     # ------------------------------------------------------------------
     # SceneControls interface — deferred transitions
     # ------------------------------------------------------------------
-
-    def load(self, name: str) -> None:
-        """Record a load transition for *name*; raises immediately if unknown.
-
-        Raises:
-            MissingCapabilityError: the device can't run *name*; nothing is
-                recorded.
-        """
-        scene = self._scene_registry.get(name)
-        self._require_runnable(name)
-        self._pending = ("load", scene)
 
     def overlay(self, name: str) -> None:
         """Record an overlay transition for *name*; raises immediately if invalid.
@@ -594,7 +609,7 @@ class SceneManager(SceneControls):
         """Advance one tick: call ``engine.update`` then apply any pending transition.
 
         Skips ``engine.update`` when the stack is empty.  At most one pending
-        transition executes per tick; the last ``load``/``overlay``/``pop``
+        transition executes per tick; the last ``overlay``/``pop``
         call within a tick wins.
         """
         if self._stack:
@@ -603,9 +618,7 @@ class SceneManager(SceneControls):
         if self._pending is not None:
             pending = self._pending
             self._pending = None
-            if pending[0] == "load":
-                self._do_load(pending[1])
-            elif pending[0] == "overlay":
+            if pending[0] == "overlay":
                 self._do_overlay(pending[1])
             else:
                 self._do_pop()
@@ -635,20 +648,6 @@ class SceneManager(SceneControls):
         declared_packs = frozenset(pack.name for pack in scene.effect_packs)
         self._namespace.install(scene.local_effect_registry, scene.local_sound_map, declared_packs)
 
-    def _do_load(self, scene: Scene) -> None:
-        """Replace the entire stack with a single fresh entry for *scene*."""
-        combined_rules = self._resolve_rules(scene)
-
-        for i in range(len(self._stack) - 1, -1, -1):
-            self._deactivate(self._stack[i])
-
-        self._stack = []
-        state = self._engine.create_state(self, scene.settings)
-        entry = _SceneStackEntry(scene, state, combined_rules, saved_merge=None)
-        self._stack.append(entry)
-        self._effect_admin.reset_merge_strategies()
-        self._activate(entry)
-
     def _do_overlay(self, scene: Scene) -> None:
         """Suspend the current top and push *scene* above it."""
         combined_rules = self._resolve_rules(scene)
@@ -666,7 +665,7 @@ class SceneManager(SceneControls):
         self._deactivate(self._stack[-1])
         popped = self._stack.pop()
         # pop() rejects a stack of size <= 1, so the popped entry is always one
-        # overlay() pushed — never the base entry from load(), whose
+        # overlay() pushed — never the boot scene's base entry, whose
         # saved_merge is None. Narrows the type for apply_merge_strategies.
         assert popped.saved_merge is not None
         self._effect_admin.apply_merge_strategies(popped.saved_merge)

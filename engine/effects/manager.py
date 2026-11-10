@@ -239,7 +239,7 @@ class EffectManager(EffectControls, EffectAdmin):
         """Reset every registered scope key's merge strategy to SPLIT.
 
         Reserved for ``SceneManager`` (via the ``EffectAdmin`` face) — called
-        from ``_do_load`` so no strategy choice survives a ``load``.
+        by ``activate_boot_scene`` so the boot scene starts on Split.
         """
         for key in self._merge_strategies:
             self._merge_strategies[key] = SPLIT

@@ -120,13 +120,12 @@ def test_scene_prefix_fires_start_event_with_pack_equals_scene(pack_tree) -> Non
 # ---------------------------------------------------------------------------
 
 
-def test_scene_manager_installs_local_effects_on_load(pack_tree) -> None:
+def test_scene_manager_installs_local_effects_on_boot(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"forest": _local_effects("flash")})
     namespace = RecordingNamespace()
     manager = make_scene_manager(catalog, namespace=namespace)
 
-    manager.load("forest")
-    manager.update()
+    manager.activate_boot_scene("forest")
 
     [(local_effects, _, _)] = namespace.installs
     assert local_effects.items() == ["flash"]
@@ -136,8 +135,7 @@ def test_scene_manager_installs_overlay_scene_local_effects_on_overlay(pack_tree
     catalog = pack_tree.scan(scenes={"scene_b": _local_effects("b_flash"), "scene_a": {}})
     namespace = RecordingNamespace()
     manager = make_scene_manager(catalog, namespace=namespace)
-    manager.load("scene_a")
-    manager.update()
+    manager.activate_boot_scene("scene_a")
 
     manager.overlay("scene_b")
     manager.update()
@@ -152,8 +150,7 @@ def test_scene_manager_restores_base_local_effects_on_pop(pack_tree) -> None:
     )
     namespace = RecordingNamespace()
     manager = make_scene_manager(catalog, namespace=namespace)
-    manager.load("scene_a")
-    manager.update()
+    manager.activate_boot_scene("scene_a")
     manager.overlay("scene_b")
     manager.update()
 
@@ -169,13 +166,12 @@ def test_scene_manager_restores_base_local_effects_on_pop(pack_tree) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_scene_manager_installs_scene_sounds_on_load(pack_tree) -> None:
+def test_scene_manager_installs_scene_sounds_on_boot(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"forest": {"sounds": ["victory_sting"]}})
     namespace = RecordingNamespace()
     manager = make_scene_manager(catalog, namespace=namespace)
 
-    manager.load("forest")
-    manager.update()
+    manager.activate_boot_scene("forest")
 
     [(_, local_sounds, _)] = namespace.installs
     assert list(local_sounds) == ["victory_sting"]
@@ -186,8 +182,7 @@ def test_scene_manager_installs_no_sounds_for_a_scene_with_none(pack_tree) -> No
     namespace = RecordingNamespace()
     manager = make_scene_manager(catalog, namespace=namespace)
 
-    manager.load("bare_scene")
-    manager.update()
+    manager.activate_boot_scene("bare_scene")
 
     [(_, local_sounds, _)] = namespace.installs
     assert local_sounds == {}
@@ -197,8 +192,7 @@ def test_scene_manager_installs_overlay_scene_sounds_on_overlay(pack_tree) -> No
     catalog = pack_tree.scan(scenes={"scene_b": {"sounds": ["b_sting"]}, "scene_a": {}})
     namespace = RecordingNamespace()
     manager = make_scene_manager(catalog, namespace=namespace)
-    manager.load("scene_a")
-    manager.update()
+    manager.activate_boot_scene("scene_a")
 
     manager.overlay("scene_b")
     manager.update()
@@ -216,8 +210,7 @@ def test_scene_manager_restores_base_scene_sounds_on_pop(pack_tree) -> None:
     )
     namespace = RecordingNamespace()
     manager = make_scene_manager(catalog, namespace=namespace)
-    manager.load("scene_a")
-    manager.update()
+    manager.activate_boot_scene("scene_a")
     manager.overlay("scene_b")
     manager.update()
 
