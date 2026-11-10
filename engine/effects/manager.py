@@ -1,10 +1,5 @@
 from __future__ import annotations
 
-try:
-    from typing import TYPE_CHECKING
-except ImportError:
-    TYPE_CHECKING = False
-
 from effects.effect import Effect, EffectConfig, EffectVerb, PixelBuffer, ResolvedClip
 from engine.effects.merge import SPLIT
 from engine.effects.output import EffectOutput
@@ -19,6 +14,8 @@ from engine.state import (
     ScopeValue,
 )
 from engine.timer import Timer
+
+TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
