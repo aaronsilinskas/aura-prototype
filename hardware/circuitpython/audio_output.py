@@ -99,7 +99,9 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
         except OSError:
             return None
         # Stub defect: circuitpython-stubs marks WaveFile's buffer required, but the
-        # firmware treats it as optional. UPSTREAM_ISSUE_URL
+        # firmware treats it as optional. Upstream report drafted in
+        # https://github.com/aaronsilinskas/aura-prototype/issues/1236; swap in its
+        # adafruit/circuitpython URL once filed.
         return (f, audiocore.WaveFile(f))  # type: ignore[call-arg]
 
     def play(self, slot: int, source: object, loop: bool) -> None:
