@@ -412,10 +412,13 @@ def test_last_pending_transition_wins_within_one_tick() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_rules_have_no_way_to_load_a_scene_in_process() -> None:
+def test_scene_controls_offer_rules_no_way_to_load_a_scene_in_process() -> None:
+    assert not hasattr(SceneControls(), "load")
+
+
+def test_scene_manager_offers_rules_no_way_to_load_a_scene_in_process() -> None:
     manager = _make_scene_manager(_make_engine())
 
-    assert not hasattr(SceneControls(), "load")
     assert not hasattr(manager, "load")
 
 

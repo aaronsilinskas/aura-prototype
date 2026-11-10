@@ -341,8 +341,9 @@ starting data: rules seed their own runtime state through `state.get`/`state.set
 `overlay(name)` pushes on top (suspending the current scene); `pop()` restores the previous
 scene. Transitions are deferred to end-of-tick — rules call
 `state.scene_controls.overlay/pop()` during a tick
-and the transition is applied after `engine.update(state)` returns. Every scene the manager
-unloads or suspends has its effects stopped on `Scope.ALL` automatically.
+and the transition is applied after `engine.update(state)` returns. `overlay` sets the
+covered scene's effects aside without stopping them (its sound and haptics fall silent) and
+`pop` stops the overlay's own effects on `Scope.ALL`, then gives the covered scene its effects back.
 
 ---
 

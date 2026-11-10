@@ -84,6 +84,17 @@ class _Slot:
         self.claim_seq = 0
 
 
+class _HeldLoop:
+    """A looping clip ``VoicePool.hold`` freed, kept until ``restore`` plays it again."""
+
+    __slots__ = ("path", "receipt", "stops_receipt")
+
+    def __init__(self, receipt: EffectReceipt, path: str, stops_receipt: bool) -> None:
+        self.receipt = receipt
+        self.path = path
+        self.stops_receipt = stops_receipt
+
+
 class VoicePool:
     """Owns voice-slot bookkeeping for a flat pool of ``num_voices`` voices.
 
@@ -98,9 +109,7 @@ class VoicePool:
         self._num_voices = num_voices
         self._slots = [_Slot() for _ in range(num_voices)]
         self._claim_counter = 0
-        # (receipt, path, stops_receipt) of each loop freed by ``hold``, kept
-        # until ``restore`` plays it again.
-        self._held_loops: list[tuple[EffectReceipt, str, bool]] = []
+        self._held_loops: list[_HeldLoop] = []
 
     def _select_slot(self, loop: bool) -> int:
         """Return the slot to use for a new clip, or ``-1`` if none is claimable.
@@ -221,7 +230,7 @@ class VoicePool:
             if s.receipt is not receipt:
                 continue
             if s.is_loop:
-                self._held_loops.append((receipt, s.path, s.stops_receipt))
+                self._held_loops.append(_HeldLoop(receipt, s.path, s.stops_receipt))
             stops = not s.is_loop and s.stops_receipt
             sink.stop(i)
             s.reset()
@@ -234,12 +243,9 @@ class VoicePool:
         One-shots are not replayed, and nothing plays for a receipt stopped
         while held.
         """
-        kept: list[tuple[EffectReceipt, str, bool]] = []
-        restored: list[tuple[EffectReceipt, str, bool]] = []
-        for held in self._held_loops:
-            (restored if held[0] is receipt else kept).append(held)
-        self._held_loops = kept
+        restoring = [held for held in self._held_loops if held.receipt is receipt]
+        self._held_loops = [held for held in self._held_loops if held.receipt is not receipt]
         if receipt.is_stopped():
             return
-        for _, path, stops_receipt in restored:
-            self.claim(sink, path, True, stops_receipt, receipt)
+        for held in restoring:
+            self.claim(sink, held.path, True, held.stops_receipt, receipt)
