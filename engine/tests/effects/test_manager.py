@@ -2,6 +2,7 @@ from unittest.mock import ANY
 
 import pytest
 
+from effects.effect import EffectVerb
 from engine.effects.builder import EffectBuilder
 from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
@@ -639,6 +640,26 @@ def test_add_effect_fires_start_event_to_matching_output(pack_tree) -> None:
     assert output.handle_event_calls == [
         (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), ANY, receipt)
     ]
+
+
+def test_starting_an_effect_announces_the_engine_start_verb(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+
+    assert output.handle_event_calls[0][0].verb is EffectVerb.START
+
+
+def test_stopping_an_effect_announces_the_engine_stop_verb(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+    manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+    output.handle_event_calls.clear()
+
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert output.handle_event_calls[0][0].verb is EffectVerb.STOP
 
 
 def test_add_effect_start_event_not_delivered_to_out_of_scope_output(pack_tree) -> None:

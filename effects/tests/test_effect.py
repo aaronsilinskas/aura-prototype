@@ -7,6 +7,7 @@ from effects.effect import (
     EffectConfig,
     EffectHaptic,
     EffectPixels,
+    EffectVerb,
     HapticPattern,
     PixelBuffer,
 )
@@ -81,6 +82,33 @@ def test_all_registered_listeners_are_notified_in_registration_order() -> None:
     config.notify_listeners("tick")
 
     assert received == ["a:tick", "b:tick"]
+
+
+# ---------------------------------------------------------------------------
+# EffectVerb
+# ---------------------------------------------------------------------------
+
+
+def test_effect_verbs_with_the_same_name_are_distinct() -> None:
+    assert EffectVerb("strike") != EffectVerb("strike")
+
+
+def test_engine_verbs_are_named_start_and_stop() -> None:
+    assert (EffectVerb.START.name, EffectVerb.STOP.name) == ("start", "stop")
+
+
+def test_notify_listeners_delivers_the_verb_object_it_was_given() -> None:
+    verb = EffectVerb("strike")
+    received: list[EffectVerb] = []
+    config = EffectConfig(resolution=10, listeners=[received.append])
+
+    config.notify_listeners(verb)
+
+    assert received[0] is verb
+
+
+def test_pixels_declare_no_custom_verbs_by_default() -> None:
+    assert EffectPixels.VERBS == ()
 
 
 # ---------------------------------------------------------------------------

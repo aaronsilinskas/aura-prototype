@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from effects.effect import EffectConfig, PixelBuffer
+from effects.effect import EffectConfig, EffectVerb, PixelBuffer
 
 
 def _config(options: dict | None = None, listeners: list | None = None) -> EffectConfig:
@@ -32,6 +32,18 @@ def test_pulse_effect_calls_listener_on_peak() -> None:
     effect.pixels.update(0.6)
 
     assert "peak" in events
+
+
+def test_pulse_effect_emits_its_declared_peak_verb() -> None:
+    from packs.effects.basic.helpers.pulse_effect import PulseEffect
+
+    events: list[EffectVerb] = []
+    effect = _build(listeners=[events.append])
+
+    effect.pixels.update(0.6)
+
+    assert events[0] is PulseEffect.PEAK
+    assert PulseEffect.VERBS == (PulseEffect.PEAK,)
 
 
 # --- PulseEffect does NOT call listener when not at peak ---

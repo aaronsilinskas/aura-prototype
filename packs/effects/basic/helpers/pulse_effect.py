@@ -1,10 +1,18 @@
-from effects.effect import EffectConfig, EffectPixels, PixelBuffer
+try:
+    from typing import Final
+except ImportError:
+    pass  # Not available on CircuitPython
+
+from effects.effect import EffectConfig, EffectPixels, EffectVerb, PixelBuffer
 from effects.layers.pulse_layer import PulseLayer
 from effects.palette import Palette
 
 
 class PulseEffect(EffectPixels):
-    """Wraps a :class:`PulseLayer`, firing a ``"peak"`` listener event on each peak."""
+    """Wraps a :class:`PulseLayer`, emitting ``PEAK`` each time the pulse peaks."""
+
+    PEAK: Final = EffectVerb("peak")
+    VERBS: tuple[EffectVerb, ...] = (PEAK,)
 
     __slots__ = ("_config", "_layer", "_palette")
 
@@ -19,10 +27,10 @@ class PulseEffect(EffectPixels):
         self._config = config
 
     def update(self, elapsed: float) -> None:
-        """Advance the layer and fire a peak event if a peak was crossed."""
+        """Advance the layer and emit ``PEAK`` if a peak was crossed."""
         self._layer.update(elapsed)
         if self._layer.at_peak:
-            self._config.notify_listeners("peak")
+            self._config.notify_listeners(self.PEAK)
 
     def render(self, output: PixelBuffer) -> None:
         count = len(output)
