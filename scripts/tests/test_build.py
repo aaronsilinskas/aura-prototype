@@ -2,10 +2,11 @@
 
 import os
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from scripts.build import BuildError, build
+from scripts.build import _MPY_CROSS_BIN, BuildError, build, mpy_cross_compile
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -522,3 +523,75 @@ def test_first_build_compiles_all_modules_with_no_prior_staging_tree(tmp_path: P
     assert sorted(compile_calls) == ["palette.py", "render.py"]
     assert result.compiled == 2
     assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# mpy-cross targets the board's architecture
+# ---------------------------------------------------------------------------
+
+
+def _shipped_py_files(source: Path) -> list[Path]:
+    excluded = {"tests", "__pycache__"}
+    return [
+        p
+        for p in source.rglob("*.py")
+        if not excluded & set(p.relative_to(source).parts) and p.name != "conftest.py"
+    ]
+
+
+def _compile_every_module_recording_argv(source: Path, staging: Path) -> list[list[str]]:
+    """Build *source* through the real mpy-cross wrapper; return each mpy-cross argv."""
+    calls: list[list[str]] = []
+
+    def record_run(argv: list[str], **_kwargs: object) -> None:
+        calls.append(argv)
+        Path(argv[argv.index("-o") + 1]).write_text("FAKE_MPY")
+
+    with patch("subprocess.run", side_effect=record_run):
+        build(source_root=source, staging_root=staging, compile=mpy_cross_compile)
+    return calls
+
+
+def test_every_module_is_compiled_for_the_rp2350_architecture(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+
+    calls = _compile_every_module_recording_argv(source, tmp_path / "build")
+
+    compiled = sorted(Path(argv[argv.index("-o") + 1]).name for argv in calls)
+    assert compiled == sorted(p.with_suffix(".mpy").name for p in _shipped_py_files(source))
+    assert all("-march=armv7emsp" in argv for argv in calls)
+
+
+def test_architecture_flag_follows_the_pinned_constant(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    (source / "effects").mkdir(parents=True)
+    (source / "effects" / "render.py").write_text("# render")
+
+    with patch("scripts.build.MPY_CROSS_ARCH", "armv6m"):
+        calls = _compile_every_module_recording_argv(source, tmp_path / "build")
+
+    assert "-march=armv6m" in calls[0]
+
+
+@pytest.mark.skipif(
+    not os.access(_MPY_CROSS_BIN, os.X_OK),
+    reason="needs the real mpy-cross (scripts/setup_mpy_cross.sh, or set MPY_CROSS)",
+)
+def test_native_function_the_emitter_rejects_fails_the_build_naming_the_file(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    (source / "effects").mkdir(parents=True)
+    # The native emitter can't compile a bare re-raise.
+    (source / "effects" / "reraise.py").write_text(
+        "import micropython\n\n@micropython.native\ndef f():\n    raise\n"
+    )
+
+    with pytest.raises(BuildError) as exc_info:
+        build(source_root=source, staging_root=tmp_path / "build", compile=mpy_cross_compile)
+
+    assert "reraise.py" in str(exc_info.value)
+    # mpy-cross 10.3.1 aborts in the native emitter rather than rejecting the arch.
+    assert "emitnative" in str(exc_info.value)
