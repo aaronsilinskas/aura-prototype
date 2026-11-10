@@ -106,6 +106,24 @@ except ImportError:
     pass  # Not available on all embedded runtimes
 ```
 
+**Checker-only imports go under a bare `TYPE_CHECKING = False`:**
+
+This is the one sanctioned `TYPE_CHECKING` idiom. Declare the name at module level after the runtime imports (ruff's E402 rejects imports below an assignment), never import it:
+
+```python
+from engine.packs import PackRegistry
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Final
+
+    from engine.scene import SceneLocalRegistry
+```
+
+The device never imports `typing` and skips the block. mypy treats the name as true, so the guarded imports are still checked. Don't use `try: from typing import TYPE_CHECKING / except ImportError: TYPE_CHECKING = False`: mypy rejects the fallback assignment ("cannot assign to final").
+
 **Module count matters.** Import cost is paid at startup on-device. Keep related logic in the same file rather than splitting into many small modules when startup latency is a concern.
 
 **Still unavailable on latest CircuitPython / MicroPython:**
@@ -183,5 +201,6 @@ class _Data:
 - [ ] State objects initialized once via a guard, mutated in place on subsequent frames
 - [ ] `__slots__` used on long-lived per-instance state objects
 - [ ] `typing` and `collections.abc` imports guarded with `try/except ImportError` (advanced constructs such as `TypeVar`, `Protocol` and `Callable` are still absent from latest releases)
+- [ ] `TYPE_CHECKING` declared as a bare module-level `TYPE_CHECKING = False`, never imported from `typing`
 - [ ] Class-level constants annotated with `Final` (unquoted, no type parameter; import guarded with `try/except ImportError`)
 - [ ] No imports from unavailable stdlib modules

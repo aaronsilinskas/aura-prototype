@@ -16,13 +16,10 @@ __all__ = [
     "UndeclaredPackError",
 ]
 
-try:
-    from typing import TYPE_CHECKING
-except ImportError:
-    TYPE_CHECKING = False
-
 from engine.effects.builder import EffectBuilder
 from engine.packs import PackRegistry, RegistryError, UnknownItemError, UnknownPackError
+
+TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from engine.scene import SceneLocalRegistry

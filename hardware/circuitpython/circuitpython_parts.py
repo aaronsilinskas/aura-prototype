@@ -7,22 +7,6 @@ that doesn't need a part never requires its library to be installed.
 
 from __future__ import annotations
 
-try:
-    from collections.abc import Callable
-    from typing import TYPE_CHECKING, Final
-except ImportError:
-    TYPE_CHECKING = False
-
-if TYPE_CHECKING:
-    from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
-    from adafruit_lis3dh import LIS3DH_I2C
-    from adafruit_mmc56x3 import MMC5603
-
-    from hardware.circuitpython.audio_output import AudioEffectOutput
-    from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
-    from hardware.circuitpython.rfm69_radio_transport import Rfm69RadioTransport
-    from hardware.circuitpython.sdcard_storage import SdCardStorage
-
 import sys
 import time
 
@@ -44,6 +28,21 @@ from hardware.shared.device_config import (
 )
 from hardware.shared.device_parts import DeviceParts, PinRef
 from hardware.shared.ir_transport import PulseWriter
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Final
+
+    from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
+    from adafruit_lis3dh import LIS3DH_I2C
+    from adafruit_mmc56x3 import MMC5603
+
+    from hardware.circuitpython.audio_output import AudioEffectOutput
+    from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
+    from hardware.circuitpython.rfm69_radio_transport import Rfm69RadioTransport
+    from hardware.circuitpython.sdcard_storage import SdCardStorage
 
 __all__ = ["CircuitPythonParts", "SdCardMountError"]
 

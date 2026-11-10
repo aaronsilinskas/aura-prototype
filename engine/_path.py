@@ -10,27 +10,44 @@ from __future__ import annotations
 
 import os
 
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+
+def _normpath(p: str) -> str:
+    return p
+
+
+def _join(a: str, b: str) -> str:
+    return a.rstrip("/") + "/" + b
+
+
+def _isdir(p: str) -> bool:
+    try:
+        return bool(os.stat(p)[0] & 0x4000)
+    except OSError:
+        return False
+
+
+def _isfile(p: str) -> bool:
+    try:
+        return bool(os.stat(p)[0] & 0x8000)
+    except OSError:
+        return False
+
+
+normpath: Callable[[str], str]
+join: Callable[[str, str], str]
+isdir: Callable[[str], bool]
+isfile: Callable[[str], bool]
+
 try:
     from os.path import isdir, isfile, join, normpath
 except (ImportError, AttributeError):
     # CircuitPython / MicroPython fallback.
-    def normpath(p):  # type: ignore[misc]
-        return p
-
-    def join(a, b):  # type: ignore[misc]
-        return a.rstrip("/") + "/" + b
-
-    def isdir(p):  # type: ignore[misc]
-        try:
-            return bool(os.stat(p)[0] & 0x4000)
-        except OSError:
-            return False
-
-    def isfile(p):  # type: ignore[misc]
-        try:
-            return bool(os.stat(p)[0] & 0x8000)
-        except OSError:
-            return False
+    normpath, join, isdir, isfile = _normpath, _join, _isdir, _isfile
 
 
 def scan_stems(path: str, extensions: tuple[str, ...]) -> dict[str, str]:
