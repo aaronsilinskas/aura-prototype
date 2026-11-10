@@ -110,7 +110,12 @@ allowed_importers = ["**.tests", "app.simulation"]
 
 [tool.mypy]
 python_version = "3.10"
-files = ["app", "effects", "engine", "hardware", "magic", "packs", "scripts"]
+# micropython.py is the host-only stand-in for the device's built-in module, listed
+# so it is checked even before any production code imports it. A local module
+# outranks an installed stub, so mypy resolves `micropython` to it rather than
+# circuitpython-stubs' stub, which lacks `native`: the one deliberate exception to
+# the no-local-copies-of-real-stubs rule in typings/README.md. See its docstring.
+files = ["app", "effects", "engine", "hardware", "magic", "packs", "scripts", "micropython.py"]
 exclude = ['(^|/)tests/']
 # Local stubs for modules circuitpython-stubs lacks; see typings/README.md.
 mypy_path = "typings"
