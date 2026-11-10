@@ -4,6 +4,7 @@ from effects.effect import (
     EffectAudio,
     EffectConfig,
     EffectPixels,
+    EffectVerb,
     PixelBuffer,
 )
 from effects.layers.pulse_layer import PulseLayer
@@ -14,7 +15,7 @@ _RED_PALETTE = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 0, 0]))
 _GREEN_PALETTE = PaletteLUT256(bytes([0, 0, 0, 0, 255, 0, 255, 0]))
 
 _READY_AUDIO = EffectAudio(
-    clips={"start": AudioPlaybackConfig(name="scene.ready_start", loop=False)}
+    clips={EffectVerb.START: AudioPlaybackConfig(name="scene.ready_start", loop=False)}
 )
 
 _BRIGHTEN = 0.3

@@ -8,6 +8,7 @@ from unittest.mock import ANY
 
 import pytest
 
+from effects.effect import EffectVerb
 from engine.effects.manager import EffectManager
 from engine.events import EffectEvent
 from engine.namespace import ActiveSceneNamespace
@@ -111,7 +112,7 @@ def test_scene_prefix_fires_start_event_with_pack_equals_scene(pack_tree) -> Non
     receipt = manager.set_effect(Scope.PERSONAL, "scene.flash", {})
 
     assert output.handle_event_calls == [
-        (EffectEvent("scene", "flash", "start"), frozenset({"personal"}), ANY, receipt)
+        (EffectEvent("scene", "flash", EffectVerb.START), frozenset({"personal"}), ANY, receipt)
     ]
 
 

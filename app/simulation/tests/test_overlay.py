@@ -143,10 +143,12 @@ RULE = _HumOnce()
 """
 
 _HUM_EFFECT = """\
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig, EffectVerb
 from engine.effects.builder import EffectBuilder
 
-_AUDIO = EffectAudio(clips={"start": AudioPlaybackConfig(name="basic.blip_echo", loop=True)})
+_AUDIO = EffectAudio(
+    clips={EffectVerb.START: AudioPlaybackConfig(name="basic.blip_echo", loop=True)}
+)
 
 
 class _Builder(EffectBuilder):

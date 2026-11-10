@@ -3,7 +3,7 @@
 On entry, plays ``elements.fire`` across the whole device and adds the
 scene-local game-over sting, storing its ``EffectReceipt`` on ``TagState``.
 Stays in ``game_over`` until the sting's receipt reports stopped (the sting's
-"start" audio clip carries ``stops_effect=True``, so this fires the moment
+``EffectVerb.START`` audio clip carries ``stops_effect=True``, so this fires the moment
 the sound finishes), then transitions back to Ready. There is no fixed
 duration — entering Ready replaces the looping fire with the ready effect.
 """

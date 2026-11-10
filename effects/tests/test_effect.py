@@ -54,34 +54,34 @@ def test_get_option_returns_default_when_no_options_were_provided() -> None:
 def test_notify_listeners_is_silent_when_no_listeners_are_registered() -> None:
     config = EffectConfig(resolution=10)
 
-    config.notify_listeners("frame_start")  # must not raise
+    config.notify_listeners(EffectVerb.START)  # must not raise
 
 
 def test_registered_listener_receives_event_on_notify() -> None:
-    received: list[str] = []
+    received: list[EffectVerb] = []
     config = EffectConfig(
         resolution=10,
         listeners=[received.append],
     )
 
-    config.notify_listeners("frame_start")
+    config.notify_listeners(EffectVerb.START)
 
-    assert received == ["frame_start"]
+    assert received == [EffectVerb.START]
 
 
 def test_all_registered_listeners_are_notified_in_registration_order() -> None:
-    received: list[str] = []
+    received: list[tuple[str, EffectVerb]] = []
     config = EffectConfig(
         resolution=10,
         listeners=[
-            lambda e: received.append(f"a:{e}"),
-            lambda e: received.append(f"b:{e}"),
+            lambda verb: received.append(("a", verb)),
+            lambda verb: received.append(("b", verb)),
         ],
     )
 
-    config.notify_listeners("tick")
+    config.notify_listeners(EffectVerb.START)
 
-    assert received == ["a:tick", "b:tick"]
+    assert received == [("a", EffectVerb.START), ("b", EffectVerb.START)]
 
 
 # ---------------------------------------------------------------------------
@@ -335,9 +335,9 @@ def test_audio_playback_config_raises_when_loop_and_stops_effect_both_true() -> 
 
 def test_effect_audio_stores_clips_dict() -> None:
     clip = AudioPlaybackConfig(name="bg", loop=True)
-    audio = EffectAudio(clips={"start": clip})
+    audio = EffectAudio(clips={EffectVerb.START: clip})
 
-    assert audio.clips["start"] is clip
+    assert audio.clips[EffectVerb.START] is clip
 
 
 # ---------------------------------------------------------------------------
@@ -395,6 +395,6 @@ def test_no_haptic_constant_overlaps_with_drv2605l_hardware_waveform_ids() -> No
 
 def test_effect_haptic_accepts_haptic_pattern_as_pattern_value() -> None:
     cfg = HapticPattern(sequence=[HapticPattern.STRONG_CLICK])
-    haptic = EffectHaptic(patterns={"cast": cfg})
+    haptic = EffectHaptic(patterns={EffectVerb.START: cfg})
 
-    assert haptic.patterns["cast"] is cfg
+    assert haptic.patterns[EffectVerb.START] is cfg

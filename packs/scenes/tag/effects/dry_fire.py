@@ -16,17 +16,22 @@ from effects.effect import (
     EffectAudio,
     EffectConfig,
     EffectHaptic,
+    EffectVerb,
     HapticPattern,
 )
 from engine.effects.builder import EffectBuilder
 
 _DRY_FIRE_AUDIO = EffectAudio(
     clips={
-        "start": AudioPlaybackConfig(name="scene.dry_fire_start", loop=False, stops_effect=True),
+        EffectVerb.START: AudioPlaybackConfig(
+            name="scene.dry_fire_start", loop=False, stops_effect=True
+        ),
     }
 )
 
-_DRY_FIRE_HAPTIC = EffectHaptic(patterns={"start": HapticPattern([HapticPattern.SOFT_BUMP])})
+_DRY_FIRE_HAPTIC = EffectHaptic(
+    patterns={EffectVerb.START: HapticPattern([HapticPattern.SOFT_BUMP])}
+)
 
 
 class _Builder(EffectBuilder):

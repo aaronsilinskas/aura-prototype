@@ -14,12 +14,14 @@ try:
 except ImportError:
     pass
 
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig, EffectVerb
 from effects.layers.progress_layer import ProgressLayer
 from engine.effects.builder import EffectBuilder
 from packs.scenes.tag.effects.helpers.progress_fill_effect import ProgressFillEffect
 
-_RELOAD_AUDIO = EffectAudio(clips={"start": AudioPlaybackConfig(name="scene.reload", loop=True)})
+_RELOAD_AUDIO = EffectAudio(
+    clips={EffectVerb.START: AudioPlaybackConfig(name="scene.reload", loop=True)}
+)
 
 _COLOR: Final = 0xFF0000
 _DEFAULT_DURATION: Final = 3.0
