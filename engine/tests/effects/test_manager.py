@@ -4,7 +4,7 @@ import pytest
 
 from effects.effect import EffectVerb
 from engine.effects.builder import EffectBuilder
-from engine.effects.manager import EffectManager
+from engine.effects.manager import EffectManager, VerbKeyError
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.events import EffectEvent
 from engine.namespace import CLIP, ActiveSceneNamespace, MissingPrefixError, UndeclaredPackError
@@ -970,10 +970,16 @@ def test_failed_set_effect_takes_no_receipt_id(pack_tree) -> None:
 # ---------------------------------------------------------------------------
 
 
+# A verb no test effect emits, and a hand-made twin of the declared FIRED.
+_MISFIRED = EffectVerb("misfired")
+_HANDMADE_FIRED = EffectVerb("fired")
+
 _VERB_SOURCES = (
     (EffectVerb.START, "EffectVerb.START"),
     (EffectVerb.STOP, "EffectVerb.STOP"),
     (VerbFiringPixels.FIRED, "VerbFiringPixels.FIRED"),
+    (_MISFIRED, "EffectVerb('misfired')"),
+    (_HANDMADE_FIRED, "EffectVerb('fired')"),
 )
 
 
@@ -991,6 +997,19 @@ def _clip_item(clips: dict[EffectVerb, str], fires: bool = False) -> str:
         "from effects.effect import EffectVerb\n"
         "from engine.tests.effects.helpers import AudioClipEffectBuilder, VerbFiringPixels\n"
         + f"BUILD = AudioClipEffectBuilder({{{entries}}}, fires={fires!r})\n"
+    )
+
+
+def _pattern_item(verbs: list[EffectVerb], pixels: bool = True) -> str:
+    """Source for an effect item whose ``BUILD`` declares a haptic pattern on each of *verbs*.
+
+    With *pixels* its pixels are non-firing ``VerbFiringPixels``; without, it has none.
+    """
+    keys = ", ".join(_verb_source(verb) for verb in verbs)
+    return (
+        "from effects.effect import EffectVerb\n"
+        "from engine.tests.effects.helpers import HapticPatternEffectBuilder, VerbFiringPixels\n"
+        + f"BUILD = HapticPatternEffectBuilder([{keys}], pixels={pixels!r})\n"
     )
 
 
@@ -1029,20 +1048,6 @@ def test_start_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
     (start,) = _events(output)
     assert start.clip.config.name == "sfx.boom"
     assert start.clip.path == catalog.pack_sounds["sfx.boom"]
-
-
-def test_stop_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager, catalog = _make_clip_manager(
-        pack_tree, {"bang": _clip_item({EffectVerb.STOP: "sfx.chime"})}, [output]
-    )
-    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
-
-    manager.stop_effect(Scope.PERSONAL)
-
-    stop = _events(output)[-1]
-    assert stop.verb is EffectVerb.STOP
-    assert stop.clip.path == catalog.pack_sounds["sfx.chime"]
 
 
 def test_custom_verb_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
@@ -1132,6 +1137,101 @@ def test_building_leaves_the_shared_playback_configs_unchanged(pack_tree) -> Non
     assert starts[0].clip.config is declared
     assert starts[1].clip.config is declared
     assert starts[0].clip is not starts[1].clip
+
+
+# ---------------------------------------------------------------------------
+# Verb keys are checked when the effect is built (ADR-0006)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("method", ["set_effect", "add_effect"])
+def test_clip_keyed_on_a_verb_the_effect_never_emits_raises(pack_tree, method) -> None:
+    manager, _ = _make_clip_manager(pack_tree, {"bang": _clip_item({_MISFIRED: "sfx.boom"})}, [])
+
+    with pytest.raises(VerbKeyError):
+        getattr(manager, method)(Scope.PERSONAL, "sfx.bang", {})
+
+
+def test_clip_keyed_on_a_hand_made_twin_of_a_declared_verb_raises(pack_tree) -> None:
+    manager, _ = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({_HANDMADE_FIRED: "sfx.boom"})}, []
+    )
+
+    with pytest.raises(VerbKeyError):
+        manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+
+def test_wrapper_may_key_clips_on_the_verbs_its_reused_pixels_declare(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, _ = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({VerbFiringPixels.FIRED: "sfx.boom"})}, [output]
+    )
+
+    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+    assert [event.verb for event in _events(output)] == [EffectVerb.START]
+
+
+def test_clip_keyed_on_stop_raises_explaining_teardown_is_flush(pack_tree) -> None:
+    manager, _ = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({EffectVerb.STOP: "sfx.chime"})}, []
+    )
+
+    with pytest.raises(VerbKeyError, match="flush"):
+        manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+
+@pytest.mark.parametrize("method", ["set_effect", "add_effect"])
+def test_pattern_keyed_on_a_verb_the_effect_never_emits_raises(pack_tree, method) -> None:
+    manager, _ = _make_clip_manager(pack_tree, {"buzz": _pattern_item([_MISFIRED])}, [])
+
+    with pytest.raises(VerbKeyError):
+        getattr(manager, method)(Scope.PERSONAL, "sfx.buzz", {})
+
+
+def test_pattern_keyed_on_stop_builds(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, _ = _make_clip_manager(pack_tree, {"buzz": _pattern_item([EffectVerb.STOP])}, [output])
+
+    manager.set_effect(Scope.PERSONAL, "sfx.buzz", {})
+
+    assert [event.verb for event in _events(output)] == [EffectVerb.START]
+
+
+def test_effect_without_pixels_can_key_no_custom_verb(pack_tree) -> None:
+    manager, _ = _make_clip_manager(
+        pack_tree, {"buzz": _pattern_item([VerbFiringPixels.FIRED], pixels=False)}, []
+    )
+
+    with pytest.raises(VerbKeyError):
+        manager.set_effect(Scope.PERSONAL, "sfx.buzz", {})
+
+
+def test_verb_key_error_names_the_effect_modality_key_and_emitted_verbs(pack_tree) -> None:
+    manager, _ = _make_clip_manager(pack_tree, {"buzz": _pattern_item([_MISFIRED])}, [])
+
+    with pytest.raises(VerbKeyError) as exc_info:
+        manager.set_effect(Scope.PERSONAL, "sfx.buzz", {})
+
+    message = str(exc_info.value)
+    for part in ("'sfx.buzz'", "patterns", "'misfired'", "'start'", "'stop'", "'fired'"):
+        assert part in message
+
+
+def test_verb_key_error_leaves_the_scope_unchanged(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, _ = _make_clip_manager(pack_tree, {"buzz": _pattern_item([_MISFIRED])}, [output])
+    plain_receipt = manager.set_effect(Scope.PERSONAL, "sfx.plain", {})
+    output.handle_event_calls.clear()
+
+    with pytest.raises(VerbKeyError):
+        manager.set_effect(Scope.PERSONAL, "sfx.buzz", {})
+    assert output.handle_event_calls == []
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert output.handle_event_calls == [
+        (EffectEvent("sfx", "plain", EffectVerb.STOP), frozenset({"personal"}), ANY, plain_receipt)
+    ]
 
 
 # ---------------------------------------------------------------------------
