@@ -207,7 +207,7 @@ Identifies what a game effect targets, output-agnostically. Leaf scopes: `PERSON
 _Avoid_: `ScopeValue` (implementation artifact); using `AMBIENT` to mean idle effect (it is a routing scope)
 
 ### EffectOutput
-A hardware or software output registered with the effect system; `receives_pixels = False` for non-pixel outputs (audio, haptic), which skip buffer allocation and render.
+A hardware or software output registered with the effect system; `receives_pixels = False` for non-pixel outputs (audio, haptic), which skip buffer allocation and render. Told when an effect is held under an **Overlay** (`hold_effect`) and restored on `pop` (`restore_effect`): audio frees the effect's voices and replays its loops on restore, haptics interrupt the current sequence; pixel outputs need nothing, as held effects leave their scopes dark.
 _Avoid_: "output" (ambiguous in multi-output contexts); importing it from `engine.effects.manager` (import from `engine.effects.output`)
 
 ### EffectEvent
@@ -259,7 +259,7 @@ A CircuitPython `EffectOutput` driving audio via I2S and the live `VoiceSink` ad
 _Avoid_: stopping playback in `handle_event` on `"stop"`; assuming a fixed voice count or role-assigned slots; putting slot bookkeeping back in the output; resolving clip names (the event already carries the path)
 
 ### VoicePool
-A hardware-agnostic owner of audio voice-slot bookkeeping (imports no CircuitPython), driving hardware through a `VoiceSink` port and evicting oldest-first when full.
+A hardware-agnostic owner of audio voice-slot bookkeeping (imports no CircuitPython), driving hardware through a `VoiceSink` port and evicting oldest-first when full. `hold` frees a held effect's voices (a cut-off `stops_effect` one-shot stops its receipt, as on eviction) and `restore` plays its held loops again from the top.
 _Avoid_: importing CircuitPython audio libs here (hardware lives behind `VoiceSink`); parallel per-slot lists (use the `_Slot` record)
 
 ### VoiceSink

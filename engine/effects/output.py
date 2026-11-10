@@ -61,6 +61,26 @@ class EffectOutput:
         LEDs). Default is a no-op.
         """
 
+    def hold_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        """Take a running effect out of play while an **Overlay** covers its scene.
+
+        Called once per held effect, for the scope keys it covers that this
+        output serves. Outputs that play something over time (sound,
+        haptics) silence it here. Pixel outputs need nothing: a scope left
+        without effects goes dark through ``clear_pixels``. Default is a no-op.
+        """
+
+    def restore_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        """Bring a held effect back into play as the **Overlay** above it is popped.
+
+        Called once per effect earlier passed to ``hold_effect``. Default is a
+        no-op.
+        """
+
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
     ) -> None:

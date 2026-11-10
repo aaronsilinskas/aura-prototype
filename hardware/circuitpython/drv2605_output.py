@@ -89,6 +89,14 @@ class Drv2605EffectOutput(EffectOutput):
         self._active_receipt = receipt
         self._driver.play()
 
+    def hold_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        """Interrupt *receipt*'s sequence if it is the one playing; it is never replayed."""
+        if self._active_receipt is receipt:
+            self._driver.stop()
+            self._active_receipt = None
+
     def flush(self) -> None:
         if self._active_receipt is not None and self._active_receipt.is_stopped():
             self._driver.stop()

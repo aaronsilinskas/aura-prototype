@@ -168,6 +168,16 @@ class SimulatedAudio(EffectOutput, VoiceSink):
         if self._pool.claim(self, clip.path, clip.config.loop, stops_receipt, receipt) != -1:
             self._device.on_clip_played(clip.config.name)
 
+    def hold_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        self._pool.hold(self, receipt)
+
+    def restore_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        self._pool.restore(self, receipt)
+
     def is_path_playing(self, path: str) -> bool:
         """Whether the clip at *path* is sounding on any voice now."""
         return any(

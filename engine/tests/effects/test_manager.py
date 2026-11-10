@@ -1821,3 +1821,25 @@ def test_resetting_merge_strategies_puts_every_scope_on_split(pack_tree) -> None
     manager.reset_merge_strategies()
 
     assert _tick(manager, output) == _SPLIT_RED_BLUE
+
+
+def test_setting_effects_aside_tells_each_output_which_effects_are_held(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
+
+    manager.set_aside()
+
+    assert [(keys, r) for keys, _, r in output.held_calls] == [(frozenset({"personal"}), receipt)]
+    assert output.restored_calls == []
+
+
+def test_putting_effects_back_tells_each_output_which_effects_are_restored(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
+    held = manager.set_aside()
+
+    manager.put_back(held)
+
+    assert [(keys, r) for keys, _, r in output.restored_calls] == [
+        (frozenset({"personal"}), receipt)
+    ]
