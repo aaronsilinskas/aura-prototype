@@ -282,6 +282,22 @@ def test_effect_stores_audio_and_haptic_passed_at_construction() -> None:
     assert effect.haptic is haptic
 
 
+def test_effect_without_pixels_emits_only_start_and_stop() -> None:
+    effect = Effect(name="test")
+
+    assert effect.emitted_verbs() == (EffectVerb.START, EffectVerb.STOP)
+
+
+def test_effect_emits_start_stop_and_the_custom_verbs_its_pixels_declare() -> None:
+    class _PeakingPixels(EffectPixels):
+        PEAK = EffectVerb("peak")
+        VERBS = (PEAK,)
+
+    effect = Effect(name="test", pixels=_PeakingPixels())
+
+    assert effect.emitted_verbs() == (EffectVerb.START, EffectVerb.STOP, _PeakingPixels.PEAK)
+
+
 # ---------------------------------------------------------------------------
 # EffectPixels — abstract base class protocol
 # ---------------------------------------------------------------------------

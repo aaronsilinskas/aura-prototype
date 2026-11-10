@@ -30,6 +30,8 @@ class EffectVerb:
 
     __slots__ = ["name"]
 
+    # Not Final: a class cannot construct itself in its own body, so these are
+    # assigned below it, and type checkers reject a Final declared without a value.
     START: EffectVerb
     STOP: EffectVerb
 
@@ -46,7 +48,7 @@ EffectVerb.STOP = EffectVerb("stop")
 EffectListenerFunc: TypeAlias = "Callable[[EffectVerb], None]"
 
 
-def _require_verb_keys(field: str, keys: Iterable[object]) -> None:
+def _reject_non_verb_keys(field: str, keys: Iterable[object]) -> None:
     for key in keys:
         if not isinstance(key, EffectVerb):
             raise TypeError(
@@ -130,7 +132,7 @@ class EffectAudio:
     __slots__ = ["clips"]
 
     def __init__(self, clips: dict[EffectVerb, AudioPlaybackConfig]) -> None:
-        _require_verb_keys("clips", clips)
+        _reject_non_verb_keys("clips", clips)
         self.clips = clips
 
 
@@ -172,7 +174,7 @@ class EffectHaptic:
     __slots__ = ["patterns"]
 
     def __init__(self, patterns: dict[EffectVerb, HapticPattern]) -> None:
-        _require_verb_keys("patterns", patterns)
+        _reject_non_verb_keys("patterns", patterns)
         self.patterns = patterns
 
 
@@ -283,3 +285,14 @@ class Effect:
         self.pixels = pixels
         self.audio = audio
         self.haptic = haptic
+
+    def emitted_verbs(self) -> tuple[EffectVerb, ...]:
+        """Return every verb this effect can emit, the keys its ``clips`` and ``patterns`` may use.
+
+        That is ``EffectVerb.START``, ``EffectVerb.STOP`` and the custom verbs
+        its pixels declare in ``VERBS``. Builds a new tuple on each call, so
+        ``EffectManager`` calls it once when the effect is built, never per tick.
+        """
+        if self.pixels is None:
+            return (EffectVerb.START, EffectVerb.STOP)
+        return (EffectVerb.START, EffectVerb.STOP) + self.pixels.VERBS

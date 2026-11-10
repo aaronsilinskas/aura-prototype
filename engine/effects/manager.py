@@ -31,9 +31,9 @@ class VerbKeyError(ValueError):
 
     Raised by ``EffectManager.set_effect``/``add_effect`` before anything in
     scope is stopped. Not a **Registry lookup error**: every name resolved, but
-    the key is not one of the verbs the effect can emit (``EffectVerb.START``,
-    ``EffectVerb.STOP`` and its pixels' ``VERBS``), or it is a ``STOP`` clip.
-    *effect_name* is qualified, *modality* is ``"clips"`` or ``"patterns"``,
+    the key is not one of the verbs the effect can emit (``Effect.emitted_verbs``),
+    or it is a ``STOP`` clip. *effect_name* is qualified, *modality* is
+    ``"clips"`` or ``"patterns"``, *problem* says what is wrong with *verb*,
     and *emitted* lists the verbs the effect can emit.
     """
 
@@ -42,41 +42,46 @@ class VerbKeyError(ValueError):
         effect_name: str,
         modality: str,
         verb: EffectVerb,
+        problem: str,
         emitted: tuple[EffectVerb, ...],
     ) -> None:
         self.effect_name = effect_name
         self.modality = modality
         self.verb = verb
         self.emitted = emitted
-        if modality == "clips" and verb is EffectVerb.STOP:
-            message = (
-                f"Effect '{effect_name}' keys a clip on EffectVerb.STOP: audio teardown "
-                + "is the output's flush(), not a clip, so a STOP clip is cut off or "
-                + "plays only depending on how the effect was stopped"
-            )
-        else:
-            message = (
-                f"Effect '{effect_name}' {modality} key {verb!r} is not a verb it emits "
-                + f"(it emits {', '.join(repr(v) for v in emitted)})"
-            )
-        super().__init__(message)
+        super().__init__(
+            f"Effect '{effect_name}' {modality} key {verb!r} {problem} "
+            + f"(it emits {', '.join(repr(v) for v in emitted)})"
+        )
 
 
-def _check_verb_keys(
+def _reject_unemitted_verbs(
     effect_name: str,
     modality: str,
     keys: Iterable[EffectVerb],
     emitted: tuple[EffectVerb, ...],
 ) -> None:
-    """Raise ``VerbKeyError`` for the first of *keys* not in *emitted*, matched by identity.
-
-    A ``clips`` key of ``EffectVerb.STOP`` is rejected too.
-    """
+    """Raise ``VerbKeyError`` for the first of *keys* not in *emitted*, matched by identity."""
     for verb in keys:
-        if (modality == "clips" and verb is EffectVerb.STOP) or not any(
-            verb is known for known in emitted
-        ):
-            raise VerbKeyError(effect_name, modality, verb, emitted)
+        if not any(verb is known for known in emitted):
+            raise VerbKeyError(effect_name, modality, verb, "is not a verb it emits", emitted)
+
+
+def _reject_stop_clip(
+    effect_name: str, clips: Iterable[EffectVerb], emitted: tuple[EffectVerb, ...]
+) -> None:
+    """Raise ``VerbKeyError`` if *clips* keys a clip on ``EffectVerb.STOP``."""
+    for verb in clips:
+        if verb is EffectVerb.STOP:
+            raise VerbKeyError(
+                effect_name,
+                "clips",
+                verb,
+                "cannot hold a clip: audio teardown is the output's flush(), not a "
+                + "clip, so a STOP clip is cut off or plays only depending on how the "
+                + "effect was stopped",
+                emitted,
+            )
 
 
 class _HeldEffects(HeldEffects):
@@ -236,14 +241,14 @@ class EffectManager(EffectControls, EffectAdmin):
         entry.effect = builder(effect_name, config)
 
         qualified = pack_name + "." + effect_name
-        emitted = (EffectVerb.START, EffectVerb.STOP)
-        if entry.effect.pixels is not None:
-            emitted += entry.effect.pixels.VERBS
-        if entry.effect.haptic is not None:
-            _check_verb_keys(qualified, "patterns", entry.effect.haptic.patterns, emitted)
+        haptic = entry.effect.haptic
         audio = entry.effect.audio
+        emitted = entry.effect.emitted_verbs()
+        if haptic is not None:
+            _reject_unemitted_verbs(qualified, "patterns", haptic.patterns, emitted)
         if audio is not None:
-            _check_verb_keys(qualified, "clips", audio.clips, emitted)
+            _reject_unemitted_verbs(qualified, "clips", audio.clips, emitted)
+            _reject_stop_clip(qualified, audio.clips, emitted)
             for verb, clip_config in audio.clips.items():
                 path = self._namespace.resolve_clip(clip_config.name)
                 entry.clips[verb] = ResolvedClip(clip_config, path)

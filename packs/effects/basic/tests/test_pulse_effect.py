@@ -24,16 +24,21 @@ def _render(effect, pixel_count: int = 4) -> list:
 # --- PulseEffect emits PEAK when the brighten phase ends ---
 
 
-def test_pulse_effect_emits_its_declared_peak_verb() -> None:
+def test_pulse_effect_declares_peak_as_its_only_custom_verb() -> None:
+    from packs.effects.basic.helpers.pulse_effect import PulseEffect
+
+    assert PulseEffect.VERBS == (PulseEffect.PEAK,)
+
+
+def test_pulse_effect_emits_peak_when_the_brighten_phase_ends() -> None:
     from packs.effects.basic.helpers.pulse_effect import PulseEffect
 
     events: list[EffectVerb] = []
     effect = _build(listeners=[events.append])
 
-    effect.pixels.update(0.6)
+    effect.pixels.update(0.6)  # past the default 0.5 s brighten phase → crosses b_on
 
-    assert events[0] is PulseEffect.PEAK
-    assert PulseEffect.VERBS == (PulseEffect.PEAK,)
+    assert events == [PulseEffect.PEAK]
 
 
 # --- PulseEffect does NOT call listener when not at peak ---
