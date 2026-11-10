@@ -1000,6 +1000,9 @@ class _FakeRfm69:
         self.sent: list[bytes] = []
         _FakeRfm69.built.append(self)
 
+    def listen(self) -> None:
+        pass
+
     def send(self, data: bytes, keep_listening: bool = False) -> None:
         self.sent.append(data)
 
