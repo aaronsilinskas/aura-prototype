@@ -98,7 +98,9 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
             f = open(path, "rb")  # noqa: SIM115
         except OSError:
             return None
-        return (f, audiocore.WaveFile(f))
+        # Stub defect: circuitpython-stubs marks WaveFile's buffer required, but the
+        # firmware treats it as optional. UPSTREAM_ISSUE_URL
+        return (f, audiocore.WaveFile(f))  # type: ignore[call-arg]
 
     def play(self, slot: int, source: object, loop: bool) -> None:
         assert isinstance(source, tuple)  # the (file, WaveFile) open_source returned
