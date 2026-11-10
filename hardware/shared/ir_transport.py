@@ -33,7 +33,7 @@ class PulseWriter:
     connect to hardware (e.g. ``pulseio.PulseOut``) or a test fake.
     """
 
-    def write_pulses(self, durations: "array[int] | list[int]") -> None:
+    def write_pulses(self, durations: "array[int]") -> None:
         """Transmit a sequence of pulse durations in microseconds.
 
         Args:

@@ -20,7 +20,16 @@ Usage::
     writer = PulseOutWriter(pulseout)
 """
 
+from __future__ import annotations
+
 from hardware.shared.ir_transport import PulseReader, PulseWriter
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from array import array
+
+    import pulseio
 
 
 class PulseInReader(PulseReader):
@@ -37,7 +46,7 @@ class PulseInReader(PulseReader):
 
     __slots__ = ("_pulsein", "buffer_full_on_poll")
 
-    def __init__(self, pulsein: object) -> None:  # pulseio.PulseIn — no stub on CPython
+    def __init__(self, pulsein: pulseio.PulseIn) -> None:
         self._pulsein = pulsein
 
         # Monotonic-since-boot count of reads that observed a full buffer —
@@ -78,11 +87,11 @@ class PulseOutWriter(PulseWriter):
 
     __slots__ = ("_busy", "_pulseout")
 
-    def __init__(self, pulseout: object) -> None:  # pulseio.PulseOut — no stub on CPython
+    def __init__(self, pulseout: pulseio.PulseOut) -> None:
         self._pulseout = pulseout
         self._busy: bool = False
 
-    def write_pulses(self, durations: list[int]) -> None:
+    def write_pulses(self, durations: array[int]) -> None:
         """Send *durations* via the PulseOut hardware.
 
         Blocks until transmission completes. ``is_busy()`` reports ``True``

@@ -11,7 +11,14 @@ passes it ``usb_cdc.data`` (the channel ``hardware/circuitpython/boot.py``
 opens) while tests pass a plain fake stream.
 """
 
+from __future__ import annotations
+
 from hardware.shared.sd_sync_protocol import Transport
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    import usb_cdc
 
 __all__ = ["UsbCdcTransport"]
 
@@ -26,7 +33,7 @@ class UsbCdcTransport(Transport):
             any object exposing ``read(size)``/``write(data)`` works.
     """
 
-    def __init__(self, serial: object) -> None:
+    def __init__(self, serial: usb_cdc.Serial) -> None:
         # usb_cdc.Serial defaults to a None (infinite) timeout, which makes
         # read(size) block until exactly size bytes arrive -- recv() below
         # relies on a non-blocking read (whatever's available now, even
