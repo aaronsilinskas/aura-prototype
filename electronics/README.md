@@ -5,12 +5,12 @@ symbols/footprints, and fabrication exports. This directory is deliberately sepa
 from:
 
 - **`hardware/`** (repo root) — the Python firmware package that runs on the props'
-  microcontrollers, governed by `ruff`/`import-linter`.
+  microcontrollers, governed by `ruff`/`import-linter`/`mypy`.
 - **CircuitPython's `board` module** — the on-device pin-naming API `hardware/`
   imports at runtime.
 
 `electronics/` contains no Python and is not a package. It carries no import
-contracts, isn't touched by `ruff` or `import-linter`, and the Python-only
+contracts, isn't touched by `ruff`, `import-linter` or `mypy`, and the Python-only
 pre-commit hooks never rewrite the PCB-tool files in here.
 
 Boards are drawn in one of two tools, used as peers: **KiCad** and
