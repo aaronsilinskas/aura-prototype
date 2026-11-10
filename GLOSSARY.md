@@ -21,7 +21,7 @@ The **Modality** (sound) declaring an effect's audio behaviour, mapping event ve
 _Avoid_: a `"stop"` clips key (teardown is `flush()`, not `handle_event`)
 
 ### AudioPlaybackConfig
-A value object for how one clip plays: which clip (a qualified clip name, resolved by the **Active scene namespace** when the effect is built), whether it loops, and whether finishing it stops the whole owning effect (`stops_effect`). Declared once at module level and shared by every effect built from it.
+A value object for how one clip plays: which clip (a qualified clip name, resolved by the **Active scene namespace** when the effect is built), whether it loops, and whether finishing it stops the whole owning effect (`stops_effect`). Being cut off counts as finishing: a clip whose voice is taken by another sound, or that an **Overlay** covers mid-play, stops its effect just as if it had played out. Declared once at module level and shared by every effect built from it.
 _Avoid_: `stop_on_finish`, `end_effect`; reading `stops_effect` as "the sound stops" (it names the effect's end); combining it with `loop=True` (rejected); writing a resolved path onto it (that is a **Resolved clip**)
 
 ### Resolved clip
@@ -167,15 +167,20 @@ Serves a fresh `Scene` per lookup from the scenes the **PackCatalog** discovered
 _Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); calling `register` outside tests; changing a scene's Settings after the scan (pass **Setting overrides** to the catalog scan); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
 
 ### SceneControls
-The rule-facing scene-transition seam (`load`, `overlay`, `pop`, `reboot_into`, `reboot_to_previous`); `SceneManager` is the live implementation. Every transition into a scene first checks its **Required capabilities** against the device, and rules can ask whether the device can run a scene before offering it.
+The rule-facing scene-transition seam (`overlay`, `pop`, `reboot_into`, `reboot_to_previous`); `SceneManager` is the live implementation. Every transition into a scene first checks its **Required capabilities** against the device, and rules can ask whether the device can run a scene before offering it.
+_Avoid_: a rule-facing `load` (a rule changes scene by **Reboot**, which starts the new scene clean)
+
+### Overlay
+A scene laid temporarily on top of the running scene (a pause, a menu) and removed by `pop`. While it is on top, the scene it covers is suspended: none of its rules run, it hears no events, its game state is kept as it was, and its game time stops, so on `pop` its phases continue from where they were. The covered scene's running effects are set aside, neither drawn nor heard, and given back on `pop` with the same receipts; a looping sound restarts from the top, and a cut-off one-shot is not replayed. An overlay starts on **Split** for every scope, whatever the covered scene chose, and `pop` puts back the covered scene's **Merge strategies**. An overlay runs on the IR codec of the scene it covers, whatever its own `ir_codec` says, so it never breaks the game's traffic. Overlays stack, and each `pop` removes only the top one. It is not a scene switch: the covered scene is still the device's scene.
+_Avoid_: "scene switch" for it; counting the time spent covered against the covered scene's phases; a "live" overlay running beside the covered scene (a display over live play is the game's own effects); swapping the codec on overlay or pop
 
 ### SceneManager
 Owns the scene stack and drives scene transitions, trusting the **PackCatalog** to have checked each scene's pack declarations, installing the active scene into the **Active scene namespace** once per transition, saving and restoring merge strategies through the injected `EffectAdmin`, and routing reboots through the injected `SceneReboot` port. The live `SceneControls`.
-_Avoid_: calling `register()` on it (removed); validating pack versions on load or overlay (the catalog already did); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); installing locals or declared packs piecemeal (one install per transition)
+_Avoid_: calling `register()` on it (removed); offering rules a way to load a scene in-process (scenes change by **Reboot**); validating pack versions on load or overlay (the catalog already did); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); installing locals or declared packs piecemeal (one install per transition)
 
 ### Reboot
-How a device switches scenes: the target is persisted to device storage, then the device resets and boots that scene. Only storage and what is physically happening to the device (held buttons, motion, where its IR points) carry across; game state, phases and output state do not, and nothing after the reset runs. A device with no SD card cannot persist a target, so it does not reboot.
-_Avoid_: "scene switch" for a reboot (`load`/`overlay`/`pop` switch scenes without one); "restart", "reload" (reload is CircuitPython's soft reboot after a deploy)
+The one way a device switches scenes: the target is persisted to device storage, then the device resets and boots that scene. Only storage and what is physically happening to the device (held buttons, motion, where its IR points) carry across; game state, phases and output state do not, and nothing after the reset runs. A device with no SD card cannot persist a target, so it does not reboot, and stays in the scene it booted.
+_Avoid_: calling an **Overlay** a scene switch (the covered scene is still the device's scene); switching scenes in-process; "restart", "reload" (reload is CircuitPython's soft reboot after a deploy)
 
 ### Persisted scene
 The scene a device's card names in `aura-state.json` (`scene`, with its `return_to` companion), written by a **Reboot**. On boot it outranks the flash `default_scene`; a `deploy.py --scene` deploy clears it once, through a new **Scene deploy token**. One the device lacks the **Required capabilities** for is skipped at boot, left on the card, and logged.
@@ -210,7 +215,7 @@ A structured event payload (`pack`, `name`, `verb`, plus the verb's **Resolved c
 _Avoid_: confusing with `Event` (game-rule events); assuming only `"start"`/`"stop"` verbs exist
 
 ### Merge strategy
-The per-scope policy deciding how a scope's stack of layered effect buffers becomes shown pixels; set per rule via `EffectControls.set_merge_strategy`, defaulting to **Split**. Two ship: **Split** and **Additive**.
+The per-scope policy deciding how a scope's stack of layered effect buffers becomes shown pixels; set per rule via `EffectControls.set_merge_strategy`, defaulting to **Split**. A booted scene and every **Overlay** start on Split; popping an overlay puts back the strategies of the scene it covered. Two ship: **Split** and **Additive**.
 _Avoid_: making it a per-output or `aura-device.json` choice; holding merge state on the output; a global (non-per-scope) strategy
 
 ### Split
@@ -449,7 +454,7 @@ The board-free single owner of a device's whole IR subsystem — the transmitter
 _Avoid_: importing `NetworkEvents`/game-event vocabulary here (the event is built in `run_scene`); a value-returning `update()`; calling it a hardware "driver"; exposing the transmitter map as a public collection
 
 ### Wire-frame codec
-An encoder/decoder pair mapping an opaque payload ↔ IR pulse durations, injected into the IR transport; two coexist — the **Aura wire-frame** and the **Tag protocol** — selected per scene. Travels as a class pair, so each receiver reader gets its own fresh decoder. A built device's codec is mutable once, at boot, via `InfraredTransceiver.apply_codec`, which hands the installed pair back read-only.
+An encoder/decoder pair mapping an opaque payload ↔ IR pulse durations, injected into the IR transport; two coexist — the **Aura wire-frame** and the **Tag protocol** — selected by the scene a device boots; an **Overlay** runs on the codec of the scene it covers. Travels as a class pair, so each receiver reader gets its own fresh decoder. A built device's codec is mutable once, at boot, via `InfraredTransceiver.apply_codec`, which hands the installed pair back read-only.
 _Avoid_: assuming a single global wire-frame; treating wire-frames as interchangeable across scenes; passing codec instances (one decoder must never be shared between readers)
 
 ### Aura wire-frame
