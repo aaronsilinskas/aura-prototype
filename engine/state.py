@@ -102,7 +102,11 @@ class SceneControls:
     unit tests) pass the base ``SceneControls()`` instance, which raises on
     any call.
 
-    ``load``/``overlay``/``pop`` are deferred to end-of-tick — the transition
+    There is no in-process scene switch: a rule changes scene by Reboot
+    (ADR-0005). The boot scene is activated by ``SceneManager`` itself, off
+    this seam.
+
+    ``overlay``/``pop`` are deferred to end-of-tick — the transition
     is applied after ``engine.update(state)`` returns, not immediately inside
     the rule. ``reboot_into``/``reboot_to_previous`` are the opposite: scene
     switching across a reboot is not in-process, so both apply immediately
@@ -111,10 +115,6 @@ class SceneControls:
     """
 
     __slots__ = ()
-
-    def load(self, name: str) -> None:
-        """Replace the entire scene stack with the named scene."""
-        raise NotImplementedError
 
     def overlay(self, name: str) -> None:
         """Push the named scene on top, suspending the current scene."""
@@ -145,7 +145,7 @@ class SceneControls:
     def can_run(self, name: str) -> bool:
         """Whether this device has every Required capability of scene *name*.
 
-        Ask before offering a scene: ``load``, ``overlay``, ``reboot_into``
+        Ask before offering a scene: ``overlay``, ``reboot_into``
         and ``reboot_to_previous`` raise ``MissingCapabilityError`` for a
         scene this answers ``False`` for.
         """
@@ -318,7 +318,7 @@ class EffectControls:
 
         Ticks after the next ``prepare_buffers`` call route through the new
         strategy. Defaults to ``SPLIT`` for every scope key; ``SceneManager``
-        resets the choice on ``load`` and captures/applies it across
+        starts the boot scene on Split and captures/applies it across
         ``overlay``/``pop`` through the separate ``EffectAdmin`` face.
         """
         raise NotImplementedError
@@ -341,8 +341,8 @@ class EffectAdmin:
     def reset_merge_strategies(self) -> None:
         """Reset every registered scope key's merge strategy to ``SPLIT``.
 
-        Called by ``SceneManager._do_load`` so no strategy choice survives a
-        ``load``.
+        Called by ``SceneManager.activate_boot_scene`` so the boot scene starts
+        on Split.
         """
         raise NotImplementedError
 

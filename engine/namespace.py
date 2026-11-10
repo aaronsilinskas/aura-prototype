@@ -70,7 +70,7 @@ class ActiveSceneNamespace:
 
     Built once at composition from the Pack catalog's effect registry and pack
     sounds, with no scene installed. ``SceneManager`` calls ``install`` once
-    per activation (load, overlay, pop). Nothing is cached between lookups
+    per activation (boot scene, overlay, pop). Nothing is cached between lookups
     beyond what the registries cache themselves.
     """
 

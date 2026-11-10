@@ -328,7 +328,7 @@ Any other key fails the scan with `MalformedSceneError`.
 Required capabilities are compared with the device only for the scene about to
 run. At boot, a Persisted scene the device can't run is skipped (and logged,
 but left on the card) in favour of the flash `default_scene`; boot raises
-`MissingCapabilityError` when neither fits. `load`, `overlay`, `reboot_into`
+`MissingCapabilityError` when neither fits. `overlay`, `reboot_into`
 and `reboot_to_previous` raise `MissingCapabilityError` for a scene the device
 can't run, before anything is recorded, persisted or reset;
 `state.scene_controls.can_run(name)` asks the same without raising. A scene
@@ -336,9 +336,11 @@ that copes without some hardware leaves it out of `requires` and asks
 `state.capabilities.has(name)` before using it. A scene carries no
 starting data: rules seed their own runtime state through `state.get`/`state.set`.
 
-`SceneManager` owns a scene stack. `load(name)` replaces the stack; `overlay(name)` pushes
-on top (suspending the current scene); `pop()` restores the previous scene. Transitions are
-deferred to end-of-tick — rules call `state.scene_controls.load/overlay/pop()` during a tick
+`SceneManager` owns a scene stack. The boot activates the first scene with
+`activate_boot_scene(name)`; rules change scene only by `reboot_into` (see ADR-0005).
+`overlay(name)` pushes on top (suspending the current scene); `pop()` restores the previous
+scene. Transitions are deferred to end-of-tick — rules call
+`state.scene_controls.overlay/pop()` during a tick
 and the transition is applied after `engine.update(state)` returns. Every scene the manager
 unloads or suspends has its effects stopped on `Scope.ALL` automatically.
 

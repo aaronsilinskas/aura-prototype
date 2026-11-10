@@ -418,13 +418,6 @@ def test_state_exposes_scene_controls_passed_at_construction() -> None:
     assert state.scene_controls is scene_controls
 
 
-def test_scene_controls_default_raises_not_implemented_on_load() -> None:
-    sc = SceneControls()
-
-    with pytest.raises(NotImplementedError):
-        sc.load("some-scene")
-
-
 def test_scene_controls_default_raises_not_implemented_on_overlay() -> None:
     sc = SceneControls()
 
