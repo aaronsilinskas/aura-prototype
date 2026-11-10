@@ -110,8 +110,9 @@ app/              Composition layer — the one place allowed to import both the
                         between them (the IR medium) and radio to every other
                         device with a radio (the radio medium); add_device(
                         without={...}) drops Capabilities from the simulated
-                        config (without={"storage"} is card-less) — never
-                        deployed
+                        config (without={"storage"} is card-less); a test can
+                        cover a device's scene with an Overlay and pop it —
+                        never deployed
 
 examples/         Runnable CircuitPython entry points; deploy-watch's flash targets
 

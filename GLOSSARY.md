@@ -343,7 +343,7 @@ A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` 
 _Avoid_: mock device, virtual device, emulator (it does not run CircuitPython); faking the CircuitPython libraries beneath `device_builder`; hard-coding its hardware shape (declare it in the simulated config)
 
 ### Simulation test harness
-The test-only fixture layer that boots real scenes on one or more **simulated devices**, drives them through scripted inputs and time, and answers questions about what each device observably did. Tests written on it state behaviour, not the engine calls that produce it. A test can build a device without some **Capabilities** (without `storage` it is card-less) or hand it a card it prepared, follow it through each **reboot** into the scene it runs next, and redeploy it with a scene. At most one card in a simulation may carry packs, and a closed simulation leaves no trace of its cards for the next.
+The test-only fixture layer that boots real scenes on one or more **simulated devices**, drives them through scripted inputs and time, and answers questions about what each device observably did. Tests written on it state behaviour, not the engine calls that produce it. A test can build a device without some **Capabilities** (without `storage` it is card-less) or hand it a card it prepared, follow it through each **reboot** into the scene it runs next, redeploy it with a scene, and cover its scene with an **Overlay** and pop it, as a rule would. At most one card in a simulation may carry packs, and a closed simulation leaves no trace of its cards for the next.
 _Avoid_: device harness, scene harness (both read as runtime code); asserting on which effect names a rule passed to `EffectControls`
 
 ### Aim

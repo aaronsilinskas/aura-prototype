@@ -12,7 +12,9 @@ Its radio reaches every other device through the radio medium, with no aim;
 ``receive_radio`` stands in for an outside sender.
 
 A device reboots as a board does (see ``SimulatedDevice``), so a test can
-follow the lobby into a game and back, or redeploy it with a scene.
+follow the lobby into a game and back, or redeploy it with a scene. A test
+can cover a device's scene with an Overlay and pop it, as a pause trigger
+would: ``red.overlay("pause")`` then, later, ``red.pop()``.
 
 A device's card is a real directory, so card scenes and card packs work as on
 a device. ``aura_packs`` is a regular package, bound to the first card that
@@ -429,6 +431,7 @@ class SimulatedDevice:
             setting_overrides=self._setting_overrides,
         )
         self._scene_tick = boot.tick
+        self._scene_controls = boot.runtime.manager
         self._namespace = boot.runtime.namespace
         self.scene = boot.scene_name
         """The scene the device is running now."""
@@ -455,6 +458,34 @@ class SimulatedDevice:
         """
         self._sim_hw.power_on()
         self._boot()
+
+    # -- overlays -----------------------------------------------------------
+
+    def overlay(self, scene: str) -> None:
+        """Cover the running scene with *scene*, as a rule's ``overlay`` would.
+
+        Time does not advance: the overlay takes effect at the end of the
+        device's next tick, and the last ``overlay`` or ``pop`` before that
+        tick wins. *scene* can be any scene the device has, a card scene
+        among them. ``scene`` still names the scene the device booted.
+
+        Raises:
+            MissingCapabilityError: the device lacks a Required capability of
+                *scene*; nothing changes.
+            ValueError: *scene* is not a scene the device has.
+        """
+        self._scene_controls.overlay(scene)
+
+    def pop(self) -> None:
+        """Pop the top overlay, as a rule's ``pop`` would, uncovering the scene below.
+
+        Time does not advance: the pop takes effect at the end of the
+        device's next tick.
+
+        Raises:
+            ValueError: nothing covers the device's scene.
+        """
+        self._scene_controls.pop()
 
     # -- inputs -------------------------------------------------------------
 
