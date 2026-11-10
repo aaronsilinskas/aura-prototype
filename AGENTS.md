@@ -6,7 +6,7 @@ GitHub Issues in `aaronsilinskas/aura-prototype` via the `gh` CLI. See `docs/age
 
 ### Triage labels
 
-Default triage labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), plus `idea`/`spec`/`grilled` and `wayfinder:*`. See `docs/agents/triage-labels.md`.
+Default triage labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), plus `idea`/`spec` and `wayfinder:*`. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
