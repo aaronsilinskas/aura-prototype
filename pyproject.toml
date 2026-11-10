@@ -23,6 +23,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.15.1",
     "ruff>=0.15.6",
+    "ty==0.0.100",
 ]
 
 [tool.pytest.ini_options]
@@ -102,3 +103,12 @@ protected_modules = ["app.simulation", "hardware.simulated"]
 # scene's tests may play it on the Simulation test harness, which itself builds
 # on the Simulated device. Nothing else may import either.
 allowed_importers = ["**.tests", "app.simulation"]
+
+[tool.ty.environment]
+python = ".venv"
+python-version = "3.14"
+extra-paths = ["typings"]
+
+[tool.ty.src]
+include = ["app", "effects", "engine", "hardware", "magic", "packs", "scripts"]
+exclude = ["**/tests/**"]
