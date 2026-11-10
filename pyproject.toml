@@ -18,6 +18,7 @@ dev = [
     # Download the CircuitPython binary via: scripts/setup_mpy_cross.sh
     # Binary lands at tools/mpy-cross (gitignored). Bump version with CircuitPython upgrades.
     "pre-commit>=4.0.0",
+    "pyrefly==1.4.1",
     "pyserial>=3.5",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
@@ -102,3 +103,9 @@ protected_modules = ["app.simulation", "hardware.simulated"]
 # scene's tests may play it on the Simulation test harness, which itself builds
 # on the Simulated device. Nothing else may import either.
 allowed_importers = ["**.tests", "app.simulation"]
+
+[tool.pyrefly]
+project-includes = ["app", "effects", "engine", "hardware", "magic", "packs", "scripts"]
+project-excludes = ["**/tests/**", "**/__pycache__/**"]
+search-path = [".", "typings"]
+python-version = "3.14"
