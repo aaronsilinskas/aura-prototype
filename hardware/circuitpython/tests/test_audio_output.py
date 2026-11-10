@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from effects.effect import AudioPlaybackConfig, Effect, EffectPixels, ResolvedClip
+from effects.effect import AudioPlaybackConfig, Effect, EffectPixels, EffectVerb, ResolvedClip
 from engine.events import EffectEvent
 from engine.state import EffectReceipt
 
@@ -77,7 +77,7 @@ def _audio_only() -> Effect:
 def _event(path: str, loop: bool = False, stops_effect: bool = False) -> EffectEvent:
     """A start event carrying a clip resolved to *path*."""
     config = AudioPlaybackConfig(name="sfx.clip", loop=loop, stops_effect=stops_effect)
-    return EffectEvent("sfx", "effect", "start", ResolvedClip(config, path))
+    return EffectEvent("sfx", "effect", EffectVerb.START, ResolvedClip(config, path))
 
 
 def _wav(tmp_path, name: str = "clip") -> str:
@@ -119,7 +119,7 @@ def test_an_event_with_no_clip_plays_nothing() -> None:
     output, mixer = _make_output()
 
     output.handle_event(
-        EffectEvent("rlgl", "effect", "stop"),
+        EffectEvent("rlgl", "effect", EffectVerb.STOP),
         frozenset({"personal"}),
         _with_pixels(),
         _make_receipt(),

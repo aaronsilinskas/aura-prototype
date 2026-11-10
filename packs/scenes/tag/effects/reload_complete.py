@@ -14,18 +14,21 @@ from effects.effect import (
     EffectAudio,
     EffectConfig,
     EffectHaptic,
+    EffectVerb,
     HapticPattern,
 )
 from engine.effects.builder import EffectBuilder
 
 _RELOAD_COMPLETE_AUDIO = EffectAudio(
     clips={
-        "start": AudioPlaybackConfig(name="scene.reload_complete", loop=False, stops_effect=True),
+        EffectVerb.START: AudioPlaybackConfig(
+            name="scene.reload_complete", loop=False, stops_effect=True
+        ),
     }
 )
 
 _RELOAD_COMPLETE_HAPTIC = EffectHaptic(
-    patterns={"start": HapticPattern([HapticPattern.DOUBLE_CLICK])}
+    patterns={EffectVerb.START: HapticPattern([HapticPattern.DOUBLE_CLICK])}
 )
 
 

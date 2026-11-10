@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from effects.effect import EffectConfig, PixelBuffer
+from effects.effect import EffectConfig, EffectVerb, PixelBuffer
 from effects.palette import PaletteLUT256
 from effects.shape import Shape
 from packs.effects.elements.lightning import (
@@ -86,12 +86,16 @@ def test_lightning_effect_name_matches_builder_argument() -> None:
 
 
 # ---------------------------------------------------------------------------
-# LightningEffect — notify_listeners("strike") on tick with at_strike
+# LightningEffect — emits STRIKE on tick with at_strike
 # ---------------------------------------------------------------------------
 
 
-def test_lightning_effect_calls_notify_listeners_when_bolt_strikes() -> None:
-    events: list[str] = []
+def test_lightning_effect_declares_strike_as_its_only_custom_verb() -> None:
+    assert LightningEffect.VERBS == (LightningEffect.STRIKE,)
+
+
+def test_lightning_effect_emits_strike_when_a_bolt_strikes() -> None:
+    events: list[EffectVerb] = []
     config = _config(listeners=[events.append])
 
     shape = Shape.padded(0.25, Shape.centered_gradient())
@@ -101,11 +105,11 @@ def test_lightning_effect_calls_notify_listeners_when_bolt_strikes() -> None:
 
     effect.update(10.0)  # well past hide_max of 1.5 — triggers IDLE → STRIKE
 
-    assert "strike" in events
+    assert events == [LightningEffect.STRIKE]
 
 
 def test_lightning_effect_no_notify_when_no_bolt_strikes() -> None:
-    events: list[str] = []
+    events: list[EffectVerb] = []
     config = _config(listeners=[events.append])
 
     shape = Shape.padded(0.25, Shape.centered_gradient())
@@ -119,7 +123,7 @@ def test_lightning_effect_no_notify_when_no_bolt_strikes() -> None:
 
 
 def test_lightning_effect_emits_single_strike_event_even_when_multiple_bolts_transition() -> None:
-    events: list[str] = []
+    events: list[EffectVerb] = []
     config = _config(listeners=[events.append])
 
     shape = Shape.padded(0.25, Shape.centered_gradient())
@@ -129,7 +133,7 @@ def test_lightning_effect_emits_single_strike_event_even_when_multiple_bolts_tra
 
     effect.update(10.0)  # well past hide_max of 1.5 — all bolts transition to STRIKE
 
-    assert events.count("strike") == 1
+    assert events.count(LightningEffect.STRIKE) == 1
 
 
 # ---------------------------------------------------------------------------

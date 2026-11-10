@@ -3,7 +3,10 @@ from effects.effect import (
     Effect,
     EffectAudio,
     EffectConfig,
+    EffectHaptic,
     EffectPixels,
+    EffectVerb,
+    HapticPattern,
     PixelBuffer,
 )
 from engine.effects.builder import EffectBuilder
@@ -182,48 +185,65 @@ class RenderLengthProbeEffectBuilder(EffectBuilder):
         return Effect(name=name, pixels=_ProbePixels())
 
 
+class VerbFiringPixels(EffectPixels):
+    """Test pixels that declare one custom verb, ``FIRED``, and emit it on every update.
+
+    Built with ``fires=False`` they declare ``FIRED`` but never emit it.
+    """
+
+    FIRED = EffectVerb("fired")
+    VERBS = (FIRED,)
+
+    def __init__(self, config: EffectConfig, fires: bool = True) -> None:
+        self._config = config
+        self._fires = fires
+
+    def update(self, elapsed: float) -> None:
+        if self._fires:
+            self._config.notify_listeners(self.FIRED)
+
+    def render(self, output: object) -> None:
+        pass
+
+
 class AudioClipEffectBuilder(EffectBuilder):
     """Builder whose effects declare the given verb → clip-name map as audio.
 
     The ``AudioPlaybackConfig`` objects are made once, in ``clips``, and shared
     by every effect it builds, like a real effect's module-level constants.
-    When *fires* is set, the effect fires that custom verb on every update.
+    Its pixels are ``VerbFiringPixels``; when *fires* is set they emit
+    ``VerbFiringPixels.FIRED`` on every update.
     """
 
-    def __init__(self, clips: dict[str, str], fires: str | None = None) -> None:
-        self.clips: dict[str, AudioPlaybackConfig] = {
+    def __init__(self, clips: dict[EffectVerb, str], fires: bool = False) -> None:
+        self.clips: dict[EffectVerb, AudioPlaybackConfig] = {
             verb: AudioPlaybackConfig(clip_name, loop=False) for verb, clip_name in clips.items()
         }
         self._fires = fires
 
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        fires = self._fires
+        pixels = VerbFiringPixels(config, fires=self._fires)
+        return Effect(name=name, pixels=pixels, audio=EffectAudio(self.clips))
 
-        class _ClipPixels(EffectPixels):
-            def update(self, elapsed: float) -> None:
-                if fires is not None:
-                    config.notify_listeners(fires)
 
-            def render(self, output: object) -> None:
-                pass
+class HapticPatternEffectBuilder(EffectBuilder):
+    """Builder whose effects declare a one-click ``HapticPattern`` on each given verb.
 
-        return Effect(name=name, pixels=_ClipPixels(), audio=EffectAudio(self.clips))
+    With *pixels* set, its pixels are non-firing ``VerbFiringPixels`` (declaring
+    ``FIRED``); without, the effect has no pixels and so no custom verbs.
+    """
+
+    def __init__(self, verbs: list[EffectVerb], pixels: bool = True) -> None:
+        self._patterns = {verb: HapticPattern([HapticPattern.SHARP_CLICK]) for verb in verbs}
+        self._pixels = pixels
+
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        pixels = VerbFiringPixels(config, fires=False) if self._pixels else None
+        return Effect(name=name, pixels=pixels, haptic=EffectHaptic(self._patterns))
 
 
 class EventFiringEffectBuilder(EffectBuilder):
-    """Builder that creates an effect which fires a named event on each update."""
-
-    def __init__(self, event_name: str) -> None:
-        self._event_name = event_name
+    """Builder whose effects emit ``VerbFiringPixels.FIRED`` on every update."""
 
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        event_name = self._event_name
-
-        class _EventPixels(EffectPixels):
-            def update(self, elapsed: float) -> None:
-                config.notify_listeners(event_name)
-
-            def render(self, output: object) -> None:
-                pass
-
-        return Effect(name=name, pixels=_EventPixels())
+        return Effect(name=name, pixels=VerbFiringPixels(config))

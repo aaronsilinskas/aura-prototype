@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from effects.effect import Effect, EffectConfig, PixelBuffer, ResolvedClip
+try:
+    from typing import TYPE_CHECKING
+except ImportError:
+    TYPE_CHECKING = False
+
+from effects.effect import Effect, EffectConfig, EffectVerb, PixelBuffer, ResolvedClip
 from engine.effects.merge import SPLIT
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
@@ -15,7 +20,68 @@ from engine.state import (
 )
 from engine.timer import Timer
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
 _DEFAULT_RESOLUTION = 16
+
+
+class VerbKeyError(ValueError):
+    """A built effect keys ``clips`` or ``patterns`` on a verb it cannot use there.
+
+    Raised by ``EffectManager.set_effect``/``add_effect`` before anything in
+    scope is stopped. Not a **Registry lookup error**: every name resolved, but
+    the key is not one of the verbs the effect can emit (``Effect.emitted_verbs``),
+    or it is a ``STOP`` clip. *effect_name* is qualified, *modality* is
+    ``"clips"`` or ``"patterns"``, *problem* says what is wrong with *verb*,
+    and *emitted* lists the verbs the effect can emit.
+    """
+
+    def __init__(
+        self,
+        effect_name: str,
+        modality: str,
+        verb: EffectVerb,
+        problem: str,
+        emitted: tuple[EffectVerb, ...],
+    ) -> None:
+        self.effect_name = effect_name
+        self.modality = modality
+        self.verb = verb
+        self.emitted = emitted
+        super().__init__(
+            f"Effect '{effect_name}' {modality} key {verb!r} {problem} "
+            + f"(it emits {', '.join(repr(v) for v in emitted)})"
+        )
+
+
+def _reject_unemitted_verbs(
+    effect_name: str,
+    modality: str,
+    keys: Iterable[EffectVerb],
+    emitted: tuple[EffectVerb, ...],
+) -> None:
+    """Raise ``VerbKeyError`` for the first of *keys* not in *emitted*, matched by identity."""
+    for verb in keys:
+        if not any(verb is known for known in emitted):
+            raise VerbKeyError(effect_name, modality, verb, "is not a verb it emits", emitted)
+
+
+def _reject_stop_clip(
+    effect_name: str, clips: Iterable[EffectVerb], emitted: tuple[EffectVerb, ...]
+) -> None:
+    """Raise ``VerbKeyError`` if *clips* keys a clip on ``EffectVerb.STOP``."""
+    for verb in clips:
+        if verb is EffectVerb.STOP:
+            raise VerbKeyError(
+                effect_name,
+                "clips",
+                verb,
+                "cannot hold a clip: audio teardown is the output's flush(), not a "
+                + "clip, so a STOP clip is cut off or plays only depending on how the "
+                + "effect was stopped",
+                emitted,
+            )
 
 
 class _HeldEffects(HeldEffects):
@@ -73,7 +139,7 @@ class EffectManager(EffectControls, EffectAdmin):
             self.effect: Effect | None = effect
             # Verb → Resolved clip, owned by this running effect. Never written
             # back onto the effect's shared AudioPlaybackConfig declarations.
-            self.clips: dict[str, ResolvedClip] = {}
+            self.clips: dict[EffectVerb, ResolvedClip] = {}
 
         def __repr__(self) -> str:
             rid = self.receipt.id
@@ -120,7 +186,9 @@ class EffectManager(EffectControls, EffectAdmin):
             for o, key_set in zip(outputs, self._output_key_sets)
         ]
 
-    def _emit(self, entry: EffectManager._EffectEntry, verb: str, event_keys: set[str]) -> None:
+    def _emit(
+        self, entry: EffectManager._EffectEntry, verb: EffectVerb, event_keys: set[str]
+    ) -> None:
         """Send *entry*'s *verb* event, with its resolved clip, to outputs serving event_keys."""
         event = EffectEvent(entry.pack_name, entry.effect_name, verb, entry.clips.get(verb))
         for i in range(len(self._outputs)):
@@ -136,7 +204,7 @@ class EffectManager(EffectControls, EffectAdmin):
         name: str,
         options: dict[str, object],
     ) -> EffectManager._EffectEntry:
-        """Construct an Effect for the named effect and resolve every clip it declares.
+        """Construct an Effect for the named effect, check its verb keys, and resolve its clips.
 
         Every verb's clip is resolved now, not when the verb first fires, so
         a misspelled clip on a rarely fired verb fails here too. Nothing is
@@ -146,6 +214,8 @@ class EffectManager(EffectControls, EffectAdmin):
             RegistryError: the effect name, or one of the built effect's clip
                 names, does not resolve in the active scene namespace (see
                 ``ActiveSceneNamespace.resolve_effect`` and ``resolve_clip``).
+            VerbKeyError: a ``clips`` or ``patterns`` key is not a verb the
+                effect emits, or a ``clips`` key is ``EffectVerb.STOP``.
         """
         builder, pack_name, effect_name = self._namespace.resolve_effect(name)
 
@@ -164,14 +234,21 @@ class EffectManager(EffectControls, EffectAdmin):
             tuple(scope_key_set), pack_name, effect_name, receipt, [], None
         )
 
-        def scoped_listener(event_name: str) -> None:
-            self._emit(entry, event_name, set(entry.keys))
+        def scoped_listener(verb: EffectVerb) -> None:
+            self._emit(entry, verb, set(entry.keys))
 
         config = EffectConfig(resolution=resolution, options=options, listeners=[scoped_listener])
         entry.effect = builder(effect_name, config)
 
+        qualified = pack_name + "." + effect_name
+        haptic = entry.effect.haptic
         audio = entry.effect.audio
+        emitted = entry.effect.emitted_verbs()
+        if haptic is not None:
+            _reject_unemitted_verbs(qualified, "patterns", haptic.patterns, emitted)
         if audio is not None:
+            _reject_unemitted_verbs(qualified, "clips", audio.clips, emitted)
+            _reject_stop_clip(qualified, audio.clips, emitted)
             for verb, clip_config in audio.clips.items():
                 path = self._namespace.resolve_clip(clip_config.name)
                 entry.clips[verb] = ResolvedClip(clip_config, path)
@@ -215,7 +292,7 @@ class EffectManager(EffectControls, EffectAdmin):
                 with their keys already narrowed to the post-stop state.
         """
         for entry, removed_keys in stopped:
-            self._emit(entry, "stop", removed_keys)
+            self._emit(entry, EffectVerb.STOP, removed_keys)
 
         remaining_key_set: set[str] = set()
         for r in remaining:
@@ -317,7 +394,7 @@ class EffectManager(EffectControls, EffectAdmin):
         entry = self._build_effect(scope_key_set, name, options)
         self._remove_effects_in_scope(scope_key_set)
         self._effects.append(entry)
-        self._emit(entry, "start", scope_key_set)
+        self._emit(entry, EffectVerb.START, scope_key_set)
         return entry.receipt
 
     def add_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
@@ -329,7 +406,7 @@ class EffectManager(EffectControls, EffectAdmin):
         scope_key_set = set(scope.keys)
         entry = self._build_effect(scope_key_set, name, options)
         self._effects.append(entry)
-        self._emit(entry, "start", scope_key_set)
+        self._emit(entry, EffectVerb.START, scope_key_set)
         return entry.receipt
 
     def stop_effect(self, scope: ScopeValue) -> None:

@@ -1,6 +1,11 @@
 import random
 
-from effects.effect import Effect, EffectConfig, EffectPixels, PixelBuffer
+try:
+    from typing import Final
+except ImportError:
+    pass  # Not available on CircuitPython
+
+from effects.effect import Effect, EffectConfig, EffectPixels, EffectVerb, PixelBuffer
 from effects.layers.layer import Layer
 from effects.level import clamp_level
 from effects.palette import Palette, PaletteLUT256
@@ -81,7 +86,10 @@ class _LightningBolt(Layer):
 
 
 class LightningEffect(EffectPixels):
-    """Renders multiple lightning bolts and fires a 'strike' event on IDLE→STRIKE transitions."""
+    """Renders multiple lightning bolts, emitting ``STRIKE`` when any bolt goes IDLE→STRIKE."""
+
+    STRIKE: Final = EffectVerb("strike")
+    VERBS: tuple[EffectVerb, ...] = (STRIKE,)
 
     __slots__ = ["_bolts", "_config", "_palette"]
 
@@ -96,7 +104,7 @@ class LightningEffect(EffectPixels):
         self._config = config
 
     def update(self, elapsed: float) -> None:
-        """Advance all bolts; call notify_listeners('strike') if any bolt just struck."""
+        """Advance all bolts; emit ``STRIKE`` once if any bolt just struck."""
         for bolt in self._bolts:
             bolt.update(elapsed)
         struck = False
@@ -105,7 +113,7 @@ class LightningEffect(EffectPixels):
                 struck = True
                 break
         if struck:
-            self._config.notify_listeners("strike")
+            self._config.notify_listeners(self.STRIKE)
 
     def render(self, output: PixelBuffer) -> None:
         count = len(output)

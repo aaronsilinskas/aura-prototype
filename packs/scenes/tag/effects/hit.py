@@ -14,6 +14,7 @@ from effects.effect import (
     EffectAudio,
     EffectConfig,
     EffectHaptic,
+    EffectVerb,
     HapticPattern,
 )
 from engine.effects.builder import EffectBuilder
@@ -23,7 +24,7 @@ _pulse = PulseBuilder()
 
 _HIT_HAPTIC = EffectHaptic(
     patterns={
-        "start": HapticPattern(
+        EffectVerb.START: HapticPattern(
             [
                 HapticPattern.STRONG_BUZZ,
                 HapticPattern.PAUSE_250,
@@ -34,7 +35,9 @@ _HIT_HAPTIC = EffectHaptic(
 )
 
 _HIT_AUDIO = EffectAudio(
-    clips={"start": AudioPlaybackConfig(name="scene.hit_start", loop=False, stops_effect=True)}
+    clips={
+        EffectVerb.START: AudioPlaybackConfig(name="scene.hit_start", loop=False, stops_effect=True)
+    }
 )
 
 

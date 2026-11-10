@@ -2,8 +2,9 @@ from unittest.mock import ANY
 
 import pytest
 
+from effects.effect import EffectVerb
 from engine.effects.builder import EffectBuilder
-from engine.effects.manager import EffectManager
+from engine.effects.manager import EffectManager, VerbKeyError
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.events import EffectEvent
 from engine.namespace import CLIP, ActiveSceneNamespace, MissingPrefixError, UndeclaredPackError
@@ -15,6 +16,7 @@ from engine.tests.effects.helpers import (
     RenderLengthProbeEffectBuilder,
     SpyEffectBuilder,
     SpyEffectOutput,
+    VerbFiringPixels,
 )
 from engine.timer import Timer
 
@@ -202,7 +204,7 @@ def test_effect_event_reaches_matching_scope_output(pack_tree) -> None:
             "events": {
                 "shock": (
                     "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
-                    "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
+                    "BUILD = EventFiringEffectBuilder()\n"
                 )
             }
         }
@@ -214,8 +216,13 @@ def test_effect_event_reaches_matching_scope_output(pack_tree) -> None:
     manager.update(_make_timer())
 
     assert output.handle_event_calls == [
-        (EffectEvent("events", "shock", "start"), frozenset({"personal"}), ANY, receipt),
-        (EffectEvent("events", "shock", "lightning_strike"), frozenset({"personal"}), ANY, receipt),
+        (EffectEvent("events", "shock", EffectVerb.START), frozenset({"personal"}), ANY, receipt),
+        (
+            EffectEvent("events", "shock", VerbFiringPixels.FIRED),
+            frozenset({"personal"}),
+            ANY,
+            receipt,
+        ),
     ]
 
 
@@ -225,7 +232,7 @@ def test_effect_event_does_not_reach_out_of_scope_output(pack_tree) -> None:
             "events": {
                 "shock": (
                     "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
-                    "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
+                    "BUILD = EventFiringEffectBuilder()\n"
                 )
             }
         }
@@ -637,8 +644,28 @@ def test_add_effect_fires_start_event_to_matching_output(pack_tree) -> None:
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), ANY, receipt)
+        (EffectEvent("stub", "fire", EffectVerb.START), frozenset({"personal"}), ANY, receipt)
     ]
+
+
+def test_starting_an_effect_announces_the_engine_start_verb(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+
+    manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+
+    assert output.handle_event_calls[0][0].verb is EffectVerb.START
+
+
+def test_stopping_an_effect_announces_the_engine_stop_verb(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+    manager.set_effect(Scope.PERSONAL, "stub.fire", {})
+    output.handle_event_calls.clear()
+
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert output.handle_event_calls[0][0].verb is EffectVerb.STOP
 
 
 def test_add_effect_start_event_not_delivered_to_out_of_scope_output(pack_tree) -> None:
@@ -661,7 +688,7 @@ def test_add_effect_does_not_fire_stop_for_existing_effects(pack_tree) -> None:
     ice_receipt = manager.add_effect(Scope.PERSONAL, "stub.ice", {})
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "ice", "start"), frozenset({"personal"}), ANY, ice_receipt)
+        (EffectEvent("stub", "ice", EffectVerb.START), frozenset({"personal"}), ANY, ice_receipt)
     ]
 
 
@@ -673,8 +700,8 @@ def test_add_effect_fires_start_event_unconditionally_for_duplicate_name(pack_tr
     receipt_b = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), ANY, receipt_a),
-        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), ANY, receipt_b),
+        (EffectEvent("stub", "fire", EffectVerb.START), frozenset({"personal"}), ANY, receipt_a),
+        (EffectEvent("stub", "fire", EffectVerb.START), frozenset({"personal"}), ANY, receipt_b),
     ]
 
 
@@ -688,7 +715,7 @@ def test_stop_effect_fires_stop_event_to_matching_output(pack_tree) -> None:
     manager.stop_effect(Scope.PERSONAL)
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, receipt)
+        (EffectEvent("stub", "fire", EffectVerb.STOP), frozenset({"personal"}), ANY, receipt)
     ]
 
 
@@ -703,8 +730,8 @@ def test_stop_effect_fires_stop_for_each_effect_in_scope(pack_tree) -> None:
     manager.stop_effect(Scope.PERSONAL)
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, fire_receipt),
-        (EffectEvent("stub", "ice", "stop"), frozenset({"personal"}), ANY, ice_receipt),
+        (EffectEvent("stub", "fire", EffectVerb.STOP), frozenset({"personal"}), ANY, fire_receipt),
+        (EffectEvent("stub", "ice", EffectVerb.STOP), frozenset({"personal"}), ANY, ice_receipt),
     ]
 
 
@@ -718,8 +745,8 @@ def test_set_effect_fires_stop_then_start_when_replacing_effect(pack_tree) -> No
     ice_receipt = manager.set_effect(Scope.PERSONAL, "stub.ice", {})
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, fire_receipt),
-        (EffectEvent("stub", "ice", "start"), frozenset({"personal"}), ANY, ice_receipt),
+        (EffectEvent("stub", "fire", EffectVerb.STOP), frozenset({"personal"}), ANY, fire_receipt),
+        (EffectEvent("stub", "ice", EffectVerb.START), frozenset({"personal"}), ANY, ice_receipt),
     ]
 
 
@@ -738,8 +765,8 @@ def test_set_effect_fires_stop_only_to_outputs_in_call_time_scope(pack_tree) -> 
     ice_receipt = manager.set_effect(Scope.PERSONAL, "stub.ice", {})
 
     assert output_personal.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, fire_receipt),
-        (EffectEvent("stub", "ice", "start"), frozenset({"personal"}), ANY, ice_receipt),
+        (EffectEvent("stub", "fire", EffectVerb.STOP), frozenset({"personal"}), ANY, fire_receipt),
+        (EffectEvent("stub", "ice", EffectVerb.START), frozenset({"personal"}), ANY, ice_receipt),
     ]
     assert output_directional.handle_event_calls == []
 
@@ -759,10 +786,15 @@ def test_stop_effect_with_broader_scope_fires_stop_to_all_matching_outputs(pack_
     manager.stop_effect(Scope.ALL)
 
     assert output_personal.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, fire_receipt)
+        (EffectEvent("stub", "fire", EffectVerb.STOP), frozenset({"personal"}), ANY, fire_receipt)
     ]
     assert output_directional.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"directional"}), ANY, fire_receipt)
+        (
+            EffectEvent("stub", "fire", EffectVerb.STOP),
+            frozenset({"directional"}),
+            ANY,
+            fire_receipt,
+        )
     ]
 
 
@@ -777,7 +809,7 @@ def test_stop_effect_by_receipt_fires_stop_event(pack_tree) -> None:
     manager.update(_make_timer())
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, receipt)
+        (EffectEvent("stub", "fire", EffectVerb.STOP), frozenset({"personal"}), ANY, receipt)
     ]
 
 
@@ -801,7 +833,12 @@ def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect(p
 
     assert output_personal.handle_event_calls == []
     assert output_directional.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"directional"}), ANY, fire_receipt)
+        (
+            EffectEvent("stub", "fire", EffectVerb.STOP),
+            frozenset({"directional"}),
+            ANY,
+            fire_receipt,
+        )
     ]
 
 
@@ -817,7 +854,7 @@ def test_handle_event_receives_personal_scope_for_personal_effect(pack_tree) -> 
     receipt = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), ANY, receipt)
+        (EffectEvent("stub", "fire", EffectVerb.START), frozenset({"personal"}), ANY, receipt)
     ]
 
 
@@ -828,7 +865,7 @@ def test_handle_event_receives_directional_scope_for_directional_effect(pack_tre
     receipt = manager.add_effect(Scope.DIRECTIONAL, "stub.ice", {})
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "ice", "start"), frozenset({"directional"}), ANY, receipt)
+        (EffectEvent("stub", "ice", EffectVerb.START), frozenset({"directional"}), ANY, receipt)
     ]
 
 
@@ -843,10 +880,10 @@ def test_handle_event_receives_composite_scope_not_decomposed_leaf(pack_tree) ->
     receipt = manager.add_effect(Scope.ALL, "stub.fire", {})
 
     assert output_personal.handle_event_calls == [
-        (EffectEvent("stub", "fire", "start"), frozenset({"personal"}), ANY, receipt)
+        (EffectEvent("stub", "fire", EffectVerb.START), frozenset({"personal"}), ANY, receipt)
     ]
     assert output_directional.handle_event_calls == [
-        (EffectEvent("stub", "fire", "start"), frozenset({"directional"}), ANY, receipt)
+        (EffectEvent("stub", "fire", EffectVerb.START), frozenset({"directional"}), ANY, receipt)
     ]
 
 
@@ -912,7 +949,7 @@ def test_failed_set_effect_adds_no_effect(pack_tree) -> None:
     manager.stop_effect(Scope.PERSONAL)
 
     assert output.handle_event_calls == [
-        (EffectEvent("stub", "fire", "stop"), frozenset({"personal"}), ANY, fire_receipt)
+        (EffectEvent("stub", "fire", EffectVerb.STOP), frozenset({"personal"}), ANY, fire_receipt)
     ]
 
 
@@ -933,11 +970,46 @@ def test_failed_set_effect_takes_no_receipt_id(pack_tree) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _clip_item(clips: dict[str, str], fires: str | None = None) -> str:
-    """Source for an effect item whose ``BUILD`` declares *clips* (verb → clip name)."""
+# A verb no test effect emits, and a hand-made twin of the declared FIRED.
+_MISFIRED = EffectVerb("misfired")
+_HANDMADE_FIRED = EffectVerb("fired")
+
+_VERB_SOURCES = (
+    (EffectVerb.START, "EffectVerb.START"),
+    (EffectVerb.STOP, "EffectVerb.STOP"),
+    (VerbFiringPixels.FIRED, "VerbFiringPixels.FIRED"),
+    (_MISFIRED, "EffectVerb('misfired')"),
+    (_HANDMADE_FIRED, "EffectVerb('fired')"),
+)
+
+
+def _verb_source(verb: EffectVerb) -> str:
+    return next(source for known, source in _VERB_SOURCES if known is verb)
+
+
+def _clip_item(clips: dict[EffectVerb, str], fires: bool = False) -> str:
+    """Source for an effect item whose ``BUILD`` declares *clips* (verb → clip name).
+
+    Its pixels are ``VerbFiringPixels``; with *fires* they emit ``FIRED`` on every update.
+    """
+    entries = ", ".join(f"{_verb_source(verb)}: {name!r}" for verb, name in clips.items())
     return (
-        "from engine.tests.effects.helpers import AudioClipEffectBuilder\n"
-        + f"BUILD = AudioClipEffectBuilder({clips!r}, fires={fires!r})\n"
+        "from effects.effect import EffectVerb\n"
+        "from engine.tests.effects.helpers import AudioClipEffectBuilder, VerbFiringPixels\n"
+        + f"BUILD = AudioClipEffectBuilder({{{entries}}}, fires={fires!r})\n"
+    )
+
+
+def _pattern_item(verbs: list[EffectVerb], pixels: bool = True) -> str:
+    """Source for an effect item whose ``BUILD`` declares a haptic pattern on each of *verbs*.
+
+    With *pixels* its pixels are non-firing ``VerbFiringPixels``; without, it has none.
+    """
+    keys = ", ".join(_verb_source(verb) for verb in verbs)
+    return (
+        "from effects.effect import EffectVerb\n"
+        "from engine.tests.effects.helpers import HapticPatternEffectBuilder, VerbFiringPixels\n"
+        + f"BUILD = HapticPatternEffectBuilder([{keys}], pixels={pixels!r})\n"
     )
 
 
@@ -968,7 +1040,7 @@ def _events(output: SpyEffectOutput) -> list[EffectEvent]:
 def test_start_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager, catalog = _make_clip_manager(
-        pack_tree, {"bang": _clip_item({"start": "sfx.boom"})}, [output]
+        pack_tree, {"bang": _clip_item({EffectVerb.START: "sfx.boom"})}, [output]
     )
 
     manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
@@ -978,44 +1050,34 @@ def test_start_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
     assert start.clip.path == catalog.pack_sounds["sfx.boom"]
 
 
-def test_stop_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager, catalog = _make_clip_manager(
-        pack_tree, {"bang": _clip_item({"stop": "sfx.chime"})}, [output]
-    )
-    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
-
-    manager.stop_effect(Scope.PERSONAL)
-
-    stop = _events(output)[-1]
-    assert stop.verb == "stop"
-    assert stop.clip.path == catalog.pack_sounds["sfx.chime"]
-
-
 def test_custom_verb_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager, catalog = _make_clip_manager(
-        pack_tree, {"bang": _clip_item({"peak": "scene.cheer"}, fires="peak")}, [output]
+        pack_tree,
+        {"bang": _clip_item({VerbFiringPixels.FIRED: "scene.cheer"}, fires=True)},
+        [output],
     )
     manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
 
     manager.update(_make_timer())
 
-    peak = _events(output)[-1]
-    assert peak.verb == "peak"
-    assert peak.clip.path == catalog.scene_registry.get("arena").local_sound_map["cheer"]
+    fired = _events(output)[-1]
+    assert fired.verb is VerbFiringPixels.FIRED
+    assert fired.clip.path == catalog.scene_registry.get("arena").local_sound_map["cheer"]
 
 
 def test_verb_with_no_clip_emits_an_event_with_no_clip(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager, _ = _make_clip_manager(pack_tree, {"bang": _clip_item({"peak": "sfx.boom"})}, [output])
+    manager, _ = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({VerbFiringPixels.FIRED: "sfx.boom"})}, [output]
+    )
 
     manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
     manager.stop_effect(Scope.PERSONAL)
 
     assert [(event.verb, event.clip) for event in _events(output)] == [
-        ("start", None),
-        ("stop", None),
+        (EffectVerb.START, None),
+        (EffectVerb.STOP, None),
     ]
 
 
@@ -1029,7 +1091,7 @@ def test_effect_with_no_audio_emits_events_with_no_clip(pack_tree) -> None:
     assert start.clip is None
 
 
-@pytest.mark.parametrize("verb", ["start", "peak"])
+@pytest.mark.parametrize("verb", [EffectVerb.START, VerbFiringPixels.FIRED])
 def test_misspelled_clip_raises_from_set_effect_on_any_verb(pack_tree, verb) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager, _ = _make_clip_manager(pack_tree, {"bang": _clip_item({verb: "sfx.bomm"})}, [output])
@@ -1042,7 +1104,9 @@ def test_misspelled_clip_raises_from_set_effect_on_any_verb(pack_tree, verb) -> 
 
 def test_misspelled_clip_on_a_custom_verb_leaves_the_scope_unchanged(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager, _ = _make_clip_manager(pack_tree, {"bang": _clip_item({"peak": "sfx.bomm"})}, [output])
+    manager, _ = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({VerbFiringPixels.FIRED: "sfx.bomm"})}, [output]
+    )
     plain_receipt = manager.set_effect(Scope.PERSONAL, "sfx.plain", {})
     output.handle_event_calls.clear()
 
@@ -1052,27 +1116,162 @@ def test_misspelled_clip_on_a_custom_verb_leaves_the_scope_unchanged(pack_tree) 
     manager.stop_effect(Scope.PERSONAL)
 
     assert output.handle_event_calls == [
-        (EffectEvent("sfx", "plain", "stop"), frozenset({"personal"}), ANY, plain_receipt)
+        (EffectEvent("sfx", "plain", EffectVerb.STOP), frozenset({"personal"}), ANY, plain_receipt)
     ]
 
 
 def test_building_leaves_the_shared_playback_configs_unchanged(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager, catalog = _make_clip_manager(
-        pack_tree, {"bang": _clip_item({"start": "sfx.boom"})}, [output]
+        pack_tree, {"bang": _clip_item({EffectVerb.START: "sfx.boom"})}, [output]
     )
     builder = catalog.effect_registry.get("sfx", "bang", EffectBuilder)
-    declared = builder.clips["start"]
+    declared = builder.clips[EffectVerb.START]
 
     manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
     manager.add_effect(Scope.PERSONAL, "sfx.bang", {})
 
-    assert builder.clips == {"start": declared}
+    assert builder.clips == {EffectVerb.START: declared}
     assert (declared.name, declared.loop, declared.stops_effect) == ("sfx.boom", False, False)
     starts = _events(output)
     assert starts[0].clip.config is declared
     assert starts[1].clip.config is declared
     assert starts[0].clip is not starts[1].clip
+
+
+# ---------------------------------------------------------------------------
+# Verb keys are checked when the effect is built (ADR-0006)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("method", ["set_effect", "add_effect"])
+def test_clip_keyed_on_a_verb_the_effect_never_emits_raises(pack_tree, method) -> None:
+    manager, _ = _make_clip_manager(pack_tree, {"bang": _clip_item({_MISFIRED: "sfx.boom"})}, [])
+
+    with pytest.raises(VerbKeyError):
+        getattr(manager, method)(Scope.PERSONAL, "sfx.bang", {})
+
+
+def test_clip_keyed_on_a_hand_made_twin_of_a_declared_verb_raises(pack_tree) -> None:
+    manager, _ = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({_HANDMADE_FIRED: "sfx.boom"})}, []
+    )
+
+    with pytest.raises(VerbKeyError):
+        manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+
+# A scene-local effect that reuses basic.pulse's pixels and keys a clip on
+# PulseEffect.PEAK without declaring any verb itself.
+_PULSE_WRAPPER_ITEM = (
+    "from effects.effect import AudioPlaybackConfig, Effect, EffectAudio\n"
+    "from engine.effects.builder import EffectBuilder\n"
+    "from packs.effects.basic.helpers.pulse_effect import PulseEffect\n"
+    "from packs.effects.basic.pulse import BUILD as PULSE\n"
+    "_AUDIO = EffectAudio({PulseEffect.PEAK: AudioPlaybackConfig('sfx.boom', loop=False)})\n"
+    "class _Wrapper(EffectBuilder):\n"
+    "    def __call__(self, name, config):\n"
+    "        return Effect(name, pixels=PULSE(name, config).pixels, audio=_AUDIO)\n"
+    "BUILD = _Wrapper()\n"
+)
+
+# basic.pulse brightens for 0.5 s by default, so one 0.6 s tick crosses its peak.
+_PAST_PULSE_PEAK = 0.6
+
+
+def test_wrapper_may_key_clips_on_the_verbs_its_reused_pack_pixels_declare(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, catalog = _make_clip_manager(pack_tree, {"warn": _PULSE_WRAPPER_ITEM}, [output])
+    manager.set_effect(Scope.PERSONAL, "sfx.warn", {})
+    timer = _make_timer()
+    timer.elapsed = _PAST_PULSE_PEAK
+
+    manager.update(timer)
+
+    peak = _events(output)[-1]
+    assert peak.verb.name == "peak"
+    assert peak.clip.path == catalog.pack_sounds["sfx.boom"]
+
+
+def test_clip_keyed_on_stop_raises_explaining_teardown_is_flush(pack_tree) -> None:
+    manager, _ = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({EffectVerb.STOP: "sfx.chime"})}, []
+    )
+
+    with pytest.raises(VerbKeyError, match="flush"):
+        manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+
+def test_stop_clip_error_names_the_effect_modality_and_emitted_verbs(pack_tree) -> None:
+    manager, _ = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({EffectVerb.STOP: "sfx.chime"})}, []
+    )
+
+    with pytest.raises(VerbKeyError) as exc_info:
+        manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+    message = str(exc_info.value)
+    for part in ("'sfx.bang'", "clips", "'stop'", "'start'", "'fired'"):
+        assert part in message
+
+
+@pytest.mark.parametrize("method", ["set_effect", "add_effect"])
+def test_pattern_keyed_on_a_verb_the_effect_never_emits_raises(pack_tree, method) -> None:
+    manager, _ = _make_clip_manager(pack_tree, {"buzz": _pattern_item([_MISFIRED])}, [])
+
+    with pytest.raises(VerbKeyError):
+        getattr(manager, method)(Scope.PERSONAL, "sfx.buzz", {})
+
+
+def test_pattern_keyed_on_stop_builds(pack_tree) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, _ = _make_clip_manager(pack_tree, {"buzz": _pattern_item([EffectVerb.STOP])}, [output])
+
+    manager.set_effect(Scope.PERSONAL, "sfx.buzz", {})
+
+    assert [event.verb for event in _events(output)] == [EffectVerb.START]
+
+
+def test_effect_without_pixels_can_key_no_custom_verb(pack_tree) -> None:
+    manager, _ = _make_clip_manager(
+        pack_tree, {"buzz": _pattern_item([VerbFiringPixels.FIRED], pixels=False)}, []
+    )
+
+    with pytest.raises(VerbKeyError):
+        manager.set_effect(Scope.PERSONAL, "sfx.buzz", {})
+
+
+def test_verb_key_error_names_the_effect_modality_key_and_emitted_verbs(pack_tree) -> None:
+    manager, _ = _make_clip_manager(pack_tree, {"buzz": _pattern_item([_MISFIRED])}, [])
+
+    with pytest.raises(VerbKeyError) as exc_info:
+        manager.set_effect(Scope.PERSONAL, "sfx.buzz", {})
+
+    message = str(exc_info.value)
+    for part in ("'sfx.buzz'", "patterns", "'misfired'", "'start'", "'stop'", "'fired'"):
+        assert part in message
+
+
+@pytest.mark.parametrize("method", ["set_effect", "add_effect"])
+@pytest.mark.parametrize(
+    "bad_item",
+    [_pattern_item([_MISFIRED]), _clip_item({_MISFIRED: "sfx.boom"})],
+    ids=["patterns", "clips"],
+)
+def test_verb_key_error_leaves_the_scope_unchanged(pack_tree, method, bad_item) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager, _ = _make_clip_manager(pack_tree, {"bad": bad_item}, [output])
+    plain_receipt = manager.set_effect(Scope.PERSONAL, "sfx.plain", {})
+    output.handle_event_calls.clear()
+
+    with pytest.raises(VerbKeyError):
+        getattr(manager, method)(Scope.PERSONAL, "sfx.bad", {})
+    assert output.handle_event_calls == []
+    manager.stop_effect(Scope.PERSONAL)
+
+    assert output.handle_event_calls == [
+        (EffectEvent("sfx", "plain", EffectVerb.STOP), frozenset({"personal"}), ANY, plain_receipt)
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -1284,7 +1483,7 @@ def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_tree) -> None
             "evt": {
                 "shock": (
                     "from engine.tests.effects.helpers import EventFiringEffectBuilder\n"
-                    "BUILD = EventFiringEffectBuilder('lightning_strike')\n"
+                    "BUILD = EventFiringEffectBuilder()\n"
                 )
             }
         }
@@ -1300,14 +1499,14 @@ def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_tree) -> None
 
     manager.update(_make_timer())
 
-    # shock effect fires "lightning_strike"; scoped_listener reads live entry.keys
+    # shock effect fires VerbFiringPixels.FIRED; scoped_listener reads live entry.keys
     # → personal output must NOT receive it after narrowing
     assert not any(
-        c[0] == EffectEvent("evt", "shock", "lightning_strike")
+        c[0] == EffectEvent("evt", "shock", VerbFiringPixels.FIRED)
         for c in output_personal.handle_event_calls
     )
     assert any(
-        c[0] == EffectEvent("evt", "shock", "lightning_strike")
+        c[0] == EffectEvent("evt", "shock", VerbFiringPixels.FIRED)
         for c in output_directional.handle_event_calls
     )
 
@@ -1768,7 +1967,7 @@ def test_an_effect_whose_receipt_stopped_while_held_stops_on_the_first_tick_afte
     frame = _tick(manager, output)
 
     assert frame is None
-    assert [call[0].verb for call in output.handle_event_calls] == ["stop"]
+    assert [call[0].verb for call in output.handle_event_calls] == [EffectVerb.STOP]
     assert output.clear_pixels_calls[0] == "personal"
 
 

@@ -1,8 +1,8 @@
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig, EffectVerb
 from engine.effects.builder import EffectBuilder
 
 _GREEN_LIGHT_MUSIC_AUDIO = EffectAudio(
-    clips={"start": AudioPlaybackConfig(name="scene.green_light_music_start", loop=True)}
+    clips={EffectVerb.START: AudioPlaybackConfig(name="scene.green_light_music_start", loop=True)}
 )
 
 

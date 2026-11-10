@@ -15,12 +15,15 @@ from effects.effect import (
     Effect,
     EffectAudio,
     EffectConfig,
+    EffectVerb,
 )
 from engine.effects.builder import EffectBuilder
 
 _READY_SHOTS_AUDIO = EffectAudio(
     clips={
-        "start": AudioPlaybackConfig(name="scene.ready_shots_start", loop=False, stops_effect=True),
+        EffectVerb.START: AudioPlaybackConfig(
+            name="scene.ready_shots_start", loop=False, stops_effect=True
+        ),
     }
 )
 

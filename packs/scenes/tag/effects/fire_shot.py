@@ -14,6 +14,7 @@ from effects.effect import (
     EffectAudio,
     EffectConfig,
     EffectHaptic,
+    EffectVerb,
     HapticPattern,
 )
 from engine.effects.builder import EffectBuilder
@@ -23,11 +24,15 @@ _solid = SolidBuilder()
 
 _FIRE_SHOT_AUDIO = EffectAudio(
     clips={
-        "start": AudioPlaybackConfig(name="scene.fire_shot_start", loop=False, stops_effect=True)
+        EffectVerb.START: AudioPlaybackConfig(
+            name="scene.fire_shot_start", loop=False, stops_effect=True
+        )
     }
 )
 
-_FIRE_SHOT_HAPTIC = EffectHaptic(patterns={"start": HapticPattern([HapticPattern.STRONG_CLICK])})
+_FIRE_SHOT_HAPTIC = EffectHaptic(
+    patterns={EffectVerb.START: HapticPattern([HapticPattern.STRONG_CLICK])}
+)
 
 _FLASH_COLOR = 0xFFFFFF
 

@@ -4,15 +4,18 @@ from effects.effect import (
     EffectAudio,
     EffectConfig,
     EffectHaptic,
+    EffectVerb,
     HapticPattern,
 )
 from engine.effects.builder import EffectBuilder
 
 _SFX_TEST_AUDIO = EffectAudio(
-    clips={"start": AudioPlaybackConfig(name="scene.sfx_test_start", loop=False)}
+    clips={EffectVerb.START: AudioPlaybackConfig(name="scene.sfx_test_start", loop=False)}
 )
 
-_SFX_TEST_HAPTIC = EffectHaptic(patterns={"start": HapticPattern([HapticPattern.STRONG_CLICK])})
+_SFX_TEST_HAPTIC = EffectHaptic(
+    patterns={EffectVerb.START: HapticPattern([HapticPattern.STRONG_CLICK])}
+)
 
 
 class _Builder(EffectBuilder):

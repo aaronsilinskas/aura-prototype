@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 try:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Iterable, Iterator
     from typing import TypeAlias
 except ImportError:
     pass
@@ -18,7 +18,44 @@ try:
 except ImportError:
     pass  # Not available on CircuitPython
 
-EffectListenerFunc: TypeAlias = "Callable[[str], None]"
+
+class EffectVerb:
+    """A named moment an effect announces to its outputs; the key for ``clips`` and ``patterns``.
+
+    The engine owns ``EffectVerb.START`` and ``EffectVerb.STOP``. Custom verbs
+    are class constants on the ``EffectPixels`` subclass that emits them, listed
+    in its ``VERBS``. ``name`` is for display only: two verbs with the same name
+    are different verbs.
+    """
+
+    __slots__ = ["name"]
+
+    # Not Final: a class cannot construct itself in its own body, so these are
+    # assigned below it, and type checkers reject a Final declared without a value.
+    START: EffectVerb
+    STOP: EffectVerb
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __repr__(self) -> str:
+        return f"EffectVerb({self.name!r})"
+
+
+EffectVerb.START = EffectVerb("start")
+EffectVerb.STOP = EffectVerb("stop")
+
+EffectListenerFunc: TypeAlias = "Callable[[EffectVerb], None]"
+
+
+def _reject_non_verb_keys(field: str, keys: Iterable[object]) -> None:
+    for key in keys:
+        if not isinstance(key, EffectVerb):
+            raise TypeError(
+                f"{field} key {key!r} is not an EffectVerb: key by EffectVerb.START "
+                + "or EffectVerb.STOP, or by the emitting effect's constant "
+                + "(PulseEffect.PEAK)"
+            )
 
 
 class EffectPixels:
@@ -26,7 +63,14 @@ class EffectPixels:
 
     ``EffectManager`` drives the per-frame ``update``/``render`` contract
     directly on ``effect.pixels``; the ``Effect`` shell is not involved.
+
+    ``VERBS`` lists the custom verbs (**EffectVerb**) a subclass emits through
+    ``EffectConfig.notify_listeners``, each also defined as a class constant
+    (``PulseEffect.PEAK``). Empty by default: such an effect emits only
+    ``EffectVerb.START`` and ``EffectVerb.STOP``, which the engine sends.
     """
+
+    VERBS: tuple[EffectVerb, ...] = ()
 
     def update(self, elapsed: float) -> None:
         """Advance pixel state for the current frame."""
@@ -80,13 +124,15 @@ class ResolvedClip:
 class EffectAudio:
     """The sound **Modality**: declares the audio behaviour of an effect.
 
-    ``clips`` maps event verbs to ``AudioPlaybackConfig`` instances.
+    ``clips`` maps each **EffectVerb** to an ``AudioPlaybackConfig``; a key
+    that is not an ``EffectVerb`` raises ``TypeError``.
     Set on ``Effect.audio``; if ``None``, the effect produces no audio.
     """
 
     __slots__ = ["clips"]
 
-    def __init__(self, clips: dict[str, AudioPlaybackConfig]) -> None:
+    def __init__(self, clips: dict[EffectVerb, AudioPlaybackConfig]) -> None:
+        _reject_non_verb_keys("clips", clips)
         self.clips = clips
 
 
@@ -120,13 +166,15 @@ class HapticPattern:
 class EffectHaptic:
     """The touch **Modality**: declares the haptic behaviour of an effect.
 
-    ``patterns`` maps event verbs to ``HapticPattern`` instances.
+    ``patterns`` maps each **EffectVerb** to a ``HapticPattern``; a key that
+    is not an ``EffectVerb`` raises ``TypeError``.
     Set on ``Effect.haptic``; if ``None``, the effect produces no haptic output.
     """
 
     __slots__ = ["patterns"]
 
-    def __init__(self, patterns: dict[str, HapticPattern]) -> None:
+    def __init__(self, patterns: dict[EffectVerb, HapticPattern]) -> None:
+        _reject_non_verb_keys("patterns", patterns)
         self.patterns = patterns
 
 
@@ -134,8 +182,8 @@ class EffectConfig:
     """Runtime configuration shared across a render pass.
 
     Passed to effect builders at construction. Controls the number of sample
-    positions via ``resolution``. Registered listeners are called by name when
-    significant rendering events occur.
+    positions via ``resolution``. Registered listeners hear each **EffectVerb**
+    the effect announces through ``notify_listeners``.
 
     Constraints:
       - ``resolution`` is clamped to a minimum of ``1`` at construction.
@@ -163,10 +211,10 @@ class EffectConfig:
             return self._options[key]  # type: ignore[return-value]
         return default
 
-    def notify_listeners(self, event_name: str) -> None:
-        """Invoke all registered listeners with ``event_name``."""
+    def notify_listeners(self, verb: EffectVerb) -> None:
+        """Announce ``verb`` to every registered listener, in registration order."""
         for listener in self.listeners:
-            listener(event_name)
+            listener(verb)
 
 
 class PixelBuffer:
@@ -237,3 +285,14 @@ class Effect:
         self.pixels = pixels
         self.audio = audio
         self.haptic = haptic
+
+    def emitted_verbs(self) -> tuple[EffectVerb, ...]:
+        """Return every verb this effect can emit, the keys its ``clips`` and ``patterns`` may use.
+
+        That is ``EffectVerb.START``, ``EffectVerb.STOP`` and the custom verbs
+        its pixels declare in ``VERBS``. Builds a new tuple on each call, so
+        ``EffectManager`` calls it once when the effect is built, never per tick.
+        """
+        if self.pixels is None:
+            return (EffectVerb.START, EffectVerb.STOP)
+        return (EffectVerb.START, EffectVerb.STOP) + self.pixels.VERBS
