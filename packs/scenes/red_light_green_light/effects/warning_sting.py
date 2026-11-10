@@ -7,14 +7,17 @@ from effects.effect import (
     HapticPattern,
 )
 from engine.effects.builder import EffectBuilder
+from packs.effects.basic.helpers.pulse_effect import PulseEffect
 from packs.effects.basic.pulse import PulseBuilder
 
 _pulse = PulseBuilder()
 
-_WARNING_STING_HAPTIC = EffectHaptic(patterns={"peak": HapticPattern([HapticPattern.STRONG_CLICK])})
+_WARNING_STING_HAPTIC = EffectHaptic(
+    patterns={PulseEffect.PEAK: HapticPattern([HapticPattern.STRONG_CLICK])}
+)
 
 _WARNING_STING_AUDIO = EffectAudio(
-    clips={"peak": AudioPlaybackConfig(name="scene.warning_sting_peak", loop=False)}
+    clips={PulseEffect.PEAK: AudioPlaybackConfig(name="scene.warning_sting_peak", loop=False)}
 )
 
 

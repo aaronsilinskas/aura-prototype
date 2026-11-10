@@ -21,6 +21,7 @@ from effects.effect import (
     AudioPlaybackConfig,
     Effect,
     EffectHaptic,
+    EffectVerb,
     HapticPattern,
     ResolvedClip,
 )
@@ -647,10 +648,15 @@ def drv2605(monkeypatch: pytest.MonkeyPatch) -> None:
 def _buzz(output: EffectOutput) -> None:
     effect = Effect(
         name="buzz",
-        haptic=EffectHaptic(patterns={"start": HapticPattern([HapticPattern.STRONG_BUZZ])}),
+        haptic=EffectHaptic(
+            patterns={EffectVerb.START: HapticPattern([HapticPattern.STRONG_BUZZ])}
+        ),
     )
     output.handle_event(
-        EffectEvent("buzz", "haptic", "start"), frozenset({"all"}), effect, EffectReceipt(1)
+        EffectEvent("buzz", "haptic", EffectVerb.START),
+        frozenset({"all"}),
+        effect,
+        EffectReceipt(1),
     )
 
 
@@ -784,7 +790,7 @@ def test_audio_output_plays_the_resolved_clips_path(audio_stack: None, tmp_path:
     resolved = ResolvedClip(AudioPlaybackConfig(name="scene.zap", loop=False), str(clip))
 
     output.handle_event(
-        EffectEvent("zap", "audio", "start", resolved),
+        EffectEvent("zap", "audio", EffectVerb.START, resolved),
         frozenset({"all"}),
         Effect(name="zap"),
         EffectReceipt(1),

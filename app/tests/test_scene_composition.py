@@ -639,10 +639,12 @@ RULE = _CardRule()
 """
 
 _CARD_EFFECT_SOURCE = """\
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig, EffectVerb
 from engine.effects.builder import EffectBuilder
 
-_AUDIO = EffectAudio(clips={"start": AudioPlaybackConfig(name="scene.card_clip", loop=False)})
+_AUDIO = EffectAudio(
+    clips={EffectVerb.START: AudioPlaybackConfig(name="scene.card_clip", loop=False)}
+)
 
 
 class _Builder(EffectBuilder):
@@ -869,11 +871,11 @@ def test_card_scene_can_reference_and_run_a_card_rule_packs_rule(device_storage)
 # ---------------------------------------------------------------------------
 
 _CARD_EFFECT_PACK_BUILD_SOURCE = """\
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig, EffectVerb
 from engine.effects.builder import EffectBuilder
 
 _AUDIO = EffectAudio(
-    clips={{"start": AudioPlaybackConfig(name="{pack_name}.card_pack_clip", loop=False)}}
+    clips={{EffectVerb.START: AudioPlaybackConfig(name="{pack_name}.card_pack_clip", loop=False)}}
 )
 
 

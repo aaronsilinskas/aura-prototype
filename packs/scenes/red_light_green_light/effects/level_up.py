@@ -9,6 +9,7 @@ from effects.effect import (
     EffectAudio,
     EffectConfig,
     EffectHaptic,
+    EffectVerb,
     HapticPattern,
 )
 from effects.layers.pulse_layer import PulseLayer
@@ -26,11 +27,11 @@ _T_OFF: Final = 0.9
 _CYCLE_TOTAL: Final = 1.0
 
 _LEVEL_UP_AUDIO: Final = EffectAudio(
-    clips={"start": AudioPlaybackConfig(name="scene.level_up_start", loop=False)}
+    clips={EffectVerb.START: AudioPlaybackConfig(name="scene.level_up_start", loop=False)}
 )
 
 _LEVEL_UP_HAPTIC: Final = EffectHaptic(
-    patterns={"start": HapticPattern([HapticPattern.DOUBLE_CLICK])}
+    patterns={EffectVerb.START: HapticPattern([HapticPattern.DOUBLE_CLICK])}
 )
 
 

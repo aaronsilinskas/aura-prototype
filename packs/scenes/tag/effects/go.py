@@ -15,15 +15,18 @@ from effects.effect import (
     EffectAudio,
     EffectConfig,
     EffectHaptic,
+    EffectVerb,
     HapticPattern,
 )
 from engine.effects.builder import EffectBuilder
 
 _GO_AUDIO = EffectAudio(
-    clips={"start": AudioPlaybackConfig(name="scene.go_start", loop=False, stops_effect=True)}
+    clips={
+        EffectVerb.START: AudioPlaybackConfig(name="scene.go_start", loop=False, stops_effect=True)
+    }
 )
 
-_GO_HAPTIC = EffectHaptic(patterns={"start": HapticPattern([HapticPattern.STRONG_BUZZ])})
+_GO_HAPTIC = EffectHaptic(patterns={EffectVerb.START: HapticPattern([HapticPattern.STRONG_BUZZ])})
 
 
 class _Builder(EffectBuilder):

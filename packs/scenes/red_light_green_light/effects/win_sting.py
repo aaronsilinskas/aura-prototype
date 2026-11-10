@@ -4,13 +4,14 @@ from effects.effect import (
     EffectAudio,
     EffectConfig,
     EffectHaptic,
+    EffectVerb,
     HapticPattern,
 )
 from engine.effects.builder import EffectBuilder
 
 _WIN_STING_HAPTIC = EffectHaptic(
     patterns={
-        "start": HapticPattern(
+        EffectVerb.START: HapticPattern(
             [
                 HapticPattern.TRIPLE_CLICK,
             ]
@@ -20,7 +21,9 @@ _WIN_STING_HAPTIC = EffectHaptic(
 
 _WIN_STING_AUDIO = EffectAudio(
     clips={
-        "start": AudioPlaybackConfig(name="scene.win_sting_start", loop=False, stops_effect=True)
+        EffectVerb.START: AudioPlaybackConfig(
+            name="scene.win_sting_start", loop=False, stops_effect=True
+        )
     }
 )
 

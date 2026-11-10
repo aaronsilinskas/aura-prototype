@@ -4,13 +4,14 @@ from effects.effect import (
     EffectAudio,
     EffectConfig,
     EffectHaptic,
+    EffectVerb,
     HapticPattern,
 )
 from engine.effects.builder import EffectBuilder
 
 _GAME_OVER_HAPTIC = EffectHaptic(
     patterns={
-        "start": HapticPattern(
+        EffectVerb.START: HapticPattern(
             [
                 HapticPattern.STRONG_BUZZ,
                 HapticPattern.PAUSE_250,
@@ -25,7 +26,7 @@ _GAME_OVER_HAPTIC = EffectHaptic(
 
 _GAME_OVER_AUDIO = EffectAudio(
     clips={
-        "start": AudioPlaybackConfig(
+        EffectVerb.START: AudioPlaybackConfig(
             name="basic.game_over_sting_start", loop=False, stops_effect=True
         )
     }

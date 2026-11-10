@@ -6,7 +6,7 @@ import re
 
 import pytest
 
-from effects.effect import Effect, EffectHaptic, HapticPattern
+from effects.effect import Effect, EffectHaptic, EffectVerb, HapticPattern
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.input import ButtonData
@@ -574,14 +574,16 @@ def test_a_device_without_a_logger_is_silent(capsys):
 # -- haptics -------------------------------------------------------------------
 
 _ALL = frozenset({"all"})
-_BUZZ = Effect(name="buzz", haptic=EffectHaptic(patterns={"start": HapticPattern(sequence=[1, 2])}))
+_BUZZ = Effect(
+    name="buzz", haptic=EffectHaptic(patterns={EffectVerb.START: HapticPattern(sequence=[1, 2])})
+)
 
 
 def _buzzing(receipt: EffectReceipt) -> tuple[SimulatedHardware, EffectOutput]:
     """A device at time 3.0 whose haptic is playing ``_BUZZ``'s start sequence for *receipt*."""
     sim_hw = SimulatedHardware(now=lambda: 3.0, config=_config(haptics={}))
     haptic = sim_hw.hw.outputs[-1]
-    haptic.handle_event(EffectEvent("buzz", "haptic", "start"), _ALL, _BUZZ, receipt)
+    haptic.handle_event(EffectEvent("buzz", "haptic", EffectVerb.START), _ALL, _BUZZ, receipt)
     return sim_hw, haptic
 
 
