@@ -8,7 +8,7 @@ Read at review time (`code-review`), not during implementation. Each source belo
 - **Terms**: `GLOSSARY.md`. Use its canonical terms and flag the terms it says to avoid.
 - **Design decisions**: `docs/adr/`. Flag code that departs from an accepted ADR.
 
-ruff, ruff format, import-linter and pytest run in pre-commit and CI; skip what they enforce.
+ruff, ruff format, import-linter, basedpyright and pytest run in pre-commit and CI; skip what they enforce. basedpyright fails only on errors missing from `.basedpyright/baseline.json`.
 
 ## Judgement calls
 
