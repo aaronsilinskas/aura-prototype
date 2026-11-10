@@ -175,7 +175,7 @@ A scene laid temporarily on top of the running scene (a pause, a menu) and remov
 _Avoid_: "scene switch" for it; counting the time spent covered against the covered scene's phases; a "live" overlay running beside the covered scene (a display over live play is the game's own effects); swapping the codec on overlay or pop
 
 ### SceneManager
-Owns the scene stack and drives scene transitions, trusting the **PackCatalog** to have checked each scene's pack declarations, installing the active scene into the **Active scene namespace** once per transition, saving and restoring merge strategies through the injected `EffectAdmin`, and routing reboots through the injected `SceneReboot` port. The live `SceneControls`.
+Owns the scene stack and drives scene transitions, trusting the **PackCatalog** to have checked each scene's pack declarations, installing the active scene into the **Active scene namespace** once per transition, setting the covered scene's effects and merge strategies aside and putting them back through the injected `EffectAdmin`, and routing reboots through the injected `SceneReboot` port. The live `SceneControls`.
 _Avoid_: calling `register()` on it (removed); offering rules a way to load a scene in-process (scenes change by **Reboot**); validating pack versions on load or overlay (the catalog already did); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); installing locals or declared packs piecemeal (one install per transition)
 
 ### Reboot
@@ -199,7 +199,7 @@ The **rule-facing** effect seam a rule holds via `GameState.effect_controls`: `s
 _Avoid_: adding `set_local_effects` or the merge-strategy snapshot lifecycle back onto it
 
 ### EffectAdmin
-The **scene-transition-facing** counterpart to `EffectControls`, reserved for `SceneManager`: it owns the merge-strategy snapshot lifecycle. `EffectManager` implements both faces.
+The **scene-transition-facing** counterpart to `EffectControls`, reserved for `SceneManager`: `set_aside` takes the running effects and merge strategies out of play together as one `HeldEffects` bundle (the **Overlay** then starts on **Split**), `put_back` gives that bundle back on `pop`, and `reset_merge_strategies` starts a booted scene on Split. `EffectManager` implements both faces.
 _Avoid_: calling any `EffectAdmin` method from a `GameRule`; putting it in the rule-facing `EffectControls`; installing scene locals or declared packs through it (that is the **Active scene namespace**)
 
 ### Scope
@@ -207,7 +207,7 @@ Identifies what a game effect targets, output-agnostically. Leaf scopes: `PERSON
 _Avoid_: `ScopeValue` (implementation artifact); using `AMBIENT` to mean idle effect (it is a routing scope)
 
 ### EffectOutput
-A hardware or software output registered with the effect system; `receives_pixels = False` for non-pixel outputs (audio, haptic), which skip buffer allocation and render.
+A hardware or software output registered with the effect system; `receives_pixels = False` for non-pixel outputs (audio, haptic), which skip buffer allocation and render. Told when an effect is held under an **Overlay** (`hold_effect`) and restored on `pop` (`restore_effect`): audio frees the effect's voices and replays its loops on restore, haptics interrupt the current sequence; pixel outputs need nothing, as held effects leave their scopes dark.
 _Avoid_: "output" (ambiguous in multi-output contexts); importing it from `engine.effects.manager` (import from `engine.effects.output`)
 
 ### EffectEvent
@@ -259,7 +259,7 @@ A CircuitPython `EffectOutput` driving audio via I2S and the live `VoiceSink` ad
 _Avoid_: stopping playback in `handle_event` on `"stop"`; assuming a fixed voice count or role-assigned slots; putting slot bookkeeping back in the output; resolving clip names (the event already carries the path)
 
 ### VoicePool
-A hardware-agnostic owner of audio voice-slot bookkeeping (imports no CircuitPython), driving hardware through a `VoiceSink` port and evicting oldest-first when full.
+A hardware-agnostic owner of audio voice-slot bookkeeping (imports no CircuitPython), driving hardware through a `VoiceSink` port and evicting oldest-first when full. `hold` frees a held effect's voices (a cut-off `stops_effect` one-shot stops its receipt, as on eviction) and `restore` plays its held loops again from the top.
 _Avoid_: importing CircuitPython audio libs here (hardware lives behind `VoiceSink`); parallel per-slot lists (use the `_Slot` record)
 
 ### VoiceSink
@@ -343,7 +343,7 @@ A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` 
 _Avoid_: mock device, virtual device, emulator (it does not run CircuitPython); faking the CircuitPython libraries beneath `device_builder`; hard-coding its hardware shape (declare it in the simulated config)
 
 ### Simulation test harness
-The test-only fixture layer that boots real scenes on one or more **simulated devices**, drives them through scripted inputs and time, and answers questions about what each device observably did. Tests written on it state behaviour, not the engine calls that produce it. A test can build a device without some **Capabilities** (without `storage` it is card-less) or hand it a card it prepared, follow it through each **reboot** into the scene it runs next, and redeploy it with a scene. At most one card in a simulation may carry packs, and a closed simulation leaves no trace of its cards for the next.
+The test-only fixture layer that boots real scenes on one or more **simulated devices**, drives them through scripted inputs and time, and answers questions about what each device observably did. Tests written on it state behaviour, not the engine calls that produce it. A test can build a device without some **Capabilities** (without `storage` it is card-less) or hand it a card it prepared, follow it through each **reboot** into the scene it runs next, redeploy it with a scene, and cover its scene with an **Overlay** and pop it, as a rule would. At most one card in a simulation may carry packs, and a closed simulation leaves no trace of its cards for the next.
 _Avoid_: device harness, scene harness (both read as runtime code); asserting on which effect names a rule passed to `EffectControls`
 
 ### Aim

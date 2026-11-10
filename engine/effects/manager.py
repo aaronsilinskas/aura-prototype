@@ -5,10 +5,31 @@ from engine.effects.merge import SPLIT
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.namespace import ActiveSceneNamespace
-from engine.state import EffectAdmin, EffectControls, EffectReceipt, MergeStrategy, ScopeValue
+from engine.state import (
+    EffectAdmin,
+    EffectControls,
+    EffectReceipt,
+    HeldEffects,
+    MergeStrategy,
+    ScopeValue,
+)
 from engine.timer import Timer
 
 _DEFAULT_RESOLUTION = 16
+
+
+class _HeldEffects(HeldEffects):
+    """``EffectManager``'s held bundle: the set-aside effect entries and merge strategies."""
+
+    __slots__ = ("effects", "merge_strategies")
+
+    def __init__(
+        self,
+        effects: list[EffectManager._EffectEntry],
+        merge_strategies: dict[str, MergeStrategy],
+    ) -> None:
+        self.effects = effects
+        self.merge_strategies = merge_strategies
 
 
 class EffectManager(EffectControls, EffectAdmin):
@@ -239,33 +260,52 @@ class EffectManager(EffectControls, EffectAdmin):
         """Reset every registered scope key's merge strategy to SPLIT.
 
         Reserved for ``SceneManager`` (via the ``EffectAdmin`` face) — called
-        from ``_do_load`` so no strategy choice survives a ``load``.
+        by ``activate_boot_scene`` so the boot scene starts on Split.
         """
         for key in self._merge_strategies:
             self._merge_strategies[key] = SPLIT
 
-    def capture_merge_strategies(self) -> dict[str, MergeStrategy]:
-        """Return an independent copy of the current per-scope merge strategy map.
+    def set_aside(self) -> HeldEffects:
+        """Move the running effects and merge strategies into a held bundle; restart on Split.
 
-        The live map is left in place, so an overlay starts by inheriting the
-        underlying scene's current choices while remaining free to change
-        them. Reserved for ``SceneManager`` (via the ``EffectAdmin`` face) —
-        called from ``_do_overlay``; the returned copy rides in the scene
-        stack entry the overlay pushes.
+        No stop event fires. Each output is told which effects are held
+        (``hold_effect``), so sound and haptics fall silent; pixel scopes
+        simply have nothing to draw, so the next ``update`` clears them. See
+        ``EffectAdmin.set_aside``.
         """
-        return dict(self._merge_strategies)
+        for entry in self._effects:
+            for output, keys in self._outputs_serving(entry):
+                output.hold_effect(keys, entry.effect, entry.receipt)
+        held = _HeldEffects(self._effects, self._merge_strategies)
+        self._effects = []
+        self._merge_strategies = dict.fromkeys(held.merge_strategies, SPLIT)
+        return held
 
-    def apply_merge_strategies(self, snapshot: dict[str, MergeStrategy]) -> None:
-        """Direct-install *snapshot* as the live per-scope merge strategy map.
+    def put_back(self, held: HeldEffects) -> None:
+        """Install *held*'s effects and merge strategies as the live ones.
 
-        *snapshot* is installed by reference, not copied: ``capture_merge_strategies``
-        already unaliased it from the live map at capture time, and the caller
-        discards the scene stack entry that owned it immediately after this
-        call, so there is no reuse to protect against. Reserved for
-        ``SceneManager`` (via the ``EffectAdmin`` face) — called from
-        ``_do_pop`` with the popped entry's saved snapshot.
+        Both are installed by reference: the bundle came from ``set_aside``,
+        which already detached them, and the caller drops it right after.
+        Each output is told which effects are restored (``restore_effect``).
+        See ``EffectAdmin.put_back``.
         """
-        self._merge_strategies = snapshot
+        assert isinstance(held, _HeldEffects)
+        self._effects = held.effects
+        self._merge_strategies = held.merge_strategies
+        for entry in self._effects:
+            for output, keys in self._outputs_serving(entry):
+                output.restore_effect(keys, entry.effect, entry.receipt)
+
+    def _outputs_serving(
+        self, entry: EffectManager._EffectEntry
+    ) -> list[tuple[EffectOutput, frozenset[str]]]:
+        """Each output serving any of *entry*'s scope keys, with the keys it serves."""
+        serving = []
+        for i in range(len(self._outputs)):
+            matching = self._output_key_sets[i].intersection(entry.keys)
+            if matching:
+                serving.append((self._outputs[i], matching))
+        return serving
 
     def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
         """Replace any running effect(s) in scope and start this one.

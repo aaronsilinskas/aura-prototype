@@ -168,6 +168,16 @@ class SimulatedAudio(EffectOutput, VoiceSink):
         if self._pool.claim(self, clip.path, clip.config.loop, stops_receipt, receipt) != -1:
             self._device.on_clip_played(clip.config.name)
 
+    def hold_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        self._pool.hold(self, receipt)
+
+    def restore_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        self._pool.restore(self, receipt)
+
     def is_path_playing(self, path: str) -> bool:
         """Whether the clip at *path* is sounding on any voice now."""
         return any(
@@ -198,11 +208,20 @@ class SimulatedAudio(EffectOutput, VoiceSink):
 
 
 class _RecordingHaptic(EffectOutput):
+    """Records each sequence it buzzes, and each one an Overlay interrupts.
+
+    Like ``Drv2605EffectOutput``, one sequence plays at a time: a hold
+    interrupts it only if it belongs to the held receipt, and a restore never
+    replays it.
+    """
+
     def __init__(self, device: SimulatedHardware) -> None:
         super().__init__(receives_pixels=False)
         self.min_resolution = 1
         self.scopes = [Scope.ALL]
         self._device = device
+        self._active_receipt: EffectReceipt | None = None
+        self._active_pattern: tuple[int, ...] = ()
 
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
@@ -211,7 +230,20 @@ class _RecordingHaptic(EffectOutput):
             return
         pattern = effect.haptic.patterns.get(event.verb)
         if pattern is not None:
-            self._device.on_buzzed(tuple(pattern.sequence))
+            self._active_receipt = receipt
+            self._active_pattern = tuple(pattern.sequence)
+            self._device.on_buzzed(self._active_pattern)
+
+    def hold_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        if self._active_receipt is receipt:
+            self._device.on_buzz_held(self._active_pattern)
+            self._active_receipt = None
+
+    def flush(self) -> None:
+        if self._active_receipt is not None and self._active_receipt.is_stopped():
+            self._active_receipt = None
 
 
 class SimulatedAccelerometer:

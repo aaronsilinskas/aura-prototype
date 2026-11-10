@@ -176,7 +176,7 @@ def build_scene_runtime(
     scene_reboot: SceneReboot | None = None,
     timer: Timer | None = None,
 ) -> SceneRuntime:
-    """Wire the engine to *catalog*'s registries and load *scene_name* from it.
+    """Wire the engine to *catalog*'s registries and boot into *scene_name* from it.
 
     Raises ``ValueError`` naming the known scenes when *scene_name* is not in
     the catalog's ``SceneRegistry``. The returned ``SceneRuntime`` has the
@@ -223,8 +223,7 @@ def build_scene_runtime(
         namespace=namespace,
         scene_reboot=scene_reboot if scene_reboot is not None else SceneReboot(),
     )
-    manager.load(scene_registry.resolve_known(scene_name))
-    manager.update()  # applies the load transition; the scene is now active
+    manager.activate_boot_scene(scene_registry.resolve_known(scene_name))
 
     return SceneRuntime(
         manager=manager,

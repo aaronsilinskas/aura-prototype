@@ -25,6 +25,18 @@ class SpyEffectOutput(EffectOutput):
         self.handle_event_calls: list = []
         self.flush_calls: list = []
         self.clear_pixels_calls: list = []
+        self.held_calls: list = []
+        self.restored_calls: list = []
+
+    def hold_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        self.held_calls.append((scope_keys, effect, receipt))
+
+    def restore_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        self.restored_calls.append((scope_keys, effect, receipt))
 
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
@@ -123,6 +135,28 @@ class ColorFillEffectBuilder(EffectBuilder):
                     buf[i] = color
 
         return Effect(name=name, pixels=_ColorFillPixels())
+
+
+class UpdateCountFillEffectBuilder(EffectBuilder):
+    """Builder whose effect fills its buffer with the number of updates it has had.
+
+    A composed frame then shows how far the effect has advanced, so a test can
+    tell an effect that froze from one that kept running.
+    """
+
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        class _UpdateCountPixels(EffectPixels):
+            def __init__(self) -> None:
+                self.updates = 0
+
+            def update(self, elapsed: float) -> None:
+                self.updates += 1
+
+            def render(self, buf: PixelBuffer) -> None:
+                for i in range(len(buf)):
+                    buf[i] = self.updates
+
+        return Effect(name=name, pixels=_UpdateCountPixels())
 
 
 class RenderLengthProbeEffectBuilder(EffectBuilder):

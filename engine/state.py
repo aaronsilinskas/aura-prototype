@@ -5,6 +5,7 @@ __all__ = [
     "EffectControls",
     "EffectReceipt",
     "GameState",
+    "HeldEffects",
     "MergeStrategy",
     "NetworkControls",
     "SceneControls",
@@ -102,7 +103,11 @@ class SceneControls:
     unit tests) pass the base ``SceneControls()`` instance, which raises on
     any call.
 
-    ``load``/``overlay``/``pop`` are deferred to end-of-tick — the transition
+    There is no in-process scene switch: a rule changes scene by Reboot
+    (ADR-0005). The boot scene is activated by ``SceneManager`` itself, off
+    this seam.
+
+    ``overlay``/``pop`` are deferred to end-of-tick — the transition
     is applied after ``engine.update(state)`` returns, not immediately inside
     the rule. ``reboot_into``/``reboot_to_previous`` are the opposite: scene
     switching across a reboot is not in-process, so both apply immediately
@@ -111,10 +116,6 @@ class SceneControls:
     """
 
     __slots__ = ()
-
-    def load(self, name: str) -> None:
-        """Replace the entire scene stack with the named scene."""
-        raise NotImplementedError
 
     def overlay(self, name: str) -> None:
         """Push the named scene on top, suspending the current scene."""
@@ -145,7 +146,7 @@ class SceneControls:
     def can_run(self, name: str) -> bool:
         """Whether this device has every Required capability of scene *name*.
 
-        Ask before offering a scene: ``load``, ``overlay``, ``reboot_into``
+        Ask before offering a scene: ``overlay``, ``reboot_into``
         and ``reboot_to_previous`` raise ``MissingCapabilityError`` for a
         scene this answers ``False`` for.
         """
@@ -296,7 +297,8 @@ class EffectControls:
 
     Provides effect start/stop and merge-strategy operations only. The update()
     tick is intentionally excluded so rules cannot advance the effect loop.
-    Scene-transition operations (merge-strategy snapshot/reset/apply) live on
+    Scene-transition operations (setting effects aside and putting them back,
+    resetting to Split) live on
     the separate ``EffectAdmin`` face, reached
     through ``SceneManager`` rather than through this interface.
     """
@@ -318,17 +320,31 @@ class EffectControls:
 
         Ticks after the next ``prepare_buffers`` call route through the new
         strategy. Defaults to ``SPLIT`` for every scope key; ``SceneManager``
-        resets the choice on ``load`` and captures/applies it across
-        ``overlay``/``pop`` through the separate ``EffectAdmin`` face.
+        starts the boot scene and every Overlay on Split, and ``pop`` puts
+        the covered scene's strategies back, through the separate
+        ``EffectAdmin`` face.
         """
         raise NotImplementedError
+
+
+class HeldEffects:
+    """A covered scene's running effects and merge strategies, set aside together.
+
+    Returned by ``EffectAdmin.set_aside`` and handed back, unopened, to
+    ``EffectAdmin.put_back``. Its contents belong to the effect system that
+    made it; ``SceneManager`` only carries it in the Overlay's scene stack
+    entry.
+    """
+
+    __slots__ = ()
 
 
 class EffectAdmin:
     """Scene-transition-facing effect interface, reserved for ``SceneManager``.
 
     Carries the operations ``EffectControls`` deliberately sheds so rules never
-    see them: the merge-strategy snapshot lifecycle (reset, capture, apply).
+    see them: setting a covered scene's effects aside for an Overlay, putting
+    them back on ``pop``, and starting a booted scene on Split.
     The active scene's local effects and declared packs go to the Active
     scene namespace instead.
     ``SceneManager`` holds an injected ``EffectAdmin`` handle (wired to the same
@@ -341,28 +357,30 @@ class EffectAdmin:
     def reset_merge_strategies(self) -> None:
         """Reset every registered scope key's merge strategy to ``SPLIT``.
 
-        Called by ``SceneManager._do_load`` so no strategy choice survives a
-        ``load``.
+        Called by ``SceneManager.activate_boot_scene`` so the boot scene starts
+        on Split.
         """
         raise NotImplementedError
 
-    def capture_merge_strategies(self) -> dict[str, MergeStrategy]:
-        """Return an independent snapshot of the current per-scope merge strategy map.
+    def set_aside(self) -> HeldEffects:
+        """Take every running effect and the merge strategies out of play, together.
 
-        The live map is left in place, so an overlay starts by inheriting the
-        underlying scene's current choices while remaining free to change
-        them. Called by ``SceneManager._do_overlay``; the returned snapshot
-        rides in the scene stack entry the overlay pushes, to be applied back
-        on the matching ``pop``.
+        Afterwards no effect is running, so scopes go dark on the next tick,
+        and every scope is on ``SPLIT``. Held effects are neither updated nor
+        rendered, and effect calls (including a stop on ``Scope.ALL``) don't
+        reach them; their receipts stay valid. Called by
+        ``SceneManager._do_overlay``; the result rides in the Overlay's scene
+        stack entry.
         """
         raise NotImplementedError
 
-    def apply_merge_strategies(self, snapshot: dict[str, MergeStrategy]) -> None:
-        """Direct-install *snapshot* as the live per-scope merge strategy map.
+    def put_back(self, held: HeldEffects) -> None:
+        """Make *held*'s effects the running set again and restore its merge strategies.
 
-        Called by ``SceneManager._do_pop`` with the popped scene stack entry's
-        saved snapshot, discarding any ``set_merge_strategy`` calls made during
-        the popped overlay.
+        Expects no effect to be running (the Overlay's own were stopped
+        first). Held effects resume from where they froze; any whose receipt
+        was stopped while held is removed on the next tick, as usual. Called
+        by ``SceneManager._do_pop`` with the popped entry's bundle.
         """
         raise NotImplementedError
 
@@ -472,7 +490,10 @@ class GameState:
 
     @property
     def total(self) -> float:
-        """Cumulative seconds elapsed since the engine started."""
+        """Cumulative seconds of the ticks this state has received: its scene's game time.
+
+        Stops while an Overlay covers the scene, since a covered scene receives no ticks.
+        """
         return self._total
 
     def get(self, key: str, default: T) -> T:
@@ -600,7 +621,7 @@ class GameState:
         """Count the event about to be dispatched. Called only by GameEngine."""
         self._dispatch_count += 1
 
-    def _update_time(self, elapsed: float, total: float) -> None:
-        """Refresh time values from the engine's timer. Called only by GameEngine."""
+    def _advance_time(self, elapsed: float) -> None:
+        """Count one tick of *elapsed* seconds this state received. Called only by GameEngine."""
         self._elapsed = elapsed
-        self._total = total
+        self._total += elapsed

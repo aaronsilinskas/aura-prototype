@@ -386,6 +386,137 @@ def test_sweep_ignores_idle_slots(pool: VoicePool, sink: RecordingSink) -> None:
 
 
 # ---------------------------------------------------------------------------
+# hold / restore — an Overlay covers the effect's scene, then pops
+# ---------------------------------------------------------------------------
+
+
+def test_hold_frees_every_voice_of_the_held_receipt(pool: VoicePool, sink: RecordingSink) -> None:
+    held = make_receipt()
+    pool.claim(sink, "loop.wav", loop=True, stops_receipt=False, receipt=held)
+    pool.claim(sink, "shot.wav", loop=False, stops_receipt=False, receipt=held)
+
+    pool.hold(sink, held)
+
+    assert sink.playing[:2] == [False, False]
+
+
+def test_hold_leaves_other_receipts_voices_playing(pool: VoicePool, sink: RecordingSink) -> None:
+    pool.claim(sink, "loop.wav", loop=True, stops_receipt=False, receipt=make_receipt())
+    held = make_receipt()
+    pool.claim(sink, "shot.wav", loop=False, stops_receipt=False, receipt=held)
+
+    pool.hold(sink, held)
+
+    assert sink.playing[:2] == [True, False]
+
+
+def test_a_freed_voice_is_free_for_the_next_claim(pool: VoicePool, sink: RecordingSink) -> None:
+    held = make_receipt()
+    pool.claim(sink, "shot.wav", loop=False, stops_receipt=False, receipt=held)
+    pool.hold(sink, held)
+
+    slot = pool.claim(sink, "next.wav", loop=False, stops_receipt=False, receipt=make_receipt())
+
+    assert slot == 0
+
+
+def test_holding_a_stops_effect_one_shot_stops_its_receipt(
+    pool: VoicePool, sink: RecordingSink
+) -> None:
+    held = make_receipt()
+    pool.claim(sink, "sting.wav", loop=False, stops_receipt=True, receipt=held)
+
+    pool.hold(sink, held)
+
+    assert held.is_stopped()
+
+
+def test_holding_a_plain_one_shot_leaves_its_receipt_running(
+    pool: VoicePool, sink: RecordingSink
+) -> None:
+    held = make_receipt()
+    pool.claim(sink, "shot.wav", loop=False, stops_receipt=False, receipt=held)
+
+    pool.hold(sink, held)
+
+    assert not held.is_stopped()
+
+
+def test_holding_a_loop_leaves_its_receipt_running(pool: VoicePool, sink: RecordingSink) -> None:
+    # An audio-only effect's loop claims with stops_receipt set, but a held
+    # loop has not finished: it plays again on restore.
+    held = make_receipt()
+    pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=held)
+
+    pool.hold(sink, held)
+
+    assert not held.is_stopped()
+
+
+def test_restore_plays_a_held_loop_again_from_the_top(pool: VoicePool, sink: RecordingSink) -> None:
+    held = make_receipt()
+    pool.claim(sink, "loop.wav", loop=True, stops_receipt=False, receipt=held)
+    pool.hold(sink, held)
+    sink.calls.clear()
+
+    pool.restore(sink, held)
+
+    assert ("open_source", "loop.wav") in sink.calls
+    assert [(c[1], c[3]) for c in play_calls(sink)] == [(0, True)]
+
+
+def test_restore_does_not_replay_a_held_one_shot(pool: VoicePool, sink: RecordingSink) -> None:
+    held = make_receipt()
+    pool.claim(sink, "shot.wav", loop=False, stops_receipt=False, receipt=held)
+    pool.hold(sink, held)
+    sink.calls.clear()
+
+    pool.restore(sink, held)
+
+    assert play_calls(sink) == []
+
+
+def test_a_restored_loop_plays_at_its_receipts_loudness(
+    pool: VoicePool, sink: RecordingSink
+) -> None:
+    held = make_receipt()
+    pool.claim(sink, "loop.wav", loop=True, stops_receipt=False, receipt=held)
+    pool.hold(sink, held)
+    held.loudness = 0.3
+    sink.calls.clear()
+
+    pool.restore(sink, held)
+
+    assert ("set_loudness", 0, 0.3) in sink.calls
+
+
+def test_restore_does_not_replay_a_loop_whose_receipt_stopped_while_held(
+    pool: VoicePool, sink: RecordingSink
+) -> None:
+    held = make_receipt()
+    pool.claim(sink, "loop.wav", loop=True, stops_receipt=False, receipt=held)
+    pool.hold(sink, held)
+    held.stop()
+    sink.calls.clear()
+
+    pool.restore(sink, held)
+
+    assert play_calls(sink) == []
+
+
+def test_restore_plays_a_held_loop_only_once(pool: VoicePool, sink: RecordingSink) -> None:
+    held = make_receipt()
+    pool.claim(sink, "loop.wav", loop=True, stops_receipt=False, receipt=held)
+    pool.hold(sink, held)
+    pool.restore(sink, held)
+    sink.calls.clear()
+
+    pool.restore(sink, held)
+
+    assert play_calls(sink) == []
+
+
+# ---------------------------------------------------------------------------
 # clip_stops_receipt — the claim rule both audio outputs share
 # ---------------------------------------------------------------------------
 

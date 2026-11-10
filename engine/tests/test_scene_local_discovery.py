@@ -64,23 +64,22 @@ def test_a_scenes_local_rules_are_not_visible_to_another_scene(pack_tree) -> Non
 
 
 # ---------------------------------------------------------------------------
-# SceneManager — scene-local rules appended after pack rules on load
+# SceneManager — scene-local rules appended after pack rules
 # ---------------------------------------------------------------------------
 
 
-def test_scene_manager_load_includes_scene_local_rules_in_engine(pack_tree) -> None:
+def test_boot_scene_includes_scene_local_rules_in_engine(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"my_scene": {"rules": {"local_rule": rule_source()}}})
 
     engine = _make_engine()
     manager = make_scene_manager(catalog, engine=engine)
-    manager.load("my_scene")
-    manager.update()
+    manager.activate_boot_scene("my_scene")
 
     assert len(engine.rules) == 1
     assert isinstance(engine.rules[0], GameRule)
 
 
-def test_scene_manager_load_appends_local_rules_after_pack_rules(pack_tree) -> None:
+def test_boot_scene_appends_local_rules_after_pack_rules(pack_tree) -> None:
     root = pack_tree.root("ts_flash")
     pack_tree.rule_pack(root, "pack_rules", items={"pack_rule": rule_source("PackRule")})
     pack_tree.scene(
@@ -94,8 +93,7 @@ def test_scene_manager_load_appends_local_rules_after_pack_rules(pack_tree) -> N
 
     engine = _make_engine()
     manager = make_scene_manager(catalog, engine=engine)
-    manager.load("my_scene")
-    manager.update()
+    manager.activate_boot_scene("my_scene")
 
     rules = engine.rules
     assert len(rules) == 2
@@ -104,32 +102,29 @@ def test_scene_manager_load_appends_local_rules_after_pack_rules(pack_tree) -> N
     assert rules[1] is not pack_rule
 
 
-def test_a_local_rule_without_a_rule_attribute_fails_when_the_scene_load_is_applied(
+def test_a_local_rule_without_a_rule_attribute_fails_when_the_boot_scene_is_activated(
     pack_tree,
 ) -> None:
     catalog = pack_tree.scan(scenes={"my_scene": {"rules": {"broken_rule": "NOT_A_RULE = 1"}}})
 
     manager = make_scene_manager(catalog)
-    manager.load("my_scene")
-
     with pytest.raises(ValueError, match="no attribute 'RULE'"):
-        manager.update()
+        manager.activate_boot_scene("my_scene")
 
 
-def test_scene_manager_local_rules_are_not_active_for_other_loaded_scene(pack_tree) -> None:
+def test_scene_manager_local_rules_are_not_active_for_another_boot_scene(pack_tree) -> None:
     catalog = pack_tree.scan(
         scenes={"scene_a": {"rules": {"local_rule": rule_source()}}, "scene_b": {}}
     )
 
     engine = _make_engine()
     manager = make_scene_manager(catalog, engine=engine)
-    manager.load("scene_b")
-    manager.update()
+    manager.activate_boot_scene("scene_b")
 
     assert engine.rules == []
 
 
-def test_local_rule_receives_events_after_scene_load(pack_tree) -> None:
+def test_local_rule_receives_events_in_the_boot_scene(pack_tree) -> None:
     rule_src = (
         "from engine.engine import GameRule\n"
         "from engine.state import GameState\n"
@@ -148,9 +143,8 @@ def test_local_rule_receives_events_after_scene_load(pack_tree) -> None:
 
     engine = _make_engine()
     manager = make_scene_manager(catalog, engine=engine)
-    manager.load("my_scene")
+    manager.activate_boot_scene("my_scene")
     manager.update()
-    manager.update()  # first engine tick
 
     manager.active_state.queue_event(Event(_GROUP, "ping"))
     manager.update()

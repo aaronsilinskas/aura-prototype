@@ -333,12 +333,11 @@ def loaded_debug_engine(catalog: PackCatalog):
         namespace=namespace,
         scene_reboot=SceneReboot(),
     )
-    manager.load("test_scene")
-    manager.update()
+    manager.activate_boot_scene("test_scene")
     return engine, rule_registry
 
 
-def test_scene_manager_load_wires_event_logger_rule_from_pack(
+def test_boot_scene_wires_event_logger_rule_from_pack(
     loaded_debug_engine,
 ) -> None:
     engine, _ = loaded_debug_engine
@@ -346,7 +345,7 @@ def test_scene_manager_load_wires_event_logger_rule_from_pack(
     assert any(isinstance(r, EventLoggerRule) for r in engine.rules)
 
 
-def test_scene_manager_load_activates_all_rules_from_pack(
+def test_boot_scene_activates_all_rules_from_pack(
     loaded_debug_engine,
 ) -> None:
     engine, rule_registry = loaded_debug_engine

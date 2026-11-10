@@ -64,10 +64,11 @@ class _Slot:
     lists.
     """
 
-    __slots__ = ("claim_seq", "is_loop", "loudness", "receipt", "stops_receipt")
+    __slots__ = ("claim_seq", "is_loop", "loudness", "path", "receipt", "stops_receipt")
 
     def __init__(self) -> None:
         self.receipt: EffectReceipt | None = None
+        self.path: str = ""
         self.is_loop: bool = False
         self.stops_receipt: bool = False
         self.loudness: float = 1.0
@@ -76,10 +77,22 @@ class _Slot:
     def reset(self) -> None:
         """Clear the slot back to idle (``receipt is None``)."""
         self.receipt = None
+        self.path = ""
         self.is_loop = False
         self.stops_receipt = False
         self.loudness = 1.0
         self.claim_seq = 0
+
+
+class _HeldLoop:
+    """A looping clip ``VoicePool.hold`` freed, kept until ``restore`` plays it again."""
+
+    __slots__ = ("path", "receipt", "stops_receipt")
+
+    def __init__(self, receipt: EffectReceipt, path: str, stops_receipt: bool) -> None:
+        self.receipt = receipt
+        self.path = path
+        self.stops_receipt = stops_receipt
 
 
 class VoicePool:
@@ -90,12 +103,13 @@ class VoicePool:
     All hardware is reached through an injected :class:`VoiceSink`.
     """
 
-    __slots__ = ("_claim_counter", "_num_voices", "_slots")
+    __slots__ = ("_claim_counter", "_held_loops", "_num_voices", "_slots")
 
     def __init__(self, num_voices: int) -> None:
         self._num_voices = num_voices
         self._slots = [_Slot() for _ in range(num_voices)]
         self._claim_counter = 0
+        self._held_loops: list[_HeldLoop] = []
 
     def _select_slot(self, loop: bool) -> int:
         """Return the slot to use for a new clip, or ``-1`` if none is claimable.
@@ -165,6 +179,7 @@ class VoicePool:
         sink.stop(slot)
         self._claim_counter += 1
         s.receipt = receipt
+        s.path = path
         s.is_loop = loop
         s.stops_receipt = stops_receipt
         s.loudness = receipt.loudness
@@ -201,3 +216,36 @@ class VoicePool:
             if loudness != s.loudness:
                 sink.set_loudness(i, loudness)
                 s.loudness = loudness
+
+    def hold(self, sink: VoiceSink, receipt: EffectReceipt) -> None:
+        """Free every voice playing for ``receipt``, whose effect an Overlay now covers.
+
+        A cut-off one-shot is gone for good: with ``stops_receipt`` set its
+        receipt is stopped, as if it had played out, so its effect ends;
+        otherwise the receipt is left to rules. A cut-off loop is remembered
+        for ``restore`` and leaves the receipt running.
+        """
+        for i in range(self._num_voices):
+            s = self._slots[i]
+            if s.receipt is not receipt:
+                continue
+            if s.is_loop:
+                self._held_loops.append(_HeldLoop(receipt, s.path, s.stops_receipt))
+            stops = not s.is_loop and s.stops_receipt
+            sink.stop(i)
+            s.reset()
+            if stops:
+                receipt.stop()
+
+    def restore(self, sink: VoiceSink, receipt: EffectReceipt) -> None:
+        """Play each loop ``hold`` freed for ``receipt`` again, from the top.
+
+        One-shots are not replayed, and nothing plays for a receipt stopped
+        while held.
+        """
+        restoring = [held for held in self._held_loops if held.receipt is receipt]
+        self._held_loops = [held for held in self._held_loops if held.receipt is not receipt]
+        if receipt.is_stopped():
+            return
+        for held in restoring:
+            self.claim(sink, held.path, True, held.stops_receipt, receipt)

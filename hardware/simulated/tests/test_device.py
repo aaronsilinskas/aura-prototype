@@ -6,15 +6,18 @@ import re
 
 import pytest
 
+from effects.effect import Effect, EffectHaptic, HapticPattern
+from engine.effects.output import EffectOutput
+from engine.events import EffectEvent
 from engine.input import ButtonData
 from engine.log import Logger
 from engine.network import CONE, LINE
-from engine.state import Scope
+from engine.state import EffectReceipt, Scope
 from hardware.shared.device_config import DeviceConfig, parse_device_config
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.polled_sensor import PolledSensor
-from hardware.simulated.device import IrSent, SimulatedHardware, Strip
+from hardware.simulated.device import Buzzed, BuzzHeld, IrSent, SimulatedHardware, Strip
 
 
 def _config(**sections: object) -> DeviceConfig:
@@ -566,3 +569,44 @@ def test_a_device_without_a_logger_is_silent(capsys):
     SimulatedHardware(now=lambda: 0.0, config=_config(buttons=["GP2"]))
 
     assert capsys.readouterr().out == ""
+
+
+# -- haptics -------------------------------------------------------------------
+
+_ALL = frozenset({"all"})
+_BUZZ = Effect(name="buzz", haptic=EffectHaptic(patterns={"start": HapticPattern(sequence=[1, 2])}))
+
+
+def _buzzing(receipt: EffectReceipt) -> tuple[SimulatedHardware, EffectOutput]:
+    """A device at time 3.0 whose haptic is playing ``_BUZZ``'s start sequence for *receipt*."""
+    sim_hw = SimulatedHardware(now=lambda: 3.0, config=_config(haptics={}))
+    haptic = sim_hw.hw.outputs[-1]
+    haptic.handle_event(EffectEvent("buzz", "haptic", "start"), _ALL, _BUZZ, receipt)
+    return sim_hw, haptic
+
+
+def test_holding_the_buzzing_effect_records_its_sequence_interrupted():
+    receipt = EffectReceipt(1)
+    sim_hw, haptic = _buzzing(receipt)
+
+    haptic.hold_effect(_ALL, _BUZZ, receipt)
+
+    assert sim_hw.buzz_held == [BuzzHeld(3.0, (1, 2))]
+
+
+def test_holding_an_effect_that_is_not_buzzing_interrupts_nothing():
+    sim_hw, haptic = _buzzing(EffectReceipt(1))
+
+    haptic.hold_effect(_ALL, _BUZZ, EffectReceipt(2))
+
+    assert sim_hw.buzz_held == []
+
+
+def test_restoring_a_held_buzz_does_not_replay_its_sequence():
+    receipt = EffectReceipt(1)
+    sim_hw, haptic = _buzzing(receipt)
+    haptic.hold_effect(_ALL, _BUZZ, receipt)
+
+    haptic.restore_effect(_ALL, _BUZZ, receipt)
+
+    assert sim_hw.buzzed == [Buzzed(3.0, (1, 2))]

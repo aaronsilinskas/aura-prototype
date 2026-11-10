@@ -309,3 +309,44 @@ def test_flush_does_nothing_when_receipt_is_still_active() -> None:
     output.flush()
 
     assert driver.stop_calls == 0
+
+
+# ---------------------------------------------------------------------------
+# hold_effect / restore_effect — an Overlay covers the effect's scene
+# ---------------------------------------------------------------------------
+
+
+def test_holding_the_effect_whose_sequence_is_playing_interrupts_it() -> None:
+    output, driver = _make_output()
+    effect = _effect_with_sequence("strike", [HapticPattern.STRONG_BUZZ])
+    receipt = _make_receipt()
+    output.handle_event(EffectEvent("tag", "hit", "strike"), frozenset({"all"}), effect, receipt)
+
+    output.hold_effect(frozenset({"all"}), effect, receipt)
+
+    assert driver.stop_calls == 1
+
+
+def test_holding_an_effect_that_is_not_buzzing_leaves_the_sequence_playing() -> None:
+    output, driver = _make_output()
+    effect = _effect_with_sequence("strike", [HapticPattern.STRONG_BUZZ])
+    output.handle_event(
+        EffectEvent("tag", "hit", "strike"), frozenset({"all"}), effect, _make_receipt()
+    )
+
+    output.hold_effect(frozenset({"all"}), effect, EffectReceipt(2))
+
+    assert driver.stop_calls == 0
+
+
+def test_restoring_an_interrupted_effect_does_not_replay_its_sequence() -> None:
+    output, driver = _make_output()
+    effect = _effect_with_sequence("strike", [HapticPattern.STRONG_BUZZ])
+    receipt = _make_receipt()
+    output.handle_event(EffectEvent("tag", "hit", "strike"), frozenset({"all"}), effect, receipt)
+    output.hold_effect(frozenset({"all"}), effect, receipt)
+
+    output.restore_effect(frozenset({"all"}), effect, receipt)
+    output.flush()
+
+    assert driver.play_calls == 1

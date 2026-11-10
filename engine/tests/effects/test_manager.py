@@ -1641,50 +1641,20 @@ def test_two_outputs_sharing_scope_both_reflect_the_same_receipts_brightness(pac
 # ---------------------------------------------------------------------------
 
 
-def test_capture_merge_strategies_defaults_every_registered_key_to_split() -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL, Scope.DIRECTIONAL])
-    manager = _make_manager(registry=PackRegistry(), outputs=[output])
+def _make_counting_manager(pack_tree):
+    """Return (manager, output) over one PERSONAL output of 4 pixels.
 
-    assert manager.capture_merge_strategies() == {"personal": SPLIT, "directional": SPLIT}
-
-
-def test_capture_merge_strategies_returns_a_copy_independent_of_later_live_map_mutations() -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=PackRegistry(), outputs=[output])
-
-    snapshot = manager.capture_merge_strategies()
-    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
-
-    assert snapshot["personal"] is SPLIT, "earlier snapshot must not see the later mutation"
-
-
-def test_reset_merge_strategies_sets_every_registered_key_back_to_split() -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL, Scope.DIRECTIONAL])
-    manager = _make_manager(registry=PackRegistry(), outputs=[output])
-    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
-    manager.set_merge_strategy(Scope.DIRECTIONAL, ADDITIVE)
-
-    manager.reset_merge_strategies()
-
-    assert manager.capture_merge_strategies() == {"personal": SPLIT, "directional": SPLIT}
-
-
-def test_apply_merge_strategies_installs_the_given_snapshot_as_the_live_map() -> None:
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=PackRegistry(), outputs=[output])
-    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
-    snapshot = {"personal": SPLIT}
-
-    manager.apply_merge_strategies(snapshot)
-
-    assert manager.capture_merge_strategies() == snapshot
-
-
-def test_apply_merge_strategies_takes_effect_on_the_very_next_tick(pack_tree) -> None:
-    """Direct-installing a captured Split snapshot over a live Additive choice
-    must change the composed pixels from the very next update()."""
+    'count.fx' fills its buffer with its own update count, so a frame shows
+    how far it has advanced; 'color.red'/'color.blue' fill solid colors.
+    """
     registry = pack_tree.scan(
         effect_packs={
+            "count": {
+                "fx": (
+                    "from engine.tests.effects.helpers import UpdateCountFillEffectBuilder\n"
+                    "BUILD = UpdateCountFillEffectBuilder()\n"
+                ),
+            },
             "color": {
                 "red": (
                     "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
@@ -1694,21 +1664,181 @@ def test_apply_merge_strategies_takes_effect_on_the_very_next_tick(pack_tree) ->
                     "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
                     "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
                 ),
-            }
+            },
         }
     ).effect_registry
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager = _make_manager(registry=registry, outputs=[output])
-    split_snapshot = manager.capture_merge_strategies()
+    output = SpyEffectOutput(min_resolution=4, scopes=[Scope.PERSONAL])
+    return _make_manager(registry=registry, outputs=[output]), output
+
+
+def _tick(manager, output) -> list | None:
+    """Update once; return the PERSONAL frame delivered that tick, or None if it went dark."""
+    output.update_pixels_calls.clear()
+    manager.update(_make_timer())
+    if not output.update_pixels_calls:
+        return None
+    _, composed = output.update_pixels_calls[-1]
+    return list(composed)
+
+
+_SPLIT_RED_BLUE = [0xFF0000] * 2 + [0x0000FF] * 2
+_ADDITIVE_RED_BLUE = [0xFF00FF] * 4
+
+
+def test_a_scope_whose_effects_are_set_aside_goes_dark(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    manager.set_effect(Scope.PERSONAL, "count.fx", {})
+    _tick(manager, output)
+
+    manager.set_aside()
+
+    assert _tick(manager, output) is None
+    assert output.clear_pixels_calls[-1] == "personal"
+
+
+def test_a_put_back_effect_resumes_from_where_it_froze(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    manager.set_effect(Scope.PERSONAL, "count.fx", {})
+    _tick(manager, output)
+    _tick(manager, output)
+    held = manager.set_aside()
+    for _ in range(3):
+        _tick(manager, output)
+
+    manager.put_back(held)
+
+    assert _tick(manager, output) == [3] * 4, "two updates before the hold, one after"
+
+
+def test_a_put_back_effects_receipt_still_controls_its_brightness(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
+    held = manager.set_aside()
+    manager.put_back(held)
+
+    receipt.brightness = 0.5
+
+    assert _tick(manager, output) == [0x7F0000] * 4
+
+
+def test_a_put_back_effects_receipt_still_stops_it(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
+    held = manager.set_aside()
+    manager.put_back(held)
+
+    receipt.stop()
+
+    assert _tick(manager, output) is None
+
+
+def test_stopping_every_scope_while_effects_are_held_leaves_them_untouched(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    manager.set_effect(Scope.PERSONAL, "color.red", {})
+    held = manager.set_aside()
+    output.handle_event_calls.clear()
+
+    manager.stop_effect(Scope.ALL)
+    manager.put_back(held)
+
+    assert output.handle_event_calls == [], "no stop event reaches a held effect"
+    assert _tick(manager, output) == [0xFF0000] * 4
+
+
+def test_an_effect_started_while_others_are_held_does_not_join_them(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    manager.set_effect(Scope.PERSONAL, "color.red", {})
+    manager.set_aside()
+    manager.set_effect(Scope.PERSONAL, "color.blue", {})
+
+    assert _tick(manager, output) == [0x0000FF] * 4
+
+
+def test_an_effect_whose_receipt_stopped_while_held_stops_on_the_first_tick_after_put_back(
+    pack_tree,
+) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
+    held = manager.set_aside()
+    receipt.stop()
+    manager.put_back(held)
+    output.handle_event_calls.clear()
+    output.clear_pixels_calls.clear()
+
+    frame = _tick(manager, output)
+
+    assert frame is None
+    assert [call[0].verb for call in output.handle_event_calls] == ["stop"]
+    assert output.clear_pixels_calls[0] == "personal"
+
+
+def test_setting_effects_aside_starts_every_scope_on_split(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+
+    manager.set_aside()
+    manager.add_effect(Scope.PERSONAL, "color.red", {})
+    manager.add_effect(Scope.PERSONAL, "color.blue", {})
+
+    assert _tick(manager, output) == _SPLIT_RED_BLUE
+
+
+def test_putting_effects_back_restores_their_merge_strategies(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
     manager.add_effect(Scope.PERSONAL, "color.red", {})
     manager.add_effect(Scope.PERSONAL, "color.blue", {})
     manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
-    manager.update(_make_timer())
-    _, additive_composed = output.update_pixels_calls[-1]
-    assert list(additive_composed) == [0xFF00FF] * 10
+    held = manager.set_aside()
+    manager.set_merge_strategy(Scope.PERSONAL, SPLIT)
 
-    manager.apply_merge_strategies(split_snapshot)
-    manager.update(_make_timer())
+    manager.put_back(held)
 
-    _, split_composed = output.update_pixels_calls[-1]
-    assert list(split_composed) == [0xFF0000] * 5 + [0x0000FF] * 5
+    assert _tick(manager, output) == _ADDITIVE_RED_BLUE
+
+
+def test_bundles_set_aside_in_turn_each_put_back_their_own_effects(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    manager.set_effect(Scope.PERSONAL, "color.red", {})
+    under = manager.set_aside()
+    manager.set_effect(Scope.PERSONAL, "color.blue", {})
+    middle = manager.set_aside()
+
+    manager.put_back(middle)
+    blue = _tick(manager, output)
+    manager.stop_effect(Scope.ALL)
+    manager.put_back(under)
+
+    assert blue == [0x0000FF] * 4
+    assert _tick(manager, output) == [0xFF0000] * 4
+
+
+def test_resetting_merge_strategies_puts_every_scope_on_split(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    manager.add_effect(Scope.PERSONAL, "color.red", {})
+    manager.add_effect(Scope.PERSONAL, "color.blue", {})
+    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+
+    manager.reset_merge_strategies()
+
+    assert _tick(manager, output) == _SPLIT_RED_BLUE
+
+
+def test_setting_effects_aside_tells_each_output_which_effects_are_held(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
+
+    manager.set_aside()
+
+    assert [(keys, r) for keys, _, r in output.held_calls] == [(frozenset({"personal"}), receipt)]
+
+
+def test_putting_effects_back_tells_each_output_which_effects_are_restored(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
+    held = manager.set_aside()
+
+    manager.put_back(held)
+
+    assert [(keys, r) for keys, _, r in output.restored_calls] == [
+        (frozenset({"personal"}), receipt)
+    ]
