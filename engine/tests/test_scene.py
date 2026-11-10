@@ -796,6 +796,136 @@ def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
 
 
 # ---------------------------------------------------------------------------
+# SceneManager — a covered scene's game time stops
+# ---------------------------------------------------------------------------
+
+_STEP = 0.25
+"""Seconds each tick of a ``_SteppingTimer`` lasts: exact in binary, so sums compare exactly."""
+
+
+class _SteppingTimer(Timer):
+    """An engine clock whose every tick lasts exactly ``_STEP`` seconds."""
+
+    def update(self) -> None:
+        self.elapsed = _STEP
+        self.total += _STEP
+
+
+def _covered_scene_manager(rule_registry: PackRegistry | None = None, rule_packs=()):
+    """A SceneManager on a ``_SteppingTimer`` with ``base`` (running *rule_packs*) and ``pause``."""
+    engine = GameEngine(effect_controls=_RecordingEffectControls(), timer=_SteppingTimer())
+    scene_reg = _scene_registry(
+        ("base", _scene_factory(rule_packs=list(rule_packs))),
+        ("pause", _scene_factory()),
+    )
+    return _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
+
+
+def _tick(manager: SceneManager, ticks: int) -> None:
+    for _ in range(ticks):
+        manager.update()
+
+
+def test_a_covered_scenes_game_time_stops_while_covered() -> None:
+    manager = _covered_scene_manager()
+    manager.activate_boot_scene("base")
+    base_state = manager.active_state
+    _tick(manager, 4)
+
+    manager.overlay("pause")
+    _tick(manager, 1)  # base's last tick; the overlay arrives at its end
+    covered_at = base_state.total
+    _tick(manager, 10)
+
+    assert base_state.total == covered_at == 5 * _STEP
+
+
+def test_after_pop_a_covered_scenes_game_time_continues_from_where_it_stopped() -> None:
+    manager = _covered_scene_manager()
+    manager.activate_boot_scene("base")
+    base_state = manager.active_state
+    _tick(manager, 4)
+    manager.overlay("pause")
+    _tick(manager, 1)
+    _tick(manager, 10)
+
+    manager.pop()
+    _tick(manager, 1)  # the overlay's last tick; the pop applies at its end
+    _tick(manager, 3)
+
+    assert base_state.total == (5 + 3) * _STEP
+
+
+def test_a_covered_scenes_first_tick_after_pop_has_an_ordinary_elapsed() -> None:
+    manager = _covered_scene_manager()
+    manager.activate_boot_scene("base")
+    base_state = manager.active_state
+    manager.overlay("pause")
+    _tick(manager, 1)
+    _tick(manager, 10)
+    manager.pop()
+    _tick(manager, 1)
+
+    _tick(manager, 1)
+
+    assert base_state.elapsed == _STEP
+
+
+_PHASE_ELAPSED_RULE = """\
+from engine.events import Event
+from engine.phase import PhaseKey, PhaseRule, PhaseSlot
+
+_PHASE = PhaseKey("timed")
+_SLOT = PhaseSlot("timed_machine", _PHASE)
+
+
+class _RecordsPhaseElapsed(PhaseRule):
+    def __init__(self) -> None:
+        super().__init__(_PHASE, _SLOT)
+        self.on(Event, self._record)
+
+    def _record(self, event, state) -> None:
+        state.set("phase_elapsed", _SLOT(state).elapsed(state.total))
+
+
+RULE = _RecordsPhaseElapsed()
+"""
+
+
+def test_a_phases_elapsed_time_excludes_the_time_its_scene_spent_covered(pack_tree) -> None:
+    rule_registry = pack_tree.scan(
+        rule_packs={"timed": {"rule": _PHASE_ELAPSED_RULE}}
+    ).rule_registry
+    manager = _covered_scene_manager(rule_registry, rule_packs=[_ref("timed")])
+    manager.activate_boot_scene("base")
+    base_state = manager.active_state
+    _tick(manager, 4)
+    manager.overlay("pause")
+    _tick(manager, 1)
+    _tick(manager, 10)
+    manager.pop()
+    _tick(manager, 1)
+    _tick(manager, 2)
+
+    base_state.queue_event(Event(_GROUP, "tick"))
+    _tick(manager, 1)
+
+    assert base_state.get("phase_elapsed", -1.0) == (5 + 3) * _STEP
+
+
+def test_an_overlays_game_time_starts_when_the_overlay_arrives() -> None:
+    manager = _covered_scene_manager()
+    manager.activate_boot_scene("base")
+    _tick(manager, 4)
+    manager.overlay("pause")
+    _tick(manager, 1)
+
+    _tick(manager, 3)
+
+    assert manager.active_state.total == 3 * _STEP
+
+
+# ---------------------------------------------------------------------------
 # SceneManager — rule pack integration
 # ---------------------------------------------------------------------------
 

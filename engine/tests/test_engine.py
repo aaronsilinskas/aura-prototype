@@ -120,16 +120,16 @@ class _TimeCaptureRule(GameRule):
         self.seen_total.append(state.total)
 
 
-class _ControlledTimer(Timer):
-    """Timer whose elapsed/total values are set directly for deterministic tests."""
+class _SteppingTimer(Timer):
+    """Timer whose every tick lasts exactly *step* seconds, for deterministic tests."""
 
-    def __init__(self, elapsed: float = 0.0, total: float = 0.0) -> None:
+    def __init__(self, step: float) -> None:
         super().__init__()
-        self.elapsed = elapsed
-        self.total = total
+        self._step = step
 
     def update(self) -> None:
-        pass  # values remain whatever was set at construction / by the test
+        self.elapsed = self._step
+        self.total += self._step
 
 
 def test_elapsed_is_read_only() -> None:
@@ -146,29 +146,62 @@ def test_total_is_read_only() -> None:
         state.total = 1.0  # type: ignore[misc]
 
 
-def test_state_elapsed_and_total_reflect_timer_values_after_engine_update() -> None:
-    timer = _ControlledTimer(elapsed=0.016, total=1.5)
-    engine = GameEngine(effect_controls=_make_effect_controls(), timer=timer)
+def test_state_elapsed_is_the_engine_timers_elapsed_for_the_tick() -> None:
+    engine = GameEngine(effect_controls=_make_effect_controls(), timer=_SteppingTimer(0.25))
     state = engine.create_state(_make_scene_controls())
 
     engine.update(state)
 
-    assert state.elapsed == pytest.approx(0.016)
-    assert state.total == pytest.approx(1.5)
+    assert state.elapsed == 0.25
 
 
-def test_rules_see_elapsed_and_total_time_from_the_engines_timer() -> None:
-    timer = _ControlledTimer(elapsed=0.032, total=2.0)
+def test_state_total_sums_the_elapsed_of_every_tick_the_state_received() -> None:
+    engine = GameEngine(effect_controls=_make_effect_controls(), timer=_SteppingTimer(0.25))
+    state = engine.create_state(_make_scene_controls())
+
+    for _ in range(3):
+        engine.update(state)
+
+    assert state.total == 0.75
+
+
+def test_a_state_given_every_tick_keeps_the_same_total_as_the_engines_timer() -> None:
+    timer = _SteppingTimer(0.016)
     engine = GameEngine(effect_controls=_make_effect_controls(), timer=timer)
+    state = engine.create_state(_make_scene_controls())
+
+    for _ in range(100):
+        engine.update(state)
+
+    assert state.total == timer.total
+
+
+def test_a_states_total_does_not_count_ticks_given_to_another_state() -> None:
+    engine = GameEngine(effect_controls=_make_effect_controls(), timer=_SteppingTimer(0.25))
+    state = engine.create_state(_make_scene_controls())
+    other = engine.create_state(_make_scene_controls())
+    engine.update(state)
+
+    for _ in range(4):
+        engine.update(other)
+    engine.update(state)
+
+    assert state.total == 0.5
+    assert state.elapsed == 0.25
+
+
+def test_rules_see_the_states_elapsed_and_total_time() -> None:
+    engine = GameEngine(effect_controls=_make_effect_controls(), timer=_SteppingTimer(0.25))
     state = engine.create_state(_make_scene_controls())
     rule = _TimeCaptureRule()
     engine.add_rules(rule)
+    engine.update(state)
     state.queue_event(Event(_GROUP, "tick"))
 
     engine.update(state)
 
-    assert rule.seen_elapsed == [pytest.approx(0.032)]
-    assert rule.seen_total == [pytest.approx(2.0)]
+    assert rule.seen_elapsed == [0.25]
+    assert rule.seen_total == [0.5]
 
 
 # ---------------------------------------------------------------------------

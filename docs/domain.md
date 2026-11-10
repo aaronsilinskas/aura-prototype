@@ -172,7 +172,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `ActiveSceneNamespace` | `engine/namespace.py` | Resolves effect names to builders and clip names to WAV paths for the active scene; installed by `SceneManager` per transition |
 | `ResolvedClip` | `effects/effect.py` | A declared `AudioPlaybackConfig` plus its resolved path, carried on `EffectEvent` |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update` tick |
-| `GameState` | `engine/state.py` | Per-tick game context passed to each rule; `settings` is its scene's read-only `Settings`; `capabilities` is the device's read-only `Capabilities` (`has(name)`, raising for a name outside the vocabulary), handed through `GameEngine` from `DeviceHardware.capabilities` |
+| `GameState` | `engine/state.py` | Per-tick game context passed to each rule; `elapsed`/`total` are its scene's own game time, summed from the ticks this state receives, so they stop while an Overlay covers the scene; `settings` is its scene's read-only `Settings`; `capabilities` is the device's read-only `Capabilities` (`has(name)`, raising for a name outside the vocabulary), handed through `GameEngine` from `DeviceHardware.capabilities` |
 | `Capabilities` | `engine/capabilities.py` | Read-only view of the device's Capabilities that rules ask with `has(name)` |
 | `Settings` | `engine/settings.py` | One scene's resolved Settings, read by namespace (`scene` or a pack name) and name; built by the catalog scan |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
