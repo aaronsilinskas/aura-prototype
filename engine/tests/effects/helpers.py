@@ -25,6 +25,18 @@ class SpyEffectOutput(EffectOutput):
         self.handle_event_calls: list = []
         self.flush_calls: list = []
         self.clear_pixels_calls: list = []
+        self.held_calls: list = []
+        self.restored_calls: list = []
+
+    def hold_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        self.held_calls.append((scope_keys, effect, receipt))
+
+    def restore_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        self.restored_calls.append((scope_keys, effect, receipt))
 
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt

@@ -69,6 +69,16 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
         stops_receipt = clip_stops_receipt(effect, clip.config)
         self._pool.claim(self, clip.path, clip.config.loop, stops_receipt, receipt)
 
+    def hold_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        self._pool.hold(self, receipt)
+
+    def restore_effect(
+        self, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
+    ) -> None:
+        self._pool.restore(self, receipt)
+
     def flush(self) -> None:
         self._pool.sweep(self)
 

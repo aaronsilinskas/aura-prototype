@@ -225,6 +225,35 @@ def test_a_finished_clip_with_pixels_and_no_stops_effect_leaves_the_receipt_to_r
 
 
 # ---------------------------------------------------------------------------
+# hold_effect / restore_effect — routed to the pool's hold and restore
+# ---------------------------------------------------------------------------
+
+
+def test_holding_an_effect_silences_its_voice(tmp_path) -> None:
+    output, mixer = _make_output()
+    effect, receipt = _with_pixels(), _make_receipt()
+    output.handle_event(_event(_wav(tmp_path), loop=True), frozenset({"all"}), effect, receipt)
+    mixer.voice[0].stop.reset_mock()
+
+    output.hold_effect(frozenset({"all"}), effect, receipt)
+
+    mixer.voice[0].stop.assert_called_once()
+
+
+def test_restoring_an_effect_plays_its_held_loop_again(tmp_path) -> None:
+    output, mixer = _make_output()
+    effect, receipt = _with_pixels(), _make_receipt()
+    output.handle_event(_event(_wav(tmp_path), loop=True), frozenset({"all"}), effect, receipt)
+    output.hold_effect(frozenset({"all"}), effect, receipt)
+    mixer.voice[0].play.reset_mock()
+
+    output.restore_effect(frozenset({"all"}), effect, receipt)
+
+    assert mixer.voice[0].play.call_args[1]["loop"] is True
+    output.stop(0)
+
+
+# ---------------------------------------------------------------------------
 # VoiceSink — last-mile hardware mapping
 # ---------------------------------------------------------------------------
 

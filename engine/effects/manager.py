@@ -268,10 +268,13 @@ class EffectManager(EffectControls, EffectAdmin):
     def set_aside(self) -> HeldEffects:
         """Move the running effects and merge strategies into a held bundle; restart on Split.
 
-        No stop event fires and no output is told: the scopes simply have
-        nothing to draw, so the next ``update`` clears them. See
+        No stop event fires. Each output is told which effects are held
+        (``hold_effect``), so sound and haptics fall silent; pixel scopes
+        simply have nothing to draw, so the next ``update`` clears them. See
         ``EffectAdmin.set_aside``.
         """
+        for entry in self._effects:
+            self._notify_outputs(entry, restored=False)
         held = _HeldEffects(self._effects, self._merge_strategies)
         self._effects = []
         self._merge_strategies = dict.fromkeys(held.merge_strategies, SPLIT)
@@ -282,11 +285,26 @@ class EffectManager(EffectControls, EffectAdmin):
 
         Both are installed by reference: the bundle came from ``set_aside``,
         which already detached them, and the caller drops it right after.
+        Each output is told which effects are restored (``restore_effect``).
         See ``EffectAdmin.put_back``.
         """
         assert isinstance(held, _HeldEffects)
         self._effects = held.effects
         self._merge_strategies = held.merge_strategies
+        for entry in self._effects:
+            self._notify_outputs(entry, restored=True)
+
+    def _notify_outputs(self, entry: EffectManager._EffectEntry, restored: bool) -> None:
+        """Tell every output serving any of *entry*'s scope keys it is held, or restored."""
+        for i in range(len(self._outputs)):
+            matching = self._output_key_sets[i].intersection(entry.keys)
+            if not matching:
+                continue
+            output = self._outputs[i]
+            if restored:
+                output.restore_effect(matching, entry.effect, entry.receipt)
+            else:
+                output.hold_effect(matching, entry.effect, entry.receipt)
 
     def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
         """Replace any running effect(s) in scope and start this one.
