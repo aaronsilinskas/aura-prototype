@@ -19,6 +19,10 @@ from hardware.shared.ir_transport import (
 )
 from hardware.shared.polled_part import PolledPart
 
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 __all__ = ["InfraredTransceiver"]
 
 
@@ -52,7 +56,7 @@ class InfraredTransceiver(PolledPart):
         self._transmitters = transmitters
         self._receiver = receiver
         self._gate = gate
-        self._codec: tuple[type[InfraredEncoder], type[InfraredDecoder]] = (
+        self._codec: tuple[type[InfraredEncoder], Callable[[], InfraredDecoder]] = (
             AuraInfraredEncoder,
             AuraInfraredDecoder,
         )
@@ -123,7 +127,9 @@ class InfraredTransceiver(PolledPart):
         self.received = receiver.receive() if receiver is not None else None
 
     def apply_codec(
-        self, encoder_class: type[InfraredEncoder], decoder_class: type[InfraredDecoder]
+        self,
+        encoder_class: type[InfraredEncoder],
+        decoder_class: "Callable[[], InfraredDecoder]",
     ) -> None:
         """Install the codec *encoder_class* and *decoder_class* make up.
 
@@ -152,7 +158,7 @@ class InfraredTransceiver(PolledPart):
             receiver.set_decoder(decoder_class)
 
     @property
-    def codec(self) -> tuple[type[InfraredEncoder], type[InfraredDecoder]]:
+    def codec(self) -> "tuple[type[InfraredEncoder], Callable[[], InfraredDecoder]]":
         """The installed ``(encoder_class, decoder_class)`` pair, as :meth:`apply_codec` took it.
 
         The Aura wire-frame pair until :meth:`apply_codec` is called.
