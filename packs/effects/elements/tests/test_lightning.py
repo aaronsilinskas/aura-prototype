@@ -90,7 +90,11 @@ def test_lightning_effect_name_matches_builder_argument() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_lightning_effect_emits_its_declared_strike_verb() -> None:
+def test_lightning_effect_declares_strike_as_its_only_custom_verb() -> None:
+    assert LightningEffect.VERBS == (LightningEffect.STRIKE,)
+
+
+def test_lightning_effect_emits_strike_when_a_bolt_strikes() -> None:
     events: list[EffectVerb] = []
     config = _config(listeners=[events.append])
 
@@ -101,8 +105,7 @@ def test_lightning_effect_emits_its_declared_strike_verb() -> None:
 
     effect.update(10.0)  # well past hide_max of 1.5 — triggers IDLE → STRIKE
 
-    assert events[0] is LightningEffect.STRIKE
-    assert LightningEffect.VERBS == (LightningEffect.STRIKE,)
+    assert events == [LightningEffect.STRIKE]
 
 
 def test_lightning_effect_no_notify_when_no_bolt_strikes() -> None:

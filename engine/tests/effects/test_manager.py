@@ -1161,15 +1161,36 @@ def test_clip_keyed_on_a_hand_made_twin_of_a_declared_verb_raises(pack_tree) -> 
         manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
 
 
-def test_wrapper_may_key_clips_on_the_verbs_its_reused_pixels_declare(pack_tree) -> None:
+# A scene-local effect that reuses basic.pulse's pixels and keys a clip on
+# PulseEffect.PEAK without declaring any verb itself.
+_PULSE_WRAPPER_ITEM = (
+    "from effects.effect import AudioPlaybackConfig, Effect, EffectAudio\n"
+    "from engine.effects.builder import EffectBuilder\n"
+    "from packs.effects.basic.helpers.pulse_effect import PulseEffect\n"
+    "from packs.effects.basic.pulse import BUILD as PULSE\n"
+    "_AUDIO = EffectAudio({PulseEffect.PEAK: AudioPlaybackConfig('sfx.boom', loop=False)})\n"
+    "class _Wrapper(EffectBuilder):\n"
+    "    def __call__(self, name, config):\n"
+    "        return Effect(name, pixels=PULSE(name, config).pixels, audio=_AUDIO)\n"
+    "BUILD = _Wrapper()\n"
+)
+
+# basic.pulse brightens for 0.5 s by default, so one 0.6 s tick crosses its peak.
+_PAST_PULSE_PEAK = 0.6
+
+
+def test_wrapper_may_key_clips_on_the_verbs_its_reused_pack_pixels_declare(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager, _ = _make_clip_manager(
-        pack_tree, {"bang": _clip_item({VerbFiringPixels.FIRED: "sfx.boom"})}, [output]
-    )
+    manager, catalog = _make_clip_manager(pack_tree, {"warn": _PULSE_WRAPPER_ITEM}, [output])
+    manager.set_effect(Scope.PERSONAL, "sfx.warn", {})
+    timer = _make_timer()
+    timer.elapsed = _PAST_PULSE_PEAK
 
-    manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+    manager.update(timer)
 
-    assert [event.verb for event in _events(output)] == [EffectVerb.START]
+    peak = _events(output)[-1]
+    assert peak.verb.name == "peak"
+    assert peak.clip.path == catalog.pack_sounds["sfx.boom"]
 
 
 def test_clip_keyed_on_stop_raises_explaining_teardown_is_flush(pack_tree) -> None:
@@ -1179,6 +1200,19 @@ def test_clip_keyed_on_stop_raises_explaining_teardown_is_flush(pack_tree) -> No
 
     with pytest.raises(VerbKeyError, match="flush"):
         manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+
+def test_stop_clip_error_names_the_effect_modality_and_emitted_verbs(pack_tree) -> None:
+    manager, _ = _make_clip_manager(
+        pack_tree, {"bang": _clip_item({EffectVerb.STOP: "sfx.chime"})}, []
+    )
+
+    with pytest.raises(VerbKeyError) as exc_info:
+        manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
+
+    message = str(exc_info.value)
+    for part in ("'sfx.bang'", "clips", "'stop'", "'start'", "'fired'"):
+        assert part in message
 
 
 @pytest.mark.parametrize("method", ["set_effect", "add_effect"])
@@ -1218,14 +1252,20 @@ def test_verb_key_error_names_the_effect_modality_key_and_emitted_verbs(pack_tre
         assert part in message
 
 
-def test_verb_key_error_leaves_the_scope_unchanged(pack_tree) -> None:
+@pytest.mark.parametrize("method", ["set_effect", "add_effect"])
+@pytest.mark.parametrize(
+    "bad_item",
+    [_pattern_item([_MISFIRED]), _clip_item({_MISFIRED: "sfx.boom"})],
+    ids=["patterns", "clips"],
+)
+def test_verb_key_error_leaves_the_scope_unchanged(pack_tree, method, bad_item) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    manager, _ = _make_clip_manager(pack_tree, {"buzz": _pattern_item([_MISFIRED])}, [output])
+    manager, _ = _make_clip_manager(pack_tree, {"bad": bad_item}, [output])
     plain_receipt = manager.set_effect(Scope.PERSONAL, "sfx.plain", {})
     output.handle_event_calls.clear()
 
     with pytest.raises(VerbKeyError):
-        manager.set_effect(Scope.PERSONAL, "sfx.buzz", {})
+        getattr(manager, method)(Scope.PERSONAL, "sfx.bad", {})
     assert output.handle_event_calls == []
     manager.stop_effect(Scope.PERSONAL)
 
