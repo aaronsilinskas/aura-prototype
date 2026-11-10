@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from array import array
+
 import pytest
 
 from engine.capabilities import MissingCapabilityError
@@ -23,7 +27,7 @@ class _RecordingPulseWriter(PulseWriter):
     def __init__(self) -> None:
         self.calls: list[list[int]] = []
 
-    def write_pulses(self, durations: list[int]) -> None:
+    def write_pulses(self, durations: array[int]) -> None:
         self.calls.append(list(durations))
 
     def is_busy(self) -> bool:

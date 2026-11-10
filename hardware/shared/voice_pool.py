@@ -16,6 +16,15 @@ from __future__ import annotations
 from effects.effect import AudioPlaybackConfig, Effect
 from engine.state import EffectReceipt
 
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Any
+
+    # A platform's opaque voice source: the pool only passes it from
+    # open_source to play, and each adapter narrows it to what it opens.
+    VoiceSource = Any
+
 
 def clip_stops_receipt(effect: Effect, clip: AudioPlaybackConfig) -> bool:
     """Whether ``clip``'s release (finish or eviction) should stop ``effect``'s receipt.
@@ -35,11 +44,11 @@ class VoiceSink:
     adapter owns the ``max_volume`` calibration.
     """
 
-    def open_source(self, path: str) -> object | None:
+    def open_source(self, path: str) -> VoiceSource | None:
         """Load the clip at ``path``; return an opaque source, or ``None`` on failure."""
         raise NotImplementedError
 
-    def play(self, slot: int, source: object, loop: bool) -> None:
+    def play(self, slot: int, source: VoiceSource, loop: bool) -> None:
         """Store ``source`` and start playing it on ``slot``'s voice."""
         raise NotImplementedError
 

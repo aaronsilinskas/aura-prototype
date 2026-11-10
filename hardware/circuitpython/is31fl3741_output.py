@@ -1,11 +1,11 @@
 """EffectOutput for the IS31FL3741 13x9 RGB LED matrix.
 
 Board-free and importable under CPython: no runtime vendor driver or
-``board`` import. The injected ``matrix`` need only satisfy the duck-type contract the
-constructor and ``flush`` reach through: indexed byte writes
-(``matrix[offset] = byte``) and ``matrix.show()``. ``CircuitPythonParts`` owns
-the real vendor import and driver construction and injects the built driver
-here.
+``board`` import. The injected ``matrix`` is the vendor's
+``Adafruit_RGBMatrixQT``, imported here only for the checker;
+``CircuitPythonParts`` owns the real vendor import and driver construction and
+injects the built driver. Only indexed byte writes (``matrix[offset] = byte``)
+and ``matrix.show()`` are used, which is all a test fake needs.
 """
 
 from __future__ import annotations

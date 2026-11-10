@@ -166,7 +166,7 @@ class PioPulseWriter(PulseWriter):
         self._sm = state_machine
         self._inflight: array[int] | None = None
 
-    def write_pulses(self, durations: array[int] | list[int]) -> None:
+    def write_pulses(self, durations: array[int]) -> None:
         """Start a non-blocking DMA write of *durations* and return immediately.
 
         Builds the DMA buffer by converting each µs duration to a carrier-period

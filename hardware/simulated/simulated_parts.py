@@ -20,7 +20,7 @@ import wave
 from array import array
 from collections import deque
 from collections.abc import Callable
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
 
 from effects.effect import Effect, PixelBuffer
 from engine.effects.output import EffectOutput
@@ -40,6 +40,8 @@ from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transport import PulseReader, PulseWriter
 from hardware.shared.radio_transport import RadioTransport
 from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
+
+TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from hardware.shared.device_parts import Bus
@@ -102,7 +104,7 @@ class _SimulatedPulseWriter(PulseWriter):
         self._device = device
         self._emitter = emitter
 
-    def write_pulses(self, durations: array | list[int]) -> None:
+    def write_pulses(self, durations: array[int]) -> None:
         self._device.on_ir_written(self._emitter, durations)
 
     def is_busy(self) -> bool:
@@ -189,11 +191,10 @@ class SimulatedAudio(EffectOutput, VoiceSink):
     def flush(self) -> None:
         self._pool.sweep(self)
 
-    def open_source(self, path: str) -> object | None:
+    def open_source(self, path: str) -> tuple[str, float] | None:
         return (path, wav_length(path))
 
-    def play(self, slot: int, source: object, loop: bool) -> None:
-        assert isinstance(source, tuple)  # the (path, length) open_source returned
+    def play(self, slot: int, source: tuple[str, float], loop: bool) -> None:
         path, length = source
         self._voices[slot] = (path, math.inf if loop else self._device.now() + length)
 

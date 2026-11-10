@@ -5,12 +5,13 @@ from __future__ import annotations
 import sys
 from collections.abc import Iterator
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
 from engine.tests.pack_tree import PackTree
 from hardware.shared.device_storage import DeviceStorage
+
+TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from app.simulation import Simulation

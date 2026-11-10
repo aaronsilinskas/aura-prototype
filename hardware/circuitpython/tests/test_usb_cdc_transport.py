@@ -1,7 +1,7 @@
 """Behaviour-driven tests for UsbCdcTransport's line framing over a serial-like stream.
 
-``UsbCdcTransport`` needs no ``usb_cdc`` import of its own -- it frames lines
-over any object exposing ``read(n)``/``write(bytes)`` -- so these run under
+``UsbCdcTransport`` imports ``usb_cdc`` only for the checker and touches just
+``timeout``, ``read(n)`` and ``write(bytes)`` on its stream, so these run under
 plain CPython against a fake stream standing in for ``usb_cdc.data``, with no
 CircuitPython stub required (unlike ``SdCardStorage``'s ``sdcardio``/``storage``).
 """

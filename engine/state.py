@@ -413,8 +413,10 @@ else:
     class StateSlot:
         """Callable accessor that owns the get-or-create-and-revalidate pattern for a GameState key.
 
-        Constructed once at module load. Calling it returns the value typed as
-        *expected_class*, so call sites need no cast.
+        Constructed once at module load. Calling it returns the value under
+        *key*, created by *factory* on first use, after checking it is an
+        *expected_class* instance. The checker-only ``StateSlot(Generic[T])``
+        declared above types that result, so call sites need no cast.
         """
 
         __slots__ = ("_expected_class", "_factory", "key")

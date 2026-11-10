@@ -15,7 +15,7 @@ try:
     from collections.abc import Callable
     from typing import TypeVar
 
-    Section = TypeVar("Section", bound="_Gated")
+    GatedSection = TypeVar("GatedSection", bound="_Gated")
     T = TypeVar("T")
 except ImportError:
     pass
@@ -196,9 +196,9 @@ def _ir(ir_config: IRConfig, parts: DeviceParts) -> tuple[InfraredTransceiver, s
 
 def _gated_step(
     logger: Logger,
-    section: Section | None,
-    describe: Callable[[Section], str],
-    build: Callable[[Section], tuple[T, str]],
+    section: GatedSection | None,
+    describe: Callable[[GatedSection], str],
+    build: Callable[[GatedSection], tuple[T, str]],
 ) -> T | None:
     """Narrate and *build* a declared, enabled *section*; ``None`` for an absent or disabled one.
 

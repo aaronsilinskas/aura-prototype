@@ -209,12 +209,12 @@ def resolve_settings(
             resolved[name] = declaration.default
     for layer in overrides:
         for name, value in layer.items():
-            found = declarations.get(name)
-            if found is None:
+            if name not in declarations:
                 raise SettingValueError(name, "is not declared")
-            if not _matches(found.type_name, value):
-                raise SettingValueError(name, f"{value!r} is not a {found.type_name}")
-            resolved[name] = _coerce(found.type_name, value)
+            declaration = declarations[name]
+            if not _matches(declaration.type_name, value):
+                raise SettingValueError(name, f"{value!r} is not a {declaration.type_name}")
+            resolved[name] = _coerce(declaration.type_name, value)
     for name in declarations:
         if name not in resolved:
             raise SettingValueError(name, "is required and was not set")
