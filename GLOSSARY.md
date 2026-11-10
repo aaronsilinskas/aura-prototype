@@ -18,7 +18,7 @@ _Avoid_: calling `update`/`render` on the `Effect` shell; putting `name` on a co
 
 ### EffectAudio
 The **Modality** (sound) declaring an effect's audio behaviour, mapping **EffectVerb**s to playback configs; `None` means no audio.
-_Avoid_: an `EffectVerb.STOP` clips key (teardown is `flush()`, not `handle_event`); string keys (rejected)
+_Avoid_: an `EffectVerb.STOP` clips key (teardown is `flush()`, not `handle_event`; rejected at build with a **VerbKeyError**); string keys (rejected)
 
 ### AudioPlaybackConfig
 A value object for how one clip plays: which clip (a qualified clip name, resolved by the **Active scene namespace** when the effect is built), whether it loops, and whether finishing it stops the whole owning effect (`stops_effect`). Being cut off counts as finishing: a clip whose voice is taken by another sound, or that an **Overlay** covers mid-play, stops its effect just as if it had played out. Declared once at module level and shared by every effect built from it.
@@ -217,6 +217,10 @@ _Avoid_: confusing with `Event` (game-rule events); assuming only `EffectVerb.ST
 ### EffectVerb
 A named moment an **Effect** announces to its outputs, and the key for `clips` and `patterns`: `EffectVerb.START`/`STOP` from the engine, plus the custom verbs its sight modality declares (`PulseEffect.PEAK`, `LightningEffect.STRIKE`). Matched by identity, so only the declared instance counts. Heard by outputs, never by rules. An effect pack's declared verbs are part of its versioned interface.
 _Avoid_: string keys; a hand-made `EffectVerb("…")` outside its emitter; "event name"; "verb" unqualified where SD-sync protocol verbs are nearby; treating an **Overlay**'s hold/restore as verbs; reusing it for game-rule `Event`s (rules match those by class)
+
+### VerbKeyError
+The `ValueError` that `set_effect`/`add_effect` raise, before anything in scope stops, when a built effect keys `clips` or `patterns` on a verb it can never emit (anything but `EffectVerb.START`, `EffectVerb.STOP` and its pixels' `VERBS`), or keys a clip on `EffectVerb.STOP`. Carries the qualified effect name, the modality (`"clips"`/`"patterns"`), the offending verb and the verbs the effect emits (ADR-0006).
+_Avoid_: confusing with **Registry lookup errors** (every name resolved; the key is wrong); rejecting a `STOP` haptic pattern (allowed: an effect may buzz as it ends)
 
 ### Merge strategy
 The per-scope policy deciding how a scope's stack of layered effect buffers becomes shown pixels; set per rule via `EffectControls.set_merge_strategy`, defaulting to **Split**. A booted scene and every **Overlay** start on Split; popping an overlay puts back the strategies of the scene it covered. Two ship: **Split** and **Additive**.

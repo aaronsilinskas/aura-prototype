@@ -53,7 +53,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   log.py          Board-free, tag-prefixed line logger with an injectable sink
   effects/
     builder.py    EffectBuilder
-    manager.py    EffectManager
+    manager.py    EffectManager; VerbKeyError
     output.py     EffectOutput (abstract hardware output port)
     merge.py      SplitMerge, AdditiveMerge (per-scope layered-buffer compositing;
                   subclass state.py's MergeStrategy)

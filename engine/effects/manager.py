@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+try:
+    from typing import TYPE_CHECKING
+except ImportError:
+    TYPE_CHECKING = False
+
 from effects.effect import Effect, EffectConfig, EffectVerb, PixelBuffer, ResolvedClip
 from engine.effects.merge import SPLIT
 from engine.effects.output import EffectOutput
@@ -15,7 +20,63 @@ from engine.state import (
 )
 from engine.timer import Timer
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
 _DEFAULT_RESOLUTION = 16
+
+
+class VerbKeyError(ValueError):
+    """A built effect keys ``clips`` or ``patterns`` on a verb it cannot use there.
+
+    Raised by ``EffectManager.set_effect``/``add_effect`` before anything in
+    scope is stopped. Not a **Registry lookup error**: every name resolved, but
+    the key is not one of the verbs the effect can emit (``EffectVerb.START``,
+    ``EffectVerb.STOP`` and its pixels' ``VERBS``), or it is a ``STOP`` clip.
+    *effect_name* is qualified, *modality* is ``"clips"`` or ``"patterns"``,
+    and *emitted* lists the verbs the effect can emit.
+    """
+
+    def __init__(
+        self,
+        effect_name: str,
+        modality: str,
+        verb: EffectVerb,
+        emitted: tuple[EffectVerb, ...],
+    ) -> None:
+        self.effect_name = effect_name
+        self.modality = modality
+        self.verb = verb
+        self.emitted = emitted
+        if modality == "clips" and verb is EffectVerb.STOP:
+            message = (
+                f"Effect '{effect_name}' keys a clip on EffectVerb.STOP: audio teardown "
+                + "is the output's flush(), not a clip, so a STOP clip is cut off or "
+                + "plays only depending on how the effect was stopped"
+            )
+        else:
+            message = (
+                f"Effect '{effect_name}' {modality} key {verb!r} is not a verb it emits "
+                + f"(it emits {', '.join(repr(v) for v in emitted)})"
+            )
+        super().__init__(message)
+
+
+def _check_verb_keys(
+    effect_name: str,
+    modality: str,
+    keys: Iterable[EffectVerb],
+    emitted: tuple[EffectVerb, ...],
+) -> None:
+    """Raise ``VerbKeyError`` for the first of *keys* not in *emitted*, matched by identity.
+
+    A ``clips`` key of ``EffectVerb.STOP`` is rejected too.
+    """
+    for verb in keys:
+        if (modality == "clips" and verb is EffectVerb.STOP) or not any(
+            verb is known for known in emitted
+        ):
+            raise VerbKeyError(effect_name, modality, verb, emitted)
 
 
 class _HeldEffects(HeldEffects):
@@ -138,7 +199,7 @@ class EffectManager(EffectControls, EffectAdmin):
         name: str,
         options: dict[str, object],
     ) -> EffectManager._EffectEntry:
-        """Construct an Effect for the named effect and resolve every clip it declares.
+        """Construct an Effect for the named effect, check its verb keys, and resolve its clips.
 
         Every verb's clip is resolved now, not when the verb first fires, so
         a misspelled clip on a rarely fired verb fails here too. Nothing is
@@ -148,6 +209,8 @@ class EffectManager(EffectControls, EffectAdmin):
             RegistryError: the effect name, or one of the built effect's clip
                 names, does not resolve in the active scene namespace (see
                 ``ActiveSceneNamespace.resolve_effect`` and ``resolve_clip``).
+            VerbKeyError: a ``clips`` or ``patterns`` key is not a verb the
+                effect emits, or a ``clips`` key is ``EffectVerb.STOP``.
         """
         builder, pack_name, effect_name = self._namespace.resolve_effect(name)
 
@@ -172,8 +235,15 @@ class EffectManager(EffectControls, EffectAdmin):
         config = EffectConfig(resolution=resolution, options=options, listeners=[scoped_listener])
         entry.effect = builder(effect_name, config)
 
+        qualified = pack_name + "." + effect_name
+        emitted = (EffectVerb.START, EffectVerb.STOP)
+        if entry.effect.pixels is not None:
+            emitted += entry.effect.pixels.VERBS
+        if entry.effect.haptic is not None:
+            _check_verb_keys(qualified, "patterns", entry.effect.haptic.patterns, emitted)
         audio = entry.effect.audio
         if audio is not None:
+            _check_verb_keys(qualified, "clips", audio.clips, emitted)
             for verb, clip_config in audio.clips.items():
                 path = self._namespace.resolve_clip(clip_config.name)
                 entry.clips[verb] = ResolvedClip(clip_config, path)

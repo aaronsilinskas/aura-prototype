@@ -3,8 +3,10 @@ from effects.effect import (
     Effect,
     EffectAudio,
     EffectConfig,
+    EffectHaptic,
     EffectPixels,
     EffectVerb,
+    HapticPattern,
     PixelBuffer,
 )
 from engine.effects.builder import EffectBuilder
@@ -222,6 +224,22 @@ class AudioClipEffectBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
         pixels = VerbFiringPixels(config, fires=self._fires)
         return Effect(name=name, pixels=pixels, audio=EffectAudio(self.clips))
+
+
+class HapticPatternEffectBuilder(EffectBuilder):
+    """Builder whose effects declare a one-click ``HapticPattern`` on each given verb.
+
+    With *pixels* set, its pixels are non-firing ``VerbFiringPixels`` (declaring
+    ``FIRED``); without, the effect has no pixels and so no custom verbs.
+    """
+
+    def __init__(self, verbs: list[EffectVerb], pixels: bool = True) -> None:
+        self._patterns = {verb: HapticPattern([HapticPattern.SHARP_CLICK]) for verb in verbs}
+        self._pixels = pixels
+
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        pixels = VerbFiringPixels(config, fires=False) if self._pixels else None
+        return Effect(name=name, pixels=pixels, haptic=EffectHaptic(self._patterns))
 
 
 class EventFiringEffectBuilder(EffectBuilder):
