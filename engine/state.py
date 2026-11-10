@@ -5,6 +5,7 @@ __all__ = [
     "EffectControls",
     "EffectReceipt",
     "GameState",
+    "HeldEffects",
     "MergeStrategy",
     "NetworkControls",
     "SceneControls",
@@ -296,7 +297,8 @@ class EffectControls:
 
     Provides effect start/stop and merge-strategy operations only. The update()
     tick is intentionally excluded so rules cannot advance the effect loop.
-    Scene-transition operations (merge-strategy snapshot/reset/apply) live on
+    Scene-transition operations (setting effects aside and putting them back,
+    resetting to Split) live on
     the separate ``EffectAdmin`` face, reached
     through ``SceneManager`` rather than through this interface.
     """
@@ -318,17 +320,31 @@ class EffectControls:
 
         Ticks after the next ``prepare_buffers`` call route through the new
         strategy. Defaults to ``SPLIT`` for every scope key; ``SceneManager``
-        starts the boot scene on Split and captures/applies it across
-        ``overlay``/``pop`` through the separate ``EffectAdmin`` face.
+        starts the boot scene and every Overlay on Split, and ``pop`` puts
+        the covered scene's strategies back, through the separate
+        ``EffectAdmin`` face.
         """
         raise NotImplementedError
+
+
+class HeldEffects:
+    """A covered scene's running effects and merge strategies, set aside together.
+
+    Returned by ``EffectAdmin.set_aside`` and handed back, unopened, to
+    ``EffectAdmin.put_back``. Its contents belong to the effect system that
+    made it; ``SceneManager`` only carries it in the Overlay's scene stack
+    entry.
+    """
+
+    __slots__ = ()
 
 
 class EffectAdmin:
     """Scene-transition-facing effect interface, reserved for ``SceneManager``.
 
     Carries the operations ``EffectControls`` deliberately sheds so rules never
-    see them: the merge-strategy snapshot lifecycle (reset, capture, apply).
+    see them: setting a covered scene's effects aside for an Overlay, putting
+    them back on ``pop``, and starting a booted scene on Split.
     The active scene's local effects and declared packs go to the Active
     scene namespace instead.
     ``SceneManager`` holds an injected ``EffectAdmin`` handle (wired to the same
@@ -346,23 +362,25 @@ class EffectAdmin:
         """
         raise NotImplementedError
 
-    def capture_merge_strategies(self) -> dict[str, MergeStrategy]:
-        """Return an independent snapshot of the current per-scope merge strategy map.
+    def set_aside(self) -> HeldEffects:
+        """Take every running effect and the merge strategies out of play, together.
 
-        The live map is left in place, so an overlay starts by inheriting the
-        underlying scene's current choices while remaining free to change
-        them. Called by ``SceneManager._do_overlay``; the returned snapshot
-        rides in the scene stack entry the overlay pushes, to be applied back
-        on the matching ``pop``.
+        Afterwards no effect is running, so scopes go dark on the next tick,
+        and every scope is on ``SPLIT``. Held effects are neither updated nor
+        rendered, and effect calls (including a stop on ``Scope.ALL``) don't
+        reach them; their receipts stay valid. Called by
+        ``SceneManager._do_overlay``; the result rides in the Overlay's scene
+        stack entry.
         """
         raise NotImplementedError
 
-    def apply_merge_strategies(self, snapshot: dict[str, MergeStrategy]) -> None:
-        """Direct-install *snapshot* as the live per-scope merge strategy map.
+    def put_back(self, held: HeldEffects) -> None:
+        """Make *held*'s effects the running set again and restore its merge strategies.
 
-        Called by ``SceneManager._do_pop`` with the popped scene stack entry's
-        saved snapshot, discarding any ``set_merge_strategy`` calls made during
-        the popped overlay.
+        Expects no effect to be running (the Overlay's own were stopped
+        first). Held effects resume from where they froze; any whose receipt
+        was stopped while held is removed on the next tick, as usual. Called
+        by ``SceneManager._do_pop`` with the popped entry's bundle.
         """
         raise NotImplementedError
 

@@ -32,7 +32,7 @@ effects/          Animation engine (CircuitPython-safe)
 
 engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   engine.py       GameEngine, GameRule
-  state.py        GameState, EffectControls, EffectAdmin, EffectReceipt, MergeStrategy,
+  state.py        GameState, EffectControls, EffectAdmin, HeldEffects, EffectReceipt, MergeStrategy,
                   NetworkControls, Scope, ScopeValue
   scene.py        Scene, SceneRegistry, SceneLocalRegistry, SceneManager, SceneControls
   phase.py        PhaseKey, PhaseMachine, PhaseSlot, PhaseRule, InPhaseRule
@@ -162,7 +162,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
 | `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
 | `EffectControls` | `engine/state.py` | Rule-facing effect seam |
-| `EffectAdmin` | `engine/state.py` | Merge-strategy snapshot seam, reserved for `SceneManager` |
+| `EffectAdmin` | `engine/state.py` | Overlay seam, reserved for `SceneManager`: `set_aside` → `HeldEffects` (running effects + merge strategies; live set left empty, on Split), `put_back(held)`, `reset_merge_strategies` for the boot scene |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output port |
 | `EffectBuilder` | `engine/effects/builder.py` | Callable `(name, config) → Effect`; one per effect item |
@@ -178,7 +178,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
 | `SceneControls` | `engine/state.py` | Rule-facing transition seam (`overlay`, `pop`, `reboot_into`, `reboot_to_previous`; no in-process scene switch, see ADR-0005) plus `can_run(name)`, which the `lobby` pack asks to leave out entries the device can't play |
-| `SceneManager` | `engine/scene.py` | The live `SceneControls`. Drives scene transitions, installing each active scene into the `ActiveSceneNamespace` and snapshotting merge strategies through `EffectAdmin`; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot`. Its own `activate_boot_scene(name)`, off the rule-facing seam, is how the boot composition makes the first scene active (on Split). `activate_boot_scene`, `overlay`, `reboot_into` and `reboot_to_previous` raise `MissingCapabilityError` before recording, persisting or resetting anything when the target's Required capabilities aren't all in `GameEngine.capabilities`; `pop` does not check |
+| `SceneManager` | `engine/scene.py` | The live `SceneControls`. Drives scene transitions, installing each active scene into the `ActiveSceneNamespace` setting the covered scene's effects aside on `overlay` and putting them back on `pop` through `EffectAdmin` (the held bundle rides in the overlay's stack entry; the IR codec is not touched); delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot`. Its own `activate_boot_scene(name)`, off the rule-facing seam, is how the boot composition makes the first scene active (on Split). `activate_boot_scene`, `overlay`, `reboot_into` and `reboot_to_previous` raise `MissingCapabilityError` before recording, persisting or resetting anything when the target's Required capabilities aren't all in `GameEngine.capabilities`; `pop` does not check |
 | `SceneReboot` | `engine/state.py` | Board-free port `SceneManager` reboots through; `previous_scene()` names the scene `reboot_to_previous` would boot, so it is checked first; live adapter `DeviceSceneReboot` |
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
 | `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor for a phase machine's key + initial phase; registry of each phase's owning `PhaseRule` |
