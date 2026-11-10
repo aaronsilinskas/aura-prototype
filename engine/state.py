@@ -388,15 +388,48 @@ class EffectAdmin:
         raise NotImplementedError
 
 
+class _StateSlotBase:
+    """Callable accessor that owns the get-or-create-and-revalidate pattern for a GameState key.
+
+    Constructed once at module load. Calling it returns the value under
+    *key*, created by *factory* on first use, after checking it is an
+    *expected_class* instance. Use it as ``StateSlot``; the checker sees a
+    generic subclass that types the result as *expected_class*.
+    """
+
+    __slots__ = ("_expected_class", "_factory", "key")
+
+    def __init__(
+        self,
+        key: str,
+        factory: Callable[[GameState], object],
+        expected_class: type,
+    ) -> None:
+        self.key: str = key
+        self._factory = factory
+        self._expected_class = expected_class
+
+    def __call__(self, state: GameState) -> object:
+        """Return the value for *key*, creating and caching it on first use.
+
+        Raises:
+            ValueError: if the stored value is not an instance of *expected_class*.
+        """
+        if not state.has(self.key):
+            state.set(self.key, self._factory(state))
+        return state.get_or_none(self.key, self._expected_class)
+
+    def is_in(self, state: GameState) -> bool:
+        """Return True if this slot's key is present in *state*."""
+        return state.has(self.key)
+
+
 if TYPE_CHECKING:
     from typing import Generic
 
-    # The checker's view of the runtime class below: generic, so a slot's call is
-    # typed as its expected_class. CircuitPython can't run generics (ADR-0007), so
-    # the two declarations are kept in step by hand.
-    class StateSlot(Generic[T]):
-        key: str
-
+    # Checker-only: narrows the two signatures that mention T. CircuitPython
+    # can't run generics (ADR-0007), so at runtime StateSlot is the base itself.
+    class StateSlot(_StateSlotBase, Generic[T]):
         def __init__(
             self,
             key: str,
@@ -406,44 +439,8 @@ if TYPE_CHECKING:
 
         def __call__(self, state: GameState) -> T: ...
 
-        def is_in(self, state: GameState) -> bool: ...
-
 else:
-
-    class StateSlot:
-        """Callable accessor that owns the get-or-create-and-revalidate pattern for a GameState key.
-
-        Constructed once at module load. Calling it returns the value under
-        *key*, created by *factory* on first use, after checking it is an
-        *expected_class* instance. The checker-only ``StateSlot(Generic[T])``
-        declared above types that result, so call sites need no cast.
-        """
-
-        __slots__ = ("_expected_class", "_factory", "key")
-
-        def __init__(
-            self,
-            key: str,
-            factory: Callable[[GameState], object],
-            expected_class: type[T],
-        ) -> None:
-            self.key: str = key
-            self._factory = factory
-            self._expected_class = expected_class
-
-        def __call__(self, state: GameState) -> T:
-            """Return the value for *key*, creating and caching it on first use.
-
-            Raises:
-                ValueError: if the stored value is not an instance of *expected_class*.
-            """
-            if not state.has(self.key):
-                state.set(self.key, self._factory(state))
-            return state.get_or_none(self.key, self._expected_class)
-
-        def is_in(self, state: GameState) -> bool:
-            """Return True if this slot's key is present in *state*."""
-            return state.has(self.key)
+    StateSlot = _StateSlotBase
 
 
 class GameState:

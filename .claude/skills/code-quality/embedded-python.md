@@ -124,6 +124,26 @@ if TYPE_CHECKING:
 
 The device never imports `typing` and skips the block. mypy treats the name as true, so the guarded imports are still checked. Don't use `try: from typing import TYPE_CHECKING / except ImportError: TYPE_CHECKING = False`: mypy rejects the fallback assignment ("cannot assign to final").
 
+**Generics are checker-only subclasses (ADR-0007):**
+
+The device can't run `Generic`, so put the implementation in a plain runtime class and declare the generic as a subclass of it under `TYPE_CHECKING`. Re-declare only the signatures that mention the type parameter, and bind the public name to the runtime class under `else:`:
+
+```python
+class _StateSlotBase:
+    def __call__(self, state: GameState) -> object: ...  # the real body
+
+if TYPE_CHECKING:
+    from typing import Generic
+
+    class StateSlot(_StateSlotBase, Generic[T]):
+        def __call__(self, state: GameState) -> T: ...
+
+else:
+    StateSlot = _StateSlotBase
+```
+
+Never put the implementation under `else:`. mypy treats that branch as unreachable and doesn't check it.
+
 **Module count matters.** Import cost is paid at startup on-device. Keep related logic in the same file rather than splitting into many small modules when startup latency is a concern.
 
 **Still unavailable on latest CircuitPython / MicroPython:**
