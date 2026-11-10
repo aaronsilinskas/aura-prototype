@@ -241,4 +241,4 @@ All code in `effects/`, `engine/`, `magic/`, and `rules/` must run on CPython, C
 
 ## Tests
 
-~2000 tests spread across `tests/` folders under `effects/`, `engine/`, `magic/`, `hardware/`, `packs/`, and `scripts/`. Run with `python -m pytest`. All must pass before commit. Pre-commit hooks run `python -m ruff` (lint) and `ruff format`.
+~2000 tests spread across `tests/` folders under `effects/`, `engine/`, `magic/`, `hardware/`, `packs/`, and `scripts/`. Run with `python -m pytest`. All must pass before commit. Pre-commit hooks run `ruff` (lint), `ruff format`, `import-linter` and `mypy`.
