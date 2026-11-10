@@ -41,6 +41,16 @@ def test_construction_disables_receive_timeout_so_driver_reads_never_block() -> 
     assert mock_radio.receive_timeout is None
 
 
+def test_construction_starts_the_chip_listening_so_packets_arrive_before_the_first_send() -> None:
+    # The driver's constructor leaves the chip in standby, and with
+    # receive_timeout=None its receive() never calls listen() itself.
+    mock_radio = MagicMock(name="radio")
+
+    _build_transport(mock_radio)
+
+    mock_radio.listen.assert_called_once_with()
+
+
 # ---------------------------------------------------------------------------
 # send() — transmits with keep_listening=True
 # ---------------------------------------------------------------------------
@@ -57,12 +67,16 @@ def test_send_transmits_payload_with_keep_listening_so_chip_returns_to_rx() -> N
 
 # ---------------------------------------------------------------------------
 # receive() — non-blocking, gated on payload_ready
+#
+# ``payload_ready`` is a method on adafruit_rfm69.RFM69, not a property; the
+# mocks set its return value so a gate that tests the bound method itself
+# (always truthy) fails these tests.
 # ---------------------------------------------------------------------------
 
 
 def test_receive_returns_none_without_calling_receive_when_nothing_is_waiting() -> None:
     mock_radio = MagicMock(name="radio")
-    mock_radio.payload_ready = False
+    mock_radio.payload_ready.return_value = False
     transport = _build_transport(mock_radio)
 
     result = transport.receive()
@@ -73,7 +87,7 @@ def test_receive_returns_none_without_calling_receive_when_nothing_is_waiting() 
 
 def test_receive_recovers_from_byte_as_sender_and_strips_the_header() -> None:
     mock_radio = MagicMock(name="radio")
-    mock_radio.payload_ready = True
+    mock_radio.payload_ready.return_value = True
     # RadioHead header: [to, from, id, flags] followed by the payload.
     mock_radio.receive.return_value = bytes([0x02, 0x07, 0x00, 0x00]) + b"\xab\xcd"
     transport = _build_transport(mock_radio)
@@ -87,7 +101,7 @@ def test_receive_requests_the_radiohead_header_so_the_sender_can_be_identified()
     # Without with_header=True the driver strips the RadioHead header itself and
     # the From byte is lost, leaving no way to tell who sent the packet.
     mock_radio = MagicMock(name="radio")
-    mock_radio.payload_ready = True
+    mock_radio.payload_ready.return_value = True
     mock_radio.receive.return_value = bytes([0x02, 0x07, 0x00, 0x00]) + b"\xab"
     transport = _build_transport(mock_radio)
 
@@ -101,7 +115,7 @@ def test_receive_returns_none_when_payload_ready_but_receive_yields_nothing() ->
     chip (interrupt-driven) -- receive() honors a None from the underlying
     driver rather than crashing on it."""
     mock_radio = MagicMock(name="radio")
-    mock_radio.payload_ready = True
+    mock_radio.payload_ready.return_value = True
     mock_radio.receive.return_value = None
     transport = _build_transport(mock_radio)
 

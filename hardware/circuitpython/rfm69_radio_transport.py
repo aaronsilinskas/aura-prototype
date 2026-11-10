@@ -43,6 +43,9 @@ class Rfm69RadioTransport(RadioTransport):
         # Keep receive() non-blocking; the driver otherwise waits up to its
         # default 0.5s receive_timeout for a packet.
         radio.receive_timeout = None
+        # The driver's constructor leaves the chip in standby, and with no
+        # receive_timeout its receive() never enters RX itself.
+        radio.listen()
         self._radio = radio
 
     def send(self, data: bytes) -> None:
@@ -58,7 +61,7 @@ class Rfm69RadioTransport(RadioTransport):
         4-byte header (to, from, id, flags) stripped.
         """
         radio = self._radio
-        if not radio.payload_ready:
+        if not radio.payload_ready():
             return None
         packet = radio.receive(with_header=True)
         if packet is None:
