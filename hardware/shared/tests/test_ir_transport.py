@@ -657,10 +657,10 @@ def _encode_pulses(payload: bytes):
     return list(AuraInfraredEncoder().encode(payload))
 
 
-def _make_receiver(num_readers, decoder_class=AuraInfraredDecoder, gate=None):
+def _make_receiver(num_readers, decoder_factory=AuraInfraredDecoder, gate=None):
     """Build an InfraredReceiver over ``num_readers`` independent FakePulseReaders."""
     readers = [FakePulseReader() for _ in range(num_readers)]
-    rx = InfraredReceiver(readers, decoder_class, gate)
+    rx = InfraredReceiver(readers, decoder_factory, gate)
     return rx, readers
 
 
@@ -897,8 +897,8 @@ def test_receiver_reset_telemetry_zeroes_every_counter_telemetry_reports(
     """Read/reset symmetry: whatever telemetry() reports, reset_telemetry()
     zeroes — checked generically across every declared counter on every
     reader and decoder, so a newly added counter is covered automatically."""
-    decoder_class, built = recording_tag_decoder
-    rx, readers = _make_receiver(num_readers, decoder_class)
+    decoder_factory, built = recording_tag_decoder
+    rx, readers = _make_receiver(num_readers, decoder_factory)
     for name in InfraredDecoder.OWNED_TELEMETRY_FIELDS:
         for decoder in built:
             setattr(decoder, name, 7)
@@ -1131,10 +1131,10 @@ def test_receiver_set_decoder_decodes_through_the_new_decoder_type(num_readers):
 
 
 def test_receiver_set_decoder_gives_each_reader_its_own_fresh_decoder(recording_tag_decoder):
-    decoder_class, built = recording_tag_decoder
+    decoder_factory, built = recording_tag_decoder
     rx, _ = _make_receiver(2)
 
-    rx.set_decoder(decoder_class)
+    rx.set_decoder(decoder_factory)
 
     assert len(built) == 2
     assert built[0] is not built[1]

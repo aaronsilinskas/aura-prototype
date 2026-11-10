@@ -26,6 +26,7 @@ TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from typing import Any
 
 _DEFAULT_RESOLUTION = 16
 
@@ -72,10 +73,9 @@ def _reject_unemitted_verbs(
 
 
 def _float_option(options: dict[str, object], key: str) -> float:
-    """Return *options*' *key* as a float, 1.0 when absent; TypeError unless a number or string."""
-    value = options.get(key, 1.0)
-    if not isinstance(value, (int, float, str)):
-        raise TypeError(key + " option must be a number, not " + type(value).__name__)
+    """Return ``options[key]`` as a float, 1.0 when absent; ``float()`` raises on the rest."""
+    # Any, not object: float() alone decides what converts and what it raises.
+    value: Any = options.get(key, 1.0)
     return float(value)
 
 
@@ -149,6 +149,8 @@ class EffectManager(EffectControls, EffectAdmin):
             self.output_buffers: list[dict[str, PixelBuffer] | None] = output_buffers
             # Assigned by _build_effect once the builder returns: the effect's
             # listener closes over this entry, so the entry exists first.
+            # Unset during the build is safe because effects announce verbs only
+            # from update() (see EffectPixels), never while being built.
             self.effect: Effect
             # Verb → Resolved clip, owned by this running effect. Never written
             # back onto the effect's shared AudioPlaybackConfig declarations.
@@ -486,7 +488,8 @@ class EffectManager(EffectControls, EffectAdmin):
                     pixels_list.clear()
                 for entry in self._effects:
                     buf_dict = entry.output_buffers[i]
-                    # An effect without pixels never has a buffer dict.
+                    # Buffers exist only when pixels do, so the pixels check never
+                    # skips a buffer: it is there to narrow pixels for mypy.
                     pixels = entry.effect.pixels
                     if buf_dict is not None and pixels is not None:
                         for k, buf in buf_dict.items():

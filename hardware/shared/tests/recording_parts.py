@@ -57,7 +57,7 @@ class Writer(PulseWriter):
         self.emitter = emitter
         self.written: list[list[int]] = []
 
-    def write_pulses(self, durations: array | list[int]) -> None:
+    def write_pulses(self, durations: array[int]) -> None:
         self.written.append(list(durations))
 
     def is_busy(self) -> bool:

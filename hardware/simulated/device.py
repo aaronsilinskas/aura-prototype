@@ -232,7 +232,7 @@ class SimulatedHardware:
         ir = self.hw.ir
         if ir is None:
             return
-        encoder_class, _decoder_class = ir.codec
+        encoder_class, _decoder_factory = ir.codec
         self.land_ir(encoder_class().encode(payload))
 
     def land_ir(self, pulses: array | list[int], receivers: Sequence[int] | None = None) -> None:
@@ -369,8 +369,8 @@ class SimulatedHardware:
         """The payload *pulses* carry, read back through the installed codec."""
         ir = self.hw.ir
         assert ir is not None  # only an assembled transceiver's emitters emit
-        _encoder_class, decoder_class = ir.codec
-        decoder = decoder_class()
+        _encoder_class, decoder_factory = ir.codec
+        decoder = decoder_factory()
         for pulse in pulses:
             payload = decoder.decode(pulse)
             if payload is not None:

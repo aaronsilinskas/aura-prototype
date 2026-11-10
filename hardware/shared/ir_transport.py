@@ -37,8 +37,9 @@ class PulseWriter:
         """Transmit a sequence of pulse durations in microseconds.
 
         Args:
-            durations: Sequence of integer pulse durations (µs), alternating
-                mark/space, starting with a mark.
+            durations: An ``array('H', …)`` of pulse durations (µs), as an
+                encoder returns them, alternating mark/space, starting with a
+                mark.
 
         Raises:
             NotImplementedError: Always — subclasses must override.
@@ -350,7 +351,7 @@ class InfraredReceiver:
     """Polls one or more :class:`PulseReader` instances and returns the best packet.
 
     Each reader is paired with its own decoder, built fresh from
-    *decoder_class*. When more than one decoder completes a packet in the
+    *decoder_factory*. When more than one decoder completes a packet in the
     same tick, the reader with the **lowest error margin** wins (the first
     such reader on a tie) — this improves reliability across a wide
     reception area. Multiple readers do **not** derive direction. A device
@@ -374,7 +375,7 @@ class InfraredReceiver:
 
     Args:
         pulse_readers: The :class:`PulseReader` instances to poll; never empty.
-        decoder_class: Called with no arguments once per reader to build that
+        decoder_factory: Called with no arguments once per reader to build that
             reader's :class:`~hardware.shared.ir_codecs.base.InfraredDecoder`.
         gate: :class:`IrTransmitGate` read for self-echo suppression.
 
@@ -393,12 +394,12 @@ class InfraredReceiver:
     def __init__(
         self,
         pulse_readers: "list[PulseReader]",
-        decoder_class: "Callable[[], InfraredDecoder]",
+        decoder_factory: "Callable[[], InfraredDecoder]",
         gate: "IrTransmitGate | None" = None,
     ) -> None:
         readers = list(pulse_readers)
         self._readers = readers
-        self._decoders = [decoder_class() for _ in readers]
+        self._decoders = [decoder_factory() for _ in readers]
         self._gate = gate
         self._count = len(readers)
         self._telemetry_gate = IrTelemetryGate()
@@ -466,17 +467,17 @@ class InfraredReceiver:
 
         return best_packet
 
-    def set_decoder(self, decoder_class: "Callable[[], InfraredDecoder]") -> None:
-        """Rebuild the per-reader decoder list from *decoder_class*.
+    def set_decoder(self, decoder_factory: "Callable[[], InfraredDecoder]") -> None:
+        """Rebuild the per-reader decoder list from *decoder_factory*.
 
         Builds one **fresh** decoder per reader, so stateful decoders are
         never shared across readers.
 
         Args:
-            decoder_class: Called with no arguments once per reader, as at
+            decoder_factory: Called with no arguments once per reader, as at
                 construction.
         """
-        self._decoders = [decoder_class() for _ in self._readers]
+        self._decoders = [decoder_factory() for _ in self._readers]
 
     def _drain_discard_all(self) -> None:
         """Drain every available pulse from every reader, discarding each.

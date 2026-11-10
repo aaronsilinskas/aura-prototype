@@ -227,8 +227,8 @@ class _CodecRecordingIr:
     def __init__(self) -> None:
         self.codec: tuple[object, object] | None = None
 
-    def apply_codec(self, encoder_class, decoder_class) -> None:
-        self.codec = (encoder_class, decoder_class)
+    def apply_codec(self, encoder_class, decoder_factory) -> None:
+        self.codec = (encoder_class, decoder_factory)
 
 
 def test_boot_speaks_the_wire_frame_codec_the_booted_scene_declares():

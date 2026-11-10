@@ -38,7 +38,7 @@ def _make_output(cols: int = _COLS, scope_rows: dict = _SCOPE_ROWS):
 
 
 class _RecordingMatrix:
-    """Fake matrix satisfying the duck-type contract, recording every write.
+    """Fake matrix with the indexed writes and ``show()`` the output uses, recording every write.
 
     Unlike the ``MagicMock`` matrix used elsewhere, it retains each
     ``offset -> byte`` write so a test can assert exactly which register

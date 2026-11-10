@@ -5,10 +5,10 @@ delimiter -- ``encode_frame`` output is plain base64 and so never contains one
 -- so a byte stream with no message boundaries of its own (like a serial port)
 can still exchange one frame per :meth:`~UsbCdcTransport.send`/:meth:`~UsbCdcTransport.recv`.
 
-Needs no ``usb_cdc`` import: it frames lines over any object exposing
-``read(size) -> bytes``/``write(data: bytes) -> None``, so on-device wiring
-passes it ``usb_cdc.data`` (the channel ``hardware/circuitpython/boot.py``
-opens) while tests pass a plain fake stream.
+Takes a ``usb_cdc.Serial`` -- on-device wiring passes ``usb_cdc.data``, the
+channel ``hardware/circuitpython/boot.py`` opens -- but imports ``usb_cdc``
+only for the checker. It touches just ``timeout``, ``read(size)`` and
+``write(data)``, so tests pass a fake stream with those three.
 """
 
 from __future__ import annotations
@@ -29,8 +29,7 @@ class UsbCdcTransport(Transport):
     """Live ``Transport`` framing SD-sync lines over a serial-like stream.
 
     Args:
-        serial: The stream to frame lines over -- on-device, ``usb_cdc.data``;
-            any object exposing ``read(size)``/``write(data)`` works.
+        serial: The stream to frame lines over -- on-device, ``usb_cdc.data``.
     """
 
     def __init__(self, serial: usb_cdc.Serial) -> None:

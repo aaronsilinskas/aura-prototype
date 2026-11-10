@@ -78,14 +78,14 @@ class TagShootingRule(InPhaseRule):
             Scope.Global.BUFF, "basic.progress", {"progress": 1.0, "color": AMMO_COLOR}
         )
         state.effect_controls.add_effect(Scope.Global.BUFF, "scene.reload_complete", {})
-        tag.shot.reload_started_at = None
-        reload_receipt = tag.shot.reload_receipt
-        assert reload_receipt is not None  # set together with reload_started_at
-        reload_receipt.stop()
-        tag.shot.reload_receipt = None
+        self._end_reload(tag)
 
     def _cancel_reload(self, state: GameState, tag: TagState) -> None:
         state.effect_controls.set_effect(Scope.Global.BUFF, "scene.ammo_empty", {})
+        self._end_reload(tag)
+
+    def _end_reload(self, tag: TagState) -> None:
+        """Leave the reload and stop its ``scene.reload`` effect."""
         tag.shot.reload_started_at = None
         reload_receipt = tag.shot.reload_receipt
         assert reload_receipt is not None  # set together with reload_started_at

@@ -93,7 +93,7 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
     # VoiceSink — last-mile hardware mapping
     # ------------------------------------------------------------------
 
-    def open_source(self, path: str) -> object | None:
+    def open_source(self, path: str) -> tuple[BinaryIO, audiocore.WaveFile] | None:
         try:
             f = open(path, "rb")  # noqa: SIM115
         except OSError:
@@ -104,8 +104,7 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
         # adafruit/circuitpython URL once filed.
         return (f, audiocore.WaveFile(f))  # type: ignore[call-arg]
 
-    def play(self, slot: int, source: object, loop: bool) -> None:
-        assert isinstance(source, tuple)  # the (file, WaveFile) open_source returned
+    def play(self, slot: int, source: tuple[BinaryIO, audiocore.WaveFile], loop: bool) -> None:
         self._sources[slot] = source
         _, wave = source
         self._mixer.voice[slot].play(wave, loop=loop)
