@@ -46,6 +46,12 @@ from array import array
 
 from hardware.shared.ir_transport import PulseWriter
 
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    import microcontroller
+    import rp2pio
+
 # State-machine clock: 1 MHz so one PIO clock is exactly 1 µs. This is what lets
 # the [delay] counts in the program below be read directly as microseconds.
 _SM_HZ: Final = 1_000_000
@@ -109,7 +115,7 @@ def _duration_us_to_loops(duration_us: int) -> int:
     return periods - 1
 
 
-def make_state_machine(pin: object) -> object:
+def make_state_machine(pin: microcontroller.Pin) -> rp2pio.StateMachine:
     """Build one ``rp2pio.StateMachine`` driving the carrier program on *pin*.
 
     The ``rp2pio`` / ``adafruit_pioasm`` imports happen here, not at module
@@ -156,11 +162,11 @@ class PioPulseWriter(PulseWriter):
 
     __slots__ = ("_inflight", "_sm")
 
-    def __init__(self, state_machine: object) -> None:
+    def __init__(self, state_machine: rp2pio.StateMachine) -> None:
         self._sm = state_machine
-        self._inflight: object | None = None
+        self._inflight: array[int] | None = None
 
-    def write_pulses(self, durations: array[int] | list[int]) -> None:
+    def write_pulses(self, durations: array[int]) -> None:
         """Start a non-blocking DMA write of *durations* and return immediately.
 
         Builds the DMA buffer by converting each µs duration to a carrier-period

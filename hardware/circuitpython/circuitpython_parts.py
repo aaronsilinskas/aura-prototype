@@ -7,22 +7,6 @@ that doesn't need a part never requires its library to be installed.
 
 from __future__ import annotations
 
-try:
-    from collections.abc import Callable
-    from typing import TYPE_CHECKING, Final
-except ImportError:
-    TYPE_CHECKING = False
-
-if TYPE_CHECKING:
-    from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
-    from adafruit_lis3dh import LIS3DH_I2C
-    from adafruit_mmc56x3 import MMC5603
-
-    from hardware.circuitpython.audio_output import AudioEffectOutput
-    from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
-    from hardware.circuitpython.rfm69_radio_transport import Rfm69RadioTransport
-    from hardware.circuitpython.sdcard_storage import SdCardStorage
-
 import sys
 import time
 
@@ -44,6 +28,24 @@ from hardware.shared.device_config import (
 )
 from hardware.shared.device_parts import DeviceParts, PinRef
 from hardware.shared.ir_transport import PulseWriter
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Final, TypeVar
+
+    from adafruit_drv2605 import DRV2605
+    from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
+    from adafruit_lis3dh import LIS3DH_I2C
+    from adafruit_mmc56x3 import MMC5603
+
+    from hardware.circuitpython.audio_output import AudioEffectOutput
+    from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
+    from hardware.circuitpython.rfm69_radio_transport import Rfm69RadioTransport
+    from hardware.circuitpython.sdcard_storage import SdCardStorage
+
+    Driver = TypeVar("Driver")
 
 __all__ = ["CircuitPythonParts", "SdCardMountError"]
 
@@ -113,8 +115,8 @@ def _setup_matrix_is31fl3741(
 
 
 def _construct_with_optional_address(
-    ctor: Callable[..., object], i2c: busio.I2C, address: int | None
-) -> object:
+    ctor: Callable[..., Driver], i2c: busio.I2C, address: int | None
+) -> Driver:
     """Return ``ctor(i2c[, address=address])``.
 
     ``None`` omits the keyword so the driver's own default address applies,
@@ -187,7 +189,7 @@ def _setup_magnetometer(i2c: busio.I2C, address: int | None = None) -> MMC5603:
     )
 
 
-def _setup_drv2605(i2c: busio.I2C, address: int | None = None) -> object:
+def _setup_drv2605(i2c: busio.I2C, address: int | None = None) -> DRV2605:
     """Return a DRV2605 haptic driver on *i2c*."""
     import adafruit_drv2605
 

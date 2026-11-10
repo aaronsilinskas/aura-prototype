@@ -43,7 +43,7 @@ class NetworkEvents:
 
         def __init__(
             self,
-            data: bytes,
+            data: bytes | bytearray,
             signal_strength: float | None,
             error_margin: int | None,
             best_receiver: str | None,

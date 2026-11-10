@@ -97,6 +97,12 @@ class SdSyncServer:
     def __init__(self, storage: DeviceStorage | None) -> None:
         self._storage = storage
 
+    def _required_storage(self, verb: str) -> DeviceStorage:
+        """Return the injected storage, which *verb* cannot run without."""
+        storage = self._storage
+        assert storage is not None, verb + " needs a server built with storage"
+        return storage
+
     def read(self, sd_path: str) -> Iterator[bytes] | None:
         """Stream *sd_path*'s contents in wire-sized chunks, or ``None`` if never written.
 
@@ -112,7 +118,7 @@ class SdSyncServer:
         Args:
             sd_path: The file's path, relative to the SD mount root.
         """
-        return self._storage.read_chunks(sd_path, CHUNK_SIZE)
+        return self._required_storage("read").read_chunks(sd_path, CHUNK_SIZE)
 
     def write(self, sd_path: str, chunks: Iterable[bytes]) -> None:
         """Durably replace *sd_path* with the streamed *chunks*, creating missing parent dirs.
@@ -130,7 +136,7 @@ class SdSyncServer:
             sd_path: The file's path, relative to the SD mount root.
             chunks: The file's content, in order.
         """
-        self._storage.write_chunks(sd_path, chunks)
+        self._required_storage("write").write_chunks(sd_path, chunks)
 
     def list(self, subpath: str = "") -> list[tuple[str, int]] | None:
         """Enumerate every file under *subpath*, or ``None`` if this server has no storage.

@@ -19,6 +19,10 @@ from hardware.shared.ir_transport import (
 )
 from hardware.shared.polled_part import PolledPart
 
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 __all__ = ["InfraredTransceiver"]
 
 
@@ -52,7 +56,7 @@ class InfraredTransceiver(PolledPart):
         self._transmitters = transmitters
         self._receiver = receiver
         self._gate = gate
-        self._codec: tuple[type[InfraredEncoder], type[InfraredDecoder]] = (
+        self._codec: tuple[type[InfraredEncoder], Callable[[], InfraredDecoder]] = (
             AuraInfraredEncoder,
             AuraInfraredDecoder,
         )
@@ -123,13 +127,15 @@ class InfraredTransceiver(PolledPart):
         self.received = receiver.receive() if receiver is not None else None
 
     def apply_codec(
-        self, encoder_class: type[InfraredEncoder], decoder_class: type[InfraredDecoder]
+        self,
+        encoder_class: type[InfraredEncoder],
+        decoder_factory: "Callable[[], InfraredDecoder]",
     ) -> None:
-        """Install the codec *encoder_class* and *decoder_class* make up.
+        """Install the codec *encoder_class* and *decoder_factory* make up.
 
         Builds one encoder that every transmitter shares, and hands
-        *decoder_class* to the receiver, which builds a fresh decoder per
-        reader. Both classes must be constructible with no arguments.
+        *decoder_factory* to the receiver, which builds a fresh decoder per
+        reader. Both are called with no arguments.
 
         Applied uniformly, with no "differs from default?" branch — intended
         for a single call before the first tick, not guarded against mid-run
@@ -139,9 +145,10 @@ class InfraredTransceiver(PolledPart):
         Args:
             encoder_class: The encoder class, as
                 :func:`~hardware.shared.ir_codecs.codec_for` returns it.
-            decoder_class: The matching decoder class.
+            decoder_factory: Builds the matching decoder; usually the decoder
+                class itself.
         """
-        self._codec = (encoder_class, decoder_class)
+        self._codec = (encoder_class, decoder_factory)
 
         encoder = encoder_class()
         for tx in self._transmitters.values():
@@ -149,11 +156,11 @@ class InfraredTransceiver(PolledPart):
 
         receiver = self._receiver
         if receiver is not None:
-            receiver.set_decoder(decoder_class)
+            receiver.set_decoder(decoder_factory)
 
     @property
-    def codec(self) -> tuple[type[InfraredEncoder], type[InfraredDecoder]]:
-        """The installed ``(encoder_class, decoder_class)`` pair, as :meth:`apply_codec` took it.
+    def codec(self) -> "tuple[type[InfraredEncoder], Callable[[], InfraredDecoder]]":
+        """The installed ``(encoder_class, decoder_factory)`` pair, as :meth:`apply_codec` took it.
 
         The Aura wire-frame pair until :meth:`apply_codec` is called.
         """

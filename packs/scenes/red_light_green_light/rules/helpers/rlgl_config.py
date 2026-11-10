@@ -146,4 +146,4 @@ def _from_state(state: GameState) -> RlglConfig:
     return RlglConfig.from_settings(state.settings)
 
 
-rlgl_config: StateSlot = StateSlot(_CONFIG_KEY, _from_state, RlglConfig)
+rlgl_config = StateSlot(_CONFIG_KEY, _from_state, RlglConfig)

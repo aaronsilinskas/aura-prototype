@@ -5,7 +5,7 @@ try:
 except ImportError:
     pass
 
-import adafruit_drv2605  # type: ignore[import]
+import adafruit_drv2605
 
 from effects.effect import Effect, HapticPattern
 from engine.effects.output import EffectOutput
@@ -54,7 +54,7 @@ class Drv2605EffectOutput(EffectOutput):
 
     __slots__ = ("_active_receipt", "_driver")
 
-    def __init__(self, driver: object) -> None:
+    def __init__(self, driver: adafruit_drv2605.DRV2605) -> None:
         super().__init__(receives_pixels=False)
         self.min_resolution = 1
         self.scopes = [Scope.ALL]

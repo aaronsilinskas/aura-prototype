@@ -88,7 +88,7 @@ class IrTelemetryGate:
     __slots__ = ("_previous",)
 
     def __init__(self) -> None:
-        self._previous = None
+        self._previous: IrTelemetrySnapshot | None = None
 
     def poll(self, snapshot: IrTelemetrySnapshot) -> str | None:
         """Compare *snapshot* to the last-reported snapshot.

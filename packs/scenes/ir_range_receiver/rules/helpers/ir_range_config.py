@@ -55,4 +55,4 @@ def _from_state(state: GameState) -> IrRangeConfig:
     return IrRangeConfig.from_settings(state.settings)
 
 
-ir_range_config: StateSlot = StateSlot(_CONFIG_KEY, _from_state, IrRangeConfig)
+ir_range_config = StateSlot(_CONFIG_KEY, _from_state, IrRangeConfig)

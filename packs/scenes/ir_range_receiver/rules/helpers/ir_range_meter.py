@@ -31,4 +31,4 @@ def _build_meter(state: GameState) -> ReceptionQualityMeter:
     )
 
 
-ir_range_meter: StateSlot = StateSlot(_METER_KEY, _build_meter, ReceptionQualityMeter)
+ir_range_meter = StateSlot(_METER_KEY, _build_meter, ReceptionQualityMeter)

@@ -20,7 +20,7 @@ import wave
 from array import array
 from collections import deque
 from collections.abc import Callable
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
 
 from effects.effect import Effect, PixelBuffer
 from engine.effects.output import EffectOutput
@@ -41,7 +41,10 @@ from hardware.shared.ir_transport import PulseReader, PulseWriter
 from hardware.shared.radio_transport import RadioTransport
 from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
 
+TYPE_CHECKING = False
+
 if TYPE_CHECKING:
+    from hardware.shared.device_parts import Bus
     from hardware.simulated.device import SimulatedHardware
 
 __all__ = [
@@ -101,7 +104,7 @@ class _SimulatedPulseWriter(PulseWriter):
         self._device = device
         self._emitter = emitter
 
-    def write_pulses(self, durations: array | list[int]) -> None:
+    def write_pulses(self, durations: array[int]) -> None:
         self._device.on_ir_written(self._emitter, durations)
 
     def is_busy(self) -> bool:
@@ -188,11 +191,10 @@ class SimulatedAudio(EffectOutput, VoiceSink):
     def flush(self) -> None:
         self._pool.sweep(self)
 
-    def open_source(self, path: str) -> object | None:
+    def open_source(self, path: str) -> tuple[str, float] | None:
         return (path, wav_length(path))
 
-    def play(self, slot: int, source: object, loop: bool) -> None:
-        assert isinstance(source, tuple)  # the (path, length) open_source returned
+    def play(self, slot: int, source: tuple[str, float], loop: bool) -> None:
         path, length = source
         self._voices[slot] = (path, math.inf if loop else self._device.now() + length)
 
@@ -310,7 +312,7 @@ class SimulatedParts(DeviceParts):
 
     def __init__(self, device: SimulatedHardware, previous: SimulatedParts | None = None) -> None:
         self._device = device
-        self._kept = previous._kept if previous is not None else _KeptParts()
+        self._kept: _KeptParts = previous._kept if previous is not None else _KeptParts()
         self.strips: list[RecordingPixels] = []
         self.audio: SimulatedAudio | None = None
         self.ir_readers: list[SimulatedPulseReader] = []
@@ -323,15 +325,13 @@ class SimulatedParts(DeviceParts):
     def high_current_rail(self, pin: PinRef, level: bool) -> None:
         pass
 
-    def i2c_bus(self, scl: PinRef | None, sda: PinRef | None) -> object | None:
+    def i2c_bus(self, scl: PinRef | None, sda: PinRef | None) -> Bus | None:
         return _STAND_IN_BUS
 
-    def spi_bus(
-        self, sck: PinRef | None, mosi: PinRef | None, miso: PinRef | None
-    ) -> object | None:
+    def spi_bus(self, sck: PinRef | None, mosi: PinRef | None, miso: PinRef | None) -> Bus | None:
         return _STAND_IN_BUS
 
-    def matrix_pixels(self, pixels: MatrixPixelsConfig, i2c: object) -> EffectOutput:
+    def matrix_pixels(self, pixels: MatrixPixelsConfig, i2c: Bus) -> EffectOutput:
         raise ValueError("the Simulated device has no matrix; lay pixels out as strips")
 
     def neopixel_strip(self, strip: NeoPixelStripConfig, pin: PinRef) -> EffectOutput:
@@ -347,7 +347,7 @@ class SimulatedParts(DeviceParts):
         return self._kept.accelerometer
 
     def accelerometer(
-        self, accelerometer: I2CDeviceConfig, i2c: object
+        self, accelerometer: I2CDeviceConfig, i2c: Bus
     ) -> Callable[[], tuple[float, float, float]]:
         kept = self._kept
         scripted = kept.accelerometer = _kept_or_made(
@@ -361,7 +361,7 @@ class SimulatedParts(DeviceParts):
         return self._kept.magnetometer
 
     def magnetometer(
-        self, magnetometer: I2CDeviceConfig, i2c: object
+        self, magnetometer: I2CDeviceConfig, i2c: Bus
     ) -> Callable[[], tuple[float, float, float]]:
         kept = self._kept
         scripted = kept.magnetometer = _kept_or_made(kept.magnetometer, SimulatedMagnetometer)
@@ -377,7 +377,7 @@ class SimulatedParts(DeviceParts):
         self.audio = SimulatedAudio(self._device, audio.voices)
         return self.audio
 
-    def haptic_output(self, haptics: I2CDeviceConfig, i2c: object) -> EffectOutput:
+    def haptic_output(self, haptics: I2CDeviceConfig, i2c: Bus) -> EffectOutput:
         return _RecordingHaptic(self._device)
 
     def ir_reader(self, pin: PinRef) -> PulseReader:
@@ -389,12 +389,12 @@ class SimulatedParts(DeviceParts):
         return _SimulatedPulseWriter(self._device, emitter), _WRITER_KIND
 
     def radio_transport(
-        self, radio: RadioConfig, spi: object, cs: PinRef, reset: PinRef
+        self, radio: RadioConfig, spi: Bus, cs: PinRef, reset: PinRef
     ) -> RadioTransport:
         self.radio = SimulatedRadioTransport(self._device)
         return self.radio
 
-    def storage(self, sdcard: SDCardConfig, spi: object, cs: PinRef) -> DeviceStorage:
+    def storage(self, sdcard: SDCardConfig, spi: Bus, cs: PinRef) -> DeviceStorage:
         if self._kept.storage is None:
             if self._device.card is None:
                 raise ValueError("an enabled sdcard section needs a card directory")

@@ -5,6 +5,11 @@ try:
 except ImportError:
     pass
 
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import ItemsView
+
 
 class ButtonData:
     """Reusable buffer of button states, overwritten in place each poll.
@@ -65,7 +70,7 @@ class ButtonData:
         """Return the raw state constant for *name*, or ``None`` if unknown."""
         return self._states.get(name)
 
-    def items(self):  # type: ignore[return]  # ItemsView not available on CircuitPython/MicroPython
+    def items(self) -> "ItemsView[str, int]":
         """Iterate over ``(button_name, state)`` pairs for all buttons."""
         return self._states.items()
 

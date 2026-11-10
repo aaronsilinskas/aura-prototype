@@ -143,7 +143,7 @@ def load_item(
         raise MissingItemAttributeError(context, item_attr) from None
     if not isinstance(value, expected_class):
         raise ItemTypeError(context, item_attr, expected_class)
-    return value  # type: ignore[return-value]
+    return value
 
 
 class _PackEntry:
@@ -196,7 +196,7 @@ class PackRegistry:
     def __init__(self) -> None:
         # Empty until ``_from_packs`` fills it and sets the export attribute;
         # until then every get() misses before reading it.
-        self._item_attr: str | None = None
+        self._item_attr: str = ""
         self._packs: dict[str, _PackEntry] = {}
         self._cache: dict[tuple[str, str], object] = {}
 
@@ -240,13 +240,13 @@ class PackRegistry:
 
         cache_key = (pack_name, item_name)
         if cache_key in self._cache:
-            return self._cache[cache_key]  # type: ignore[return-value]
+            return self._cache[cache_key]  # type: ignore[return-value]  # checked when loaded
 
         full_module = meta.module_prefix + "." + item_name
         context = f"Pack '{pack_name}' item '{item_name}'"
         value = load_item(full_module, self._item_attr, context, expected_class)
         self._cache[cache_key] = value
-        return value  # type: ignore[return-value]
+        return value
 
     def items(self, pack_name: str) -> list[str]:
         """Return item names for *pack_name* in alphabetical order.

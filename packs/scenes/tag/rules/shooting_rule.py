@@ -41,8 +41,9 @@ class TagShootingRule(InPhaseRule):
         tag = tag_state(state)
         config = tag_config(state)
 
-        if tag.shot.reload_started_at is not None:
-            self._handle_reload(event, state, tag, config)
+        reload_started_at = tag.shot.reload_started_at
+        if reload_started_at is not None:
+            self._handle_reload(event, state, tag, config, reload_started_at)
             return
 
         if event.buttons.is_pressed("A"):
@@ -61,8 +62,9 @@ class TagShootingRule(InPhaseRule):
         state: GameState,
         tag: TagState,
         config: TagConfig,
+        reload_started_at: float,
     ) -> None:
-        reload_complete = state.total - tag.shot.reload_started_at >= config.reload_duration
+        reload_complete = state.total - reload_started_at >= config.reload_duration
         if reload_complete:
             self._complete_reload(state, tag, config)
         elif event.buttons.is_down("A"):
@@ -76,14 +78,18 @@ class TagShootingRule(InPhaseRule):
             Scope.Global.BUFF, "basic.progress", {"progress": 1.0, "color": AMMO_COLOR}
         )
         state.effect_controls.add_effect(Scope.Global.BUFF, "scene.reload_complete", {})
-        tag.shot.reload_started_at = None
-        tag.shot.reload_receipt.stop()
-        tag.shot.reload_receipt = None
+        self._end_reload(tag)
 
     def _cancel_reload(self, state: GameState, tag: TagState) -> None:
         state.effect_controls.set_effect(Scope.Global.BUFF, "scene.ammo_empty", {})
+        self._end_reload(tag)
+
+    def _end_reload(self, tag: TagState) -> None:
+        """Leave the reload and stop its ``scene.reload`` effect."""
         tag.shot.reload_started_at = None
-        tag.shot.reload_receipt.stop()
+        reload_receipt = tag.shot.reload_receipt
+        assert reload_receipt is not None  # set together with reload_started_at
+        reload_receipt.stop()
         tag.shot.reload_receipt = None
 
     def _can_fire(self, state: GameState, tag: TagState, config: TagConfig) -> bool:

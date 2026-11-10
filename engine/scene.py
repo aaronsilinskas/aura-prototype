@@ -44,7 +44,7 @@ class SceneLocalRegistry:
     def __init__(self) -> None:
         # Empty until ``_from_items`` fills it and sets the export attribute;
         # until then every get() misses before reading it.
-        self._item_attr: str | None = None
+        self._item_attr: str = ""
         self._item_names: set[str] = set()
         self._module_prefix: str = ""
         self._cache: dict[str, object] = {}
@@ -75,13 +75,13 @@ class SceneLocalRegistry:
             raise UnknownItemError(item_name, sorted(self._item_names))
 
         if item_name in self._cache:
-            return self._cache[item_name]  # type: ignore[return-value]
+            return self._cache[item_name]  # type: ignore[return-value]  # checked when loaded
 
         full_module = self._module_prefix + "." + item_name
         context = f"Local item '{item_name}'"
         value = load_item(full_module, self._item_attr, context, expected_class)
         self._cache[item_name] = value
-        return value  # type: ignore[return-value]
+        return value
 
     def items(self) -> list[str]:
         """Return all registered item names in alphabetical order."""

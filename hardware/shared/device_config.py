@@ -8,12 +8,25 @@ try:
     from collections.abc import Callable
     from typing import Final, TypeVar
 
-    Bus = TypeVar("Bus", "I2CConfig", "SPIConfig")
+    BusSection = TypeVar("BusSection", "I2CConfig", "SPIConfig")
 except ImportError:
     pass
 
 from engine.network import IR_EMITTERS
 from engine.state import Scope
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Protocol
+
+    class _Slotted(Protocol):
+        """A config section, rebuilt by ``_disabled_copy`` from its ``__slots__``."""
+
+        @property
+        def __slots__(self) -> tuple[str, ...]: ...
+
+    SlottedSection = TypeVar("SlottedSection", bound=_Slotted)
 
 __all__ = [
     "DEFAULT_BUS",
@@ -395,7 +408,7 @@ class NeoPixelCurrentBudgetConfig:
         self.at_min_brightness: int = at_min_brightness
 
 
-def _disabled_copy(section: object) -> object:
+def _disabled_copy(section: SlottedSection) -> SlottedSection:
     """Return a copy of *section* with ``enabled`` forced to ``False``.
 
     Private to ``isolate`` (#715, #1071). It can only disable, never force a
@@ -942,8 +955,8 @@ def _parse_i2c_device(raw: dict, section: str, i2c_buses: dict[str, I2CConfig]) 
 
 
 def _parse_buses(
-    raw: object, section: str, pin_fields: tuple[str, ...], build: Callable[..., Bus]
-) -> dict[str, Bus]:
+    raw: object, section: str, pin_fields: tuple[str, ...], build: Callable[..., BusSection]
+) -> dict[str, BusSection]:
     """Parse the ``i2c`` or ``spi`` *section*: a mapping of bus name to that bus's pins.
 
     Each bus must declare every one of *pin_fields*; *build* receives their
@@ -952,7 +965,7 @@ def _parse_buses(
     if not isinstance(raw, dict):
         pins = "/".join(pin_fields)
         raise ValueError(f"{section} must be a mapping of bus name to {pins} pins")
-    buses: dict[str, Bus] = {}
+    buses: dict[str, BusSection] = {}
     for name, bus_raw in raw.items():
         if not isinstance(name, str) or not name:
             raise ValueError(f"{section} bus name must be a non-empty string, got {name!r}")
@@ -961,8 +974,8 @@ def _parse_buses(
 
 
 def _parse_bus(
-    bus_raw: object, field: str, pin_fields: tuple[str, ...], build: Callable[..., Bus]
-) -> Bus:
+    bus_raw: object, field: str, pin_fields: tuple[str, ...], build: Callable[..., BusSection]
+) -> BusSection:
     if not isinstance(bus_raw, dict):
         pins = "/".join(pin_fields)
         raise ValueError(f"{field} must be a mapping of {pins} pins")
@@ -983,7 +996,9 @@ def _parse_bus(
     return build(*(bus_raw[pin] for pin in pin_fields))
 
 
-def _parse_bus_reference(raw: dict, section: str, kind: str, declared: dict[str, object]) -> str:
+def _parse_bus_reference(
+    raw: dict, section: str, kind: str, declared: dict[str, BusSection]
+) -> str:
     """Return the *kind* bus (``i2c`` or ``spi``) *raw* joins, ``"default"`` when it names none.
 
     *section* labels the device in error messages; *declared* holds the

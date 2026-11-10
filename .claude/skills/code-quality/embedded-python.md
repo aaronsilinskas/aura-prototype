@@ -106,6 +106,44 @@ except ImportError:
     pass  # Not available on all embedded runtimes
 ```
 
+**Checker-only imports go under a bare `TYPE_CHECKING = False`:**
+
+This is the one sanctioned `TYPE_CHECKING` idiom. Declare the name at module level after the runtime imports (ruff's E402 rejects imports below an assignment), never import it:
+
+```python
+from engine.packs import PackRegistry
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Final
+
+    from engine.scene import SceneLocalRegistry
+```
+
+The device never imports `typing` and skips the block. mypy treats the name as true, so the guarded imports are still checked. Don't use `try: from typing import TYPE_CHECKING / except ImportError: TYPE_CHECKING = False`: mypy rejects the fallback assignment ("cannot assign to final").
+
+**Generics are checker-only subclasses (ADR-0007):**
+
+The device can't run `Generic`, so put the implementation in a plain runtime class and declare the generic as a subclass of it under `TYPE_CHECKING`. Re-declare only the signatures that mention the type parameter, and bind the public name to the runtime class under `else:`:
+
+```python
+class _StateSlotBase:
+    def __call__(self, state: GameState) -> object: ...  # the real body
+
+if TYPE_CHECKING:
+    from typing import Generic
+
+    class StateSlot(_StateSlotBase, Generic[T]):
+        def __call__(self, state: GameState) -> T: ...
+
+else:
+    StateSlot = _StateSlotBase
+```
+
+Never put the implementation under `else:`. mypy treats that branch as unreachable and doesn't check it.
+
 **Module count matters.** Import cost is paid at startup on-device. Keep related logic in the same file rather than splitting into many small modules when startup latency is a concern.
 
 **Still unavailable on latest CircuitPython / MicroPython:**
@@ -128,7 +166,34 @@ The `code-quality` skill requires type hints on all parameters and returns. On e
 
 When using an exception, still annotate with the best available fallback type and add a brief code comment explaining why a precise type is not possible in that location.
 
-For board-provided attributes and pin objects (for example `board.TX`, `board.RX`) where stubs may be incomplete, prefer leaving diagnostics visible instead of adding inline `# pyright: ignore[...]` comments. Only suppress these diagnostics when explicitly requested by the user or required by project policy.
+## Stub Defects
+
+When `circuitpython-stubs` is wrong about a call the firmware accepts, suppress the error at the call site with `# type: ignore[code]` and a reason comment that links an upstream adafruit/circuitpython issue reporting the defect. File the issue first: the `shared-bindings` file and line, the wrong and corrected signatures, and evidence that the firmware accepts the call. Never patch or shadow the stub with a local copy.
+
+```python
+# Stub defect: circuitpython-stubs marks WaveFile's buffer required, but the
+# firmware treats it as optional. https://github.com/adafruit/circuitpython/issues/<n>
+wave = audiocore.WaveFile(f)  # type: ignore[call-arg]
+```
+
+A stub-defect ignore without a linked upstream issue fails review. When the fixed stubs ship, the version bump removes the ignore (mypy reports it as unused).
+
+## CircuitPython Handles
+
+Annotate a CircuitPython handle (a pin, bus, `pulseio.PulseIn`, `rp2pio.StateMachine`, a driver object) with its stub type, never `object`. Import the type under `if TYPE_CHECKING:` so the device pays nothing at runtime:
+
+```python
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    import pulseio
+
+
+class PulseInReader:
+    def __init__(self, pulsein: pulseio.PulseIn) -> None: ...
+```
+
+Quote the annotation when the module has no `from __future__ import annotations`. A port that passes a handle through without using it (as `DeviceParts` does a bus) declares a checker-only `Any` alias for it, which each adapter narrows.
 
 ## Class-Level Constants
 
@@ -183,5 +248,8 @@ class _Data:
 - [ ] State objects initialized once via a guard, mutated in place on subsequent frames
 - [ ] `__slots__` used on long-lived per-instance state objects
 - [ ] `typing` and `collections.abc` imports guarded with `try/except ImportError` (advanced constructs such as `TypeVar`, `Protocol` and `Callable` are still absent from latest releases)
+- [ ] `TYPE_CHECKING` declared as a bare module-level `TYPE_CHECKING = False`, never imported from `typing`
+- [ ] CircuitPython handles annotated with their stub type, imported under `if TYPE_CHECKING:`, never `object`
+- [ ] Every stub-defect `# type: ignore[code]` links its upstream adafruit/circuitpython issue; no local copy of a stub `circuitpython-stubs` provides
 - [ ] Class-level constants annotated with `Final` (unquoted, no type parameter; import guarded with `try/except ImportError`)
 - [ ] No imports from unavailable stdlib modules

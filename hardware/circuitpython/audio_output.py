@@ -8,6 +8,13 @@ from engine.events import EffectEvent
 from engine.state import EffectReceipt, Scope
 from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
 
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import BinaryIO
+
+    import microcontroller
+
 
 class AudioEffectOutput(EffectOutput, VoiceSink):
     """EffectOutput that plays WAV files via the PropMaker's built-in I2S amp.
@@ -37,9 +44,9 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
         max_volume: float,
         num_voices: int,
         *,
-        i2s_bit_clock: object,
-        i2s_word_select: object,
-        i2s_data: object,
+        i2s_bit_clock: "microcontroller.Pin",
+        i2s_word_select: "microcontroller.Pin",
+        i2s_data: "microcontroller.Pin",
     ) -> None:
         super().__init__(receives_pixels=False)
         self.min_resolution = 1
@@ -58,7 +65,7 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
 
         # Per-slot opaque source: a (file, WaveFile) bundle while the slot plays,
         # or None when idle.  The file stays open until stop() closes it.
-        self._sources: list[object | None] = [None] * num_voices
+        self._sources: list[tuple[BinaryIO, audiocore.WaveFile] | None] = [None] * num_voices
 
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
@@ -86,14 +93,18 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
     # VoiceSink — last-mile hardware mapping
     # ------------------------------------------------------------------
 
-    def open_source(self, path: str) -> object | None:
+    def open_source(self, path: str) -> tuple[BinaryIO, audiocore.WaveFile] | None:
         try:
             f = open(path, "rb")  # noqa: SIM115
         except OSError:
             return None
-        return (f, audiocore.WaveFile(f))
+        # Stub defect: circuitpython-stubs marks WaveFile's buffer required, but the
+        # firmware treats it as optional. Upstream report drafted in
+        # https://github.com/aaronsilinskas/aura-prototype/issues/1236; swap in its
+        # adafruit/circuitpython URL once filed.
+        return (f, audiocore.WaveFile(f))  # type: ignore[call-arg]
 
-    def play(self, slot: int, source: object, loop: bool) -> None:
+    def play(self, slot: int, source: tuple[BinaryIO, audiocore.WaveFile], loop: bool) -> None:
         self._sources[slot] = source
         _, wave = source
         self._mixer.voice[slot].play(wave, loop=loop)

@@ -10,6 +10,12 @@ import adafruit_rfm69
 
 from hardware.shared.radio_transport import RadioTransport
 
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    import busio
+    import digitalio
+
 __all__ = ["Rfm69RadioTransport"]
 
 
@@ -32,9 +38,9 @@ class Rfm69RadioTransport(RadioTransport):
 
     def __init__(
         self,
-        spi: object,
-        cs: object,
-        reset: object,
+        spi: "busio.SPI",
+        cs: "digitalio.DigitalInOut",
+        reset: "digitalio.DigitalInOut",
         frequency: float,
         node: int,
     ) -> None:

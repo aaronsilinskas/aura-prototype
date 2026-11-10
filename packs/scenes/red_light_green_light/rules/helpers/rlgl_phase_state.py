@@ -56,6 +56,4 @@ class RlglPhaseState:
             self.music_receipt = None
 
 
-rlgl_phase_state: StateSlot = StateSlot(
-    _PHASE_STATE_KEY, lambda s: RlglPhaseState(), RlglPhaseState
-)
+rlgl_phase_state = StateSlot(_PHASE_STATE_KEY, lambda s: RlglPhaseState(), RlglPhaseState)

@@ -68,6 +68,8 @@ class EffectPixels:
     ``EffectConfig.notify_listeners``, each also defined as a class constant
     (``PulseEffect.PEAK``). Empty by default: such an effect emits only
     ``EffectVerb.START`` and ``EffectVerb.STOP``, which the engine sends.
+    Custom verbs are emitted from ``update``, never while the builder runs:
+    ``EffectManager`` has no effect to hand its outputs until the builder returns.
     """
 
     VERBS: tuple[EffectVerb, ...] = ()
@@ -208,7 +210,7 @@ class EffectConfig:
         of ``default`` based on the caller's contract with the option.
         """
         if key in self._options:
-            return self._options[key]  # type: ignore[return-value]
+            return self._options[key]  # type: ignore[return-value]  # typed like default by contract
         return default
 
     def notify_listeners(self, verb: EffectVerb) -> None:

@@ -13,7 +13,11 @@ dependencies = []
 [dependency-groups]
 dev = [
     "adafruit-board-toolkit>=1.1.2",
+    # Pinned to the device firmware: CIRCUITPYTHON_VERSION in scripts/setup_mpy_cross.sh.
+    # Bump both together.
+    "circuitpython-stubs==10.3.1",
     "import-linter>=2.3",
+    "mypy==2.4.1",
     # mpy-cross is NOT on PyPI for CircuitPython — the PyPI package is MicroPython's.
     # Download the CircuitPython binary via: scripts/setup_mpy_cross.sh
     # Binary lands at tools/mpy-cross (gitignored). Bump version with CircuitPython upgrades.
@@ -23,6 +27,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.15.1",
     "ruff>=0.15.6",
+    "types-pyserial>=3.5.0.20261104",
 ]
 
 [tool.pytest.ini_options]
@@ -102,3 +107,15 @@ protected_modules = ["app.simulation", "hardware.simulated"]
 # scene's tests may play it on the Simulation test harness, which itself builds
 # on the Simulated device. Nothing else may import either.
 allowed_importers = ["**.tests", "app.simulation"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["app", "effects", "engine", "hardware", "magic", "packs", "scripts"]
+exclude = ['(^|/)tests/']
+# Local stubs for modules circuitpython-stubs lacks; see typings/README.md.
+mypy_path = "typings"
+explicit_package_bases = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+warn_unused_ignores = true
+enable_error_code = ["ignore-without-code"]

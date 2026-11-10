@@ -28,6 +28,8 @@ from engine.capabilities import Capabilities
 from engine.events import Event
 from engine.settings import Settings
 
+TYPE_CHECKING = False
+
 
 class ScopeValue:
     """A routing token that identifies one or more outputs.
@@ -386,11 +388,13 @@ class EffectAdmin:
         raise NotImplementedError
 
 
-class StateSlot:
+class _StateSlotBase:
     """Callable accessor that owns the get-or-create-and-revalidate pattern for a GameState key.
 
-    Constructed once at module load; the single ``# type: ignore[return-value]`` cast lives
-    here so call sites are cast-free.
+    Constructed once at module load. Calling it returns the value under
+    *key*, created by *factory* on first use, after checking it is an
+    *expected_class* instance. Use it as ``StateSlot``; the checker sees a
+    generic subclass that types the result as *expected_class*.
     """
 
     __slots__ = ("_expected_class", "_factory", "key")
@@ -399,13 +403,13 @@ class StateSlot:
         self,
         key: str,
         factory: Callable[[GameState], object],
-        expected_class: type[T],
+        expected_class: type,
     ) -> None:
         self.key: str = key
         self._factory = factory
         self._expected_class = expected_class
 
-    def __call__(self, state: GameState) -> T:
+    def __call__(self, state: GameState) -> object:
         """Return the value for *key*, creating and caching it on first use.
 
         Raises:
@@ -413,11 +417,30 @@ class StateSlot:
         """
         if not state.has(self.key):
             state.set(self.key, self._factory(state))
-        return state.get_or_none(self.key, self._expected_class)  # type: ignore[return-value]
+        return state.get_or_none(self.key, self._expected_class)
 
     def is_in(self, state: GameState) -> bool:
         """Return True if this slot's key is present in *state*."""
         return state.has(self.key)
+
+
+if TYPE_CHECKING:
+    from typing import Generic
+
+    # Checker-only: narrows the two signatures that mention T. CircuitPython
+    # can't run generics (ADR-0007), so at runtime StateSlot is the base itself.
+    class StateSlot(_StateSlotBase, Generic[T]):
+        def __init__(
+            self,
+            key: str,
+            factory: Callable[[GameState], T],
+            expected_class: type[T],
+        ) -> None: ...
+
+        def __call__(self, state: GameState) -> T: ...
+
+else:
+    StateSlot = _StateSlotBase
 
 
 class GameState:
@@ -500,7 +523,7 @@ class GameState:
     def get(self, key: str, default: T) -> T:
         """Return the stored value for *key*, or *default* if absent."""
         if key in self._data:
-            return self._data[key]  # type: ignore[return-value]
+            return self._data[key]  # type: ignore[return-value]  # typed like default by contract
         return default
 
     def get_or_none(self, key: str, expected_class: type[T]) -> T | None:
@@ -541,7 +564,7 @@ class GameState:
         if not isinstance(value, type_):
             raise ValueError(f"Key '{key}' value is not an instance of {type_.__name__}")
         del self._data[key]
-        return value  # type: ignore[return-value]
+        return value
 
     def delete(self, key: str) -> None:
         """Remove *key* from state; no-op if absent."""
@@ -575,7 +598,7 @@ class GameState:
         iterating these indices rather than popping, so same-tick appended
         events are picked up by re-reading ``event_count``.
         """
-        return self._queue[index]  # type: ignore[return-value]
+        return self._queue[index]  # type: ignore[return-value]  # filled below event_count
 
     def queue_event(self, event: Event) -> None:
         """Enqueue an event for processing on the current or next update.

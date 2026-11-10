@@ -15,7 +15,7 @@ import sys
 
 try:
     from collections.abc import Callable
-    from typing import Final
+    from typing import ClassVar
 except ImportError:
     pass  # Not available on CircuitPython
 
@@ -49,7 +49,7 @@ class Logger:
 
     __slots__ = ("_open", "_sink", "_tag")
 
-    SILENT: Final[Logger]
+    SILENT: ClassVar[Logger]
 
     def __init__(self, tag: str, sink: Callable[[str], None] = _write_stdout) -> None:
         self._tag = tag
