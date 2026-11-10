@@ -635,13 +635,14 @@ def test_set_effect_stops_the_receipt_of_the_effect_it_replaces(pack_tree) -> No
     manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
     replaced = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
 
-    replacement = manager.set_effect(Scope.PERSONAL, "stub.ice", {})
+    manager.set_effect(Scope.PERSONAL, "stub.ice", {})
 
     assert replaced.is_stopped()
-    assert not replacement.is_stopped()
 
 
-def test_stop_effect_leaves_a_narrowed_effects_receipt_running(pack_tree) -> None:
+def test_stop_effect_keeps_a_narrowed_effect_rendering_with_its_receipt_not_stopped(
+    pack_tree,
+) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(

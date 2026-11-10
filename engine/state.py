@@ -260,7 +260,7 @@ class EffectReceipt:
         self._stopped = True
 
     def is_stopped(self) -> bool:
-        """Return ``True`` once this effect has been stopped, by any route."""
+        """Return ``True`` once ``stop()`` or ``EffectControls`` has stopped this effect."""
         return self._stopped
 
     def __repr__(self) -> str:

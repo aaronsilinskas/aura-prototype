@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from app.simulation import TICK, Simulation
+from app.simulation import TICK, SimulatedDevice, Simulation
 
 _HUM = "basic.blip_echo"
 """``scene.hum``'s looping clip."""
@@ -97,7 +97,7 @@ def card(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _hum_then_press_a(simulation: Simulation, card: Path, scene: str):
+def _hum_then_press_a(simulation: Simulation, card: Path, scene: str) -> SimulatedDevice:
     device = simulation.add_device("red", scene=scene, card=card)
     simulation.advance(0.1)
     assert device.is_playing(_HUM)
