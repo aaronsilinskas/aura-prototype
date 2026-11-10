@@ -146,6 +146,18 @@ The `code-quality` skill requires type hints on all parameters and returns. On e
 
 When using an exception, still annotate with the best available fallback type and add a brief code comment explaining why a precise type is not possible in that location.
 
+## Stub Defects
+
+When `circuitpython-stubs` is wrong about a call the firmware accepts, suppress the error at the call site with `# type: ignore[code]` and a reason comment that links an upstream adafruit/circuitpython issue reporting the defect. File the issue first: the `shared-bindings` file and line, the wrong and corrected signatures, and evidence that the firmware accepts the call. Never patch or shadow the stub with a local copy.
+
+```python
+# Stub defect: circuitpython-stubs marks WaveFile's buffer required, but the
+# firmware treats it as optional. https://github.com/adafruit/circuitpython/issues/<n>
+wave = audiocore.WaveFile(f)  # type: ignore[call-arg]
+```
+
+A stub-defect ignore without a linked upstream issue fails review. When the fixed stubs ship, the version bump removes the ignore (mypy reports it as unused).
+
 ## CircuitPython Handles
 
 Annotate a CircuitPython handle (a pin, bus, `pulseio.PulseIn`, `rp2pio.StateMachine`, a driver object) with its stub type, never `object`. Import the type under `if TYPE_CHECKING:` so the device pays nothing at runtime:
@@ -218,5 +230,6 @@ class _Data:
 - [ ] `typing` and `collections.abc` imports guarded with `try/except ImportError` (advanced constructs such as `TypeVar`, `Protocol` and `Callable` are still absent from latest releases)
 - [ ] `TYPE_CHECKING` declared as a bare module-level `TYPE_CHECKING = False`, never imported from `typing`
 - [ ] CircuitPython handles annotated with their stub type, imported under `if TYPE_CHECKING:`, never `object`
+- [ ] Every stub-defect `# type: ignore[code]` links its upstream adafruit/circuitpython issue; no local copy of a stub `circuitpython-stubs` provides
 - [ ] Class-level constants annotated with `Final` (unquoted, no type parameter; import guarded with `try/except ImportError`)
 - [ ] No imports from unavailable stdlib modules
