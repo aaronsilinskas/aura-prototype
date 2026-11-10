@@ -77,7 +77,7 @@ def _parse_entry(entry: object) -> LobbyEntry:
     if not scene or not effect:
         raise ValueError(f"Lobby entry missing 'scene' or 'effect': {entry!r}")
     options = entry.get("options", {})
-    return LobbyEntry(scene=scene, effect=effect, options=options)  # type: ignore[arg-type]
+    return LobbyEntry(scene=scene, effect=effect, options=options)
 
 
 class LobbyConfig:

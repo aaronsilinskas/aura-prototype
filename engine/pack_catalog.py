@@ -41,7 +41,7 @@ from engine.settings import (
 from engine.version import Version
 
 try:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
     from typing import TypeAlias
 except ImportError:
     pass  # Not available on CircuitPython
@@ -339,7 +339,7 @@ def _read_setting_overrides(
 def _resolve_kind(
     scene: str,
     kind: str,
-    references: list[PackReference],
+    references: Sequence[PackReference],
     declarations: dict[str, dict[str, SettingDeclaration]],
     given: dict[str, dict],
 ) -> dict[str, dict[str, object]]:
@@ -385,7 +385,7 @@ def _check_declarations(
 def _check_kind(
     scene: str,
     kind: str,
-    references: list[PackReference],
+    references: Sequence[PackReference],
     installed: dict[str, Version],
 ) -> None:
     for reference in references:

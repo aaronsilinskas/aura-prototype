@@ -32,7 +32,7 @@ _DEFAULT_OFF_DURATION: Final = 0.0
 
 class _Builder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        pulse_options = {
+        pulse_options: dict[str, object] = {
             "start_color": _DEFAULT_START_COLOR,
             "end_color": _DEFAULT_END_COLOR,
             "brighten_duration": _DEFAULT_BRIGHTEN_DURATION,

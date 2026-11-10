@@ -29,7 +29,7 @@ from engine._path import isdir
 
 try:
     from collections.abc import Iterable, Iterator
-    from typing import Final
+    from typing import BinaryIO, Final
 except ImportError:
     pass
 
@@ -124,7 +124,7 @@ class DeviceStorage:
             return None
         return self._read_open_file_in_chunks(f, chunk_size)
 
-    def _read_open_file_in_chunks(self, f, chunk_size: int) -> "Iterator[bytes]":
+    def _read_open_file_in_chunks(self, f: "BinaryIO", chunk_size: int) -> "Iterator[bytes]":
         """Yield successive *chunk_size* reads from already-open file *f*, closing it when done.
 
         A separate generator function so :meth:`read_chunks` itself stays a

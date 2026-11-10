@@ -5,7 +5,7 @@ try:
 except ImportError:
     pass
 
-import adafruit_drv2605  # type: ignore[import]
+import adafruit_drv2605
 
 from effects.effect import Effect, HapticPattern
 from engine.effects.output import EffectOutput

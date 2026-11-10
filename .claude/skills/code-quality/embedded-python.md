@@ -146,8 +146,6 @@ The `code-quality` skill requires type hints on all parameters and returns. On e
 
 When using an exception, still annotate with the best available fallback type and add a brief code comment explaining why a precise type is not possible in that location.
 
-For board-provided attributes and pin objects (for example `board.TX`, `board.RX`) where stubs may be incomplete, prefer leaving diagnostics visible instead of adding inline `# pyright: ignore[...]` comments. Only suppress these diagnostics when explicitly requested by the user or required by project policy.
-
 ## CircuitPython Handles
 
 Annotate a CircuitPython handle (a pin, bus, `pulseio.PulseIn`, `rp2pio.StateMachine`, a driver object) with its stub type, never `object`. Import the type under `if TYPE_CHECKING:` so the device pays nothing at runtime:

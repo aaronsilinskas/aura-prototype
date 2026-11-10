@@ -524,7 +524,7 @@ class GameState:
     def get(self, key: str, default: T) -> T:
         """Return the stored value for *key*, or *default* if absent."""
         if key in self._data:
-            return self._data[key]  # type: ignore[return-value]
+            return self._data[key]  # type: ignore[return-value]  # typed like default by contract
         return default
 
     def get_or_none(self, key: str, expected_class: type[T]) -> T | None:
@@ -599,7 +599,7 @@ class GameState:
         iterating these indices rather than popping, so same-tick appended
         events are picked up by re-reading ``event_count``.
         """
-        return self._queue[index]  # type: ignore[return-value]
+        return self._queue[index]  # type: ignore[return-value]  # filled below event_count
 
     def queue_event(self, event: Event) -> None:
         """Enqueue an event for processing on the current or next update.

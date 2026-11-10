@@ -112,6 +112,7 @@ class SdSyncServer:
         Args:
             sd_path: The file's path, relative to the SD mount root.
         """
+        assert self._storage is not None, "read needs a server built with storage"
         return self._storage.read_chunks(sd_path, CHUNK_SIZE)
 
     def write(self, sd_path: str, chunks: Iterable[bytes]) -> None:
@@ -130,6 +131,7 @@ class SdSyncServer:
             sd_path: The file's path, relative to the SD mount root.
             chunks: The file's content, in order.
         """
+        assert self._storage is not None, "write needs a server built with storage"
         self._storage.write_chunks(sd_path, chunks)
 
     def list(self, subpath: str = "") -> list[tuple[str, int]] | None:
