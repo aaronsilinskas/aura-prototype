@@ -15,6 +15,19 @@ except ImportError:
 from engine.network import IR_EMITTERS
 from engine.state import Scope
 
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Protocol
+
+    class _Slotted(Protocol):
+        """A config section, rebuilt by ``_disabled_copy`` from its ``__slots__``."""
+
+        @property
+        def __slots__(self) -> tuple[str, ...]: ...
+
+    Section = TypeVar("Section", bound=_Slotted)
+
 __all__ = [
     "DEFAULT_BUS",
     "DeviceConfig",
@@ -395,7 +408,7 @@ class NeoPixelCurrentBudgetConfig:
         self.at_min_brightness: int = at_min_brightness
 
 
-def _disabled_copy(section: object) -> object:
+def _disabled_copy(section: Section) -> Section:
     """Return a copy of *section* with ``enabled`` forced to ``False``.
 
     Private to ``isolate`` (#715, #1071). It can only disable, never force a
@@ -983,7 +996,7 @@ def _parse_bus(
     return build(*(bus_raw[pin] for pin in pin_fields))
 
 
-def _parse_bus_reference(raw: dict, section: str, kind: str, declared: dict[str, object]) -> str:
+def _parse_bus_reference(raw: dict, section: str, kind: str, declared: dict[str, Bus]) -> str:
     """Return the *kind* bus (``i2c`` or ``spi``) *raw* joins, ``"default"`` when it names none.
 
     *section* labels the device in error messages; *declared* holds the

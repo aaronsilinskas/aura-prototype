@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from effects.effect import Effect, EffectConfig, EffectVerb, PixelBuffer, ResolvedClip
+from effects.effect import (
+    Effect,
+    EffectConfig,
+    EffectPixels,
+    EffectVerb,
+    PixelBuffer,
+    ResolvedClip,
+)
 from engine.effects.merge import SPLIT
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
@@ -62,6 +69,14 @@ def _reject_unemitted_verbs(
     for verb in keys:
         if not any(verb is known for known in emitted):
             raise VerbKeyError(effect_name, modality, verb, "is not a verb it emits", emitted)
+
+
+def _float_option(options: dict[str, object], key: str) -> float:
+    """Return *options*' *key* as a float, 1.0 when absent; TypeError unless a number or string."""
+    value = options.get(key, 1.0)
+    if not isinstance(value, (int, float, str)):
+        raise TypeError(key + " option must be a number, not " + type(value).__name__)
+    return float(value)
 
 
 def _reject_stop_clip(
@@ -126,14 +141,15 @@ class EffectManager(EffectControls, EffectAdmin):
             effect_name: str,
             receipt: EffectReceipt,
             output_buffers: list[dict[str, PixelBuffer] | None],
-            effect: Effect | None,
         ) -> None:
             self.keys: tuple[str, ...] = keys
             self.pack_name: str = pack_name
             self.effect_name: str = effect_name
             self.receipt: EffectReceipt = receipt
             self.output_buffers: list[dict[str, PixelBuffer] | None] = output_buffers
-            self.effect: Effect | None = effect
+            # Assigned by _build_effect once the builder returns: the effect's
+            # listener closes over this entry, so the entry exists first.
+            self.effect: Effect
             # Verb → Resolved clip, owned by this running effect. Never written
             # back onto the effect's shared AudioPlaybackConfig declarations.
             self.clips: dict[EffectVerb, ResolvedClip] = {}
@@ -146,7 +162,7 @@ class EffectManager(EffectControls, EffectAdmin):
     __slots__ = (
         "_effects",
         "_frame_bufs",
-        "_frame_effects",
+        "_frame_pixels",
         "_frame_receipts",
         "_merge_strategies",
         "_namespace",
@@ -169,17 +185,17 @@ class EffectManager(EffectControls, EffectAdmin):
         }
         # Pre-allocated per-output frame accumulators — cleared and reused each tick
         # to avoid dict/list allocation in the hot path.
-        # Non-pixel outputs (receives_pixels=False) use None as a placeholder.
-        self._frame_bufs: list[dict[str, list[PixelBuffer]] | None] = [
-            {k: [] for k in key_set} if o.receives_pixels else None
+        # Non-pixel outputs (receives_pixels=False) get an empty, unused placeholder.
+        self._frame_bufs: list[dict[str, list[PixelBuffer]]] = [
+            {k: [] for k in key_set} if o.receives_pixels else {}
             for o, key_set in zip(outputs, self._output_key_sets)
         ]
-        self._frame_receipts: list[dict[str, list[EffectReceipt]] | None] = [
-            {k: [] for k in key_set} if o.receives_pixels else None
+        self._frame_receipts: list[dict[str, list[EffectReceipt | None]]] = [
+            {k: [] for k in key_set} if o.receives_pixels else {}
             for o, key_set in zip(outputs, self._output_key_sets)
         ]
-        self._frame_effects: list[dict[str, list[Effect]] | None] = [
-            {k: [] for k in key_set} if o.receives_pixels else None
+        self._frame_pixels: list[dict[str, list[EffectPixels]]] = [
+            {k: [] for k in key_set} if o.receives_pixels else {}
             for o, key_set in zip(outputs, self._output_key_sets)
         ]
 
@@ -218,8 +234,8 @@ class EffectManager(EffectControls, EffectAdmin):
 
         receipt = EffectReceipt(self._next_id)
         self._next_id += 1
-        receipt.brightness = float(options.get("brightness", 1.0))
-        receipt.loudness = float(options.get("loudness", 1.0))
+        receipt.brightness = _float_option(options, "brightness")
+        receipt.loudness = _float_option(options, "loudness")
 
         resolution = _DEFAULT_RESOLUTION
         for i, output in enumerate(self._outputs):
@@ -228,7 +244,7 @@ class EffectManager(EffectControls, EffectAdmin):
                 resolution = output.min_resolution
 
         entry = EffectManager._EffectEntry(
-            tuple(scope_key_set), pack_name, effect_name, receipt, [], None
+            tuple(scope_key_set), pack_name, effect_name, receipt, []
         )
 
         def scoped_listener(verb: EffectVerb) -> None:
@@ -453,7 +469,7 @@ class EffectManager(EffectControls, EffectAdmin):
         # Render must happen between prepare_buffers and merge — each buffer
         # is only correctly sized (by the key's MergeStrategy) once
         # prepare_buffers has run, and merge reads the rendered pixels.
-        # _frame_bufs, _frame_receipts, and _frame_effects are pre-allocated in
+        # _frame_bufs, _frame_receipts, and _frame_pixels are pre-allocated in
         # __init__ and cleared here — no new objects in steady state after warmup.
         # Non-pixel outputs (receives_pixels=False) skip update_pixels entirely;
         # flush() is always called unconditionally.
@@ -461,29 +477,31 @@ class EffectManager(EffectControls, EffectAdmin):
             if output.receives_pixels:
                 frame_bufs = self._frame_bufs[i]
                 frame_receipts = self._frame_receipts[i]
-                frame_effects = self._frame_effects[i]
+                frame_pixels = self._frame_pixels[i]
                 for buf_list in frame_bufs.values():
                     buf_list.clear()
                 for receipt_list in frame_receipts.values():
                     receipt_list.clear()
-                for effect_list in frame_effects.values():
-                    effect_list.clear()
+                for pixels_list in frame_pixels.values():
+                    pixels_list.clear()
                 for entry in self._effects:
                     buf_dict = entry.output_buffers[i]
-                    if buf_dict is not None:
+                    # An effect without pixels never has a buffer dict.
+                    pixels = entry.effect.pixels
+                    if buf_dict is not None and pixels is not None:
                         for k, buf in buf_dict.items():
                             frame_bufs[k].append(buf)
                             frame_receipts[k].append(entry.receipt)
-                            frame_effects[k].append(entry.effect)
+                            frame_pixels[k].append(pixels)
                 for key, bufs in frame_bufs.items():
                     if not bufs:
                         output.clear_pixels(key)
                         continue
                     strategy = self._merge_strategies[key]
                     strategy.prepare_buffers(bufs)
-                    effects = frame_effects[key]
+                    key_pixels = frame_pixels[key]
                     for j, buf in enumerate(bufs):
-                        effects[j].pixels.render(buf)
+                        key_pixels[j].render(buf)
                     composed = strategy.merge(bufs, frame_receipts[key])
                     output.update_pixels(key, composed)
             output.flush()

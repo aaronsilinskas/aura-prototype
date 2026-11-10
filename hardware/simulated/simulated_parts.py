@@ -311,7 +311,7 @@ class SimulatedParts(DeviceParts):
 
     def __init__(self, device: SimulatedHardware, previous: SimulatedParts | None = None) -> None:
         self._device = device
-        self._kept = previous._kept if previous is not None else _KeptParts()
+        self._kept: _KeptParts = previous._kept if previous is not None else _KeptParts()
         self.strips: list[RecordingPixels] = []
         self.audio: SimulatedAudio | None = None
         self.ir_readers: list[SimulatedPulseReader] = []

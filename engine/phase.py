@@ -38,7 +38,7 @@ try:
     from collections.abc import Callable
     from typing import TypeVar
 
-    T = TypeVar("T")
+    T = TypeVar("T", bound="Event")
 except ImportError:
     pass  # No typing support on CircuitPython yet
 

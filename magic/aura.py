@@ -164,7 +164,7 @@ class Spells:
 
     def get_by_class(self, cls: "type[T]") -> "list[T]":
         """Finds spells by their class type."""
-        matching = []
+        matching: list[T] = []
         for spell in self._spells:
             if isinstance(spell, cls):
                 matching.append(spell)

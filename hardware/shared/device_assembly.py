@@ -15,7 +15,7 @@ try:
     from collections.abc import Callable
     from typing import TypeVar
 
-    Section = TypeVar("Section")
+    Section = TypeVar("Section", bound="_Gated")
     T = TypeVar("T")
 except ImportError:
     pass
@@ -70,7 +70,16 @@ from hardware.shared.radio_transceiver import RadioTransceiver
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
+    from typing import Protocol
+
     from hardware.shared.device_parts import Bus
+
+    class _Gated(Protocol):
+        """A config section ``_gated_step`` can skip: one with an ``enabled`` flag."""
+
+        @property
+        def enabled(self) -> bool: ...
+
 
 __all__ = ["assemble_device", "button_label", "open_i2c"]
 
@@ -198,7 +207,7 @@ def _gated_step(
     if section is None:
         return None
     description = describe(section)
-    if not section.enabled:  # type: ignore[attr-defined]  # every gated section has one
+    if not section.enabled:
         narrate_skip(logger, description, "disabled")
         return None
     return narrate_step(logger, description, lambda: build(section))
@@ -325,16 +334,13 @@ def assemble_device(
         if not pixels.enabled:
             narrate_skip(logger, description, "disabled")
             continue
-        outputs.extend(
-            narrate_step(
-                logger,
-                description,
-                lambda index=index, pixels=pixels: (
-                    _pixel_outputs(index, pixels, parts, i2c),
-                    "ok",
-                ),
-            )
-        )
+
+        def _build_pixels(
+            index: int = index, pixels: MatrixPixelsConfig | NeoPixelPixelsConfig = pixels
+        ) -> tuple[list[EffectOutput], str]:
+            return _pixel_outputs(index, pixels, parts, i2c), "ok"
+
+        outputs.extend(narrate_step(logger, description, _build_pixels))
 
     def _build_buttons() -> tuple[DebouncedButtons, str]:
         readers = [

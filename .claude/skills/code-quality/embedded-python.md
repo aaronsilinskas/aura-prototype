@@ -146,8 +146,6 @@ The `code-quality` skill requires type hints on all parameters and returns. On e
 
 When using an exception, still annotate with the best available fallback type and add a brief code comment explaining why a precise type is not possible in that location.
 
-For board-provided attributes and pin objects (for example `board.TX`, `board.RX`) where stubs may be incomplete, prefer leaving diagnostics visible instead of adding inline `# pyright: ignore[...]` comments. Only suppress these diagnostics when explicitly requested by the user or required by project policy.
-
 ## Stub Defects
 
 When `circuitpython-stubs` is wrong about a call the firmware accepts, suppress the error at the call site with `# type: ignore[code]` and a reason comment that links an upstream adafruit/circuitpython issue reporting the defect. File the issue first: the `shared-bindings` file and line, the wrong and corrected signatures, and evidence that the firmware accepts the call. Never patch or shadow the stub with a local copy.

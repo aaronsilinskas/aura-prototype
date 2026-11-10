@@ -26,7 +26,7 @@ class TagData:
         self.damage = damage
 
 
-def encode_tag_data(tag_data: TagData) -> bytearray:
+def encode_tag_data(tag_data: TagData) -> bytes:
     """Encode *tag_data* fields into a single byte.
 
     Byte format: ``[padding(1)] [team(2)] [player-1(3)] [damage-1(2)]``.
@@ -35,7 +35,7 @@ def encode_tag_data(tag_data: TagData) -> bytearray:
         tag_data: Tag information to encode.
 
     Returns:
-        ``bytearray`` of length 1 containing the encoded byte.
+        ``bytes`` of length 1 containing the encoded byte.
 
     Raises:
         ValueError: If ``team``, ``player``, or ``damage`` is out of range.
@@ -51,7 +51,7 @@ def encode_tag_data(tag_data: TagData) -> bytearray:
     byte |= ((tag_data.player - 1) & 0b111) << 2
     byte |= (tag_data.damage - 1) & 0b11
 
-    return bytearray([byte])
+    return bytes([byte])
 
 
 def decode_tag_data(data: bytes | bytearray) -> TagData:
