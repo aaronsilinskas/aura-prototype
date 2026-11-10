@@ -10,8 +10,10 @@ wheels/
 .ruff_cache/
 .import_linter_cache/
 
-# IDE
-.vscode/
+# IDE (shared VS Code config is tracked; machine-specific files stay local)
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
 
 # Virtual environments

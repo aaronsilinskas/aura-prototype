@@ -8,6 +8,8 @@
 
 set -euo pipefail
 
+# The device firmware version. circuitpython-stubs in pyproject.toml is pinned to
+# match it; bump both together.
 CIRCUITPYTHON_VERSION="${1:-10.3.1}"
 DEST="$(cd "$(dirname "$0")/.." && pwd)/tools/mpy-cross"
 BASE_URL="https://adafruit-circuit-python.s3.amazonaws.com/bin/mpy-cross"
