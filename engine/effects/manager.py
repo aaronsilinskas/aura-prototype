@@ -310,7 +310,12 @@ class EffectManager(EffectControls, EffectAdmin):
                             self._outputs[i].clear_pixels(key)
 
     def _remove_effects_in_scope(self, scope_key_set: set[str]) -> None:
-        """Remove or narrow entries that overlap scope_key_set, firing stop events."""
+        """Remove or narrow entries that overlap scope_key_set, firing stop events.
+
+        A removed entry's receipt is stopped, so outputs tracking it (a looping
+        voice, a haptic sequence) release it on their next flush. A narrowed
+        entry is still running, so its receipt is left alone.
+        """
         stopped: list[tuple[EffectManager._EffectEntry, set[str]]] = []
         new_effects: list[EffectManager._EffectEntry] = []
         for entry in self._effects:
@@ -321,6 +326,8 @@ class EffectManager(EffectControls, EffectAdmin):
                 entry.keys = remaining
                 self._update_output_buffers(entry)
                 new_effects.append(entry)
+            else:
+                entry.receipt.stop()
         self._stop_entries(stopped, new_effects)
         self._effects = new_effects
 
