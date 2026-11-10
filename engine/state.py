@@ -472,7 +472,10 @@ class GameState:
 
     @property
     def total(self) -> float:
-        """Cumulative seconds elapsed since the engine started."""
+        """Cumulative seconds of the ticks this state has received: its scene's game time.
+
+        Stops while an Overlay covers the scene, since a covered scene receives no ticks.
+        """
         return self._total
 
     def get(self, key: str, default: T) -> T:
@@ -600,7 +603,7 @@ class GameState:
         """Count the event about to be dispatched. Called only by GameEngine."""
         self._dispatch_count += 1
 
-    def _update_time(self, elapsed: float, total: float) -> None:
-        """Refresh time values from the engine's timer. Called only by GameEngine."""
+    def _advance_time(self, elapsed: float) -> None:
+        """Count one tick of *elapsed* seconds this state received. Called only by GameEngine."""
         self._elapsed = elapsed
-        self._total = total
+        self._total += elapsed
