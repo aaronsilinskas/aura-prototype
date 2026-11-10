@@ -18,7 +18,44 @@ try:
 except ImportError:
     pass  # Not available on CircuitPython
 
-EffectListenerFunc: TypeAlias = "Callable[[str], None]"
+
+class EffectVerb:
+    """A named moment an effect announces to its outputs; the key for ``clips`` and ``patterns``.
+
+    The engine owns ``EffectVerb.START`` and ``EffectVerb.STOP``. Custom verbs
+    are class constants on the ``EffectPixels`` subclass that emits them, listed
+    in its ``VERBS``. ``name`` is for display only: two verbs with the same name
+    are different verbs.
+
+    Temporary: an ``EffectVerb`` also equals, and hashes like, its ``name``
+    string, so ``clips``/``patterns`` keyed by strings still match while they
+    migrate. The contract step of ADR-0006 removes this.
+    """
+
+    __slots__ = ["name"]
+
+    START: EffectVerb
+    STOP: EffectVerb
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, str):
+            return other == self.name
+        return self is other
+
+    def __hash__(self) -> int:
+        return hash(self.name)
+
+    def __repr__(self) -> str:
+        return f"EffectVerb({self.name!r})"
+
+
+EffectVerb.START = EffectVerb("start")
+EffectVerb.STOP = EffectVerb("stop")
+
+EffectListenerFunc: TypeAlias = "Callable[[EffectVerb], None]"
 
 
 class EffectPixels:
@@ -26,7 +63,14 @@ class EffectPixels:
 
     ``EffectManager`` drives the per-frame ``update``/``render`` contract
     directly on ``effect.pixels``; the ``Effect`` shell is not involved.
+
+    ``VERBS`` lists the custom verbs (**EffectVerb**) a subclass emits through
+    ``EffectConfig.notify_listeners``, each also defined as a class constant
+    (``PulseEffect.PEAK``). Empty by default: such an effect emits only
+    ``EffectVerb.START`` and ``EffectVerb.STOP``, which the engine sends.
     """
+
+    VERBS: tuple[EffectVerb, ...] = ()
 
     def update(self, elapsed: float) -> None:
         """Advance pixel state for the current frame."""
@@ -134,8 +178,8 @@ class EffectConfig:
     """Runtime configuration shared across a render pass.
 
     Passed to effect builders at construction. Controls the number of sample
-    positions via ``resolution``. Registered listeners are called by name when
-    significant rendering events occur.
+    positions via ``resolution``. Registered listeners hear each **EffectVerb**
+    the effect announces through ``notify_listeners``.
 
     Constraints:
       - ``resolution`` is clamped to a minimum of ``1`` at construction.
@@ -163,10 +207,10 @@ class EffectConfig:
             return self._options[key]  # type: ignore[return-value]
         return default
 
-    def notify_listeners(self, event_name: str) -> None:
-        """Invoke all registered listeners with ``event_name``."""
+    def notify_listeners(self, verb: EffectVerb) -> None:
+        """Announce ``verb`` to every registered listener, in registration order."""
         for listener in self.listeners:
-            listener(event_name)
+            listener(verb)
 
 
 class PixelBuffer:

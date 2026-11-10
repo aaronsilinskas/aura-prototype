@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from effects.effect import Effect, EffectConfig, PixelBuffer, ResolvedClip
+from effects.effect import Effect, EffectConfig, EffectVerb, PixelBuffer, ResolvedClip
 from engine.effects.merge import SPLIT
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
@@ -73,7 +73,7 @@ class EffectManager(EffectControls, EffectAdmin):
             self.effect: Effect | None = effect
             # Verb → Resolved clip, owned by this running effect. Never written
             # back onto the effect's shared AudioPlaybackConfig declarations.
-            self.clips: dict[str, ResolvedClip] = {}
+            self.clips: dict[EffectVerb, ResolvedClip] = {}
 
         def __repr__(self) -> str:
             rid = self.receipt.id
@@ -120,7 +120,9 @@ class EffectManager(EffectControls, EffectAdmin):
             for o, key_set in zip(outputs, self._output_key_sets)
         ]
 
-    def _emit(self, entry: EffectManager._EffectEntry, verb: str, event_keys: set[str]) -> None:
+    def _emit(
+        self, entry: EffectManager._EffectEntry, verb: EffectVerb, event_keys: set[str]
+    ) -> None:
         """Send *entry*'s *verb* event, with its resolved clip, to outputs serving event_keys."""
         event = EffectEvent(entry.pack_name, entry.effect_name, verb, entry.clips.get(verb))
         for i in range(len(self._outputs)):
@@ -164,8 +166,8 @@ class EffectManager(EffectControls, EffectAdmin):
             tuple(scope_key_set), pack_name, effect_name, receipt, [], None
         )
 
-        def scoped_listener(event_name: str) -> None:
-            self._emit(entry, event_name, set(entry.keys))
+        def scoped_listener(verb: EffectVerb) -> None:
+            self._emit(entry, verb, set(entry.keys))
 
         config = EffectConfig(resolution=resolution, options=options, listeners=[scoped_listener])
         entry.effect = builder(effect_name, config)
@@ -215,7 +217,7 @@ class EffectManager(EffectControls, EffectAdmin):
                 with their keys already narrowed to the post-stop state.
         """
         for entry, removed_keys in stopped:
-            self._emit(entry, "stop", removed_keys)
+            self._emit(entry, EffectVerb.STOP, removed_keys)
 
         remaining_key_set: set[str] = set()
         for r in remaining:
@@ -317,7 +319,7 @@ class EffectManager(EffectControls, EffectAdmin):
         entry = self._build_effect(scope_key_set, name, options)
         self._remove_effects_in_scope(scope_key_set)
         self._effects.append(entry)
-        self._emit(entry, "start", scope_key_set)
+        self._emit(entry, EffectVerb.START, scope_key_set)
         return entry.receipt
 
     def add_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
@@ -329,7 +331,7 @@ class EffectManager(EffectControls, EffectAdmin):
         scope_key_set = set(scope.keys)
         entry = self._build_effect(scope_key_set, name, options)
         self._effects.append(entry)
-        self._emit(entry, "start", scope_key_set)
+        self._emit(entry, EffectVerb.START, scope_key_set)
         return entry.receipt
 
     def stop_effect(self, scope: ScopeValue) -> None:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from effects.effect import EffectConfig, PixelBuffer
+from effects.effect import EffectConfig, EffectVerb, PixelBuffer
 from effects.palette import PaletteLUT256
 from effects.shape import Shape
 from packs.effects.elements.lightning import (
@@ -102,6 +102,21 @@ def test_lightning_effect_calls_notify_listeners_when_bolt_strikes() -> None:
     effect.update(10.0)  # well past hide_max of 1.5 — triggers IDLE → STRIKE
 
     assert "strike" in events
+
+
+def test_lightning_effect_emits_its_declared_strike_verb() -> None:
+    events: list[EffectVerb] = []
+    config = _config(listeners=[events.append])
+
+    shape = Shape.padded(0.25, Shape.centered_gradient())
+    bolt = _LightningBolt(shape, 1.5, 0.5, 1.25)
+    palette = PaletteLUT256(_LIGHTNING_PALETTE)
+    effect = LightningEffect([bolt], palette, config)
+
+    effect.update(10.0)  # well past hide_max of 1.5 — triggers IDLE → STRIKE
+
+    assert events[0] is LightningEffect.STRIKE
+    assert LightningEffect.VERBS == (LightningEffect.STRIKE,)
 
 
 def test_lightning_effect_no_notify_when_no_bolt_strikes() -> None:

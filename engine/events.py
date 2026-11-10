@@ -6,7 +6,7 @@ except ImportError:
     TYPE_CHECKING = False
 
 if TYPE_CHECKING:
-    from effects.effect import ResolvedClip
+    from effects.effect import EffectVerb, ResolvedClip
 
 
 class EventGroup:
@@ -55,10 +55,12 @@ class EffectEvent:
 
     __slots__ = ["clip", "name", "pack", "verb"]
 
-    def __init__(self, pack: str, name: str, verb: str, clip: ResolvedClip | None = None) -> None:
+    def __init__(
+        self, pack: str, name: str, verb: EffectVerb, clip: ResolvedClip | None = None
+    ) -> None:
         self.pack: str = pack
         self.name: str = name
-        self.verb: str = verb
+        self.verb: EffectVerb = verb
         self.clip: ResolvedClip | None = clip
 
     def __eq__(self, other: object) -> bool:
