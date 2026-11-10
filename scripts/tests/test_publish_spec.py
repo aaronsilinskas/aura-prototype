@@ -100,7 +100,17 @@ def test_domain_doc_changes_ship_alone_in_an_auto_merging_pr_that_references_the
     assert shell.ran("gh", "pr", "merge") == [
         ["gh", "pr", "merge", "--auto", "--merge", "https://github.com/o/r/pull/301"]
     ]
-    assert shell.calls[-1] == ["git", "checkout", "main"]
+
+
+def test_publishing_ends_on_main_without_the_local_docs_branch(tmp_path):
+    shell = _Shell(status=" M GLOSSARY.md\n")
+
+    publish(_spec(tmp_path), None, None, shell, _quiet)
+
+    assert shell.calls[-2:] == [
+        ["git", "checkout", "main"],
+        ["git", "branch", "-D", "spec-300-domain-docs"],
+    ]
 
 
 def test_off_main_nothing_is_published(tmp_path):

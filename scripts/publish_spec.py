@@ -9,7 +9,7 @@ The publish step at the tail of ``grill-with-docs`` (see the Spec workflow in
 3. Close the source ``idea`` issue (``--idea``) as superseded by the spec.
 4. If ``GLOSSARY.md`` or ``docs/adr/`` has changes, commit only those on a new
    ``spec-<N>-domain-docs`` branch, push, open a PR referencing the spec, turn on
-   auto-merge, and switch back to ``main``.
+   auto-merge, switch back to ``main``, and delete the local branch.
 
 Every precondition is checked before anything leaves the machine: on ``main``,
 nothing staged, and the spec has a title. Each step prints as it completes, so a
@@ -134,6 +134,8 @@ def publish(
     pr = run(["gh", "pr", "create", "--title", message, "--body", pr_body]).strip().splitlines()[-1]
     run(["gh", "pr", "merge", "--auto", "--merge", pr])
     run(["git", "checkout", "main"])
+    # The PR merges from the pushed branch, so the local copy has no further use.
+    run(["git", "branch", "-D", branch])
     say(f"domain-doc PR with auto-merge: {pr} ({', '.join(docs)})")
     return number
 
