@@ -10,7 +10,7 @@ Default triage labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-f
 
 ### Domain docs
 
-Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/domain.md` (the map: module layout, key types, constraints), and `docs/adr/`. Extended design in the Obsidian vault at `~/dev/aura/aura-docs/`. See `docs/agents/domain.md`.
+Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/domain.md` (the map: module layout, key types, constraints), and `docs/adr/`. These are the single source of truth for engine design; `README.md` points at them rather than restating them. Extended design in the Obsidian vault at `~/dev/aura/aura-docs/`. See `docs/agents/domain.md`.
 
 ### Other
 
@@ -30,4 +30,4 @@ Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/doma
 
 ### Ticket implementation workflow
 
-Invoke the `implement` skill via the Skill tool and follow it.
+Build a ticket with the `tdd` skill. Review happens afterwards in `code-review`, against `CODING_STANDARDS.md`.

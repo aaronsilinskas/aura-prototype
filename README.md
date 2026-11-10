@@ -336,14 +336,10 @@ that copes without some hardware leaves it out of `requires` and asks
 `state.capabilities.has(name)` before using it. A scene carries no
 starting data: rules seed their own runtime state through `state.get`/`state.set`.
 
-`SceneManager` owns a scene stack. The boot activates the first scene with
-`activate_boot_scene(name)`; rules change scene only by `reboot_into` (see ADR-0005).
-`overlay(name)` pushes on top (suspending the current scene); `pop()` restores the previous
-scene. Transitions are deferred to end-of-tick — rules call
-`state.scene_controls.overlay/pop()` during a tick
-and the transition is applied after `engine.update(state)` returns. `overlay` sets the
-covered scene's effects aside without stopping them (its sound and haptics fall silent) and
-`pop` stops the overlay's own effects on `Scope.ALL`, then gives the covered scene its effects back.
+Scenes switch only by **Reboot**; an **Overlay** covers a scene for a while and gives it
+back intact. How each works is in the **SceneControls**, **Overlay**, **SceneManager** and
+**Reboot** entries of [`GLOSSARY.md`](GLOSSARY.md) and in
+[ADR-0005](docs/adr/0005-scenes-switch-only-by-reboot.md).
 
 ---
 
