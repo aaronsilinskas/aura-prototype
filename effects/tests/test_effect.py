@@ -93,6 +93,12 @@ def test_effect_verbs_with_the_same_name_are_distinct() -> None:
     assert EffectVerb("strike") != EffectVerb("strike")
 
 
+def test_a_verb_key_does_not_match_another_verb_with_the_same_name() -> None:
+    keyed = {EffectVerb("strike"): "clip"}
+
+    assert EffectVerb("strike") not in keyed
+
+
 def test_engine_verbs_are_named_start_and_stop() -> None:
     assert (EffectVerb.START.name, EffectVerb.STOP.name) == ("start", "stop")
 
@@ -340,6 +346,13 @@ def test_effect_audio_stores_clips_dict() -> None:
     assert audio.clips[EffectVerb.START] is clip
 
 
+def test_effect_audio_rejects_a_string_clips_key() -> None:
+    clip = AudioPlaybackConfig(name="bg", loop=True)
+
+    with pytest.raises(TypeError, match="clips"):
+        EffectAudio(clips={"start": clip})  # type: ignore[dict-item]
+
+
 # ---------------------------------------------------------------------------
 # EffectHaptic — patterns
 # ---------------------------------------------------------------------------
@@ -398,3 +411,10 @@ def test_effect_haptic_accepts_haptic_pattern_as_pattern_value() -> None:
     haptic = EffectHaptic(patterns={EffectVerb.START: cfg})
 
     assert haptic.patterns[EffectVerb.START] is cfg
+
+
+def test_effect_haptic_rejects_a_string_patterns_key() -> None:
+    cfg = HapticPattern(sequence=[HapticPattern.STRONG_CLICK])
+
+    with pytest.raises(TypeError, match="patterns"):
+        EffectHaptic(patterns={"start": cfg})  # type: ignore[dict-item]

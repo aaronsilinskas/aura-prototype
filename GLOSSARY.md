@@ -17,8 +17,8 @@ The **Modality** (sight) that owns pixel simulation and rendering for an effect;
 _Avoid_: calling `update`/`render` on the `Effect` shell; putting `name` on a compositor (it belongs on `Effect`)
 
 ### EffectAudio
-The **Modality** (sound) declaring an effect's audio behaviour, mapping event verbs to playback configs; `None` means no audio.
-_Avoid_: a `"stop"` clips key (teardown is `flush()`, not `handle_event`)
+The **Modality** (sound) declaring an effect's audio behaviour, mapping **EffectVerb**s to playback configs; `None` means no audio.
+_Avoid_: an `EffectVerb.STOP` clips key (teardown is `flush()`, not `handle_event`); string keys (rejected)
 
 ### AudioPlaybackConfig
 A value object for how one clip plays: which clip (a qualified clip name, resolved by the **Active scene namespace** when the effect is built), whether it loops, and whether finishing it stops the whole owning effect (`stops_effect`). Being cut off counts as finishing: a clip whose voice is taken by another sound, or that an **Overlay** covers mid-play, stops its effect just as if it had played out. Declared once at module level and shared by every effect built from it.
@@ -29,8 +29,8 @@ A declared `AudioPlaybackConfig` paired with the WAV path its name resolved to, 
 _Avoid_: resolving a clip name in an output; mutating the declared config to hold the path
 
 ### EffectHaptic
-The **Modality** (touch) declaring an effect's haptic behaviour, mapping event verbs to `HapticPattern`s; `None` means no haptic output.
-_Avoid_: raw DRV2605L waveform IDs as values (hardware IDs live in the output); "vibration" (use `haptic`)
+The **Modality** (touch) declaring an effect's haptic behaviour, mapping **EffectVerb**s to `HapticPattern`s; `None` means no haptic output.
+_Avoid_: string keys (rejected); raw DRV2605L waveform IDs as values (hardware IDs live in the output); "vibration" (use `haptic`)
 
 ### HapticPattern
 A value object holding an ordered sequence of abstract haptic constants — effect constants (`STRONG_CLICK`, …) and pause constants (`PAUSE_250`, …), distinct from hardware waveform IDs.
@@ -211,8 +211,8 @@ A hardware or software output registered with the effect system; `receives_pixel
 _Avoid_: "output" (ambiguous in multi-output contexts); importing it from `engine.effects.manager` (import from `engine.effects.output`)
 
 ### EffectEvent
-A structured event payload (`pack`, `name`, `verb`, plus the verb's **Resolved clip** or `None`) routed to every in-scope `EffectOutput.handle_event`; `"start"`/`"stop"` are emitted automatically, custom verbs (`"peak"`, `"strike"`) via `notify_listeners`. Its identity is `pack`, `name` and `verb`; the clip is payload.
-_Avoid_: confusing with `Event` (game-rule events); assuming only `"start"`/`"stop"` verbs exist
+A structured event payload (`pack`, `name`, `verb`, plus the verb's **Resolved clip** or `None`) routed to every in-scope `EffectOutput.handle_event`; `verb` is an **EffectVerb**. `EffectVerb.START`/`STOP` are emitted automatically, custom verbs (`PulseEffect.PEAK`, `LightningEffect.STRIKE`) via `notify_listeners`. Its identity is `pack`, `name` and `verb`; the clip is payload.
+_Avoid_: confusing with `Event` (game-rule events); assuming only `EffectVerb.START`/`STOP` exist
 
 ### EffectVerb
 A named moment an **Effect** announces to its outputs, and the key for `clips` and `patterns`: `EffectVerb.START`/`STOP` from the engine, plus the custom verbs its sight modality declares (`PulseEffect.PEAK`, `LightningEffect.STRIKE`). Matched by identity, so only the declared instance counts. Heard by outputs, never by rules. An effect pack's declared verbs are part of its versioned interface.
@@ -260,7 +260,7 @@ _Avoid_: "phase" (a Round spans several); "level-up" (the celebratory beat betwe
 
 ### AudioEffectOutput
 A CircuitPython `EffectOutput` driving audio via I2S and the live `VoiceSink` adapter: it plays the path on each event's **Resolved clip**, owns the hardware (amp, mixer, WAV sources) and delegates voice-slot bookkeeping to a `VoicePool`.
-_Avoid_: stopping playback in `handle_event` on `"stop"`; assuming a fixed voice count or role-assigned slots; putting slot bookkeeping back in the output; resolving clip names (the event already carries the path)
+_Avoid_: stopping playback in `handle_event` on `EffectVerb.STOP`; assuming a fixed voice count or role-assigned slots; putting slot bookkeeping back in the output; resolving clip names (the event already carries the path)
 
 ### VoicePool
 A hardware-agnostic owner of audio voice-slot bookkeeping (imports no CircuitPython), driving hardware through a `VoiceSink` port and evicting oldest-first when full. `hold` frees a held effect's voices (a cut-off `stops_effect` one-shot stops its receipt, as on eviction) and `restore` plays its held loops again from the top.

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 try:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Iterable, Iterator
     from typing import TypeAlias
 except ImportError:
     pass
@@ -26,10 +26,6 @@ class EffectVerb:
     are class constants on the ``EffectPixels`` subclass that emits them, listed
     in its ``VERBS``. ``name`` is for display only: two verbs with the same name
     are different verbs.
-
-    Temporary: an ``EffectVerb`` also equals, and hashes like, its ``name``
-    string, so ``clips``/``patterns`` keyed by strings still match while they
-    migrate. The contract step of ADR-0006 removes this.
     """
 
     __slots__ = ["name"]
@@ -40,14 +36,6 @@ class EffectVerb:
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, str):
-            return other == self.name
-        return self is other
-
-    def __hash__(self) -> int:
-        return hash(self.name)
-
     def __repr__(self) -> str:
         return f"EffectVerb({self.name!r})"
 
@@ -56,6 +44,16 @@ EffectVerb.START = EffectVerb("start")
 EffectVerb.STOP = EffectVerb("stop")
 
 EffectListenerFunc: TypeAlias = "Callable[[EffectVerb], None]"
+
+
+def _require_verb_keys(field: str, keys: Iterable[object]) -> None:
+    for key in keys:
+        if not isinstance(key, EffectVerb):
+            raise TypeError(
+                f"{field} key {key!r} is not an EffectVerb: key by EffectVerb.START "
+                + "or EffectVerb.STOP, or by the emitting effect's constant "
+                + "(PulseEffect.PEAK)"
+            )
 
 
 class EffectPixels:
@@ -124,13 +122,15 @@ class ResolvedClip:
 class EffectAudio:
     """The sound **Modality**: declares the audio behaviour of an effect.
 
-    ``clips`` maps event verbs to ``AudioPlaybackConfig`` instances.
+    ``clips`` maps each **EffectVerb** to an ``AudioPlaybackConfig``; a key
+    that is not an ``EffectVerb`` raises ``TypeError``.
     Set on ``Effect.audio``; if ``None``, the effect produces no audio.
     """
 
     __slots__ = ["clips"]
 
-    def __init__(self, clips: dict[str, AudioPlaybackConfig]) -> None:
+    def __init__(self, clips: dict[EffectVerb, AudioPlaybackConfig]) -> None:
+        _require_verb_keys("clips", clips)
         self.clips = clips
 
 
@@ -164,13 +164,15 @@ class HapticPattern:
 class EffectHaptic:
     """The touch **Modality**: declares the haptic behaviour of an effect.
 
-    ``patterns`` maps event verbs to ``HapticPattern`` instances.
+    ``patterns`` maps each **EffectVerb** to a ``HapticPattern``; a key that
+    is not an ``EffectVerb`` raises ``TypeError``.
     Set on ``Effect.haptic``; if ``None``, the effect produces no haptic output.
     """
 
     __slots__ = ["patterns"]
 
-    def __init__(self, patterns: dict[str, HapticPattern]) -> None:
+    def __init__(self, patterns: dict[EffectVerb, HapticPattern]) -> None:
+        _require_verb_keys("patterns", patterns)
         self.patterns = patterns
 
 

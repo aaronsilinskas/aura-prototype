@@ -22,7 +22,7 @@ Full game and hardware design lives in `~/dev/aura/aura-docs/` (an Obsidian vaul
 ```
 effects/          Animation engine (CircuitPython-safe)
   effect.py       EffectConfig, PixelBuffer, Effect, EffectPixels, EffectAudio, EffectHaptic,
-                  AudioPlaybackConfig, ResolvedClip, HapticPattern
+                  EffectVerb, AudioPlaybackConfig, ResolvedClip, HapticPattern
   palette.py      Palette, PaletteLUT256 (pre-computed, immutable)
   shape.py        Shape (factory), EffectShapeFunc
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
@@ -153,6 +153,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 |------|----------|------|
 | `EffectConfig` | `effects/effect.py` | Resolution, options, and listeners for one render pass |
 | `PixelBuffer` | `effects/effect.py` | List-backed in-memory pixel buffer of packed RGB values |
+| `EffectVerb` | `effects/effect.py` | Identity-matched key for `clips` and `patterns`; engine owns `START`/`STOP`, `EffectPixels` subclasses declare custom verbs in `VERBS` |
 | `Effect` | `effects/effect.py` | Base class for all effects; subclasses implement `name`, `update`, `render` |
 | `Layer` | `effects/layers/layer.py` | Base layer: `update` + `sample` |
 | `Scroll` | `effects/layers/scroll.py` | Scroll base: `update` + `apply` |
