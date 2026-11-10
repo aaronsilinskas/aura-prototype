@@ -214,8 +214,9 @@ class NetworkControls:
 class EffectReceipt:
     """Identity and lifecycle handle for a single running effect instance.
 
-    Call ``stop()`` to request removal on the next tick; ``is_stopped()``
-    reports whether that has happened.
+    Call ``stop()`` to request removal on the next tick. ``is_stopped()``
+    reports whether the effect has been stopped, whether by ``stop()`` or by
+    ``EffectControls`` stopping or replacing it in every scope it ran in.
 
     ``brightness`` and ``loudness`` are runtime intensity controls in
     ``[0.0, 1.0]`` (default ``1.0``) that rules set directly
@@ -259,7 +260,7 @@ class EffectReceipt:
         self._stopped = True
 
     def is_stopped(self) -> bool:
-        """Return ``True`` if ``stop()`` has been called on this receipt."""
+        """Return ``True`` once this effect has been stopped, by any route."""
         return self._stopped
 
     def __repr__(self) -> str:
