@@ -25,7 +25,7 @@ except ImportError:
 from engine.input import InputEvents
 from engine.phase import PhaseKey, PhaseRule
 from engine.state import GameState, Scope, ScopeValue, StateSlot
-from packs.scenes.hardware_test.rules.helpers.flash import ir_flash, radio_flash
+from packs.scenes.hardware_test.rules.helpers.flash import Flash, ir_flash, radio_flash
 from packs.scenes.hardware_test.rules.helpers.mode import UNAVAILABLE_COLOR
 from packs.scenes.hardware_test.rules.helpers.phases import (
     MODE_ORDER,
@@ -88,7 +88,9 @@ class HwModeRule(PhaseRule):
         self._expire_flash(state, ir_flash, Scope.DIRECTIONAL)
         self._expire_flash(state, radio_flash, Scope.Global.ALL)
 
-    def _expire_flash(self, state: GameState, slot: StateSlot, idle_scope: ScopeValue) -> None:
+    def _expire_flash(
+        self, state: GameState, slot: StateSlot[Flash], idle_scope: ScopeValue
+    ) -> None:
         if not slot.is_in(state):
             return
 

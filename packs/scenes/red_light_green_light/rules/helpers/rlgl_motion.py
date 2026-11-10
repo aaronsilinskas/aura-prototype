@@ -89,4 +89,4 @@ class RlglMotion:
         return self.ema
 
 
-rlgl_motion: StateSlot = StateSlot(_MOTION_KEY, lambda s: RlglMotion(), RlglMotion)
+rlgl_motion = StateSlot(_MOTION_KEY, lambda s: RlglMotion(), RlglMotion)
