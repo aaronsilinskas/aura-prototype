@@ -28,6 +28,8 @@ from engine.capabilities import Capabilities
 from engine.events import Event
 from engine.settings import Settings
 
+TYPE_CHECKING = False
+
 
 class ScopeValue:
     """A routing token that identifies one or more outputs.
@@ -386,38 +388,60 @@ class EffectAdmin:
         raise NotImplementedError
 
 
-class StateSlot:
-    """Callable accessor that owns the get-or-create-and-revalidate pattern for a GameState key.
+if TYPE_CHECKING:
+    from typing import Generic
 
-    Constructed once at module load; the single ``# type: ignore[return-value]`` cast lives
-    here so call sites are cast-free.
-    """
+    # The checker's view of the runtime class below: generic, so a slot's call is
+    # typed as its expected_class. CircuitPython can't run generics (ADR-0007), so
+    # the two declarations are kept in step by hand.
+    class StateSlot(Generic[T]):
+        key: str
 
-    __slots__ = ("_expected_class", "_factory", "key")
+        def __init__(
+            self,
+            key: str,
+            factory: Callable[[GameState], T],
+            expected_class: type[T],
+        ) -> None: ...
 
-    def __init__(
-        self,
-        key: str,
-        factory: Callable[[GameState], object],
-        expected_class: type[T],
-    ) -> None:
-        self.key: str = key
-        self._factory = factory
-        self._expected_class = expected_class
+        def __call__(self, state: GameState) -> T: ...
 
-    def __call__(self, state: GameState) -> T:
-        """Return the value for *key*, creating and caching it on first use.
+        def is_in(self, state: GameState) -> bool: ...
 
-        Raises:
-            ValueError: if the stored value is not an instance of *expected_class*.
+else:
+
+    class StateSlot:
+        """Callable accessor that owns the get-or-create-and-revalidate pattern for a GameState key.
+
+        Constructed once at module load. Calling it returns the value typed as
+        *expected_class*, so call sites need no cast.
         """
-        if not state.has(self.key):
-            state.set(self.key, self._factory(state))
-        return state.get_or_none(self.key, self._expected_class)  # type: ignore[return-value]
 
-    def is_in(self, state: GameState) -> bool:
-        """Return True if this slot's key is present in *state*."""
-        return state.has(self.key)
+        __slots__ = ("_expected_class", "_factory", "key")
+
+        def __init__(
+            self,
+            key: str,
+            factory: Callable[[GameState], object],
+            expected_class: type[T],
+        ) -> None:
+            self.key: str = key
+            self._factory = factory
+            self._expected_class = expected_class
+
+        def __call__(self, state: GameState) -> T:
+            """Return the value for *key*, creating and caching it on first use.
+
+            Raises:
+                ValueError: if the stored value is not an instance of *expected_class*.
+            """
+            if not state.has(self.key):
+                state.set(self.key, self._factory(state))
+            return state.get_or_none(self.key, self._expected_class)
+
+        def is_in(self, state: GameState) -> bool:
+            """Return True if this slot's key is present in *state*."""
+            return state.has(self.key)
 
 
 class GameState:
@@ -541,7 +565,7 @@ class GameState:
         if not isinstance(value, type_):
             raise ValueError(f"Key '{key}' value is not an instance of {type_.__name__}")
         del self._data[key]
-        return value  # type: ignore[return-value]
+        return value
 
     def delete(self, key: str) -> None:
         """Remove *key* from state; no-op if absent."""

@@ -71,4 +71,4 @@ class TagState:
         self.shot = ShotState()
 
 
-tag_state: StateSlot = StateSlot(_STATE_KEY, lambda s: TagState(), TagState)
+tag_state = StateSlot(_STATE_KEY, lambda s: TagState(), TagState)

@@ -130,8 +130,7 @@ class PhaseSlot:
     """The one accessor a scene builds per phase machine.
 
     Owns the machine's ``GameState`` key and initial phase, wrapping a
-    :class:`~engine.state.StateSlot` internally (the single
-    ``# type: ignore`` cast lives there — see :meth:`StateSlot.__call__`).
+    :class:`~engine.state.StateSlot` internally.
     Callable ``(state) -> PhaseMachine``, get-or-create on first use so there
     is no "unestablished key" failure to guard against.
 
@@ -153,7 +152,7 @@ class PhaseSlot:
     __slots__ = ("_owners", "_slot")
 
     def __init__(self, key: str, initial_phase: PhaseKey) -> None:
-        self._slot: StateSlot = StateSlot(key, lambda s: PhaseMachine(initial_phase), PhaseMachine)
+        self._slot = StateSlot(key, lambda s: PhaseMachine(initial_phase), PhaseMachine)
         self._owners: dict[PhaseKey, PhaseRule] = {}
 
     @property

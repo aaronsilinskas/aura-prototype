@@ -41,7 +41,7 @@ except ImportError:
 
 _INDEX_KEY: Final = "lobby_index"
 
-_config: StateSlot = StateSlot(
+_config = StateSlot(
     "lobby_resolved",
     lambda state: LobbyConfig.from_settings(state.settings, state.scene_controls.can_run),
     LobbyConfig,

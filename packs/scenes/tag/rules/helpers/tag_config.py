@@ -83,4 +83,4 @@ def _from_state(state: GameState) -> TagConfig:
     return TagConfig.from_settings(state.settings)
 
 
-tag_config: StateSlot = StateSlot(_CONFIG_KEY, _from_state, TagConfig)
+tag_config = StateSlot(_CONFIG_KEY, _from_state, TagConfig)

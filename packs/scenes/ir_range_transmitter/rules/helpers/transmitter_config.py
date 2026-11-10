@@ -63,4 +63,4 @@ def _from_state(state: GameState) -> TransmitterConfig:
     return TransmitterConfig.from_settings(state.settings)
 
 
-transmitter_config: StateSlot = StateSlot(_CONFIG_KEY, _from_state, TransmitterConfig)
+transmitter_config = StateSlot(_CONFIG_KEY, _from_state, TransmitterConfig)
