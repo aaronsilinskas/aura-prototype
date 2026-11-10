@@ -130,6 +130,23 @@ When using an exception, still annotate with the best available fallback type an
 
 For board-provided attributes and pin objects (for example `board.TX`, `board.RX`) where stubs may be incomplete, prefer leaving diagnostics visible instead of adding inline `# pyright: ignore[...]` comments. Only suppress these diagnostics when explicitly requested by the user or required by project policy.
 
+## CircuitPython Handles
+
+Annotate a CircuitPython handle (a pin, bus, `pulseio.PulseIn`, `rp2pio.StateMachine`, a driver object) with its stub type, never `object`. Import the type under `if TYPE_CHECKING:` so the device pays nothing at runtime:
+
+```python
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    import pulseio
+
+
+class PulseInReader:
+    def __init__(self, pulsein: pulseio.PulseIn) -> None: ...
+```
+
+Quote the annotation when the module has no `from __future__ import annotations`. A port that passes a handle through without using it (as `DeviceParts` does a bus) declares a checker-only `Any` alias for it, which each adapter narrows.
+
 ## Class-Level Constants
 
 Annotate all class-level constants with `Final` to prevent accidental reassignment. Omit the type parameter, since Pylance infers it from the assigned value:
@@ -183,5 +200,6 @@ class _Data:
 - [ ] State objects initialized once via a guard, mutated in place on subsequent frames
 - [ ] `__slots__` used on long-lived per-instance state objects
 - [ ] `typing` and `collections.abc` imports guarded with `try/except ImportError` (advanced constructs such as `TypeVar`, `Protocol` and `Callable` are still absent from latest releases)
+- [ ] CircuitPython handles annotated with their stub type, imported under `if TYPE_CHECKING:`, never `object`
 - [ ] Class-level constants annotated with `Final` (unquoted, no type parameter; import guarded with `try/except ImportError`)
 - [ ] No imports from unavailable stdlib modules

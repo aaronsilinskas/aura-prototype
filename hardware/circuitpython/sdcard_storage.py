@@ -12,6 +12,12 @@ import storage
 
 from hardware.shared.device_storage import DeviceStorage
 
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    import busio
+    import microcontroller
+
 __all__ = ["SdCardStorage"]
 
 
@@ -36,7 +42,7 @@ class SdCardStorage(DeviceStorage):
             adding legible context.
     """
 
-    def __init__(self, spi: object, cs: object, mount: str) -> None:
+    def __init__(self, spi: "busio.SPI", cs: "microcontroller.Pin", mount: str) -> None:
         card = sdcardio.SDCard(spi, cs)
         # readonly=False is VfsFat's own default, but is passed explicitly
         # here to document that device-mutable state depends on the mount

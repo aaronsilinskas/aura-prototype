@@ -1,6 +1,6 @@
 """NeoPixel effect output — one strip, multiple scope segments.
 
-The ``neopixel`` import lives only in ``circuitpython_parts`` (which supplies
+The runtime ``neopixel`` import lives only in ``circuitpython_parts`` (which supplies
 already-initialised strip objects), keeping this module testable under CPython.
 """
 
@@ -9,6 +9,11 @@ from __future__ import annotations
 from effects.effect import PixelBuffer
 from engine.effects.output import EffectOutput
 from engine.state import ScopeValue
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    import neopixel
 
 __all__ = ["NeoPixelEffectOutput"]
 
@@ -34,7 +39,7 @@ class NeoPixelEffectOutput(EffectOutput):
 
     def __init__(
         self,
-        strip: object,
+        strip: neopixel.NeoPixel,
         scope_pixels: dict[str, range],
     ) -> None:
         super().__init__()

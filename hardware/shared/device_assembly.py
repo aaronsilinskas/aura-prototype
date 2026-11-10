@@ -67,6 +67,11 @@ from hardware.shared.polled_part import PolledPart
 from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.radio_transceiver import RadioTransceiver
 
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from hardware.shared.device_parts import Bus
+
 __all__ = ["assemble_device", "button_label", "open_i2c"]
 
 
@@ -75,7 +80,7 @@ def button_label(index: int) -> str:
     return chr(ord("A") + index)
 
 
-def open_i2c(name: str, declared: dict[str, I2CConfig], parts: DeviceParts) -> object | None:
+def open_i2c(name: str, declared: dict[str, I2CConfig], parts: DeviceParts) -> Bus | None:
     """Open I2C bus *name*: its declared pins, or the board's own bus when undeclared.
 
     ``None`` when the bus can't be built (nothing pulls it up).
@@ -87,8 +92,8 @@ def open_i2c(name: str, declared: dict[str, I2CConfig], parts: DeviceParts) -> o
 
 
 def _require_i2c(
-    buses: dict[str, object | None], section: str, device: MatrixPixelsConfig | I2CDeviceConfig
-) -> object:
+    buses: dict[str, Bus | None], section: str, device: MatrixPixelsConfig | I2CDeviceConfig
+) -> Bus:
     bus = buses.get(device.i2c)
     if bus is None:
         raise RuntimeError(f"{section} joins I2C bus '{device.i2c}' but no I2C bus is available")
@@ -99,20 +104,20 @@ def _open_named_buses(
     logger: Logger,
     names: list[str],
     describe: Callable[[str], str],
-    open_bus: Callable[[str], object | None],
-) -> dict[str, object | None]:
+    open_bus: Callable[[str], Bus | None],
+) -> dict[str, Bus | None]:
     """Open each **Named bus** in *names* once, in first-named order, one narrated line each.
 
     *names* holds the bus each enabled device joins, so a declared bus no
     enabled device names is never opened. A bus *open_bus* can't build is
     ``None``, narrated ``no bus``; the device that needs it rejects it.
     """
-    buses: dict[str, object | None] = {}
+    buses: dict[str, Bus | None] = {}
     for name in names:
         if name in buses:
             continue
 
-        def _build(name: str = name) -> tuple[object | None, str]:
+        def _build(name: str = name) -> tuple[Bus | None, str]:
             bus = open_bus(name)
             return bus, "no bus" if bus is None else "ok"
 
@@ -120,7 +125,7 @@ def _open_named_buses(
     return buses
 
 
-def _open_spi(name: str, declared: dict[str, SPIConfig], parts: DeviceParts) -> object | None:
+def _open_spi(name: str, declared: dict[str, SPIConfig], parts: DeviceParts) -> Bus | None:
     """Open SPI bus *name*: its declared pins, or the board's own bus when undeclared."""
     spi = declared.get(name)
     if spi is None:
@@ -133,8 +138,8 @@ def _open_spi(name: str, declared: dict[str, SPIConfig], parts: DeviceParts) -> 
 
 
 def _require_spi(
-    buses: dict[str, object | None], section: str, device: RadioConfig | SDCardConfig
-) -> object:
+    buses: dict[str, Bus | None], section: str, device: RadioConfig | SDCardConfig
+) -> Bus:
     bus = buses.get(device.spi)
     if bus is None:
         raise RuntimeError(f"{section} joins SPI bus '{device.spi}' but no SPI bus is available")
@@ -145,7 +150,7 @@ def _pixel_outputs(
     index: int,
     pixels: MatrixPixelsConfig | NeoPixelPixelsConfig,
     parts: DeviceParts,
-    i2c: dict[str, object | None],
+    i2c: dict[str, Bus | None],
 ) -> list[EffectOutput]:
     """Build enabled pixel entry *index*: a matrix, or one output per NeoPixel strip.
 
@@ -201,11 +206,11 @@ def _gated_step(
 
 def _polled_sensor(
     logger: Logger,
-    i2c: dict[str, object | None],
+    i2c: dict[str, Bus | None],
     name: str,
     section: I2CDeviceConfig | None,
     describe: Callable[[I2CDeviceConfig], str],
-    read_part: Callable[[I2CDeviceConfig, object], Callable[[], tuple[float, float, float]]],
+    read_part: Callable[[I2CDeviceConfig, Bus], Callable[[], tuple[float, float, float]]],
     reading: AccelerationData | MagneticData,
 ) -> PolledSensor | None:
     """Build the I2C sensor ``name`` as a **PolledSensor** over ``reading``, gated like any section.
