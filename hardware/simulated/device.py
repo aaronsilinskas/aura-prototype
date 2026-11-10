@@ -50,6 +50,7 @@ from hardware.simulated.simulated_parts import (
 
 __all__ = [
     "DEFAULT_SWAY_STRENGTH",
+    "BuzzHeld",
     "Buzzed",
     "IrSent",
     "Played",
@@ -87,6 +88,14 @@ class Played:
 
 @dataclass(frozen=True)
 class Buzzed:
+    at: float
+    pattern: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class BuzzHeld:
+    """A buzzing sequence an Overlay interrupted; it is never replayed."""
+
     at: float
     pattern: tuple[int, ...]
 
@@ -193,6 +202,7 @@ class SimulatedHardware:
         self.radio_sent: list[RadioSent] = []
         self.played: list[Played] = []
         self.buzzed: list[Buzzed] = []
+        self.buzz_held: list[BuzzHeld] = []
         # Which button each pin is, so a scripted press of a label reaches its pin.
         self._button_of_pin = {name: button_label(i) for i, name in enumerate(config.buttons)}
         labels = self._button_of_pin.values()
@@ -322,6 +332,7 @@ class SimulatedHardware:
         self.radio_sent.clear()
         self.played.clear()
         self.buzzed.clear()
+        self.buzz_held.clear()
 
     def _boot(self, parts: SimulatedParts) -> None:
         self._parts = parts
@@ -341,6 +352,9 @@ class SimulatedHardware:
 
     def on_buzzed(self, pattern: tuple[int, ...]) -> None:
         self.buzzed.append(Buzzed(self.now(), pattern))
+
+    def on_buzz_held(self, pattern: tuple[int, ...]) -> None:
+        self.buzz_held.append(BuzzHeld(self.now(), pattern))
 
     def on_radio_sent(self, payload: bytes) -> None:
         self.radio_sent.append(RadioSent(self.now(), payload))

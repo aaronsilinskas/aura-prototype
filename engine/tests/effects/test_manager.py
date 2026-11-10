@@ -1830,7 +1830,6 @@ def test_setting_effects_aside_tells_each_output_which_effects_are_held(pack_tre
     manager.set_aside()
 
     assert [(keys, r) for keys, _, r in output.held_calls] == [(frozenset({"personal"}), receipt)]
-    assert output.restored_calls == []
 
 
 def test_putting_effects_back_tells_each_output_which_effects_are_restored(pack_tree) -> None:

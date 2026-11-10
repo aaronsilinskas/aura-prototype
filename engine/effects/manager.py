@@ -274,7 +274,8 @@ class EffectManager(EffectControls, EffectAdmin):
         ``EffectAdmin.set_aside``.
         """
         for entry in self._effects:
-            self._notify_outputs(entry, restored=False)
+            for output, keys in self._outputs_serving(entry):
+                output.hold_effect(keys, entry.effect, entry.receipt)
         held = _HeldEffects(self._effects, self._merge_strategies)
         self._effects = []
         self._merge_strategies = dict.fromkeys(held.merge_strategies, SPLIT)
@@ -292,19 +293,19 @@ class EffectManager(EffectControls, EffectAdmin):
         self._effects = held.effects
         self._merge_strategies = held.merge_strategies
         for entry in self._effects:
-            self._notify_outputs(entry, restored=True)
+            for output, keys in self._outputs_serving(entry):
+                output.restore_effect(keys, entry.effect, entry.receipt)
 
-    def _notify_outputs(self, entry: EffectManager._EffectEntry, restored: bool) -> None:
-        """Tell every output serving any of *entry*'s scope keys it is held, or restored."""
+    def _outputs_serving(
+        self, entry: EffectManager._EffectEntry
+    ) -> list[tuple[EffectOutput, frozenset[str]]]:
+        """Each output serving any of *entry*'s scope keys, with the keys it serves."""
+        serving = []
         for i in range(len(self._outputs)):
             matching = self._output_key_sets[i].intersection(entry.keys)
-            if not matching:
-                continue
-            output = self._outputs[i]
-            if restored:
-                output.restore_effect(matching, entry.effect, entry.receipt)
-            else:
-                output.hold_effect(matching, entry.effect, entry.receipt)
+            if matching:
+                serving.append((self._outputs[i], matching))
+        return serving
 
     def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
         """Replace any running effect(s) in scope and start this one.
