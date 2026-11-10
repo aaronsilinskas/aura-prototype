@@ -74,3 +74,7 @@ def scan_stems(path: str, extensions: tuple[str, ...]) -> dict[str, str]:
             continue
         stems[stem] = full_path
     return stems
+
+
+def _deliberate_type_error() -> int:
+    return "not an int"
