@@ -17,6 +17,10 @@ from array import array
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_telemetry import IrTelemetryGate, IrTelemetrySnapshot
 
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 # ---------------------------------------------------------------------------
 # Port abstractions
 # ---------------------------------------------------------------------------
@@ -389,7 +393,7 @@ class InfraredReceiver:
     def __init__(
         self,
         pulse_readers: "list[PulseReader]",
-        decoder_class: "type[InfraredDecoder]",
+        decoder_class: "Callable[[], InfraredDecoder]",
         gate: "IrTransmitGate | None" = None,
     ) -> None:
         readers = list(pulse_readers)
@@ -428,7 +432,7 @@ class InfraredReceiver:
         readers = self._readers
         decoders = self._decoders
         best_i = -1
-        best_margin = 0
+        best_margin: int | None = None
         best_packet = None
         for i in range(self._count):
             reader = readers[i]
@@ -441,8 +445,11 @@ class InfraredReceiver:
                 packet = decoder.decode(pulse)
                 if packet is not None:
                     margin = decoder.last_error_margin
-                    # Strict < keeps the first reader on a tie
-                    if best_packet is None or margin < best_margin:
+                    # Strict < keeps the first reader on a tie. A decoded packet
+                    # always sets a margin; a missing one would rank worst.
+                    if best_packet is None or (
+                        margin is not None and (best_margin is None or margin < best_margin)
+                    ):
                         best_i = i
                         best_margin = margin
                         best_packet = packet
@@ -459,7 +466,7 @@ class InfraredReceiver:
 
         return best_packet
 
-    def set_decoder(self, decoder_class: "type[InfraredDecoder]") -> None:
+    def set_decoder(self, decoder_class: "Callable[[], InfraredDecoder]") -> None:
         """Rebuild the per-reader decoder list from *decoder_class*.
 
         Builds one **fresh** decoder per reader, so stateful decoders are
