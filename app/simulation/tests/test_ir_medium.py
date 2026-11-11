@@ -6,6 +6,8 @@ shot, and through the IR range pair, whose transmitter sends on its own.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
@@ -24,8 +26,8 @@ BYSTANDER: dict[str, object] = {"expected_team": 1, "expected_player": 1}
 RED = 0xFF0000
 
 
-def tag_settings(settings: dict[str, object]) -> SettingOverrides:
-    return {"tag": {"settings": settings}}
+def tag_settings(settings: Mapping[str, object]) -> SettingOverrides:
+    return {"tag": {"settings": dict(settings)}}
 
 
 def start_game(simulation: Simulation, *players: SimulatedDevice) -> None:

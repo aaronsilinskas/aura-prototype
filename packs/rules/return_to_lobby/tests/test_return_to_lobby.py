@@ -31,10 +31,16 @@ def _scenes_with_the_pack() -> list[str]:
 
 SCENES = _scenes_with_the_pack()
 
-LOBBY_ENTRIES = [
-    entry["scene"]
-    for entry in settings_for("example_lobby").get("lobby", "entries")  # type: ignore[attr-defined]
-]
+
+def _lobby_entries() -> list[object]:
+    entries = []
+    for entry in settings_for("example_lobby").get_list("lobby", "entries"):
+        assert isinstance(entry, dict)
+        entries.append(entry["scene"])
+    return entries
+
+
+LOBBY_ENTRIES = _lobby_entries()
 """``example_lobby``'s entries, in the order A steps through them."""
 
 
