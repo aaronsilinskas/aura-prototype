@@ -142,9 +142,6 @@ exclude = [
     # #1259
     '^effects/tests/',
     '^engine/tests/',
-    # #1260
-    '^app/simulation/tests/',
-    '^app/tests/',
 ]
 # Local stubs for modules circuitpython-stubs lacks; see typings/README.md.
 mypy_path = "typings"

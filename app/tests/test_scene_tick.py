@@ -1,18 +1,23 @@
 """Behaviour-driven tests for build_scene_tick, the per-tick loop shared by
 the device and the Simulated device."""
 
+from typing import TypeVar
+
 from app.scene_composition import (
     SceneRuntime,
     build_scene_runtime,
     build_scene_tick,
     scan_boot_pack_catalog,
 )
+from engine.effects.manager import EffectManager
 from engine.events import Event
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
 from engine.namespace import ActiveSceneNamespace
 from engine.network import LINE, NetworkEvents
 from engine.packs import PackRegistry
+from engine.scene import SceneManager
+from engine.state import GameState
 from engine.tests.helpers import SpyNetworkControls
 from engine.timer import Timer
 from hardware.shared.debounced_buttons import DebouncedButtons
@@ -42,7 +47,7 @@ def _hw(
         buttons=buttons,
         accelerometer=accelerometer,
         magnetometer=magnetometer,
-        network_controls="fake-network-controls",
+        network_controls=SpyNetworkControls(),
         ir=ir,
         radio=radio,
         storage=None,
@@ -51,7 +56,7 @@ def _hw(
     )
 
 
-class _RecordingState:
+class _RecordingState(GameState):
     """Stands in for the active scene's GameState: keeps every queued event."""
 
     def __init__(self) -> None:
@@ -61,21 +66,25 @@ class _RecordingState:
         self.queued.append(event)
 
 
-class _RecordingManager:
+class _RecordingManager(SceneManager):
     """Stands in for SceneManager: an active state, and a timer advanced on update
     the way GameEngine.update advances it."""
 
     def __init__(self, timer: Timer, active: bool = True) -> None:
-        self.active_state = _RecordingState() if active else None
+        self._active_state = _RecordingState() if active else None
         self._timer = timer
         self.update_count = 0
+
+    @property
+    def active_state(self) -> _RecordingState | None:
+        return self._active_state
 
     def update(self) -> None:
         self.update_count += 1
         self._timer.update()
 
 
-class _RecordingEffectManager:
+class _RecordingEffectManager(EffectManager):
     def __init__(self) -> None:
         self.updated_with: list[Timer] = []
 
@@ -95,8 +104,13 @@ def _runtime(hw: DeviceHardware, active: bool = True) -> SceneRuntime:
     )
 
 
-def _queued(runtime: SceneRuntime, event_type: type[Event]) -> list[Event]:
-    return [e for e in runtime.manager.active_state.queued if isinstance(e, event_type)]
+_E = TypeVar("_E", bound=Event)
+
+
+def _queued(runtime: SceneRuntime, event_type: type[_E]) -> list[_E]:
+    state = runtime.manager.active_state
+    assert isinstance(state, _RecordingState)
+    return [e for e in state.queued if isinstance(e, event_type)]
 
 
 def _sensors(runtime: SceneRuntime) -> list[InputEvents.Sensors]:
@@ -144,6 +158,8 @@ def test_the_sensors_event_carries_the_latest_accelerometer_and_magnetometer_rea
     tick()
 
     event = _sensors(runtime)[0]
+    assert event.acceleration is not None
+    assert event.magnetic is not None
     assert (event.acceleration.x, event.acceleration.y, event.acceleration.z) == (1.0, 2.0, 3.0)
     assert (event.magnetic.x, event.magnetic.y, event.magnetic.z) == (4.0, 5.0, 6.0)
 
@@ -272,6 +288,8 @@ def test_each_tick_updates_the_scene_and_renders_effects_on_the_runtimes_timer()
     tick()
     tick()
 
+    assert isinstance(runtime.manager, _RecordingManager)
+    assert isinstance(runtime.effect_manager, _RecordingEffectManager)
     assert runtime.manager.update_count == 2
     assert runtime.effect_manager.updated_with == [runtime.timer, runtime.timer]
 
