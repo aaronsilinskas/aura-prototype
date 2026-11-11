@@ -118,9 +118,6 @@ exclude = [
     # #1256
     '^hardware/shared/ir_codecs/tests/',
     '^hardware/shared/tests/',
-    # #1259
-    '^effects/tests/',
-    '^engine/tests/',
 ]
 # Local stubs for modules circuitpython-stubs lacks; see typings/README.md.
 mypy_path = "typings"

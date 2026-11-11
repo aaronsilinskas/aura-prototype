@@ -142,4 +142,4 @@ def test_scene_local_registry_does_not_allow_arbitrary_attributes() -> None:
     registry = SceneLocalRegistry()
 
     with pytest.raises(AttributeError):
-        registry.unexpected = "oops"  # type: ignore[attr-defined]
+        registry.unexpected = "oops"  # type: ignore[attr-defined]  # slotted, must raise

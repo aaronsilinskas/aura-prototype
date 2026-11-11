@@ -129,6 +129,7 @@ def test_scene_manager_installs_local_effects_on_boot(pack_tree) -> None:
     manager.activate_boot_scene("forest")
 
     [(local_effects, _, _)] = namespace.installs
+    assert local_effects is not None
     assert local_effects.items() == ["flash"]
 
 
@@ -142,6 +143,7 @@ def test_scene_manager_installs_overlay_scene_local_effects_on_overlay(pack_tree
     manager.update()
 
     local_effects, _, _ = namespace.installs[-1]
+    assert local_effects is not None
     assert local_effects.items() == ["b_flash"]
 
 
@@ -159,6 +161,7 @@ def test_scene_manager_restores_base_local_effects_on_pop(pack_tree) -> None:
     manager.update()
 
     local_effects, _, _ = namespace.installs[-1]
+    assert local_effects is not None
     assert local_effects.items() == ["a_flash"]
 
 

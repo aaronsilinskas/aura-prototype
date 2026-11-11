@@ -49,6 +49,7 @@ def test_resolve_calls_callable_and_returns_its_result() -> None:
 
 def test_random_produces_values_within_specified_range() -> None:
     gen = ValueGenerator.random(0.2, 0.8)
+    assert callable(gen)
 
     for _ in range(50):
         v = gen()
@@ -57,6 +58,7 @@ def test_random_produces_values_within_specified_range() -> None:
 
 def test_random_uses_default_range_of_zero_to_one() -> None:
     gen = ValueGenerator.random()
+    assert callable(gen)
 
     for _ in range(50):
         v = gen()
@@ -65,6 +67,7 @@ def test_random_uses_default_range_of_zero_to_one() -> None:
 
 def test_random_produces_varying_values_across_calls() -> None:
     gen = ValueGenerator.random(0.0, 1.0)
+    assert callable(gen)
 
     values = {gen() for _ in range(20)}
     assert len(values) > 1
@@ -78,6 +81,7 @@ def test_random_produces_varying_values_across_calls() -> None:
 def test_random_choice_only_returns_values_from_the_provided_list() -> None:
     choices = [0.1, 0.5, 0.9]
     gen = ValueGenerator.random_choice(choices)
+    assert callable(gen)
 
     for _ in range(50):
         assert gen() in choices
@@ -85,6 +89,7 @@ def test_random_choice_only_returns_values_from_the_provided_list() -> None:
 
 def test_random_choice_returns_the_only_option_when_list_has_one_element() -> None:
     gen = ValueGenerator.random_choice([42.0])
+    assert callable(gen)
 
     assert gen() == pytest.approx(42.0)
 
@@ -92,6 +97,7 @@ def test_random_choice_returns_the_only_option_when_list_has_one_element() -> No
 def test_random_choice_produces_varying_values_across_calls() -> None:
     choices = [1.0, 2.0, 3.0, 4.0, 5.0]
     gen = ValueGenerator.random_choice(choices)
+    assert callable(gen)
 
     values = {gen() for _ in range(50)}
     assert len(values) > 1

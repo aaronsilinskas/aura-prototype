@@ -129,7 +129,7 @@ def _run(rules: list, ticks: int, events_per_tick: int = 1) -> list[str]:
     return [name for _, name, _ in spy.add_effect_calls]
 
 
-def _rule_machine(rule: _LifecycleRule, state: GameState) -> PhaseMachine:
+def _rule_machine(rule: PhaseRule | InPhaseRule, state: GameState) -> PhaseMachine:
     """Dedicated helper: expose a rule's internal machine for seam-level identity tests."""
     return rule._machine(state)
 

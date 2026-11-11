@@ -366,7 +366,7 @@ def test_effect_audio_rejects_a_string_clips_key() -> None:
     clip = AudioPlaybackConfig(name="bg", loop=True)
 
     with pytest.raises(TypeError, match="clips"):
-        EffectAudio(clips={"start": clip})  # type: ignore[dict-item]
+        EffectAudio(clips={"start": clip})  # type: ignore[dict-item]  # wrong key type must raise
 
 
 # ---------------------------------------------------------------------------
@@ -433,4 +433,4 @@ def test_effect_haptic_rejects_a_string_patterns_key() -> None:
     cfg = HapticPattern(sequence=[HapticPattern.STRONG_CLICK])
 
     with pytest.raises(TypeError, match="patterns"):
-        EffectHaptic(patterns={"start": cfg})  # type: ignore[dict-item]
+        EffectHaptic(patterns={"start": cfg})  # type: ignore[dict-item]  # wrong key type must raise

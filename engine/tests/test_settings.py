@@ -31,18 +31,18 @@ def test_assigning_an_attribute_on_the_view_raises() -> None:
     settings = Settings({"return_to_lobby": {"hold_seconds": 2.5}})
 
     with pytest.raises(AttributeError):
-        settings.hold_seconds = 1.0  # type: ignore[attr-defined]
+        settings.hold_seconds = 1.0  # type: ignore[attr-defined]  # read-only view, must raise
 
 
 def test_assigning_an_item_on_the_view_raises() -> None:
     settings = Settings({"return_to_lobby": {"hold_seconds": 2.5}})
 
     with pytest.raises(TypeError):
-        settings["return_to_lobby"] = {"hold_seconds": 1.0}  # type: ignore[index]
+        settings["return_to_lobby"] = {"hold_seconds": 1.0}  # type: ignore[index]  # read-only view, must raise
 
 
 def test_changing_the_source_mapping_does_not_change_the_view() -> None:
-    values = {"return_to_lobby": {"hold_seconds": 2.5}}
+    values: dict[str, dict[str, object]] = {"return_to_lobby": {"hold_seconds": 2.5}}
     settings = Settings(values)
 
     values["return_to_lobby"]["hold_seconds"] = 9.0
