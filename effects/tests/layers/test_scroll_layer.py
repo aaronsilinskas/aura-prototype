@@ -1,10 +1,11 @@
 import pytest
 
+from effects.layers.layer import Layer
 from effects.layers.scroll import ScrollOffset
 from effects.layers.scroll_layer import ScrollLayer
 
 
-class _PositionLayer:
+class _PositionLayer(Layer):
     """Layer whose sample returns the position passed to it."""
 
     def update(self, elapsed: float) -> None:
@@ -14,7 +15,7 @@ class _PositionLayer:
         return position
 
 
-class _UpdateCountLayer:
+class _UpdateCountLayer(Layer):
     """Layer that records how many times update was called."""
 
     def __init__(self) -> None:
@@ -61,7 +62,7 @@ def test_scroll_layer_delegates_update_to_inner_layer() -> None:
 def test_scroll_layer_passes_pixel_count_to_inner_sample() -> None:
     recorded: list[int] = []
 
-    class _RecordPixelCount:
+    class _RecordPixelCount(Layer):
         def update(self, elapsed: float) -> None:
             pass
 

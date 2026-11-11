@@ -127,6 +127,7 @@ def test_scanned_scene_carries_its_scene_json_fields(pack_tree) -> None:
 
     scene = scan_pack_roots([str(root)]).scene_registry.get("tag")
 
+    assert scene.version is not None
     assert (scene.version.major, scene.version.minor) == (2, 1)
     assert [(ref.name, str(ref.version), ref.settings) for ref in scene.effect_packs] == [
         ("basic", "1.0", {})

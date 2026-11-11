@@ -142,9 +142,6 @@ exclude = [
     '^packs/scenes/tag/rules/helpers/tests/',
     '^packs/scenes/tag/tests/',
     '^packs/tests/',
-    # #1259
-    '^effects/tests/',
-    '^engine/tests/',
     # #1260
     '^app/simulation/tests/',
     '^app/tests/',

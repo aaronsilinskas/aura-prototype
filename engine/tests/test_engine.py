@@ -136,14 +136,14 @@ def test_elapsed_is_read_only() -> None:
     state = _make_state()
 
     with pytest.raises(AttributeError):
-        state.elapsed = 1.0  # type: ignore[misc]
+        state.elapsed = 1.0  # type: ignore[misc]  # read-only, must raise
 
 
 def test_total_is_read_only() -> None:
     state = _make_state()
 
     with pytest.raises(AttributeError):
-        state.total = 1.0  # type: ignore[misc]
+        state.total = 1.0  # type: ignore[misc]  # read-only, must raise
 
 
 def test_state_elapsed_is_the_engine_timers_elapsed_for_the_tick() -> None:
@@ -352,7 +352,7 @@ def test_data_written_by_an_earlier_rule_is_visible_to_a_later_rule_in_the_same_
 
     class _ReaderRule(GameRule):
         def __init__(self) -> None:
-            self.value = None
+            self.value: int | None = None
 
         def handle_event(self, event: Event, state: GameState) -> None:
             self.value = state.get_or_none("shared", int)

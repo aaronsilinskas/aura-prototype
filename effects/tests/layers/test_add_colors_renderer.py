@@ -1,11 +1,12 @@
 from effects.effect import PixelBuffer
 from effects.layers.add_colors_renderer import AddColorsRenderer
+from effects.layers.layer import Layer
 from effects.palette import Palette, PaletteLUT256
 
 _BLACK_TO_WHITE = bytes([0, 0, 0, 0, 255, 255, 255, 255])
 
 
-class _ConstantLayer:
+class _ConstantLayer(Layer):
     def __init__(self, value: float) -> None:
         self._value = value
         self.update_count = 0

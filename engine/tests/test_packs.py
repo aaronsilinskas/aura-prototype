@@ -49,7 +49,7 @@ def test_pack_registry_does_not_allow_arbitrary_attributes() -> None:
     registry = PackRegistry()
 
     with pytest.raises(AttributeError):
-        registry.unexpected_attr = "oops"  # type: ignore[attr-defined]
+        registry.unexpected_attr = "oops"  # type: ignore[attr-defined]  # slotted, must raise
 
 
 # ---------------------------------------------------------------------------
