@@ -139,16 +139,20 @@ An effect or rule loaded from an `effects/` or `rules/` subdirectory inside a sc
 _Avoid_: "private pack"; putting scene-only code under `packs/`
 
 ### Scene-local sound
-A bare `{stem: path}` map of `*.wav` files from a `sounds/` subdirectory inside a scene's own folder — a plain path lookup, not a `SceneLocalRegistry` (no module import, no `scene.` prefix stored). `SceneManager` installs it into the **Active scene namespace**, where it is addressed by the `scene.` prefix.
+A bare `{stem: path}` map of `*.wav` files from a `sounds/` subdirectory inside a scene's own folder — a plain path lookup, not a `SceneLocalRegistry` (no module import, no `scene.` prefix stored). It is installed into the **Active scene namespace** as part of the scene's **Scene view**, where it is addressed by the `scene.` prefix.
 _Avoid_: confusing the bare stem key here with the `scene.`-prefixed name a clip is referenced by (the prefix is added at resolution, not stored on the map)
 
 ### SceneLocalRegistry
 A single-namespace registry for one scene's local effects (or rules), with the same `get`/`items` surface as `PackRegistry` but no version concept.
 _Avoid_: modelling scene-local items as a synthetic single-pack `PackRegistry`; calling it a "namespace" (that is the **Active scene namespace**)
 
+### Scene view
+What the **Active scene namespace** holds for one scene: its scene-local effects and sounds, and the effect packs it declares. Installed at every transition into that scene.
+_Avoid_: "scene part", "scene context"
+
 ### Active scene namespace
-The names the active scene can reach: its scene-local effects and sounds under `scene.`, plus the shared effect packs (and their sounds) it declares under `<pack>.`. Built once from the **PackCatalog**, reinstalled by `SceneManager` on every transition, and the one place that says which builder an effect name means and which file a clip name means. Every clip resolves against the active scene, including a pack effect's clips; an effect's own pack grants nothing extra.
-_Avoid_: "resolver", "registry" for it; a bypass or "allow everything" mode (demos install a view declaring every pack); resolving names anywhere in hardware
+The names the active scene can reach: its scene-local effects and sounds under `scene.`, plus the shared effect packs (and their sounds) it declares under `<pack>.`. Built once from the **PackCatalog**, its **Scene view** reinstalled by the effect system on every transition, and the one place that says which builder an effect name means and which file a clip name means. Every clip resolves against the active scene, including a pack effect's clips; an effect's own pack grants nothing extra.
+_Avoid_: "resolver", "registry" for it; a bypass or "allow everything" mode (demos install a **Scene view** declaring every pack); resolving names anywhere in hardware
 
 ### Registry lookup errors
 The typed `ValueError` subclasses (`RegistryError` base; `UnknownPackError`, `UnknownItemError`, `MissingItemAttributeError`, `ItemTypeError`) that registries and the **Active scene namespace** raise for lookup failures, typed all the way to the caller so code dispatches on the exception **type** and message wording stays a free display detail.
@@ -175,8 +179,8 @@ A scene laid temporarily on top of the running scene (a pause, a menu) and remov
 _Avoid_: "scene switch" for it; counting the time spent covered against the covered scene's phases; a "live" overlay running beside the covered scene (a display over live play is the game's own effects); swapping the codec on overlay or pop
 
 ### SceneManager
-Owns the scene stack and drives scene transitions, trusting the **PackCatalog** to have checked each scene's pack declarations, installing the active scene into the **Active scene namespace** once per transition, setting the covered scene's effects and merge strategies aside and putting them back through the injected `EffectAdmin`, and routing reboots through the injected `SceneReboot` port. The live `SceneControls`.
-_Avoid_: calling `register()` on it (removed); offering rules a way to load a scene in-process (scenes change by **Reboot**); validating pack versions on load or overlay (the catalog already did); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); installing locals or declared packs piecemeal (one install per transition)
+Owns the scene stack and drives scene transitions, trusting the **PackCatalog** to have checked each scene's pack declarations. Each transition makes one call to the injected `EffectAdmin`, carrying the **Scene view** of the scene it brings to the top; reboots go through the injected `SceneReboot` port. The live `SceneControls`.
+_Avoid_: calling `register()` on it (removed); offering rules a way to load a scene in-process (scenes change by **Reboot**); validating pack versions on load or overlay (the catalog already did); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); holding or installing into the **Active scene namespace** (the effect system does)
 
 ### Reboot
 The one way a device switches scenes: the target is persisted to device storage, then the device resets and boots that scene. Only storage and what is physically happening to the device (held buttons, motion, where its IR points) carry across; game state, phases and output state do not, and nothing after the reset runs. A device with no SD card cannot persist a target, so it does not reboot, and stays in the scene it booted.
@@ -199,8 +203,8 @@ The **rule-facing** effect seam a rule holds via `GameState.effect_controls`: `s
 _Avoid_: adding `set_local_effects` or the merge-strategy snapshot lifecycle back onto it
 
 ### EffectAdmin
-The **scene-transition-facing** counterpart to `EffectControls`, reserved for `SceneManager`: `set_aside` takes the running effects and merge strategies out of play together as one `HeldEffects` bundle (the **Overlay** then starts on **Split**), `put_back` gives that bundle back on `pop`, and `reset_merge_strategies` starts a booted scene on Split. `EffectManager` implements both faces.
-_Avoid_: calling any `EffectAdmin` method from a `GameRule`; putting it in the rule-facing `EffectControls`; installing scene locals or declared packs through it (that is the **Active scene namespace**)
+The **scene-transition-facing** counterpart to `EffectControls`, reserved for the scene manager. It has one step per transition, and each step installs the **Scene view** it is given: entering the boot scene starts every scope on **Split**; covering sets the running effects and merge strategies aside as one held bundle (the **Overlay** then starts on Split); uncovering stops the Overlay's own effects and gives that bundle back. `EffectManager` implements both faces.
+_Avoid_: calling any `EffectAdmin` step from a `GameRule`; putting it in the rule-facing `EffectControls`; installing a Scene view any other way during a transition; stopping an Overlay's effects yourself before uncovering (uncovering does it)
 
 ### Scope
 Identifies what a game effect targets, output-agnostically. Leaf scopes: `PERSONAL`, `DIRECTIONAL`, `Global.MAIN/BUFF/DEBUFF`, `AMBIENT`. Composite scopes: `Global.ALL`, `NON_AMBIENT`, `Scope.ALL` (everything — use for teardown).
@@ -313,6 +317,10 @@ _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; 
 ### Scene boot
 The one boot the device and the **Simulated device** share, and the **Composition layer**'s only way in. From the hardware a device built, it applies a pending **Scene deploy token**, then picks the boot scene (the **Persisted scene**, else the flash `default_scene`), skipping one the device lacks the **Required capabilities** for and raising when none fits. It applies that scene's wire-frame codec before the first tick, and hands back the booted scene's name, its tick, its **SceneControls** and its **Active scene namespace**. Card content is scanned exactly like flash content. Each boot builds one tick, whose buffers are allocated once and reused every tick.
 _Avoid_: sequencing the boot's steps at a call site; a second boot for tests or examples; scanning packs or scenes outside it; copying the tick's body into a harness or entry point; building a tick per frame; reading `ir` or `radio` anywhere but `DeviceHardware`; "startup", "init" for it
+
+### SceneRuntime
+The engine's matched set for running scenes, built once from the **PackCatalog** and what the device offers (its effect outputs, network controls, **Capabilities** and **SceneReboot**): one **Active scene namespace**, the effect system that resolves through it, and the scene manager that drives transitions. A tick queues its events on it and updates it once; that dispatches the events, applies any pending **Overlay** or pop, then updates effects, on one clock.
+_Avoid_: wiring the namespace, effect manager, game engine and scene manager by hand; driving its parts separately within a tick; more than one per device; "engine" for it (the game engine is one of its parts)
 
 ### Device assembly
 The board-free turning of a `DeviceConfig` into a `DeviceHardware`, shared by the physical device and the **Simulated device**: which components are built or skipped, which need a bus, the order they come up in, how each is narrated, and how the IR and radio subsystems are wired. It reaches hardware only through **DeviceParts**, so a config the board rejects for config reasons is rejected in simulation too.
