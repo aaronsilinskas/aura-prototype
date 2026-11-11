@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -57,6 +58,24 @@ class _Builder(EffectBuilder):
 BUILD = _Builder()
 """
 
+_CHIME_EFFECT = """\
+from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig, EffectVerb
+from engine.effects.builder import EffectBuilder
+
+_AUDIO = EffectAudio(clips={{EffectVerb.START: AudioPlaybackConfig(name={clip!r}, loop=True)}})
+
+
+class _Builder(EffectBuilder):
+    def __call__(self, name: str, config: EffectConfig) -> Effect:
+        return Effect(name=name, pixels=None, audio=_AUDIO)
+
+
+BUILD = _Builder()
+"""
+
+_A_WAV = Path(__file__).parents[3] / "packs/scenes/hardware_test/sounds/sfx_test_start.wav"
+"""A real WAV for a card to carry: the simulated audio reads the length from its header."""
+
 
 _REBOOT_ON_A_RULE = """\
 from engine.engine import GameRule
@@ -108,6 +127,42 @@ def install_card_scene(
     )
     rules = _package(scene_dir / "rules")
     (rules / "light.py").write_text(_LIGHTING_RULE.format(effect=effect, color=color))
+
+
+def install_card_scene_effect(
+    card: Path, scene: str, effect: str, source: str = _SOLID_EFFECT
+) -> None:
+    """Give card scene *scene* its own effect *effect*, built by *source*."""
+    effects = _package(_card_pack_dir(card, "scenes", scene) / "effects")
+    (effects / f"{effect}.py").write_text(source)
+
+
+def install_card_sound(owner_dir: Path, stem: str) -> None:
+    """Put a playable ``<stem>.wav`` in the ``sounds/`` of the scene or pack at *owner_dir*."""
+    sounds = owner_dir / "sounds"
+    sounds.mkdir(parents=True, exist_ok=True)
+    shutil.copy(_A_WAV, sounds / f"{stem}.wav")
+
+
+def install_card_rule_pack(card: Path, pack: str, color: int = _GREEN) -> None:
+    """Put rule pack *pack*, version 1.0, on *card*: its rule lights the personal strip *color*."""
+    pack_dir = _card_pack_dir(card, "rules", pack)
+    (pack_dir / "rules.json").write_text(json.dumps({"version": "1.0"}))
+    (pack_dir / "light.py").write_text(_LIGHTING_RULE.format(effect="basic.solid", color=color))
+
+
+def install_card_scene_using_rule_pack(card: Path, scene: str, pack: str) -> None:
+    """Put *scene* on *card*: it has no rules of its own and runs rule pack *pack*, version 1.0."""
+    scene_dir = _card_pack_dir(card, "scenes", scene)
+    (scene_dir / "scene.json").write_text(
+        json.dumps(
+            {
+                "version": "1.0",
+                "effect_packs": [{"name": "basic", "version": "1.1"}],
+                "rule_packs": [{"name": pack, "version": "1.0"}],
+            }
+        )
+    )
 
 
 def install_card_launcher(card: Path, scene: str, target: str) -> None:
@@ -168,6 +223,70 @@ def test_a_scene_using_a_card_effect_pack_plays_it(simulation, tmp_path):
     simulation.advance(0.1)
 
     assert device.strip(Scope.PERSONAL).all_lit(_GREEN)
+
+
+def test_a_card_scenes_own_effect_plays(simulation, tmp_path):
+    install_card_scene(tmp_path, "card_scene", effect="scene.glow")
+    install_card_scene_effect(tmp_path, "card_scene", "glow")
+
+    device = simulation.add_device("red", scene="card_scene", card=tmp_path)
+    simulation.advance(0.1)
+
+    assert device.strip(Scope.PERSONAL).all_lit(_GREEN)
+
+
+def test_a_card_scenes_own_sound_plays_from_the_card(simulation, tmp_path):
+    install_card_scene(tmp_path, "card_scene", effect="scene.chime")
+    install_card_scene_effect(
+        tmp_path, "card_scene", "chime", _CHIME_EFFECT.format(clip="scene.chime")
+    )
+    install_card_sound(_card_pack_dir(tmp_path, "scenes", "card_scene"), "chime")
+
+    device = simulation.add_device("red", scene="card_scene", card=tmp_path)
+    simulation.advance(0.1)
+
+    assert device.is_playing("scene.chime")
+
+
+def test_a_card_effect_packs_own_sound_plays_from_the_card(simulation, tmp_path):
+    pack_dir = _card_pack_dir(tmp_path, "effects", "card_pack")
+    (pack_dir / "effects.json").write_text(json.dumps({"version": "1.0"}))
+    (pack_dir / "chime.py").write_text(_CHIME_EFFECT.format(clip="card_pack.chime"))
+    install_card_sound(pack_dir, "chime")
+    install_card_scene(
+        tmp_path, "card_scene", effect="card_pack.chime", effect_pack=("card_pack", "1.0")
+    )
+
+    device = simulation.add_device("red", scene="card_scene", card=tmp_path)
+    simulation.advance(0.1)
+
+    assert device.is_playing("card_pack.chime")
+
+
+def test_a_card_scene_runs_a_card_rule_packs_rule(simulation, tmp_path):
+    install_card_rule_pack(tmp_path, "card_rules")
+    install_card_scene_using_rule_pack(tmp_path, "card_scene", "card_rules")
+
+    device = simulation.add_device("red", scene="card_scene", card=tmp_path)
+    simulation.advance(0.1)
+
+    assert device.strip(Scope.PERSONAL).all_lit(_GREEN)
+
+
+def test_a_device_handed_a_card_without_aura_packs_boots_its_flash_scene(simulation, tmp_path):
+    device = simulation.add_device("red", scene="element_browser", card=tmp_path)
+
+    assert device.scene == "element_browser"
+
+
+def test_a_device_handed_a_card_with_an_empty_aura_packs_boots_its_flash_scene(
+    simulation, tmp_path
+):
+    _package(tmp_path / "aura_packs")
+
+    device = simulation.add_device("red", scene="element_browser", card=tmp_path)
+
+    assert device.scene == "element_browser"
 
 
 def test_rebooting_into_a_scene_the_device_cannot_run_raises_and_persists_nothing(
