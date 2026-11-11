@@ -86,12 +86,7 @@ Prefer multiply over divide when the denominator is fixed. In hot paths, always 
 
 ## Native Code (`@micropython.native`)
 
-Production code stays bytecode. On an RP2350 board with 8 MB PSRAM, spec #1235 measured it: no single function on the per-pixel path (merge strategies, palette lookup, layer renderers, `EffectManager.update`) gained more than ~3 % FPS, and compiling every module `-X emit=native` made frames 24–30 % slower. A function earns `@micropython.native` only with new evidence that it dominates the frame, measured against this bar:
-
-- **Keep rule:** median FPS rises ≥5 % at 60 px on `tag` or `element_browser`, against an undecorated control run in the same session, and drops on neither. The PR records both medians per scene and pixel count, the `.mpy` size change, and `gc.mem_free()` at scene start (a throwaway print after `build_scene_boot` in `app/scene_runtime.py`; no timing helper is committed, #1180).
-- **Spelling:** `import micropython`, then `@micropython.native`, per function. `mpy-cross` recognizes only that spelling. Whole-module native and `@micropython.viper` stay out of production code.
-- **Host module:** CPython has no `micropython`, so the first kept decoration restores the host-only root `micropython.py` from 2aee7f5 (never deployed; #1239).
-- **Procedure** (deploy-watch): back up CIRCUITPY's `aura-device.json`; set every enabled NeoPixel strip's `count` to 60, then 144, spreading its `scope_pixels` bands evenly over the new count (effects render only scope pixels), matrix untouched; in one session run the control, then the candidate, 75 s per scene with the `debug` pack's `fps_logging_enabled` Setting on (`element_browser` sets it; add it to `tag`'s `scene.json` for the run only), `tag` three times per side since it drifts ~4 %; take the median of the last 10 `FPS:` windows; restore the backup, revert the `tag` edit and redeploy.
+Production code stays bytecode. On an RP2350 board with 8 MB PSRAM, spec #1235 measured it: no single function on the per-pixel path (merge strategies, palette lookup, layer renderers, `EffectManager.update`) gained more than ~3 % FPS, and compiling every module `-X emit=native` made frames 24–30 % slower. A function earns `@micropython.native` only with new evidence that it dominates the frame.
 
 ## CircuitPython and MicroPython Compatibility
 
@@ -262,4 +257,4 @@ class _Data:
 - [ ] Every stub-defect `# type: ignore[code]` links its upstream adafruit/circuitpython issue; no local copy of a stub `circuitpython-stubs` provides
 - [ ] Class-level constants annotated with `Final` (unquoted, no type parameter; import guarded with `try/except ImportError`)
 - [ ] No imports from unavailable stdlib modules
-- [ ] Functions stay bytecode; any `@micropython.native` (spelled exactly so, after `import micropython`) meets the keep rule against a same-session control, and its PR records the FPS numbers, `.mpy` size change and `gc.mem_free()`
+- [ ] Functions stay bytecode; any `@micropython.native` comes with new measured evidence that it dominates the frame
