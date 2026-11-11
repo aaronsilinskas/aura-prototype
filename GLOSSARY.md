@@ -451,8 +451,8 @@ The hardware-agnostic infrared send/receive subsystem (no `pulseio`), reached th
 _Avoid_: importing `pulseio` into shared IR code; encoding spell fields in the transport
 
 ### InfraredTransceiver
-The board-free single owner of a device's whole IR subsystem — the transmitter map, the receiver, and the shared **IR transmit gate** — exposed as `DeviceHardware.ir`; the network seam's `send_ir` delegates to it. A send routes to the named emitter, and it builds no game event.
-_Avoid_: importing `NetworkEvents`/game-event vocabulary here (the event is built in `run_scene`); a value-returning `update()`; calling it a hardware "driver"; exposing the transmitter map as a public collection
+The board-free single owner of a device's whole IR subsystem, exposed as `DeviceHardware.ir`. It builds its own transmitters (one per wired **IR emitter**), its receiver and the shared **IR transmit gate** from the pulse readers, emitter pins and writer factory the platform hands it. It starts on the Aura wire-frame and reports what is wired. The network seam's `send_ir` delegates to it; a send routes to the named emitter, and it builds no game event.
+_Avoid_: importing `NetworkEvents`/game-event vocabulary here (the event is built in the **Scene boot**'s tick); building its transmitters, receiver or gate anywhere else; a value-returning `update()`; calling it a hardware "driver"; exposing the transmitter map as a public collection
 
 ### Wire-frame codec
 An encoder/decoder pair mapping an opaque payload ↔ IR pulse durations, injected into the IR transport; two coexist — the **Aura wire-frame** and the **Tag protocol** — selected by the scene a device boots; an **Overlay** runs on the codec of the scene it covers. Travels as a class pair, so each receiver reader gets its own fresh decoder. A built device's codec is mutable once, at boot, via `InfraredTransceiver.apply_codec`, which hands the installed pair back read-only.
@@ -479,8 +479,8 @@ Several IR receivers, each on its own data line, returning the packet with the l
 _Avoid_: treating the array as a direction finder; sharing one data line across receivers; a separate config flag to opt in (pin count is the switch)
 
 ### InfraredReceiver
-The one board-free receiver that reads every IR receiver on a device through that receiver's own pulse reader and decoder, for any number of readers; surfaces at most one packet per tick, the one with the lowest **IR error margin**, and names the winning reader only when there was a pick to make. On its own, "IR receiver" means the physical sensor on one data line.
-_Avoid_: separate single- and multi-receiver classes; branching on reader count to choose a receiver; sharing one decoder between readers
+The one board-free receiver the **InfraredTransceiver** builds over every IR receiver on a device, reading each through that receiver's own pulse reader and decoder, for any number of readers; surfaces at most one packet per tick, the one with the lowest **IR error margin**, and names the winning reader only when there was a pick to make. On its own, "IR receiver" means the physical sensor on one data line.
+_Avoid_: constructing one outside the **InfraredTransceiver**; separate single- and multi-receiver classes; branching on reader count to choose a receiver; sharing one decoder between readers
 
 ### IR error margin
 The worst-case pulse-timing deviation (µs) tolerated while still decoding a packet; lower is better, and it's the key the multi-receiver uses to pick the best receiver.
@@ -500,7 +500,7 @@ _Avoid_: suppressing it in a scene (the old Tag `deafen_until` hack); telling it
 
 ### IR transmit gate
 The shared coordination primitive that keeps a device from decoding its own **self-echo**: transmitters mark when they are emitting, and the receiver discards while emission is active plus once more on the falling edge.
-_Avoid_: a second source of truth for "transmitting"; exposing it on `DeviceHardware`; calling `should_discard()` more than once per tick per receiver
+_Avoid_: a second source of truth for "transmitting"; exposing it on `DeviceHardware`; a second gate per device, or one built outside the **InfraredTransceiver**
 
 ### Drain-but-discard
 The receiver's gated-receive contract: while the **IR transmit gate** signals emission, every available pulse is still drained from the reader (so `PulseIn` never overflows) but none is decoded, and any in-progress decode is reset.
