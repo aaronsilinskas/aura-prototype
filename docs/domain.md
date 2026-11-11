@@ -175,7 +175,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update` tick |
 | `GameState` | `engine/state.py` | Per-tick game context passed to each rule; `elapsed`/`total` are its scene's own game time, summed from the ticks this state receives, so they stop while an Overlay covers the scene; `settings` is its scene's read-only `Settings`; `capabilities` is the device's read-only `Capabilities` (`has(name)`, raising for a name outside the vocabulary), handed through `GameEngine` from `DeviceHardware.capabilities` |
 | `Capabilities` | `engine/capabilities.py` | Read-only view of the device's Capabilities that rules ask with `has(name)` |
-| `Settings` | `engine/settings.py` | One scene's resolved Settings, read by namespace (`scene` or a pack name) and name; built by the catalog scan |
+| `Settings` | `engine/settings.py` | One scene's resolved Settings, read by namespace (`scene` or a Rule pack name) and name; built by the catalog scan |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
 | `SceneControls` | `engine/state.py` | Rule-facing transition seam (`overlay`, `pop`, `reboot_into`, `reboot_to_previous`; no in-process scene switch, see ADR-0005) plus `can_run(name)`, which the `lobby` pack asks to leave out entries the device can't play |
