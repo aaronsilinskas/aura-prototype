@@ -10,15 +10,22 @@ from app.scene_composition import (
     scan_boot_pack_catalog,
 )
 from engine.effects.manager import EffectManager
+from engine.engine import GameEngine
 from engine.events import Event
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
 from engine.namespace import ActiveSceneNamespace
 from engine.network import LINE, NetworkEvents
 from engine.packs import PackRegistry
-from engine.scene import SceneManager
-from engine.state import GameState
-from engine.tests.helpers import SpyNetworkControls
+from engine.scene import SceneManager, SceneRegistry
+from engine.state import GameState, SceneControls
+from engine.tests.helpers import (
+    RecordingNamespace,
+    RecordingSceneReboot,
+    SpyEffectAdmin,
+    SpyEffectControls,
+    SpyNetworkControls,
+)
 from engine.timer import Timer
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_hardware import DeviceHardware
@@ -60,6 +67,7 @@ class _RecordingState(GameState):
     """Stands in for the active scene's GameState: keeps every queued event."""
 
     def __init__(self) -> None:
+        super().__init__(SpyEffectControls(), SceneControls())
         self.queued: list[Event] = []
 
     def queue_event(self, event: Event) -> None:
@@ -71,6 +79,15 @@ class _RecordingManager(SceneManager):
     the way GameEngine.update advances it."""
 
     def __init__(self, timer: Timer, active: bool = True) -> None:
+        super().__init__(
+            GameEngine(effect_controls=SpyEffectControls()),
+            PackRegistry(),
+            PackRegistry(),
+            SceneRegistry(),
+            SpyEffectAdmin(),
+            RecordingNamespace(),
+            RecordingSceneReboot(),
+        )
         self._active_state = _RecordingState() if active else None
         self._timer = timer
         self.update_count = 0
@@ -86,6 +103,7 @@ class _RecordingManager(SceneManager):
 
 class _RecordingEffectManager(EffectManager):
     def __init__(self) -> None:
+        super().__init__(ActiveSceneNamespace(PackRegistry(), {}), [])
         self.updated_with: list[Timer] = []
 
     def update(self, timer: Timer) -> None:

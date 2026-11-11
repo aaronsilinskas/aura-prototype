@@ -1,7 +1,5 @@
 """Tests for PulseInReader and PulseOutWriter — CircuitPython pulseio adapters."""
 
-from __future__ import annotations
-
 from array import array
 from typing import TYPE_CHECKING, cast
 
@@ -36,7 +34,7 @@ class FakePulseIn:
         self._pulses.clear()
 
 
-def fake_pulse_in(pulses: list[int] | None = None, maxlen: int = 256) -> pulseio.PulseIn:
+def fake_pulse_in(pulses: list[int] | None = None, maxlen: int = 256) -> "pulseio.PulseIn":
     return cast("pulseio.PulseIn", FakePulseIn(pulses, maxlen))
 
 
@@ -50,7 +48,7 @@ class FakePulseOut:
         self.send_calls.append(pulses)
 
 
-def as_pulse_out(pulseout: FakePulseOut) -> pulseio.PulseOut:
+def as_pulse_out(pulseout: FakePulseOut) -> "pulseio.PulseOut":
     return cast("pulseio.PulseOut", pulseout)
 
 

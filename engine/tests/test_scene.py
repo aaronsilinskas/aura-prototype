@@ -19,6 +19,7 @@ from engine.tests.helpers import (
     RecordingNamespace,
     RecordingSceneReboot,
     SpyEffectAdmin,
+    active_state,
 )
 from engine.timer import Timer
 from engine.version import Version
@@ -92,13 +93,6 @@ def _make_scene_manager(
         namespace if namespace is not None else RecordingNamespace(),
         scene_reboot if scene_reboot is not None else RecordingSceneReboot(),
     )
-
-
-def _active_state(manager: SceneManager) -> GameState:
-    """The manager's active state, failing the test if no scene is loaded."""
-    state = manager.active_state
-    assert state is not None
-    return state
 
 
 def _ref(name: str) -> PackReference:
@@ -391,7 +385,7 @@ def test_transition_applies_after_engine_update_in_same_tick() -> None:
     manager.update()
 
     assert engine._update_calls == [main_state], "engine.update must run before the transition"
-    assert _active_state(manager).settings.get("scene", "which") == "overlay"
+    assert active_state(manager).settings.get("scene", "which") == "overlay"
 
 
 def test_last_pending_transition_wins_within_one_tick() -> None:
@@ -409,7 +403,7 @@ def test_last_pending_transition_wins_within_one_tick() -> None:
     manager.overlay("scene_b")
     manager.update()
 
-    assert _active_state(manager).settings.get("scene", "which") == "b", (
+    assert active_state(manager).settings.get("scene", "which") == "b", (
         "last overlay() call in tick should win"
     )
 
@@ -435,7 +429,7 @@ def test_activating_the_boot_scene_makes_it_active_at_once() -> None:
 
     manager.activate_boot_scene("main")
 
-    assert _active_state(manager).settings.get("scene", "which") == "main"
+    assert active_state(manager).settings.get("scene", "which") == "main"
 
 
 def test_activating_an_unregistered_boot_scene_raises() -> None:
@@ -650,13 +644,13 @@ def test_overlay_suspends_active_scene_and_pushes_without_clearing_stack() -> No
     manager.overlay("overlay_scene")
     manager.update()
     manager.update()  # tick on overlay
-    assert _active_state(manager).settings.get("scene", "which") == "overlay"
+    assert active_state(manager).settings.get("scene", "which") == "overlay"
 
     # base was suspended (not cleared): popping restores it
     manager.pop()
     manager.update()
     manager.update()
-    assert _active_state(manager).settings.get("scene", "which") == "base"
+    assert active_state(manager).settings.get("scene", "which") == "base"
 
 
 def test_overlay_clears_suspended_base_state_queue_before_pushing(pack_tree) -> None:
@@ -794,7 +788,7 @@ def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
     manager.update()
     manager.update()  # tick on restored scene
 
-    assert _active_state(manager).settings.get("scene", "which") == "mid", (
+    assert active_state(manager).settings.get("scene", "which") == "mid", (
         "pop from 3-layer stack must restore the scene directly below"
     )
 
@@ -802,7 +796,7 @@ def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
     manager.update()
     manager.update()
 
-    assert _active_state(manager).settings.get("scene", "which") == "base"
+    assert active_state(manager).settings.get("scene", "which") == "base"
 
 
 # ---------------------------------------------------------------------------
@@ -1045,7 +1039,7 @@ def test_pop_activates_revealed_entry_with_both_rules_and_its_namespace_view(pac
     manager.pop()
     manager.update()
 
-    _active_state(manager).queue_event(Event(_GROUP, "check"))
+    active_state(manager).queue_event(Event(_GROUP, "check"))
     manager.update()
     assert base_events, "base rules must be active on the engine after pop"
     assert namespace.installs[-1][0] is base_local_registry

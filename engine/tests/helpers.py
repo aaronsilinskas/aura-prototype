@@ -9,11 +9,13 @@ from engine.state import (
     EffectAdmin,
     EffectControls,
     EffectReceipt,
+    GameState,
     HeldEffects,
     NetworkControls,
     SceneReboot,
     ScopeValue,
 )
+from engine.timer import Timer
 
 _STUB_RECEIPT_ID = 0
 
@@ -129,6 +131,20 @@ class RecordingSceneReboot(SceneReboot):
 
     def previous_scene(self) -> str | None:
         return self._previous
+
+
+def active_state(manager: SceneManager) -> GameState:
+    """The manager's active state, failing the test if no scene is loaded."""
+    state = manager.active_state
+    assert state is not None
+    return state
+
+
+class FrozenTimer(Timer):
+    """A ``Timer`` that never advances, so a rule's timed behaviour stays put."""
+
+    def update(self) -> None:
+        pass
 
 
 def rule_source(class_name: str = "ARule") -> str:

@@ -1,7 +1,5 @@
 """Behaviour-driven tests for InfraredTransceiver (hardware/shared/ir_transceiver.py)."""
 
-from array import array
-
 import pytest
 
 from engine.network import CONE, LINE
@@ -17,40 +15,11 @@ from hardware.shared.ir_transport import (
     PulseReader,
     PulseWriter,
 )
+from hardware.shared.tests.ir_fakes import StubEncoder, make_transmitter
 
 # ---------------------------------------------------------------------------
 # Fakes
 # ---------------------------------------------------------------------------
-
-
-class _RecordingPulseWriter(PulseWriter):
-    """Captures written pulse sequences without touching hardware.
-
-    ``is_busy()`` always reports ``False`` — matches the blocking
-    ``PulseOutWriter``'s externally-observable behaviour.
-    """
-
-    def __init__(self) -> None:
-        self.calls: list[list[int]] = []
-
-    def write_pulses(self, durations) -> None:
-        self.calls.append(list(durations))
-
-    def is_busy(self) -> bool:
-        return False
-
-
-class _StubEncoder(InfraredEncoder):
-    """Minimal encoder that converts each byte to a single pulse duration."""
-
-    def encode(self, data: bytes) -> array:
-        return array("H", list(data))
-
-
-def _make_transmitter() -> tuple[InfraredTransmitter, _RecordingPulseWriter]:
-    writer = _RecordingPulseWriter()
-    tx = InfraredTransmitter(writer, _StubEncoder())
-    return tx, writer
 
 
 class _RecordingTransmitter(InfraredTransmitter):
@@ -148,7 +117,7 @@ def _receiver_holding(pulses) -> InfraredReceiver:
 
 
 def test_send_routes_payload_to_the_named_transmitter() -> None:
-    tx, writer = _make_transmitter()
+    tx, writer = make_transmitter()
     transceiver = InfraredTransceiver({CONE: tx}, None, IrTransmitGate())
 
     transceiver.send(b"\xab\xcd", CONE)
@@ -157,8 +126,8 @@ def test_send_routes_payload_to_the_named_transmitter() -> None:
 
 
 def test_send_routes_to_the_correct_transmitter_among_several() -> None:
-    tx_line, writer_line = _make_transmitter()
-    tx_cone, writer_cone = _make_transmitter()
+    tx_line, writer_line = make_transmitter()
+    tx_cone, writer_cone = make_transmitter()
     transceiver = InfraredTransceiver({LINE: tx_line, CONE: tx_cone}, None, IrTransmitGate())
 
     transceiver.send(b"\xff", CONE)
@@ -168,7 +137,7 @@ def test_send_routes_to_the_correct_transmitter_among_several() -> None:
 
 
 def test_send_raises_for_unwired_emitter() -> None:
-    tx, _ = _make_transmitter()
+    tx, _ = make_transmitter()
     transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
 
     with pytest.raises(ValueError):
@@ -188,7 +157,7 @@ def test_send_raises_for_empty_transmitter_map() -> None:
 
 
 def test_transceiver_does_not_expose_transmitters_as_a_public_collection() -> None:
-    tx, _ = _make_transmitter()
+    tx, _ = make_transmitter()
     transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
 
     assert not hasattr(transceiver, "transmitters")
@@ -211,7 +180,7 @@ def test_busy_pumps_the_named_transmitter() -> None:
 
 def test_busy_reports_the_writer_still_in_flight() -> None:
     writer = ControllableFakePulseWriter()
-    tx = InfraredTransmitter(writer, _StubEncoder())
+    tx = InfraredTransmitter(writer, StubEncoder())
     transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
     tx.send(b"\xab")
     writer.set_busy(True)
@@ -220,14 +189,14 @@ def test_busy_reports_the_writer_still_in_flight() -> None:
 
 
 def test_busy_reports_the_writer_idle() -> None:
-    tx, _ = _make_transmitter()
+    tx, _ = make_transmitter()
     transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
 
     assert transceiver.busy(LINE) is False
 
 
 def test_busy_raises_for_unwired_emitter() -> None:
-    tx, _ = _make_transmitter()
+    tx, _ = make_transmitter()
     transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
 
     with pytest.raises(ValueError):

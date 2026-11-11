@@ -1,52 +1,20 @@
 from __future__ import annotations
 
-from array import array
-
 import pytest
 
 from engine.capabilities import MissingCapabilityError
 from engine.engine import GameEngine
 from engine.network import CONE, LINE
 from engine.state import EffectControls, SceneControls
-from hardware.shared.ir_codecs.base import InfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.ir_transport import InfraredTransmitter, IrTransmitGate, PulseWriter
+from hardware.shared.ir_transport import InfraredTransmitter, IrTransmitGate
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.radio_transceiver import RadioTransceiver
+from hardware.shared.tests.ir_fakes import make_transmitter
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-class _RecordingPulseWriter(PulseWriter):
-    """Captures written pulse sequences without touching hardware.
-
-    ``is_busy()`` always reports ``False`` — matches the blocking
-    ``PulseOutWriter``'s externally-observable behaviour.
-    """
-
-    def __init__(self) -> None:
-        self.calls: list[list[int]] = []
-
-    def write_pulses(self, durations: array[int]) -> None:
-        self.calls.append(list(durations))
-
-    def is_busy(self) -> bool:
-        return False
-
-
-class _StubEncoder(InfraredEncoder):
-    """Minimal encoder that converts each byte to a single pulse duration."""
-
-    def encode(self, data: bytes) -> array[int]:
-        return array("H", list(data))
-
-
-def _make_transmitter() -> tuple[InfraredTransmitter, _RecordingPulseWriter]:
-    writer = _RecordingPulseWriter()
-    tx = InfraredTransmitter(writer, _StubEncoder())
-    return tx, writer
 
 
 def _make_transceiver(**transmitters: InfraredTransmitter) -> InfraredTransceiver:
@@ -59,7 +27,7 @@ def _make_transceiver(**transmitters: InfraredTransmitter) -> InfraredTransceive
 
 
 def test_hardware_network_controls_send_ir_dispatches_correct_data() -> None:
-    tx, writer = _make_transmitter()
+    tx, writer = make_transmitter()
     controls = HardwareNetworkControls(_make_transceiver(**{CONE: tx}))
 
     controls.send_ir(b"\xab\xcd", CONE)
@@ -77,7 +45,7 @@ def test_send_ir_with_no_ir_raises_missing_capability_for_the_emitter() -> None:
 
 
 def test_send_ir_on_an_emitter_not_wired_raises_missing_capability_for_it() -> None:
-    tx, _ = _make_transmitter()
+    tx, _ = make_transmitter()
     controls = HardwareNetworkControls(_make_transceiver(**{CONE: tx}))
 
     with pytest.raises(MissingCapabilityError) as raised:
@@ -87,7 +55,7 @@ def test_send_ir_on_an_emitter_not_wired_raises_missing_capability_for_it() -> N
 
 
 def test_send_ir_on_an_unknown_emitter_raises_value_error_naming_it() -> None:
-    tx, _ = _make_transmitter()
+    tx, _ = make_transmitter()
     controls = HardwareNetworkControls(_make_transceiver(**{CONE: tx}))
 
     with pytest.raises(ValueError, match="laser"):

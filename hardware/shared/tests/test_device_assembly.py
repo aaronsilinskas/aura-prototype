@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, cast
+from typing import Any
 
 import pytest
 
@@ -60,6 +60,21 @@ def _narration(config: DeviceConfig, **parts_options: Any) -> str:
 
 def _disabled(section_config: dict) -> dict:
     return {**section_config, "enabled": False}
+
+
+def _disabled_section(sections: dict[str, object], section: str) -> dict:
+    section_config = sections[section]
+    assert isinstance(section_config, dict)
+    return _disabled(section_config)
+
+
+def _output_parts(hw: DeviceHardware) -> list[str]:
+    """The part name of each built output, in build order."""
+    parts = []
+    for output in hw.outputs:
+        assert isinstance(output, Output)
+        parts.append(output.part)
+    return parts
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +195,7 @@ def test_haptics_are_built_with_their_config_on_the_i2c_bus():
 def test_disabled_audio_builds_no_audio_output():
     hw, _parts = _assemble(_config(pixels=[_NEOPIXEL], audio=_disabled(_AUDIO)))
 
-    assert [cast(Output, output).part for output in hw.outputs] == ["neopixel_strip"]
+    assert _output_parts(hw) == ["neopixel_strip"]
 
 
 def test_a_disabled_sdcard_builds_no_storage():
@@ -414,7 +429,7 @@ def test_pixel_outputs_follow_config_order(entries):
     hw, _parts = _assemble(_config(pixels=entries))
 
     expected = ["matrix_pixels" if e is _MATRIX else "neopixel_strip" for e in entries]
-    assert [cast(Output, output).part for output in hw.outputs] == expected
+    assert _output_parts(hw) == expected
 
 
 def test_a_segmented_strip_is_one_strip_carrying_every_segment():
@@ -858,7 +873,7 @@ def test_without_ir_the_network_controls_cannot_send_ir():
 def test_outputs_are_pixels_then_audio_then_haptics():
     hw, _parts = _assemble(_config(pixels=[_NEOPIXEL], audio=_AUDIO, haptics={}))
 
-    assert [cast(Output, output).part for output in hw.outputs] == [
+    assert _output_parts(hw) == [
         "neopixel_strip",
         "audio_output",
         "haptic_output",
@@ -962,7 +977,7 @@ def test_an_ir_section_without_receivers_has_no_ir_receive():
 )
 def test_a_disabled_component_is_not_a_capability(section, lost):
     sections = dict(_FULL_SECTIONS)
-    sections[section] = _disabled(cast(dict, sections[section]))
+    sections[section] = _disabled_section(sections, section)
 
     hw, _parts = _assemble(_config(**sections))
 
@@ -995,7 +1010,7 @@ def test_a_bare_config_polls_only_its_buttons():
 @pytest.mark.parametrize("section", ["accelerometer", "magnetometer", "radio", "ir"])
 def test_a_disabled_component_is_not_polled(section):
     sections = dict(_FULL_SECTIONS)
-    sections[section] = _disabled(cast(dict, sections[section]))
+    sections[section] = _disabled_section(sections, section)
 
     hw, _parts = _assemble(_config(**sections))
 
