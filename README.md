@@ -138,7 +138,7 @@ To put the code on a board:
 4. Deploy the scene runner and all modules:
 
    ```sh
-   uv run python scripts/deploy.py examples/hardware/scene_demo.py
+   uv run python -m scripts.deploy examples/hardware/scene_demo.py
    ```
 
    The board reboots and starts the scene.
