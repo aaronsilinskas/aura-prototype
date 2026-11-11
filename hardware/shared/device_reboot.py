@@ -3,7 +3,7 @@
 Board-free: the reset is injected rather than imported, so the adapter runs
 under CPython. ``app.scene_composition.build_scene_boot`` builds it with the
 reset it is handed (on a board, ``run_scene`` passes ``microcontroller.reset``)
-and hands it to ``build_scene_runtime`` as the ``SceneReboot`` port.
+and wires it into the booted scene as its ``SceneReboot`` port.
 """
 
 from __future__ import annotations

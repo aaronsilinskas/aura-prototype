@@ -94,13 +94,13 @@ hardware/         Hardware abstraction layer
 
 app/              Composition layer — the one place allowed to import both the engine's
                   runtime machinery and hardware.* together
-  scene_composition.py  build_scene_boot, build_scene_runtime, build_scene_tick (board-free,
-                        CPython-testable); the device and the Simulated device share
-                        both the boot and the tick, which polls DeviceHardware.polled.
-                        resolve_boot_scene_name boots the
-                        Persisted scene, else flash default_scene, skipping one the
-                        device lacks the Required capabilities for (raises
-                        MissingCapabilityError when none fits)
+  scene_composition.py  The Scene boot: build_scene_boot and the SceneBoot it returns
+                        are its whole interface (board-free, CPython-testable); the
+                        device and the Simulated device share both the boot and the
+                        tick, which polls DeviceHardware.polled. Boot runs the Persisted
+                        scene, else flash default_scene, skipping one the device lacks
+                        the Required capabilities for (raises MissingCapabilityError
+                        when none fits)
   scene_runtime.py      run_scene (device-only: bring-up, build_scene_boot, then loops
                         the tick it returns)
   simulation/           Test-only Simulation test harness (Simulation, SimulatedDevice):
@@ -208,8 +208,8 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, an optional receiver, shared transmit gate; `emitters` and `receives` say what is wired); wired only by `wire_ir` (`hardware/shared/ir_wiring.py`), for the device and the Simulated device alike |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |
-| `SceneRuntime` | `app/scene_composition.py` | Bundle from `build_scene_runtime` that `build_scene_tick` drives |
-| `build_scene_tick` | `app/scene_composition.py` | The scene tick shared by the device and the Simulated device: each tick calls `update(elapsed)` on every part in `DeviceHardware.polled` (IR and radio included, before the active-scene check) without naming any, then queues `InputEvents.Sensors` and the IR/radio received events from the parts' state; allocates nothing per tick |
+| `build_scene_boot` | `app/scene_composition.py` | The **Scene boot**, the Composition layer's only entry point: boots a `DeviceHardware` into its boot scene and returns a `SceneBoot`; shared by `run_scene` and the Simulated device |
+| `SceneBoot` | `app/scene_composition.py` | What `build_scene_boot` returns: the booted `scene_name`, its `tick`, its `scene_controls` (`SceneControls`) and its Active scene `namespace`. The tick is shared by the device and the Simulated device: each tick calls `update(elapsed)` on every part in `DeviceHardware.polled` (IR and radio included, before the active-scene check) without naming any, then queues `InputEvents.Sensors` and the IR/radio received events from the parts' state; allocates nothing per tick |
 | `DeviceSceneReboot` | `hardware/shared/device_reboot.py` | Live `SceneReboot` adapter; persists the target, then calls its injected `reset` (`build_scene_boot` wires it; `run_scene` passes `microcontroller.reset`) |
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol |

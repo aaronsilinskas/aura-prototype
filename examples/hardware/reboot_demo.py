@@ -70,7 +70,6 @@ import microcontroller
 from app.scene_composition import build_scene_boot
 from engine.capabilities import MissingCapabilityError
 from engine.log import Logger
-from engine.state import SceneControls
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
 from hardware.shared.device_boot import read_boot_mapping
 from hardware.shared.device_state import DeviceStateStore
@@ -94,8 +93,7 @@ hw = build_hardware(config, logger=hw_logger)
 
 boot = build_scene_boot(hw, read_boot_mapping(), reset=microcontroller.reset, logger=hw_logger)
 scene_name = boot.scene_name
-# SceneBoot hands the booted scene's SceneControls through its runtime's manager.
-controls: SceneControls = boot.runtime.manager
+controls = boot.scene_controls
 
 # This example owns reboot_demo_phase; return_to is the reboot's own key, read
 # here only to print as proof (the reboot is what writes and clears it).

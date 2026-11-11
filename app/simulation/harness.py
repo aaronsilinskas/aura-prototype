@@ -1,7 +1,7 @@
 """The Simulation test harness: real scenes on simulated devices, one shared clock.
 
 Boots each device through the same ``build_scene_boot`` the board boots
-through, and drives it with the ``build_scene_tick`` body that returns. It
+through, and drives it with the tick that boot returns. It
 lives under ``app/`` because booting a scene needs the composition layer,
 which the hardware import contract keeps out of ``hardware/``.
 
@@ -376,7 +376,7 @@ class SimulatedDevice:
     """A simulated device running a real scene: the handle a test talks to.
 
     It boots and ticks as a board does, through the same ``build_scene_boot``
-    and ``build_scene_tick``, reading its own boot values, which switching
+    and the tick it returns, reading its own boot values, which switching
     it on seeds with that scene as ``default_scene`` and ``redeploy`` changes.
     It reboots as a board does:
     ``DeviceSceneReboot`` persists the next scene to its card, then resets
@@ -431,8 +431,8 @@ class SimulatedDevice:
             setting_overrides=self._setting_overrides,
         )
         self._scene_tick = boot.tick
-        self._scene_controls = boot.runtime.manager
-        self._namespace = boot.runtime.namespace
+        self._scene_controls = boot.scene_controls
+        self._namespace = boot.namespace
         self.scene = boot.scene_name
         """The scene the device is running now."""
 
