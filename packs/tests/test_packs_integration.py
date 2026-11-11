@@ -14,6 +14,7 @@ from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog, scan_pack_roots
 from engine.scene import PackReference, Scene, SceneManager, SceneRegistry
 from engine.state import SceneReboot, Scope
+from engine.tests.effects.helpers import SpyEffectOutput
 from engine.version import Version
 from packs.rules.debug.event_logger import EventLoggerRule
 
@@ -315,17 +316,23 @@ def test_hardware_test_scenes_own_sound_resolves_to_its_sounds_folder(
     )
 
 
-def test_a_device_with_no_audio_still_starts_an_effect_that_declares_a_clip(
+def test_a_device_with_no_audio_output_still_resolves_the_clip_of_an_effect_it_starts(
     catalog: PackCatalog,
 ) -> None:
-    """Clips resolve the same with or without an audio output, so no-audio devices need no case."""
+    """Clips resolve the same with or without an audio output, so no-audio devices need no case.
+
+    The device's one output is a pixel strip; the effect's START still carries the resolved clip.
+    """
+    strip = SpyEffectOutput(min_resolution=8, scopes=[Scope.PERSONAL])
     effect_manager = EffectManager(
-        namespace=_namespace_with_active(catalog, "hardware_test"), outputs=[]
+        namespace=_namespace_with_active(catalog, "hardware_test"), outputs=[strip]
     )
 
-    receipt = effect_manager.set_effect(Scope.PERSONAL, "scene.sfx_test", {})
+    effect_manager.set_effect(Scope.PERSONAL, "scene.sfx_test", {})
 
-    assert receipt is not None
+    [(start, *_)] = strip.handle_event_calls
+    assert start.clip is not None
+    assert start.clip.path == _under_packs("scenes/hardware_test/sounds/sfx_test_start.wav")
 
 
 # --- Tag scene audio discovery (issue #805) ---

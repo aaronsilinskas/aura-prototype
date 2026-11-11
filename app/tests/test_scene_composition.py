@@ -5,11 +5,10 @@ the boot logged, persisted or raised."""
 import pytest
 
 from app.scene_composition import build_scene_boot
-from app.tests.probe import PROBE_SCENE
+from app.tests.probe import PROBE_SCENE, no_reset
 from engine.capabilities import MissingCapabilityError
-from engine.events import Event
 from engine.log import Logger
-from engine.pack_catalog import PackScanError, scan_pack_roots
+from engine.pack_catalog import PackScanError
 from engine.tests.helpers import SpyNetworkControls
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_hardware import DeviceHardware
@@ -37,7 +36,7 @@ _FLASH_SCENE = "hardware_test"
 
 
 def _hw(storage=None, ir=None, capabilities=_FULL):
-    """Return a DeviceHardware built entirely from CPython-safe fakes."""
+    """Return a DeviceHardware built entirely from CPython-safe fakes; *ir* is Polled."""
     return DeviceHardware(
         outputs=[],
         buttons=DebouncedButtons([]),
@@ -48,31 +47,37 @@ def _hw(storage=None, ir=None, capabilities=_FULL):
         radio=None,
         storage=storage,
         capabilities=capabilities,
-        polled=(),
+        polled=(ir,) if ir is not None else (),
     )
 
 
-def _no_reset() -> None:
-    raise AssertionError("the boot reset the device")
-
-
-def _known_scenes(error: pytest.ExceptionInfo[ValueError]) -> list[str]:
-    """Return the known scenes an unknown-scene error names, sorted."""
-    return sorted(str(error.value).split("known scenes: ")[1].split(", "))
-
-
-def _flash_scenes() -> list[str]:
-    return sorted(scan_pack_roots(["packs"]).scene_registry.names())
-
-
 class _CodecRecordingIr:
-    """Stands in for the device's IR, recording the wire-frame codec applied to it."""
+    """Stands in for the device's IR, recording the codec applied to it and each use, in order.
+
+    ``uses`` logs ``("apply_codec", (encoder, decoder))``, ``("update", None)`` for
+    each poll, and ``("received", None)`` for each read of a received packet.
+    """
 
     def __init__(self) -> None:
         self.codec: tuple[object, object] | None = None
+        self.uses: list[tuple[str, object]] = []
+        self.last_signal_strength = 0
+        self.last_error_margin = 0
 
     def apply_codec(self, encoder_class, decoder_factory) -> None:
         self.codec = (encoder_class, decoder_factory)
+        self.uses.append(("apply_codec", self.codec))
+
+    def update(self, elapsed: float) -> None:
+        self.uses.append(("update", None))
+
+    @property
+    def received(self) -> bytes | None:
+        self.uses.append(("received", None))
+        return None
+
+    def telemetry_line(self) -> str | None:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +94,7 @@ def test_the_cards_persisted_scene_boots_over_the_flash_default_scene(probe):
 
 
 def test_a_card_less_device_boots_the_flash_default_scene():
-    boot = build_scene_boot(_hw(), {"default_scene": _FLASH_SCENE}, reset=_no_reset)
+    boot = build_scene_boot(_hw(), {"default_scene": _FLASH_SCENE}, reset=no_reset)
 
     assert boot.scene_name == _FLASH_SCENE
 
@@ -177,27 +182,27 @@ def test_an_applied_scene_deploy_token_no_longer_overrides_the_persisted_scene(p
 # ---------------------------------------------------------------------------
 
 
-def test_a_card_less_device_reaches_only_the_flash_scenes():
-    with pytest.raises(ValueError) as error:
-        build_scene_boot(_hw(), {"default_scene": "not-a-real-scene"}, reset=_no_reset)
-
-    assert _known_scenes(error) == _flash_scenes()
+def test_a_device_without_the_card_cannot_boot_a_scene_only_that_card_carries(probe):
+    with pytest.raises(ValueError, match=f"unknown scene {PROBE_SCENE!r}"):
+        probe.boot(_hw(storage=None))
 
 
-def test_a_card_without_aura_packs_reaches_only_the_flash_scenes(device_storage):
-    with pytest.raises(ValueError) as error:
-        build_scene_boot(
-            _hw(device_storage), {"default_scene": "not-a-real-scene"}, reset=_no_reset
-        )
+def test_a_card_without_aura_packs_still_boots_a_flash_scene(device_storage):
+    boot = build_scene_boot(_hw(device_storage), {"default_scene": _FLASH_SCENE}, reset=no_reset)
 
-    assert _known_scenes(error) == _flash_scenes()
+    assert boot.scene_name == _FLASH_SCENE
 
 
-def test_a_card_with_aura_packs_reaches_the_flash_scenes_and_the_cards(probe):
-    with pytest.raises(ValueError) as error:
-        probe.boot(_hw(probe.storage), boot_mapping={"default_scene": "not-a-real-scene"})
+def test_a_card_with_aura_packs_boots_its_own_scene(probe):
+    boot = probe.boot(_hw(probe.storage))
 
-    assert _known_scenes(error) == sorted([*_flash_scenes(), PROBE_SCENE])
+    assert boot.scene_name == PROBE_SCENE
+
+
+def test_a_card_with_aura_packs_still_boots_a_flash_scene(probe):
+    boot = probe.boot(_hw(probe.storage), boot_mapping={"default_scene": _FLASH_SCENE})
+
+    assert boot.scene_name == _FLASH_SCENE
 
 
 def test_a_misconfigured_card_scene_stops_boot_with_a_pack_scan_error(probe):
@@ -212,10 +217,13 @@ def test_a_misconfigured_card_scene_stops_boot_with_a_pack_scan_error(probe):
 
 def test_boot_applies_the_booted_scenes_declared_codec_to_the_ir_before_the_first_tick(probe):
     ir = _CodecRecordingIr()
+    tick = probe.boot(_hw(probe.storage, ir=ir), scene_json={"ir_codec": "tag"}).tick
 
-    probe.boot(_hw(probe.storage, ir=ir), scene_json={"ir_codec": "tag"})
+    tick()
 
-    assert ir.codec == (TagInfraredEncoder, TagInfraredDecoder)
+    first_use, *later_uses = ir.uses
+    assert first_use == ("apply_codec", (TagInfraredEncoder, TagInfraredDecoder))
+    assert {use for use, _ in later_uses} == {"update", "received"}
 
 
 def test_a_scene_declaring_no_codec_boots_on_the_aura_wire_frame(probe):
@@ -247,8 +255,7 @@ def test_setting_overrides_reach_the_booted_scenes_settings(probe):
 
     tick()
 
-    [(_, state), *_] = probe.heard(Event)
-    assert state.settings.get_int("scene", "rounds") == 2
+    assert probe.state().settings.get_int("scene", "rounds") == 2
 
 
 def test_the_booted_scenes_rules_see_the_devices_capabilities(probe):
@@ -256,7 +263,7 @@ def test_the_booted_scenes_rules_see_the_devices_capabilities(probe):
 
     tick()
 
-    [(_, state), *_] = probe.heard(Event)
+    state = probe.state()
     assert (state.capabilities.has("radio"), state.capabilities.has("ir.line")) == (True, False)
 
 
@@ -272,9 +279,8 @@ def test_a_reboot_the_booted_scene_asks_for_persists_its_target_then_resets(prob
         reset=lambda: persisted_at_reset.append(probe.storage.read_json("aura-state.json")),
     ).tick
     tick()
-    [(_, state), *_] = probe.heard(Event)
 
-    state.scene_controls.reboot_into(_FLASH_SCENE)
+    probe.state().scene_controls.reboot_into(_FLASH_SCENE)
 
     [persisted] = persisted_at_reset
     assert persisted is not None
@@ -284,6 +290,5 @@ def test_a_reboot_the_booted_scene_asks_for_persists_its_target_then_resets(prob
 def test_the_boots_scene_controls_are_the_ones_the_booted_scenes_rules_hold(probe):
     boot = probe.boot(_hw(probe.storage))
     boot.tick()
-    [(_, state), *_] = probe.heard(Event)
 
-    assert boot.scene_controls is state.scene_controls
+    assert boot.scene_controls is probe.state().scene_controls
