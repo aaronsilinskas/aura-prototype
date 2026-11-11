@@ -246,28 +246,33 @@ def test_a_scan_override_of_an_undeclared_scene_setting_raises(pack_tree) -> Non
     assert _fields(excinfo.value) == ("game", "scene", "max_ammo")
 
 
-@pytest.mark.parametrize(
-    ("reference_settings", "setting_overrides"),
-    [
-        ({"speed": 0.5}, None),
-        (None, {"game": {"effect_packs": {"glow": {"speed": 0.5}}}}),
-    ],
-    ids=["scene-override", "scan-override"],
-)
-def test_an_effect_pack_override_is_checked_against_its_manifest(
-    pack_tree, reference_settings, setting_overrides
+def test_a_scan_override_of_an_effect_pack_setting_is_checked_against_its_manifest(
+    pack_tree,
 ) -> None:
     root = pack_tree.root("ts_flash")
     pack_tree.effect_pack(root, "glow", settings={"speed": {"type": "int", "default": 1}})
-    reference: dict[str, object] = {"name": "glow", "version": "1.0"}
-    if reference_settings is not None:
-        reference["settings"] = reference_settings
-    pack_tree.scene(root, "game", effect_packs=[reference])
+    pack_tree.scene(root, "game", effect_packs=[{"name": "glow", "version": "1.0"}])
 
     with pytest.raises(SettingOverrideError) as excinfo:
-        pack_tree.scan_roots(root, setting_overrides=setting_overrides)
+        pack_tree.scan_roots(
+            root, setting_overrides={"game": {"effect_packs": {"glow": {"speed": 0.5}}}}
+        )
 
     assert _fields(excinfo.value) == ("game", "glow", "speed")
+
+
+def test_settings_on_an_effect_pack_reference_raise_malformed_scene_error(pack_tree) -> None:
+    root = pack_tree.root("ts_flash")
+    pack_tree.effect_pack(root, "glow")
+    pack_tree.scene(root, "game", effect_packs=[{"name": "glow", "version": "1.0", "settings": {}}])
+
+    with pytest.raises(MalformedSceneError) as excinfo:
+        pack_tree.scan_roots(root)
+
+    assert (excinfo.value.scene, excinfo.value.path) == (
+        "game",
+        str(root / "scenes" / "game" / "scene.json"),
+    )
 
 
 def test_a_setting_override_error_is_a_scene_declaration_error() -> None:

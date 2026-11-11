@@ -310,8 +310,8 @@ A **Scene** is a declarative bundle, described by its `scene.json`:
 ```
 
 - `version` — the scene's own `MAJOR.MINOR` version
-- `effect_packs` — ordered `{"name": ..., "version": ...}` objects (an optional `settings` object holds that pack's Setting overrides, checked at scan; effects do not receive them yet); `version` is the minimum compatible version, same major, checked at scan
-- `rule_packs` — the same object form; all rules loaded and appended in declared order
+- `effect_packs` — ordered `{"name": ..., "version": ...}` objects; `version` is the minimum compatible version, same major, checked at scan. An effect pack takes no Setting overrides: a `settings` object here fails the scan with `MalformedSceneError`
+- `rule_packs` — the same object form, plus an optional `settings` object holding that pack's Setting overrides, checked at scan; all rules loaded and appended in declared order
 - Optional `settings` — the scene's own Setting declarations, in the manifest's shape; rules
   read them in the `scene` namespace, and a Scene Config builds from them with the typed reads
   (`state.settings.get_float("scene", "window_seconds")`). A bad declaration fails the scan
