@@ -155,6 +155,7 @@ def test_pulse_default_end_color_appears_at_on_phase() -> None:
     from packs.effects.basic.pulse import BUILD
 
     effect = BUILD("basic.pulse", EffectConfig(resolution=16))
+    assert effect.pixels is not None
     effect.pixels.update(0.75)  # past brighten(0.5) + into on(0.5)
     pixels = _render(effect)
     assert all(p == 0xFFFFFF for p in pixels)

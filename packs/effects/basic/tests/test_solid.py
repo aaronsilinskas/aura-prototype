@@ -18,6 +18,7 @@ def _render(pixel_count: int = 4, color: int | None = None):
     config = _config(color)
     effect = BUILD("basic.solid", config)
     buf = PixelBuffer(pixel_count)
+    assert effect.pixels is not None
     effect.pixels.render(buf)
     return list(buf)
 
@@ -55,6 +56,7 @@ def test_solid_ignores_brightness_option() -> None:
     config = EffectConfig(resolution=16, options={"color": 0xFFFFFF, "brightness": 0.5})
     effect = BUILD("basic.solid", config)
     buf = PixelBuffer(4)
+    assert effect.pixels is not None
     effect.pixels.render(buf)
     # brightness is ignored; raw color is stored as-is
     assert all(p == 0xFFFFFF for p in buf)
@@ -69,6 +71,7 @@ def test_solid_no_color_option_defaults_to_white() -> None:
     config = EffectConfig(resolution=16)
     effect = BUILD("basic.solid", config)
     buf = PixelBuffer(4)
+    assert effect.pixels is not None
     effect.pixels.render(buf)
     assert all(p == 0xFFFFFF for p in buf)
 
