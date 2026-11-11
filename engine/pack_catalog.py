@@ -451,8 +451,13 @@ def _scan_packs(root: str, root_name: str, kind: str, packs: list[_PackEntry]) -
             if entry.name == name:
                 raise DuplicateNameError(name, entry.source_path, pack_dir)
         manifest = _read_manifest(manifest_path)
-        if kind == "effects" and "requires" in manifest:
-            raise MalformedManifestError(manifest_path, "an effect pack cannot list 'requires'")
+        if kind == "effects":
+            _reject_effect_manifest_keys(manifest, manifest_path)
+            declarations: dict[str, SettingDeclaration] = {}
+            requires: frozenset[str] = frozenset()
+        else:
+            declarations = read_manifest_declarations(manifest, manifest_path)
+            requires = _read_requires(manifest, manifest_path, MalformedManifestError)
         version = _parse_version(manifest.get("version"), manifest_path)
         packs.append(
             _PackEntry(
@@ -461,10 +466,25 @@ def _scan_packs(root: str, root_name: str, kind: str, packs: list[_PackEntry]) -
                 module_prefix=root_name + "." + kind + "." + name,
                 item_names=scan_item_names(pack_dir),
                 source_path=pack_dir,
-                declarations=read_manifest_declarations(manifest, manifest_path),
-                requires=_read_requires(manifest, manifest_path, MalformedManifestError),
+                declarations=declarations,
+                requires=requires,
             )
         )
+
+
+def _reject_effect_manifest_keys(manifest: dict, path: str) -> None:
+    """Raise if the effect pack *manifest* read from *path* has a key only Rule packs may have.
+
+    An effect pack is tuned per use through ``options``, so it declares no
+    Settings and lists no Capabilities.
+
+    Raises:
+        MalformedManifestError: *manifest* has a ``requires`` or ``settings`` key.
+    """
+    if "requires" in manifest:
+        raise MalformedManifestError(path, "an effect pack cannot list 'requires'")
+    if "settings" in manifest:
+        raise MalformedManifestError(path, "an effect pack cannot declare 'settings'")
 
 
 def _scan_scenes(
