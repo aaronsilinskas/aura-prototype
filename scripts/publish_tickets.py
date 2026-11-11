@@ -6,6 +6,12 @@ parent and gets GitHub's native "blocked by" edges. Afterwards every created
 issue is read back and printed as a table, so a wrong title or edge shows up
 immediately.
 
+Tickets cite the spec's ``GLOSSARY.md`` / ``docs/adr/`` entries, so before creating
+anything the script waits for the spec's domain-docs PR (branch
+``spec-<parent>-domain-docs``, opened by ``publish_spec.py``) to merge. A spec with no
+such PR is not waited for; one closed unmerged, or still open at ``--wait-timeout``,
+stops the publish.
+
 Manifest shape (``body_file`` paths are relative to the manifest)::
 
     {
@@ -31,6 +37,7 @@ import argparse
 import json
 import subprocess
 import sys
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -39,6 +46,10 @@ Runner = Callable[[list[str]], str]
 
 class ManifestError(ValueError):
     """The manifest is malformed: a missing field, duplicate key, or bad blocker."""
+
+
+class DomainDocsError(RuntimeError):
+    """The spec's domain-docs PR was closed unmerged, or did not merge before the timeout."""
 
 
 class Ticket:
@@ -84,6 +95,44 @@ def load_manifest(path: Path) -> tuple[int, list[str], list[Ticket]]:
         seen.add(key)
         tickets.append(Ticket(key, title, body_file, blocked_by))
     return parent, labels, tickets
+
+
+def wait_for_domain_docs(
+    spec: int,
+    run: Runner,
+    sleep: Callable[[float], None] = time.sleep,
+    now: Callable[[], float] = time.monotonic,
+    timeout: float = 900,
+    interval: float = 15,
+    log: Callable[[str], None] = print,
+) -> None:
+    """Return once spec *spec*'s domain-docs PR has merged, or when it has none."""
+    branch = f"spec-{spec}-domain-docs"
+    deadline = now() + timeout
+    while True:
+        state = run(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--head",
+                branch,
+                "--state",
+                "all",
+                "--json",
+                "state",
+                "--jq",
+                '.[0].state // ""',
+            ]
+        ).strip()
+        if state in ("", "MERGED"):
+            return
+        if state != "OPEN":
+            raise DomainDocsError(f"domain-docs PR for {branch} is {state.lower()}, not merged")
+        if now() + interval > deadline:
+            raise DomainDocsError(f"domain-docs PR for {branch} did not merge within {timeout:g}s")
+        log(f"waiting for the domain-docs PR ({branch}) to merge...")
+        sleep(interval)
 
 
 def publish(parent: int, labels: list[str], tickets: list[Ticket], run: Runner) -> dict[str, int]:
@@ -142,6 +191,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dry-run", action="store_true", help="check the manifest and print the plan"
     )
+    parser.add_argument(
+        "--wait-timeout",
+        type=float,
+        default=900,
+        help="seconds to wait for the spec's domain-docs PR to merge (default 900)",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -156,6 +211,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"- {ticket.key}: {ticket.title} (blocked by {ticket.blocked_by or 'none'})")
         return 0
 
+    try:
+        wait_for_domain_docs(parent, _gh, timeout=args.wait_timeout)
+    except DomainDocsError as exc:
+        print(f"error: {exc}; nothing was created", file=sys.stderr)
+        return 1
     numbers = publish(parent, labels, tickets, _gh)
     print("\n".join(read_back(numbers, _gh)))
     return 0
