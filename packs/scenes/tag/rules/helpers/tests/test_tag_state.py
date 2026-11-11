@@ -9,19 +9,13 @@ from __future__ import annotations
 
 from engine.engine import GameEngine
 from engine.state import SceneControls
-from engine.tests.helpers import SpyEffectControls
-from engine.timer import Timer
+from engine.tests.helpers import FrozenTimer, SpyEffectControls
 from packs.scenes.tag.rules.helpers.tag_state import TagState, tag_state
-
-
-class _StubTimer(Timer):
-    def update(self) -> None:
-        pass
 
 
 def _make_state():
     spy = SpyEffectControls()
-    timer = _StubTimer()
+    timer = FrozenTimer()
     engine = GameEngine(spy, timer=timer)
     return engine.create_state(SceneControls())
 

@@ -9,23 +9,12 @@ import pytest
 from hardware.shared.device_config import (
     DeviceConfig,
     MatrixPixelsConfig,
-    NeoPixelPixelsConfig,
     load_device_config,
     parse_device_config,
     read_device_config_mapping,
     validate_band_map,
 )
-
-
-def _matrix(entry: MatrixPixelsConfig | NeoPixelPixelsConfig) -> MatrixPixelsConfig:
-    assert isinstance(entry, MatrixPixelsConfig)
-    return entry
-
-
-def _neopixel(entry: MatrixPixelsConfig | NeoPixelPixelsConfig) -> NeoPixelPixelsConfig:
-    assert isinstance(entry, NeoPixelPixelsConfig)
-    return entry
-
+from hardware.shared.tests.pixels_config import as_matrix, as_neopixel
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SAMPLE_CONFIG_PATH = _REPO_ROOT / "examples" / "aura-device.pico-2.json"
@@ -110,7 +99,7 @@ def test_parse_full_matrix_config_maps_every_section(matrix_config):
     result = parse_device_config(matrix_config)
 
     assert len(result.pixels) == 1
-    assert _matrix(result.pixels[0]).cols == 13
+    assert as_matrix(result.pixels[0]).cols == 13
     assert result.buttons == ["D9", "D10"]
     assert result.ir is not None
     assert result.ir.rx == ["D11"]
@@ -126,7 +115,7 @@ def test_parse_full_matrix_config_maps_every_section(matrix_config):
 def test_parse_matrix_config_scope_rows_converted_to_ranges(matrix_config):
     result = parse_device_config(matrix_config)
 
-    scope_rows = _matrix(result.pixels[0]).scope_rows
+    scope_rows = as_matrix(result.pixels[0]).scope_rows
     assert scope_rows["global.buff"] == range(0, 1)
     assert scope_rows["global.main"] == range(2, 5)
     assert scope_rows["ambient"] == range(8, 9)
@@ -233,7 +222,7 @@ def test_parse_matrix_scope_rows_error_lists_valid_keys(matrix_config):
 def test_parse_matrix_without_brightness_defaults_to_one(matrix_config):
     result = parse_device_config(matrix_config)
 
-    assert _matrix(result.pixels[0]).brightness == 1.0
+    assert as_matrix(result.pixels[0]).brightness == 1.0
 
 
 def test_parse_matrix_explicit_brightness_is_stored(matrix_config):
@@ -241,7 +230,7 @@ def test_parse_matrix_explicit_brightness_is_stored(matrix_config):
 
     result = parse_device_config(matrix_config)
 
-    assert _matrix(result.pixels[0]).brightness == 0.2
+    assert as_matrix(result.pixels[0]).brightness == 0.2
 
 
 def test_parse_matrix_brightness_boundary_zero_is_accepted(matrix_config):
@@ -249,7 +238,7 @@ def test_parse_matrix_brightness_boundary_zero_is_accepted(matrix_config):
 
     result = parse_device_config(matrix_config)
 
-    assert _matrix(result.pixels[0]).brightness == 0.0
+    assert as_matrix(result.pixels[0]).brightness == 0.0
 
 
 def test_parse_matrix_brightness_boundary_one_is_accepted(matrix_config):
@@ -257,7 +246,7 @@ def test_parse_matrix_brightness_boundary_one_is_accepted(matrix_config):
 
     result = parse_device_config(matrix_config)
 
-    assert _matrix(result.pixels[0]).brightness == 1.0
+    assert as_matrix(result.pixels[0]).brightness == 1.0
 
 
 def test_parse_matrix_non_numeric_brightness_raises_value_error(matrix_config):
@@ -289,7 +278,7 @@ def test_parse_matrix_negative_brightness_raises_value_error(matrix_config):
 def test_parse_matrix_without_address_defaults_to_none(matrix_config):
     result = parse_device_config(matrix_config)
 
-    assert _matrix(result.pixels[0]).address is None
+    assert as_matrix(result.pixels[0]).address is None
 
 
 def test_parse_matrix_integer_address_is_stored_as_int(matrix_config):
@@ -297,7 +286,7 @@ def test_parse_matrix_integer_address_is_stored_as_int(matrix_config):
 
     result = parse_device_config(matrix_config)
 
-    assert _matrix(result.pixels[0]).address == 49
+    assert as_matrix(result.pixels[0]).address == 49
 
 
 def test_parse_matrix_lowercase_hex_string_address_is_normalized_to_int(matrix_config):
@@ -305,7 +294,7 @@ def test_parse_matrix_lowercase_hex_string_address_is_normalized_to_int(matrix_c
 
     result = parse_device_config(matrix_config)
 
-    assert _matrix(result.pixels[0]).address == 0x31
+    assert as_matrix(result.pixels[0]).address == 0x31
 
 
 def test_parse_matrix_uppercase_hex_string_address_is_normalized_to_int(matrix_config):
@@ -313,7 +302,7 @@ def test_parse_matrix_uppercase_hex_string_address_is_normalized_to_int(matrix_c
 
     result = parse_device_config(matrix_config)
 
-    assert _matrix(result.pixels[0]).address == 0x31
+    assert as_matrix(result.pixels[0]).address == 0x31
 
 
 def test_parse_matrix_address_boundary_minimum_is_accepted(matrix_config):
@@ -321,7 +310,7 @@ def test_parse_matrix_address_boundary_minimum_is_accepted(matrix_config):
 
     result = parse_device_config(matrix_config)
 
-    assert _matrix(result.pixels[0]).address == 0x08
+    assert as_matrix(result.pixels[0]).address == 0x08
 
 
 def test_parse_matrix_address_boundary_maximum_is_accepted(matrix_config):
@@ -329,7 +318,7 @@ def test_parse_matrix_address_boundary_maximum_is_accepted(matrix_config):
 
     result = parse_device_config(matrix_config)
 
-    assert _matrix(result.pixels[0]).address == 0x77
+    assert as_matrix(result.pixels[0]).address == 0x77
 
 
 def test_parse_matrix_address_below_reserved_floor_raises_value_error(matrix_config):
@@ -547,13 +536,13 @@ def test_validate_band_map_invalid_scope_key_raises_value_error():
 def test_parse_neopixel_first_entry_exposes_configured_scopes(neopixel_config):
     result = parse_device_config(neopixel_config)
 
-    assert "personal" in _neopixel(result.pixels[0]).scopes
+    assert "personal" in as_neopixel(result.pixels[0]).scopes
 
 
 def test_parse_neopixel_scope_fields_match(neopixel_config):
     result = parse_device_config(neopixel_config)
 
-    scope = _neopixel(result.pixels[0]).scopes["personal"]
+    scope = as_neopixel(result.pixels[0]).scopes["personal"]
     assert scope.pin == "D5"
     assert scope.count == 30
     assert scope.order == "GRB"
@@ -1767,7 +1756,7 @@ def test_isolate_disabled_copy_preserves_matrix_pixels_fields(matrix_config):
     isolated = config.isolate(keep="audio")
 
     _assert_same_fields_except_enabled(config.pixels[0], isolated.pixels[0])
-    assert _matrix(isolated.pixels[0]).address == 0x31
+    assert as_matrix(isolated.pixels[0]).address == 0x31
     assert isolated.pixels[0].enabled is False
 
 

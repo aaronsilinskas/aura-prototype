@@ -14,8 +14,6 @@ The carrier (38 kHz) is generated inside the PIO program, so the writer feeds
 the state machine raw mark/space durations only.
 """
 
-from __future__ import annotations
-
 from array import array
 from typing import TYPE_CHECKING, cast
 
@@ -51,7 +49,7 @@ class _FakeStateMachine:
         self.writing = True
 
 
-def as_state_machine(sm: _FakeStateMachine) -> rp2pio.StateMachine:
+def as_state_machine(sm: _FakeStateMachine) -> "rp2pio.StateMachine":
     return cast("rp2pio.StateMachine", sm)
 
 

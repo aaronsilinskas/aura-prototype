@@ -6,8 +6,6 @@ libraries are faked at their public names (``busio.I2C``, ``digitalio.DigitalInO
 installs; the board module is a plain namespace of pin objects.
 """
 
-from __future__ import annotations
-
 import sys
 import time
 from array import array
@@ -59,7 +57,7 @@ def _board(*names: str) -> SimpleNamespace:
 class _FakeDigitalInOut:
     """A GPIO: remembers its pin, direction and pull, and holds a settable ``value``."""
 
-    built: ClassVar[list[_FakeDigitalInOut]] = []
+    built: ClassVar[list["_FakeDigitalInOut"]] = []
 
     def __init__(self, pin: object) -> None:
         self.pin = pin
@@ -171,12 +169,12 @@ class _FakeSPI:
         self.pins = (sck, MOSI, MISO)
 
 
-def fake_i2c() -> busio.I2C:
+def fake_i2c() -> "busio.I2C":
     """A sentinel passed off as an I2C bus, for parts that only hand it to their driver."""
     return cast("busio.I2C", object())
 
 
-def fake_spi() -> busio.SPI:
+def fake_spi() -> "busio.SPI":
     """A sentinel passed off as an SPI bus, for parts that only hand it to their driver."""
     return cast("busio.SPI", object())
 
@@ -286,7 +284,7 @@ def test_button_reader_reads_the_pins_current_raw_level(gpio: list[_FakeDigitalI
 class _FakeNeoPixel(list):
     """A strip's pixel list, remembering how it was constructed."""
 
-    built: ClassVar[_FakeNeoPixel | None] = None
+    built: ClassVar["_FakeNeoPixel | None"] = None
 
     def __init__(
         self, pin: object, n: int, *, pixel_order: str, brightness: float, auto_write: bool
@@ -363,7 +361,7 @@ class _FakeMatrixDriver:
     """An IS31FL3741 driver; the first ``unresponsive_attempts`` constructions raise."""
 
     unresponsive_attempts: ClassVar[int] = 0
-    responded: ClassVar[_FakeMatrixDriver | None] = None
+    responded: ClassVar["_FakeMatrixDriver | None"] = None
 
     def __init__(self, i2c: object, **kwargs: object) -> None:
         if _FakeMatrixDriver.unresponsive_attempts > 0:
@@ -565,7 +563,7 @@ class _FakeMmc5603(_FakeI2CChip):
     """An MMC5603 whose first ``dead_polls`` reads of ``.magnetic`` are the dead-chip reading."""
 
     dead_polls = 0
-    built: ClassVar[list[_FakeMmc5603]] = []
+    built: ClassVar[list["_FakeMmc5603"]] = []
 
     def __init__(self, i2c: object, **kwargs: object) -> None:
         super().__init__(i2c, **kwargs)
@@ -641,7 +639,7 @@ def test_magnetometer_whose_first_conversions_read_dead_is_used_once_one_reads_l
 class _FakeDrv2605(_FakeI2CChip):
     """A DRV2605 haptic driver; counts how often it was told to play."""
 
-    built: ClassVar[list[_FakeDrv2605]] = []
+    built: ClassVar[list["_FakeDrv2605"]] = []
 
     def __init__(self, i2c: object, **kwargs: object) -> None:
         super().__init__(i2c, **kwargs)
@@ -711,7 +709,7 @@ class _FakeVoice:
         self.playing = False
         self.wave: _FakeWaveFile | None = None
 
-    def play(self, wave: _FakeWaveFile, loop: bool = False) -> None:
+    def play(self, wave: "_FakeWaveFile", loop: bool = False) -> None:
         self.wave = wave
         self.playing = True
 
@@ -727,7 +725,7 @@ class _FakeMixer:
 class _FakeI2SOut:
     """An I2S amp on its three pins, remembering the mixer it plays."""
 
-    built: ClassVar[list[_FakeI2SOut]] = []
+    built: ClassVar[list["_FakeI2SOut"]] = []
 
     def __init__(self, bit_clock: object, word_select: object, data: object) -> None:
         self.pins = (bit_clock, word_select, data)
@@ -834,7 +832,7 @@ def test_audio_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
 class _FakePulseIn(list):
     """A ``pulseio.PulseIn`` buffer of pulse durations, remembering how it was opened."""
 
-    built: ClassVar[list[_FakePulseIn]] = []
+    built: ClassVar[list["_FakePulseIn"]] = []
 
     def __init__(self, pin: object, *, maxlen: int, idle_state: bool) -> None:
         super().__init__()
@@ -890,7 +888,7 @@ def test_ir_reader_pin_naming_an_unknown_pin_raises_value_error_naming_its_field
 class _FakePulseOut:
     """A ``pulseio.PulseOut`` carrier on a pin, recording every pulse train sent."""
 
-    built: ClassVar[list[_FakePulseOut]] = []
+    built: ClassVar[list["_FakePulseOut"]] = []
 
     def __init__(self, pin: object, *, frequency: int, duty_cycle: int) -> None:
         self.pin = pin
@@ -906,7 +904,7 @@ class _FakePulseOut:
 class _FakeStateMachine:
     """An ``rp2pio.StateMachine``; program and frequency are positional-only, as on the board."""
 
-    built: ClassVar[list[_FakeStateMachine]] = []
+    built: ClassVar[list["_FakeStateMachine"]] = []
 
     def __init__(
         self, program: object, frequency: int, /, *, first_set_pin: object, **_kwargs: object
@@ -1008,7 +1006,7 @@ def test_ir_writer_pin_naming_an_unknown_pin_raises_value_error_naming_its_field
 class _FakeRfm69:
     """An ``adafruit_rfm69.RFM69`` chip, remembering how it was built and what it sent."""
 
-    built: ClassVar[list[_FakeRfm69]] = []
+    built: ClassVar[list["_FakeRfm69"]] = []
 
     def __init__(self, spi: object, cs: object, reset: object, frequency: float) -> None:
         self.spi = spi

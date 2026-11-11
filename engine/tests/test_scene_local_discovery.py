@@ -12,6 +12,7 @@ from engine.pack_catalog import scan_pack_roots
 from engine.scene import Scene
 from engine.tests.helpers import (
     SpyEffectControls,
+    active_state,
     make_scene_manager,
     rule_source,
 )
@@ -146,10 +147,9 @@ def test_local_rule_receives_events_in_the_boot_scene(pack_tree) -> None:
     manager.activate_boot_scene("my_scene")
     manager.update()
 
-    state = manager.active_state
-    assert state is not None
-    state.queue_event(Event(_GROUP, "ping"))
+    active_state(manager).queue_event(Event(_GROUP, "ping"))
     manager.update()
 
     rule = engine.rules[0]
-    assert "ping" in vars(rule)["received"]
+    assert hasattr(rule, "received")
+    assert "ping" in rule.received

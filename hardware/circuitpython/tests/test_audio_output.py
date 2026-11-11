@@ -9,8 +9,6 @@ last-mile hardware mapping of the five ``VoiceSink`` methods onto the mixer and
 file handles.
 """
 
-from __future__ import annotations
-
 import sys
 from typing import TYPE_CHECKING, cast
 from unittest.mock import MagicMock
@@ -38,7 +36,7 @@ def _make_receipt(loudness: float = 1.0) -> MagicMock:
     return r
 
 
-def fake_pin() -> microcontroller.Pin:
+def fake_pin() -> "microcontroller.Pin":
     """A distinct sentinel passed off as a board pin."""
     return cast("microcontroller.Pin", object())
 
@@ -48,14 +46,14 @@ _FAKE_WORD_SELECT = fake_pin()
 _FAKE_DATA = fake_pin()
 
 
-def _hardware_mock(module: str, name: str) -> MagicMock:
+def _installed_mock(module: str, name: str) -> MagicMock:
     """The mock that ``_make_output`` installed as ``module.name``."""
     return getattr(sys.modules[module], name)
 
 
 def _make_output(
     max_volume: float = 0.2, num_voices: int = 2
-) -> tuple[AudioEffectOutput, MagicMock]:
+) -> tuple["AudioEffectOutput", MagicMock]:
     """Build an AudioEffectOutput with all hardware deps patched out.
 
     Returns the output and the mock mixer it was constructed with, so tests can
@@ -113,7 +111,7 @@ def test_i2sout_constructed_with_caller_supplied_pins() -> None:
     """audiobusio.I2SOut is constructed with the caller-supplied I2S pins."""
     _make_output()
 
-    _hardware_mock("audiobusio", "I2SOut").assert_called_once_with(
+    _installed_mock("audiobusio", "I2SOut").assert_called_once_with(
         _FAKE_BIT_CLOCK, _FAKE_WORD_SELECT, _FAKE_DATA
     )
 
@@ -122,7 +120,7 @@ def test_mixer_constructed_with_num_voices() -> None:
     """audiomixer.Mixer is constructed with voice_count=num_voices."""
     _make_output(num_voices=4)
 
-    mixer_class = _hardware_mock("audiomixer", "Mixer")
+    mixer_class = _installed_mock("audiomixer", "Mixer")
     mixer_class.assert_called_once()
     assert mixer_class.call_args[1]["voice_count"] == 4
 
@@ -192,7 +190,7 @@ def test_the_resolved_clips_path_plays_on_an_idle_voice(tmp_path) -> None:
         _make_receipt(loudness=0.5),
     )
 
-    opened_file = _hardware_mock("audiocore", "WaveFile").call_args[0][0]
+    opened_file = _installed_mock("audiocore", "WaveFile").call_args[0][0]
     assert opened_file.name == path
     mixer.voice[0].play.assert_called_once()
     assert mixer.voice[0].play.call_args[1]["loop"] is True
@@ -283,7 +281,7 @@ def test_open_source_opens_file_and_wraps_wavefile(tmp_path) -> None:
 
     assert source is not None
     f, wave = source
-    wave_file_class = _hardware_mock("audiocore", "WaveFile")
+    wave_file_class = _installed_mock("audiocore", "WaveFile")
     wave_file_class.assert_called_once_with(f)
     assert wave is wave_file_class.return_value
     assert not f.closed  # file stays open while playing
