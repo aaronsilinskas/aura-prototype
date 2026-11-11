@@ -3,7 +3,6 @@ from unittest.mock import ANY
 import pytest
 
 from effects.effect import EffectVerb
-from engine.effects.builder import EffectBuilder
 from engine.effects.manager import EffectManager, VerbKeyError
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.events import EffectEvent
@@ -12,6 +11,7 @@ from engine.pack_catalog import PackCatalog
 from engine.packs import PackRegistry, UnknownItemError
 from engine.state import Scope
 from engine.tests.effects.helpers import (
+    AudioClipEffectBuilder,
     CapturingEffectBuilder,
     RenderLengthProbeEffectBuilder,
     SpyEffectBuilder,
@@ -1084,6 +1084,7 @@ def test_start_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> None:
     manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
 
     (start,) = _events(output)
+    assert start.clip is not None
     assert start.clip.config.name == "sfx.boom"
     assert start.clip.path == catalog.pack_sounds["sfx.boom"]
 
@@ -1101,6 +1102,7 @@ def test_custom_verb_event_carries_the_resolved_clip_for_its_verb(pack_tree) -> 
 
     fired = _events(output)[-1]
     assert fired.verb is VerbFiringPixels.FIRED
+    assert fired.clip is not None
     assert fired.clip.path == catalog.scene_registry.get("arena").local_sound_map["cheer"]
 
 
@@ -1163,7 +1165,7 @@ def test_building_leaves_the_shared_playback_configs_unchanged(pack_tree) -> Non
     manager, catalog = _make_clip_manager(
         pack_tree, {"bang": _clip_item({EffectVerb.START: "sfx.boom"})}, [output]
     )
-    builder = catalog.effect_registry.get("sfx", "bang", EffectBuilder)
+    builder = catalog.effect_registry.get("sfx", "bang", AudioClipEffectBuilder)
     declared = builder.clips[EffectVerb.START]
 
     manager.set_effect(Scope.PERSONAL, "sfx.bang", {})
@@ -1172,6 +1174,8 @@ def test_building_leaves_the_shared_playback_configs_unchanged(pack_tree) -> Non
     assert builder.clips == {EffectVerb.START: declared}
     assert (declared.name, declared.loop, declared.stops_effect) == ("sfx.boom", False, False)
     starts = _events(output)
+    assert starts[0].clip is not None
+    assert starts[1].clip is not None
     assert starts[0].clip.config is declared
     assert starts[1].clip.config is declared
     assert starts[0].clip is not starts[1].clip
@@ -1228,6 +1232,7 @@ def test_wrapper_may_key_clips_on_the_verbs_its_reused_pack_pixels_declare(pack_
 
     peak = _events(output)[-1]
     assert peak.verb.name == "peak"
+    assert peak.clip is not None
     assert peak.clip.path == catalog.pack_sounds["sfx.boom"]
 
 

@@ -5,26 +5,17 @@ from __future__ import annotations
 
 from engine.engine import GameEngine
 from engine.state import EffectReceipt, SceneControls, StateSlot
-from engine.tests.helpers import SpyEffectControls
+from engine.tests.helpers import FrozenTimer, SpyEffectControls
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_phase_state import (
     RlglPhaseState,
     rlgl_phase_state,
 )
 
 
-class _StubTimer:
-    def __init__(self) -> None:
-        self.elapsed: float = 0.0
-        self.total: float = 0.0
-
-    def update(self) -> None:
-        pass
-
-
 def _make_state():
     spy = SpyEffectControls()
-    timer = _StubTimer()
-    engine = GameEngine(spy, timer=timer)  # pyright: ignore[reportArgumentType]
+    timer = FrozenTimer()
+    engine = GameEngine(spy, timer=timer)
     return engine.create_state(SceneControls())
 
 

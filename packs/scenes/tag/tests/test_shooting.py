@@ -139,7 +139,7 @@ def test_a_press_after_the_cooldown_fires_again(simulation):
 
 
 def empty_the_magazine(simulation: Simulation, player: SimulatedDevice) -> None:
-    for _ in range(TWO_ROUNDS["max_ammo"]):
+    for _ in range(int(TWO_ROUNDS["max_ammo"])):
         player.tap("A")
         simulation.advance(TWO_ROUNDS["shot_cooldown"])
     player.forget()

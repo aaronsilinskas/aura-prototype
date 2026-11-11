@@ -93,7 +93,7 @@ def test_there_is_no_writer_kind_when_no_emitter_is_wired():
 @pytest.mark.parametrize("reader_count", [1, 3])
 def test_the_receiver_decodes_an_aura_shot_landing_on_its_readers(reader_count):
     readers = [_FakeReader() for _ in range(reader_count)]
-    transceiver, _kind = wire_ir(readers, {}, _WriterFactory())
+    transceiver, _kind = wire_ir(list(readers), {}, _WriterFactory())
     for reader in readers:
         reader.pulses.extend(AuraInfraredEncoder().encode(b"\x2a"))
 
@@ -104,7 +104,7 @@ def test_the_receiver_decodes_an_aura_shot_landing_on_its_readers(reader_count):
 
 def test_the_receiver_reads_every_reader_not_just_the_first():
     readers = [_FakeReader(), _FakeReader()]
-    transceiver, _kind = wire_ir(readers, {}, _WriterFactory())
+    transceiver, _kind = wire_ir(list(readers), {}, _WriterFactory())
     readers[1].pulses.extend(AuraInfraredEncoder().encode(b"\x2a"))
 
     transceiver.update(0.0)

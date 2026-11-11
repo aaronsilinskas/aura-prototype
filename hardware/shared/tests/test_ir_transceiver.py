@@ -4,6 +4,7 @@ import pytest
 
 from engine.network import CONE, LINE
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
+from hardware.shared.ir_codecs.base import InfraredEncoder
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 from hardware.shared.ir_telemetry import format_ir_telemetry_line
 from hardware.shared.ir_transceiver import InfraredTransceiver
@@ -14,43 +15,14 @@ from hardware.shared.ir_transport import (
     PulseReader,
     PulseWriter,
 )
+from hardware.shared.tests.ir_fakes import StubEncoder, make_transmitter
 
 # ---------------------------------------------------------------------------
 # Fakes
 # ---------------------------------------------------------------------------
 
 
-class _RecordingPulseWriter(PulseWriter):
-    """Captures written pulse sequences without touching hardware.
-
-    ``is_busy()`` always reports ``False`` — matches the blocking
-    ``PulseOutWriter``'s externally-observable behaviour.
-    """
-
-    def __init__(self) -> None:
-        self.calls: list[list[int]] = []
-
-    def write_pulses(self, durations) -> None:
-        self.calls.append(list(durations))
-
-    def is_busy(self) -> bool:
-        return False
-
-
-class _StubEncoder:
-    """Minimal encoder that converts each byte to a single-item pulse list."""
-
-    def encode(self, data: bytes) -> list:
-        return list(data)
-
-
-def _make_transmitter() -> tuple[InfraredTransmitter, _RecordingPulseWriter]:
-    writer = _RecordingPulseWriter()
-    tx = InfraredTransmitter(writer, _StubEncoder())
-    return tx, writer
-
-
-class _RecordingTransmitter:
+class _RecordingTransmitter(InfraredTransmitter):
     """Fake transmitter recording each poll() call into a shared order list —
     isolates update()'s pump-before-receive fan-out from InfraredTransmitter's
     own poll() behaviour (covered separately in test_ir_transport.py)."""
@@ -65,11 +37,11 @@ class _RecordingTransmitter:
     def send(self, data: bytes) -> bool:
         return True  # not exercised by these tests
 
-    def set_encoder(self, encoder) -> None:
+    def set_encoder(self, encoder: InfraredEncoder) -> None:
         pass  # not exercised by these tests
 
 
-class _RecordingSetEncoderTransmitter:
+class _RecordingSetEncoderTransmitter(InfraredTransmitter):
     """Fake transmitter recording each set_encoder() call and its argument."""
 
     def __init__(self, calls: list) -> None:
@@ -81,7 +53,7 @@ class _RecordingSetEncoderTransmitter:
     def send(self, data: bytes) -> bool:
         return True  # not exercised by these tests
 
-    def set_encoder(self, encoder) -> None:
+    def set_encoder(self, encoder: InfraredEncoder) -> None:
         self._calls.append(encoder)
 
 
@@ -130,8 +102,8 @@ class _RecordingPulseReader(PulseReader):
         return None
 
 
-def _encode_pulses(payload: bytes) -> list:
-    return list(AuraInfraredEncoder().encode(payload))
+def _encode_pulses(payload: bytes | bytearray) -> list[int]:
+    return list(AuraInfraredEncoder().encode(bytes(payload)))
 
 
 def _receiver_holding(pulses) -> InfraredReceiver:
@@ -145,7 +117,7 @@ def _receiver_holding(pulses) -> InfraredReceiver:
 
 
 def test_send_routes_payload_to_the_named_transmitter() -> None:
-    tx, writer = _make_transmitter()
+    tx, writer = make_transmitter()
     transceiver = InfraredTransceiver({CONE: tx}, None, IrTransmitGate())
 
     transceiver.send(b"\xab\xcd", CONE)
@@ -154,8 +126,8 @@ def test_send_routes_payload_to_the_named_transmitter() -> None:
 
 
 def test_send_routes_to_the_correct_transmitter_among_several() -> None:
-    tx_line, writer_line = _make_transmitter()
-    tx_cone, writer_cone = _make_transmitter()
+    tx_line, writer_line = make_transmitter()
+    tx_cone, writer_cone = make_transmitter()
     transceiver = InfraredTransceiver({LINE: tx_line, CONE: tx_cone}, None, IrTransmitGate())
 
     transceiver.send(b"\xff", CONE)
@@ -165,7 +137,7 @@ def test_send_routes_to_the_correct_transmitter_among_several() -> None:
 
 
 def test_send_raises_for_unwired_emitter() -> None:
-    tx, _ = _make_transmitter()
+    tx, _ = make_transmitter()
     transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
 
     with pytest.raises(ValueError):
@@ -185,7 +157,7 @@ def test_send_raises_for_empty_transmitter_map() -> None:
 
 
 def test_transceiver_does_not_expose_transmitters_as_a_public_collection() -> None:
-    tx, _ = _make_transmitter()
+    tx, _ = make_transmitter()
     transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
 
     assert not hasattr(transceiver, "transmitters")
@@ -208,7 +180,7 @@ def test_busy_pumps_the_named_transmitter() -> None:
 
 def test_busy_reports_the_writer_still_in_flight() -> None:
     writer = ControllableFakePulseWriter()
-    tx = InfraredTransmitter(writer, _StubEncoder())
+    tx = InfraredTransmitter(writer, StubEncoder())
     transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
     tx.send(b"\xab")
     writer.set_busy(True)
@@ -217,14 +189,14 @@ def test_busy_reports_the_writer_still_in_flight() -> None:
 
 
 def test_busy_reports_the_writer_idle() -> None:
-    tx, _ = _make_transmitter()
+    tx, _ = make_transmitter()
     transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
 
     assert transceiver.busy(LINE) is False
 
 
 def test_busy_raises_for_unwired_emitter() -> None:
-    tx, _ = _make_transmitter()
+    tx, _ = make_transmitter()
     transceiver = InfraredTransceiver({LINE: tx}, None, IrTransmitGate())
 
     with pytest.raises(ValueError):
@@ -390,7 +362,7 @@ def test_codec_cannot_be_assigned() -> None:
     transceiver = InfraredTransceiver({}, None, IrTransmitGate())
 
     with pytest.raises(AttributeError):
-        transceiver.codec = (TagInfraredEncoder, TagInfraredDecoder)  # type: ignore[misc]
+        transceiver.codec = (TagInfraredEncoder, TagInfraredDecoder)  # type: ignore[misc]  # proves it is read-only
 
 
 # ---------------------------------------------------------------------------
@@ -435,7 +407,7 @@ def test_telemetry_line_is_forwarded_from_the_receiver() -> None:
 
 
 def test_last_best_receiver_is_forwarded_from_the_receiver() -> None:
-    readers = [FakePulseReader(), FakePulseReader(_encode_pulses(b"\x42"))]
+    readers: list[PulseReader] = [FakePulseReader(), FakePulseReader(_encode_pulses(b"\x42"))]
     transceiver = InfraredTransceiver(
         {}, InfraredReceiver(readers, AuraInfraredDecoder), IrTransmitGate()
     )

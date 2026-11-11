@@ -21,19 +21,15 @@ from hardware.shared.sd_sync_server import SdSyncServer
 from scripts.sd_sync import build_client, dispatch, parse_args
 from scripts.sd_sync_client import SdSyncNotFoundError
 from scripts.sd_sync_transport import SdSyncPortError, select_data_port
+from scripts.tests.fake_comport import fake_comport
 
 # ---------------------------------------------------------------------------
 # select_data_port
 # ---------------------------------------------------------------------------
 
 
-class _FakeComport:
-    def __init__(self, device: str) -> None:
-        self.device = device
-
-
 def test_select_data_port_auto_selects_the_single_match() -> None:
-    port = select_data_port([_FakeComport("/dev/tty.usbmodem1")])
+    port = select_data_port([fake_comport("/dev/tty.usbmodem1")])
 
     assert port == "/dev/tty.usbmodem1"
 
@@ -45,18 +41,18 @@ def test_select_data_port_raises_when_no_ports_found() -> None:
 
 def test_select_data_port_raises_when_multiple_ports_found() -> None:
     with pytest.raises(SdSyncPortError, match="--port"):
-        select_data_port([_FakeComport("/dev/tty.usbmodem1"), _FakeComport("/dev/tty.usbmodem2")])
+        select_data_port([fake_comport("/dev/tty.usbmodem1"), fake_comport("/dev/tty.usbmodem2")])
 
 
 def test_select_data_port_explicit_port_wins_over_a_single_auto_detected_match() -> None:
-    port = select_data_port([_FakeComport("/dev/tty.usbmodem1")], explicit_port="/dev/tty.explicit")
+    port = select_data_port([fake_comport("/dev/tty.usbmodem1")], explicit_port="/dev/tty.explicit")
 
     assert port == "/dev/tty.explicit"
 
 
 def test_select_data_port_explicit_port_wins_over_ambiguous_auto_detection() -> None:
     port = select_data_port(
-        [_FakeComport("/dev/tty.usbmodem1"), _FakeComport("/dev/tty.usbmodem2")],
+        [fake_comport("/dev/tty.usbmodem1"), fake_comport("/dev/tty.usbmodem2")],
         explicit_port="/dev/tty.explicit",
     )
 

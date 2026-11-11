@@ -14,6 +14,7 @@ from hardware.shared.device_config import (
     read_device_config_mapping,
     validate_band_map,
 )
+from hardware.shared.tests.pixels_config import as_matrix, as_neopixel
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SAMPLE_CONFIG_PATH = _REPO_ROOT / "examples" / "aura-device.pico-2.json"
@@ -98,7 +99,7 @@ def test_parse_full_matrix_config_maps_every_section(matrix_config):
     result = parse_device_config(matrix_config)
 
     assert len(result.pixels) == 1
-    assert result.pixels[0].cols == 13
+    assert as_matrix(result.pixels[0]).cols == 13
     assert result.buttons == ["D9", "D10"]
     assert result.ir is not None
     assert result.ir.rx == ["D11"]
@@ -114,7 +115,7 @@ def test_parse_full_matrix_config_maps_every_section(matrix_config):
 def test_parse_matrix_config_scope_rows_converted_to_ranges(matrix_config):
     result = parse_device_config(matrix_config)
 
-    scope_rows = result.pixels[0].scope_rows
+    scope_rows = as_matrix(result.pixels[0]).scope_rows
     assert scope_rows["global.buff"] == range(0, 1)
     assert scope_rows["global.main"] == range(2, 5)
     assert scope_rows["ambient"] == range(8, 9)
@@ -221,7 +222,7 @@ def test_parse_matrix_scope_rows_error_lists_valid_keys(matrix_config):
 def test_parse_matrix_without_brightness_defaults_to_one(matrix_config):
     result = parse_device_config(matrix_config)
 
-    assert result.pixels[0].brightness == 1.0
+    assert as_matrix(result.pixels[0]).brightness == 1.0
 
 
 def test_parse_matrix_explicit_brightness_is_stored(matrix_config):
@@ -229,7 +230,7 @@ def test_parse_matrix_explicit_brightness_is_stored(matrix_config):
 
     result = parse_device_config(matrix_config)
 
-    assert result.pixels[0].brightness == 0.2
+    assert as_matrix(result.pixels[0]).brightness == 0.2
 
 
 def test_parse_matrix_brightness_boundary_zero_is_accepted(matrix_config):
@@ -237,7 +238,7 @@ def test_parse_matrix_brightness_boundary_zero_is_accepted(matrix_config):
 
     result = parse_device_config(matrix_config)
 
-    assert result.pixels[0].brightness == 0.0
+    assert as_matrix(result.pixels[0]).brightness == 0.0
 
 
 def test_parse_matrix_brightness_boundary_one_is_accepted(matrix_config):
@@ -245,7 +246,7 @@ def test_parse_matrix_brightness_boundary_one_is_accepted(matrix_config):
 
     result = parse_device_config(matrix_config)
 
-    assert result.pixels[0].brightness == 1.0
+    assert as_matrix(result.pixels[0]).brightness == 1.0
 
 
 def test_parse_matrix_non_numeric_brightness_raises_value_error(matrix_config):
@@ -277,7 +278,7 @@ def test_parse_matrix_negative_brightness_raises_value_error(matrix_config):
 def test_parse_matrix_without_address_defaults_to_none(matrix_config):
     result = parse_device_config(matrix_config)
 
-    assert result.pixels[0].address is None
+    assert as_matrix(result.pixels[0]).address is None
 
 
 def test_parse_matrix_integer_address_is_stored_as_int(matrix_config):
@@ -285,7 +286,7 @@ def test_parse_matrix_integer_address_is_stored_as_int(matrix_config):
 
     result = parse_device_config(matrix_config)
 
-    assert result.pixels[0].address == 49
+    assert as_matrix(result.pixels[0]).address == 49
 
 
 def test_parse_matrix_lowercase_hex_string_address_is_normalized_to_int(matrix_config):
@@ -293,7 +294,7 @@ def test_parse_matrix_lowercase_hex_string_address_is_normalized_to_int(matrix_c
 
     result = parse_device_config(matrix_config)
 
-    assert result.pixels[0].address == 0x31
+    assert as_matrix(result.pixels[0]).address == 0x31
 
 
 def test_parse_matrix_uppercase_hex_string_address_is_normalized_to_int(matrix_config):
@@ -301,7 +302,7 @@ def test_parse_matrix_uppercase_hex_string_address_is_normalized_to_int(matrix_c
 
     result = parse_device_config(matrix_config)
 
-    assert result.pixels[0].address == 0x31
+    assert as_matrix(result.pixels[0]).address == 0x31
 
 
 def test_parse_matrix_address_boundary_minimum_is_accepted(matrix_config):
@@ -309,7 +310,7 @@ def test_parse_matrix_address_boundary_minimum_is_accepted(matrix_config):
 
     result = parse_device_config(matrix_config)
 
-    assert result.pixels[0].address == 0x08
+    assert as_matrix(result.pixels[0]).address == 0x08
 
 
 def test_parse_matrix_address_boundary_maximum_is_accepted(matrix_config):
@@ -317,7 +318,7 @@ def test_parse_matrix_address_boundary_maximum_is_accepted(matrix_config):
 
     result = parse_device_config(matrix_config)
 
-    assert result.pixels[0].address == 0x77
+    assert as_matrix(result.pixels[0]).address == 0x77
 
 
 def test_parse_matrix_address_below_reserved_floor_raises_value_error(matrix_config):
@@ -535,13 +536,13 @@ def test_validate_band_map_invalid_scope_key_raises_value_error():
 def test_parse_neopixel_first_entry_exposes_configured_scopes(neopixel_config):
     result = parse_device_config(neopixel_config)
 
-    assert "personal" in result.pixels[0].scopes
+    assert "personal" in as_neopixel(result.pixels[0]).scopes
 
 
 def test_parse_neopixel_scope_fields_match(neopixel_config):
     result = parse_device_config(neopixel_config)
 
-    scope = result.pixels[0].scopes["personal"]
+    scope = as_neopixel(result.pixels[0]).scopes["personal"]
     assert scope.pin == "D5"
     assert scope.count == 30
     assert scope.order == "GRB"
@@ -690,6 +691,7 @@ def test_parse_ir_rx_list_of_pins_preserves_declared_order(matrix_config):
 
     result = parse_device_config(matrix_config)
 
+    assert result.ir is not None
     assert result.ir.rx == ["D11", "D13", "D15"]
 
 
@@ -710,6 +712,7 @@ def test_parse_ir_rx_list_with_non_string_entry_names_its_index(matrix_config):
 def test_parse_ir_absent_enabled_key_defaults_to_true(matrix_config):
     result = parse_device_config(matrix_config)
 
+    assert result.ir is not None
     assert result.ir.enabled is True
 
 
@@ -1154,6 +1157,7 @@ def test_parse_radio_node_boundary_zero_is_accepted(matrix_config):
 
     result = parse_device_config(matrix_config)
 
+    assert result.radio is not None
     assert result.radio.node == 0
 
 
@@ -1162,6 +1166,7 @@ def test_parse_radio_node_boundary_254_is_accepted(matrix_config):
 
     result = parse_device_config(matrix_config)
 
+    assert result.radio is not None
     assert result.radio.node == 254
 
 
@@ -1183,6 +1188,7 @@ def test_parse_radio_absent_enabled_key_defaults_to_true(matrix_config):
 
     result = parse_device_config(matrix_config)
 
+    assert result.radio is not None
     assert result.radio.enabled is True
 
 
@@ -1235,6 +1241,7 @@ def test_parse_sdcard_without_mount_defaults_to_slash_sd(matrix_config):
 
     result = parse_device_config(matrix_config)
 
+    assert result.sdcard is not None
     assert result.sdcard.mount == "/sd"
 
 
@@ -1291,6 +1298,7 @@ def test_parse_sdcard_absent_enabled_key_defaults_to_true(matrix_config):
 
     result = parse_device_config(matrix_config)
 
+    assert result.sdcard is not None
     assert result.sdcard.enabled is True
 
 
@@ -1365,6 +1373,7 @@ def test_parse_high_current_rail_absent_active_high_key_defaults_to_true(matrix_
 
     result = parse_device_config(matrix_config)
 
+    assert result.high_current_rail is not None
     assert result.high_current_rail.active_high is True
 
 
@@ -1380,6 +1389,7 @@ def test_parse_high_current_rail_absent_enabled_key_defaults_to_true(matrix_conf
 
     result = parse_device_config(matrix_config)
 
+    assert result.high_current_rail is not None
     assert result.high_current_rail.enabled is True
 
 
@@ -1458,6 +1468,7 @@ def test_parse_absent_audio_section_yields_none(matrix_config):
 def test_parse_audio_absent_enabled_key_defaults_to_true(matrix_config):
     result = parse_device_config(matrix_config)
 
+    assert result.audio is not None
     assert result.audio.enabled is True
 
 
@@ -1623,6 +1634,13 @@ def test_isolate_leaves_the_original_config_unchanged(full_isolatable_config):
 
     config.isolate(keep="audio")
 
+    assert config.ir is not None
+    assert config.accelerometer is not None
+    assert config.magnetometer is not None
+    assert config.haptics is not None
+    assert config.radio is not None
+    assert config.sdcard is not None
+    assert config.high_current_rail is not None
     assert config.ir.enabled is True
     assert config.accelerometer.enabled is True
     assert config.magnetometer.enabled is True
@@ -1670,6 +1688,7 @@ def test_isolate_does_not_force_enable_a_kept_component_declared_disabled(full_i
 
     isolated = config.isolate(keep="audio")
 
+    assert isolated.audio is not None
     assert isolated.audio.enabled is False
 
 
@@ -1682,6 +1701,8 @@ def test_isolate_never_touches_i2c_spi_buttons_or_high_current_rail(full_isolata
     assert isolated.i2c == config.i2c
     assert isolated.spi == config.spi
     assert isolated.buttons == config.buttons
+    assert isolated.high_current_rail is not None
+    assert config.high_current_rail is not None
     assert isolated.high_current_rail.pin == config.high_current_rail.pin
     assert isolated.high_current_rail.active_high == config.high_current_rail.active_high
     assert isolated.high_current_rail.enabled == config.high_current_rail.enabled
@@ -1696,6 +1717,7 @@ def test_isolate_never_disables_high_current_rail_declared_disabled(full_isolata
 
     isolated = config.isolate(keep="audio")
 
+    assert isolated.high_current_rail is not None
     assert isolated.high_current_rail.enabled is False
 
 
@@ -1734,7 +1756,7 @@ def test_isolate_disabled_copy_preserves_matrix_pixels_fields(matrix_config):
     isolated = config.isolate(keep="audio")
 
     _assert_same_fields_except_enabled(config.pixels[0], isolated.pixels[0])
-    assert isolated.pixels[0].address == 0x31
+    assert as_matrix(isolated.pixels[0]).address == 0x31
     assert isolated.pixels[0].enabled is False
 
 
@@ -1745,6 +1767,12 @@ def test_isolate_disabled_copy_preserves_accelerometer_magnetometer_and_haptics_
 
     isolated = config.isolate(keep="pixels")
 
+    assert isolated.accelerometer is not None
+    assert config.accelerometer is not None
+    assert isolated.magnetometer is not None
+    assert config.magnetometer is not None
+    assert isolated.haptics is not None
+    assert config.haptics is not None
     assert isolated.accelerometer.address == config.accelerometer.address == 0x19
     assert isolated.magnetometer.address == config.magnetometer.address == 0x32
     assert isolated.haptics.address == config.haptics.address == 0x5B

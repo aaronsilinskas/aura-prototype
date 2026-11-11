@@ -3,6 +3,15 @@
 import sys
 import types
 
+
+def _fake_module(name: str, **attrs: object) -> types.ModuleType:
+    """Build a module named ``name`` holding ``attrs``, without registering it."""
+    module = types.ModuleType(name)
+    for attr, value in attrs.items():
+        setattr(module, attr, value)
+    return module
+
+
 for _name in (
     "audiobusio",
     "audiocore",
@@ -15,9 +24,7 @@ for _name in (
 ):
     sys.modules.setdefault(_name, types.ModuleType(_name))
 
-_microcontroller_mod = types.ModuleType("microcontroller")
-_microcontroller_mod.Pin = type("Pin", (), {})  # type: ignore[attr-defined]
-sys.modules.setdefault("microcontroller", _microcontroller_mod)
+sys.modules.setdefault("microcontroller", _fake_module("microcontroller", Pin=type("Pin", (), {})))
 
 _board = sys.modules["board"]
 
@@ -25,15 +32,14 @@ _board = sys.modules["board"]
 # adafruit_is31fl3741 stub — minimal for circuitpython_parts imports
 # ---------------------------------------------------------------------------
 
-_is31_mod = types.ModuleType("adafruit_is31fl3741")
-_is31_mod.MUST_BUFFER = 1  # type: ignore[attr-defined]
-sys.modules.setdefault("adafruit_is31fl3741", _is31_mod)
-
-_rgbmatrix_mod = types.ModuleType("adafruit_is31fl3741.adafruit_rgbmatrixqt")
-_rgbmatrix_mod.Adafruit_RGBMatrixQT = type(  # type: ignore[attr-defined]
-    "Adafruit_RGBMatrixQT", (), {}
+sys.modules.setdefault("adafruit_is31fl3741", _fake_module("adafruit_is31fl3741", MUST_BUFFER=1))
+sys.modules.setdefault(
+    "adafruit_is31fl3741.adafruit_rgbmatrixqt",
+    _fake_module(
+        "adafruit_is31fl3741.adafruit_rgbmatrixqt",
+        Adafruit_RGBMatrixQT=type("Adafruit_RGBMatrixQT", (), {}),
+    ),
 )
-sys.modules.setdefault("adafruit_is31fl3741.adafruit_rgbmatrixqt", _rgbmatrix_mod)
 
 
 # ---------------------------------------------------------------------------
@@ -75,30 +81,24 @@ class _Pause:
         return f"Pause({self.duration})"
 
 
-_drv2605_mod = types.ModuleType("adafruit_drv2605")
-_drv2605_mod.Effect = _Effect  # type: ignore[attr-defined]
-_drv2605_mod.Pause = _Pause  # type: ignore[attr-defined]
-sys.modules["adafruit_drv2605"] = _drv2605_mod
+sys.modules["adafruit_drv2605"] = _fake_module("adafruit_drv2605", Effect=_Effect, Pause=_Pause)
 
 
 # ---------------------------------------------------------------------------
 # adafruit_rfm69 stub — minimal RFM69 placeholder for Rfm69RadioTransport tests
 # ---------------------------------------------------------------------------
 
-_rfm69_mod = types.ModuleType("adafruit_rfm69")
-_rfm69_mod.RFM69 = type("RFM69", (), {})  # type: ignore[attr-defined]
-sys.modules.setdefault("adafruit_rfm69", _rfm69_mod)
+sys.modules.setdefault(
+    "adafruit_rfm69", _fake_module("adafruit_rfm69", RFM69=type("RFM69", (), {}))
+)
 
 
 # ---------------------------------------------------------------------------
 # sdcardio / storage stubs -- minimal placeholders for SdCardStorage tests
 # ---------------------------------------------------------------------------
 
-_sdcardio_mod = types.ModuleType("sdcardio")
-_sdcardio_mod.SDCard = type("SDCard", (), {})  # type: ignore[attr-defined]
-sys.modules.setdefault("sdcardio", _sdcardio_mod)
-
-_storage_mod = types.ModuleType("storage")
-_storage_mod.VfsFat = type("VfsFat", (), {})  # type: ignore[attr-defined]
-_storage_mod.mount = lambda *args, **kwargs: None  # type: ignore[attr-defined]
-sys.modules.setdefault("storage", _storage_mod)
+sys.modules.setdefault("sdcardio", _fake_module("sdcardio", SDCard=type("SDCard", (), {})))
+sys.modules.setdefault(
+    "storage",
+    _fake_module("storage", VfsFat=type("VfsFat", (), {}), mount=lambda *args, **kwargs: None),
+)

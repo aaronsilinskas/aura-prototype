@@ -68,7 +68,7 @@ class _FakeLis3dh:
 def lis3dh_board(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     """A board whose default SPI bus builds, with a fake LIS3DH library installed."""
     lis3dh = ModuleType("adafruit_lis3dh")
-    lis3dh.LIS3DH_I2C = _FakeLis3dh  # type: ignore[attr-defined]
+    monkeypatch.setattr(lis3dh, "LIS3DH_I2C", _FakeLis3dh, raising=False)
     monkeypatch.setattr(_FakeLis3dh, "built", [])
     monkeypatch.setitem(sys.modules, "adafruit_lis3dh", lis3dh)
     return SimpleNamespace(SPI=object)
@@ -112,6 +112,7 @@ def test_i2c_parts_are_built_on_the_default_bus_the_boot_opens_on_the_board_pins
 
     (chip,) = _FakeLis3dh.built
     assert i2c_buses == [chip.i2c]
+    assert isinstance(chip.i2c, _FakeI2C)
     assert chip.i2c.pins == (lis3dh_board.SCL, lis3dh_board.SDA)
 
 

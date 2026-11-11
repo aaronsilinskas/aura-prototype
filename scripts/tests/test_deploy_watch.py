@@ -21,6 +21,7 @@ from scripts.deploy_watch import (
     select_console_port,
     watch_stream,
 )
+from scripts.tests.fake_comport import fake_comport
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -356,13 +357,8 @@ def test_split_writer_file_excludes_lines_written_directly_to_stdout() -> None:
 # filters the data channel out before selection.
 
 
-class _FakeComport:
-    def __init__(self, device: str) -> None:
-        self.device = device
-
-
 def test_select_console_port_auto_selects_the_single_console_port() -> None:
-    port = select_console_port([_FakeComport("/dev/cu.usbmodem1101")])
+    port = select_console_port([fake_comport("/dev/cu.usbmodem1101")])
 
     assert port == "/dev/cu.usbmodem1101"
 
@@ -375,7 +371,7 @@ def test_select_console_port_raises_when_no_console_port_found() -> None:
 def test_select_console_port_raises_listing_candidates_when_multiple_console_ports_found() -> None:
     with pytest.raises(ConsolePortError, match=r"cu\.usbmodem1101.*cu\.usbmodem2101.*--port"):
         select_console_port(
-            [_FakeComport("/dev/cu.usbmodem1101"), _FakeComport("/dev/cu.usbmodem2101")]
+            [fake_comport("/dev/cu.usbmodem1101"), fake_comport("/dev/cu.usbmodem2101")]
         )
 
 

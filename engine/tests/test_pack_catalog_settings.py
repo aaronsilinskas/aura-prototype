@@ -202,7 +202,7 @@ def test_changing_a_resolved_list_setting_does_not_change_the_next_read(pack_tre
     root = _scene_with_rule_pack(pack_tree, {"hold_seconds": {"type": "list", "default": [1]}})
     settings = pack_tree.scan_roots(root).scene_registry.get("game").settings
 
-    settings.get("exit", "hold_seconds").append(2)  # type: ignore[union-attr]
+    settings.get("exit", "hold_seconds").append(2)
 
     assert settings.get("exit", "hold_seconds") == [1]
 

@@ -24,7 +24,7 @@ class LifecycleTrackingSpell(Spell):
     def __init__(self) -> None:
         super().__init__(tags=[])
         self.started = False
-        self.update_elapsed_time = None
+        self.update_elapsed_time: float | None = None
         self.stopped = False
 
     def start(self, aura: Aura) -> None:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from engine.pack_catalog import read_manifest_declarations, scan_pack_roots
+from engine.pack_catalog import SettingOverrides, read_manifest_declarations, scan_pack_roots
 from engine.settings import Settings, resolve_settings
 
 _PACKS_ROOT = Path(__file__).resolve().parents[1]
@@ -37,7 +37,9 @@ def settings_for(
     """
     rule_packs = rule_packs or {}
     if scene is not None:
-        overrides = {scene: {"settings": settings or {}, "rule_packs": rule_packs}}
+        overrides: SettingOverrides = {
+            scene: {"settings": settings or {}, "rule_packs": rule_packs}
+        }
         catalog = scan_pack_roots([str(_PACKS_ROOT)], setting_overrides=overrides)
         return catalog.scene_registry.get(scene).settings
     if settings:

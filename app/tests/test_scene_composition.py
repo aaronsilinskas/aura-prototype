@@ -19,7 +19,7 @@ from engine.network import LINE
 from engine.pack_catalog import PackCatalog, PackScanError, scan_pack_roots
 from engine.scene import PackReference, Scene, SceneRegistry
 from engine.state import Scope
-from engine.tests.helpers import RecordingSceneReboot, SpyNetworkControls
+from engine.tests.helpers import RecordingSceneReboot, SpyNetworkControls, active_state
 from engine.version import Version
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_hardware import DeviceHardware
@@ -52,7 +52,7 @@ def _fake_hw(ir=None, radio=None, storage=None, network_controls=None, capabilit
         accelerometer=None,
         magnetometer=None,
         network_controls=(
-            network_controls if network_controls is not None else "fake-network-controls"
+            network_controls if network_controls is not None else SpyNetworkControls()
         ),
         ir=ir,
         radio=radio,
@@ -91,7 +91,8 @@ def test_the_active_scenes_rules_see_the_devices_capabilities():
 
     runtime = build_scene_runtime(hw, "hardware_test", catalog=_boot_catalog())
 
-    capabilities = runtime.manager.active_state.capabilities
+    state = active_state(runtime.manager)
+    capabilities = state.capabilities
     assert (capabilities.has("radio"), capabilities.has("ir.line")) == (True, False)
 
 
@@ -120,7 +121,8 @@ def test_ir_range_transmitter_sends_an_ir_packet_on_line_with_no_button_press():
         catalog=_boot_catalog(),
     )
 
-    runtime.manager.active_state.queue_event(InputEvents.Sensors(ButtonData(states={})))
+    state = active_state(runtime.manager)
+    state.queue_event(InputEvents.Sensors(ButtonData(states={})))
     runtime.manager.update()
 
     assert len(network_spy.send_ir_calls) == 1
@@ -722,10 +724,11 @@ def test_card_scenes_local_rule_imports_off_the_card_and_handles_events(device_s
     hw = _fake_hw(storage=device_storage)
 
     runtime = build_scene_runtime(hw, "card_scene", catalog=_boot_catalog(device_storage))
-    runtime.manager.active_state.queue_event(Event(_CARD_TEST_EVENT_GROUP, "ping"))
+    state = active_state(runtime.manager)
+    state.queue_event(Event(_CARD_TEST_EVENT_GROUP, "ping"))
     runtime.manager.update()
 
-    assert runtime.manager.active_state.get_or_none("card_rule_ran", bool) is True
+    assert state.get_or_none("card_rule_ran", bool) is True
 
 
 def test_card_scenes_local_effect_imports_off_the_card_and_resolves_at_runtime(device_storage):
@@ -839,10 +842,11 @@ def test_flash_scene_can_reference_and_run_a_card_rule_packs_rule(device_storage
     hw = _fake_hw(storage=device_storage)
 
     runtime = build_scene_runtime(hw, "card_pack_scene", catalog=catalog)
-    runtime.manager.active_state.queue_event(Event(_CARD_TEST_EVENT_GROUP, "ping"))
+    state = active_state(runtime.manager)
+    state.queue_event(Event(_CARD_TEST_EVENT_GROUP, "ping"))
     runtime.manager.update()
 
-    assert runtime.manager.active_state.get_or_none("card_pack_rule_ran", bool) is True
+    assert state.get_or_none("card_pack_rule_ran", bool) is True
 
 
 def test_card_scene_can_reference_and_run_a_card_rule_packs_rule(device_storage):
@@ -860,10 +864,11 @@ def test_card_scene_can_reference_and_run_a_card_rule_packs_rule(device_storage)
     hw = _fake_hw(storage=device_storage)
 
     runtime = build_scene_runtime(hw, "card_scene", catalog=_boot_catalog(device_storage))
-    runtime.manager.active_state.queue_event(Event(_CARD_TEST_EVENT_GROUP, "ping"))
+    state = active_state(runtime.manager)
+    state.queue_event(Event(_CARD_TEST_EVENT_GROUP, "ping"))
     runtime.manager.update()
 
-    assert runtime.manager.active_state.get_or_none("card_pack_rule_ran", bool) is True
+    assert state.get_or_none("card_pack_rule_ran", bool) is True
 
 
 # ---------------------------------------------------------------------------

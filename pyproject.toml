@@ -111,7 +111,6 @@ allowed_importers = ["**.tests", "app.simulation"]
 [tool.mypy]
 python_version = "3.10"
 files = ["app", "effects", "engine", "hardware", "magic", "packs", "scripts"]
-exclude = ['(^|/)tests/']
 # Local stubs for modules circuitpython-stubs lacks; see typings/README.md.
 mypy_path = "typings"
 explicit_package_bases = true
@@ -119,3 +118,8 @@ check_untyped_defs = true
 disallow_untyped_defs = true
 warn_unused_ignores = true
 enable_error_code = ["ignore-without-code"]
+
+# Test functions and fixtures need no annotations; their bodies stay checked.
+[[tool.mypy.overrides]]
+module = ["*.tests.*"]
+disallow_untyped_defs = false

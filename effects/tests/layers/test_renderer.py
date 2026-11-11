@@ -1,11 +1,12 @@
 from effects.effect import PixelBuffer
+from effects.layers.layer import Layer
 from effects.layers.renderer import LayerRenderer
 from effects.palette import PaletteLUT256
 
 _BLACK_TO_WHITE = bytes([0, 0, 0, 0, 255, 255, 255, 255])
 
 
-class _ConstantLayer:
+class _ConstantLayer(Layer):
     """Layer that always returns a fixed value."""
 
     def __init__(self, value: float) -> None:
@@ -41,7 +42,7 @@ def test_layer_renderer_maps_layer_sample_through_palette_for_each_pixel() -> No
 
 def test_layer_renderer_passes_normalized_position_per_pixel_to_layer() -> None:
     # gradient layer: sample(pos, count) = pos
-    class _GradientLayer:
+    class _GradientLayer(Layer):
         def update(self, elapsed: float) -> None:
             pass
 

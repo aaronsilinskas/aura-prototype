@@ -78,6 +78,7 @@ def test_get_returns_scene_with_version_parsed_from_json(pack_tree) -> None:
 
     scene = registry.get("forest")
 
+    assert scene.version is not None
     assert scene.version.major == 2
     assert scene.version.minor == 3
 
@@ -273,6 +274,8 @@ def test_register_factory_scene_exposes_same_version_field_as_json_scene(
     disk_scene = registry.get("from_disk")
     mem_scene = registry.get("from_memory")
 
+    assert disk_scene.version is not None
+    assert mem_scene.version is not None
     assert disk_scene.version.major == mem_scene.version.major
     assert disk_scene.version.minor == mem_scene.version.minor
 

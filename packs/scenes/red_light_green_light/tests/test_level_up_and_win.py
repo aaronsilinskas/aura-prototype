@@ -195,7 +195,8 @@ def test_a_win_strikes_lightning_across_every_strip(simulation):
     )
     win_the_only_round(simulation, player)
 
-    lit, dark = set(), set()
+    lit: set[str] = set()
+    dark: set[str] = set()
     for _ in range(int(2.0 / TICK)):
         simulation.advance(TICK)
         for scope in EVERY_STRIP:
