@@ -48,7 +48,8 @@ def record(event: Event, state: GameState) -> None:
     HEARD.append((event, state))
 
 
-def _no_reset() -> None:
+def no_reset() -> None:
+    """A reset that fails the test: pass it where a boot must not reset the device."""
     raise AssertionError("the boot reset the device")
 
 
@@ -65,7 +66,7 @@ class Probe:
         *,
         scene_json: dict[str, object] | None = None,
         boot_mapping: dict | None = None,
-        reset: Callable[[], None] = _no_reset,
+        reset: Callable[[], None] = no_reset,
         timer: Timer | None = None,
         logger: Logger | None = None,
         setting_overrides: SettingOverrides | None = None,
@@ -95,6 +96,14 @@ class Probe:
         ``heard(Event)`` is everything it handled, oldest first.
         """
         return [(event, state) for event, state in HEARD if isinstance(event, event_type)]
+
+    def state(self) -> GameState:
+        """Return the ``GameState`` the rule saw when it handled its first event.
+
+        Fails the test when the rule has handled nothing yet; tick the boot first.
+        """
+        assert HEARD, "the probe's rule has handled no event; tick the boot first"
+        return HEARD[0][1]
 
     def events(self, event_type: type[_E]) -> list[_E]:
         """Return the events of *event_type* the rule handled, oldest first."""

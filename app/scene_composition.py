@@ -238,9 +238,8 @@ def build_scene_boot(
     and the Simulated device, whose returned tick is also their one loop body.
     A pending Scene deploy token is applied first (see
     :func:`~hardware.shared.scene_selection.apply_scene_deploy`); then the
-    card's Persisted scene wins over *boot_mapping*'s ``default_scene``.
-    A reboot the scene asks for
-    persists to ``hw.storage``, then calls *reset*.
+    card's Persisted scene wins over *boot_mapping*'s ``default_scene``. A
+    reboot the scene asks for persists to ``hw.storage``, then calls *reset*.
 
     *setting_overrides* overrides scenes' Settings (shaped as for
     ``scan_pack_roots``); the Simulated device boots shortened scenes through

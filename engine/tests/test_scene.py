@@ -994,6 +994,41 @@ def test_rule_pack_items_loaded_in_alphabetical_order(pack_tree) -> None:
     assert items == sorted(items)
 
 
+_FLAGGING_RULE = """\
+from engine.engine import GameRule
+from engine.events import Event
+
+
+class _Flag(GameRule):
+    def __init__(self) -> None:
+        self.on(Event, lambda event, state: state.set("card_pack_rule_ran", True))
+
+
+RULE = _Flag()
+"""
+
+
+def test_a_flash_scene_runs_a_rule_from_a_card_rule_pack(pack_tree) -> None:
+    flash = pack_tree.root("tc_flash")
+    card = pack_tree.root("tc_card")
+    pack_tree.rule_pack(card, "card_pack", items={"flag": _FLAGGING_RULE})
+    pack_tree.scene(flash, "lobby", rule_packs=[{"name": "card_pack", "version": "1.0"}])
+    catalog = pack_tree.scan_roots(flash, card)
+    manager = _make_scene_manager(
+        _make_engine(),
+        effect_registry=catalog.effect_registry,
+        rule_registry=catalog.rule_registry,
+        scene_registry=catalog.scene_registry,
+    )
+    manager.activate_boot_scene("lobby")
+    state = active_state(manager)
+
+    state.queue_event(Event(_GROUP, "ping"))
+    manager.update()
+
+    assert state.get_or_none("card_pack_rule_ran", bool) is True
+
+
 # ---------------------------------------------------------------------------
 # SceneManager — GC eligibility after full unload
 # ---------------------------------------------------------------------------
