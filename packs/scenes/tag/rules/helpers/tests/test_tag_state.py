@@ -10,14 +10,11 @@ from __future__ import annotations
 from engine.engine import GameEngine
 from engine.state import SceneControls
 from engine.tests.helpers import SpyEffectControls
+from engine.timer import Timer
 from packs.scenes.tag.rules.helpers.tag_state import TagState, tag_state
 
 
-class _StubTimer:
-    def __init__(self) -> None:
-        self.elapsed: float = 0.0
-        self.total: float = 0.0
-
+class _StubTimer(Timer):
     def update(self) -> None:
         pass
 
@@ -25,7 +22,7 @@ class _StubTimer:
 def _make_state():
     spy = SpyEffectControls()
     timer = _StubTimer()
-    engine = GameEngine(spy, timer=timer)  # pyright: ignore[reportArgumentType]
+    engine = GameEngine(spy, timer=timer)
     return engine.create_state(SceneControls())
 
 
