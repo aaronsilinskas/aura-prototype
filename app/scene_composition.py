@@ -1,9 +1,9 @@
-"""Board-free scene wiring — builds the engine/effect/scene machinery for one scene.
+"""The Scene boot: ``build_scene_boot`` turns a device's hardware into a booted scene and its tick.
 
-CPython-testable: imports only ``engine`` and the board-free modules under
-``hardware.shared`` (``device_hardware``, ``ir_codecs``, ``ir_transceiver``,
-``radio_transceiver``, ``scene_selection``). No ``TYPE_CHECKING`` guard is
-needed because none of them carry board imports.
+Its interface is ``build_scene_boot`` and the ``SceneBoot`` it returns; every
+boot step below is private. CPython-testable: imports only ``engine`` and the
+board-free modules under ``hardware.shared``, so no ``TYPE_CHECKING`` guard
+is needed.
 """
 
 from __future__ import annotations
@@ -18,15 +18,13 @@ from engine.namespace import ActiveSceneNamespace
 from engine.network import NetworkEvents
 from engine.pack_catalog import PackCatalog, SettingOverrides, scan_pack_roots
 from engine.scene import SceneManager, SceneRegistry
-from engine.state import SceneReboot
+from engine.state import SceneControls, SceneReboot
 from engine.timer import Timer
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_reboot import DeviceSceneReboot
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs import codec_for
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
-from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.radio_transceiver import RadioTransceiver
 from hardware.shared.scene_selection import apply_scene_deploy, boot_scene_candidates
 
 try:
@@ -34,64 +32,57 @@ try:
 except ImportError:
     pass  # collections.abc not available on all embedded runtimes
 
-__all__ = [
-    "SceneBoot",
-    "SceneRuntime",
-    "build_scene_boot",
-    "build_scene_runtime",
-    "build_scene_tick",
-    "resolve_boot_scene_name",
-    "resolve_ir_codec",
-    "scan_boot_pack_catalog",
-]
+__all__ = ["SceneBoot", "build_scene_boot"]
 
 
-class SceneRuntime:
+class _SceneRuntime:
     """Bundle of the live objects a scene's per-tick loop drives.
 
     ``manager`` applies scene transitions, ``effect_manager`` renders the
-    active scene's effects, ``timer`` tracks elapsed/total tick time, ``ir``
-    is the device's ``InfraredTransceiver`` (``None`` on a device with no IR
-    subsystem wired), and ``radio`` is the device's ``RadioTransceiver``
-    (``None`` on a device with no radio peripheral wired) — both passed
-    straight through from ``DeviceHardware``, no separate object built here.
+    active scene's effects, and ``timer`` tracks elapsed/total tick time.
     ``namespace`` is the Active scene namespace ``manager`` installs each
     scene into and ``effect_manager`` resolves names through.
     """
 
-    __slots__ = ("effect_manager", "ir", "manager", "namespace", "radio", "timer")
+    __slots__ = ("effect_manager", "manager", "namespace", "timer")
 
     def __init__(
         self,
         manager: SceneManager,
         effect_manager: EffectManager,
         timer: Timer,
-        ir: InfraredTransceiver | None,
-        radio: RadioTransceiver | None,
         namespace: ActiveSceneNamespace,
     ) -> None:
         self.manager: SceneManager = manager
         self.effect_manager: EffectManager = effect_manager
         self.timer: Timer = timer
-        self.ir: InfraredTransceiver | None = ir
-        self.radio: RadioTransceiver | None = radio
         self.namespace: ActiveSceneNamespace = namespace
 
 
 class SceneBoot:
-    """What ``build_scene_boot`` hands back: the booted scene, its tick and its runtime.
+    """What ``build_scene_boot`` hands back: the booted scene and how to drive it.
 
-    ``scene_name`` is the scene the device booted into, ``tick`` the per-tick
-    body to call once per tick, and ``runtime`` the live objects that body
-    drives (its ``namespace`` resolves names as the running game does).
+    ``scene_name`` is the scene the device booted into and ``tick`` the
+    per-tick body to call once per tick. ``scene_controls`` are the booted
+    scene's ``SceneControls``, the same ones its rules hold: they cover it
+    with an Overlay, pop it, or reboot. ``namespace`` is the game's own
+    Active scene namespace, so a caller resolves a clip name exactly as the
+    running game does.
     """
 
-    __slots__ = ("runtime", "scene_name", "tick")
+    __slots__ = ("namespace", "scene_controls", "scene_name", "tick")
 
-    def __init__(self, scene_name: str, tick: Callable[[], None], runtime: SceneRuntime) -> None:
+    def __init__(
+        self,
+        scene_name: str,
+        tick: Callable[[], None],
+        scene_controls: SceneControls,
+        namespace: ActiveSceneNamespace,
+    ) -> None:
         self.scene_name: str = scene_name
         self.tick: Callable[[], None] = tick
-        self.runtime: SceneRuntime = runtime
+        self.scene_controls: SceneControls = scene_controls
+        self.namespace: ActiveSceneNamespace = namespace
 
 
 _TELEMETRY_PRINT_INTERVAL = 1.0  # seconds
@@ -99,7 +90,7 @@ _FLASH_PACKS_ROOT = "packs"
 _CARD_PACKS_ROOT = "aura_packs"
 
 
-def resolve_boot_scene_name(
+def _resolve_boot_scene_name(
     scene_registry: SceneRegistry,
     storage: DeviceStorage | None,
     boot_mapping: dict,
@@ -136,7 +127,7 @@ def resolve_boot_scene_name(
     return scene_name
 
 
-def resolve_ir_codec(
+def _resolve_ir_codec(
     scene_registry: SceneRegistry, scene_name: str
 ) -> tuple[type[InfraredEncoder], type[InfraredDecoder]]:
     """Return the encoder/decoder class pair of the wire-frame codec *scene_name* declares.
@@ -147,7 +138,7 @@ def resolve_ir_codec(
     return codec_for(scene_registry.ir_codec_for(scene_name))
 
 
-def scan_boot_pack_catalog(
+def _scan_boot_pack_catalog(
     storage: DeviceStorage | None,
     setting_overrides: SettingOverrides | None = None,
 ) -> PackCatalog:
@@ -169,21 +160,21 @@ def scan_boot_pack_catalog(
     return scan_pack_roots(roots, setting_overrides=setting_overrides)
 
 
-def build_scene_runtime(
+def _build_scene_runtime(
     hw: DeviceHardware,
     scene_name: str,
     catalog: PackCatalog,
     scene_reboot: SceneReboot | None = None,
     timer: Timer | None = None,
-) -> SceneRuntime:
+) -> _SceneRuntime:
     """Wire the engine to *catalog*'s registries and boot into *scene_name* from it.
 
     Raises ``ValueError`` naming the known scenes when *scene_name* is not in
-    the catalog's ``SceneRegistry``. The returned ``SceneRuntime`` has the
+    the catalog's ``SceneRegistry``. The returned ``_SceneRuntime`` has the
     resolved scene already active — the caller only needs to drive the
     per-tick loop.
 
-    *catalog* is the one boot scan from ``scan_boot_pack_catalog``, shared
+    *catalog* is the one boot scan from ``_scan_boot_pack_catalog``, shared
     with boot-scene and IR-codec resolution; nothing is scanned here.
 
     *scene_reboot*, if supplied, is the board-free ``SceneReboot`` port wired
@@ -195,7 +186,7 @@ def build_scene_runtime(
     without pretending a reboot request can go anywhere.
 
     *timer*, if supplied, is the clock the whole runtime ticks on — the
-    engine, the effects, and the debouncer via ``SceneRuntime.timer``. The
+    engine, the effects, and the Polled parts the tick updates. The
     Simulation test harness passes a fixed-step clock here; omitted, a
     wall-clock ``Timer`` is built.
     """
@@ -225,12 +216,10 @@ def build_scene_runtime(
     )
     manager.activate_boot_scene(scene_registry.resolve_known(scene_name))
 
-    return SceneRuntime(
+    return _SceneRuntime(
         manager=manager,
         effect_manager=effect_manager,
         timer=timer,
-        ir=hw.ir,
-        radio=hw.radio,
         namespace=namespace,
     )
 
@@ -243,39 +232,44 @@ def build_scene_boot(
     logger: Logger | None = None,
     setting_overrides: SettingOverrides | None = None,
 ) -> SceneBoot:
-    """Boot *hw* into its boot scene; return its name, per-tick body and runtime.
+    """Boot *hw* into its boot scene; return the ``SceneBoot`` that names and drives it.
 
     The one boot shared by the device (:func:`app.scene_runtime.run_scene`)
-    and the Simulated device, as :func:`build_scene_tick` is their one tick.
+    and the Simulated device, whose returned tick is also their one loop body.
     A pending Scene deploy token is applied first (see
     :func:`~hardware.shared.scene_selection.apply_scene_deploy`); then the
-    card's Persisted scene wins over *boot_mapping*'s ``default_scene``.
-    An unknown name raises naming the known scenes. A reboot the scene asks for
-    persists to ``hw.storage``, then calls *reset*.
+    card's Persisted scene wins over *boot_mapping*'s ``default_scene``. A
+    reboot the scene asks for persists to ``hw.storage``, then calls *reset*.
 
     *setting_overrides* overrides scenes' Settings (shaped as for
     ``scan_pack_roots``); the Simulated device boots shortened scenes through
     it.
 
-    The runtime's ``namespace`` is the game's own Active scene namespace, so
-    the Simulated device can resolve a clip name exactly as the game does.
+    Raises:
+        PackScanError: a pack or scene under a scanned pack root is
+            misconfigured.
+        MissingCapabilityError: no boot scene candidate fits the device's
+            Capabilities.
+        ValueError: neither boot file names a scene, a named scene is
+            unknown (the message names the known scenes), or the booted
+            scene declares an unknown wire-frame codec.
     """
-    catalog = scan_boot_pack_catalog(hw.storage, setting_overrides)
+    catalog = _scan_boot_pack_catalog(hw.storage, setting_overrides)
     scene_registry = catalog.scene_registry
     apply_scene_deploy(hw.storage, boot_mapping, logger)
-    scene_name = resolve_boot_scene_name(
+    scene_name = _resolve_boot_scene_name(
         scene_registry, hw.storage, boot_mapping, hw.capabilities, logger
     )
     if hw.ir is not None:
-        hw.ir.apply_codec(*resolve_ir_codec(scene_registry, scene_name))
+        hw.ir.apply_codec(*_resolve_ir_codec(scene_registry, scene_name))
     scene_reboot = DeviceSceneReboot(
         hw.storage, booted_scene=scene_name, reset=reset, logger=logger
     )
-    runtime = build_scene_runtime(hw, scene_name, catalog, scene_reboot=scene_reboot, timer=timer)
-    return SceneBoot(scene_name, build_scene_tick(hw, runtime), runtime)
+    runtime = _build_scene_runtime(hw, scene_name, catalog, scene_reboot=scene_reboot, timer=timer)
+    return SceneBoot(scene_name, _build_scene_tick(hw, runtime), runtime.manager, runtime.namespace)
 
 
-def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], None]:
+def _build_scene_tick(hw: DeviceHardware, runtime: _SceneRuntime) -> Callable[[], None]:
     """Return the per-tick body that drives *runtime* on *hw*; call it once per tick.
 
     The one loop body shared by the device
@@ -288,10 +282,6 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     (the button, acceleration and magnetic buffers are each part's own
     ``reading``) and mutated in place every tick, so the steady-state tick
     allocates nothing on-device.
-
-    A caller with events of its own to inject queues them on
-    ``runtime.manager.active_state`` before calling the tick; they are
-    dispatched in that tick's ``manager.update()``.
     """
     polled = hw.polled
     accelerometer = hw.accelerometer
@@ -306,8 +296,8 @@ def build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], 
     manager = runtime.manager
     effect_manager = runtime.effect_manager
     timer = runtime.timer
-    ir = runtime.ir
-    radio = runtime.radio
+    ir = hw.ir
+    radio = hw.radio
     last_telemetry_print_total = 0.0
 
     def tick() -> None:

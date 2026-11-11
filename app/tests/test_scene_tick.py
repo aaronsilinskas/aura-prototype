@@ -1,32 +1,11 @@
-"""Behaviour-driven tests for build_scene_tick, the per-tick loop shared by
-the device and the Simulated device."""
+"""Behaviour-driven tests for the tick ``build_scene_boot`` hands back, the
+per-tick body the device and the Simulated device share: each test boots the
+probe scene and checks what its rule hears."""
 
-from typing import TypeVar
-
-from app.scene_composition import (
-    SceneRuntime,
-    build_scene_runtime,
-    build_scene_tick,
-    scan_boot_pack_catalog,
-)
-from engine.effects.manager import EffectManager
-from engine.engine import GameEngine
-from engine.events import Event
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
-from engine.namespace import ActiveSceneNamespace
-from engine.network import LINE, NetworkEvents
-from engine.packs import PackRegistry
-from engine.scene import SceneManager, SceneRegistry
-from engine.state import GameState, SceneControls
-from engine.tests.helpers import (
-    RecordingNamespace,
-    RecordingSceneReboot,
-    SpyEffectAdmin,
-    SpyEffectControls,
-    SpyNetworkControls,
-)
-from engine.timer import Timer
+from engine.network import NetworkEvents
+from engine.tests.helpers import FrozenTimer, SpyNetworkControls
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.polled_part import PolledPart
@@ -34,15 +13,15 @@ from hardware.shared.polled_sensor import PolledSensor
 
 
 def _hw(
+    probe,
     buttons=None,
     accelerometer=None,
     magnetometer=None,
     ir=None,
     radio=None,
-    capabilities=(),
     other_polled=(),
 ):
-    """Return a DeviceHardware built entirely from CPython-safe fakes.
+    """Return a DeviceHardware of CPython-safe fakes, carrying the probe's card.
 
     Its ``polled`` lists every part given, as the Device assembly lists what it
     built, followed by ``other_polled``.
@@ -57,112 +36,37 @@ def _hw(
         network_controls=SpyNetworkControls(),
         ir=ir,
         radio=radio,
-        storage=None,
-        capabilities=frozenset(capabilities),
+        storage=probe.storage,
+        capabilities=frozenset(),
         polled=tuple(part for part in built if part is not None) + tuple(other_polled),
     )
 
 
-class _RecordingState(GameState):
-    """Stands in for the active scene's GameState: keeps every queued event."""
-
-    def __init__(self) -> None:
-        super().__init__(SpyEffectControls(), SceneControls())
-        self.queued: list[Event] = []
-
-    def queue_event(self, event: Event) -> None:
-        self.queued.append(event)
-
-
-class _RecordingManager(SceneManager):
-    """Stands in for SceneManager: an active state, and a timer advanced on update
-    the way GameEngine.update advances it."""
-
-    def __init__(self, timer: Timer, active: bool = True) -> None:
-        super().__init__(
-            GameEngine(effect_controls=SpyEffectControls()),
-            PackRegistry(),
-            PackRegistry(),
-            SceneRegistry(),
-            SpyEffectAdmin(),
-            RecordingNamespace(),
-            RecordingSceneReboot(),
-        )
-        self._active_state = _RecordingState() if active else None
-        self._timer = timer
-        self.update_count = 0
-
-    @property
-    def active_state(self) -> _RecordingState | None:
-        return self._active_state
-
-    def update(self) -> None:
-        self.update_count += 1
-        self._timer.update()
-
-
-class _RecordingEffectManager(EffectManager):
-    def __init__(self) -> None:
-        super().__init__(ActiveSceneNamespace(PackRegistry(), {}), [])
-        self.updated_with: list[Timer] = []
-
-    def update(self, timer: Timer) -> None:
-        self.updated_with.append(timer)
-
-
-def _runtime(hw: DeviceHardware, active: bool = True) -> SceneRuntime:
-    timer = Timer()
-    return SceneRuntime(
-        manager=_RecordingManager(timer, active=active),
-        effect_manager=_RecordingEffectManager(),
-        timer=timer,
-        ir=hw.ir,
-        radio=hw.radio,
-        namespace=ActiveSceneNamespace(PackRegistry(), {}),
-    )
-
-
-_E = TypeVar("_E", bound=Event)
-
-
-def _queued(runtime: SceneRuntime, event_type: type[_E]) -> list[_E]:
-    state = runtime.manager.active_state
-    assert isinstance(state, _RecordingState)
-    return [e for e in state.queued if isinstance(e, event_type)]
-
-
-def _sensors(runtime: SceneRuntime) -> list[InputEvents.Sensors]:
-    return _queued(runtime, InputEvents.Sensors)
-
-
-def test_each_tick_queues_one_sensors_event_carrying_the_debounced_button_states():
-    hw = _hw(buttons=DebouncedButtons([("A", lambda: True)]))
-    runtime = _runtime(hw)
-    tick = build_scene_tick(hw, runtime)
+def test_each_tick_delivers_one_sensors_event_carrying_the_debounced_button_states(probe):
+    tick = probe.boot(_hw(probe, buttons=DebouncedButtons([("A", lambda: True)]))).tick
 
     tick()
 
-    sensors = _sensors(runtime)
-    assert len(sensors) == 1
-    assert sensors[0].buttons.get("A") == ButtonData.UP
+    [sensors] = probe.events(InputEvents.Sensors)
+    assert sensors.buttons.get("A") == ButtonData.UP
 
 
-def test_ticks_reuse_one_sensors_event_and_button_buffer_instead_of_allocating():
-    hw = _hw(buttons=DebouncedButtons([("A", lambda: True)]))
-    runtime = _runtime(hw)
-    tick = build_scene_tick(hw, runtime)
+def test_ticks_reuse_one_sensors_event_and_button_buffer_instead_of_allocating(probe):
+    tick = probe.boot(_hw(probe, buttons=DebouncedButtons([("A", lambda: True)]))).tick
 
     tick()
     tick()
     tick()
 
-    first, *rest = _sensors(runtime)
+    first, *rest = probe.events(InputEvents.Sensors)
+    assert len(rest) == 2
     assert all(event is first for event in rest)
     assert all(event.buttons is first.buttons for event in rest)
 
 
-def test_the_sensors_event_carries_the_latest_accelerometer_and_magnetometer_readings():
+def test_the_sensors_event_carries_the_latest_accelerometer_and_magnetometer_readings(probe):
     hw = _hw(
+        probe,
         accelerometer=PolledSensor(
             lambda: (1.0, 2.0, 3.0), AccelerationData(0.0, 0.0, 0.0), "accelerometer", Logger.SILENT
         ),
@@ -170,26 +74,23 @@ def test_the_sensors_event_carries_the_latest_accelerometer_and_magnetometer_rea
             lambda: (4.0, 5.0, 6.0), MagneticData(0.0, 0.0, 0.0), "magnetometer", Logger.SILENT
         ),
     )
-    runtime = _runtime(hw)
-    tick = build_scene_tick(hw, runtime)
+    tick = probe.boot(hw).tick
 
     tick()
 
-    event = _sensors(runtime)[0]
+    [event] = probe.events(InputEvents.Sensors)
     assert event.acceleration is not None
     assert event.magnetic is not None
     assert (event.acceleration.x, event.acceleration.y, event.acceleration.z) == (1.0, 2.0, 3.0)
     assert (event.magnetic.x, event.magnetic.y, event.magnetic.z) == (4.0, 5.0, 6.0)
 
 
-def test_a_device_without_an_accelerometer_or_magnetometer_reports_none_for_them():
-    hw = _hw()
-    runtime = _runtime(hw)
-    tick = build_scene_tick(hw, runtime)
+def test_a_device_without_an_accelerometer_or_magnetometer_reports_none_for_them(probe):
+    tick = probe.boot(_hw(probe)).tick
 
     tick()
 
-    event = _sensors(runtime)[0]
+    [event] = probe.events(InputEvents.Sensors)
     assert event.acceleration is None
     assert event.magnetic is None
 
@@ -203,13 +104,14 @@ class _FakeIr:
         self.last_error_margin = 3
         self.telemetry = telemetry
         self.update_count = 0
-        self.telemetry_calls = 0
+
+    def apply_codec(self, encoder_class, decoder_factory) -> None:
+        pass
 
     def update(self, elapsed: float) -> None:
         self.update_count += 1
 
     def telemetry_line(self) -> str | None:
-        self.telemetry_calls += 1
         return self.telemetry
 
 
@@ -225,41 +127,25 @@ class _FakeRadio:
         self.update_count += 1
 
 
-def test_a_received_ir_packet_is_queued_as_ir_received_with_its_telemetry():
-    hw = _hw(ir=_FakeIr(received=b"\x01\x02"))
-    runtime = _runtime(hw)
-    tick = build_scene_tick(hw, runtime)
+def test_a_received_ir_packet_reaches_the_rules_as_ir_received_in_the_same_tick(probe):
+    tick = probe.boot(_hw(probe, ir=_FakeIr(received=b"\x01\x02"))).tick
 
     tick()
 
-    [event] = _queued(runtime, NetworkEvents.IRReceived)
+    [event] = probe.events(NetworkEvents.IRReceived)
     assert event.data == b"\x01\x02"
     assert event.signal_strength == 87
     assert event.error_margin == 3
 
 
-def test_a_received_radio_packet_is_queued_as_radio_received_naming_the_sender():
-    hw = _hw(radio=_FakeRadio(received=b"\x09", last_sender=42))
-    runtime = _runtime(hw)
-    tick = build_scene_tick(hw, runtime)
+def test_a_received_radio_packet_reaches_the_rules_as_radio_received_in_the_same_tick(probe):
+    tick = probe.boot(_hw(probe, radio=_FakeRadio(received=b"\x09", last_sender=42))).tick
 
     tick()
 
-    [event] = _queued(runtime, NetworkEvents.RadioReceived)
+    [event] = probe.events(NetworkEvents.RadioReceived)
     assert event.data == b"\x09"
     assert event.sender == "42"
-
-
-def test_ir_and_radio_are_pumped_every_tick_even_with_no_active_scene():
-    hw = _hw(ir=_FakeIr(received=b"\x01"), radio=_FakeRadio(received=b"\x02"))
-    runtime = _runtime(hw, active=False)
-    tick = build_scene_tick(hw, runtime)
-
-    tick()
-    tick()
-
-    assert hw.ir.update_count == 2
-    assert hw.radio.update_count == 2
 
 
 class _CountingPart(PolledPart):
@@ -272,65 +158,37 @@ class _CountingPart(PolledPart):
         self.update_count += 1
 
 
-def test_every_polled_part_is_updated_once_per_tick_without_the_tick_naming_it():
+def test_every_polled_part_is_updated_every_tick_even_when_no_event_results(probe):
+    ir = _FakeIr()
+    radio = _FakeRadio()
     part = _CountingPart()
-    hw = _hw(other_polled=(part,))
-    runtime = _runtime(hw)
-    tick = build_scene_tick(hw, runtime)
+    tick = probe.boot(_hw(probe, ir=ir, radio=radio, other_polled=(part,))).tick
 
     tick()
     tick()
 
-    assert part.update_count == 2
+    assert (ir.update_count, radio.update_count, part.update_count) == (2, 2, 2)
+    assert probe.events(NetworkEvents.IRReceived) == []
+    assert probe.events(NetworkEvents.RadioReceived) == []
 
 
-def test_ticking_a_real_scene_delivers_the_sensors_event_to_its_rules():
-    """ir_range_transmitter sends on LINE as soon as it sees a sensors event, so
-    one tick proves the event reached the scene's rules through manager.update()."""
-    network_spy = SpyNetworkControls()
-    hw = _hw(capabilities={"ir.line"})
-    hw.network_controls = network_spy
-    runtime = build_scene_runtime(hw, "ir_range_transmitter", catalog=scan_boot_pack_catalog(None))
-    tick = build_scene_tick(hw, runtime)
-
-    tick()
-
-    assert [emitter for _, emitter in network_spy.send_ir_calls] == [LINE]
-
-
-def test_each_tick_updates_the_scene_and_renders_effects_on_the_runtimes_timer():
-    hw = _hw()
-    runtime = _runtime(hw)
-    tick = build_scene_tick(hw, runtime)
-
-    tick()
-    tick()
-
-    assert isinstance(runtime.manager, _RecordingManager)
-    assert isinstance(runtime.effect_manager, _RecordingEffectManager)
-    assert runtime.manager.update_count == 2
-    assert runtime.effect_manager.updated_with == [runtime.timer, runtime.timer]
-
-
-def test_the_ir_telemetry_line_prints_at_most_once_per_second_of_scene_time(capsys):
-    hw = _hw(ir=_FakeIr(telemetry="ir: rx=3"))
-    runtime = _runtime(hw)
-    tick = build_scene_tick(hw, runtime)
+def test_the_ir_telemetry_line_prints_at_most_once_per_second_of_scene_time(probe, capsys):
+    timer = FrozenTimer()
+    tick = probe.boot(_hw(probe, ir=_FakeIr(telemetry="ir: rx=3")), timer=timer).tick
 
     for _ in range(5):
-        runtime.timer.total += 0.3
+        timer.total += 0.3
         tick()
 
     # totals 0.3, 0.6, 0.9, 1.2 (prints), 1.5 -> one line inside the first 1.5 s
     assert capsys.readouterr().out == "ir: rx=3\n"
 
 
-def test_no_telemetry_prints_when_the_ir_reports_no_change(capsys):
-    hw = _hw(ir=_FakeIr(telemetry=None))
-    runtime = _runtime(hw)
-    tick = build_scene_tick(hw, runtime)
+def test_no_telemetry_prints_when_the_ir_reports_no_change(probe, capsys):
+    timer = FrozenTimer()
+    tick = probe.boot(_hw(probe, ir=_FakeIr(telemetry=None)), timer=timer).tick
 
-    runtime.timer.total = 5.0
+    timer.total = 5.0
     tick()
 
     assert capsys.readouterr().out == ""

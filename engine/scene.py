@@ -356,9 +356,9 @@ class SceneRegistry:
     def resolve_known(self, name: str) -> str:
         """Return *name* if registered, else raise naming the known scenes.
 
-        The single known-scene check, shared by
-        ``app.scene_composition.resolve_boot_scene_name`` (the boot-time guard)
-        and ``SceneManager.reboot_into`` (the Button-B fail-fast guard) so the
+        The single known-scene check, shared by the Scene boot
+        (``app.scene_composition.build_scene_boot``, the boot-time guard) and
+        ``SceneManager.reboot_into`` (the Button-B fail-fast guard) so the
         check and its message have exactly one implementation.
         """
         names = self.names()

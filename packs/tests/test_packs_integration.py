@@ -13,11 +13,17 @@ from engine.engine import GameEngine, GameRule
 from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog, scan_pack_roots
 from engine.scene import PackReference, Scene, SceneManager, SceneRegistry
-from engine.state import SceneReboot
+from engine.state import SceneReboot, Scope
+from engine.tests.effects.helpers import SpyEffectOutput
 from engine.version import Version
 from packs.rules.debug.event_logger import EventLoggerRule
 
 _PACKS_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
+
+
+def _under_packs(relative_path: str) -> str:
+    """*relative_path*, a path under ``packs/``, where the scanned catalog records it."""
+    return os.path.join(_PACKS_ROOT, relative_path)
 
 
 @pytest.fixture(scope="module")
@@ -257,14 +263,22 @@ def test_hardware_test_scene_json_does_not_list_debug_rule_pack(catalog: PackCat
     assert "debug" not in rule_pack_names
 
 
-def _resolve_every_local_clip(catalog: PackCatalog, scene_name: str) -> list[str]:
-    """Resolve every clip *scene_name*'s local effects declare, as the game would with it active."""
+def _namespace_with_active(catalog: PackCatalog, scene_name: str) -> ActiveSceneNamespace:
+    """The Active scene namespace with *scene_name* installed, as the game installs it."""
     scene = catalog.scene_registry.get(scene_name)
-    local_effects = scene.local_effect_registry
     namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
     namespace.install(
-        local_effects, scene.local_sound_map, frozenset(pack.name for pack in scene.effect_packs)
+        scene.local_effect_registry,
+        scene.local_sound_map,
+        frozenset(pack.name for pack in scene.effect_packs),
     )
+    return namespace
+
+
+def _resolve_every_local_clip(catalog: PackCatalog, scene_name: str) -> list[str]:
+    """Resolve every clip *scene_name*'s local effects declare, as the game would with it active."""
+    local_effects = catalog.scene_registry.get(scene_name).local_effect_registry
+    namespace = _namespace_with_active(catalog, scene_name)
 
     resolved_paths = []
     for effect_name in local_effects.items():
@@ -277,7 +291,77 @@ def _resolve_every_local_clip(catalog: PackCatalog, scene_name: str) -> list[str
     return resolved_paths
 
 
+# --- Clip resolution through the Active scene namespace (issue #804) ---
+
+
+def test_effect_pack_sounds_resolve_qualified_by_their_pack_name(catalog: PackCatalog) -> None:
+    namespace = _namespace_with_active(catalog, "hardware_test")
+
+    assert namespace.resolve_clip("basic.game_over_sting_start") == _under_packs(
+        "effects/basic/sounds/game_over_sting_start.wav"
+    )
+    assert namespace.resolve_clip("elements.lightning_strike") == _under_packs(
+        "effects/elements/sounds/lightning_strike.wav"
+    )
+
+
+def test_hardware_test_scenes_own_sound_resolves_to_its_sounds_folder(
+    catalog: PackCatalog,
+) -> None:
+    """scene.sfx_test_start is the clip hardware_test's sfx_test effect plays."""
+    namespace = _namespace_with_active(catalog, "hardware_test")
+
+    assert namespace.resolve_clip("scene.sfx_test_start") == _under_packs(
+        "scenes/hardware_test/sounds/sfx_test_start.wav"
+    )
+
+
+def test_a_device_with_no_audio_output_still_resolves_the_clip_of_an_effect_it_starts(
+    catalog: PackCatalog,
+) -> None:
+    """Clips resolve the same with or without an audio output, so no-audio devices need no case.
+
+    The device's one output is a pixel strip; the effect's START still carries the resolved clip.
+    """
+    strip = SpyEffectOutput(min_resolution=8, scopes=[Scope.PERSONAL])
+    effect_manager = EffectManager(
+        namespace=_namespace_with_active(catalog, "hardware_test"), outputs=[strip]
+    )
+
+    effect_manager.set_effect(Scope.PERSONAL, "scene.sfx_test", {})
+
+    [(start, *_)] = strip.handle_event_calls
+    assert start.clip is not None
+    assert start.clip.path == _under_packs("scenes/hardware_test/sounds/sfx_test_start.wav")
+
+
 # --- Tag scene audio discovery (issue #805) ---
+
+
+def test_tag_scenes_own_sounds_resolve_to_its_sounds_folder(catalog: PackCatalog) -> None:
+    namespace = _namespace_with_active(catalog, "tag")
+
+    for stem in (
+        "fire_shot_start",
+        "reload",
+        "reload_complete",
+        "dry_fire_start",
+        "ready_shots_start",
+        "go_start",
+        "warning_pulse_peak",
+        "hit_start",
+    ):
+        assert namespace.resolve_clip(f"scene.{stem}") == _under_packs(
+            f"scenes/tag/sounds/{stem}.wav"
+        )
+
+
+def test_tags_game_over_sting_resolves_through_the_basic_pack(catalog: PackCatalog) -> None:
+    namespace = _namespace_with_active(catalog, "tag")
+
+    assert namespace.resolve_clip("basic.game_over_sting_start") == _under_packs(
+        "effects/basic/sounds/game_over_sting_start.wav"
+    )
 
 
 def test_tag_scene_every_audio_playing_effects_clip_name_resolves(catalog: PackCatalog) -> None:
@@ -293,6 +377,34 @@ def test_tag_scene_every_audio_playing_effects_clip_name_resolves(catalog: PackC
 
 
 # --- Red Light Green Light scene audio discovery (issue #806) ---
+
+
+def test_red_light_green_light_scenes_own_sounds_resolve_to_its_sounds_folder(
+    catalog: PackCatalog,
+) -> None:
+    namespace = _namespace_with_active(catalog, "red_light_green_light")
+
+    for stem in (
+        "green_light_music_start",
+        "red_light_music_start",
+        "level_up_start",
+        "win_sting_start",
+        "ready_start",
+        "warning_sting_peak",
+    ):
+        assert namespace.resolve_clip(f"scene.{stem}") == _under_packs(
+            f"scenes/red_light_green_light/sounds/{stem}.wav"
+        )
+
+
+def test_red_light_green_light_game_over_sting_resolves_through_the_basic_pack(
+    catalog: PackCatalog,
+) -> None:
+    namespace = _namespace_with_active(catalog, "red_light_green_light")
+
+    assert namespace.resolve_clip("basic.game_over_sting_start") == _under_packs(
+        "effects/basic/sounds/game_over_sting_start.wav"
+    )
 
 
 def test_red_light_green_light_scene_every_audio_playing_effects_clip_name_resolves(
