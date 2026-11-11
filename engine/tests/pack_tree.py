@@ -49,8 +49,9 @@ class PackTree:
     ) -> Path:
         """Create effect pack *name* under *root*, with ``effects.json`` stating *version*.
 
-        *settings* is the manifest's ``settings`` section, the pack's Setting
-        declarations; *requires*, when given, its ``requires`` list. *manifest*
+        *settings* is the manifest's ``settings`` section; effect packs declare
+        no Settings, so it exists only to build a manifest the scan rejects.
+        *requires*, when given, is its ``requires`` list. *manifest*
         gives the manifest's raw text instead; ``version=None`` omits the version.
         """
         pack_dir = self._pack(

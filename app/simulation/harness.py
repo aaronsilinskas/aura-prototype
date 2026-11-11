@@ -256,7 +256,7 @@ class Simulation:
         Raises:
             SettingOverrideError: *setting_overrides* names an undeclared
                 Setting, gives the wrong type, or leaves one unset.
-            OverrideOfUndeclaredPackError: *setting_overrides* names a pack
+            OverrideOfUndeclaredPackError: *setting_overrides* names a Rule pack
                 the scene does not declare.
             ValueError: If *without* names something that is not a Capability;
                 if *card* is given without ``storage``, or is another device's
