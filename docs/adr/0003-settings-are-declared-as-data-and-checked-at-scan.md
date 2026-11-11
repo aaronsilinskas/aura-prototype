@@ -20,6 +20,7 @@ A mistyped key silently read as the default, and a seeded key that nothing read 
 - Defaults that were Python constants (`MOTION_EMA_ALPHA`, `GRAVITY_LOWPASS_BETA`) move into JSON. A constraint between two Settings is checked by the Scene Config that derives from them.
 - Types are limited to what JSON can state and the scan can check cheaply: `int`, `float`, `bool`, `str`, and `list` (top level only). Deep structure is still validated by pack code.
 - Rules read Settings through a read-only view, by namespace (`scene` or the pack's name) and Setting name, never through `GameState`'s `get` / `set`.
-- A pack's Settings are part of its versioned interface:
+- Effect packs declare no Settings: an effect builder has no way to receive them, so the scan rejects them rather than accept values nothing reads. Only scenes and Rule packs declare Settings.
+- A Rule pack's Settings are part of its versioned interface:
   - **Minor bump:** adding a Setting that has a default.
   - **Major bump:** adding a required Setting, or removing, renaming or retyping a Setting.

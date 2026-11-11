@@ -40,8 +40,8 @@ _Avoid_: raw DRV2605L waveform IDs; `HapticConfig` (collides with the device-con
 Runtime configuration passed to effect builders at construction: `resolution`, effect-specific `options`, and `listeners`.
 
 ### Effect pack
-A named, versioned directory of effect items, each exporting an `EffectBuilder`, whose **Pack manifest** states its version and declares its **Settings**; shared and cross-scene.
-_Avoid_: calling a scene-local effect set a "pack" (a pack is shared, versioned, cross-scene)
+A named, versioned directory of effect items, each exporting an `EffectBuilder`, whose **Pack manifest** states only its version; shared and cross-scene. It declares no **Settings**: an effect is tuned per use, by the `options` the rule that starts it passes.
+_Avoid_: calling a scene-local effect set a "pack" (a pack is shared, versioned, cross-scene); declaring Settings or **Required capabilities** in its manifest (both rejected by the scan)
 
 ### Rule pack
 A named, versioned directory of rule items, each exporting a `GameRule`, whose **Pack manifest** states its version, declares its **Settings** and lists its **Required capabilities**; shared and cross-scene.
@@ -56,7 +56,7 @@ Everything installed under a device's pack roots, discovered in one scan by `sca
 _Avoid_: scanning packs, scenes or sounds anywhere else; re-checking scene declarations at load time
 
 ### PackScanError
-The typed `ValueError` family raised while building a `PackCatalog`, when the files on disk are wrong (missing root, duplicate or reserved name, malformed version, `scene.json` or **Pack manifest**, a scene declaring a pack twice or declaring one that is missing or incompatible, a **Setting override** naming a pack its scene does not declare or an undeclared Setting, giving the wrong type, or leaving a required Setting unset, or a `requires` list naming an unknown **Capability**). Each carries the file, scene, pack or Setting at fault, so tests check the type and those fields, never the wording.
+The typed `ValueError` family raised while building a `PackCatalog`, when the files on disk are wrong (missing root, duplicate or reserved name, malformed version, `scene.json` or **Pack manifest**, an **Effect pack** declaring Settings or `requires`, or a scene giving one Setting overrides, a scene declaring a pack twice or declaring one that is missing or incompatible, a **Setting override** naming a Rule pack its scene does not declare or an undeclared Setting, giving the wrong type, or leaving a required Setting unset, or a `requires` list naming an unknown **Capability**). Each carries the file, scene, pack or Setting at fault, so tests check the type and those fields, never the wording.
 _Avoid_: confusing with **Registry lookup errors** (a name not registered, after a good scan); classifying by message text; raising one because the device lacks a scene's **Required capabilities** (the scan never looks at hardware)
 
 ### DynamicValue
@@ -101,15 +101,15 @@ A `GameRule` whose handlers fire only while a given phase is active, with no lif
 _Avoid_: making it own or change phases (use `PhaseRule`)
 
 ### Setting
-A named, typed, immutable start-up value that a scene or a pack declares, with a default unless it is required. Resolved once, when the **PackCatalog** is scanned; rules can read it but never change it, and it is kept apart from the runtime game data in `GameState`.
+A named, typed, immutable start-up value that a scene or a **Rule pack** declares, with a default unless it is required. Resolved once, when the **PackCatalog** is scanned; rules can read it but never change it, and it is kept apart from the runtime game data in `GameState`.
 _Avoid_: "tunable", "knob", "initial data", "config key"; keeping a Setting in `GameState`'s `get`/`set` store; seeding runtime game data from `scene.json` (rules seed their own); confusing with the boot values in `aura-boot.json`
 
 ### Setting override
-A value that replaces a declared **Setting**'s default for one scene: written by the scene for a pack it declares, or supplied when the **Simulated device** boots.
+A value that replaces a declared **Setting**'s default for one scene: written by the scene for a **Rule pack** it declares, or supplied when the **Simulated device** boots.
 _Avoid_: "initial data"; changing a scene's resolved Settings after the scan
 
 ### Pack manifest
-The JSON file in an **Effect pack** or **Rule pack** that states the pack's version and declares its **Settings**; a Rule pack's also lists its **Required capabilities**, which are part of its versioned interface.
+The JSON file in an **Effect pack** or **Rule pack** that states the pack's version; a Rule pack's also declares its **Settings** and lists its **Required capabilities**, both part of its versioned interface.
 _Avoid_: `version.txt`
 
 ### Scene Config
@@ -120,7 +120,7 @@ _Avoid_: confusing with `EffectConfig`; calling the Settings themselves the Scen
 Owned internally by `GameEngine`. Rules access time only via `state.elapsed`/`state.total`, never by holding a `Timer` reference.
 
 ### Scene
-A declarative bundle of a self-contained game context: effect/rule packs, its own declared **Settings** and its **Setting overrides** for the packs it declares, a `version`, a declared `ir_codec` name, its own **Required capabilities**, and references to its scene-local effects/rules. Carries no mutable runtime state.
+A declarative bundle of a self-contained game context: effect/rule packs, its own declared **Settings** and its **Setting overrides** for the Rule packs it declares, a `version`, a declared `ir_codec` name, its own **Required capabilities**, and references to its scene-local effects/rules. Carries no mutable runtime state.
 
 ### Capability
 One thing a device has that a scene can depend on, named from a fixed vocabulary: a button by label (`button.A`, `button.B`, …), an IR emitter by name (`ir.line`, `ir.cone`, `ir.area_of_effect`), any IR receiver (`ir.receive`), `radio`, `storage`, `accelerometer`, `magnetometer`. A device **has** a capability when what it built provides it — a component declared but not built (disabled, isolated, or its bus failed to open) is not had. Named by component, never by bus or part: an accelerometer on I2C and one on SPI are the same capability.
