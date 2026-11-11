@@ -84,6 +84,10 @@ def shape(position):
 
 Prefer multiply over divide when the denominator is fixed. In hot paths, always use `x * x` instead of `x ** 2`. The `**` operator has meaningful overhead on embedded devices even with compile-time constant exponents.
 
+## Native Code (`@micropython.native`)
+
+Production code compiles to bytecode only: `@micropython.native` and `-X emit=native` are unsupported while the project targets the RP2350. Spec #1235 measured both on an RP2350 board with 8 MB PSRAM: no single function on the per-pixel path (merge strategies, palette lookup, layer renderers, `EffectManager.update`) gained more than ~3 % FPS, and compiling every module native made frames 24–30 % slower.
+
 ## CircuitPython and MicroPython Compatibility
 
 This reference targets the **latest stable releases** of CircuitPython and MicroPython. Do not flag features as unavailable unless they are absent from current releases.
