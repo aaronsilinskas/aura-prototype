@@ -142,9 +142,6 @@ exclude = [
     '^packs/scenes/tag/rules/helpers/tests/',
     '^packs/scenes/tag/tests/',
     '^packs/tests/',
-    # #1260
-    '^app/simulation/tests/',
-    '^app/tests/',
 ]
 # Local stubs for modules circuitpython-stubs lacks; see typings/README.md.
 mypy_path = "typings"

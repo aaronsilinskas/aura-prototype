@@ -8,6 +8,7 @@ so a test sets the accelerometer up during Warning and watches Red.
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Mapping
 
 import pytest
 
@@ -22,9 +23,9 @@ ONE_ROUND = {"max_ammo": 1, "reload_duration": 1.0}
 """One round, so a fresh press after it starts a one-second reload."""
 
 
-def tag_settings(settings: dict[str, object]) -> SettingOverrides:
+def tag_settings(settings: Mapping[str, object]) -> SettingOverrides:
     """The ``setting_overrides`` that boot Tag with *settings* in its scene namespace."""
-    return {"tag": {"settings": settings}}
+    return {"tag": {"settings": dict(settings)}}
 
 
 def start_game(simulation: Simulation, *players: SimulatedDevice) -> None:
