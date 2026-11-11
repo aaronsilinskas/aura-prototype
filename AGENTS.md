@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-GitHub Issues in `aaronsilinskas/aura-prototype` via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+GitHub Issues in `aaronsilinskas/aura-prototype` via the `gh` CLI. Before reading or creating issues, see `docs/agents/issue-tracker.md` for the `gh` conventions and gotchas.
 
 ### Triage labels
 

@@ -5,7 +5,7 @@ Issues and specs for this repo live as GitHub issues in `aaronsilinskas/aura-pro
 ## Conventions
 
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
-- **Read an issue**: `gh issue view <number> --json number,title,body,labels,comments`.
+- **Read an issue**: `gh issue view <number> --json number,title,body,labels,comments`. Not `--comments`: outside a terminal it prints only the comments, so an issue with none reads as empty.
 - **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
 - **Make an issue a sub-issue of a parent**: `gh issue create --parent <parent> ...`, or `gh issue edit <parent> --add-sub-issue <child>` afterwards.
 - **Publish a batch of tickets** (`to-tickets`): write each body to a file and list the tickets in a manifest, then run `uv run python scripts/publish_tickets.py <manifest.json>` (`--dry-run` checks it first). It creates them in order under the parent, adds the blocking edges, and prints a read-back table to compare against the approved breakdown. The manifest shape is in the script's docstring.
