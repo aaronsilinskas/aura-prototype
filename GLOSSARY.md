@@ -167,7 +167,7 @@ Serves a fresh `Scene` per lookup from the scenes the **PackCatalog** discovered
 _Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); calling `register` outside tests; changing a scene's Settings after the scan (pass **Setting overrides** to the catalog scan); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
 
 ### SceneControls
-The rule-facing scene-transition seam (`overlay`, `pop`, `reboot_into`, `reboot_to_previous`); `SceneManager` is the live implementation. Every transition into a scene first checks its **Required capabilities** against the device, and rules can ask whether the device can run a scene before offering it.
+The scene-transition seam rules use (`overlay`, `pop`, `reboot_into`, `reboot_to_previous`, `can_run`); `SceneManager` is the live implementation. The **Scene boot** hands the same seam to the **Simulation test harness** and the reboot example, which use it as a rule would. Every transition into a scene first checks its **Required capabilities** against the device, and rules can ask whether the device can run a scene before offering it.
 _Avoid_: a rule-facing `load` (a rule changes scene by **Reboot**, which starts the new scene clean)
 
 ### Overlay
@@ -188,11 +188,11 @@ _Avoid_: "saved scene", "override" for it; clearing it because this device canno
 
 ### Scene deploy token
 The per-deploy value `deploy.py --scene` writes as `scene_deploy_token` beside `default_scene` in `aura-boot.json`, new on every invocation. On boot, before the boot scene is resolved, a non-empty token that differs from the one recorded in the card's `aura-state.json` is applied: the **Persisted scene** and its `return_to` are removed and the token recorded, in one write, and one line is logged naming the deployed scene and the Persisted scene it cleared. So each `--scene` deploy wins once, and Reboots made after it keep persisting. The apply never checks the deployed scene against the registry: an unknown one is cleared to, then fails resolution naming the known scenes.
-_Avoid_: "nonce", "deploy id" for it; comparing scene names instead (a second deploy of the same scene would be mistaken for the first); copying the deployed scene onto the card; a separate inbox file; applying it outside the shared boot (`build_scene_boot`)
+_Avoid_: "nonce", "deploy id" for it; comparing scene names instead (a second deploy of the same scene would be mistaken for the first); copying the deployed scene onto the card; a separate inbox file; applying it outside the **Scene boot**
 
 ### SceneReboot
 The board-free port `SceneManager` reaches to persist a scene switch and reboot the device; live adapter `DeviceSceneReboot`. Its `previous_scene` names the scene `reboot_to_previous` would boot, so `SceneManager` can check that scene's **Required capabilities** before anything is persisted.
-_Avoid_: validating the target here (that is `SceneManager.reboot_into`'s job); calling `microcontroller.reset()` anywhere but `run_scene` (and the on-device `reboot_demo` example), which inject it into `DeviceSceneReboot`
+_Avoid_: validating the target here (that is `SceneManager.reboot_into`'s job); calling `microcontroller.reset()` anywhere but the device's entry points (`run_scene` and the on-device reboot example), which pass it to the **Scene boot**
 
 ### EffectControls
 The **rule-facing** effect seam a rule holds via `GameState.effect_controls`: `set_effect`, `add_effect`, `stop_effect`, `set_merge_strategy`; scene-transition operations live on `EffectAdmin`.
@@ -310,25 +310,9 @@ _Avoid_: repeating bus pins inside a device section; "shared bus" for the whole 
 The top-level `app/` package — the one place allowed to import both engine runtime machinery and `hardware.*` together. It composes the board-free engine/effect/scene machinery (CPython-testable) and wires it to real hardware for the per-tick loop.
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
-### SceneRuntime / build_scene_runtime
-The board-free bundle `build_scene_runtime` wires and returns for the per-tick loop to drive — registries, managers, engine, and pass-through `ir`/`radio` handles. Discovers nothing itself; takes the boot **PackCatalog** from `scan_boot_pack_catalog`.
-_Avoid_: duplicating the wiring or scene-name resolution at a call site; hand-sequencing the transmit-then-receive order at a call site (drive `ir.update()`/`radio.update()`); scanning a second catalog or registry when a caller already has one; expecting it to discover packs or scenes
-
-### build_scene_tick
-The board-free per-tick body shared by the device (`run_scene`) and the **Simulated device**: reads inputs, pumps IR/radio, queues events onto the active scene, then updates the scene and its effects. Built once per `SceneRuntime`; its buffers are allocated at build time and reused every tick.
-_Avoid_: copying the loop body into a harness or entry point; rebuilding it every tick (reallocates the per-tick buffers)
-
-### scan_boot_pack_catalog
-The board-free builder of the boot **PackCatalog**: chooses the pack roots (flash `packs`, plus the card's `aura_packs` when the mounted card carries one) and scans them, so card content is first-class exactly like flash content.
-_Avoid_: `scan_boot_scene_registry` (old name); calling it before `build_hardware` (the card leg needs storage mounted); scanning packs or scenes anywhere else once this exists
-
-### resolve_boot_scene_name
-The boot-time seam that picks the scene to boot into (**Persisted scene** → flash `default_scene` → raise), skipping a candidate the device lacks the **Required capabilities** for, and guarantees the winner is registered. `build_scene_boot` applies any pending **Scene deploy token** just before it.
-_Avoid_: calling `boot_scene_candidates` directly and skipping registry validation (`SceneRegistry.resolve_known`); calling it before `build_hardware` (the persisted leg needs storage mounted)
-
-### resolve_ir_codec
-Resolves a scene's declared **wire-frame codec** name to its encoder/decoder class pair. Board-free, needing no built hardware to run.
-_Avoid_: applying the resolved pair after the first tick (defeats the boot-time-selection point); duplicating the name-to-class mapping instead of delegating to `codec_for`
+### Scene boot
+The one boot the device and the **Simulated device** share, and the **Composition layer**'s only way in. From the hardware a device built, it applies a pending **Scene deploy token**, then picks the boot scene (the **Persisted scene**, else the flash `default_scene`), skipping one the device lacks the **Required capabilities** for and raising when none fits. It applies that scene's wire-frame codec before the first tick, and hands back the booted scene's name, its tick, its **SceneControls** and its **Active scene namespace**. Card content is scanned exactly like flash content. Each boot builds one tick, whose buffers are allocated once and reused every tick.
+_Avoid_: sequencing the boot's steps at a call site; a second boot for tests or examples; scanning packs or scenes outside it; copying the tick's body into a harness or entry point; building a tick per frame; reading `ir` or `radio` anywhere but `DeviceHardware`; "startup", "init" for it
 
 ### Device assembly
 The board-free turning of a `DeviceConfig` into a `DeviceHardware`, shared by the physical device and the **Simulated device**: which components are built or skipped, which need a bus, the order they come up in, how each is narrated, and how the IR and radio subsystems are wired. It reaches hardware only through **DeviceParts**, so a config the board rejects for config reasons is rejected in simulation too.
