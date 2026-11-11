@@ -79,16 +79,20 @@ def test_write_bytes_then_read_chunks_round_trips_exact_bytes(tmp_path):
     storage = DeviceStorage(str(tmp_path))
     storage.write_bytes("state.json", b"\x00\x01hello\xff")
 
-    assert b"".join(storage.read_chunks("state.json", chunk_size=8)) == b"\x00\x01hello\xff"
+    chunks = storage.read_chunks("state.json", chunk_size=8)
+
+    assert chunks is not None
+    assert b"".join(chunks) == b"\x00\x01hello\xff"
 
 
 def test_read_chunks_yields_multiple_chunks_when_content_exceeds_chunk_size(tmp_path):
     storage = DeviceStorage(str(tmp_path))
     storage.write_bytes("log.txt", b"0123456789")
 
-    chunks = list(storage.read_chunks("log.txt", chunk_size=4))
+    chunks = storage.read_chunks("log.txt", chunk_size=4)
 
-    assert chunks == [b"0123", b"4567", b"89"]
+    assert chunks is not None
+    assert list(chunks) == [b"0123", b"4567", b"89"]
 
 
 @pytest.mark.parametrize("escaping_name", ESCAPING_NAMES)
@@ -135,7 +139,12 @@ def test_write_chunks_writes_each_pulled_chunk_before_pulling_the_next(tmp_path,
         if not (str(path).endswith(".tmp") and "w" in mode):
             return f
         real_write = f.write
-        f.write = lambda data: (events.append(f"wrote {data!r}"), real_write(data))[1]
+
+        def recording_write(data):
+            events.append(f"wrote {data!r}")
+            return real_write(data)
+
+        f.write = recording_write
         return f
 
     monkeypatch.setattr(builtins, "open", recording_open)

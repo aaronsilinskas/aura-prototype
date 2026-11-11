@@ -299,16 +299,15 @@ def test_describe_haptics_pads_its_configured_address_to_two_hex_digits():
     assert describe_haptics(I2CDeviceConfig(address=0x05)) == "haptics drv2605 address=0x05"
 
 
-def _audio(**overrides: object) -> AudioConfig:
-    fields = {
-        "voices": 4,
-        "max_volume": 0.5,
-        "i2s_bit_clock": "GP10",
-        "i2s_word_select": "GP11",
-        "i2s_data": "GP9",
-        **overrides,
-    }
-    return AudioConfig(**fields)
+def _audio(enabled: bool = True) -> AudioConfig:
+    return AudioConfig(
+        voices=4,
+        max_volume=0.5,
+        i2s_bit_clock="GP10",
+        i2s_word_select="GP11",
+        i2s_data="GP9",
+        enabled=enabled,
+    )
 
 
 def test_describe_audio_reports_its_voices_volume_and_i2s_pins():

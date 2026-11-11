@@ -83,7 +83,7 @@ def test_a_missing_key_within_an_otherwise_valid_object_reads_as_absent(device_s
 
 def test_malformed_json_logs_the_fail_soft_read(device_storage):
     device_storage.write_bytes("aura-state.json", b"{not valid json")
-    lines = []
+    lines: list[str] = []
     store = DeviceStateStore(device_storage, logger=Logger("[state]", sink=lines.append))
 
     store.get("scene")
@@ -93,7 +93,7 @@ def test_malformed_json_logs_the_fail_soft_read(device_storage):
 
 def test_non_object_json_logs_the_fail_soft_read(device_storage):
     device_storage.write_json("aura-state.json", ["scene", "tag"])
-    lines = []
+    lines: list[str] = []
     store = DeviceStateStore(device_storage, logger=Logger("[state]", sink=lines.append))
 
     store.get("scene")
@@ -103,7 +103,7 @@ def test_non_object_json_logs_the_fail_soft_read(device_storage):
 
 def test_a_well_formed_read_logs_nothing(device_storage):
     device_storage.write_json("aura-state.json", {"scene": "tag"})
-    lines = []
+    lines: list[str] = []
     store = DeviceStateStore(device_storage, logger=Logger("[state]", sink=lines.append))
 
     store.get("scene")

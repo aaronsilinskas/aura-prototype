@@ -8,6 +8,7 @@ Covers:
 """
 
 import tracemalloc
+from array import array
 
 import pytest
 
@@ -106,7 +107,7 @@ class FakePulseReader(PulseReader):
 def test_pulse_writer_base_raises_not_implemented():
     writer = PulseWriter()
     with pytest.raises(NotImplementedError):
-        writer.write_pulses([500])
+        writer.write_pulses(array("H", [500]))
 
 
 def test_pulse_reader_base_raises_not_implemented():
@@ -660,7 +661,7 @@ def _encode_pulses(payload: bytes):
 def _make_receiver(num_readers, decoder_factory=AuraInfraredDecoder, gate=None):
     """Build an InfraredReceiver over ``num_readers`` independent FakePulseReaders."""
     readers = [FakePulseReader() for _ in range(num_readers)]
-    rx = InfraredReceiver(readers, decoder_factory, gate)
+    rx = InfraredReceiver(list(readers), decoder_factory, gate)
     return rx, readers
 
 

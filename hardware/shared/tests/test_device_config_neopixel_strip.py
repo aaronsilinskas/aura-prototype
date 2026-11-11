@@ -6,9 +6,16 @@ Covers the new scope_pixels segmented-strip shape introduced in issue #482.
 import pytest
 
 from hardware.shared.device_config import (
+    MatrixPixelsConfig,
     NeoPixelPixelsConfig,
     parse_device_config,
 )
+
+
+def _neopixel(entry: MatrixPixelsConfig | NeoPixelPixelsConfig) -> NeoPixelPixelsConfig:
+    assert isinstance(entry, NeoPixelPixelsConfig)
+    return entry
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -75,41 +82,41 @@ def test_parse_neopixel_entry_produces_single_pixels_output(single_strip_config)
 def test_parse_neopixel_entry_produces_single_strip(single_strip_config):
     result = parse_device_config(single_strip_config)
 
-    assert len(result.pixels[0].strips) == 1
+    assert len(_neopixel(result.pixels[0]).strips) == 1
 
 
 def test_parse_neopixel_strip_pin_matches(single_strip_config):
     result = parse_device_config(single_strip_config)
 
-    strip = result.pixels[0].strips[0]
+    strip = _neopixel(result.pixels[0]).strips[0]
     assert strip.pin == "D5"
 
 
 def test_parse_neopixel_strip_count_matches(single_strip_config):
     result = parse_device_config(single_strip_config)
 
-    strip = result.pixels[0].strips[0]
+    strip = _neopixel(result.pixels[0]).strips[0]
     assert strip.count == 30
 
 
 def test_parse_neopixel_strip_order_defaults_to_grb(single_strip_config):
     result = parse_device_config(single_strip_config)
 
-    strip = result.pixels[0].strips[0]
+    strip = _neopixel(result.pixels[0]).strips[0]
     assert strip.order == "GRB"
 
 
 def test_parse_neopixel_strip_brightness_defaults_to_one(single_strip_config):
     result = parse_device_config(single_strip_config)
 
-    strip = result.pixels[0].strips[0]
+    strip = _neopixel(result.pixels[0]).strips[0]
     assert strip.brightness == 1.0
 
 
 def test_parse_neopixel_strip_scope_pixels_converted_to_ranges(single_strip_config):
     result = parse_device_config(single_strip_config)
 
-    scope_pixels = result.pixels[0].strips[0].scope_pixels
+    scope_pixels = _neopixel(result.pixels[0]).strips[0].scope_pixels
     assert scope_pixels["personal"] == range(0, 10)
     assert scope_pixels["ambient"] == range(10, 30)
 
@@ -131,7 +138,7 @@ def test_parse_neopixel_strip_explicit_order_and_brightness():
 
     result = parse_device_config(config)
 
-    strip = result.pixels[0].strips[0]
+    strip = _neopixel(result.pixels[0]).strips[0]
     assert strip.order == "RGB"
     assert strip.brightness == 0.5
 
@@ -211,7 +218,7 @@ def test_parse_neopixel_strip_brightness_boundary_zero_is_accepted():
 
     result = parse_device_config(config)
 
-    assert result.pixels[0].strips[0].brightness == 0.0
+    assert _neopixel(result.pixels[0]).strips[0].brightness == 0.0
 
 
 # ---------------------------------------------------------------------------

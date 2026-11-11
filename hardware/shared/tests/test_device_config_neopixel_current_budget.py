@@ -4,9 +4,33 @@ Every test goes through ``parse_device_config`` and asserts only on its public
 result: the tuned strip/scope brightness and the parsed budget's fields.
 """
 
+from typing import Any
+
 import pytest
 
-from hardware.shared.device_config import parse_device_config
+from hardware.shared.device_config import (
+    DeviceConfig,
+    MatrixPixelsConfig,
+    NeoPixelCurrentBudgetConfig,
+    NeoPixelPixelsConfig,
+    parse_device_config,
+)
+
+
+def _neopixel(entry: MatrixPixelsConfig | NeoPixelPixelsConfig) -> NeoPixelPixelsConfig:
+    assert isinstance(entry, NeoPixelPixelsConfig)
+    return entry
+
+
+def _matrix(entry: MatrixPixelsConfig | NeoPixelPixelsConfig) -> MatrixPixelsConfig:
+    assert isinstance(entry, MatrixPixelsConfig)
+    return entry
+
+
+def _budget(config: DeviceConfig) -> NeoPixelCurrentBudgetConfig:
+    budget = config.neopixel_current_budget
+    assert budget is not None
+    return budget
 
 
 def _strip(pin: str, count: int, brightness: float, **extra) -> dict:
@@ -25,13 +49,13 @@ def test_absent_budget_block_parses_to_none_and_leaves_brightness_as_declared():
     result = parse_device_config({"pixels": [_strip("D5", 100, 1.0)]})
 
     assert result.neopixel_current_budget is None
-    assert result.pixels[0].strips[0].brightness == 1.0
+    assert _neopixel(result.pixels[0]).strips[0].brightness == 1.0
 
 
 def test_empty_budget_block_applies_default_limit_pixel_current_and_floor():
     result = parse_device_config({"pixels": [], "neopixel_current_budget": {}})
 
-    budget = result.neopixel_current_budget
+    budget = _budget(result)
     assert budget.current_limit_ma == 2000
     assert budget.max_pixel_current_ma == 60
     assert budget.min_brightness == 0.05
@@ -46,9 +70,9 @@ def test_single_strip_over_budget_is_dimmed_to_draw_exactly_at_the_limit():
         }
     )
 
-    assert result.pixels[0].strips[0].brightness == pytest.approx(1 / 3)
-    assert result.neopixel_current_budget.estimate_ma == pytest.approx(6000)
-    assert result.neopixel_current_budget.scale == pytest.approx(1 / 3)
+    assert _neopixel(result.pixels[0]).strips[0].brightness == pytest.approx(1 / 3)
+    assert _budget(result).estimate_ma == pytest.approx(6000)
+    assert _budget(result).scale == pytest.approx(1 / 3)
 
 
 def test_legacy_scopes_strips_are_counted_and_scaled():
@@ -68,10 +92,10 @@ def test_legacy_scopes_strips_are_counted_and_scaled():
         }
     )
 
-    scopes = result.pixels[0].scopes
+    scopes = _neopixel(result.pixels[0]).scopes
     assert scopes["personal"].brightness == pytest.approx(0.25)
     assert scopes["ambient"].brightness == pytest.approx(0.5)
-    assert result.neopixel_current_budget.estimate_ma == pytest.approx(1500)
+    assert _budget(result).estimate_ma == pytest.approx(1500)
 
 
 def test_disabled_strip_is_excluded_from_the_estimate_and_left_as_declared():
@@ -86,8 +110,8 @@ def test_disabled_strip_is_excluded_from_the_estimate_and_left_as_declared():
         }
     )
 
-    assert result.neopixel_current_budget.estimate_ma == pytest.approx(600)
-    assert result.pixels[1].strips[0].brightness == 1.0
+    assert _budget(result).estimate_ma == pytest.approx(600)
+    assert _neopixel(result.pixels[1]).strips[0].brightness == 1.0
 
 
 @pytest.mark.parametrize("field", ["current_limit_ma", "max_pixel_current_ma"])
@@ -117,18 +141,18 @@ def test_strips_on_separate_entries_share_one_scale_applied_to_each_declared_val
         }
     )
 
-    assert result.pixels[0].strips[0].brightness == pytest.approx(1 / 3)
-    assert result.pixels[1].strips[0].brightness == pytest.approx(1 / 6)
-    assert result.neopixel_current_budget.scale == pytest.approx(1 / 3)
+    assert _neopixel(result.pixels[0]).strips[0].brightness == pytest.approx(1 / 3)
+    assert _neopixel(result.pixels[1]).strips[0].brightness == pytest.approx(1 / 6)
+    assert _budget(result).scale == pytest.approx(1 / 3)
 
 
 def test_strips_under_budget_keep_declared_brightness_with_scale_one():
     # 10 px @ 0.5 x 60 mA = 300 mA, well under the default 2000 mA.
     result = parse_device_config({"pixels": [_strip("D5", 10, 0.5)], "neopixel_current_budget": {}})
 
-    assert result.pixels[0].strips[0].brightness == 0.5
-    assert result.neopixel_current_budget.estimate_ma == pytest.approx(300)
-    assert result.neopixel_current_budget.scale == 1.0
+    assert _neopixel(result.pixels[0]).strips[0].brightness == 0.5
+    assert _budget(result).estimate_ma == pytest.approx(300)
+    assert _budget(result).scale == 1.0
 
 
 def test_matrix_entry_is_excluded_from_the_estimate_and_left_as_declared():
@@ -142,8 +166,8 @@ def test_matrix_entry_is_excluded_from_the_estimate_and_left_as_declared():
         }
     )
 
-    assert result.neopixel_current_budget.estimate_ma == pytest.approx(600)
-    assert result.pixels[0].brightness == 1.0
+    assert _budget(result).estimate_ma == pytest.approx(600)
+    assert _matrix(result.pixels[0]).brightness == 1.0
 
 
 def test_isolate_carries_the_budget_through_and_never_offers_it_as_a_keep():
@@ -177,7 +201,7 @@ def test_isolate_keeps_budgeted_strips_at_their_parse_time_tuned_brightness(keep
 
     isolated = config.isolate(keep)
 
-    assert isolated.pixels[0].strips[0].brightness == pytest.approx(1 / 3)
+    assert _neopixel(isolated.pixels[0]).strips[0].brightness == pytest.approx(1 / 3)
 
 
 def test_strip_that_would_scale_below_the_floor_is_held_there_and_the_rest_absorb_the_cut():
@@ -190,8 +214,8 @@ def test_strip_that_would_scale_below_the_floor_is_held_there_and_the_rest_absor
         }
     )
 
-    assert result.pixels[1].strips[0].brightness == pytest.approx(0.1)
-    assert result.pixels[0].strips[0].brightness == pytest.approx(1400 / 6000)
+    assert _neopixel(result.pixels[1]).strips[0].brightness == pytest.approx(0.1)
+    assert _neopixel(result.pixels[0]).strips[0].brightness == pytest.approx(1400 / 6000)
 
 
 def test_strip_declared_below_the_floor_keeps_its_declared_brightness():
@@ -204,7 +228,7 @@ def test_strip_declared_below_the_floor_keeps_its_declared_brightness():
         }
     )
 
-    assert result.pixels[1].strips[0].brightness == 0.05
+    assert _neopixel(result.pixels[1]).strips[0].brightness == 0.05
 
 
 def test_holding_one_strip_at_the_floor_can_push_a_second_strip_under_it():
@@ -223,7 +247,7 @@ def test_holding_one_strip_at_the_floor_can_push_a_second_strip_under_it():
         }
     )
 
-    brightness = [entry.strips[0].brightness for entry in result.pixels]
+    brightness = [entry.strips[0].brightness for entry in map(_neopixel, result.pixels)]
     assert brightness == pytest.approx([0.35, 0.1, 0.1])
 
 
@@ -256,7 +280,7 @@ def test_limit_met_exactly_at_the_floor_holds_every_strip_there():
         }
     )
 
-    assert result.pixels[0].strips[0].brightness == 0.32
+    assert _neopixel(result.pixels[0]).strips[0].brightness == 0.32
 
 
 def test_tuned_total_never_exceeds_the_limit_under_float_rounding():
@@ -273,7 +297,7 @@ def test_tuned_total_never_exceeds_the_limit_under_float_rounding():
         }
     )
 
-    strips = [entry.strips[0] for entry in result.pixels]
+    strips = [entry.strips[0] for entry in map(_neopixel, result.pixels)]
     assert sum(strip.count * strip.brightness * 64 for strip in strips) <= 15475
 
 
@@ -286,7 +310,7 @@ def test_budget_records_the_shared_scale_applied_to_strips_not_held_at_the_floor
         }
     )
 
-    assert result.neopixel_current_budget.scale == pytest.approx(1400 / 6000)
+    assert _budget(result).scale == pytest.approx(1400 / 6000)
 
 
 def test_budget_counts_strips_held_at_their_declared_value_or_at_the_floor():
@@ -303,21 +327,21 @@ def test_budget_counts_strips_held_at_their_declared_value_or_at_the_floor():
         }
     )
 
-    assert result.neopixel_current_budget.at_min_brightness == 2
+    assert _budget(result).at_min_brightness == 2
 
 
 def test_strip_count_raised_beyond_its_declaration_is_budgeted_at_the_raised_count():
     # Declared 10 px @ 1.0 (600 mA) fits 2000 mA as declared; raising the count
     # to 100 px (6000 mA) in the mapping gets it dimmed to a third on re-parse.
-    mapping = {
+    mapping: dict[str, Any] = {
         "pixels": [_strip("D5", 10, 1.0)],
         "neopixel_current_budget": {"current_limit_ma": 2000},
     }
-    assert parse_device_config(mapping).pixels[0].strips[0].brightness == 1.0
+    assert _neopixel(parse_device_config(mapping).pixels[0]).strips[0].brightness == 1.0
     mapping["pixels"][0]["count"] = 100
 
     result = parse_device_config(mapping)
 
-    assert result.pixels[0].strips[0].count == 100
-    assert result.pixels[0].strips[0].brightness == pytest.approx(1 / 3)
-    assert result.neopixel_current_budget.estimate_ma == pytest.approx(6000)
+    assert _neopixel(result.pixels[0]).strips[0].count == 100
+    assert _neopixel(result.pixels[0]).strips[0].brightness == pytest.approx(1 / 3)
+    assert _budget(result).estimate_ma == pytest.approx(6000)

@@ -26,7 +26,10 @@ def test_read_returns_the_exact_bytes_of_a_written_file(device_storage):
     device_storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
     server = SdSyncServer(device_storage)
 
-    assert b"".join(server.read("aura-state.json")) == b'{"scene": "tag"}'
+    chunks = server.read("aura-state.json")
+
+    assert chunks is not None
+    assert b"".join(chunks) == b'{"scene": "tag"}'
 
 
 def test_read_returns_none_for_a_never_written_path(device_storage):
@@ -39,9 +42,10 @@ def test_read_yields_more_than_one_chunk_for_content_larger_than_chunk_size(devi
     device_storage.write_bytes("log.txt", b"x" * (CHUNK_SIZE + 1))
     server = SdSyncServer(device_storage)
 
-    chunks = list(server.read("log.txt"))
+    chunks = server.read("log.txt")
 
-    assert len(chunks) > 1
+    assert chunks is not None
+    assert len(list(chunks)) > 1
 
 
 # ---------------------------------------------------------------------------

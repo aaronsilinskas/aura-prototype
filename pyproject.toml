@@ -115,9 +115,6 @@ files = ["app", "effects", "engine", "hardware", "magic", "packs", "scripts"]
 # deletes its own group once those tests are clean, and #1261 deletes this
 # setting, so new test directories are checked by default.
 exclude = [
-    # #1256
-    '^hardware/shared/ir_codecs/tests/',
-    '^hardware/shared/tests/',
 ]
 # Local stubs for modules circuitpython-stubs lacks; see typings/README.md.
 mypy_path = "typings"

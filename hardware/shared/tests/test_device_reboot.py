@@ -62,7 +62,7 @@ def test_reboot_into_on_a_card_less_device_does_not_reset():
 
 
 def test_reboot_into_on_a_card_less_device_logs():
-    lines = []
+    lines: list[str] = []
     reboot = DeviceSceneReboot(
         None, booted_scene="lobby", reset=RecordingReset(), logger=Logger("[reboot]", lines.append)
     )
@@ -115,7 +115,7 @@ def test_reboot_to_previous_with_no_recorded_return_to_does_not_reset(device_sto
 
 
 def test_reboot_to_previous_with_no_recorded_return_to_logs(device_storage):
-    lines = []
+    lines: list[str] = []
     reboot = DeviceSceneReboot(
         device_storage,
         booted_scene="tag",
@@ -138,7 +138,7 @@ def test_reboot_to_previous_on_a_card_less_device_does_not_reset():
 
 
 def test_reboot_to_previous_on_a_card_less_device_logs():
-    lines = []
+    lines: list[str] = []
     reboot = DeviceSceneReboot(
         None, booted_scene="tag", reset=RecordingReset(), logger=Logger("[reboot]", lines.append)
     )
