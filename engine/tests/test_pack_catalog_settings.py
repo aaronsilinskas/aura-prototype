@@ -226,7 +226,7 @@ def test_a_scan_override_for_a_pack_the_scene_does_not_declare_raises(
     pack_tree, kind: str, values: dict
 ) -> None:
     root = _scene_with_rule_pack(pack_tree, HOLD)
-    getattr(pack_tree, kind + "_pack")(root, "unused", settings=HOLD)
+    getattr(pack_tree, kind + "_pack")(root, "unused", settings=HOLD if kind == "rule" else None)
 
     with pytest.raises(OverrideOfUndeclaredPackError) as excinfo:
         pack_tree.scan_roots(
@@ -258,7 +258,7 @@ def test_an_effect_pack_override_is_checked_against_its_manifest(
     pack_tree, reference_settings, setting_overrides
 ) -> None:
     root = pack_tree.root("ts_flash")
-    pack_tree.effect_pack(root, "glow", settings={"speed": {"type": "int", "default": 1}})
+    pack_tree.effect_pack(root, "glow")
     reference: dict[str, object] = {"name": "glow", "version": "1.0"}
     if reference_settings is not None:
         reference["settings"] = reference_settings
@@ -303,17 +303,29 @@ def test_a_setting_override_error_is_a_scene_declaration_error() -> None:
         "section-not-an-object",
     ],
 )
-@pytest.mark.parametrize("kind", ["effect", "rule"])
 def test_a_bad_declaration_raises_malformed_manifest_error_naming_the_manifest(
-    pack_tree, kind, settings
+    pack_tree, settings
 ) -> None:
     root = pack_tree.root("ts_flash")
-    pack_dir = getattr(pack_tree, kind + "_pack")(root, "exit", settings=settings)
+    pack_dir = pack_tree.rule_pack(root, "exit", settings=settings)
 
     with pytest.raises(MalformedManifestError) as excinfo:
         pack_tree.scan_roots(root)
 
-    assert excinfo.value.path == str(pack_dir / (kind + "s.json"))
+    assert excinfo.value.path == str(pack_dir / "rules.json")
+
+
+@pytest.mark.parametrize("settings", [HOLD, {}], ids=["with-declarations", "empty-section"])
+def test_an_effect_pack_declaring_settings_raises_malformed_manifest_error(
+    pack_tree, settings
+) -> None:
+    root = pack_tree.root("ts_flash")
+    pack_dir = pack_tree.effect_pack(root, "glow", settings=settings)
+
+    with pytest.raises(MalformedManifestError) as excinfo:
+        pack_tree.scan_roots(root)
+
+    assert excinfo.value.path == str(pack_dir / "effects.json")
 
 
 @pytest.mark.parametrize(
