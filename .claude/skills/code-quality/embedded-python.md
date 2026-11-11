@@ -93,7 +93,7 @@ Prefer multiply over divide when the denominator is fixed. In hot paths, always 
 - **Spelling:** `import micropython`, then `@micropython.native`. `mpy-cross` recognizes the decorator only by that exact spelling, so `from micropython import native` never compiles native. On the host, tests and mypy import the root `micropython.py` stand-in, whose `native` returns the function unchanged.
 - **Per function only:** whole-module native (`-X emit=native`) and `@micropython.viper` stay out of production code.
 
-Measure on the Core2350B under deploy-watch:
+Measure on an RP2350 board with 8 MB PSRAM under deploy-watch:
 
 1. Back up CIRCUITPY's `aura-device.json`.
 2. Set every enabled NeoPixel strip's `count` to 60, then to 144, and spread its `scope_pixels` bands evenly over the new count. Effects render only scope pixels, so raising `count` alone adds no per-pixel work. The matrix stays out.
