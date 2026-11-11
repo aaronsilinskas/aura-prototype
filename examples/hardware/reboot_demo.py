@@ -2,14 +2,20 @@
 
 Exercises the hardware-boundary behaviour the CPython suite cannot: that a
 scene selection written to ``aura-state.json`` actually survives
-``microcontroller.reset()`` and is read back by the boot resolver on the next
-boot. A rule triggers a reboot only through downstream lobby work, so this
-example drives the live adapter
-(:class:`~hardware.shared.device_reboot.DeviceSceneReboot`, reset by
-``microcontroller.reset``) directly --
-the smallest end-to-end exercise of the seam on real hardware. Keep it around
-as a regression check to re-run whenever the reboot path, the state store, or
-the boot resolver changes.
+``microcontroller.reset()`` and is read back by the boot on the next boot.
+It boots the way a device does, through
+:func:`~app.scene_composition.build_scene_boot` with ``microcontroller.reset``
+as the reset, and reboots the way a rule does, through the booted scene's
+:class:`~engine.state.SceneControls` (``reboot_into``, then
+``reboot_to_previous``), so it proves the path rules actually take. Keep it
+around as a regression check to re-run whenever the reboot path, the state
+store, or the boot changes.
+
+Rebooting through ``SceneControls`` checks the target's Required
+capabilities (ADR-0004), so the board must be able to run ``TARGET_SCENE``.
+Red Light Green Light requires ``accelerometer``, ``button.A`` and
+``button.B``; a board missing any of them stops on boot 1 with
+``MissingCapabilityError`` instead of rebooting.
 
 ``microcontroller.reset()`` re-runs this same ``code.py``, so this example is
 idempotent across resets by recording its own progress under a dedicated
@@ -17,22 +23,22 @@ idempotent across resets by recording its own progress under a dedicated
 yields a self-terminating three-boot cycle that proves the whole seam in a
 single deploy:
 
-- **Boot 1** (no phase): resolve + print the boot scene (the flash
+- **Boot 1** (no phase): boot + print the boot scene (the flash
   ``default_scene``), record ``phase=into``, then ``reboot_into(TARGET_SCENE)``
   -- writes ``scene=TARGET_SCENE`` and ``return_to=<booted scene>``, then
   hard-resets.
 - **Boot 2** (``phase=into``; scene now resolves to ``TARGET_SCENE``, with
   ``return_to`` recorded): print it -- this is the proof the write survived the
-  reset and the boot resolver read the override -- record ``phase=previous``,
+  reset and the boot read the override -- record ``phase=previous``,
   then ``reboot_to_previous()`` -- writes ``scene=<recorded return_to>``, clears
   ``return_to``, and hard-resets.
 - **Boot 3** (``phase=previous``; scene back to the original, ``return_to``
   cleared): print, clear the phase key, then stop -- proving the ``return_to``
   round-trip and its ``clear``, and leaving the card clean to re-run.
 
-The ``phase`` key is written before each ``reboot_*`` call, so the adapter's own
+The ``phase`` key is written before each ``reboot_*`` call, so the reboot's own
 ``scene``/``return_to`` writes (read-modify-write) preserve it across the reset;
-the boot resolver ignores the extra key.
+the boot ignores the extra key.
 
 Each boot prints a distinctive ``__REBOOT`` marker so the three boots are
 unmistakable in the serial log.
@@ -61,11 +67,12 @@ import time
 
 import microcontroller
 
-from app.scene_composition import resolve_boot_scene_name, scan_boot_pack_catalog
+from app.scene_composition import build_scene_boot
+from engine.capabilities import MissingCapabilityError
 from engine.log import Logger
+from engine.state import SceneControls
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
 from hardware.shared.device_boot import read_boot_mapping
-from hardware.shared.device_reboot import DeviceSceneReboot
 from hardware.shared.device_state import DeviceStateStore
 
 # The scene reboot_into() switches to. Must be in the registry and, for the
@@ -85,40 +92,38 @@ config = load_device_config()
 hw_logger = Logger("[hw]")
 hw = build_hardware(config, logger=hw_logger)
 
-scene_registry = scan_boot_pack_catalog(hw.storage).scene_registry
+boot = build_scene_boot(hw, read_boot_mapping(), reset=microcontroller.reset, logger=hw_logger)
+scene_name = boot.scene_name
+# SceneBoot hands the booted scene's SceneControls through its runtime's manager.
+controls: SceneControls = boot.runtime.manager
 
-boot_mapping = read_boot_mapping()
-scene_name = resolve_boot_scene_name(
-    scene_registry, hw.storage, boot_mapping, hw.capabilities, logger=hw_logger
-)
-
-# This example owns reboot_demo_phase; return_to is the seam's own key, read
-# here only to print as proof (the adapter is what writes and clears it).
+# This example owns reboot_demo_phase; return_to is the reboot's own key, read
+# here only to print as proof (the reboot is what writes and clears it).
 state = DeviceStateStore(hw.storage, hw_logger)
 phase = state.get("reboot_demo_phase")
 return_to = state.get("return_to")
 
-reboot = DeviceSceneReboot(
-    hw.storage, booted_scene=scene_name, reset=microcontroller.reset, logger=hw_logger
-)
-
 if hw.storage is None:
-    # Card-less: the adapter would only log-and-return, so there's nothing to
+    # Card-less: a reboot would only log-and-return, so there's nothing to
     # round-trip. Say so loudly rather than silently sitting on boot 1 forever.
     print(f"__REBOOT boot=? scene={scene_name!r} storage=None (card-less; nothing to test)")
 elif phase is None:
     print(f"__REBOOT boot=1 phase=None scene={scene_name!r} -- will reboot_into({TARGET_SCENE!r})")
     state.set("reboot_demo_phase", "into")
     _hold(hw_logger, f"reboot_into({TARGET_SCENE!r})")
-    reboot.reboot_into(TARGET_SCENE)
+    try:
+        controls.reboot_into(TARGET_SCENE)
+    except MissingCapabilityError:
+        state.clear("reboot_demo_phase")  # leave the card clean to re-run
+        raise
     print("__REBOOT ERROR: reboot_into returned without resetting")
 elif phase == "into":
-    # The criterion's proof: after the reset the resolver picked up the override.
+    # The criterion's proof: after the reset the boot picked up the override.
     print(f"__REBOOT boot=2 phase=into scene={scene_name!r} return_to={return_to!r}")
     print("__REBOOT boot=2 override survived the reset; will reboot_to_previous()")
     state.set("reboot_demo_phase", "previous")
     _hold(hw_logger, "reboot_to_previous()")
-    reboot.reboot_to_previous()
+    controls.reboot_to_previous()
     print("__REBOOT ERROR: reboot_to_previous returned without resetting")
 else:  # phase == "previous"
     print(f"__REBOOT boot=3 phase=previous scene={scene_name!r} return_to={return_to!r}")
