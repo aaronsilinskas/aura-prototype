@@ -16,11 +16,12 @@ except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
 from engine.capabilities import MissingCapabilityError
+from engine.effects.admin import EffectAdmin, HeldEffects
 from engine.engine import GameEngine, GameRule, Version
 from engine.namespace import ActiveSceneNamespace
 from engine.packs import PackRegistry, UnknownItemError, load_item
 from engine.settings import SettingDeclaration, Settings
-from engine.state import EffectAdmin, GameState, HeldEffects, SceneControls, SceneReboot, Scope
+from engine.state import GameState, SceneControls, SceneReboot, Scope
 
 
 class SceneLocalRegistry:

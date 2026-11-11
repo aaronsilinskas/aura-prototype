@@ -89,6 +89,7 @@ forbidden_modules = [
     "engine.scene",
     "engine.packs",
     "engine.timer",
+    "engine.effects.admin",
     "engine.effects.manager",
     "engine.namespace",
 ]
