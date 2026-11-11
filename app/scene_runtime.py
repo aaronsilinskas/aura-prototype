@@ -31,9 +31,8 @@ def run_scene() -> None:
     name the scene is why hardware always comes up before a scene name is
     known to be valid.
 
-    Each tick runs the per-tick body that boot returns, the same
-    :func:`app.scene_composition.build_scene_tick` the Simulated device
-    drives, then ``gc.collect()``. A live ``[hw]``-tagged
+    Each tick runs the per-tick body that boot returns, the same tick the
+    Simulated device drives, then ``gc.collect()``. A live ``[hw]``-tagged
     :class:`~engine.log.Logger` narrates hardware setup and the boot on
     stdout.
 

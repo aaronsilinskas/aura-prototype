@@ -279,3 +279,11 @@ def test_a_reboot_the_booted_scene_asks_for_persists_its_target_then_resets(prob
     [persisted] = persisted_at_reset
     assert persisted is not None
     assert persisted["scene"] == _FLASH_SCENE
+
+
+def test_the_boots_scene_controls_are_the_ones_the_booted_scenes_rules_hold(probe):
+    boot = probe.boot(_hw(probe.storage))
+    boot.tick()
+    [(_, state), *_] = probe.heard(Event)
+
+    assert boot.scene_controls is state.scene_controls
