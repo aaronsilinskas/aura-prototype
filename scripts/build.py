@@ -26,14 +26,14 @@ _MPY_CROSS_BIN: Final = os.environ.get("MPY_CROSS", _DEFAULT_MPY_CROSS)
 
 # Repo-pinned CircuitPython major version.  Must match the major version used by
 # the installed mpy-cross binary (see scripts/setup_mpy_cross.sh) and the firmware
-# flashed on target devices.  Bump when upgrading CircuitPython, and recheck
-# MPY_CROSS_ARCH below against the new firmware.
+# flashed on target devices.  Bump when upgrading CircuitPython.  A firmware or
+# board change must update this and MPY_CROSS_ARCH together.
 EXPECTED_CIRCUITPYTHON_MAJOR: Final = 10
 
 # mpy-cross target architecture for native code: the RP2350's Cortex-M33.  Every
 # module is compiled with it, so @micropython.native needs no per-module flag.
-# Must match the board that EXPECTED_CIRCUITPYTHON_MAJOR's firmware runs on;
-# change both together.  A wrong value fails at import on the device.
+# A firmware or board change must update this and EXPECTED_CIRCUITPYTHON_MAJOR
+# together.  A wrong value fails at import on the device.
 MPY_CROSS_ARCH: Final = "armv7emsp"
 
 _BOOT_OUT_VERSION_RE: Final = re.compile(r"Adafruit CircuitPython (\d+)\.")
@@ -57,6 +57,11 @@ class BuildResult:
         self.compiled = compiled
         self.skipped = skipped
         self.pruned = pruned
+
+
+def mpy_cross_available() -> bool:
+    """Return True when the configured mpy-cross binary exists and is executable."""
+    return os.access(_MPY_CROSS_BIN, os.X_OK)
 
 
 def mpy_cross_compile(src: Path, dest: Path) -> None:

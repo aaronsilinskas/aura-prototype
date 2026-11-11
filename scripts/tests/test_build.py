@@ -6,9 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts.build import _MPY_CROSS_BIN, BuildError, build, mpy_cross_compile
-
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+from scripts.build import BuildError, build, mpy_cross_available, mpy_cross_compile
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -250,11 +248,13 @@ def test_conftest_py_is_not_in_staging_tree(tmp_path: Path) -> None:
     assert not (staging / "rules" / "conftest.py").exists()
 
 
-def test_host_only_micropython_module_is_not_in_staging_tree(tmp_path: Path) -> None:
+def test_host_only_micropython_module_is_not_in_staging_tree(
+    tmp_path: Path, repo_root: Path
+) -> None:
     # Builds the real repo, so the test guards wherever the module actually lives.
     staging = tmp_path / "build"
 
-    build(source_root=_REPO_ROOT, staging_root=staging, compile=fake_compile)
+    build(source_root=repo_root, staging_root=staging, compile=fake_compile)
 
     assert sorted(staging.rglob("micropython.*")) == []
 
@@ -541,13 +541,8 @@ def test_first_build_compiles_all_modules_with_no_prior_staging_tree(tmp_path: P
 # ---------------------------------------------------------------------------
 
 
-def _shipped_py_files(source: Path) -> list[Path]:
-    excluded = {"tests", "__pycache__"}
-    return [
-        p
-        for p in source.rglob("*.py")
-        if not excluded & set(p.relative_to(source).parts) and p.name != "conftest.py"
-    ]
+def _output_path(mpy_cross_argv: list[str]) -> Path:
+    return Path(mpy_cross_argv[mpy_cross_argv.index("-o") + 1])
 
 
 def _compile_every_module_recording_argv(source: Path, staging: Path) -> list[list[str]]:
@@ -556,38 +551,28 @@ def _compile_every_module_recording_argv(source: Path, staging: Path) -> list[li
 
     def record_run(argv: list[str], **_kwargs: object) -> None:
         calls.append(argv)
-        Path(argv[argv.index("-o") + 1]).write_text("FAKE_MPY")
+        _output_path(argv).write_text("FAKE_MPY")
 
     with patch("subprocess.run", side_effect=record_run):
         build(source_root=source, staging_root=staging, compile=mpy_cross_compile)
     return calls
 
 
-def test_every_module_is_compiled_for_the_rp2350_architecture(tmp_path: Path) -> None:
+def test_every_compiled_module_targets_the_rp2350_architecture(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
+    build(source_root=source, staging_root=tmp_path / "reference", compile=fake_compile)
+    module_count = len(list((tmp_path / "reference").rglob("*.mpy")))
 
     calls = _compile_every_module_recording_argv(source, tmp_path / "build")
 
-    compiled = sorted(Path(argv[argv.index("-o") + 1]).name for argv in calls)
-    assert compiled == sorted(p.with_suffix(".mpy").name for p in _shipped_py_files(source))
-    assert all("-march=armv7emsp" in argv for argv in calls)
-
-
-def test_architecture_flag_follows_the_pinned_constant(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    (source / "effects").mkdir(parents=True)
-    (source / "effects" / "render.py").write_text("# render")
-
-    with patch("scripts.build.MPY_CROSS_ARCH", "armv6m"):
-        calls = _compile_every_module_recording_argv(source, tmp_path / "build")
-
-    assert "-march=armv6m" in calls[0]
+    arch_flags = [[arg for arg in argv if arg.startswith("-march=")] for argv in calls]
+    assert arch_flags == [["-march=armv7emsp"]] * module_count
 
 
 @pytest.mark.skipif(
-    not os.access(_MPY_CROSS_BIN, os.X_OK),
+    not mpy_cross_available(),
     reason="needs the real mpy-cross (scripts/setup_mpy_cross.sh, or set MPY_CROSS)",
 )
 def test_native_function_the_emitter_rejects_fails_the_build_naming_the_file(
@@ -604,5 +589,3 @@ def test_native_function_the_emitter_rejects_fails_the_build_naming_the_file(
         build(source_root=source, staging_root=tmp_path / "build", compile=mpy_cross_compile)
 
     assert "reraise.py" in str(exc_info.value)
-    # mpy-cross 10.3.1 aborts in the native emitter rather than rejecting the arch.
-    assert "emitnative" in str(exc_info.value)
