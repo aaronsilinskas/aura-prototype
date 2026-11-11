@@ -257,4 +257,3 @@ class _Data:
 - [ ] Every stub-defect `# type: ignore[code]` links its upstream adafruit/circuitpython issue; no local copy of a stub `circuitpython-stubs` provides
 - [ ] Class-level constants annotated with `Final` (unquoted, no type parameter; import guarded with `try/except ImportError`)
 - [ ] No imports from unavailable stdlib modules
-- [ ] Functions stay bytecode; any `@micropython.native` comes with new measured evidence that it dominates the frame
