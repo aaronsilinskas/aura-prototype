@@ -86,20 +86,12 @@ Prefer multiply over divide when the denominator is fixed. In hot paths, always 
 
 ## Native Code (`@micropython.native`)
 
-`@micropython.native` compiles one function to machine code, at a cost in flash and RAM. A function earns it only by a measured gain:
+Production code stays bytecode. On an RP2350 board with 8 MB PSRAM, spec #1235 measured it: no single function on the per-pixel path (merge strategies, palette lookup, layer renderers, `EffectManager.update`) gained more than ~3 % FPS, and compiling every module `-X emit=native` made frames 24–30 % slower. A function earns `@micropython.native` only with new evidence that it dominates the frame, measured against this bar:
 
-- **Keep rule:** decorate a function only when median FPS rises by at least 5 % at 60 pixels, against the undecorated control run in the same session, on at least one benchmark scene (`tag`, `element_browser`) and drops on neither. Revert a decoration below the bar. 144-pixel numbers are recorded for information only.
-- **The PR records** the median FPS of the control and the candidate, per scene and pixel count; the `.mpy` size change; and `gc.mem_free()` at scene start. Read `gc.mem_free()` with a throwaway, uncommitted print after `build_scene_boot` in `app/scene_runtime.py`: no timing or reporting helper is committed (#1180).
-- **Spelling:** `import micropython`, then `@micropython.native`. `mpy-cross` recognizes the decorator only by that exact spelling, so `from micropython import native` never compiles native. CPython has no `micropython` module, so the first decoration also adds a host-only `micropython.py` at the repo root, never deployed, for tests and mypy. #1239 built one and withdrew it unused.
-- **Per function only:** whole-module native (`-X emit=native`) and `@micropython.viper` stay out of production code.
-
-Measure on an RP2350 board with 8 MB PSRAM under deploy-watch:
-
-1. Back up CIRCUITPY's `aura-device.json`.
-2. Set every enabled NeoPixel strip's `count` to 60, then to 144, and spread its `scope_pixels` bands evenly over the new count. Effects render only scope pixels, so raising `count` alone adds no per-pixel work. The matrix stays out.
-3. In one session, run the undecorated control, then the decorated candidate: `tag` and `element_browser` (`--scene`, `--seconds 75`) with the `debug` pack's `fps_logging_enabled` Setting on. `element_browser`'s `scene.json` sets it. For `tag`, add the `debug` pack reference with that Setting to its `scene.json` for the run only.
-4. Take the median of the last 10 three-second `FpsLoggerRule` windows (`FPS:` lines) per scene and count. The first ~20 s run slower. `tag` drifts ~4 % between runs, so run it three times per side and use the median of the run medians; a recorded baseline can't stand in for the same-session control.
-5. Restore the backup, revert the `tag` edit and redeploy.
+- **Keep rule:** median FPS rises ≥5 % at 60 px on `tag` or `element_browser`, against an undecorated control run in the same session, and drops on neither. The PR records both medians per scene and pixel count, the `.mpy` size change, and `gc.mem_free()` at scene start (a throwaway print after `build_scene_boot` in `app/scene_runtime.py`; no timing helper is committed, #1180).
+- **Spelling:** `import micropython`, then `@micropython.native`, per function. `mpy-cross` recognizes only that spelling. Whole-module native and `@micropython.viper` stay out of production code.
+- **Host module:** CPython has no `micropython`, so the first kept decoration restores the host-only root `micropython.py` from 2aee7f5 (never deployed; #1239).
+- **Procedure** (deploy-watch): back up CIRCUITPY's `aura-device.json`; set every enabled NeoPixel strip's `count` to 60, then 144, spreading its `scope_pixels` bands evenly over the new count (effects render only scope pixels), matrix untouched; in one session run the control, then the candidate, 75 s per scene with the `debug` pack's `fps_logging_enabled` Setting on (`element_browser` sets it; add it to `tag`'s `scene.json` for the run only), `tag` three times per side since it drifts ~4 %; take the median of the last 10 `FPS:` windows; restore the backup, revert the `tag` edit and redeploy.
 
 ## CircuitPython and MicroPython Compatibility
 
@@ -270,4 +262,4 @@ class _Data:
 - [ ] Every stub-defect `# type: ignore[code]` links its upstream adafruit/circuitpython issue; no local copy of a stub `circuitpython-stubs` provides
 - [ ] Class-level constants annotated with `Final` (unquoted, no type parameter; import guarded with `try/except ImportError`)
 - [ ] No imports from unavailable stdlib modules
-- [ ] Every `@micropython.native` (spelled exactly so, after `import micropython`) meets the keep rule against a same-session control, and its PR records the FPS numbers, `.mpy` size change and `gc.mem_free()`
+- [ ] Functions stay bytecode; any `@micropython.native` (spelled exactly so, after `import micropython`) meets the keep rule against a same-session control, and its PR records the FPS numbers, `.mpy` size change and `gc.mem_free()`
