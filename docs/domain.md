@@ -32,7 +32,7 @@ effects/          Animation engine (CircuitPython-safe)
 
 engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   engine.py       GameEngine, GameRule
-  state.py        GameState, EffectControls, EffectAdmin, HeldEffects, EffectReceipt, MergeStrategy,
+  state.py        GameState, EffectControls, EffectReceipt, MergeStrategy,
                   NetworkControls, Scope, ScopeValue
   scene.py        Scene, SceneRegistry, SceneLocalRegistry, SceneManager, SceneControls
   phase.py        PhaseKey, PhaseMachine, PhaseSlot, PhaseRule, InPhaseRule
@@ -52,6 +52,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   network.py      NetworkEvents
   log.py          Board-free, tag-prefixed line logger with an injectable sink
   effects/
+    admin.py      EffectAdmin, HeldEffects (scene-transition face; hardware can't reach it)
     builder.py    EffectBuilder
     manager.py    EffectManager; VerbKeyError
     output.py     EffectOutput (abstract hardware output port)
@@ -163,7 +164,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
 | `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
 | `EffectControls` | `engine/state.py` | Rule-facing effect seam |
-| `EffectAdmin` | `engine/state.py` | Overlay seam, reserved for `SceneManager`: `set_aside` → `HeldEffects` (running effects + merge strategies; live set left empty, on Split), `put_back(held)`, `reset_merge_strategies` for the boot scene |
+| `EffectAdmin` | `engine/effects/admin.py` | Overlay seam, reserved for `SceneManager`: `set_aside` → `HeldEffects` (running effects + merge strategies; live set left empty, on Split), `put_back(held)`, `reset_merge_strategies` for the boot scene |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output port |
 | `EffectBuilder` | `engine/effects/builder.py` | Callable `(name, config) → Effect`; one per effect item |

@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from engine.capabilities import MissingCapabilityError
+from engine.effects.admin import EffectAdmin
 from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.engine import GameEngine, GameRule
@@ -13,7 +14,7 @@ from engine.namespace import ActiveSceneNamespace
 from engine.packs import PackRegistry
 from engine.scene import PackReference, Scene, SceneManager, SceneRegistry
 from engine.settings import Settings
-from engine.state import EffectAdmin, EffectControls, GameState, SceneControls, SceneReboot, Scope
+from engine.state import EffectControls, GameState, SceneControls, SceneReboot, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
 from engine.tests.helpers import (
     RecordingNamespace,
