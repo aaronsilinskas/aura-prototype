@@ -12,8 +12,10 @@ import io
 import queue
 import threading
 from pathlib import Path
+from typing import cast
 
 import pytest
+from serial.tools.list_ports_common import ListPortInfo
 
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.sd_sync_protocol import Transport
@@ -32,8 +34,12 @@ class _FakeComport:
         self.device = device
 
 
+def _fake_comport(device: str) -> ListPortInfo:
+    return cast(ListPortInfo, _FakeComport(device))
+
+
 def test_select_data_port_auto_selects_the_single_match() -> None:
-    port = select_data_port([_FakeComport("/dev/tty.usbmodem1")])
+    port = select_data_port([_fake_comport("/dev/tty.usbmodem1")])
 
     assert port == "/dev/tty.usbmodem1"
 
@@ -45,18 +51,20 @@ def test_select_data_port_raises_when_no_ports_found() -> None:
 
 def test_select_data_port_raises_when_multiple_ports_found() -> None:
     with pytest.raises(SdSyncPortError, match="--port"):
-        select_data_port([_FakeComport("/dev/tty.usbmodem1"), _FakeComport("/dev/tty.usbmodem2")])
+        select_data_port([_fake_comport("/dev/tty.usbmodem1"), _fake_comport("/dev/tty.usbmodem2")])
 
 
 def test_select_data_port_explicit_port_wins_over_a_single_auto_detected_match() -> None:
-    port = select_data_port([_FakeComport("/dev/tty.usbmodem1")], explicit_port="/dev/tty.explicit")
+    port = select_data_port(
+        [_fake_comport("/dev/tty.usbmodem1")], explicit_port="/dev/tty.explicit"
+    )
 
     assert port == "/dev/tty.explicit"
 
 
 def test_select_data_port_explicit_port_wins_over_ambiguous_auto_detection() -> None:
     port = select_data_port(
-        [_FakeComport("/dev/tty.usbmodem1"), _FakeComport("/dev/tty.usbmodem2")],
+        [_fake_comport("/dev/tty.usbmodem1"), _fake_comport("/dev/tty.usbmodem2")],
         explicit_port="/dev/tty.explicit",
     )
 

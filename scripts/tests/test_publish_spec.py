@@ -16,7 +16,7 @@ class _Shell:
     def __init__(self, branch: str = "main", staged: str = "", status: str = "") -> None:
         self.calls: list[list[str]] = []
         self.bodies: list[str] = []
-        self._answers = {
+        self._answers: dict[tuple[str, ...], str] = {
             ("git", "rev-parse"): branch + "\n",
             ("git", "diff"): staged,
             ("git", "status"): status,

@@ -15,7 +15,7 @@ repos:
         pass_filenames: false
       - id: mypy
         name: mypy
-        description: Type-check the production packages configured in pyproject.toml.
+        description: Type-check the packages, and their tests, configured in pyproject.toml.
         entry: uv run mypy
         language: system
         pass_filenames: false
