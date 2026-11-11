@@ -86,7 +86,7 @@ Prefer multiply over divide when the denominator is fixed. In hot paths, always 
 
 ## Native Code (`@micropython.native`)
 
-Production code stays bytecode. On an RP2350 board with 8 MB PSRAM, spec #1235 measured it: no single function on the per-pixel path (merge strategies, palette lookup, layer renderers, `EffectManager.update`) gained more than ~3 % FPS, and compiling every module `-X emit=native` made frames 24–30 % slower. A function earns `@micropython.native` only with new evidence that it dominates the frame.
+Production code compiles to bytecode only: `@micropython.native` and `-X emit=native` are unsupported while the project targets the RP2350. Spec #1235 measured both on an RP2350 board with 8 MB PSRAM: no single function on the per-pixel path (merge strategies, palette lookup, layer renderers, `EffectManager.update`) gained more than ~3 % FPS, and compiling every module native made frames 24–30 % slower.
 
 ## CircuitPython and MicroPython Compatibility
 
