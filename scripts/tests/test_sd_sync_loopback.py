@@ -507,7 +507,9 @@ def test_pull_edit_push_round_trip_changes_scene_and_preserves_return_to(
     push_client, _ = make_loopback_client(device_storage, verb="push")
     push_client.push(str(host_path), "aura-state.json")
 
-    assert json.loads(device_storage.read_bytes("aura-state.json")) == {
+    pushed = device_storage.read_bytes("aura-state.json")
+    assert pushed is not None
+    assert json.loads(pushed) == {
         "scene": "tag",
         "return_to": "lobby",
     }

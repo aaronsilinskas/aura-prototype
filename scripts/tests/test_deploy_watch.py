@@ -6,8 +6,10 @@ import io
 import json
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import pytest
+from serial.tools.list_ports_common import ListPortInfo
 
 from scripts.deploy import deploy
 from scripts.deploy_watch import (
@@ -361,8 +363,12 @@ class _FakeComport:
         self.device = device
 
 
+def _fake_comport(device: str) -> ListPortInfo:
+    return cast(ListPortInfo, _FakeComport(device))
+
+
 def test_select_console_port_auto_selects_the_single_console_port() -> None:
-    port = select_console_port([_FakeComport("/dev/cu.usbmodem1101")])
+    port = select_console_port([_fake_comport("/dev/cu.usbmodem1101")])
 
     assert port == "/dev/cu.usbmodem1101"
 
@@ -375,7 +381,7 @@ def test_select_console_port_raises_when_no_console_port_found() -> None:
 def test_select_console_port_raises_listing_candidates_when_multiple_console_ports_found() -> None:
     with pytest.raises(ConsolePortError, match=r"cu\.usbmodem1101.*cu\.usbmodem2101.*--port"):
         select_console_port(
-            [_FakeComport("/dev/cu.usbmodem1101"), _FakeComport("/dev/cu.usbmodem2101")]
+            [_fake_comport("/dev/cu.usbmodem1101"), _fake_comport("/dev/cu.usbmodem2101")]
         )
 
 

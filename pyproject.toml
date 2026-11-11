@@ -111,7 +111,44 @@ allowed_importers = ["**.tests", "app.simulation"]
 [tool.mypy]
 python_version = "3.10"
 files = ["app", "effects", "engine", "hardware", "magic", "packs", "scripts"]
-exclude = ['(^|/)tests/']
+# Test directories mypy does not check yet. Each later ticket of spec #1254
+# deletes its own group once those tests are clean, and #1261 deletes this
+# setting, so new test directories are checked by default.
+exclude = [
+    # #1256
+    '^hardware/shared/ir_codecs/tests/',
+    '^hardware/shared/tests/',
+    # #1257
+    '^hardware/circuitpython/tests/',
+    '^hardware/simulated/tests/',
+    # #1258
+    '^packs/effects/basic/tests/',
+    '^packs/effects/elements/tests/',
+    '^packs/rules/debug/tests/',
+    '^packs/rules/lobby/helpers/tests/',
+    '^packs/rules/lobby/tests/',
+    '^packs/rules/return_to_lobby/tests/',
+    '^packs/scenes/element_browser/tests/',
+    '^packs/scenes/example_lobby/tests/',
+    '^packs/scenes/hardware_test/rules/tests/',
+    '^packs/scenes/hardware_test/tests/',
+    '^packs/scenes/ir_range_receiver/rules/helpers/tests/',
+    '^packs/scenes/ir_range_receiver/tests/',
+    '^packs/scenes/ir_range_transmitter/rules/tests/',
+    '^packs/scenes/ir_range_transmitter/tests/',
+    '^packs/scenes/red_light_green_light/rules/tests/',
+    '^packs/scenes/red_light_green_light/tests/',
+    '^packs/scenes/tag/effects/helpers/tests/',
+    '^packs/scenes/tag/rules/helpers/tests/',
+    '^packs/scenes/tag/tests/',
+    '^packs/tests/',
+    # #1259
+    '^effects/tests/',
+    '^engine/tests/',
+    # #1260
+    '^app/simulation/tests/',
+    '^app/tests/',
+]
 # Local stubs for modules circuitpython-stubs lacks; see typings/README.md.
 mypy_path = "typings"
 explicit_package_bases = true
@@ -119,3 +156,8 @@ check_untyped_defs = true
 disallow_untyped_defs = true
 warn_unused_ignores = true
 enable_error_code = ["ignore-without-code"]
+
+# Test functions and fixtures need no annotations; their bodies stay checked.
+[[tool.mypy.overrides]]
+module = ["*.tests.*"]
+disallow_untyped_defs = false
