@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import adafruit_drv2605  # type: ignore[import]
+import adafruit_drv2605
 import pytest
 
 from effects.effect import Effect, EffectHaptic, EffectVerb, HapticPattern
