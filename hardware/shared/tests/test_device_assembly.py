@@ -31,7 +31,7 @@ _IR = {"rx": "GP5", "line": "GP6"}
 _RAIL = {"pin": "GP20"}
 
 # Every gated section, its config, and the part it asks for.
-_SECTIONS = [
+_SECTIONS: list[tuple[str, dict[str, Any], str]] = [
     ("accelerometer", {}, "accelerometer"),
     ("magnetometer", {}, "magnetometer"),
     ("haptics", {}, "haptic_output"),
@@ -587,7 +587,7 @@ def test_a_boot_narrates_begin_each_step_and_ready():
     assert re.fullmatch(r"\[hw\] ready outputs=1 buttons=2 elapsed_s=\d+\.\d{3}", lines[-1])
 
 
-_EVERY_SECTION = {
+_EVERY_SECTION: dict[str, Any] = {
     "high_current_rail": {"pin": "GP28", "active_high": True},
     "i2c": {"default": {"sda": "GP4", "scl": "GP5"}},
     "spi": {"default": {"sck": "SCK", "mosi": "MOSI", "miso": "MISO"}},

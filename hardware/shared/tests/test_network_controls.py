@@ -8,9 +8,11 @@ from engine.capabilities import MissingCapabilityError
 from engine.engine import GameEngine
 from engine.network import CONE, LINE
 from engine.state import EffectControls, SceneControls
+from hardware.shared.ir_codecs.base import InfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_transport import InfraredTransmitter, IrTransmitGate, PulseWriter
 from hardware.shared.network_controls import HardwareNetworkControls
+from hardware.shared.radio_transceiver import RadioTransceiver
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -34,11 +36,11 @@ class _RecordingPulseWriter(PulseWriter):
         return False
 
 
-class _StubEncoder:
-    """Minimal encoder that converts each byte to a single-item pulse list."""
+class _StubEncoder(InfraredEncoder):
+    """Minimal encoder that converts each byte to a single pulse duration."""
 
-    def encode(self, data: bytes) -> list[int]:
-        return list(data)
+    def encode(self, data: bytes) -> array[int]:
+        return array("H", list(data))
 
 
 def _make_transmitter() -> tuple[InfraredTransmitter, _RecordingPulseWriter]:
@@ -92,15 +94,17 @@ def test_send_ir_on_an_unknown_emitter_raises_value_error_naming_it() -> None:
         controls.send_ir(b"x", "laser")
 
 
-class _RecordingIrTransceiver:
+class _RecordingIrTransceiver(InfraredTransceiver):
     """Fake transceiver that just records send() calls -- isolates
     HardwareNetworkControls.send_ir's delegation from InfraredTransceiver's
     own send() behaviour (covered separately in test_ir_transceiver.py)."""
 
-    emitters = (LINE,)
-
     def __init__(self) -> None:
         self.calls: list[tuple[bytes, str]] = []
+
+    @property
+    def emitters(self) -> tuple[str, ...]:
+        return (LINE,)
 
     def send(self, data: bytes, emitter: str) -> None:
         self.calls.append((data, emitter))
@@ -115,7 +119,7 @@ def test_hardware_network_controls_send_ir_delegates_to_the_wired_transceiver() 
     assert transceiver.calls == [(b"\x01", LINE)]
 
 
-class _RecordingRadioTransceiver:
+class _RecordingRadioTransceiver(RadioTransceiver):
     """Fake transceiver that just records send() calls -- isolates
     HardwareNetworkControls.send_radio's delegation from RadioTransceiver's
     own send() behaviour (covered separately in test_radio_transceiver.py)."""

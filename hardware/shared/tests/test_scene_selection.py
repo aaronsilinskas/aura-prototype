@@ -82,7 +82,7 @@ def test_card_less_device_falls_back_to_flash_default():
 
 def test_applying_a_scene_deploy_over_a_malformed_card_logs_the_malformed_card_once(device_storage):
     device_storage.write_bytes("aura-state.json", b"{not valid json")
-    lines = []
+    lines: list[str] = []
 
     apply_scene_deploy(
         device_storage,
@@ -99,7 +99,7 @@ def test_an_empty_or_non_string_scene_deploy_token_keeps_the_persisted_scene_and
 ):
     device_storage.write_json("aura-state.json", {"scene": "tag"})
     boot_values = {"default_scene": "red_light_green_light", "scene_deploy_token": token}
-    lines = []
+    lines: list[str] = []
 
     apply_scene_deploy(device_storage, boot_values, Logger("[boot]", sink=lines.append))
 
