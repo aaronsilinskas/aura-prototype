@@ -110,8 +110,7 @@ allowed_importers = ["**.tests", "app.simulation"]
 
 [tool.mypy]
 python_version = "3.10"
-# micropython.py deliberately shadows circuitpython-stubs' stub; its docstring says why.
-files = ["app", "effects", "engine", "hardware", "magic", "packs", "scripts", "micropython.py"]
+files = ["app", "effects", "engine", "hardware", "magic", "packs", "scripts"]
 exclude = ['(^|/)tests/']
 # Local stubs for modules circuitpython-stubs lacks; see typings/README.md.
 mypy_path = "typings"

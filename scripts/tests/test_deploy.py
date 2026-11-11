@@ -436,18 +436,6 @@ def test_conftest_py_is_not_copied_to_mount(tmp_path: Path) -> None:
     assert not (mount / "rules" / "conftest.py").exists()
 
 
-def test_host_only_micropython_module_is_never_copied_to_mount(
-    tmp_path: Path, repo_root: Path
-) -> None:
-    # Deploys the real repo, so the test guards wherever the module actually lives.
-    mount = tmp_path / "mount"
-    mount.mkdir()
-
-    deploy(None, mount, source_root=repo_root, use_source=True)
-
-    assert sorted(mount.rglob("micropython.*")) == []
-
-
 # ---------------------------------------------------------------------------
 # Skip logic (existing destination = up to date for slice 1)
 # ---------------------------------------------------------------------------

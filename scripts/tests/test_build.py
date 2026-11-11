@@ -248,17 +248,6 @@ def test_conftest_py_is_not_in_staging_tree(tmp_path: Path) -> None:
     assert not (staging / "rules" / "conftest.py").exists()
 
 
-def test_host_only_micropython_module_is_not_in_staging_tree(
-    tmp_path: Path, repo_root: Path
-) -> None:
-    # Builds the real repo, so the test guards wherever the module actually lives.
-    staging = tmp_path / "build"
-
-    build(source_root=repo_root, staging_root=staging, compile=fake_compile)
-
-    assert sorted(staging.rglob("micropython.*")) == []
-
-
 # ---------------------------------------------------------------------------
 # Compile failure aborts the build
 # ---------------------------------------------------------------------------

@@ -90,7 +90,7 @@ Prefer multiply over divide when the denominator is fixed. In hot paths, always 
 
 - **Keep rule:** decorate a function only when median FPS rises by at least 5 % at 60 pixels, against the undecorated control run in the same session, on at least one benchmark scene (`tag`, `element_browser`) and drops on neither. Revert a decoration below the bar. 144-pixel numbers are recorded for information only.
 - **The PR records** the median FPS of the control and the candidate, per scene and pixel count; the `.mpy` size change; and `gc.mem_free()` at scene start. Read `gc.mem_free()` with a throwaway, uncommitted print after `build_scene_boot` in `app/scene_runtime.py`: no timing or reporting helper is committed (#1180).
-- **Spelling:** `import micropython`, then `@micropython.native`. `mpy-cross` recognizes the decorator only by that exact spelling, so `from micropython import native` never compiles native. On the host, tests and mypy import the root `micropython.py` stand-in, whose `native` returns the function unchanged.
+- **Spelling:** `import micropython`, then `@micropython.native`. `mpy-cross` recognizes the decorator only by that exact spelling, so `from micropython import native` never compiles native. CPython has no `micropython` module, so the first decoration also adds a host-only `micropython.py` at the repo root, never deployed, for tests and mypy. #1239 built one and withdrew it unused.
 - **Per function only:** whole-module native (`-X emit=native`) and `@micropython.viper` stay out of production code.
 
 Measure on an RP2350 board with 8 MB PSRAM under deploy-watch:
@@ -185,7 +185,7 @@ When using an exception, still annotate with the best available fallback type an
 
 ## Stub Defects
 
-When `circuitpython-stubs` is wrong about a call the firmware accepts, suppress the error at the call site with `# type: ignore[code]` and a reason comment that links an upstream adafruit/circuitpython issue reporting the defect. File the issue first: the `shared-bindings` file and line, the wrong and corrected signatures, and evidence that the firmware accepts the call. Never patch or shadow the stub with a local copy. The one exception is the root `micropython.py`; its docstring says why.
+When `circuitpython-stubs` is wrong about a call the firmware accepts, suppress the error at the call site with `# type: ignore[code]` and a reason comment that links an upstream adafruit/circuitpython issue reporting the defect. File the issue first: the `shared-bindings` file and line, the wrong and corrected signatures, and evidence that the firmware accepts the call. Never patch or shadow the stub with a local copy.
 
 ```python
 # Stub defect: circuitpython-stubs marks WaveFile's buffer required, but the
