@@ -93,8 +93,9 @@ class PackReference:
 
     *version* is the minimum compatible version: the installed pack must have
     the same major and at least this minor. *settings* holds the scene's
-    Setting overrides for the pack, exactly as written in ``scene.json``; the
-    scan checks them when it resolves the scene's Settings.
+    Setting overrides for a Rule pack, exactly as written in ``scene.json``;
+    the scan checks them when it resolves the scene's Settings. An effect
+    pack's reference takes no overrides, so its *settings* is always empty.
     """
 
     __slots__ = ("name", "settings", "version")

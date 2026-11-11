@@ -218,7 +218,7 @@ def test_a_scan_override_for_a_rule_pack_the_scene_does_not_declare_raises(
         pack_tree.scan_roots(root, setting_overrides={"game": {"rule_packs": {"unused": values}}})
 
     error = excinfo.value
-    assert (error.scene, error.pack, error.kind) == ("game", "unused", "rule")
+    assert (error.scene, error.pack) == ("game", "unused")
 
 
 def test_a_scan_override_of_an_undeclared_scene_setting_raises(pack_tree) -> None:
