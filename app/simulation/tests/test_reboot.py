@@ -41,7 +41,7 @@ def launch(device: SimulatedDevice, scene: str) -> None:
 def hold_to_return(simulation: Simulation, device: SimulatedDevice) -> None:
     """Hold A+B for the scene's ``hold_seconds``, rebooting back to the lobby; A and B stay down."""
     device.hold("A", "B")
-    simulation.advance(settings_for(device.scene).get("return_to_lobby", "hold_seconds"))
+    simulation.advance(settings_for(device.scene).get_float("return_to_lobby", "hold_seconds"))
 
 
 def test_setting_overrides_change_a_launched_scenes_hold_seconds(simulation):
