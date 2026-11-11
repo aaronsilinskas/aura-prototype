@@ -5,8 +5,6 @@ from unittest.mock import patch
 
 from scripts.deploy import deploy
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-
 
 def fake_compile(src: Path, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -438,12 +436,14 @@ def test_conftest_py_is_not_copied_to_mount(tmp_path: Path) -> None:
     assert not (mount / "rules" / "conftest.py").exists()
 
 
-def test_host_only_micropython_module_is_never_copied_to_mount(tmp_path: Path) -> None:
+def test_host_only_micropython_module_is_never_copied_to_mount(
+    tmp_path: Path, repo_root: Path
+) -> None:
     # Deploys the real repo, so the test guards wherever the module actually lives.
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    deploy(None, mount, source_root=_REPO_ROOT, use_source=True)
+    deploy(None, mount, source_root=repo_root, use_source=True)
 
     assert sorted(mount.rglob("micropython.*")) == []
 

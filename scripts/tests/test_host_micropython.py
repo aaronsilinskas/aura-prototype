@@ -7,7 +7,6 @@ from pathlib import Path
 
 import micropython
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
 _DECORATED_MODULE = (
     "import micropython\n\n\n@micropython.native\ndef double(x: int) -> int:\n    return x * 2\n"
 )
@@ -41,7 +40,7 @@ def test_a_module_decorated_with_micropython_native_imports_and_runs_on_cpython(
 
 
 def test_mypy_checks_a_micropython_native_function_with_its_own_signature(
-    tmp_path: Path,
+    tmp_path: Path, repo_root: Path
 ) -> None:
     # The circuitpython-stubs stub has no ``native``, so a clean run proves mypy
     # resolved ``micropython`` to the host-only module instead.
@@ -50,7 +49,7 @@ def test_mypy_checks_a_micropython_native_function_with_its_own_signature(
 
     result = subprocess.run(
         [sys.executable, "-m", "mypy", "--no-error-summary", str(source)],
-        cwd=_REPO_ROOT,
+        cwd=repo_root,
         capture_output=True,
         text=True,
     )

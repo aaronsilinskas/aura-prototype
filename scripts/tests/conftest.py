@@ -1,6 +1,14 @@
 """Shared fixtures for scripts/tests."""
 
+from pathlib import Path
+
 import pytest
+
+
+@pytest.fixture
+def repo_root() -> Path:
+    """The repository root, for tests that build, deploy or type-check the real tree."""
+    return Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture(autouse=True)
