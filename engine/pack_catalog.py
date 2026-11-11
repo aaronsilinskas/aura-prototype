@@ -50,7 +50,11 @@ _REQUIRED_SCENE_KEYS = ("version", "effect_packs", "rule_packs")
 
 _SCENE_KEYS = _REQUIRED_SCENE_KEYS + ("settings", "ir_codec", "requires")
 
-_PACK_REFERENCE_KEYS = ("name", "version", "settings")
+# The keys a scene.json pack reference may hold, by list; only Rule packs take Setting overrides.
+_PACK_REFERENCE_KEYS = {
+    "effect_packs": ("name", "version"),
+    "rule_packs": ("name", "version", "settings"),
+}
 
 # The attribute each kind's items export, in packs and scenes alike.
 _EXPORT_ATTR = {"effects": "BUILD", "rules": "RULE"}
@@ -580,12 +584,16 @@ def _read_pack_references(scene: str, path: str, data: dict, key: str) -> list[P
 def _read_pack_reference(scene: str, path: str, key: str, entry: object) -> PackReference:
     if not isinstance(entry, dict):
         raise MalformedSceneError(scene, path, f"'{key}' entry {entry!r} is not an object")
-    for field in entry:
-        if field not in _PACK_REFERENCE_KEYS:
-            raise MalformedSceneError(scene, path, f"'{key}' entry has unknown key {field!r}")
     name = entry.get("name")
     if not isinstance(name, str):
         raise MalformedSceneError(scene, path, f"'{key}' entry {entry!r} has no string 'name'")
+    if key == "effect_packs" and "settings" in entry:
+        raise MalformedSceneError(
+            scene, path, f"effect pack '{name}' cannot be given Setting overrides"
+        )
+    for field in entry:
+        if field not in _PACK_REFERENCE_KEYS[key]:
+            raise MalformedSceneError(scene, path, f"'{key}' entry has unknown key {field!r}")
     if "version" not in entry:
         raise MalformedSceneError(scene, path, f"'{key}' entry for '{name}' has no 'version'")
     settings = entry.get("settings", {})
