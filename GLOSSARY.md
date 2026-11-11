@@ -120,7 +120,8 @@ _Avoid_: confusing with `EffectConfig`; calling the Settings themselves the Scen
 Owned internally by `GameEngine`. Rules access time only via `state.elapsed`/`state.total`, never by holding a `Timer` reference.
 
 ### Scene
-A declarative bundle of a self-contained game context: effect/rule packs, its own declared **Settings** and its **Setting overrides** for the Rule packs it declares, a `version`, a declared `ir_codec` name, its own **Required capabilities**, and references to its scene-local effects/rules. Carries no mutable runtime state.
+A declarative bundle of a self-contained game context, read-only once the **PackCatalog** has scanned it: its effect and rule packs, a `version`, a declared `ir_codec` name, its resolved **Settings** (its own and its Rule packs', with its **Setting overrides** applied), its **Required capabilities**, and its scene-local effects, rules and sounds. Every lookup shares the same one.
+_Avoid_: mutating a scene after the scan; a second record type for the same scene
 
 ### Capability
 One thing a device has that a scene can depend on, named from a fixed vocabulary: a button by label (`button.A`, `button.B`, …), an IR emitter by name (`ir.line`, `ir.cone`, `ir.area_of_effect`), any IR receiver (`ir.receive`), `radio`, `storage`, `accelerometer`, `magnetometer`. A device **has** a capability when what it built provides it — a component declared but not built (disabled, isolated, or its bus failed to open) is not had. Named by component, never by bus or part: an accelerometer on I2C and one on SPI are the same capability.
@@ -167,8 +168,8 @@ The **game-facing**, send-only network seam a rule holds via `GameState.network_
 _Avoid_: putting `poll_transmits()` or any per-tick pump on it (keep the seam send-only); a send that silently does nothing on missing hardware (a rule that copes asks `state.capabilities.has` first)
 
 ### SceneRegistry
-Serves a fresh `Scene` per lookup from the scenes the **PackCatalog** discovered and checked; it does no scanning of its own. Can also surface a scene's declared codec name without constructing the `Scene`, for callers resolving hardware before building it. `register` is a test-only escape hatch for in-memory scenes, which skip the catalog's declaration checks.
-_Avoid_: registering scenes via `SceneManager` (it no longer accepts `register()`); calling `register` outside tests; changing a scene's Settings after the scan (pass **Setting overrides** to the catalog scan); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
+The installed **Scenes**, keyed by name: built from the scenes the **PackCatalog** discovered and checked, it answers every question about a scene (the scene itself, its codec name, its **Required capabilities**, whether a name is known) from that one collection and does no scanning of its own. Tests build one straight from **Scene** records; those skip the catalog's declaration checks, but not the Required capabilities check.
+_Avoid_: a second way to add scenes (an in-memory factory, a `register` call); copying a **Scene** on lookup; changing a scene's Settings after the scan (pass **Setting overrides** to the catalog scan); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
 
 ### SceneControls
 The scene-transition seam rules use (`overlay`, `pop`, `reboot_into`, `reboot_to_previous`, `can_run`); `SceneManager` is the live implementation. The **Scene boot** hands the same seam to the **Simulation test harness** and the reboot example, which use it as a rule would. Every transition into a scene first checks its **Required capabilities** against the device, and rules can ask whether the device can run a scene before offering it.
@@ -180,7 +181,7 @@ _Avoid_: "scene switch" for it; counting the time spent covered against the cove
 
 ### SceneManager
 Owns the scene stack and drives scene transitions, trusting the **PackCatalog** to have checked each scene's pack declarations. Each transition makes one call to the injected `EffectAdmin`, carrying the **Scene view** of the scene it brings to the top; reboots go through the injected `SceneReboot` port. The live `SceneControls`.
-_Avoid_: calling `register()` on it (removed); offering rules a way to load a scene in-process (scenes change by **Reboot**); validating pack versions on load or overlay (the catalog already did); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); holding or installing into the **Active scene namespace** (the effect system does)
+_Avoid_: offering rules a way to load a scene in-process (scenes change by **Reboot**); validating pack versions on load or overlay (the catalog already did); routing scene-transition effect calls through `state.effect_controls` (use the injected `EffectAdmin`); holding or installing into the **Active scene namespace** (the effect system does)
 
 ### Reboot
 The one way a device switches scenes: the target is persisted to device storage, then the device resets and boots that scene. Only storage and what is physically happening to the device (held buttons, motion, where its IR points) carry across; game state, phases and output state do not, and nothing after the reset runs. A device with no SD card cannot persist a target, so it does not reboot, and stays in the scene it booted.
