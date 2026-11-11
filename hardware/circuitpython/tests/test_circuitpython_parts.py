@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import sys
 import time
+from array import array
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import pytest
 
@@ -38,6 +39,9 @@ from hardware.shared.device_config import (
     SDCardConfig,
 )
 from hardware.shared.device_parts import PinRef
+
+if TYPE_CHECKING:
+    import busio
 
 
 class _Pin:
@@ -165,6 +169,16 @@ class _FakeI2C:
 class _FakeSPI:
     def __init__(self, sck: object, MOSI: object = None, MISO: object = None) -> None:  # noqa: N803
         self.pins = (sck, MOSI, MISO)
+
+
+def fake_i2c() -> busio.I2C:
+    """A sentinel passed off as an I2C bus, for parts that only hand it to their driver."""
+    return cast("busio.I2C", object())
+
+
+def fake_spi() -> busio.SPI:
+    """A sentinel passed off as an SPI bus, for parts that only hand it to their driver."""
+    return cast("busio.SPI", object())
 
 
 @pytest.fixture
@@ -404,7 +418,7 @@ def _driver() -> _FakeMatrixDriver:
 def test_matrix_pixels_drive_a_matrix_on_the_given_bus_at_its_configured_address(
     matrix_driver: None,
 ) -> None:
-    bus = object()
+    bus = fake_i2c()
     CircuitPythonParts(_board()).matrix_pixels(_matrix(address=0x31), bus)
 
     driver = _driver()
@@ -414,13 +428,13 @@ def test_matrix_pixels_drive_a_matrix_on_the_given_bus_at_its_configured_address
 def test_matrix_pixels_leave_the_drivers_default_address_when_none_is_configured(
     matrix_driver: None,
 ) -> None:
-    CircuitPythonParts(_board()).matrix_pixels(_matrix(address=None), object())
+    CircuitPythonParts(_board()).matrix_pixels(_matrix(address=None), fake_i2c())
 
     assert "address" not in _driver().kwargs
 
 
 def test_matrix_pixels_are_as_wide_as_the_configured_columns(matrix_driver: None) -> None:
-    output = CircuitPythonParts(_board()).matrix_pixels(_matrix(), object())
+    output = CircuitPythonParts(_board()).matrix_pixels(_matrix(), fake_i2c())
 
     assert output.min_resolution == 13
 
@@ -429,7 +443,7 @@ def test_matrix_pixels_are_as_wide_as_the_configured_columns(matrix_driver: None
 def test_matrix_led_scaling_follows_the_configured_brightness(
     matrix_driver: None, brightness: float, scaling: int
 ) -> None:
-    CircuitPythonParts(_board()).matrix_pixels(_matrix(brightness=brightness), object())
+    CircuitPythonParts(_board()).matrix_pixels(_matrix(brightness=brightness), fake_i2c())
 
     assert _driver().led_scaling == scaling
 
@@ -438,13 +452,13 @@ def test_matrix_led_scaling_follows_the_configured_brightness(
 def test_matrix_driver_buffers_pixel_writes_until_show_at_any_address(
     matrix_driver: None, address: int | None
 ) -> None:
-    CircuitPythonParts(_board()).matrix_pixels(_matrix(address=address), object())
+    CircuitPythonParts(_board()).matrix_pixels(_matrix(address=address), fake_i2c())
 
     assert _driver().kwargs["allocate"] == sys.modules["adafruit_is31fl3741"].MUST_BUFFER
 
 
 def test_matrix_starts_enabled_at_full_global_current(matrix_driver: None) -> None:
-    CircuitPythonParts(_board()).matrix_pixels(_matrix(), object())
+    CircuitPythonParts(_board()).matrix_pixels(_matrix(), fake_i2c())
 
     driver = _driver()
     assert (driver.global_current, driver.enable) == (0xFF, True)
@@ -453,7 +467,7 @@ def test_matrix_starts_enabled_at_full_global_current(matrix_driver: None) -> No
 def test_matrix_that_responds_within_the_startup_window_is_used(matrix_driver: None) -> None:
     _FakeMatrixDriver.unresponsive_attempts = 2
 
-    output = CircuitPythonParts(_board()).matrix_pixels(_matrix(), object())
+    output = CircuitPythonParts(_board()).matrix_pixels(_matrix(), fake_i2c())
 
     output.flush()
     assert _driver().shown
@@ -464,7 +478,7 @@ def test_matrix_that_never_responds_raises_after_the_startup_window(matrix_drive
     parts = CircuitPythonParts(_board())
 
     with pytest.raises(RuntimeError, match="IS31FL3741 matrix did not respond within 3s"):
-        parts.matrix_pixels(_matrix(), object())
+        parts.matrix_pixels(_matrix(), fake_i2c())
 
 
 # ---------------------------------------------------------------------------
@@ -513,7 +527,7 @@ def lis3dh(monkeypatch: pytest.MonkeyPatch) -> list[_FakeLis3dh]:
 def test_accelerometer_is_a_lis3dh_on_the_given_bus_at_its_configured_address(
     lis3dh: list[_FakeLis3dh],
 ) -> None:
-    bus = object()
+    bus = fake_i2c()
 
     CircuitPythonParts(_board()).accelerometer(I2CDeviceConfig(address=0x19), bus)
 
@@ -524,7 +538,7 @@ def test_accelerometer_is_a_lis3dh_on_the_given_bus_at_its_configured_address(
 def test_accelerometer_leaves_the_drivers_default_address_when_none_is_configured(
     lis3dh: list[_FakeLis3dh],
 ) -> None:
-    CircuitPythonParts(_board()).accelerometer(I2CDeviceConfig(), object())
+    CircuitPythonParts(_board()).accelerometer(I2CDeviceConfig(), fake_i2c())
 
     (chip,) = lis3dh
     assert chip.kwargs == {}
@@ -533,7 +547,7 @@ def test_accelerometer_leaves_the_drivers_default_address_when_none_is_configure
 def test_accelerometer_reads_the_lis3dhs_current_acceleration(
     lis3dh: list[_FakeLis3dh],
 ) -> None:
-    read = CircuitPythonParts(_board()).accelerometer(I2CDeviceConfig(), object())
+    read = CircuitPythonParts(_board()).accelerometer(I2CDeviceConfig(), fake_i2c())
     (chip,) = lis3dh
 
     chip.acceleration = (1.0, 2.0, 3.0)
@@ -577,13 +591,13 @@ def mmc56x3(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _magnetometer_read() -> Callable[[], tuple[float, float, float]]:
-    return CircuitPythonParts(_board()).magnetometer(I2CDeviceConfig(), object())
+    return CircuitPythonParts(_board()).magnetometer(I2CDeviceConfig(), fake_i2c())
 
 
 def test_magnetometer_is_an_mmc5603_on_the_given_bus_at_its_configured_address(
     mmc56x3: None,
 ) -> None:
-    bus = object()
+    bus = fake_i2c()
 
     CircuitPythonParts(_board()).magnetometer(I2CDeviceConfig(address=0x32), bus)
 
@@ -663,7 +677,7 @@ def _buzz(output: EffectOutput) -> None:
 def test_haptic_output_drives_a_drv2605_on_the_given_bus_at_its_configured_address(
     drv2605: None,
 ) -> None:
-    bus = object()
+    bus = fake_i2c()
 
     CircuitPythonParts(_board()).haptic_output(I2CDeviceConfig(address=0x5B), bus)
 
@@ -671,7 +685,7 @@ def test_haptic_output_drives_a_drv2605_on_the_given_bus_at_its_configured_addre
 
 
 def test_haptic_output_plays_haptic_effects_on_its_drv2605(drv2605: None) -> None:
-    output = CircuitPythonParts(_board()).haptic_output(I2CDeviceConfig(), object())
+    output = CircuitPythonParts(_board()).haptic_output(I2CDeviceConfig(), fake_i2c())
 
     _buzz(output)
 
@@ -681,7 +695,7 @@ def test_haptic_output_plays_haptic_effects_on_its_drv2605(drv2605: None) -> Non
 def test_haptic_output_leaves_the_drivers_default_address_when_none_is_configured(
     drv2605: None,
 ) -> None:
-    CircuitPythonParts(_board()).haptic_output(I2CDeviceConfig(), object())
+    CircuitPythonParts(_board()).haptic_output(I2CDeviceConfig(), fake_i2c())
 
     assert [d.kwargs for d in _FakeDrv2605.built] == [{}]
 
@@ -885,7 +899,7 @@ class _FakePulseOut:
         self.sent: list[list[int]] = []
         _FakePulseOut.built.append(self)
 
-    def send(self, durations: list[int]) -> None:
+    def send(self, durations: array[int]) -> None:
         self.sent.append(list(durations))
 
 
@@ -935,7 +949,7 @@ def test_ir_writer_on_silicon_without_pio_sends_pulses_on_a_38khz_carrier_on_its
     board = _board("GP8")
     writer, _kind = CircuitPythonParts(board).ir_writer("line", PinRef("GP8", "ir.line"))
 
-    writer.write_pulses([9000, 4500, 560])
+    writer.write_pulses(array("H", [9000, 4500, 560]))
 
     assert [(p.pin, p.frequency, p.sent) for p in _FakePulseOut.built] == [
         (board.GP8, 38000, [[9000, 4500, 560]])
@@ -961,7 +975,7 @@ def test_ir_writer_on_pio_silicon_clocks_its_carrier_out_of_a_state_machine_on_i
 def test_ir_writer_on_pio_silicon_sends_pulses_through_its_state_machine(pio: None) -> None:
     writer, _kind = CircuitPythonParts(_board("GP8")).ir_writer("line", PinRef("GP8", "ir.line"))
 
-    writer.write_pulses([9000, 4500, 560])
+    writer.write_pulses(array("H", [9000, 4500, 560]))
 
     (state_machine,) = _FakeStateMachine.built
     assert len(state_machine.written) == 1  # the encoding is test_pio_pulse_writer's
@@ -1025,7 +1039,7 @@ _RADIO_PINS = (PinRef("D10", "radio.cs"), PinRef("D11", "radio.reset"))
 def test_radio_transport_sends_through_an_rfm69_on_the_given_bus_at_its_frequency_and_node(
     rfm69: None,
 ) -> None:
-    bus = object()
+    bus = fake_spi()
     transport = CircuitPythonParts(_board("D10", "D11")).radio_transport(
         RadioConfig("D10", "D11", 433.0, 7), bus, *_RADIO_PINS
     )
@@ -1043,7 +1057,7 @@ def test_radio_chip_select_and_reset_are_gpios_on_their_referenced_pins(
     board = _board("D10", "D11")
 
     CircuitPythonParts(board).radio_transport(
-        RadioConfig("D10", "D11", 433.0, 7), object(), *_RADIO_PINS
+        RadioConfig("D10", "D11", 433.0, 7), fake_spi(), *_RADIO_PINS
     )
 
     (chip,) = _FakeRfm69.built
@@ -1059,7 +1073,7 @@ def test_radio_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
 
     with pytest.raises(ValueError, match=rf"^{field}: pin 'NOPE' not found on board$"):
         CircuitPythonParts(_board("D10", "D11")).radio_transport(
-            RadioConfig("D10", "D11", 433.0, 7), object(), *pins
+            RadioConfig("D10", "D11", 433.0, 7), fake_spi(), *pins
         )
 
 
@@ -1113,7 +1127,7 @@ def test_storage_mounts_the_card_on_the_given_bus_and_chip_select_at_its_mount_p
     sd: list[tuple[_FakeVfsFat, str]],
 ) -> None:
     board = _board("D24")
-    bus = object()
+    bus = fake_spi()
 
     CircuitPythonParts(board).storage(SDCardConfig("D24", "/sd"), bus, PinRef("D24", "sdcard.cs"))
 
@@ -1133,7 +1147,7 @@ def test_storage_whose_card_fails_to_mount_raises_sd_card_mount_error_naming_cs_
 
     expected = r"^sdcard section is declared but the card at cs=D24 mount=/media failed to mount: "
     with pytest.raises(SdCardMountError, match=expected) as raised:
-        parts.storage(SDCardConfig("D24", "/media"), object(), PinRef("D24", "sdcard.cs"))
+        parts.storage(SDCardConfig("D24", "/media"), fake_spi(), PinRef("D24", "sdcard.cs"))
     assert isinstance(raised.value.__cause__, OSError)
 
 
@@ -1157,21 +1171,21 @@ _OPTIONAL_PARTS = {
 
 
 _REQUESTS: dict[str, Callable[[CircuitPythonParts], object]] = {
-    "matrix_pixels": lambda parts: parts.matrix_pixels(_matrix(), object()),
+    "matrix_pixels": lambda parts: parts.matrix_pixels(_matrix(), fake_i2c()),
     "neopixel_strip": lambda parts: parts.neopixel_strip(
         _strip({"personal": range(0, 4)}), PinRef("D5", "pixels.pin")
     ),
-    "accelerometer": lambda parts: parts.accelerometer(I2CDeviceConfig(), object()),
-    "magnetometer": lambda parts: parts.magnetometer(I2CDeviceConfig(), object()),
-    "haptic_output": lambda parts: parts.haptic_output(I2CDeviceConfig(), object()),
+    "accelerometer": lambda parts: parts.accelerometer(I2CDeviceConfig(), fake_i2c()),
+    "magnetometer": lambda parts: parts.magnetometer(I2CDeviceConfig(), fake_i2c()),
+    "haptic_output": lambda parts: parts.haptic_output(I2CDeviceConfig(), fake_i2c()),
     "audio_output": lambda parts: parts.audio_output(_audio(), *_I2S_PINS),
     "ir_reader": lambda parts: parts.ir_reader(PinRef("GP7", "ir.rx")),
     "ir_writer": lambda parts: parts.ir_writer("line", PinRef("GP8", "ir.line")),
     "radio_transport": lambda parts: parts.radio_transport(
-        RadioConfig("D10", "D11", 433.0, 7), object(), *_RADIO_PINS
+        RadioConfig("D10", "D11", 433.0, 7), fake_spi(), *_RADIO_PINS
     ),
     "storage": lambda parts: parts.storage(
-        SDCardConfig("D24"), object(), PinRef("D24", "sdcard.cs")
+        SDCardConfig("D24"), fake_spi(), PinRef("D24", "sdcard.cs")
     ),
 }
 

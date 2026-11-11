@@ -17,6 +17,10 @@ the state machine raw mark/space durations only.
 from __future__ import annotations
 
 from array import array
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    import rp2pio
 
 # ---------------------------------------------------------------------------
 # Test doubles for rp2pio.StateMachine and adafruit_pioasm.Program.
@@ -47,6 +51,10 @@ class _FakeStateMachine:
         self.writing = True
 
 
+def as_state_machine(sm: _FakeStateMachine) -> rp2pio.StateMachine:
+    return cast("rp2pio.StateMachine", sm)
+
+
 class _FakeProgram:
     """Stub for an assembled ``adafruit_pioasm.Program``."""
 
@@ -72,7 +80,7 @@ from hardware.shared.ir_codecs.aura import (  # noqa: E402
 
 def _make_writer():
     sm = _FakeStateMachine(_FakeProgram("nop"), 1, first_set_pin=object())
-    return PioPulseWriter(sm), sm
+    return PioPulseWriter(as_state_machine(sm)), sm
 
 
 def _loops_to_us(loops: int) -> int:
@@ -122,7 +130,7 @@ def test_is_busy_is_false_before_any_write_even_when_state_machine_reports_writi
     """
     sm = _FakeStateMachine(_FakeProgram("nop"), 1, first_set_pin=object())
     sm.writing = True  # uninitialised-hardware flag, before any write_pulses
-    writer = PioPulseWriter(sm)
+    writer = PioPulseWriter(as_state_machine(sm))
     assert writer.is_busy() is False
 
 
