@@ -1,6 +1,6 @@
 # Settings are declared as data and checked when the catalog is scanned
 
-A scene's and a pack's **Settings** are declared as data: in `scene.json`, and in the pack's **Pack manifest** (`rules.json` / `effects.json`, which replaces `version.txt`). Each declaration gives a name, a type and an optional default. Each pack reference in a scene can carry **Setting overrides** for that pack. The **PackCatalog** scan checks every override against the declarations and resolves every Setting before boot continues.
+A scene's and a Rule pack's **Settings** are declared as data: in `scene.json`, and in the Rule pack's **Pack manifest**, `rules.json` (every pack's manifest, `rules.json` or `effects.json`, replaces `version.txt`). Each declaration gives a name, a type and an optional default. Each Rule pack reference in a scene can carry **Setting overrides** for that pack. The **PackCatalog** scan checks every override against the declarations and resolves every Setting before boot continues.
 
 Before this change, a knob was stated in three places that nothing tied together:
 - a seed key in `scene.json`'s `initial_data`;
@@ -13,7 +13,7 @@ A mistyped key silently read as the default, and a seeded key that nothing read 
 
 - **Declare each Setting in Python, in the Scene Config module, and check when the scene starts.** This keeps typing and named constants. But the catalog imports item code lazily, at first use, so the scan can't read a Python declaration on a device without importing every installed scene's code at boot. Errors would then surface at scene start instead of at scan.
 - **Have the scan import each scene's settings module.** This gives scan-time errors, but it breaks lazy loading and costs RAM at boot for scenes that never run.
-- **Declare Settings as data in manifests and `scene.json` (chosen).** The scan reads JSON it already opens, so every override is checked before boot continues, with no code imported. A default lives only in its declaration, and Python never restates it.
+- **Declare Settings as data in Rule pack manifests and `scene.json` (chosen).** The scan reads JSON it already opens, so every override is checked before boot continues, with no code imported. A default lives only in its declaration, and Python never restates it.
 
 ## Consequences
 

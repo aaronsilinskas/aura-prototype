@@ -50,11 +50,8 @@ _REQUIRED_SCENE_KEYS = ("version", "effect_packs", "rule_packs")
 
 _SCENE_KEYS = _REQUIRED_SCENE_KEYS + ("settings", "ir_codec", "requires")
 
-# The keys a scene.json pack reference may hold, by list; only Rule packs take Setting overrides.
-_PACK_REFERENCE_KEYS = {
-    "effect_packs": ("name", "version"),
-    "rule_packs": ("name", "version", "settings"),
-}
+# The keys a scene.json pack reference may hold; only a Rule pack's may hold "settings".
+_PACK_REFERENCE_KEYS = ("name", "version", "settings")
 
 # The attribute each kind's items export, in packs and scenes alike.
 _EXPORT_ATTR = {"effects": "BUILD", "rules": "RULE"}
@@ -167,14 +164,13 @@ class IncompatiblePackError(SceneDeclarationError):
 
 
 class OverrideOfUndeclaredPackError(SceneDeclarationError):
-    """The scan's Setting overrides name a Rule pack the scene lacks; *kind* is ``"rule"``."""
+    """The scan's Setting overrides name a Rule pack the scene does not declare."""
 
-    def __init__(self, scene: str, pack: str, kind: str) -> None:
-        self.kind = kind
+    def __init__(self, scene: str, pack: str) -> None:
         super().__init__(
             scene,
             pack,
-            f"Setting overrides for scene '{scene}' name {kind} pack '{pack}', "
+            f"Setting overrides for scene '{scene}' name Rule pack '{pack}', "
             + "which the scene does not declare",
         )
 
@@ -318,19 +314,18 @@ def _read_setting_overrides(scene: str, given: object) -> tuple[dict[str, object
     for key in given:
         if key not in _OVERRIDE_KEYS:
             raise ValueError(f"setting overrides for scene {scene!r} have unknown key {key!r}")
-    parts = []
-    for key in _OVERRIDE_KEYS:
-        part = given.get(key, {})
-        if not isinstance(part, dict):
-            raise ValueError(f"setting overrides {key!r} for scene {scene!r} are not a dict")
-        if key != "settings":
-            for pack, values in part.items():
-                if not isinstance(values, dict):
-                    raise ValueError(
-                        f"setting overrides for {key} {pack!r} of scene {scene!r} are not a dict"
-                    )
-        parts.append(part)
-    return parts[0], parts[1]
+    own = given.get("settings", {})
+    if not isinstance(own, dict):
+        raise ValueError(f"setting overrides 'settings' for scene {scene!r} are not a dict")
+    rules = given.get("rule_packs", {})
+    if not isinstance(rules, dict):
+        raise ValueError(f"setting overrides 'rule_packs' for scene {scene!r} are not a dict")
+    for pack, values in rules.items():
+        if not isinstance(values, dict):
+            raise ValueError(
+                f"setting overrides for rule_packs {pack!r} of scene {scene!r} are not a dict"
+            )
+    return own, rules
 
 
 def _resolve_rule_packs(
@@ -342,7 +337,7 @@ def _resolve_rule_packs(
     declared = [reference.name for reference in references]
     for pack in given:
         if pack not in declared:
-            raise OverrideOfUndeclaredPackError(scene, pack, "rule")
+            raise OverrideOfUndeclaredPackError(scene, pack)
     return {
         reference.name: _resolve_namespace(
             scene,
@@ -604,7 +599,7 @@ def _read_pack_reference(scene: str, path: str, key: str, entry: object) -> Pack
             scene, path, f"effect pack '{name}' cannot be given Setting overrides"
         )
     for field in entry:
-        if field not in _PACK_REFERENCE_KEYS[key]:
+        if field not in _PACK_REFERENCE_KEYS:
             raise MalformedSceneError(scene, path, f"'{key}' entry has unknown key {field!r}")
     if "version" not in entry:
         raise MalformedSceneError(scene, path, f"'{key}' entry for '{name}' has no 'version'")
