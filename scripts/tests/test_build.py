@@ -2,11 +2,10 @@
 
 import os
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-from scripts.build import BuildError, build, mpy_cross_available, mpy_cross_compile
+from scripts.build import BuildError, build
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -523,58 +522,3 @@ def test_first_build_compiles_all_modules_with_no_prior_staging_tree(tmp_path: P
     assert sorted(compile_calls) == ["palette.py", "render.py"]
     assert result.compiled == 2
     assert result.skipped == 0
-
-
-# ---------------------------------------------------------------------------
-# mpy-cross targets the board's architecture
-# ---------------------------------------------------------------------------
-
-
-def _output_path(mpy_cross_argv: list[str]) -> Path:
-    return Path(mpy_cross_argv[mpy_cross_argv.index("-o") + 1])
-
-
-def _compile_every_module_recording_argv(source: Path, staging: Path) -> list[list[str]]:
-    """Build *source* through the real mpy-cross wrapper; return each mpy-cross argv."""
-    calls: list[list[str]] = []
-
-    def record_run(argv: list[str], **_kwargs: object) -> None:
-        calls.append(argv)
-        _output_path(argv).write_text("FAKE_MPY")
-
-    with patch("subprocess.run", side_effect=record_run):
-        build(source_root=source, staging_root=staging, compile=mpy_cross_compile)
-    return calls
-
-
-def test_every_compiled_module_targets_the_rp2350_architecture(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    build(source_root=source, staging_root=tmp_path / "reference", compile=fake_compile)
-    module_count = len(list((tmp_path / "reference").rglob("*.mpy")))
-
-    calls = _compile_every_module_recording_argv(source, tmp_path / "build")
-
-    arch_flags = [[arg for arg in argv if arg.startswith("-march=")] for argv in calls]
-    assert arch_flags == [["-march=armv7emsp"]] * module_count
-
-
-@pytest.mark.skipif(
-    not mpy_cross_available(),
-    reason="needs the real mpy-cross (scripts/setup_mpy_cross.sh, or set MPY_CROSS)",
-)
-def test_native_function_the_emitter_rejects_fails_the_build_naming_the_file(
-    tmp_path: Path,
-) -> None:
-    source = tmp_path / "source"
-    (source / "effects").mkdir(parents=True)
-    # The native emitter can't compile a bare re-raise.
-    (source / "effects" / "reraise.py").write_text(
-        "import micropython\n\n@micropython.native\ndef f():\n    raise\n"
-    )
-
-    with pytest.raises(BuildError) as exc_info:
-        build(source_root=source, staging_root=tmp_path / "build", compile=mpy_cross_compile)
-
-    assert "reraise.py" in str(exc_info.value)
