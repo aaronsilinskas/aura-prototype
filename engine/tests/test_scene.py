@@ -5,21 +5,19 @@ from __future__ import annotations
 import pytest
 
 from engine.capabilities import MissingCapabilityError
-from engine.effects.manager import EffectManager
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
-from engine.namespace import ActiveSceneNamespace
 from engine.packs import PackRegistry
 from engine.scene import PackReference, Scene, SceneManager, SceneRegistry
 from engine.settings import Settings
-from engine.state import EffectAdmin, EffectControls, GameState, SceneControls, SceneReboot, Scope
+from engine.state import EffectControls, GameState, SceneControls, SceneReboot, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
 from engine.tests.helpers import (
-    RecordingNamespace,
     RecordingSceneReboot,
     SpyEffectAdmin,
     active_state,
+    make_scene_runtime,
 )
 from engine.timer import Timer
 from engine.version import Version
@@ -71,26 +69,22 @@ def _make_engine_with_controls():
 
 def _make_scene_manager(
     engine: GameEngine,
-    effect_registry: PackRegistry | None = None,
     rule_registry: PackRegistry | None = None,
     scene_registry: SceneRegistry | None = None,
-    effect_admin: EffectAdmin | None = None,
-    namespace: ActiveSceneNamespace | None = None,
+    effect_admin: SpyEffectAdmin | None = None,
     scene_reboot: SceneReboot | None = None,
 ) -> SceneManager:
     """Construct a SceneManager, defaulting any unspecified registry/admin/port.
 
-    Absorbs SceneManager's injected-EffectAdmin/namespace/SceneReboot
-    constructor parameters so most call sites only need to override the
+    Absorbs SceneManager's injected-EffectAdmin/SceneReboot constructor
+    parameters so most call sites only need to override the
     registries/admins/ports they actually care about.
     """
     return SceneManager(
         engine,
-        effect_registry if effect_registry is not None else PackRegistry(),
         rule_registry if rule_registry is not None else PackRegistry(),
         scene_registry if scene_registry is not None else SceneRegistry(),
         effect_admin if effect_admin is not None else SpyEffectAdmin(),
-        namespace if namespace is not None else RecordingNamespace(),
         scene_reboot if scene_reboot is not None else RecordingSceneReboot(),
     )
 
@@ -210,13 +204,11 @@ def test_scene_rejects_unknown_attributes() -> None:
 
 def test_scene_manager_satisfies_scene_controls_interface() -> None:
     engine = _make_engine()
-    effect_registry = PackRegistry()
     rule_registry = PackRegistry()
     scene_registry = SceneRegistry()
 
     manager = _make_scene_manager(
         engine,
-        effect_registry=effect_registry,
         rule_registry=rule_registry,
         scene_registry=scene_registry,
     )
@@ -465,34 +457,26 @@ def test_activating_a_second_boot_scene_raises_and_keeps_the_first() -> None:
     assert manager.active_state is first_state
 
 
-def test_the_boot_scene_starts_on_split(pack_tree) -> None:
-    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(pack_tree, ["base"])
-    effect_manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
-
-    scene_manager.activate_boot_scene("base")
-
-    assert _fill_personal_and_tick(effect_manager, output) == _SPLIT_RED_BLUE
-
-
-def test_the_boot_scene_is_installed_into_the_active_scene_namespace(pack_tree) -> None:
+def test_activating_the_boot_scene_enters_it_with_its_view(pack_tree) -> None:
     catalog = pack_tree.scan(
         effect_packs={"fx": {}},
         scenes={"base": {"effect_packs": [{"name": "fx", "version": "1.0"}], "sounds": ["win"]}},
     )
-    namespace = RecordingNamespace()
+    admin = SpyEffectAdmin()
     manager = _make_scene_manager(
         _make_engine(),
-        effect_registry=catalog.effect_registry,
         rule_registry=catalog.rule_registry,
         scene_registry=catalog.scene_registry,
-        namespace=namespace,
+        effect_admin=admin,
     )
 
     manager.activate_boot_scene("base")
 
-    ((_, local_sounds, declared_packs),) = namespace.installs
-    assert list(local_sounds) == ["win"]
-    assert declared_packs == frozenset({"fx"})
+    ((step, view),) = admin.steps
+    assert step == "enter"
+    assert view.local_effects is catalog.scene_registry.get("base").local_effect_registry
+    assert list(view.local_sounds) == ["win"]
+    assert view.declared_packs == frozenset({"fx"})
 
 
 # ---------------------------------------------------------------------------
@@ -521,41 +505,18 @@ def test_the_boot_scenes_state_carries_the_scenes_settings() -> None:
     assert engine._last_state.settings is settings
 
 
-def test_activating_the_boot_scene_stops_no_effects() -> None:
-    engine, controls = _make_engine_with_controls()
-    scene_reg = _scene_registry(("main", _scene_factory()))
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
-    manager.activate_boot_scene("main")
-
-    assert controls.stopped_scopes == [], "no outgoing scene means nothing to stop"
-
-
-def test_overlay_stops_none_of_the_covered_scenes_effects() -> None:
+def test_no_transition_stops_effects_through_the_rule_facing_controls() -> None:
     engine, controls = _make_engine_with_controls()
     scene_reg = _scene_registry(("main", _scene_factory()), ("overlay_scene", _scene_factory()))
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
-    manager.activate_boot_scene("main")
-    controls.stopped_scopes.clear()
 
-    manager.overlay("overlay_scene")
-    manager.update()
-
-    assert controls.stopped_scopes == []
-
-
-def test_pop_stops_all_effects_on_the_popped_scene() -> None:
-    engine, controls = _make_engine_with_controls()
-    scene_reg = _scene_registry(("main", _scene_factory()), ("overlay_scene", _scene_factory()))
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.activate_boot_scene("main")
     manager.overlay("overlay_scene")
     manager.update()
-    controls.stopped_scopes.clear()
-
     manager.pop()
     manager.update()
 
-    assert controls.stopped_scopes == [Scope.ALL]
+    assert controls.stopped_scopes == []
 
 
 def test_the_boot_scenes_rules_receive_events(pack_tree) -> None:
@@ -565,7 +526,7 @@ def test_the_boot_scenes_rules_receive_events(pack_tree) -> None:
             "stubs": {"scene_rule": _GAME_RULE_SOURCE},
         }
     )
-    effect_registry, rule_registry = catalog.effect_registry, catalog.rule_registry
+    rule_registry = catalog.rule_registry
     engine = _TrackingEngine(_RecordingEffectControls())
 
     fired: list = []
@@ -578,7 +539,6 @@ def test_the_boot_scenes_rules_receive_events(pack_tree) -> None:
     scene_reg = _scene_registry(("main", _scene_factory(rule_packs=[_ref("stubs"), _ref("rules")])))
     manager = _make_scene_manager(
         engine,
-        effect_registry=effect_registry,
         rule_registry=rule_registry,
         scene_registry=scene_reg,
     )
@@ -599,7 +559,7 @@ def test_scene_rules_fire_before_pack_rules(pack_tree) -> None:
             "stubs": {"scene_rule": _GAME_RULE_SOURCE},
         }
     )
-    effect_registry, rule_registry = catalog.effect_registry, catalog.rule_registry
+    rule_registry = catalog.rule_registry
     engine = _TrackingEngine(_RecordingEffectControls())
 
     fired: list = []
@@ -612,7 +572,6 @@ def test_scene_rules_fire_before_pack_rules(pack_tree) -> None:
     scene_reg = _scene_registry(("main", _scene_factory(rule_packs=[_ref("stubs"), _ref("rules")])))
     manager = _make_scene_manager(
         engine,
-        effect_registry=effect_registry,
         rule_registry=rule_registry,
         scene_registry=scene_reg,
     )
@@ -699,7 +658,7 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_tre
             "stubs": {"base_rule": _GAME_RULE_SOURCE},
         }
     )
-    effect_registry, rule_registry = catalog.effect_registry, catalog.rule_registry
+    rule_registry = catalog.rule_registry
     engine = _TrackingEngine(_RecordingEffectControls())
 
     base_events: list = []
@@ -715,7 +674,6 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_tre
     )
     manager = _make_scene_manager(
         engine,
-        effect_registry=effect_registry,
         rule_registry=rule_registry,
         scene_registry=scene_reg,
     )
@@ -945,7 +903,7 @@ def test_rule_pack_items_all_receive_events_after_load(pack_tree) -> None:
             "stubs": {"scene_rule": rule_content},
         }
     )
-    effect_registry, rule_registry = catalog.effect_registry, catalog.rule_registry
+    rule_registry = catalog.rule_registry
     engine = _TrackingEngine(_RecordingEffectControls())
 
     fired_by: list = []
@@ -960,7 +918,6 @@ def test_rule_pack_items_all_receive_events_after_load(pack_tree) -> None:
     scene_reg = _scene_registry(("main", _scene_factory(rule_packs=[_ref("stubs"), _ref("rules")])))
     manager = _make_scene_manager(
         engine,
-        effect_registry=effect_registry,
         rule_registry=rule_registry,
         scene_registry=scene_reg,
     )
@@ -1016,7 +973,6 @@ def test_a_flash_scene_runs_a_rule_from_a_card_rule_pack(pack_tree) -> None:
     catalog = pack_tree.scan_roots(flash, card)
     manager = _make_scene_manager(
         _make_engine(),
-        effect_registry=catalog.effect_registry,
         rule_registry=catalog.rule_registry,
         scene_registry=catalog.scene_registry,
     )
@@ -1039,9 +995,9 @@ def test_a_flash_scene_runs_a_rule_from_a_card_rule_pack(pack_tree) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_pop_activates_revealed_entry_with_both_rules_and_its_namespace_view(pack_tree) -> None:
+def test_pop_activates_revealed_entry_with_both_rules_and_its_view(pack_tree) -> None:
     """After boot → overlay → pop, the revealed entry has rules on the engine
-    AND its own view installed in the namespace (invariant: no half-activation)."""
+    AND its own view handed to uncover (invariant: no half-activation)."""
     engine = _make_engine()
     base_local_registry = Scene(effect_packs=[], rule_packs=[]).local_effect_registry
     rule_registry = pack_tree.scan(
@@ -1062,9 +1018,9 @@ def test_pop_activates_revealed_entry_with_both_rules_and_its_namespace_view(pac
     scene_reg = SceneRegistry()
     scene_reg.register("base", base_factory)
     scene_reg.register("overlay_scene", _scene_factory())
-    namespace = RecordingNamespace()
+    admin = SpyEffectAdmin()
     manager = _make_scene_manager(
-        engine, rule_registry=rule_registry, scene_registry=scene_reg, namespace=namespace
+        engine, rule_registry=rule_registry, scene_registry=scene_reg, effect_admin=admin
     )
 
     manager.activate_boot_scene("base")
@@ -1077,22 +1033,23 @@ def test_pop_activates_revealed_entry_with_both_rules_and_its_namespace_view(pac
     active_state(manager).queue_event(Event(_GROUP, "check"))
     manager.update()
     assert base_events, "base rules must be active on the engine after pop"
-    assert namespace.installs[-1][0] is base_local_registry
+    assert admin.steps[-1][1].local_effects is base_local_registry
 
 
-def test_each_transition_installs_the_active_scene_once(pack_tree) -> None:
+def test_each_transition_makes_one_effect_admin_step_carrying_the_top_scenes_view(
+    pack_tree,
+) -> None:
     catalog = pack_tree.scan(effect_packs={"fx": {}, "gfx": {}})
     scene_reg = _scene_registry(
         ("base", _scene_factory(effect_packs=[_ref("fx")])),
         ("overlay_scene", _scene_factory(effect_packs=[_ref("gfx")])),
     )
-    namespace = RecordingNamespace()
+    admin = SpyEffectAdmin()
     manager = _make_scene_manager(
         _make_engine(),
-        effect_registry=catalog.effect_registry,
         rule_registry=catalog.rule_registry,
         scene_registry=scene_reg,
-        namespace=namespace,
+        effect_admin=admin,
     )
 
     manager.activate_boot_scene("base")
@@ -1101,11 +1058,36 @@ def test_each_transition_installs_the_active_scene_once(pack_tree) -> None:
     manager.pop()
     manager.update()
 
-    declared = [declared_packs for _, _, declared_packs in namespace.installs]
-    assert declared == [frozenset({"fx"}), frozenset({"gfx"}), frozenset({"fx"})]
+    assert [(step, view.declared_packs) for step, view in admin.steps] == [
+        ("enter", frozenset({"fx"})),
+        ("cover", frozenset({"gfx"})),
+        ("uncover", frozenset({"fx"})),
+    ]
 
 
-def test_pop_reinstalls_the_underlying_scene_view(pack_tree) -> None:
+def test_pop_hands_back_the_bundle_its_overlay_set_aside() -> None:
+    scene_reg = _scene_registry(
+        ("base", _scene_factory()), ("mid", _scene_factory()), ("top", _scene_factory())
+    )
+    admin = SpyEffectAdmin()
+    manager = _make_scene_manager(_make_engine(), scene_registry=scene_reg, effect_admin=admin)
+    manager.activate_boot_scene("base")
+    manager.overlay("mid")
+    manager.update()
+    manager.overlay("top")
+    manager.update()
+
+    manager.pop()
+    manager.update()
+    manager.pop()
+    manager.update()
+
+    under_mid, under_top = admin.covered
+    assert admin.uncovered[0] is under_top
+    assert admin.uncovered[1] is under_mid
+
+
+def test_uncovering_carries_the_covered_scenes_whole_view(pack_tree) -> None:
     catalog = pack_tree.scan(
         effect_packs={"fx": {}, "gfx": {}},
         scenes={
@@ -1116,26 +1098,25 @@ def test_pop_reinstalls_the_underlying_scene_view(pack_tree) -> None:
             },
         },
     )
-    namespace = RecordingNamespace()
+    admin = SpyEffectAdmin()
     manager = _make_scene_manager(
         _make_engine(),
-        effect_registry=catalog.effect_registry,
         rule_registry=catalog.rule_registry,
         scene_registry=catalog.scene_registry,
-        namespace=namespace,
+        effect_admin=admin,
     )
     manager.activate_boot_scene("base")
-    base_view = namespace.installs[-1]
     manager.overlay("overlay_scene")
     manager.update()
 
     manager.pop()
     manager.update()
 
-    local_effects, local_sounds, declared_packs = namespace.installs[-1]
-    assert local_effects is base_view[0]
-    assert list(local_sounds) == ["win"]
-    assert declared_packs == frozenset({"fx"})
+    step, view = admin.steps[-1]
+    assert step == "uncover"
+    assert view.local_effects is catalog.scene_registry.get("base").local_effect_registry
+    assert list(view.local_sounds) == ["win"]
+    assert view.declared_packs == frozenset({"fx"})
 
 
 # ---------------------------------------------------------------------------
@@ -1171,44 +1152,94 @@ def test_suspended_scene_remains_on_stack_after_overlay() -> None:
 
 
 # ---------------------------------------------------------------------------
-# SceneManager — merge-strategy scene lifecycle (issue #587)
+# Merge strategies and effects across an Overlay, through the SceneRuntime (issue #587)
 # ---------------------------------------------------------------------------
 
 
-def _make_merge_strategy_scene_manager(pack_tree, scene_names):
-    """Return (scene_manager, effect_manager, output).
+class _Act(Event):
+    """An event whose handler runs *action* on the active scene's ``EffectControls``.
 
-    Wires a real ``EffectManager`` (not the recording stub) as the engine's
-    effect controls, with a 'color' pack providing solid-fill 'red'/'blue'
-    effects, so merge-strategy behaviour can be observed on composed pixels.
-    Every scene declares 'color' in its effect_packs so the namespace view
-    SceneManager installs on each transition resolves it.
+    The handler stores what *action* returned in ``result``.
     """
-    effect_registry = pack_tree.scan(effect_packs={"color": _COLOR_EFFECTS}).effect_registry
-    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-    namespace = ActiveSceneNamespace(effect_registry, {})
-    effect_manager = EffectManager(namespace=namespace, outputs=[output])
-    engine = GameEngine(effect_controls=effect_manager)
-    scene_reg = _scene_registry(
-        *[(name, _scene_factory(effect_packs=[_ref("color")])) for name in scene_names]
-    )
-    scene_manager = _make_scene_manager(
-        engine,
-        effect_registry=effect_registry,
-        scene_registry=scene_reg,
-        effect_admin=effect_manager,
-        namespace=namespace,
-    )
-    return scene_manager, effect_manager, output
+
+    __slots__ = ("action", "result")
+
+    def __init__(self, action) -> None:
+        super().__init__(_GROUP, "act")
+        self.action = action
+        self.result = None
 
 
-def _fill_personal_and_tick(effect_manager, output) -> list:
-    """Add fresh red+blue effects to PERSONAL, tick once, and return the composed pixels."""
-    effect_manager.add_effect(Scope.PERSONAL, "color.red", {})
-    effect_manager.add_effect(Scope.PERSONAL, "color.blue", {})
-    effect_manager.update(Timer())
-    _, composed = output.update_pixels_calls[-1]
-    return list(composed)
+def _run_act(event: _Act, state: GameState) -> None:
+    event.result = event.action(state.effect_controls)
+
+
+class _MergeStrategyRig:
+    """A SceneRuntime over solid-fill 'red'/'blue' effects, drawn on one PERSONAL output.
+
+    Every scene declares the 'color' pack and runs its own rule, which
+    answers ``act`` by running the given action on that scene's
+    ``EffectControls``.
+    """
+
+    def __init__(self, pack_tree, scene_names) -> None:
+        catalog = pack_tree.scan(
+            effect_packs={"color": _COLOR_EFFECTS},
+            rule_packs={name + "_rules": {"rule": _GAME_RULE_SOURCE} for name in scene_names},
+            scenes={
+                name: {
+                    "effect_packs": [{"name": "color", "version": "1.0"}],
+                    "rule_packs": [{"name": name + "_rules", "version": "1.0"}],
+                }
+                for name in scene_names
+            },
+        )
+        for name in scene_names:
+            catalog.rule_registry.get(name + "_rules", "rule", GameRule).on(_Act, _run_act)
+        self.output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+        self.runtime = make_scene_runtime(catalog, [self.output])
+        self.runtime.activate_boot_scene(scene_names[0])
+
+    def act(self, action):
+        """Run *action* on the top scene's ``EffectControls`` in one tick; return its result."""
+        event = _Act(action)
+        self.runtime.queue_event(event)
+        self.runtime.update()
+        return event.result
+
+    def overlay(self, name: str) -> None:
+        self.runtime.scene_controls.overlay(name)
+        self.runtime.update()
+
+    def pop(self) -> None:
+        self.runtime.scene_controls.pop()
+        self.runtime.update()
+
+    def tick(self) -> None:
+        self.runtime.update()
+
+    def drawn(self) -> list:
+        """The pixels composed on the output's last draw."""
+        _, composed = self.output.update_pixels_calls[-1]
+        return list(composed)
+
+    def fill_personal(self) -> list:
+        """Add fresh red+blue effects to PERSONAL in one tick; return the composed pixels."""
+
+        def add_red_and_blue(controls: EffectControls) -> None:
+            controls.add_effect(Scope.PERSONAL, "color.red", {})
+            controls.add_effect(Scope.PERSONAL, "color.blue", {})
+
+        self.act(add_red_and_blue)
+        return self.drawn()
+
+
+def _set_merge_strategy(strategy):
+    return lambda controls: controls.set_merge_strategy(Scope.PERSONAL, strategy)
+
+
+def _set_effect(name: str):
+    return lambda controls: controls.set_effect(Scope.PERSONAL, name, {})
 
 
 _SPLIT_RED_BLUE = [0xFF0000] * 5 + [0x0000FF] * 5
@@ -1216,127 +1247,84 @@ _ADDITIVE_RED_BLUE = [0xFF00FF] * 10
 
 
 def test_an_overlay_starts_on_split_whatever_the_covered_scene_chose(pack_tree) -> None:
-    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_tree, ["base", "overlay_scene"]
-    )
-    scene_manager.activate_boot_scene("base")
-    effect_manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+    rig = _MergeStrategyRig(pack_tree, ["base", "overlay_scene"])
+    rig.act(_set_merge_strategy(ADDITIVE))
 
-    scene_manager.overlay("overlay_scene")
-    scene_manager.update()
+    rig.overlay("overlay_scene")
 
-    assert _fill_personal_and_tick(effect_manager, output) == _SPLIT_RED_BLUE
+    assert rig.fill_personal() == _SPLIT_RED_BLUE
 
 
 def test_pop_restores_the_covered_scenes_additive_merge_strategy(pack_tree) -> None:
-    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_tree, ["base", "overlay_scene"]
-    )
-    scene_manager.activate_boot_scene("base")
-    effect_manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
-    scene_manager.overlay("overlay_scene")
-    scene_manager.update()
+    rig = _MergeStrategyRig(pack_tree, ["base", "overlay_scene"])
+    rig.act(_set_merge_strategy(ADDITIVE))
+    rig.overlay("overlay_scene")
 
-    scene_manager.pop()
-    scene_manager.update()
+    rig.pop()
 
-    assert _fill_personal_and_tick(effect_manager, output) == _ADDITIVE_RED_BLUE
+    assert rig.fill_personal() == _ADDITIVE_RED_BLUE
 
 
 def test_while_covered_the_covered_scenes_effects_are_not_drawn(pack_tree) -> None:
-    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_tree, ["base", "overlay_scene"]
-    )
-    scene_manager.activate_boot_scene("base")
-    effect_manager.set_effect(Scope.PERSONAL, "color.red", {})
+    rig = _MergeStrategyRig(pack_tree, ["base", "overlay_scene"])
+    rig.act(_set_effect("color.red"))
 
-    scene_manager.overlay("overlay_scene")
-    scene_manager.update()
-    output.update_pixels_calls.clear()
-    effect_manager.update(Timer())
+    rig.overlay("overlay_scene")
+    rig.output.update_pixels_calls.clear()
+    rig.tick()
 
-    assert output.update_pixels_calls == []
+    assert rig.output.update_pixels_calls == []
 
 
 def test_after_pop_the_covered_scenes_effects_are_drawn_again_under_the_same_receipt(
     pack_tree,
 ) -> None:
-    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_tree, ["base", "overlay_scene"]
-    )
-    scene_manager.activate_boot_scene("base")
-    receipt = effect_manager.set_effect(Scope.PERSONAL, "color.red", {})
-    scene_manager.overlay("overlay_scene")
-    scene_manager.update()
-    effect_manager.set_effect(Scope.PERSONAL, "color.blue", {})  # the overlay's own
+    rig = _MergeStrategyRig(pack_tree, ["base", "overlay_scene"])
+    receipt = rig.act(_set_effect("color.red"))
+    rig.overlay("overlay_scene")
+    rig.act(_set_effect("color.blue"))  # the overlay's own
 
-    scene_manager.pop()
-    scene_manager.update()
+    rig.pop()
     receipt.brightness = 0.5
-    effect_manager.update(Timer())
+    rig.tick()
 
-    _, composed = output.update_pixels_calls[-1]
-    assert list(composed) == [0x7F0000] * 10
+    assert rig.drawn() == [0x7F0000] * 10
 
 
 def test_an_overlays_stop_on_every_scope_leaves_the_covered_scenes_effects(pack_tree) -> None:
-    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_tree, ["base", "overlay_scene"]
-    )
-    scene_manager.activate_boot_scene("base")
-    effect_manager.set_effect(Scope.PERSONAL, "color.red", {})
-    scene_manager.overlay("overlay_scene")
-    scene_manager.update()
+    rig = _MergeStrategyRig(pack_tree, ["base", "overlay_scene"])
+    rig.act(_set_effect("color.red"))
+    rig.overlay("overlay_scene")
 
-    effect_manager.stop_effect(Scope.ALL)
-    scene_manager.pop()
-    scene_manager.update()
-    effect_manager.update(Timer())
+    rig.act(lambda controls: controls.stop_effect(Scope.ALL))
+    rig.pop()
 
-    _, composed = output.update_pixels_calls[-1]
-    assert list(composed) == [0xFF0000] * 10
+    assert rig.drawn() == [0xFF0000] * 10
 
 
 def test_stacked_overlays_each_give_back_the_scene_directly_beneath(pack_tree) -> None:
-    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_tree, ["base", "mid", "top"]
-    )
-    scene_manager.activate_boot_scene("base")
-    effect_manager.set_effect(Scope.PERSONAL, "color.red", {})
-    scene_manager.overlay("mid")
-    scene_manager.update()
-    effect_manager.set_effect(Scope.PERSONAL, "color.blue", {})
-    scene_manager.overlay("top")
-    scene_manager.update()
+    rig = _MergeStrategyRig(pack_tree, ["base", "mid", "top"])
+    rig.act(_set_effect("color.red"))
+    rig.overlay("mid")
+    rig.act(_set_effect("color.blue"))
+    rig.overlay("top")
 
-    scene_manager.pop()
-    scene_manager.update()
-    effect_manager.update(Timer())
-    _, mid_frame = output.update_pixels_calls[-1]
-    mid_pixels = list(mid_frame)
-    scene_manager.pop()
-    scene_manager.update()
-    effect_manager.update(Timer())
+    rig.pop()
+    mid_pixels = rig.drawn()
+    rig.pop()
 
-    _, base_frame = output.update_pixels_calls[-1]
     assert mid_pixels == [0x0000FF] * 10
-    assert list(base_frame) == [0xFF0000] * 10
+    assert rig.drawn() == [0xFF0000] * 10
 
 
 def test_scene_overlay_merge_strategy_change_takes_effect_the_next_tick(pack_tree) -> None:
-    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_tree, ["base", "overlay_scene"]
-    )
-    scene_manager.activate_boot_scene("base")
-    scene_manager.overlay("overlay_scene")
-    scene_manager.update()
-    assert _fill_personal_and_tick(effect_manager, output) == _SPLIT_RED_BLUE
+    rig = _MergeStrategyRig(pack_tree, ["base", "overlay_scene"])
+    rig.overlay("overlay_scene")
+    assert rig.fill_personal() == _SPLIT_RED_BLUE
 
-    effect_manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
-    effect_manager.update(Timer())
+    rig.act(_set_merge_strategy(ADDITIVE))
 
-    _, composed = output.update_pixels_calls[-1]
-    assert list(composed) == _ADDITIVE_RED_BLUE, (
+    assert rig.drawn() == _ADDITIVE_RED_BLUE, (
         "a set_merge_strategy call during an overlay must apply from its very next tick"
     )
 
@@ -1344,18 +1332,13 @@ def test_scene_overlay_merge_strategy_change_takes_effect_the_next_tick(pack_tre
 def test_scene_pop_restores_pre_overlay_merge_strategy_discarding_overlay_changes(
     pack_tree,
 ) -> None:
-    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_tree, ["base", "overlay_scene"]
-    )
-    scene_manager.activate_boot_scene("base")
-    scene_manager.overlay("overlay_scene")
-    scene_manager.update()
-    effect_manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)  # overlay-only change
+    rig = _MergeStrategyRig(pack_tree, ["base", "overlay_scene"])
+    rig.overlay("overlay_scene")
+    rig.act(_set_merge_strategy(ADDITIVE))  # overlay-only change
 
-    scene_manager.pop()
-    scene_manager.update()
+    rig.pop()
 
-    assert _fill_personal_and_tick(effect_manager, output) == _SPLIT_RED_BLUE, (
+    assert rig.fill_personal() == _SPLIT_RED_BLUE, (
         "pop must restore base's pre-overlay Split choice, discarding the overlay's Additive"
     )
 
@@ -1363,28 +1346,21 @@ def test_scene_pop_restores_pre_overlay_merge_strategy_discarding_overlay_change
 def test_nested_overlay_pop_merge_strategy_change_never_leaks_past_its_own_pop(
     pack_tree,
 ) -> None:
-    scene_manager, effect_manager, output = _make_merge_strategy_scene_manager(
-        pack_tree, ["base", "mid", "top"]
-    )
-    scene_manager.activate_boot_scene("base")
+    rig = _MergeStrategyRig(pack_tree, ["base", "mid", "top"])
 
-    scene_manager.overlay("mid")
-    scene_manager.update()
-    effect_manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)  # mid's own choice
+    rig.overlay("mid")
+    rig.act(_set_merge_strategy(ADDITIVE))  # mid's own choice
 
-    scene_manager.overlay("top")
-    scene_manager.update()
-    effect_manager.set_merge_strategy(Scope.PERSONAL, SPLIT)  # top-only change
+    rig.overlay("top")
+    rig.act(_set_merge_strategy(SPLIT))  # top-only change
 
-    scene_manager.pop()  # leave top; discard top's change, restore mid's Additive
-    scene_manager.update()
-    assert _fill_personal_and_tick(effect_manager, output) == _ADDITIVE_RED_BLUE, (
+    rig.pop()  # leave top; discard top's change, restore mid's Additive
+    assert rig.fill_personal() == _ADDITIVE_RED_BLUE, (
         "mid's Additive choice must survive popping the nested top overlay"
     )
 
-    scene_manager.pop()  # leave mid; discard mid's change, restore base's original Split
-    scene_manager.update()
-    assert _fill_personal_and_tick(effect_manager, output) == _SPLIT_RED_BLUE, (
+    rig.pop()  # leave mid; discard mid's change, restore base's original Split
+    assert rig.fill_personal() == _SPLIT_RED_BLUE, (
         "base's original Split choice must be restored once every overlay above it is popped"
     )
 

@@ -8,16 +8,16 @@ from effects.effect import (
     PixelBuffer,
     ResolvedClip,
 )
+from engine.effects.admin import EffectAdmin, HeldEffects, SceneView
 from engine.effects.merge import SPLIT
 from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
 from engine.namespace import ActiveSceneNamespace
 from engine.state import (
-    EffectAdmin,
     EffectControls,
     EffectReceipt,
-    HeldEffects,
     MergeStrategy,
+    Scope,
     ScopeValue,
 )
 from engine.timer import Timer
@@ -355,22 +355,22 @@ class EffectManager(EffectControls, EffectAdmin):
         for key in scope.keys:
             self._merge_strategies[key] = strategy
 
-    def reset_merge_strategies(self) -> None:
-        """Reset every registered scope key's merge strategy to SPLIT.
+    def enter_boot_scene(self, view: SceneView) -> None:
+        """Put every registered scope key on SPLIT, then install *view*.
 
-        Reserved for ``SceneManager`` (via the ``EffectAdmin`` face) — called
-        by ``activate_boot_scene`` so the boot scene starts on Split.
+        See ``EffectAdmin.enter_boot_scene``.
         """
         for key in self._merge_strategies:
             self._merge_strategies[key] = SPLIT
+        self._namespace.install(view)
 
-    def set_aside(self) -> HeldEffects:
-        """Move the running effects and merge strategies into a held bundle; restart on Split.
+    def cover(self, view: SceneView) -> HeldEffects:
+        """Move the running effects and merge strategies into a held bundle, then install *view*.
 
         No stop event fires. Each output is told which effects are held
         (``hold_effect``), so sound and haptics fall silent; pixel scopes
-        simply have nothing to draw, so the next ``update`` clears them. See
-        ``EffectAdmin.set_aside``.
+        simply have nothing to draw, so the next ``update`` clears them.
+        Every scope restarts on SPLIT. See ``EffectAdmin.cover``.
         """
         for entry in self._effects:
             for output, keys in self._outputs_serving(entry):
@@ -378,22 +378,26 @@ class EffectManager(EffectControls, EffectAdmin):
         held = _HeldEffects(self._effects, self._merge_strategies)
         self._effects = []
         self._merge_strategies = dict.fromkeys(held.merge_strategies, SPLIT)
+        self._namespace.install(view)
         return held
 
-    def put_back(self, held: HeldEffects) -> None:
-        """Install *held*'s effects and merge strategies as the live ones.
+    def uncover(self, held: HeldEffects, view: SceneView) -> None:
+        """Stop every running effect, install *held*'s effects and merge strategies, then *view*.
 
-        Both are installed by reference: the bundle came from ``set_aside``,
-        which already detached them, and the caller drops it right after.
-        Each output is told which effects are restored (``restore_effect``).
-        See ``EffectAdmin.put_back``.
+        The stopped effects (the Overlay's own) fire their stop events as any
+        stop does. *held*'s effects and merge strategies are installed by
+        reference: the bundle came from ``cover``, which already detached
+        them, and the caller drops it right after. Each output is told which
+        effects are restored (``restore_effect``). See ``EffectAdmin.uncover``.
         """
         assert isinstance(held, _HeldEffects)
+        self.stop_effect(Scope.ALL)
         self._effects = held.effects
         self._merge_strategies = held.merge_strategies
         for entry in self._effects:
             for output, keys in self._outputs_serving(entry):
                 output.restore_effect(keys, entry.effect, entry.receipt)
+        self._namespace.install(view)
 
     def _outputs_serving(
         self, entry: EffectManager._EffectEntry

@@ -61,7 +61,6 @@ from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_parts import DeviceParts
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.ir_wiring import wire_ir
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.polled_part import PolledPart
 from hardware.shared.polled_sensor import PolledSensor
@@ -175,7 +174,8 @@ def _ir(ir_config: IRConfig, parts: DeviceParts) -> tuple[InfraredTransceiver, s
     emitter_pins = {
         emitter: PinRef(name, f"ir.{emitter}") for emitter, name in ir_config.emitters.items()
     }
-    transceiver, writer_kind = wire_ir(readers, emitter_pins, parts.ir_writer)
+    transceiver = InfraredTransceiver(readers, emitter_pins, parts.ir_writer)
+    writer_kind = transceiver.writer_kind
     return transceiver, "ok" if writer_kind is None else f"writer={writer_kind} ok"
 
 

@@ -6,6 +6,7 @@ import time
 import tty
 
 from effects.effect import Effect, PixelBuffer
+from engine.effects.admin import SceneView
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
 from engine.engine import GameEngine, GameRule
@@ -23,7 +24,7 @@ _catalog = scan_pack_roots([_packs_root])
 # Standalone demo, no SceneManager: install a scene view with no locals that
 # declares every pack in the catalog, so every pack.effect name below resolves.
 _namespace = ActiveSceneNamespace(_catalog.effect_registry, _catalog.pack_sounds)
-_namespace.install(None, {}, frozenset(_catalog.effect_registry.names()))
+_namespace.install(SceneView(None, {}, frozenset(_catalog.effect_registry.names())))
 
 
 BLOCK_HEIGHT = 2  # 1 pixel line (layered effects already split/merged into it) + 1 event line

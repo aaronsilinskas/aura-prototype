@@ -2,7 +2,7 @@
 
 Loads whichever scene is resolved at boot and runs it with the default (Aura)
 IR wire-frame.  This is a thin entry point: it hands straight off to
-``app.scene_runtime.run_scene``, which owns hardware bring-up, boot-scene
+``app.run_scene.run_scene``, which owns hardware bring-up, boot-scene
 resolution, and the main loop.
 
 Scene selection
@@ -53,6 +53,6 @@ Installation
    The board reboots and starts running automatically.
 """
 
-from app.scene_runtime import run_scene
+from app.run_scene import run_scene
 
 run_scene()
