@@ -32,7 +32,6 @@ def _pixel_scopes(config: DeviceConfig) -> set[str]:
         if isinstance(entry, MatrixPixelsConfig):
             scopes.update(entry.scope_rows)
         else:
-            scopes.update(entry.scopes)
             for strip in entry.strips:
                 scopes.update(strip.scope_pixels)
     return scopes

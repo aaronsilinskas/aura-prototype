@@ -237,23 +237,6 @@ def test_describe_pixel_entry_reports_a_neopixel_strips_brightness_to_two_decima
     assert describe_pixel_entry(0, pixels).endswith(" brightness=0.40")
 
 
-def test_describe_pixel_entry_joins_each_legacy_scope_strip_naming_its_scope_key():
-    pixels = _pixel_entry(
-        {
-            "type": "neopixel",
-            "scopes": {
-                "personal": {"pin": "D5", "count": 10, "brightness": 0.25},
-                "directional": {"pin": "D6", "count": 4, "brightness": 0.6},
-            },
-        }
-    )
-
-    assert describe_pixel_entry(0, pixels) == (
-        "pixels[0] neopixel pin=D5 count=10 order=GRB scope=personal brightness=0.25 | "
-        "pin=D6 count=4 order=GRB scope=directional brightness=0.60"
-    )
-
-
 def test_describe_pixel_entry_disabled_matrix_is_its_index_and_kind_only():
     pixels = _pixel_entry(_matrix_entry(enabled=False))
 
@@ -262,7 +245,13 @@ def test_describe_pixel_entry_disabled_matrix_is_its_index_and_kind_only():
 
 def test_describe_pixel_entry_disabled_neopixel_is_its_index_and_kind_only():
     pixels = _pixel_entry(
-        {"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}, "enabled": False}
+        {
+            "type": "neopixel",
+            "pin": "D5",
+            "count": 10,
+            "scope_pixels": {"personal": [0, 10]},
+            "enabled": False,
+        }
     )
 
     assert describe_pixel_entry(2, pixels) == "pixels[2] neopixel"

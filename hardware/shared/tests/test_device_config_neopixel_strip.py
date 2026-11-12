@@ -281,6 +281,17 @@ def test_parse_neopixel_strip_missing_pin_raises_value_error():
         parse_device_config(config)
 
 
+def test_parse_legacy_scopes_entry_is_rejected_naming_the_entry_and_the_shape_to_use(
+    single_strip_config,
+):
+    single_strip_config["pixels"].append(
+        {"type": "neopixel", "scopes": {"ambient": {"pin": "D6", "count": 10}}}
+    )
+
+    with pytest.raises(ValueError, match=r"^pixels\[1\]: .*'pin' with 'scope_pixels'"):
+        parse_device_config(single_strip_config)
+
+
 # ---------------------------------------------------------------------------
 # Validation: count required
 # ---------------------------------------------------------------------------

@@ -332,11 +332,9 @@ def test_neopixel_strip_pin_naming_an_unknown_pin_raises_value_error_naming_its_
 ) -> None:
     parts = CircuitPythonParts(_board("D5"))
 
-    expected = r"^pixels\.scopes\.personal\.pin: pin 'GP99' not found on board$"
+    expected = r"^pixels\[1\]\.pin: pin 'GP99' not found on board$"
     with pytest.raises(ValueError, match=expected):
-        parts.neopixel_strip(
-            _strip({"personal": range(0, 4)}), PinRef("GP99", "pixels.scopes.personal.pin")
-        )
+        parts.neopixel_strip(_strip({"personal": range(0, 4)}), PinRef("GP99", "pixels[1].pin"))
 
 
 def test_neopixel_strip_writes_each_scope_into_its_own_segment(neopixel: None) -> None:

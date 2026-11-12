@@ -152,22 +152,12 @@ def _bus_suffix(kind: str, name: str) -> str:
 
 
 def _describe_neopixel_pixels(pixels: NeoPixelPixelsConfig) -> str:
-    """Return the pin/count/order/segmentation/brightness detail for a NeoPixel
-    entry -- the ``strips`` form (one physical strip, segmented by
-    ``scope_pixels``) or the legacy ``scopes`` map form (one physical strip
-    per scope key, joined with ``" | "`` when more than one shares the entry).
-    """
-    if pixels.strips:
-        strip = pixels.strips[0]
-        return (
-            f"pin={strip.pin} count={strip.count} order={strip.order} "
-            + f"scope_pixels=[{_format_ranges(strip.scope_pixels)}] "
-            + f"brightness={strip.brightness:.2f}"
-        )
-    return " | ".join(
-        f"pin={scope.pin} count={scope.count} order={scope.order} scope={key} "
-        + f"brightness={scope.brightness:.2f}"
-        for key, scope in pixels.scopes.items()
+    """Return the pin/count/order/segmentation/brightness detail for a NeoPixel entry's strip."""
+    strip = pixels.strips[0]
+    return (
+        f"pin={strip.pin} count={strip.count} order={strip.order} "
+        + f"scope_pixels=[{_format_ranges(strip.scope_pixels)}] "
+        + f"brightness={strip.brightness:.2f}"
     )
 
 
