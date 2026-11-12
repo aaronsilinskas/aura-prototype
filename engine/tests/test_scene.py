@@ -9,7 +9,7 @@ from engine.effects.merge import ADDITIVE, SPLIT
 from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
 from engine.packs import PackRegistry
-from engine.scene import PackReference, Scene, SceneManager, SceneRegistry
+from engine.scene import PackReference, Scene, SceneLocalRegistry, SceneManager, SceneRegistry
 from engine.settings import Settings
 from engine.state import EffectControls, GameState, SceneControls, SceneReboot, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
@@ -17,6 +17,8 @@ from engine.tests.helpers import (
     RecordingSceneReboot,
     SpyEffectAdmin,
     active_state,
+    make_scene,
+    make_scene_registry,
     make_scene_runtime,
 )
 from engine.timer import Timer
@@ -94,30 +96,9 @@ def _ref(name: str) -> PackReference:
     return PackReference(name, Version(1, 0))
 
 
-def _scene_factory(**kwargs):
-    """Return a zero-arg factory producing a Scene from keyword overrides."""
-
-    def factory():
-        return Scene(
-            effect_packs=kwargs.get("effect_packs", []),
-            rule_packs=kwargs.get("rule_packs", []),
-            settings=kwargs.get("settings"),
-        )
-
-    return factory
-
-
 def _which(name: str) -> Settings:
     """Settings telling a scene's state apart: scene Setting ``which`` is *name*."""
     return Settings({"scene": {"which": name}})
-
-
-def _scene_registry(*entries) -> SceneRegistry:
-    """Return a SceneRegistry pre-loaded with (name, factory) pairs."""
-    registry = SceneRegistry()
-    for name, factory in entries:
-        registry.register(name, factory)
-    return registry
 
 
 def _rule(name: str = "test.rule") -> GameRule:
@@ -234,7 +215,7 @@ def test_active_state_is_none_before_any_scene_is_loaded() -> None:
 
 def test_overlay_raises_immediately_for_unregistered_scene_name() -> None:
     engine = _make_engine()
-    scene_reg = _scene_registry(("base", _scene_factory()))
+    scene_reg = make_scene_registry(("base", make_scene()))
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.activate_boot_scene("base")
 
@@ -244,7 +225,7 @@ def test_overlay_raises_immediately_for_unregistered_scene_name() -> None:
 
 def test_overlay_raises_immediately_when_stack_is_empty() -> None:
     engine = _make_engine()
-    scene_reg = _scene_registry(("overlay_scene", _scene_factory()))
+    scene_reg = make_scene_registry(("overlay_scene", make_scene()))
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
     with pytest.raises(ValueError):
@@ -261,7 +242,7 @@ def test_pop_raises_immediately_with_zero_entries_on_stack() -> None:
 
 def test_pop_raises_immediately_with_exactly_one_entry_on_stack() -> None:
     engine = _make_engine()
-    scene_reg = _scene_registry(("main", _scene_factory()))
+    scene_reg = make_scene_registry(("main", make_scene()))
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.activate_boot_scene("main")
 
@@ -276,7 +257,7 @@ def test_pop_raises_immediately_with_exactly_one_entry_on_stack() -> None:
 
 def test_reboot_into_delegates_to_the_injected_scene_reboot_port() -> None:
     engine = _make_engine()
-    scene_reg = _scene_registry(("tag", _scene_factory()))
+    scene_reg = make_scene_registry(("tag", make_scene()))
     scene_reboot = RecordingSceneReboot()
     manager = _make_scene_manager(engine, scene_registry=scene_reg, scene_reboot=scene_reboot)
 
@@ -335,7 +316,7 @@ def test_update_skips_engine_update_when_stack_is_empty() -> None:
 
 def test_update_calls_engine_update_with_active_state_on_each_tick() -> None:
     engine = _TrackingEngine(_RecordingEffectControls())
-    scene_reg = _scene_registry(("main", _scene_factory()))
+    scene_reg = make_scene_registry(("main", make_scene()))
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.activate_boot_scene("main")
 
@@ -365,9 +346,9 @@ class _TrackingEngine(GameEngine):
 
 def test_transition_applies_after_engine_update_in_same_tick() -> None:
     engine = _TrackingEngine(_RecordingEffectControls())
-    scene_reg = _scene_registry(
-        ("main", _scene_factory()),
-        ("overlay_scene", _scene_factory(settings=_which("overlay"))),
+    scene_reg = make_scene_registry(
+        ("main", make_scene()),
+        ("overlay_scene", make_scene(settings=_which("overlay"))),
     )
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.activate_boot_scene("main")
@@ -382,10 +363,10 @@ def test_transition_applies_after_engine_update_in_same_tick() -> None:
 
 def test_last_pending_transition_wins_within_one_tick() -> None:
     engine = _make_engine()
-    scene_reg = _scene_registry(
-        ("main", _scene_factory()),
-        ("scene_a", _scene_factory(settings=_which("a"))),
-        ("scene_b", _scene_factory(settings=_which("b"))),
+    scene_reg = make_scene_registry(
+        ("main", make_scene()),
+        ("scene_a", make_scene(settings=_which("a"))),
+        ("scene_b", make_scene(settings=_which("b"))),
     )
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.activate_boot_scene("main")
@@ -416,7 +397,7 @@ def test_scene_manager_offers_rules_no_way_to_load_a_scene_in_process() -> None:
 
 
 def test_activating_the_boot_scene_makes_it_active_at_once() -> None:
-    scene_reg = _scene_registry(("main", _scene_factory(settings=_which("main"))))
+    scene_reg = make_scene_registry(("main", make_scene(settings=_which("main"))))
     manager = _make_scene_manager(_make_engine(), scene_registry=scene_reg)
 
     manager.activate_boot_scene("main")
@@ -431,12 +412,12 @@ def test_activating_an_unregistered_boot_scene_raises() -> None:
         manager.activate_boot_scene("nonexistent")
 
 
-def test_activating_a_boot_scene_the_device_cannot_run_raises_and_activates_nothing(
-    pack_tree,
-) -> None:
-    catalog = pack_tree.scan(scenes={"tilt": {"requires": ["accelerometer"]}})
+def test_activating_a_boot_scene_the_device_cannot_run_raises_and_activates_nothing() -> None:
+    scene_reg = make_scene_registry(
+        ("tilt", make_scene(required_capabilities=frozenset({"accelerometer"})))
+    )
     engine = GameEngine(effect_controls=_RecordingEffectControls(), capabilities=_HAS_BUTTONS)
-    manager = _make_scene_manager(engine, scene_registry=catalog.scene_registry)
+    manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
     with pytest.raises(MissingCapabilityError) as excinfo:
         manager.activate_boot_scene("tilt")
@@ -446,7 +427,7 @@ def test_activating_a_boot_scene_the_device_cannot_run_raises_and_activates_noth
 
 
 def test_activating_a_second_boot_scene_raises_and_keeps_the_first() -> None:
-    scene_reg = _scene_registry(("first", _scene_factory()), ("second", _scene_factory()))
+    scene_reg = make_scene_registry(("first", make_scene()), ("second", make_scene()))
     manager = _make_scene_manager(_make_engine(), scene_registry=scene_reg)
     manager.activate_boot_scene("first")
     first_state = manager.active_state
@@ -486,7 +467,7 @@ def test_activating_the_boot_scene_enters_it_with_its_view(pack_tree) -> None:
 
 def test_the_boot_scenes_state_carries_the_scene_manager_as_scene_controls() -> None:
     engine = _TrackingEngine(_RecordingEffectControls())
-    scene_reg = _scene_registry(("main", _scene_factory()))
+    scene_reg = make_scene_registry(("main", make_scene()))
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.activate_boot_scene("main")
     manager.update()  # engine.update(active_state)
@@ -497,7 +478,7 @@ def test_the_boot_scenes_state_carries_the_scene_manager_as_scene_controls() -> 
 def test_the_boot_scenes_state_carries_the_scenes_settings() -> None:
     engine = _TrackingEngine(_RecordingEffectControls())
     settings = _which("main")
-    scene_reg = _scene_registry(("main", _scene_factory(settings=settings)))
+    scene_reg = make_scene_registry(("main", make_scene(settings=settings)))
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
     manager.activate_boot_scene("main")
     manager.update()  # engine.update(active_state); _last_state is now set
@@ -507,7 +488,7 @@ def test_the_boot_scenes_state_carries_the_scenes_settings() -> None:
 
 def test_no_transition_stops_effects_through_the_rule_facing_controls() -> None:
     engine, controls = _make_engine_with_controls()
-    scene_reg = _scene_registry(("main", _scene_factory()), ("overlay_scene", _scene_factory()))
+    scene_reg = make_scene_registry(("main", make_scene()), ("overlay_scene", make_scene()))
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
     manager.activate_boot_scene("main")
@@ -536,7 +517,7 @@ def test_the_boot_scenes_rules_receive_events(pack_tree) -> None:
 
     scene_rule = rule_registry.get("stubs", "scene_rule", GameRule)
     scene_rule.on(Event, lambda e, s: fired.append("scene"))
-    scene_reg = _scene_registry(("main", _scene_factory(rule_packs=[_ref("stubs"), _ref("rules")])))
+    scene_reg = make_scene_registry(("main", make_scene(rule_packs=[_ref("stubs"), _ref("rules")])))
     manager = _make_scene_manager(
         engine,
         rule_registry=rule_registry,
@@ -569,7 +550,7 @@ def test_scene_rules_fire_before_pack_rules(pack_tree) -> None:
 
     scene_rule = rule_registry.get("stubs", "scene_rule", GameRule)
     scene_rule.on(Event, lambda e, s: fired.append("scene"))
-    scene_reg = _scene_registry(("main", _scene_factory(rule_packs=[_ref("stubs"), _ref("rules")])))
+    scene_reg = make_scene_registry(("main", make_scene(rule_packs=[_ref("stubs"), _ref("rules")])))
     manager = _make_scene_manager(
         engine,
         rule_registry=rule_registry,
@@ -591,9 +572,9 @@ def test_scene_rules_fire_before_pack_rules(pack_tree) -> None:
 
 def test_overlay_suspends_active_scene_and_pushes_without_clearing_stack() -> None:
     engine = _make_engine()
-    scene_reg = _scene_registry(
-        ("base", _scene_factory(settings=_which("base"))),
-        ("overlay_scene", _scene_factory(settings=_which("overlay"))),
+    scene_reg = make_scene_registry(
+        ("base", make_scene(settings=_which("base"))),
+        ("overlay_scene", make_scene(settings=_which("overlay"))),
     )
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
@@ -620,9 +601,9 @@ def test_overlay_clears_suspended_base_state_queue_before_pushing(pack_tree) -> 
     base_events: list = []
     base_rule = rule_registry.get("stubs", "base_rule", GameRule)
     base_rule.on(Event, lambda e, s: base_events.append(e.name))
-    scene_reg = _scene_registry(
-        ("base", _scene_factory(rule_packs=[_ref("stubs")])),
-        ("overlay_scene", _scene_factory()),
+    scene_reg = make_scene_registry(
+        ("base", make_scene(rule_packs=[_ref("stubs")])),
+        ("overlay_scene", make_scene()),
     )
     manager = _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
 
@@ -668,9 +649,9 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_tre
     pack_events: list = []
     pack_rule.on(Event, lambda e, s: pack_events.append(e.name))
 
-    scene_reg = _scene_registry(
-        ("base", _scene_factory(rule_packs=[_ref("stubs"), _ref("rules")])),
-        ("overlay_scene", _scene_factory()),
+    scene_reg = make_scene_registry(
+        ("base", make_scene(rule_packs=[_ref("stubs"), _ref("rules")])),
+        ("overlay_scene", make_scene()),
     )
     manager = _make_scene_manager(
         engine,
@@ -701,9 +682,9 @@ def test_pop_clears_restored_state_queue_so_suspended_events_do_not_replay(pack_
     base_events: list = []
     base_rule = rule_registry.get("stubs", "base_rule", GameRule)
     base_rule.on(Event, lambda e, s: base_events.append(e.name))
-    scene_reg = _scene_registry(
-        ("base", _scene_factory(rule_packs=[_ref("stubs")])),
-        ("overlay_scene", _scene_factory()),
+    scene_reg = make_scene_registry(
+        ("base", make_scene(rule_packs=[_ref("stubs")])),
+        ("overlay_scene", make_scene()),
     )
     manager = _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
 
@@ -728,10 +709,10 @@ def test_pop_clears_restored_state_queue_so_suspended_events_do_not_replay(pack_
 
 def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
     engine = _make_engine()
-    scene_reg = _scene_registry(
-        ("base", _scene_factory(settings=_which("base"))),
-        ("mid", _scene_factory(settings=_which("mid"))),
-        ("top", _scene_factory(settings=_which("top"))),
+    scene_reg = make_scene_registry(
+        ("base", make_scene(settings=_which("base"))),
+        ("mid", make_scene(settings=_which("mid"))),
+        ("top", make_scene(settings=_which("top"))),
     )
     manager = _make_scene_manager(engine, scene_registry=scene_reg)
 
@@ -776,9 +757,9 @@ class _SteppingTimer(Timer):
 def _covered_scene_manager(rule_registry: PackRegistry | None = None, rule_packs=()):
     """A SceneManager on a ``_SteppingTimer`` with ``base`` (running *rule_packs*) and ``pause``."""
     engine = GameEngine(effect_controls=_RecordingEffectControls(), timer=_SteppingTimer())
-    scene_reg = _scene_registry(
-        ("base", _scene_factory(rule_packs=list(rule_packs))),
-        ("pause", _scene_factory()),
+    scene_reg = make_scene_registry(
+        ("base", make_scene(rule_packs=list(rule_packs))),
+        ("pause", make_scene()),
     )
     return _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
 
@@ -915,7 +896,7 @@ def test_rule_pack_items_all_receive_events_after_load(pack_tree) -> None:
 
     scene_rule = rule_registry.get("stubs", "scene_rule", GameRule)
     scene_rule.on(Event, lambda e, s: fired_by.append("scene"))
-    scene_reg = _scene_registry(("main", _scene_factory(rule_packs=[_ref("stubs"), _ref("rules")])))
+    scene_reg = make_scene_registry(("main", make_scene(rule_packs=[_ref("stubs"), _ref("rules")])))
     manager = _make_scene_manager(
         engine,
         rule_registry=rule_registry,
@@ -999,7 +980,7 @@ def test_pop_activates_revealed_entry_with_both_rules_and_its_view(pack_tree) ->
     """After boot → overlay → pop, the revealed entry has rules on the engine
     AND its own view handed to uncover (invariant: no half-activation)."""
     engine = _make_engine()
-    base_local_registry = Scene(effect_packs=[], rule_packs=[]).local_effect_registry
+    base_local_registry = SceneLocalRegistry()
     rule_registry = pack_tree.scan(
         rule_packs={"stubs": {"base_rule": _GAME_RULE_SOURCE}}
     ).rule_registry
@@ -1008,16 +989,10 @@ def test_pop_activates_revealed_entry_with_both_rules_and_its_view(pack_tree) ->
     base_events: list = []
     base_rule.on(Event, lambda e, s: base_events.append(e.name))
 
-    def base_factory():
-        return Scene(
-            effect_packs=[],
-            rule_packs=[_ref("stubs")],
-            local_effect_registry=base_local_registry,
-        )
-
-    scene_reg = SceneRegistry()
-    scene_reg.register("base", base_factory)
-    scene_reg.register("overlay_scene", _scene_factory())
+    scene_reg = make_scene_registry(
+        ("base", make_scene(rule_packs=[_ref("stubs")], local_effect_registry=base_local_registry)),
+        ("overlay_scene", make_scene()),
+    )
     admin = SpyEffectAdmin()
     manager = _make_scene_manager(
         engine, rule_registry=rule_registry, scene_registry=scene_reg, effect_admin=admin
@@ -1040,9 +1015,9 @@ def test_each_transition_makes_one_effect_admin_step_carrying_the_top_scenes_vie
     pack_tree,
 ) -> None:
     catalog = pack_tree.scan(effect_packs={"fx": {}, "gfx": {}})
-    scene_reg = _scene_registry(
-        ("base", _scene_factory(effect_packs=[_ref("fx")])),
-        ("overlay_scene", _scene_factory(effect_packs=[_ref("gfx")])),
+    scene_reg = make_scene_registry(
+        ("base", make_scene(effect_packs=[_ref("fx")])),
+        ("overlay_scene", make_scene(effect_packs=[_ref("gfx")])),
     )
     admin = SpyEffectAdmin()
     manager = _make_scene_manager(
@@ -1066,8 +1041,8 @@ def test_each_transition_makes_one_effect_admin_step_carrying_the_top_scenes_vie
 
 
 def test_pop_hands_back_the_bundle_its_overlay_set_aside() -> None:
-    scene_reg = _scene_registry(
-        ("base", _scene_factory()), ("mid", _scene_factory()), ("top", _scene_factory())
+    scene_reg = make_scene_registry(
+        ("base", make_scene()), ("mid", make_scene()), ("top", make_scene())
     )
     admin = SpyEffectAdmin()
     manager = _make_scene_manager(_make_engine(), scene_registry=scene_reg, effect_admin=admin)
@@ -1122,33 +1097,6 @@ def test_uncovering_carries_the_covered_scenes_whole_view(pack_tree) -> None:
 # ---------------------------------------------------------------------------
 # SceneManager — resolution-failure ordering
 # ---------------------------------------------------------------------------
-
-
-def test_suspended_scene_remains_on_stack_after_overlay() -> None:
-    import gc
-    import weakref
-
-    engine = _make_engine()
-    created_scene = None
-
-    def factory():
-        nonlocal created_scene
-        created_scene = Scene(effect_packs=[], rule_packs=[])
-        return created_scene
-
-    scene_reg = _scene_registry(("base", factory), ("overlay_scene", _scene_factory()))
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
-
-    manager.activate_boot_scene("base")
-
-    ref = weakref.ref(created_scene)
-    created_scene = None
-
-    manager.overlay("overlay_scene")
-    manager.update()
-
-    gc.collect()
-    assert ref() is not None, "Suspended scene should remain on stack (not GC'd)"
 
 
 # ---------------------------------------------------------------------------
@@ -1372,16 +1320,17 @@ def test_nested_overlay_pop_merge_strategy_change_never_leaks_past_its_own_pop(
 _HAS_BUTTONS = frozenset(("button.A", "button.B"))
 
 
-def _capability_manager(pack_tree, scene_reboot: SceneReboot | None = None) -> SceneManager:
+def _capability_manager(scene_reboot: SceneReboot | None = None) -> SceneManager:
     """A manager on a device with only buttons A and B, whose ``home`` scene is active.
 
     ``home`` requires nothing; ``tilt`` requires the accelerometer the device lacks.
     """
-    catalog = pack_tree.scan(scenes={"home": {}, "tilt": {"requires": ["accelerometer"]}})
-    engine = GameEngine(effect_controls=_RecordingEffectControls(), capabilities=_HAS_BUTTONS)
-    manager = _make_scene_manager(
-        engine, scene_registry=catalog.scene_registry, scene_reboot=scene_reboot
+    scene_reg = make_scene_registry(
+        ("home", make_scene()),
+        ("tilt", make_scene(required_capabilities=frozenset({"accelerometer"}))),
     )
+    engine = GameEngine(effect_controls=_RecordingEffectControls(), capabilities=_HAS_BUTTONS)
+    manager = _make_scene_manager(engine, scene_registry=scene_reg, scene_reboot=scene_reboot)
     manager.activate_boot_scene("home")
     return manager
 
@@ -1396,27 +1345,27 @@ def test_scene_reboot_previous_scene_raises_not_implemented_error() -> None:
         SceneReboot().previous_scene()
 
 
-def test_can_run_a_scene_whose_required_capabilities_the_device_has(pack_tree):
-    manager = _capability_manager(pack_tree)
+def test_can_run_a_scene_whose_required_capabilities_the_device_has() -> None:
+    manager = _capability_manager()
 
     assert manager.can_run("home")
 
 
-def test_cannot_run_a_scene_requiring_a_capability_the_device_lacks(pack_tree):
-    manager = _capability_manager(pack_tree)
+def test_cannot_run_a_scene_requiring_a_capability_the_device_lacks() -> None:
+    manager = _capability_manager()
 
     assert not manager.can_run("tilt")
 
 
-def test_can_run_raises_for_an_unknown_scene(pack_tree):
-    manager = _capability_manager(pack_tree)
+def test_can_run_raises_for_an_unknown_scene() -> None:
+    manager = _capability_manager()
 
     with pytest.raises(ValueError, match="nonexistent"):
         manager.can_run("nonexistent")
 
 
-def test_an_overlay_of_a_scene_the_device_cannot_run_raises(pack_tree):
-    manager = _capability_manager(pack_tree)
+def test_an_overlay_of_a_scene_the_device_cannot_run_raises() -> None:
+    manager = _capability_manager()
 
     with pytest.raises(MissingCapabilityError) as excinfo:
         manager.overlay("tilt")
@@ -1424,8 +1373,8 @@ def test_an_overlay_of_a_scene_the_device_cannot_run_raises(pack_tree):
     assert (excinfo.value.scene, excinfo.value.capabilities) == ("tilt", {"accelerometer"})
 
 
-def test_a_refused_overlay_leaves_the_active_scene_in_place(pack_tree):
-    manager = _capability_manager(pack_tree)
+def test_a_refused_overlay_leaves_the_active_scene_in_place() -> None:
+    manager = _capability_manager()
     before = manager.active_state
 
     with pytest.raises(MissingCapabilityError):
@@ -1435,9 +1384,9 @@ def test_a_refused_overlay_leaves_the_active_scene_in_place(pack_tree):
     assert manager.active_state is before
 
 
-def test_reboot_into_a_scene_the_device_cannot_run_raises_and_never_reaches_the_port(pack_tree):
+def test_reboot_into_a_scene_the_device_cannot_run_raises_and_never_reaches_the_port() -> None:
     scene_reboot = RecordingSceneReboot()
-    manager = _capability_manager(pack_tree, scene_reboot)
+    manager = _capability_manager(scene_reboot)
 
     with pytest.raises(MissingCapabilityError) as excinfo:
         manager.reboot_into("tilt")
@@ -1446,11 +1395,9 @@ def test_reboot_into_a_scene_the_device_cannot_run_raises_and_never_reaches_the_
     assert scene_reboot.reboot_into_calls == []
 
 
-def test_reboot_to_previous_into_a_scene_the_device_cannot_run_raises_and_never_reaches_the_port(
-    pack_tree,
-):
+def test_reboot_to_previous_into_a_scene_the_device_cannot_run_raises_and_never_reaches_the_port():
     scene_reboot = RecordingSceneReboot(previous="tilt")
-    manager = _capability_manager(pack_tree, scene_reboot)
+    manager = _capability_manager(scene_reboot)
 
     with pytest.raises(MissingCapabilityError) as excinfo:
         manager.reboot_to_previous()
@@ -1459,9 +1406,9 @@ def test_reboot_to_previous_into_a_scene_the_device_cannot_run_raises_and_never_
     assert scene_reboot.reboot_to_previous_calls == 0
 
 
-def test_reboot_to_previous_into_a_scene_the_device_can_run_reaches_the_port(pack_tree):
+def test_reboot_to_previous_into_a_scene_the_device_can_run_reaches_the_port() -> None:
     scene_reboot = RecordingSceneReboot(previous="home")
-    manager = _capability_manager(pack_tree, scene_reboot)
+    manager = _capability_manager(scene_reboot)
 
     manager.reboot_to_previous()
 

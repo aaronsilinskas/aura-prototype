@@ -9,9 +9,8 @@ import pytest
 from engine.engine import GameRule
 from engine.events import Event, EventGroup
 from engine.pack_catalog import PackCatalog, scan_pack_roots
-from engine.scene import Scene
 from engine.scene_runtime import SceneRuntime
-from engine.tests.helpers import make_scene_runtime, rule_source
+from engine.tests.helpers import make_scene, make_scene_runtime, rule_source
 
 _PING = Event(EventGroup("test"), "ping")
 
@@ -30,8 +29,8 @@ def test_a_scenes_rules_folder_items_are_its_local_rules(pack_tree) -> None:
     assert "ambush" in scene.local_rule_registry.items()
 
 
-def test_scene_constructed_directly_has_empty_local_rule_registry() -> None:
-    scene = Scene(effect_packs=[], rule_packs=[])
+def test_a_scene_built_in_memory_has_an_empty_local_rule_registry() -> None:
+    scene = make_scene()
 
     assert scene.local_rule_registry.items() == []
 
