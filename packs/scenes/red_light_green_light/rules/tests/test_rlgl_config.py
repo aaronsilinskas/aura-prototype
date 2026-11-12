@@ -110,7 +110,7 @@ def test_rejects_gravity_beta_not_below_motion_smoothing(gravity_beta):
 
 
 # ---------------------------------------------------------------------------
-# rlgl_config accessor
+# rlgl_config — get-or-create accessor
 # ---------------------------------------------------------------------------
 
 

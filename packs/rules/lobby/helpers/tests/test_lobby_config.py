@@ -53,8 +53,20 @@ def test_scope_by_name_raises_value_error_for_a_scope_that_is_not_a_string(name)
 
 
 # ---------------------------------------------------------------------------
-# LobbyConfig — built from the lobby pack's Settings
+# Building from Settings
 # ---------------------------------------------------------------------------
+
+
+def test_construction_accepts_a_single_scope_and_single_entry():
+    settings = _lobby_settings(
+        ["personal"],
+        [{"scene": "hardware_test", "effect": "elements.fire", "options": {"level": 5}}],
+    )
+
+    config = LobbyConfig(settings, _runs_anything)
+
+    assert config.scopes == [Scope.PERSONAL]
+    assert config.entries[0].scene == "hardware_test"
 
 
 def test_config_resolves_scopes_and_entries_in_order():

@@ -1,8 +1,7 @@
 """``TransmitterConfig`` — the IR range transmitter's Scene Config.
 
 Holds the scene's Settings, declared in its ``scene.json``, and the values
-derived from them. ``TransmitterConfig`` is built from the scene's Settings
-view.
+derived from them.
 
 ``transmitter_config`` is a :class:`engine.state.StateSlot` callable accessor:
 it lazily builds the config from ``state.settings`` on first use and caches it

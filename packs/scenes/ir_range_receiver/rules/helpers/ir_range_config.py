@@ -3,7 +3,6 @@
 Holds the scene's three Settings, declared in its ``scene.json``: the
 rolling-window length and silence timeout the ``ReceptionQualityMeter`` uses,
 and the green threshold that decides how strict "Perfect" reception must be.
-``IrRangeConfig`` is built from the scene's Settings view.
 
 ``ir_range_config`` is a :class:`engine.state.StateSlot` callable accessor: it
 lazily builds the config from ``state.settings`` on first use and caches it

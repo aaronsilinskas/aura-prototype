@@ -1,8 +1,6 @@
 """``RlglConfig`` — the Red Light Green Light Scene Config.
 
-Holds the scene's twelve Settings, declared in its ``scene.json``, each named
-as its field.  ``RlglConfig.__init__`` reads them from the Settings view and
-checks that ``gravity_beta`` stays below ``motion_smoothing``.
+Holds the scene's twelve Settings, declared in its ``scene.json``.
 
 ``rlgl_config`` is a :class:`engine.state.StateSlot` callable accessor: it lazily
 builds the config from ``state.settings`` on first use and caches it under a single
@@ -32,7 +30,8 @@ _WARNING_DARKEN_RATIO: Final = 0.3
 
 
 class RlglConfig:
-    """Immutable duration/threshold configuration for the RLGL scene."""
+    """Immutable duration/threshold configuration for the RLGL scene, each
+    field read from the scene Setting of the same name."""
 
     __slots__ = (
         "game_over_duration",
@@ -50,7 +49,7 @@ class RlglConfig:
     )
 
     def __init__(self, settings: Settings) -> None:
-        """Read each of the scene's Settings into the field of the same name.
+        """Read the scene's Settings, checking they agree.
 
         Raises:
             ValueError: ``gravity_beta`` is not below ``motion_smoothing``, so
@@ -68,10 +67,10 @@ class RlglConfig:
         self.max_level = settings.get_int(SCENE_NAMESPACE, "max_level")
         self.motion_smoothing = settings.get_float(SCENE_NAMESPACE, "motion_smoothing")
         self.gravity_beta = settings.get_float(SCENE_NAMESPACE, "gravity_beta")
-        gravity_beta, motion_smoothing = self.gravity_beta, self.motion_smoothing
-        if gravity_beta >= motion_smoothing:
+        if self.gravity_beta >= self.motion_smoothing:
             raise ValueError(
-                f"gravity_beta ({gravity_beta}) must be below motion_smoothing ({motion_smoothing})"
+                f"gravity_beta ({self.gravity_beta}) must be below"
+                + f" motion_smoothing ({self.motion_smoothing})"
             )
 
     def red_duration(self, level: int) -> float:
