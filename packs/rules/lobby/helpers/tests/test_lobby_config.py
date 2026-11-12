@@ -6,7 +6,7 @@ import pytest
 
 from engine.settings import Settings
 from engine.state import Scope
-from packs.rules.lobby.helpers.lobby_config import LobbyConfig, LobbyEntry, scope_by_name
+from packs.rules.lobby.helpers.lobby_config import LobbyConfig, scope_by_name
 from packs.tests.settings_helper import settings_for
 
 
@@ -53,36 +53,11 @@ def test_scope_by_name_raises_value_error_for_a_scope_that_is_not_a_string(name)
 
 
 # ---------------------------------------------------------------------------
-# LobbyConfig.__init__ — direct construction validation
+# LobbyConfig — built from the lobby pack's Settings
 # ---------------------------------------------------------------------------
 
 
-def test_construction_rejects_empty_scopes():
-    with pytest.raises(ValueError, match="scopes"):
-        LobbyConfig(scopes=[], entries=[LobbyEntry("hardware_test", "elements.fire", {})])
-
-
-def test_construction_rejects_empty_entries():
-    with pytest.raises(ValueError, match="entries"):
-        LobbyConfig(scopes=[Scope.PERSONAL], entries=[])
-
-
-def test_construction_accepts_a_single_scope_and_single_entry():
-    config = LobbyConfig(
-        scopes=[Scope.PERSONAL],
-        entries=[LobbyEntry("hardware_test", "elements.fire", {"level": 5})],
-    )
-
-    assert config.scopes == [Scope.PERSONAL]
-    assert config.entries[0].scene == "hardware_test"
-
-
-# ---------------------------------------------------------------------------
-# LobbyConfig.from_settings
-# ---------------------------------------------------------------------------
-
-
-def test_from_settings_resolves_scopes_and_entries_in_order():
+def test_config_resolves_scopes_and_entries_in_order():
     settings = _lobby_settings(
         ["personal", "global.main"],
         [
@@ -91,7 +66,7 @@ def test_from_settings_resolves_scopes_and_entries_in_order():
         ],
     )
 
-    config = LobbyConfig.from_settings(settings, _runs_anything)
+    config = LobbyConfig(settings, _runs_anything)
 
     assert config.scopes == [Scope.PERSONAL, Scope.Global.MAIN]
     assert [e.scene for e in config.entries] == ["hardware_test", "tag"]
@@ -99,58 +74,58 @@ def test_from_settings_resolves_scopes_and_entries_in_order():
     assert config.entries[0].options == {"level": 5}
 
 
-def test_from_settings_defaults_missing_options_to_empty_dict():
+def test_config_defaults_missing_options_to_empty_dict():
     settings = _lobby_settings(
         ["personal"], [{"scene": "hardware_test", "effect": "elements.fire"}]
     )
 
-    config = LobbyConfig.from_settings(settings, _runs_anything)
+    config = LobbyConfig(settings, _runs_anything)
 
     assert config.entries[0].options == {}
 
 
-def test_from_settings_raises_on_empty_scopes():
+def test_config_raises_on_empty_scopes():
     settings = _lobby_settings([], [{"scene": "hardware_test", "effect": "elements.fire"}])
 
     with pytest.raises(ValueError, match="scopes"):
-        LobbyConfig.from_settings(settings, _runs_anything)
+        LobbyConfig(settings, _runs_anything)
 
 
-def test_from_settings_raises_on_empty_entries():
+def test_config_raises_on_empty_entries():
     settings = _lobby_settings(["personal"], [])
 
     with pytest.raises(ValueError, match="entries"):
-        LobbyConfig.from_settings(settings, _runs_anything)
+        LobbyConfig(settings, _runs_anything)
 
 
-def test_from_settings_raises_on_unknown_scope_name():
+def test_config_raises_on_unknown_scope_name():
     settings = _lobby_settings(
         ["not-a-real-scope"], [{"scene": "hardware_test", "effect": "elements.fire"}]
     )
 
     with pytest.raises(ValueError, match="not-a-real-scope"):
-        LobbyConfig.from_settings(settings, _runs_anything)
+        LobbyConfig(settings, _runs_anything)
 
 
-def test_from_settings_raises_on_entry_missing_scene():
+def test_config_raises_on_entry_missing_scene():
     settings = _lobby_settings(["personal"], [{"effect": "elements.fire"}])
 
     with pytest.raises(ValueError, match="scene"):
-        LobbyConfig.from_settings(settings, _runs_anything)
+        LobbyConfig(settings, _runs_anything)
 
 
-def test_from_settings_raises_on_entry_missing_effect():
+def test_config_raises_on_entry_missing_effect():
     settings = _lobby_settings(["personal"], [{"scene": "hardware_test"}])
 
     with pytest.raises(ValueError, match="effect"):
-        LobbyConfig.from_settings(settings, _runs_anything)
+        LobbyConfig(settings, _runs_anything)
 
 
-def test_from_settings_raises_on_an_entry_that_is_not_an_object():
+def test_config_raises_on_an_entry_that_is_not_an_object():
     settings = _lobby_settings(["personal"], ["hardware_test"])
 
     with pytest.raises(ValueError, match="hardware_test"):
-        LobbyConfig.from_settings(settings, _runs_anything)
+        LobbyConfig(settings, _runs_anything)
 
 
 _THREE_ENTRIES = [
@@ -160,23 +135,23 @@ _THREE_ENTRIES = [
 ]
 
 
-def test_from_settings_leaves_out_entries_the_device_cannot_run_keeping_the_order():
+def test_config_leaves_out_entries_the_device_cannot_run_keeping_the_order():
     settings = _lobby_settings(["personal"], _THREE_ENTRIES)
 
-    config = LobbyConfig.from_settings(settings, lambda scene: scene != "red_light_green_light")
+    config = LobbyConfig(settings, lambda scene: scene != "red_light_green_light")
 
     assert [e.scene for e in config.entries] == ["hardware_test", "tag"]
 
 
-def test_from_settings_raises_when_the_device_can_run_no_entry():
+def test_config_raises_when_the_device_can_run_no_entry():
     settings = _lobby_settings(["personal"], _THREE_ENTRIES)
 
     with pytest.raises(ValueError, match="entries"):
-        LobbyConfig.from_settings(settings, lambda scene: False)
+        LobbyConfig(settings, lambda scene: False)
 
 
-def test_from_settings_checks_every_entry_before_asking_whether_the_device_can_run_it():
+def test_config_checks_every_entry_before_asking_whether_the_device_can_run_it():
     settings = _lobby_settings(["personal"], [*_THREE_ENTRIES, {"scene": "tag"}])
 
     with pytest.raises(ValueError, match="effect"):
-        LobbyConfig.from_settings(settings, lambda scene: False)
+        LobbyConfig(settings, lambda scene: False)
