@@ -28,7 +28,7 @@ effects/          Animation engine (CircuitPython-safe)
   level.py        clamp_level, level_progress, level_lerp, level_lerp_int
   value.py        DynamicValue, ValueGenerator, lerp
   layers/         Layer base class + scroll, flame, drift_noise, sparkle, shape, progress, pulse
-                  layers and the renderer compositors
+                  layers and the renderers
 
 engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   engine.py       GameEngine, GameRule
@@ -166,6 +166,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `LayerRenderer` | `effects/layers/renderer.py` | Single-layer `Effect` |
 | `AddColorsRenderer` | `effects/layers/add_colors_renderer.py` | Composites layers by summing packed RGB colors |
 | `AddSamplesRenderer` | `effects/layers/add_samples_renderer.py` | Composites layers by summing float samples then sampling a palette |
+| `ProgressRenderer` | `effects/layers/progress_renderer.py` | Progress fill in one raw RGB color, no palette |
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
 | `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
 | `EffectControls` | `engine/state.py` | Rule-facing effect seam |

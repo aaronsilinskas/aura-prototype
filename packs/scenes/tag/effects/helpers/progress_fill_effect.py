@@ -7,7 +7,7 @@ class ProgressFillEffect(EffectPixels):
 
     Advances its own internal clock each ``update``, so it need not be re-issued
     every tick. Renders like
-    :class:`~packs.effects.basic.helpers.progress_effect.ProgressEffect`:
+    :class:`~effects.layers.progress_renderer.ProgressRenderer`:
     multiplies ``color`` by each pixel's lit fraction inline, allocating no
     ``Palette``/``PaletteLUT256``.
     """
