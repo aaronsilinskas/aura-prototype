@@ -165,13 +165,13 @@ class NeoPixelStripConfig:
 
     def __init__(
         self,
-        pin: str,
+        pin: PinRef,
         count: int,
         order: str,
         brightness: float,
         scope_pixels: dict[str, range],
     ) -> None:
-        self.pin: str = pin
+        self.pin: PinRef = pin
         self.count: int = count
         self.order: str = order
         self.brightness: float = brightness
@@ -787,7 +787,7 @@ def _parse_neopixel_strip_entry(mapping: dict, entry_index: int) -> NeoPixelStri
     validate_band_map(scope_pixels, f"{label} pin '{pin}' scope_pixels")
 
     return NeoPixelStripConfig(
-        pin=pin,
+        pin=PinRef(pin, f"{label}.pin"),
         count=count,
         order=order,
         brightness=brightness,
@@ -1166,11 +1166,12 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
                 raise ValueError(f"pixels[{i}]: only one matrix entry is allowed")
         elif isinstance(parsed, NeoPixelPixelsConfig):
             for strip in parsed.strips:
-                if strip.pin in seen_pins:
+                pin = strip.pin.name
+                if pin in seen_pins:
                     raise ValueError(
-                        f"pixels[{i}]: pin '{strip.pin}' is already used by another strip entry"
+                        f"pixels[{i}]: pin '{pin}' is already used by another strip entry"
                     )
-                seen_pins.add(strip.pin)
+                seen_pins.add(pin)
         pixels.append(parsed)
 
     buttons_raw = mapping.get("buttons", [])

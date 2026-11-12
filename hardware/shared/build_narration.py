@@ -155,7 +155,7 @@ def _describe_neopixel_pixels(pixels: NeoPixelPixelsConfig) -> str:
     """Return the pin/count/order/segmentation/brightness detail for a NeoPixel entry's strip."""
     strip = pixels.strips[0]
     return (
-        f"pin={strip.pin} count={strip.count} order={strip.order} "
+        f"pin={strip.pin.name} count={strip.count} order={strip.order} "
         + f"scope_pixels=[{_format_ranges(strip.scope_pixels)}] "
         + f"brightness={strip.brightness:.2f}"
     )

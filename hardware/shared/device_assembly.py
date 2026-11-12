@@ -165,7 +165,7 @@ def _pixel_outputs(
     if isinstance(pixels, MatrixPixelsConfig):
         bus = _require_i2c(i2c, f"pixels[{index}]", pixels)
         return [parts.matrix_pixels(pixels, bus)]
-    return [parts.neopixel_strip(strip, PinRef(strip.pin, "pixels.pin")) for strip in pixels.strips]
+    return [parts.neopixel_strip(strip, strip.pin) for strip in pixels.strips]
 
 
 def _ir(ir_config: IRConfig, parts: DeviceParts) -> tuple[InfraredTransceiver, str]:

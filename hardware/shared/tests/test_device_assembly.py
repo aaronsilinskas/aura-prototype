@@ -406,7 +406,7 @@ def test_an_enabled_matrix_entry_is_built_on_the_i2c_bus():
     assert (matrix_config.cols, bus.kind) == (13, "i2c")
 
 
-def test_each_neopixel_strip_is_built_on_its_pin():
+def test_each_neopixel_strip_is_built_on_its_parsed_pin_reference():
     _hw, parts = _assemble(
         _config(
             pixels=[_NEOPIXEL, {**_NEOPIXEL, "pin": "GP1", "scope_pixels": {"ambient": [0, 4]}}]
@@ -414,8 +414,8 @@ def test_each_neopixel_strip_is_built_on_its_pin():
     )
 
     assert [(strip.scope_pixels, pin) for strip, pin in parts.args_of("neopixel_strip")] == [
-        ({"personal": range(0, 4)}, PinRef("GP0", "pixels.pin")),
-        ({"ambient": range(0, 4)}, PinRef("GP1", "pixels.pin")),
+        ({"personal": range(0, 4)}, PinRef("GP0", "pixels[0].pin")),
+        ({"ambient": range(0, 4)}, PinRef("GP1", "pixels[1].pin")),
     ]
 
 
@@ -439,7 +439,7 @@ def test_a_segmented_strip_is_one_strip_carrying_every_segment():
     ((strip, pin),) = parts.args_of("neopixel_strip")
     assert (strip.scope_pixels, pin) == (
         {"personal": range(0, 10), "ambient": range(10, 20)},
-        PinRef("GP0", "pixels.pin"),
+        PinRef("GP0", "pixels[0].pin"),
     )
     assert len(hw.outputs) == 1
 
