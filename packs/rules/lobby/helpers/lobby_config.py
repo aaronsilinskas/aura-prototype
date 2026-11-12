@@ -3,10 +3,9 @@
 Holds the ordered display scopes and ordered selectable entries the ``lobby``
 pack declares as its ``scopes`` and ``entries`` Settings (see
 ``LobbySelectRule`` for their shape). The scan checks only that each is a
-list; the deep checks live here. ``LobbyConfig.__init__`` takes
-already-resolved values so it is unit-testable directly; ``from_settings`` is
-the factory that reads the Settings view and resolves each scope string to its
-engine ``ScopeValue`` via ``scope_by_name``. Both Settings are required, with
+list; the deep checks live here. ``LobbyConfig``'s constructor reads the
+Settings view and resolves each scope string to its engine ``ScopeValue`` via
+``scope_by_name``. Both Settings are required, with
 no default (a missing entry list can't default to "no scenes"), and an empty
 or malformed one raises rather than showing the wrong scenes. So does an entry
 list the device can run none of: a lobby with nothing to offer fails loudly
@@ -83,42 +82,30 @@ def _parse_entry(entry: object) -> LobbyEntry:
 class LobbyConfig:
     """Resolved, validated lobby configuration: ordered display scopes plus ordered entries.
 
-    All values are already-resolved (no Settings knowledge), so this can
-    be constructed directly in tests. Use :meth:`from_settings` to build one
-    from a scene's Settings.
+    Built from the ``lobby`` pack's ``scopes`` and ``entries`` Settings. Keeps,
+    in order, only the entries whose scene *can_run* accepts
+    (``SceneControls.can_run`` on a device), so the lobby offers only scenes
+    this prop can play. Every entry is checked before any is left out.
 
     Raises:
-        ValueError: if *scopes* or *entries* is empty.
+        ValueError: if an entry is not an object or is missing
+            ``scene``/``effect``, if entries were declared but the device can
+            run none of them, if any scope name is unknown, if ``scopes`` is
+            empty, or if no entry was declared.
     """
 
     __slots__ = ("entries", "scopes")
 
-    def __init__(self, scopes: list[ScopeValue], entries: list[LobbyEntry]) -> None:
-        if not scopes:
-            raise ValueError("Lobby config 'scopes' must be non-empty")
-        if not entries:
-            raise ValueError("Lobby config 'entries' must be non-empty")
-        self.scopes = scopes
-        self.entries = entries
-
-    @classmethod
-    def from_settings(cls, settings: Settings, can_run: Callable[[str], bool]) -> LobbyConfig:
-        """Build from the ``lobby`` pack's ``scopes`` and ``entries`` Settings.
-
-        Keeps, in order, only the entries whose scene *can_run* accepts
-        (``SceneControls.can_run`` on a device), so the lobby offers only
-        scenes this prop can play. Every entry is checked before any is left
-        out.
-
-        Raises:
-            ValueError: if ``scopes`` is empty, if any scope name is unknown,
-                if an entry is not an object or is missing ``scene``/``effect``,
-                or if no entry is left: none was declared, or the device can
-                run none of them.
-        """
-        scopes = settings.get_list(NAMESPACE, "scopes")
+    def __init__(self, settings: Settings, can_run: Callable[[str], bool]) -> None:
+        scope_names = settings.get_list(NAMESPACE, "scopes")
         entries = [_parse_entry(entry) for entry in settings.get_list(NAMESPACE, "entries")]
         playable = [entry for entry in entries if can_run(entry.scene)]
         if entries and not playable:
             raise ValueError("Lobby config 'entries' has no scene this device can run")
-        return cls([scope_by_name(name) for name in scopes], playable)
+        scopes = [scope_by_name(name) for name in scope_names]
+        if not scopes:
+            raise ValueError("Lobby config 'scopes' must be non-empty")
+        if not playable:
+            raise ValueError("Lobby config 'entries' must be non-empty")
+        self.scopes: list[ScopeValue] = scopes
+        self.entries: list[LobbyEntry] = playable

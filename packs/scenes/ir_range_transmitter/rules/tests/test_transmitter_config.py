@@ -19,12 +19,12 @@ def _settings(**values: object) -> Settings:
 
 
 # ---------------------------------------------------------------------------
-# from_settings
+# Building from Settings
 # ---------------------------------------------------------------------------
 
 
 def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
-    config = TransmitterConfig.from_settings(_settings(send_rate_hz=10.0, payload_size=8))
+    config = TransmitterConfig(_settings(send_rate_hz=10.0, payload_size=8))
 
     assert config.send_rate_hz == pytest.approx(10.0)
     assert config.payload_size == 8
@@ -33,7 +33,7 @@ def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
 def test_with_no_overrides_each_field_holds_its_declared_default():
     defaults = declared_scene_defaults("ir_range_transmitter")
 
-    config = TransmitterConfig.from_settings(_settings())
+    config = TransmitterConfig(_settings())
 
     assert {name: getattr(config, name) for name in defaults} == defaults
 
@@ -44,13 +44,13 @@ def test_with_no_overrides_each_field_holds_its_declared_default():
 
 
 def test_send_period_seconds_is_the_reciprocal_of_send_rate():
-    config = TransmitterConfig(send_rate_hz=10.0, payload_size=4)
+    config = TransmitterConfig(_settings(send_rate_hz=10.0))
 
     assert config.send_period_seconds == pytest.approx(0.1)
 
 
 def test_payload_padding_carries_a_fixed_non_zero_marker_in_every_padding_byte():
-    config = TransmitterConfig(send_rate_hz=5.0, payload_size=4)
+    config = TransmitterConfig(_settings(payload_size=4))
 
     assert config.payload_padding == bytes([0xA1, 0xA2, 0xA3])
 

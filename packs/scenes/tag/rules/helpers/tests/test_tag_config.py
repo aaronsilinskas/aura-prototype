@@ -19,12 +19,12 @@ def _settings(**values: object) -> Settings:
 
 
 # ---------------------------------------------------------------------------
-# from_settings
+# Building from Settings
 # ---------------------------------------------------------------------------
 
 
 def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
-    config = TagConfig.from_settings(
+    config = TagConfig(
         _settings(
             starting_hitpoints=20,
             expected_team=2,
@@ -50,7 +50,7 @@ def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
 def test_with_no_overrides_each_field_holds_its_declared_default():
     defaults = declared_scene_defaults("tag")
 
-    config = TagConfig.from_settings(_settings())
+    config = TagConfig(_settings())
 
     assert {name: getattr(config, name) for name in defaults} == defaults
 
@@ -61,16 +61,7 @@ def test_with_no_overrides_each_field_holds_its_declared_default():
 
 
 def test_warning_duration_is_count_times_pulse_duration():
-    config = TagConfig(
-        starting_hitpoints=10,
-        expected_team=0,
-        expected_player=1,
-        warning_pulse_count=5,
-        warning_pulse_duration=0.6,
-        max_ammo=10,
-        shot_cooldown=1.0,
-        reload_duration=3.0,
-    )
+    config = TagConfig(_settings(warning_pulse_count=5, warning_pulse_duration=0.6))
 
     assert config.warning_duration() == pytest.approx(3.0)
 

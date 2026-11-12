@@ -43,7 +43,7 @@ _INDEX_KEY: Final = "lobby_index"
 
 _config = StateSlot(
     "lobby_resolved",
-    lambda state: LobbyConfig.from_settings(state.settings, state.scene_controls.can_run),
+    lambda state: LobbyConfig(state.settings, state.scene_controls.can_run),
     LobbyConfig,
 )
 
@@ -53,8 +53,7 @@ class LobbySelectRule(GameRule):
 
     Reads its scopes/entries config from the pack's Settings via a
     :class:`engine.state.StateSlot`, which resolves and caches a
-    ``LobbyConfig`` in ``GameState`` on first read (see
-    ``LobbyConfig.from_settings``), so an empty or malformed
+    ``LobbyConfig`` in ``GameState`` on first read, so an empty or malformed
     config raises there rather than at construction time (this rule is built
     with no ``GameState`` available yet -- see the pack's ``RULE`` singleton
     below).

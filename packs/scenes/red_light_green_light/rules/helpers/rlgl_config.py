@@ -1,9 +1,6 @@
 """``RlglConfig`` — the Red Light Green Light Scene Config.
 
-Holds the scene's twelve Settings, declared in its ``scene.json``, each named
-as its field.  ``RlglConfig.__init__`` takes already-resolved values and checks
-that ``gravity_beta`` stays below ``motion_smoothing``; ``from_settings`` builds
-one from the Settings view.
+Holds the scene's twelve Settings, declared in its ``scene.json``.
 
 ``rlgl_config`` is a :class:`engine.state.StateSlot` callable accessor: it lazily
 builds the config from ``state.settings`` on first use and caches it under a single
@@ -33,10 +30,8 @@ _WARNING_DARKEN_RATIO: Final = 0.3
 
 
 class RlglConfig:
-    """Immutable duration/threshold configuration for the RLGL scene.
-
-    Use :meth:`from_settings` to build one from the scene's Settings.
-    """
+    """Immutable duration/threshold configuration for the RLGL scene, each
+    field read from the scene Setting of the same name."""
 
     __slots__ = (
         "game_over_duration",
@@ -53,65 +48,30 @@ class RlglConfig:
         "warning_pulse_min",
     )
 
-    def __init__(
-        self,
-        red_duration_max: float,
-        red_duration_min: float,
-        green_duration_max: float,
-        green_duration_min: float,
-        warning_pulse_max: float,
-        warning_pulse_min: float,
-        game_over_duration: float,
-        green_still_timeout: float,
-        level_up_duration: float,
-        max_level: int,
-        motion_smoothing: float,
-        gravity_beta: float,
-    ) -> None:
-        """Store already-resolved values.
+    def __init__(self, settings: Settings) -> None:
+        """Read the scene's Settings, checking they agree.
 
         Raises:
             ValueError: ``gravity_beta`` is not below ``motion_smoothing``, so
                 real motion would be absorbed into the gravity estimate.
         """
-        if gravity_beta >= motion_smoothing:
+        self.red_duration_max = settings.get_float(SCENE_NAMESPACE, "red_duration_max")
+        self.red_duration_min = settings.get_float(SCENE_NAMESPACE, "red_duration_min")
+        self.green_duration_max = settings.get_float(SCENE_NAMESPACE, "green_duration_max")
+        self.green_duration_min = settings.get_float(SCENE_NAMESPACE, "green_duration_min")
+        self.warning_pulse_max = settings.get_float(SCENE_NAMESPACE, "warning_pulse_max")
+        self.warning_pulse_min = settings.get_float(SCENE_NAMESPACE, "warning_pulse_min")
+        self.game_over_duration = settings.get_float(SCENE_NAMESPACE, "game_over_duration")
+        self.green_still_timeout = settings.get_float(SCENE_NAMESPACE, "green_still_timeout")
+        self.level_up_duration = settings.get_float(SCENE_NAMESPACE, "level_up_duration")
+        self.max_level = settings.get_int(SCENE_NAMESPACE, "max_level")
+        self.motion_smoothing = settings.get_float(SCENE_NAMESPACE, "motion_smoothing")
+        self.gravity_beta = settings.get_float(SCENE_NAMESPACE, "gravity_beta")
+        if self.gravity_beta >= self.motion_smoothing:
             raise ValueError(
-                f"gravity_beta ({gravity_beta}) must be below motion_smoothing ({motion_smoothing})"
+                f"gravity_beta ({self.gravity_beta}) must be below"
+                + f" motion_smoothing ({self.motion_smoothing})"
             )
-        self.red_duration_max = red_duration_max
-        self.red_duration_min = red_duration_min
-        self.green_duration_max = green_duration_max
-        self.green_duration_min = green_duration_min
-        self.warning_pulse_max = warning_pulse_max
-        self.warning_pulse_min = warning_pulse_min
-        self.game_over_duration = game_over_duration
-        self.green_still_timeout = green_still_timeout
-        self.level_up_duration = level_up_duration
-        self.max_level = max_level
-        self.motion_smoothing = motion_smoothing
-        self.gravity_beta = gravity_beta
-
-    @classmethod
-    def from_settings(cls, settings: Settings) -> RlglConfig:
-        """Build a config from the scene's Settings, each named as its field.
-
-        Raises:
-            ValueError: ``gravity_beta`` is not below ``motion_smoothing``.
-        """
-        return cls(
-            red_duration_max=settings.get_float(SCENE_NAMESPACE, "red_duration_max"),
-            red_duration_min=settings.get_float(SCENE_NAMESPACE, "red_duration_min"),
-            green_duration_max=settings.get_float(SCENE_NAMESPACE, "green_duration_max"),
-            green_duration_min=settings.get_float(SCENE_NAMESPACE, "green_duration_min"),
-            warning_pulse_max=settings.get_float(SCENE_NAMESPACE, "warning_pulse_max"),
-            warning_pulse_min=settings.get_float(SCENE_NAMESPACE, "warning_pulse_min"),
-            game_over_duration=settings.get_float(SCENE_NAMESPACE, "game_over_duration"),
-            green_still_timeout=settings.get_float(SCENE_NAMESPACE, "green_still_timeout"),
-            level_up_duration=settings.get_float(SCENE_NAMESPACE, "level_up_duration"),
-            max_level=settings.get_int(SCENE_NAMESPACE, "max_level"),
-            motion_smoothing=settings.get_float(SCENE_NAMESPACE, "motion_smoothing"),
-            gravity_beta=settings.get_float(SCENE_NAMESPACE, "gravity_beta"),
-        )
 
     def red_duration(self, level: int) -> float:
         """Return the red phase duration scaled by Game Level."""
@@ -143,7 +103,7 @@ class RlglConfig:
 
 
 def _from_state(state: GameState) -> RlglConfig:
-    return RlglConfig.from_settings(state.settings)
+    return RlglConfig(state.settings)
 
 
 rlgl_config = StateSlot(_CONFIG_KEY, _from_state, RlglConfig)
