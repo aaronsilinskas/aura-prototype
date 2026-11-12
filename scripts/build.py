@@ -108,7 +108,7 @@ def parse_circuitpython_major_from_boot_out(boot_out_text: str) -> int:
     return int(match.group(1))
 
 
-def validate_mpy_cross_version(mount: Path | None, mpy_cross_bin: str) -> None:
+def validate_mpy_cross_version(mount: Path | None, mpy_cross_bin: str = _MPY_CROSS_BIN) -> None:
     """Raise :class:`VersionError` when the mpy-cross major version does not match.
 
     Validates against the device's ``boot_out.txt`` when *mount* is given,

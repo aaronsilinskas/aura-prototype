@@ -1,9 +1,14 @@
 import json
 import os
+import shutil
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
+from scripts.build import BuildError
 from scripts.deploy import deploy
+from scripts.ship_list import ship_list
 
 
 def fake_compile(src: Path, dest: Path) -> None:
@@ -20,23 +25,12 @@ def make_source_tree(root: Path) -> None:
     """Create a minimal fake source tree that mirrors the real repo layout."""
     (root / "effects").mkdir()
     (root / "effects" / "render.py").write_text("# render")
-    (root / "effects" / "__pycache__").mkdir()
-    (root / "effects" / "__pycache__" / "render.cpython-312.pyc").write_text("")
-    (root / "effects" / "render.mpy").write_text("")
-    (root / "effects" / "tests").mkdir()
-    (root / "effects" / "tests" / "__init__.py").write_text("")
 
     (root / "engine").mkdir()
     (root / "engine" / "timer.py").write_text("# timer")
-    (root / "engine" / "tests" / "effects").mkdir(parents=True)
-    (root / "engine" / "tests" / "effects" / "helpers.py").write_text("")
 
     (root / "magic").mkdir()
     (root / "magic" / "aura.py").write_text("# aura")
-
-    (root / "rules").mkdir()
-    (root / "rules" / "__init__.py").write_text("")
-    (root / "rules" / "conftest.py").write_text("")
 
     (root / "hardware").mkdir()
     (root / "hardware" / "__init__.py").write_text("")
@@ -137,8 +131,6 @@ def test_example_file_is_always_deployed_even_when_up_to_date(tmp_path: Path) ->
     # Simulate an older example already deployed as code.py with the same mtime
     existing = mount / "code.py"
     existing.write_text("# old demo")
-    import os
-
     os.utime(existing, (example.stat().st_mtime, example.stat().st_mtime))
 
     deploy(example, mount, source_root=source, compile=fake_compile)
@@ -313,126 +305,6 @@ def test_hardware_subdirectory_modules_are_deployed(tmp_path: Path) -> None:
     assert (mount / "hardware" / "__init__.mpy").exists()
     assert (mount / "hardware" / "shared" / "__init__.mpy").exists()
     assert (mount / "hardware" / "shared" / "matrix_output.mpy").exists()
-
-
-# ---------------------------------------------------------------------------
-# Exclusion rules
-# ---------------------------------------------------------------------------
-
-
-def test_pycache_directories_are_not_copied_to_mount(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    mount = tmp_path / "mount"
-    mount.mkdir()
-
-    deploy(None, mount, source_root=source, compile=fake_compile)
-
-    assert not (mount / "effects" / "__pycache__").exists()
-
-
-def test_pyc_files_are_not_copied_to_mount(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    # Add a .pyc at module root level too
-    (source / "effects" / "stale.pyc").write_text("")
-    mount = tmp_path / "mount"
-    mount.mkdir()
-
-    deploy(None, mount, source_root=source, compile=fake_compile)
-
-    assert not list((mount / "effects").rglob("*.pyc"))
-
-
-def test_mpy_files_are_copied_to_mount(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    mount = tmp_path / "mount"
-    mount.mkdir()
-
-    deploy(None, mount, source_root=source, compile=fake_compile)
-
-    assert (mount / "effects" / "render.mpy").exists()
-
-
-def test_ds_store_files_are_not_copied_to_mount(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    (source / "effects" / ".DS_Store").write_bytes(b"")
-    mount = tmp_path / "mount"
-    mount.mkdir()
-
-    deploy(None, mount, source_root=source, compile=fake_compile)
-
-    assert not (mount / "effects" / ".DS_Store").exists()
-
-
-def test_tests_directory_files_are_not_copied_to_mount(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    mount = tmp_path / "mount"
-    mount.mkdir()
-
-    deploy(None, mount, source_root=source, compile=fake_compile)
-
-    assert not (mount / "effects" / "tests" / "__init__.py").exists()
-
-
-def test_nested_tests_directory_files_are_not_copied_to_mount(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    mount = tmp_path / "mount"
-    mount.mkdir()
-
-    deploy(None, mount, source_root=source, compile=fake_compile)
-
-    assert not (mount / "engine" / "tests" / "effects" / "helpers.py").exists()
-
-
-def test_simulation_test_harness_is_not_copied_to_mount(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    (source / "app" / "simulation").mkdir(parents=True)
-    (source / "app" / "simulation" / "harness.py").write_text("# harness")
-    mount = tmp_path / "mount"
-    mount.mkdir()
-
-    deploy(None, mount, source_root=source, compile=fake_compile)
-
-    assert not (mount / "app" / "simulation").exists()
-
-
-def test_simulated_device_is_not_copied_to_mount(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    (source / "hardware" / "simulated").mkdir()
-    (source / "hardware" / "simulated" / "device.py").write_text("# device")
-    mount = tmp_path / "mount"
-    mount.mkdir()
-
-    deploy(None, mount, source_root=source, compile=fake_compile)
-
-    assert not (mount / "hardware" / "simulated").exists()
-
-
-def test_conftest_py_is_not_copied_to_mount(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    mount = tmp_path / "mount"
-    mount.mkdir()
-
-    deploy(None, mount, source_root=source, compile=fake_compile)
-
-    assert not (mount / "rules" / "conftest.py").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -706,8 +578,6 @@ def test_module_root_removed_when_fully_pruned(tmp_path: Path) -> None:
     (source / "engine" / "timer.py").write_text("# timer")
     (source / "magic").mkdir()
     (source / "magic" / "aura.py").write_text("# aura")
-    (source / "rules").mkdir()
-    (source / "rules" / "__init__.py").write_text("")
     mount = tmp_path / "mount"
     mount.mkdir()
     (mount / "effects").mkdir()
@@ -1001,8 +871,6 @@ def test_deploy_summary_includes_compiled_count(tmp_path: Path, capsys) -> None:
 
 
 def test_deploy_compile_failure_returns_nonzero_exit_code(tmp_path: Path) -> None:
-    from scripts.build import BuildError
-
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
@@ -1018,8 +886,6 @@ def test_deploy_compile_failure_returns_nonzero_exit_code(tmp_path: Path) -> Non
 
 
 def test_deploy_compile_failure_leaves_mount_untouched(tmp_path: Path) -> None:
-    from scripts.build import BuildError
-
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
@@ -1037,8 +903,6 @@ def test_deploy_compile_failure_leaves_mount_untouched(tmp_path: Path) -> None:
 def test_deploy_compile_failure_prints_error_with_file_and_toolchain_output(
     tmp_path: Path, capsys
 ) -> None:
-    from scripts.build import BuildError
-
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
@@ -1251,8 +1115,37 @@ def test_source_mode_succeeds_without_mpy_cross_installed(tmp_path: Path) -> Non
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    with patch("scripts.build.validate_mpy_cross_version") as mock_validate:
+    with patch("scripts.deploy.validate_mpy_cross_version") as mock_validate:
         result = deploy(None, mount, source_root=source, use_source=True)
 
     assert result == 0
     mock_validate.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# End to end: the real repo tree
+# ---------------------------------------------------------------------------
+
+_REPO_ROOT = Path(__file__).parents[2]
+
+
+@pytest.mark.parametrize("use_source", [False, True], ids=["compiled", "source"])
+def test_real_repo_tree_lands_exactly_the_ship_list_and_code_py_on_the_mount(
+    tmp_path: Path, use_source: bool
+) -> None:
+    source = tmp_path / "source"
+    for top in ("app", "effects", "engine", "hardware", "magic", "packs"):
+        shutil.copytree(_REPO_ROOT / top, source / top, ignore=shutil.ignore_patterns("*.pyc"))
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    example = tmp_path / "example.py"
+    example.write_text("# demo")
+
+    result = deploy(example, mount, source_root=source, compile=fake_compile, use_source=use_source)
+
+    landed = {path.relative_to(mount) for path in mount.rglob("*") if path.is_file()}
+    listed = {entry.source_device if use_source else entry.device for entry in ship_list(source)}
+    hardware_init = Path("hardware/__init__.py" if use_source else "hardware/__init__.mpy")
+    assert result == 0
+    assert {Path("code.py"), Path("boot.py"), hardware_init} <= landed
+    assert landed == listed | {Path("code.py")}
