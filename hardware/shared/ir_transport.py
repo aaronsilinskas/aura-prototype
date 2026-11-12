@@ -181,15 +181,17 @@ class _InfraredTransmitter:
         start-of-write — never per-tick.
 
     Gate timing:
-      - Starting a write calls :meth:`_IrTransmitGate.begin_transmit`, encodes,
+      - Starting a write first releases any gate a finished write left
+        armed, then calls :meth:`_IrTransmitGate.begin_transmit`, encodes,
         calls :meth:`PulseWriter.write_pulses`, arms the deferred-release
         flag, then calls :meth:`_release_gate_when_idle`. If the writer is
         already idle (a blocking writer finished synchronously)
         :meth:`_IrTransmitGate.end_transmit` fires immediately. If the writer
-        is still busy (e.g. DMA in flight) the flag stays armed and the next
-        :meth:`poll` that observes idle releases it, via the same
-        :meth:`_release_gate_when_idle`, before starting the oldest queued
-        send.
+        is still busy (e.g. DMA in flight) the flag stays armed until the next
+        :meth:`poll` or write start that observes idle releases it, via the
+        same :meth:`_release_gate_when_idle`. Each ``begin_transmit`` thus
+        pairs with exactly one ``end_transmit``, even when a :meth:`send`
+        follows a finished write with no :meth:`poll` between.
 
     Error semantics:
       - An encode error raised while kicking off a write from :meth:`send`
@@ -289,6 +291,7 @@ class _InfraredTransmitter:
         Args:
             data: Opaque payload bytes to transmit.
         """
+        self._release_gate_when_idle()
         gate = self._gate
         gate.begin_transmit()
         try:
@@ -307,10 +310,10 @@ class _InfraredTransmitter:
         No-op unless :attr:`_gate_armed` is set. A blocking writer is already
         idle by the time :meth:`_start_write` calls this, so the release
         happens inline; a non-blocking (e.g. DMA-backed) writer stays busy
-        until a later :meth:`poll` observes idle and releases it there. Either
-        way this is the sole place ``_gate_armed`` is cleared and
-        ``end_transmit`` fires, so both writer kinds get identical self-echo
-        suppression.
+        until a later :meth:`poll`, or the next :meth:`_start_write`, observes
+        idle and releases it there. Either way this is the sole place
+        ``_gate_armed`` is cleared and ``end_transmit`` fires, so both writer
+        kinds get identical self-echo suppression.
         """
         if not self._gate_armed or self._writer.is_busy():
             return
