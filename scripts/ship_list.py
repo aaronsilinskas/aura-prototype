@@ -31,6 +31,7 @@ _EXCLUDED_FILE_NAMES: Final = frozenset({"conftest.py"})
 _TEST_ONLY_PATHS: Final = (Path("app/simulation"), Path("hardware/simulated"))
 
 _COMPILED_SUFFIX: Final = ".py"
+_COMPILED_TARGET_SUFFIX: Final = ".mpy"
 _RAW_SUFFIXES: Final = frozenset({".json", ".txt", ".wav"})
 
 
@@ -65,6 +66,15 @@ def ship_list(source_root: Path) -> list[ShipEntry]:
     return sorted(entries.values())
 
 
+def decides(rel: Path) -> bool:
+    """Return True when the list decides whether a file at repo- or mount-relative *rel* ships.
+
+    Deploy prunes such a file from a module directory on the mount when the list
+    doesn't name it, and leaves any other file there alone.
+    """
+    return not _is_excluded(rel) and (_ships(rel) or rel.suffix == _COMPILED_TARGET_SUFFIX)
+
+
 def _parent_inits(source_root: Path, module: Path) -> list[Path]:
     """Return the existing ``__init__.py`` of each package above a nested *module*."""
     parents = [Path(*module.parts[: i + 1]) for i in range(len(module.parts) - 1)]
@@ -87,5 +97,5 @@ def _ships(rel: Path) -> bool:
 
 def _module_entry(rel: Path) -> ShipEntry:
     if rel.suffix == _COMPILED_SUFFIX:
-        return ShipEntry(rel, rel.with_suffix(".mpy"), compiled=True)
+        return ShipEntry(rel, rel.with_suffix(_COMPILED_TARGET_SUFFIX), compiled=True)
     return ShipEntry(rel, rel, compiled=False)

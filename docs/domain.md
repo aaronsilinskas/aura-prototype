@@ -144,9 +144,8 @@ pre-commit hook on every commit):
   **Composition layer (app/)** in `GLOSSARY.md`).
 - No shipped module may import the test-only `app.simulation` or
   `hardware.simulated`; only `tests/` packages may. The **Ship list**
-  (`scripts/ship_list.py`) leaves both directories out, so the
-  `scripts/build.py` compile step never stages them; `scripts/deploy.py`
-  still skips both by its own rules.
+  (`scripts/ship_list.py`) leaves both directories out, so they never
+  reach a device.
 
 ---
 
@@ -226,7 +225,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `SerialTransport` | `scripts/sd_sync_transport.py` | Live host-side `Transport`, framing SD-sync lines the same way as `UsbCdcTransport` but over a host serial port opened via `deploy_watch`'s `SerialHandle`/`_open_serial_with_retry` |
 | `find_data_port` / `select_data_port` | `scripts/sd_sync_transport.py` | Data-channel port resolution for `scripts/sd_sync.py`: auto-detects via `adafruit_board_toolkit.circuitpython_serial.data_comports()`, single match wins, `--port` always overrides, zero/multiple matches raises `SdSyncPortError` |
 | `find_console_port` / `select_console_port` | `scripts/deploy_watch.py` | Console-channel port resolution for `deploy_watch`: auto-detects via `adafruit_board_toolkit.circuitpython_serial.repl_comports()` (imported lazily), single match wins, `--port` overrides without scanning, zero/multiple matches raises `ConsolePortError` |
-| `ship_list` / `ShipEntry` | `scripts/ship_list.py` | The **Ship list**: host-only, given a source root it returns one `ShipEntry` per file that goes on the device (`source`, `device` path on a compiled deploy, `compiled` to `.mpy` or copied raw, and `source_device` for a source deploy). It owns `MODULE_DIRS`, the exclusions (`tests`, `__pycache__`, `conftest.py`, and by path the Simulation test harness and the Simulated device), the shipped suffixes, each nested module directory's parent `__init__` (listed once), and `boot.py`'s placement on the mount root (`BOOT_SOURCE` → `BOOT_DEVICE`). `code.py` is not in it. `scripts/build.py` stages every entry but `boot.py` (compiling or copying it, and pruning staged files the list no longer produces). An import-linter contract keeps every device package from importing `scripts` |
+| `ship_list` / `ShipEntry` / `decides` | `scripts/ship_list.py` | The **Ship list**: host-only, given a source root it returns one `ShipEntry` per file that goes on the device (`source`, `device` path on a compiled deploy, `compiled` to `.mpy` or copied raw, and `source_device` for a source deploy). It owns `MODULE_DIRS`, the exclusions (`tests`, `__pycache__`, `conftest.py`, and by path the Simulation test harness and the Simulated device), the shipped suffixes, each nested module directory's parent `__init__` (listed once), and `boot.py`'s placement on the mount root (`BOOT_SOURCE` → `BOOT_DEVICE`). `code.py` is not in it. `scripts/build.py` stages every entry but `boot.py` (compiling or copying it, and pruning staged files the list no longer produces). `scripts/deploy.py` syncs the entries to the mount (staged by default, raw sources in source mode, `boot.py` beside `code.py`) and prunes the files under a module directory that `decides` covers but the list no longer names. An import-linter contract keeps every device package from importing `scripts` |
 
 ---
 

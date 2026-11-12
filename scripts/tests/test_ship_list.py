@@ -1,8 +1,6 @@
 from pathlib import Path
 
-from scripts.build import build
-from scripts.deploy import deploy
-from scripts.ship_list import BOOT_DEVICE, ShipEntry, ship_list
+from scripts.ship_list import ShipEntry, decides, ship_list
 
 
 def write(root: Path, *rel_paths: str) -> None:
@@ -116,47 +114,20 @@ def test_raw_entry_lands_at_its_device_path_when_deployed_as_source() -> None:
     assert entry.source_device == Path("boot.py")
 
 
-# ---------------------------------------------------------------------------
-# The real repo tree, against what today's build and deploy ship
-# ---------------------------------------------------------------------------
+def test_list_decides_on_shipped_kinds_of_file_including_compiled_mpy() -> None:
+    paths = ["engine/timer.py", "engine/timer.mpy", "packs/core/effects.json", "packs/a.wav"]
 
-_REPO_ROOT = Path(__file__).parents[2]
-
-
-def _files_under(root: Path) -> set[Path]:
-    return {path.relative_to(root) for path in root.rglob("*") if path.is_file()}
+    assert all(decides(Path(path)) for path in paths)
 
 
-def _fake_compile(src: Path, dest: Path) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(f"FAKE_MPY:{src.name}")
+def test_list_does_not_decide_on_excluded_paths_or_other_suffixes() -> None:
+    paths = [
+        "effects/old.pyc",
+        "effects/tests/old_test.mpy",
+        "effects/__pycache__/render.mpy",
+        "magic/conftest.py",
+        "app/simulation/harness.mpy",
+        "hardware/circuitpython/boot.py",
+    ]
 
-
-def test_real_tree_lists_exactly_what_a_source_deploy_lands_on_the_mount(tmp_path: Path) -> None:
-    mount = tmp_path / "mount"
-    mount.mkdir()
-    example = tmp_path / "example.py"
-    example.write_text("")
-
-    deploy(example, mount, source_root=_REPO_ROOT, use_source=True)
-
-    landed = _files_under(mount) - {Path("code.py")}
-    assert {entry.source_device for entry in ship_list(_REPO_ROOT)} == landed
-
-
-def test_real_tree_lists_exactly_what_the_build_stages_compiled_or_raw(tmp_path: Path) -> None:
-    staging = tmp_path / "build"
-
-    build(_REPO_ROOT, staging, _fake_compile)
-
-    staged = {
-        (path, path.suffix == ".mpy")
-        for path in _files_under(staging)
-        if path.suffix != ".srcsha256"
-    }
-    listed = {
-        (entry.device, entry.compiled)
-        for entry in ship_list(_REPO_ROOT)
-        if entry.device != BOOT_DEVICE
-    }
-    assert listed == staged
+    assert not any(decides(Path(path)) for path in paths)
