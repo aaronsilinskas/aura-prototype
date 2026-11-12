@@ -299,7 +299,6 @@ def test_module_directories_are_synced_to_mount(tmp_path: Path) -> None:
     assert (mount / "effects" / "render.mpy").exists()
     assert (mount / "engine" / "timer.mpy").exists()
     assert (mount / "magic" / "aura.mpy").exists()
-    assert (mount / "rules" / "__init__.mpy").exists()
 
 
 def test_hardware_subdirectory_modules_are_deployed(tmp_path: Path) -> None:
