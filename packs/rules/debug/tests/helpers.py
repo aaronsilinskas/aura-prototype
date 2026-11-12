@@ -1,8 +1,8 @@
-"""An engine and a logger for the FPS logger's unit tests, which inject its output and clock."""
+"""A SceneRun and a logger for the FPS logger's unit tests, which inject its output and clock."""
 
-from engine.engine import GameEngine
+from engine.engine import GameRule
 from engine.settings import Settings
-from engine.state import EffectControls, GameState, SceneControls
+from engine.state import EffectControls, GameState, SceneControls, SceneRun
 
 
 class CapturingLogger:
@@ -15,12 +15,6 @@ class CapturingLogger:
         self.logs.append(message)
 
 
-class EngineFixture:
-    """Pre-wired engine for rule integration tests, its state built with *settings*."""
-
-    def __init__(self, settings: Settings) -> None:
-        self.game_engine = GameEngine(EffectControls())
-        self.state: GameState = self.game_engine.create_state(SceneControls(), settings=settings)
-
-    def update_engine(self) -> None:
-        self.game_engine.update(self.state)
+def scene_run_for(rule: GameRule, settings: Settings) -> SceneRun:
+    """A SceneRun dispatching to *rule* alone, its state built with *settings*."""
+    return SceneRun(GameState(EffectControls(), SceneControls(), settings=settings), [rule])

@@ -1,7 +1,7 @@
 """Behaviour tests for the phase-machine engine primitive.
 
 Lifecycle behaviour (``on_enter`` / handler / ``on_exit``) is exercised
-through the real ``GameEngine.update`` + ``SpyEffectControls`` seam using
+through a real ``SceneRun.tick`` + ``SpyEffectControls`` seam using
 throwaway rule subclasses that emit a uniquely-named effect at each lifecycle
 point.  Tests assert on those observable effects only — never on the machine's
 private entry flag.
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from engine.engine import GameEngine, GameRule
+from engine.engine import GameRule
 from engine.events import Event, EventGroup
 from engine.phase import (
     InPhaseRule,
@@ -20,7 +20,7 @@ from engine.phase import (
     PhaseRule,
     PhaseSlot,
 )
-from engine.state import GameState, SceneControls, Scope
+from engine.state import GameState, SceneControls, SceneRun, Scope
 from engine.tests.helpers import SpyEffectControls
 
 _GROUP = EventGroup("phase_test")
@@ -117,15 +117,14 @@ class _InPhaseEmitter(InPhaseRule):
 
 
 def _run(rules: list, ticks: int, events_per_tick: int = 1) -> list[str]:
-    """Run *rules* through *ticks* engine updates; return emitted effect names in order."""
+    """Run *rules* through *ticks* SceneRun ticks; return emitted effect names in order."""
     spy = SpyEffectControls()
-    engine = GameEngine(effect_controls=spy)
-    state = engine.create_state(SceneControls())
-    engine.set_rules(rules)
+    state = GameState(spy, SceneControls())
+    run = SceneRun(state, rules)
     for _ in range(ticks):
         for _ in range(events_per_tick):
             state.queue_event(_TickEvent())
-        engine.update(state)
+        run.tick(0.0)
     return [name for _, name, _ in spy.add_effect_calls]
 
 

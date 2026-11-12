@@ -9,12 +9,12 @@ from effects.effect import Effect, PixelBuffer
 from engine.effects.admin import SceneView
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
-from engine.engine import GameEngine, GameRule
+from engine.engine import GameRule
 from engine.events import EffectEvent, Event
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import scan_pack_roots
-from engine.state import EffectReceipt, GameState, SceneControls, Scope, ScopeValue
+from engine.state import EffectReceipt, GameState, SceneControls, SceneRun, Scope, ScopeValue
 from engine.timer import Timer
 
 _packs_root = os.path.normpath(
@@ -82,8 +82,6 @@ personal_output = AnsiEffectOutput(scopes=[Scope.PERSONAL])
 effect_manager = EffectManager(namespace=_namespace, outputs=[personal_output])
 
 timer = Timer()
-game_engine = GameEngine(effect_controls=effect_manager, timer=timer)
-game_state = game_engine.create_state(SceneControls())
 
 
 class MakeEffectRule(GameRule):
@@ -100,7 +98,7 @@ class MakeEffectRule(GameRule):
                 state.effect_controls.stop_effect(Scope.ALL)
 
 
-game_engine.add_rules(MakeEffectRule())
+scene_run = SceneRun(GameState(effect_manager, SceneControls()), [MakeEffectRule()])
 
 _default_acceleration = AccelerationData(x=0.0, y=9.8, z=0.0)
 
@@ -127,8 +125,8 @@ def main() -> None:
                 key = sys.stdin.read(1)
                 if key == "q":
                     break
-            game_state.queue_event(_make_event(key))
-            game_engine.update(game_state)
+            scene_run.state.queue_event(_make_event(key))
+            scene_run.tick(timer.elapsed)
             effect_manager.update(timer)
             time.sleep(0.033)  # ~30 fps
     finally:
