@@ -569,11 +569,15 @@ class SceneRun:
     elapsed time in.
     """
 
-    __slots__ = ("_rules", "state")
+    __slots__ = ("_rules", "_state")
 
     def __init__(self, state: GameState, rules: Sequence[_Rule]) -> None:
-        self.state: Final = state
+        self._state = state
         self._rules: tuple[_Rule, ...] = tuple(rules)
+
+    @property
+    def state(self) -> GameState:
+        return self._state
 
     def tick(self, elapsed: float) -> None:
         """Advance game time by *elapsed*, dispatch the queue, then empty it in place.
@@ -582,7 +586,10 @@ class SceneRun:
         ``dispatch_count`` once (ADR-0001). The queue length is re-read per
         event, so events queued during dispatch go out in this same tick.
         """
-        state = self.state
+        # SceneRun lives in GameState's module so it can be the single writer of
+        # the clock, ADR-0001's dispatch count and the queue: their invariants
+        # stay in one module, and the per-event loop pays no accessor calls.
+        state = self._state
         state._elapsed = elapsed
         state._total += elapsed
         rules = self._rules
