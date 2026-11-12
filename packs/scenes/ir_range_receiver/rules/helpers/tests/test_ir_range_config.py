@@ -21,7 +21,7 @@ def _settings(**values: object) -> Settings:
 def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
     settings = _settings(window_seconds=2.0, silence_timeout=0.75, green_threshold=0.95)
 
-    config = IrRangeConfig.from_settings(settings)
+    config = IrRangeConfig(settings)
 
     assert config.window_seconds == pytest.approx(2.0)
     assert config.silence_timeout == pytest.approx(0.75)
@@ -31,7 +31,7 @@ def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
 def test_with_no_overrides_each_field_holds_its_declared_default():
     defaults = declared_scene_defaults("ir_range_receiver")
 
-    config = IrRangeConfig.from_settings(_settings())
+    config = IrRangeConfig(_settings())
 
     assert {name: getattr(config, name) for name in defaults} == defaults
 
