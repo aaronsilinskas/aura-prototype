@@ -25,7 +25,8 @@ effects/          Animation engine (CircuitPython-safe)
                   EffectVerb, AudioPlaybackConfig, ResolvedClip, HapticPattern
   palette.py      Palette, PaletteLUT256 (pre-computed, immutable)
   shape.py        Shape (factory), EffectShapeFunc
-  level.py        clamp_level, level_progress, level_lerp, level_lerp_int
+  level.py        EFFECT_TOP_LEVEL, clamp_level, effect_level (the Effect Level read);
+                  level_progress, level_lerp, level_lerp_int (removed once builders migrate)
   value.py        DynamicValue, ValueGenerator, lerp
   layers/         Layer base class + scroll, flame, drift_noise, sparkle, shape, progress, pulse
                   layers and the renderer compositors
@@ -40,7 +41,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   phase.py        PhaseKey, PhaseMachine, PhaseSlot, PhaseRule, InPhaseRule
   events.py       Event, EventGroup, EffectEvent
   timer.py        Timer
-  lerp.py         Integer/float interpolation helpers
+  lerp.py         level_lerp, level_lerp_int (the one level interpolation, Game and Effect Levels)
   packs.py        PackRegistry, RegistryError family (lookup-time)
   pack_catalog.py scan_pack_roots, PackCatalog, PackScanError family (scan-time)
   scan_error.py   PackScanError base, kept apart so capabilities.py stays importable by hardware
