@@ -13,7 +13,7 @@ try:
 except ImportError:
     pass
 
-from scripts.ship_list import BOOT_DEVICE, ShipEntry, ship_list
+from scripts.ship_list import ShipEntry, ship_list
 
 _HASH_SUFFIX: Final = ".srcsha256"
 
@@ -180,12 +180,11 @@ def build(
     staging_root: Path,
     compile: Callable[[Path, Path], None],
 ) -> BuildResult:
-    """Stage the Ship list in *staging_root*: compiled entries as .mpy, raw entries copied.
+    """Stage the Ship list's module entries in *staging_root*: compiled as .mpy, raw copied.
 
-    The board's ``boot.py`` is not staged; deploy ships it from source beside ``code.py``.
+    The list's ``boot.py`` entry is not staged; deploy copies it from source beside ``code.py``.
     """
-    # Only boot.py lands on the mount root, so its entry is the one to leave out.
-    entries = [entry for entry in ship_list(source_root) if entry.device != BOOT_DEVICE]
+    entries = ship_list(source_root).modules
     staging_root.mkdir(parents=True, exist_ok=True)
     pruned = _prune_staging(staging_root, {staging_root / entry.device for entry in entries})
 
