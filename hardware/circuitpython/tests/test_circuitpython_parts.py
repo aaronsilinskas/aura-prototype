@@ -757,7 +757,7 @@ _I2S_PINS = (
 
 
 def _audio(voices: int = 2, max_volume: float = 0.5) -> AudioConfig:
-    return AudioConfig(voices, max_volume, "GP10", "GP11", "GP12")
+    return AudioConfig(voices, max_volume, *_I2S_PINS)
 
 
 def _amp() -> _FakeI2SOut:
@@ -1039,7 +1039,7 @@ def test_radio_transport_sends_through_an_rfm69_on_the_given_bus_at_its_frequenc
 ) -> None:
     bus = fake_spi()
     transport = CircuitPythonParts(_board("D10", "D11")).radio_transport(
-        RadioConfig("D10", "D11", 433.0, 7), bus, *_RADIO_PINS
+        RadioConfig(*_RADIO_PINS, 433.0, 7), bus, *_RADIO_PINS
     )
 
     transport.send(b"hi")
@@ -1055,7 +1055,7 @@ def test_radio_chip_select_and_reset_are_gpios_on_their_referenced_pins(
     board = _board("D10", "D11")
 
     CircuitPythonParts(board).radio_transport(
-        RadioConfig("D10", "D11", 433.0, 7), fake_spi(), *_RADIO_PINS
+        RadioConfig(*_RADIO_PINS, 433.0, 7), fake_spi(), *_RADIO_PINS
     )
 
     (chip,) = _FakeRfm69.built
@@ -1071,7 +1071,7 @@ def test_radio_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
 
     with pytest.raises(ValueError, match=rf"^{field}: pin 'NOPE' not found on board$"):
         CircuitPythonParts(_board("D10", "D11")).radio_transport(
-            RadioConfig("D10", "D11", 433.0, 7), fake_spi(), *pins
+            RadioConfig(*_RADIO_PINS, 433.0, 7), fake_spi(), *pins
         )
 
 
@@ -1127,7 +1127,9 @@ def test_storage_mounts_the_card_on_the_given_bus_and_chip_select_at_its_mount_p
     board = _board("D24")
     bus = fake_spi()
 
-    CircuitPythonParts(board).storage(SDCardConfig("D24", "/sd"), bus, PinRef("D24", "sdcard.cs"))
+    CircuitPythonParts(board).storage(
+        SDCardConfig(PinRef("D24", "sdcard.cs"), "/sd"), bus, PinRef("D24", "sdcard.cs")
+    )
 
     assert [(fs.card.spi, fs.card.cs, mount) for fs, mount in sd] == [(bus, board.D24, "/sd")]
 
@@ -1145,7 +1147,11 @@ def test_storage_whose_card_fails_to_mount_raises_sd_card_mount_error_naming_cs_
 
     expected = r"^sdcard section is declared but the card at cs=D24 mount=/media failed to mount: "
     with pytest.raises(SdCardMountError, match=expected) as raised:
-        parts.storage(SDCardConfig("D24", "/media"), fake_spi(), PinRef("D24", "sdcard.cs"))
+        parts.storage(
+            SDCardConfig(PinRef("D24", "sdcard.cs"), "/media"),
+            fake_spi(),
+            PinRef("D24", "sdcard.cs"),
+        )
     assert isinstance(raised.value.__cause__, OSError)
 
 
@@ -1180,10 +1186,10 @@ _REQUESTS: dict[str, Callable[[CircuitPythonParts], object]] = {
     "ir_reader": lambda parts: parts.ir_reader(PinRef("GP7", "ir.rx")),
     "ir_writer": lambda parts: parts.ir_writer("line", PinRef("GP8", "ir.line")),
     "radio_transport": lambda parts: parts.radio_transport(
-        RadioConfig("D10", "D11", 433.0, 7), fake_spi(), *_RADIO_PINS
+        RadioConfig(*_RADIO_PINS, 433.0, 7), fake_spi(), *_RADIO_PINS
     ),
     "storage": lambda parts: parts.storage(
-        SDCardConfig("D24"), fake_spi(), PinRef("D24", "sdcard.cs")
+        SDCardConfig(PinRef("D24", "sdcard.cs")), fake_spi(), PinRef("D24", "sdcard.cs")
     ),
 }
 

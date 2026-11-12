@@ -9,6 +9,7 @@ import pytest
 from hardware.shared.device_config import (
     DeviceConfig,
     MatrixPixelsConfig,
+    PinRef,
     load_device_config,
     parse_device_config,
     read_device_config_mapping,
@@ -107,9 +108,9 @@ def test_parse_full_matrix_config_maps_every_section(matrix_config):
     assert result.audio is not None
     assert result.audio.voices == 1
     assert result.audio.max_volume == 0.1
-    assert result.audio.i2s_bit_clock == "I2S_BIT_CLOCK"
-    assert result.audio.i2s_word_select == "I2S_WORD_SELECT"
-    assert result.audio.i2s_data == "I2S_DATA"
+    assert result.audio.i2s_bit_clock == PinRef("I2S_BIT_CLOCK", "audio.i2s_bit_clock")
+    assert result.audio.i2s_word_select == PinRef("I2S_WORD_SELECT", "audio.i2s_word_select")
+    assert result.audio.i2s_data == PinRef("I2S_DATA", "audio.i2s_data")
 
 
 def test_parse_matrix_config_scope_rows_converted_to_ranges(matrix_config):
@@ -865,8 +866,8 @@ def test_parse_i2c_section_maps_each_named_bus_to_its_pins(matrix_config):
     result = parse_device_config(matrix_config)
 
     assert {name: (bus.sda, bus.scl) for name, bus in result.i2c.items()} == {
-        "default": ("GP4", "GP5"),
-        "sensors": ("GP6", "GP7"),
+        "default": (PinRef("GP4", "i2c.default.sda"), PinRef("GP5", "i2c.default.scl")),
+        "sensors": (PinRef("GP6", "i2c.sensors.sda"), PinRef("GP7", "i2c.sensors.scl")),
     }
 
 
@@ -960,8 +961,16 @@ def test_parse_spi_section_maps_each_named_bus_to_its_pins(matrix_config):
     result = parse_device_config(matrix_config)
 
     assert {name: (bus.sck, bus.mosi, bus.miso) for name, bus in result.spi.items()} == {
-        "default": ("GP2", "GP3", "GP0"),
-        "radio": ("GP14", "GP15", "GP12"),
+        "default": (
+            PinRef("GP2", "spi.default.sck"),
+            PinRef("GP3", "spi.default.mosi"),
+            PinRef("GP0", "spi.default.miso"),
+        ),
+        "radio": (
+            PinRef("GP14", "spi.radio.sck"),
+            PinRef("GP15", "spi.radio.mosi"),
+            PinRef("GP12", "spi.radio.miso"),
+        ),
     }
 
 
@@ -1063,8 +1072,8 @@ def test_parse_radio_section_maps_cs_reset_frequency_node(matrix_config):
     result = parse_device_config(matrix_config)
 
     assert result.radio is not None
-    assert result.radio.cs == "GP9"
-    assert result.radio.reset == "GP10"
+    assert result.radio.cs == PinRef("GP9", "radio.cs")
+    assert result.radio.reset == PinRef("GP10", "radio.reset")
     assert result.radio.frequency == 915.0
     assert result.radio.node == 42
 
@@ -1231,7 +1240,7 @@ def test_parse_sdcard_section_maps_cs_mount_and_enabled(matrix_config):
     result = parse_device_config(matrix_config)
 
     assert result.sdcard is not None
-    assert result.sdcard.cs == "GP9"
+    assert result.sdcard.cs == PinRef("GP9", "sdcard.cs")
     assert result.sdcard.mount == "/data"
     assert result.sdcard.enabled is False
 
@@ -1453,7 +1462,7 @@ def test_parse_audio_section_with_no_clips_key_succeeds_and_carries_no_clips_att
     assert result.audio is not None
     assert result.audio.voices == 1
     assert result.audio.max_volume == 0.1
-    assert result.audio.i2s_bit_clock == "I2S_BIT_CLOCK"
+    assert result.audio.i2s_bit_clock.name == "I2S_BIT_CLOCK"
     assert not hasattr(result.audio, "clips")
 
 
@@ -1552,9 +1561,9 @@ def test_committed_sample_device_config_parses():
     result = parse_device_config(mapping)
 
     assert result.audio is not None
-    assert result.audio.i2s_bit_clock == "GP21"
-    assert result.audio.i2s_word_select == "GP22"
-    assert result.audio.i2s_data == "GP20"
+    assert result.audio.i2s_bit_clock.name == "GP21"
+    assert result.audio.i2s_word_select.name == "GP22"
+    assert result.audio.i2s_data.name == "GP20"
     assert result.accelerometer is not None
     assert result.haptics is not None
     assert result.radio is not None
