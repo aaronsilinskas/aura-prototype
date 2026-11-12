@@ -17,10 +17,17 @@ except ImportError:
 
 from engine.capabilities import MissingCapabilityError
 from engine.effects.admin import EffectAdmin, HeldEffects, SceneView
-from engine.engine import GameEngine, GameRule, Version
+from engine.engine import GameRule, Version
 from engine.packs import PackRegistry, UnknownItemError, load_item
 from engine.settings import Settings
-from engine.state import GameState, SceneControls, SceneReboot
+from engine.state import (
+    EffectControls,
+    GameState,
+    NetworkControls,
+    SceneControls,
+    SceneReboot,
+    SceneRun,
+)
 
 
 class SceneLocalRegistry:
@@ -266,8 +273,9 @@ def _scene_view(scene: Scene) -> SceneView:
 class _SceneStackEntry:
     """One entry in ``SceneManager``'s scene stack.  Internal use only.
 
-    ``view`` is the scene's Scene view, built once and handed to every
-    ``EffectAdmin`` step that brings this entry to the top.  ``held`` is the
+    ``run`` is the scene's SceneRun: its state and its rules.  ``view`` is
+    the scene's Scene view, built once and handed to every ``EffectAdmin``
+    step that brings this entry to the top.  ``held`` is the
     covered scene's effects and merge strategies, returned by
     ``EffectAdmin.cover`` when ``overlay`` pushed this entry and given to
     ``EffectAdmin.uncover`` when it is popped — ``None`` for the boot
@@ -275,40 +283,41 @@ class _SceneStackEntry:
     same entry as the scene stack means the two stacks can never desync.
     """
 
-    __slots__ = ("held", "rules", "scene", "state", "view")
+    __slots__ = ("held", "run", "scene", "view")
 
     def __init__(
         self,
         scene: Scene,
-        state: GameState,
-        rules: list[GameRule],
+        run: SceneRun,
         view: SceneView,
         held: HeldEffects | None,
     ) -> None:
         self.scene = scene
-        self.state = state
-        self.rules = rules
+        self.run = run
         self.view = view
         self.held = held
 
 
 class SceneManager(SceneControls):
-    """Manages a stack of active scenes, driving the game engine each tick.
+    """Manages a stack of active scenes, each a ``SceneRun``, ticking the top one.
 
     Construction::
 
         manager = SceneManager(
-            engine,
+            effect_controls,
+            network_controls,
+            capabilities,
             rule_registry,
             scene_registry,
             effect_admin,
             scene_reboot,
         )
 
-    Driving the game loop::
+    Driving the game loop, with the tick's elapsed time from the clock its
+    caller (``SceneRuntime``) holds::
 
         while running:
-            manager.update()
+            manager.update(elapsed)
 
     The boot composition makes the first scene active with
     ``activate_boot_scene``, which applies at once and is not on
@@ -316,14 +325,18 @@ class SceneManager(SceneControls):
 
     Scene transitions (``overlay``, ``pop``) are deferred: they
     record a pending transition and the last call per tick wins.  The
-    transition executes at the end of ``update()`` after ``engine.update``
-    has processed all queued events.
+    transition executes at the end of ``update()`` after the top
+    ``SceneRun`` has dispatched all queued events.
 
     Scene lookup delegates entirely to *scene_registry*:
     ``activate_boot_scene`` and ``overlay`` call ``scene_registry.get(name)``,
     which raises ``ValueError`` for unknown names.
 
-    The device's Capabilities are ``engine.capabilities``. Every transition
+    Each scene's ``GameState`` carries *effect_controls*, *network_controls*,
+    *capabilities*, this manager as its ``SceneControls`` and the scene's
+    Settings.
+
+    *capabilities* are the device's Capabilities. Every transition
     into a scene (``activate_boot_scene``, ``overlay``, ``reboot_into``,
     ``reboot_to_previous``) checks the target's Required capabilities against
     them and raises ``MissingCapabilityError`` before recording, persisting
@@ -331,8 +344,7 @@ class SceneManager(SceneControls):
     does not check. ``can_run`` asks the same question without raising.
 
     *effect_admin* is the scene-transition face of the same effect system
-    ``engine`` was built with (its ``EffectControls`` and ``EffectAdmin`` are
-    two faces of one ``EffectManager`` instance). Every transition makes
+    as *effect_controls* (two faces of one ``EffectManager`` instance). Every transition makes
     exactly one call to it, carrying the Scene view of the scene it brings to
     the top: ``activate_boot_scene`` enters, ``overlay`` covers and ``pop``
     uncovers. No transition reaches the effect system through a stack entry's
@@ -348,8 +360,10 @@ class SceneManager(SceneControls):
     """
 
     __slots__ = (
+        "_capabilities",
         "_effect_admin",
-        "_engine",
+        "_effect_controls",
+        "_network_controls",
         "_pending",
         "_rule_registry",
         "_scene_reboot",
@@ -359,13 +373,17 @@ class SceneManager(SceneControls):
 
     def __init__(
         self,
-        engine: GameEngine,
+        effect_controls: EffectControls,
+        network_controls: NetworkControls,
+        capabilities: frozenset[str],
         rule_registry: PackRegistry,
         scene_registry: SceneRegistry,
         effect_admin: EffectAdmin,
         scene_reboot: SceneReboot,
     ) -> None:
-        self._engine = engine
+        self._effect_controls = effect_controls
+        self._network_controls = network_controls
+        self._capabilities = capabilities
         self._rule_registry = rule_registry
         self._scene_registry = scene_registry
         self._effect_admin = effect_admin
@@ -393,12 +411,9 @@ class SceneManager(SceneControls):
             raise ValueError("Cannot activate boot scene: a scene is already active")
         scene = self._scene_registry.get(name)
         self._require_runnable(name)
-        rules = self._resolve_rules(scene)
-        state = self._engine.create_state(self, scene.settings)
-        entry = _SceneStackEntry(scene, state, rules, _scene_view(scene), held=None)
+        entry = _SceneStackEntry(scene, self._new_run(scene), _scene_view(scene), held=None)
         self._stack.append(entry)
         self._effect_admin.enter_boot_scene(entry.view)
-        self._activate(entry)
 
     # ------------------------------------------------------------------
     # SceneControls interface — deferred transitions
@@ -418,15 +433,15 @@ class SceneManager(SceneControls):
         self._pending = ("overlay", scene)
 
     def can_run(self, name: str) -> bool:
-        """Whether the engine's device has every Required capability of *name*.
+        """Whether the device has every Required capability of *name*.
 
         Raises:
             ValueError: if *name* is not in the scene registry.
         """
-        return not self._scene_registry.missing_capabilities(name, self._engine.capabilities)
+        return not self._scene_registry.missing_capabilities(name, self._capabilities)
 
     def _require_runnable(self, name: str) -> None:
-        missing = self._scene_registry.missing_capabilities(name, self._engine.capabilities)
+        missing = self._scene_registry.missing_capabilities(name, self._capabilities)
         if missing:
             raise MissingCapabilityError(missing, name)
 
@@ -435,7 +450,7 @@ class SceneManager(SceneControls):
         """The ``GameState`` for the top-most active scene, or ``None`` if the stack is empty."""
         if not self._stack:
             return None
-        return self._stack[-1].state
+        return self._stack[-1].run.state
 
     def pop(self) -> None:
         """Record a pop transition; raises immediately if stack has ≤ 1 entry."""
@@ -487,15 +502,16 @@ class SceneManager(SceneControls):
     # Main loop driver
     # ------------------------------------------------------------------
 
-    def update(self) -> None:
-        """Advance one tick: call ``engine.update`` then apply any pending transition.
+    def update(self, elapsed: float) -> None:
+        """Tick the top ``SceneRun`` by *elapsed* seconds, then apply any pending transition.
 
-        Skips ``engine.update`` when the stack is empty.  At most one pending
-        transition executes per tick; the last ``overlay``/``pop``
-        call within a tick wins.
+        Ticks nothing when the stack is empty; a covered scene is never
+        ticked, so its game time stops.  At most one pending transition
+        executes per tick; the last ``overlay``/``pop`` call within a tick
+        wins.
         """
         if self._stack:
-            self._engine.update(self._stack[-1].state)
+            self._stack[-1].run.tick(elapsed)
 
         if self._pending is not None:
             pending = self._pending
@@ -519,30 +535,30 @@ class SceneManager(SceneControls):
             combined.append(scene.local_rule_registry.get(item_name, GameRule))
         return combined
 
-    def _activate(self, entry: _SceneStackEntry) -> None:
-        self._engine.set_rules(entry.rules)
-        entry.state.clear_queue()
+    def _new_run(self, scene: Scene) -> SceneRun:
+        """Return a fresh ``SceneRun`` of *scene*: a new state and its resolved rules."""
+        state = GameState(
+            self._effect_controls,
+            self,
+            self._network_controls,
+            settings=scene.settings,
+            capabilities=self._capabilities,
+        )
+        return SceneRun(state, self._resolve_rules(scene))
 
     def _do_overlay(self, scene: Scene) -> None:
         """Suspend the current top, covering its effects, and push *scene* above it."""
-        combined_rules = self._resolve_rules(scene)
-
-        self._stack[-1].state.clear_queue()
-        state = self._engine.create_state(self, scene.settings)
+        run = self._new_run(scene)
         view = _scene_view(scene)
         held = self._effect_admin.cover(view)
-        entry = _SceneStackEntry(scene, state, combined_rules, view, held)
-        self._stack.append(entry)
-        self._activate(entry)
+        self._stack.append(_SceneStackEntry(scene, run, view, held))
 
     def _do_pop(self) -> None:
         """Remove the top entry and uncover the scene below it."""
         popped = self._stack.pop()
-        popped.state.clear_queue()
         # pop() rejects a stack of size <= 1, so the popped entry is always one
         # overlay() pushed — never the boot scene's base entry, whose held is
         # None. Narrows the type for uncover.
         assert popped.held is not None
         revealed = self._stack[-1]
         self._effect_admin.uncover(popped.held, revealed.view)
-        self._activate(revealed)

@@ -6,22 +6,29 @@ import pytest
 
 from engine.capabilities import MissingCapabilityError
 from engine.effects.merge import ADDITIVE, SPLIT
-from engine.engine import GameEngine, GameRule
+from engine.engine import GameRule
 from engine.events import Event, EventGroup
 from engine.packs import PackRegistry
 from engine.scene import PackReference, Scene, SceneLocalRegistry, SceneManager, SceneRegistry
 from engine.settings import Settings
-from engine.state import EffectControls, GameState, SceneControls, SceneReboot, Scope
+from engine.state import (
+    EffectControls,
+    GameState,
+    NetworkControls,
+    SceneControls,
+    SceneReboot,
+    Scope,
+)
 from engine.tests.effects.helpers import SpyEffectOutput
 from engine.tests.helpers import (
     RecordingSceneReboot,
     SpyEffectAdmin,
+    SpyNetworkControls,
     active_state,
     make_scene,
     make_scene_registry,
     make_scene_runtime,
 )
-from engine.timer import Timer
 from engine.version import Version
 
 # ---------------------------------------------------------------------------
@@ -59,31 +66,29 @@ class _RecordingEffectControls(EffectControls):
         self.stopped_scopes.append(scope)
 
 
-def _make_engine() -> GameEngine:
-    return GameEngine(effect_controls=_RecordingEffectControls())
-
-
-def _make_engine_with_controls():
-    """Return (engine, recording_controls) so tests can inspect stopped scopes."""
-    controls = _RecordingEffectControls()
-    return GameEngine(effect_controls=controls), controls
+_STEP = 0.25
+"""Seconds of elapsed time each tick hands the manager: exact in binary, so sums compare exactly."""
 
 
 def _make_scene_manager(
-    engine: GameEngine,
     rule_registry: PackRegistry | None = None,
     scene_registry: SceneRegistry | None = None,
     effect_admin: SpyEffectAdmin | None = None,
     scene_reboot: SceneReboot | None = None,
+    *,
+    effect_controls: EffectControls | None = None,
+    network_controls: NetworkControls | None = None,
+    capabilities: frozenset[str] = frozenset(),
 ) -> SceneManager:
-    """Construct a SceneManager, defaulting any unspecified registry/admin/port.
+    """Construct a SceneManager, defaulting any unspecified registry, port or control.
 
-    Absorbs SceneManager's injected-EffectAdmin/SceneReboot constructor
-    parameters so most call sites only need to override the
-    registries/admins/ports they actually care about.
+    Most call sites only override the registries, admin or ports they
+    actually care about; the device has no Capabilities unless given.
     """
     return SceneManager(
-        engine,
+        effect_controls if effect_controls is not None else _RecordingEffectControls(),
+        network_controls if network_controls is not None else SpyNetworkControls(),
+        capabilities,
         rule_registry if rule_registry is not None else PackRegistry(),
         scene_registry if scene_registry is not None else make_scene_registry(),
         effect_admin if effect_admin is not None else SpyEffectAdmin(),
@@ -184,12 +189,10 @@ def test_scene_rejects_unknown_attributes() -> None:
 
 
 def test_scene_manager_satisfies_scene_controls_interface() -> None:
-    engine = _make_engine()
     rule_registry = PackRegistry()
     scene_registry = make_scene_registry()
 
     manager = _make_scene_manager(
-        engine,
         rule_registry=rule_registry,
         scene_registry=scene_registry,
     )
@@ -203,7 +206,7 @@ def test_scene_manager_satisfies_scene_controls_interface() -> None:
 
 
 def test_active_state_is_none_before_any_scene_is_loaded() -> None:
-    manager = _make_scene_manager(_make_engine())
+    manager = _make_scene_manager()
 
     assert manager.active_state is None
 
@@ -214,9 +217,8 @@ def test_active_state_is_none_before_any_scene_is_loaded() -> None:
 
 
 def test_overlay_raises_immediately_for_unregistered_scene_name() -> None:
-    engine = _make_engine()
     scene_reg = make_scene_registry(("base", make_scene()))
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg)
     manager.activate_boot_scene("base")
 
     with pytest.raises(ValueError, match="Unknown scene"):
@@ -224,26 +226,23 @@ def test_overlay_raises_immediately_for_unregistered_scene_name() -> None:
 
 
 def test_overlay_raises_immediately_when_stack_is_empty() -> None:
-    engine = _make_engine()
     scene_reg = make_scene_registry(("overlay_scene", make_scene()))
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg)
 
     with pytest.raises(ValueError):
         manager.overlay("overlay_scene")
 
 
 def test_pop_raises_immediately_with_zero_entries_on_stack() -> None:
-    engine = _make_engine()
-    manager = _make_scene_manager(engine)
+    manager = _make_scene_manager()
 
     with pytest.raises(ValueError):
         manager.pop()
 
 
 def test_pop_raises_immediately_with_exactly_one_entry_on_stack() -> None:
-    engine = _make_engine()
     scene_reg = make_scene_registry(("main", make_scene()))
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg)
     manager.activate_boot_scene("main")
 
     with pytest.raises(ValueError):
@@ -256,10 +255,9 @@ def test_pop_raises_immediately_with_exactly_one_entry_on_stack() -> None:
 
 
 def test_reboot_into_delegates_to_the_injected_scene_reboot_port() -> None:
-    engine = _make_engine()
     scene_reg = make_scene_registry(("tag", make_scene()))
     scene_reboot = RecordingSceneReboot()
-    manager = _make_scene_manager(engine, scene_registry=scene_reg, scene_reboot=scene_reboot)
+    manager = _make_scene_manager(scene_registry=scene_reg, scene_reboot=scene_reboot)
 
     manager.reboot_into("tag")
 
@@ -269,9 +267,8 @@ def test_reboot_into_delegates_to_the_injected_scene_reboot_port() -> None:
 def test_reboot_into_rejects_an_unregistered_scene_name_and_persists_nothing() -> None:
     """An unknown target must never reach the port -- a typo persisted there
     would brick the next boot."""
-    engine = _make_engine()
     scene_reboot = RecordingSceneReboot()
-    manager = _make_scene_manager(engine, scene_reboot=scene_reboot)
+    manager = _make_scene_manager(scene_reboot=scene_reboot)
 
     with pytest.raises(ValueError, match="unknown scene"):
         manager.reboot_into("nonexistent")
@@ -280,9 +277,8 @@ def test_reboot_into_rejects_an_unregistered_scene_name_and_persists_nothing() -
 
 
 def test_reboot_to_previous_delegates_to_the_injected_scene_reboot_port() -> None:
-    engine = _make_engine()
     scene_reboot = RecordingSceneReboot()
-    manager = _make_scene_manager(engine, scene_reboot=scene_reboot)
+    manager = _make_scene_manager(scene_reboot=scene_reboot)
 
     manager.reboot_to_previous()
 
@@ -292,11 +288,8 @@ def test_reboot_to_previous_delegates_to_the_injected_scene_reboot_port() -> Non
 def test_reboot_to_previous_delegates_without_registry_validation() -> None:
     """Unlike reboot_into, no scene name is validated here at all -- the
     recorded return_to is checked at boot by SceneRegistry.resolve_known instead."""
-    engine = _make_engine()
     scene_reboot = RecordingSceneReboot()
-    manager = _make_scene_manager(
-        engine, scene_registry=make_scene_registry(), scene_reboot=scene_reboot
-    )
+    manager = _make_scene_manager(scene_registry=make_scene_registry(), scene_reboot=scene_reboot)
 
     manager.reboot_to_previous()  # must not raise, even with an empty registry
 
@@ -304,79 +297,59 @@ def test_reboot_to_previous_delegates_without_registry_validation() -> None:
 
 
 # ---------------------------------------------------------------------------
-# SceneManager — update() engine delegation and deferred transitions
+# SceneManager — update(elapsed) ticks the top scene, then deferred transitions
 # ---------------------------------------------------------------------------
 
 
-def test_update_skips_engine_update_when_stack_is_empty() -> None:
-    engine = _make_engine()
-    manager = _make_scene_manager(engine)
+def test_update_with_no_scene_active_does_nothing() -> None:
+    manager = _make_scene_manager()
 
-    # No exception should be raised; engine.update would fail without a state
-    manager.update()
+    manager.update(_STEP)
+
+    assert manager.active_state is None
 
 
-def test_update_calls_engine_update_with_active_state_on_each_tick() -> None:
-    engine = _TrackingEngine(_RecordingEffectControls())
+def test_update_hands_the_active_scene_the_elapsed_time_it_is_given() -> None:
     scene_reg = make_scene_registry(("main", make_scene()))
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg)
     manager.activate_boot_scene("main")
+    state = active_state(manager)
 
-    manager.update()
-    assert len(engine._update_calls) == 1
+    manager.update(0.25)
+    manager.update(0.5)
 
-    manager.update()  # another tick; same active state passed each time
-    assert len(engine._update_calls) == 2
-    assert engine._update_calls[0] is engine._update_calls[1]
-
-
-class _TrackingEngine(GameEngine):
-    """GameEngine subclass that records each update() call for order verification."""
-
-    def __init__(self, effect_controls: EffectControls) -> None:
-        super().__init__(effect_controls=effect_controls)
-        self._update_calls: list = []
-
-    @property
-    def _last_state(self) -> GameState:
-        return self._update_calls[-1]
-
-    def update(self, state: GameState) -> None:
-        self._update_calls.append(state)
-        super().update(state)
+    assert (state.elapsed, state.total) == (0.5, 0.75)
 
 
-def test_transition_applies_after_engine_update_in_same_tick() -> None:
-    engine = _TrackingEngine(_RecordingEffectControls())
+def test_a_transition_applies_after_the_scene_below_it_has_ticked() -> None:
     scene_reg = make_scene_registry(
         ("main", make_scene()),
         ("overlay_scene", make_scene(settings=_which("overlay"))),
     )
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg)
     manager.activate_boot_scene("main")
-    main_state = manager.active_state
+    main_state = active_state(manager)
 
     manager.overlay("overlay_scene")
-    manager.update()
+    manager.update(_STEP)
 
-    assert engine._update_calls == [main_state], "engine.update must run before the transition"
+    assert main_state.total == _STEP, "the covered scene must tick before the overlay applies"
     assert active_state(manager).settings.get("scene", "which") == "overlay"
 
 
 def test_last_pending_transition_wins_within_one_tick() -> None:
-    engine = _make_engine()
     scene_reg = make_scene_registry(
         ("main", make_scene()),
         ("scene_a", make_scene(settings=_which("a"))),
         ("scene_b", make_scene(settings=_which("b"))),
     )
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg)
     manager.activate_boot_scene("main")
 
     # Both recorded in one tick — last wins
     manager.overlay("scene_a")
     manager.overlay("scene_b")
-    manager.update()
+    manager.update(_STEP)
 
     assert active_state(manager).settings.get("scene", "which") == "b", (
         "last overlay() call in tick should win"
@@ -393,14 +366,14 @@ def test_scene_controls_offer_rules_no_way_to_load_a_scene_in_process() -> None:
 
 
 def test_scene_manager_offers_rules_no_way_to_load_a_scene_in_process() -> None:
-    manager = _make_scene_manager(_make_engine())
+    manager = _make_scene_manager()
 
     assert not hasattr(manager, "load")
 
 
 def test_activating_the_boot_scene_makes_it_active_at_once() -> None:
     scene_reg = make_scene_registry(("main", make_scene(settings=_which("main"))))
-    manager = _make_scene_manager(_make_engine(), scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg)
 
     manager.activate_boot_scene("main")
 
@@ -408,7 +381,7 @@ def test_activating_the_boot_scene_makes_it_active_at_once() -> None:
 
 
 def test_activating_an_unregistered_boot_scene_raises() -> None:
-    manager = _make_scene_manager(_make_engine())
+    manager = _make_scene_manager()
 
     with pytest.raises(ValueError, match="Unknown scene"):
         manager.activate_boot_scene("nonexistent")
@@ -418,8 +391,7 @@ def test_activating_a_boot_scene_the_device_cannot_run_raises_and_activates_noth
     scene_reg = make_scene_registry(
         ("tilt", make_scene(required_capabilities=frozenset({"accelerometer"})))
     )
-    engine = GameEngine(effect_controls=_RecordingEffectControls(), capabilities=_HAS_BUTTONS)
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg, capabilities=_HAS_BUTTONS)
 
     with pytest.raises(MissingCapabilityError) as excinfo:
         manager.activate_boot_scene("tilt")
@@ -430,7 +402,7 @@ def test_activating_a_boot_scene_the_device_cannot_run_raises_and_activates_noth
 
 def test_activating_a_second_boot_scene_raises_and_keeps_the_first() -> None:
     scene_reg = make_scene_registry(("first", make_scene()), ("second", make_scene()))
-    manager = _make_scene_manager(_make_engine(), scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg)
     manager.activate_boot_scene("first")
     first_state = manager.active_state
 
@@ -447,7 +419,6 @@ def test_activating_the_boot_scene_enters_it_with_its_view(pack_tree) -> None:
     )
     admin = SpyEffectAdmin()
     manager = _make_scene_manager(
-        _make_engine(),
         rule_registry=catalog.rule_registry,
         scene_registry=catalog.scene_registry,
         effect_admin=admin,
@@ -468,36 +439,55 @@ def test_activating_the_boot_scene_enters_it_with_its_view(pack_tree) -> None:
 
 
 def test_the_boot_scenes_state_carries_the_scene_manager_as_scene_controls() -> None:
-    engine = _TrackingEngine(_RecordingEffectControls())
     scene_reg = make_scene_registry(("main", make_scene()))
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg)
     manager.activate_boot_scene("main")
-    manager.update()  # engine.update(active_state)
+    manager.update(_STEP)
 
-    assert engine._last_state.scene_controls is manager
+    assert active_state(manager).scene_controls is manager
 
 
 def test_the_boot_scenes_state_carries_the_scenes_settings() -> None:
-    engine = _TrackingEngine(_RecordingEffectControls())
     settings = _which("main")
     scene_reg = make_scene_registry(("main", make_scene(settings=settings)))
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg)
     manager.activate_boot_scene("main")
-    manager.update()  # engine.update(active_state); _last_state is now set
+    manager.update(_STEP)
 
-    assert engine._last_state.settings is settings
+    assert active_state(manager).settings is settings
+
+
+def test_a_scenes_state_carries_the_devices_controls_and_capabilities() -> None:
+    effect_controls = _RecordingEffectControls()
+    network_controls = SpyNetworkControls()
+    scene_reg = make_scene_registry(("main", make_scene()), ("pause", make_scene()))
+    manager = _make_scene_manager(
+        scene_registry=scene_reg,
+        effect_controls=effect_controls,
+        network_controls=network_controls,
+        capabilities=_HAS_BUTTONS,
+    )
+    manager.activate_boot_scene("main")
+    manager.overlay("pause")
+    manager.update(_STEP)
+
+    state = active_state(manager)
+
+    assert state.effect_controls is effect_controls
+    assert state.network_controls is network_controls
+    assert state.capabilities.has("button.A")
 
 
 def test_no_transition_stops_effects_through_the_rule_facing_controls() -> None:
-    engine, controls = _make_engine_with_controls()
+    controls = _RecordingEffectControls()
     scene_reg = make_scene_registry(("main", make_scene()), ("overlay_scene", make_scene()))
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg, effect_controls=controls)
 
     manager.activate_boot_scene("main")
     manager.overlay("overlay_scene")
-    manager.update()
+    manager.update(_STEP)
     manager.pop()
-    manager.update()
+    manager.update(_STEP)
 
     assert controls.stopped_scopes == []
 
@@ -510,7 +500,6 @@ def test_the_boot_scenes_rules_receive_events(pack_tree) -> None:
         }
     )
     rule_registry = catalog.rule_registry
-    engine = _TrackingEngine(_RecordingEffectControls())
 
     fired: list = []
 
@@ -521,15 +510,14 @@ def test_the_boot_scenes_rules_receive_events(pack_tree) -> None:
     scene_rule.on(Event, lambda e, s: fired.append("scene"))
     scene_reg = make_scene_registry(("main", make_scene(rule_packs=[_ref("stubs"), _ref("rules")])))
     manager = _make_scene_manager(
-        engine,
         rule_registry=rule_registry,
         scene_registry=scene_reg,
     )
     manager.activate_boot_scene("main")
-    manager.update()  # engine.update(active_state)
+    manager.update(_STEP)
 
-    engine._last_state.queue_event(Event(_GROUP, "verify"))
-    manager.update()
+    active_state(manager).queue_event(Event(_GROUP, "verify"))
+    manager.update(_STEP)
 
     assert "scene" in fired, "scene rule must receive events"
     assert "pack" in fired, "pack rule must receive events"
@@ -543,7 +531,6 @@ def test_scene_rules_fire_before_pack_rules(pack_tree) -> None:
         }
     )
     rule_registry = catalog.rule_registry
-    engine = _TrackingEngine(_RecordingEffectControls())
 
     fired: list = []
 
@@ -554,15 +541,14 @@ def test_scene_rules_fire_before_pack_rules(pack_tree) -> None:
     scene_rule.on(Event, lambda e, s: fired.append("scene"))
     scene_reg = make_scene_registry(("main", make_scene(rule_packs=[_ref("stubs"), _ref("rules")])))
     manager = _make_scene_manager(
-        engine,
         rule_registry=rule_registry,
         scene_registry=scene_reg,
     )
     manager.activate_boot_scene("main")
-    manager.update()
+    manager.update(_STEP)
 
-    engine._last_state.queue_event(Event(_GROUP, "verify"))
-    manager.update()
+    active_state(manager).queue_event(Event(_GROUP, "verify"))
+    manager.update(_STEP)
 
     assert fired.index("scene") < fired.index("pack")
 
@@ -573,60 +559,25 @@ def test_scene_rules_fire_before_pack_rules(pack_tree) -> None:
 
 
 def test_overlay_suspends_active_scene_and_pushes_without_clearing_stack() -> None:
-    engine = _make_engine()
     scene_reg = make_scene_registry(
         ("base", make_scene(settings=_which("base"))),
         ("overlay_scene", make_scene(settings=_which("overlay"))),
     )
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg)
 
     manager.activate_boot_scene("base")
-    manager.update()  # tick on base
+    manager.update(_STEP)  # tick on base
 
     manager.overlay("overlay_scene")
-    manager.update()
-    manager.update()  # tick on overlay
+    manager.update(_STEP)
+    manager.update(_STEP)  # tick on overlay
     assert active_state(manager).settings.get("scene", "which") == "overlay"
 
     # base was suspended (not cleared): popping restores it
     manager.pop()
-    manager.update()
-    manager.update()
+    manager.update(_STEP)
+    manager.update(_STEP)
     assert active_state(manager).settings.get("scene", "which") == "base"
-
-
-def test_overlay_clears_suspended_base_state_queue_before_pushing(pack_tree) -> None:
-    engine = _TrackingEngine(_RecordingEffectControls())
-    rule_registry = pack_tree.scan(
-        rule_packs={"stubs": {"base_rule": _GAME_RULE_SOURCE}}
-    ).rule_registry
-    base_events: list = []
-    base_rule = rule_registry.get("stubs", "base_rule", GameRule)
-    base_rule.on(Event, lambda e, s: base_events.append(e.name))
-    scene_reg = make_scene_registry(
-        ("base", make_scene(rule_packs=[_ref("stubs")])),
-        ("overlay_scene", make_scene()),
-    )
-    manager = _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
-
-    manager.activate_boot_scene("base")
-    manager.update()  # engine.update(base_state)
-    base_state = engine._last_state
-
-    # Queue a stale event, then overlay (which clears the base_state queue)
-    base_state.queue_event(Event(_GROUP, "stale"))
-    manager.overlay("overlay_scene")
-    manager.update()  # engine.update on base, then overlay fires + clears base_state queue
-
-    # After overlay, queue another event on the suspended base_state externally
-    base_state.queue_event(Event(_GROUP, "while_suspended"))
-    manager.pop()
-    manager.update()  # pop fires: defensive clear_queue on base_state, then on_resume
-    manager.update()  # engine.update(base_state); "while_suspended" must have been cleared
-
-    assert "while_suspended" not in base_events, (
-        "event queued while suspended must not replay after pop"
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -642,7 +593,6 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_tre
         }
     )
     rule_registry = catalog.rule_registry
-    engine = _TrackingEngine(_RecordingEffectControls())
 
     base_events: list = []
     base_rule = rule_registry.get("stubs", "base_rule", GameRule)
@@ -656,86 +606,49 @@ def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_tre
         ("overlay_scene", make_scene()),
     )
     manager = _make_scene_manager(
-        engine,
         rule_registry=rule_registry,
         scene_registry=scene_reg,
     )
 
     manager.activate_boot_scene("base")
-    manager.update()  # tick on base; _last_state = base_state
     manager.overlay("overlay_scene")
-    manager.update()  # engine.update(base_state), then overlay fires
+    manager.update(_STEP)
     manager.pop()
-    manager.update()  # engine.update(overlay_state), then pop fires; base rules restored
-    manager.update()  # engine.update(base_state); _last_state = base_state
+    manager.update(_STEP)
 
-    engine._last_state.queue_event(Event(_GROUP, "verify"))
-    manager.update()
+    active_state(manager).queue_event(Event(_GROUP, "verify"))
+    manager.update(_STEP)
 
     assert "verify" in base_events, "base_rule must receive events after pop restores base scene"
     assert "verify" in pack_events, "pack_rule must receive events after pop restores base scene"
 
 
-def test_pop_clears_restored_state_queue_so_suspended_events_do_not_replay(pack_tree) -> None:
-    engine = _TrackingEngine(_RecordingEffectControls())
-    rule_registry = pack_tree.scan(
-        rule_packs={"stubs": {"base_rule": _GAME_RULE_SOURCE}}
-    ).rule_registry
-    base_events: list = []
-    base_rule = rule_registry.get("stubs", "base_rule", GameRule)
-    base_rule.on(Event, lambda e, s: base_events.append(e.name))
-    scene_reg = make_scene_registry(
-        ("base", make_scene(rule_packs=[_ref("stubs")])),
-        ("overlay_scene", make_scene()),
-    )
-    manager = _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
-
-    manager.activate_boot_scene("base")
-    manager.update()  # engine.update(base_state); _last_state = base_state
-    base_state = engine._last_state
-
-    manager.overlay("overlay_scene")
-    manager.update()  # overlay fires; base_state.clear_queue() called
-
-    # Directly queue a stale event on the suspended base_state
-    base_state.queue_event(Event(_GROUP, "stale_while_suspended"))
-
-    manager.pop()
-    manager.update()  # pop fires: defensive clear_queue on base_state before on_resume
-    manager.update()  # engine.update(base_state) — stale event must not fire
-
-    assert "stale_while_suspended" not in base_events, (
-        "events queued on suspended state must be discarded by pop's defensive clear_queue"
-    )
-
-
 def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
-    engine = _make_engine()
     scene_reg = make_scene_registry(
         ("base", make_scene(settings=_which("base"))),
         ("mid", make_scene(settings=_which("mid"))),
         ("top", make_scene(settings=_which("top"))),
     )
-    manager = _make_scene_manager(engine, scene_registry=scene_reg)
+    manager = _make_scene_manager(scene_registry=scene_reg)
 
     manager.activate_boot_scene("base")
     manager.overlay("mid")
-    manager.update()
+    manager.update(_STEP)
     manager.overlay("top")
-    manager.update()
-    manager.update()  # tick on top
+    manager.update(_STEP)
+    manager.update(_STEP)  # tick on top
 
     manager.pop()
-    manager.update()
-    manager.update()  # tick on restored scene
+    manager.update(_STEP)
+    manager.update(_STEP)  # tick on restored scene
 
     assert active_state(manager).settings.get("scene", "which") == "mid", (
         "pop from 3-layer stack must restore the scene directly below"
     )
 
     manager.pop()
-    manager.update()
-    manager.update()
+    manager.update(_STEP)
+    manager.update(_STEP)
 
     assert active_state(manager).settings.get("scene", "which") == "base"
 
@@ -744,80 +657,65 @@ def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
 # SceneManager — a covered scene's game time stops
 # ---------------------------------------------------------------------------
 
-_STEP = 0.25
-"""Seconds each tick of a ``_SteppingTimer`` lasts: exact in binary, so sums compare exactly."""
-
-
-class _SteppingTimer(Timer):
-    """An engine clock whose every tick lasts exactly ``_STEP`` seconds."""
-
-    def update(self) -> None:
-        self.elapsed = _STEP
-        self.total += _STEP
-
 
 def _covered_scene_manager(
     rule_registry: PackRegistry | None = None, rule_packs=()
-) -> tuple[SceneManager, Timer]:
-    """A SceneManager with ``base`` (running *rule_packs*) and ``pause``, and its clock."""
-    clock = _SteppingTimer()
-    engine = GameEngine(effect_controls=_RecordingEffectControls(), timer=clock)
+) -> SceneManager:
+    """A SceneManager with ``base`` (running *rule_packs*) and ``pause``."""
     scene_reg = make_scene_registry(
         ("base", make_scene(rule_packs=list(rule_packs))),
         ("pause", make_scene()),
     )
-    manager = _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
-    return manager, clock
+    return _make_scene_manager(rule_registry=rule_registry, scene_registry=scene_reg)
 
 
-def _tick(manager: SceneManager, clock: Timer, ticks: int) -> None:
-    """Run *ticks* ticks as the scene tick does: advance *clock*, then update *manager*."""
+def _tick(manager: SceneManager, ticks: int) -> None:
+    """Run *ticks* ticks of ``_STEP`` seconds each, as ``SceneRuntime`` hands them down."""
     for _ in range(ticks):
-        clock.update()
-        manager.update()
+        manager.update(_STEP)
 
 
 def test_a_covered_scenes_game_time_stops_while_covered() -> None:
-    manager, clock = _covered_scene_manager()
+    manager = _covered_scene_manager()
     manager.activate_boot_scene("base")
     base_state = active_state(manager)
-    _tick(manager, clock, 4)
+    _tick(manager, 4)
 
     manager.overlay("pause")
-    _tick(manager, clock, 1)  # base's last tick; the overlay arrives at its end
+    _tick(manager, 1)  # base's last tick; the overlay arrives at its end
     covered_at = base_state.total
-    _tick(manager, clock, 10)
+    _tick(manager, 10)
 
     assert base_state.total == covered_at == 5 * _STEP
 
 
 def test_after_pop_a_covered_scenes_game_time_continues_from_where_it_stopped() -> None:
-    manager, clock = _covered_scene_manager()
+    manager = _covered_scene_manager()
     manager.activate_boot_scene("base")
     base_state = active_state(manager)
-    _tick(manager, clock, 4)
+    _tick(manager, 4)
     manager.overlay("pause")
-    _tick(manager, clock, 1)
-    _tick(manager, clock, 10)
+    _tick(manager, 1)
+    _tick(manager, 10)
 
     manager.pop()
-    _tick(manager, clock, 1)  # the overlay's last tick; the pop applies at its end
-    _tick(manager, clock, 3)
+    _tick(manager, 1)  # the overlay's last tick; the pop applies at its end
+    _tick(manager, 3)
 
     assert base_state.total == (5 + 3) * _STEP
 
 
 def test_a_covered_scenes_first_tick_after_pop_has_an_ordinary_elapsed() -> None:
-    manager, clock = _covered_scene_manager()
+    manager = _covered_scene_manager()
     manager.activate_boot_scene("base")
     base_state = active_state(manager)
     manager.overlay("pause")
-    _tick(manager, clock, 1)
-    _tick(manager, clock, 10)
+    _tick(manager, 1)
+    _tick(manager, 10)
     manager.pop()
-    _tick(manager, clock, 1)
+    _tick(manager, 1)
 
-    _tick(manager, clock, 1)
+    _tick(manager, 1)
 
     assert base_state.elapsed == _STEP
 
@@ -847,31 +745,31 @@ def test_a_phases_elapsed_time_excludes_the_time_its_scene_spent_covered(pack_tr
     rule_registry = pack_tree.scan(
         rule_packs={"timed": {"rule": _PHASE_ELAPSED_RULE}}
     ).rule_registry
-    manager, clock = _covered_scene_manager(rule_registry, rule_packs=[_ref("timed")])
+    manager = _covered_scene_manager(rule_registry, rule_packs=[_ref("timed")])
     manager.activate_boot_scene("base")
     base_state = active_state(manager)
-    _tick(manager, clock, 4)
+    _tick(manager, 4)
     manager.overlay("pause")
-    _tick(manager, clock, 1)
-    _tick(manager, clock, 10)
+    _tick(manager, 1)
+    _tick(manager, 10)
     manager.pop()
-    _tick(manager, clock, 1)
-    _tick(manager, clock, 2)
+    _tick(manager, 1)
+    _tick(manager, 2)
 
     base_state.queue_event(Event(_GROUP, "tick"))
-    _tick(manager, clock, 1)
+    _tick(manager, 1)
 
     assert base_state.get("phase_elapsed", -1.0) == (5 + 3) * _STEP
 
 
 def test_an_overlays_game_time_starts_when_the_overlay_arrives() -> None:
-    manager, clock = _covered_scene_manager()
+    manager = _covered_scene_manager()
     manager.activate_boot_scene("base")
-    _tick(manager, clock, 4)
+    _tick(manager, 4)
     manager.overlay("pause")
-    _tick(manager, clock, 1)
+    _tick(manager, 1)
 
-    _tick(manager, clock, 3)
+    _tick(manager, 3)
 
     assert active_state(manager).total == 3 * _STEP
 
@@ -893,7 +791,6 @@ def test_rule_pack_items_all_receive_events_after_load(pack_tree) -> None:
         }
     )
     rule_registry = catalog.rule_registry
-    engine = _TrackingEngine(_RecordingEffectControls())
 
     fired_by: list = []
 
@@ -906,15 +803,14 @@ def test_rule_pack_items_all_receive_events_after_load(pack_tree) -> None:
     scene_rule.on(Event, lambda e, s: fired_by.append("scene"))
     scene_reg = make_scene_registry(("main", make_scene(rule_packs=[_ref("stubs"), _ref("rules")])))
     manager = _make_scene_manager(
-        engine,
         rule_registry=rule_registry,
         scene_registry=scene_reg,
     )
     manager.activate_boot_scene("main")
-    manager.update()  # engine.update(active_state)
+    manager.update(_STEP)
 
-    engine._last_state.queue_event(Event(_GROUP, "verify"))
-    manager.update()
+    active_state(manager).queue_event(Event(_GROUP, "verify"))
+    manager.update(_STEP)
 
     assert "scene" in fired_by, "scene rule must fire"
     assert "pack_a" in fired_by, "pack rule_a must fire"
@@ -961,7 +857,6 @@ def test_a_flash_scene_runs_a_rule_from_a_card_rule_pack(pack_tree) -> None:
     pack_tree.scene(flash, "lobby", rule_packs=[{"name": "card_pack", "version": "1.0"}])
     catalog = pack_tree.scan_roots(flash, card)
     manager = _make_scene_manager(
-        _make_engine(),
         rule_registry=catalog.rule_registry,
         scene_registry=catalog.scene_registry,
     )
@@ -969,7 +864,7 @@ def test_a_flash_scene_runs_a_rule_from_a_card_rule_pack(pack_tree) -> None:
     state = active_state(manager)
 
     state.queue_event(Event(_GROUP, "ping"))
-    manager.update()
+    manager.update(_STEP)
 
     assert state.get_or_none("card_pack_rule_ran", bool) is True
 
@@ -985,9 +880,8 @@ def test_a_flash_scene_runs_a_rule_from_a_card_rule_pack(pack_tree) -> None:
 
 
 def test_pop_activates_revealed_entry_with_both_rules_and_its_view(pack_tree) -> None:
-    """After boot → overlay → pop, the revealed entry has rules on the engine
-    AND its own view handed to uncover (invariant: no half-activation)."""
-    engine = _make_engine()
+    """After boot → overlay → pop, the revealed entry runs its rules again
+    AND has its own view handed to uncover (invariant: no half-activation)."""
     base_local_registry = SceneLocalRegistry()
     rule_registry = pack_tree.scan(
         rule_packs={"stubs": {"base_rule": _GAME_RULE_SOURCE}}
@@ -1003,19 +897,19 @@ def test_pop_activates_revealed_entry_with_both_rules_and_its_view(pack_tree) ->
     )
     admin = SpyEffectAdmin()
     manager = _make_scene_manager(
-        engine, rule_registry=rule_registry, scene_registry=scene_reg, effect_admin=admin
+        rule_registry=rule_registry, scene_registry=scene_reg, effect_admin=admin
     )
 
     manager.activate_boot_scene("base")
     manager.overlay("overlay_scene")
-    manager.update()
+    manager.update(_STEP)
 
     manager.pop()
-    manager.update()
+    manager.update(_STEP)
 
     active_state(manager).queue_event(Event(_GROUP, "check"))
-    manager.update()
-    assert base_events, "base rules must be active on the engine after pop"
+    manager.update(_STEP)
+    assert base_events, "base rules must run again after pop"
     assert admin.steps[-1][1].local_effects is base_local_registry
 
 
@@ -1029,7 +923,6 @@ def test_each_transition_makes_one_effect_admin_step_carrying_the_top_scenes_vie
     )
     admin = SpyEffectAdmin()
     manager = _make_scene_manager(
-        _make_engine(),
         rule_registry=catalog.rule_registry,
         scene_registry=scene_reg,
         effect_admin=admin,
@@ -1037,9 +930,9 @@ def test_each_transition_makes_one_effect_admin_step_carrying_the_top_scenes_vie
 
     manager.activate_boot_scene("base")
     manager.overlay("overlay_scene")
-    manager.update()
+    manager.update(_STEP)
     manager.pop()
-    manager.update()
+    manager.update(_STEP)
 
     assert [(step, view.declared_packs) for step, view in admin.steps] == [
         ("enter", frozenset({"fx"})),
@@ -1053,17 +946,17 @@ def test_pop_hands_back_the_bundle_its_overlay_set_aside() -> None:
         ("base", make_scene()), ("mid", make_scene()), ("top", make_scene())
     )
     admin = SpyEffectAdmin()
-    manager = _make_scene_manager(_make_engine(), scene_registry=scene_reg, effect_admin=admin)
+    manager = _make_scene_manager(scene_registry=scene_reg, effect_admin=admin)
     manager.activate_boot_scene("base")
     manager.overlay("mid")
-    manager.update()
+    manager.update(_STEP)
     manager.overlay("top")
-    manager.update()
+    manager.update(_STEP)
 
     manager.pop()
-    manager.update()
+    manager.update(_STEP)
     manager.pop()
-    manager.update()
+    manager.update(_STEP)
 
     under_mid, under_top = admin.covered
     assert admin.uncovered[0] is under_top
@@ -1083,17 +976,16 @@ def test_uncovering_carries_the_covered_scenes_whole_view(pack_tree) -> None:
     )
     admin = SpyEffectAdmin()
     manager = _make_scene_manager(
-        _make_engine(),
         rule_registry=catalog.rule_registry,
         scene_registry=catalog.scene_registry,
         effect_admin=admin,
     )
     manager.activate_boot_scene("base")
     manager.overlay("overlay_scene")
-    manager.update()
+    manager.update(_STEP)
 
     manager.pop()
-    manager.update()
+    manager.update(_STEP)
 
     step, view = admin.steps[-1]
     assert step == "uncover"
@@ -1341,8 +1233,9 @@ def _capability_manager(scene_reboot: SceneReboot | None = None) -> SceneManager
         ("home", make_scene()),
         ("tilt", make_scene(required_capabilities=frozenset({"accelerometer"}))),
     )
-    engine = GameEngine(effect_controls=_RecordingEffectControls(), capabilities=_HAS_BUTTONS)
-    manager = _make_scene_manager(engine, scene_registry=scene_reg, scene_reboot=scene_reboot)
+    manager = _make_scene_manager(
+        scene_registry=scene_reg, scene_reboot=scene_reboot, capabilities=_HAS_BUTTONS
+    )
     manager.activate_boot_scene("home")
     return manager
 
@@ -1391,7 +1284,7 @@ def test_a_refused_overlay_leaves_the_active_scene_in_place() -> None:
 
     with pytest.raises(MissingCapabilityError):
         manager.overlay("tilt")
-    manager.update()
+    manager.update(_STEP)
 
     assert manager.active_state is before
 
