@@ -1,6 +1,6 @@
 """Tests for ProgressFillEffect — self-animating progress-bar fill.
 
-Prior art: ``packs/effects/basic/helpers/progress_effect.py`` (static fill
+Prior art: ``effects/layers/progress_renderer.py`` (static fill
 render) and ``packs/effects/basic/tests/test_pulse_effect.py`` (driving
 ``update(elapsed)`` across steps).
 """
