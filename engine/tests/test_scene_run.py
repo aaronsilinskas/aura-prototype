@@ -76,6 +76,19 @@ def test_an_event_dispatched_in_one_tick_is_not_dispatched_again_in_the_next() -
     assert log == [("rule", event)]
 
 
+def test_tick_dispatches_every_event_queued_beyond_the_initial_capacity_in_order() -> None:
+    log: list[tuple[str, Event]] = []
+    state = GameState(EffectControls(), SceneControls(), queue_capacity=2)
+    run = SceneRun(state, [_RecordingRule("rule", log)])
+    events = [Event(_GROUP, str(i)) for i in range(5)]
+    for event in events:
+        state.queue_event(event)
+
+    run.tick(0.0)
+
+    assert log == [("rule", event) for event in events]
+
+
 class _ReadingRule(GameRule):
     """Records ``(elapsed, total, dispatch_count)`` as read inside each handler call."""
 

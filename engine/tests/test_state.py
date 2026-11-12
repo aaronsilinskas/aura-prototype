@@ -1,6 +1,5 @@
 import pytest
 
-from engine.events import Event, EventGroup
 from engine.state import (
     EffectControls,
     EffectReceipt,
@@ -10,8 +9,6 @@ from engine.state import (
     ScopeValue,
     StateSlot,
 )
-
-_GROUP = EventGroup("test")
 
 # ---------------------------------------------------------------------------
 # GameState.get_or_none
@@ -447,83 +444,113 @@ def test_state_slot_is_in_is_false_after_key_deleted_from_state() -> None:
 
 
 # ---------------------------------------------------------------------------
-# GameState event queue — enqueue and indexed read-back
+# GameState.elapsed / total / dispatch_count — read-only to rules
 # ---------------------------------------------------------------------------
 
 
-def test_event_count_is_zero_for_a_fresh_state() -> None:
+def test_elapsed_is_read_only() -> None:
     state = _make_state()
 
-    assert state.event_count == 0
+    with pytest.raises(AttributeError):
+        state.elapsed = 1.0  # type: ignore[misc]  # read-only, must raise
 
 
-def test_queued_event_increments_event_count() -> None:
+def test_total_is_read_only() -> None:
     state = _make_state()
 
-    state.queue_event(Event(_GROUP, "tick"))
+    with pytest.raises(AttributeError):
+        state.total = 1.0  # type: ignore[misc]  # read-only, must raise
 
-    assert state.event_count == 1
 
-
-def test_event_at_returns_events_in_enqueue_order() -> None:
+def test_dispatch_count_is_read_only() -> None:
     state = _make_state()
-    first = Event(_GROUP, "first")
-    second = Event(_GROUP, "second")
 
-    state.queue_event(first)
-    state.queue_event(second)
-
-    assert state.event_at(0) is first
-    assert state.event_at(1) is second
+    with pytest.raises(AttributeError):
+        state.dispatch_count = 1  # type: ignore[misc]  # read-only, must raise
 
 
 # ---------------------------------------------------------------------------
-# GameState event queue — reset_queue and clear_queue
+# GameState — typed accessor API (get, set, pop, delete, has)
 # ---------------------------------------------------------------------------
 
 
-def test_reset_queue_empties_the_queue() -> None:
+def test_get_returns_value_when_key_is_present() -> None:
+    state = GameState(EffectControls(), SceneControls(), data={"x": 42})
+
+    assert state.get("x", 0) == 42
+
+
+def test_get_returns_default_when_key_is_absent() -> None:
     state = _make_state()
-    state.queue_event(Event(_GROUP, "tick"))
 
-    state.reset_queue()
-
-    assert state.event_count == 0
+    assert state.get("missing", 99) == 99
 
 
-def test_clear_queue_empties_the_queue() -> None:
+def test_set_then_get_returns_stored_value() -> None:
     state = _make_state()
-    state.queue_event(Event(_GROUP, "tick"))
+    state.set("y", "hello")
 
-    state.clear_queue()
-
-    assert state.event_count == 0
+    assert state.get("y", "") == "hello"
 
 
-def test_events_queued_after_reset_start_at_index_zero() -> None:
+def test_pop_removes_and_returns_value() -> None:
+    state = GameState(EffectControls(), SceneControls(), data={"n": 7})
+
+    result = state.pop("n", int)
+
+    assert result == 7
+    assert "n" not in state
+
+
+def test_pop_raises_key_error_when_key_is_absent() -> None:
     state = _make_state()
-    state.queue_event(Event(_GROUP, "old"))
-    state.reset_queue()
 
-    fresh = Event(_GROUP, "new")
-    state.queue_event(fresh)
+    with pytest.raises(KeyError):
+        state.pop("absent", int)
 
-    assert state.event_count == 1
-    assert state.event_at(0) is fresh
+
+def test_pop_raises_value_error_on_type_mismatch_and_does_not_remove_key() -> None:
+    state = GameState(EffectControls(), SceneControls(), data={"v": "text"})
+
+    with pytest.raises(ValueError):
+        state.pop("v", int)
+
+    assert "v" in state
+
+
+def test_delete_removes_a_present_key() -> None:
+    state = GameState(EffectControls(), SceneControls(), data={"k": 1})
+    state.delete("k")
+
+    assert "k" not in state
+
+
+def test_delete_is_a_noop_when_key_is_absent() -> None:
+    state = _make_state()
+
+    state.delete("nonexistent")  # must not raise
+
+
+def test_has_returns_true_when_key_is_present() -> None:
+    state = GameState(EffectControls(), SceneControls(), data={"p": True})
+
+    assert "p" in state
+
+
+def test_has_returns_false_when_key_is_absent() -> None:
+    state = _make_state()
+
+    assert "absent" not in state
 
 
 # ---------------------------------------------------------------------------
-# GameState event queue — overflow grows the backing store
+# GameState.scene_controls — scene transition interface
 # ---------------------------------------------------------------------------
 
 
-def test_queue_grows_to_hold_more_events_than_initial_capacity() -> None:
-    state = GameState(EffectControls(), SceneControls(), queue_capacity=2)
-    events = [Event(_GROUP, str(i)) for i in range(5)]
+def test_state_exposes_scene_controls_passed_at_construction() -> None:
+    scene_controls = SceneControls()
 
-    for event in events:
-        state.queue_event(event)
+    state = GameState(EffectControls(), scene_controls)
 
-    assert state.event_count == 5
-    for i, event in enumerate(events):
-        assert state.event_at(i) is event
+    assert state.scene_controls is scene_controls
