@@ -3,14 +3,41 @@ from __future__ import annotations
 __all__ = [
     "EffectAdmin",
     "HeldEffects",
+    "SceneView",
 ]
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from engine.scene import SceneLocalRegistry
+
+
+class SceneView:
+    """What the Active scene namespace holds for one scene.
+
+    The scene's local effects (``None`` when it has none), its local sounds
+    as a bare ``{stem: path}`` map, and the names of the effect packs it
+    declares. Carried by every ``EffectAdmin`` step, which installs it.
+    """
+
+    __slots__ = ("declared_packs", "local_effects", "local_sounds")
+
+    def __init__(
+        self,
+        local_effects: SceneLocalRegistry | None,
+        local_sounds: dict[str, str],
+        declared_packs: frozenset[str],
+    ) -> None:
+        self.local_effects = local_effects
+        self.local_sounds = local_sounds
+        self.declared_packs = declared_packs
 
 
 class HeldEffects:
     """A covered scene's running effects and merge strategies, set aside together.
 
-    Returned by ``EffectAdmin.set_aside`` and handed back, unopened, to
-    ``EffectAdmin.put_back``. Its contents belong to the effect system that
+    Returned by ``EffectAdmin.cover`` and handed back, unopened, to
+    ``EffectAdmin.uncover``. Its contents belong to the effect system that
     made it; ``SceneManager`` only carries it in the Overlay's scene stack
     entry.
     """
@@ -22,43 +49,33 @@ class EffectAdmin:
     """Scene-transition-facing effect interface, reserved for ``SceneManager``.
 
     Carries the operations ``EffectControls`` deliberately sheds so rules never
-    see them: setting a covered scene's effects aside for an Overlay, putting
-    them back on ``pop``, and starting a booted scene on Split.
-    The active scene's local effects and declared packs go to the Active
-    scene namespace instead.
-    ``SceneManager`` holds an injected ``EffectAdmin`` handle (wired to the same
-    instance as ``state.effect_controls``, e.g. the single ``EffectManager``)
-    and drives every transition call through it, never through
-    ``state.effect_controls``. All three methods raise ``NotImplementedError``
-    by default.
+    see them: one step per transition, each installing the ``SceneView`` it is
+    given into the Active scene namespace (ADR-0008). ``SceneManager`` makes
+    exactly one of these calls per transition, never reaching the effect
+    system through a stack entry's ``state.effect_controls``. All three steps
+    raise ``NotImplementedError`` by default.
     """
 
-    def reset_merge_strategies(self) -> None:
-        """Reset every registered scope key's merge strategy to ``SPLIT``.
-
-        Called by ``SceneManager.activate_boot_scene`` so the boot scene starts
-        on Split.
-        """
+    def enter_boot_scene(self, view: SceneView) -> None:
+        """Put every scope on ``SPLIT``, then install the boot scene's *view*."""
         raise NotImplementedError
 
-    def set_aside(self) -> HeldEffects:
-        """Take every running effect and the merge strategies out of play, together.
+    def cover(self, view: SceneView) -> HeldEffects:
+        """Set the running effects and merge strategies aside, then install the Overlay's *view*.
 
         Afterwards no effect is running, so scopes go dark on the next tick,
         and every scope is on ``SPLIT``. Held effects are neither updated nor
         rendered, and effect calls (including a stop on ``Scope.ALL``) don't
-        reach them; their receipts stay valid. Called by
-        ``SceneManager._do_overlay``; the result rides in the Overlay's scene
-        stack entry.
+        reach them; their receipts stay valid. The result rides in the
+        Overlay's scene stack entry until ``uncover``.
         """
         raise NotImplementedError
 
-    def put_back(self, held: HeldEffects) -> None:
-        """Make *held*'s effects the running set again and restore its merge strategies.
+    def uncover(self, held: HeldEffects, view: SceneView) -> None:
+        """Stop every running effect, put *held* back, then reinstall the covered scene's *view*.
 
-        Expects no effect to be running (the Overlay's own were stopped
-        first). Held effects resume from where they froze; any whose receipt
-        was stopped while held is removed on the next tick, as usual. Called
-        by ``SceneManager._do_pop`` with the popped entry's bundle.
+        The stopped effects are the Overlay's own. *held*'s effects resume
+        from where they froze, under their merge strategies; any whose
+        receipt was stopped while held is removed on the next tick, as usual.
         """
         raise NotImplementedError

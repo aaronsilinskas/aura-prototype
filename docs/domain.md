@@ -52,7 +52,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   network.py      NetworkEvents
   log.py          Board-free, tag-prefixed line logger with an injectable sink
   effects/
-    admin.py      EffectAdmin, HeldEffects (scene-transition face; hardware can't reach it)
+    admin.py      EffectAdmin, HeldEffects, SceneView (scene-transition face; hardware can't reach it)
     builder.py    EffectBuilder
     manager.py    EffectManager; VerbKeyError
     output.py     EffectOutput (abstract hardware output port)
@@ -164,14 +164,15 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
 | `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
 | `EffectControls` | `engine/state.py` | Rule-facing effect seam |
-| `EffectAdmin` | `engine/effects/admin.py` | Overlay seam, reserved for `SceneManager`: `set_aside` → `HeldEffects` (running effects + merge strategies; live set left empty, on Split), `put_back(held)`, `reset_merge_strategies` for the boot scene |
+| `EffectAdmin` | `engine/effects/admin.py` | Scene-transition seam, reserved for `SceneManager`: one step per transition, each installing the `SceneView` it is given into the Active scene namespace. `enter_boot_scene(view)` puts every scope on Split; `cover(view)` → `HeldEffects` (running effects + merge strategies; live set left empty, on Split); `uncover(held, view)` stops the Overlay's own effects and puts the bundle back |
+| `SceneView` | `engine/effects/admin.py` | A scene's local effects, local sounds and declared effect-pack names: what each `EffectAdmin` step installs |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output port |
 | `EffectBuilder` | `engine/effects/builder.py` | Callable `(name, config) → Effect`; one per effect item |
 | `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop` plus `brightness`/`loudness` controls |
 | `ScopeValue` / `Scope` | `engine/state.py` | Output-agnostic routing keys (see glossary) |
 | `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam; a send on missing hardware raises `MissingCapabilityError` |
-| `ActiveSceneNamespace` | `engine/namespace.py` | Resolves effect names to builders and clip names to WAV paths for the active scene; installed by `SceneManager` per transition |
+| `ActiveSceneNamespace` | `engine/namespace.py` | Resolves effect names to builders and clip names to WAV paths for the active scene; its Scene view is installed by each `EffectAdmin` step |
 | `ResolvedClip` | `effects/effect.py` | A declared `AudioPlaybackConfig` plus its resolved path, carried on `EffectEvent` |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update` tick |
 | `GameState` | `engine/state.py` | Per-tick game context passed to each rule; `elapsed`/`total` are its scene's own game time, summed from the ticks this state receives, so they stop while an Overlay covers the scene; `settings` is its scene's read-only `Settings`; `capabilities` is the device's read-only `Capabilities` (`has(name)`, raising for a name outside the vocabulary), handed through `GameEngine` from `DeviceHardware.capabilities` |
@@ -180,7 +181,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
 | `SceneControls` | `engine/state.py` | Rule-facing transition seam (`overlay`, `pop`, `reboot_into`, `reboot_to_previous`; no in-process scene switch, see ADR-0005) plus `can_run(name)`, which the `lobby` pack asks to leave out entries the device can't play |
-| `SceneManager` | `engine/scene.py` | The live `SceneControls`. Drives scene transitions, installing each active scene into the `ActiveSceneNamespace`, setting the covered scene's effects aside on `overlay` and putting them back on `pop` through `EffectAdmin` (the held bundle rides in the overlay's stack entry; the IR codec is not touched); delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot`. Its own `activate_boot_scene(name)`, off the rule-facing seam, is how the boot composition makes the first scene active (on Split). `activate_boot_scene`, `overlay`, `reboot_into` and `reboot_to_previous` raise `MissingCapabilityError` before recording, persisting or resetting anything when the target's Required capabilities aren't all in `GameEngine.capabilities`; `pop` does not check |
+| `SceneManager` | `engine/scene.py` | The live `SceneControls`. Drives scene transitions, each making one `EffectAdmin` call carrying the top scene's `SceneView`: enter on boot, cover on `overlay`, uncover on `pop` (the held bundle rides in the overlay's stack entry; the IR codec is not touched). Holds no namespace or effect registry; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot`. Its own `activate_boot_scene(name)`, off the rule-facing seam, is how the boot composition makes the first scene active (on Split). `activate_boot_scene`, `overlay`, `reboot_into` and `reboot_to_previous` raise `MissingCapabilityError` before recording, persisting or resetting anything when the target's Required capabilities aren't all in `GameEngine.capabilities`; `pop` does not check |
 | `SceneReboot` | `engine/state.py` | Board-free port `SceneManager` reboots through; `previous_scene()` names the scene `reboot_to_previous` would boot, so it is checked first; live adapter `DeviceSceneReboot` |
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
 | `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor for a phase machine's key + initial phase; registry of each phase's owning `PhaseRule` |

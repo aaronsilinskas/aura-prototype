@@ -207,11 +207,9 @@ def _build_scene_runtime(
 
     manager = SceneManager(
         engine,
-        effect_registry,
         rule_registry,
         scene_registry,
         effect_admin=effect_manager,
-        namespace=namespace,
         scene_reboot=scene_reboot if scene_reboot is not None else SceneReboot(),
     )
     manager.activate_boot_scene(scene_registry.resolve_known(scene_name))
