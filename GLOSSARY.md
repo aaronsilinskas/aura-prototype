@@ -14,7 +14,7 @@ _Avoid_: "capability" (a **Capability** is hardware a device has); "channel" (na
 
 ### EffectPixels
 The **Modality** (sight) that owns pixel simulation and rendering for an effect; `pixels is None` means no pixel output.
-_Avoid_: calling `update`/`render` on the `Effect` shell; putting `name` on a compositor (it belongs on `Effect`)
+_Avoid_: calling `update`/`render` on the `Effect` shell; putting `name` on a **Renderer** (it belongs on `Effect`)
 
 ### EffectAudio
 The **Modality** (sound) declaring an effect's audio behaviour, mapping **EffectVerb**s to playback configs; `None` means no audio.
@@ -66,8 +66,12 @@ _Avoid_: confusing with **Registry lookup errors** (a name not registered, after
 `Callable[[float], float]` — maps a normalized position in `[0, 1]` to an output value.
 
 ### Layer
-A composable simulation unit used by `EffectPixels` subclasses; compositors combine layers into pixel output.
+A composable simulation unit used by `EffectPixels` subclasses; **Renderers** turn layers into pixel output.
 _Avoid_: importing layer helpers from anywhere other than `effects.layers`
+
+### Renderer
+An `EffectPixels` that turns one or more **Layers** into pixels every frame. The stock renderers in `effects.layers` cover one layer through a palette, layers' samples summed and clamped through a palette, layers' colours added, and a progress fill in one colour. An effect whose loop matches one subclasses it, adding only its own verbs and update.
+_Avoid_: "compositor"; re-typing a stock render loop in a pack or scene; putting `name` on a renderer (it belongs on `Effect`)
 
 ### GameRule
 An event handler registered with `GameEngine`. **Game-data-stateless** — all game data lives in `GameState`, never as mutable instance attributes (construction-time config is the only permitted instance state).
