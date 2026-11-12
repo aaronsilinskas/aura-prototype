@@ -2,13 +2,14 @@
 
 Owns the transmitter map, the receiver, and the shared :class:`IrTransmitGate`
 that keeps a device from decoding its own self-echo. Pumps its own
-transmitters directly rather than through an ``engine``-side seam, so it
-imports no ``engine`` types.
+transmitters directly rather than through an ``engine``-side seam.
 
-Assembled by :func:`~hardware.shared.ir_wiring.wire_ir` and exposed as
+Built by :meth:`InfraredTransceiver.build` from what the platform provides,
+for the device and the Simulated device alike, and exposed as
 ``DeviceHardware.ir``.
 """
 
+from engine.network import IR_EMITTERS
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_transport import (
@@ -16,12 +17,18 @@ from hardware.shared.ir_transport import (
     InfraredTransmitter,
     IrTransmitGate,
     PulseReader,
+    PulseWriter,
 )
 from hardware.shared.polled_part import PolledPart
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from typing import TypeVar
+
+    # A pin is whatever the platform's writer factory takes (a board pin, a
+    # pin reference), so it is passed through untouched.
+    Pin = TypeVar("Pin")
 
 __all__ = ["InfraredTransceiver"]
 
@@ -45,7 +52,7 @@ class InfraredTransceiver(PolledPart):
             into both at construction, so this class never drives it.
     """
 
-    __slots__ = ("_codec", "_gate", "_receiver", "_transmitters", "received")
+    __slots__ = ("_codec", "_gate", "_receiver", "_transmitters", "_writer_kind", "received")
 
     def __init__(
         self,
@@ -61,6 +68,52 @@ class InfraredTransceiver(PolledPart):
             AuraInfraredDecoder,
         )
         self.received: bytearray | None = None
+        self._writer_kind: str | None = None
+
+    @classmethod
+    def build(
+        cls,
+        readers: "list[PulseReader]",
+        emitter_pins: "dict[str, Pin]",
+        writer_factory: "Callable[[str, Pin], tuple[PulseWriter, str]]",
+    ) -> "InfraredTransceiver":
+        """Build the IR subsystem over *readers* and the emitters in *emitter_pins*.
+
+        One :class:`IrTransmitGate` is shared by the receiver and every
+        transmitter, so a device never decodes its own self-echo. Everything
+        speaks the Aura wire-frame until :meth:`apply_codec`.
+
+        Args:
+            readers: One pulse reader per IR receiver; empty wires no receiver.
+            emitter_pins: Emitter key (a member of ``IR_EMITTERS``) to whatever
+                *writer_factory* needs to build that emitter's writer. An
+                emitter absent from it is not wired.
+            writer_factory: Called with an emitter key and its pin, in
+                ``IR_EMITTERS`` order; builds that emitter's writer and returns
+                it paired with the writer kind.
+        """
+        gate = IrTransmitGate()
+        receiver = InfraredReceiver(readers, AuraInfraredDecoder, gate) if readers else None
+        encoder = AuraInfraredEncoder()
+        transmitters: dict[str, InfraredTransmitter] = {}
+        writer_kind: str | None = None
+        for emitter in IR_EMITTERS:
+            if emitter not in emitter_pins:
+                continue
+            writer, writer_kind = writer_factory(emitter, emitter_pins[emitter])
+            transmitters[emitter] = InfraredTransmitter(writer, encoder, gate)
+        transceiver = cls(transmitters, receiver, gate)
+        transceiver._writer_kind = writer_kind
+        return transceiver
+
+    @property
+    def writer_kind(self) -> str | None:
+        """The writer kind :meth:`build`'s factory last reported, for boot narration.
+
+        ``None`` when no emitter is wired. Every emitter is on one board, so
+        one kind describes them all.
+        """
+        return self._writer_kind
 
     @property
     def emitters(self) -> tuple[str, ...]:
