@@ -38,7 +38,7 @@ from scripts.build import (
     mpy_cross_compile,
     validate_mpy_cross_version,
 )
-from scripts.ship_list import governed_mount_files, ship_list
+from scripts.ship_list import MODULE_DIRS, governed_mount_files, ship_list
 
 try:
     from collections.abc import Callable
@@ -86,12 +86,15 @@ def _sync_file(
         print(f"COPY  {label}")
 
 
-def _remove_emptied_dirs(mount: Path, pruned: "list[Path]") -> None:
-    """Remove each directory above a *pruned* file that is now empty, up to *mount*."""
-    parents = {parent for path in pruned for parent in path.parents if parent != mount}
-    for directory in sorted(parents, key=lambda p: len(p.parts), reverse=True):
-        if directory.is_relative_to(mount) and not any(directory.iterdir()):
-            directory.rmdir()
+def _remove_empty_dirs(dest_dir: Path) -> None:
+    """Remove every empty directory under *dest_dir*, then *dest_dir* itself if empty."""
+    if not dest_dir.is_dir():
+        return
+    for d in sorted(dest_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        if d.is_dir() and not any(d.iterdir()):
+            d.rmdir()
+    if not any(dest_dir.iterdir()):
+        dest_dir.rmdir()
 
 
 def _write_scene(mount: Path, scene: str) -> None:
@@ -120,7 +123,8 @@ def deploy(
     """Deploy to mount. Returns 0 on success, 1 on error.
 
     Syncs the Ship list's entries to *mount*, then prunes each mount file the
-    list governs but no longer names, with any directory that leaves empty.
+    list governs but no longer names, and removes every empty directory under
+    each module directory.
 
     Args:
         example_file: Path to the example file to copy as ``code.py``.
@@ -219,7 +223,7 @@ def deploy(
     for device, src in synced.items():
         _sync_file(src, mount / device, str(device), copied, skipped, dry_run)
 
-    for rel in governed_mount_files(mount):
+    for rel in governed_mount_files(mount, use_source):
         if rel in synced:
             continue
         pruned.append(mount / rel)
@@ -230,7 +234,8 @@ def deploy(
             print(f"PRUNE  {rel}")
 
     if not dry_run:
-        _remove_emptied_dirs(mount, pruned)
+        for module in MODULE_DIRS:
+            _remove_empty_dirs(mount / module)
 
     print(
         f"Done. {compiled_count} compiled, "

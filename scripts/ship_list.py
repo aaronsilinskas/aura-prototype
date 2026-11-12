@@ -74,23 +74,27 @@ def ship_list(source_root: Path) -> ShipList:
     return ShipList(sorted(modules.values()), boot)
 
 
-def governed_mount_files(mount: Path) -> list[Path]:
+def governed_mount_files(mount: Path, use_source: bool = False) -> list[Path]:
     """Return the mount-relative files under *mount*'s module directories the list governs.
 
     A governed file is one of a kind the list ships (or the ``.mpy`` a compiled
-    deploy leaves) outside its exclusions. Deploy prunes each governed file the
-    list doesn't name, and leaves every other file on the mount alone.
+    deploy leaves) outside its exclusions. With *use_source*, every ``.mpy`` is
+    governed too, wherever it sits, since a source deploy ships none. Deploy
+    prunes each governed file the list doesn't name, and leaves every other file
+    on the mount alone.
     """
     governed = []
     for module in MODULE_DIRS:
         for path in sorted((mount / module).rglob("*")):
             rel = path.relative_to(mount)
-            if path.is_file() and _is_governed(rel):
+            if path.is_file() and _is_governed(rel, use_source):
                 governed.append(rel)
     return governed
 
 
-def _is_governed(rel: Path) -> bool:
+def _is_governed(rel: Path, use_source: bool) -> bool:
+    if rel.suffix == _COMPILED_TARGET_SUFFIX and use_source:
+        return True
     return not _is_excluded(rel) and (_ships(rel) or rel.suffix == _COMPILED_TARGET_SUFFIX)
 
 

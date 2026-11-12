@@ -150,3 +150,12 @@ def test_list_does_not_govern_mount_files_outside_its_module_directories(tmp_pat
     write(tmp_path, "code.py", "boot.py", "lib/neopixel.mpy", "hardware/__init__.mpy")
 
     assert governed_mount_files(tmp_path) == []
+
+
+def test_list_governs_every_mpy_on_the_mount_for_a_source_deploy(tmp_path: Path) -> None:
+    write(tmp_path, "effects/tests/old_test.mpy", "app/simulation/harness.mpy", "effects/old.pyc")
+
+    assert governed_mount_files(tmp_path, use_source=True) == [
+        Path("app/simulation/harness.mpy"),
+        Path("effects/tests/old_test.mpy"),
+    ]

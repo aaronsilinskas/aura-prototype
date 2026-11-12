@@ -572,6 +572,18 @@ def test_empty_subdirectory_is_removed_after_pruning(tmp_path: Path) -> None:
     assert not (mount / "effects" / "steps").exists()
 
 
+def test_empty_subdirectory_already_on_mount_is_removed(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    (mount / "effects" / "steps").mkdir(parents=True)
+
+    deploy(None, mount, source_root=source, compile=fake_compile)
+
+    assert not (mount / "effects" / "steps").exists()
+
+
 def test_module_root_removed_when_fully_pruned(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -1060,6 +1072,20 @@ def test_source_mode_prunes_orphaned_mpy_left_by_previous_compiled_deploy(
     # Simulate a previously-compiled deploy: device has .mpy files
     (mount / "effects").mkdir()
     orphaned_mpy = mount / "effects" / "render.mpy"
+    orphaned_mpy.write_bytes(b"OLD_MPY")
+
+    deploy(None, mount, source_root=source, use_source=True)
+
+    assert not orphaned_mpy.exists()
+
+
+def test_source_mode_prunes_every_mpy_under_a_module_directory(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    (mount / "effects" / "tests").mkdir(parents=True)
+    orphaned_mpy = mount / "effects" / "tests" / "old_test.mpy"
     orphaned_mpy.write_bytes(b"OLD_MPY")
 
     deploy(None, mount, source_root=source, use_source=True)
