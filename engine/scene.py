@@ -192,6 +192,9 @@ class SceneRegistry:
 
         registry = SceneRegistry({"forest": forest})
         scene = registry.get("forest")  # the stored record itself
+
+    The registry holds *scenes* as given, without copying it, so callers
+    must not mutate the mapping afterwards.
     """
 
     __slots__ = ("_scenes",)
@@ -203,7 +206,7 @@ class SceneRegistry:
         """Return the stored ``Scene`` for *name*, the same record on every call.
 
         Raises:
-            ValueError: if *name* is not registered.
+            ValueError: if *name* is not in the registry.
         """
         scene = self._scenes.get(name)
         if scene is None:
@@ -214,7 +217,7 @@ class SceneRegistry:
         """Return *name*'s declared ``ir_codec`` string (default ``"aura"``).
 
         Raises:
-            ValueError: if *name* is not registered.
+            ValueError: if *name* is not in the registry.
         """
         return self.get(name).ir_codec
 
@@ -222,7 +225,7 @@ class SceneRegistry:
         """Return *name*'s Required capabilities.
 
         Raises:
-            ValueError: if *name* is not registered.
+            ValueError: if *name* is not in the registry.
         """
         return self.get(name).required_capabilities
 
@@ -230,16 +233,16 @@ class SceneRegistry:
         """Return the Required capabilities of *name* that are not in *capabilities*.
 
         Raises:
-            ValueError: if *name* is not registered.
+            ValueError: if *name* is not in the registry.
         """
         return self.required_capabilities(name) - capabilities
 
     def names(self) -> list[str]:
-        """Return all registered scene names sorted alphabetically."""
+        """Return the names of all scenes in the registry, sorted alphabetically."""
         return sorted(self._scenes)
 
     def resolve_known(self, name: str) -> str:
-        """Return *name* if registered, else raise naming the known scenes.
+        """Return *name* if it is in the registry, else raise naming the known scenes.
 
         The single known-scene check, shared by the Scene boot
         (``app.scene_composition.build_scene_boot``, the boot-time guard) and
@@ -381,7 +384,7 @@ class SceneManager(SceneControls):
         Reboot instead.
 
         Raises:
-            ValueError: *name* is not a registered scene, or a scene is
+            ValueError: *name* is not in the scene registry, or a scene is
                 already active.
             MissingCapabilityError: the device can't run *name*; nothing is
                 activated.
@@ -418,7 +421,7 @@ class SceneManager(SceneControls):
         """Whether the engine's device has every Required capability of *name*.
 
         Raises:
-            ValueError: if *name* is not a registered scene.
+            ValueError: if *name* is not in the scene registry.
         """
         return not self._scene_registry.missing_capabilities(name, self._engine.capabilities)
 
