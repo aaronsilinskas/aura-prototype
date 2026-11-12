@@ -84,7 +84,7 @@ hardware/         Hardware abstraction layer
                   device_config, neopixel_current_budget, device_boot, device_state,
                   device_hardware,
                   device_storage, network_controls, scene_selection, ir_transport,
-                  ir_transceiver, ir_wiring, ir_codecs/ (base, aura, tag), ir_telemetry,
+                  ir_transceiver, ir_codecs/ (base, aura, tag), ir_telemetry,
                   radio_transport, radio_transceiver, sd_sync_protocol, sd_sync_server,
                   build_narration, device_reboot,
                   device_assembly, device_parts)
@@ -205,7 +205,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `DeviceParts` / `PinRef` | `hardware/shared/device_parts.py` | Port the Device assembly builds each part through (one constructor per part), taking config sections and pin references (a pin name with its config field); a bus crosses it as the checker-only `Bus` alias (`Any`), which each adapter narrows to its platform's bus type; adapters `SimulatedParts` (`hardware/simulated/simulated_parts.py`, which also decides what persists across a reboot) and `CircuitPythonParts` (`hardware/circuitpython/circuitpython_parts.py`) |
 | `PolledSensor` | `hardware/shared/polled_sensor.py` | Board-free **Polled part** owning one sensor's reading (`DeviceHardware.accelerometer` / `.magnetometer`): wraps a `DeviceParts` raw read callable and, on each `update(elapsed)`, hands the raw read to the reading's `assign` (`AccelerationData` / `MagneticData`), which overwrites it in place, so the sensor never knows the reading's shape; keeps the last good reading on a failed read and logs the start and end of each run of failures |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter; `send_ir` raises `MissingCapabilityError` when IR or the emitter is absent, `send_radio` when the radio is |
-| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, an optional receiver, shared transmit gate; `emitters` and `receives` say what is wired); wired only by `wire_ir` (`hardware/shared/ir_wiring.py`), for the device and the Simulated device alike |
+| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, an optional receiver, shared transmit gate; `emitters` and `receives` say what is wired); builds itself via `InfraredTransceiver.build` from pulse readers, emitter pins and a writer factory, and reports the factory's `writer_kind`, for the device and the Simulated device alike |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |
 | `build_scene_boot` | `app/scene_composition.py` | The **Scene boot**, the Composition layer's only entry point: boots a `DeviceHardware` into its boot scene and returns a `SceneBoot`; shared by `run_scene` and the Simulated device |

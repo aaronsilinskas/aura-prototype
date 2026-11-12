@@ -2,7 +2,7 @@
 
 import pytest
 
-from engine.network import CONE, LINE
+from engine.network import AREA_OF_EFFECT, CONE, LINE
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.base import InfraredEncoder
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
@@ -15,7 +15,7 @@ from hardware.shared.ir_transport import (
     PulseReader,
     PulseWriter,
 )
-from hardware.shared.tests.ir_fakes import StubEncoder, make_transmitter
+from hardware.shared.tests.ir_fakes import RecordingPulseWriter, StubEncoder, make_transmitter
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -109,6 +109,147 @@ def _encode_pulses(payload: bytes | bytearray) -> list[int]:
 def _receiver_holding(pulses) -> InfraredReceiver:
     """A real Aura-decoding receiver over one reader preloaded with *pulses*."""
     return InfraredReceiver([FakePulseReader(pulses)], AuraInfraredDecoder)
+
+
+class _WriterFactory:
+    """Builds a writer per emitter, recording each ``(emitter, pin)`` call.
+
+    Each writer is a blocking :class:`RecordingPulseWriter`, or, with
+    *echo_to*, one that also lands its pulses on those readers like a lit
+    emitter's self-echo.
+    """
+
+    def __init__(self, kind: str = "fake", echo_to: list[FakePulseReader] | None = None) -> None:
+        self.kind = kind
+        self.calls: list[tuple[str, object]] = []
+        self.writers: dict[str, RecordingPulseWriter] = {}
+        self._echo_to = echo_to or []
+
+    def __call__(self, emitter: str, pin: object) -> tuple[PulseWriter, str]:
+        self.calls.append((emitter, pin))
+        writer = _EchoingPulseWriter(self._echo_to)
+        self.writers[emitter] = writer
+        return writer, self.kind
+
+
+class _EchoingPulseWriter(RecordingPulseWriter):
+    """A blocking recording writer whose pulses also land on *echo_to*'s readers."""
+
+    def __init__(self, echo_to: list[FakePulseReader]) -> None:
+        super().__init__()
+        self._echo_to = echo_to
+
+    def write_pulses(self, durations) -> None:
+        super().write_pulses(durations)
+        for reader in self._echo_to:
+            reader.load(durations)
+
+
+_ALL_PINS = {LINE: "GP1", CONE: "GP2", AREA_OF_EFFECT: "GP3"}
+
+
+# ---------------------------------------------------------------------------
+# build() — wires itself from pulse readers, emitter pins and a writer factory
+# ---------------------------------------------------------------------------
+
+
+def test_build_calls_the_factory_once_per_emitter_in_ir_emitters_order_with_its_pin() -> None:
+    factory = _WriterFactory()
+    pins = {AREA_OF_EFFECT: object(), LINE: object(), CONE: object()}
+
+    transceiver = InfraredTransceiver.build([FakePulseReader()], pins, factory)
+
+    assert factory.calls == [
+        (LINE, pins[LINE]),
+        (CONE, pins[CONE]),
+        (AREA_OF_EFFECT, pins[AREA_OF_EFFECT]),
+    ]
+    assert transceiver.emitters == (LINE, CONE, AREA_OF_EFFECT)
+
+
+def test_build_reports_the_writer_kind_the_factory_produced() -> None:
+    transceiver = InfraredTransceiver.build(
+        [FakePulseReader()], {LINE: "GP1"}, _WriterFactory(kind="pio")
+    )
+
+    assert transceiver.writer_kind == "pio"
+
+
+def test_build_with_no_emitter_pins_wires_no_emitter_and_reports_no_writer_kind() -> None:
+    factory = _WriterFactory()
+
+    transceiver = InfraredTransceiver.build([FakePulseReader()], {}, factory)
+
+    assert factory.calls == []
+    assert transceiver.emitters == ()
+    assert transceiver.writer_kind is None
+
+
+@pytest.mark.parametrize("emitter", [LINE, CONE, AREA_OF_EFFECT])
+def test_build_sends_only_on_the_writer_built_for_that_emitter_in_the_aura_wire_frame(
+    emitter,
+) -> None:
+    factory = _WriterFactory()
+    transceiver = InfraredTransceiver.build([FakePulseReader()], _ALL_PINS, factory)
+
+    transceiver.send(b"\x2a", emitter)
+
+    assert {e: w.calls for e, w in factory.writers.items()} == {
+        e: [_encode_pulses(b"\x2a")] if e == emitter else [] for e in _ALL_PINS
+    }
+
+
+def test_build_does_not_wire_an_emitter_missing_from_the_pins() -> None:
+    transceiver = InfraredTransceiver.build([FakePulseReader()], {LINE: "GP1"}, _WriterFactory())
+
+    assert transceiver.emitters == (LINE,)
+    with pytest.raises(ValueError):
+        transceiver.send(b"\x2a", CONE)
+
+
+def test_build_with_no_readers_wires_no_receiver() -> None:
+    transceiver = InfraredTransceiver.build([], {LINE: "GP1"}, _WriterFactory())
+
+    transceiver.update(0.0)
+
+    assert transceiver.receives is False
+    assert transceiver.received is None
+
+
+@pytest.mark.parametrize("reader_count", [1, 3])
+def test_build_receives_an_aura_shot_landing_on_its_readers(reader_count) -> None:
+    readers = [FakePulseReader(_encode_pulses(b"\x2a")) for _ in range(reader_count)]
+    transceiver = InfraredTransceiver.build(list(readers), {}, _WriterFactory())
+
+    transceiver.update(0.0)
+
+    assert transceiver.receives is True
+    assert transceiver.received == bytearray(b"\x2a")
+    assert transceiver.codec == (AuraInfraredEncoder, AuraInfraredDecoder)
+
+
+def test_build_receives_on_every_reader_not_just_the_first() -> None:
+    readers = [FakePulseReader(), FakePulseReader(_encode_pulses(b"\x2a"))]
+    transceiver = InfraredTransceiver.build(list(readers), {}, _WriterFactory())
+
+    transceiver.update(0.0)
+
+    assert transceiver.received == bytearray(b"\x2a")
+
+
+@pytest.mark.parametrize("emitter", [LINE, CONE, AREA_OF_EFFECT])
+def test_build_shares_one_gate_so_no_reader_decodes_a_send_on_any_emitter(
+    emitter,
+) -> None:
+    readers = [FakePulseReader(), FakePulseReader()]
+    transceiver = InfraredTransceiver.build(
+        list(readers), _ALL_PINS, _WriterFactory(echo_to=readers)
+    )
+
+    transceiver.send(b"\x2a", emitter)
+    transceiver.update(0.0)
+
+    assert transceiver.received is None
 
 
 # ---------------------------------------------------------------------------
