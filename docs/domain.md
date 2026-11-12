@@ -35,6 +35,8 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   state.py        GameState, EffectControls, EffectReceipt, MergeStrategy,
                   NetworkControls, Scope, ScopeValue
   scene.py        Scene, SceneRegistry, SceneLocalRegistry, SceneManager, SceneControls
+  scene_runtime.py SceneRuntime (the matched set built from a PackCatalog; above scene
+                  and pack_catalog in the import graph)
   phase.py        PhaseKey, PhaseMachine, PhaseSlot, PhaseRule, InPhaseRule
   events.py       Event, EventGroup, EffectEvent
   timer.py        Timer
@@ -182,6 +184,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
 | `SceneControls` | `engine/state.py` | Rule-facing transition seam (`overlay`, `pop`, `reboot_into`, `reboot_to_previous`; no in-process scene switch, see ADR-0005) plus `can_run(name)`, which the `lobby` pack asks to leave out entries the device can't play |
 | `SceneManager` | `engine/scene.py` | The live `SceneControls`. Drives scene transitions, each making one `EffectAdmin` call carrying the top scene's `SceneView`: enter on boot, cover on `overlay`, uncover on `pop` (the held bundle rides in the overlay's stack entry; the IR codec is not touched). Holds no namespace or effect registry; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot`. Its own `activate_boot_scene(name)`, off the rule-facing seam, is how the boot composition makes the first scene active (on Split). `activate_boot_scene`, `overlay`, `reboot_into` and `reboot_to_previous` raise `MissingCapabilityError` before recording, persisting or resetting anything when the target's Required capabilities aren't all in `GameEngine.capabilities`; `pop` does not check |
+| `SceneRuntime` | `engine/scene_runtime.py` | The engine's matched set, built from a `PackCatalog`, effect outputs, `NetworkControls`, Capabilities, `SceneReboot` and an optional clock: one `ActiveSceneNamespace`, the `EffectManager` resolving through it, a `GameEngine` on it and the `SceneManager` (with it as `EffectAdmin`). `activate_boot_scene(name)`, `queue_event(event)` (dropped with no scene active), `update()` (dispatch, then any pending Overlay or pop, then effects, on one clock), `elapsed`, `scene_controls`, `namespace`; exposes none of its parts |
 | `SceneReboot` | `engine/state.py` | Board-free port `SceneManager` reboots through; `previous_scene()` names the scene `reboot_to_previous` would boot, so it is checked first; live adapter `DeviceSceneReboot` |
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
 | `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor for a phase machine's key + initial phase; registry of each phase's owning `PhaseRule` |
