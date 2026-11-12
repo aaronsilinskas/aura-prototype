@@ -15,6 +15,7 @@ Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/doma
 ### Other
 
 - **deploy-watch** — Deploy a CircuitPython example to the device and capture serial output. See `docs/agents/deploy-watch.md` before using `scripts/deploy_watch.py`.
+- **implement** — repo notes that refine the skill's steps. Read `docs/agents/implement.md` before running it.
 - **implement-spec** — repo notes that refine the skill's steps. Read `docs/agents/implement-spec.md` before running it.
 
 **When a workflow step names a skill, invoke it with the Skill tool and follow it precisely before proceeding — unless the step is tagged _(user-run)_, in which case do not invoke it (or its underlying skills) yourself. Pause, tell the user the previous step is done, and ask them to run it as the next step.**
