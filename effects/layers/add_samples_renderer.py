@@ -1,6 +1,13 @@
+from __future__ import annotations
+
 from effects.effect import EffectPixels, PixelBuffer
 from effects.layers.layer import Layer
 from effects.palette import Palette
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class AddSamplesRenderer(EffectPixels):
@@ -12,7 +19,7 @@ class AddSamplesRenderer(EffectPixels):
 
     __slots__ = ["_layers", "_palette"]
 
-    def __init__(self, layers: list[Layer], palette: Palette) -> None:
+    def __init__(self, layers: Sequence[Layer], palette: Palette) -> None:
         self._layers = layers
         self._palette = palette
 

@@ -9,10 +9,11 @@ class ProgressFillEffect(ProgressRenderer):
     zero ``duration`` is full on the first ``update``.
     """
 
-    __slots__ = ("_duration", "_elapsed")
+    __slots__ = ("_bar", "_duration", "_elapsed")
 
     def __init__(self, layer: ProgressLayer, color: int, duration: float) -> None:
         super().__init__(layer, color)
+        self._bar = layer
         self._duration = duration
         self._elapsed = 0.0
 
@@ -25,4 +26,4 @@ class ProgressFillEffect(ProgressRenderer):
             progress = self._elapsed / duration
             if progress > 1.0:
                 progress = 1.0
-        self._layer.set_progress(progress)
+        self._bar.set_progress(progress)
