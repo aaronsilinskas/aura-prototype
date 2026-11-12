@@ -436,15 +436,12 @@ def test_red_light_green_light_scene_every_audio_playing_effects_clip_name_resol
 
 def _debug_runtime(catalog: PackCatalog, settings: Settings | None = None) -> SceneRuntime:
     """A SceneRuntime over the real packs whose booted scene runs only the ``debug`` rule pack."""
-    scene_registry = SceneRegistry()
-    scene_registry.register(
-        "debug_scene",
-        lambda: Scene(
-            effect_packs=[],
-            rule_packs=[PackReference("debug", Version(1, 0))],
-            settings=settings,
-        ),
+    debug_scene = Scene(
+        effect_packs=[],
+        rule_packs=[PackReference("debug", Version(1, 0))],
+        settings=settings,
     )
+    scene_registry = SceneRegistry({"debug_scene": debug_scene})
     debug_catalog = PackCatalog(
         catalog.effect_registry, catalog.rule_registry, scene_registry, catalog.pack_sounds
     )
