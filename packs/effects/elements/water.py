@@ -3,9 +3,10 @@ from effects.layers.flame_layer import FlameLayer
 from effects.layers.renderer import LayerRenderer
 from effects.layers.scroll import PhaseScroll
 from effects.layers.scroll_layer import ScrollLayer
-from effects.level import clamp_level, level_lerp
+from effects.level import EFFECT_TOP_LEVEL, effect_level
 from effects.palette import PaletteLUT256
 from engine.effects.builder import EffectBuilder
+from engine.lerp import level_lerp
 
 # fmt: off
 _water_palette = bytes([0, 0, 0, 64,
@@ -23,7 +24,7 @@ class WaterBuilder(EffectBuilder):
         Level: the current accelerates and the flame grows more turbulent,
         producing faster, stronger ripples.
         """
-        level = clamp_level(config.get_option("level", 1))
+        level = effect_level(config)
         return Effect(
             name=name,
             pixels=LayerRenderer(
@@ -31,12 +32,12 @@ class WaterBuilder(EffectBuilder):
                     FlameLayer(
                         spark_count=level,
                         resolution=config.resolution,
-                        heat_rate=level_lerp(level, 0.2, 0.29),
+                        heat_rate=level_lerp(level, 0.2, 0.29, EFFECT_TOP_LEVEL),
                         extra_cool_rate=0.0,
                         spread=0.2,
                     ),
                     PhaseScroll(
-                        speed=level_lerp(level, 0.05, 0.14),
+                        speed=level_lerp(level, 0.05, 0.14, EFFECT_TOP_LEVEL),
                         min_phase=3.0,
                         max_phase=5.0,
                     ),

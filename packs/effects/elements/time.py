@@ -4,10 +4,11 @@ from effects.layers.drift_noise_layer import DriftNoiseLayer
 from effects.layers.scroll import ScrollOffset
 from effects.layers.scroll_layer import ScrollLayer
 from effects.layers.shape_layer import ShapeLayer
-from effects.level import clamp_level, level_lerp
+from effects.level import EFFECT_TOP_LEVEL, effect_level
 from effects.palette import PaletteLUT256
 from effects.shape import Shape
 from engine.effects.builder import EffectBuilder
+from engine.lerp import level_lerp
 
 # fmt: off
 _GRAYSCALE_PALETTE = bytes([  0,   0,   0,   0,
@@ -27,10 +28,10 @@ class TimeBuilder(EffectBuilder):
         Level: the sand drifts faster and more tickers sweep more quickly around
         the strip.
         """
-        level = clamp_level(config.get_option("level", 1))
+        level = effect_level(config)
 
-        drift_speed = level_lerp(level, 0.02, 0.065)
-        ticker_rotate_speed = level_lerp(level, 0.1, 0.28)
+        drift_speed = level_lerp(level, 0.02, 0.065, EFFECT_TOP_LEVEL)
+        ticker_rotate_speed = level_lerp(level, 0.1, 0.28, EFFECT_TOP_LEVEL)
 
         sand = DriftNoiseLayer(
             resolution=24,

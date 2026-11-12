@@ -3,9 +3,10 @@ from effects.layers.flame_layer import FlameLayer
 from effects.layers.renderer import LayerRenderer
 from effects.layers.scroll import ScrollOffset
 from effects.layers.scroll_layer import ScrollLayer
-from effects.level import clamp_level, level_lerp
+from effects.level import EFFECT_TOP_LEVEL, effect_level
 from effects.palette import PaletteLUT256
 from engine.effects.builder import EffectBuilder
+from engine.lerp import level_lerp
 
 # fmt: off
 _ice_palette = bytes([0, 0, 64, 8,
@@ -23,7 +24,7 @@ class IceBuilder(EffectBuilder):
         Level: the flame flows faster with a tighter spread, producing a sharper,
         more active column.
         """
-        level = clamp_level(config.get_option("level", 1))
+        level = effect_level(config)
         return Effect(
             name=name,
             pixels=LayerRenderer(
@@ -33,9 +34,9 @@ class IceBuilder(EffectBuilder):
                         resolution=config.resolution,
                         heat_rate=0.15,
                         extra_cool_rate=0.0,
-                        spread=level_lerp(level, 0.75, 0.45),
+                        spread=level_lerp(level, 0.75, 0.45, EFFECT_TOP_LEVEL),
                     ),
-                    ScrollOffset(speed=level_lerp(level, 0.02, 0.05)),
+                    ScrollOffset(speed=level_lerp(level, 0.02, 0.05, EFFECT_TOP_LEVEL)),
                 ),
                 palette=PaletteLUT256(_ice_palette),
             ),
