@@ -30,6 +30,7 @@ from hardware.shared.device_config import (
     MatrixPixelsConfig,
     NeoPixelCurrentBudgetConfig,
     NeoPixelPixelsConfig,
+    PinRef,
     RadioConfig,
     SDCardConfig,
     SPIConfig,
@@ -120,13 +121,13 @@ def test_narrate_skip_emits_begin_then_end_with_no_build_step():
 
 
 def test_describe_high_current_rail_names_its_pin_and_polarity():
-    rail = HighCurrentRailConfig(pin="D10", active_high=False)
+    rail = HighCurrentRailConfig(pin=PinRef("D10", "high_current_rail.pin"), active_high=False)
 
     assert describe_high_current_rail(rail) == "high_current_rail pin=D10 active_high=False"
 
 
 def test_describe_i2c_names_a_declared_bus_and_its_scl_and_sda_pins():
-    i2c = I2CConfig(sda="GP6", scl="GP7")
+    i2c = I2CConfig(sda=PinRef("GP6", "i2c.sensors.sda"), scl=PinRef("GP7", "i2c.sensors.scl"))
 
     assert describe_i2c("sensors", i2c) == "i2c sensors scl=GP7 sda=GP6"
 
@@ -136,7 +137,11 @@ def test_describe_i2c_of_an_undeclared_default_names_the_board_bus():
 
 
 def test_describe_spi_names_a_declared_bus_and_its_sck_mosi_and_miso_pins():
-    spi = SPIConfig(sck="GP14", mosi="GP15", miso="GP12")
+    spi = SPIConfig(
+        sck=PinRef("GP14", "spi.radio.sck"),
+        mosi=PinRef("GP15", "spi.radio.mosi"),
+        miso=PinRef("GP12", "spi.radio.miso"),
+    )
 
     assert describe_spi("radio", spi) == "spi radio sck=GP14 mosi=GP15 miso=GP12"
 
@@ -232,23 +237,6 @@ def test_describe_pixel_entry_reports_a_neopixel_strips_brightness_to_two_decima
     assert describe_pixel_entry(0, pixels).endswith(" brightness=0.40")
 
 
-def test_describe_pixel_entry_joins_each_legacy_scope_strip_naming_its_scope_key():
-    pixels = _pixel_entry(
-        {
-            "type": "neopixel",
-            "scopes": {
-                "personal": {"pin": "D5", "count": 10, "brightness": 0.25},
-                "directional": {"pin": "D6", "count": 4, "brightness": 0.6},
-            },
-        }
-    )
-
-    assert describe_pixel_entry(0, pixels) == (
-        "pixels[0] neopixel pin=D5 count=10 order=GRB scope=personal brightness=0.25 | "
-        "pin=D6 count=4 order=GRB scope=directional brightness=0.60"
-    )
-
-
 def test_describe_pixel_entry_disabled_matrix_is_its_index_and_kind_only():
     pixels = _pixel_entry(_matrix_entry(enabled=False))
 
@@ -257,14 +245,22 @@ def test_describe_pixel_entry_disabled_matrix_is_its_index_and_kind_only():
 
 def test_describe_pixel_entry_disabled_neopixel_is_its_index_and_kind_only():
     pixels = _pixel_entry(
-        {"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}, "enabled": False}
+        {
+            "type": "neopixel",
+            "pin": "D5",
+            "count": 10,
+            "scope_pixels": {"personal": [0, 10]},
+            "enabled": False,
+        }
     )
 
     assert describe_pixel_entry(2, pixels) == "pixels[2] neopixel"
 
 
 def test_describe_buttons_pairs_each_label_with_its_declared_pin_in_order():
-    assert describe_buttons(["GP2", "GP3", "GP4"]) == "buttons A=GP2 B=GP3 C=GP4"
+    pins = [PinRef(name, f"buttons[{i}]") for i, name in enumerate(["GP2", "GP3", "GP4"])]
+
+    assert describe_buttons(pins) == "buttons A=GP2 B=GP3 C=GP4"
 
 
 def test_describe_buttons_with_none_declared_is_the_bare_step_name():
@@ -303,9 +299,9 @@ def _audio(enabled: bool = True) -> AudioConfig:
     return AudioConfig(
         voices=4,
         max_volume=0.5,
-        i2s_bit_clock="GP10",
-        i2s_word_select="GP11",
-        i2s_data="GP9",
+        i2s_bit_clock=PinRef("GP10", "audio.i2s_bit_clock"),
+        i2s_word_select=PinRef("GP11", "audio.i2s_word_select"),
+        i2s_data=PinRef("GP9", "audio.i2s_data"),
         enabled=enabled,
     )
 
@@ -321,25 +317,33 @@ def test_describe_audio_disabled_is_the_bare_section_name():
 
 
 def test_describe_radio_reports_its_frequency_node_and_pins():
-    radio = RadioConfig(cs="GP17", reset="GP20", frequency=915.0, node=3)
+    radio = RadioConfig(
+        cs=PinRef("GP17", "radio.cs"), reset=PinRef("GP20", "radio.reset"), frequency=915.0, node=3
+    )
 
     assert describe_radio(radio) == "radio frequency=915.0 node=3 cs=GP17 reset=GP20"
 
 
 def test_describe_sdcard_reports_its_mount_point_and_chip_select_pin():
-    sdcard = SDCardConfig(cs="GP13", mount="/cards")
+    sdcard = SDCardConfig(cs=PinRef("GP13", "sdcard.cs"), mount="/cards")
 
     assert describe_sdcard(sdcard) == "sdcard mount=/cards cs=GP13"
 
 
 def test_describe_radio_appends_the_spi_bus_it_joins_when_not_default():
-    radio = RadioConfig(cs="GP13", reset="GP11", frequency=915.0, node=1, spi="radio")
+    radio = RadioConfig(
+        cs=PinRef("GP13", "radio.cs"),
+        reset=PinRef("GP11", "radio.reset"),
+        frequency=915.0,
+        node=1,
+        spi="radio",
+    )
 
     assert describe_radio(radio) == "radio frequency=915.0 node=1 cs=GP13 reset=GP11 spi=radio"
 
 
 def test_describe_sdcard_appends_the_spi_bus_it_joins_when_not_default():
-    sdcard = SDCardConfig(cs="GP1", spi="storage")
+    sdcard = SDCardConfig(cs=PinRef("GP1", "sdcard.cs"), spi="storage")
 
     assert describe_sdcard(sdcard) == "sdcard mount=/sd cs=GP1 spi=storage"
 
@@ -353,22 +357,34 @@ def test_describe_i2c_chips_append_the_i2c_bus_they_join_when_not_default():
 
 
 def test_describe_ir_names_a_single_rx_pin_without_multi_receiver_wording():
-    ir = IRConfig(rx=["D11"], emitters={LINE: "D12"})
+    ir = IRConfig(rx=[PinRef("D11", "ir.rx")], emitters={LINE: PinRef("D12", "ir.line")})
 
     assert describe_ir(ir) == "ir rx=[D11] emitters=line:D12"
 
 
 def test_describe_ir_labels_two_rx_pins_as_an_ir_multi_receiver():
-    ir = IRConfig(rx=["D11", "D13"], emitters={LINE: "D12"})
+    ir = IRConfig(
+        rx=[PinRef("D11", "ir.rx[0]"), PinRef("D13", "ir.rx[1]")],
+        emitters={LINE: PinRef("D12", "ir.line")},
+    )
 
     assert describe_ir(ir) == "ir rx=[D11 D13] (IR multi-receiver) emitters=line:D12"
 
 
 def test_describe_ir_lists_emitters_in_ir_emitters_order_not_config_order():
-    ir = IRConfig(rx=["D11"], emitters={AREA_OF_EFFECT: "D14", CONE: "D13", LINE: "D12"})
+    ir = IRConfig(
+        rx=[PinRef("D11", "ir.rx")],
+        emitters={
+            AREA_OF_EFFECT: PinRef("D14", "ir.area_of_effect"),
+            CONE: PinRef("D13", "ir.cone"),
+            LINE: PinRef("D12", "ir.line"),
+        },
+    )
 
     assert describe_ir(ir) == "ir rx=[D11] emitters=line:D12 cone:D13 area_of_effect:D14"
 
 
 def test_describe_ir_with_no_emitters_wired_notes_none():
-    assert describe_ir(IRConfig(rx=["D11"], emitters={})) == "ir rx=[D11] emitters=(none)"
+    ir = IRConfig(rx=[PinRef("D11", "ir.rx")], emitters={})
+
+    assert describe_ir(ir) == "ir rx=[D11] emitters=(none)"

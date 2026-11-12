@@ -18,7 +18,6 @@ except ImportError:
 from hardware.shared.device_config import (
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
-    NeoPixelScopeConfig,
     NeoPixelStripConfig,
 )
 
@@ -32,19 +31,16 @@ _BUDGET_ROUNDING_MARGIN: Final = 1e-9
 
 def _budgeted_strips(
     pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig],
-) -> list[NeoPixelStripConfig | NeoPixelScopeConfig]:
-    """Every strip the current budget counts: enabled NeoPixel entries, both shapes."""
-    strips: list[NeoPixelStripConfig | NeoPixelScopeConfig] = []
+) -> list[NeoPixelStripConfig]:
+    """Every strip the current budget counts: enabled NeoPixel entries."""
+    strips: list[NeoPixelStripConfig] = []
     for entry in pixels:
         if isinstance(entry, NeoPixelPixelsConfig) and entry.enabled:
             strips.extend(entry.strips)
-            strips.extend(entry.scopes.values())
     return strips
 
 
-def _draw_ma(
-    strips: list[NeoPixelStripConfig | NeoPixelScopeConfig], max_pixel_current_ma: int
-) -> float:
+def _draw_ma(strips: list[NeoPixelStripConfig], max_pixel_current_ma: int) -> float:
     """Worst-case draw of *strips* at full white, at their current brightness."""
     total = 0.0
     for strip in strips:

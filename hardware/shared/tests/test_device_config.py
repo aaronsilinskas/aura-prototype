@@ -9,12 +9,13 @@ import pytest
 from hardware.shared.device_config import (
     DeviceConfig,
     MatrixPixelsConfig,
+    PinRef,
     load_device_config,
     parse_device_config,
     read_device_config_mapping,
     validate_band_map,
 )
-from hardware.shared.tests.pixels_config import as_matrix, as_neopixel
+from hardware.shared.tests.pixels_config import as_matrix
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SAMPLE_CONFIG_PATH = _REPO_ROOT / "examples" / "aura-device.pico-2.json"
@@ -62,10 +63,11 @@ def neopixel_config():
         "pixels": [
             {
                 "type": "neopixel",
-                "scopes": {
-                    "personal": {"pin": "D5", "count": 30, "order": "GRB", "brightness": 0.5},
-                    "ambient": {"pin": "D6", "count": 10, "order": "RGB", "brightness": 1.0},
-                },
+                "pin": "D5",
+                "count": 30,
+                "order": "RGB",
+                "brightness": 0.5,
+                "scope_pixels": {"personal": [0, 20], "ambient": [20, 30]},
             }
         ],
         "buttons": ["D9"],
@@ -100,16 +102,16 @@ def test_parse_full_matrix_config_maps_every_section(matrix_config):
 
     assert len(result.pixels) == 1
     assert as_matrix(result.pixels[0]).cols == 13
-    assert result.buttons == ["D9", "D10"]
+    assert result.buttons == [PinRef("D9", "buttons[0]"), PinRef("D10", "buttons[1]")]
     assert result.ir is not None
-    assert result.ir.rx == ["D11"]
-    assert result.ir.emitters["line"] == "D12"
+    assert result.ir.rx == [PinRef("D11", "ir.rx")]
+    assert result.ir.emitters["line"] == PinRef("D12", "ir.line")
     assert result.audio is not None
     assert result.audio.voices == 1
     assert result.audio.max_volume == 0.1
-    assert result.audio.i2s_bit_clock == "I2S_BIT_CLOCK"
-    assert result.audio.i2s_word_select == "I2S_WORD_SELECT"
-    assert result.audio.i2s_data == "I2S_DATA"
+    assert result.audio.i2s_bit_clock == PinRef("I2S_BIT_CLOCK", "audio.i2s_bit_clock")
+    assert result.audio.i2s_word_select == PinRef("I2S_WORD_SELECT", "audio.i2s_word_select")
+    assert result.audio.i2s_data == PinRef("I2S_DATA", "audio.i2s_data")
 
 
 def test_parse_matrix_config_scope_rows_converted_to_ranges(matrix_config):
@@ -464,25 +466,6 @@ def test_parse_disabled_neopixel_pixels_entry_reusing_pin_still_raises_value_err
 
 
 # ---------------------------------------------------------------------------
-# NeoPixel legacy scope brightness validation
-# ---------------------------------------------------------------------------
-
-
-def test_parse_neopixel_scope_non_numeric_brightness_raises_value_error(neopixel_config):
-    neopixel_config["pixels"][0]["scopes"]["personal"]["brightness"] = "bright"
-
-    with pytest.raises(ValueError, match=r"personal\.brightness"):
-        parse_device_config(neopixel_config)
-
-
-def test_parse_neopixel_scope_out_of_range_brightness_raises_value_error(neopixel_config):
-    neopixel_config["pixels"][0]["scopes"]["personal"]["brightness"] = 1.5
-
-    with pytest.raises(ValueError, match=r"personal\.brightness"):
-        parse_device_config(neopixel_config)
-
-
-# ---------------------------------------------------------------------------
 # Band-map validator: overlapping scope_rows
 # ---------------------------------------------------------------------------
 
@@ -526,67 +509,6 @@ def test_validate_band_map_invalid_scope_key_raises_value_error():
 
     with pytest.raises(ValueError, match="bad_scope"):
         validate_band_map(bands, "test")
-
-
-# ---------------------------------------------------------------------------
-# NeoPixel shape validation
-# ---------------------------------------------------------------------------
-
-
-def test_parse_neopixel_first_entry_exposes_configured_scopes(neopixel_config):
-    result = parse_device_config(neopixel_config)
-
-    assert "personal" in as_neopixel(result.pixels[0]).scopes
-
-
-def test_parse_neopixel_scope_fields_match(neopixel_config):
-    result = parse_device_config(neopixel_config)
-
-    scope = as_neopixel(result.pixels[0]).scopes["personal"]
-    assert scope.pin == "D5"
-    assert scope.count == 30
-    assert scope.order == "GRB"
-    assert scope.brightness == 0.5
-
-
-def test_parse_neopixel_scope_missing_pin_raises_value_error(neopixel_config):
-    del neopixel_config["pixels"][0]["scopes"]["personal"]["pin"]
-
-    with pytest.raises(ValueError, match=r"personal\.pin"):
-        parse_device_config(neopixel_config)
-
-
-def test_parse_neopixel_scope_missing_count_raises_value_error(neopixel_config):
-    del neopixel_config["pixels"][0]["scopes"]["personal"]["count"]
-
-    with pytest.raises(ValueError, match=r"personal\.count"):
-        parse_device_config(neopixel_config)
-
-
-@pytest.mark.parametrize("count", ["10", 10.0, True, 0, -1])
-def test_parse_neopixel_scope_count_not_positive_integer_raises_value_error_naming_field(
-    neopixel_config, count
-):
-    neopixel_config["pixels"][0]["scopes"]["personal"]["count"] = count
-
-    with pytest.raises(
-        ValueError, match=r"pixels\.scopes\.personal\.count must be a positive integer"
-    ):
-        parse_device_config(neopixel_config)
-
-
-def test_parse_neopixel_scope_with_unknown_key_raises_value_error(neopixel_config):
-    neopixel_config["pixels"][0]["scopes"]["bad_scope"] = {"pin": "D7", "count": 5}
-
-    with pytest.raises(ValueError, match="bad_scope"):
-        parse_device_config(neopixel_config)
-
-
-def test_parse_neopixel_scope_error_lists_valid_keys(neopixel_config):
-    neopixel_config["pixels"][0]["scopes"]["bad_scope"] = {"pin": "D7", "count": 5}
-
-    with pytest.raises(ValueError, match="personal"):
-        parse_device_config(neopixel_config)
 
 
 # ---------------------------------------------------------------------------
@@ -686,13 +608,39 @@ def test_parse_absent_ir_section_yields_none(matrix_config):
     assert result.ir is None
 
 
-def test_parse_ir_rx_list_of_pins_preserves_declared_order(matrix_config):
+def test_parse_ir_rx_single_name_is_recorded_on_ir_rx(matrix_config):
+    matrix_config["ir"]["rx"] = "D11"
+
+    result = parse_device_config(matrix_config)
+
+    assert result.ir is not None
+    assert result.ir.rx == [PinRef("D11", "ir.rx")]
+
+
+def test_parse_ir_rx_list_records_indexed_fields_in_declared_order(matrix_config):
     matrix_config["ir"]["rx"] = ["D11", "D13", "D15"]
 
     result = parse_device_config(matrix_config)
 
     assert result.ir is not None
-    assert result.ir.rx == ["D11", "D13", "D15"]
+    assert result.ir.rx == [
+        PinRef("D11", "ir.rx[0]"),
+        PinRef("D13", "ir.rx[1]"),
+        PinRef("D15", "ir.rx[2]"),
+    ]
+
+
+def test_parse_ir_emitters_are_recorded_on_their_own_fields(matrix_config):
+    matrix_config["ir"].update({"line": "D12", "cone": "D13", "area_of_effect": "D14"})
+
+    result = parse_device_config(matrix_config)
+
+    assert result.ir is not None
+    assert result.ir.emitters == {
+        "line": PinRef("D12", "ir.line"),
+        "cone": PinRef("D13", "ir.cone"),
+        "area_of_effect": PinRef("D14", "ir.area_of_effect"),
+    }
 
 
 def test_parse_ir_rx_empty_list_raises_value_error(matrix_config):
@@ -865,8 +813,8 @@ def test_parse_i2c_section_maps_each_named_bus_to_its_pins(matrix_config):
     result = parse_device_config(matrix_config)
 
     assert {name: (bus.sda, bus.scl) for name, bus in result.i2c.items()} == {
-        "default": ("GP4", "GP5"),
-        "sensors": ("GP6", "GP7"),
+        "default": (PinRef("GP4", "i2c.default.sda"), PinRef("GP5", "i2c.default.scl")),
+        "sensors": (PinRef("GP6", "i2c.sensors.sda"), PinRef("GP7", "i2c.sensors.scl")),
     }
 
 
@@ -960,8 +908,16 @@ def test_parse_spi_section_maps_each_named_bus_to_its_pins(matrix_config):
     result = parse_device_config(matrix_config)
 
     assert {name: (bus.sck, bus.mosi, bus.miso) for name, bus in result.spi.items()} == {
-        "default": ("GP2", "GP3", "GP0"),
-        "radio": ("GP14", "GP15", "GP12"),
+        "default": (
+            PinRef("GP2", "spi.default.sck"),
+            PinRef("GP3", "spi.default.mosi"),
+            PinRef("GP0", "spi.default.miso"),
+        ),
+        "radio": (
+            PinRef("GP14", "spi.radio.sck"),
+            PinRef("GP15", "spi.radio.mosi"),
+            PinRef("GP12", "spi.radio.miso"),
+        ),
     }
 
 
@@ -1063,8 +1019,8 @@ def test_parse_radio_section_maps_cs_reset_frequency_node(matrix_config):
     result = parse_device_config(matrix_config)
 
     assert result.radio is not None
-    assert result.radio.cs == "GP9"
-    assert result.radio.reset == "GP10"
+    assert result.radio.cs == PinRef("GP9", "radio.cs")
+    assert result.radio.reset == PinRef("GP10", "radio.reset")
     assert result.radio.frequency == 915.0
     assert result.radio.node == 42
 
@@ -1231,7 +1187,7 @@ def test_parse_sdcard_section_maps_cs_mount_and_enabled(matrix_config):
     result = parse_device_config(matrix_config)
 
     assert result.sdcard is not None
-    assert result.sdcard.cs == "GP9"
+    assert result.sdcard.cs == PinRef("GP9", "sdcard.cs")
     assert result.sdcard.mount == "/data"
     assert result.sdcard.enabled is False
 
@@ -1343,7 +1299,7 @@ def test_parse_high_current_rail_section_maps_pin_active_high_and_enabled(matrix
     result = parse_device_config(matrix_config)
 
     assert result.high_current_rail is not None
-    assert result.high_current_rail.pin == "GP28"
+    assert result.high_current_rail.pin == PinRef("GP28", "high_current_rail.pin")
     assert result.high_current_rail.active_high is False
     assert result.high_current_rail.enabled is False
 
@@ -1453,7 +1409,7 @@ def test_parse_audio_section_with_no_clips_key_succeeds_and_carries_no_clips_att
     assert result.audio is not None
     assert result.audio.voices == 1
     assert result.audio.max_volume == 0.1
-    assert result.audio.i2s_bit_clock == "I2S_BIT_CLOCK"
+    assert result.audio.i2s_bit_clock.name == "I2S_BIT_CLOCK"
     assert not hasattr(result.audio, "clips")
 
 
@@ -1552,9 +1508,9 @@ def test_committed_sample_device_config_parses():
     result = parse_device_config(mapping)
 
     assert result.audio is not None
-    assert result.audio.i2s_bit_clock == "GP21"
-    assert result.audio.i2s_word_select == "GP22"
-    assert result.audio.i2s_data == "GP20"
+    assert result.audio.i2s_bit_clock.name == "GP21"
+    assert result.audio.i2s_word_select.name == "GP22"
+    assert result.audio.i2s_data.name == "GP20"
     assert result.accelerometer is not None
     assert result.haptics is not None
     assert result.radio is not None
@@ -1607,7 +1563,7 @@ def test_load_device_config_parses_valid_file(tmp_path, matrix_config):
     result = load_device_config(str(path))
 
     assert isinstance(result, DeviceConfig)
-    assert result.buttons == ["D9", "D10"]
+    assert result.buttons == [PinRef("D9", "buttons[0]"), PinRef("D10", "buttons[1]")]
 
 
 def test_load_device_config_raises_when_file_missing(tmp_path):

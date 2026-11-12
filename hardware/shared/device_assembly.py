@@ -52,13 +52,12 @@ from hardware.shared.device_config import (
     IRConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
-    NeoPixelStripConfig,
     RadioConfig,
     SDCardConfig,
     SPIConfig,
 )
 from hardware.shared.device_hardware import DeviceHardware
-from hardware.shared.device_parts import DeviceParts, PinRef
+from hardware.shared.device_parts import DeviceParts
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.network_controls import HardwareNetworkControls
@@ -96,7 +95,7 @@ def open_i2c(name: str, declared: dict[str, I2CConfig], parts: DeviceParts) -> B
     i2c = declared.get(name)
     if i2c is None:
         return parts.i2c_bus(None, None)
-    return parts.i2c_bus(PinRef(i2c.scl, f"i2c.{name}.scl"), PinRef(i2c.sda, f"i2c.{name}.sda"))
+    return parts.i2c_bus(i2c.scl, i2c.sda)
 
 
 def _require_i2c(
@@ -138,11 +137,7 @@ def _open_spi(name: str, declared: dict[str, SPIConfig], parts: DeviceParts) -> 
     spi = declared.get(name)
     if spi is None:
         return parts.spi_bus(None, None, None)
-    return parts.spi_bus(
-        PinRef(spi.sck, f"spi.{name}.sck"),
-        PinRef(spi.mosi, f"spi.{name}.mosi"),
-        PinRef(spi.miso, f"spi.{name}.miso"),
-    )
+    return parts.spi_bus(spi.sck, spi.mosi, spi.miso)
 
 
 def _require_spi(
@@ -160,36 +155,17 @@ def _pixel_outputs(
     parts: DeviceParts,
     i2c: dict[str, Bus | None],
 ) -> list[EffectOutput]:
-    """Build enabled pixel entry *index*: a matrix, or one output per NeoPixel strip.
-
-    A legacy ``scopes`` entry is one strip per scope, spanning the whole scope.
-    """
+    """Build enabled pixel entry *index*: a matrix, or one output per NeoPixel strip."""
     if isinstance(pixels, MatrixPixelsConfig):
         bus = _require_i2c(i2c, f"pixels[{index}]", pixels)
         return [parts.matrix_pixels(pixels, bus)]
-    outputs = [
-        parts.neopixel_strip(strip, PinRef(strip.pin, "pixels.pin")) for strip in pixels.strips
-    ]
-    for key, scope in pixels.scopes.items():
-        strip = NeoPixelStripConfig(
-            scope.pin, scope.count, scope.order, scope.brightness, {key: range(0, scope.count)}
-        )
-        outputs.append(parts.neopixel_strip(strip, PinRef(scope.pin, f"pixels.scopes.{key}.pin")))
-    return outputs
+    return [parts.neopixel_strip(strip, strip.pin) for strip in pixels.strips]
 
 
 def _ir(ir_config: IRConfig, parts: DeviceParts) -> tuple[InfraredTransceiver, str]:
     """Wire the IR subsystem; return it with the ``ir`` line's closing suffix."""
-    rx = ir_config.rx
-    if len(rx) == 1:
-        rx_pins = [PinRef(rx[0], "ir.rx")]
-    else:
-        rx_pins = [PinRef(name, f"ir.rx[{i}]") for i, name in enumerate(rx)]
-    readers = [parts.ir_reader(pin) for pin in rx_pins]
-    emitter_pins = {
-        emitter: PinRef(name, f"ir.{emitter}") for emitter, name in ir_config.emitters.items()
-    }
-    transceiver = InfraredTransceiver(readers, emitter_pins, parts.ir_writer)
+    readers = [parts.ir_reader(pin) for pin in ir_config.rx]
+    transceiver = InfraredTransceiver(readers, ir_config.emitters, parts.ir_writer)
     writer_kind = transceiver.writer_kind
     return transceiver, "ok" if writer_kind is None else f"writer={writer_kind} ok"
 
@@ -306,7 +282,7 @@ def assemble_device(
 
         def _build_rail() -> tuple[None, str]:
             level = rail.active_high if rail.enabled else not rail.active_high
-            parts.high_current_rail(PinRef(rail.pin, "high_current_rail.pin"), level)
+            parts.high_current_rail(rail.pin, level)
             return None, "asserted" if rail.enabled else "held off"
 
         narrate_step(logger, describe_high_current_rail(rail), _build_rail)
@@ -344,8 +320,7 @@ def assemble_device(
 
     def _build_buttons() -> tuple[DebouncedButtons, str]:
         readers = [
-            (button_label(i), parts.button_reader(PinRef(name, f"buttons[{i}]")))
-            for i, name in enumerate(config.buttons)
+            (button_label(i), parts.button_reader(pin)) for i, pin in enumerate(config.buttons)
         ]
         return DebouncedButtons(readers), "ok"
 
@@ -375,10 +350,7 @@ def assemble_device(
 
     def _build_audio(audio: AudioConfig) -> tuple[EffectOutput, str]:
         output = parts.audio_output(
-            audio,
-            PinRef(audio.i2s_bit_clock, "audio.i2s_bit_clock"),
-            PinRef(audio.i2s_word_select, "audio.i2s_word_select"),
-            PinRef(audio.i2s_data, "audio.i2s_data"),
+            audio, audio.i2s_bit_clock, audio.i2s_word_select, audio.i2s_data
         )
         return output, "ok"
 
@@ -399,8 +371,8 @@ def assemble_device(
         transport = parts.radio_transport(
             radio,
             _require_spi(spi, "radio", radio),
-            PinRef(radio.cs, "radio.cs"),
-            PinRef(radio.reset, "radio.reset"),
+            radio.cs,
+            radio.reset,
         )
         return RadioTransceiver(transport), "ok"
 
@@ -412,7 +384,7 @@ def assemble_device(
         config.sdcard,
         describe_sdcard,
         lambda c: (
-            parts.storage(c, _require_spi(spi, "sdcard", c), PinRef(c.cs, "sdcard.cs")),
+            parts.storage(c, _require_spi(spi, "sdcard", c), c.cs),
             "ok",
         ),
     )

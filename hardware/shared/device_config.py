@@ -37,8 +37,8 @@ __all__ = [
     "MatrixPixelsConfig",
     "NeoPixelCurrentBudgetConfig",
     "NeoPixelPixelsConfig",
-    "NeoPixelScopeConfig",
     "NeoPixelStripConfig",
+    "PinRef",
     "RadioConfig",
     "SDCardConfig",
     "SPIConfig",
@@ -63,8 +63,6 @@ _I2C_PIN_FIELDS: Final = ("sda", "scl")
 _SPI_PIN_FIELDS: Final = ("sck", "mosi", "miso")
 
 _RADIO_ALLOWED_KEYS: Final = ("spi", "cs", "reset", "frequency", "node", "enabled")
-
-_RADIO_PIN_FIELDS: Final = ("cs", "reset")
 
 _SDCARD_ALLOWED_KEYS: Final = ("spi", "cs", "mount", "enabled")
 
@@ -110,6 +108,25 @@ _ISOLATE_EXCLUDED_COMPONENTS: Final = (
 # ---------------------------------------------------------------------------
 
 
+class PinRef:
+    """A pin name paired with the config field it came from, e.g. ``GP7`` from ``ir.line``."""
+
+    __slots__ = ("field", "name")
+
+    def __init__(self, name: str, field: str) -> None:
+        self.name: str = name
+        self.field: str = field
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, PinRef) and (self.name, self.field) == (other.name, other.field)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.field))
+
+    def __repr__(self) -> str:
+        return f"PinRef({self.name!r}, {self.field!r})"
+
+
 class MatrixPixelsConfig:
     """Parsed matrix pixels configuration.
 
@@ -135,18 +152,6 @@ class MatrixPixelsConfig:
         self.address: int | None = address
 
 
-class NeoPixelScopeConfig:
-    """Parsed NeoPixel scope configuration (legacy one-strip-per-scope shape)."""
-
-    __slots__ = ("brightness", "count", "order", "pin")
-
-    def __init__(self, pin: str, count: int, order: str, brightness: float) -> None:
-        self.pin: str = pin
-        self.count: int = count
-        self.order: str = order
-        self.brightness: float = brightness
-
-
 class NeoPixelStripConfig:
     """Parsed NeoPixel strip configuration with scope_pixels segmentation.
 
@@ -158,13 +163,13 @@ class NeoPixelStripConfig:
 
     def __init__(
         self,
-        pin: str,
+        pin: PinRef,
         count: int,
         order: str,
         brightness: float,
         scope_pixels: dict[str, range],
     ) -> None:
-        self.pin: str = pin
+        self.pin: PinRef = pin
         self.count: int = count
         self.order: str = order
         self.brightness: float = brightness
@@ -174,20 +179,16 @@ class NeoPixelStripConfig:
 class NeoPixelPixelsConfig:
     """Parsed NeoPixel pixels configuration.
 
-    ``strips`` holds one ``NeoPixelStripConfig`` per physical strip entry
-    (new scope_pixels shape).  ``scopes`` holds the legacy one-strip-per-scope
-    mapping and is populated only when parsing old-shape entries.
+    ``strips`` holds one ``NeoPixelStripConfig`` per physical strip entry.
     """
 
-    __slots__ = ("enabled", "scopes", "strips")
+    __slots__ = ("enabled", "strips")
 
     def __init__(
         self,
-        scopes: dict[str, NeoPixelScopeConfig] | None = None,
         strips: list[NeoPixelStripConfig] | None = None,
         enabled: bool = True,
     ) -> None:
-        self.scopes: dict[str, NeoPixelScopeConfig] = scopes if scopes is not None else {}
         self.strips: list[NeoPixelStripConfig] = strips if strips is not None else []
         self.enabled: bool = enabled
 
@@ -212,34 +213,36 @@ class AudioConfig:
         self,
         voices: int,
         max_volume: float,
-        i2s_bit_clock: str,
-        i2s_word_select: str,
-        i2s_data: str,
+        i2s_bit_clock: PinRef,
+        i2s_word_select: PinRef,
+        i2s_data: PinRef,
         enabled: bool = True,
     ) -> None:
         self.voices: int = voices
         self.max_volume: float = max_volume
-        self.i2s_bit_clock: str = i2s_bit_clock
-        self.i2s_word_select: str = i2s_word_select
-        self.i2s_data: str = i2s_data
+        self.i2s_bit_clock: PinRef = i2s_bit_clock
+        self.i2s_word_select: PinRef = i2s_word_select
+        self.i2s_data: PinRef = i2s_data
         self.enabled: bool = enabled
 
 
 class IRConfig:
     """Parsed IR configuration.
 
-    ``rx`` is always a list of pin names, regardless of whether
+    ``rx`` is always a list of Pin references, regardless of whether
     ``aura-device.json`` declared ``ir.rx`` as a single string (the
-    single-receiver shape) or a list of strings (the multi-receiver shape) —
-    callers deal with one representation either way. It is empty only when
-    ``ir.rx`` is left out: an emitter-only section with no receiver.
+    single-receiver shape, recorded on ``ir.rx``) or a list of strings (the
+    multi-receiver shape, recorded on ``ir.rx[i]``) — callers deal with one
+    representation either way. It is empty only when ``ir.rx`` is left out:
+    an emitter-only section with no receiver. ``emitters`` maps each emitter
+    key to its Pin reference, recorded on ``ir.<emitter>``.
     """
 
     __slots__ = ("emitters", "enabled", "rx")
 
-    def __init__(self, rx: list[str], emitters: dict[str, str], enabled: bool = True) -> None:
-        self.rx: list[str] = rx
-        self.emitters: dict[str, str] = emitters
+    def __init__(self, rx: list[PinRef], emitters: dict[str, PinRef], enabled: bool = True) -> None:
+        self.rx: list[PinRef] = rx
+        self.emitters: dict[str, PinRef] = emitters
         self.enabled: bool = enabled
 
 
@@ -252,9 +255,9 @@ class I2CConfig:
 
     __slots__ = ("scl", "sda")
 
-    def __init__(self, sda: str, scl: str) -> None:
-        self.sda: str = sda
-        self.scl: str = scl
+    def __init__(self, sda: PinRef, scl: PinRef) -> None:
+        self.sda: PinRef = sda
+        self.scl: PinRef = scl
 
 
 class SPIConfig:
@@ -267,10 +270,10 @@ class SPIConfig:
 
     __slots__ = ("miso", "mosi", "sck")
 
-    def __init__(self, sck: str, mosi: str, miso: str) -> None:
-        self.sck: str = sck
-        self.mosi: str = mosi
-        self.miso: str = miso
+    def __init__(self, sck: PinRef, mosi: PinRef, miso: PinRef) -> None:
+        self.sck: PinRef = sck
+        self.mosi: PinRef = mosi
+        self.miso: PinRef = miso
 
 
 class I2CDeviceConfig:
@@ -309,16 +312,16 @@ class RadioConfig:
 
     def __init__(
         self,
-        cs: str,
-        reset: str,
+        cs: PinRef,
+        reset: PinRef,
         frequency: float,
         node: int,
         enabled: bool = True,
         spi: str = DEFAULT_BUS,
     ) -> None:
         self.spi: str = spi
-        self.cs: str = cs
-        self.reset: str = reset
+        self.cs: PinRef = cs
+        self.reset: PinRef = reset
         self.frequency: float = frequency
         self.node: int = node
         self.enabled: bool = enabled
@@ -335,10 +338,10 @@ class SDCardConfig:
     __slots__ = ("cs", "enabled", "mount", "spi")
 
     def __init__(
-        self, cs: str, mount: str = "/sd", enabled: bool = True, spi: str = DEFAULT_BUS
+        self, cs: PinRef, mount: str = "/sd", enabled: bool = True, spi: str = DEFAULT_BUS
     ) -> None:
         self.spi: str = spi
-        self.cs: str = cs
+        self.cs: PinRef = cs
         self.mount: str = mount
         self.enabled: bool = enabled
 
@@ -360,8 +363,8 @@ class HighCurrentRailConfig:
 
     __slots__ = ("active_high", "enabled", "pin")
 
-    def __init__(self, pin: str, active_high: bool = True, enabled: bool = True) -> None:
-        self.pin: str = pin
+    def __init__(self, pin: PinRef, active_high: bool = True, enabled: bool = True) -> None:
+        self.pin: PinRef = pin
         self.active_high: bool = active_high
         self.enabled: bool = enabled
 
@@ -450,7 +453,7 @@ class DeviceConfig:
     def __init__(
         self,
         pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig],
-        buttons: list[str],
+        buttons: list[PinRef],
         ir: IRConfig | None,
         audio: AudioConfig | None,
         i2c: dict[str, I2CConfig],
@@ -464,7 +467,7 @@ class DeviceConfig:
         neopixel_current_budget: NeoPixelCurrentBudgetConfig | None,
     ) -> None:
         self.pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = pixels
-        self.buttons: list[str] = buttons
+        self.buttons: list[PinRef] = buttons
         self.ir: IRConfig | None = ir
         self.audio: AudioConfig | None = audio
         self.i2c: dict[str, I2CConfig] = i2c
@@ -574,7 +577,7 @@ def validate_band_map(bands: dict[str, range], context: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Brightness validator (shared across matrix, strip, and legacy scope entries)
+# Brightness validator (shared across matrix and strip entries)
 # ---------------------------------------------------------------------------
 
 
@@ -602,7 +605,7 @@ def _parse_brightness(mapping: dict, key: str, field: str) -> float:
 
 
 # ---------------------------------------------------------------------------
-# NeoPixel count validator (shared across strip and legacy scope entries)
+# NeoPixel count validator
 # ---------------------------------------------------------------------------
 
 
@@ -711,6 +714,26 @@ def _parse_enabled(mapping: dict, field: str) -> bool:
     return value
 
 
+def _parse_pin(mapping: dict, key: str, field: str) -> PinRef:
+    """Return the Pin reference at *key* in *mapping*, recorded under *field*.
+
+    Args:
+        mapping: The raw config mapping to read *key* from.
+        key: The mapping key holding the pin name (e.g. ``"cs"``).
+        field: The field path, used both in error messages and as the
+            returned ``PinRef.field`` (e.g. ``"radio.cs"``).
+
+    Raises:
+        ValueError: If *key* is absent or its value is not a string, naming *field*.
+    """
+    if key not in mapping:
+        raise ValueError(f"{field} is required")
+    name = mapping[key]
+    if not isinstance(name, str):
+        raise ValueError(f"{field} must be a string pin name")
+    return PinRef(name, field)
+
+
 # ---------------------------------------------------------------------------
 # Parser
 # ---------------------------------------------------------------------------
@@ -784,7 +807,7 @@ def _parse_neopixel_strip_entry(mapping: dict, entry_index: int) -> NeoPixelStri
     validate_band_map(scope_pixels, f"{label} pin '{pin}' scope_pixels")
 
     return NeoPixelStripConfig(
-        pin=pin,
+        pin=PinRef(pin, f"{label}.pin"),
         count=count,
         order=order,
         brightness=brightness,
@@ -796,34 +819,14 @@ def _parse_neopixel_pixels(mapping: dict, entry_index: int) -> NeoPixelPixelsCon
     label = f"pixels[{entry_index}]"
     enabled = _parse_enabled(mapping, f"{label}.enabled")
 
-    if "scope_pixels" in mapping or "pin" in mapping:
-        strip = _parse_neopixel_strip_entry(mapping, entry_index)
-        return NeoPixelPixelsConfig(strips=[strip], enabled=enabled)
-
-    # Legacy shape: scopes dict
-    scopes_raw = mapping.get("scopes", {})
-    scopes: dict[str, NeoPixelScopeConfig] = {}
-
-    for key, scope_cfg in scopes_raw.items():
-        if key not in _VALID_SCOPE_KEYS:
-            valid = ", ".join(sorted(_VALID_SCOPE_KEYS))
-            raise ValueError(f"pixels.scopes key '{key}' is not valid; valid keys: {valid}")
-        if "pin" not in scope_cfg:
-            raise ValueError(f"pixels.scopes.{key}.pin is required")
-        if not isinstance(scope_cfg["pin"], str):
-            raise ValueError(f"pixels.scopes.{key}.pin must be a string pin name")
-        if "count" not in scope_cfg:
-            raise ValueError(f"pixels.scopes.{key}.count is required")
-        count = _parse_count(scope_cfg, "count", f"pixels.scopes.{key}.count")
-        brightness = _parse_brightness(scope_cfg, "brightness", f"pixels.scopes.{key}.brightness")
-        scopes[key] = NeoPixelScopeConfig(
-            pin=scope_cfg["pin"],
-            count=count,
-            order=scope_cfg.get("order", "GRB"),
-            brightness=brightness,
+    if "scopes" in mapping and "pin" not in mapping and "scope_pixels" not in mapping:
+        raise ValueError(
+            f"{label}: the 'scopes' map is no longer supported;"
+            + " use 'pin' with 'scope_pixels' to declare one strip per entry"
         )
 
-    return NeoPixelPixelsConfig(scopes=scopes, enabled=enabled)
+    strip = _parse_neopixel_strip_entry(mapping, entry_index)
+    return NeoPixelPixelsConfig(strips=[strip], enabled=enabled)
 
 
 def _parse_pixels_entry(
@@ -839,22 +842,22 @@ def _parse_pixels_entry(
     )
 
 
-def _parse_buttons(buttons_raw: list) -> list[str]:
-    result: list[str] = []
+def _parse_buttons(buttons_raw: list) -> list[PinRef]:
+    result: list[PinRef] = []
     for i, pin in enumerate(buttons_raw):
         if not isinstance(pin, str):
             raise ValueError(f"buttons[{i}] must be a string pin name, got {type(pin).__name__}")
-        result.append(pin)
+        result.append(PinRef(pin, f"buttons[{i}]"))
     return result
 
 
-def _parse_ir_rx(rx_raw: object) -> list[str]:
-    """Normalize ``ir.rx`` to a non-empty list of pin names.
+def _parse_ir_rx(rx_raw: object) -> list[PinRef]:
+    """Normalize ``ir.rx`` to a non-empty list of Pin references.
 
     Accepts either shape declared in ``aura-device.json``: a single pin-name
-    string (today's single-receiver shape, normalized to a one-element list)
-    or a non-empty list of pin-name strings (the multi-receiver shape,
-    order preserved).
+    string (the single-receiver shape, a one-element list recorded on
+    ``ir.rx``) or a non-empty list of pin-name strings (the multi-receiver
+    shape, order preserved, each recorded on ``ir.rx[i]``).
 
     Raises:
         ValueError: If *rx_raw* is an empty list, a list containing a
@@ -862,16 +865,16 @@ def _parse_ir_rx(rx_raw: object) -> list[str]:
             list.
     """
     if isinstance(rx_raw, str):
-        return [rx_raw]
+        return [PinRef(rx_raw, "ir.rx")]
 
     if isinstance(rx_raw, list):
         if not rx_raw:
             raise ValueError("ir.rx must not be an empty list")
-        result: list[str] = []
+        result: list[PinRef] = []
         for i, pin in enumerate(rx_raw):
             if not isinstance(pin, str):
                 raise ValueError(f"ir.rx[{i}] must be a string pin name, got {type(pin).__name__}")
-            result.append(pin)
+            result.append(PinRef(pin, f"ir.rx[{i}]"))
         return result
 
     raise ValueError("ir.rx must be a string pin name or a list of string pin names")
@@ -883,16 +886,14 @@ def _parse_ir(ir_raw: dict) -> IRConfig:
     # Every IR item is optional: a prop with no receiver omits rx, and one
     # that cannot transmit on a given emitter (line/cone/area_of_effect)
     # omits it. Emitters are validated uniformly by the loop below.
-    emitters: dict[str, str] = {}
-    for key, pin in ir_raw.items():
+    emitters: dict[str, PinRef] = {}
+    for key in ir_raw:
         if key in ("rx", "enabled"):
             continue
         if key not in _VALID_IR_EMITTER_KEYS:
             valid = ", ".join(sorted(_VALID_IR_EMITTER_KEYS))
             raise ValueError(f"ir emitter key '{key}' is not valid; valid keys: {valid}")
-        if not isinstance(pin, str):
-            raise ValueError(f"ir.{key} must be a string pin name")
-        emitters[key] = pin
+        emitters[key] = _parse_pin(ir_raw, key, f"ir.{key}")
 
     enabled = _parse_enabled(ir_raw, "ir.enabled")
     return IRConfig(rx=rx, emitters=emitters, enabled=enabled)
@@ -912,17 +913,17 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
         names = ", ".join(f"audio.{field}" for field in missing)
         raise ValueError(f"{names} required together when audio section is present")
 
-    for field in _I2S_PIN_FIELDS:
-        if not isinstance(audio_raw[field], str):
-            raise ValueError(f"audio.{field} must be a string pin name")
+    bit_clock, word_select, data = (
+        _parse_pin(audio_raw, field, f"audio.{field}") for field in _I2S_PIN_FIELDS
+    )
 
     enabled = _parse_enabled(audio_raw, "audio.enabled")
     return AudioConfig(
         voices=voices,
         max_volume=max_volume,
-        i2s_bit_clock=audio_raw["i2s_bit_clock"],
-        i2s_word_select=audio_raw["i2s_word_select"],
-        i2s_data=audio_raw["i2s_data"],
+        i2s_bit_clock=bit_clock,
+        i2s_word_select=word_select,
+        i2s_data=data,
         enabled=enabled,
     )
 
@@ -960,7 +961,8 @@ def _parse_buses(
     """Parse the ``i2c`` or ``spi`` *section*: a mapping of bus name to that bus's pins.
 
     Each bus must declare every one of *pin_fields*; *build* receives their
-    values positionally, in *pin_fields* order.
+    Pin references (field path ``<section>.<bus>.<pin>``) positionally, in
+    *pin_fields* order.
     """
     if not isinstance(raw, dict):
         pins = "/".join(pin_fields)
@@ -989,11 +991,7 @@ def _parse_bus(
         names = ", ".join(f"{field}.{pin}" for pin in missing)
         raise ValueError(f"{names} required together when {field} is declared")
 
-    for pin in pin_fields:
-        if not isinstance(bus_raw[pin], str):
-            raise ValueError(f"{field}.{pin} must be a string pin name")
-
-    return build(*(bus_raw[pin] for pin in pin_fields))
+    return build(*(_parse_pin(bus_raw, pin, f"{field}.{pin}") for pin in pin_fields))
 
 
 def _parse_bus_reference(
@@ -1023,13 +1021,8 @@ def _parse_radio(radio_raw: dict, spi_buses: dict[str, SPIConfig]) -> RadioConfi
     _reject_unknown_keys(radio_raw, "radio", allowed=_RADIO_ALLOWED_KEYS)
     spi = _parse_bus_reference(radio_raw, "radio", "spi", spi_buses)
 
-    for field in _RADIO_PIN_FIELDS:
-        if field not in radio_raw:
-            raise ValueError(f"radio.{field} is required")
-        if not isinstance(radio_raw[field], str):
-            raise ValueError(f"radio.{field} must be a string pin name")
-    cs = radio_raw["cs"]
-    reset = radio_raw["reset"]
+    cs = _parse_pin(radio_raw, "cs", "radio.cs")
+    reset = _parse_pin(radio_raw, "reset", "radio.reset")
 
     if "frequency" not in radio_raw:
         raise ValueError("radio.frequency is required")
@@ -1055,11 +1048,7 @@ def _parse_sdcard(sdcard_raw: dict, spi_buses: dict[str, SPIConfig]) -> SDCardCo
     _reject_unknown_keys(sdcard_raw, "sdcard", allowed=_SDCARD_ALLOWED_KEYS)
     spi = _parse_bus_reference(sdcard_raw, "sdcard", "spi", spi_buses)
 
-    if "cs" not in sdcard_raw:
-        raise ValueError("sdcard.cs is required")
-    cs = sdcard_raw["cs"]
-    if not isinstance(cs, str):
-        raise ValueError("sdcard.cs must be a string pin name")
+    cs = _parse_pin(sdcard_raw, "cs", "sdcard.cs")
 
     mount = sdcard_raw.get("mount", "/sd")
     if not isinstance(mount, str) or not mount.startswith("/"):
@@ -1074,11 +1063,7 @@ def _parse_sdcard(sdcard_raw: dict, spi_buses: dict[str, SPIConfig]) -> SDCardCo
 def _parse_high_current_rail(rail_raw: dict) -> HighCurrentRailConfig:
     _reject_unknown_keys(rail_raw, "high_current_rail", allowed=_HIGH_CURRENT_RAIL_ALLOWED_KEYS)
 
-    if "pin" not in rail_raw:
-        raise ValueError("high_current_rail.pin is required")
-    pin = rail_raw["pin"]
-    if not isinstance(pin, str):
-        raise ValueError("high_current_rail.pin must be a string pin name")
+    pin = _parse_pin(rail_raw, "pin", "high_current_rail.pin")
 
     active_high = rail_raw.get("active_high", True)
     if not isinstance(active_high, bool):
@@ -1183,11 +1168,12 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
                 raise ValueError(f"pixels[{i}]: only one matrix entry is allowed")
         elif isinstance(parsed, NeoPixelPixelsConfig):
             for strip in parsed.strips:
-                if strip.pin in seen_pins:
+                pin = strip.pin.name
+                if pin in seen_pins:
                     raise ValueError(
-                        f"pixels[{i}]: pin '{strip.pin}' is already used by another strip entry"
+                        f"pixels[{i}]: pin '{pin}' is already used by another strip entry"
                     )
-                seen_pins.add(strip.pin)
+                seen_pins.add(pin)
         pixels.append(parsed)
 
     buttons_raw = mapping.get("buttons", [])

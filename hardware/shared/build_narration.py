@@ -39,6 +39,7 @@ from hardware.shared.device_config import (
     MatrixPixelsConfig,
     NeoPixelCurrentBudgetConfig,
     NeoPixelPixelsConfig,
+    PinRef,
     RadioConfig,
     SDCardConfig,
     SPIConfig,
@@ -101,21 +102,21 @@ def narrate_skip(logger: Logger, description: str, note: str) -> None:
 
 
 def describe_high_current_rail(rail: HighCurrentRailConfig) -> str:
-    return f"high_current_rail pin={rail.pin} active_high={rail.active_high}"
+    return f"high_current_rail pin={rail.pin.name} active_high={rail.active_high}"
 
 
 def describe_i2c(name: str, i2c: I2CConfig | None) -> str:
     """Describe opening the I2C bus *name*; *i2c* ``None`` is the board's own bus."""
     if i2c is None:
         return f"i2c {name} board"
-    return f"i2c {name} scl={i2c.scl} sda={i2c.sda}"
+    return f"i2c {name} scl={i2c.scl.name} sda={i2c.sda.name}"
 
 
 def describe_spi(name: str, spi: SPIConfig | None) -> str:
     """Describe opening the SPI bus *name*; *spi* ``None`` is the board's own bus."""
     if spi is None:
         return f"spi {name} board"
-    return f"spi {name} sck={spi.sck} mosi={spi.mosi} miso={spi.miso}"
+    return f"spi {name} sck={spi.sck.name} mosi={spi.mosi.name} miso={spi.miso.name}"
 
 
 def describe_neopixel_current_budget(budget: NeoPixelCurrentBudgetConfig) -> str:
@@ -152,22 +153,12 @@ def _bus_suffix(kind: str, name: str) -> str:
 
 
 def _describe_neopixel_pixels(pixels: NeoPixelPixelsConfig) -> str:
-    """Return the pin/count/order/segmentation/brightness detail for a NeoPixel
-    entry -- the ``strips`` form (one physical strip, segmented by
-    ``scope_pixels``) or the legacy ``scopes`` map form (one physical strip
-    per scope key, joined with ``" | "`` when more than one shares the entry).
-    """
-    if pixels.strips:
-        strip = pixels.strips[0]
-        return (
-            f"pin={strip.pin} count={strip.count} order={strip.order} "
-            + f"scope_pixels=[{_format_ranges(strip.scope_pixels)}] "
-            + f"brightness={strip.brightness:.2f}"
-        )
-    return " | ".join(
-        f"pin={scope.pin} count={scope.count} order={scope.order} scope={key} "
-        + f"brightness={scope.brightness:.2f}"
-        for key, scope in pixels.scopes.items()
+    """Return the pin/count/order/segmentation/brightness detail for a NeoPixel entry's strip."""
+    strip = pixels.strips[0]
+    return (
+        f"pin={strip.pin.name} count={strip.count} order={strip.order} "
+        + f"scope_pixels=[{_format_ranges(strip.scope_pixels)}] "
+        + f"brightness={strip.brightness:.2f}"
     )
 
 
@@ -187,9 +178,9 @@ def describe_pixel_entry(index: int, pixels: MatrixPixelsConfig | NeoPixelPixels
     return f"pixels[{index}] {kind} {detail}"
 
 
-def describe_buttons(pin_names: list[str]) -> str:
+def describe_buttons(pins: list[PinRef]) -> str:
     """Label buttons ``A``, ``B``, ... in declaration order -- the labels the board assigns."""
-    labelled = " ".join(f"{chr(ord('A') + i)}={name}" for i, name in enumerate(pin_names))
+    labelled = " ".join(f"{chr(ord('A') + i)}={pin.name}" for i, pin in enumerate(pins))
     return f"buttons {labelled}" if labelled else "buttons"
 
 
@@ -210,32 +201,32 @@ def describe_audio(audio: AudioConfig) -> str:
         return "audio"
     return (
         f"audio voices={audio.voices} max_volume={audio.max_volume:.2f} "
-        + f"i2s_bit_clock={audio.i2s_bit_clock} "
-        + f"i2s_word_select={audio.i2s_word_select} i2s_data={audio.i2s_data}"
+        + f"i2s_bit_clock={audio.i2s_bit_clock.name} "
+        + f"i2s_word_select={audio.i2s_word_select.name} i2s_data={audio.i2s_data.name}"
     )
 
 
 def describe_radio(radio: RadioConfig) -> str:
     return (
         f"radio frequency={radio.frequency} node={radio.node} "
-        + f"cs={radio.cs} reset={radio.reset}"
+        + f"cs={radio.cs.name} reset={radio.reset.name}"
         + _bus_suffix("spi", radio.spi)
     )
 
 
 def describe_sdcard(sdcard: SDCardConfig) -> str:
-    return f"sdcard mount={sdcard.mount} cs={sdcard.cs}" + _bus_suffix("spi", sdcard.spi)
+    return f"sdcard mount={sdcard.mount} cs={sdcard.cs.name}" + _bus_suffix("spi", sdcard.spi)
 
 
 def describe_ir(ir: IRConfig) -> str:
     """Describe the ``ir`` step without its writer kind (``writer=pio``/``pulseio``),
     which is only known once the IR subsystem is built, so it closes the line instead."""
-    rx_desc = f"rx=[{' '.join(ir.rx)}]" if ir.rx else "rx=(none)"
+    rx_desc = f"rx=[{' '.join(pin.name for pin in ir.rx)}]" if ir.rx else "rx=(none)"
     if len(ir.rx) > 1:
         rx_desc += " (IR multi-receiver)"
     if ir.emitters:
         emitters_desc = "emitters=" + " ".join(
-            f"{key}:{ir.emitters[key]}" for key in IR_EMITTERS if key in ir.emitters
+            f"{key}:{ir.emitters[key].name}" for key in IR_EMITTERS if key in ir.emitters
         )
     else:
         emitters_desc = "emitters=(none)"

@@ -10,9 +10,8 @@ import pytest
 from engine.log import Logger
 from engine.network import AREA_OF_EFFECT, CONE, LINE
 from hardware.shared.device_assembly import assemble_device
-from hardware.shared.device_config import DeviceConfig, parse_device_config
+from hardware.shared.device_config import DeviceConfig, PinRef, parse_device_config
 from hardware.shared.device_hardware import DeviceHardware
-from hardware.shared.device_parts import PinRef
 from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.radio_transceiver import RadioTransceiver
 from hardware.shared.tests.recording_parts import Output, PartError, RecordingParts
@@ -407,7 +406,7 @@ def test_an_enabled_matrix_entry_is_built_on_the_i2c_bus():
     assert (matrix_config.cols, bus.kind) == (13, "i2c")
 
 
-def test_each_neopixel_strip_is_built_on_its_pin():
+def test_each_neopixel_strip_is_built_on_its_parsed_pin_reference():
     _hw, parts = _assemble(
         _config(
             pixels=[_NEOPIXEL, {**_NEOPIXEL, "pin": "GP1", "scope_pixels": {"ambient": [0, 4]}}]
@@ -415,8 +414,8 @@ def test_each_neopixel_strip_is_built_on_its_pin():
     )
 
     assert [(strip.scope_pixels, pin) for strip, pin in parts.args_of("neopixel_strip")] == [
-        ({"personal": range(0, 4)}, PinRef("GP0", "pixels.pin")),
-        ({"ambient": range(0, 4)}, PinRef("GP1", "pixels.pin")),
+        ({"personal": range(0, 4)}, PinRef("GP0", "pixels[0].pin")),
+        ({"ambient": range(0, 4)}, PinRef("GP1", "pixels[1].pin")),
     ]
 
 
@@ -440,43 +439,9 @@ def test_a_segmented_strip_is_one_strip_carrying_every_segment():
     ((strip, pin),) = parts.args_of("neopixel_strip")
     assert (strip.scope_pixels, pin) == (
         {"personal": range(0, 10), "ambient": range(10, 20)},
-        PinRef("GP0", "pixels.pin"),
+        PinRef("GP0", "pixels[0].pin"),
     )
     assert len(hw.outputs) == 1
-
-
-def test_a_legacy_entry_with_several_scopes_is_one_strip_per_scope_with_its_own_settings():
-    legacy = {
-        "type": "neopixel",
-        "scopes": {
-            "personal": {"pin": "GP2", "count": 10, "brightness": 0.5},
-            "directional": {"pin": "GP3", "count": 4, "order": "RGB"},
-        },
-    }
-
-    hw, parts = _assemble(_config(pixels=[legacy]))
-
-    assert [
-        (strip.scope_pixels, strip.brightness, strip.order, pin)
-        for strip, pin in parts.args_of("neopixel_strip")
-    ] == [
-        ({"personal": range(0, 10)}, 0.5, "GRB", PinRef("GP2", "pixels.scopes.personal.pin")),
-        ({"directional": range(0, 4)}, 1.0, "RGB", PinRef("GP3", "pixels.scopes.directional.pin")),
-    ]
-    assert len(hw.outputs) == 2
-
-
-def test_a_legacy_scope_entry_is_one_strip_per_scope_spanning_it():
-    legacy = {"type": "neopixel", "scopes": {"personal": {"pin": "GP2", "count": 6}}}
-
-    _hw, parts = _assemble(_config(pixels=[legacy]))
-
-    ((strip, pin),) = parts.args_of("neopixel_strip")
-    assert (strip.count, strip.scope_pixels, pin) == (
-        6,
-        {"personal": range(0, 6)},
-        PinRef("GP2", "pixels.scopes.personal.pin"),
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -608,7 +573,7 @@ _EVERY_SECTION: dict[str, Any] = {
     "spi": {"default": {"sck": "SCK", "mosi": "MOSI", "miso": "MISO"}},
     "pixels": [
         {"type": "matrix", "cols": 13, "scope_rows": {"global.main": [0, 5]}},
-        {"type": "neopixel", "scopes": {"personal": {"pin": "D5", "count": 10}}},
+        {"type": "neopixel", "pin": "D5", "count": 10, "scope_pixels": {"personal": [0, 10]}},
     ],
     "buttons": ["D9"],
     "accelerometer": {},
@@ -636,7 +601,8 @@ def test_a_config_declaring_every_section_narrates_each_built_in_build_order():
         "[hw] i2c default scl=GP5 sda=GP4 ok",
         "[hw] spi default sck=SCK mosi=MOSI miso=MISO ok",
         "[hw] pixels[0] matrix cols=13 scope_rows=[global.main:0-5] brightness=1.00 ok",
-        "[hw] pixels[1] neopixel pin=D5 count=10 order=GRB scope=personal brightness=1.00 ok",
+        "[hw] pixels[1] neopixel pin=D5 count=10 order=GRB "
+        + "scope_pixels=[personal:0-10] brightness=1.00 ok",
         "[hw] buttons A=D9 ok",
         "[hw] accelerometer lis3dh ok",
         "[hw] magnetometer mmc5603 ok",
