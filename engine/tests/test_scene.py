@@ -85,7 +85,7 @@ def _make_scene_manager(
     return SceneManager(
         engine,
         rule_registry if rule_registry is not None else PackRegistry(),
-        scene_registry if scene_registry is not None else SceneRegistry(),
+        scene_registry if scene_registry is not None else make_scene_registry(),
         effect_admin if effect_admin is not None else SpyEffectAdmin(),
         scene_reboot if scene_reboot is not None else RecordingSceneReboot(),
     )
@@ -186,7 +186,7 @@ def test_scene_rejects_unknown_attributes() -> None:
 def test_scene_manager_satisfies_scene_controls_interface() -> None:
     engine = _make_engine()
     rule_registry = PackRegistry()
-    scene_registry = SceneRegistry()
+    scene_registry = make_scene_registry()
 
     manager = _make_scene_manager(
         engine,
@@ -294,7 +294,9 @@ def test_reboot_to_previous_delegates_without_registry_validation() -> None:
     recorded return_to is checked at boot by SceneRegistry.resolve_known instead."""
     engine = _make_engine()
     scene_reboot = RecordingSceneReboot()
-    manager = _make_scene_manager(engine, scene_registry=SceneRegistry(), scene_reboot=scene_reboot)
+    manager = _make_scene_manager(
+        engine, scene_registry=make_scene_registry(), scene_reboot=scene_reboot
+    )
 
     manager.reboot_to_previous()  # must not raise, even with an empty registry
 

@@ -192,7 +192,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `MergeStrategy` | `engine/state.py` | Per-scope compositing policy; subclasses in `engine/effects/merge.py` |
 | `PackRegistry` | `engine/packs.py` | Looks up the items of versioned effect or rule packs by pack and item name; filled only by the catalog |
 | `PackCatalog` | `engine/pack_catalog.py` | One scan of every pack root: effect/rule `PackRegistry`s, `SceneRegistry`, pack sounds map; scene declarations, Setting overrides and `requires` names checked, Settings resolved |
-| `SceneRegistry` | `engine/scene.py` | Built from a mapping of scene names to `Scene` records (the catalog's scan, or tests); `get` returns the stored record, and `ir_codec_for`/`required_capabilities` read it. Still accepts test-only `register` factories |
+| `SceneRegistry` | `engine/scene.py` | Built from a mapping of scene names to `Scene` records; `get` returns the stored record, and every other question (`ir_codec_for`, `required_capabilities`, `names`, `resolve_known`) reads that one mapping |
 | `UnknownCapabilityError` / `MissingCapabilityError` | `engine/capabilities.py` | The Capability errors: a `requires` name outside the vocabulary (a `PackScanError`), and a device lacking what a scene or send needs (raised at boot when neither the Persisted scene nor `default_scene` fits, and by a transition into a scene the device can't run) |
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
