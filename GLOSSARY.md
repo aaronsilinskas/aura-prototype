@@ -285,7 +285,7 @@ _Avoid_: constructing with a `None` driver; reading `receipt.loudness` (the DRV2
 
 ### aura-device.json
 The single **required** on-device file holding all hardware configuration; a missing file raises. Sections: `buttons`, `ir`, `pixels`, `audio`, `i2c`, `spi`, `radio`, `sdcard`, `high_current_rail`, `neopixel_current_budget`, `accelerometer`, `magnetometer`, `haptics`. `pixels` and `buttons` are each an optional, possibly-empty list. Pure hardware config — scene selection lives in **`aura-boot.json`** instead.
-_Avoid_: `settings.toml` (removed — unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`; a top-level `"scene"` key (moved to `aura-boot.json`)
+_Avoid_: `settings.toml` (removed — unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`; a top-level `"scene"` key (moved to `aura-boot.json`); a `scopes` map in a NeoPixel `pixels` entry (removed; use `pin` with `scope_pixels`)
 
 ### aura-boot.json
 The single **required** on-device flash file holding the device's **boot values**: start-up values, mostly written by `deploy.py`, that choose the boot scene and never reach `GameState`. Drag-editable over USB alongside `aura-device.json`; a missing file raises. Carries the `default_scene` key — named for its *default*-selection role, since the card's **Persisted scene** layers on top of it — and, once `deploy.py --scene` has run, the **Scene deploy token** (`scene_deploy_token`, optional; hand-authored files omit it).
@@ -327,8 +327,12 @@ _Avoid_: wiring the namespace, effect manager, game engine and scene manager by 
 The board-free turning of a `DeviceConfig` into a `DeviceHardware`, shared by the physical device and the **Simulated device**: which components are built or skipped, which need a bus, the order they come up in, how each is narrated, and how the IR and radio subsystems are wired. It reaches hardware only through **DeviceParts**, so a config the board rejects for config reasons is rejected in simulation too.
 _Avoid_: builder (names the device-only entry point); repeating gating or IR wiring in a `DeviceParts` adapter
 
+### Pin reference
+A pin name from **aura-device.json** together with the field it was written in (`pixels[1].pin`, `ir.rx[0]`, `buttons[2]`), recorded when the file is parsed, so any error about that pin names the exact field to fix. Every part the **Device assembly** builds receives its pins this way.
+_Avoid_: rebuilding a field path outside the parser; passing a bare pin name or a board pin object to **DeviceParts**
+
 ### DeviceParts
-The port **Device assembly** reaches leaf hardware through — one constructor per part (pins, buses, pixels, buttons, sensors, audio, haptics, IR pulse readers and writers, radio transport, storage), taking pin names rather than pin objects. One adapter per platform, so a new platform (CircuitPython today; MicroPython or a Linux single-board computer later) adds an adapter, not a builder: `CircuitPythonParts` on a board, and the **Simulated device**'s `SimulatedParts`, which also decides which parts persist across a **reboot**.
+The port **Device assembly** reaches leaf hardware through — one constructor per part (pins, buses, pixels, buttons, sensors, audio, haptics, IR pulse readers and writers, radio transport, storage), taking **Pin references** rather than board pin objects. One adapter per platform, so a new platform (CircuitPython today; MicroPython or a Linux single-board computer later) adds an adapter, not a builder: `CircuitPythonParts` on a board, and the **Simulated device**'s `SimulatedParts`, which also decides which parts persist across a **reboot**.
 _Avoid_: leaves, leaf factory; deciding enabled/declared or bus requirements in an adapter (that is the assembly's job)
 
 ### device_builder
