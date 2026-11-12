@@ -7,6 +7,7 @@ import pytest
 
 from hardware.shared.device_config import (
     NeoPixelPixelsConfig,
+    PinRef,
     parse_device_config,
 )
 from hardware.shared.tests.pixels_config import as_neopixel, first_strip
@@ -79,11 +80,19 @@ def test_parse_neopixel_entry_produces_single_strip(single_strip_config):
     assert len(as_neopixel(result.pixels[0]).strips) == 1
 
 
-def test_parse_neopixel_strip_pin_matches(single_strip_config):
+def test_a_strip_pin_is_recorded_with_its_indexed_field(single_strip_config):
     result = parse_device_config(single_strip_config)
 
-    strip = first_strip(result)
-    assert strip.pin == "D5"
+    assert first_strip(result).pin == PinRef("D5", "pixels[0].pin")
+
+
+def test_two_strips_record_distinct_indexed_pin_fields(two_strip_config):
+    result = parse_device_config(two_strip_config)
+
+    assert [first_strip(result, entry).pin for entry in (0, 1)] == [
+        PinRef("D5", "pixels[0].pin"),
+        PinRef("D6", "pixels[1].pin"),
+    ]
 
 
 def test_parse_neopixel_strip_count_matches(single_strip_config):
@@ -225,14 +234,6 @@ def test_parse_two_neopixel_strips_yields_two_entries(two_strip_config):
 
     total_strips = sum(len(p.strips) for p in result.pixels if isinstance(p, NeoPixelPixelsConfig))
     assert total_strips == 2
-
-
-def test_parse_two_neopixel_strips_correct_pins(two_strip_config):
-    result = parse_device_config(two_strip_config)
-
-    strips = [s for p in result.pixels if isinstance(p, NeoPixelPixelsConfig) for s in p.strips]
-    pins = {s.pin for s in strips}
-    assert pins == {"D5", "D6"}
 
 
 # ---------------------------------------------------------------------------
@@ -577,7 +578,7 @@ def test_parse_two_strips_sharing_scope_key_preserves_both_pins():
     result = parse_device_config(config)
 
     strips = [s for p in result.pixels if isinstance(p, NeoPixelPixelsConfig) for s in p.strips]
-    pins = {s.pin for s in strips}
+    pins = {s.pin.name for s in strips}
     assert pins == {"D5", "D6"}
 
 

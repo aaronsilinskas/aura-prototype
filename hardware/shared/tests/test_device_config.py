@@ -102,7 +102,7 @@ def test_parse_full_matrix_config_maps_every_section(matrix_config):
 
     assert len(result.pixels) == 1
     assert as_matrix(result.pixels[0]).cols == 13
-    assert result.buttons == ["D9", "D10"]
+    assert result.buttons == [PinRef("D9", "buttons[0]"), PinRef("D10", "buttons[1]")]
     assert result.ir is not None
     assert result.ir.rx == ["D11"]
     assert result.ir.emitters["line"] == "D12"
@@ -1273,7 +1273,7 @@ def test_parse_high_current_rail_section_maps_pin_active_high_and_enabled(matrix
     result = parse_device_config(matrix_config)
 
     assert result.high_current_rail is not None
-    assert result.high_current_rail.pin == "GP28"
+    assert result.high_current_rail.pin == PinRef("GP28", "high_current_rail.pin")
     assert result.high_current_rail.active_high is False
     assert result.high_current_rail.enabled is False
 
@@ -1537,7 +1537,7 @@ def test_load_device_config_parses_valid_file(tmp_path, matrix_config):
     result = load_device_config(str(path))
 
     assert isinstance(result, DeviceConfig)
-    assert result.buttons == ["D9", "D10"]
+    assert result.buttons == [PinRef("D9", "buttons[0]"), PinRef("D10", "buttons[1]")]
 
 
 def test_load_device_config_raises_when_file_missing(tmp_path):

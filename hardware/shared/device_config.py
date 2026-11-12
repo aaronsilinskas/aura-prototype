@@ -165,13 +165,13 @@ class NeoPixelStripConfig:
 
     def __init__(
         self,
-        pin: str,
+        pin: PinRef,
         count: int,
         order: str,
         brightness: float,
         scope_pixels: dict[str, range],
     ) -> None:
-        self.pin: str = pin
+        self.pin: PinRef = pin
         self.count: int = count
         self.order: str = order
         self.brightness: float = brightness
@@ -363,8 +363,8 @@ class HighCurrentRailConfig:
 
     __slots__ = ("active_high", "enabled", "pin")
 
-    def __init__(self, pin: str, active_high: bool = True, enabled: bool = True) -> None:
-        self.pin: str = pin
+    def __init__(self, pin: PinRef, active_high: bool = True, enabled: bool = True) -> None:
+        self.pin: PinRef = pin
         self.active_high: bool = active_high
         self.enabled: bool = enabled
 
@@ -453,7 +453,7 @@ class DeviceConfig:
     def __init__(
         self,
         pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig],
-        buttons: list[str],
+        buttons: list[PinRef],
         ir: IRConfig | None,
         audio: AudioConfig | None,
         i2c: dict[str, I2CConfig],
@@ -467,7 +467,7 @@ class DeviceConfig:
         neopixel_current_budget: NeoPixelCurrentBudgetConfig | None,
     ) -> None:
         self.pixels: list[MatrixPixelsConfig | NeoPixelPixelsConfig] = pixels
-        self.buttons: list[str] = buttons
+        self.buttons: list[PinRef] = buttons
         self.ir: IRConfig | None = ir
         self.audio: AudioConfig | None = audio
         self.i2c: dict[str, I2CConfig] = i2c
@@ -787,7 +787,7 @@ def _parse_neopixel_strip_entry(mapping: dict, entry_index: int) -> NeoPixelStri
     validate_band_map(scope_pixels, f"{label} pin '{pin}' scope_pixels")
 
     return NeoPixelStripConfig(
-        pin=pin,
+        pin=PinRef(pin, f"{label}.pin"),
         count=count,
         order=order,
         brightness=brightness,
@@ -822,12 +822,12 @@ def _parse_pixels_entry(
     )
 
 
-def _parse_buttons(buttons_raw: list) -> list[str]:
-    result: list[str] = []
+def _parse_buttons(buttons_raw: list) -> list[PinRef]:
+    result: list[PinRef] = []
     for i, pin in enumerate(buttons_raw):
         if not isinstance(pin, str):
             raise ValueError(f"buttons[{i}] must be a string pin name, got {type(pin).__name__}")
-        result.append(pin)
+        result.append(PinRef(pin, f"buttons[{i}]"))
     return result
 
 
@@ -1069,7 +1069,9 @@ def _parse_high_current_rail(rail_raw: dict) -> HighCurrentRailConfig:
         raise ValueError(f"high_current_rail.active_high must be a boolean, got {active_high!r}")
 
     enabled = _parse_enabled(rail_raw, "high_current_rail.enabled")
-    return HighCurrentRailConfig(pin=pin, active_high=active_high, enabled=enabled)
+    return HighCurrentRailConfig(
+        pin=PinRef(pin, "high_current_rail.pin"), active_high=active_high, enabled=enabled
+    )
 
 
 def _parse_milliamps(budget_raw: dict, key: str, default: int) -> int:
@@ -1167,11 +1169,12 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
                 raise ValueError(f"pixels[{i}]: only one matrix entry is allowed")
         elif isinstance(parsed, NeoPixelPixelsConfig):
             for strip in parsed.strips:
-                if strip.pin in seen_pins:
+                pin = strip.pin.name
+                if pin in seen_pins:
                     raise ValueError(
-                        f"pixels[{i}]: pin '{strip.pin}' is already used by another strip entry"
+                        f"pixels[{i}]: pin '{pin}' is already used by another strip entry"
                     )
-                seen_pins.add(strip.pin)
+                seen_pins.add(pin)
         pixels.append(parsed)
 
     buttons_raw = mapping.get("buttons", [])

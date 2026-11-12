@@ -161,7 +161,7 @@ def _pixel_outputs(
     if isinstance(pixels, MatrixPixelsConfig):
         bus = _require_i2c(i2c, f"pixels[{index}]", pixels)
         return [parts.matrix_pixels(pixels, bus)]
-    return [parts.neopixel_strip(strip, PinRef(strip.pin, "pixels.pin")) for strip in pixels.strips]
+    return [parts.neopixel_strip(strip, strip.pin) for strip in pixels.strips]
 
 
 def _ir(ir_config: IRConfig, parts: DeviceParts) -> tuple[InfraredTransceiver, str]:
@@ -291,7 +291,7 @@ def assemble_device(
 
         def _build_rail() -> tuple[None, str]:
             level = rail.active_high if rail.enabled else not rail.active_high
-            parts.high_current_rail(PinRef(rail.pin, "high_current_rail.pin"), level)
+            parts.high_current_rail(rail.pin, level)
             return None, "asserted" if rail.enabled else "held off"
 
         narrate_step(logger, describe_high_current_rail(rail), _build_rail)
@@ -329,8 +329,7 @@ def assemble_device(
 
     def _build_buttons() -> tuple[DebouncedButtons, str]:
         readers = [
-            (button_label(i), parts.button_reader(PinRef(name, f"buttons[{i}]")))
-            for i, name in enumerate(config.buttons)
+            (button_label(i), parts.button_reader(pin)) for i, pin in enumerate(config.buttons)
         ]
         return DebouncedButtons(readers), "ok"
 

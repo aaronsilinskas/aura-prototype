@@ -305,7 +305,7 @@ def neopixel(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _strip(scope_pixels: dict[str, range]) -> NeoPixelStripConfig:
     count = max(r.stop for r in scope_pixels.values())
-    return NeoPixelStripConfig("D5", count, "GRB", 0.25, scope_pixels)
+    return NeoPixelStripConfig(PinRef("D5", "pixels[0].pin"), count, "GRB", 0.25, scope_pixels)
 
 
 def test_neopixel_strip_drives_a_strip_on_its_pin_with_its_count_order_and_brightness(
@@ -314,7 +314,7 @@ def test_neopixel_strip_drives_a_strip_on_its_pin_with_its_count_order_and_brigh
     board = _board("D5")
     parts = CircuitPythonParts(board)
 
-    parts.neopixel_strip(_strip({"personal": range(0, 10)}), PinRef("D5", "pixels.pin"))
+    parts.neopixel_strip(_strip({"personal": range(0, 10)}), PinRef("D5", "pixels[0].pin"))
 
     strip = _FakeNeoPixel.built
     assert strip is not None
@@ -340,7 +340,7 @@ def test_neopixel_strip_pin_naming_an_unknown_pin_raises_value_error_naming_its_
 def test_neopixel_strip_writes_each_scope_into_its_own_segment(neopixel: None) -> None:
     parts = CircuitPythonParts(_board("D5"))
     output = parts.neopixel_strip(
-        _strip({"personal": range(0, 2), "ambient": range(2, 4)}), PinRef("D5", "pixels.pin")
+        _strip({"personal": range(0, 2), "ambient": range(2, 4)}), PinRef("D5", "pixels[0].pin")
     )
     buffer = output.create_buffer("ambient")
     buffer[0], buffer[1] = 0x112233, 0x445566
@@ -1175,7 +1175,7 @@ _OPTIONAL_PARTS = {
 _REQUESTS: dict[str, Callable[[CircuitPythonParts], object]] = {
     "matrix_pixels": lambda parts: parts.matrix_pixels(_matrix(), fake_i2c()),
     "neopixel_strip": lambda parts: parts.neopixel_strip(
-        _strip({"personal": range(0, 4)}), PinRef("D5", "pixels.pin")
+        _strip({"personal": range(0, 4)}), PinRef("D5", "pixels[0].pin")
     ),
     "accelerometer": lambda parts: parts.accelerometer(I2CDeviceConfig(), fake_i2c()),
     "magnetometer": lambda parts: parts.magnetometer(I2CDeviceConfig(), fake_i2c()),
