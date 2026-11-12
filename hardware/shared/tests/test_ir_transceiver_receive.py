@@ -12,7 +12,6 @@ import tracemalloc
 import pytest
 
 from engine.network import LINE
-from hardware.shared.ir_codecs.aura import AuraInfraredEncoder
 from hardware.shared.ir_codecs.tag import (
     TAG_GAP_THRESHOLD,
     TAG_PREAMBLE,
@@ -25,6 +24,9 @@ from hardware.shared.tests.ir_fakes import (
     EmitterPulseWriter,
     EmitterWriterFactory,
     ReplayingPulseReader,
+    aura_pulses,
+    tag_pulses,
+    telemetry_counters,
 )
 
 # ---------------------------------------------------------------------------
@@ -53,24 +55,6 @@ def _emitting(
     return transceiver, readers, factory.writers[LINE]
 
 
-def _aura_pulses(payload: bytes) -> list[int]:
-    return list(AuraInfraredEncoder().encode(payload))
-
-
-def _tag_pulses(payload: bytes) -> list[int]:
-    return list(TagInfraredEncoder().encode(bytearray(payload)))
-
-
-def _counters(transceiver: InfraredTransceiver) -> dict[str, int]:
-    """Parse the transceiver's telemetry line into ``{counter: value}``.
-
-    Only valid on a call that reports — the first call, or one after a change.
-    """
-    line = transceiver.telemetry_line()
-    assert line is not None
-    return {name: int(value) for name, value in (f.split("=") for f in line.split()[1:])}
-
-
 # ---------------------------------------------------------------------------
 # Receiving frames
 # ---------------------------------------------------------------------------
@@ -87,7 +71,7 @@ def test_received_is_none_when_no_reader_has_pulses(reader_count):
 
 def test_a_valid_frame_is_received_after_one_update():
     transceiver, readers = _receiving(1)
-    readers[0].load(_aura_pulses(b"\xde\xad"))
+    readers[0].load(aura_pulses(b"\xde\xad"))
 
     transceiver.update(0.0)
 
@@ -96,7 +80,7 @@ def test_a_valid_frame_is_received_after_one_update():
 
 def test_a_received_frame_reports_its_signal_strength_and_error_margin():
     transceiver, readers = _receiving(1)
-    readers[0].load(_aura_pulses(b"\x42"))
+    readers[0].load(aura_pulses(b"\x42"))
 
     transceiver.update(0.0)
 
@@ -106,7 +90,7 @@ def test_a_received_frame_reports_its_signal_strength_and_error_margin():
 
 def test_received_is_cleared_by_the_next_update_with_no_frame():
     transceiver, readers = _receiving(1)
-    readers[0].load(_aura_pulses(b"\x42"))
+    readers[0].load(aura_pulses(b"\x42"))
     transceiver.update(0.0)
 
     transceiver.update(0.0)
@@ -117,7 +101,7 @@ def test_received_is_cleared_by_the_next_update_with_no_frame():
 def test_a_frame_fed_across_several_updates_is_received_once_complete():
     transceiver, readers = _receiving(1)
 
-    for pulse in _aura_pulses(b"\xbe\xef"):
+    for pulse in aura_pulses(b"\xbe\xef"):
         readers[0].load([pulse])
         transceiver.update(0.0)
 
@@ -126,7 +110,7 @@ def test_a_frame_fed_across_several_updates_is_received_once_complete():
 
 def test_a_frame_on_one_of_several_readers_is_received():
     transceiver, readers = _receiving(2)
-    readers[1].load(_aura_pulses(b"\x11\x22"))
+    readers[1].load(aura_pulses(b"\x11\x22"))
 
     transceiver.update(0.0)
 
@@ -135,7 +119,7 @@ def test_a_frame_on_one_of_several_readers_is_received():
 
 def test_back_to_back_frames_on_one_reader_are_received_one_update_apart():
     transceiver, readers = _receiving(1)
-    readers[0].load(_aura_pulses(b"\x01") + _aura_pulses(b"\x02"))
+    readers[0].load(aura_pulses(b"\x01") + aura_pulses(b"\x02"))
 
     transceiver.update(0.0)
     first = transceiver.received
@@ -152,10 +136,10 @@ def test_back_to_back_frames_on_one_reader_are_received_one_update_apart():
 
 @pytest.mark.parametrize("clean_index", [0, 1])
 def test_the_frame_with_the_lowest_error_margin_wins_and_its_reader_is_named(clean_index):
-    noisy = _aura_pulses(b"\xab")
+    noisy = aura_pulses(b"\xab")
     noisy[3] += 80  # 80 µs deviation — still within the decoder's tolerance
     transceiver, readers = _receiving(2)
-    readers[clean_index].load(_aura_pulses(b"\xab"))
+    readers[clean_index].load(aura_pulses(b"\xab"))
     readers[1 - clean_index].load(noisy)
 
     transceiver.update(0.0)
@@ -167,8 +151,8 @@ def test_the_frame_with_the_lowest_error_margin_wins_and_its_reader_is_named(cle
 
 def test_the_first_reader_wins_an_error_margin_tie():
     transceiver, readers = _receiving(3)
-    readers[1].load(_aura_pulses(b"\x5a"))
-    readers[2].load(_aura_pulses(b"\x5a"))
+    readers[1].load(aura_pulses(b"\x5a"))
+    readers[2].load(aura_pulses(b"\x5a"))
 
     transceiver.update(0.0)
 
@@ -177,7 +161,7 @@ def test_the_first_reader_wins_an_error_margin_tie():
 
 def test_the_winning_readers_signal_is_reported():
     transceiver, readers = _receiving(3)
-    readers[2].load(_aura_pulses(b"\x99"))
+    readers[2].load(aura_pulses(b"\x99"))
 
     transceiver.update(0.0)
 
@@ -189,7 +173,7 @@ def test_the_winning_readers_signal_is_reported():
 def test_a_single_reader_reports_its_signal_but_names_no_best_receiver():
     """With one reader there is no pick to report, but the signal still is."""
     transceiver, readers = _receiving(1)
-    readers[0].load(_aura_pulses(b"\x42"))
+    readers[0].load(aura_pulses(b"\x42"))
 
     transceiver.update(0.0)
 
@@ -215,8 +199,8 @@ def test_no_signal_or_best_receiver_is_reported_before_the_first_frame():
 def test_frames_read_on_any_reader_while_emitting_are_never_received():
     transceiver, readers, _ = _emitting(3, holds=True)
     transceiver.send(b"\x33", LINE)  # the writer stays busy: still emitting
-    readers[0].load(_aura_pulses(b"\x33"))
-    readers[2].load(_aura_pulses(b"\x33"))
+    readers[0].load(aura_pulses(b"\x33"))
+    readers[2].load(aura_pulses(b"\x33"))
 
     transceiver.update(0.0)
 
@@ -231,7 +215,7 @@ def test_pulses_read_while_emitting_count_as_dropped_not_seen():
 
     transceiver.update(0.0)
 
-    counters = _counters(transceiver)
+    counters = telemetry_counters(transceiver)
     assert counters["pulses_dropped_transmitting"] == 5
     assert counters["pulses_seen"] == 0
 
@@ -243,14 +227,14 @@ def test_the_first_update_after_emission_ends_drains_the_buffered_echo_tail():
 
     transceiver.update(0.0)
 
-    assert _counters(transceiver)["pulses_dropped_transmitting"] == 2
+    assert telemetry_counters(transceiver)["pulses_dropped_transmitting"] == 2
 
 
 def test_a_frame_after_the_post_emission_drain_is_received_normally():
     transceiver, readers, _ = _emitting(2, holds=False)
     transceiver.send(b"\x33", LINE)
     transceiver.update(0.0)  # the one post-emission drain
-    readers[1].load(_aura_pulses(b"\x21"))
+    readers[1].load(aura_pulses(b"\x21"))
 
     transceiver.update(0.0)
 
@@ -258,7 +242,7 @@ def test_a_frame_after_the_post_emission_drain_is_received_normally():
 
 
 def test_a_decode_in_progress_on_every_reader_when_emission_begins_is_reset():
-    pulses = _aura_pulses(b"\x44")
+    pulses = aura_pulses(b"\x44")
     mid = len(pulses) // 2
     transceiver, readers, writer = _emitting(2, holds=True)
     for reader in readers:
@@ -277,7 +261,7 @@ def test_a_decode_in_progress_on_every_reader_when_emission_begins_is_reset():
 
 
 def test_a_decode_in_progress_when_emission_ends_does_not_survive_the_post_emission_drain():
-    pulses = _aura_pulses(b"\xde\xad")
+    pulses = aura_pulses(b"\xde\xad")
     mid = len(pulses) // 2
     transceiver, readers, writer = _emitting(1, holds=True)
     transceiver.send(b"\x01", LINE)
@@ -302,7 +286,7 @@ def test_after_apply_codec_frames_decode_with_the_new_wire_frame(reader_count):
     transceiver, readers = _receiving(reader_count)
 
     transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
-    readers[-1].load(_tag_pulses(b"\x10"))
+    readers[-1].load(tag_pulses(b"\x10"))
     transceiver.update(0.0)
 
     assert transceiver.received == bytearray(b"\x10")
@@ -325,7 +309,7 @@ def test_apply_codec_builds_a_separate_decoder_for_each_reader():
 
 
 def test_a_partial_frame_on_one_reader_does_not_corrupt_another_readers_frame():
-    pulses = _tag_pulses(b"\x30")
+    pulses = tag_pulses(b"\x30")
     transceiver, readers = _receiving(2)
     transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
     readers[0].load(pulses[: len(pulses) // 2])  # never completes
@@ -346,7 +330,7 @@ def test_after_apply_codec_telemetry_reports_the_new_decoders_counters():
 
     transceiver.update(0.0)
 
-    assert _counters(transceiver)["preamble_reject"] == 1
+    assert telemetry_counters(transceiver)["preamble_reject"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -355,11 +339,11 @@ def test_after_apply_codec_telemetry_reports_the_new_decoders_counters():
 
 
 def test_an_inter_frame_gap_abandons_a_stalled_partial_frame_so_the_next_decodes():
-    stalled = _tag_pulses(b"\x55")[: len(TAG_PREAMBLE) + 2]
+    stalled = tag_pulses(b"\x55")[: len(TAG_PREAMBLE) + 2]
     transceiver, readers = _receiving(1)
     transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
 
-    readers[0].load(stalled + [TAG_GAP_THRESHOLD] + _tag_pulses(b"\x2a"))
+    readers[0].load(stalled + [TAG_GAP_THRESHOLD] + tag_pulses(b"\x2a"))
     transceiver.update(0.0)
 
     assert transceiver.received == bytearray(b"\x2a")
@@ -390,7 +374,7 @@ def test_telemetry_line_is_none_until_a_counter_changes():
 
 
 def test_telemetry_line_reports_every_counter_in_pipeline_order_after_a_frame():
-    pulses = _aura_pulses(b"\x42")
+    pulses = aura_pulses(b"\x42")
     transceiver, readers = _receiving(1)
     readers[0].load(pulses)
 
@@ -411,17 +395,17 @@ def test_pulses_seen_counts_every_pulse_across_readers_and_updates():
     readers[0].load([400])
     transceiver.update(0.0)
 
-    assert _counters(transceiver)["pulses_seen"] == 4
+    assert telemetry_counters(transceiver)["pulses_seen"] == 4
 
 
 def test_packets_surfaced_counts_only_received_frames():
     transceiver, readers = _receiving(2)
-    readers[0].load(_aura_pulses(b"\x01"))
+    readers[0].load(aura_pulses(b"\x01"))
     transceiver.update(0.0)
     readers[1].load([100, 200])  # noise, no frame
     transceiver.update(0.0)
 
-    assert _counters(transceiver)["packets_surfaced"] == 1
+    assert telemetry_counters(transceiver)["packets_surfaced"] == 1
 
 
 def test_decoder_counters_are_summed_across_readers():
@@ -434,7 +418,7 @@ def test_decoder_counters_are_summed_across_readers():
 
     transceiver.update(0.0)
 
-    assert _counters(transceiver)["preamble_reject"] == 2
+    assert telemetry_counters(transceiver)["preamble_reject"] == 2
 
 
 def test_reader_counters_are_summed_across_readers():
@@ -442,7 +426,7 @@ def test_reader_counters_are_summed_across_readers():
     readers[0].buffer_full_on_poll = 2
     readers[2].buffer_full_on_poll = 5
 
-    assert _counters(transceiver)["buffer_full_on_poll"] == 7
+    assert telemetry_counters(transceiver)["buffer_full_on_poll"] == 7
 
 
 def test_packets_completed_can_exceed_surfaced_when_several_readers_catch_one_shot():
@@ -450,12 +434,12 @@ def test_packets_completed_can_exceed_surfaced_when_several_readers_catch_one_sh
     only the winner is received."""
     transceiver, readers = _receiving(3)
     transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
-    readers[0].load(_tag_pulses(b"\x10"))
-    readers[2].load(_tag_pulses(b"\x10"))
+    readers[0].load(tag_pulses(b"\x10"))
+    readers[2].load(tag_pulses(b"\x10"))
 
     transceiver.update(0.0)
 
-    counters = _counters(transceiver)
+    counters = telemetry_counters(transceiver)
     assert counters["packets_completed"] == 2
     assert counters["packets_surfaced"] == 1
 
@@ -489,13 +473,13 @@ def _reordered_snapshot_init(
 def test_telemetry_counters_survive_a_snapshot_fields_reorder(monkeypatch):
     """Counters reach the snapshot by name, so reordering its fields swaps nothing."""
     monkeypatch.setattr(IrTelemetrySnapshot, "__init__", _reordered_snapshot_init)
-    pulses = _aura_pulses(b"\xde\xad")
+    pulses = aura_pulses(b"\xde\xad")
     transceiver, readers = _receiving(1)
     readers[0].load(pulses)
 
     transceiver.update(0.0)
 
-    counters = _counters(transceiver)
+    counters = telemetry_counters(transceiver)
     assert counters["pulses_seen"] == len(pulses)
     assert counters["packets_surfaced"] == 1
 

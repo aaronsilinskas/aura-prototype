@@ -17,7 +17,7 @@ from hardware.shared.tests.ir_fakes import EmitterPulseWriter
 # ---------------------------------------------------------------------------
 
 
-def _transceiver_wiring(emitter: str) -> tuple[InfraredTransceiver, EmitterPulseWriter]:
+def _transceiver_with_emitter(emitter: str) -> tuple[InfraredTransceiver, EmitterPulseWriter]:
     """A receiver-less transceiver with only *emitter* wired, and that emitter's writer."""
     writer = EmitterPulseWriter()
     transceiver = InfraredTransceiver([], {emitter: "GP1"}, lambda _e, _pin: (writer, "fake"))
@@ -30,7 +30,7 @@ def _transceiver_wiring(emitter: str) -> tuple[InfraredTransceiver, EmitterPulse
 
 
 def test_send_ir_writes_the_encoded_payload_on_the_named_emitter() -> None:
-    transceiver, writer = _transceiver_wiring(CONE)
+    transceiver, writer = _transceiver_with_emitter(CONE)
     controls = HardwareNetworkControls(transceiver)
 
     controls.send_ir(b"\xab\xcd", CONE)
@@ -48,7 +48,7 @@ def test_send_ir_with_no_ir_raises_missing_capability_for_the_emitter() -> None:
 
 
 def test_send_ir_on_an_emitter_not_wired_raises_missing_capability_for_it() -> None:
-    transceiver, _ = _transceiver_wiring(CONE)
+    transceiver, _ = _transceiver_with_emitter(CONE)
     controls = HardwareNetworkControls(transceiver)
 
     with pytest.raises(MissingCapabilityError) as raised:
@@ -58,7 +58,7 @@ def test_send_ir_on_an_emitter_not_wired_raises_missing_capability_for_it() -> N
 
 
 def test_send_ir_on_an_unknown_emitter_raises_value_error_naming_it() -> None:
-    transceiver, _ = _transceiver_wiring(CONE)
+    transceiver, _ = _transceiver_with_emitter(CONE)
     controls = HardwareNetworkControls(transceiver)
 
     with pytest.raises(ValueError, match="laser"):

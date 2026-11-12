@@ -18,15 +18,9 @@ from hardware.shared.tests.ir_fakes import (
     EmitterPulseWriter,
     EmitterWriterFactory,
     ReplayingPulseReader,
+    aura_pulses,
+    tag_pulses,
 )
-
-
-def _aura(payload: bytes) -> list[int]:
-    return list(AuraInfraredEncoder().encode(payload))
-
-
-def _tag(payload: bytes) -> list[int]:
-    return list(TagInfraredEncoder().encode(payload))
 
 
 def _build(
@@ -54,8 +48,8 @@ def test_send_writes_each_payload_only_on_its_own_emitters_writer() -> None:
     transceiver.send(b"\x01", LINE)
     transceiver.send(b"\x02", CONE)
 
-    assert writers[LINE].calls == [_aura(b"\x01")]
-    assert writers[CONE].calls == [_aura(b"\x02")]
+    assert writers[LINE].calls == [aura_pulses(b"\x01")]
+    assert writers[CONE].calls == [aura_pulses(b"\x02")]
     assert writers[AREA_OF_EFFECT].calls == []
 
 
@@ -65,7 +59,7 @@ def test_every_send_to_an_idle_writer_is_written_once_in_order() -> None:
     transceiver.send(b"\x01", LINE)
     transceiver.send(b"\x02", LINE)
 
-    assert writers[LINE].calls == [_aura(b"\x01"), _aura(b"\x02")]
+    assert writers[LINE].calls == [aura_pulses(b"\x01"), aura_pulses(b"\x02")]
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +74,7 @@ def test_a_send_while_the_writer_is_busy_writes_nothing_yet() -> None:
     transceiver.send(b"\x02", LINE)
     transceiver.update(0.0)
 
-    assert writers[LINE].calls == [_aura(b"\x01")]
+    assert writers[LINE].calls == [aura_pulses(b"\x01")]
 
 
 def test_sends_queued_behind_a_busy_writer_are_written_oldest_first_one_per_finished_write() -> (
@@ -95,13 +89,13 @@ def test_sends_queued_behind_a_busy_writer_are_written_oldest_first_one_per_fini
     writer.finish()
     transceiver.update(0.0)
     transceiver.update(0.0)  # \x02 still in flight: \x03 must wait
-    assert writer.calls == [_aura(b"\x01"), _aura(b"\x02")]
+    assert writer.calls == [aura_pulses(b"\x01"), aura_pulses(b"\x02")]
 
     writer.finish()
     transceiver.update(0.0)
     writer.finish()
     transceiver.update(0.0)  # queue empty: nothing is written twice
-    assert writer.calls == [_aura(b"\x01"), _aura(b"\x02"), _aura(b"\x03")]
+    assert writer.calls == [aura_pulses(b"\x01"), aura_pulses(b"\x02"), aura_pulses(b"\x03")]
 
 
 class _CountingEncoder(AuraInfraredEncoder):
@@ -153,7 +147,7 @@ def test_a_queued_payload_failing_to_encode_raises_from_update_and_the_rest_stil
         transceiver.update(0.0)
     transceiver.update(0.0)
 
-    assert writer.calls == [_aura(b"\x01"), _aura(b"\x03")]
+    assert writer.calls == [aura_pulses(b"\x01"), aura_pulses(b"\x03")]
 
 
 def test_update_starts_queued_sends_on_every_emitter_even_with_no_receiver() -> None:
@@ -167,7 +161,7 @@ def test_update_starts_queued_sends_on_every_emitter_even_with_no_receiver() -> 
     transceiver.update(0.0)
 
     for emitter in (LINE, CONE):
-        assert factory.writers[emitter].calls == [_aura(b"\x01"), _aura(b"\x02")]
+        assert factory.writers[emitter].calls == [aura_pulses(b"\x01"), aura_pulses(b"\x02")]
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +193,7 @@ def test_busy_starts_the_emitters_queued_send_and_reports_it_in_flight() -> None
     writers[LINE].finish()
 
     assert transceiver.busy(LINE) is True
-    assert writers[LINE].calls == [_aura(b"\x01"), _aura(b"\x02")]
+    assert writers[LINE].calls == [aura_pulses(b"\x01"), aura_pulses(b"\x02")]
 
 
 def test_busy_starts_queued_sends_only_on_the_emitter_it_names() -> None:
@@ -211,8 +205,8 @@ def test_busy_starts_queued_sends_only_on_the_emitter_it_names() -> None:
 
     transceiver.busy(LINE)
 
-    assert writers[LINE].calls == [_aura(b"\x01"), _aura(b"\x02")]
-    assert writers[CONE].calls == [_aura(b"\x01")]
+    assert writers[LINE].calls == [aura_pulses(b"\x01"), aura_pulses(b"\x02")]
+    assert writers[CONE].calls == [aura_pulses(b"\x01")]
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +221,7 @@ def test_a_write_finished_before_update_releases_the_gate_so_the_next_frame_deco
 
     writers[LINE].finish()
     transceiver.update(0.0)  # pumps first: releases the gate, then the one falling-edge drain
-    reader.load(_aura(b"\x2a"))
+    reader.load(aura_pulses(b"\x2a"))
     transceiver.update(0.0)
 
     assert transceiver.received == bytearray(b"\x2a")
@@ -240,13 +234,13 @@ def test_frames_are_discarded_until_every_emitters_write_has_finished() -> None:
     writers[LINE].finish()
     transceiver.update(0.0)
 
-    reader.load(_aura(b"\x2a"))
+    reader.load(aura_pulses(b"\x2a"))
     transceiver.update(0.0)  # CONE still lit
     assert transceiver.received is None
 
     writers[CONE].finish()
     transceiver.update(0.0)
-    reader.load(_aura(b"\x2b"))
+    reader.load(aura_pulses(b"\x2b"))
     transceiver.update(0.0)
     assert transceiver.received == bytearray(b"\x2b")
 
@@ -267,7 +261,7 @@ def test_a_writer_failing_mid_send_raises_and_does_not_leave_reception_blocked()
     with pytest.raises(RuntimeError):
         transceiver.send(b"\x01", LINE)
     transceiver.update(0.0)
-    reader.load(_aura(b"\x2a"))
+    reader.load(aura_pulses(b"\x2a"))
     transceiver.update(0.0)
 
     assert transceiver.received == bytearray(b"\x2a")
@@ -285,8 +279,8 @@ def test_apply_codec_encodes_later_sends_in_the_new_wire_frame_on_every_emitter(
     transceiver.send(b"\x10", LINE)
     transceiver.send(b"\x20", CONE)
 
-    assert writers[LINE].calls == [_tag(b"\x10")]
-    assert writers[CONE].calls == [_tag(b"\x20")]
+    assert writers[LINE].calls == [tag_pulses(b"\x10")]
+    assert writers[CONE].calls == [tag_pulses(b"\x20")]
 
 
 def test_apply_codec_encodes_a_send_already_queued_in_the_new_wire_frame() -> None:
@@ -298,7 +292,7 @@ def test_apply_codec_encodes_a_send_already_queued_in_the_new_wire_frame() -> No
     writers[LINE].finish()
     transceiver.update(0.0)
 
-    assert writers[LINE].calls == [_aura(b"\x01"), _tag(b"\x10")]
+    assert writers[LINE].calls == [aura_pulses(b"\x01"), tag_pulses(b"\x10")]
 
 
 # ---------------------------------------------------------------------------
@@ -313,7 +307,7 @@ def test_a_sends_self_echo_is_never_received_and_the_next_frame_is() -> None:
     transceiver.update(0.0)
     assert transceiver.received is None
 
-    reader.load(_aura(b"\x2a"))
+    reader.load(aura_pulses(b"\x2a"))
     transceiver.update(0.0)
     assert transceiver.received == bytearray(b"\x2a")
 
@@ -324,11 +318,11 @@ def test_every_frame_arriving_while_a_write_is_in_flight_is_discarded() -> None:
     transceiver, _, reader = _build(blocking=False, echo=True)
     transceiver.send(b"\x01", LINE)
 
-    reader.load(_aura(b"\x2a"))
+    reader.load(aura_pulses(b"\x2a"))
     transceiver.update(0.0)
     assert transceiver.received is None
 
-    reader.load(_aura(b"\x2b"))
+    reader.load(aura_pulses(b"\x2b"))
     transceiver.update(0.0)
     assert transceiver.received is None
 
@@ -341,18 +335,18 @@ def test_pulses_waiting_when_the_write_finishes_are_discarded_once_more_on_the_f
     transceiver.update(0.0)
 
     writers[LINE].finish()
-    reader.load(_aura(b"\x2a"))  # echo tail still buffered in the reader
+    reader.load(aura_pulses(b"\x2a"))  # echo tail still buffered in the reader
     transceiver.update(0.0)
     assert transceiver.received is None
 
-    reader.load(_aura(b"\x2b"))
+    reader.load(aura_pulses(b"\x2b"))
     transceiver.update(0.0)
     assert transceiver.received == bytearray(b"\x2b")
 
 
 def test_a_frame_partly_decoded_when_the_device_sends_is_abandoned() -> None:
     transceiver, _, reader = _build()
-    frame = _aura(b"\x2a")
+    frame = aura_pulses(b"\x2a")
     reader.load(frame[:6])
     transceiver.update(0.0)
 
@@ -361,6 +355,6 @@ def test_a_frame_partly_decoded_when_the_device_sends_is_abandoned() -> None:
     transceiver.update(0.0)
     assert transceiver.received is None
 
-    reader.load(_aura(b"\x2b"))
+    reader.load(aura_pulses(b"\x2b"))
     transceiver.update(0.0)
     assert transceiver.received == bytearray(b"\x2b")

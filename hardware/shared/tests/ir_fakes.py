@@ -1,10 +1,34 @@
-"""Hardware-free fakes for the infrared pulse readers and writers."""
+"""Hardware-free fakes for the infrared pulse readers and writers, plus the
+wire-frame encoders and telemetry parser the IR tests share."""
 
 from __future__ import annotations
 
 from array import array
 
+from hardware.shared.ir_codecs.aura import AuraInfraredEncoder
+from hardware.shared.ir_codecs.tag import TagInfraredEncoder
+from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_transport import PulseReader, PulseWriter
+
+
+def aura_pulses(payload: bytes | bytearray) -> list[int]:
+    """*payload* encoded in the Aura wire-frame."""
+    return list(AuraInfraredEncoder().encode(bytes(payload)))
+
+
+def tag_pulses(payload: bytes | bytearray) -> list[int]:
+    """*payload* encoded in the Tag wire-frame."""
+    return list(TagInfraredEncoder().encode(bytes(payload)))
+
+
+def telemetry_counters(transceiver: InfraredTransceiver) -> dict[str, int]:
+    """Parse the transceiver's telemetry line into ``{counter: value}``.
+
+    Only valid on a call that reports — the first call, or one after a change.
+    """
+    line = transceiver.telemetry_line()
+    assert line is not None
+    return {name: int(value) for name, value in (f.split("=") for f in line.split()[1:])}
 
 
 class ReplayingPulseReader(PulseReader):
