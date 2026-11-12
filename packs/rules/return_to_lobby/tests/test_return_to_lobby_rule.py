@@ -2,22 +2,12 @@
 
 from __future__ import annotations
 
-from engine.engine import GameEngine
 from engine.input import ButtonData, InputEvents
-from engine.state import EffectControls, SceneControls
-from engine.timer import Timer
+from engine.state import EffectControls, GameState, SceneControls, SceneRun
 from packs.rules.return_to_lobby.return_to_lobby_rule import ReturnToLobbyRule
 from packs.tests.settings_helper import settings_for
 
 _TICK = 0.25
-
-
-class _FixedTimer(Timer):
-    """Advances by exactly ``_TICK`` per update."""
-
-    def update(self) -> None:
-        self.elapsed = _TICK
-        self.total += _TICK
 
 
 class _RecordingSceneControls(SceneControls):
@@ -30,17 +20,14 @@ class _RecordingSceneControls(SceneControls):
 
 def _hold_both(hold_seconds: float, seconds: float) -> int:
     """Hold A and B for *seconds* under a *hold_seconds* Setting; return reboots requested."""
-    timer = _FixedTimer()
-    engine = GameEngine(EffectControls(), timer=timer)
-    engine.add_rules(ReturnToLobbyRule())
     scene_controls = _RecordingSceneControls()
     settings = settings_for(rule_packs={"return_to_lobby": {"hold_seconds": hold_seconds}})
-    state = engine.create_state(scene_controls, settings=settings)
+    state = GameState(EffectControls(), scene_controls, settings=settings)
+    run = SceneRun(state, [ReturnToLobbyRule()])
     both = ButtonData(states={"A": ButtonData.DOWN, "B": ButtonData.DOWN})
     for _ in range(round(seconds / _TICK)):
-        timer.update()
         state.queue_event(InputEvents.Sensors(both))
-        engine.update(state)
+        run.tick(_TICK)
     return scene_controls.reboots_to_previous
 
 

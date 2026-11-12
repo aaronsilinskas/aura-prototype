@@ -140,7 +140,7 @@ def test_abstract_network_controls_has_no_poll_transmits() -> None:
 
 
 # ---------------------------------------------------------------------------
-# GameState — network_controls field wired from GameEngine.create_state
+# GameState — network_controls field
 # ---------------------------------------------------------------------------
 
 
