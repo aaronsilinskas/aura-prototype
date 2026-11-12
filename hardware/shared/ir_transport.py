@@ -131,12 +131,11 @@ class _IrTransmitGate:
     def end_transmit(self) -> None:
         """Mark one emission as ending.
 
-        Decrements the active-emission depth (never below 0) and arms the
-        one-shot flush latch so the receiver performs exactly one more
-        drain-and-discard on its next poll.
+        Decrements the active-emission depth and arms the one-shot flush
+        latch so the receiver performs exactly one more drain-and-discard on
+        its next poll.
         """
-        if self._depth > 0:
-            self._depth -= 1
+        self._depth -= 1
         self._flush_pending = True
 
     @property
@@ -214,7 +213,7 @@ class _InfraredTransmitter:
         self,
         pulse_writer: PulseWriter,
         encoder: InfraredEncoder,
-        gate: "_IrTransmitGate | None" = None,
+        gate: _IrTransmitGate,
     ) -> None:
         self._writer = pulse_writer
         self._encoder = encoder
@@ -235,7 +234,7 @@ class _InfraredTransmitter:
         """
         self._encoder = encoder
 
-    def send(self, data: bytes) -> bool:
+    def send(self, data: bytes) -> None:
         """Start transmitting *data* if idle, else append it to the FIFO queue.
 
         While a write is outstanding (``PulseWriter.is_busy()`` is ``True``),
@@ -245,21 +244,11 @@ class _InfraredTransmitter:
 
         Args:
             data: Opaque payload bytes to transmit.
-
-        Returns:
-            ``True`` only if *data* was fully transmitted synchronously —
-            the writer was idle at entry *and* reports idle again
-            immediately after :meth:`PulseWriter.write_pulses` returns (a
-            blocking writer). ``False`` in every other case: the writer was
-            busy at entry (*data* was appended to the queue), or the write
-            started but is still outstanding on a non-blocking (e.g.
-            DMA-backed) writer — started, not yet sent.
         """
         if self._writer.is_busy():
             self._pending_queue.append(data)
-            return False
+            return
         self._start_write(data)
-        return not self._writer.is_busy()
 
     def poll(self) -> bool:
         """Per-tick pump: release a deferred gate and start the oldest queued send.
@@ -301,11 +290,6 @@ class _InfraredTransmitter:
             data: Opaque payload bytes to transmit.
         """
         gate = self._gate
-        if gate is None:
-            pulses = self._encoder.encode(data)
-            self._writer.write_pulses(pulses)
-            return
-
         gate.begin_transmit()
         try:
             pulses = self._encoder.encode(data)
@@ -331,9 +315,7 @@ class _InfraredTransmitter:
         if not self._gate_armed or self._writer.is_busy():
             return
         self._gate_armed = False
-        gate = self._gate
-        if gate is not None:
-            gate.end_transmit()
+        self._gate.end_transmit()
 
 
 # ---------------------------------------------------------------------------
@@ -388,7 +370,7 @@ class _InfraredReceiver:
         self,
         pulse_readers: "list[PulseReader]",
         decoder_factory: "Callable[[], InfraredDecoder]",
-        gate: "_IrTransmitGate | None" = None,
+        gate: _IrTransmitGate,
     ) -> None:
         readers = list(pulse_readers)
         self._readers = readers
@@ -411,15 +393,14 @@ class _InfraredReceiver:
         """Poll every reader and return the best packet this tick, or ``None``.
 
         Must be called every tick. Each reader surfaces at most one packet
-        per tick. With a *gate* present, pulses captured while transmitting
-        are drained and discarded across every reader rather than decoded
+        per tick. Pulses captured while the gate reports transmitting are
+        drained and discarded across every reader rather than decoded
         (self-echo suppression).
 
         Returns:
             ``bytearray`` payload from the lowest-error-margin reader, or ``None``.
         """
-        gate = self._gate
-        if gate is not None and gate.should_discard():
+        if self._gate.should_discard():
             self._drain_discard_all()
             return None
 
