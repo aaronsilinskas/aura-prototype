@@ -1,9 +1,8 @@
 """``TransmitterConfig`` — the IR range transmitter's Scene Config.
 
 Holds the scene's Settings, declared in its ``scene.json``, and the values
-derived from them. ``TransmitterConfig.__init__`` takes already-resolved
-values so it is unit-testable directly; ``from_settings`` builds one from the
-Settings view.
+derived from them. ``TransmitterConfig`` is built from the scene's Settings
+view.
 
 ``transmitter_config`` is a :class:`engine.state.StateSlot` callable accessor:
 it lazily builds the config from ``state.settings`` on first use and caches it
@@ -36,31 +35,21 @@ def _build_payload_padding(payload_size: int) -> bytes:
 
 
 class TransmitterConfig:
-    """Immutable configuration for the IR range transmitter scene.
-
-    All values are already-resolved, so this can be constructed directly in
-    tests. Use :meth:`from_settings` to build one from the scene's Settings.
-    """
+    """Immutable configuration for the IR range transmitter scene: each scene
+    Setting read into the field of the same name, plus the send period and
+    payload padding derived from them."""
 
     __slots__ = ("payload_padding", "payload_size", "send_period_seconds", "send_rate_hz")
 
-    def __init__(self, send_rate_hz: float, payload_size: int) -> None:
-        self.send_rate_hz = send_rate_hz
-        self.payload_size = payload_size
-        self.send_period_seconds = 1.0 / send_rate_hz
-        self.payload_padding = _build_payload_padding(payload_size)
-
-    @classmethod
-    def from_settings(cls, settings: Settings) -> TransmitterConfig:
-        """Build a config from the scene's Settings, each named as its field."""
-        return cls(
-            send_rate_hz=settings.get_float(SCENE_NAMESPACE, "send_rate_hz"),
-            payload_size=settings.get_int(SCENE_NAMESPACE, "payload_size"),
-        )
+    def __init__(self, settings: Settings) -> None:
+        self.send_rate_hz = settings.get_float(SCENE_NAMESPACE, "send_rate_hz")
+        self.payload_size = settings.get_int(SCENE_NAMESPACE, "payload_size")
+        self.send_period_seconds = 1.0 / self.send_rate_hz
+        self.payload_padding = _build_payload_padding(self.payload_size)
 
 
 def _from_state(state: GameState) -> TransmitterConfig:
-    return TransmitterConfig.from_settings(state.settings)
+    return TransmitterConfig(state.settings)
 
 
 transmitter_config = StateSlot(_CONFIG_KEY, _from_state, TransmitterConfig)
