@@ -1,8 +1,8 @@
 """Hardware-agnostic IR transport layer for the Aura platform.
 
-Provides the ``PulseReader`` / ``PulseWriter`` port abstractions, the
-``InfraredTransmitter``, and the ``InfraredReceiver`` built on top of the
-codec base classes from ``hardware.shared.ir_codecs.base``.
+Provides the public ``PulseReader`` / ``PulseWriter`` ports the platform
+adapters implement, and the module-private transmitter, receiver and IR
+transmit gate that only ``InfraredTransceiver`` builds and drives.
 
 No ``pulseio`` import — safe on CPython, CircuitPython 10.x, and MicroPython.
 
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 class PulseWriter:
-    """Port through which :class:`InfraredTransmitter` sends IR pulses.
+    """Port through which the IR subsystem sends one emitter's pulses.
 
     A plain base class — subclass and override :meth:`write_pulses` to
     connect to hardware (e.g. ``pulseio.PulseOut``) or a test fake.
@@ -74,9 +74,8 @@ class PulseReader:
             test fakes) still satisfy the telemetry contract.
     """
 
-    # The IR receive-path telemetry counter this class owns — the read
-    # source ``InfraredReceiver.telemetry()`` sums across every reader
-    # and the reset source ``reset_telemetry()`` zeroes on every reader.
+    # The IR receive-path telemetry counter this class owns, which
+    # ``_InfraredReceiver.telemetry()`` sums across every reader.
     OWNED_TELEMETRY_FIELDS = ("buffer_full_on_poll",)
 
     buffer_full_on_poll: int = 0
@@ -95,18 +94,13 @@ class PulseReader:
         """
         raise NotImplementedError
 
-    def reset_telemetry(self) -> None:
-        """Zero ``buffer_full_on_poll``. No-op on the base — overridden by
-        readers that track real telemetry (e.g. :class:`PulseInReader`)."""
-        self.buffer_full_on_poll = 0
-
 
 # ---------------------------------------------------------------------------
 # IR transmit gate
 # ---------------------------------------------------------------------------
 
 
-class IrTransmitGate:
+class _IrTransmitGate:
     """Coordinates transmit and receive so a device never decodes its own
     **self-echo** — the IR pulses its own receiver captures while its own
     emitter is lit.
@@ -172,7 +166,7 @@ class IrTransmitGate:
 # ---------------------------------------------------------------------------
 
 
-class InfraredTransmitter:
+class _InfraredTransmitter:
     """Transmits IR payloads through a :class:`PulseWriter`, hiding whether the
     underlying write is blocking or non-blocking from callers — one class
     drives both kinds of writer.
@@ -188,11 +182,11 @@ class InfraredTransmitter:
         start-of-write — never per-tick.
 
     Gate timing:
-      - Starting a write calls :meth:`IrTransmitGate.begin_transmit`, encodes,
+      - Starting a write calls :meth:`_IrTransmitGate.begin_transmit`, encodes,
         calls :meth:`PulseWriter.write_pulses`, arms the deferred-release
         flag, then calls :meth:`_release_gate_when_idle`. If the writer is
         already idle (a blocking writer finished synchronously)
-        :meth:`IrTransmitGate.end_transmit` fires immediately. If the writer
+        :meth:`_IrTransmitGate.end_transmit` fires immediately. If the writer
         is still busy (e.g. DMA in flight) the flag stays armed and the next
         :meth:`poll` that observes idle releases it, via the same
         :meth:`_release_gate_when_idle`, before starting the oldest queued
@@ -212,7 +206,7 @@ class InfraredTransmitter:
         pulse_writer: Hardware port that physically transmits pulses.
         encoder: :class:`~hardware.shared.ir_codecs.base.InfraredEncoder` subclass
             that converts bytes to a pulse-duration array.
-        gate: :class:`IrTransmitGate` driven across the write so the receiver
+        gate: :class:`_IrTransmitGate` driven across the write so the receiver
             can suppress self-echo.
     """
 
@@ -220,7 +214,7 @@ class InfraredTransmitter:
         self,
         pulse_writer: PulseWriter,
         encoder: InfraredEncoder,
-        gate: "IrTransmitGate | None" = None,
+        gate: "_IrTransmitGate | None" = None,
     ) -> None:
         self._writer = pulse_writer
         self._encoder = encoder
@@ -347,7 +341,7 @@ class InfraredTransmitter:
 # ---------------------------------------------------------------------------
 
 
-class InfraredReceiver:
+class _InfraredReceiver:
     """Polls one or more :class:`PulseReader` instances and returns the best packet.
 
     Each reader is paired with its own decoder, built fresh from
@@ -360,12 +354,11 @@ class InfraredReceiver:
     ``receive()`` is polled every tick and must not allocate: CircuitPython's
     garbage collector would otherwise run mid-game.
 
-    Telemetry: :meth:`telemetry` and :meth:`reset_telemetry` walk
-    ``OWNED_TELEMETRY_FIELDS`` declared on
+    Telemetry: :meth:`telemetry` walks ``OWNED_TELEMETRY_FIELDS`` declared on
     :class:`~hardware.shared.ir_codecs.base.InfraredDecoder`,
     :class:`PulseReader`, and this class — decoder-owned fields are summed
     across every decoder, reader-owned fields across every reader, and
-    receiver-owned fields read (and reset) directly off ``self``, so there is
+    receiver-owned fields read directly off ``self``, so there is
     no hand-maintained field list to drift from ``IrTelemetrySnapshot``.
 
     Telemetry note — **dedup, not loss**: with several readers the summed
@@ -377,13 +370,13 @@ class InfraredReceiver:
         pulse_readers: The :class:`PulseReader` instances to poll; never empty.
         decoder_factory: Called with no arguments once per reader to build that
             reader's :class:`~hardware.shared.ir_codecs.base.InfraredDecoder`.
-        gate: :class:`IrTransmitGate` read for self-echo suppression.
+        gate: :class:`_IrTransmitGate` read for self-echo suppression.
 
     Attributes:
         pulses_seen: Count of pulses drained from every reader and decoded.
         packets_surfaced: Count of packets returned by :meth:`receive`.
         pulses_dropped_transmitting: Count of pulses drained and discarded
-            under **drain-but-discard** while the :class:`IrTransmitGate` was
+            under **drain-but-discard** while the :class:`_IrTransmitGate` was
             transmitting or flushing. Kept out of ``pulses_seen``.
     """
 
@@ -395,7 +388,7 @@ class InfraredReceiver:
         self,
         pulse_readers: "list[PulseReader]",
         decoder_factory: "Callable[[], InfraredDecoder]",
-        gate: "IrTransmitGate | None" = None,
+        gate: "_IrTransmitGate | None" = None,
     ) -> None:
         readers = list(pulse_readers)
         self._readers = readers
@@ -507,7 +500,7 @@ class InfraredReceiver:
         """
         fields: dict[str, int] = {}
 
-        for name in InfraredReceiver.OWNED_TELEMETRY_FIELDS:
+        for name in _InfraredReceiver.OWNED_TELEMETRY_FIELDS:
             fields[name] = getattr(self, name)
 
         for name in InfraredDecoder.OWNED_TELEMETRY_FIELDS:
@@ -517,21 +510,6 @@ class InfraredReceiver:
             fields[name] = sum(getattr(reader, name) for reader in self._readers)
 
         return IrTelemetrySnapshot(**fields)
-
-    def reset_telemetry(self) -> None:
-        """Zero this receiver's own counters, then every decoder's and reader's.
-
-        Reading and resetting walk the same lists, so a counter can never go
-        stale after a reset. Also rebuilds :meth:`telemetry_line`'s
-        change-gate baseline, so the next call reports unconditionally.
-        """
-        for name in InfraredReceiver.OWNED_TELEMETRY_FIELDS:
-            setattr(self, name, 0)
-        for decoder in self._decoders:
-            decoder.reset_telemetry()
-        for reader in self._readers:
-            reader.reset_telemetry()
-        self._telemetry_gate = IrTelemetryGate()
 
     def telemetry_line(self) -> "str | None":
         """Return a change-gated one-line telemetry summary, or ``None``.

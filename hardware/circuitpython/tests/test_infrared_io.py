@@ -128,16 +128,6 @@ def test_buffer_full_on_poll_counts_once_per_full_read_not_per_drain():
     assert reader.buffer_full_on_poll == 1
 
 
-def test_reset_telemetry_zeroes_buffer_full_on_poll():
-    reader = PulseInReader(fake_pulse_in([500, 1000], maxlen=2))
-    reader.read_pulse()
-    assert reader.buffer_full_on_poll == 1
-
-    reader.reset_telemetry()
-
-    assert reader.buffer_full_on_poll == 0
-
-
 # ---------------------------------------------------------------------------
 # PulseOutWriter — wraps pulseio.PulseOut
 # ---------------------------------------------------------------------------

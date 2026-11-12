@@ -354,24 +354,3 @@ def test_packets_started_counts_every_preamble_match_not_just_completions():
 
     assert decoder.packets_started == 2
     assert decoder.packets_completed == 1
-
-
-def test_reset_telemetry_zeroes_all_decoder_counters():
-    encoder = TagInfraredEncoder()
-    decoder = TagInfraredDecoder()
-
-    pulses = encoder.encode(bytearray([0x55]))
-    for pulse in pulses:
-        decoder.decode(pulse)
-    bad_preamble = list(TAG_PREAMBLE)
-    bad_preamble[1] = 4000
-    for pulse in bad_preamble:
-        decoder.decode(pulse)
-
-    decoder.reset_telemetry()
-
-    assert decoder.packets_started == 0
-    assert decoder.packets_completed == 0
-    assert decoder.preamble_reject == 0
-    assert decoder.mark_reject == 0
-    assert decoder.space_reject == 0

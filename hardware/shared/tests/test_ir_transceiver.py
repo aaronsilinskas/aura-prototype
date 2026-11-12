@@ -6,46 +6,12 @@ from engine.network import AREA_OF_EFFECT, CONE, LINE
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.ir_transport import PulseReader, PulseWriter
-from hardware.shared.tests.ir_fakes import RecordingPulseWriter
-
-# ---------------------------------------------------------------------------
-# Fakes
-# ---------------------------------------------------------------------------
-
-
-class ControllableFakePulseWriter(PulseWriter):
-    """Non-blocking fake writer whose busy state the test drives directly."""
-
-    def __init__(self) -> None:
-        self.calls: list = []
-        self._busy = False
-
-    def write_pulses(self, durations) -> None:
-        self.calls.append(list(durations))
-        self._busy = True
-
-    def is_busy(self) -> bool:
-        return self._busy
-
-    def set_busy(self, busy: bool) -> None:
-        self._busy = busy
-
-
-class FakePulseReader(PulseReader):
-    """Replaying fake — drains a queue of pre-loaded pulses one at a time."""
-
-    def __init__(self, pulses=None) -> None:
-        self._queue = list(pulses) if pulses else []
-
-    def load(self, pulses) -> None:
-        """Replace the pending pulse queue."""
-        self._queue = list(pulses)
-
-    def read_pulse(self) -> int | None:
-        if self._queue:
-            return self._queue.pop(0)
-        return None
+from hardware.shared.ir_transport import PulseWriter
+from hardware.shared.tests.ir_fakes import (
+    EmitterPulseWriter,
+    EmitterWriterFactory,
+    ReplayingPulseReader,
+)
 
 
 def _encode_pulses(payload: bytes | bytearray) -> list[int]:
@@ -53,12 +19,12 @@ def _encode_pulses(payload: bytes | bytearray) -> list[int]:
 
 
 def _transceiver_over(
-    readers: list[FakePulseReader] | None = None,
+    readers: list[ReplayingPulseReader] | None = None,
     writers: dict[str, PulseWriter] | None = None,
 ) -> InfraredTransceiver:
     """A transceiver built over *readers*, wiring each emitter in *writers* to that writer."""
     wired = writers or {}
-    return InfraredTransceiver.build(
+    return InfraredTransceiver(
         list(readers or []),
         {emitter: emitter for emitter in wired},
         lambda emitter, _pin: (wired[emitter], "fake"),
@@ -75,53 +41,19 @@ def _counter(line: str | None, name: str) -> int:
     raise AssertionError(f"{name} not in {line!r}")
 
 
-class _WriterFactory:
-    """Builds a writer per emitter, recording each ``(emitter, pin)`` call.
-
-    Each writer is a blocking :class:`RecordingPulseWriter`, or, with
-    *echo_to*, one that also lands its pulses on those readers like a lit
-    emitter's self-echo.
-    """
-
-    def __init__(self, kind: str = "fake", echo_to: list[FakePulseReader] | None = None) -> None:
-        self.kind = kind
-        self.calls: list[tuple[str, object]] = []
-        self.writers: dict[str, RecordingPulseWriter] = {}
-        self._echo_to = echo_to or []
-
-    def __call__(self, emitter: str, pin: object) -> tuple[PulseWriter, str]:
-        self.calls.append((emitter, pin))
-        writer = _EchoingPulseWriter(self._echo_to)
-        self.writers[emitter] = writer
-        return writer, self.kind
-
-
-class _EchoingPulseWriter(RecordingPulseWriter):
-    """A blocking recording writer whose pulses also land on *echo_to*'s readers."""
-
-    def __init__(self, echo_to: list[FakePulseReader]) -> None:
-        super().__init__()
-        self._echo_to = echo_to
-
-    def write_pulses(self, durations) -> None:
-        super().write_pulses(durations)
-        for reader in self._echo_to:
-            reader.load(durations)
-
-
 _ALL_PINS = {LINE: "GP1", CONE: "GP2", AREA_OF_EFFECT: "GP3"}
 
 
 # ---------------------------------------------------------------------------
-# build() — wires itself from pulse readers, emitter pins and a writer factory
+# Construction — wires itself from pulse readers, emitter pins and a writer factory
 # ---------------------------------------------------------------------------
 
 
-def test_build_calls_the_factory_once_per_emitter_in_ir_emitters_order_with_its_pin() -> None:
-    factory = _WriterFactory()
+def test_constructor_calls_the_factory_once_per_emitter_in_ir_emitters_order_with_its_pin() -> None:
+    factory = EmitterWriterFactory()
     pins = {AREA_OF_EFFECT: object(), LINE: object(), CONE: object()}
 
-    transceiver = InfraredTransceiver.build([FakePulseReader()], pins, factory)
+    transceiver = InfraredTransceiver([ReplayingPulseReader()], pins, factory)
 
     assert factory.calls == [
         (LINE, pins[LINE]),
@@ -131,18 +63,18 @@ def test_build_calls_the_factory_once_per_emitter_in_ir_emitters_order_with_its_
     assert transceiver.emitters == (LINE, CONE, AREA_OF_EFFECT)
 
 
-def test_build_reports_the_writer_kind_the_factory_produced() -> None:
-    transceiver = InfraredTransceiver.build(
-        [FakePulseReader()], {LINE: "GP1"}, _WriterFactory(kind="pio")
+def test_constructor_reports_the_writer_kind_the_factory_produced() -> None:
+    transceiver = InfraredTransceiver(
+        [ReplayingPulseReader()], {LINE: "GP1"}, EmitterWriterFactory(kind="pio")
     )
 
     assert transceiver.writer_kind == "pio"
 
 
-def test_build_with_no_emitter_pins_wires_no_emitter_and_reports_no_writer_kind() -> None:
-    factory = _WriterFactory()
+def test_constructor_with_no_emitter_pins_wires_no_emitter_and_reports_no_writer_kind() -> None:
+    factory = EmitterWriterFactory()
 
-    transceiver = InfraredTransceiver.build([FakePulseReader()], {}, factory)
+    transceiver = InfraredTransceiver([ReplayingPulseReader()], {}, factory)
 
     assert factory.calls == []
     assert transceiver.emitters == ()
@@ -150,11 +82,11 @@ def test_build_with_no_emitter_pins_wires_no_emitter_and_reports_no_writer_kind(
 
 
 @pytest.mark.parametrize("emitter", [LINE, CONE, AREA_OF_EFFECT])
-def test_build_sends_only_on_the_writer_built_for_that_emitter_in_the_aura_wire_frame(
+def test_constructor_sends_only_on_the_writer_built_for_that_emitter_in_the_aura_wire_frame(
     emitter,
 ) -> None:
-    factory = _WriterFactory()
-    transceiver = InfraredTransceiver.build([FakePulseReader()], _ALL_PINS, factory)
+    factory = EmitterWriterFactory()
+    transceiver = InfraredTransceiver([ReplayingPulseReader()], _ALL_PINS, factory)
 
     transceiver.send(b"\x2a", emitter)
 
@@ -163,16 +95,18 @@ def test_build_sends_only_on_the_writer_built_for_that_emitter_in_the_aura_wire_
     }
 
 
-def test_build_does_not_wire_an_emitter_missing_from_the_pins() -> None:
-    transceiver = InfraredTransceiver.build([FakePulseReader()], {LINE: "GP1"}, _WriterFactory())
+def test_constructor_does_not_wire_an_emitter_missing_from_the_pins() -> None:
+    transceiver = InfraredTransceiver(
+        [ReplayingPulseReader()], {LINE: "GP1"}, EmitterWriterFactory()
+    )
 
     assert transceiver.emitters == (LINE,)
     with pytest.raises(ValueError):
         transceiver.send(b"\x2a", CONE)
 
 
-def test_build_with_no_readers_wires_no_receiver() -> None:
-    transceiver = InfraredTransceiver.build([], {LINE: "GP1"}, _WriterFactory())
+def test_constructor_with_no_readers_wires_no_receiver() -> None:
+    transceiver = InfraredTransceiver([], {LINE: "GP1"}, EmitterWriterFactory())
 
     transceiver.update(0.0)
 
@@ -181,9 +115,9 @@ def test_build_with_no_readers_wires_no_receiver() -> None:
 
 
 @pytest.mark.parametrize("reader_count", [1, 3])
-def test_build_receives_an_aura_shot_landing_on_its_readers(reader_count) -> None:
-    readers = [FakePulseReader(_encode_pulses(b"\x2a")) for _ in range(reader_count)]
-    transceiver = InfraredTransceiver.build(list(readers), {}, _WriterFactory())
+def test_constructor_receives_an_aura_shot_landing_on_its_readers(reader_count) -> None:
+    readers = [ReplayingPulseReader(_encode_pulses(b"\x2a")) for _ in range(reader_count)]
+    transceiver = InfraredTransceiver(list(readers), {}, EmitterWriterFactory())
 
     transceiver.update(0.0)
 
@@ -192,9 +126,9 @@ def test_build_receives_an_aura_shot_landing_on_its_readers(reader_count) -> Non
     assert transceiver.codec == (AuraInfraredEncoder, AuraInfraredDecoder)
 
 
-def test_build_receives_on_every_reader_not_just_the_first() -> None:
-    readers = [FakePulseReader(), FakePulseReader(_encode_pulses(b"\x2a"))]
-    transceiver = InfraredTransceiver.build(list(readers), {}, _WriterFactory())
+def test_constructor_receives_on_every_reader_not_just_the_first() -> None:
+    readers = [ReplayingPulseReader(), ReplayingPulseReader(_encode_pulses(b"\x2a"))]
+    transceiver = InfraredTransceiver(list(readers), {}, EmitterWriterFactory())
 
     transceiver.update(0.0)
 
@@ -202,12 +136,12 @@ def test_build_receives_on_every_reader_not_just_the_first() -> None:
 
 
 @pytest.mark.parametrize("emitter", [LINE, CONE, AREA_OF_EFFECT])
-def test_build_shares_one_gate_so_no_reader_decodes_a_send_on_any_emitter(
+def test_constructor_shares_one_gate_so_no_reader_decodes_a_send_on_any_emitter(
     emitter,
 ) -> None:
-    readers = [FakePulseReader(), FakePulseReader()]
-    transceiver = InfraredTransceiver.build(
-        list(readers), _ALL_PINS, _WriterFactory(echo_to=readers)
+    readers = [ReplayingPulseReader(), ReplayingPulseReader()]
+    transceiver = InfraredTransceiver(
+        list(readers), _ALL_PINS, EmitterWriterFactory(echo_to=readers)
     )
 
     transceiver.send(b"\x2a", emitter)
@@ -229,7 +163,7 @@ def test_send_raises_with_no_emitter_wired() -> None:
 
 
 def test_transceiver_does_not_expose_transmitters_as_a_public_collection() -> None:
-    transceiver = _transceiver_over(writers={LINE: RecordingPulseWriter()})
+    transceiver = _transceiver_over(writers={LINE: EmitterPulseWriter()})
 
     assert not hasattr(transceiver, "transmitters")
 
@@ -240,7 +174,7 @@ def test_transceiver_does_not_expose_transmitters_as_a_public_collection() -> No
 
 
 def test_busy_reports_an_emitter_whose_writer_is_still_writing() -> None:
-    writer = ControllableFakePulseWriter()
+    writer = EmitterPulseWriter(blocking=False)
     transceiver = _transceiver_over(writers={LINE: writer})
 
     transceiver.send(b"\xab", LINE)
@@ -249,17 +183,17 @@ def test_busy_reports_an_emitter_whose_writer_is_still_writing() -> None:
 
 
 def test_busy_reports_idle_once_the_writer_finishes() -> None:
-    writer = ControllableFakePulseWriter()
+    writer = EmitterPulseWriter(blocking=False)
     transceiver = _transceiver_over(writers={LINE: writer})
     transceiver.send(b"\xab", LINE)
 
-    writer.set_busy(False)
+    writer.finish()
 
     assert transceiver.busy(LINE) is False
 
 
 def test_busy_reports_idle_for_a_blocking_writer() -> None:
-    transceiver = _transceiver_over(writers={LINE: RecordingPulseWriter()})
+    transceiver = _transceiver_over(writers={LINE: EmitterPulseWriter()})
 
     transceiver.send(b"\xab", LINE)
 
@@ -267,14 +201,14 @@ def test_busy_reports_idle_for_a_blocking_writer() -> None:
 
 
 def test_busy_starts_only_that_emitters_queued_send_once_its_writer_finishes() -> None:
-    line_writer = ControllableFakePulseWriter()
-    cone_writer = ControllableFakePulseWriter()
+    line_writer = EmitterPulseWriter(blocking=False)
+    cone_writer = EmitterPulseWriter(blocking=False)
     transceiver = _transceiver_over(writers={LINE: line_writer, CONE: cone_writer})
     for emitter in (LINE, CONE):
         transceiver.send(b"\x01", emitter)
         transceiver.send(b"\x02", emitter)  # queued behind the write in flight
-    line_writer.set_busy(False)
-    cone_writer.set_busy(False)
+    line_writer.finish()
+    cone_writer.finish()
 
     transceiver.busy(LINE)
 
@@ -283,7 +217,7 @@ def test_busy_starts_only_that_emitters_queued_send_once_its_writer_finishes() -
 
 
 def test_busy_raises_for_unwired_emitter() -> None:
-    transceiver = _transceiver_over(writers={LINE: RecordingPulseWriter()})
+    transceiver = _transceiver_over(writers={LINE: EmitterPulseWriter()})
 
     with pytest.raises(ValueError):
         transceiver.busy(CONE)
@@ -297,11 +231,11 @@ def test_busy_raises_for_unwired_emitter() -> None:
 def test_update_releases_a_write_that_finished_this_tick_before_receiving() -> None:
     """Pumping first lets the falling-edge flush land on this tick, so the
     very next tick's frame decodes instead of being discarded as self-echo."""
-    writer = ControllableFakePulseWriter()
-    reader = FakePulseReader()
+    writer = EmitterPulseWriter(blocking=False)
+    reader = ReplayingPulseReader()
     transceiver = _transceiver_over([reader], {LINE: writer})
     transceiver.send(b"\xaa", LINE)
-    writer.set_busy(False)
+    writer.finish()
 
     transceiver.update(0.0)
     reader.load(_encode_pulses(b"\x07"))
@@ -314,12 +248,14 @@ def test_update_releases_a_write_that_finished_this_tick_before_receiving() -> N
 def test_update_starts_every_emitters_queued_send_once_its_writer_finishes(
     reader_count,
 ) -> None:
-    writers = {LINE: ControllableFakePulseWriter(), CONE: ControllableFakePulseWriter()}
-    transceiver = _transceiver_over([FakePulseReader() for _ in range(reader_count)], dict(writers))
+    writers = {LINE: EmitterPulseWriter(blocking=False), CONE: EmitterPulseWriter(blocking=False)}
+    transceiver = _transceiver_over(
+        [ReplayingPulseReader() for _ in range(reader_count)], dict(writers)
+    )
     for emitter, writer in writers.items():
         transceiver.send(b"\x01", emitter)
         transceiver.send(b"\x02", emitter)  # queued behind the write in flight
-        writer.set_busy(False)
+        writer.finish()
 
     transceiver.update(0.0)
 
@@ -342,7 +278,7 @@ def test_update_with_nothing_wired_leaves_received_none() -> None:
 
 
 def test_received_is_none_when_the_pulses_decode_nothing() -> None:
-    transceiver = _transceiver_over([FakePulseReader([100, 200])])
+    transceiver = _transceiver_over([ReplayingPulseReader([100, 200])])
 
     transceiver.update(0.0)
 
@@ -351,7 +287,7 @@ def test_received_is_none_when_the_pulses_decode_nothing() -> None:
 
 def test_received_holds_the_decoded_payload_on_a_decoding_tick() -> None:
     payload = bytearray(b"\xab\xcd")
-    transceiver = _transceiver_over([FakePulseReader(_encode_pulses(payload))])
+    transceiver = _transceiver_over([ReplayingPulseReader(_encode_pulses(payload))])
 
     transceiver.update(0.0)
 
@@ -359,7 +295,7 @@ def test_received_holds_the_decoded_payload_on_a_decoding_tick() -> None:
 
 
 def test_received_resets_to_none_on_the_tick_after_a_decode() -> None:
-    transceiver = _transceiver_over([FakePulseReader(_encode_pulses(b"\x01"))])
+    transceiver = _transceiver_over([ReplayingPulseReader(_encode_pulses(b"\x01"))])
 
     transceiver.update(0.0)
     transceiver.update(0.0)
@@ -373,8 +309,8 @@ def test_received_resets_to_none_on_the_tick_after_a_decode() -> None:
 
 
 def test_apply_codec_makes_every_emitter_send_in_the_new_wire_frame() -> None:
-    writers = {LINE: RecordingPulseWriter(), CONE: RecordingPulseWriter()}
-    transceiver = _transceiver_over([FakePulseReader()], dict(writers))
+    writers = {LINE: EmitterPulseWriter(), CONE: EmitterPulseWriter()}
+    transceiver = _transceiver_over([ReplayingPulseReader()], dict(writers))
 
     transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
     transceiver.send(b"\x10", LINE)
@@ -387,7 +323,7 @@ def test_apply_codec_makes_every_emitter_send_in_the_new_wire_frame() -> None:
 def test_apply_codec_makes_the_readers_decode_the_new_wire_frame() -> None:
     """A Tag frame only decodes once the Tag decoder is installed."""
     payload = bytearray([0x10])
-    transceiver = _transceiver_over([FakePulseReader(TagInfraredEncoder().encode(payload))])
+    transceiver = _transceiver_over([ReplayingPulseReader(TagInfraredEncoder().encode(payload))])
 
     transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
     transceiver.update(0.0)
@@ -396,7 +332,7 @@ def test_apply_codec_makes_the_readers_decode_the_new_wire_frame() -> None:
 
 
 def test_apply_codec_with_no_receiver_wired_still_changes_what_is_sent() -> None:
-    writer = RecordingPulseWriter()
+    writer = EmitterPulseWriter()
     transceiver = _transceiver_over(writers={LINE: writer})
 
     transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)  # must not raise
@@ -443,7 +379,7 @@ def test_codec_cannot_be_assigned() -> None:
 
 
 def test_a_cleanly_timed_frame_reports_full_signal_strength() -> None:
-    transceiver = _transceiver_over([FakePulseReader(_encode_pulses(b"\x42"))])
+    transceiver = _transceiver_over([ReplayingPulseReader(_encode_pulses(b"\x42"))])
 
     transceiver.update(0.0)
 
@@ -451,7 +387,7 @@ def test_a_cleanly_timed_frame_reports_full_signal_strength() -> None:
 
 
 def test_a_cleanly_timed_frame_reports_a_zero_error_margin() -> None:
-    transceiver = _transceiver_over([FakePulseReader(_encode_pulses(b"\x42"))])
+    transceiver = _transceiver_over([ReplayingPulseReader(_encode_pulses(b"\x42"))])
 
     transceiver.update(0.0)
 
@@ -459,7 +395,7 @@ def test_a_cleanly_timed_frame_reports_a_zero_error_margin() -> None:
 
 
 def test_signal_strength_and_error_margin_are_none_before_any_frame() -> None:
-    transceiver = _transceiver_over([FakePulseReader()])
+    transceiver = _transceiver_over([ReplayingPulseReader()])
 
     transceiver.update(0.0)
 
@@ -467,7 +403,7 @@ def test_signal_strength_and_error_margin_are_none_before_any_frame() -> None:
 
 
 def test_last_best_receiver_names_the_reader_that_decoded_the_frame() -> None:
-    readers = [FakePulseReader(), FakePulseReader(_encode_pulses(b"\x42"))]
+    readers = [ReplayingPulseReader(), ReplayingPulseReader(_encode_pulses(b"\x42"))]
     transceiver = _transceiver_over(readers)
 
     transceiver.update(0.0)
@@ -476,7 +412,7 @@ def test_last_best_receiver_names_the_reader_that_decoded_the_frame() -> None:
 
 
 def test_last_best_receiver_is_none_with_a_single_reader() -> None:
-    transceiver = _transceiver_over([FakePulseReader(_encode_pulses(b"\x42"))])
+    transceiver = _transceiver_over([ReplayingPulseReader(_encode_pulses(b"\x42"))])
 
     transceiver.update(0.0)
 
@@ -486,7 +422,7 @@ def test_last_best_receiver_is_none_with_a_single_reader() -> None:
 def test_telemetry_line_reports_a_decoded_frame_through_every_stage() -> None:
     """Uses the Tag codec because its decoder counts started and completed packets."""
     pulses = list(TagInfraredEncoder().encode(b"\x10"))
-    transceiver = _transceiver_over([FakePulseReader(pulses)])
+    transceiver = _transceiver_over([ReplayingPulseReader(pulses)])
     transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
 
     transceiver.update(0.0)
@@ -499,7 +435,7 @@ def test_telemetry_line_reports_a_decoded_frame_through_every_stage() -> None:
 
 
 def test_telemetry_line_is_none_when_no_counter_changed() -> None:
-    transceiver = _transceiver_over([FakePulseReader(_encode_pulses(b"\x42"))])
+    transceiver = _transceiver_over([ReplayingPulseReader(_encode_pulses(b"\x42"))])
     transceiver.update(0.0)
     transceiver.telemetry_line()
 
@@ -509,7 +445,7 @@ def test_telemetry_line_is_none_when_no_counter_changed() -> None:
 
 
 def test_with_no_receiver_wired_every_receive_side_value_is_none() -> None:
-    transceiver = _transceiver_over(writers={LINE: RecordingPulseWriter()})
+    transceiver = _transceiver_over(writers={LINE: EmitterPulseWriter()})
 
     transceiver.update(0.0)
 
@@ -531,8 +467,8 @@ def test_update_discards_self_echo_and_an_overlapping_real_shot_while_transmitti
     """A transmit arms the gate; while it stays armed, update() drains and
     discards both the self-echo and any real shot overlapping it — the two
     are indistinguishable at the pulse level, so both are dropped."""
-    reader = FakePulseReader()
-    transceiver = _transceiver_over([reader], {LINE: ControllableFakePulseWriter()})
+    reader = ReplayingPulseReader()
+    transceiver = _transceiver_over([reader], {LINE: EmitterPulseWriter(blocking=False)})
 
     transceiver.send(b"\xaa", LINE)  # non-blocking writer stays busy — gate armed across ticks
     echo_pulses = _encode_pulses(b"\xaa")
@@ -551,8 +487,8 @@ def test_update_falling_edge_flush_recovers_the_decoder_for_the_next_genuine_pac
     """After the transmit ends, one more update() drain-discards the flush
     tail; the decoder returns to idle and the next real packet decodes
     normally — the inter-frame-gap recovery path."""
-    writer = ControllableFakePulseWriter()
-    reader = FakePulseReader()
+    writer = EmitterPulseWriter(blocking=False)
+    reader = ReplayingPulseReader()
     transceiver = _transceiver_over([reader], {LINE: writer})
 
     transceiver.send(b"\xaa", LINE)  # gate armed
@@ -563,7 +499,7 @@ def test_update_falling_edge_flush_recovers_the_decoder_for_the_next_genuine_pac
         transceiver.telemetry_line(), "pulses_dropped_transmitting"
     )
 
-    writer.set_busy(False)  # hardware signals the write completed
+    writer.finish()  # hardware signals the write completed
     reader.load([111])  # buffered echo tail still sitting in the reader
     transceiver.update(0.0)  # releases the gate; falling-edge flush drains the tail
     assert transceiver.received is None

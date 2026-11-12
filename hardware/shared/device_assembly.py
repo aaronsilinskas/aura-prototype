@@ -189,7 +189,7 @@ def _ir(ir_config: IRConfig, parts: DeviceParts) -> tuple[InfraredTransceiver, s
     emitter_pins = {
         emitter: PinRef(name, f"ir.{emitter}") for emitter, name in ir_config.emitters.items()
     }
-    transceiver = InfraredTransceiver.build(readers, emitter_pins, parts.ir_writer)
+    transceiver = InfraredTransceiver(readers, emitter_pins, parts.ir_writer)
     writer_kind = transceiver.writer_kind
     return transceiver, "ok" if writer_kind is None else f"writer={writer_kind} ok"
 

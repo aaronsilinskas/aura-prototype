@@ -30,7 +30,7 @@ def test_device_hardware_is_constructible_under_cpython_with_board_free_parts(tm
     accelerometer = PolledSensor(_still, AccelerationData(), "accelerometer", Logger("[hw]"))
     magnetometer = PolledSensor(_still, MagneticData(), "magnetometer", Logger("[hw]"))
     network_controls = NetworkControls()
-    ir = InfraredTransceiver.build([], {}, _no_writer)
+    ir = InfraredTransceiver([], {}, _no_writer)
     radio = RadioTransceiver(None)
     storage = DeviceStorage(str(tmp_path))
     polled = (buttons, ir)
