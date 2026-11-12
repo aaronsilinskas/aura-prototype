@@ -27,19 +27,19 @@ from engine.effects.output import EffectOutput
 from engine.input import AccelerationData, MagneticData
 from engine.log import Logger
 from hardware.shared.build_narration import (
-    describe_accelerometer,
-    describe_audio,
-    describe_buttons,
-    describe_haptics,
-    describe_high_current_rail,
-    describe_i2c,
-    describe_ir,
-    describe_magnetometer,
-    describe_neopixel_current_budget,
-    describe_pixel_entry,
-    describe_radio,
-    describe_sdcard,
-    describe_spi,
+    _describe_accelerometer,
+    _describe_audio,
+    _describe_buttons,
+    _describe_haptics,
+    _describe_high_current_rail,
+    _describe_i2c,
+    _describe_ir,
+    _describe_magnetometer,
+    _describe_neopixel_current_budget,
+    _describe_pixel_entry,
+    _describe_radio,
+    _describe_sdcard,
+    _describe_spi,
     narrate_skip,
     narrate_step,
 )
@@ -285,28 +285,28 @@ def assemble_device(
             parts.high_current_rail(rail.pin, level)
             return None, "asserted" if rail.enabled else "held off"
 
-        narrate_step(logger, describe_high_current_rail(rail), _build_rail)
+        narrate_step(logger, _describe_high_current_rail(rail), _build_rail)
 
     i2c = _open_named_buses(
         logger,
         [d.i2c for d in config.i2c_devices()],
-        lambda name: describe_i2c(name, config.i2c.get(name)),
+        lambda name: _describe_i2c(name, config.i2c.get(name)),
         lambda name: open_i2c(name, config.i2c, parts),
     )
 
     spi = _open_named_buses(
         logger,
         [d.spi for d in config.spi_devices()],
-        lambda name: describe_spi(name, config.spi.get(name)),
+        lambda name: _describe_spi(name, config.spi.get(name)),
         lambda name: _open_spi(name, config.spi, parts),
     )
 
     if config.neopixel_current_budget is not None:
-        logger.log(describe_neopixel_current_budget(config.neopixel_current_budget))
+        logger.log(_describe_neopixel_current_budget(config.neopixel_current_budget))
 
     outputs: list[EffectOutput] = []
     for index, pixels in enumerate(config.pixels):
-        description = describe_pixel_entry(index, pixels)
+        description = _describe_pixel_entry(index, pixels)
         if not pixels.enabled:
             narrate_skip(logger, description, "disabled")
             continue
@@ -318,13 +318,13 @@ def assemble_device(
 
         outputs.extend(narrate_step(logger, description, _build_pixels))
 
+    labelled_pins = [(button_label(i), pin) for i, pin in enumerate(config.buttons)]
+
     def _build_buttons() -> tuple[DebouncedButtons, str]:
-        readers = [
-            (button_label(i), parts.button_reader(pin)) for i, pin in enumerate(config.buttons)
-        ]
+        readers = [(label, parts.button_reader(pin)) for label, pin in labelled_pins]
         return DebouncedButtons(readers), "ok"
 
-    buttons = narrate_step(logger, describe_buttons(config.buttons), _build_buttons)
+    buttons = narrate_step(logger, _describe_buttons(labelled_pins), _build_buttons)
     polled: list[PolledPart] = [buttons]
 
     accelerometer = _polled_sensor(
@@ -332,7 +332,7 @@ def assemble_device(
         i2c,
         "accelerometer",
         config.accelerometer,
-        describe_accelerometer,
+        _describe_accelerometer,
         parts.accelerometer,
         AccelerationData(0.0, 0.0, 0.0),
     )
@@ -341,7 +341,7 @@ def assemble_device(
         i2c,
         "magnetometer",
         config.magnetometer,
-        describe_magnetometer,
+        _describe_magnetometer,
         parts.magnetometer,
         MagneticData(0.0, 0.0, 0.0),
     )
@@ -354,14 +354,14 @@ def assemble_device(
         )
         return output, "ok"
 
-    audio_output = _gated_step(logger, config.audio, describe_audio, _build_audio)
+    audio_output = _gated_step(logger, config.audio, _describe_audio, _build_audio)
     if audio_output is not None:
         outputs.append(audio_output)
 
     haptic_output = _gated_step(
         logger,
         config.haptics,
-        describe_haptics,
+        _describe_haptics,
         lambda c: (parts.haptic_output(c, _require_i2c(i2c, "haptics", c)), "ok"),
     )
     if haptic_output is not None:
@@ -376,20 +376,20 @@ def assemble_device(
         )
         return RadioTransceiver(transport), "ok"
 
-    radio = _gated_step(logger, config.radio, describe_radio, _build_radio)
+    radio = _gated_step(logger, config.radio, _describe_radio, _build_radio)
     _append_built(polled, radio)
 
     storage = _gated_step(
         logger,
         config.sdcard,
-        describe_sdcard,
+        _describe_sdcard,
         lambda c: (
             parts.storage(c, _require_spi(spi, "sdcard", c), c.cs),
             "ok",
         ),
     )
 
-    ir = _gated_step(logger, config.ir, describe_ir, lambda c: _ir(c, parts))
+    ir = _gated_step(logger, config.ir, _describe_ir, lambda c: _ir(c, parts))
     _append_built(polled, ir)
 
     elapsed = time.monotonic() - start

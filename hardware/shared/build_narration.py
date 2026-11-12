@@ -6,12 +6,13 @@ what it is about to build, run the build, then ``end`` the line with a success d
 or ``fail`` it on an exception. :func:`narrate_step` and :func:`narrate_skip` own that
 sequence once so a component block reduces to a single call.
 
-The ``describe_*`` functions build each boot step's description. Every one works
-from a config section's pin-name strings, never resolved pins, so a step's line
-opens before any of its pins resolve -- and a bad pin name fails that step's own
-line. Each returns the exact line the board prints for its section, so a
-section that narrates a bare name when disabled (``audio``,
-``pixels[i] <kind>``) gets that form here too; the rest keep their detail.
+The private ``_describe_*`` functions build each boot step's description for the
+Device assembly, their only caller. Every one works from a config section's
+pin-name strings, never resolved pins, so a step's line opens before any of its
+pins resolve -- and a bad pin name fails that step's own line. Each returns the
+exact line the board prints for its section, so a section that narrates a bare
+name when disabled (``audio``, ``pixels[i] <kind>``) gets that form here too;
+the rest keep their detail.
 
 No ``board``/``busio`` imports, so this module is CPython-testable in isolation,
 like the rest of ``hardware/shared``.
@@ -45,23 +46,7 @@ from hardware.shared.device_config import (
     SPIConfig,
 )
 
-__all__ = [
-    "describe_accelerometer",
-    "describe_audio",
-    "describe_buttons",
-    "describe_haptics",
-    "describe_high_current_rail",
-    "describe_i2c",
-    "describe_ir",
-    "describe_magnetometer",
-    "describe_neopixel_current_budget",
-    "describe_pixel_entry",
-    "describe_radio",
-    "describe_sdcard",
-    "describe_spi",
-    "narrate_skip",
-    "narrate_step",
-]
+__all__ = ["narrate_skip", "narrate_step"]
 
 
 def narrate_step(
@@ -101,25 +86,25 @@ def narrate_skip(logger: Logger, description: str, note: str) -> None:
     logger.end(note)
 
 
-def describe_high_current_rail(rail: HighCurrentRailConfig) -> str:
+def _describe_high_current_rail(rail: HighCurrentRailConfig) -> str:
     return f"high_current_rail pin={rail.pin.name} active_high={rail.active_high}"
 
 
-def describe_i2c(name: str, i2c: I2CConfig | None) -> str:
+def _describe_i2c(name: str, i2c: I2CConfig | None) -> str:
     """Describe opening the I2C bus *name*; *i2c* ``None`` is the board's own bus."""
     if i2c is None:
         return f"i2c {name} board"
     return f"i2c {name} scl={i2c.scl.name} sda={i2c.sda.name}"
 
 
-def describe_spi(name: str, spi: SPIConfig | None) -> str:
+def _describe_spi(name: str, spi: SPIConfig | None) -> str:
     """Describe opening the SPI bus *name*; *spi* ``None`` is the board's own bus."""
     if spi is None:
         return f"spi {name} board"
     return f"spi {name} sck={spi.sck.name} mosi={spi.mosi.name} miso={spi.miso.name}"
 
 
-def describe_neopixel_current_budget(budget: NeoPixelCurrentBudgetConfig) -> str:
+def _describe_neopixel_current_budget(budget: NeoPixelCurrentBudgetConfig) -> str:
     """Return the line reporting what the parse-time current budget applied.
 
     The tuning already happened in ``parse_device_config``; this only reports
@@ -162,7 +147,7 @@ def _describe_neopixel_pixels(pixels: NeoPixelPixelsConfig) -> str:
     )
 
 
-def describe_pixel_entry(index: int, pixels: MatrixPixelsConfig | NeoPixelPixelsConfig) -> str:
+def _describe_pixel_entry(index: int, pixels: MatrixPixelsConfig | NeoPixelPixelsConfig) -> str:
     kind = "matrix" if isinstance(pixels, MatrixPixelsConfig) else "neopixel"
     if not pixels.enabled:
         return f"pixels[{index}] {kind}"
@@ -178,25 +163,25 @@ def describe_pixel_entry(index: int, pixels: MatrixPixelsConfig | NeoPixelPixels
     return f"pixels[{index}] {kind} {detail}"
 
 
-def describe_buttons(pins: list[PinRef]) -> str:
-    """Label buttons ``A``, ``B``, ... in declaration order -- the labels the board assigns."""
-    labelled = " ".join(f"{chr(ord('A') + i)}={pin.name}" for i, pin in enumerate(pins))
+def _describe_buttons(labelled_pins: list[tuple[str, PinRef]]) -> str:
+    """List each button as ``label=pin``; the Device assembly assigns the labels."""
+    labelled = " ".join(f"{label}={pin.name}" for label, pin in labelled_pins)
     return f"buttons {labelled}" if labelled else "buttons"
 
 
-def describe_accelerometer(accelerometer: I2CDeviceConfig) -> str:
+def _describe_accelerometer(accelerometer: I2CDeviceConfig) -> str:
     return _describe_i2c_chip("accelerometer", "lis3dh", accelerometer)
 
 
-def describe_magnetometer(magnetometer: I2CDeviceConfig) -> str:
+def _describe_magnetometer(magnetometer: I2CDeviceConfig) -> str:
     return _describe_i2c_chip("magnetometer", "mmc5603", magnetometer)
 
 
-def describe_haptics(haptics: I2CDeviceConfig) -> str:
+def _describe_haptics(haptics: I2CDeviceConfig) -> str:
     return _describe_i2c_chip("haptics", "drv2605", haptics)
 
 
-def describe_audio(audio: AudioConfig) -> str:
+def _describe_audio(audio: AudioConfig) -> str:
     if not audio.enabled:
         return "audio"
     return (
@@ -206,7 +191,7 @@ def describe_audio(audio: AudioConfig) -> str:
     )
 
 
-def describe_radio(radio: RadioConfig) -> str:
+def _describe_radio(radio: RadioConfig) -> str:
     return (
         f"radio frequency={radio.frequency} node={radio.node} "
         + f"cs={radio.cs.name} reset={radio.reset.name}"
@@ -214,11 +199,11 @@ def describe_radio(radio: RadioConfig) -> str:
     )
 
 
-def describe_sdcard(sdcard: SDCardConfig) -> str:
+def _describe_sdcard(sdcard: SDCardConfig) -> str:
     return f"sdcard mount={sdcard.mount} cs={sdcard.cs.name}" + _bus_suffix("spi", sdcard.spi)
 
 
-def describe_ir(ir: IRConfig) -> str:
+def _describe_ir(ir: IRConfig) -> str:
     """Describe the ``ir`` step without its writer kind (``writer=pio``/``pulseio``),
     which is only known once the IR subsystem is built, so it closes the line instead."""
     rx_desc = f"rx=[{' '.join(pin.name for pin in ir.rx)}]" if ir.rx else "rx=(none)"
