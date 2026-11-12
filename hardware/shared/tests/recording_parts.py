@@ -116,9 +116,6 @@ class RecordingParts(DeviceParts):
         self._record("board_name")
         return "test-board"
 
-    def high_current_rail(self, pin: PinRef, level: bool) -> None:
-        self._record("high_current_rail", pin, level)
-
     def i2c_bus(self, scl: PinRef | None, sda: PinRef | None) -> object | None:
         self._record("i2c_bus", scl, sda)
         return None if self._no_i2c else Bus("i2c")
