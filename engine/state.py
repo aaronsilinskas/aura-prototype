@@ -120,7 +120,7 @@ class SceneControls:
     this seam.
 
     ``overlay``/``pop`` are deferred to end-of-tick — the transition
-    is applied after ``engine.update(state)`` returns, not immediately inside
+    is applied after the top ``SceneRun``'s tick returns, not immediately inside
     the rule. ``reboot_into``/``reboot_to_previous`` are the opposite: scene
     switching across a reboot is not in-process, so both apply immediately
     and synchronously (``microcontroller.reset()`` never returns) rather than
@@ -397,17 +397,14 @@ else:
 class GameState:
     """Portable game context passed to every rule handler on every tick.
 
-    Create via ``GameEngine.create_state()`` for production use, or directly
-    for rule unit tests.  Data stored via ``state.set()`` survives across
-    ticks when the same ``GameState`` instance is passed to each
-    ``engine.update(state)`` call.
+    ``SceneManager`` builds one for each scene on its stack and wraps it, with
+    the scene's rules, in a ``SceneRun``; rule unit tests construct it directly.
+    Data stored via ``state.set()`` survives across ticks.
 
-    Provides access to time information, the effect controls interface for
-    starting and stopping effects, and ``queue_event`` so rules can enqueue
-    events without holding a ``GameEngine`` reference.
-
-    Time values are read-only; use ``state.elapsed`` and ``state.total`` to
-    read per-tick and cumulative time.
+    Rules read time and control effects, scenes and the network through it,
+    and enqueue events with ``queue_event``. Its ``SceneRun`` is the only
+    thing that dispatches the queue and moves ``elapsed``, ``total`` and
+    ``dispatch_count`` on; rules read them only.
     """
 
     __slots__ = (
@@ -530,26 +527,12 @@ class GameState:
 
     @property
     def dispatch_count(self) -> int:
-        """How many events the engine has dispatched, counting the one in flight.
+        """How many events its ``SceneRun`` has dispatched, counting the one in flight.
 
         Bumped once per event, so the reused per-frame ``Sensors`` event still
         counts as a new dispatch each frame.
         """
         return self._dispatch_count
-
-    @property
-    def event_count(self) -> int:
-        """Number of events currently queued (the queue's fill level)."""
-        return self._len
-
-    def event_at(self, index: int) -> Event:
-        """Return the queued event at *index*.
-
-        Valid for ``0 <= index < event_count``; the engine dispatches by
-        iterating these indices rather than popping, so same-tick appended
-        events are picked up by re-reading ``event_count``.
-        """
-        return self._queue[index]  # type: ignore[return-value]  # filled below event_count
 
     def queue_event(self, event: Event) -> None:
         """Enqueue an event for processing on the current or next update.
@@ -563,22 +546,7 @@ class GameState:
             self._queue.append(event)
         self._len += 1
 
-    def reset_queue(self) -> None:
-        """Drop all queued events, releasing their references, without allocating.
-
-        Called by the engine after dispatching a tick's events.
-        """
-        self._reset_queue()
-
-    def clear_queue(self) -> None:
-        """Discard all pending events without processing them.
-
-        Reserved for scene transitions; resets the queue in place without
-        allocating.
-        """
-        self._reset_queue()
-
-    def _reset_queue(self) -> None:
+    def _empty_queue(self) -> None:
         """Empty the queue in place, keeping the backing list's capacity.
 
         Filled slots are nulled so the previous tick's event references are
@@ -591,15 +559,6 @@ class GameState:
             queue[i] = None
             i += 1
         self._len = 0
-
-    def _begin_dispatch(self) -> None:
-        """Count the event about to be dispatched. Called only by GameEngine."""
-        self._dispatch_count += 1
-
-    def _advance_time(self, elapsed: float) -> None:
-        """Count one tick of *elapsed* seconds this state received. Called only by GameEngine."""
-        self._elapsed = elapsed
-        self._total += elapsed
 
 
 class SceneRun:
@@ -634,4 +593,4 @@ class SceneRun:
             for rule in rules:
                 rule.handle_event(event, state)  # type: ignore[arg-type]  # filled below _len
             i += 1
-        state._reset_queue()
+        state._empty_queue()

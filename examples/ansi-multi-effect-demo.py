@@ -39,7 +39,7 @@ class AnsiEffectOutput(EffectOutput):
         self.scopes = scopes
         self._initialized = False
         self._last_event: str = ""
-        self._event_count: int = 0
+        self._audio_count: int = 0
 
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(self.PIXEL_COUNT)
@@ -52,7 +52,7 @@ class AnsiEffectOutput(EffectOutput):
         receipt: EffectReceipt,
     ) -> None:
         self._last_event = str(event)
-        self._event_count += 1
+        self._audio_count += 1
 
     def update_pixels(self, scope_key: str, buffer: PixelBuffer) -> None:
         parts = []
@@ -63,7 +63,7 @@ class AnsiEffectOutput(EffectOutput):
             parts.append(f"\033[48;2;{r};{g};{b}m  \033[0m")
         pixel_line = "\r" + "".join(parts)
         event_line = (
-            f"\r[audio #{self._event_count}] {self._last_event}\033[K"
+            f"\r[audio #{self._audio_count}] {self._last_event}\033[K"
             if self._last_event
             else "\r\033[K"
         )
