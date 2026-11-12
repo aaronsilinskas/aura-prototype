@@ -254,9 +254,6 @@ class CircuitPythonParts(DeviceParts):
     def board_name(self) -> str:
         return _board_id()
 
-    def high_current_rail(self, pin: PinRef, level: bool) -> None:
-        digitalio.DigitalInOut(self._pin(pin)).switch_to_output(value=level)
-
     def i2c_bus(self, scl: PinRef | None, sda: PinRef | None) -> busio.I2C | None:
         """Return a new bus, or ``None`` with no pull-up or no board default.
 

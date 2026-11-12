@@ -9,8 +9,8 @@ never reads ``enabled`` or ``declared``: whatever the assembly asks for is
 what the config builds. The card is no stand-in: it is the real
 ``DeviceStorage`` over the card directory the device was handed.
 
-Pin names and buses are ignored: a bus is a stand-in token, the high-current
-rail drives nothing, and there is no matrix.
+Pin names and buses are ignored: a bus is a stand-in token, and there is no
+matrix.
 """
 
 from __future__ import annotations
@@ -322,9 +322,6 @@ class SimulatedParts(DeviceParts):
 
     def board_name(self) -> str:
         return "simulated"
-
-    def high_current_rail(self, pin: PinRef, level: bool) -> None:
-        pass
 
     def i2c_bus(self, scl: PinRef | None, sda: PinRef | None) -> Bus | None:
         return _STAND_IN_BUS

@@ -50,10 +50,6 @@ class DeviceParts:
     def board_name(self) -> str:
         raise NotImplementedError
 
-    def high_current_rail(self, pin: PinRef, level: bool) -> None:
-        """Drive the rail's *pin* to *level*."""
-        raise NotImplementedError
-
     def i2c_bus(self, scl: PinRef | None, sda: PinRef | None) -> Bus | None:
         """Return an I2C bus on *scl*/*sda*, or the board default when both are ``None``.
 

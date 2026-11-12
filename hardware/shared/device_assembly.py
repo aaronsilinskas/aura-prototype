@@ -5,8 +5,7 @@ Decides what a config builds and reaches hardware only through a
 device and the Simulated device build, skip, reject and narrate a config alike.
 
 Every component is config-gated: built only when its section is declared *and*
-enabled, never probed by physical presence. The high-current rail is the one
-exception: a disabled rail is still driven, to its deasserted level.
+enabled, never probed by physical presence.
 """
 
 from __future__ import annotations
@@ -33,7 +32,6 @@ from hardware.shared.device_config import (
     DEFAULT_BUS,
     AudioConfig,
     DeviceConfig,
-    HighCurrentRailConfig,
     I2CConfig,
     I2CDeviceConfig,
     IRConfig,
@@ -238,10 +236,6 @@ def _capabilities(
     return frozenset(names)
 
 
-def _describe_high_current_rail(rail: HighCurrentRailConfig) -> str:
-    return f"high_current_rail pin={rail.pin.name} active_high={rail.active_high}"
-
-
 def _describe_i2c(name: str, i2c: I2CConfig | None) -> str:
     if i2c is None:
         return f"i2c {name} board"
@@ -362,8 +356,8 @@ def assemble_device(
 ) -> DeviceHardware:
     """Build *config*'s hardware through *parts*, narrating each step to *logger*.
 
-    Components come up in a fixed order: high-current rail, buses, pixels,
-    buttons, sensors, audio, haptics, radio, storage, IR. Each narrates one
+    Components come up in a fixed order: buses, pixels, buttons, sensors,
+    audio, haptics, radio, storage, IR. Each narrates one
     line opened before it is built (see
     :func:`~hardware.shared.build_narration.narrate_step`), so a part that
     raises fails its own line and the exception propagates. *logger* omitted
@@ -382,16 +376,6 @@ def assemble_device(
 
     start = time.monotonic()
     logger.log(f"begin board={parts.board_name()}")
-
-    rail = config.high_current_rail
-    if rail is not None:
-
-        def _build_rail() -> tuple[None, str]:
-            level = rail.active_high if rail.enabled else not rail.active_high
-            parts.high_current_rail(rail.pin, level)
-            return None, "asserted" if rail.enabled else "held off"
-
-        narrate_step(logger, _describe_high_current_rail(rail), _build_rail)
 
     i2c = _open_named_buses(
         logger,

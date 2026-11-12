@@ -27,7 +27,6 @@ _AUDIO = {
 _RADIO = {"cs": "GP13", "reset": "GP14", "frequency": 915.0, "node": 3}
 _SDCARD = {"cs": "GP15", "mount": "/sd"}
 _IR = {"rx": "GP5", "line": "GP6"}
-_RAIL = {"pin": "GP20"}
 
 # Every gated section, its config, and the part it asks for.
 _SECTIONS: list[tuple[str, dict[str, Any], str]] = [
@@ -201,12 +200,6 @@ def test_a_disabled_sdcard_builds_no_storage():
     hw, _parts = _assemble(_config(sdcard=_disabled(_SDCARD)))
 
     assert hw.storage is None
-
-
-def test_no_rail_section_drives_no_rail_pin():
-    _hw, parts = _assemble(_config())
-
-    assert "high_current_rail" not in parts.parts()
 
 
 # ---------------------------------------------------------------------------
@@ -478,39 +471,11 @@ def test_an_unbuildable_i2c_bus_is_narrated_as_no_bus():
 
 
 # ---------------------------------------------------------------------------
-# High-current rail
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("active_high", "enabled", "level", "note"),
-    [
-        (True, True, True, "asserted"),
-        (False, True, False, "asserted"),
-        (True, False, False, "held off"),
-        (False, False, True, "held off"),
-    ],
-    ids=["active-high-on", "active-low-on", "active-high-off", "active-low-off"],
-)
-def test_the_rail_is_driven_asserted_when_enabled_and_deasserted_when_disabled(
-    active_high, enabled, level, note
-):
-    config = _config(high_current_rail={**_RAIL, "active_high": active_high, "enabled": enabled})
-
-    _hw, parts = _assemble(config)
-
-    assert parts.args_of("high_current_rail") == [(PinRef("GP20", "high_current_rail.pin"), level)]
-    assert f"[hw] high_current_rail pin=GP20 active_high={active_high} {note}\n" in _narration(
-        config
-    )
-
-
-# ---------------------------------------------------------------------------
 # Build order
 # ---------------------------------------------------------------------------
 
 
-def test_parts_come_up_rail_buses_pixels_buttons_sensors_audio_haptics_radio_storage_ir():
+def test_parts_come_up_buses_pixels_buttons_sensors_audio_haptics_radio_storage_ir():
     config = _config(
         ir=_IR,
         sdcard=_SDCARD,
@@ -521,14 +486,12 @@ def test_parts_come_up_rail_buses_pixels_buttons_sensors_audio_haptics_radio_sto
         accelerometer={},
         buttons=["GP3"],
         pixels=[_NEOPIXEL],
-        high_current_rail=_RAIL,
     )
 
     _hw, parts = _assemble(config)
 
     assert parts.parts() == [
         "board_name",
-        "high_current_rail",
         "i2c_bus",
         "spi_bus",
         "neopixel_strip",
@@ -568,7 +531,6 @@ def test_a_boot_narrates_begin_each_step_and_ready():
 
 
 _EVERY_SECTION: dict[str, Any] = {
-    "high_current_rail": {"pin": "GP28", "active_high": True},
     "i2c": {"default": {"sda": "GP4", "scl": "GP5"}},
     "spi": {"default": {"sck": "SCK", "mosi": "MOSI", "miso": "MISO"}},
     "pixels": [
@@ -597,7 +559,6 @@ def test_a_config_declaring_every_section_narrates_each_built_in_build_order():
 
     assert lines[:-1] == [
         "[hw] begin board=test-board",
-        "[hw] high_current_rail pin=GP28 active_high=True asserted",
         "[hw] i2c default scl=GP5 sda=GP4 ok",
         "[hw] spi default sck=SCK mosi=MOSI miso=MISO ok",
         "[hw] pixels[0] matrix cols=13 scope_rows=[global.main:0-5] brightness=1.00 ok",
@@ -628,7 +589,6 @@ def test_a_config_disabling_every_section_narrates_each_disabled_in_build_order(
 
     assert lines[:-1] == [
         "[hw] begin board=test-board",
-        "[hw] high_current_rail pin=GP28 active_high=True held off",
         "[hw] pixels[0] matrix disabled",
         "[hw] pixels[1] neopixel disabled",
         "[hw] buttons A=D9 ok",
