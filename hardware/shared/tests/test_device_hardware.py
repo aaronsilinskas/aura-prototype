@@ -10,13 +10,17 @@ from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.ir_transport import IrTransmitGate
+from hardware.shared.ir_transport import PulseWriter
 from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.radio_transceiver import RadioTransceiver
 
 
 def _still() -> tuple[float, float, float]:
     return (0.0, 0.0, 0.0)
+
+
+def _no_writer(emitter: str, pin: object) -> tuple[PulseWriter, str]:
+    raise AssertionError("no emitter is wired")
 
 
 def test_device_hardware_is_constructible_under_cpython_with_board_free_parts(tmp_path):
@@ -26,7 +30,7 @@ def test_device_hardware_is_constructible_under_cpython_with_board_free_parts(tm
     accelerometer = PolledSensor(_still, AccelerationData(), "accelerometer", Logger("[hw]"))
     magnetometer = PolledSensor(_still, MagneticData(), "magnetometer", Logger("[hw]"))
     network_controls = NetworkControls()
-    ir = InfraredTransceiver({}, None, IrTransmitGate())
+    ir = InfraredTransceiver.build([], {}, _no_writer)
     radio = RadioTransceiver(None)
     storage = DeviceStorage(str(tmp_path))
     polled = (buttons, ir)
