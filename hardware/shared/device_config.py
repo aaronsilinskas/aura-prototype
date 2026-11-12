@@ -39,6 +39,7 @@ __all__ = [
     "NeoPixelPixelsConfig",
     "NeoPixelScopeConfig",
     "NeoPixelStripConfig",
+    "PinRef",
     "RadioConfig",
     "SDCardConfig",
     "SPIConfig",
@@ -108,6 +109,25 @@ _ISOLATE_EXCLUDED_COMPONENTS: Final = (
 # ---------------------------------------------------------------------------
 # Config data classes
 # ---------------------------------------------------------------------------
+
+
+class PinRef:
+    """A pin name paired with the config field it came from, e.g. ``GP7`` from ``ir.line``."""
+
+    __slots__ = ("field", "name")
+
+    def __init__(self, name: str, field: str) -> None:
+        self.name: str = name
+        self.field: str = field
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, PinRef) and (self.name, self.field) == (other.name, other.field)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.field))
+
+    def __repr__(self) -> str:
+        return f"PinRef({self.name!r}, {self.field!r})"
 
 
 class MatrixPixelsConfig:

@@ -53,12 +53,13 @@ from hardware.shared.device_config import (
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
     NeoPixelStripConfig,
+    PinRef,
     RadioConfig,
     SDCardConfig,
     SPIConfig,
 )
 from hardware.shared.device_hardware import DeviceHardware
-from hardware.shared.device_parts import DeviceParts, PinRef
+from hardware.shared.device_parts import DeviceParts
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.ir_wiring import wire_ir

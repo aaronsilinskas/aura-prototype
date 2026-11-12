@@ -20,6 +20,7 @@ from hardware.shared.device_config import (
     I2CDeviceConfig,
     MatrixPixelsConfig,
     NeoPixelStripConfig,
+    PinRef,
     RadioConfig,
     SDCardConfig,
 )
@@ -36,26 +37,7 @@ if TYPE_CHECKING:
     # each adapter narrows it to the bus type its parts take.
     Bus = Any
 
-__all__ = ["DeviceParts", "PinRef"]
-
-
-class PinRef:
-    """A pin name paired with the config field it came from, e.g. ``GP7`` from ``ir.left``."""
-
-    __slots__ = ("field", "name")
-
-    def __init__(self, name: str, field: str) -> None:
-        self.name: str = name
-        self.field: str = field
-
-    def __eq__(self, other: object) -> bool:
-        return isinstance(other, PinRef) and (self.name, self.field) == (other.name, other.field)
-
-    def __hash__(self) -> int:
-        return hash((self.name, self.field))
-
-    def __repr__(self) -> str:
-        return f"PinRef({self.name!r}, {self.field!r})"
+__all__ = ["DeviceParts"]
 
 
 class DeviceParts:

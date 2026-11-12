@@ -10,9 +10,8 @@ import pytest
 from engine.log import Logger
 from engine.network import AREA_OF_EFFECT, CONE, LINE
 from hardware.shared.device_assembly import assemble_device
-from hardware.shared.device_config import DeviceConfig, parse_device_config
+from hardware.shared.device_config import DeviceConfig, PinRef, parse_device_config
 from hardware.shared.device_hardware import DeviceHardware
-from hardware.shared.device_parts import PinRef
 from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.radio_transceiver import RadioTransceiver
 from hardware.shared.tests.recording_parts import Output, PartError, RecordingParts
