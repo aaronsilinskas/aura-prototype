@@ -298,10 +298,9 @@ class EffectControls:
 
     Provides effect start/stop and merge-strategy operations only. The update()
     tick is intentionally excluded so rules cannot advance the effect loop.
-    Scene-transition operations (setting effects aside and putting them back,
-    resetting to Split) live on
-    the separate ``EffectAdmin`` face, reached
-    through ``SceneManager`` rather than through this interface.
+    Scene-transition steps (entering the boot scene, covering and uncovering)
+    live on the separate ``EffectAdmin`` face, which only ``SceneManager``
+    calls, never this interface.
     """
 
     def set_effect(self, scope: ScopeValue, name: str, options: dict[str, object]) -> EffectReceipt:
@@ -320,10 +319,10 @@ class EffectControls:
         """Set the merge strategy for every scope key in scope.keys.
 
         Ticks after the next ``prepare_buffers`` call route through the new
-        strategy. Defaults to ``SPLIT`` for every scope key; ``SceneManager``
-        starts the boot scene and every Overlay on Split, and ``pop`` puts
-        the covered scene's strategies back, through the separate
-        ``EffectAdmin`` face.
+        strategy. Defaults to ``SPLIT`` for every scope key. The boot scene
+        and every Overlay start on Split, and uncovering gives the covered
+        scene its strategies back; those are ``EffectAdmin`` steps, not
+        calls on this interface.
         """
         raise NotImplementedError
 

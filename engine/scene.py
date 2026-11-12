@@ -16,12 +16,11 @@ except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
 from engine.capabilities import MissingCapabilityError
-from engine.effects.admin import EffectAdmin, HeldEffects
+from engine.effects.admin import EffectAdmin, HeldEffects, SceneView
 from engine.engine import GameEngine, GameRule, Version
-from engine.namespace import ActiveSceneNamespace
 from engine.packs import PackRegistry, UnknownItemError, load_item
 from engine.settings import SettingDeclaration, Settings
-from engine.state import GameState, SceneControls, SceneReboot, Scope
+from engine.state import GameState, SceneControls, SceneReboot
 
 
 class SceneLocalRegistry:
@@ -379,14 +378,16 @@ class SceneRegistry:
 class _SceneStackEntry:
     """One entry in ``SceneManager``'s scene stack.  Internal use only.
 
-    ``held`` is the covered scene's effects and merge strategies, set aside
-    by ``EffectAdmin.set_aside`` when ``overlay`` pushed this entry and put
-    back by ``EffectAdmin.put_back`` when it is popped — ``None`` for the
-    boot scene's base entry, which covers nothing.  Folding the bundle into
-    the same entry as the scene stack means the two stacks can never desync.
+    ``view`` is the scene's Scene view, built once and handed to every
+    ``EffectAdmin`` step that brings this entry to the top.  ``held`` is the
+    covered scene's effects and merge strategies, returned by
+    ``EffectAdmin.cover`` when ``overlay`` pushed this entry and given to
+    ``EffectAdmin.uncover`` when it is popped — ``None`` for the boot
+    scene's base entry, which covers nothing.  Folding the bundle into the
+    same entry as the scene stack means the two stacks can never desync.
     """
 
-    __slots__ = ("held", "rules", "scene", "state")
+    __slots__ = ("held", "rules", "scene", "state", "view")
 
     def __init__(
         self,
@@ -399,6 +400,11 @@ class _SceneStackEntry:
         self.state = state
         self.rules = rules
         self.held = held
+        self.view = SceneView(
+            scene.local_effect_registry,
+            scene.local_sound_map,
+            frozenset(pack.name for pack in scene.effect_packs),
+        )
 
 
 class SceneManager(SceneControls):
@@ -408,11 +414,9 @@ class SceneManager(SceneControls):
 
         manager = SceneManager(
             engine,
-            effect_registry,
             rule_registry,
             scene_registry,
             effect_admin,
-            namespace,
             scene_reboot,
         )
 
@@ -443,31 +447,24 @@ class SceneManager(SceneControls):
 
     *effect_admin* is the scene-transition face of the same effect system
     ``engine`` was built with (its ``EffectControls`` and ``EffectAdmin`` are
-    two faces of one ``EffectManager`` instance). ``overlay`` sets the
-    covered scene's effects and merge strategies aside through it, ``pop``
-    stops the overlay's own effects and puts the bundle back, and the boot
-    scene is reset to Split through it, never through a stack entry's
+    two faces of one ``EffectManager`` instance). Every transition makes
+    exactly one call to it, carrying the Scene view of the scene it brings to
+    the top: ``activate_boot_scene`` enters, ``overlay`` covers and ``pop``
+    uncovers. No transition reaches the effect system through a stack entry's
     ``state.effect_controls``. The IR codec is not touched by ``overlay`` or
     ``pop``: an overlay runs on the covered scene's codec (ADR-0005).
 
-    *namespace* is the Active scene namespace that same ``EffectManager``
-    resolves names through. Every activation (boot scene, overlay, pop) makes one
-    ``install`` call with the top-of-stack scene's local effects, local
-    sounds and declared ``effect_packs`` names.
-
     *scene_reboot* is the injected ``SceneReboot`` port ``reboot_into``/
     ``reboot_to_previous`` delegate to (its ``previous_scene`` names the
-    target ``reboot_to_previous`` checks). Unlike *effect_admin* and
-    *namespace* it plays no role in activation, ``overlay`` or ``pop`` — it exists
-    solely for the two reboot methods, which apply immediately and synchronously rather
+    target ``reboot_to_previous`` checks). Unlike *effect_admin* it plays no
+    role in activation, ``overlay`` or ``pop`` — it exists solely for the
+    two reboot methods, which apply immediately and synchronously rather
     than joining the deferred-transition queue.
     """
 
     __slots__ = (
         "_effect_admin",
-        "_effect_registry",
         "_engine",
-        "_namespace",
         "_pending",
         "_rule_registry",
         "_scene_reboot",
@@ -478,19 +475,15 @@ class SceneManager(SceneControls):
     def __init__(
         self,
         engine: GameEngine,
-        effect_registry: PackRegistry,
         rule_registry: PackRegistry,
         scene_registry: SceneRegistry,
         effect_admin: EffectAdmin,
-        namespace: ActiveSceneNamespace,
         scene_reboot: SceneReboot,
     ) -> None:
         self._engine = engine
-        self._effect_registry = effect_registry
         self._rule_registry = rule_registry
         self._scene_registry = scene_registry
         self._effect_admin = effect_admin
-        self._namespace = namespace
         self._scene_reboot = scene_reboot
         self._stack: list[_SceneStackEntry] = []
         self._pending: tuple[Literal["overlay"], Scene] | tuple[Literal["pop"]] | None = None
@@ -519,7 +512,7 @@ class SceneManager(SceneControls):
         state = self._engine.create_state(self, scene.settings)
         entry = _SceneStackEntry(scene, state, rules, held=None)
         self._stack.append(entry)
-        self._effect_admin.reset_merge_strategies()
+        self._effect_admin.enter_boot_scene(entry.view)
         self._activate(entry)
 
     # ------------------------------------------------------------------
@@ -644,31 +637,26 @@ class SceneManager(SceneControls):
     def _activate(self, entry: _SceneStackEntry) -> None:
         self._engine.set_rules(entry.rules)
         entry.state.clear_queue()
-        scene = entry.scene
-        declared_packs = frozenset(pack.name for pack in scene.effect_packs)
-        self._namespace.install(scene.local_effect_registry, scene.local_sound_map, declared_packs)
 
     def _do_overlay(self, scene: Scene) -> None:
-        """Suspend the current top, setting its effects aside, and push *scene* above it."""
+        """Suspend the current top, covering its effects, and push *scene* above it."""
         combined_rules = self._resolve_rules(scene)
 
         self._stack[-1].state.clear_queue()
-        held = self._effect_admin.set_aside()
-
         state = self._engine.create_state(self, scene.settings)
-        entry = _SceneStackEntry(scene, state, combined_rules, held=held)
+        entry = _SceneStackEntry(scene, state, combined_rules, held=None)
+        entry.held = self._effect_admin.cover(entry.view)
         self._stack.append(entry)
         self._activate(entry)
 
     def _do_pop(self) -> None:
-        """Remove the top entry, stopping its effects, and give back the scene below it."""
+        """Remove the top entry and uncover the scene below it."""
         popped = self._stack.pop()
-        popped.state.effect_controls.stop_effect(Scope.ALL)
         popped.state.clear_queue()
         # pop() rejects a stack of size <= 1, so the popped entry is always one
         # overlay() pushed — never the boot scene's base entry, whose held is
-        # None. Narrows the type for put_back.
+        # None. Narrows the type for uncover.
         assert popped.held is not None
-        self._effect_admin.put_back(popped.held)
-
-        self._activate(self._stack[-1])
+        revealed = self._stack[-1]
+        self._effect_admin.uncover(popped.held, revealed.view)
+        self._activate(revealed)

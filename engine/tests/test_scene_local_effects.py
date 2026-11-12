@@ -9,6 +9,7 @@ from unittest.mock import ANY
 import pytest
 
 from effects.effect import EffectVerb
+from engine.effects.admin import SceneView
 from engine.effects.manager import EffectManager
 from engine.events import EffectEvent
 from engine.namespace import ActiveSceneNamespace
@@ -17,7 +18,7 @@ from engine.scene import Scene
 from engine.state import Scope
 from engine.tests.effects.helpers import SpyEffectOutput
 from engine.tests.helpers import (
-    RecordingNamespace,
+    SpyEffectAdmin,
     make_scene_manager,
 )
 from engine.timer import Timer
@@ -39,10 +40,12 @@ def _local_effects(*names: str) -> dict[str, dict]:
 
 
 def _make_effect_manager(scene: Scene, outputs=None) -> EffectManager:
-    """Return an EffectManager whose namespace has *scene*'s view installed."""
+    """Return an EffectManager that has entered *scene* as its boot scene."""
     namespace = ActiveSceneNamespace(PackRegistry(), {})
-    namespace.install(scene.local_effect_registry, scene.local_sound_map, frozenset())
-    return EffectManager(namespace=namespace, outputs=outputs or [])
+    manager = EffectManager(namespace=namespace, outputs=outputs or [])
+    view = SceneView(scene.local_effect_registry, scene.local_sound_map, frozenset())
+    manager.enter_boot_scene(view)
+    return manager
 
 
 # ---------------------------------------------------------------------------
@@ -117,42 +120,44 @@ def test_scene_prefix_fires_start_event_with_pack_equals_scene(pack_tree) -> Non
 
 
 # ---------------------------------------------------------------------------
-# SceneManager installs the active scene's local effects on transitions
+# Each transition hands EffectAdmin the top scene's local effects
 # ---------------------------------------------------------------------------
 
 
-def test_scene_manager_installs_local_effects_on_boot(pack_tree) -> None:
+def test_entering_the_boot_scene_carries_its_local_effects(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"forest": _local_effects("flash")})
-    namespace = RecordingNamespace()
-    manager = make_scene_manager(catalog, namespace=namespace)
+    admin = SpyEffectAdmin()
+    manager = make_scene_manager(catalog, effect_admin=admin)
 
     manager.activate_boot_scene("forest")
 
-    [(local_effects, _, _)] = namespace.installs
+    [(step, view)] = admin.steps
+    assert step == "enter"
+    local_effects = view.local_effects
     assert local_effects is not None
     assert local_effects.items() == ["flash"]
 
 
-def test_scene_manager_installs_overlay_scene_local_effects_on_overlay(pack_tree) -> None:
+def test_covering_carries_the_overlays_local_effects(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"scene_b": _local_effects("b_flash"), "scene_a": {}})
-    namespace = RecordingNamespace()
-    manager = make_scene_manager(catalog, namespace=namespace)
+    admin = SpyEffectAdmin()
+    manager = make_scene_manager(catalog, effect_admin=admin)
     manager.activate_boot_scene("scene_a")
 
     manager.overlay("scene_b")
     manager.update()
 
-    local_effects, _, _ = namespace.installs[-1]
+    local_effects = admin.steps[-1][1].local_effects
     assert local_effects is not None
     assert local_effects.items() == ["b_flash"]
 
 
-def test_scene_manager_restores_base_local_effects_on_pop(pack_tree) -> None:
+def test_uncovering_carries_the_covered_scenes_local_effects(pack_tree) -> None:
     catalog = pack_tree.scan(
         scenes={"scene_a": _local_effects("a_flash"), "scene_b": _local_effects("b_flash")}
     )
-    namespace = RecordingNamespace()
-    manager = make_scene_manager(catalog, namespace=namespace)
+    admin = SpyEffectAdmin()
+    manager = make_scene_manager(catalog, effect_admin=admin)
     manager.activate_boot_scene("scene_a")
     manager.overlay("scene_b")
     manager.update()
@@ -160,60 +165,64 @@ def test_scene_manager_restores_base_local_effects_on_pop(pack_tree) -> None:
     manager.pop()
     manager.update()
 
-    local_effects, _, _ = namespace.installs[-1]
+    local_effects = admin.steps[-1][1].local_effects
     assert local_effects is not None
     assert local_effects.items() == ["a_flash"]
 
 
 # ---------------------------------------------------------------------------
-# SceneManager installs the active scene's local sounds on transitions
+# Each transition hands EffectAdmin the top scene's local sounds
 # ---------------------------------------------------------------------------
 
 
-def test_scene_manager_installs_scene_sounds_on_boot(pack_tree) -> None:
+def test_entering_the_boot_scene_carries_its_local_sounds(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"forest": {"sounds": ["victory_sting"]}})
-    namespace = RecordingNamespace()
-    manager = make_scene_manager(catalog, namespace=namespace)
+    admin = SpyEffectAdmin()
+    manager = make_scene_manager(catalog, effect_admin=admin)
 
     manager.activate_boot_scene("forest")
 
-    [(_, local_sounds, _)] = namespace.installs
+    [(step, view)] = admin.steps
+    assert step == "enter"
+    local_sounds = view.local_sounds
     assert list(local_sounds) == ["victory_sting"]
 
 
-def test_scene_manager_installs_no_sounds_for_a_scene_with_none(pack_tree) -> None:
+def test_a_scene_with_no_sounds_carries_none(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"bare_scene": {}})
-    namespace = RecordingNamespace()
-    manager = make_scene_manager(catalog, namespace=namespace)
+    admin = SpyEffectAdmin()
+    manager = make_scene_manager(catalog, effect_admin=admin)
 
     manager.activate_boot_scene("bare_scene")
 
-    [(_, local_sounds, _)] = namespace.installs
+    [(step, view)] = admin.steps
+    assert step == "enter"
+    local_sounds = view.local_sounds
     assert local_sounds == {}
 
 
-def test_scene_manager_installs_overlay_scene_sounds_on_overlay(pack_tree) -> None:
+def test_covering_carries_the_overlays_local_sounds(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"scene_b": {"sounds": ["b_sting"]}, "scene_a": {}})
-    namespace = RecordingNamespace()
-    manager = make_scene_manager(catalog, namespace=namespace)
+    admin = SpyEffectAdmin()
+    manager = make_scene_manager(catalog, effect_admin=admin)
     manager.activate_boot_scene("scene_a")
 
     manager.overlay("scene_b")
     manager.update()
 
-    _, local_sounds, _ = namespace.installs[-1]
+    local_sounds = admin.steps[-1][1].local_sounds
     assert list(local_sounds) == ["b_sting"]
 
 
-def test_scene_manager_restores_base_scene_sounds_on_pop(pack_tree) -> None:
+def test_uncovering_carries_the_covered_scenes_local_sounds(pack_tree) -> None:
     catalog = pack_tree.scan(
         scenes={
             "scene_a": {"sounds": ["a_sting"]},
             "scene_b": {"sounds": ["b_sting"]},
         },
     )
-    namespace = RecordingNamespace()
-    manager = make_scene_manager(catalog, namespace=namespace)
+    admin = SpyEffectAdmin()
+    manager = make_scene_manager(catalog, effect_admin=admin)
     manager.activate_boot_scene("scene_a")
     manager.overlay("scene_b")
     manager.update()
@@ -221,7 +230,7 @@ def test_scene_manager_restores_base_scene_sounds_on_pop(pack_tree) -> None:
     manager.pop()
     manager.update()
 
-    _, local_sounds, _ = namespace.installs[-1]
+    local_sounds = admin.steps[-1][1].local_sounds
     assert list(local_sounds) == ["a_sting"]
 
 

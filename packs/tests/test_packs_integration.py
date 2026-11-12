@@ -427,8 +427,7 @@ def test_red_light_green_light_scene_every_audio_playing_effects_clip_name_resol
 @pytest.fixture
 def loaded_debug_engine(catalog: PackCatalog):
     rule_registry = catalog.rule_registry
-    effect_registry = catalog.effect_registry
-    namespace = ActiveSceneNamespace(effect_registry, catalog.pack_sounds)
+    namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
     effect_manager = EffectManager(namespace=namespace, outputs=[])
     engine = GameEngine(effect_manager)
     scene_registry = SceneRegistry()
@@ -438,11 +437,9 @@ def loaded_debug_engine(catalog: PackCatalog):
     )
     manager = SceneManager(
         engine,
-        effect_registry,
         rule_registry,
         scene_registry,
         effect_admin=effect_manager,
-        namespace=namespace,
         scene_reboot=SceneReboot(),
     )
     manager.activate_boot_scene("test_scene")

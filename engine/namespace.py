@@ -63,11 +63,12 @@ class UndeclaredPackError(RegistryError):
 
 
 class ActiveSceneNamespace:
-    """Resolves names against the scene view ``SceneManager`` last installed.
+    """Resolves names against the Scene view last installed.
 
     Built once at composition from the Pack catalog's effect registry and pack
-    sounds, with no scene installed. ``SceneManager`` calls ``install`` once
-    per activation (boot scene, overlay, pop). Nothing is cached between lookups
+    sounds, with no scene installed. The ``EffectManager`` resolving through
+    it calls ``install`` once per transition (boot scene, overlay, pop), as
+    part of each ``EffectAdmin`` step (ADR-0008). Nothing is cached between lookups
     beyond what the registries cache themselves.
     """
 
