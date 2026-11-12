@@ -27,10 +27,10 @@ from engine.pack_catalog import (
     PackScanError,
 )
 from engine.packs import PackRegistry
-from engine.scene import Scene, SceneRegistry
+from engine.scene import Scene
 from engine.scene_runtime import SceneRuntime
 from engine.state import EffectControls, GameState, SceneControls
-from engine.tests.helpers import make_scene_runtime
+from engine.tests.helpers import make_scene, make_scene_registry, make_scene_runtime
 
 # ---------------------------------------------------------------------------
 # Required capabilities
@@ -121,20 +121,20 @@ def test_a_scenes_missing_capabilities_are_the_required_ones_the_device_lacks(pa
 
 
 def test_a_scene_built_in_memory_is_held_to_its_required_capabilities() -> None:
-    probe = Scene(effect_packs=[], rule_packs=[], required_capabilities=frozenset(("radio",)))
-    registry = SceneRegistry({"probe": probe})
+    probe = make_scene(required_capabilities=frozenset(("radio",)))
+    registry = make_scene_registry(("probe", probe))
 
     assert registry.missing_capabilities("probe", frozenset(("storage",))) == {"radio"}
 
 
 def _in_memory_runtime(scene: Scene, capabilities: frozenset[str]) -> SceneRuntime:
     """A ``SceneRuntime`` on a device with *capabilities*, holding only *scene* as ``probe``."""
-    catalog = PackCatalog(PackRegistry(), PackRegistry(), SceneRegistry({"probe": scene}), {})
+    catalog = PackCatalog(PackRegistry(), PackRegistry(), make_scene_registry(("probe", scene)), {})
     return make_scene_runtime(catalog, capabilities=capabilities)
 
 
 def test_a_scene_with_no_required_capabilities_runs_on_a_device_with_none() -> None:
-    runtime = _in_memory_runtime(Scene(effect_packs=[], rule_packs=[]), frozenset())
+    runtime = _in_memory_runtime(make_scene(), frozenset())
 
     runtime.activate_boot_scene("probe")
 
@@ -142,9 +142,7 @@ def test_a_scene_with_no_required_capabilities_runs_on_a_device_with_none() -> N
 
 
 def test_a_test_built_scene_the_device_cannot_run_raises_and_activates_nothing() -> None:
-    tilt = Scene(
-        effect_packs=[], rule_packs=[], required_capabilities=frozenset(("accelerometer",))
-    )
+    tilt = make_scene(required_capabilities=frozenset(("accelerometer",)))
     runtime = _in_memory_runtime(tilt, frozenset(("radio",)))
 
     with pytest.raises(MissingCapabilityError) as excinfo:
@@ -156,7 +154,7 @@ def test_a_test_built_scene_the_device_cannot_run_raises_and_activates_nothing()
 
 def test_required_capabilities_of_an_unregistered_scene_raises_value_error() -> None:
     with pytest.raises(ValueError):
-        SceneRegistry().required_capabilities("nowhere")
+        make_scene_registry().required_capabilities("nowhere")
 
 
 # ---------------------------------------------------------------------------

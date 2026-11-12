@@ -4,7 +4,7 @@ __all__ = ["PackReference", "Scene", "SceneLocalRegistry", "SceneManager", "Scen
 
 
 try:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Mapping, Sequence
 except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
@@ -192,65 +192,39 @@ class SceneRegistry:
 
         registry = SceneRegistry({"forest": forest})
         scene = registry.get("forest")  # the stored record itself
-
-    In-memory registration (test escape hatch, being retired)::
-
-        registry.register("test_scene", lambda: Scene(...))
     """
 
-    __slots__ = ("_factories", "_scenes")
+    __slots__ = ("_scenes",)
 
-    def __init__(self, scenes: Mapping[str, Scene] | None = None) -> None:
-        self._scenes: Mapping[str, Scene] = scenes if scenes is not None else {}
-        self._factories: dict[str, Callable[[], Scene]] = {}
+    def __init__(self, scenes: Mapping[str, Scene]) -> None:
+        self._scenes = scenes
 
     def get(self, name: str) -> Scene:
         """Return the stored ``Scene`` for *name*, the same record on every call.
 
-        Factory-registered scenes return whatever the factory produces.
-
         Raises:
             ValueError: if *name* is not registered.
         """
-        factory = self._factories.get(name)
-        if factory is not None:
-            return factory()
-        return self._stored(name)
-
-    def ir_codec_for(self, name: str) -> str:
-        """Return *name*'s declared ``ir_codec`` string (default ``"aura"``).
-
-        Factory-registered scenes (the ``register`` test escape hatch) have no
-        stored record, so this calls the factory and reads the ``Scene`` it
-        returns. Mirrors ``get``'s precedence: a factory registered under the
-        same name as a stored scene overrides it.
-
-        Raises:
-            ValueError: if *name* is not registered.
-        """
-        factory = self._factories.get(name)
-        if factory is not None:
-            return factory().ir_codec
-        return self._stored(name).ir_codec
-
-    def required_capabilities(self, name: str) -> frozenset[str]:
-        """Return *name*'s Required capabilities, read from its stored ``Scene``.
-
-        A scene registered in memory through ``register`` requires nothing,
-        even when it shadows a stored one.
-
-        Raises:
-            ValueError: if *name* is not registered.
-        """
-        if name in self._factories:
-            return frozenset()
-        return self._stored(name).required_capabilities
-
-    def _stored(self, name: str) -> Scene:
         scene = self._scenes.get(name)
         if scene is None:
             raise ValueError(f"Unknown scene '{name}'")
         return scene
+
+    def ir_codec_for(self, name: str) -> str:
+        """Return *name*'s declared ``ir_codec`` string (default ``"aura"``).
+
+        Raises:
+            ValueError: if *name* is not registered.
+        """
+        return self.get(name).ir_codec
+
+    def required_capabilities(self, name: str) -> frozenset[str]:
+        """Return *name*'s Required capabilities.
+
+        Raises:
+            ValueError: if *name* is not registered.
+        """
+        return self.get(name).required_capabilities
 
     def missing_capabilities(self, name: str, capabilities: frozenset[str]) -> frozenset[str]:
         """Return the Required capabilities of *name* that are not in *capabilities*.
@@ -262,8 +236,7 @@ class SceneRegistry:
 
     def names(self) -> list[str]:
         """Return all registered scene names sorted alphabetically."""
-        all_names = set(self._scenes.keys()) | set(self._factories.keys())
-        return sorted(all_names)
+        return sorted(self._scenes)
 
     def resolve_known(self, name: str) -> str:
         """Return *name* if registered, else raise naming the known scenes.
@@ -273,18 +246,9 @@ class SceneRegistry:
         ``SceneManager.reboot_into`` (the Button-B fail-fast guard) so the
         check and its message have exactly one implementation.
         """
-        names = self.names()
-        if name in names:
+        if name in self._scenes:
             return name
-        raise ValueError(f"unknown scene {name!r}; known scenes: {', '.join(names)}")
-
-    def register(self, name: str, factory: Callable[[], Scene]) -> None:
-        """Register *factory* — a zero-arg callable returning a ``Scene`` — for *name*.
-
-        This is a test-only escape hatch for injecting in-memory scenes without
-        any JSON on disk.
-        """
-        self._factories[name] = factory
+        raise ValueError(f"unknown scene {name!r}; known scenes: {', '.join(self.names())}")
 
 
 def _scene_view(scene: Scene) -> SceneView:

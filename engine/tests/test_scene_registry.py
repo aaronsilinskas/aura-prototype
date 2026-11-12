@@ -2,8 +2,8 @@
 
 Scanned registries come from ``scan_pack_roots`` over trees laid out by the
 shared ``pack_tree`` builder; scan failures are covered by the catalog tests.
-In-memory registries are built from ``Scene`` records through the public
-constructor.
+In-memory registries are built from ``Scene`` records with the shared
+``make_scene`` and ``make_scene_registry`` helpers.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ import pytest
 
 from engine.pack_catalog import scan_pack_roots
 from engine.scene import Scene, SceneRegistry
+from engine.tests.helpers import make_scene, make_scene_registry
 from engine.version import Version
 
 # ---------------------------------------------------------------------------
@@ -64,8 +65,8 @@ def test_scene_ir_codec_is_stored_as_the_value_passed_to_constructor() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_scene_registry_names_is_empty_on_construction() -> None:
-    registry = SceneRegistry()
+def test_a_registry_built_from_no_scenes_has_no_names() -> None:
+    registry = make_scene_registry()
 
     assert registry.names() == []
 
@@ -135,8 +136,8 @@ def test_get_returns_the_same_record_on_each_call(pack_tree) -> None:
 
 
 def test_get_returns_the_record_the_registry_was_built_from() -> None:
-    forest = Scene(effect_packs=[], rule_packs=[])
-    registry = SceneRegistry({"forest": forest})
+    forest = make_scene()
+    registry = make_scene_registry(("forest", forest))
 
     assert registry.get("forest") is forest
 
@@ -147,7 +148,7 @@ def test_get_returns_the_record_the_registry_was_built_from() -> None:
 
 
 def test_get_raises_value_error_for_unknown_scene_name() -> None:
-    registry = SceneRegistry()
+    registry = make_scene_registry()
 
     with pytest.raises(ValueError, match="Unknown scene"):
         registry.get("nonexistent")
@@ -165,7 +166,7 @@ def test_resolve_known_returns_a_scanned_scene_name(pack_tree) -> None:
 
 
 def test_resolve_known_returns_a_scene_name_the_registry_was_built_with() -> None:
-    registry = SceneRegistry({"in_memory": Scene(effect_packs=[], rule_packs=[])})
+    registry = make_scene_registry(("in_memory", make_scene()))
 
     assert registry.resolve_known("in_memory") == "in_memory"
 
@@ -189,14 +190,14 @@ def test_ir_codec_for_returns_the_declared_codec_name(pack_tree) -> None:
 
 
 def test_ir_codec_for_raises_value_error_for_unknown_scene_name() -> None:
-    registry = SceneRegistry()
+    registry = make_scene_registry()
 
     with pytest.raises(ValueError, match="Unknown scene"):
         registry.ir_codec_for("nonexistent")
 
 
 def test_ir_codec_for_answers_the_codec_of_the_record_the_registry_was_built_with() -> None:
-    registry = SceneRegistry({"arena": Scene(effect_packs=[], rule_packs=[], ir_codec="tag")})
+    registry = make_scene_registry(("arena", make_scene(ir_codec="tag")))
 
     assert registry.ir_codec_for("arena") == "tag"
 
@@ -213,11 +214,6 @@ def test_names_returns_scene_names_sorted_alphabetically(pack_tree) -> None:
 
 
 def test_names_lists_the_scenes_the_registry_was_built_with() -> None:
-    registry = SceneRegistry(
-        {
-            "zebra": Scene(effect_packs=[], rule_packs=[]),
-            "alpha": Scene(effect_packs=[], rule_packs=[]),
-        }
-    )
+    registry = make_scene_registry(("zebra", make_scene()), ("alpha", make_scene()))
 
     assert registry.names() == ["alpha", "zebra"]
