@@ -33,7 +33,7 @@ effects/          Animation engine (CircuitPython-safe)
 
 engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   engine.py       GameEngine, GameRule
-  state.py        GameState, EffectControls, EffectReceipt, MergeStrategy,
+  state.py        GameState, SceneRun, EffectControls, EffectReceipt, MergeStrategy,
                   NetworkControls, Scope, ScopeValue
   scene.py        Scene, SceneRegistry, SceneLocalRegistry, SceneManager, SceneControls
   scene_runtime.py SceneRuntime (the matched set built from a PackCatalog; above scene
@@ -184,6 +184,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `ResolvedClip` | `effects/effect.py` | A declared `AudioPlaybackConfig` plus its resolved path, carried on `EffectEvent` |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update` tick, which reads its `Timer` (adding its elapsed time to the state's) but never advances it |
 | `GameState` | `engine/state.py` | Per-tick game context passed to each rule; `elapsed`/`total` are its scene's own game time, summed from the ticks this state receives, so they stop while an Overlay covers the scene; `settings` is its scene's read-only `Settings`; `capabilities` is the device's read-only `Capabilities` (`has(name)`, raising for a name outside the vocabulary), handed through `GameEngine` from `DeviceHardware.capabilities` |
+| `SceneRun` | `engine/state.py` | A scene's `GameState` plus its rules, fixed at construction, in dispatch order; `tick(elapsed)` sets the state's `elapsed`, adds it to `total`, dispatches every queued event to every rule in order (events queued during dispatch go out in the same tick, `dispatch_count` rising once per event), then empties the queue in place. Holds no clock |
 | `Capabilities` | `engine/capabilities.py` | Read-only view of the device's Capabilities that rules ask with `has(name)` |
 | `Settings` | `engine/settings.py` | One scene's resolved Settings, read by namespace (`scene` or a Rule pack name) and name; built by the catalog scan |
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |

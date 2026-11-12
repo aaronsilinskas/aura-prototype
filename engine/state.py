@@ -8,6 +8,7 @@ __all__ = [
     "NetworkControls",
     "SceneControls",
     "SceneReboot",
+    "SceneRun",
     "Scope",
     "ScopeValue",
     "StateSlot",
@@ -27,6 +28,17 @@ from engine.events import Event
 from engine.settings import Settings
 
 TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from typing import Protocol
+
+    # What SceneRun needs of a GameRule, typed structurally so this module
+    # takes no import edge, even a checker-only one, on engine.engine: the
+    # import-linter contract keeping hardware off engine runtime machinery
+    # reaches engine.engine through any import from here.
+    class _Rule(Protocol):
+        def handle_event(self, event: Event, state: GameState) -> None: ...
 
 
 class ScopeValue:
@@ -588,3 +600,38 @@ class GameState:
         """Count one tick of *elapsed* seconds this state received. Called only by GameEngine."""
         self._elapsed = elapsed
         self._total += elapsed
+
+
+class SceneRun:
+    """One run of a scene: its ``GameState`` and its rules in dispatch order.
+
+    The only thing that dispatches the scene's queued events. The rules are
+    fixed at construction. Holds no clock: whoever ticks it passes the tick's
+    elapsed time in.
+    """
+
+    __slots__ = ("_rules", "state")
+
+    def __init__(self, state: GameState, rules: Sequence[_Rule]) -> None:
+        self.state: Final = state
+        self._rules: tuple[_Rule, ...] = tuple(rules)
+
+    def tick(self, elapsed: float) -> None:
+        """Advance game time by *elapsed*, dispatch the queue, then empty it in place.
+
+        Each queued event goes to every rule in order, bumping
+        ``dispatch_count`` once (ADR-0001). The queue length is re-read per
+        event, so events queued during dispatch go out in this same tick.
+        """
+        state = self.state
+        state._elapsed = elapsed
+        state._total += elapsed
+        rules = self._rules
+        i = 0
+        while i < state._len:
+            event = state._queue[i]
+            state._dispatch_count += 1
+            for rule in rules:
+                rule.handle_event(event, state)  # type: ignore[arg-type]  # filled below _len
+            i += 1
+        state._reset_queue()
