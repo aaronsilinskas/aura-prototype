@@ -29,7 +29,7 @@ import engine._path as _path
 from engine.capabilities import UnknownCapabilityError, unknown_capabilities
 from engine.packs import PackRegistry, _PackEntry, scan_item_names
 from engine.scan_error import PackScanError
-from engine.scene import PackReference, SceneLocalRegistry, SceneRegistry, _SceneEntry
+from engine.scene import PackReference, Scene, SceneLocalRegistry, SceneRegistry
 from engine.settings import (
     SCENE_NAMESPACE,
     SettingDeclaration,
@@ -190,6 +190,66 @@ class SettingOverrideError(SceneDeclarationError):
         )
 
 
+class _SceneScan:
+    """What the scan reads for one scene before it can build the ``Scene``.
+
+    Holds the scan-only data, the scene's folder and raw Setting
+    declarations, beside the parsed ``scene.json`` fields; ``to_scene``
+    builds the record once Settings are resolved and Required capabilities
+    merged. Never reaches the registry.
+    """
+
+    __slots__ = (
+        "declarations",
+        "effect_packs",
+        "ir_codec",
+        "local_effect_registry",
+        "local_rule_registry",
+        "local_sound_map",
+        "requires",
+        "rule_packs",
+        "source_path",
+        "version",
+    )
+
+    def __init__(
+        self,
+        version: Version,
+        effect_packs: Sequence[PackReference],
+        rule_packs: Sequence[PackReference],
+        source_path: str,
+        ir_codec: str,
+        local_rule_registry: SceneLocalRegistry,
+        local_effect_registry: SceneLocalRegistry,
+        local_sound_map: dict[str, str],
+        declarations: dict[str, SettingDeclaration],
+        requires: frozenset[str],
+    ) -> None:
+        self.version = version
+        self.effect_packs = effect_packs
+        self.rule_packs = rule_packs
+        self.source_path = source_path
+        self.ir_codec = ir_codec
+        self.local_rule_registry = local_rule_registry
+        self.local_effect_registry = local_effect_registry
+        self.local_sound_map = local_sound_map
+        self.declarations = declarations
+        self.requires = requires
+
+    def to_scene(self, settings: Settings, required_capabilities: frozenset[str]) -> Scene:
+        return Scene(
+            effect_packs=self.effect_packs,
+            rule_packs=self.rule_packs,
+            version=self.version,
+            ir_codec=self.ir_codec,
+            local_rule_registry=self.local_rule_registry,
+            local_effect_registry=self.local_effect_registry,
+            local_sound_map=self.local_sound_map,
+            settings=settings,
+            required_capabilities=required_capabilities,
+        )
+
+
 class PackCatalog:
     """Everything installed under a device's pack roots, as found by ``scan_pack_roots``."""
 
@@ -256,7 +316,7 @@ def scan_pack_roots(
     overrides = setting_overrides or {}
     effect_packs: list[_PackEntry] = []
     rule_packs: list[_PackEntry] = []
-    scenes: dict[str, _SceneEntry] = {}
+    scenes: dict[str, _SceneScan] = {}
     root_paths: dict[str, str] = {}
     for given_root in roots:
         root = _path.normpath(given_root).rstrip("/")
@@ -271,19 +331,18 @@ def scan_pack_roots(
         _scan_scenes(root, root_name, scenes)
     _check_override_scenes(overrides, scenes)
     _check_declarations(scenes, effect_packs, rule_packs)
-    _combine_required_capabilities(scenes, rule_packs)
-    _resolve_settings(scenes, rule_packs, overrides)
+    built = _build_scenes(scenes, rule_packs, overrides)
     for root_name, root in root_paths.items():
         _add_import_parent(root[: -len(root_name)])
     return PackCatalog(
         PackRegistry._from_packs(_EXPORT_ATTR["effects"], effect_packs),
         PackRegistry._from_packs(_EXPORT_ATTR["rules"], rule_packs),
-        SceneRegistry._from_scenes(scenes),
+        SceneRegistry(built),
         _pack_sounds(effect_packs),
     )
 
 
-def _check_override_scenes(overrides: SettingOverrides, scenes: dict[str, _SceneEntry]) -> None:
+def _check_override_scenes(overrides: SettingOverrides, scenes: dict[str, _SceneScan]) -> None:
     for scene in overrides:
         if scene not in scenes:
             raise ValueError(
@@ -292,19 +351,35 @@ def _check_override_scenes(overrides: SettingOverrides, scenes: dict[str, _Scene
             )
 
 
-def _resolve_settings(
-    scenes: dict[str, _SceneEntry],
+def _build_scenes(
+    scenes: dict[str, _SceneScan],
     rule_packs: list[_PackEntry],
     setting_overrides: SettingOverrides,
-) -> None:
+) -> dict[str, Scene]:
+    """Return each scanned scene's ``Scene``, its Settings resolved and requirements merged."""
     rule_declarations = {entry.name: entry.declarations for entry in rule_packs}
-    for scene, entry in scenes.items():
-        own, rules = _read_setting_overrides(scene, setting_overrides.get(scene, {}))
-        values = {
-            SCENE_NAMESPACE: _resolve_namespace(scene, SCENE_NAMESPACE, entry.declarations, [own])
-        }
-        values.update(_resolve_rule_packs(scene, entry.rule_packs, rule_declarations, rules))
-        entry.settings = Settings(values)
+    pack_requires = {entry.name: entry.requires for entry in rule_packs}
+    return {
+        scene: entry.to_scene(
+            _resolve_settings(scene, entry, rule_declarations, setting_overrides),
+            _combine_required_capabilities(entry, pack_requires),
+        )
+        for scene, entry in scenes.items()
+    }
+
+
+def _resolve_settings(
+    scene: str,
+    entry: _SceneScan,
+    rule_declarations: dict[str, dict[str, SettingDeclaration]],
+    setting_overrides: SettingOverrides,
+) -> Settings:
+    own, rules = _read_setting_overrides(scene, setting_overrides.get(scene, {}))
+    values = {
+        SCENE_NAMESPACE: _resolve_namespace(scene, SCENE_NAMESPACE, entry.declarations, [own])
+    }
+    values.update(_resolve_rule_packs(scene, entry.rule_packs, rule_declarations, rules))
+    return Settings(values)
 
 
 def _read_setting_overrides(scene: str, given: object) -> tuple[dict[str, object], dict[str, dict]]:
@@ -362,7 +437,7 @@ def _resolve_namespace(
 
 
 def _check_declarations(
-    scenes: dict[str, _SceneEntry],
+    scenes: dict[str, _SceneScan],
     effect_packs: list[_PackEntry],
     rule_packs: list[_PackEntry],
 ) -> None:
@@ -388,14 +463,12 @@ def _check_kind(
 
 
 def _combine_required_capabilities(
-    scenes: dict[str, _SceneEntry], rule_packs: list[_PackEntry]
-) -> None:
-    pack_requires = {entry.name: entry.requires for entry in rule_packs}
-    for entry in scenes.values():
-        required = set(entry.required_capabilities)
-        for reference in entry.rule_packs:
-            required.update(pack_requires[reference.name])
-        entry.required_capabilities = frozenset(required)
+    entry: _SceneScan, pack_requires: dict[str, frozenset[str]]
+) -> frozenset[str]:
+    required = set(entry.requires)
+    for reference in entry.rule_packs:
+        required.update(pack_requires[reference.name])
+    return frozenset(required)
 
 
 def _is_compatible(installed: Version, required: Version) -> bool:
@@ -477,7 +550,7 @@ def _reject_effect_manifest_keys(manifest: dict, path: str) -> None:
 def _scan_scenes(
     root: str,
     root_name: str,
-    scenes: dict[str, _SceneEntry],
+    scenes: dict[str, _SceneScan],
 ) -> None:
     kind_dir = _path.join(root, "scenes")
     if not _path.isdir(kind_dir):
@@ -491,7 +564,7 @@ def _scan_scenes(
             raise DuplicateNameError(name, scenes[name].source_path, scene_dir)
         data = _read_scene_json(name, scene_json)
         scene_prefix = root_name + ".scenes." + name
-        scenes[name] = _SceneEntry(
+        scenes[name] = _SceneScan(
             version=_parse_version(data["version"], scene_json),
             effect_packs=_read_pack_references(name, scene_json, data, "effect_packs"),
             rule_packs=_read_pack_references(name, scene_json, data, "rule_packs"),

@@ -122,26 +122,21 @@ def test_get_returns_scene_with_ir_codec_parsed_from_json(pack_tree) -> None:
 
 
 # ---------------------------------------------------------------------------
-# SceneRegistry.get — fresh instance per call
+# SceneRegistry.get — the stored record
 # ---------------------------------------------------------------------------
 
 
-def test_get_returns_fresh_scene_on_each_call(pack_tree) -> None:
+def test_get_returns_the_same_record_on_each_call(pack_tree) -> None:
     registry = _scan_scene(pack_tree)
 
-    scene_a = registry.get("forest")
-    scene_b = registry.get("forest")
-
-    assert scene_a is not scene_b
+    assert registry.get("forest") is registry.get("forest")
 
 
-def test_get_returns_scenes_with_shared_version_instance(pack_tree) -> None:
-    registry = _scan_scene(pack_tree, version="1.0")
+def test_get_returns_the_record_the_registry_was_built_from() -> None:
+    forest = Scene(effect_packs=[], rule_packs=[])
+    registry = SceneRegistry({"forest": forest})
 
-    scene_a = registry.get("forest")
-    scene_b = registry.get("forest")
-
-    assert scene_a.version is scene_b.version
+    assert registry.get("forest") is forest
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +160,12 @@ def test_resolve_known_returns_a_scanned_scene_name(pack_tree) -> None:
     registry = _scan_scene(pack_tree)
 
     assert registry.resolve_known("forest") == "forest"
+
+
+def test_resolve_known_returns_a_scene_name_the_registry_was_built_with() -> None:
+    registry = SceneRegistry({"in_memory": Scene(effect_packs=[], rule_packs=[])})
+
+    assert registry.resolve_known("in_memory") == "in_memory"
 
 
 def test_resolve_known_returns_a_factory_registered_scene_name() -> None:
@@ -197,6 +198,12 @@ def test_ir_codec_for_raises_value_error_for_unknown_scene_name() -> None:
 
     with pytest.raises(ValueError, match="Unknown scene"):
         registry.ir_codec_for("nonexistent")
+
+
+def test_ir_codec_for_answers_the_codec_of_the_record_the_registry_was_built_with() -> None:
+    registry = SceneRegistry({"arena": Scene(effect_packs=[], rule_packs=[], ir_codec="tag")})
+
+    assert registry.ir_codec_for("arena") == "tag"
 
 
 def test_ir_codec_for_works_for_register_factory_scene() -> None:

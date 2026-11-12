@@ -4,7 +4,7 @@ __all__ = ["PackReference", "Scene", "SceneLocalRegistry", "SceneManager", "Scen
 
 
 try:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
@@ -19,7 +19,7 @@ from engine.capabilities import MissingCapabilityError
 from engine.effects.admin import EffectAdmin, HeldEffects, SceneView
 from engine.engine import GameEngine, GameRule, Version
 from engine.packs import PackRegistry, UnknownItemError, load_item
-from engine.settings import SettingDeclaration, Settings
+from engine.settings import Settings
 from engine.state import GameState, SceneControls, SceneReboot
 
 
@@ -109,47 +109,39 @@ class PackReference:
 
 
 class Scene:
-    """Declarative bundle describing a scene's rules, packs, and Settings.
+    """One scene's complete, read-only record: its packs, Settings and local items.
 
-    Carries no mutable runtime state.  Pass a zero-arg factory that returns a
-    fresh ``Scene`` to ``SceneManager.register``; ``SceneManager`` calls the
-    factory when the scene is first loaded so each load gets a clean instance.
+    Built once, complete, by the ``PackCatalog`` scan (or in memory by tests)
+    and shared by every holder afterwards: ``SceneRegistry.get`` returns the
+    stored record itself. Nothing mutates a ``Scene`` or its fields after it
+    is built; callers must treat the sound map, Settings and pack references
+    as read-only.
 
     ``effect_packs`` and ``rule_packs`` are ordered ``PackReference`` sequences
     naming packs in the respective ``PackRegistry``.  ``rule_packs`` order sets
     the order of rules across packs.
 
-    ``version`` is the scene's own declared version, parsed from ``scene.json`` at
-    discovery time.  It is informational for now — format-validated and stored, but
-    not checked against any requirement.
+    ``version`` is the scene's own declared version from ``scene.json``,
+    format-checked by the scan; nothing reads it yet.
 
-    ``ir_codec`` names the scene's declared IR wire-frame codec, parsed from
-    ``scene.json`` at discovery time and defaulting to ``"aura"`` when the key
-    is absent.  A plain string only — the engine never imports the codec
-    classes themselves, preserving the one-way ``engine`` → ``hardware``
-    layering.  Resolving the name to a codec is a ``hardware``-layer concern.
+    ``ir_codec`` names the scene's declared IR wire-frame codec, defaulting to
+    ``"aura"``, which ``SceneRegistry.ir_codec_for`` reads.  A plain string
+    only — the engine never imports the codec classes themselves, preserving
+    the one-way ``engine`` → ``hardware`` layering.  Resolving the name to a
+    codec is a ``hardware``-layer concern.
 
-    ``local_rule_registry`` is the ``SceneLocalRegistry`` for this scene's
-    scene-local rules.  It is built once at discovery and shared across fresh
-    ``Scene`` instances; mutable import-cache state lives on the registry, not
-    on the ``Scene`` itself.
+    ``settings`` is the scene's resolved ``Settings``, which ``SceneManager``
+    hands to each ``GameState`` it creates for the scene.
 
-    ``local_effect_registry`` is the ``SceneLocalRegistry`` for this scene's
-    scene-local effects (items expose a ``BUILD`` ``EffectBuilder``).  Built
-    once at discovery and shared across fresh ``Scene`` instances.
+    ``required_capabilities`` is what the scene's ``requires`` lists plus what
+    each of its Rule packs lists; ``SceneRegistry`` answers from it.
 
-    ``local_sound_map`` is a bare-keyed ``{stem: path}`` map of this scene's
-    scene-local sounds (its ``sounds/`` subdirectory).  Built once at discovery;
-    unlike ``local_rule_registry``/``local_effect_registry``
-    it is a plain mutable dict rather than an encapsulated registry, so each
-    fresh ``Scene`` from ``SceneRegistry.get`` receives its own copy, keeping
-    mutation from poisoning future loads.  Purely additive for now — no
-    consumer resolves it yet.
-
-    ``settings`` is the scene's resolved, read-only ``Settings``, which
-    ``SceneManager`` hands to each ``GameState`` it creates for the scene.
-    Scanned scenes share one across fresh ``Scene`` instances; an in-memory
-    scene without one declares no Settings.
+    ``local_rule_registry`` and ``local_effect_registry`` are the
+    ``SceneLocalRegistry`` instances for the scene's scene-local rules and
+    effects (items export ``RULE`` and ``BUILD``).  ``local_sound_map`` is the
+    bare-keyed ``{stem: path}`` map of its scene-local sounds (its ``sounds/``
+    subdirectory).  ``SceneManager`` installs all three as the Scene view on
+    every transition into the scene.
     """
 
     __slots__ = (
@@ -159,6 +151,7 @@ class Scene:
         "local_effect_registry",
         "local_rule_registry",
         "local_sound_map",
+        "required_capabilities",
         "rule_packs",
         "settings",
         "version",
@@ -174,6 +167,7 @@ class Scene:
         local_effect_registry: SceneLocalRegistry | None = None,
         local_sound_map: dict[str, str] | None = None,
         settings: Settings | None = None,
+        required_capabilities: frozenset[str] = frozenset(),
     ) -> None:
         self.settings = settings if settings is not None else Settings()
         self.effect_packs = effect_packs
@@ -187,91 +181,33 @@ class Scene:
             local_effect_registry if local_effect_registry is not None else SceneLocalRegistry()
         )
         self.local_sound_map = local_sound_map if local_sound_map is not None else {}
-
-
-class _SceneEntry:
-    """Stored metadata for a single discovered scene.  Internal use only."""
-
-    __slots__ = (
-        "declarations",
-        "effect_packs",
-        "ir_codec",
-        "local_effect_registry",
-        "local_rule_registry",
-        "local_sound_map",
-        "required_capabilities",
-        "rule_packs",
-        "settings",
-        "source_path",
-        "version",
-    )
-
-    def __init__(
-        self,
-        version: Version,
-        effect_packs: Sequence[PackReference],
-        rule_packs: Sequence[PackReference],
-        source_path: str,
-        ir_codec: str,
-        local_rule_registry: SceneLocalRegistry,
-        local_effect_registry: SceneLocalRegistry,
-        local_sound_map: dict[str, str],
-        declarations: dict[str, SettingDeclaration] | None = None,
-        requires: frozenset[str] = frozenset(),
-    ) -> None:
-        # The scene's own Setting declarations, from scene.json's ``settings``.
-        self.declarations = declarations or {}
-        # scene.json's ``requires``; the catalog adds its rule packs' once
-        # every pack is scanned.
-        self.required_capabilities = requires
-        # Resolved by the catalog once every pack is scanned.
-        self.settings = Settings()
-        self.version = version
-        self.effect_packs = effect_packs
-        self.rule_packs = rule_packs
-        self.source_path = source_path
-        self.ir_codec = ir_codec
-        self.local_rule_registry = local_rule_registry
-        self.local_effect_registry = local_effect_registry
-        self.local_sound_map = local_sound_map
+        self.required_capabilities = required_capabilities
 
 
 class SceneRegistry:
-    """The installed JSON-described scenes, built by ``scan_pack_roots``.
+    """The installed scenes, each a ``Scene`` record keyed by name.
 
-    Scene access::
+    Built by ``scan_pack_roots`` from the scanned records, or by tests from
+    in-memory ones::
 
-        scene = registry.get("forest")  # fresh Scene each call
+        registry = SceneRegistry({"forest": forest})
+        scene = registry.get("forest")  # the stored record itself
 
-    In-memory registration (test escape hatch)::
+    In-memory registration (test escape hatch, being retired)::
 
         registry.register("test_scene", lambda: Scene(...))
     """
 
     __slots__ = ("_factories", "_scenes")
 
-    def __init__(self) -> None:
-        self._scenes: dict[str, _SceneEntry] = {}
+    def __init__(self, scenes: Mapping[str, Scene] | None = None) -> None:
+        self._scenes: Mapping[str, Scene] = scenes if scenes is not None else {}
         self._factories: dict[str, Callable[[], Scene]] = {}
 
-    @staticmethod
-    def _from_scenes(scenes: dict[str, _SceneEntry]) -> SceneRegistry:
-        """Return a registry serving *scenes*, keyed by scene name.
-
-        The ``PackCatalog`` construction path: the catalog has already scanned
-        and validated every entry.
-        """
-        registry = SceneRegistry()
-        registry._scenes = scenes
-        return registry
-
     def get(self, name: str) -> Scene:
-        """Return a fresh ``Scene`` for *name*.
+        """Return the stored ``Scene`` for *name*, the same record on every call.
 
-        JSON-discovered scenes share the parsed ``Version`` across calls but
-        receive their own copy of ``local_sound_map`` so
-        that mutations cannot poison future loads.  Factory-registered scenes
-        return whatever the factory produces.
+        Factory-registered scenes return whatever the factory produces.
 
         Raises:
             ValueError: if *name* is not registered.
@@ -279,34 +215,15 @@ class SceneRegistry:
         factory = self._factories.get(name)
         if factory is not None:
             return factory()
-
-        entry = self._scenes.get(name)
-        if entry is None:
-            raise ValueError(f"Unknown scene '{name}'")
-
-        return Scene(
-            effect_packs=entry.effect_packs,
-            rule_packs=entry.rule_packs,
-            version=entry.version,
-            ir_codec=entry.ir_codec,
-            local_rule_registry=entry.local_rule_registry,
-            local_effect_registry=entry.local_effect_registry,
-            local_sound_map=dict(entry.local_sound_map),
-            settings=entry.settings,
-        )
+        return self._stored(name)
 
     def ir_codec_for(self, name: str) -> str:
         """Return *name*'s declared ``ir_codec`` string (default ``"aura"``).
 
-        For scan-discovered scenes this reads straight off the stored scan
-        entry, without constructing a ``Scene``, so resolving the codec ahead
-        of hardware build never doubles scene construction.  Factory-registered
-        scenes (the ``register`` test escape hatch) have no scan entry to read,
-        so this falls back to calling the factory and reading ``ir_codec`` off
-        the resulting ``Scene``.
-
-        Mirrors ``get``'s precedence: a factory registered under the same name
-        as a scanned scene overrides it.
+        Factory-registered scenes (the ``register`` test escape hatch) have no
+        stored record, so this calls the factory and reads the ``Scene`` it
+        returns. Mirrors ``get``'s precedence: a factory registered under the
+        same name as a stored scene overrides it.
 
         Raises:
             ValueError: if *name* is not registered.
@@ -314,31 +231,26 @@ class SceneRegistry:
         factory = self._factories.get(name)
         if factory is not None:
             return factory().ir_codec
-
-        entry = self._scenes.get(name)
-        if entry is not None:
-            return entry.ir_codec
-
-        raise ValueError(f"Unknown scene '{name}'")
+        return self._stored(name).ir_codec
 
     def required_capabilities(self, name: str) -> frozenset[str]:
-        """Return *name*'s Required capabilities, without constructing a ``Scene``.
+        """Return *name*'s Required capabilities, read from its stored ``Scene``.
 
-        A scanned scene requires what its ``scene.json`` lists plus what every
-        rule pack it declares lists. A scene registered in memory through
-        ``register`` requires nothing, even when it shadows a scanned one.
+        A scene registered in memory through ``register`` requires nothing,
+        even when it shadows a stored one.
 
         Raises:
             ValueError: if *name* is not registered.
         """
         if name in self._factories:
             return frozenset()
+        return self._stored(name).required_capabilities
 
-        entry = self._scenes.get(name)
-        if entry is not None:
-            return entry.required_capabilities
-
-        raise ValueError(f"Unknown scene '{name}'")
+    def _stored(self, name: str) -> Scene:
+        scene = self._scenes.get(name)
+        if scene is None:
+            raise ValueError(f"Unknown scene '{name}'")
+        return scene
 
     def missing_capabilities(self, name: str, capabilities: frozenset[str]) -> frozenset[str]:
         """Return the Required capabilities of *name* that are not in *capabilities*.
