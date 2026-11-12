@@ -327,6 +327,10 @@ _Avoid_: wiring the namespace, effect manager, game engine and scene manager by 
 The board-free turning of a `DeviceConfig` into a `DeviceHardware`, shared by the physical device and the **Simulated device**: which components are built or skipped, which need a bus, the order they come up in, how each is narrated, and how the IR and radio subsystems are wired. It reaches hardware only through **DeviceParts**, so a config the board rejects for config reasons is rejected in simulation too.
 _Avoid_: builder (names the device-only entry point); repeating gating or IR wiring in a `DeviceParts` adapter
 
+### Boot narration
+The `[hw]` lines a device prints as the **Device assembly** brings it up: a begin line naming the board, one line per part (what it is, how it's wired, and whether it came up, was skipped as disabled, or `FAILED`), and a ready line with counts and elapsed time. Only the Device assembly writes it, so each part's line reads the same on every prop and in the **Simulated device**.
+_Avoid_: "build log", "boot log" for it; describing a part anywhere but the Device assembly; parsing it in tools (it is for people reading deploy-watch output)
+
 ### Pin reference
 A pin name from **aura-device.json** together with the field it was written in (`pixels[1].pin`, `ir.rx[0]`, `buttons[2]`), recorded when the file is parsed, so any error about that pin names the exact field to fix. Every part the **Device assembly** builds receives its pins this way.
 _Avoid_: rebuilding a field path outside the parser; passing a bare pin name or a board pin object to **DeviceParts**
