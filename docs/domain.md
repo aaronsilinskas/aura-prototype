@@ -89,8 +89,9 @@ hardware/         Hardware abstraction layer
                   device_storage, network_controls, scene_selection, ir_transport,
                   ir_transceiver, ir_codecs/ (base, aura, tag), ir_telemetry,
                   radio_transport, radio_transceiver, sd_sync_protocol, sd_sync_server,
-                  device_reboot, device_assembly (the Device assembly, with
-                  build_narration as its private Boot narration wording),
+                  device_reboot, device_assembly (the Device assembly, which
+                  owns Boot narration's per-part wording; build_narration
+                  holds its narrate_step/narrate_skip primitives),
                   device_parts)
   simulated/      Test-only Simulated device (device: SimulatedHardware; simulated_parts:
                   SimulatedParts, its DeviceParts adapter, whose card is the real
@@ -208,7 +209,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `PinRef` | `hardware/shared/device_config.py` | **Pin reference**: a pin name with the `aura-device.json` field it came from, so a pin error names the field to fix; lives with the config so the parser can create it without importing `DeviceParts` |
 | `NeoPixelCurrentBudgetConfig` | `hardware/shared/device_config.py` | Opt-in `neopixel_current_budget` policy; the parser calls `tune_neopixel_brightness` (`hardware/shared/neopixel_current_budget.py`) to fold the tuned brightness into each NeoPixel strip config, and records the estimate/scale for boot narration |
 | `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the Device assembly returns (outputs, sensors, network seam, `ir`, radio, storage, `capabilities`: the frozenset of Capabilities read off the parts it built, so a disabled, isolated or absent component is not had, and `polled`: the ordered tuple of **Polled parts** it built (buttons, sensors, radio, IR), each a `PolledPart` (`hardware/shared/polled_part.py`), so a part that is not built is not polled) |
-| `assemble_device` | `hardware/shared/device_assembly.py` | The **Device assembly**: board-free `DeviceConfig` → `DeviceHardware`, owning gating, on-demand bus opening (only buses an enabled device names), build order, **Boot narration** (its per-part wording private in `hardware/shared/build_narration.py`), buttons, IR/radio wiring and network controls; reaches hardware only through `DeviceParts` |
+| `assemble_device` | `hardware/shared/device_assembly.py` | The **Device assembly**: board-free `DeviceConfig` → `DeviceHardware`, owning gating, on-demand bus opening (only buses an enabled device names), build order, **Boot narration** (its per-part wording, over the `narrate_step`/`narrate_skip` primitives in `hardware/shared/build_narration.py`), buttons, IR/radio wiring and network controls; reaches hardware only through `DeviceParts` |
 | `DeviceParts` | `hardware/shared/device_parts.py` | Port the Device assembly builds each part through (one constructor per part), taking config sections and `PinRef`s; a bus crosses it as the checker-only `Bus` alias (`Any`), which each adapter narrows to its platform's bus type; adapters `SimulatedParts` (`hardware/simulated/simulated_parts.py`, which also decides what persists across a reboot) and `CircuitPythonParts` (`hardware/circuitpython/circuitpython_parts.py`) |
 | `PolledSensor` | `hardware/shared/polled_sensor.py` | Board-free **Polled part** owning one sensor's reading (`DeviceHardware.accelerometer` / `.magnetometer`): wraps a `DeviceParts` raw read callable and, on each `update(elapsed)`, hands the raw read to the reading's `assign` (`AccelerationData` / `MagneticData`), which overwrites it in place, so the sensor never knows the reading's shape; keeps the last good reading on a failed read and logs the start and end of each run of failures |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter; `send_ir` raises `MissingCapabilityError` when IR or the emitter is absent, `send_radio` when the radio is |

@@ -26,32 +26,21 @@ from engine.capabilities import IR_RECEIVE, button_capability, ir_emitter_capabi
 from engine.effects.output import EffectOutput
 from engine.input import AccelerationData, MagneticData
 from engine.log import Logger
-from hardware.shared.build_narration import (
-    _describe_accelerometer,
-    _describe_audio,
-    _describe_buttons,
-    _describe_haptics,
-    _describe_high_current_rail,
-    _describe_i2c,
-    _describe_ir,
-    _describe_magnetometer,
-    _describe_neopixel_current_budget,
-    _describe_pixel_entry,
-    _describe_radio,
-    _describe_sdcard,
-    _describe_spi,
-    narrate_skip,
-    narrate_step,
-)
+from engine.network import IR_EMITTERS
+from hardware.shared.build_narration import narrate_skip, narrate_step
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_config import (
+    DEFAULT_BUS,
     AudioConfig,
     DeviceConfig,
+    HighCurrentRailConfig,
     I2CConfig,
     I2CDeviceConfig,
     IRConfig,
     MatrixPixelsConfig,
+    NeoPixelCurrentBudgetConfig,
     NeoPixelPixelsConfig,
+    PinRef,
     RadioConfig,
     SDCardConfig,
     SPIConfig,
@@ -247,6 +236,123 @@ def _capabilities(
         if ir.receives:
             names.append(IR_RECEIVE)
     return frozenset(names)
+
+
+def _describe_high_current_rail(rail: HighCurrentRailConfig) -> str:
+    return f"high_current_rail pin={rail.pin.name} active_high={rail.active_high}"
+
+
+def _describe_i2c(name: str, i2c: I2CConfig | None) -> str:
+    if i2c is None:
+        return f"i2c {name} board"
+    return f"i2c {name} scl={i2c.scl.name} sda={i2c.sda.name}"
+
+
+def _describe_spi(name: str, spi: SPIConfig | None) -> str:
+    if spi is None:
+        return f"spi {name} board"
+    return f"spi {name} sck={spi.sck.name} mosi={spi.mosi.name} miso={spi.miso.name}"
+
+
+def _describe_neopixel_current_budget(budget: NeoPixelCurrentBudgetConfig) -> str:
+    return (
+        f"neopixel_current_budget limit={budget.current_limit_ma}mA "
+        + f"estimate={budget.estimate_ma:.0f}mA scale={budget.scale:.2f} "
+        + f"at_min_brightness={budget.at_min_brightness}"
+    )
+
+
+def _format_ranges(ranges: dict[str, range]) -> str:
+    return " ".join(f"{key}:{r.start}-{r.stop}" for key, r in ranges.items())
+
+
+def _address_suffix(address: int | None) -> str:
+    return f" address=0x{address:02X}" if address is not None else ""
+
+
+def _describe_i2c_chip(part: str, chip: str, config: I2CDeviceConfig) -> str:
+    return f"{part} {chip}" + _address_suffix(config.address) + _bus_suffix("i2c", config.i2c)
+
+
+def _bus_suffix(kind: str, name: str) -> str:
+    return f" {kind}={name}" if name != DEFAULT_BUS else ""
+
+
+def _describe_neopixel_pixels(pixels: NeoPixelPixelsConfig) -> str:
+    strip = pixels.strips[0]
+    return (
+        f"pin={strip.pin.name} count={strip.count} order={strip.order} "
+        + f"scope_pixels=[{_format_ranges(strip.scope_pixels)}] "
+        + f"brightness={strip.brightness:.2f}"
+    )
+
+
+def _describe_pixel_entry(index: int, pixels: MatrixPixelsConfig | NeoPixelPixelsConfig) -> str:
+    kind = "matrix" if isinstance(pixels, MatrixPixelsConfig) else "neopixel"
+    if not pixels.enabled:
+        return f"pixels[{index}] {kind}"
+    if isinstance(pixels, MatrixPixelsConfig):
+        detail = (
+            f"cols={pixels.cols} scope_rows=[{_format_ranges(pixels.scope_rows)}] "
+            + f"brightness={pixels.brightness:.2f}"
+            + _address_suffix(pixels.address)
+            + _bus_suffix("i2c", pixels.i2c)
+        )
+    else:
+        detail = _describe_neopixel_pixels(pixels)
+    return f"pixels[{index}] {kind} {detail}"
+
+
+def _describe_buttons(labelled_pins: list[tuple[str, PinRef]]) -> str:
+    labelled = " ".join(f"{label}={pin.name}" for label, pin in labelled_pins)
+    return f"buttons {labelled}" if labelled else "buttons"
+
+
+def _describe_accelerometer(accelerometer: I2CDeviceConfig) -> str:
+    return _describe_i2c_chip("accelerometer", "lis3dh", accelerometer)
+
+
+def _describe_magnetometer(magnetometer: I2CDeviceConfig) -> str:
+    return _describe_i2c_chip("magnetometer", "mmc5603", magnetometer)
+
+
+def _describe_haptics(haptics: I2CDeviceConfig) -> str:
+    return _describe_i2c_chip("haptics", "drv2605", haptics)
+
+
+def _describe_audio(audio: AudioConfig) -> str:
+    if not audio.enabled:
+        return "audio"
+    return (
+        f"audio voices={audio.voices} max_volume={audio.max_volume:.2f} "
+        + f"i2s_bit_clock={audio.i2s_bit_clock.name} "
+        + f"i2s_word_select={audio.i2s_word_select.name} i2s_data={audio.i2s_data.name}"
+    )
+
+
+def _describe_radio(radio: RadioConfig) -> str:
+    return (
+        f"radio frequency={radio.frequency} node={radio.node} "
+        + f"cs={radio.cs.name} reset={radio.reset.name}"
+        + _bus_suffix("spi", radio.spi)
+    )
+
+
+def _describe_sdcard(sdcard: SDCardConfig) -> str:
+    return f"sdcard mount={sdcard.mount} cs={sdcard.cs.name}" + _bus_suffix("spi", sdcard.spi)
+
+
+def _describe_ir(ir: IRConfig) -> str:
+    rx_desc = f"rx=[{' '.join(pin.name for pin in ir.rx)}]" if ir.rx else "rx=(none)"
+    if len(ir.rx) > 1:
+        rx_desc += " (IR multi-receiver)"
+    if ir.emitters:
+        emitters_desc = "emitters=" + " ".join(
+            f"{key}:{ir.emitters[key].name}" for key in IR_EMITTERS if key in ir.emitters
+        )
+    else:
+        emitters_desc = "emitters=(none)"
+    return f"ir {rx_desc} {emitters_desc}"
 
 
 def assemble_device(
