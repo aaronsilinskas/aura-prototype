@@ -7,17 +7,13 @@ hitpoints and the per-phase receipts.
 
 from __future__ import annotations
 
-from engine.engine import GameEngine
-from engine.state import SceneControls
-from engine.tests.helpers import FrozenTimer, SpyEffectControls
+from engine.state import GameState, SceneControls
+from engine.tests.helpers import SpyEffectControls
 from packs.scenes.tag.rules.helpers.tag_state import TagState, tag_state
 
 
 def _make_state():
-    spy = SpyEffectControls()
-    timer = FrozenTimer()
-    engine = GameEngine(spy, timer=timer)
-    return engine.create_state(SceneControls())
+    return GameState(SpyEffectControls(), SceneControls())
 
 
 # ---------------------------------------------------------------------------

@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
-from engine.engine import GameEngine
 from engine.events import Event
 from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog
@@ -54,14 +53,10 @@ class SceneRuntime:
         self._clock: Timer = clock if clock is not None else Timer()
         self._namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
         self._effect_manager = EffectManager(namespace=self._namespace, outputs=outputs)
-        engine = GameEngine(
-            effect_controls=self._effect_manager,
-            timer=self._clock,
-            network_controls=network_controls,
-            capabilities=capabilities,
-        )
         self._scene_manager = SceneManager(
-            engine,
+            self._effect_manager,
+            network_controls,
+            capabilities,
             catalog.rule_registry,
             catalog.scene_registry,
             self._effect_manager,
@@ -102,8 +97,12 @@ class SceneRuntime:
         self._clock.update()
 
     def update(self) -> None:
-        """Run one tick: dispatch queued events, apply a pending Overlay or pop, update effects."""
-        self._scene_manager.update()
+        """Run one tick: dispatch queued events, apply a pending Overlay or pop, update effects.
+
+        The top scene's game time moves on by the clock's elapsed time for
+        this tick.
+        """
+        self._scene_manager.update(self._clock.elapsed)
         self._effect_manager.update(self._clock)
 
     @property

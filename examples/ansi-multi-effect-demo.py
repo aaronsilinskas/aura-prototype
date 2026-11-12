@@ -9,12 +9,12 @@ from effects.effect import Effect, PixelBuffer
 from engine.effects.admin import SceneView
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
-from engine.engine import GameEngine, GameRule
+from engine.engine import GameRule
 from engine.events import EffectEvent, Event
 from engine.input import AccelerationData, ButtonData, InputEvents
 from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import scan_pack_roots
-from engine.state import EffectReceipt, GameState, SceneControls, Scope, ScopeValue
+from engine.state import EffectReceipt, GameState, SceneControls, SceneRun, Scope, ScopeValue
 from engine.timer import Timer
 
 _packs_root = os.path.normpath(
@@ -39,7 +39,7 @@ class AnsiEffectOutput(EffectOutput):
         self.scopes = scopes
         self._initialized = False
         self._last_event: str = ""
-        self._event_count: int = 0
+        self._audio_count: int = 0
 
     def create_buffer(self, scope_key: str) -> PixelBuffer:
         return PixelBuffer(self.PIXEL_COUNT)
@@ -52,7 +52,7 @@ class AnsiEffectOutput(EffectOutput):
         receipt: EffectReceipt,
     ) -> None:
         self._last_event = str(event)
-        self._event_count += 1
+        self._audio_count += 1
 
     def update_pixels(self, scope_key: str, buffer: PixelBuffer) -> None:
         parts = []
@@ -63,7 +63,7 @@ class AnsiEffectOutput(EffectOutput):
             parts.append(f"\033[48;2;{r};{g};{b}m  \033[0m")
         pixel_line = "\r" + "".join(parts)
         event_line = (
-            f"\r[audio #{self._event_count}] {self._last_event}\033[K"
+            f"\r[audio #{self._audio_count}] {self._last_event}\033[K"
             if self._last_event
             else "\r\033[K"
         )
@@ -82,8 +82,6 @@ personal_output = AnsiEffectOutput(scopes=[Scope.PERSONAL])
 effect_manager = EffectManager(namespace=_namespace, outputs=[personal_output])
 
 timer = Timer()
-game_engine = GameEngine(effect_controls=effect_manager, timer=timer)
-game_state = game_engine.create_state(SceneControls())
 
 
 class MakeEffectRule(GameRule):
@@ -100,7 +98,7 @@ class MakeEffectRule(GameRule):
                 state.effect_controls.stop_effect(Scope.ALL)
 
 
-game_engine.add_rules(MakeEffectRule())
+scene_run = SceneRun(GameState(effect_manager, SceneControls()), [MakeEffectRule()])
 
 _default_acceleration = AccelerationData(x=0.0, y=9.8, z=0.0)
 
@@ -127,8 +125,8 @@ def main() -> None:
                 key = sys.stdin.read(1)
                 if key == "q":
                     break
-            game_state.queue_event(_make_event(key))
-            game_engine.update(game_state)
+            scene_run.state.queue_event(_make_event(key))
+            scene_run.tick(timer.elapsed)
             effect_manager.update(timer)
             time.sleep(0.033)  # ~30 fps
     finally:

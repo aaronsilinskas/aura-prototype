@@ -18,7 +18,6 @@ from engine.capabilities import (
     ir_emitter_capability,
     ir_emitter_of,
 )
-from engine.engine import GameEngine
 from engine.network import AREA_OF_EFFECT, CONE
 from engine.pack_catalog import (
     MalformedManifestError,
@@ -320,11 +319,3 @@ def test_asking_about_a_name_outside_the_vocabulary_raises(name) -> None:
 
     with pytest.raises(ValueError, match=re.escape(repr(name))):
         state.capabilities.has(name)
-
-
-def test_an_engine_hands_its_capabilities_to_the_states_it_creates() -> None:
-    engine = GameEngine(EffectControls(), capabilities=frozenset(("magnetometer",)))
-
-    state = engine.create_state(SceneControls())
-
-    assert state.capabilities.has("magnetometer")

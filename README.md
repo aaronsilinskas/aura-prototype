@@ -202,8 +202,8 @@ The example file also shows the `accelerometer`, `magnetometer`, `haptics`, `rad
 (InputEvent | NetworkEvent)
         │
         ▼
-   GameEngine             holds rule list; stateless — caller owns GameState
-        │  engine.update(state)
+   SceneRun               one per scene: its GameState + rules in dispatch order
+        │  run.tick(elapsed)
         ▼
    GameRule.handle_event(event, state)
         │  rules read/write state.data, queue new events,

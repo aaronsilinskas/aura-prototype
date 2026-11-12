@@ -146,7 +146,7 @@ def test_covering_carries_the_overlays_local_effects(pack_tree) -> None:
     manager.activate_boot_scene("scene_a")
 
     manager.overlay("scene_b")
-    manager.update()
+    manager.update(0.0)
 
     local_effects = admin.steps[-1][1].local_effects
     assert local_effects is not None
@@ -161,10 +161,10 @@ def test_uncovering_carries_the_covered_scenes_local_effects(pack_tree) -> None:
     manager = make_scene_manager(catalog, admin)
     manager.activate_boot_scene("scene_a")
     manager.overlay("scene_b")
-    manager.update()
+    manager.update(0.0)
 
     manager.pop()
-    manager.update()
+    manager.update(0.0)
 
     local_effects = admin.steps[-1][1].local_effects
     assert local_effects is not None
@@ -209,7 +209,7 @@ def test_covering_carries_the_overlays_local_sounds(pack_tree) -> None:
     manager.activate_boot_scene("scene_a")
 
     manager.overlay("scene_b")
-    manager.update()
+    manager.update(0.0)
 
     local_sounds = admin.steps[-1][1].local_sounds
     assert list(local_sounds) == ["b_sting"]
@@ -226,10 +226,10 @@ def test_uncovering_carries_the_covered_scenes_local_sounds(pack_tree) -> None:
     manager = make_scene_manager(catalog, admin)
     manager.activate_boot_scene("scene_a")
     manager.overlay("scene_b")
-    manager.update()
+    manager.update(0.0)
 
     manager.pop()
-    manager.update()
+    manager.update(0.0)
 
     local_sounds = admin.steps[-1][1].local_sounds
     assert list(local_sounds) == ["a_sting"]
