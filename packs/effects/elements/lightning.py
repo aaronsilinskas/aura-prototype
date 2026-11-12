@@ -100,7 +100,7 @@ class LightningEffect(AddSamplesRenderer):
         palette: Palette,
         config: EffectConfig,
     ) -> None:
-        super().__init__(list(bolts), palette)
+        super().__init__(bolts, palette)
         self._bolts = bolts
         self._config = config
 
