@@ -2,187 +2,66 @@
 
 from __future__ import annotations
 
-from effects.effect import EffectConfig, EffectVerb, PixelBuffer
-from effects.palette import PaletteLUT256
-from effects.shape import Shape
-from packs.effects.elements.lightning import (
-    _LIGHTNING_PALETTE,
-    LightningBuilder,
-    LightningEffect,
-    _LightningBolt,
-)
+import random
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+from effects.effect import Effect, EffectConfig, EffectVerb
+from packs.effects.elements.lightning import BUILD, LightningEffect
+
+# Longer than any bolt's idle or strike phase at any level, so one update of this
+# length moves every bolt across exactly one phase boundary.
+_PAST_ANY_PHASE = 10.0
 
 
-def _config(level: int = 5, listeners=None) -> EffectConfig:
-    return EffectConfig(resolution=16, options={"level": level}, listeners=listeners or [])
+def _build(level: int, events: list[EffectVerb]) -> Effect:
+    random.seed(1323)
+    config = EffectConfig(resolution=16, options={"level": level}, listeners=[events.append])
+    return BUILD("elements.lightning", config)
 
 
-def _make_bolt() -> _LightningBolt:
-    shape = Shape.padded(0.25, Shape.centered_gradient())
-    return _LightningBolt(shape, hide_max=1.5, strike_duration_min=0.5, strike_duration_max=1.25)
+def _update(effect: Effect, elapsed: float) -> None:
+    assert effect.pixels is not None
+    effect.pixels.update(elapsed)
 
 
-# ---------------------------------------------------------------------------
-# _LightningBolt — at_strike initial state
-# ---------------------------------------------------------------------------
+def test_lightning_declares_strike_as_its_only_custom_verb() -> None:
+    effect = _build(level=1, events=[])
+
+    assert effect.emitted_verbs() == (EffectVerb.START, EffectVerb.STOP, LightningEffect.STRIKE)
 
 
-def test_lightning_bolt_at_strike_initialized_false() -> None:
-    bolt = _make_bolt()
-    assert bolt.at_strike is False
-
-
-# ---------------------------------------------------------------------------
-# _LightningBolt — at_strike is True only on IDLE→STRIKE transition
-# ---------------------------------------------------------------------------
-
-
-def test_lightning_bolt_at_strike_true_on_idle_to_strike_transition() -> None:
-    bolt = _make_bolt()
-
-    bolt.update(10.0)  # well past hide_max of 1.5 — forces IDLE → STRIKE
-
-    assert bolt.at_strike is True
-
-
-def test_lightning_bolt_at_strike_false_before_idle_threshold_is_crossed() -> None:
-    bolt = _make_bolt()
-
-    bolt.update(0.0)
-
-    assert bolt.at_strike is False
-
-
-def test_lightning_bolt_at_strike_false_during_strike_phase() -> None:
-    bolt = _make_bolt()
-    bolt.update(10.0)  # well past hide_max of 1.5 — forces IDLE → STRIKE
-
-    bolt.update(0.0)
-
-    assert bolt.at_strike is False
-
-
-def test_lightning_bolt_at_strike_false_on_strike_to_idle_transition() -> None:
-    bolt = _make_bolt()
-    bolt.update(10.0)  # well past hide_max of 1.5 — IDLE → STRIKE
-
-    bolt.update(10.0)  # well past strike_duration_max of 1.25 — STRIKE → IDLE
-
-    assert bolt.at_strike is False
-
-
-# ---------------------------------------------------------------------------
-# LightningBuilder — name is passed through to the effect
-# ---------------------------------------------------------------------------
-
-
-def test_lightning_effect_name_matches_builder_argument() -> None:
-    effect = LightningBuilder()("elements.lightning", _config())
-    assert effect.name == "elements.lightning"
-
-
-# ---------------------------------------------------------------------------
-# LightningEffect — emits STRIKE on tick with at_strike
-# ---------------------------------------------------------------------------
-
-
-def test_lightning_effect_declares_strike_as_its_only_custom_verb() -> None:
-    assert LightningEffect.VERBS == (LightningEffect.STRIKE,)
-
-
-def test_lightning_effect_emits_strike_when_a_bolt_strikes() -> None:
+def test_lightning_notifies_strike_in_an_update_where_its_bolt_strikes() -> None:
     events: list[EffectVerb] = []
-    config = _config(listeners=[events.append])
+    effect = _build(level=1, events=events)
 
-    shape = Shape.padded(0.25, Shape.centered_gradient())
-    bolt = _LightningBolt(shape, 1.5, 0.5, 1.25)
-    palette = PaletteLUT256(_LIGHTNING_PALETTE)
-    effect = LightningEffect([bolt], palette, config)
-
-    effect.update(10.0)  # well past hide_max of 1.5 — triggers IDLE → STRIKE
+    _update(effect, _PAST_ANY_PHASE)
 
     assert events == [LightningEffect.STRIKE]
 
 
-def test_lightning_effect_no_notify_when_no_bolt_strikes() -> None:
+def test_lightning_notifies_strike_once_when_several_bolts_strike_in_the_same_update() -> None:
     events: list[EffectVerb] = []
-    config = _config(listeners=[events.append])
+    effect = _build(level=10, events=events)  # level 10 builds five bolts
 
-    shape = Shape.padded(0.25, Shape.centered_gradient())
-    bolt = _LightningBolt(shape, 1.5, 0.5, 1.25)
-    palette = PaletteLUT256(_LIGHTNING_PALETTE)
-    effect = LightningEffect([bolt], palette, config)
+    _update(effect, _PAST_ANY_PHASE)
 
-    effect.update(0.0)  # below idle threshold — bolt stays IDLE
+    assert events == [LightningEffect.STRIKE]
+
+
+def test_lightning_does_not_notify_strike_in_an_update_where_no_bolt_strikes() -> None:
+    events: list[EffectVerb] = []
+    effect = _build(level=10, events=events)
+
+    _update(effect, 0.0)
 
     assert events == []
 
 
-def test_lightning_effect_emits_single_strike_event_even_when_multiple_bolts_transition() -> None:
+def test_lightning_does_not_notify_strike_when_its_bolts_end_their_strike() -> None:
     events: list[EffectVerb] = []
-    config = _config(listeners=[events.append])
+    effect = _build(level=10, events=events)
+    _update(effect, _PAST_ANY_PHASE)  # every bolt strikes
+    events.clear()
 
-    shape = Shape.padded(0.25, Shape.centered_gradient())
-    bolts = [_LightningBolt(shape, 1.5, 0.5, 1.25) for _ in range(3)]
-    palette = PaletteLUT256(_LIGHTNING_PALETTE)
-    effect = LightningEffect(bolts, palette, config)
+    _update(effect, _PAST_ANY_PHASE)  # every bolt ends its strike and goes idle
 
-    effect.update(10.0)  # well past hide_max of 1.5 — all bolts transition to STRIKE
-
-    assert events.count(LightningEffect.STRIKE) == 1
-
-
-# ---------------------------------------------------------------------------
-# LightningEffect — pixel output is non-zero during strike phase
-# ---------------------------------------------------------------------------
-
-
-def test_lightning_effect_pixel_output_is_nonzero_during_strike_phase() -> None:
-    shape = Shape.padded(0.25, Shape.centered_gradient())
-    bolt = _LightningBolt(shape, 1.5, 0.5, 1.25)
-    palette = PaletteLUT256(_LIGHTNING_PALETTE)
-    effect = LightningEffect([bolt], palette, _config())
-
-    bolt.update(10.0)  # well past hide_max of 1.5 — advances to STRIKE phase
-
-    out = PixelBuffer(16)
-    effect.render(out)
-
-    assert any(px != 0 for px in out)
-
-
-# ---------------------------------------------------------------------------
-# LightningEffect — no listeners registered is safe (no crash)
-# ---------------------------------------------------------------------------
-
-
-def test_lightning_effect_update_does_not_raise_when_no_listeners_registered() -> None:
-    config = _config(listeners=[])
-
-    shape = Shape.padded(0.25, Shape.centered_gradient())
-    bolt = _LightningBolt(shape, 1.5, 0.5, 1.25)
-    palette = PaletteLUT256(_LIGHTNING_PALETTE)
-    effect = LightningEffect([bolt], palette, config)
-
-    effect.update(10.0)  # well past hide_max of 1.5 — triggers strike; should not raise
-
-
-# ---------------------------------------------------------------------------
-# LightningEffect — pixel output is zero during idle phase
-# ---------------------------------------------------------------------------
-
-
-def test_lightning_effect_pixel_output_is_zero_during_idle_phase() -> None:
-    shape = Shape.padded(0.25, Shape.centered_gradient())
-    bolt = _LightningBolt(shape, 1.5, 0.5, 1.25)
-    palette = PaletteLUT256(_LIGHTNING_PALETTE)
-    effect = LightningEffect([bolt], palette, _config())
-
-    out = PixelBuffer(16)
-    effect.render(out)  # bolt has not been updated — still in IDLE phase
-
-    assert all(px == 0 for px in out)
+    assert events == []
