@@ -5,13 +5,17 @@ Builders interpolate across it with ``engine.lerp.level_lerp``, passing
 
 from __future__ import annotations
 
+try:
+    from typing import Final
+except ImportError:
+    pass
+
 from effects.effect import EffectConfig
 
-EFFECT_TOP_LEVEL = 10
+EFFECT_TOP_LEVEL: Final = 10
 
 
-def clamp_level(level: int) -> int:
-    """Clamp ``level`` to the valid range ``[1, EFFECT_TOP_LEVEL]``."""
+def _clamp_level(level: int) -> int:
     if level < 1:
         return 1
     if level > EFFECT_TOP_LEVEL:
@@ -20,5 +24,5 @@ def clamp_level(level: int) -> int:
 
 
 def effect_level(config: EffectConfig) -> int:
-    """Return the effect's ``level`` option clamped to ``[1, 10]``, or 1 if missing."""
-    return clamp_level(config.get_option("level", 1))
+    """Return the ``level`` option clamped to ``[1, EFFECT_TOP_LEVEL]``; 1 if missing."""
+    return _clamp_level(config.get_option("level", 1))

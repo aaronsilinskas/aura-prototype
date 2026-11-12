@@ -25,7 +25,7 @@ effects/          Animation engine (CircuitPython-safe)
                   EffectVerb, AudioPlaybackConfig, ResolvedClip, HapticPattern
   palette.py      Palette, PaletteLUT256 (pre-computed, immutable)
   shape.py        Shape (factory), EffectShapeFunc
-  level.py        EFFECT_TOP_LEVEL, clamp_level, effect_level (the Effect Level's range and
+  level.py        EFFECT_TOP_LEVEL, effect_level (the Effect Level's range and
                   its one read; no interpolation, builders use engine/lerp.py)
   value.py        DynamicValue, ValueGenerator, lerp
   layers/         Layer base class + scroll, flame, drift_noise, sparkle, shape, progress, pulse
