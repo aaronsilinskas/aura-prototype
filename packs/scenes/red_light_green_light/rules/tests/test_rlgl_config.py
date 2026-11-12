@@ -24,9 +24,7 @@ def _settings(**values: object) -> Settings:
 
 
 def test_warning_sting_opts_uses_breathe_cycle_ratios_of_pulse_duration():
-    config = RlglConfig.from_settings(
-        _settings(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10)
-    )
+    config = RlglConfig(_settings(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10))
 
     opts = config.warning_sting_opts(1)
 
@@ -39,9 +37,7 @@ def test_warning_sting_opts_uses_breathe_cycle_ratios_of_pulse_duration():
 
 
 def test_warning_sting_opts_scales_sub_durations_with_level():
-    config = RlglConfig.from_settings(
-        _settings(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10)
-    )
+    config = RlglConfig(_settings(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10))
 
     opts = config.warning_sting_opts(10)
 
@@ -52,7 +48,7 @@ def test_warning_sting_opts_scales_sub_durations_with_level():
 
 
 # ---------------------------------------------------------------------------
-# from_settings
+# Building from Settings
 # ---------------------------------------------------------------------------
 
 
@@ -72,7 +68,7 @@ def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
         gravity_beta=0.2,
     )
 
-    config = RlglConfig.from_settings(settings)
+    config = RlglConfig(settings)
 
     assert config.red_duration_max == pytest.approx(6.0)
     assert config.red_duration_min == pytest.approx(2.5)
@@ -91,7 +87,7 @@ def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
 def test_with_no_overrides_each_field_holds_its_declared_default():
     defaults = declared_scene_defaults("red_light_green_light")
 
-    config = RlglConfig.from_settings(_settings())
+    config = RlglConfig(_settings())
 
     assert {name: getattr(config, name) for name in defaults} == defaults
 
@@ -99,17 +95,18 @@ def test_with_no_overrides_each_field_holds_its_declared_default():
 def test_the_declared_gravity_tracking_is_slower_than_motion_smoothing():
     """Gravity must track slower than the motion signal, or real motion is
     absorbed into the gravity estimate before it ever registers."""
-    config = RlglConfig.from_settings(_settings())
+    config = RlglConfig(_settings())
 
     assert config.gravity_beta < config.motion_smoothing
 
 
 @pytest.mark.parametrize("gravity_beta", [0.3, 0.4])
-def test_from_settings_rejects_gravity_beta_not_below_motion_smoothing(gravity_beta):
+def test_rejects_gravity_beta_not_below_motion_smoothing(gravity_beta):
     settings = _settings(motion_smoothing=0.3, gravity_beta=gravity_beta)
 
-    with pytest.raises(ValueError):
-        RlglConfig.from_settings(settings)
+    expected = rf"gravity_beta \({gravity_beta}\) must be below motion_smoothing \(0\.3\)"
+    with pytest.raises(ValueError, match=expected):
+        RlglConfig(settings)
 
 
 # ---------------------------------------------------------------------------
