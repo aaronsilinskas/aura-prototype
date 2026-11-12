@@ -155,11 +155,11 @@ class AirBuilder(EffectBuilder):
         level = effect_level(config)
 
         breeze_count = 1 + level // 5
-        padding = 0.3 - level_lerp(level, 0.0, 0.3, EFFECT_TOP_LEVEL)
+        padding = level_lerp(level, 0.3, 0.0, EFFECT_TOP_LEVEL)
         multiplier_end = level_lerp(level, 0.0, 0.5, EFFECT_TOP_LEVEL) + 0.50 / breeze_count
 
         hide_dur_min = 0.5
-        hide_dur_max = 3.0 - level_lerp(level, 0.0, 2.0, EFFECT_TOP_LEVEL)
+        hide_dur_max = level_lerp(level, 3.0, 1.0, EFFECT_TOP_LEVEL)
         sweep_dur_min = 2.0
         sweep_dur_max = level_lerp(level, 2.5, 5.0, EFFECT_TOP_LEVEL)
 
