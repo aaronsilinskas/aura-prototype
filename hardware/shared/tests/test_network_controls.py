@@ -3,9 +3,8 @@ from __future__ import annotations
 import pytest
 
 from engine.capabilities import MissingCapabilityError
-from engine.engine import GameEngine
 from engine.network import CONE, LINE
-from engine.state import EffectControls, SceneControls
+from engine.state import EffectControls, GameState, SceneControls
 from hardware.shared.ir_codecs.aura import AuraInfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.network_controls import HardwareNetworkControls
@@ -96,14 +95,13 @@ def test_hardware_network_controls_send_radio_delegates_to_the_wired_transceiver
 
 
 # ---------------------------------------------------------------------------
-# HardwareNetworkControls — wiring into engine.create_state (issue #608)
+# HardwareNetworkControls — handed to rules through GameState (issue #608)
 # ---------------------------------------------------------------------------
 
 
-def test_create_state_wires_engine_network_controls() -> None:
+def test_a_state_exposes_the_hardware_network_controls_it_is_given() -> None:
     nc = HardwareNetworkControls(None)
-    engine = GameEngine(effect_controls=EffectControls(), network_controls=nc)
 
-    state = engine.create_state(SceneControls())
+    state = GameState(EffectControls(), SceneControls(), nc)
 
     assert state.network_controls is nc

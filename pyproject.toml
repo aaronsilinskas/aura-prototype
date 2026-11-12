@@ -94,12 +94,6 @@ forbidden_modules = [
     "engine.effects.manager",
     "engine.namespace",
 ]
-# hardware.shared.tests.test_network_controls verifies HardwareNetworkControls'
-# wiring into GameEngine.create_state (issue #608) — a legitimate cross-layer
-# integration test, not a production dependency from hardware on engine.
-ignore_imports = [
-    "hardware.shared.tests.test_network_controls -> engine.engine",
-]
 
 [[tool.importlinter.contracts]]
 name = "shipped code must not import test-only simulation code"

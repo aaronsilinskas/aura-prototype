@@ -5,10 +5,9 @@ from __future__ import annotations
 
 import pytest
 
-from engine.engine import GameEngine
 from engine.input import AccelerationData
-from engine.state import SceneControls, StateSlot
-from engine.tests.helpers import FrozenTimer, SpyEffectControls
+from engine.state import GameState, SceneControls, StateSlot
+from engine.tests.helpers import SpyEffectControls
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_motion import (
     RlglMotion,
     rlgl_motion,
@@ -19,10 +18,7 @@ _AT_REST = AccelerationData(x=0.0, y=0.0, z=_G)
 
 
 def _make_state():
-    spy = SpyEffectControls()
-    timer = FrozenTimer()
-    engine = GameEngine(spy, timer=timer)
-    return engine.create_state(SceneControls())
+    return GameState(SpyEffectControls(), SceneControls())
 
 
 # ---------------------------------------------------------------------------
