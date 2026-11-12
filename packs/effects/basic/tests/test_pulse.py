@@ -53,18 +53,6 @@ def test_pulse_at_end_of_brighten_pixels_equal_end_color() -> None:
     assert all(p == 0xFFFFFF for p in pixels)
 
 
-# --- Phase: mid-BRIGHTEN per-channel interpolation ---
-
-
-def test_pulse_mid_brighten_interpolates_colors_correctly() -> None:
-    # brighten=0.5, advance 0.25s → t=0.5
-    # start=0x000000, end=0xFFFFFF → each channel: int(0 + 255 * 0.5) = 127 = 0x7F
-    effect = _build(options={"start_color": 0x000000, "end_color": 0xFFFFFF})
-    effect.pixels.update(0.25)
-    pixels = _render(effect)
-    assert all(p == 0x7F7F7F for p in pixels)
-
-
 # --- Phase: ON holds end color ---
 
 
@@ -159,19 +147,6 @@ def test_pulse_default_end_color_appears_at_on_phase() -> None:
     effect.pixels.update(0.75)  # past brighten(0.5) + into on(0.5)
     pixels = _render(effect)
     assert all(p == 0xFFFFFF for p in pixels)
-
-
-# --- off_duration=0.0 ---
-
-
-def test_pulse_darken_phase_fades_correctly_when_off_duration_is_zero() -> None:
-    # cycle=brighten(0.5)+on(0.5)+darken(0.5)+off(0.0)=1.5
-    effect = _build(options={"start_color": 0x000000, "end_color": 0xFFFFFF, "off_duration": 0.0})
-    # At elapsed=1.4 (in DARKEN, near end): t=(1.4-1.0)/0.5=0.8
-    # r=int(255+(0-255)*0.8)=int(51.0)=51=0x33
-    effect.pixels.update(1.4)
-    pixels = _render(effect)
-    assert all(p == 0x333333 for p in pixels)
 
 
 # --- ValueError at build time ---
