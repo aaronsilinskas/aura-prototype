@@ -35,8 +35,8 @@ class NetworkEvents:
     class IRReceived(Event):
         """Event fired when an IR packet is received.
 
-        Carries the raw payload, normalised signal quality and worst-case
-        timing deviation. It names no receiver: an IR multi-receiver picks
+        Carries the raw payload, normalised signal quality and error margin.
+        It names no receiver: an IR multi-receiver picks
         one for reliability only, never direction.
         """
 

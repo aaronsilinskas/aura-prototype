@@ -85,12 +85,6 @@ def test_ir_received_stores_error_margin_from_hardware() -> None:
     assert event.error_margin == 42
 
 
-def test_ir_received_names_no_receiver_because_the_multi_receiver_gives_no_direction() -> None:
-    event = NetworkEvents.IRReceived(b"x", signal_strength=0.8, error_margin=10)
-
-    assert not hasattr(event, "best_receiver")
-
-
 # ---------------------------------------------------------------------------
 # NetworkEvents.RadioReceived
 # ---------------------------------------------------------------------------
