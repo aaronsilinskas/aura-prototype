@@ -5,7 +5,6 @@ from typing import Any
 
 from engine.effects.admin import EffectAdmin, HeldEffects, SceneView
 from engine.effects.output import EffectOutput
-from engine.engine import GameEngine
 from engine.pack_catalog import PackCatalog
 from engine.scene import PackReference, Scene, SceneManager, SceneRegistry
 from engine.scene_runtime import SceneRuntime
@@ -166,7 +165,9 @@ def make_scene_manager(catalog: PackCatalog, effect_admin: SpyEffectAdmin) -> Sc
     *effect_admin* records each transition's step; every other port is a spy.
     """
     return SceneManager(
-        GameEngine(effect_controls=SpyEffectControls()),
+        SpyEffectControls(),
+        SpyNetworkControls(),
+        frozenset(),
         catalog.rule_registry,
         catalog.scene_registry,
         effect_admin,
