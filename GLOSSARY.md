@@ -117,8 +117,8 @@ The JSON file in an **Effect pack** or **Rule pack** that states the pack's vers
 _Avoid_: `version.txt`
 
 ### Scene Config
-A scene's derived, immutable helper object, built once from the scene's **Settings** — e.g. `RlglConfig` scaling durations by Game Level. One per scene (`RlglConfig`, `TagConfig`).
-_Avoid_: confusing with `EffectConfig`; calling the Settings themselves the Scene Config; re-deriving it every tick (build once, cache)
+The immutable helper a scene's rules, or a **Rule pack**'s, build once from the scene's **Settings** (the scene's own namespace, or the pack's within it): each Setting it needs as a typed field, plus what derives from them (e.g. Red Light Green Light's durations scaled by **Game Level**) and any check across Settings. One per scene or Rule pack that needs one (Tag's, Red Light Green Light's, the lobby's).
+_Avoid_: confusing with `EffectConfig`; calling the Settings themselves the Scene Config; re-deriving it every tick (build once, cache); restating a Setting's default in it (its declaration holds it); a second way to build it from loose values
 
 ### Timer
 Owned internally by `GameEngine`. Rules access time only via `state.elapsed`/`state.total`, never by holding a `Timer` reference.
