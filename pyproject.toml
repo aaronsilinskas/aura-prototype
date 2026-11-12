@@ -75,10 +75,10 @@ root_packages = ["effects", "engine", "magic", "packs", "hardware", "app"]
 source_roots = ["."]
 
 [[tool.importlinter.contracts]]
-name = "engine must not import hardware"
+name = "engine must not import hardware or app"
 type = "forbidden"
 source_modules = ["engine"]
-forbidden_modules = ["hardware"]
+forbidden_modules = ["hardware", "app"]
 
 [[tool.importlinter.contracts]]
 name = "hardware must not import engine runtime machinery"
@@ -87,6 +87,7 @@ source_modules = ["hardware"]
 forbidden_modules = [
     "engine.engine",
     "engine.scene",
+    "engine.scene_runtime",
     "engine.packs",
     "engine.timer",
     "engine.effects.admin",
