@@ -192,8 +192,8 @@ The scene a device's card names in `aura-state.json` (`scene`, with its `return_
 _Avoid_: "saved scene", "override" for it; clearing it because this device cannot run it (the card may go back to a prop that can); expecting it to name the running scene right after a `--scene` deploy (the card names none until the next Reboot); treating it as host-authored (only the device writes it)
 
 ### Scene deploy token
-The per-deploy value `deploy.py --scene` writes as `scene_deploy_token` beside `default_scene` in `aura-boot.json`, new on every invocation. On boot, before the boot scene is resolved, a non-empty token that differs from the one recorded in the card's `aura-state.json` is applied: the **Persisted scene** and its `return_to` are removed and the token recorded, in one write, and one line is logged naming the deployed scene and the Persisted scene it cleared. So each `--scene` deploy wins once, and Reboots made after it keep persisting. The apply never checks the deployed scene against the registry: an unknown one is cleared to, then fails resolution naming the known scenes.
-_Avoid_: "nonce", "deploy id" for it; comparing scene names instead (a second deploy of the same scene would be mistaken for the first); copying the deployed scene onto the card; a separate inbox file; applying it outside the **Scene boot**
+The per-deploy value written as `scene_deploy_token` beside `default_scene` in `aura-boot.json`, new on every write: by `deploy.py --scene` on a device, and by a **Simulated device**'s redeploy in tests, both through the one write rule beside the boot code that reads it. On boot, before the boot scene is resolved, a non-empty token that differs from the one recorded in the card's `aura-state.json` is applied: the **Persisted scene** and its `return_to` are removed and the token recorded, in one write, and one line is logged naming the deployed scene and the Persisted scene it cleared. So each `--scene` deploy wins once, and Reboots made after it keep persisting. The apply never checks the deployed scene against the registry: an unknown one is cleared to, then fails resolution naming the known scenes.
+_Avoid_: "nonce", "deploy id" for it; restating its key or how it's written in a writer; comparing scene names instead (a second deploy of the same scene would be mistaken for the first); copying the deployed scene onto the card; a separate inbox file; applying it outside the **Scene boot**
 
 ### SceneReboot
 The board-free port `SceneManager` reaches to persist a scene switch and reboot the device; live adapter `DeviceSceneReboot`. Its `previous_scene` names the scene `reboot_to_previous` would boot, so `SceneManager` can check that scene's **Required capabilities** before anything is persisted.
@@ -517,6 +517,10 @@ _Avoid_: leaving pulses in the buffer to overflow (drain even when discarding); 
 ### Inter-frame gap
 The idle period between two IR shots, delivered by `PulseIn` as a single over-long "space" pulse (≈6500 µs+); treated as a frame terminator that abandons a stalled partial decode and returns the decoder to idle.
 _Avoid_: trying to "re-arm" or salvage a pulse from an overlapping frame (recognise the gap and start the next frame clean)
+
+### Ship list
+The one answer to which repo files go on a device and where each lands: the device modules (compiled to `.mpy`, or as source), their data files, each nested package's parent `__init__`, and the board's `boot.py` on the mount root. It never includes tests, `conftest.py`, the **Simulation test harness** or the **Simulated device**. Building and deploying both follow it.
+_Avoid_: excluding or placing files separately in the build or deploy step; "manifest" for it (a **Pack manifest** is `effects.json`/`rules.json`)
 
 ### Deploy-watch
 The host tool that deploys an example and captures the resulting serial run; unlike `deploy.py` it flashes *and* captures.
