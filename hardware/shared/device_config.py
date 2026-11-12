@@ -229,18 +229,20 @@ class AudioConfig:
 class IRConfig:
     """Parsed IR configuration.
 
-    ``rx`` is always a list of pin names, regardless of whether
+    ``rx`` is always a list of Pin references, regardless of whether
     ``aura-device.json`` declared ``ir.rx`` as a single string (the
-    single-receiver shape) or a list of strings (the multi-receiver shape) —
-    callers deal with one representation either way. It is empty only when
-    ``ir.rx`` is left out: an emitter-only section with no receiver.
+    single-receiver shape, recorded on ``ir.rx``) or a list of strings (the
+    multi-receiver shape, recorded on ``ir.rx[i]``) — callers deal with one
+    representation either way. It is empty only when ``ir.rx`` is left out:
+    an emitter-only section with no receiver. ``emitters`` maps each emitter
+    key to its Pin reference, recorded on ``ir.<emitter>``.
     """
 
     __slots__ = ("emitters", "enabled", "rx")
 
-    def __init__(self, rx: list[str], emitters: dict[str, str], enabled: bool = True) -> None:
-        self.rx: list[str] = rx
-        self.emitters: dict[str, str] = emitters
+    def __init__(self, rx: list[PinRef], emitters: dict[str, PinRef], enabled: bool = True) -> None:
+        self.rx: list[PinRef] = rx
+        self.emitters: dict[str, PinRef] = emitters
         self.enabled: bool = enabled
 
 
@@ -849,13 +851,13 @@ def _parse_buttons(buttons_raw: list) -> list[PinRef]:
     return result
 
 
-def _parse_ir_rx(rx_raw: object) -> list[str]:
-    """Normalize ``ir.rx`` to a non-empty list of pin names.
+def _parse_ir_rx(rx_raw: object) -> list[PinRef]:
+    """Normalize ``ir.rx`` to a non-empty list of Pin references.
 
     Accepts either shape declared in ``aura-device.json``: a single pin-name
-    string (today's single-receiver shape, normalized to a one-element list)
-    or a non-empty list of pin-name strings (the multi-receiver shape,
-    order preserved).
+    string (the single-receiver shape, a one-element list recorded on
+    ``ir.rx``) or a non-empty list of pin-name strings (the multi-receiver
+    shape, order preserved, each recorded on ``ir.rx[i]``).
 
     Raises:
         ValueError: If *rx_raw* is an empty list, a list containing a
@@ -863,16 +865,16 @@ def _parse_ir_rx(rx_raw: object) -> list[str]:
             list.
     """
     if isinstance(rx_raw, str):
-        return [rx_raw]
+        return [PinRef(rx_raw, "ir.rx")]
 
     if isinstance(rx_raw, list):
         if not rx_raw:
             raise ValueError("ir.rx must not be an empty list")
-        result: list[str] = []
+        result: list[PinRef] = []
         for i, pin in enumerate(rx_raw):
             if not isinstance(pin, str):
                 raise ValueError(f"ir.rx[{i}] must be a string pin name, got {type(pin).__name__}")
-            result.append(pin)
+            result.append(PinRef(pin, f"ir.rx[{i}]"))
         return result
 
     raise ValueError("ir.rx must be a string pin name or a list of string pin names")
@@ -884,16 +886,14 @@ def _parse_ir(ir_raw: dict) -> IRConfig:
     # Every IR item is optional: a prop with no receiver omits rx, and one
     # that cannot transmit on a given emitter (line/cone/area_of_effect)
     # omits it. Emitters are validated uniformly by the loop below.
-    emitters: dict[str, str] = {}
-    for key, pin in ir_raw.items():
+    emitters: dict[str, PinRef] = {}
+    for key in ir_raw:
         if key in ("rx", "enabled"):
             continue
         if key not in _VALID_IR_EMITTER_KEYS:
             valid = ", ".join(sorted(_VALID_IR_EMITTER_KEYS))
             raise ValueError(f"ir emitter key '{key}' is not valid; valid keys: {valid}")
-        if not isinstance(pin, str):
-            raise ValueError(f"ir.{key} must be a string pin name")
-        emitters[key] = pin
+        emitters[key] = _parse_pin(ir_raw, key, f"ir.{key}")
 
     enabled = _parse_enabled(ir_raw, "ir.enabled")
     return IRConfig(rx=rx, emitters=emitters, enabled=enabled)

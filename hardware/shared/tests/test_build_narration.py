@@ -357,22 +357,34 @@ def test_describe_i2c_chips_append_the_i2c_bus_they_join_when_not_default():
 
 
 def test_describe_ir_names_a_single_rx_pin_without_multi_receiver_wording():
-    ir = IRConfig(rx=["D11"], emitters={LINE: "D12"})
+    ir = IRConfig(rx=[PinRef("D11", "ir.rx")], emitters={LINE: PinRef("D12", "ir.line")})
 
     assert describe_ir(ir) == "ir rx=[D11] emitters=line:D12"
 
 
 def test_describe_ir_labels_two_rx_pins_as_an_ir_multi_receiver():
-    ir = IRConfig(rx=["D11", "D13"], emitters={LINE: "D12"})
+    ir = IRConfig(
+        rx=[PinRef("D11", "ir.rx[0]"), PinRef("D13", "ir.rx[1]")],
+        emitters={LINE: PinRef("D12", "ir.line")},
+    )
 
     assert describe_ir(ir) == "ir rx=[D11 D13] (IR multi-receiver) emitters=line:D12"
 
 
 def test_describe_ir_lists_emitters_in_ir_emitters_order_not_config_order():
-    ir = IRConfig(rx=["D11"], emitters={AREA_OF_EFFECT: "D14", CONE: "D13", LINE: "D12"})
+    ir = IRConfig(
+        rx=[PinRef("D11", "ir.rx")],
+        emitters={
+            AREA_OF_EFFECT: PinRef("D14", "ir.area_of_effect"),
+            CONE: PinRef("D13", "ir.cone"),
+            LINE: PinRef("D12", "ir.line"),
+        },
+    )
 
     assert describe_ir(ir) == "ir rx=[D11] emitters=line:D12 cone:D13 area_of_effect:D14"
 
 
 def test_describe_ir_with_no_emitters_wired_notes_none():
-    assert describe_ir(IRConfig(rx=["D11"], emitters={})) == "ir rx=[D11] emitters=(none)"
+    ir = IRConfig(rx=[PinRef("D11", "ir.rx")], emitters={})
+
+    assert describe_ir(ir) == "ir rx=[D11] emitters=(none)"
