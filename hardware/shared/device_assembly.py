@@ -52,7 +52,6 @@ from hardware.shared.device_config import (
     IRConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
-    NeoPixelStripConfig,
     PinRef,
     RadioConfig,
     SDCardConfig,
@@ -162,22 +161,11 @@ def _pixel_outputs(
     parts: DeviceParts,
     i2c: dict[str, Bus | None],
 ) -> list[EffectOutput]:
-    """Build enabled pixel entry *index*: a matrix, or one output per NeoPixel strip.
-
-    A legacy ``scopes`` entry is one strip per scope, spanning the whole scope.
-    """
+    """Build enabled pixel entry *index*: a matrix, or one output per NeoPixel strip."""
     if isinstance(pixels, MatrixPixelsConfig):
         bus = _require_i2c(i2c, f"pixels[{index}]", pixels)
         return [parts.matrix_pixels(pixels, bus)]
-    outputs = [
-        parts.neopixel_strip(strip, PinRef(strip.pin, "pixels.pin")) for strip in pixels.strips
-    ]
-    for key, scope in pixels.scopes.items():
-        strip = NeoPixelStripConfig(
-            scope.pin, scope.count, scope.order, scope.brightness, {key: range(0, scope.count)}
-        )
-        outputs.append(parts.neopixel_strip(strip, PinRef(scope.pin, f"pixels.scopes.{key}.pin")))
-    return outputs
+    return [parts.neopixel_strip(strip, PinRef(strip.pin, "pixels.pin")) for strip in pixels.strips]
 
 
 def _ir(ir_config: IRConfig, parts: DeviceParts) -> tuple[InfraredTransceiver, str]:
