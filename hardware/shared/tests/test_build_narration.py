@@ -30,6 +30,7 @@ from hardware.shared.device_config import (
     MatrixPixelsConfig,
     NeoPixelCurrentBudgetConfig,
     NeoPixelPixelsConfig,
+    PinRef,
     RadioConfig,
     SDCardConfig,
     SPIConfig,
@@ -120,7 +121,7 @@ def test_narrate_skip_emits_begin_then_end_with_no_build_step():
 
 
 def test_describe_high_current_rail_names_its_pin_and_polarity():
-    rail = HighCurrentRailConfig(pin="D10", active_high=False)
+    rail = HighCurrentRailConfig(pin=PinRef("D10", "high_current_rail.pin"), active_high=False)
 
     assert describe_high_current_rail(rail) == "high_current_rail pin=D10 active_high=False"
 
@@ -253,7 +254,9 @@ def test_describe_pixel_entry_disabled_neopixel_is_its_index_and_kind_only():
 
 
 def test_describe_buttons_pairs_each_label_with_its_declared_pin_in_order():
-    assert describe_buttons(["GP2", "GP3", "GP4"]) == "buttons A=GP2 B=GP3 C=GP4"
+    pins = [PinRef(name, f"buttons[{i}]") for i, name in enumerate(["GP2", "GP3", "GP4"])]
+
+    assert describe_buttons(pins) == "buttons A=GP2 B=GP3 C=GP4"
 
 
 def test_describe_buttons_with_none_declared_is_the_bare_step_name():

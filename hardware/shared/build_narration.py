@@ -39,6 +39,7 @@ from hardware.shared.device_config import (
     MatrixPixelsConfig,
     NeoPixelCurrentBudgetConfig,
     NeoPixelPixelsConfig,
+    PinRef,
     RadioConfig,
     SDCardConfig,
     SPIConfig,
@@ -101,7 +102,7 @@ def narrate_skip(logger: Logger, description: str, note: str) -> None:
 
 
 def describe_high_current_rail(rail: HighCurrentRailConfig) -> str:
-    return f"high_current_rail pin={rail.pin} active_high={rail.active_high}"
+    return f"high_current_rail pin={rail.pin.name} active_high={rail.active_high}"
 
 
 def describe_i2c(name: str, i2c: I2CConfig | None) -> str:
@@ -177,9 +178,9 @@ def describe_pixel_entry(index: int, pixels: MatrixPixelsConfig | NeoPixelPixels
     return f"pixels[{index}] {kind} {detail}"
 
 
-def describe_buttons(pin_names: list[str]) -> str:
+def describe_buttons(pins: list[PinRef]) -> str:
     """Label buttons ``A``, ``B``, ... in declaration order -- the labels the board assigns."""
-    labelled = " ".join(f"{chr(ord('A') + i)}={name}" for i, name in enumerate(pin_names))
+    labelled = " ".join(f"{chr(ord('A') + i)}={pin.name}" for i, pin in enumerate(pins))
     return f"buttons {labelled}" if labelled else "buttons"
 
 

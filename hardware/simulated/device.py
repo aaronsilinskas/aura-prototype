@@ -204,7 +204,7 @@ class SimulatedHardware:
         self.buzzed: list[Buzzed] = []
         self.buzz_held: list[BuzzHeld] = []
         # Which button each pin is, so a scripted press of a label reaches its pin.
-        self._button_of_pin = {name: button_label(i) for i, name in enumerate(config.buttons)}
+        self._button_of_pin = {pin.name: button_label(i) for i, pin in enumerate(config.buttons)}
         labels = self._button_of_pin.values()
         self._pressed = dict.fromkeys(labels, False)
         self._pin_changes: dict[str, list[tuple[float, bool]]] = {b: [] for b in labels}
