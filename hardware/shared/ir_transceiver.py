@@ -1,27 +1,33 @@
 """InfraredTransceiver — board-free single owner of the IR hardware subsystem.
 
-Owns the transmitter map, the receiver, and the shared :class:`IrTransmitGate`
-that keeps a device from decoding its own self-echo. Pumps its own
-transmitters directly rather than through an ``engine``-side seam, so it
-imports no ``engine`` types.
-
-Assembled by :func:`~hardware.shared.ir_wiring.wire_ir` and exposed as
+Builds and owns the transmitters, the receiver, and the shared IR transmit
+gate that keeps a device from decoding its own self-echo, from the pulse
+readers, emitter pins and writer factory the platform provides. Pumps its own
+transmitters directly rather than through an ``engine``-side seam. Used by
+the device and the Simulated device alike, and exposed as
 ``DeviceHardware.ir``.
 """
 
+from engine.network import IR_EMITTERS
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_transport import (
-    InfraredReceiver,
-    InfraredTransmitter,
-    IrTransmitGate,
     PulseReader,
+    PulseWriter,
+    _InfraredReceiver,
+    _InfraredTransmitter,
+    _IrTransmitGate,
 )
 from hardware.shared.polled_part import PolledPart
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from typing import TypeVar
+
+    # A pin is whatever the platform's writer factory takes (a board pin, a
+    # pin reference), so it is passed through untouched.
+    Pin = TypeVar("Pin")
 
 __all__ = ["InfraredTransceiver"]
 
@@ -29,38 +35,58 @@ __all__ = ["InfraredTransceiver"]
 class InfraredTransceiver(PolledPart):
     """Owns and drives the whole IR subsystem for one device.
 
-    The transmitter map is never exposed as a raw collection; reach a
-    transmitter only through :meth:`send` and :meth:`busy`. :attr:`emitters`
-    and :attr:`receives` say what is wired.
+    Builds its own transmitters, receiver and shared IR transmit gate from
+    what the platform provides. One gate is shared by the receiver and every
+    transmitter, so a device never decodes its own self-echo. Everything
+    speaks the Aura wire-frame until :meth:`apply_codec`.
+
+    Reach a transmitter only through :meth:`send` and :meth:`busy`;
+    :attr:`emitters` and :attr:`receives` say what is wired.
 
     Args:
-        transmitters: Map from emitter constant (``LINE``, ``CONE``,
-            ``AREA_OF_EFFECT``) to the :class:`InfraredTransmitter` wired to
-            that physical emitter. An empty dict means no emitters are
-            wired; :meth:`send` then raises ``ValueError`` for every emitter.
-        receiver: The wired :class:`InfraredReceiver`, or ``None`` on a
-            device with no IR receiver.
-        gate: The :class:`IrTransmitGate` shared by *transmitters* and
-            *receiver*. Held only as the assembly reference — already wired
-            into both at construction, so this class never drives it.
+        readers: One pulse reader per IR receiver; empty wires no receiver.
+        emitter_pins: Emitter key (a member of ``IR_EMITTERS``) to whatever
+            *writer_factory* needs to build that emitter's writer. An emitter
+            absent from it is not wired, and :meth:`send` raises for it.
+        writer_factory: Called with an emitter key and its pin, in
+            ``IR_EMITTERS`` order; builds that emitter's writer and returns it
+            paired with the writer kind.
     """
 
-    __slots__ = ("_codec", "_gate", "_receiver", "_transmitters", "received")
+    __slots__ = ("_codec", "_receiver", "_transmitters", "_writer_kind", "received")
 
     def __init__(
         self,
-        transmitters: dict[str, InfraredTransmitter],
-        receiver: InfraredReceiver | None,
-        gate: IrTransmitGate,
+        readers: "list[PulseReader]",
+        emitter_pins: "dict[str, Pin]",
+        writer_factory: "Callable[[str, Pin], tuple[PulseWriter, str]]",
     ) -> None:
+        gate = _IrTransmitGate()
+        self._receiver = _InfraredReceiver(readers, AuraInfraredDecoder, gate) if readers else None
+        encoder = AuraInfraredEncoder()
+        transmitters: dict[str, _InfraredTransmitter] = {}
+        writer_kind: str | None = None
+        for emitter in IR_EMITTERS:
+            if emitter not in emitter_pins:
+                continue
+            writer, writer_kind = writer_factory(emitter, emitter_pins[emitter])
+            transmitters[emitter] = _InfraredTransmitter(writer, encoder, gate)
         self._transmitters = transmitters
-        self._receiver = receiver
-        self._gate = gate
+        self._writer_kind = writer_kind
         self._codec: tuple[type[InfraredEncoder], Callable[[], InfraredDecoder]] = (
             AuraInfraredEncoder,
             AuraInfraredDecoder,
         )
         self.received: bytearray | None = None
+
+    @property
+    def writer_kind(self) -> str | None:
+        """The writer kind the writer factory last reported, for boot narration.
+
+        ``None`` when no emitter is wired. Every emitter is on one board, so
+        one kind describes them all.
+        """
+        return self._writer_kind
 
     @property
     def emitters(self) -> tuple[str, ...]:
@@ -75,9 +101,8 @@ class InfraredTransceiver(PolledPart):
     def send(self, data: bytes, emitter: str) -> None:
         """Route *data* to the transmitter wired to *emitter*.
 
-        Fire-and-forget, mirroring :meth:`InfraredTransmitter.send`: whether
-        the write completes synchronously or is still in flight stays a
-        transmitter-level detail.
+        Fire-and-forget: whether the write completes synchronously or is
+        still in flight stays a transmitter-level detail.
 
         Args:
             data: Opaque payload bytes to transmit.
@@ -200,8 +225,7 @@ class InfraredTransceiver(PolledPart):
         """Delegate to the receiver's change-gated telemetry summary.
 
         Returns ``None`` with no receiver wired, or when the receiver has
-        nothing new to report (see
-        :meth:`~hardware.shared.ir_transport.InfraredReceiver.telemetry_line`).
+        nothing new to report.
         """
         receiver = self._receiver
         return receiver.telemetry_line() if receiver is not None else None

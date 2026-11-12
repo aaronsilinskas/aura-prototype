@@ -51,7 +51,7 @@ class PulseInReader(PulseReader):
 
         # Monotonic-since-boot count of reads that observed a full buffer —
         # a proxy for buffer-overrun pulse loss (pulseio exposes no real
-        # overflow signal). Reset via reset_telemetry() on the receiver.
+        # overflow signal).
         self.buffer_full_on_poll: int = 0
 
     def read_pulse(self) -> int | None:
@@ -71,10 +71,6 @@ class PulseInReader(PulseReader):
         if count == pulsein.maxlen:
             self.buffer_full_on_poll += 1
         return pulsein.popleft()
-
-    def reset_telemetry(self) -> None:
-        """Zero ``buffer_full_on_poll`` (for CPython test resets)."""
-        self.buffer_full_on_poll = 0
 
 
 class PulseOutWriter(PulseWriter):

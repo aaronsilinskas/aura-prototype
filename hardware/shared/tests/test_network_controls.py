@@ -6,19 +6,22 @@ from engine.capabilities import MissingCapabilityError
 from engine.engine import GameEngine
 from engine.network import CONE, LINE
 from engine.state import EffectControls, SceneControls
+from hardware.shared.ir_codecs.aura import AuraInfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.ir_transport import InfraredTransmitter, IrTransmitGate
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.radio_transceiver import RadioTransceiver
-from hardware.shared.tests.ir_fakes import make_transmitter
+from hardware.shared.tests.ir_fakes import EmitterPulseWriter
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_transceiver(**transmitters: InfraredTransmitter) -> InfraredTransceiver:
-    return InfraredTransceiver(transmitters, None, IrTransmitGate())
+def _transceiver_with_emitter(emitter: str) -> tuple[InfraredTransceiver, EmitterPulseWriter]:
+    """A receiver-less transceiver with only *emitter* wired, and that emitter's writer."""
+    writer = EmitterPulseWriter()
+    transceiver = InfraredTransceiver([], {emitter: "GP1"}, lambda _e, _pin: (writer, "fake"))
+    return transceiver, writer
 
 
 # ---------------------------------------------------------------------------
@@ -26,13 +29,13 @@ def _make_transceiver(**transmitters: InfraredTransmitter) -> InfraredTransceive
 # ---------------------------------------------------------------------------
 
 
-def test_hardware_network_controls_send_ir_dispatches_correct_data() -> None:
-    tx, writer = make_transmitter()
-    controls = HardwareNetworkControls(_make_transceiver(**{CONE: tx}))
+def test_send_ir_writes_the_encoded_payload_on_the_named_emitter() -> None:
+    transceiver, writer = _transceiver_with_emitter(CONE)
+    controls = HardwareNetworkControls(transceiver)
 
     controls.send_ir(b"\xab\xcd", CONE)
 
-    assert writer.calls[0] == [0xAB, 0xCD]
+    assert writer.calls == [list(AuraInfraredEncoder().encode(b"\xab\xcd"))]
 
 
 def test_send_ir_with_no_ir_raises_missing_capability_for_the_emitter() -> None:
@@ -45,8 +48,8 @@ def test_send_ir_with_no_ir_raises_missing_capability_for_the_emitter() -> None:
 
 
 def test_send_ir_on_an_emitter_not_wired_raises_missing_capability_for_it() -> None:
-    tx, _ = make_transmitter()
-    controls = HardwareNetworkControls(_make_transceiver(**{CONE: tx}))
+    transceiver, _ = _transceiver_with_emitter(CONE)
+    controls = HardwareNetworkControls(transceiver)
 
     with pytest.raises(MissingCapabilityError) as raised:
         controls.send_ir(b"x", LINE)
@@ -55,36 +58,11 @@ def test_send_ir_on_an_emitter_not_wired_raises_missing_capability_for_it() -> N
 
 
 def test_send_ir_on_an_unknown_emitter_raises_value_error_naming_it() -> None:
-    tx, _ = make_transmitter()
-    controls = HardwareNetworkControls(_make_transceiver(**{CONE: tx}))
+    transceiver, _ = _transceiver_with_emitter(CONE)
+    controls = HardwareNetworkControls(transceiver)
 
     with pytest.raises(ValueError, match="laser"):
         controls.send_ir(b"x", "laser")
-
-
-class _RecordingIrTransceiver(InfraredTransceiver):
-    """Fake transceiver that just records send() calls -- isolates
-    HardwareNetworkControls.send_ir's delegation from InfraredTransceiver's
-    own send() behaviour (covered separately in test_ir_transceiver.py)."""
-
-    def __init__(self) -> None:
-        self.calls: list[tuple[bytes, str]] = []
-
-    @property
-    def emitters(self) -> tuple[str, ...]:
-        return (LINE,)
-
-    def send(self, data: bytes, emitter: str) -> None:
-        self.calls.append((data, emitter))
-
-
-def test_hardware_network_controls_send_ir_delegates_to_the_wired_transceiver() -> None:
-    transceiver = _RecordingIrTransceiver()
-    controls = HardwareNetworkControls(transceiver)
-
-    controls.send_ir(b"\x01", LINE)
-
-    assert transceiver.calls == [(b"\x01", LINE)]
 
 
 class _RecordingRadioTransceiver(RadioTransceiver):
