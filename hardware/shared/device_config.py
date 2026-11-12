@@ -64,8 +64,6 @@ _SPI_PIN_FIELDS: Final = ("sck", "mosi", "miso")
 
 _RADIO_ALLOWED_KEYS: Final = ("spi", "cs", "reset", "frequency", "node", "enabled")
 
-_RADIO_PIN_FIELDS: Final = ("cs", "reset")
-
 _SDCARD_ALLOWED_KEYS: Final = ("spi", "cs", "mount", "enabled")
 
 # The bus a device joins when it names none. Always a valid reference: when no
@@ -714,6 +712,26 @@ def _parse_enabled(mapping: dict, field: str) -> bool:
     return value
 
 
+def _parse_pin(mapping: dict, key: str, field: str) -> PinRef:
+    """Return the Pin reference at *key* in *mapping*, recorded under *field*.
+
+    Args:
+        mapping: The raw config mapping to read *key* from.
+        key: The mapping key holding the pin name (e.g. ``"cs"``).
+        field: The field path, used both in error messages and as the
+            returned ``PinRef.field`` (e.g. ``"radio.cs"``).
+
+    Raises:
+        ValueError: If *key* is absent or its value is not a string, naming *field*.
+    """
+    if key not in mapping:
+        raise ValueError(f"{field} is required")
+    name = mapping[key]
+    if not isinstance(name, str):
+        raise ValueError(f"{field} must be a string pin name")
+    return PinRef(name, field)
+
+
 # ---------------------------------------------------------------------------
 # Parser
 # ---------------------------------------------------------------------------
@@ -895,17 +913,17 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
         names = ", ".join(f"audio.{field}" for field in missing)
         raise ValueError(f"{names} required together when audio section is present")
 
-    for field in _I2S_PIN_FIELDS:
-        if not isinstance(audio_raw[field], str):
-            raise ValueError(f"audio.{field} must be a string pin name")
+    bit_clock, word_select, data = (
+        _parse_pin(audio_raw, field, f"audio.{field}") for field in _I2S_PIN_FIELDS
+    )
 
     enabled = _parse_enabled(audio_raw, "audio.enabled")
     return AudioConfig(
         voices=voices,
         max_volume=max_volume,
-        i2s_bit_clock=PinRef(audio_raw["i2s_bit_clock"], "audio.i2s_bit_clock"),
-        i2s_word_select=PinRef(audio_raw["i2s_word_select"], "audio.i2s_word_select"),
-        i2s_data=PinRef(audio_raw["i2s_data"], "audio.i2s_data"),
+        i2s_bit_clock=bit_clock,
+        i2s_word_select=word_select,
+        i2s_data=data,
         enabled=enabled,
     )
 
@@ -973,11 +991,7 @@ def _parse_bus(
         names = ", ".join(f"{field}.{pin}" for pin in missing)
         raise ValueError(f"{names} required together when {field} is declared")
 
-    for pin in pin_fields:
-        if not isinstance(bus_raw[pin], str):
-            raise ValueError(f"{field}.{pin} must be a string pin name")
-
-    return build(*(PinRef(bus_raw[pin], f"{field}.{pin}") for pin in pin_fields))
+    return build(*(_parse_pin(bus_raw, pin, f"{field}.{pin}") for pin in pin_fields))
 
 
 def _parse_bus_reference(
@@ -1007,13 +1021,8 @@ def _parse_radio(radio_raw: dict, spi_buses: dict[str, SPIConfig]) -> RadioConfi
     _reject_unknown_keys(radio_raw, "radio", allowed=_RADIO_ALLOWED_KEYS)
     spi = _parse_bus_reference(radio_raw, "radio", "spi", spi_buses)
 
-    for field in _RADIO_PIN_FIELDS:
-        if field not in radio_raw:
-            raise ValueError(f"radio.{field} is required")
-        if not isinstance(radio_raw[field], str):
-            raise ValueError(f"radio.{field} must be a string pin name")
-    cs = PinRef(radio_raw["cs"], "radio.cs")
-    reset = PinRef(radio_raw["reset"], "radio.reset")
+    cs = _parse_pin(radio_raw, "cs", "radio.cs")
+    reset = _parse_pin(radio_raw, "reset", "radio.reset")
 
     if "frequency" not in radio_raw:
         raise ValueError("radio.frequency is required")
@@ -1039,11 +1048,7 @@ def _parse_sdcard(sdcard_raw: dict, spi_buses: dict[str, SPIConfig]) -> SDCardCo
     _reject_unknown_keys(sdcard_raw, "sdcard", allowed=_SDCARD_ALLOWED_KEYS)
     spi = _parse_bus_reference(sdcard_raw, "sdcard", "spi", spi_buses)
 
-    if "cs" not in sdcard_raw:
-        raise ValueError("sdcard.cs is required")
-    cs = sdcard_raw["cs"]
-    if not isinstance(cs, str):
-        raise ValueError("sdcard.cs must be a string pin name")
+    cs = _parse_pin(sdcard_raw, "cs", "sdcard.cs")
 
     mount = sdcard_raw.get("mount", "/sd")
     if not isinstance(mount, str) or not mount.startswith("/"):
@@ -1052,26 +1057,20 @@ def _parse_sdcard(sdcard_raw: dict, spi_buses: dict[str, SPIConfig]) -> SDCardCo
         )
 
     enabled = _parse_enabled(sdcard_raw, "sdcard.enabled")
-    return SDCardConfig(cs=PinRef(cs, "sdcard.cs"), mount=mount, enabled=enabled, spi=spi)
+    return SDCardConfig(cs=cs, mount=mount, enabled=enabled, spi=spi)
 
 
 def _parse_high_current_rail(rail_raw: dict) -> HighCurrentRailConfig:
     _reject_unknown_keys(rail_raw, "high_current_rail", allowed=_HIGH_CURRENT_RAIL_ALLOWED_KEYS)
 
-    if "pin" not in rail_raw:
-        raise ValueError("high_current_rail.pin is required")
-    pin = rail_raw["pin"]
-    if not isinstance(pin, str):
-        raise ValueError("high_current_rail.pin must be a string pin name")
+    pin = _parse_pin(rail_raw, "pin", "high_current_rail.pin")
 
     active_high = rail_raw.get("active_high", True)
     if not isinstance(active_high, bool):
         raise ValueError(f"high_current_rail.active_high must be a boolean, got {active_high!r}")
 
     enabled = _parse_enabled(rail_raw, "high_current_rail.enabled")
-    return HighCurrentRailConfig(
-        pin=PinRef(pin, "high_current_rail.pin"), active_high=active_high, enabled=enabled
-    )
+    return HighCurrentRailConfig(pin=pin, active_high=active_high, enabled=enabled)
 
 
 def _parse_milliamps(budget_raw: dict, key: str, default: int) -> int:
