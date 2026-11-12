@@ -88,8 +88,7 @@ _I2C_DEVICE_SECTIONS: Final = ("accelerometer", "magnetometer", "haptics")
 # `DeviceConfig.isolate` derives its isolatable set from `DeviceConfig.__slots__`
 # minus these -- i2c/spi are buses (infrastructure for the kept component, not
 # competition with it), buttons carries no `enabled` flag to isolate, and
-# neopixel_current_budget is parse-time policy with no `enabled` flag; it
-# builds nothing, so there is nothing to isolate.
+# neopixel_current_budget is parse-time policy that builds nothing.
 _ISOLATE_EXCLUDED_COMPONENTS: Final = (
     "i2c",
     "spi",

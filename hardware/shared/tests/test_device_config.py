@@ -78,8 +78,9 @@ def neopixel_config():
 def full_isolatable_config(matrix_config):
     # Adds every section `matrix_config` lacks (i2c, spi, radio, sdcard,
     # accelerometer, magnetometer, haptics) so every isolatable component --
-    # plus both excluded buses -- is declared and enabled, giving `isolate` tests a config where
-    # "disabled" and "absent" can never be confused for one another.
+    # plus both excluded buses -- is declared and enabled, giving `isolate`
+    # tests a config where "disabled" and "absent" can never be confused for
+    # one another.
     matrix_config["i2c"] = {"default": {"sda": "GP4", "scl": "GP5"}}
     matrix_config["spi"] = {"default": {"sck": "GP6", "mosi": "GP7", "miso": "GP8"}}
     matrix_config["radio"] = {"cs": "GP13", "reset": "GP14", "frequency": 915.0, "node": 5}
