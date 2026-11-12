@@ -482,16 +482,6 @@ def test_a_disabled_matrix_entry_boots():
     assert sim_hw.hw.outputs == []
 
 
-def test_a_declared_high_current_rail_boots_asserted():
-    logger, fragments = _recording_logger()
-
-    SimulatedHardware(
-        now=lambda: 0.0, config=_config(high_current_rail={"pin": "GP20"}), logger=logger
-    )
-
-    assert "[hw] high_current_rail pin=GP20 active_high=True asserted\n" in "".join(fragments)
-
-
 _PERSISTING = _config(**_MAGNETOMETER, accelerometer={}, sdcard={"cs": "GP9"})
 
 

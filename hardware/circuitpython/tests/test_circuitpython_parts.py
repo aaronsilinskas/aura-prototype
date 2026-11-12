@@ -117,38 +117,6 @@ def test_board_name_is_the_platform_when_the_board_module_is_missing(
 
 
 # ---------------------------------------------------------------------------
-# Pin references
-# ---------------------------------------------------------------------------
-
-
-def test_unknown_pin_name_raises_value_error_naming_the_config_field(
-    gpio: list[_FakeDigitalInOut],
-) -> None:
-    parts = CircuitPythonParts(_board("GP28"))
-
-    expected = r"^high_current_rail\.pin: pin 'GP99' not found on board$"
-    with pytest.raises(ValueError, match=expected):
-        parts.high_current_rail(PinRef("GP99", "high_current_rail.pin"), True)
-
-
-# ---------------------------------------------------------------------------
-# High-current rail
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("level", [True, False])
-def test_rail_drives_its_pin_to_the_level_it_is_told(
-    gpio: list[_FakeDigitalInOut], level: bool
-) -> None:
-    board = _board("GP28")
-    parts = CircuitPythonParts(board)
-
-    parts.high_current_rail(PinRef("GP28", "high_current_rail.pin"), level)
-
-    assert [(g.pin, g.direction, g.value) for g in gpio] == [(board.GP28, "output", level)]
-
-
-# ---------------------------------------------------------------------------
 # Buses
 # ---------------------------------------------------------------------------
 

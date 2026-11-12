@@ -31,7 +31,6 @@ if TYPE_CHECKING:
 __all__ = [
     "DEFAULT_BUS",
     "DeviceConfig",
-    "HighCurrentRailConfig",
     "I2CConfig",
     "I2CDeviceConfig",
     "MatrixPixelsConfig",
@@ -70,8 +69,6 @@ _SDCARD_ALLOWED_KEYS: Final = ("spi", "cs", "mount", "enabled")
 # bus of that name is declared, it is the board's own bus.
 DEFAULT_BUS: Final = "default"
 
-_HIGH_CURRENT_RAIL_ALLOWED_KEYS: Final = ("pin", "active_high", "enabled")
-
 _NEOPIXEL_CURRENT_BUDGET_ALLOWED_KEYS: Final = (
     "current_limit_ma",
     "max_pixel_current_ma",
@@ -91,15 +88,12 @@ _I2C_DEVICE_SECTIONS: Final = ("accelerometer", "magnetometer", "haptics")
 # `DeviceConfig.isolate` derives its isolatable set from `DeviceConfig.__slots__`
 # minus these -- i2c/spi are buses (infrastructure for the kept component, not
 # competition with it), buttons carries no `enabled` flag to isolate, and
-# high_current_rail is infrastructure too: it gates the whole board's
-# high-current rail, so no `keep` should ever be able to switch it off.
 # neopixel_current_budget is parse-time policy with no `enabled` flag; it
 # builds nothing, so there is nothing to isolate.
 _ISOLATE_EXCLUDED_COMPONENTS: Final = (
     "i2c",
     "spi",
     "buttons",
-    "high_current_rail",
     "neopixel_current_budget",
 )
 
@@ -346,29 +340,6 @@ class SDCardConfig:
         self.enabled: bool = enabled
 
 
-class HighCurrentRailConfig:
-    """Parsed high-current rail enable-pin configuration.
-
-    Gates the board's high-current rail (NeoPixels, audio amp, and other
-    peripherals drawing more than a GPIO pin's own budget). ``active_high``
-    picks the asserted polarity: ``True`` (the default) drives the pin high
-    to enable the rail, ``False`` drives it low.
-
-    Unlike every other gated section, ``enabled=False`` does not mean "build
-    nothing" -- the Device assembly still drives ``pin``, to the
-    *deasserted* level, holding the rail definitively off rather than leaving
-    it floating (useful for brown-out debugging). See ``device_assembly``'s
-    high-current-rail step for the driven-level logic.
-    """
-
-    __slots__ = ("active_high", "enabled", "pin")
-
-    def __init__(self, pin: PinRef, active_high: bool = True, enabled: bool = True) -> None:
-        self.pin: PinRef = pin
-        self.active_high: bool = active_high
-        self.enabled: bool = enabled
-
-
 class NeoPixelCurrentBudgetConfig:
     """Parsed opt-in NeoPixel current budget.
 
@@ -439,7 +410,6 @@ class DeviceConfig:
         "audio",
         "buttons",
         "haptics",
-        "high_current_rail",
         "i2c",
         "ir",
         "magnetometer",
@@ -462,7 +432,6 @@ class DeviceConfig:
         spi: dict[str, SPIConfig],
         radio: RadioConfig | None,
         sdcard: SDCardConfig | None,
-        high_current_rail: HighCurrentRailConfig | None,
         magnetometer: I2CDeviceConfig | None,
         neopixel_current_budget: NeoPixelCurrentBudgetConfig | None,
     ) -> None:
@@ -478,7 +447,6 @@ class DeviceConfig:
         """The declared **Named buses** of the ``spi`` section, by bus name."""
         self.radio: RadioConfig | None = radio
         self.sdcard: SDCardConfig | None = sdcard
-        self.high_current_rail: HighCurrentRailConfig | None = high_current_rail
         self.magnetometer: I2CDeviceConfig | None = magnetometer
         self.neopixel_current_budget: NeoPixelCurrentBudgetConfig | None = neopixel_current_budget
 
@@ -506,12 +474,11 @@ class DeviceConfig:
         present with ``enabled`` forced to ``False``, the same shape
         ``parse_device_config`` already produces for a declared-but-disabled
         section. A component that is absent on this config is a no-op --
-        it stays absent. ``i2c``, ``spi``, ``buttons``,
-        ``high_current_rail``, and ``neopixel_current_budget`` are never
-        touched: buses and the high-current rail are infrastructure for the
-        kept component, not competition with it -- isolating one component
-        must never leave the whole board's high-current rail switched off --
-        and the budget is parse-time policy that builds nothing.
+        it stays absent. ``i2c``, ``spi``, ``buttons``, and
+        ``neopixel_current_budget`` are never touched: buses are
+        infrastructure for the kept component, not competition with it,
+        ``buttons`` has no ``enabled`` flag, and the budget is parse-time
+        policy that builds nothing.
 
         The isolatable set is ``DeviceConfig.__slots__`` minus
         ``_ISOLATE_EXCLUDED_COMPONENTS``, so a component section added later
@@ -1060,19 +1027,6 @@ def _parse_sdcard(sdcard_raw: dict, spi_buses: dict[str, SPIConfig]) -> SDCardCo
     return SDCardConfig(cs=cs, mount=mount, enabled=enabled, spi=spi)
 
 
-def _parse_high_current_rail(rail_raw: dict) -> HighCurrentRailConfig:
-    _reject_unknown_keys(rail_raw, "high_current_rail", allowed=_HIGH_CURRENT_RAIL_ALLOWED_KEYS)
-
-    pin = _parse_pin(rail_raw, "pin", "high_current_rail.pin")
-
-    active_high = rail_raw.get("active_high", True)
-    if not isinstance(active_high, bool):
-        raise ValueError(f"high_current_rail.active_high must be a boolean, got {active_high!r}")
-
-    enabled = _parse_enabled(rail_raw, "high_current_rail.enabled")
-    return HighCurrentRailConfig(pin=pin, active_high=active_high, enabled=enabled)
-
-
 def _parse_milliamps(budget_raw: dict, key: str, default: int) -> int:
     # Whole milliamps only: sub-mA precision buys nothing, and rounding a
     # per-pixel figure up errs safe.
@@ -1209,10 +1163,6 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
         if section in mapping:
             i2c_devices[section] = _parse_i2c_device(mapping[section], section, i2c)
 
-    high_current_rail: HighCurrentRailConfig | None = None
-    if "high_current_rail" in mapping:
-        high_current_rail = _parse_high_current_rail(mapping["high_current_rail"])
-
     neopixel_current_budget: NeoPixelCurrentBudgetConfig | None = None
     if "neopixel_current_budget" in mapping:
         neopixel_current_budget = _parse_neopixel_current_budget(
@@ -1228,7 +1178,6 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
         spi=spi,
         radio=radio,
         sdcard=sdcard,
-        high_current_rail=high_current_rail,
         neopixel_current_budget=neopixel_current_budget,
         **i2c_devices,
     )
