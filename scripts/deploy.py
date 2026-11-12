@@ -25,6 +25,11 @@ import shutil
 import sys
 from pathlib import Path
 
+if not __package__:
+    # Run as a file (python scripts/deploy.py): put the repo root on the path so
+    # the package imports below resolve as they do under python -m.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from hardware.shared.scene_selection import with_scene_deploy
 from scripts.build import (
     BuildError,
@@ -33,10 +38,10 @@ from scripts.build import (
     mpy_cross_compile,
     validate_mpy_cross_version,
 )
-from scripts.ship_list import BOOT_DEVICE, BOOT_SOURCE, MODULE_DIRS, decides, ship_list
+from scripts.ship_list import MODULE_DIRS, governed_mount_files, ship_list
 
 try:
-    from collections.abc import Callable, Collection
+    from collections.abc import Callable
     from typing import Final
 except ImportError:
     pass
@@ -81,25 +86,15 @@ def _sync_file(
         print(f"COPY  {label}")
 
 
-def _stale_files(
-    mount: Path, dest_dir: Path, synced: "Collection[Path]", use_source: bool
-) -> "list[Path]":
-    """Return the files under *dest_dir* on *mount* that this deploy prunes.
-
-    That is each file the Ship list decides on but did not name in *synced*,
-    plus, in source mode, every ``.mpy`` a compiled deploy left behind.
-    """
+def _remove_empty_dirs(dest_dir: Path) -> None:
+    """Remove every empty directory under *dest_dir*, then *dest_dir* itself if empty."""
     if not dest_dir.is_dir():
-        return []
-    stale = []
-    for dest_file in sorted(dest_dir.rglob("*")):
-        if dest_file.is_dir():
-            continue
-        rel = dest_file.relative_to(mount)
-        unnamed = decides(rel) and rel not in synced
-        if unnamed or (use_source and dest_file.suffix == ".mpy"):
-            stale.append(dest_file)
-    return stale
+        return
+    for d in sorted(dest_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        if d.is_dir() and not any(d.iterdir()):
+            d.rmdir()
+    if not any(dest_dir.iterdir()):
+        dest_dir.rmdir()
 
 
 def _write_scene(mount: Path, scene: str) -> None:
@@ -127,8 +122,9 @@ def deploy(
 ) -> int:
     """Deploy to mount. Returns 0 on success, 1 on error.
 
-    Syncs the Ship list's entries to *mount*, then prunes each file under a
-    module directory that the list decides on but no longer names.
+    Syncs the Ship list's entries to *mount*, then prunes each mount file the
+    list governs but no longer names, and removes every empty directory under
+    each module directory.
 
     Args:
         example_file: Path to the example file to copy as ``code.py``.
@@ -147,8 +143,8 @@ def deploy(
         use_source: When True, skip compilation entirely and sync raw ``.py`` files
             directly from the source tree.  Requires no ``mpy-cross`` toolchain.
 
-    ``hardware/circuitpython/boot.py``, if present, is copied to the mount's
-    ``boot.py`` alongside ``code.py`` whenever *example_file* is given -- the
+    The list's ``boot.py`` entry, if any, is copied to the mount alongside
+    ``code.py`` whenever *example_file* is given -- the
     same force-always, never-pruned handling ``code.py`` gets, since a mount's
     existing ``boot.py`` is otherwise indistinguishable from a stale one (#930).
     It is not deployed when *example_file* is ``None`` (module-only sync).
@@ -172,8 +168,8 @@ def deploy(
             return 1
 
     compiled_count = 0
-    # boot.py is placed beside code.py below, not synced with the modules.
-    entries = [entry for entry in ship_list(source_root) if entry.device != BOOT_DEVICE]
+    listed = ship_list(source_root)
+    entries = listed.modules
 
     if use_source:
         synced = {entry.source_device: source_root / entry.source for entry in entries}
@@ -212,39 +208,34 @@ def deploy(
     if example_file is not None:
         _sync_file(example_file, mount / "code.py", "code.py", copied, skipped, dry_run, force=True)
 
-        boot_source = source_root / BOOT_SOURCE
-        if boot_source.is_file():
-            label = str(BOOT_DEVICE)
+        boot = listed.boot
+        if boot is not None:
             _sync_file(
-                boot_source, mount / BOOT_DEVICE, label, copied, skipped, dry_run, force=True
+                source_root / boot.source,
+                mount / boot.device,
+                str(boot.device),
+                copied,
+                skipped,
+                dry_run,
+                force=True,
             )
 
     for device, src in synced.items():
         _sync_file(src, mount / device, str(device), copied, skipped, dry_run)
 
-    for module in MODULE_DIRS:
-        dest_dir = mount / module
-        for stale_file in _stale_files(mount, dest_dir, synced.keys(), use_source):
-            label = str(stale_file.relative_to(mount))
-            if dry_run:
-                pruned.append(stale_file)
-                print(f"[DRY RUN] PRUNE  {label}")
-            else:
-                stale_file.unlink()
-                pruned.append(stale_file)
-                print(f"PRUNE  {label}")
+    for rel in governed_mount_files(mount, use_source):
+        if rel in synced:
+            continue
+        pruned.append(mount / rel)
+        if dry_run:
+            print(f"[DRY RUN] PRUNE  {rel}")
+        else:
+            (mount / rel).unlink()
+            print(f"PRUNE  {rel}")
 
-        if not dry_run and dest_dir.is_dir():
-            for d in sorted(dest_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
-                if d.is_dir():
-                    try:
-                        d.rmdir()
-                    except OSError:
-                        pass
-            try:
-                dest_dir.rmdir()
-            except OSError:
-                pass
+    if not dry_run:
+        for module in MODULE_DIRS:
+            _remove_empty_dirs(mount / module)
 
     print(
         f"Done. {compiled_count} compiled, "

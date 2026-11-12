@@ -1,6 +1,8 @@
 import json
 import os
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -8,7 +10,7 @@ import pytest
 
 from scripts.build import BuildError
 from scripts.deploy import deploy
-from scripts.ship_list import ship_list
+from scripts.ship_list import MODULE_DIRS, ship_list
 
 
 def fake_compile(src: Path, dest: Path) -> None:
@@ -570,6 +572,18 @@ def test_empty_subdirectory_is_removed_after_pruning(tmp_path: Path) -> None:
     assert not (mount / "effects" / "steps").exists()
 
 
+def test_empty_subdirectory_already_on_mount_is_removed(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    (mount / "effects" / "steps").mkdir(parents=True)
+
+    deploy(None, mount, source_root=source, compile=fake_compile)
+
+    assert not (mount / "effects" / "steps").exists()
+
+
 def test_module_root_removed_when_fully_pruned(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -1065,6 +1079,20 @@ def test_source_mode_prunes_orphaned_mpy_left_by_previous_compiled_deploy(
     assert not orphaned_mpy.exists()
 
 
+def test_source_mode_prunes_every_mpy_under_a_module_directory(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    (mount / "effects" / "tests").mkdir(parents=True)
+    orphaned_mpy = mount / "effects" / "tests" / "old_test.mpy"
+    orphaned_mpy.write_bytes(b"OLD_MPY")
+
+    deploy(None, mount, source_root=source, use_source=True)
+
+    assert not orphaned_mpy.exists()
+
+
 def test_compiled_mode_prunes_orphaned_py_left_by_previous_source_deploy(
     tmp_path: Path,
 ) -> None:
@@ -1134,7 +1162,7 @@ def test_real_repo_tree_lands_exactly_the_ship_list_and_code_py_on_the_mount(
     tmp_path: Path, use_source: bool
 ) -> None:
     source = tmp_path / "source"
-    for top in ("app", "effects", "engine", "hardware", "magic", "packs"):
+    for top in {Path(module).parts[0] for module in MODULE_DIRS}:
         shutil.copytree(_REPO_ROOT / top, source / top, ignore=shutil.ignore_patterns("*.pyc"))
     mount = tmp_path / "mount"
     mount.mkdir()
@@ -1144,8 +1172,33 @@ def test_real_repo_tree_lands_exactly_the_ship_list_and_code_py_on_the_mount(
     result = deploy(example, mount, source_root=source, compile=fake_compile, use_source=use_source)
 
     landed = {path.relative_to(mount) for path in mount.rglob("*") if path.is_file()}
-    listed = {entry.source_device if use_source else entry.device for entry in ship_list(source)}
+    shipped = ship_list(source)
+    entries = [*shipped.modules, shipped.boot]
+    listed = {
+        entry.source_device if use_source else entry.device
+        for entry in entries
+        if entry is not None
+    }
     hardware_init = Path("hardware/__init__.py" if use_source else "hardware/__init__.mpy")
     assert result == 0
     assert {Path("code.py"), Path("boot.py"), hardware_init} <= landed
     assert landed == listed | {Path("code.py")}
+
+
+# ---------------------------------------------------------------------------
+# Command line
+# ---------------------------------------------------------------------------
+
+
+def test_deploy_runs_as_a_script_file_outside_the_repo_root(tmp_path: Path) -> None:
+    env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
+
+    result = subprocess.run(
+        [sys.executable, str(_REPO_ROOT / "scripts" / "deploy.py"), "--help"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
