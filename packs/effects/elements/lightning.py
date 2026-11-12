@@ -7,7 +7,7 @@ except ImportError:
 
 from effects.effect import Effect, EffectConfig, EffectPixels, EffectVerb, PixelBuffer
 from effects.layers.layer import Layer
-from effects.level import clamp_level
+from effects.level import effect_level
 from effects.palette import Palette, PaletteLUT256
 from effects.shape import EffectShapeFunc, Shape
 from engine.effects.builder import EffectBuilder
@@ -136,7 +136,7 @@ class LightningBuilder(EffectBuilder):
 
         Level: more bolts strike at once, and each strikes more often.
         """
-        level = clamp_level(config.get_option("level", 1))
+        level = effect_level(config)
 
         hide_max = 1.5 - (1 - 1 / level)
         strike_duration_max = 1.25 - (1 - 1 / level)
