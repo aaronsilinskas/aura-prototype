@@ -138,6 +138,20 @@ def test_scanned_scene_carries_its_scene_json_fields(pack_tree) -> None:
     assert scene.ir_codec == "nec"
 
 
+def test_a_scanned_scene_carries_its_own_and_its_rule_packs_required_capabilities(
+    pack_tree,
+) -> None:
+    root = pack_tree.root("tc_flash")
+    pack_tree.rule_pack(root, "radar", requires=["radio"])
+    pack_tree.scene(
+        root, "tag", requires=["ir.line"], rule_packs=[{"name": "radar", "version": "1.0"}]
+    )
+
+    scene = scan_pack_roots([str(root)]).scene_registry.get("tag")
+
+    assert scene.required_capabilities == {"ir.line", "radio"}
+
+
 def test_scene_without_ir_codec_defaults_to_aura(pack_tree) -> None:
     root = pack_tree.root("tc_flash")
     pack_tree.scene(root, "tag")

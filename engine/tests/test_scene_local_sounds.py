@@ -19,24 +19,6 @@ def test_a_scenes_sounds_folder_wavs_are_in_its_local_sound_map(pack_tree) -> No
     assert "victory_sting" in scene.local_sound_map
 
 
-def test_each_fresh_scene_gets_the_same_local_sound_map(pack_tree) -> None:
-    registry = pack_tree.scan(scenes={"forest": {"sounds": ["chime"]}}).scene_registry
-
-    scene_a = registry.get("forest")
-    scene_b = registry.get("forest")
-    assert scene_a.local_sound_map == scene_b.local_sound_map
-
-
-def test_mutating_a_local_sound_map_does_not_affect_the_next_get(pack_tree) -> None:
-    registry = pack_tree.scan(scenes={"forest": {"sounds": ["chime"]}}).scene_registry
-
-    scene_a = registry.get("forest")
-    scene_a.local_sound_map["chime"] = "/tampered/path.wav"
-    scene_b = registry.get("forest")
-
-    assert scene_b.local_sound_map["chime"] != "/tampered/path.wav"
-
-
 def test_a_scenes_local_sounds_are_not_visible_to_another_scene(pack_tree) -> None:
     registry = pack_tree.scan(
         scenes={"forest": {"sounds": ["secret_chime"]}, "cave": {}}

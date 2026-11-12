@@ -112,6 +112,13 @@ def test_a_scenes_missing_capabilities_are_the_required_ones_the_device_lacks(pa
     assert registry.missing_capabilities("tag", frozenset(("radio", "storage"))) == {"ir.line"}
 
 
+def test_a_scene_built_in_memory_is_held_to_its_required_capabilities() -> None:
+    probe = Scene(effect_packs=[], rule_packs=[], required_capabilities=frozenset(("radio",)))
+    registry = SceneRegistry({"probe": probe})
+
+    assert registry.missing_capabilities("probe", frozenset(("storage",))) == {"radio"}
+
+
 def test_a_scene_registered_in_memory_requires_nothing() -> None:
     registry = SceneRegistry()
     registry.register("probe", lambda: Scene(effect_packs=[], rule_packs=[]))
