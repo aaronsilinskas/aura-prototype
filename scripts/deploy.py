@@ -46,7 +46,7 @@ try:
 except ImportError:
     pass
 
-_DEFAULT_MOUNT: Final = "/Volumes/CIRCUITPY"
+DEFAULT_MOUNT: Final = "/Volumes/CIRCUITPY"
 
 
 def _should_skip(src: Path, dest: Path) -> bool:
@@ -258,8 +258,8 @@ def main() -> None:
     parser.add_argument(
         "--mount",
         type=Path,
-        default=Path(_DEFAULT_MOUNT),
-        help=f"Path to the mounted CIRCUITPY volume (default: {_DEFAULT_MOUNT}).",
+        default=Path(DEFAULT_MOUNT),
+        help=f"Path to the mounted CIRCUITPY volume (default: {DEFAULT_MOUNT}).",
     )
     parser.add_argument(
         "--dry-run",
