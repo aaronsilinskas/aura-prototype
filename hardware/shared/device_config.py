@@ -215,16 +215,16 @@ class AudioConfig:
         self,
         voices: int,
         max_volume: float,
-        i2s_bit_clock: str,
-        i2s_word_select: str,
-        i2s_data: str,
+        i2s_bit_clock: PinRef,
+        i2s_word_select: PinRef,
+        i2s_data: PinRef,
         enabled: bool = True,
     ) -> None:
         self.voices: int = voices
         self.max_volume: float = max_volume
-        self.i2s_bit_clock: str = i2s_bit_clock
-        self.i2s_word_select: str = i2s_word_select
-        self.i2s_data: str = i2s_data
+        self.i2s_bit_clock: PinRef = i2s_bit_clock
+        self.i2s_word_select: PinRef = i2s_word_select
+        self.i2s_data: PinRef = i2s_data
         self.enabled: bool = enabled
 
 
@@ -255,9 +255,9 @@ class I2CConfig:
 
     __slots__ = ("scl", "sda")
 
-    def __init__(self, sda: str, scl: str) -> None:
-        self.sda: str = sda
-        self.scl: str = scl
+    def __init__(self, sda: PinRef, scl: PinRef) -> None:
+        self.sda: PinRef = sda
+        self.scl: PinRef = scl
 
 
 class SPIConfig:
@@ -270,10 +270,10 @@ class SPIConfig:
 
     __slots__ = ("miso", "mosi", "sck")
 
-    def __init__(self, sck: str, mosi: str, miso: str) -> None:
-        self.sck: str = sck
-        self.mosi: str = mosi
-        self.miso: str = miso
+    def __init__(self, sck: PinRef, mosi: PinRef, miso: PinRef) -> None:
+        self.sck: PinRef = sck
+        self.mosi: PinRef = mosi
+        self.miso: PinRef = miso
 
 
 class I2CDeviceConfig:
@@ -312,16 +312,16 @@ class RadioConfig:
 
     def __init__(
         self,
-        cs: str,
-        reset: str,
+        cs: PinRef,
+        reset: PinRef,
         frequency: float,
         node: int,
         enabled: bool = True,
         spi: str = DEFAULT_BUS,
     ) -> None:
         self.spi: str = spi
-        self.cs: str = cs
-        self.reset: str = reset
+        self.cs: PinRef = cs
+        self.reset: PinRef = reset
         self.frequency: float = frequency
         self.node: int = node
         self.enabled: bool = enabled
@@ -338,10 +338,10 @@ class SDCardConfig:
     __slots__ = ("cs", "enabled", "mount", "spi")
 
     def __init__(
-        self, cs: str, mount: str = "/sd", enabled: bool = True, spi: str = DEFAULT_BUS
+        self, cs: PinRef, mount: str = "/sd", enabled: bool = True, spi: str = DEFAULT_BUS
     ) -> None:
         self.spi: str = spi
-        self.cs: str = cs
+        self.cs: PinRef = cs
         self.mount: str = mount
         self.enabled: bool = enabled
 
@@ -903,9 +903,9 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
     return AudioConfig(
         voices=voices,
         max_volume=max_volume,
-        i2s_bit_clock=audio_raw["i2s_bit_clock"],
-        i2s_word_select=audio_raw["i2s_word_select"],
-        i2s_data=audio_raw["i2s_data"],
+        i2s_bit_clock=PinRef(audio_raw["i2s_bit_clock"], "audio.i2s_bit_clock"),
+        i2s_word_select=PinRef(audio_raw["i2s_word_select"], "audio.i2s_word_select"),
+        i2s_data=PinRef(audio_raw["i2s_data"], "audio.i2s_data"),
         enabled=enabled,
     )
 
@@ -943,7 +943,8 @@ def _parse_buses(
     """Parse the ``i2c`` or ``spi`` *section*: a mapping of bus name to that bus's pins.
 
     Each bus must declare every one of *pin_fields*; *build* receives their
-    values positionally, in *pin_fields* order.
+    Pin references (field path ``<section>.<bus>.<pin>``) positionally, in
+    *pin_fields* order.
     """
     if not isinstance(raw, dict):
         pins = "/".join(pin_fields)
@@ -976,7 +977,7 @@ def _parse_bus(
         if not isinstance(bus_raw[pin], str):
             raise ValueError(f"{field}.{pin} must be a string pin name")
 
-    return build(*(bus_raw[pin] for pin in pin_fields))
+    return build(*(PinRef(bus_raw[pin], f"{field}.{pin}") for pin in pin_fields))
 
 
 def _parse_bus_reference(
@@ -1011,8 +1012,8 @@ def _parse_radio(radio_raw: dict, spi_buses: dict[str, SPIConfig]) -> RadioConfi
             raise ValueError(f"radio.{field} is required")
         if not isinstance(radio_raw[field], str):
             raise ValueError(f"radio.{field} must be a string pin name")
-    cs = radio_raw["cs"]
-    reset = radio_raw["reset"]
+    cs = PinRef(radio_raw["cs"], "radio.cs")
+    reset = PinRef(radio_raw["reset"], "radio.reset")
 
     if "frequency" not in radio_raw:
         raise ValueError("radio.frequency is required")
@@ -1051,7 +1052,7 @@ def _parse_sdcard(sdcard_raw: dict, spi_buses: dict[str, SPIConfig]) -> SDCardCo
         )
 
     enabled = _parse_enabled(sdcard_raw, "sdcard.enabled")
-    return SDCardConfig(cs=cs, mount=mount, enabled=enabled, spi=spi)
+    return SDCardConfig(cs=PinRef(cs, "sdcard.cs"), mount=mount, enabled=enabled, spi=spi)
 
 
 def _parse_high_current_rail(rail_raw: dict) -> HighCurrentRailConfig:

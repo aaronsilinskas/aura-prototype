@@ -30,6 +30,7 @@ from hardware.shared.device_config import (
     MatrixPixelsConfig,
     NeoPixelCurrentBudgetConfig,
     NeoPixelPixelsConfig,
+    PinRef,
     RadioConfig,
     SDCardConfig,
     SPIConfig,
@@ -126,7 +127,7 @@ def test_describe_high_current_rail_names_its_pin_and_polarity():
 
 
 def test_describe_i2c_names_a_declared_bus_and_its_scl_and_sda_pins():
-    i2c = I2CConfig(sda="GP6", scl="GP7")
+    i2c = I2CConfig(sda=PinRef("GP6", "i2c.sensors.sda"), scl=PinRef("GP7", "i2c.sensors.scl"))
 
     assert describe_i2c("sensors", i2c) == "i2c sensors scl=GP7 sda=GP6"
 
@@ -136,7 +137,11 @@ def test_describe_i2c_of_an_undeclared_default_names_the_board_bus():
 
 
 def test_describe_spi_names_a_declared_bus_and_its_sck_mosi_and_miso_pins():
-    spi = SPIConfig(sck="GP14", mosi="GP15", miso="GP12")
+    spi = SPIConfig(
+        sck=PinRef("GP14", "spi.radio.sck"),
+        mosi=PinRef("GP15", "spi.radio.mosi"),
+        miso=PinRef("GP12", "spi.radio.miso"),
+    )
 
     assert describe_spi("radio", spi) == "spi radio sck=GP14 mosi=GP15 miso=GP12"
 
@@ -292,9 +297,9 @@ def _audio(enabled: bool = True) -> AudioConfig:
     return AudioConfig(
         voices=4,
         max_volume=0.5,
-        i2s_bit_clock="GP10",
-        i2s_word_select="GP11",
-        i2s_data="GP9",
+        i2s_bit_clock=PinRef("GP10", "audio.i2s_bit_clock"),
+        i2s_word_select=PinRef("GP11", "audio.i2s_word_select"),
+        i2s_data=PinRef("GP9", "audio.i2s_data"),
         enabled=enabled,
     )
 
@@ -310,25 +315,33 @@ def test_describe_audio_disabled_is_the_bare_section_name():
 
 
 def test_describe_radio_reports_its_frequency_node_and_pins():
-    radio = RadioConfig(cs="GP17", reset="GP20", frequency=915.0, node=3)
+    radio = RadioConfig(
+        cs=PinRef("GP17", "radio.cs"), reset=PinRef("GP20", "radio.reset"), frequency=915.0, node=3
+    )
 
     assert describe_radio(radio) == "radio frequency=915.0 node=3 cs=GP17 reset=GP20"
 
 
 def test_describe_sdcard_reports_its_mount_point_and_chip_select_pin():
-    sdcard = SDCardConfig(cs="GP13", mount="/cards")
+    sdcard = SDCardConfig(cs=PinRef("GP13", "sdcard.cs"), mount="/cards")
 
     assert describe_sdcard(sdcard) == "sdcard mount=/cards cs=GP13"
 
 
 def test_describe_radio_appends_the_spi_bus_it_joins_when_not_default():
-    radio = RadioConfig(cs="GP13", reset="GP11", frequency=915.0, node=1, spi="radio")
+    radio = RadioConfig(
+        cs=PinRef("GP13", "radio.cs"),
+        reset=PinRef("GP11", "radio.reset"),
+        frequency=915.0,
+        node=1,
+        spi="radio",
+    )
 
     assert describe_radio(radio) == "radio frequency=915.0 node=1 cs=GP13 reset=GP11 spi=radio"
 
 
 def test_describe_sdcard_appends_the_spi_bus_it_joins_when_not_default():
-    sdcard = SDCardConfig(cs="GP1", spi="storage")
+    sdcard = SDCardConfig(cs=PinRef("GP1", "sdcard.cs"), spi="storage")
 
     assert describe_sdcard(sdcard) == "sdcard mount=/sd cs=GP1 spi=storage"
 

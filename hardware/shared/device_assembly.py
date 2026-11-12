@@ -97,7 +97,7 @@ def open_i2c(name: str, declared: dict[str, I2CConfig], parts: DeviceParts) -> B
     i2c = declared.get(name)
     if i2c is None:
         return parts.i2c_bus(None, None)
-    return parts.i2c_bus(PinRef(i2c.scl, f"i2c.{name}.scl"), PinRef(i2c.sda, f"i2c.{name}.sda"))
+    return parts.i2c_bus(i2c.scl, i2c.sda)
 
 
 def _require_i2c(
@@ -139,11 +139,7 @@ def _open_spi(name: str, declared: dict[str, SPIConfig], parts: DeviceParts) -> 
     spi = declared.get(name)
     if spi is None:
         return parts.spi_bus(None, None, None)
-    return parts.spi_bus(
-        PinRef(spi.sck, f"spi.{name}.sck"),
-        PinRef(spi.mosi, f"spi.{name}.mosi"),
-        PinRef(spi.miso, f"spi.{name}.miso"),
-    )
+    return parts.spi_bus(spi.sck, spi.mosi, spi.miso)
 
 
 def _require_spi(
@@ -364,10 +360,7 @@ def assemble_device(
 
     def _build_audio(audio: AudioConfig) -> tuple[EffectOutput, str]:
         output = parts.audio_output(
-            audio,
-            PinRef(audio.i2s_bit_clock, "audio.i2s_bit_clock"),
-            PinRef(audio.i2s_word_select, "audio.i2s_word_select"),
-            PinRef(audio.i2s_data, "audio.i2s_data"),
+            audio, audio.i2s_bit_clock, audio.i2s_word_select, audio.i2s_data
         )
         return output, "ok"
 
@@ -388,8 +381,8 @@ def assemble_device(
         transport = parts.radio_transport(
             radio,
             _require_spi(spi, "radio", radio),
-            PinRef(radio.cs, "radio.cs"),
-            PinRef(radio.reset, "radio.reset"),
+            radio.cs,
+            radio.reset,
         )
         return RadioTransceiver(transport), "ok"
 
@@ -401,7 +394,7 @@ def assemble_device(
         config.sdcard,
         describe_sdcard,
         lambda c: (
-            parts.storage(c, _require_spi(spi, "sdcard", c), PinRef(c.cs, "sdcard.cs")),
+            parts.storage(c, _require_spi(spi, "sdcard", c), c.cs),
             "ok",
         ),
     )

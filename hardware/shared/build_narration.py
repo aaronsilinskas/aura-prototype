@@ -108,14 +108,14 @@ def describe_i2c(name: str, i2c: I2CConfig | None) -> str:
     """Describe opening the I2C bus *name*; *i2c* ``None`` is the board's own bus."""
     if i2c is None:
         return f"i2c {name} board"
-    return f"i2c {name} scl={i2c.scl} sda={i2c.sda}"
+    return f"i2c {name} scl={i2c.scl.name} sda={i2c.sda.name}"
 
 
 def describe_spi(name: str, spi: SPIConfig | None) -> str:
     """Describe opening the SPI bus *name*; *spi* ``None`` is the board's own bus."""
     if spi is None:
         return f"spi {name} board"
-    return f"spi {name} sck={spi.sck} mosi={spi.mosi} miso={spi.miso}"
+    return f"spi {name} sck={spi.sck.name} mosi={spi.mosi.name} miso={spi.miso.name}"
 
 
 def describe_neopixel_current_budget(budget: NeoPixelCurrentBudgetConfig) -> str:
@@ -200,21 +200,21 @@ def describe_audio(audio: AudioConfig) -> str:
         return "audio"
     return (
         f"audio voices={audio.voices} max_volume={audio.max_volume:.2f} "
-        + f"i2s_bit_clock={audio.i2s_bit_clock} "
-        + f"i2s_word_select={audio.i2s_word_select} i2s_data={audio.i2s_data}"
+        + f"i2s_bit_clock={audio.i2s_bit_clock.name} "
+        + f"i2s_word_select={audio.i2s_word_select.name} i2s_data={audio.i2s_data.name}"
     )
 
 
 def describe_radio(radio: RadioConfig) -> str:
     return (
         f"radio frequency={radio.frequency} node={radio.node} "
-        + f"cs={radio.cs} reset={radio.reset}"
+        + f"cs={radio.cs.name} reset={radio.reset.name}"
         + _bus_suffix("spi", radio.spi)
     )
 
 
 def describe_sdcard(sdcard: SDCardConfig) -> str:
-    return f"sdcard mount={sdcard.mount} cs={sdcard.cs}" + _bus_suffix("spi", sdcard.spi)
+    return f"sdcard mount={sdcard.mount} cs={sdcard.cs.name}" + _bus_suffix("spi", sdcard.spi)
 
 
 def describe_ir(ir: IRConfig) -> str:

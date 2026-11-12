@@ -85,7 +85,9 @@ def test_the_pico_2_config_puts_the_enabled_radio_on_its_own_spi_bus_apart_from_
     assert config.radio is not None and config.radio.enabled
     assert config.sdcard is not None
     assert (config.radio.spi, config.sdcard.spi) == ("radio", "default")
-    assert {name: (bus.sck, bus.mosi, bus.miso) for name, bus in config.spi.items()} == {
+    assert {
+        name: (bus.sck.name, bus.mosi.name, bus.miso.name) for name, bus in config.spi.items()
+    } == {
         "default": ("GP2", "GP3", "GP0"),
         "radio": ("GP14", "GP15", "GP12"),
     }
@@ -99,4 +101,6 @@ def test_the_pico_2_config_puts_the_enabled_radio_on_its_own_spi_bus_apart_from_
 def test_each_example_declares_one_default_i2c_bus_on_its_pins(path, pins):
     config = load_device_config(str(path))
 
-    assert {name: (bus.sda, bus.scl) for name, bus in config.i2c.items()} == {"default": pins}
+    assert {name: (bus.sda.name, bus.scl.name) for name, bus in config.i2c.items()} == {
+        "default": pins
+    }
