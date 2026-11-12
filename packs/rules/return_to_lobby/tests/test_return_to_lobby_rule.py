@@ -30,13 +30,15 @@ class _RecordingSceneControls(SceneControls):
 
 def _hold_both(hold_seconds: float, seconds: float) -> int:
     """Hold A and B for *seconds* under a *hold_seconds* Setting; return reboots requested."""
-    engine = GameEngine(EffectControls(), timer=_FixedTimer())
+    timer = _FixedTimer()
+    engine = GameEngine(EffectControls(), timer=timer)
     engine.add_rules(ReturnToLobbyRule())
     scene_controls = _RecordingSceneControls()
     settings = settings_for(rule_packs={"return_to_lobby": {"hold_seconds": hold_seconds}})
     state = engine.create_state(scene_controls, settings=settings)
     both = ButtonData(states={"A": ButtonData.DOWN, "B": ButtonData.DOWN})
     for _ in range(round(seconds / _TICK)):
+        timer.update()
         state.queue_event(InputEvents.Sensors(both))
         engine.update(state)
     return scene_controls.reboots_to_previous

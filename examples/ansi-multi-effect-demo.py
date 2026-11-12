@@ -81,7 +81,8 @@ class AnsiEffectOutput(EffectOutput):
 personal_output = AnsiEffectOutput(scopes=[Scope.PERSONAL])
 effect_manager = EffectManager(namespace=_namespace, outputs=[personal_output])
 
-game_engine = GameEngine(effect_controls=effect_manager)
+timer = Timer()
+game_engine = GameEngine(effect_controls=effect_manager, timer=timer)
 game_state = game_engine.create_state(SceneControls())
 
 
@@ -119,7 +120,6 @@ def main() -> None:
     try:
         tty.setraw(fd)
         print("Press 'a' (fire), 'b' (water), 'c' (lightning), 'd' (stop all), 'q' to quit.\r")
-        timer = Timer()
         while True:
             timer.update()
             key = None

@@ -216,12 +216,13 @@ def _build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[],
     (:func:`app.run_scene.run_scene`, which adds only ``while True:`` and
     ``gc.collect()``) and the Simulated device, so neither copies it, as
     both share the boot that builds it (:func:`build_scene_boot`). Each tick
-    updates every Polled part in ``hw.polled``, naming none, then builds
-    the events from their state. Build it once per runtime: the
-    ``InputEvents.Sensors`` event and the telemetry gate are allocated here
-    (the button, acceleration and magnetic buffers are each part's own
-    ``reading``) and mutated in place every tick, so the steady-state tick
-    allocates nothing on-device.
+    first advances the runtime's clock, so the parts, rules and effects all
+    see this tick's elapsed time; then updates every Polled part in
+    ``hw.polled``, naming none, and builds the events from their state.
+    Build it once per runtime: the ``InputEvents.Sensors`` event and the
+    telemetry gate are allocated here (the button, acceleration and magnetic
+    buffers are each part's own ``reading``) and mutated in place every
+    tick, so the steady-state tick allocates nothing on-device.
     """
     polled = hw.polled
     accelerometer = hw.accelerometer
@@ -240,6 +241,7 @@ def _build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[],
     def tick() -> None:
         nonlocal last_telemetry_print_total
 
+        runtime.advance_clock()
         elapsed = runtime.elapsed
         # Polled whether or not a scene is active, so a send in flight across
         # a scene transition still completes and a packet received with no

@@ -121,7 +121,8 @@ The immutable helper a scene's rules, or a **Rule pack**'s, build once from the 
 _Avoid_: confusing with `EffectConfig`; calling the Settings themselves the Scene Config; re-deriving it every tick (build once, cache); restating a Setting's default in it (its declaration holds it); a second way to build it from loose values
 
 ### Timer
-Owned internally by `GameEngine`. Rules access time only via `state.elapsed`/`state.total`, never by holding a `Timer` reference.
+The scene's clock. Whoever drives the tick advances it exactly once per tick, before anything reads it (`SceneRuntime.advance_clock`, first in the scene tick, whether or not a scene is active), so every **Polled part**, rule and effect in that tick sees the same, current elapsed time. `GameEngine` only reads it. Rules access time only via `state.elapsed`/`state.total`, never by holding a `Timer` reference.
+_Avoid_: advancing it inside `GameEngine.update` or anywhere else mid-tick; reading it before the tick has advanced it
 
 ### Scene
 A declarative bundle of a self-contained game context, read-only once the **PackCatalog** has scanned it: its effect and rule packs, a `version`, a declared `ir_codec` name, its resolved **Settings** (its own and its Rule packs', with its **Setting overrides** applied), its **Required capabilities**, and its scene-local effects, rules and sounds. Every lookup shares the same one.
