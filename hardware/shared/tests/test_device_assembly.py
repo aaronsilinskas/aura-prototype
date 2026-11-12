@@ -692,6 +692,19 @@ def test_a_matrix_entry_line_appends_its_address_then_its_non_default_i2c_bus(ov
     ) in text
 
 
+def test_a_matrix_entry_line_names_every_scope_range_and_its_brightness_to_two_decimals():
+    matrix = {
+        **_MATRIX,
+        "brightness": 0.5,
+        "scope_rows": {"global.main": [0, 5], "personal": [5, 9]},
+    }
+
+    assert (
+        "[hw] pixels[0] matrix cols=13 scope_rows=[global.main:0-5 personal:5-9] "
+        + "brightness=0.50 ok\n"
+    ) in _narration(_config(pixels=[matrix]))
+
+
 def test_a_neopixel_entry_line_names_every_segment_and_its_brightness_to_two_decimals():
     strip = {
         **_NEOPIXEL,
@@ -707,13 +720,20 @@ def test_a_neopixel_entry_line_names_every_segment_and_its_brightness_to_two_dec
 
 
 @pytest.mark.parametrize(
+    ("bus", "suffix"),
+    [({}, " ok"), ({"i2c": "sensors"}, " i2c=sensors ok")],
+    ids=["default-bus", "named-bus"],
+)
+@pytest.mark.parametrize(
     ("section", "chip"),
     [("accelerometer", "lis3dh"), ("magnetometer", "mmc5603"), ("haptics", "drv2605")],
 )
-def test_an_i2c_chip_line_names_its_chip_padded_address_and_non_default_bus(section, chip):
-    config = _config(i2c=_I2C_BUSES, **{section: {"address": 0x0A, "i2c": "sensors"}})
+def test_an_i2c_chip_line_names_its_chip_padded_address_and_non_default_bus(
+    section, chip, bus, suffix
+):
+    config = _config(i2c=_I2C_BUSES, **{section: {"address": 0x0A, **bus}})
 
-    assert f"[hw] {section} {chip} address=0x0A i2c=sensors ok\n" in _narration(config)
+    assert f"[hw] {section} {chip} address=0x0A{suffix}\n" in _narration(config)
 
 
 def test_a_radio_line_appends_the_non_default_spi_bus_it_joins():
@@ -760,7 +780,7 @@ def test_a_part_that_raises_fails_its_own_line_and_propagates(part, config, line
     assert "".join(fragments).endswith(line)
 
 
-def test_a_failing_part_leaves_the_earlier_lines_intact_and_stops_the_boot():
+def test_a_failing_part_leaves_the_earlier_lines_intact_and_narrates_nothing_after_it():
     fragments: list[str] = []
     config = _config(buttons=["GP3"], accelerometer={}, magnetometer={})
 
@@ -769,12 +789,13 @@ def test_a_failing_part_leaves_the_earlier_lines_intact_and_stops_the_boot():
             config, RecordingParts(fail_on="accelerometer"), Logger("[hw]", fragments.append)
         )
 
-    assert "".join(fragments).splitlines() == [
+    *earlier, last = "".join(fragments).splitlines()
+    assert earlier == [
         "[hw] begin board=test-board",
         "[hw] i2c default board ok",
         "[hw] buttons A=GP3 ok",
-        "[hw] accelerometer lis3dh FAILED",
     ]
+    assert last.startswith("[hw] accelerometer ")
 
 
 def test_a_missing_bus_fails_the_line_of_the_section_needing_it():

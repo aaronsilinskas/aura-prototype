@@ -6,8 +6,8 @@ what it is about to build, run the build, then ``end`` the line with a success d
 or ``fail`` it on an exception. :func:`narrate_step` and :func:`narrate_skip` own that
 sequence once so a component block reduces to a single call.
 
-The private ``_describe_*`` functions build each boot step's description for the
-Device assembly, their only caller. Every one works from a config section's
+The private ``_describe_*`` functions build each boot step's description: the
+text of the line the step opens. Every one works from a config section's
 pin-name strings, never resolved pins, so a step's line opens before any of its
 pins resolve -- and a bad pin name fails that step's own line. Each returns the
 exact line the board prints for its section, so a section that narrates a bare
