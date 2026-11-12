@@ -1,68 +1,70 @@
-"""Tests for ProgressFillEffect — self-animating progress-bar fill.
+"""Tests for ProgressFillEffect's clock: how its progress follows elapsed time.
 
-Prior art: ``packs/effects/basic/helpers/progress_effect.py`` (static fill
-render) and ``packs/effects/basic/tests/test_pulse_effect.py`` (driving
-``update(elapsed)`` across steps).
+The pixel mapping is ``ProgressRenderer``'s and is tested there. Progress is
+read back from the layer as the lit fraction of a one-pixel bar, which equals
+the progress itself.
 """
 
 from __future__ import annotations
 
-from effects.effect import PixelBuffer
+import pytest
+
 from effects.layers.progress_layer import ProgressLayer
 from packs.scenes.tag.effects.helpers.progress_fill_effect import ProgressFillEffect
 
 
-def _render(effect: ProgressFillEffect, pixel_count: int = 4) -> list[int]:
-    buf = PixelBuffer(pixel_count)
-    effect.render(buf)
-    return list(buf)
+def _fill(duration: float) -> tuple[ProgressFillEffect, ProgressLayer]:
+    layer = ProgressLayer(0.0)
+    return ProgressFillEffect(layer, color=0xFF0000, duration=duration), layer
 
 
-# --- update(elapsed) advances rendered progress proportionally ---
+def _progress(layer: ProgressLayer) -> float:
+    return layer.sample(0.0, 1)
 
 
-def test_renders_no_fill_before_any_update() -> None:
-    effect = ProgressFillEffect(ProgressLayer(0.0), color=0xFFFFFF, duration=2.0)
+def test_progress_is_empty_before_any_update() -> None:
+    _, layer = _fill(duration=2.0)
 
-    pixels = _render(effect)
-
-    assert pixels == [0x000000, 0x000000, 0x000000, 0x000000]
+    assert _progress(layer) == 0.0
 
 
-def test_update_fills_proportionally_to_elapsed_over_duration() -> None:
-    effect = ProgressFillEffect(ProgressLayer(0.0), color=0xFFFFFF, duration=2.0)
-
-    effect.update(1.0)  # halfway through the 2.0s duration -> progress 0.5
-
-    pixels = _render(effect)
-    # 4 pixels at progress 0.5 -> first 2 fully lit, rest dark
-    assert pixels == [0xFFFFFF, 0xFFFFFF, 0x000000, 0x000000]
-
-
-def test_update_accumulates_elapsed_across_multiple_calls() -> None:
-    effect = ProgressFillEffect(ProgressLayer(0.0), color=0xFFFFFF, duration=2.0)
+def test_progress_is_elapsed_over_duration_mid_way() -> None:
+    effect, layer = _fill(duration=2.0)
 
     effect.update(0.5)
-    effect.update(0.5)  # total elapsed 1.0s -> progress 0.5
 
-    pixels = _render(effect)
-    assert pixels == [0xFFFFFF, 0xFFFFFF, 0x000000, 0x000000]
+    assert _progress(layer) == pytest.approx(0.25)
 
 
-def test_progress_clamps_and_holds_at_full_past_duration() -> None:
-    effect = ProgressFillEffect(ProgressLayer(0.0), color=0xFFFFFF, duration=2.0)
+def test_progress_accumulates_elapsed_across_updates() -> None:
+    effect, layer = _fill(duration=2.0)
 
-    effect.update(5.0)  # well past duration -> progress clamps to 1.0
+    effect.update(0.5)
+    effect.update(1.0)
 
-    pixels = _render(effect)
-    assert pixels == [0xFFFFFF, 0xFFFFFF, 0xFFFFFF, 0xFFFFFF]
+    assert _progress(layer) == pytest.approx(0.75)
 
 
-def test_progress_remains_clamped_on_subsequent_update_past_duration() -> None:
-    effect = ProgressFillEffect(ProgressLayer(0.0), color=0xFFFFFF, duration=2.0)
+def test_progress_is_full_at_the_duration() -> None:
+    effect, layer = _fill(duration=2.0)
 
-    effect.update(2.0)  # exactly at duration -> progress 1.0
-    effect.update(1.0)  # further elapsed -> never overshoots
+    effect.update(2.0)
 
-    pixels = _render(effect)
-    assert pixels == [0xFFFFFF, 0xFFFFFF, 0xFFFFFF, 0xFFFFFF]
+    assert _progress(layer) == 1.0
+
+
+def test_progress_stays_full_after_the_duration() -> None:
+    effect, layer = _fill(duration=2.0)
+
+    effect.update(2.0)
+    effect.update(5.0)
+
+    assert _progress(layer) == 1.0
+
+
+def test_zero_duration_is_full_on_the_first_update() -> None:
+    effect, layer = _fill(duration=0.0)
+
+    effect.update(0.0)
+
+    assert _progress(layer) == 1.0

@@ -1,4 +1,8 @@
-"""Unit tests for packs.effects.basic.progress."""
+"""Unit tests for packs.effects.basic.progress.
+
+Pixel mapping is covered by ``effects/tests/layers/test_progress_renderer.py``;
+these check only the builder's options.
+"""
 
 from __future__ import annotations
 
@@ -36,54 +40,30 @@ def test_progress_effect_name_is_basic_progress() -> None:
     assert effect.name == "basic.progress"
 
 
-# --- Rendering: empty and full bars ---
+# --- color option ---
 
 
-def test_progress_zero_renders_all_dark() -> None:
-    pixels = _render(_build(options={"color": 0xFFFFFF, "progress": 0.0}))
-    assert all(p == 0x000000 for p in pixels)
-
-
-def test_progress_full_renders_all_at_color() -> None:
+def test_progress_color_option_sets_fill_color() -> None:
     pixels = _render(_build(options={"color": 0x12AB34, "progress": 1.0}))
     assert all(p == 0x12AB34 for p in pixels)
 
 
-# --- Rendering: partial bar with anti-aliased boundary ---
-
-
-def test_progress_partial_lights_region_and_dims_boundary() -> None:
-    # 10 pixels, progress 0.55 → 5 full, pixel 5 at half, rest dark.
-    pixels = _render(_build(options={"color": 0xFFFFFF, "progress": 0.55}))
-
-    assert all(p == 0xFFFFFF for p in pixels[:5])
-    # boundary pixel: int(255 * 0.5) = 127 per channel
-    assert pixels[5] == 0x7F7F7F
-    assert all(p == 0x000000 for p in pixels[6:])
-
-
-def test_progress_boundary_scales_color_channels_independently() -> None:
-    # color 0xFF8040, boundary fraction 0.5 → int(255*.5),int(128*.5),int(64*.5)
-    pixels = _render(_build(options={"color": 0xFF8040, "progress": 0.55}))
-    assert pixels[5] == 0x7F4020
-
-
-# --- Defaults ---
-
-
-def test_progress_defaults_color_white_and_progress_zero() -> None:
-    from packs.effects.basic.progress import BUILD
-
-    effect = BUILD("basic.progress", EffectConfig(resolution=16))
-    pixels = _render(effect)
-    # default progress 0.0 → all dark
-    assert all(p == 0x000000 for p in pixels)
-
-
-def test_progress_default_color_is_white_when_full() -> None:
-    effect = _build(options={"progress": 1.0})
-    pixels = _render(effect)
+def test_progress_default_color_is_white() -> None:
+    pixels = _render(_build(options={"progress": 1.0}))
     assert all(p == 0xFFFFFF for p in pixels)
+
+
+# --- progress option ---
+
+
+def test_progress_option_sets_how_far_the_fill_reaches() -> None:
+    pixels = _render(_build(options={"color": 0xFFFFFF, "progress": 0.3}))
+    assert pixels == [0xFFFFFF] * 3 + [0x000000] * 7
+
+
+def test_progress_default_progress_is_empty() -> None:
+    pixels = _render(_build(options={"color": 0xFFFFFF}))
+    assert all(p == 0x000000 for p in pixels)
 
 
 # --- brightness ignored ---
@@ -91,42 +71,7 @@ def test_progress_default_color_is_white_when_full() -> None:
 
 def test_progress_ignores_brightness_option() -> None:
     with_brightness = _build(options={"color": 0xFFFFFF, "progress": 1.0, "brightness": 0.5})
-    without_brightness = _build(options={"color": 0xFFFFFF, "progress": 1.0})
-    assert _render(with_brightness) == _render(without_brightness)
-    assert all(p == 0xFFFFFF for p in _render(without_brightness))
-
-
-# --- Clamping at build path ---
-
-
-def test_progress_above_one_renders_all_at_color() -> None:
-    pixels = _render(_build(options={"color": 0xFFFFFF, "progress": 1.5}))
-    assert all(p == 0xFFFFFF for p in pixels)
-
-
-def test_progress_below_zero_renders_all_dark() -> None:
-    pixels = _render(_build(options={"color": 0xFFFFFF, "progress": -0.5}))
-    assert all(p == 0x000000 for p in pixels)
-
-
-# --- Stateless update ---
-
-
-def test_progress_update_does_not_change_render() -> None:
-    effect = _build(options={"color": 0xFFFFFF, "progress": 0.55})
-    before = _render(effect)
-    effect.pixels.update(1.0)
-    after = _render(effect)
-    assert before == after
-
-
-# --- Determinism ---
-
-
-def test_progress_render_is_deterministic() -> None:
-    first = _render(_build(options={"color": 0x00FF88, "progress": 0.37}))
-    second = _render(_build(options={"color": 0x00FF88, "progress": 0.37}))
-    assert first == second
+    assert all(p == 0xFFFFFF for p in _render(with_brightness))
 
 
 # --- Resolvable through the pack registry ---

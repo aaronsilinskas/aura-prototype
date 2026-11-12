@@ -2,15 +2,16 @@ from effects.effect import EffectPixels, PixelBuffer
 from effects.layers.progress_layer import ProgressLayer
 
 
-class ProgressEffect(EffectPixels):
-    """Renders a :class:`ProgressLayer` over a single raw RGB color.
+class ProgressRenderer(EffectPixels):
+    """Renders a :class:`ProgressLayer` as a fill in one raw RGB color, no palette.
 
-    Multiplies each channel of ``color`` by the layer's per-pixel lit fraction
-    inline, so no ``Palette``/``PaletteLUT256`` is allocated; a boundary fraction
-    dims the edge pixel for an anti-aliased edge.
+    Each pixel is ``color`` with every channel scaled by the layer's lit
+    fraction, so the boundary pixel is dimmed for an anti-aliased edge.
 
-    Stateless: ``update`` is a no-op, so re-issuing ``set_effect`` every tick is
-    cheap and produces no restart artefacts.
+    ``update`` leaves the progress unchanged, so the fill is static until it is
+    re-issued. A self-animating fill subclasses this and overrides only
+    ``update``: it keeps its own reference to the layer it passes in and sets
+    that layer's progress from ``update``.
     """
 
     __slots__ = ("_b", "_g", "_layer", "_r")
@@ -22,7 +23,7 @@ class ProgressEffect(EffectPixels):
         self._b = color & 0xFF
 
     def update(self, elapsed: float) -> None:
-        """No-op — the progress bar is stateless."""
+        """No-op: the progress changes only when the layer's progress is set."""
 
     def render(self, output: PixelBuffer) -> None:
         count = len(output)

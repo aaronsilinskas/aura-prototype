@@ -1,8 +1,8 @@
-"""Tests for PulseEffect — peak event notification and PulseBuilder return type."""
+"""Tests for PulseEffect — what it adds to the single-layer renderer: the ``PEAK`` verb."""
 
 from __future__ import annotations
 
-from effects.effect import EffectConfig, EffectVerb, PixelBuffer
+from effects.effect import EffectConfig, EffectVerb
 
 
 def _config(options: dict | None = None, listeners: list | None = None) -> EffectConfig:
@@ -13,12 +13,6 @@ def _build(options: dict | None = None, listeners: list | None = None):
     from packs.effects.basic.pulse import BUILD
 
     return BUILD("basic.pulse", _config(options, listeners))
-
-
-def _render(effect, pixel_count: int = 4) -> list:
-    buf = PixelBuffer(pixel_count)
-    effect.pixels.render(buf)
-    return list(buf)
 
 
 # --- PulseEffect emits PEAK when the brighten phase ends ---
@@ -92,20 +86,10 @@ def test_pulse_effect_peak_with_no_listeners_is_silent() -> None:
     # Should not raise
 
 
-# --- PulseEffect still renders pixels correctly ---
-
-
-def test_pulse_effect_renders_pixels_correctly_at_on_phase() -> None:
-    effect = _build(options={"start_color": 0x000000, "end_color": 0xFFFFFF})
-    effect.pixels.update(0.75)  # mid-ON
-    pixels = _render(effect)
-    assert all(p == 0xFFFFFF for p in pixels)
-
-
 # --- Listener called on second cycle peak ---
 
 
-def test_pulse_effect_listener_called_on_second_cycle_peak() -> None:
+def test_pulse_effect_emits_peak_once_on_the_second_cycle_peak() -> None:
     from packs.effects.basic.helpers.pulse_effect import PulseEffect
 
     events: list[EffectVerb] = []
@@ -114,4 +98,4 @@ def test_pulse_effect_listener_called_on_second_cycle_peak() -> None:
     effect.pixels.update(2.0)  # full cycle, no peak
     events.clear()
     effect.pixels.update(0.6)  # second cycle crosses b_on
-    assert PulseEffect.PEAK in events
+    assert events == [PulseEffect.PEAK]

@@ -5,7 +5,8 @@ try:
 except ImportError:
     pass  # Not available on CircuitPython
 
-from effects.effect import Effect, EffectConfig, EffectPixels, EffectVerb, PixelBuffer
+from effects.effect import Effect, EffectConfig, EffectVerb
+from effects.layers.add_samples_renderer import AddSamplesRenderer
 from effects.layers.layer import Layer
 from effects.level import clamp_level
 from effects.palette import Palette, PaletteLUT256
@@ -85,13 +86,13 @@ class _LightningBolt(Layer):
         return self._shape((position + self._bolt_offset) % 1.0) * brightness
 
 
-class LightningEffect(EffectPixels):
-    """Renders multiple lightning bolts, emitting ``STRIKE`` when any bolt goes IDLE→STRIKE."""
+class LightningEffect(AddSamplesRenderer):
+    """Sums its bolts through a palette, emitting ``STRIKE`` when any bolt goes IDLE→STRIKE."""
 
     STRIKE: Final = EffectVerb("strike")
     VERBS: tuple[EffectVerb, ...] = (STRIKE,)
 
-    __slots__ = ["_bolts", "_config", "_palette"]
+    __slots__ = ["_bolts", "_config"]
 
     def __init__(
         self,
@@ -99,35 +100,17 @@ class LightningEffect(EffectPixels):
         palette: Palette,
         config: EffectConfig,
     ) -> None:
+        super().__init__(bolts, palette)
         self._bolts = bolts
-        self._palette = palette
         self._config = config
 
     def update(self, elapsed: float) -> None:
         """Advance all bolts; emit ``STRIKE`` once if any bolt just struck."""
-        for bolt in self._bolts:
-            bolt.update(elapsed)
-        struck = False
+        super().update(elapsed)
         for bolt in self._bolts:
             if bolt.at_strike:
-                struck = True
-                break
-        if struck:
-            self._config.notify_listeners(self.STRIKE)
-
-    def render(self, output: PixelBuffer) -> None:
-        count = len(output)
-        inv_count = 1.0 / count
-        palette = self._palette
-        bolts = self._bolts
-        for i in range(count):
-            pos = i * inv_count
-            total = 0.0
-            for bolt in bolts:
-                total += bolt.sample(pos, count)
-            if total > 1.0:
-                total = 1.0
-            output[i] = palette.lookup(total)
+                self._config.notify_listeners(self.STRIKE)
+                return
 
 
 class LightningBuilder(EffectBuilder):

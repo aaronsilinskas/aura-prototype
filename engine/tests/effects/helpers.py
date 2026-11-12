@@ -63,7 +63,7 @@ class SpyEffectOutput(EffectOutput):
 
 
 class _StubPixels(EffectPixels):
-    """A no-op pixel compositor for testing."""
+    """A no-op pixel renderer for testing."""
 
     def update(self, elapsed: float) -> None:
         pass
