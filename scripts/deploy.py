@@ -25,6 +25,8 @@ import shutil
 import sys
 from pathlib import Path
 
+from hardware.shared.scene_selection import with_scene_deploy
+
 try:
     from collections.abc import Callable
     from typing import Final
@@ -158,8 +160,7 @@ def _write_scene(mount: Path, scene: str) -> None:
     """
     boot_path = mount / "aura-boot.json"
     boot_values = json.loads(boot_path.read_text()) if boot_path.exists() else {}
-    boot_values["default_scene"] = scene
-    boot_values["scene_deploy_token"] = secrets.token_hex(8)
+    boot_values = with_scene_deploy(boot_values, scene, secrets.token_hex(8))
     boot_path.write_text(json.dumps(boot_values, indent=2))
 
 

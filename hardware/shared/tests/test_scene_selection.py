@@ -7,6 +7,7 @@ from hardware.shared.scene_selection import (
     apply_scene_deploy,
     boot_scene_candidates,
     resolve_scene_name,
+    with_scene_deploy,
 )
 
 
@@ -105,3 +106,32 @@ def test_an_empty_or_non_string_scene_deploy_token_keeps_the_persisted_scene_and
 
     assert boot_scene_candidates(device_storage, boot_values)[0] == "tag"
     assert lines == []
+
+
+def test_a_scene_deploy_write_sets_the_scene_and_token_and_keeps_other_boot_values():
+    boot_values = {"default_scene": "tag", "brightness": 0.4}
+
+    written = with_scene_deploy(boot_values, "red_light_green_light", "c3d4")
+
+    assert written == {
+        "default_scene": "red_light_green_light",
+        "scene_deploy_token": "c3d4",
+        "brightness": 0.4,
+    }
+
+
+def test_a_scene_deploy_write_leaves_the_given_boot_values_unchanged():
+    boot_values = {"default_scene": "tag"}
+
+    with_scene_deploy(boot_values, "red_light_green_light", "c3d4")
+
+    assert boot_values == {"default_scene": "tag"}
+
+
+def test_booting_a_written_scene_deploy_clears_the_persisted_scene(device_storage):
+    device_storage.write_json("aura-state.json", {"scene": "tag"})
+    boot_values = with_scene_deploy({}, "red_light_green_light", "c3d4")
+
+    apply_scene_deploy(device_storage, boot_values)
+
+    assert boot_scene_candidates(device_storage, boot_values) == (None, "red_light_green_light")

@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
+try:
+    from typing import Final
+except ImportError:
+    pass
+
 from engine.log import Logger
 from hardware.shared.device_state import DeviceStateStore
 from hardware.shared.device_storage import DeviceStorage
 
 __all__ = [
+    "SCENE_DEPLOY_TOKEN_KEY",
     "apply_scene_deploy",
     "boot_scene_candidates",
     "resolve_scene_name",
+    "with_scene_deploy",
 ]
+
+SCENE_DEPLOY_TOKEN_KEY: Final = "scene_deploy_token"
 
 
 def _non_empty_string_or_none(value: object) -> str | None:
@@ -41,6 +50,18 @@ def resolve_scene_name(boot_mapping: dict) -> str:
     raise ValueError(f"aura-boot.json 'default_scene' must be a non-empty string, got {raw!r}")
 
 
+def with_scene_deploy(boot_values: dict, scene: str, token: str) -> dict:
+    """Return a copy of *boot_values* deploying *scene* under the Scene deploy token *token*.
+
+    Every other boot value is kept. The caller supplies *token*, fresh per
+    deploy, so nothing on the device needs a random source.
+    """
+    written = dict(boot_values)
+    written["default_scene"] = scene
+    written[SCENE_DEPLOY_TOKEN_KEY] = token
+    return written
+
+
 def apply_scene_deploy(
     storage: DeviceStorage | None,
     boot_mapping: dict,
@@ -54,17 +75,17 @@ def apply_scene_deploy(
         logger: Where the applied-token line and any fail-soft state read
             are logged; omitted, nothing is logged.
     """
-    token = _non_empty_string_or_none(boot_mapping.get("scene_deploy_token"))
+    token = _non_empty_string_or_none(boot_mapping.get(SCENE_DEPLOY_TOKEN_KEY))
     if token is None or storage is None:
         return
     logger = logger if logger is not None else Logger.SILENT
     store = DeviceStateStore(storage, logger)
     state = store.read()
-    if state.get("scene_deploy_token") == token:
+    if state.get(SCENE_DEPLOY_TOKEN_KEY) == token:
         return
     persisted = state.pop("scene", None)
     state.pop("return_to", None)
-    state["scene_deploy_token"] = token
+    state[SCENE_DEPLOY_TOKEN_KEY] = token
     store.write(state)
     cleared = "no Persisted scene to clear" if persisted is None else f"cleared {persisted!r}"
     deployed = boot_mapping.get("default_scene")
