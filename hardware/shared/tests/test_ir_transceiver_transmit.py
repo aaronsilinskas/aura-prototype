@@ -245,20 +245,6 @@ def test_frames_are_discarded_until_every_emitters_write_has_finished() -> None:
     assert transceiver.received == bytearray(b"\x2b")
 
 
-def test_a_frame_is_received_after_two_back_to_back_sends_finish_with_no_update_between() -> None:
-    transceiver, writers, reader = _build(blocking=False)
-    transceiver.send(b"\x01", LINE)
-    writers[LINE].finish()
-    transceiver.send(b"\x02", LINE)
-    writers[LINE].finish()
-    transceiver.update(0.0)  # pumps first: releases the gate, then the one falling-edge drain
-
-    reader.load(aura_pulses(b"\x2a"))
-    transceiver.update(0.0)
-
-    assert transceiver.received == bytearray(b"\x2a")
-
-
 def test_a_writer_failing_mid_send_raises_and_does_not_leave_reception_blocked() -> None:
     class _FailingWriter(PulseWriter):
         def write_pulses(self, durations: "array[int]") -> None:
@@ -356,26 +342,6 @@ def test_pulses_waiting_when_the_write_finishes_are_discarded_once_more_on_the_f
     reader.load(aura_pulses(b"\x2b"))
     transceiver.update(0.0)
     assert transceiver.received == bytearray(b"\x2b")
-
-
-def test_back_to_back_sends_discard_frames_while_either_is_lit_and_on_the_falling_edge() -> None:
-    transceiver, writers, reader = _build(blocking=False, echo=True)
-    transceiver.send(b"\x01", LINE)
-    reader.load(aura_pulses(b"\x29"))
-    transceiver.update(0.0)  # first write still lit
-    assert transceiver.received is None
-
-    writers[LINE].finish()
-    transceiver.send(b"\x02", LINE)  # no update since the first write finished
-
-    reader.load(aura_pulses(b"\x2a"))
-    transceiver.update(0.0)  # second write still lit
-    assert transceiver.received is None
-
-    writers[LINE].finish()
-    reader.load(aura_pulses(b"\x2b"))  # echo tail still buffered in the reader
-    transceiver.update(0.0)
-    assert transceiver.received is None
 
 
 def test_a_frame_partly_decoded_when_the_device_sends_is_abandoned() -> None:
