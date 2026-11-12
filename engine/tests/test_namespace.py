@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from engine.effects.admin import SceneView
 from engine.effects.builder import EffectBuilder
 from engine.namespace import (
     CLIP,
@@ -47,7 +48,7 @@ def _arena_locals(catalog: PackCatalog) -> SceneLocalRegistry:
 def test_scene_effect_resolves_against_installed_locals(pack_tree) -> None:
     catalog = _catalog(pack_tree)
     namespace = _namespace(catalog)
-    namespace.install(_arena_locals(catalog), {}, frozenset())
+    namespace.install(SceneView(_arena_locals(catalog), {}, frozenset()))
 
     builder, pack_name, effect_name = namespace.resolve_effect("scene.win")
 
@@ -57,7 +58,7 @@ def test_scene_effect_resolves_against_installed_locals(pack_tree) -> None:
 
 def test_declared_pack_effect_resolves_against_shared_packs(pack_tree) -> None:
     namespace = _namespace(_catalog(pack_tree))
-    namespace.install(None, {}, frozenset({"elements"}))
+    namespace.install(SceneView(None, {}, frozenset({"elements"})))
 
     builder, pack_name, effect_name = namespace.resolve_effect("elements.fire")
 
@@ -67,7 +68,7 @@ def test_declared_pack_effect_resolves_against_shared_packs(pack_tree) -> None:
 
 def test_installed_pack_the_scene_did_not_declare_raises_undeclared_pack(pack_tree) -> None:
     namespace = _namespace(_catalog(pack_tree))
-    namespace.install(None, {}, frozenset({"basic"}))
+    namespace.install(SceneView(None, {}, frozenset({"basic"})))
 
     with pytest.raises(UndeclaredPackError) as exc_info:
         namespace.resolve_effect("elements.fire")
@@ -78,7 +79,7 @@ def test_installed_pack_the_scene_did_not_declare_raises_undeclared_pack(pack_tr
 
 def test_pack_that_is_not_installed_raises_unknown_pack_even_when_declared(pack_tree) -> None:
     namespace = _namespace(_catalog(pack_tree))
-    namespace.install(None, {}, frozenset({"spells"}))
+    namespace.install(SceneView(None, {}, frozenset({"spells"})))
 
     with pytest.raises(UnknownPackError) as exc_info:
         namespace.resolve_effect("spells.bolt")
@@ -89,7 +90,7 @@ def test_pack_that_is_not_installed_raises_unknown_pack_even_when_declared(pack_
 
 def test_unknown_pack_is_reported_before_the_declared_pack_check(pack_tree) -> None:
     namespace = _namespace(_catalog(pack_tree))
-    namespace.install(None, {}, frozenset())
+    namespace.install(SceneView(None, {}, frozenset()))
 
     with pytest.raises(UnknownPackError):
         namespace.resolve_effect("spells.bolt")
@@ -97,7 +98,7 @@ def test_unknown_pack_is_reported_before_the_declared_pack_check(pack_tree) -> N
 
 def test_unknown_effect_in_a_declared_pack_raises_unknown_item(pack_tree) -> None:
     namespace = _namespace(_catalog(pack_tree))
-    namespace.install(None, {}, frozenset({"elements"}))
+    namespace.install(SceneView(None, {}, frozenset({"elements"})))
 
     with pytest.raises(UnknownItemError) as exc_info:
         namespace.resolve_effect("elements.frost")
@@ -109,7 +110,7 @@ def test_unknown_effect_in_a_declared_pack_raises_unknown_item(pack_tree) -> Non
 def test_unknown_scene_local_effect_raises_unknown_item(pack_tree) -> None:
     catalog = _catalog(pack_tree)
     namespace = _namespace(catalog)
-    namespace.install(_arena_locals(catalog), {}, frozenset())
+    namespace.install(SceneView(_arena_locals(catalog), {}, frozenset()))
 
     with pytest.raises(UnknownItemError) as exc_info:
         namespace.resolve_effect("scene.lose")
@@ -120,7 +121,7 @@ def test_unknown_scene_local_effect_raises_unknown_item(pack_tree) -> None:
 
 def test_scene_effect_in_a_scene_with_no_locals_raises_unknown_item(pack_tree) -> None:
     namespace = _namespace(_catalog(pack_tree))
-    namespace.install(None, {}, frozenset({"elements"}))
+    namespace.install(SceneView(None, {}, frozenset({"elements"})))
 
     with pytest.raises(UnknownItemError):
         namespace.resolve_effect("scene.win")
@@ -150,9 +151,9 @@ def test_name_without_a_prefix_raises_missing_prefix_even_before_install(pack_tr
 def test_reinstalling_replaces_the_previous_scene_view(pack_tree) -> None:
     catalog = _catalog(pack_tree)
     namespace = _namespace(catalog)
-    namespace.install(_arena_locals(catalog), {}, frozenset({"elements"}))
+    namespace.install(SceneView(_arena_locals(catalog), {}, frozenset({"elements"})))
 
-    namespace.install(None, {}, frozenset({"basic"}))
+    namespace.install(SceneView(None, {}, frozenset({"basic"})))
 
     namespace.resolve_effect("basic.solid")
     with pytest.raises(UndeclaredPackError):
@@ -164,7 +165,7 @@ def test_reinstalling_replaces_the_previous_scene_view(pack_tree) -> None:
 def test_effect_with_a_bad_build_attribute_raises_the_load_fault_unchanged(pack_tree) -> None:
     catalog = pack_tree.scan(effect_packs={"broken": {"fire": "BUILD = 'not-a-builder'\n"}})
     namespace = _namespace(catalog)
-    namespace.install(None, {}, frozenset({"broken"}))
+    namespace.install(SceneView(None, {}, frozenset({"broken"})))
 
     with pytest.raises(ItemTypeError):
         namespace.resolve_effect("broken.fire")
@@ -194,7 +195,7 @@ def test_effect_errors_are_worded_from_the_name_and_kind(
 ) -> None:
     catalog = _catalog(pack_tree)
     namespace = _namespace(catalog)
-    namespace.install(_arena_locals(catalog), {}, declared)
+    namespace.install(SceneView(_arena_locals(catalog), {}, declared))
 
     with pytest.raises(RegistryError) as exc_info:
         namespace.resolve_effect(name)
@@ -237,7 +238,7 @@ def test_scene_clip_resolves_against_installed_local_sounds(pack_tree) -> None:
     catalog = _clip_catalog(pack_tree)
     namespace = _namespace(catalog)
     sounds = _scene_sounds(catalog, "arena")
-    namespace.install(None, sounds, frozenset())
+    namespace.install(SceneView(None, sounds, frozenset()))
 
     assert namespace.resolve_clip("scene.cheer") == sounds["cheer"]
 
@@ -245,7 +246,7 @@ def test_scene_clip_resolves_against_installed_local_sounds(pack_tree) -> None:
 def test_declared_pack_clip_resolves_against_pack_sounds(pack_tree) -> None:
     catalog = _clip_catalog(pack_tree)
     namespace = _namespace(catalog)
-    namespace.install(None, {}, frozenset({"elements"}))
+    namespace.install(SceneView(None, {}, frozenset({"elements"})))
 
     assert namespace.resolve_clip("elements.crackle") == catalog.pack_sounds["elements.crackle"]
 
@@ -265,7 +266,7 @@ def test_clip_lookup_failures_raise_typed_errors_naming_the_clip(
 ) -> None:
     catalog = _clip_catalog(pack_tree)
     namespace = _namespace(catalog)
-    namespace.install(None, _scene_sounds(catalog, "arena"), declared)
+    namespace.install(SceneView(None, _scene_sounds(catalog, "arena"), declared))
 
     with pytest.raises(error_type) as exc_info:
         namespace.resolve_clip(name)
@@ -288,7 +289,7 @@ def test_any_clip_lookup_before_install_raises_no_active_scene(pack_tree, name) 
 def test_scene_clip_in_a_scene_with_no_sounds_raises_unknown_item(pack_tree) -> None:
     catalog = _clip_catalog(pack_tree)
     namespace = _namespace(catalog)
-    namespace.install(None, _scene_sounds(catalog, "quiet"), frozenset({"elements"}))
+    namespace.install(SceneView(None, _scene_sounds(catalog, "quiet"), frozenset({"elements"})))
 
     with pytest.raises(UnknownItemError):
         namespace.resolve_clip("scene.cheer")
@@ -298,7 +299,7 @@ def test_clip_in_a_declared_pack_with_no_sounds_raises_unknown_item_not_unknown_
     pack_tree,
 ) -> None:
     namespace = _namespace(_clip_catalog(pack_tree))
-    namespace.install(None, {}, frozenset({"basic"}))
+    namespace.install(SceneView(None, {}, frozenset({"basic"})))
 
     with pytest.raises(UnknownItemError) as exc_info:
         namespace.resolve_clip("basic.thud")
@@ -310,7 +311,7 @@ def test_clip_in_a_pack_effect_resolves_against_the_active_scene_not_the_effect_
     pack_tree,
 ) -> None:
     namespace = _namespace(_clip_catalog(pack_tree))
-    namespace.install(None, {}, frozenset({"basic"}))
+    namespace.install(SceneView(None, {}, frozenset({"basic"})))
 
     with pytest.raises(UndeclaredPackError):
         namespace.resolve_clip("elements.crackle")
@@ -338,7 +339,7 @@ def test_clip_in_a_pack_effect_resolves_against_the_active_scene_not_the_effect_
 def test_clip_errors_are_worded_from_the_name_and_kind(pack_tree, name, declared, message) -> None:
     catalog = _clip_catalog(pack_tree)
     namespace = _namespace(catalog)
-    namespace.install(None, _scene_sounds(catalog, "arena"), declared)
+    namespace.install(SceneView(None, _scene_sounds(catalog, "arena"), declared))
 
     with pytest.raises(RegistryError) as exc_info:
         namespace.resolve_clip(name)

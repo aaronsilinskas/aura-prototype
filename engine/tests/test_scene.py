@@ -10,15 +10,14 @@ from engine.engine import GameEngine, GameRule
 from engine.events import Event, EventGroup
 from engine.packs import PackRegistry
 from engine.scene import PackReference, Scene, SceneManager, SceneRegistry
-from engine.scene_runtime import SceneRuntime
 from engine.settings import Settings
 from engine.state import EffectControls, GameState, SceneControls, SceneReboot, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
 from engine.tests.helpers import (
     RecordingSceneReboot,
     SpyEffectAdmin,
-    SpyNetworkControls,
     active_state,
+    make_scene_runtime,
 )
 from engine.timer import Timer
 from engine.version import Version
@@ -1198,13 +1197,7 @@ class _MergeStrategyRig:
         for name in scene_names:
             catalog.rule_registry.get(name + "_rules", "rule", GameRule).on(_Act, _run_act)
         self.output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
-        self.runtime = SceneRuntime(
-            catalog,
-            [self.output],
-            SpyNetworkControls(),
-            frozenset(),
-            RecordingSceneReboot(),
-        )
+        self.runtime = make_scene_runtime(catalog, [self.output])
         self.runtime.activate_boot_scene(scene_names[0])
 
     def act(self, action):

@@ -362,10 +362,7 @@ class EffectManager(EffectControls, EffectAdmin):
         """
         for key in self._merge_strategies:
             self._merge_strategies[key] = SPLIT
-        self._install(view)
-
-    def _install(self, view: SceneView) -> None:
-        self._namespace.install(view.local_effects, view.local_sounds, view.declared_packs)
+        self._namespace.install(view)
 
     def cover(self, view: SceneView) -> HeldEffects:
         """Move the running effects and merge strategies into a held bundle, then install *view*.
@@ -381,7 +378,7 @@ class EffectManager(EffectControls, EffectAdmin):
         held = _HeldEffects(self._effects, self._merge_strategies)
         self._effects = []
         self._merge_strategies = dict.fromkeys(held.merge_strategies, SPLIT)
-        self._install(view)
+        self._namespace.install(view)
         return held
 
     def uncover(self, held: HeldEffects, view: SceneView) -> None:
@@ -400,7 +397,7 @@ class EffectManager(EffectControls, EffectAdmin):
         for entry in self._effects:
             for output, keys in self._outputs_serving(entry):
                 output.restore_effect(keys, entry.effect, entry.receipt)
-        self._install(view)
+        self._namespace.install(view)
 
     def _outputs_serving(
         self, entry: EffectManager._EffectEntry

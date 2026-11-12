@@ -140,7 +140,7 @@ def _build_scene_runtime(
     scene_name: str,
     catalog: PackCatalog,
     scene_reboot: SceneReboot,
-    timer: Timer,
+    timer: Timer | None,
 ) -> SceneRuntime:
     """Build the ``SceneRuntime`` on *hw* from *catalog* and boot it into *scene_name*.
 
@@ -148,7 +148,8 @@ def _build_scene_runtime(
     the catalog's ``SceneRegistry``. *catalog* is the one boot scan from
     ``_scan_boot_pack_catalog``, shared with boot-scene and IR-codec
     resolution; nothing is scanned here. *timer* is the clock the scene, its
-    effects and the Polled parts the tick updates all run on.
+    effects and the Polled parts the tick updates all run on; ``None`` lets
+    the runtime build a wall clock.
     """
     runtime = SceneRuntime(
         catalog,
@@ -172,7 +173,7 @@ def build_scene_boot(
 ) -> SceneBoot:
     """Boot *hw* into its boot scene; return the ``SceneBoot`` that names and drives it.
 
-    The one boot shared by the device (:func:`app.scene_runtime.run_scene`)
+    The one boot shared by the device (:func:`app.run_scene.run_scene`)
     and the Simulated device, whose returned tick is also their one loop body.
     A pending Scene deploy token is applied first (see
     :func:`~hardware.shared.scene_selection.apply_scene_deploy`); then the
@@ -203,20 +204,16 @@ def build_scene_boot(
     scene_reboot = DeviceSceneReboot(
         hw.storage, booted_scene=scene_name, reset=reset, logger=logger
     )
-    if timer is None:
-        timer = Timer()
     runtime = _build_scene_runtime(hw, scene_name, catalog, scene_reboot, timer)
-    tick = _build_scene_tick(hw, runtime, timer)
+    tick = _build_scene_tick(hw, runtime)
     return SceneBoot(scene_name, tick, runtime.scene_controls, runtime.namespace)
 
 
-def _build_scene_tick(
-    hw: DeviceHardware, runtime: SceneRuntime, timer: Timer
-) -> Callable[[], None]:
+def _build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], None]:
     """Return the per-tick body that drives *runtime* on *hw*; call it once per tick.
 
     The one loop body shared by the device
-    (:func:`app.scene_runtime.run_scene`, which adds only ``while True:`` and
+    (:func:`app.run_scene.run_scene`, which adds only ``while True:`` and
     ``gc.collect()``) and the Simulated device, so neither copies it, as
     both share the boot that builds it (:func:`build_scene_boot`). Each tick
     updates every Polled part in ``hw.polled``, naming none, then builds
@@ -224,8 +221,7 @@ def _build_scene_tick(
     ``InputEvents.Sensors`` event and the telemetry gate are allocated here
     (the button, acceleration and magnetic buffers are each part's own
     ``reading``) and mutated in place every tick, so the steady-state tick
-    allocates nothing on-device. *timer* is the clock *runtime* runs on;
-    the tick reads only its running total, for telemetry.
+    allocates nothing on-device.
     """
     polled = hw.polled
     accelerometer = hw.accelerometer
@@ -247,26 +243,31 @@ def _build_scene_tick(
         elapsed = runtime.elapsed
         # Polled whether or not a scene is active, so a send in flight across
         # a scene transition still completes and a packet received with no
-        # scene active is drained; the runtime drops events queued then.
+        # scene active is drained and dropped; only building events waits on
+        # a scene.
         for part in polled:
             part.update(elapsed)
 
-        if ir is not None and ir.received is not None:
-            runtime.queue_event(
-                NetworkEvents.IRReceived(
-                    ir.received,
-                    ir.last_signal_strength,
-                    ir.last_error_margin,
-                    best_receiver=None,
+        if runtime.has_active_scene:
+            if ir is not None and ir.received is not None:
+                runtime.queue_event(
+                    NetworkEvents.IRReceived(
+                        ir.received,
+                        ir.last_signal_strength,
+                        ir.last_error_margin,
+                        best_receiver=None,
+                    )
                 )
-            )
-        if radio is not None and radio.received is not None:
-            runtime.queue_event(NetworkEvents.RadioReceived(radio.received, str(radio.last_sender)))
+            if radio is not None and radio.received is not None:
+                runtime.queue_event(
+                    NetworkEvents.RadioReceived(radio.received, str(radio.last_sender))
+                )
         runtime.queue_event(input_event)
         runtime.update()
 
-        if timer.total - last_telemetry_print_total >= _TELEMETRY_PRINT_INTERVAL:
-            last_telemetry_print_total = timer.total
+        total = runtime.total
+        if total - last_telemetry_print_total >= _TELEMETRY_PRINT_INTERVAL:
+            last_telemetry_print_total = total
             line = ir.telemetry_line() if ir is not None else None
             if line is not None:
                 print(line)

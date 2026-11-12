@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from engine.effects.admin import EffectAdmin, HeldEffects, SceneView
+from engine.effects.output import EffectOutput
 from engine.engine import GameEngine
 from engine.pack_catalog import PackCatalog
 from engine.scene import SceneManager
+from engine.scene_runtime import SceneRuntime
 from engine.state import (
     EffectControls,
     EffectReceipt,
@@ -135,17 +137,39 @@ def rule_source(class_name: str = "ARule") -> str:
     )
 
 
-def make_scene_manager(
-    catalog: PackCatalog,
-    *,
-    engine: GameEngine | None = None,
-    effect_admin: SpyEffectAdmin | None = None,
-) -> SceneManager:
-    """Construct a ``SceneManager`` over *catalog*'s registries, with spies for every port."""
+def make_scene_manager(catalog: PackCatalog, effect_admin: SpyEffectAdmin) -> SceneManager:
+    """Construct a ``SceneManager`` over *catalog*'s registries for a spy-based transition test.
+
+    *effect_admin* records each transition's step; every other port is a spy.
+    """
     return SceneManager(
-        engine or GameEngine(effect_controls=SpyEffectControls()),
+        GameEngine(effect_controls=SpyEffectControls()),
         catalog.rule_registry,
         catalog.scene_registry,
-        effect_admin or SpyEffectAdmin(),
+        effect_admin,
         RecordingSceneReboot(),
+    )
+
+
+def make_scene_runtime(
+    catalog: PackCatalog,
+    outputs: list[EffectOutput] | None = None,
+    *,
+    capabilities: frozenset[str] = frozenset(),
+    scene_reboot: SceneReboot | None = None,
+    clock: Timer | None = None,
+) -> SceneRuntime:
+    """Construct a ``SceneRuntime`` over *catalog* drawing on *outputs*, with spies for its ports.
+
+    No scene is active yet. Its network controls are a ``SpyNetworkControls``
+    and, unless *scene_reboot* is given, its Reboots go to a
+    ``RecordingSceneReboot``; omitting *clock* gives a wall clock.
+    """
+    return SceneRuntime(
+        catalog,
+        outputs if outputs is not None else [],
+        SpyNetworkControls(),
+        capabilities,
+        scene_reboot if scene_reboot is not None else RecordingSceneReboot(),
+        clock,
     )

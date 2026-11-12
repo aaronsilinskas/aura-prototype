@@ -52,8 +52,7 @@ class EffectAdmin:
     see them: one step per transition, each installing the ``SceneView`` it is
     given into the Active scene namespace (ADR-0008). ``SceneManager`` makes
     exactly one of these calls per transition, never reaching the effect
-    system through a stack entry's ``state.effect_controls``. All three steps
-    raise ``NotImplementedError`` by default.
+    system through a stack entry's ``state.effect_controls``.
     """
 
     def enter_boot_scene(self, view: SceneView) -> None:

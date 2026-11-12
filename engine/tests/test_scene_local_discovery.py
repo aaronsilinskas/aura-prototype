@@ -1,27 +1,19 @@
 """Tests for scene-local rule discovery through ``scan_pack_roots`` (the rules/
-subdir of each scanned scene) and SceneManager rule resolution with scene-local rules.
+subdir of each scanned scene) and a booted scene running its scene-local rules.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from engine.engine import GameEngine, GameRule
+from engine.engine import GameRule
 from engine.events import Event, EventGroup
-from engine.pack_catalog import scan_pack_roots
+from engine.pack_catalog import PackCatalog, scan_pack_roots
 from engine.scene import Scene
-from engine.tests.helpers import (
-    SpyEffectControls,
-    active_state,
-    make_scene_manager,
-    rule_source,
-)
+from engine.scene_runtime import SceneRuntime
+from engine.tests.helpers import make_scene_runtime, rule_source
 
-_GROUP = EventGroup("test")
-
-
-def _make_engine() -> GameEngine:
-    return GameEngine(effect_controls=SpyEffectControls())
+_PING = Event(EventGroup("test"), "ping")
 
 
 # ---------------------------------------------------------------------------
@@ -65,22 +57,33 @@ def test_a_scenes_local_rules_are_not_visible_to_another_scene(pack_tree) -> Non
 
 
 # ---------------------------------------------------------------------------
-# SceneManager — scene-local rules appended after pack rules
+# The boot scene runs its scene-local rules, after its pack rules
 # ---------------------------------------------------------------------------
 
 
-def test_boot_scene_includes_scene_local_rules_in_engine(pack_tree) -> None:
+def _local_rule(catalog: PackCatalog, scene_name: str, item_name: str) -> GameRule:
+    """The scene-local rule *item_name* of *scene_name*, the same instance the scene runs."""
+    return catalog.scene_registry.get(scene_name).local_rule_registry.get(item_name, GameRule)
+
+
+def _ping_and_update(runtime: SceneRuntime) -> None:
+    runtime.queue_event(_PING)
+    runtime.update()
+
+
+def test_a_boot_scenes_local_rules_hear_its_events(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"my_scene": {"rules": {"local_rule": rule_source()}}})
+    heard: list[Event] = []
+    _local_rule(catalog, "my_scene", "local_rule").on(Event, lambda e, state: heard.append(e))
+    runtime = make_scene_runtime(catalog)
+    runtime.activate_boot_scene("my_scene")
 
-    engine = _make_engine()
-    manager = make_scene_manager(catalog, engine=engine)
-    manager.activate_boot_scene("my_scene")
+    _ping_and_update(runtime)
 
-    assert len(engine.rules) == 1
-    assert isinstance(engine.rules[0], GameRule)
+    assert heard == [_PING]
 
 
-def test_boot_scene_appends_local_rules_after_pack_rules(pack_tree) -> None:
+def test_a_boot_scenes_local_rules_hear_each_event_after_its_pack_rules(pack_tree) -> None:
     root = pack_tree.root("ts_flash")
     pack_tree.rule_pack(root, "pack_rules", items={"pack_rule": rule_source("PackRule")})
     pack_tree.scene(
@@ -90,66 +93,37 @@ def test_boot_scene_appends_local_rules_after_pack_rules(pack_tree) -> None:
         rules={"local_rule": rule_source("LocalRule")},
     )
     catalog = scan_pack_roots([str(root)])
+    heard: list[str] = []
     pack_rule = catalog.rule_registry.get("pack_rules", "pack_rule", GameRule)
+    pack_rule.on(Event, lambda e, state: heard.append("pack"))
+    _local_rule(catalog, "my_scene", "local_rule").on(Event, lambda e, state: heard.append("local"))
+    runtime = make_scene_runtime(catalog)
+    runtime.activate_boot_scene("my_scene")
 
-    engine = _make_engine()
-    manager = make_scene_manager(catalog, engine=engine)
-    manager.activate_boot_scene("my_scene")
+    _ping_and_update(runtime)
 
-    rules = engine.rules
-    assert len(rules) == 2
-    assert rules[0] is pack_rule
-    assert isinstance(rules[1], GameRule)
-    assert rules[1] is not pack_rule
+    assert heard == ["pack", "local"]
 
 
 def test_a_local_rule_without_a_rule_attribute_fails_when_the_boot_scene_is_activated(
     pack_tree,
 ) -> None:
     catalog = pack_tree.scan(scenes={"my_scene": {"rules": {"broken_rule": "NOT_A_RULE = 1"}}})
+    runtime = make_scene_runtime(catalog)
 
-    manager = make_scene_manager(catalog)
     with pytest.raises(ValueError, match="no attribute 'RULE'"):
-        manager.activate_boot_scene("my_scene")
+        runtime.activate_boot_scene("my_scene")
 
 
-def test_scene_manager_local_rules_are_not_active_for_another_boot_scene(pack_tree) -> None:
+def test_a_scenes_local_rules_do_not_hear_another_boot_scenes_events(pack_tree) -> None:
     catalog = pack_tree.scan(
         scenes={"scene_a": {"rules": {"local_rule": rule_source()}}, "scene_b": {}}
     )
+    heard: list[Event] = []
+    _local_rule(catalog, "scene_a", "local_rule").on(Event, lambda e, state: heard.append(e))
+    runtime = make_scene_runtime(catalog)
+    runtime.activate_boot_scene("scene_b")
 
-    engine = _make_engine()
-    manager = make_scene_manager(catalog, engine=engine)
-    manager.activate_boot_scene("scene_b")
+    _ping_and_update(runtime)
 
-    assert engine.rules == []
-
-
-def test_local_rule_receives_events_in_the_boot_scene(pack_tree) -> None:
-    rule_src = (
-        "from engine.engine import GameRule\n"
-        "from engine.state import GameState\n"
-        "from engine.events import Event\n"
-        "\n"
-        "class RecorderRule(GameRule):\n"
-        "    def __init__(self):\n"
-        "        self.received = []\n"
-        "        self.on(Event, self._handle)\n"
-        "    def _handle(self, event, state):\n"
-        "        self.received.append(event.name)\n"
-        "\n"
-        "RULE = RecorderRule()\n"
-    )
-    catalog = pack_tree.scan(scenes={"my_scene": {"rules": {"recorder": rule_src}}})
-
-    engine = _make_engine()
-    manager = make_scene_manager(catalog, engine=engine)
-    manager.activate_boot_scene("my_scene")
-    manager.update()
-
-    active_state(manager).queue_event(Event(_GROUP, "ping"))
-    manager.update()
-
-    rule = engine.rules[0]
-    assert hasattr(rule, "received")
-    assert "ping" in rule.received
+    assert heard == []

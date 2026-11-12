@@ -39,8 +39,8 @@ class SceneRuntime:
             runtime.update()
 
     Timing: the clock advances inside ``update`` only while a scene is
-    active, so ``elapsed`` read before an ``update`` is the previous tick's
-    (#1263).
+    active, so ``elapsed`` and ``total`` read before an ``update`` are the
+    previous tick's (#1263).
     """
 
     __slots__ = ("_clock", "_effect_manager", "_namespace", "_scene_manager")
@@ -82,6 +82,11 @@ class SceneRuntime:
         """
         self._scene_manager.activate_boot_scene(name)
 
+    @property
+    def has_active_scene(self) -> bool:
+        """Whether a scene is active, so a queued event would reach its rules."""
+        return self._scene_manager.active_state is not None
+
     def queue_event(self, event: Event) -> None:
         """Queue *event* for the active scene's rules on the next ``update``.
 
@@ -100,6 +105,11 @@ class SceneRuntime:
     def elapsed(self) -> float:
         """The clock's elapsed time as of the last ``update`` that advanced it."""
         return self._clock.elapsed
+
+    @property
+    def total(self) -> float:
+        """The clock's running total of elapsed time, as of the last ``update`` that advanced it."""
+        return self._clock.total
 
     @property
     def scene_controls(self) -> SceneControls:
