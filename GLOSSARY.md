@@ -260,11 +260,11 @@ A linear fill effect (`basic.progress`) lighting pixels from first toward last i
 _Avoid_: confusing `progress` with `Game Level` or receipt `brightness`; treating `progress` as runtime-mutable
 
 ### Effect Level
-A 1–10 integer `level` option controlling an effect's visual/audio intensity; a build-time parameter, not a game concept. A missing level is 1, and one outside 1–10 is clamped to the nearest end. Values scale across it the same way they scale across a **Game Level**.
+A 1–10 integer `level` option controlling an effect's visual/audio intensity; a build-time parameter, not a game concept. A missing level is 1, and one outside 1–10 is clamped to the nearest end. Values scale across it the same way they scale across a **Game Level**, through the one interpolation both share: `level_lerp` in `engine/lerp.py`.
 _Avoid_: using `level` as a runtime control; conflating with `Game Level`; reading or clamping the `level` option in each builder (read it once, the Effect Level's way); a second level interpolation for effects
 
 ### Game Level
-A player's progression through a game session, stored in `GameState`; integer from 1 up to a top level the game chooses (Red Light Green Light reads its top level from one of its own Settings), starting at 1, advancing one per surviving Round, resetting on game over or win.
+A player's progression through a game session, stored in `GameState`; integer from 1 up to a top level the game chooses (Red Light Green Light reads its top level from one of its own Settings), starting at 1, advancing one per surviving Round, resetting on game over or win. Values scale across it through `level_lerp` in `engine/lerp.py`, the one interpolation it shares with the **Effect Level**.
 _Avoid_: confusing with `Effect Level`; holding it as rule instance state; a second level interpolation (Game and Effect Levels scale values the same way, from level 1 up to their top level)
 
 ### Round

@@ -1,9 +1,10 @@
 from effects.effect import Effect, EffectConfig
 from effects.layers.flame_layer import FlameLayer
 from effects.layers.renderer import LayerRenderer
-from effects.level import clamp_level, level_lerp
+from effects.level import EFFECT_TOP_LEVEL, effect_level
 from effects.palette import PaletteLUT256
 from engine.effects.builder import EffectBuilder
+from engine.lerp import level_lerp
 
 # fmt: off
 _light_palette = bytes([0, 32, 32, 32,
@@ -19,15 +20,15 @@ class LightBuilder(EffectBuilder):
         Level: hotter sparks that also cool faster — brighter peaks with quicker
         turnover and more rapid flickering.
         """
-        level = clamp_level(config.get_option("level", 1))
+        level = effect_level(config)
         return Effect(
             name=name,
             pixels=LayerRenderer(
                 layer=FlameLayer(
                     spark_count=level,
                     resolution=config.resolution,
-                    heat_rate=level_lerp(level, 0.5, 0.75),
-                    extra_cool_rate=level_lerp(level, 0.1, 0.3),
+                    heat_rate=level_lerp(level, 0.5, 0.75, EFFECT_TOP_LEVEL),
+                    extra_cool_rate=level_lerp(level, 0.1, 0.3, EFFECT_TOP_LEVEL),
                     spread=0.1,
                 ),
                 palette=PaletteLUT256(_light_palette),

@@ -3,11 +3,12 @@ import random
 from effects.effect import Effect, EffectConfig
 from effects.layers.add_samples_renderer import AddSamplesRenderer
 from effects.layers.layer import Layer
-from effects.level import clamp_level, level_lerp
+from effects.level import EFFECT_TOP_LEVEL, effect_level
 from effects.palette import PaletteLUT256
 from effects.shape import EffectShapeFunc, Shape
 from effects.value import lerp
 from engine.effects.builder import EffectBuilder
+from engine.lerp import level_lerp
 
 # fmt: off
 _AIR_PALETTE = bytes([
@@ -151,16 +152,16 @@ class AirBuilder(EffectBuilder):
         Level: more breezes sweep at once, each brighter and wider, with shorter
         gaps between sweeps.
         """
-        level = clamp_level(config.get_option("level", 1))
+        level = effect_level(config)
 
         breeze_count = 1 + level // 5
-        padding = 0.3 - level_lerp(level, 0.0, 0.3)
-        multiplier_end = level_lerp(level, 0.0, 0.5) + 0.50 / breeze_count
+        padding = level_lerp(level, 0.3, 0.0, EFFECT_TOP_LEVEL)
+        multiplier_end = level_lerp(level, 0.0, 0.5, EFFECT_TOP_LEVEL) + 0.50 / breeze_count
 
         hide_dur_min = 0.5
-        hide_dur_max = 3.0 - level_lerp(level, 0.0, 2.0)
+        hide_dur_max = level_lerp(level, 3.0, 1.0, EFFECT_TOP_LEVEL)
         sweep_dur_min = 2.0
-        sweep_dur_max = level_lerp(level, 2.5, 5.0)
+        sweep_dur_max = level_lerp(level, 2.5, 5.0, EFFECT_TOP_LEVEL)
 
         shape = Shape.padded(padding, Shape.reverse(Shape.gradient()))
 
