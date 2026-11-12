@@ -1,8 +1,7 @@
 """``TagConfig`` — the Tag scene's Scene Config.
 
 Holds the scene's Settings, declared in its ``scene.json``, and the values
-derived from them. ``TagConfig`` is built from the scene's Settings view,
-reading each Setting into the field of the same name.
+derived from them.
 
 ``tag_config`` is a :class:`engine.state.StateSlot` callable accessor: it lazily
 builds the config from ``state.settings`` on first use and caches it under a
@@ -23,7 +22,8 @@ _CONFIG_KEY: Final = "tag_config"
 
 
 class TagConfig:
-    """Immutable configuration for the Tag scene, read from its Settings."""
+    """Immutable configuration for the Tag scene, each field read from the
+    scene Setting of the same name."""
 
     __slots__ = (
         "expected_player",

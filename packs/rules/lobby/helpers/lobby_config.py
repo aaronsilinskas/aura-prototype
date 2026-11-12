@@ -89,9 +89,9 @@ class LobbyConfig:
 
     Raises:
         ValueError: if an entry is not an object or is missing
-            ``scene``/``effect``, if any scope name is unknown, if ``scopes``
-            is empty, or if no entry is left: none was declared, or the device
-            can run none of them.
+            ``scene``/``effect``, if entries were declared but the device can
+            run none of them, if any scope name is unknown, if ``scopes`` is
+            empty, or if no entry was declared.
     """
 
     __slots__ = ("entries", "scopes")
