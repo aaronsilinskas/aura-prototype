@@ -74,11 +74,16 @@ An `EffectPixels` that turns one or more **Layers** into pixels every frame. The
 _Avoid_: "compositor"; re-typing a stock render loop in a pack or scene; putting `name` on a renderer (it belongs on `Effect`)
 
 ### GameRule
-An event handler registered with `GameEngine`. **Game-data-stateless** — all game data lives in `GameState`, never as mutable instance attributes (construction-time config is the only permitted instance state).
+An event handler; one of a scene's rules, dispatched by its **SceneRun**. **Game-data-stateless** — all game data lives in `GameState`, never as mutable instance attributes (construction-time config is the only permitted instance state).
 
 ### GameState
 The game context passed to every rule handler each tick: the control seams, the read-only clock, event queuing, and typed accessors for all mutable game data.
-_Avoid_: `clear_queue()` from rules (reserved for `SceneManager`); `get(key, None)` (use `get_or_none`); storing a **Setting** in it
+Rules queue events on it and read game time and the dispatch count, but only its **SceneRun** dispatches the queue or moves its time and count on.
+_Avoid_: `get(key, None)` (use `get_or_none`); storing a **Setting** in it
+
+### SceneRun
+One run of a scene on the scene stack, from when it is booted or laid on as an **Overlay** until it is popped or the device reboots. It holds the scene's `GameState`, its rules in dispatch order and its game time, and is the only thing that dispatches the scene's queued events: each event goes to every rule in order, events queued during dispatch are dispatched in the same tick, and the dispatch count rises once per event. Only the top run is ticked, so a covered scene's game time stops.
+_Avoid_: "engine", "game engine", "session", "instance", "run unit"; adding or swapping its rules after it is built; holding the clock (it is handed each tick's elapsed time)
 
 ### Phase
 A named stage of a scene's game flow (e.g. Tag's Ready/Starting/Playing/Game Over), identified by a `PhaseKey`. A phase starts the moment it is entered, in the same tick, whatever order the scene's rules run in; its handlers first hear the event after the one that entered it.
@@ -121,8 +126,8 @@ The immutable helper a scene's rules, or a **Rule pack**'s, build once from the 
 _Avoid_: confusing with `EffectConfig`; calling the Settings themselves the Scene Config; re-deriving it every tick (build once, cache); restating a Setting's default in it (its declaration holds it); a second way to build it from loose values
 
 ### Timer
-The scene's clock. Whoever drives the tick advances it exactly once per tick, before anything reads it (`SceneRuntime.advance_clock`, first in the scene tick, whether or not a scene is active), so every **Polled part**, rule and effect in that tick sees the same, current elapsed time. `GameEngine` only reads it. Rules access time only via `state.elapsed`/`state.total`, never by holding a `Timer` reference.
-_Avoid_: advancing it inside `GameEngine.update` or anywhere else mid-tick; reading it before the tick has advanced it
+The scene's clock. Whoever drives the tick advances it exactly once per tick, before anything reads it (`SceneRuntime.advance_clock`, first in the scene tick, whether or not a scene is active), so every **Polled part**, rule and effect in that tick sees the same, current elapsed time. Only `SceneRuntime` reads it below the tick; it hands each tick's elapsed time to the top **SceneRun**. Rules access time only via `state.elapsed`/`state.total`, never by holding a `Timer` reference.
+_Avoid_: advancing it anywhere but `SceneRuntime.advance_clock`; a **SceneRun** or rule holding it; reading it before the tick has advanced it
 
 ### Scene
 A declarative bundle of a self-contained game context, read-only once the **PackCatalog** has scanned it: its effect and rule packs, a `version`, a declared `ir_codec` name, its resolved **Settings** (its own and its Rule packs', with its **Setting overrides** applied), its **Required capabilities**, and its scene-local effects, rules and sounds. Every lookup shares the same one.
@@ -322,7 +327,7 @@ _Avoid_: sequencing the boot's steps at a call site; a second boot for tests or 
 
 ### SceneRuntime
 The engine's matched set for running scenes, built once from the **PackCatalog** and what the device offers (its effect outputs, network controls, **Capabilities** and **SceneReboot**): one **Active scene namespace**, the effect system that resolves through it, and the scene manager that drives transitions. A tick queues its events on it and updates it once; that dispatches the events, applies any pending **Overlay** or pop, then updates effects, on one clock.
-_Avoid_: wiring the namespace, effect manager, game engine and scene manager by hand; driving its parts separately within a tick; more than one per device; "engine" for it (the game engine is one of its parts)
+_Avoid_: wiring the namespace, effect manager and scene manager by hand; driving its parts separately within a tick; more than one per device; "engine" or "game engine" for it
 
 ### Device assembly
 The board-free turning of a `DeviceConfig` into a `DeviceHardware`, shared by the physical device and the **Simulated device**: which components are built or skipped, which need a bus, the order they come up in, how each is narrated, and how the IR and radio subsystems are wired. It reaches hardware only through **DeviceParts**, so a config the board rejects for config reasons is rejected in simulation too.
