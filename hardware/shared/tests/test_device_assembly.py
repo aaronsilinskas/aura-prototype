@@ -676,6 +676,60 @@ def test_a_disabled_pixel_entry_is_narrated_disabled():
     assert "[hw] pixels[0] matrix disabled\n" in text
 
 
+@pytest.mark.parametrize(
+    ("overrides", "suffix"),
+    [
+        ({"address": 0x31}, " address=0x31 ok"),
+        ({"address": 0x31, "i2c": "sensors"}, " address=0x31 i2c=sensors ok"),
+    ],
+    ids=["address", "address-and-bus"],
+)
+def test_a_matrix_entry_line_appends_its_address_then_its_non_default_i2c_bus(overrides, suffix):
+    text = _narration(_config(i2c=_I2C_BUSES, pixels=[{**_MATRIX, **overrides}]))
+
+    assert (
+        "[hw] pixels[0] matrix cols=13 scope_rows=[personal:0-1] brightness=1.00" + suffix + "\n"
+    ) in text
+
+
+def test_a_neopixel_entry_line_names_every_segment_and_its_brightness_to_two_decimals():
+    strip = {
+        **_NEOPIXEL,
+        "count": 20,
+        "brightness": 0.4,
+        "scope_pixels": {"personal": [0, 10], "ambient": [10, 20]},
+    }
+
+    assert (
+        "[hw] pixels[0] neopixel pin=GP0 count=20 order=GRB "
+        + "scope_pixels=[personal:0-10 ambient:10-20] brightness=0.40 ok\n"
+    ) in _narration(_config(pixels=[strip]))
+
+
+@pytest.mark.parametrize(
+    ("section", "chip"),
+    [("accelerometer", "lis3dh"), ("magnetometer", "mmc5603"), ("haptics", "drv2605")],
+)
+def test_an_i2c_chip_line_names_its_chip_padded_address_and_non_default_bus(section, chip):
+    config = _config(i2c=_I2C_BUSES, **{section: {"address": 0x0A, "i2c": "sensors"}})
+
+    assert f"[hw] {section} {chip} address=0x0A i2c=sensors ok\n" in _narration(config)
+
+
+def test_a_radio_line_appends_the_non_default_spi_bus_it_joins():
+    config = _config(spi=_SPI_BUSES, radio={**_RADIO, "spi": "radio"})
+
+    assert "[hw] radio frequency=915.0 node=3 cs=GP13 reset=GP14 spi=radio ok\n" in _narration(
+        config
+    )
+
+
+def test_an_sdcard_line_appends_the_non_default_spi_bus_it_joins():
+    config = _config(spi=_SPI_BUSES, sdcard={"cs": "GP1", "mount": "/cards", "spi": "radio"})
+
+    assert "[hw] sdcard mount=/cards cs=GP1 spi=radio ok\n" in _narration(config)
+
+
 def test_the_current_budget_is_reported_before_the_pixel_lines():
     config = _config(neopixel_current_budget={"current_limit_ma": 100}, pixels=[_NEOPIXEL])
 
@@ -704,6 +758,23 @@ def test_a_part_that_raises_fails_its_own_line_and_propagates(part, config, line
         assemble_device(config, RecordingParts(fail_on=part), logger)
 
     assert "".join(fragments).endswith(line)
+
+
+def test_a_failing_part_leaves_the_earlier_lines_intact_and_stops_the_boot():
+    fragments: list[str] = []
+    config = _config(buttons=["GP3"], accelerometer={}, magnetometer={})
+
+    with pytest.raises(PartError):
+        assemble_device(
+            config, RecordingParts(fail_on="accelerometer"), Logger("[hw]", fragments.append)
+        )
+
+    assert "".join(fragments).splitlines() == [
+        "[hw] begin board=test-board",
+        "[hw] i2c default board ok",
+        "[hw] buttons A=GP3 ok",
+        "[hw] accelerometer lis3dh FAILED",
+    ]
 
 
 def test_a_missing_bus_fails_the_line_of_the_section_needing_it():
@@ -744,6 +815,16 @@ def test_buttons_are_labelled_a_onward_in_declared_order_over_their_pins():
     hw.buttons.update(0.5)
 
     assert (hw.buttons.reading.is_pressed("A"), hw.buttons.reading.is_pressed("B")) == (False, True)
+
+
+def test_the_buttons_line_lists_each_label_with_its_pin_in_declared_order():
+    text = _narration(_config(buttons=["GP3", "GP7", "GP2"]))
+
+    assert "[hw] buttons A=GP3 B=GP7 C=GP2 ok\n" in text
+
+
+def test_with_no_buttons_the_buttons_line_lists_none():
+    assert "[hw] buttons ok\n" in _narration(_config())
 
 
 # ---------------------------------------------------------------------------
@@ -796,6 +877,21 @@ def test_ir_with_no_receivers_narrates_none_and_reads_no_pin():
 
     assert "[hw] ir rx=(none) emitters=line:GP6 " in narration
     assert "ir_reader" not in parts.parts()
+
+
+def test_several_ir_receivers_narrate_as_an_ir_multi_receiver():
+    text = _narration(_config(ir={"rx": ["GP5", "GP8"], "line": "GP6"}))
+
+    assert "[hw] ir rx=[GP5 GP8] (IR multi-receiver) emitters=line:GP6 writer=fake ok\n" in text
+
+
+def test_ir_emitters_narrate_in_ir_emitters_order_not_config_order():
+    ir = {"rx": "GP5", "area_of_effect": "GP9", "cone": "GP7", "line": "GP6"}
+
+    assert (
+        "[hw] ir rx=[GP5] emitters=line:GP6 cone:GP7 area_of_effect:GP9 writer=fake ok\n"
+        in _narration(_config(ir=ir))
+    )
 
 
 # ---------------------------------------------------------------------------
