@@ -9,8 +9,9 @@ class ProgressRenderer(EffectPixels):
     fraction, so the boundary pixel is dimmed for an anti-aliased edge.
 
     ``update`` leaves the progress unchanged, so the fill is static until it is
-    re-issued. A self-animating fill subclasses this, overriding only
-    ``update`` to call ``self._layer.set_progress``.
+    re-issued. A self-animating fill subclasses this and overrides only
+    ``update``: it keeps its own reference to the layer it passes in and sets
+    that layer's progress from ``update``.
     """
 
     __slots__ = ("_b", "_g", "_layer", "_r")
@@ -22,7 +23,7 @@ class ProgressRenderer(EffectPixels):
         self._b = color & 0xFF
 
     def update(self, elapsed: float) -> None:
-        """No-op: the progress changes only through ``self._layer.set_progress``."""
+        """No-op: the progress changes only when the layer's progress is set."""
 
     def render(self, output: PixelBuffer) -> None:
         count = len(output)
