@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import Any
+
 from engine.effects.admin import EffectAdmin, HeldEffects, SceneView
 from engine.effects.output import EffectOutput
 from engine.engine import GameEngine
 from engine.pack_catalog import PackCatalog
-from engine.scene import SceneManager
+from engine.scene import PackReference, Scene, SceneManager, SceneRegistry
 from engine.scene_runtime import SceneRuntime
 from engine.state import (
     EffectControls,
@@ -135,6 +138,26 @@ def rule_source(class_name: str = "ARule") -> str:
         "class " + class_name + "(GameRule): pass\n"
         "RULE = " + class_name + "()\n"
     )
+
+
+def make_scene(
+    *,
+    effect_packs: Sequence[PackReference] = (),
+    rule_packs: Sequence[PackReference] = (),
+    **fields: Any,
+) -> Scene:
+    """Build an in-memory ``Scene`` record for a test that needs no scan.
+
+    Unless a test passes them, the scene has no packs, no Required
+    capabilities, the default codec, empty Settings and no scene-local items.
+    *fields* are any other ``Scene`` keyword arguments.
+    """
+    return Scene(effect_packs, rule_packs, **fields)
+
+
+def make_scene_registry(*scenes: tuple[str, Scene]) -> SceneRegistry:
+    """Build a ``SceneRegistry`` holding each ``(name, scene)`` pair."""
+    return SceneRegistry(dict(scenes))
 
 
 def make_scene_manager(catalog: PackCatalog, effect_admin: SpyEffectAdmin) -> SceneManager:

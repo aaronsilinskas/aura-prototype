@@ -2,6 +2,8 @@
 
 Scanned registries come from ``scan_pack_roots`` over trees laid out by the
 shared ``pack_tree`` builder; scan failures are covered by the catalog tests.
+In-memory registries are built from ``Scene`` records with the shared
+``make_scene`` and ``make_scene_registry`` helpers.
 """
 
 from __future__ import annotations
@@ -10,6 +12,7 @@ import pytest
 
 from engine.pack_catalog import scan_pack_roots
 from engine.scene import Scene, SceneRegistry
+from engine.tests.helpers import make_scene, make_scene_registry
 from engine.version import Version
 
 # ---------------------------------------------------------------------------
@@ -62,8 +65,8 @@ def test_scene_ir_codec_is_stored_as_the_value_passed_to_constructor() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_scene_registry_names_is_empty_on_construction() -> None:
-    registry = SceneRegistry()
+def test_a_registry_built_from_no_scenes_has_no_names() -> None:
+    registry = make_scene_registry()
 
     assert registry.names() == []
 
@@ -122,26 +125,21 @@ def test_get_returns_scene_with_ir_codec_parsed_from_json(pack_tree) -> None:
 
 
 # ---------------------------------------------------------------------------
-# SceneRegistry.get — fresh instance per call
+# SceneRegistry.get — the stored record
 # ---------------------------------------------------------------------------
 
 
-def test_get_returns_fresh_scene_on_each_call(pack_tree) -> None:
+def test_get_returns_the_same_record_on_each_call(pack_tree) -> None:
     registry = _scan_scene(pack_tree)
 
-    scene_a = registry.get("forest")
-    scene_b = registry.get("forest")
-
-    assert scene_a is not scene_b
+    assert registry.get("forest") is registry.get("forest")
 
 
-def test_get_returns_scenes_with_shared_version_instance(pack_tree) -> None:
-    registry = _scan_scene(pack_tree, version="1.0")
+def test_get_returns_the_record_the_registry_was_built_from() -> None:
+    forest = make_scene()
+    registry = make_scene_registry(("forest", forest))
 
-    scene_a = registry.get("forest")
-    scene_b = registry.get("forest")
-
-    assert scene_a.version is scene_b.version
+    assert registry.get("forest") is forest
 
 
 # ---------------------------------------------------------------------------
@@ -150,7 +148,7 @@ def test_get_returns_scenes_with_shared_version_instance(pack_tree) -> None:
 
 
 def test_get_raises_value_error_for_unknown_scene_name() -> None:
-    registry = SceneRegistry()
+    registry = make_scene_registry()
 
     with pytest.raises(ValueError, match="Unknown scene"):
         registry.get("nonexistent")
@@ -167,9 +165,8 @@ def test_resolve_known_returns_a_scanned_scene_name(pack_tree) -> None:
     assert registry.resolve_known("forest") == "forest"
 
 
-def test_resolve_known_returns_a_factory_registered_scene_name() -> None:
-    registry = SceneRegistry()
-    registry.register("in_memory", lambda: Scene(effect_packs=[], rule_packs=[]))
+def test_resolve_known_returns_a_scene_name_the_registry_was_built_with() -> None:
+    registry = make_scene_registry(("in_memory", make_scene()))
 
     assert registry.resolve_known("in_memory") == "in_memory"
 
@@ -193,30 +190,16 @@ def test_ir_codec_for_returns_the_declared_codec_name(pack_tree) -> None:
 
 
 def test_ir_codec_for_raises_value_error_for_unknown_scene_name() -> None:
-    registry = SceneRegistry()
+    registry = make_scene_registry()
 
     with pytest.raises(ValueError, match="Unknown scene"):
         registry.ir_codec_for("nonexistent")
 
 
-def test_ir_codec_for_works_for_register_factory_scene() -> None:
-    registry = SceneRegistry()
-    registry.register(
-        "in_memory",
-        lambda: Scene(effect_packs=[], rule_packs=[], ir_codec="tag"),
-    )
+def test_ir_codec_for_answers_the_codec_of_the_record_the_registry_was_built_with() -> None:
+    registry = make_scene_registry(("arena", make_scene(ir_codec="tag")))
 
-    assert registry.ir_codec_for("in_memory") == "tag"
-
-
-def test_ir_codec_for_prefers_factory_override_over_scanned_scene(pack_tree) -> None:
-    registry = _scan_scene(pack_tree, ir_codec="tag")
-    registry.register(
-        "forest",
-        lambda: Scene(effect_packs=[], rule_packs=[], ir_codec="aura"),
-    )
-
-    assert registry.ir_codec_for("forest") == "aura"
+    assert registry.ir_codec_for("arena") == "tag"
 
 
 # ---------------------------------------------------------------------------
@@ -230,60 +213,7 @@ def test_names_returns_scene_names_sorted_alphabetically(pack_tree) -> None:
     assert registry.names() == ["alpha", "mango", "zebra"]
 
 
-# ---------------------------------------------------------------------------
-# SceneRegistry.register — in-memory escape hatch
-# ---------------------------------------------------------------------------
+def test_names_lists_the_scenes_the_registry_was_built_with() -> None:
+    registry = make_scene_registry(("zebra", make_scene()), ("alpha", make_scene()))
 
-
-def test_register_factory_allows_get_without_any_disk_scan() -> None:
-    registry = SceneRegistry()
-    v = Version(1, 0)
-    registry.register("in_memory", lambda: Scene(effect_packs=[], rule_packs=[], version=v))
-
-    scene = registry.get("in_memory")
-
-    assert scene.version is v
-
-
-def test_register_factory_scene_appears_in_names() -> None:
-    registry = SceneRegistry()
-    registry.register("in_memory", lambda: Scene(effect_packs=[], rule_packs=[]))
-
-    assert "in_memory" in registry.names()
-
-
-def test_register_factory_returns_fresh_scene_on_each_get() -> None:
-    registry = SceneRegistry()
-    registry.register("in_memory", lambda: Scene(effect_packs=[], rule_packs=[]))
-
-    scene_a = registry.get("in_memory")
-    scene_b = registry.get("in_memory")
-
-    assert scene_a is not scene_b
-
-
-def test_register_factory_scene_exposes_same_version_field_as_json_scene(
-    pack_tree,
-) -> None:
-    registry = _scan_scene(pack_tree, "from_disk", version="1.0")
-    registry.register(
-        "from_memory",
-        lambda: Scene(effect_packs=[], rule_packs=[], version=Version(1, 0)),
-    )
-
-    disk_scene = registry.get("from_disk")
-    mem_scene = registry.get("from_memory")
-
-    assert disk_scene.version is not None
-    assert mem_scene.version is not None
-    assert disk_scene.version.major == mem_scene.version.major
-    assert disk_scene.version.minor == mem_scene.version.minor
-
-
-def test_names_does_not_duplicate_when_factory_overrides_scanned_scene(
-    pack_tree,
-) -> None:
-    registry = _scan_scene(pack_tree)
-    registry.register("forest", lambda: Scene(effect_packs=[], rule_packs=[]))
-
-    assert registry.names().count("forest") == 1
+    assert registry.names() == ["alpha", "zebra"]

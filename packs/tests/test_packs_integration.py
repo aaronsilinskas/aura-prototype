@@ -14,12 +14,12 @@ from engine.engine import GameRule
 from engine.events import Event, EventGroup
 from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog, scan_pack_roots
-from engine.scene import PackReference, Scene, SceneRegistry
+from engine.scene import PackReference
 from engine.scene_runtime import SceneRuntime
 from engine.settings import Settings
 from engine.state import Scope
 from engine.tests.effects.helpers import SpyEffectOutput
-from engine.tests.helpers import make_scene_runtime
+from engine.tests.helpers import make_scene, make_scene_registry, make_scene_runtime
 from engine.version import Version
 
 _PACKS_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
@@ -436,15 +436,8 @@ def test_red_light_green_light_scene_every_audio_playing_effects_clip_name_resol
 
 def _debug_runtime(catalog: PackCatalog, settings: Settings | None = None) -> SceneRuntime:
     """A SceneRuntime over the real packs whose booted scene runs only the ``debug`` rule pack."""
-    scene_registry = SceneRegistry()
-    scene_registry.register(
-        "debug_scene",
-        lambda: Scene(
-            effect_packs=[],
-            rule_packs=[PackReference("debug", Version(1, 0))],
-            settings=settings,
-        ),
-    )
+    debug_scene = make_scene(rule_packs=[PackReference("debug", Version(1, 0))], settings=settings)
+    scene_registry = make_scene_registry(("debug_scene", debug_scene))
     debug_catalog = PackCatalog(
         catalog.effect_registry, catalog.rule_registry, scene_registry, catalog.pack_sounds
     )

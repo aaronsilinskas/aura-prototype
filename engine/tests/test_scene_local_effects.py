@@ -19,6 +19,7 @@ from engine.state import Scope
 from engine.tests.effects.helpers import SpyEffectOutput
 from engine.tests.helpers import (
     SpyEffectAdmin,
+    make_scene,
     make_scene_manager,
 )
 from engine.timer import Timer
@@ -86,8 +87,8 @@ def test_a_scenes_local_effects_are_not_visible_to_another_scene(pack_tree) -> N
     assert "secret_flash" not in cave_scene.local_effect_registry.items()
 
 
-def test_scene_constructed_directly_has_empty_local_effect_registry() -> None:
-    scene = Scene(effect_packs=[], rule_packs=[])
+def test_a_scene_built_in_memory_has_an_empty_local_effect_registry() -> None:
+    scene = make_scene()
     assert scene.local_effect_registry.items() == []
 
 
