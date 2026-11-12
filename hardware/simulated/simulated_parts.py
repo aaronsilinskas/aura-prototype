@@ -32,10 +32,11 @@ from hardware.shared.device_config import (
     I2CDeviceConfig,
     MatrixPixelsConfig,
     NeoPixelStripConfig,
+    PinRef,
     RadioConfig,
     SDCardConfig,
 )
-from hardware.shared.device_parts import DeviceParts, PinRef
+from hardware.shared.device_parts import DeviceParts
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transport import PulseReader, PulseWriter
 from hardware.shared.radio_transport import RadioTransport

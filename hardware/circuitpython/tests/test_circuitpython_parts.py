@@ -33,10 +33,10 @@ from hardware.shared.device_config import (
     I2CDeviceConfig,
     MatrixPixelsConfig,
     NeoPixelStripConfig,
+    PinRef,
     RadioConfig,
     SDCardConfig,
 )
-from hardware.shared.device_parts import PinRef
 
 if TYPE_CHECKING:
     import busio
