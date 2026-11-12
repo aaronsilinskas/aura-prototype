@@ -19,7 +19,7 @@ from engine.scene_runtime import SceneRuntime
 from engine.settings import Settings
 from engine.state import Scope
 from engine.tests.effects.helpers import SpyEffectOutput
-from engine.tests.helpers import RecordingSceneReboot, SpyNetworkControls
+from engine.tests.helpers import make_scene_runtime
 from engine.version import Version
 
 _PACKS_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
@@ -269,12 +269,8 @@ def test_hardware_test_scene_json_does_not_list_debug_rule_pack(catalog: PackCat
 
 def _namespace_with_active(catalog: PackCatalog, scene_name: str) -> ActiveSceneNamespace:
     """The Active scene namespace with *scene_name* booted, on a device able to run it."""
-    runtime = SceneRuntime(
-        catalog,
-        [],
-        SpyNetworkControls(),
-        catalog.scene_registry.required_capabilities(scene_name),
-        RecordingSceneReboot(),
+    runtime = make_scene_runtime(
+        catalog, capabilities=catalog.scene_registry.required_capabilities(scene_name)
     )
     runtime.activate_boot_scene(scene_name)
     return runtime.namespace
@@ -452,9 +448,7 @@ def _debug_runtime(catalog: PackCatalog, settings: Settings | None = None) -> Sc
     debug_catalog = PackCatalog(
         catalog.effect_registry, catalog.rule_registry, scene_registry, catalog.pack_sounds
     )
-    runtime = SceneRuntime(
-        debug_catalog, [], SpyNetworkControls(), frozenset(), RecordingSceneReboot()
-    )
+    runtime = make_scene_runtime(debug_catalog)
     runtime.activate_boot_scene("debug_scene")
     return runtime
 

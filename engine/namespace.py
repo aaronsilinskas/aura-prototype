@@ -16,6 +16,7 @@ __all__ = [
     "UndeclaredPackError",
 ]
 
+from engine.effects.admin import SceneView
 from engine.effects.builder import EffectBuilder
 from engine.packs import PackRegistry, RegistryError, UnknownItemError, UnknownPackError
 
@@ -89,21 +90,14 @@ class ActiveSceneNamespace:
         self._local_sounds: dict[str, str] = {}
         self._declared_packs: frozenset[str] | None = None
 
-    def install(
-        self,
-        local_effects: SceneLocalRegistry | None,
-        local_sounds: dict[str, str],
-        declared_packs: frozenset[str],
-    ) -> None:
-        """Replace the scene view: its local effects and sounds, and its declared effect packs.
+    def install(self, view: SceneView) -> None:
+        """Replace the installed Scene view with *view*.
 
-        *local_sounds* is a bare ``{stem: path}`` map; *declared_packs* holds the
-        scene's ``effect_packs`` names. Once installed, lookups no longer fail
-        with ``NoActiveSceneError``.
+        Once installed, lookups no longer fail with ``NoActiveSceneError``.
         """
-        self._local_effects = local_effects
-        self._local_sounds = local_sounds
-        self._declared_packs = declared_packs
+        self._local_effects = view.local_effects
+        self._local_sounds = view.local_sounds
+        self._declared_packs = view.declared_packs
 
     def resolve_effect(self, name: str) -> tuple[EffectBuilder, str, str]:
         """Return ``(builder, pack_name, effect_name)`` for the qualified effect *name*.

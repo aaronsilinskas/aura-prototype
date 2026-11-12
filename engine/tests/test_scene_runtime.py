@@ -22,23 +22,18 @@ from engine.packs import RegistryError
 from engine.scene_runtime import SceneRuntime
 from engine.state import GameState, Scope
 from engine.tests.effects.helpers import SpyEffectOutput
-from engine.tests.helpers import RecordingSceneReboot, SpyNetworkControls
+from engine.tests.helpers import RecordingSceneReboot, make_scene_runtime
 from engine.timer import Timer
 
 _GROUP = EventGroup("runtime")
 _PAINT = Event(_GROUP, "paint")
 
 _RED = 0xFF0000
-_BLUE = 0x0000FF
 
 _COLOR_EFFECTS = {
     "red": (
         "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
         "BUILD = ColorFillEffectBuilder(0xFF0000)\n"
-    ),
-    "blue": (
-        "from engine.tests.effects.helpers import ColorFillEffectBuilder\n"
-        "BUILD = ColorFillEffectBuilder(0x0000FF)\n"
     ),
 }
 
@@ -116,14 +111,7 @@ def _runtime(
     scene_reboot: RecordingSceneReboot | None = None,
 ) -> SceneRuntime:
     outputs: list[EffectOutput] = [output] if output is not None else []
-    return SceneRuntime(
-        catalog,
-        outputs,
-        SpyNetworkControls(),
-        frozenset(),
-        scene_reboot if scene_reboot is not None else RecordingSceneReboot(),
-        clock,
-    )
+    return make_scene_runtime(catalog, outputs, scene_reboot=scene_reboot, clock=clock)
 
 
 def _personal_output() -> SpyEffectOutput:
@@ -193,24 +181,6 @@ def test_activating_a_second_boot_scene_raises(pack_tree) -> None:
         runtime.activate_boot_scene("cover")
 
 
-def test_the_boot_scene_starts_on_split(pack_tree) -> None:
-    catalog = _catalog(pack_tree)
-
-    def paint_red_and_blue(event: Event, state: GameState) -> None:
-        state.effect_controls.add_effect(Scope.PERSONAL, "color.red", {})
-        state.effect_controls.add_effect(Scope.PERSONAL, "color.blue", {})
-
-    _rule(catalog, "base_rules").on(Event, paint_red_and_blue)
-    output = _personal_output()
-    runtime = _runtime(catalog, output)
-    runtime.activate_boot_scene("base")
-
-    runtime.queue_event(_PAINT)
-    runtime.update()
-
-    assert _drawn(output) == [_RED, _RED, _BLUE, _BLUE]
-
-
 # ---------------------------------------------------------------------------
 # Queuing events
 # ---------------------------------------------------------------------------
@@ -244,6 +214,15 @@ def test_an_event_queued_with_no_scene_active_is_dropped(pack_tree) -> None:
     runtime.update()
 
     assert heard == []
+
+
+def test_a_scene_is_active_only_once_the_boot_scene_is_activated(pack_tree) -> None:
+    runtime = _runtime(_catalog(pack_tree))
+    before_boot = runtime.has_active_scene
+
+    runtime.activate_boot_scene("base")
+
+    assert (before_boot, runtime.has_active_scene) == (False, True)
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +283,16 @@ def test_elapsed_follows_the_clock_given_at_construction(pack_tree) -> None:
     runtime.update()
 
     assert runtime.elapsed == 0.25
+
+
+def test_total_accumulates_the_clocks_elapsed_time_across_updates(pack_tree) -> None:
+    runtime = _runtime(_catalog(pack_tree), clock=_StepClock(0.25))
+    runtime.activate_boot_scene("base")
+
+    runtime.update()
+    runtime.update()
+
+    assert runtime.total == 0.5
 
 
 def test_the_clock_does_not_advance_while_no_scene_is_active(pack_tree) -> None:

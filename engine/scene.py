@@ -375,6 +375,15 @@ class SceneRegistry:
         self._factories[name] = factory
 
 
+def _scene_view(scene: Scene) -> SceneView:
+    """Return *scene*'s Scene view: its local effects and sounds, and its declared packs."""
+    return SceneView(
+        scene.local_effect_registry,
+        scene.local_sound_map,
+        frozenset(pack.name for pack in scene.effect_packs),
+    )
+
+
 class _SceneStackEntry:
     """One entry in ``SceneManager``'s scene stack.  Internal use only.
 
@@ -394,17 +403,14 @@ class _SceneStackEntry:
         scene: Scene,
         state: GameState,
         rules: list[GameRule],
+        view: SceneView,
         held: HeldEffects | None,
     ) -> None:
         self.scene = scene
         self.state = state
         self.rules = rules
+        self.view = view
         self.held = held
-        self.view = SceneView(
-            scene.local_effect_registry,
-            scene.local_sound_map,
-            frozenset(pack.name for pack in scene.effect_packs),
-        )
 
 
 class SceneManager(SceneControls):
@@ -510,7 +516,7 @@ class SceneManager(SceneControls):
         self._require_runnable(name)
         rules = self._resolve_rules(scene)
         state = self._engine.create_state(self, scene.settings)
-        entry = _SceneStackEntry(scene, state, rules, held=None)
+        entry = _SceneStackEntry(scene, state, rules, _scene_view(scene), held=None)
         self._stack.append(entry)
         self._effect_admin.enter_boot_scene(entry.view)
         self._activate(entry)
@@ -644,8 +650,9 @@ class SceneManager(SceneControls):
 
         self._stack[-1].state.clear_queue()
         state = self._engine.create_state(self, scene.settings)
-        entry = _SceneStackEntry(scene, state, combined_rules, held=None)
-        entry.held = self._effect_admin.cover(entry.view)
+        view = _scene_view(scene)
+        held = self._effect_admin.cover(view)
+        entry = _SceneStackEntry(scene, state, combined_rules, view, held)
         self._stack.append(entry)
         self._activate(entry)
 

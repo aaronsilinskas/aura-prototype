@@ -127,7 +127,7 @@ def test_scene_prefix_fires_start_event_with_pack_equals_scene(pack_tree) -> Non
 def test_entering_the_boot_scene_carries_its_local_effects(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"forest": _local_effects("flash")})
     admin = SpyEffectAdmin()
-    manager = make_scene_manager(catalog, effect_admin=admin)
+    manager = make_scene_manager(catalog, admin)
 
     manager.activate_boot_scene("forest")
 
@@ -141,7 +141,7 @@ def test_entering_the_boot_scene_carries_its_local_effects(pack_tree) -> None:
 def test_covering_carries_the_overlays_local_effects(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"scene_b": _local_effects("b_flash"), "scene_a": {}})
     admin = SpyEffectAdmin()
-    manager = make_scene_manager(catalog, effect_admin=admin)
+    manager = make_scene_manager(catalog, admin)
     manager.activate_boot_scene("scene_a")
 
     manager.overlay("scene_b")
@@ -157,7 +157,7 @@ def test_uncovering_carries_the_covered_scenes_local_effects(pack_tree) -> None:
         scenes={"scene_a": _local_effects("a_flash"), "scene_b": _local_effects("b_flash")}
     )
     admin = SpyEffectAdmin()
-    manager = make_scene_manager(catalog, effect_admin=admin)
+    manager = make_scene_manager(catalog, admin)
     manager.activate_boot_scene("scene_a")
     manager.overlay("scene_b")
     manager.update()
@@ -178,7 +178,7 @@ def test_uncovering_carries_the_covered_scenes_local_effects(pack_tree) -> None:
 def test_entering_the_boot_scene_carries_its_local_sounds(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"forest": {"sounds": ["victory_sting"]}})
     admin = SpyEffectAdmin()
-    manager = make_scene_manager(catalog, effect_admin=admin)
+    manager = make_scene_manager(catalog, admin)
 
     manager.activate_boot_scene("forest")
 
@@ -188,10 +188,10 @@ def test_entering_the_boot_scene_carries_its_local_sounds(pack_tree) -> None:
     assert list(local_sounds) == ["victory_sting"]
 
 
-def test_a_scene_with_no_sounds_carries_none(pack_tree) -> None:
+def test_a_scene_with_no_sounds_carries_an_empty_sound_map(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"bare_scene": {}})
     admin = SpyEffectAdmin()
-    manager = make_scene_manager(catalog, effect_admin=admin)
+    manager = make_scene_manager(catalog, admin)
 
     manager.activate_boot_scene("bare_scene")
 
@@ -204,7 +204,7 @@ def test_a_scene_with_no_sounds_carries_none(pack_tree) -> None:
 def test_covering_carries_the_overlays_local_sounds(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"scene_b": {"sounds": ["b_sting"]}, "scene_a": {}})
     admin = SpyEffectAdmin()
-    manager = make_scene_manager(catalog, effect_admin=admin)
+    manager = make_scene_manager(catalog, admin)
     manager.activate_boot_scene("scene_a")
 
     manager.overlay("scene_b")
@@ -222,7 +222,7 @@ def test_uncovering_carries_the_covered_scenes_local_sounds(pack_tree) -> None:
         },
     )
     admin = SpyEffectAdmin()
-    manager = make_scene_manager(catalog, effect_admin=admin)
+    manager = make_scene_manager(catalog, admin)
     manager.activate_boot_scene("scene_a")
     manager.overlay("scene_b")
     manager.update()
