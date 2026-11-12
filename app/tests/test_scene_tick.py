@@ -217,7 +217,7 @@ class _ElapsedRecordingPart(PolledPart):
         self.seen.append(elapsed)
 
 
-def test_every_polled_part_is_updated_with_the_elapsed_time_of_the_current_tick(probe):
+def test_a_polled_part_is_updated_with_the_elapsed_time_of_the_current_tick(probe):
     part = _ElapsedRecordingPart()
     tick = probe.boot(_hw(probe, other_polled=(part,)), timer=_ScriptedClock(0.5, 0.25)).tick
 

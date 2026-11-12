@@ -66,6 +66,7 @@ def _local_rule(catalog: PackCatalog, scene_name: str, item_name: str) -> GameRu
 
 
 def _ping_and_update(runtime: SceneRuntime) -> None:
+    runtime.advance_clock()
     runtime.queue_event(_PING)
     runtime.update()
 

@@ -1159,19 +1159,23 @@ class _MergeStrategyRig:
     def act(self, action):
         """Run *action* on the top scene's ``EffectControls`` in one tick; return its result."""
         event = _Act(action)
+        self.runtime.advance_clock()
         self.runtime.queue_event(event)
         self.runtime.update()
         return event.result
 
     def overlay(self, name: str) -> None:
         self.runtime.scene_controls.overlay(name)
+        self.runtime.advance_clock()
         self.runtime.update()
 
     def pop(self) -> None:
         self.runtime.scene_controls.pop()
+        self.runtime.advance_clock()
         self.runtime.update()
 
     def tick(self) -> None:
+        self.runtime.advance_clock()
         self.runtime.update()
 
     def drawn(self) -> list:

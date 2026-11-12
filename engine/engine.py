@@ -55,9 +55,10 @@ class GameEngine:
       - Rules may queue additional events during dispatch.
 
     ``update`` reads ``timer`` but never advances it: whoever drives the tick
-    calls ``timer.update()`` first (``SceneRuntime.advance_clock`` on device).
-    Omitted, the engine gets a ``Timer`` nobody advances, so game time stays at
-    zero.
+    calls ``timer.update()`` first
+    (:meth:`~engine.scene_runtime.SceneRuntime.advance_clock` on device).
+    Omitted, the engine gets a ``Timer`` nobody advances, so game time stays
+    at zero.
 
     Use ``create_state(scene_controls, settings)`` to create a ``GameState``
     pre-wired with this engine's effect controls, the given scene controls and
@@ -114,10 +115,7 @@ class GameEngine:
         )
 
     def update(self, state: GameState) -> None:
-        """Add the timer's elapsed time to *state*'s time, then dispatch all queued events.
-
-        Reads the timer without advancing it: whoever drives the tick advances it first.
-        """
+        """Add the timer's elapsed time to *state*'s time, then dispatch all queued events."""
         state._advance_time(self._timer.elapsed)
         i = 0
         while i < state.event_count:

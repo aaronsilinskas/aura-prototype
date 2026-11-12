@@ -451,6 +451,7 @@ def test_a_booted_scene_runs_the_event_logger_from_the_debug_pack(
 ) -> None:
     runtime = _debug_runtime(catalog, Settings({"debug": {"event_logging_enabled": True}}))
 
+    runtime.advance_clock()
     runtime.queue_event(Event(EventGroup("probe"), "ping"))
     runtime.update()
 
@@ -469,6 +470,7 @@ def test_a_booted_scene_runs_every_rule_of_its_rule_pack(
         )
     runtime = _debug_runtime(catalog)
 
+    runtime.advance_clock()
     runtime.queue_event(Event(EventGroup("probe"), "ping"))
     runtime.update()
 

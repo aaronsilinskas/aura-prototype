@@ -108,12 +108,12 @@ class SceneRuntime:
 
     @property
     def elapsed(self) -> float:
-        """The clock's elapsed time for the tick, as of the last ``advance_clock``."""
+        """The clock's elapsed time for the tick, as of the last :meth:`advance_clock`."""
         return self._clock.elapsed
 
     @property
     def total(self) -> float:
-        """The clock's running total of elapsed time, as of the last ``advance_clock``."""
+        """The clock's running total of elapsed time, as of the last :meth:`advance_clock`."""
         return self._clock.total
 
     @property
