@@ -46,10 +46,8 @@ class IrRangeReceiverRule(GameRule):
         self.on(InputEvents.Sensors, self._on_sensors)
 
     def _on_ir_received(self, event: NetworkEvents.IRReceived, state: GameState) -> None:
-        # Byte 0 is the sequence number; every other field (signal_strength,
-        # error_margin, best_receiver) is telemetry the meter has no use for --
-        # in particular, best_receiver varies freely with an IR multi-receiver
-        # (multiple rx pins) without affecting reception quality at all.
+        # Byte 0 is the sequence number; the other fields (signal_strength,
+        # error_margin) are telemetry the meter has no use for.
         ir_range_meter(state).record(event.data[0], state.total)
 
     def _on_sensors(self, event: InputEvents.Sensors, state: GameState) -> None:

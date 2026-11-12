@@ -487,7 +487,7 @@ A directed infrared transmit channel; constants `LINE`, `CONE`, `AREA_OF_EFFECT`
 _Avoid_: importing `magic.CastType` for IR emitters; a default emitter on `send_ir`; restating the emitter key set (derive from `IR_EMITTERS`)
 
 ### IR multi-receiver
-Several IR receivers, each on its own data line, returning the packet with the lowest **error margin**; improves reception reliability only (no hit direction). Selected by listing **two or more `rx` pins** in `aura-device.json`.
+Several IR receivers, each on its own data line, returning the packet with the lowest **error margin**; improves reception reliability only (no hit direction). Selected by listing **two or more `rx` pins** in `aura-device.json`. Which receiver won is hardware telemetry only: `NetworkEvents.IRReceived` names no receiver, so rules never see it.
 _Avoid_: treating the array as a direction finder; sharing one data line across receivers; a separate config flag to opt in (pin count is the switch)
 
 ### InfraredReceiver

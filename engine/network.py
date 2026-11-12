@@ -35,24 +35,23 @@ class NetworkEvents:
     class IRReceived(Event):
         """Event fired when an IR packet is received.
 
-        Carries full telemetry: raw payload, normalised signal quality,
-        worst-case timing deviation, and the best-matching receiver name.
+        Carries the raw payload, normalised signal quality and worst-case
+        timing deviation. It names no receiver: an IR multi-receiver picks
+        one for reliability only, never direction.
         """
 
-        __slots__ = ("best_receiver", "data", "error_margin", "signal_strength")
+        __slots__ = ("data", "error_margin", "signal_strength")
 
         def __init__(
             self,
             data: bytes | bytearray,
             signal_strength: float | None,
             error_margin: int | None,
-            best_receiver: str | None,
         ) -> None:
             super().__init__(NetworkEvents.GROUP, "ir_received")
             self.data = data
             self.signal_strength = signal_strength
             self.error_margin = error_margin
-            self.best_receiver = best_receiver
 
     class RadioReceived(Event):
         """Event fired when a radio packet is received.

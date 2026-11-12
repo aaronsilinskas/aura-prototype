@@ -255,7 +255,6 @@ def _build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[],
                         ir.received,
                         ir.last_signal_strength,
                         ir.last_error_margin,
-                        best_receiver=None,
                     )
                 )
             if radio is not None and radio.received is not None:

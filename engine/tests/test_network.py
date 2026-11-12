@@ -40,7 +40,6 @@ def test_ir_received_identifies_itself_to_the_engine_as_ir_received() -> None:
         b"hello",
         signal_strength=0.9,
         error_margin=10,
-        best_receiver=None,
     )
 
     assert event.name == "ir_received"
@@ -51,7 +50,6 @@ def test_ir_received_stores_payload_so_rules_can_read_it() -> None:
         b"hello",
         signal_strength=0.9,
         error_margin=10,
-        best_receiver=None,
     )
 
     assert event.data == b"hello"
@@ -62,7 +60,6 @@ def test_ir_received_belongs_to_net_event_group_for_routing() -> None:
         b"x",
         signal_strength=0.5,
         error_margin=5,
-        best_receiver=None,
     )
 
     assert event.group is NetworkEvents.GROUP
@@ -73,7 +70,6 @@ def test_ir_received_stores_signal_strength_from_hardware() -> None:
         b"x",
         signal_strength=0.75,
         error_margin=20,
-        best_receiver=None,
     )
 
     assert event.signal_strength == 0.75
@@ -84,32 +80,15 @@ def test_ir_received_stores_error_margin_from_hardware() -> None:
         b"x",
         signal_strength=0.8,
         error_margin=42,
-        best_receiver=None,
     )
 
     assert event.error_margin == 42
 
 
-def test_ir_received_best_receiver_none() -> None:
-    event = NetworkEvents.IRReceived(
-        b"x",
-        signal_strength=0.8,
-        error_margin=10,
-        best_receiver=None,
-    )
+def test_ir_received_names_no_receiver_because_the_multi_receiver_gives_no_direction() -> None:
+    event = NetworkEvents.IRReceived(b"x", signal_strength=0.8, error_margin=10)
 
-    assert event.best_receiver is None
-
-
-def test_ir_received_best_receiver_set() -> None:
-    event = NetworkEvents.IRReceived(
-        b"x",
-        signal_strength=0.8,
-        error_margin=10,
-        best_receiver="receiver-A",
-    )
-
-    assert event.best_receiver == "receiver-A"
+    assert not hasattr(event, "best_receiver")
 
 
 # ---------------------------------------------------------------------------
