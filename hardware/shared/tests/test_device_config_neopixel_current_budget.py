@@ -64,29 +64,6 @@ def test_single_strip_over_budget_is_dimmed_to_draw_exactly_at_the_limit():
     assert _budget(result).scale == pytest.approx(1 / 3)
 
 
-def test_legacy_scopes_strips_are_counted_and_scaled():
-    # (30 px @ 0.5 + 10 px @ 1.0) x 60 mA = 1500 mA against 750 mA -> half.
-    result = parse_device_config(
-        {
-            "pixels": [
-                {
-                    "type": "neopixel",
-                    "scopes": {
-                        "personal": {"pin": "D5", "count": 30, "brightness": 0.5},
-                        "ambient": {"pin": "D6", "count": 10, "brightness": 1.0},
-                    },
-                }
-            ],
-            "neopixel_current_budget": {"current_limit_ma": 750},
-        }
-    )
-
-    scopes = as_neopixel(result.pixels[0]).scopes
-    assert scopes["personal"].brightness == pytest.approx(0.25)
-    assert scopes["ambient"].brightness == pytest.approx(0.5)
-    assert _budget(result).estimate_ma == pytest.approx(1500)
-
-
 def test_disabled_strip_is_excluded_from_the_estimate_and_left_as_declared():
     # Only the enabled 10 px @ 1.0 counts: 600 mA, under the 1000 mA limit.
     result = parse_device_config(

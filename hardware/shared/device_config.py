@@ -37,7 +37,6 @@ __all__ = [
     "MatrixPixelsConfig",
     "NeoPixelCurrentBudgetConfig",
     "NeoPixelPixelsConfig",
-    "NeoPixelScopeConfig",
     "NeoPixelStripConfig",
     "RadioConfig",
     "SDCardConfig",
@@ -135,18 +134,6 @@ class MatrixPixelsConfig:
         self.address: int | None = address
 
 
-class NeoPixelScopeConfig:
-    """Parsed NeoPixel scope configuration (legacy one-strip-per-scope shape)."""
-
-    __slots__ = ("brightness", "count", "order", "pin")
-
-    def __init__(self, pin: str, count: int, order: str, brightness: float) -> None:
-        self.pin: str = pin
-        self.count: int = count
-        self.order: str = order
-        self.brightness: float = brightness
-
-
 class NeoPixelStripConfig:
     """Parsed NeoPixel strip configuration with scope_pixels segmentation.
 
@@ -174,20 +161,16 @@ class NeoPixelStripConfig:
 class NeoPixelPixelsConfig:
     """Parsed NeoPixel pixels configuration.
 
-    ``strips`` holds one ``NeoPixelStripConfig`` per physical strip entry
-    (new scope_pixels shape).  ``scopes`` holds the legacy one-strip-per-scope
-    mapping and is populated only when parsing old-shape entries.
+    ``strips`` holds one ``NeoPixelStripConfig`` per physical strip entry.
     """
 
-    __slots__ = ("enabled", "scopes", "strips")
+    __slots__ = ("enabled", "strips")
 
     def __init__(
         self,
-        scopes: dict[str, NeoPixelScopeConfig] | None = None,
         strips: list[NeoPixelStripConfig] | None = None,
         enabled: bool = True,
     ) -> None:
-        self.scopes: dict[str, NeoPixelScopeConfig] = scopes if scopes is not None else {}
         self.strips: list[NeoPixelStripConfig] = strips if strips is not None else []
         self.enabled: bool = enabled
 
@@ -574,7 +557,7 @@ def validate_band_map(bands: dict[str, range], context: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Brightness validator (shared across matrix, strip, and legacy scope entries)
+# Brightness validator (shared across matrix and strip entries)
 # ---------------------------------------------------------------------------
 
 
@@ -602,7 +585,7 @@ def _parse_brightness(mapping: dict, key: str, field: str) -> float:
 
 
 # ---------------------------------------------------------------------------
-# NeoPixel count validator (shared across strip and legacy scope entries)
+# NeoPixel count validator
 # ---------------------------------------------------------------------------
 
 
@@ -796,34 +779,14 @@ def _parse_neopixel_pixels(mapping: dict, entry_index: int) -> NeoPixelPixelsCon
     label = f"pixels[{entry_index}]"
     enabled = _parse_enabled(mapping, f"{label}.enabled")
 
-    if "scope_pixels" in mapping or "pin" in mapping:
-        strip = _parse_neopixel_strip_entry(mapping, entry_index)
-        return NeoPixelPixelsConfig(strips=[strip], enabled=enabled)
-
-    # Legacy shape: scopes dict
-    scopes_raw = mapping.get("scopes", {})
-    scopes: dict[str, NeoPixelScopeConfig] = {}
-
-    for key, scope_cfg in scopes_raw.items():
-        if key not in _VALID_SCOPE_KEYS:
-            valid = ", ".join(sorted(_VALID_SCOPE_KEYS))
-            raise ValueError(f"pixels.scopes key '{key}' is not valid; valid keys: {valid}")
-        if "pin" not in scope_cfg:
-            raise ValueError(f"pixels.scopes.{key}.pin is required")
-        if not isinstance(scope_cfg["pin"], str):
-            raise ValueError(f"pixels.scopes.{key}.pin must be a string pin name")
-        if "count" not in scope_cfg:
-            raise ValueError(f"pixels.scopes.{key}.count is required")
-        count = _parse_count(scope_cfg, "count", f"pixels.scopes.{key}.count")
-        brightness = _parse_brightness(scope_cfg, "brightness", f"pixels.scopes.{key}.brightness")
-        scopes[key] = NeoPixelScopeConfig(
-            pin=scope_cfg["pin"],
-            count=count,
-            order=scope_cfg.get("order", "GRB"),
-            brightness=brightness,
+    if "scopes" in mapping and "pin" not in mapping and "scope_pixels" not in mapping:
+        raise ValueError(
+            f"{label}: the 'scopes' map is no longer supported;"
+            + " use 'pin' with 'scope_pixels' to declare one strip per entry"
         )
 
-    return NeoPixelPixelsConfig(scopes=scopes, enabled=enabled)
+    strip = _parse_neopixel_strip_entry(mapping, entry_index)
+    return NeoPixelPixelsConfig(strips=[strip], enabled=enabled)
 
 
 def _parse_pixels_entry(
