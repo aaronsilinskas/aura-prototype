@@ -52,7 +52,6 @@ from hardware.shared.device_config import (
     IRConfig,
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
-    PinRef,
     RadioConfig,
     SDCardConfig,
     SPIConfig,
@@ -165,16 +164,8 @@ def _pixel_outputs(
 
 def _ir(ir_config: IRConfig, parts: DeviceParts) -> tuple[InfraredTransceiver, str]:
     """Wire the IR subsystem; return it with the ``ir`` line's closing suffix."""
-    rx = ir_config.rx
-    if len(rx) == 1:
-        rx_pins = [PinRef(rx[0], "ir.rx")]
-    else:
-        rx_pins = [PinRef(name, f"ir.rx[{i}]") for i, name in enumerate(rx)]
-    readers = [parts.ir_reader(pin) for pin in rx_pins]
-    emitter_pins = {
-        emitter: PinRef(name, f"ir.{emitter}") for emitter, name in ir_config.emitters.items()
-    }
-    transceiver = InfraredTransceiver(readers, emitter_pins, parts.ir_writer)
+    readers = [parts.ir_reader(pin) for pin in ir_config.rx]
+    transceiver = InfraredTransceiver(readers, ir_config.emitters, parts.ir_writer)
     writer_kind = transceiver.writer_kind
     return transceiver, "ok" if writer_kind is None else f"writer={writer_kind} ok"
 

@@ -104,8 +104,8 @@ def test_parse_full_matrix_config_maps_every_section(matrix_config):
     assert as_matrix(result.pixels[0]).cols == 13
     assert result.buttons == [PinRef("D9", "buttons[0]"), PinRef("D10", "buttons[1]")]
     assert result.ir is not None
-    assert result.ir.rx == ["D11"]
-    assert result.ir.emitters["line"] == "D12"
+    assert result.ir.rx == [PinRef("D11", "ir.rx")]
+    assert result.ir.emitters["line"] == PinRef("D12", "ir.line")
     assert result.audio is not None
     assert result.audio.voices == 1
     assert result.audio.max_volume == 0.1
@@ -608,13 +608,39 @@ def test_parse_absent_ir_section_yields_none(matrix_config):
     assert result.ir is None
 
 
-def test_parse_ir_rx_list_of_pins_preserves_declared_order(matrix_config):
+def test_parse_ir_rx_single_name_is_recorded_on_ir_rx(matrix_config):
+    matrix_config["ir"]["rx"] = "D11"
+
+    result = parse_device_config(matrix_config)
+
+    assert result.ir is not None
+    assert result.ir.rx == [PinRef("D11", "ir.rx")]
+
+
+def test_parse_ir_rx_list_records_indexed_fields_in_declared_order(matrix_config):
     matrix_config["ir"]["rx"] = ["D11", "D13", "D15"]
 
     result = parse_device_config(matrix_config)
 
     assert result.ir is not None
-    assert result.ir.rx == ["D11", "D13", "D15"]
+    assert result.ir.rx == [
+        PinRef("D11", "ir.rx[0]"),
+        PinRef("D13", "ir.rx[1]"),
+        PinRef("D15", "ir.rx[2]"),
+    ]
+
+
+def test_parse_ir_emitters_are_recorded_on_their_own_fields(matrix_config):
+    matrix_config["ir"].update({"line": "D12", "cone": "D13", "area_of_effect": "D14"})
+
+    result = parse_device_config(matrix_config)
+
+    assert result.ir is not None
+    assert result.ir.emitters == {
+        "line": PinRef("D12", "ir.line"),
+        "cone": PinRef("D13", "ir.cone"),
+        "area_of_effect": PinRef("D14", "ir.area_of_effect"),
+    }
 
 
 def test_parse_ir_rx_empty_list_raises_value_error(matrix_config):

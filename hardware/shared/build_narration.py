@@ -221,12 +221,12 @@ def describe_sdcard(sdcard: SDCardConfig) -> str:
 def describe_ir(ir: IRConfig) -> str:
     """Describe the ``ir`` step without its writer kind (``writer=pio``/``pulseio``),
     which is only known once the IR subsystem is built, so it closes the line instead."""
-    rx_desc = f"rx=[{' '.join(ir.rx)}]" if ir.rx else "rx=(none)"
+    rx_desc = f"rx=[{' '.join(pin.name for pin in ir.rx)}]" if ir.rx else "rx=(none)"
     if len(ir.rx) > 1:
         rx_desc += " (IR multi-receiver)"
     if ir.emitters:
         emitters_desc = "emitters=" + " ".join(
-            f"{key}:{ir.emitters[key]}" for key in IR_EMITTERS if key in ir.emitters
+            f"{key}:{ir.emitters[key].name}" for key in IR_EMITTERS if key in ir.emitters
         )
     else:
         emitters_desc = "emitters=(none)"
