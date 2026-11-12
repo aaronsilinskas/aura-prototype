@@ -343,13 +343,14 @@ class SceneManager(SceneControls):
     or resetting anything; ``pop`` returns to a scene that already ran and
     does not check. ``can_run`` asks the same question without raising.
 
-    *effect_admin* is the scene-transition face of the same effect system
-    as *effect_controls* (two faces of one ``EffectManager`` instance). Every transition makes
-    exactly one call to it, carrying the Scene view of the scene it brings to
-    the top: ``activate_boot_scene`` enters, ``overlay`` covers and ``pop``
-    uncovers. No transition reaches the effect system through a stack entry's
-    ``state.effect_controls``. The IR codec is not touched by ``overlay`` or
-    ``pop``: an overlay runs on the covered scene's codec (ADR-0005).
+    *effect_admin* is the scene-transition face of the same effect system as
+    *effect_controls* (two faces of one ``EffectManager`` instance). Every
+    transition makes exactly one call to it, carrying the Scene view of the
+    scene it brings to the top: ``activate_boot_scene`` enters, ``overlay``
+    covers and ``pop`` uncovers. No transition reaches the effect system
+    through a stack entry's ``state.effect_controls``. The IR codec is not
+    touched by ``overlay`` or ``pop``: an overlay runs on the covered scene's
+    codec (ADR-0005).
 
     *scene_reboot* is the injected ``SceneReboot`` port ``reboot_into``/
     ``reboot_to_previous`` delegate to (its ``previous_scene`` names the
@@ -536,7 +537,6 @@ class SceneManager(SceneControls):
         return combined
 
     def _new_run(self, scene: Scene) -> SceneRun:
-        """Return a fresh ``SceneRun`` of *scene*: a new state and its resolved rules."""
         state = GameState(
             self._effect_controls,
             self,
