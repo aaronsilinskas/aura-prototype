@@ -18,8 +18,7 @@ from packs.rules.lobby.helpers.lobby_config import LobbyConfig
 from packs.tests.settings_helper import settings_for
 
 LOBBY_ENTRIES = [
-    entry.scene
-    for entry in LobbyConfig.from_settings(settings_for("example_lobby"), lambda _: True).entries
+    entry.scene for entry in LobbyConfig(settings_for("example_lobby"), lambda _: True).entries
 ]
 """``example_lobby``'s entries, in the order A steps through them on a fully built device."""
 
