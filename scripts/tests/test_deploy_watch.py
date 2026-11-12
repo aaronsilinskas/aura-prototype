@@ -4,6 +4,9 @@ and the CLI's deploy step."""
 import functools
 import io
 import json
+import os
+import subprocess
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -22,6 +25,8 @@ from scripts.deploy_watch import (
     watch_stream,
 )
 from scripts.tests.fake_comport import fake_comport
+
+_REPO_ROOT = Path(__file__).parents[2]
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -385,11 +390,11 @@ def test_find_console_port_returns_an_explicit_port_unchanged() -> None:
 
 
 def _deploy_from_source(tmp_path: Path) -> "Callable[..., int]":
-    """The real ``deploy``, syncing raw source from a tiny tree under *tmp_path*."""
+    """The real ``deploy`` over a tiny source tree under *tmp_path*."""
     source = tmp_path / "source"
     (source / "engine").mkdir(parents=True)
     (source / "engine" / "timer.py").write_text("# timer")
-    return functools.partial(deploy, source_root=source, use_source=True)
+    return functools.partial(deploy, source_root=source)
 
 
 def _cli_args(tmp_path: Path, *extra: str) -> list[str]:
@@ -403,7 +408,7 @@ def _cli_args(tmp_path: Path, *extra: str) -> list[str]:
 def test_scene_flag_records_the_scene_as_default_scene_in_deployed_boot_file(
     tmp_path: Path,
 ) -> None:
-    args = parse_args(_cli_args(tmp_path, "--scene", "hardware_test"))
+    args = parse_args(_cli_args(tmp_path, "--source", "--scene", "hardware_test"))
 
     run_deploy(args, deploy=_deploy_from_source(tmp_path))
 
@@ -412,8 +417,55 @@ def test_scene_flag_records_the_scene_as_default_scene_in_deployed_boot_file(
 
 
 def test_omitting_scene_flag_writes_no_boot_file(tmp_path: Path) -> None:
-    args = parse_args(_cli_args(tmp_path))
+    args = parse_args(_cli_args(tmp_path, "--source"))
 
     run_deploy(args, deploy=_deploy_from_source(tmp_path))
 
     assert not (tmp_path / "mount" / "aura-boot.json").exists()
+
+
+def _recording_deploy(calls: list[dict[str, object]]) -> "Callable[..., int]":
+    """A fake ``deploy`` that records the keyword arguments it was called with."""
+
+    def fake(example_file: Path, mount: Path, **kwargs: object) -> int:
+        calls.append(kwargs)
+        return 0
+
+    return fake
+
+
+def test_source_flag_deploys_raw_source(tmp_path: Path) -> None:
+    calls: list[dict[str, object]] = []
+    args = parse_args(_cli_args(tmp_path, "--source"))
+
+    run_deploy(args, deploy=_recording_deploy(calls))
+
+    assert calls[0]["use_source"] is True
+
+
+def test_omitting_source_flag_deploys_compiled_modules(tmp_path: Path) -> None:
+    calls: list[dict[str, object]] = []
+    args = parse_args(_cli_args(tmp_path))
+
+    run_deploy(args, deploy=_recording_deploy(calls))
+
+    assert calls[0]["use_source"] is False
+
+
+# ---------------------------------------------------------------------------
+# Command line
+# ---------------------------------------------------------------------------
+
+
+def test_deploy_watch_runs_as_a_script_file_outside_the_repo_root(tmp_path: Path) -> None:
+    env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
+
+    result = subprocess.run(
+        [sys.executable, str(_REPO_ROOT / "scripts" / "deploy_watch.py"), "--help"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr

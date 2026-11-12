@@ -25,67 +25,28 @@ import shutil
 import sys
 from pathlib import Path
 
+if not __package__:
+    # Run as a file (python scripts/deploy.py): put the repo root on the path so
+    # the package imports below resolve as they do under python -m.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from hardware.shared.scene_selection import with_scene_deploy
+from scripts.build import (
+    BuildError,
+    VersionError,
+    build,
+    mpy_cross_compile,
+    validate_mpy_cross_version,
+)
+from scripts.ship_list import MODULE_DIRS, governed_mount_files, ship_list
+
 try:
     from collections.abc import Callable
     from typing import Final
 except ImportError:
     pass
 
-MODULE_DIRS: Final = [
-    "app",
-    "effects",
-    "engine",
-    "hardware/circuitpython",
-    "hardware/shared",
-    "magic",
-    "packs",
-    "rules",
-]
-_EXCLUDE_DIRS: Final = {"__pycache__", "tests"}
-# Repo-relative package dirs that are test-only (the Simulation test harness)
-# and never imported on-device. Matched by path, not name, so a shipped package
-# that happens to share the name is still deployed. (The Simulated device under
-# hardware/simulated is already outside MODULE_DIRS.)
-_EXCLUDE_PATHS: Final = {Path("app/simulation")}
-# "boot.py" lives under hardware/circuitpython/ but is placed on the mount root by
-# the pairing block below, not by the module-sync walk -- exclude it from both that
-# walk and the compile step (build.py imports this set) so it is never duplicated
-# into the mount's hardware/circuitpython/ subtree or compiled to .mpy.
-_EXCLUDE_NAMES: Final = {"conftest.py", "boot.py"}
-_INCLUDE_SUFFIXES: Final = {".py", ".mpy", ".txt", ".json", ".wav"}
-_DEFAULT_MOUNT: Final = "/Volumes/CIRCUITPY"
-
-
-def _is_excluded(rel: Path) -> bool:
-    """Return True if a repo-relative path should be excluded from sync."""
-    if any(rel.is_relative_to(path) for path in _EXCLUDE_PATHS):
-        return True
-    for part in rel.parts:
-        if part in _EXCLUDE_DIRS:
-            return True
-    if rel.name in _EXCLUDE_NAMES:
-        return True
-    return rel.suffix not in _INCLUDE_SUFFIXES
-
-
-def _collect_stale_files(src_dir: Path, dest_dir: Path, module: str) -> list[Path]:
-    """Return files in dest_dir that have no counterpart in src_dir.
-
-    Returns an empty list if dest_dir does not exist.
-    Excluded paths (e.g. tests/, __pycache__/) are not considered stale.
-    """
-    if not dest_dir.is_dir():
-        return []
-    stale = []
-    for dest_file in sorted(dest_dir.rglob("*")):
-        if dest_file.is_dir():
-            continue
-        rel = dest_file.relative_to(dest_dir)
-        if _is_excluded(module / rel):
-            continue
-        if not (src_dir / rel).exists():
-            stale.append(dest_file)
-    return stale
+DEFAULT_MOUNT: Final = "/Volumes/CIRCUITPY"
 
 
 def _should_skip(src: Path, dest: Path) -> bool:
@@ -100,29 +61,6 @@ def _should_skip(src: Path, dest: Path) -> bool:
     if not dest.exists():
         return False
     return dest.stat().st_mtime >= src.stat().st_mtime - 2
-
-
-def _copy_intermediate_inits(
-    module: str,
-    sync_root: Path,
-    mount: Path,
-    copied: "list[Path]",
-    skipped: "list[Path]",
-    dry_run: bool,
-    use_source: bool = False,
-) -> None:
-    parts = Path(module).parts
-    for i in range(len(parts) - 1):
-        pkg_path = Path(*parts[: i + 1])
-        if use_source:
-            src_init = sync_root / pkg_path / "__init__.py"
-        else:
-            src_init = sync_root / pkg_path / "__init__.mpy"
-            if not src_init.exists():
-                src_init = sync_root / pkg_path / "__init__.py"
-        if src_init.exists():
-            label = str(pkg_path / src_init.name)
-            _sync_file(src_init, mount / pkg_path / src_init.name, label, copied, skipped, dry_run)
 
 
 def _sync_file(
@@ -148,6 +86,17 @@ def _sync_file(
         print(f"COPY  {label}")
 
 
+def _remove_empty_dirs(dest_dir: Path) -> None:
+    """Remove every empty directory under *dest_dir*, then *dest_dir* itself if empty."""
+    if not dest_dir.is_dir():
+        return
+    for d in sorted(dest_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        if d.is_dir() and not any(d.iterdir()):
+            d.rmdir()
+    if not any(dest_dir.iterdir()):
+        dest_dir.rmdir()
+
+
 def _write_scene(mount: Path, scene: str) -> None:
     """Set ``default_scene`` and a fresh Scene deploy token in ``aura-boot.json``.
 
@@ -158,8 +107,7 @@ def _write_scene(mount: Path, scene: str) -> None:
     """
     boot_path = mount / "aura-boot.json"
     boot_values = json.loads(boot_path.read_text()) if boot_path.exists() else {}
-    boot_values["default_scene"] = scene
-    boot_values["scene_deploy_token"] = secrets.token_hex(8)
+    boot_values = with_scene_deploy(boot_values, scene, secrets.token_hex(8))
     boot_path.write_text(json.dumps(boot_values, indent=2))
 
 
@@ -173,6 +121,10 @@ def deploy(
     use_source: bool = False,
 ) -> int:
     """Deploy to mount. Returns 0 on success, 1 on error.
+
+    Syncs the Ship list's entries to *mount*, then prunes each mount file the
+    list governs but no longer names, and removes every empty directory under
+    each module directory.
 
     Args:
         example_file: Path to the example file to copy as ``code.py``.
@@ -191,22 +143,12 @@ def deploy(
         use_source: When True, skip compilation entirely and sync raw ``.py`` files
             directly from the source tree.  Requires no ``mpy-cross`` toolchain.
 
-    ``hardware/circuitpython/boot.py``, if present, is copied to the mount's
-    ``boot.py`` alongside ``code.py`` whenever *example_file* is given -- the
+    The list's ``boot.py`` entry, if any, is copied to the mount alongside
+    ``code.py`` whenever *example_file* is given -- the
     same force-always, never-pruned handling ``code.py`` gets, since a mount's
     existing ``boot.py`` is otherwise indistinguishable from a stale one (#930).
     It is not deployed when *example_file* is ``None`` (module-only sync).
     """
-    # Import here to avoid a circular import (build imports from deploy).
-    from scripts.build import (
-        _MPY_CROSS_BIN,
-        BuildError,
-        VersionError,
-        build,
-        mpy_cross_compile,
-        validate_mpy_cross_version,
-    )
-
     if source_root is None:
         source_root = Path.cwd()
 
@@ -226,16 +168,18 @@ def deploy(
             return 1
 
     compiled_count = 0
+    listed = ship_list(source_root)
+    entries = listed.modules
 
     if use_source:
-        sync_root = source_root
+        synced = {entry.source_device: source_root / entry.source for entry in entries}
     else:
         if compile is None:
             compile = mpy_cross_compile
 
         validation_mount = None if dry_run else mount
         try:
-            validate_mpy_cross_version(mount=validation_mount, mpy_cross_bin=_MPY_CROSS_BIN)
+            validate_mpy_cross_version(mount=validation_mount)
         except VersionError as exc:
             print(f"Error: {exc}", file=sys.stderr)
             return 1
@@ -252,7 +196,7 @@ def deploy(
             return 1
 
         compiled_count = build_result.compiled
-        sync_root = staging_root
+        synced = {entry.device: staging_root / entry.device for entry in entries}
 
     if scene is not None and not dry_run:
         _write_scene(mount, scene)
@@ -264,61 +208,34 @@ def deploy(
     if example_file is not None:
         _sync_file(example_file, mount / "code.py", "code.py", copied, skipped, dry_run, force=True)
 
-        boot_source = source_root / "hardware/circuitpython" / "boot.py"
-        if boot_source.is_file():
+        boot = listed.boot
+        if boot is not None:
             _sync_file(
-                boot_source, mount / "boot.py", "boot.py", copied, skipped, dry_run, force=True
+                source_root / boot.source,
+                mount / boot.device,
+                str(boot.device),
+                copied,
+                skipped,
+                dry_run,
+                force=True,
             )
 
-    for module in MODULE_DIRS:
-        src_dir = sync_root / module
-        dest_dir = mount / module
+    for device, src in synced.items():
+        _sync_file(src, mount / device, str(device), copied, skipped, dry_run)
 
-        if src_dir.is_dir():
-            if "/" in module:
-                _copy_intermediate_inits(
-                    module, sync_root, mount, copied, skipped, dry_run, use_source=use_source
-                )
-            for src_file in sorted(src_dir.rglob("*")):
-                if src_file.is_dir():
-                    continue
-                rel = src_file.relative_to(src_dir)
-                if _is_excluded(module / rel):
-                    continue
-                if use_source and src_file.suffix == ".mpy":
-                    continue
-                label = f"{module}/{rel}"
-                _sync_file(src_file, dest_dir / rel, label, copied, skipped, dry_run)
+    for rel in governed_mount_files(mount, use_source):
+        if rel in synced:
+            continue
+        pruned.append(mount / rel)
+        if dry_run:
+            print(f"[DRY RUN] PRUNE  {rel}")
+        else:
+            (mount / rel).unlink()
+            print(f"PRUNE  {rel}")
 
-        stale_files = _collect_stale_files(src_dir, dest_dir, module)
-        if use_source and dest_dir.is_dir():
-            stale_set = set(stale_files)
-            for dest_file in sorted(dest_dir.rglob("*")):
-                is_orphaned_mpy = not dest_file.is_dir() and dest_file.suffix == ".mpy"
-                if is_orphaned_mpy and dest_file not in stale_set:
-                    stale_files.append(dest_file)
-                    stale_set.add(dest_file)
-        for stale_file in stale_files:
-            label = f"{module}/{stale_file.relative_to(dest_dir)}"
-            if dry_run:
-                pruned.append(stale_file)
-                print(f"[DRY RUN] PRUNE  {label}")
-            else:
-                stale_file.unlink()
-                pruned.append(stale_file)
-                print(f"PRUNE  {label}")
-
-        if not dry_run and dest_dir.is_dir():
-            for d in sorted(dest_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
-                if d.is_dir():
-                    try:
-                        d.rmdir()
-                    except OSError:
-                        pass
-            try:
-                dest_dir.rmdir()
-            except OSError:
-                pass
+    if not dry_run:
+        for module in MODULE_DIRS:
+            _remove_empty_dirs(mount / module)
 
     print(
         f"Done. {compiled_count} compiled, "
@@ -341,8 +258,8 @@ def main() -> None:
     parser.add_argument(
         "--mount",
         type=Path,
-        default=Path(_DEFAULT_MOUNT),
-        help=f"Path to the mounted CIRCUITPY volume (default: {_DEFAULT_MOUNT}).",
+        default=Path(DEFAULT_MOUNT),
+        help=f"Path to the mounted CIRCUITPY volume (default: {DEFAULT_MOUNT}).",
     )
     parser.add_argument(
         "--dry-run",

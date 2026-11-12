@@ -20,6 +20,6 @@ def _bypass_mpy_cross_version_check(request, monkeypatch):
     if "version" in request.node.name:
         return
 
-    from scripts import build
+    from scripts import deploy
 
-    monkeypatch.setattr(build, "validate_mpy_cross_version", lambda mount, mpy_cross_bin: None)
+    monkeypatch.setattr(deploy, "validate_mpy_cross_version", lambda mount: None)

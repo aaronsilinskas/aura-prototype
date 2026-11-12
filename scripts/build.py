@@ -13,9 +13,8 @@ try:
 except ImportError:
     pass
 
-from scripts.deploy import _EXCLUDE_DIRS, _EXCLUDE_NAMES, _EXCLUDE_PATHS, MODULE_DIRS
+from scripts.ship_list import ShipEntry, ship_list
 
-_RAW_SUFFIXES: Final = {".json", ".txt", ".wav"}
 _HASH_SUFFIX: Final = ".srcsha256"
 
 _REPO_ROOT: Final = Path(__file__).parent.parent
@@ -109,7 +108,7 @@ def parse_circuitpython_major_from_boot_out(boot_out_text: str) -> int:
     return int(match.group(1))
 
 
-def validate_mpy_cross_version(mount: Path | None, mpy_cross_bin: str) -> None:
+def validate_mpy_cross_version(mount: Path | None, mpy_cross_bin: str = _MPY_CROSS_BIN) -> None:
     """Raise :class:`VersionError` when the mpy-cross major version does not match.
 
     Validates against the device's ``boot_out.txt`` when *mount* is given,
@@ -137,15 +136,6 @@ def validate_mpy_cross_version(mount: Path | None, mpy_cross_bin: str) -> None:
         )
 
 
-def _is_excluded(rel: Path) -> bool:
-    if any(rel.is_relative_to(path) for path in _EXCLUDE_PATHS):
-        return True
-    for part in rel.parts:
-        if part in _EXCLUDE_DIRS:
-            return True
-    return rel.name in _EXCLUDE_NAMES
-
-
 def _hash_path(dest_mpy: Path) -> Path:
     return dest_mpy.with_suffix(_HASH_SUFFIX)
 
@@ -170,21 +160,18 @@ def _record_src_hash(src: Path, dest_mpy: Path) -> None:
     _hash_path(dest_mpy).write_text(_src_content_hash(src))
 
 
-def _prune_staging(source_root: Path, staging_root: Path) -> int:
-    """Prune staged .mpy files whose source .py no longer exists."""
+def _prune_staging(staging_root: Path, produced: set[Path]) -> int:
+    """Delete staged files outside *produced* (with their hash sidecars) and empty dirs."""
+    keep = produced | {_hash_path(path) for path in produced if path.suffix == ".mpy"}
     pruned = 0
-    for module in MODULE_DIRS:
-        src_dir = source_root / module
-        dest_dir = staging_root / module
-        if not dest_dir.is_dir():
-            continue
-        for staged_file in sorted(dest_dir.rglob("*.mpy")):
-            rel = staged_file.relative_to(dest_dir)
-            src_py = src_dir / rel.with_suffix(".py")
-            if not src_py.exists():
-                staged_file.unlink(missing_ok=True)
-                _hash_path(staged_file).unlink(missing_ok=True)
+    for staged_file in sorted(staging_root.rglob("*")):
+        if staged_file.is_file() and staged_file not in keep:
+            staged_file.unlink()
+            if staged_file.suffix != _HASH_SUFFIX:
                 pruned += 1
+    for directory in sorted(staging_root.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        if directory.is_dir() and not any(directory.iterdir()):
+            directory.rmdir()
     return pruned
 
 
@@ -193,47 +180,24 @@ def build(
     staging_root: Path,
     compile: Callable[[Path, Path], None],
 ) -> BuildResult:
-    """Populate *staging_root* with compiled .mpy and raw data files ready to sync."""
+    """Stage the Ship list's module entries in *staging_root*: compiled as .mpy, raw copied.
+
+    The list's ``boot.py`` entry is not staged; deploy copies it from source beside ``code.py``.
+    """
+    entries = ship_list(source_root).modules
     staging_root.mkdir(parents=True, exist_ok=True)
-    pruned = _prune_staging(source_root, staging_root)
+    pruned = _prune_staging(staging_root, {staging_root / entry.device for entry in entries})
 
     compiled = 0
     skipped = 0
-
     try:
-        for module in MODULE_DIRS:
-            src_dir = source_root / module
-            if not src_dir.is_dir():
-                continue
-
-            _build_intermediate_inits(module, source_root, staging_root, compile)
-
-            dest_dir = staging_root / module
-
-            for src_file in sorted(src_dir.rglob("*")):
-                if src_file.is_dir():
-                    continue
-                rel = src_file.relative_to(src_dir)
-                if _is_excluded(module / rel):
-                    continue
-
-                if src_file.suffix == ".py":
-                    dest_file = dest_dir / rel.with_suffix(".mpy")
-                    dest_file.parent.mkdir(parents=True, exist_ok=True)
-                    if _should_skip_compile(src_file, dest_file):
-                        skipped += 1
-                        continue
-                    compile(src_file, dest_file)
-                    src_mtime = src_file.stat().st_mtime
-                    os.utime(dest_file, (src_mtime, src_mtime))
-                    _record_src_hash(src_file, dest_file)
-                    compiled += 1
-
-                elif src_file.suffix in _RAW_SUFFIXES:
-                    dest_file = dest_dir / rel
-                    dest_file.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(src_file, dest_file)
-
+        for entry in entries:
+            if not entry.compiled:
+                _copy_raw(source_root, staging_root, entry)
+            elif _compile_entry(source_root, staging_root, entry, compile):
+                compiled += 1
+            else:
+                skipped += 1
     except BuildError:
         # Remove the partial staging tree so deploy cannot accidentally sync it.
         shutil.rmtree(staging_root, ignore_errors=True)
@@ -242,22 +206,26 @@ def build(
     return BuildResult(compiled=compiled, skipped=skipped, pruned=pruned)
 
 
-def _build_intermediate_inits(
-    module: str,
+def _copy_raw(source_root: Path, staging_root: Path, entry: ShipEntry) -> None:
+    dest = staging_root / entry.device
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_root / entry.source, dest)
+
+
+def _compile_entry(
     source_root: Path,
     staging_root: Path,
+    entry: ShipEntry,
     compile: Callable[[Path, Path], None],
-) -> None:
-    parts = Path(module).parts
-    for i in range(len(parts) - 1):
-        pkg_path = Path(*parts[: i + 1])
-        src_init = source_root / pkg_path / "__init__.py"
-        if src_init.exists():
-            dest_init = staging_root / pkg_path / "__init__.mpy"
-            if _should_skip_compile(src_init, dest_init):
-                continue
-            dest_init.parent.mkdir(parents=True, exist_ok=True)
-            compile(src_init, dest_init)
-            src_mtime = src_init.stat().st_mtime
-            os.utime(dest_init, (src_mtime, src_mtime))
-            _record_src_hash(src_init, dest_init)
+) -> bool:
+    """Compile *entry* into staging; return False when its staged .mpy is already current."""
+    src = source_root / entry.source
+    dest = staging_root / entry.device
+    if _should_skip_compile(src, dest):
+        return False
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    compile(src, dest)
+    src_mtime = src.stat().st_mtime
+    os.utime(dest, (src_mtime, src_mtime))
+    _record_src_hash(src, dest)
+    return True

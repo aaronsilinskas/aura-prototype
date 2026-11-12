@@ -22,15 +22,9 @@ def make_source_tree(root: Path) -> None:
     (root / "effects").mkdir()
     (root / "effects" / "__init__.py").write_text("# effects init")
     (root / "effects" / "render.py").write_text("# render")
-    (root / "effects" / "__pycache__").mkdir()
-    (root / "effects" / "__pycache__" / "render.cpython-312.pyc").write_text("")
-    (root / "effects" / "tests").mkdir()
-    (root / "effects" / "tests" / "__init__.py").write_text("")
 
     (root / "engine").mkdir()
     (root / "engine" / "timer.py").write_text("# timer")
-    (root / "engine" / "tests").mkdir()
-    (root / "engine" / "tests" / "helpers.py").write_text("")
 
     (root / "magic").mkdir()
     (root / "magic" / "aura.py").write_text("# aura")
@@ -41,10 +35,6 @@ def make_source_tree(root: Path) -> None:
     (root / "packs" / "readme.txt").write_text("notes")
     (root / "packs" / "sounds").mkdir()
     (root / "packs" / "sounds" / "click.wav").write_bytes(b"RIFF")
-
-    (root / "rules").mkdir()
-    (root / "rules" / "__init__.py").write_text("")
-    (root / "rules" / "conftest.py").write_text("")
 
     (root / "hardware").mkdir()
     (root / "hardware" / "__init__.py").write_text("")
@@ -92,7 +82,7 @@ def test_source_py_is_not_present_in_staging_tree(tmp_path: Path) -> None:
     assert not (staging / "effects" / "__init__.py").exists()
 
 
-def test_all_module_dirs_are_compiled(tmp_path: Path) -> None:
+def test_python_modules_in_every_module_directory_are_compiled(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
@@ -104,7 +94,6 @@ def test_all_module_dirs_are_compiled(tmp_path: Path) -> None:
     assert (staging / "engine" / "timer.mpy").exists()
     assert (staging / "magic" / "aura.mpy").exists()
     assert (staging / "packs" / "__init__.mpy").exists()
-    assert (staging / "rules" / "__init__.mpy").exists()
 
 
 def test_hardware_subdirectory_modules_are_compiled(tmp_path: Path) -> None:
@@ -166,85 +155,6 @@ def test_wav_file_is_copied_raw(tmp_path: Path) -> None:
     build(source_root=source, staging_root=staging, compile=fake_compile)
 
     assert (staging / "packs" / "sounds" / "click.wav").read_bytes() == b"RIFF"
-
-
-# ---------------------------------------------------------------------------
-# Staging tree: excluded paths are not present
-# ---------------------------------------------------------------------------
-
-
-def test_tests_directory_is_not_in_staging_tree(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    staging = tmp_path / "build"
-
-    build(source_root=source, staging_root=staging, compile=fake_compile)
-
-    assert not (staging / "effects" / "tests").exists()
-    assert not (staging / "engine" / "tests").exists()
-
-
-def test_simulation_test_harness_is_not_in_staging_tree(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    (source / "app" / "simulation").mkdir(parents=True)
-    (source / "app" / "simulation" / "harness.py").write_text("# harness")
-    staging = tmp_path / "build"
-
-    build(source_root=source, staging_root=staging, compile=fake_compile)
-
-    assert not (staging / "app" / "simulation").exists()
-
-
-def test_simulated_device_is_not_in_staging_tree(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    (source / "hardware" / "simulated").mkdir()
-    (source / "hardware" / "simulated" / "device.py").write_text("# device")
-    staging = tmp_path / "build"
-
-    build(source_root=source, staging_root=staging, compile=fake_compile)
-
-    assert not (staging / "hardware" / "simulated").exists()
-
-
-def test_a_shipped_package_merely_named_simulation_is_compiled(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    (source / "packs" / "simulation").mkdir()
-    (source / "packs" / "simulation" / "rule.py").write_text("# rule")
-    staging = tmp_path / "build"
-
-    build(source_root=source, staging_root=staging, compile=fake_compile)
-
-    assert (staging / "packs" / "simulation" / "rule.mpy").exists()
-
-
-def test_pycache_is_not_in_staging_tree(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    staging = tmp_path / "build"
-
-    build(source_root=source, staging_root=staging, compile=fake_compile)
-
-    assert not (staging / "effects" / "__pycache__").exists()
-
-
-def test_conftest_py_is_not_in_staging_tree(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    staging = tmp_path / "build"
-
-    build(source_root=source, staging_root=staging, compile=fake_compile)
-
-    assert not (staging / "rules" / "conftest.mpy").exists()
-    assert not (staging / "rules" / "conftest.py").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -522,3 +432,48 @@ def test_first_build_compiles_all_modules_with_no_prior_staging_tree(tmp_path: P
     assert sorted(compile_calls) == ["palette.py", "render.py"]
     assert result.compiled == 2
     assert result.skipped == 0
+
+
+# ---------------------------------------------------------------------------
+# Staging holds only what the Ship list produces
+# ---------------------------------------------------------------------------
+
+
+def test_deleted_raw_data_file_is_pruned_from_staging_tree(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    (source / "packs").mkdir(parents=True)
+    data = source / "packs" / "data.json"
+    data.write_text("{}")
+    staging = tmp_path / "build"
+
+    build(source_root=source, staging_root=staging, compile=fake_compile)
+    data.unlink()
+
+    result = build(source_root=source, staging_root=staging, compile=fake_compile)
+
+    assert not (staging / "packs" / "data.json").exists()
+    assert result.pruned == 1
+
+
+def test_staged_file_the_ship_list_does_not_produce_is_pruned(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    (source / "effects").mkdir(parents=True)
+    (source / "effects" / "render.py").write_text("# render")
+    staging = tmp_path / "build"
+    (staging / "rules").mkdir(parents=True)
+    (staging / "rules" / "__init__.mpy").write_text("left by an older build")
+
+    build(source_root=source, staging_root=staging, compile=fake_compile)
+
+    assert not (staging / "rules").exists()
+
+
+def test_board_boot_py_is_not_staged(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    (source / "hardware" / "circuitpython").mkdir(parents=True)
+    (source / "hardware" / "circuitpython" / "boot.py").write_text("# boot")
+    staging = tmp_path / "build"
+
+    build(source_root=source, staging_root=staging, compile=fake_compile)
+
+    assert not any(path.is_file() for path in staging.rglob("*"))

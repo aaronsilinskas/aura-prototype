@@ -30,7 +30,12 @@ from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 from typing import IO, Final, Protocol
 
-from scripts.deploy import _DEFAULT_MOUNT, deploy
+if not __package__:
+    # Run as a file (python scripts/deploy_watch.py): put the repo root on the path
+    # so the package imports below resolve as they do under python -m.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from scripts.deploy import DEFAULT_MOUNT, deploy
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
@@ -352,8 +357,8 @@ def parse_args(argv: "list[str] | None" = None) -> argparse.Namespace:
     parser.add_argument(
         "--mount",
         type=Path,
-        default=Path(_DEFAULT_MOUNT),
-        help=f"Path to the mounted CIRCUITPY volume (default: {_DEFAULT_MOUNT}).",
+        default=Path(DEFAULT_MOUNT),
+        help=f"Path to the mounted CIRCUITPY volume (default: {DEFAULT_MOUNT}).",
     )
     parser.add_argument(
         "--port",
@@ -389,6 +394,15 @@ def parse_args(argv: "list[str] | None" = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--source",
+        action="store_true",
+        default=False,
+        help=(
+            "Skip compilation and ship raw .py files, with the same meaning as "
+            "deploy.py's --source (full tracebacks on the device)."
+        ),
+    )
+    parser.add_argument(
         "--reboot-timeout",
         type=float,
         default=_DEFAULT_REBOOT_TIMEOUT,
@@ -420,7 +434,7 @@ def parse_args(argv: "list[str] | None" = None) -> argparse.Namespace:
 
 def run_deploy(args: argparse.Namespace, *, deploy: "Callable[..., int]" = deploy) -> int:
     """Run the deploy step for parsed *args*, returning ``deploy``'s exit code."""
-    return deploy(args.example_file, args.mount, scene=args.scene)
+    return deploy(args.example_file, args.mount, scene=args.scene, use_source=args.source)
 
 
 def main() -> None:

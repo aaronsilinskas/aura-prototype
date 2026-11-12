@@ -8,8 +8,7 @@ any time you want to observe what the device prints after a deploy.
 
 ## Invocation
 
-Always run as a module from the repo root (direct `python scripts/deploy_watch.py`
-fails with an import error):
+Run as a module from the repo root (`python scripts/deploy_watch.py` also works):
 
 ```
 python -m scripts.deploy_watch <example_file> [options]
@@ -25,6 +24,7 @@ At least one of `--seconds` or `--until` is required.
 | `--until TEXT` | Stop as soon as any output line contains TEXT (exit 0) |
 | `--output FILE` | Also write clean device output to FILE (no deploy chatter) |
 | `--scene NAME` | Deploy with this scene, same meaning as `deploy.py --scene` (recorded in `aura-boot.json`); omit to leave the boot scene alone |
+| `--source` | Ship raw `.py` files instead of compiled `.mpy`, same meaning as `deploy.py --source` (full tracebacks on the device) |
 | `--port PORT` | Serial port; if omitted, auto-detects the board's console channel (works with the data channel enabled too) |
 | `--reboot-timeout N` | Seconds to wait for the CircuitPython soft-reboot banner (default 5) |
 

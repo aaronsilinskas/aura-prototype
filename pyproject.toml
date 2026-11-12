@@ -71,7 +71,7 @@ allow-multiline = false  # mpy-cross rejects implicit concatenation even inside 
 "**/tests/**" = ["ISC002"]
 
 [tool.importlinter]
-root_packages = ["effects", "engine", "magic", "packs", "hardware", "app"]
+root_packages = ["effects", "engine", "magic", "packs", "hardware", "app", "scripts"]
 source_roots = ["."]
 
 [[tool.importlinter.contracts]]
@@ -105,10 +105,18 @@ ignore_imports = [
 name = "shipped code must not import test-only simulation code"
 type = "protected"
 protected_modules = ["app.simulation", "hardware.simulated"]
-# Tests are not shipped (scripts/deploy.py excludes every tests/ directory), so a
-# scene's tests may play it on the Simulation test harness, which itself builds
-# on the Simulated device. Nothing else may import either.
+# Tests are not shipped (the Ship list, scripts/ship_list.py, leaves out every
+# tests/ directory), so a scene's tests may play it on the Simulation test
+# harness, which itself builds on the Simulated device. Nothing else may import
+# either.
 allowed_importers = ["**.tests", "app.simulation"]
+
+[[tool.importlinter.contracts]]
+name = "device packages must not import host scripts"
+type = "forbidden"
+# scripts/ (the Ship list, build, deploy) is CPython-only and never ships.
+source_modules = ["effects", "engine", "magic", "packs", "hardware", "app"]
+forbidden_modules = ["scripts"]
 
 [tool.mypy]
 python_version = "3.10"
