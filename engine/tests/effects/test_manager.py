@@ -3,6 +3,7 @@ from unittest.mock import ANY
 import pytest
 
 from effects.effect import EffectVerb
+from engine.effects.admin import SceneView
 from engine.effects.manager import EffectManager, VerbKeyError
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.events import EffectEvent
@@ -42,21 +43,25 @@ def _make_stub_registry(pack_tree) -> PackRegistry:
     ).effect_registry
 
 
+def _view(*declared: str, local_sounds: dict[str, str] | None = None) -> SceneView:
+    """A Scene view with no local effects, *local_sounds*, declaring the packs *declared*."""
+    return SceneView(None, local_sounds or {}, frozenset(declared))
+
+
 def _make_timer() -> Timer:
     return Timer()
 
 
 def _make_manager(registry, outputs, allowed=None) -> EffectManager:
-    """Construct an EffectManager over a namespace with a scene view installed.
+    """Construct an EffectManager that has entered a boot scene.
 
-    Mirrors production: ``SceneManager`` installs the active scene into the
-    namespace on activation, before any rule can call ``set_effect``. The
-    installed view has no locals and declares every pack *registry* knows,
-    unless *allowed* names the declared packs instead.
+    The scene has no locals and declares every pack *registry* knows, unless
+    *allowed* names the declared packs instead.
     """
-    namespace = ActiveSceneNamespace(registry, {})
-    namespace.install(None, {}, frozenset(registry.names()) if allowed is None else allowed)
-    return EffectManager(namespace=namespace, outputs=outputs)
+    manager = EffectManager(namespace=ActiveSceneNamespace(registry, {}), outputs=outputs)
+    declared = frozenset(registry.names()) if allowed is None else allowed
+    manager.enter_boot_scene(SceneView(None, {}, declared))
+    return manager
 
 
 # ---------------------------------------------------------------------------
@@ -1066,9 +1071,10 @@ def _make_clip_manager(
     pack_tree.scene(root, "arena", sounds=["cheer"])
     catalog = pack_tree.scan_roots(root)
     namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
+    manager = EffectManager(namespace=namespace, outputs=outputs)
     local_sounds = catalog.scene_registry.get("arena").local_sound_map
-    namespace.install(None, local_sounds, frozenset({"sfx"}))
-    return EffectManager(namespace=namespace, outputs=outputs), catalog
+    manager.enter_boot_scene(_view("sfx", local_sounds=local_sounds))
+    return manager, catalog
 
 
 def _events(output: SpyEffectOutput) -> list[EffectEvent]:
@@ -1878,8 +1884,7 @@ def test_two_outputs_sharing_scope_both_reflect_the_same_receipts_brightness(pac
 
 
 # ---------------------------------------------------------------------------
-# reset_merge_strategies / capture_merge_strategies / apply_merge_strategies
-# — the EffectAdmin face's pointwise merge-strategy operations (issue #638)
+# Merge-strategy and held-effects fixtures
 # ---------------------------------------------------------------------------
 
 
@@ -1927,83 +1932,199 @@ _SPLIT_RED_BLUE = [0xFF0000] * 2 + [0x0000FF] * 2
 _ADDITIVE_RED_BLUE = [0xFF00FF] * 4
 
 
-def test_a_scope_whose_effects_are_set_aside_goes_dark(pack_tree) -> None:
+# ---------------------------------------------------------------------------
+# EffectAdmin steps — entering the boot scene, covering and uncovering
+# ---------------------------------------------------------------------------
+
+
+def test_entering_the_boot_scene_puts_every_scope_on_split(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    manager.add_effect(Scope.PERSONAL, "color.red", {})
+    manager.add_effect(Scope.PERSONAL, "color.blue", {})
+    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+
+    manager.enter_boot_scene(_view("color", "count"))
+
+    assert _tick(manager, output) == _SPLIT_RED_BLUE
+
+
+def test_entering_the_boot_scene_resolves_its_view(pack_tree) -> None:
+    registry = _make_stub_registry(pack_tree)
+    manager = EffectManager(namespace=ActiveSceneNamespace(registry, {}), outputs=[])
+
+    manager.enter_boot_scene(_view("stub"))
+
+    assert manager.set_effect(Scope.PERSONAL, "stub.fire", {}) is not None
+
+
+def test_covering_darkens_the_covered_scopes(pack_tree) -> None:
     manager, output = _make_counting_manager(pack_tree)
     manager.set_effect(Scope.PERSONAL, "count.fx", {})
     _tick(manager, output)
 
-    manager.set_aside()
+    manager.cover(_view("color"))
 
     assert _tick(manager, output) is None
     assert output.clear_pixels_calls[-1] == "personal"
 
 
-def test_a_put_back_effect_resumes_from_where_it_froze(pack_tree) -> None:
+def test_covering_tells_each_output_which_effects_are_held(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
+
+    manager.cover(_view("color"))
+
+    assert [(keys, r) for keys, _, r in output.held_calls] == [(frozenset({"personal"}), receipt)]
+
+
+def test_covering_fires_no_stop_event_for_the_covered_effects(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
+    output.handle_event_calls.clear()
+
+    manager.cover(_view("color"))
+
+    assert output.handle_event_calls == []
+    assert not receipt.is_stopped()
+
+
+def test_covering_starts_every_scope_on_split(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+
+    manager.cover(_view("color"))
+    manager.add_effect(Scope.PERSONAL, "color.red", {})
+    manager.add_effect(Scope.PERSONAL, "color.blue", {})
+
+    assert _tick(manager, output) == _SPLIT_RED_BLUE
+
+
+def test_covering_resolves_the_overlays_view(pack_tree) -> None:
+    manager, _ = _make_counting_manager(pack_tree)
+
+    manager.cover(_view("count"))
+
+    manager.set_effect(Scope.PERSONAL, "count.fx", {})
+    with pytest.raises(UndeclaredPackError):
+        manager.set_effect(Scope.PERSONAL, "color.red", {})
+
+
+def test_an_effect_started_while_others_are_held_does_not_join_them(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    manager.set_effect(Scope.PERSONAL, "color.red", {})
+    manager.cover(_view("color"))
+    manager.set_effect(Scope.PERSONAL, "color.blue", {})
+
+    assert _tick(manager, output) == [0x0000FF] * 4
+
+
+def test_stopping_every_scope_while_covered_leaves_the_held_effects_untouched(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
+    manager.cover(_view("color"))
+    output.handle_event_calls.clear()
+
+    manager.stop_effect(Scope.ALL)
+
+    assert output.handle_event_calls == [], "no stop event reaches a held effect"
+    assert not receipt.is_stopped()
+
+
+def test_uncovering_stops_the_overlays_own_effects(pack_tree) -> None:
+    manager, output = _make_counting_manager(pack_tree)
+    held = manager.cover(_view("color"))
+    overlays = manager.set_effect(Scope.PERSONAL, "color.blue", {})
+    output.handle_event_calls.clear()
+
+    manager.uncover(held, _view("color"))
+
+    assert overlays.is_stopped()
+    assert [call[0].verb for call in output.handle_event_calls] == [EffectVerb.STOP]
+
+
+def test_uncovering_redraws_the_covered_effects_from_where_they_froze(pack_tree) -> None:
     manager, output = _make_counting_manager(pack_tree)
     manager.set_effect(Scope.PERSONAL, "count.fx", {})
     _tick(manager, output)
     _tick(manager, output)
-    held = manager.set_aside()
+    held = manager.cover(_view("count"))
+    manager.set_effect(Scope.PERSONAL, "count.fx", {})  # the Overlay's own
     for _ in range(3):
         _tick(manager, output)
 
-    manager.put_back(held)
+    manager.uncover(held, _view("count"))
 
-    assert _tick(manager, output) == [3] * 4, "two updates before the hold, one after"
+    assert _tick(manager, output) == [3] * 4, "two updates before the cover, one after"
 
 
-def test_a_put_back_effects_receipt_still_controls_its_brightness(pack_tree) -> None:
+def test_a_covered_effects_receipt_still_controls_its_brightness_after_uncovering(
+    pack_tree,
+) -> None:
     manager, output = _make_counting_manager(pack_tree)
     receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
-    held = manager.set_aside()
-    manager.put_back(held)
+    held = manager.cover(_view("color"))
+    manager.uncover(held, _view("color"))
 
     receipt.brightness = 0.5
 
     assert _tick(manager, output) == [0x7F0000] * 4
 
 
-def test_a_put_back_effects_receipt_still_stops_it(pack_tree) -> None:
+def test_a_covered_effects_receipt_still_stops_it_after_uncovering(pack_tree) -> None:
     manager, output = _make_counting_manager(pack_tree)
     receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
-    held = manager.set_aside()
-    manager.put_back(held)
+    held = manager.cover(_view("color"))
+    manager.uncover(held, _view("color"))
 
     receipt.stop()
 
     assert _tick(manager, output) is None
 
 
-def test_stopping_every_scope_while_effects_are_held_leaves_them_untouched(pack_tree) -> None:
+def test_uncovering_tells_each_output_which_effects_are_restored(pack_tree) -> None:
     manager, output = _make_counting_manager(pack_tree)
-    manager.set_effect(Scope.PERSONAL, "color.red", {})
-    held = manager.set_aside()
-    output.handle_event_calls.clear()
+    receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
+    held = manager.cover(_view("color"))
 
-    manager.stop_effect(Scope.ALL)
-    manager.put_back(held)
+    manager.uncover(held, _view("color"))
 
-    assert output.handle_event_calls == [], "no stop event reaches a held effect"
-    assert _tick(manager, output) == [0xFF0000] * 4
+    assert [(keys, r) for keys, _, r in output.restored_calls] == [
+        (frozenset({"personal"}), receipt)
+    ]
 
 
-def test_an_effect_started_while_others_are_held_does_not_join_them(pack_tree) -> None:
+def test_uncovering_restores_the_covered_merge_strategies(pack_tree) -> None:
     manager, output = _make_counting_manager(pack_tree)
+    manager.add_effect(Scope.PERSONAL, "color.red", {})
+    manager.add_effect(Scope.PERSONAL, "color.blue", {})
+    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
+    held = manager.cover(_view("color"))
+    manager.set_merge_strategy(Scope.PERSONAL, SPLIT)  # the Overlay's own choice
+
+    manager.uncover(held, _view("color"))
+
+    assert _tick(manager, output) == _ADDITIVE_RED_BLUE
+
+
+def test_uncovering_resolves_the_covered_view_again(pack_tree) -> None:
+    manager, _ = _make_counting_manager(pack_tree)
+    held = manager.cover(_view("count"))
+
+    manager.uncover(held, _view("color"))
+
     manager.set_effect(Scope.PERSONAL, "color.red", {})
-    manager.set_aside()
-    manager.set_effect(Scope.PERSONAL, "color.blue", {})
-
-    assert _tick(manager, output) == [0x0000FF] * 4
+    with pytest.raises(UndeclaredPackError):
+        manager.set_effect(Scope.PERSONAL, "count.fx", {})
 
 
-def test_an_effect_whose_receipt_stopped_while_held_stops_on_the_first_tick_after_put_back(
+def test_an_effect_whose_receipt_stopped_while_held_is_removed_on_the_next_tick(
     pack_tree,
 ) -> None:
     manager, output = _make_counting_manager(pack_tree)
     receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
-    held = manager.set_aside()
+    held = manager.cover(_view("color"))
     receipt.stop()
-    manager.put_back(held)
+    manager.uncover(held, _view("color"))
     output.handle_event_calls.clear()
     output.clear_pixels_calls.clear()
 
@@ -2014,73 +2135,16 @@ def test_an_effect_whose_receipt_stopped_while_held_stops_on_the_first_tick_afte
     assert output.clear_pixels_calls[0] == "personal"
 
 
-def test_setting_effects_aside_starts_every_scope_on_split(pack_tree) -> None:
-    manager, output = _make_counting_manager(pack_tree)
-    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
-
-    manager.set_aside()
-    manager.add_effect(Scope.PERSONAL, "color.red", {})
-    manager.add_effect(Scope.PERSONAL, "color.blue", {})
-
-    assert _tick(manager, output) == _SPLIT_RED_BLUE
-
-
-def test_putting_effects_back_restores_their_merge_strategies(pack_tree) -> None:
-    manager, output = _make_counting_manager(pack_tree)
-    manager.add_effect(Scope.PERSONAL, "color.red", {})
-    manager.add_effect(Scope.PERSONAL, "color.blue", {})
-    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
-    held = manager.set_aside()
-    manager.set_merge_strategy(Scope.PERSONAL, SPLIT)
-
-    manager.put_back(held)
-
-    assert _tick(manager, output) == _ADDITIVE_RED_BLUE
-
-
-def test_bundles_set_aside_in_turn_each_put_back_their_own_effects(pack_tree) -> None:
+def test_stacked_covers_each_uncover_their_own_effects(pack_tree) -> None:
     manager, output = _make_counting_manager(pack_tree)
     manager.set_effect(Scope.PERSONAL, "color.red", {})
-    under = manager.set_aside()
+    under = manager.cover(_view("color"))
     manager.set_effect(Scope.PERSONAL, "color.blue", {})
-    middle = manager.set_aside()
+    middle = manager.cover(_view("color"))
 
-    manager.put_back(middle)
+    manager.uncover(middle, _view("color"))
     blue = _tick(manager, output)
-    manager.stop_effect(Scope.ALL)
-    manager.put_back(under)
+    manager.uncover(under, _view("color"))
 
     assert blue == [0x0000FF] * 4
     assert _tick(manager, output) == [0xFF0000] * 4
-
-
-def test_resetting_merge_strategies_puts_every_scope_on_split(pack_tree) -> None:
-    manager, output = _make_counting_manager(pack_tree)
-    manager.add_effect(Scope.PERSONAL, "color.red", {})
-    manager.add_effect(Scope.PERSONAL, "color.blue", {})
-    manager.set_merge_strategy(Scope.PERSONAL, ADDITIVE)
-
-    manager.reset_merge_strategies()
-
-    assert _tick(manager, output) == _SPLIT_RED_BLUE
-
-
-def test_setting_effects_aside_tells_each_output_which_effects_are_held(pack_tree) -> None:
-    manager, output = _make_counting_manager(pack_tree)
-    receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
-
-    manager.set_aside()
-
-    assert [(keys, r) for keys, _, r in output.held_calls] == [(frozenset({"personal"}), receipt)]
-
-
-def test_putting_effects_back_tells_each_output_which_effects_are_restored(pack_tree) -> None:
-    manager, output = _make_counting_manager(pack_tree)
-    receipt = manager.set_effect(Scope.PERSONAL, "color.red", {})
-    held = manager.set_aside()
-
-    manager.put_back(held)
-
-    assert [(keys, r) for keys, _, r in output.restored_calls] == [
-        (frozenset({"personal"}), receipt)
-    ]

@@ -1,16 +1,15 @@
 from __future__ import annotations
 
+from engine.effects.admin import EffectAdmin, HeldEffects, SceneView
+from engine.effects.output import EffectOutput
 from engine.engine import GameEngine
-from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog
-from engine.packs import PackRegistry
-from engine.scene import SceneLocalRegistry, SceneManager
+from engine.scene import SceneManager
+from engine.scene_runtime import SceneRuntime
 from engine.state import (
-    EffectAdmin,
     EffectControls,
     EffectReceipt,
     GameState,
-    HeldEffects,
     NetworkControls,
     SceneReboot,
     ScopeValue,
@@ -65,48 +64,30 @@ class SpyEffectControls(EffectControls):
 class SpyEffectAdmin(EffectAdmin):
     """Test recorder for the scene-transition ``EffectAdmin`` face.
 
-    Records every call so ``SceneManager`` transition tests can assert on
-    them without wiring a real ``EffectManager``. ``set_aside`` returns a
-    fresh, empty ``HeldEffects`` each call, since this spy holds no effects.
+    ``steps`` records each step as ``(name, view)``, where *name* is
+    ``"enter"``, ``"cover"`` or ``"uncover"``, so ``SceneManager`` transition
+    tests can assert which step each transition took with which Scene view.
+    ``cover`` returns a fresh, empty ``HeldEffects``, also kept in
+    ``covered``; ``uncovered`` records the bundle each ``uncover`` was given.
     """
 
     def __init__(self) -> None:
-        self.reset_merge_strategies_calls: int = 0
-        self.set_aside_results: list[HeldEffects] = []
-        self.put_back_calls: list[HeldEffects] = []
+        self.steps: list[tuple[str, SceneView]] = []
+        self.covered: list[HeldEffects] = []
+        self.uncovered: list[HeldEffects] = []
 
-    def reset_merge_strategies(self) -> None:
-        self.reset_merge_strategies_calls += 1
+    def enter_boot_scene(self, view: SceneView) -> None:
+        self.steps.append(("enter", view))
 
-    def set_aside(self) -> HeldEffects:
+    def cover(self, view: SceneView) -> HeldEffects:
+        self.steps.append(("cover", view))
         held = HeldEffects()
-        self.set_aside_results.append(held)
+        self.covered.append(held)
         return held
 
-    def put_back(self, held: HeldEffects) -> None:
-        self.put_back_calls.append(held)
-
-
-class RecordingNamespace(ActiveSceneNamespace):
-    """An empty ``ActiveSceneNamespace`` that also records every ``install`` call.
-
-    Each entry is the ``(local_effects, local_sounds, declared_packs)`` the
-    call passed, so ``SceneManager`` tests can assert what each transition
-    installed.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(PackRegistry(), {})
-        self.installs: list[tuple[SceneLocalRegistry | None, dict[str, str], frozenset[str]]] = []
-
-    def install(
-        self,
-        local_effects: SceneLocalRegistry | None,
-        local_sounds: dict[str, str],
-        declared_packs: frozenset[str],
-    ) -> None:
-        self.installs.append((local_effects, local_sounds, declared_packs))
-        super().install(local_effects, local_sounds, declared_packs)
+    def uncover(self, held: HeldEffects, view: SceneView) -> None:
+        self.steps.append(("uncover", view))
+        self.uncovered.append(held)
 
 
 class RecordingSceneReboot(SceneReboot):
@@ -156,20 +137,39 @@ def rule_source(class_name: str = "ARule") -> str:
     )
 
 
-def make_scene_manager(
-    catalog: PackCatalog,
-    *,
-    engine: GameEngine | None = None,
-    effect_admin: SpyEffectAdmin | None = None,
-    namespace: ActiveSceneNamespace | None = None,
-) -> SceneManager:
-    """Construct a ``SceneManager`` over *catalog*'s registries, with spies for every port."""
+def make_scene_manager(catalog: PackCatalog, effect_admin: SpyEffectAdmin) -> SceneManager:
+    """Construct a ``SceneManager`` over *catalog*'s registries for a spy-based transition test.
+
+    *effect_admin* records each transition's step; every other port is a spy.
+    """
     return SceneManager(
-        engine or GameEngine(effect_controls=SpyEffectControls()),
-        catalog.effect_registry,
+        GameEngine(effect_controls=SpyEffectControls()),
         catalog.rule_registry,
         catalog.scene_registry,
-        effect_admin or SpyEffectAdmin(),
-        namespace or RecordingNamespace(),
+        effect_admin,
         RecordingSceneReboot(),
+    )
+
+
+def make_scene_runtime(
+    catalog: PackCatalog,
+    outputs: list[EffectOutput] | None = None,
+    *,
+    capabilities: frozenset[str] = frozenset(),
+    scene_reboot: SceneReboot | None = None,
+    clock: Timer | None = None,
+) -> SceneRuntime:
+    """Construct a ``SceneRuntime`` over *catalog* drawing on *outputs*, with spies for its ports.
+
+    No scene is active yet. Its network controls are a ``SpyNetworkControls``
+    and, unless *scene_reboot* is given, its Reboots go to a
+    ``RecordingSceneReboot``; omitting *clock* gives a wall clock.
+    """
+    return SceneRuntime(
+        catalog,
+        outputs if outputs is not None else [],
+        SpyNetworkControls(),
+        capabilities,
+        scene_reboot if scene_reboot is not None else RecordingSceneReboot(),
+        clock,
     )

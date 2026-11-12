@@ -32,9 +32,11 @@ effects/          Animation engine (CircuitPython-safe)
 
 engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   engine.py       GameEngine, GameRule
-  state.py        GameState, EffectControls, EffectAdmin, HeldEffects, EffectReceipt, MergeStrategy,
+  state.py        GameState, EffectControls, EffectReceipt, MergeStrategy,
                   NetworkControls, Scope, ScopeValue
   scene.py        Scene, SceneRegistry, SceneLocalRegistry, SceneManager, SceneControls
+  scene_runtime.py SceneRuntime (the matched set built from a PackCatalog; above scene
+                  and pack_catalog in the import graph)
   phase.py        PhaseKey, PhaseMachine, PhaseSlot, PhaseRule, InPhaseRule
   events.py       Event, EventGroup, EffectEvent
   timer.py        Timer
@@ -52,6 +54,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   network.py      NetworkEvents
   log.py          Board-free, tag-prefixed line logger with an injectable sink
   effects/
+    admin.py      EffectAdmin, HeldEffects, SceneView (scene-transition face; hardware can't reach it)
     builder.py    EffectBuilder
     manager.py    EffectManager; VerbKeyError
     output.py     EffectOutput (abstract hardware output port)
@@ -101,7 +104,7 @@ app/              Composition layer — the one place allowed to import both the
                         scene, else flash default_scene, skipping one the device lacks
                         the Required capabilities for (raises MissingCapabilityError
                         when none fits)
-  scene_runtime.py      run_scene (device-only: bring-up, build_scene_boot, then loops
+  run_scene.py          run_scene (device-only: bring-up, build_scene_boot, then loops
                         the tick it returns)
   simulation/           Test-only Simulation test harness (Simulation, SimulatedDevice):
                         boots real scenes on simulated devices, reboots them
@@ -163,14 +166,15 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
 | `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
 | `EffectControls` | `engine/state.py` | Rule-facing effect seam |
-| `EffectAdmin` | `engine/state.py` | Overlay seam, reserved for `SceneManager`: `set_aside` → `HeldEffects` (running effects + merge strategies; live set left empty, on Split), `put_back(held)`, `reset_merge_strategies` for the boot scene |
+| `EffectAdmin` | `engine/effects/admin.py` | Scene-transition seam, reserved for `SceneManager`: one step per transition, each installing the `SceneView` it is given into the Active scene namespace. `enter_boot_scene(view)` puts every scope on Split; `cover(view)` → `HeldEffects` (running effects + merge strategies; live set left empty, on Split); `uncover(held, view)` stops the Overlay's own effects and puts the bundle back |
+| `SceneView` | `engine/effects/admin.py` | A scene's local effects, local sounds and declared effect-pack names: what each `EffectAdmin` step installs |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output port |
 | `EffectBuilder` | `engine/effects/builder.py` | Callable `(name, config) → Effect`; one per effect item |
 | `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop` plus `brightness`/`loudness` controls |
 | `ScopeValue` / `Scope` | `engine/state.py` | Output-agnostic routing keys (see glossary) |
 | `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam; a send on missing hardware raises `MissingCapabilityError` |
-| `ActiveSceneNamespace` | `engine/namespace.py` | Resolves effect names to builders and clip names to WAV paths for the active scene; installed by `SceneManager` per transition |
+| `ActiveSceneNamespace` | `engine/namespace.py` | Resolves effect names to builders and clip names to WAV paths for the active scene; its Scene view is installed by each `EffectAdmin` step |
 | `ResolvedClip` | `effects/effect.py` | A declared `AudioPlaybackConfig` plus its resolved path, carried on `EffectEvent` |
 | `GameEngine` | `engine/engine.py` | Event queue + `GameRule` list; driven by a single `update` tick |
 | `GameState` | `engine/state.py` | Per-tick game context passed to each rule; `elapsed`/`total` are its scene's own game time, summed from the ticks this state receives, so they stop while an Overlay covers the scene; `settings` is its scene's read-only `Settings`; `capabilities` is the device's read-only `Capabilities` (`has(name)`, raising for a name outside the vocabulary), handed through `GameEngine` from `DeviceHardware.capabilities` |
@@ -179,7 +183,8 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
 | `Scene` | `engine/scene.py` | Named game mode with its own effect and rule registries |
 | `SceneControls` | `engine/state.py` | Rule-facing transition seam (`overlay`, `pop`, `reboot_into`, `reboot_to_previous`; no in-process scene switch, see ADR-0005) plus `can_run(name)`, which the `lobby` pack asks to leave out entries the device can't play |
-| `SceneManager` | `engine/scene.py` | The live `SceneControls`. Drives scene transitions, installing each active scene into the `ActiveSceneNamespace`, setting the covered scene's effects aside on `overlay` and putting them back on `pop` through `EffectAdmin` (the held bundle rides in the overlay's stack entry; the IR codec is not touched); delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot`. Its own `activate_boot_scene(name)`, off the rule-facing seam, is how the boot composition makes the first scene active (on Split). `activate_boot_scene`, `overlay`, `reboot_into` and `reboot_to_previous` raise `MissingCapabilityError` before recording, persisting or resetting anything when the target's Required capabilities aren't all in `GameEngine.capabilities`; `pop` does not check |
+| `SceneManager` | `engine/scene.py` | The live `SceneControls`. Drives scene transitions, each making one `EffectAdmin` call carrying the top scene's `SceneView`: enter on boot, cover on `overlay`, uncover on `pop` (the held bundle rides in the overlay's stack entry; the IR codec is not touched). Holds no namespace or effect registry; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot`. Its own `activate_boot_scene(name)`, off the rule-facing seam, is how the boot composition makes the first scene active (on Split). `activate_boot_scene`, `overlay`, `reboot_into` and `reboot_to_previous` raise `MissingCapabilityError` before recording, persisting or resetting anything when the target's Required capabilities aren't all in `GameEngine.capabilities`; `pop` does not check |
+| `SceneRuntime` | `engine/scene_runtime.py` | The engine's matched set, built from a `PackCatalog`, effect outputs, `NetworkControls`, Capabilities, `SceneReboot` and an optional clock: one `ActiveSceneNamespace`, the `EffectManager` resolving through it, a `GameEngine` on it and the `SceneManager` (with it as `EffectAdmin`). `activate_boot_scene(name)`, `queue_event(event)` (dropped with no scene active), `update()` (dispatch, then any pending Overlay or pop, then effects, on one clock), `has_active_scene`, the clock's `elapsed` and `total`, `scene_controls`, `namespace`; exposes none of its parts |
 | `SceneReboot` | `engine/state.py` | Board-free port `SceneManager` reboots through; `previous_scene()` names the scene `reboot_to_previous` would boot, so it is checked first; live adapter `DeviceSceneReboot` |
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
 | `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor for a phase machine's key + initial phase; registry of each phase's owning `PhaseRule` |
@@ -209,7 +214,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |
 | `build_scene_boot` | `app/scene_composition.py` | The **Scene boot**, the Composition layer's only entry point: boots a `DeviceHardware` into its boot scene and returns a `SceneBoot`; shared by `run_scene` and the Simulated device |
-| `SceneBoot` | `app/scene_composition.py` | What `build_scene_boot` returns: the booted `scene_name`, its `tick`, its `scene_controls` (`SceneControls`) and its Active scene `namespace`. The tick is shared by the device and the Simulated device: each tick calls `update(elapsed)` on every part in `DeviceHardware.polled` (IR and radio included, before the active-scene check) without naming any, then queues `InputEvents.Sensors` and the IR/radio received events from the parts' state; allocates nothing per tick |
+| `SceneBoot` | `app/scene_composition.py` | What `build_scene_boot` returns: the booted `scene_name`, its `tick`, its `scene_controls` (`SceneControls`) and its Active scene `namespace`. The tick is shared by the device and the Simulated device and drives one `SceneRuntime`: each tick calls `update(elapsed)` on every part in `DeviceHardware.polled` (IR and radio included, whether or not a scene is active) without naming any, using the runtime's `elapsed`; then queues `InputEvents.Sensors` and the IR/radio received events from the parts' state on the runtime and calls its `update()`; allocates nothing per tick |
 | `DeviceSceneReboot` | `hardware/shared/device_reboot.py` | Live `SceneReboot` adapter; persists the target, then calls its injected `reset` (`build_scene_boot` wires it; `run_scene` passes `microcontroller.reset`) |
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol |

@@ -1,4 +1,4 @@
-"""Device-only scene runtime — brings hardware up and runs any standard-IR scene.
+"""Device-only scene entry point — brings hardware up and runs any standard-IR scene.
 
 Deploy-watch only: ``build_hardware`` imports board, busio, pulseio, digitalio.
 Imported on-device under CircuitPython, never exercised by CPython pytest. The
